@@ -35,10 +35,10 @@ describe('C141_SheepProvider session', () => {
     // Opponent takes sheep-market; sheep collection triggers animalReorg first
     let resp = session.takeAction(1, 'sheep-market')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('animalReorg')
+    expect(resp.pending.type).toBe('choice')
 
     // Confirm animal reorg for opponent (p1) — engine finishes, after-hooks fire
-    resp = session.confirmAnimalReorg(1, [])
+    resp = session.resolveChoice(1, 'confirm', [])
 
     // After-hooks silently switch to owner, auto-gain grain, and switch back
     // Grain should be gained by owner (no confirmPlayerSwitch needed for auto-gains)
@@ -52,11 +52,11 @@ describe('C141_SheepProvider session', () => {
     // Owner takes sheep-market; sheep collection triggers animalReorg first
     let resp = session.takeAction(0, 'sheep-market')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('animalReorg')
+    expect(resp.pending.type).toBe('choice')
 
     // Confirm animal reorg for owner — engine finishes, after-hooks fire
     // No PlayerSwitch needed since owner triggered it
-    resp = session.confirmAnimalReorg(0, [])
+    resp = session.resolveChoice(0, 'confirm', [])
 
     // Grain should be gained by owner
     expect(resp.state.players[0]!.resources.grain).toBe(grainBefore + 1)

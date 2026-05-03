@@ -132,8 +132,8 @@ describe('D113_FoodMerchant session', () => {
     while (resp.pending.type === 'harvestFeed') {
       resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
     }
-    while (resp.pending.type === 'animalReorg') {
-      resp = session.confirmAnimalReorg(resp.pending.playerIndex, resp.interaction.zones as any)
+    while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones as any)
     }
 
     // If the card effect triggered, player should have gained vegetable

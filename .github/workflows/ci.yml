@@ -49,6 +49,9 @@ jobs:
       - name: Lint
         run: pnpm run lint
 
+      - name: Lint i18n (no missing keys)
+        run: pnpm run lint:i18n
+
       - name: Unit tests (fast tier)
         run: pnpm run test:fast
 

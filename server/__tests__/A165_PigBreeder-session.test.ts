@@ -114,7 +114,7 @@ describe('A165 PigBreeder session integration', () => {
     const resp = session.performRoundEnd()
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.boar).toBe(3)
-    expect(resp.pending?.type).toBe('animalReorg')
+    expect(resp.pending?.type).toBe('choice')
     expect(resp.pending?.playerIndex).toBe(0)
   })
 

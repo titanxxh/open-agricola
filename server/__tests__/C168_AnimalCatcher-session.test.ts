@@ -51,24 +51,6 @@ const drainPending = (session: GameSession, resp: ReturnType<GameSession['getSta
       resp = session.resolveChoice(playerIdx, resp.pending.options[0]!.value)
     } else if (resp.pending.type === 'confirmPlayerSwitch') {
       resp = session.confirmPlayerSwitch()
-    } else if (resp.pending.type === 'animalReorg') {
-      const playerIdx = resp.pending.playerIndex ?? 0
-      const player = resp.state.players[playerIdx]!
-      const zones: { id: string; zoneType: 'pasture' | 'house' | 'stable'; animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number }[] = []
-      for (const p of player.pastures ?? []) {
-        zones.push({ id: p.id, zoneType: 'pasture', animalType: null, animalCount: 0 })
-      }
-      zones.push({ id: 'house', zoneType: 'house', animalType: null, animalCount: 0 })
-      let zoneIdx = 0
-      for (const animalType of ['sheep', 'boar', 'cattle'] as const) {
-        const count = player.resources[animalType]
-        if (count > 0 && zoneIdx < zones.length) {
-          zones[zoneIdx]!.animalType = animalType
-          zones[zoneIdx]!.animalCount = count
-          zoneIdx++
-        }
-      }
-      resp = session.confirmAnimalReorg(playerIdx, zones)
     } else {
       break
     }

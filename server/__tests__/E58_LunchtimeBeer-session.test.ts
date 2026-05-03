@@ -30,9 +30,9 @@ const drainHarvest = (session: GameSession) => {
   while (resp.pending.type !== 'none') {
     if (resp.pending.type === 'harvestFeed') {
       resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
-    } else if (resp.pending.type === 'animalReorg') {
+    } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
       const interaction = resp.interaction.stateId === 'animalReorg' ? resp.interaction : null
-      resp = session.confirmAnimalReorg(resp.pending.playerIndex, interaction?.zones ?? [])
+      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', interaction?.zones ?? [])
     } else if (resp.pending.type === 'choice') {
       const opts = resp.pending.options ?? []
       const next = opts.find((o) => o.value === '__skip__') ?? opts[0]

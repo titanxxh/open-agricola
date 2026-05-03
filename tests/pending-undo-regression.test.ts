@@ -332,7 +332,7 @@ describe('pending choice types + undo regression', () => {
     })
   })
 
-  describe('pending type: animalReorg', () => {
+  describe('pending type: choice with promptKey ui.interactionAnimalReorg', () => {
     beforeEach(() => {
       session = new GameSession(createInitialState(42))
     })
@@ -348,8 +348,8 @@ describe('pending choice types + undo regression', () => {
       const resp = session.takeAction(0, 'sheep-market')
       if (!resp.ok) return
 
-      expect(resp.pending.type).toBe('animalReorg')
-      if (resp.pending.type === 'animalReorg') {
+      expect(resp.pending.type).toBe('choice')
+      if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
         expect(resp.pending.playerIndex).toBe(0)
       }
     })
@@ -363,11 +363,10 @@ describe('pending choice types + undo regression', () => {
       if (state.round < openRound) return
 
       const takeResp = session.takeAction(0, 'sheep-market')
-      if (!takeResp.ok || takeResp.pending.type !== 'animalReorg') return
+      if (!takeResp.ok || (takeResp.pending.type !== 'choice' || (takeResp.pending as any).promptKey !== 'ui.interactionAnimalReorg')) return
 
-      const resp = session.confirmAnimalReorg(0, [
-        { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
-      ])
+      const zones = [{ id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 }]
+      const resp = session.resolveChoice(0, 'confirm', zones as unknown as Record<string, unknown>)
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('confirmNextPlayer')
     })
@@ -530,7 +529,7 @@ describe('pending choice types + undo regression', () => {
     })
 
     it('pending type is always one of the known variants', () => {
-      const validTypes = ['none', 'choice', 'animalReorg', 'harvestFeed', 'confirmNextPlayer', 'confirmPlayerSwitch']
+      const validTypes = ['none', 'choice', 'harvestFeed', 'confirmNextPlayer', 'confirmPlayerSwitch']
       const resp = session.getState()
       expect(validTypes).toContain(resp.pending.type)
 

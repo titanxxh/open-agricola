@@ -50,8 +50,6 @@ const drainPending = (session: GameSession, accept: boolean) => {
       resp = session.resolveChoice(resp.pending.playerIndex ?? 0, target.value)
     } else if (resp.pending.type === 'harvestFeed') {
       resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
-    } else if (resp.pending.type === 'animalReorg') {
-      resp = session.confirmAnimalReorg(resp.pending.playerIndex, resp.interaction.zones)
     } else {
       break
     }

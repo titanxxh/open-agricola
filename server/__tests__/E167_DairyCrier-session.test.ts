@@ -45,50 +45,6 @@ const drainPending = (session: GameSession, resp: ReturnType<GameSession['getSta
       resp = session.resolveChoice(playerIdx, resp.pending.options[0]!.value)
     } else if (resp.pending.type === 'confirmPlayerSwitch') {
       resp = session.confirmPlayerSwitch()
-    } else if (resp.pending.type === 'animalReorg') {
-      const playerIdx = resp.pending.playerIndex ?? 0
-      const player = resp.state.players[playerIdx]!
-      const zones: { id: string; zoneType: 'pasture' | 'house' | 'stable'; animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number }[] = []
-
-      // Add pasture zones
-      for (const p of player.pastures ?? []) {
-        zones.push({ id: p.id, zoneType: 'pasture', animalType: null, animalCount: 0 })
-      }
-      // Add house zone
-      zones.push({ id: 'house', zoneType: 'house', animalType: null, animalCount: 0 })
-
-      // Place cattle in pasture if available, sheep in house (pet)
-      const cattle = player.resources.cattle
-      const sheep = player.resources.sheep
-      const boar = player.resources.boar
-      if (cattle > 0 && zones.find(z => z.zoneType === 'pasture')) {
-        const pz = zones.find(z => z.zoneType === 'pasture')!
-        pz.animalType = 'cattle'
-        pz.animalCount = cattle
-      }
-      if (sheep > 0) {
-        const hz = zones.find(z => z.zoneType === 'house')!
-        hz.animalType = 'sheep'
-        hz.animalCount = Math.min(1, sheep)
-        // Put rest in pasture if available and pasture is empty
-        if (sheep > 1) {
-          const pz = zones.find(z => z.zoneType === 'pasture' && z.animalCount === 0)
-          if (pz) {
-            pz.animalType = 'sheep'
-            pz.animalCount = sheep - 1
-          }
-        }
-      } else if (boar > 0) {
-        const hz = zones.find(z => z.zoneType === 'house')!
-        hz.animalType = 'boar'
-        hz.animalCount = Math.min(1, boar)
-      } else if (cattle > 0 && !zones.find(z => z.zoneType === 'pasture')) {
-        const hz = zones.find(z => z.zoneType === 'house')!
-        hz.animalType = 'cattle'
-        hz.animalCount = 1
-      }
-
-      resp = session.confirmAnimalReorg(playerIdx, zones)
     } else {
       break
     }

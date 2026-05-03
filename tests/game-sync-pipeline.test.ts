@@ -116,7 +116,6 @@ describe('game sync pipeline (applySnapshot path)', () => {
     const variants: PendingAction[] = [
       { type: 'none' },
       { type: 'choice', playerIndex: 0, spaceId: 's', options: [] },
-      { type: 'animalReorg', playerIndex: 0, spaceId: 's' },
       { type: 'harvestFeed', playerIndex: 0, remaining: 5, foodUsed: 0 },
       { type: 'confirmNextPlayer', nextPlayerIndex: 1 },
     ]

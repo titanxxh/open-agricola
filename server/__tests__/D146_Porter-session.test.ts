@@ -106,8 +106,8 @@ describe('D146_Porter session', () => {
     expect(resp.ok).toBe(true)
 
     // Handle animalReorg for sheep
-    if (resp.pending.type === 'animalReorg') {
-      resp = session.confirmAnimalReorg(0, [
+    if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(0, 'confirm', [
         { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 4 },
       ])
     }

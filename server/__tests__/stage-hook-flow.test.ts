@@ -88,9 +88,9 @@ describe('stage hook flows', () => {
       .toBe('ui.interactionHaydryer')
 
     resp = chooseFirstOption(session, 0)
-    expect(resp.pending.type).toBe('animalReorg')
+    expect(resp.pending.type).toBe('choice')
 
-    resp = session.confirmAnimalReorg(0, [
+    resp = session.resolveChoice(0, 'confirm', [
       { id: 'p1', zoneType: 'pasture', animalType: 'cattle', animalCount: 1 },
     ])
 
@@ -253,9 +253,9 @@ describe('stage hook flows', () => {
 
     session.loadState(state)
     let resp = session.performRoundEnd()
-    expect(resp.pending.type).toBe('animalReorg')
+    expect(resp.pending.type).toBe('choice')
 
-    resp = session.confirmAnimalReorg(0, [
+    resp = session.resolveChoice(0, 'confirm', [
       { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: 3 },
       { id: 'p2', zoneType: 'pasture', animalType: 'boar', animalCount: 3 },
     ])
@@ -329,9 +329,9 @@ describe('stage hook flows', () => {
 
     session.loadState(state)
     let resp = session.performRoundEnd()
-    expect(resp.pending.type).toBe('animalReorg')
+    expect(resp.pending.type).toBe('choice')
 
-    resp = session.confirmAnimalReorg(0, [
+    resp = session.resolveChoice(0, 'confirm', [
       { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: 3 },
       { id: 'p2', zoneType: 'pasture', animalType: 'boar', animalCount: 3 },
     ])
@@ -401,9 +401,9 @@ describe('stage hook flows', () => {
 
     session.loadState(state)
     let resp = session.performRoundEnd()
-    expect(resp.pending.type).toBe('animalReorg')
+    expect(resp.pending.type).toBe('choice')
 
-    resp = session.confirmAnimalReorg(0, [
+    resp = session.resolveChoice(0, 'confirm', [
       { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: 3 },
     ])
     expect(resp.pending.type).toBe('choice')

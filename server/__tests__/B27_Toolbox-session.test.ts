@@ -140,9 +140,11 @@ describe('B27 Toolbox session', () => {
         resp = session.resolveChoice(0, 'confirm', { rooms: [tile] })
         continue
       }
-      // 优先选 construct（如果有）以确保修房触发 setFlag
+      // 优先选 construct（如果有）以确保修房触发 setFlag；
+      // 修房完成后 OR 会有 __done__，优先选它结束 OR 进入 B150/B27 prompt。
       const constructOption = opts.find(o => o.value === 'construct' || /construct/i.test(o.value))
-      const choice = constructOption ?? opts.find(o => o.value !== '__skip__') ?? opts[0]!
+      const doneOpt = opts.find(o => o.value === '__done__')
+      const choice = constructOption ?? doneOpt ?? opts.find(o => o.value !== '__skip__') ?? opts[0]!
       resp = session.resolveChoice(0, choice.value)
     }
 

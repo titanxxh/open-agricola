@@ -107,8 +107,8 @@ describe('C106_PotatoHarvester session', () => {
     while (resp.pending.type === 'harvestFeed') {
       resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
     }
-    while (resp.pending.type === 'animalReorg') {
-      resp = session.confirmAnimalReorg(resp.pending.playerIndex, resp.interaction.zones as any)
+    while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones as any)
     }
 
     const player = resp.state.players[0]!
@@ -131,8 +131,8 @@ describe('C106_PotatoHarvester session', () => {
     while (resp.pending.type === 'harvestFeed') {
       resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
     }
-    while (resp.pending.type === 'animalReorg') {
-      resp = session.confirmAnimalReorg(resp.pending.playerIndex, resp.interaction.zones as any)
+    while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones as any)
     }
 
     const player = resp.state.players[0]!
