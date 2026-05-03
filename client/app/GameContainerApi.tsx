@@ -562,9 +562,18 @@ export const GameContainerApi = () => {
         return
       }
       if (interaction.farm.farmType === 'stable') {
-        commitFarmWithError(pendingPlayerIndex, 'stable', {
-          stables: pendingStableTiles,
-        })
+        if (pendingStableTiles.length === 0) {
+          setStableError('NO_SELECTION')
+          return
+        }
+        void transport.resolveChoice(pendingPlayerIndex, 'confirm', { stables: pendingStableTiles })
+          .then((resp) => {
+            if (!resp.ok) setFarmCommitError('stable', resp.error)
+          })
+          .catch((e) => {
+            console.error(e)
+            setFarmCommitError('stable')
+          })
         return
       }
       if (interaction.farm.farmType === 'plow') {
@@ -612,7 +621,7 @@ export const GameContainerApi = () => {
     }
     if (interaction.stateId !== 'choice') return
     void transport.resolveChoice(interaction.playerIndex, value).catch((e) => console.error(e))
-  }, [interaction, currentPlayer, pendingFenceEdges, pendingPalisadeEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, setPlowError, setSowError, isInteractive, commitFarmWithError, setFarmCommitError])
+  }, [interaction, currentPlayer, pendingFenceEdges, pendingPalisadeEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, setPlowError, setSowError, setStableError, isInteractive, commitFarmWithError, setFarmCommitError])
 
   const updateBakeExchangeCount = (id: string, delta: number) => {
     if (!bakeExchangePlayer) return
