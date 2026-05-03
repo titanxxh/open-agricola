@@ -2703,6 +2703,7 @@ export class GameCore {
     const result = this.engine.resolveChoice(
       'confirm',
       { state: this.state, player: updatedPlayer, space },
+      undefined,
       resultOverride,
     )
     this.flushEngineLog()
