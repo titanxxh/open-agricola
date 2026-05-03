@@ -1,9 +1,17 @@
 import { MinorImprovement } from '../types'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A20_DoubleTurnPlow'
+
+// BGA isBuyable: turn > 5 → false. Already redundantly enforced by maxRound,
+// but register the explicit handler so the prereq label is not silently passed.
+registerPrerequisite('Round 5 or Before', (_player, state) => {
+  if (!state) return true
+  return state.round <= 5
+})
 
 // computeCosts: add 1 food after round 3
 const computeCostsListener: CardListenerRegistration = {
