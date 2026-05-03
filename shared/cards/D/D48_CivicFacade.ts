@@ -1,8 +1,12 @@
 import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D48_CivicFacade'
+
+// BGA isBuyable: countRooms() < 3 → false
+registerPrerequisite('3 Rooms', (player) => player.rooms >= 3)
 
 export const D48_CivicFacade = new MinorImprovement({
   id: CARD_ID,
