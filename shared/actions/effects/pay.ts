@@ -17,7 +17,7 @@ import {
   returnCardToBoard,
 } from '../helpers/payment'
 import {
-  payTypedFlatCost,
+  payTypedFlatCostDetailed,
   resolveCostPaymentSelection,
 } from '../helpers/pay-helpers'
 
@@ -238,8 +238,9 @@ export const payAction: ActionDefinition = {
     // attempt canPayResources(flat) and fail when the player can only
     // afford the cost via a trade swap.
     if (p.costType) {
-      const ok = payTypedFlatCost(player, flat, p.costType, state)
-      if (!ok) return { type: 'fail', logKey: 'log.payFail' }
+      const detailed = payTypedFlatCostDetailed(player, flat, p.costType, state)
+      if (!detailed.ok) return { type: 'fail', logKey: 'log.payFail' }
+      const resourcesPaid = detailed.resourcesPaid
       if (
         p.costType === 'major-improvement'
         || p.costType === 'minor-improvement'
@@ -251,19 +252,30 @@ export const payAction: ActionDefinition = {
         // post-trade cost (D95 SiteManager scoping etc.). The
         // ComplexCost branch sets the same field in buildSelectedResult.
         player._pendingImprovementPaymentInfo = {
-          resourcesPaid: flat,
+          resourcesPaid,
+          feeIndex: detailed.feeIndex,
+          returnedCardId: detailed.cardUsed,
         }
       }
+      const extraData: Record<string, unknown> = {
+        resourcesPaid,
+        bonusUsed: detailed.bonusUsed
+          ? detailed.bonusUsed.split(',').map((s) => s.trim()).filter(Boolean)
+          : [],
+      }
+      if (detailed.cardUsed) extraData.returnedCardId = detailed.cardUsed
+      if (detailed.feeIndex !== undefined) extraData.feeIndex = detailed.feeIndex
       if (sourceCard) {
-        addCardResourcePaid(player, sourceCard, flat)
+        addCardResourcePaid(player, sourceCard, resourcesPaid)
         return {
           type: 'ok',
-          resourcesPaid: flat,
+          resourcesPaid,
           logKey: 'log.cardEffectPay',
-          logParams: { cost: flat, cardId: sourceCard },
+          logParams: { cost: resourcesPaid, cardId: sourceCard },
+          extraData,
         }
       }
-      return { type: 'ok', resourcesPaid: flat }
+      return { type: 'ok', resourcesPaid, extraData }
     }
     if (!canPayResources(player, flat)) {
       return { type: 'fail', logKey: 'log.payFail' }
