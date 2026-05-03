@@ -1322,10 +1322,6 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
           this.log.append(entry)
         })
       }
-      if (result.type === 'flow') {
-        const flowNode = this.buildFlowNode(result.flow)
-        this.tree.insertAfter(node.id, [flowNode])
-      }
       const immediatePhase = this.hooks.immediatelyAfter(
         { ...executionContext, actionId: replacedActionId },
         result,
@@ -1375,15 +1371,39 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
         afterPhase.matchedListeners, 'after', replacedActionId,
         this.buildListenerEvent(executionContext, { result }),
       )
-      const allInsertNodes = [
-        ...duringActivateNodes,
-        ...hookFlows,
+      // 7b1: when the action returns a `flow`, the wrapper action's `after`
+      // / `immediatelyAfter` listeners (and follow-ups) must observe the
+      // post-flow state — for renovate-house → seq:[pay, apply-renovation],
+      // listeners that read `player.houseType` would otherwise see the
+      // pre-mutate snapshot. We therefore insert flow body FIRST (last call
+      // wins via insertAfter), and trailing hooks AFTER the flow.
+      const trailingHookNodes = [
         ...this.buildFollowUpNodes(followUps, node.id, context.player),
         ...immediateActivateNodes,
         ...afterActivateNodes,
       ]
-      if (allInsertNodes.length > 0) {
-        this.tree.insertAfter(node.id, allInsertNodes)
+      const leadingNodes = [
+        ...duringActivateNodes,
+        ...hookFlows,
+      ]
+      if (result.type === 'flow') {
+        const flowNode = this.buildFlowNode(result.flow)
+        // Insertion order: trailing hooks first (deepest behind), then flow
+        // body, then leading nodes. insertAfter prepends each batch to
+        // node.id+1, so the resulting child layout is:
+        //   [..., node, leadingNodes..., flowNode, trailingHookNodes..., ...]
+        if (trailingHookNodes.length > 0) {
+          this.tree.insertAfter(node.id, trailingHookNodes)
+        }
+        this.tree.insertAfter(node.id, [flowNode])
+        if (leadingNodes.length > 0) {
+          this.tree.insertAfter(node.id, leadingNodes)
+        }
+      } else {
+        const allInsertNodes = [...leadingNodes, ...trailingHookNodes]
+        if (allInsertNodes.length > 0) {
+          this.tree.insertAfter(node.id, allInsertNodes)
+        }
       }
       node.resolve(result)
       return { type: 'ok', nodeId: node.id, actionId: replacedActionId, result }
@@ -1563,10 +1583,6 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
             this.log.append(entry)
           })
         }
-        if (result.type === 'flow') {
-          const flowNode = this.buildFlowNode(result.flow)
-          this.tree.insertAfter(node instanceof XorNode ? node.id : child.id, [flowNode])
-        }
         const immediatePhase = this.hooks.immediatelyAfter(
           { ...executionContext, actionId, choice },
           result,
@@ -1577,7 +1593,7 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
           result,
           choice,
         )
-        
+
         const allResults = [
           ...immediatePhase.actionHookResults,
           ...afterPhase.actionHookResults,
@@ -1587,7 +1603,7 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
           .forEach((entry) => {
             this.log.append(entry)
           })
-        
+
         const hookFlows = allResults
           .map((entry) => entry.flow
             ? this.applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
@@ -1609,14 +1625,30 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
           afterPhase.matchedListeners, 'after', actionId,
           this.buildListenerEvent(executionContext, { result, choice }),
         )
-        const allInsertNodes = [
-          ...hookFlows,
+        // 7b1: insert flow body BEFORE trailing hook nodes so wrapper-style
+        // actions (renovate-house, occupation, improvement-any) emit their
+        // `after` listeners on the post-mutate state. See top-level path
+        // (resolveActionStep) for the same ordering rationale.
+        const insertAnchor = node instanceof XorNode ? node.id : child.id
+        const trailingHookNodes = [
           ...this.buildFollowUpNodes(followUps, child.id, context.player),
           ...immediateActivateNodes,
           ...afterActivateNodes,
         ]
-        if (allInsertNodes.length > 0) {
-          this.tree.insertAfter(node instanceof XorNode ? node.id : child.id, allInsertNodes)
+        if (result.type === 'flow') {
+          const flowNode = this.buildFlowNode(result.flow)
+          if (trailingHookNodes.length > 0) {
+            this.tree.insertAfter(insertAnchor, trailingHookNodes)
+          }
+          this.tree.insertAfter(insertAnchor, [flowNode])
+          if (hookFlows.length > 0) {
+            this.tree.insertAfter(insertAnchor, hookFlows)
+          }
+        } else {
+          const allInsertNodes = [...hookFlows, ...trailingHookNodes]
+          if (allInsertNodes.length > 0) {
+            this.tree.insertAfter(insertAnchor, allInsertNodes)
+          }
         }
         child.resolve(result)
         if (node instanceof XorNode) {
@@ -1683,15 +1715,9 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
       })
     }
     const insertionTargetId = this.pendingChoiceOwnerNodeId ?? this.pendingChoiceNodeId
-    if (result.type === 'flow') {
-      const flowNode = this.buildFlowNode(result.flow)
-      if (insertionTargetId) {
-        this.tree.insertAfter(insertionTargetId, [flowNode])
-      }
-    }
     const immediatePhase = this.hooks.immediatelyAfter({ ...executionContext, actionId, choice }, result, choice)
     const afterPhase = this.hooks.after({ ...executionContext, actionId, choice }, result, choice)
-    
+
     const allResults = [
       ...immediatePhase.actionHookResults,
       ...afterPhase.actionHookResults,
@@ -1701,7 +1727,7 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
       .forEach((entry) => {
         this.log.append(entry)
       })
-    
+
     const hookFlows = allResults
       .map((entry) => entry.flow
         ? this.applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
@@ -1723,14 +1749,34 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
       afterPhase.matchedListeners, 'after', actionId,
       this.buildListenerEvent(executionContext, { result, choice }),
     )
-    const allInsertNodes = [
-      ...hookFlows,
-      ...this.buildFollowUpNodes(followUps, insertionTargetId ?? '', context.player),
-      ...immediateActivateNodes,
-      ...afterActivateNodes,
-    ]
-    if (allInsertNodes.length > 0 && insertionTargetId) {
-      this.tree.insertAfter(insertionTargetId, allInsertNodes)
+    // 7b1: insert flow body BEFORE the trailing hook nodes (followUps,
+    // immediatelyAfter / after activate) so wrapper actions returning a
+    // flow (renovate-house seq, occupation seq, improvement-any seq) emit
+    // their `after` listener events on the post-mutate state. Insertion
+    // order via insertAfter prepends each batch to insertionTargetId+1, so
+    // the resulting layout is:
+    //   [..., insertionTarget, hookFlows..., flowNode, trailingHooks..., ...]
+    if (insertionTargetId) {
+      const trailingHookNodes = [
+        ...this.buildFollowUpNodes(followUps, insertionTargetId, context.player),
+        ...immediateActivateNodes,
+        ...afterActivateNodes,
+      ]
+      if (result.type === 'flow') {
+        const flowNode = this.buildFlowNode(result.flow)
+        if (trailingHookNodes.length > 0) {
+          this.tree.insertAfter(insertionTargetId, trailingHookNodes)
+        }
+        this.tree.insertAfter(insertionTargetId, [flowNode])
+        if (hookFlows.length > 0) {
+          this.tree.insertAfter(insertionTargetId, hookFlows)
+        }
+      } else {
+        const allInsertNodes = [...hookFlows, ...trailingHookNodes]
+        if (allInsertNodes.length > 0) {
+          this.tree.insertAfter(insertionTargetId, allInsertNodes)
+        }
+      }
     }
     if (this.pendingChoiceNodeId) {
       const node = this.tree.findNodeById(this.pendingChoiceNodeId)

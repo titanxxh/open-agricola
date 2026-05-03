@@ -180,22 +180,35 @@ describe('renovateHouseAction (engine opt-in choice flow)', () => {
     })
   })
 
-  it('resolveChoice("clay") executes the wood→clay tier and pays the cost', () => {
+  it('resolveChoice("clay") returns a seq:[pay, apply-renovation] flow', () => {
     const player = createPlayer({ resources: { clay: 2, reed: 1 } })
     const result = renovateHouseAction.resolveChoice!(buildExecutionContext(player), 'clay')
-    expect(result).toEqual({ type: 'ok' })
-    expect(player.houseType).toBe('clay')
-    expect(player.resources.clay).toBe(0)
-    expect(player.resources.reed).toBe(0)
+    expect(result.type).toBe('flow')
+    if (result.type !== 'flow') return
+    const flow = result.flow as { type: 'seq'; children: Array<{ type: 'leaf'; actionId: string; params: Record<string, unknown> }> }
+    expect(flow.type).toBe('seq')
+    expect(flow.children).toHaveLength(2)
+    expect(flow.children[0]!.actionId).toBe('pay')
+    expect(flow.children[0]!.params.cost).toEqual({ fee: { clay: 2, reed: 1 } })
+    expect(flow.children[0]!.params.costType).toBe('renovation')
+    expect(flow.children[0]!.params.optionPrefix).toBe('pay:renovate:clay')
+    expect(flow.children[1]!.actionId).toBe('apply-renovation')
+    expect(flow.children[1]!.params).toEqual({ nextType: 'clay' })
+    // resolveChoice itself does not mutate — engine drives pay then apply-renovation.
+    expect(player.houseType).toBe('wood')
+    expect(player.resources.clay).toBe(2)
   })
 
-  it('resolveChoice("stone") executes the wood→stone direct tier (Conservator path)', () => {
+  it('resolveChoice("stone") returns a flow targeting stone (Conservator path)', () => {
     const player = createPlayer({ resources: { stone: 2, reed: 1 } })
     const result = renovateHouseAction.resolveChoice!(buildExecutionContext(player), 'stone')
-    expect(result).toEqual({ type: 'ok' })
-    expect(player.houseType).toBe('stone')
-    expect(player.resources.stone).toBe(0)
-    expect(player.resources.reed).toBe(0)
+    expect(result.type).toBe('flow')
+    if (result.type !== 'flow') return
+    const flow = result.flow as { type: 'seq'; children: Array<{ type: 'leaf'; actionId: string; params: Record<string, unknown> }> }
+    expect(flow.children[0]!.params.cost).toEqual({ fee: { stone: 2, reed: 1 } })
+    expect(flow.children[0]!.params.optionPrefix).toBe('pay:renovate:stone')
+    expect(flow.children[1]!.params).toEqual({ nextType: 'stone' })
+    expect(player.houseType).toBe('wood')
   })
 
   it('resolveChoice fails when the chosen target is illegal for the current house', () => {
