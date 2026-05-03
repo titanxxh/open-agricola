@@ -1,7 +1,11 @@
 import { MinorImprovement } from '../types'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B33_Mantlepiece'
+
+// BGA isBuyable: getRoomType() == 'roomWood' → false (require clay or stone house)
+registerPrerequisite('Clay or Stone House', (player) => player.houseType !== 'wood')
 
 export const B33_Mantlepiece = new MinorImprovement({
   id: CARD_ID,
