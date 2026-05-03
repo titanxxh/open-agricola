@@ -1686,6 +1686,16 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
     }
     this.hooks.during({ ...executionContext, actionId }, result)
     if (result.type === 'choice') {
+      // Merge ActionDef-declared actionContext patches into pendingChoiceContext.actionContext.
+      // Used by farm ActionDefs to persist payload (e.g. fence geometry) across payment-combo
+      // second prompts. Shallow merge; later writes overwrite earlier.
+      const contextWritePatch =
+        result.extraData && typeof result.extraData === 'object'
+          ? (result.extraData.actionContextWrite as Record<string, unknown> | undefined)
+          : undefined
+      const mergedActionContext = contextWritePatch
+        ? { ...(executionContext.actionContext ?? {}), ...contextWritePatch }
+        : executionContext.actionContext
       if (this.pendingChoiceNodeId) {
         const node = this.tree.findNodeById(this.pendingChoiceNodeId)
         if (node instanceof ChoiceNode) {
@@ -1695,7 +1705,7 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
             params: executionContext.params,
             costs: executionContext.costs,
             sourceCard: this.resolveChoiceSourceCard(executionContext.sourceCard, result.options),
-            actionContext: executionContext.actionContext,
+            actionContext: mergedActionContext,
           }
           return result
         }
@@ -1705,7 +1715,7 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
         params: executionContext.params,
         costs: executionContext.costs,
         sourceCard: this.resolveChoiceSourceCard(executionContext.sourceCard, result.options),
-        actionContext: executionContext.actionContext,
+        actionContext: mergedActionContext,
       }
       // Don't clear pendingChoiceActionId - the action still needs to resolve its choice
       return result
