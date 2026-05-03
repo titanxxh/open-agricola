@@ -1,10 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import { applyFarmChoice } from '../../shared/logic/farm/farm-choice.ts'
+import { constructAction } from '../../shared/actions/effects/construct.ts'
 import { storePendingFenceBonus } from '../../shared/cards/helpers/pending-fence-bonus'
-import type { PlayerState } from '../../shared/game/types.ts'
+import type { ActionExecutionContext, ActionSpace, GameState, PlayerState } from '../../shared/game/types.ts'
 import { buildRoomFarmInteraction } from '../../shared/logic/farm/farm-interaction.ts'
 import { A14_CarpentersHammer } from '../../shared/cards/A/A14_CarpentersHammer'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
+
+const dummySpace: ActionSpace = { id: 'construct', type: 'construct' } as unknown as ActionSpace
+
+const buildRoomCtx = (
+  player: PlayerState,
+  actionContext?: Record<string, unknown>,
+): ActionExecutionContext => ({
+  state: { players: [player] } as unknown as GameState,
+  player,
+  space: dummySpace,
+  actionContext,
+})
+
 
 const fenceTradeModifiers: PlayerState['activeModifiers'] = [
   {
@@ -134,16 +148,17 @@ describe('farm choice', () => {
     expect(interaction.farmType).toBe('room')
     if (interaction.farmType !== 'room') return
 
-    const result = applyFarmChoice(player, 'room', {
+    // Single combo (1 wood + 3 clay + 2 reed → 0 left of all) finalizes
+    // immediately; no payment-choice prompt needed.
+    const result = constructAction.resolveChoice!(buildRoomCtx(player), 'confirm', {
       rooms: [interaction.selectableTiles[0]!],
     })
 
-    expect(result.ok).toBe(true)
-    if (!result.ok) return
-    expect(result.player.resources.wood).toBe(0)
-    expect(result.player.resources.clay).toBe(0)
-    expect(result.player.resources.reed).toBe(0)
-    expect(result.player.rooms).toBe(3)
+    expect(result.type).toBe('ok')
+    expect(player.resources.wood).toBe(0)
+    expect(player.resources.clay).toBe(0)
+    expect(player.resources.reed).toBe(0)
+    expect(player.rooms).toBe(3)
   })
 
   it('requires an explicit payment choice when multiple room payments are legal', () => {
@@ -158,13 +173,13 @@ describe('farm choice', () => {
     expect(interaction.farmType).toBe('room')
     if (interaction.farmType !== 'room') return
 
-    const result = applyFarmChoice(player, 'room', {
+    const result = constructAction.resolveChoice!(buildRoomCtx(player), 'confirm', {
       rooms: [interaction.selectableTiles[0]!],
     })
 
-    expect(result.ok).toBe(false)
-    if (result.ok) return
-    expect(result.error).toBe('payment choice required')
+    // Multi-combo: returns `choice` (engine forwards it as a payment-select
+    // pending) rather than a fail.
+    expect(result.type).toBe('choice')
   })
 
   it('rejects room selections above the true max buildable room count', () => {
@@ -180,13 +195,11 @@ describe('farm choice', () => {
     if (interaction.farmType !== 'room') return
     expect(interaction.maxSelections).toBe(2)
 
-    const result = applyFarmChoice(player, 'room', {
+    const result = constructAction.resolveChoice!(buildRoomCtx(player), 'confirm', {
       rooms: interaction.selectableTiles.slice(0, 3),
     })
 
-    expect(result.ok).toBe(false)
-    if (result.ok) return
-    expect(result.error).toBe('too many rooms selected')
+    expect(result.type).toBe('fail')
   })
 
 })

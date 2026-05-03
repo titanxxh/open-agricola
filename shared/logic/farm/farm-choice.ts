@@ -1,24 +1,15 @@
-import type { ActionSpace, ComplexCost, FarmTilePosition, GameState, PlayerState, Resource } from '../../game/types.ts'
-import { isComplexCost } from '../../actions/helpers/payment'
+import type { ActionSpace, GameState, PlayerState, Resource } from '../../game/types.ts'
 import {
   PAYMENT_CHOICE_REQUIRED_ERROR,
   executeResolvedTypedFlatPayment,
   resolveTypedFlatPaymentSelection,
 } from '../../actions/helpers/pay-helpers.ts'
-import {
-  buildRoomCostPerUnit,
-  buildTotalRoomCost,
-  executeResolvedRoomPayment,
-  getMaxBuildableRooms,
-  resolveRoomPaymentSelection,
-} from '../../actions/helpers/room-payment.ts'
 import { playerCanBuildPalisades } from '../../cards/helpers/card-type'
 import {
   normalizePlayerFarm,
   type PlayerFarmState,
   validateFenceSelection,
 } from './fence-validation.ts'
-import { validateRoomSelection } from './validators.ts'
 import {
   consumePendingFenceBonus,
   readPendingFenceBonus,
@@ -26,16 +17,14 @@ import {
 import { collectLockedFarmTileKeys } from '../../cards/card-effects.ts'
 import { collectComputeCostsForFarmChoice } from '../../cards/card-listeners.ts'
 
-export type FarmChoiceType = 'fence' | 'room'
+export type FarmChoiceType = 'fence'
 
 export type FarmChoicePayloadMap = {
   fence: { edges: string[]; palisadeEdges?: string[]; extraWood?: number }
-  room: { rooms: FarmTilePosition[] }
 }
 
 type FarmChoiceOptions = {
   costOverride?: Partial<Resource>
-  maxUnits?: number
   paymentChoice?: string
   state?: GameState
   space?: ActionSpace
@@ -64,14 +53,6 @@ const getInsufficientResourceError = (
     return (player.resources[key as keyof Resource] ?? 0) < value
   })
   return missing ? `Not enough ${missing[0]}` : 'Not enough resources'
-}
-
-const getComplexCostError = (
-  player: PlayerFarmState,
-  cost: ComplexCost,
-) => {
-  const firstFee = cost.fees?.[0] ?? cost.fee
-  return firstFee ? getInsufficientResourceError(player, firstFee) : 'Not enough resources'
 }
 
 export const applyFarmChoice = <T extends PlayerState>(
@@ -158,56 +139,6 @@ export const applyFarmChoice = <T extends PlayerState>(
           newPalisadeEdges: validated.newPalisadeEdges,
           newPastures: validated.newPastures as T['pastures'],
         },
-      }
-    }
-    case 'room': {
-      const { rooms } = payload as FarmChoicePayloadMap['room']
-      const selection = validateRoomSelection(normalized, rooms, lockedKeys)
-      if (!selection.ok) return { ok: false, error: selection.code }
-      const maxBuildableRooms = getMaxBuildableRooms(
-        normalized,
-        options.costOverride,
-        typeof options.maxUnits === 'number'
-          ? { maxRooms: options.maxUnits }
-          : undefined,
-      )
-      if (rooms.length > maxBuildableRooms) {
-        return { ok: false, error: 'too many rooms selected' }
-      }
-      const costPerRoom = buildRoomCostPerUnit(
-        normalized,
-        options.costOverride,
-      )
-      const resolvedPayment = resolveRoomPaymentSelection(
-        normalized,
-        costPerRoom,
-        rooms.length,
-        options.paymentChoice,
-      )
-      if (resolvedPayment.type !== 'selected') {
-        if (resolvedPayment.type === 'choice') {
-          return { ok: false, error: PAYMENT_CHOICE_REQUIRED_ERROR }
-        }
-        const totalCost = buildTotalRoomCost(costPerRoom, rooms.length)
-        if (options.paymentChoice) {
-          return { ok: false, error: 'invalid payment choice' }
-        }
-        return {
-          ok: false,
-          error: isComplexCost(totalCost)
-            ? getComplexCostError(normalized, totalCost)
-            : getInsufficientResourceError(normalized, totalCost),
-        }
-      }
-      const nextPlayer = JSON.parse(JSON.stringify(normalized)) as PlayerState
-      executeResolvedRoomPayment(nextPlayer, resolvedPayment)
-      return {
-        ok: true,
-        player: {
-          ...(nextPlayer as unknown as T),
-          roomTiles: [...nextPlayer.roomTiles, ...rooms],
-          rooms: nextPlayer.rooms + rooms.length,
-        } as T,
       }
     }
   }

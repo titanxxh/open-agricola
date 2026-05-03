@@ -42,7 +42,7 @@ describe('B27 Toolbox session', () => {
     if (resp.pending.type !== 'choice') return
 
     // 推进到 ToolboxImprovement prompt：
-    // farm-expansion OR → 选 construct seq → room select confirm → OR done → ToolboxImprovement
+    // farm-expansion OR → 选 construct seq → room select confirm w/ rooms payload → OR done → ToolboxImprovement
     let safety = 30
     let reachedBuyMajor = false
     while (resp.pending.type === 'choice' && safety-- > 0) {
@@ -59,6 +59,13 @@ describe('B27 Toolbox session', () => {
         expect(skip).toBeDefined()
         resp = session.resolveChoice(0, skip!.value)
         break
+      }
+      // Engine farm prompt: confirm with the first selectable room tile so we
+      // actually build (B27 needs a real construct to trigger onEndTurn).
+      if (promptKey === 'ui.interactionRoomSelect' && resp.interaction.stateId === 'farmSelect' && resp.interaction.farm.farmType === 'room') {
+        const tile = resp.interaction.farm.selectableTiles[0]!
+        resp = session.resolveChoice(0, 'confirm', { rooms: [tile] })
+        continue
       }
       // 若进入 farm-expansion OR 第二轮（含 __done__），选 done 结束
       const doneOpt = opts.find(o => o.value === '__done__')
@@ -125,6 +132,14 @@ describe('B27 Toolbox session', () => {
     let safety = 50
     while (resp.pending.type === 'choice' && safety-- > 0) {
       const opts = resp.pending.options
+      const promptKey = (resp.pending as { promptKey?: string }).promptKey
+      // Engine farm prompt: confirm with the first selectable room tile so we
+      // actually build (test asserts construct → setFlag flow).
+      if (promptKey === 'ui.interactionRoomSelect' && resp.interaction.stateId === 'farmSelect' && resp.interaction.farm.farmType === 'room') {
+        const tile = resp.interaction.farm.selectableTiles[0]!
+        resp = session.resolveChoice(0, 'confirm', { rooms: [tile] })
+        continue
+      }
       // 优先选 construct（如果有）以确保修房触发 setFlag
       const constructOption = opts.find(o => o.value === 'construct' || /construct/i.test(o.value))
       const choice = constructOption ?? opts.find(o => o.value !== '__skip__') ?? opts[0]!
