@@ -2,9 +2,16 @@ import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
+import { fieldHasCrop } from '../../game/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A30_BakingSheet'
+
+// BGA isBuyable: count(getGrainFields()) > 0 → false
+registerPrerequisite('No Grain Field', (player) =>
+  player.fields.every((f) => !fieldHasCrop(f, 'grain')),
+)
 
 // A30 Baking Sheet: Each time you take a Bake Bread action, you can use this card to
 // exchange exactly 1 grain for 2 food and 1 bonus score.
