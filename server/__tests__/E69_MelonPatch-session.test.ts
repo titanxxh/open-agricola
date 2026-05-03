@@ -91,7 +91,7 @@ describe('E69_MelonPatch session', () => {
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
 
-      resp = session.commitFarmChoice(0, 'sow', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: -1, col: 69, crop: 'vegetable' }],
       })
       expect(resp.ok).toBe(true)

@@ -70,7 +70,7 @@ describe('stats: gain with recipientPlayerId records resourcesFromCards on targe
       (resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey,
     ).toBe('ui.interactionSowSelect')
 
-    resp = session.commitFarmChoice(1, 'sow', {
+    resp = session.resolveChoice(1, 'confirm', {
       crops: [{ row: 0, col: 0, crop: 'grain' }],
     })
     expect(resp.ok).toBe(true)

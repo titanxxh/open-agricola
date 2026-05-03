@@ -117,7 +117,7 @@ describe('E70_CropRotationField session', () => {
       expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
 
       // Sow grain on the virtual tile
-      resp = session.commitFarmChoice(0, 'sow', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: -1, col: 70, crop: 'grain' }],
       })
       expect(resp.ok).toBe(true)
@@ -141,7 +141,7 @@ describe('E70_CropRotationField session', () => {
       resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
 
-      resp = session.commitFarmChoice(0, 'sow', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: -1, col: 70, crop: 'vegetable' }],
       })
       expect(resp.ok).toBe(true)
@@ -198,7 +198,7 @@ describe('E70_CropRotationField session', () => {
       }
       ;(session as unknown as { activeSpaceId: string | null }).activeSpaceId = 'grain-utilization'
 
-      const resp = session.commitFarmChoice(0, 'sow', {
+      const resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: -1, col: 69, crop: 'vegetable' }],
       })
 
