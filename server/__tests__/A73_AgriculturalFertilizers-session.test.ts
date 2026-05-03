@@ -49,7 +49,7 @@ describe('A73_AgriculturalFertilizers session', () => {
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
 
-    resp = session.commitFarmChoice(0, 'fence', {
+    resp = session.resolveChoice(0, 'confirm', {
       edges: edgesForTwoTiles,
       extraWood: 0,
     })
@@ -68,7 +68,7 @@ describe('A73_AgriculturalFertilizers session', () => {
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
 
-    resp = session.commitFarmChoice(0, 'fence', {
+    resp = session.resolveChoice(0, 'confirm', {
       edges: edgesForOneTile,
       extraWood: 0,
     })

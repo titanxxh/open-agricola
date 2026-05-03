@@ -79,7 +79,7 @@ describe('E16 BriarHedge — border-fence discount', () => {
     const session = discountSetup({ wood: 4 })
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
-    resp = session.commitFarmChoice(0, 'fence', {
+    resp = session.resolveChoice(0, 'confirm', {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
       extraWood: 0,
@@ -97,7 +97,7 @@ describe('E16 BriarHedge — border-fence discount', () => {
     const session = discountSetup({ wood: 4, withCard: false })
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
-    resp = session.commitFarmChoice(0, 'fence', {
+    resp = session.resolveChoice(0, 'confirm', {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
       extraWood: 0,
@@ -113,7 +113,7 @@ describe('E16 BriarHedge — border-fence discount', () => {
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
     // Enclose tile(1,1) center: all 4 edges are internal
-    resp = session.commitFarmChoice(0, 'fence', {
+    resp = session.resolveChoice(0, 'confirm', {
       edges: ['H-1-1', 'H-2-1', 'V-1-1', 'V-1-2'],
       palisadeEdges: [],
       extraWood: 0,
@@ -128,7 +128,7 @@ describe('E16 BriarHedge — border-fence discount', () => {
     const session = discountSetup({ wood: 6, withB30: true })
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
-    resp = session.commitFarmChoice(0, 'fence', {
+    resp = session.resolveChoice(0, 'confirm', {
       edges: ['H-1-0', 'V-0-1'],         // 2 internal fences
       palisadeEdges: ['H-0-0', 'V-0-0'], // 2 border palisades
       extraWood: 0,
@@ -145,7 +145,7 @@ describe('E16 BriarHedge — border-fence discount', () => {
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
     // tile(0,0): top fence (border, free) + 2 internal fences + 1 border palisade
-    resp = session.commitFarmChoice(0, 'fence', {
+    resp = session.resolveChoice(0, 'confirm', {
       edges: ['H-0-0', 'H-1-0', 'V-0-1'], // 3 fences (1 border + 2 internal)
       palisadeEdges: ['V-0-0'],           // 1 border palisade
       extraWood: 0,

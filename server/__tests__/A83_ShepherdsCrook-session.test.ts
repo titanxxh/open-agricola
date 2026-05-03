@@ -35,7 +35,7 @@ describe('A83_ShepherdsCrook session flow', () => {
     expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
       .toBe('ui.interactionFenceSelect')
 
-    resp = session.commitFarmChoice(0, 'fence', {
+    resp = session.resolveChoice(0, 'confirm', {
       edges: edgesForTwoByTwo,
       extraWood: 0,
     })

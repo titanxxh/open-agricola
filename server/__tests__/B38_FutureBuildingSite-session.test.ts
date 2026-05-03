@@ -222,7 +222,7 @@ describe('B38 FutureBuildingSite — session', () => {
 
     // Try to fence tile (0,0) which is locked
     // Edges around (0,0): H-0-0 (top), H-1-0 (bottom), V-0-0 (left), V-0-1 (right)
-    resp = session.commitFarmChoice(0, 'fence', {
+    resp = session.resolveChoice(0, 'confirm', {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
       extraWood: 0,
@@ -267,7 +267,7 @@ describe('B38 FutureBuildingSite — session', () => {
     expect(resp.ok).toBe(true)
 
     // Try to fence locked tile (0,0) — should succeed now
-    resp = session.commitFarmChoice(0, 'fence', {
+    resp = session.resolveChoice(0, 'confirm', {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
       extraWood: 0,
