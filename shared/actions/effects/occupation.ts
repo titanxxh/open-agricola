@@ -1,10 +1,12 @@
-import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, GameState, ImmediateLogEntry, PlayerState, Resource } from '../../game/types'
+import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ComplexCost, GameState, ImmediateLogEntry, PlayerState, Resource } from '../../game/types'
 import { getOccupation } from '../../game/occupations'
 import {
   canAffordCardPreviewCostByProvider,
   payCardPreviewCostByProvider,
   payTypedFlatCost,
+  resolveCardPreviewCostByProvider,
 } from '../helpers/pay-helpers'
+import { isComplexCost } from '../helpers/payment'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { activateCard } from './activate-card'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
@@ -289,22 +291,79 @@ export const playOccupationAction: ActionDefinition = {
       options: playableOptions,
     }
   },
+  // 7b1: rewrite as seq:[pay, apply-occupation-play]. The pay leaf wraps the
+  // typed-flat lessons cost as ComplexCost so multi-solution variants
+  // (Bonus modifiers, future card discounts) surface a prompt.selectPayment
+  // choice. apply-occupation-play then mutates occupationPlayed / activates
+  // onBuy. C116 FurnitureMaker now reads the real paid food off the pay
+  // leaf's extraData.resourcesPaid instead of reconstructing the lessons
+  // cost — see C116_FurnitureMaker.
   resolveChoice: ({ player, space, params, state, sourceCard }, choice) => {
     const typed = params as { costOverride?: Partial<PlayerState['resources']>; allowedCards?: string[] } | undefined
     if (typed?.allowedCards && !typed.allowedCards.includes(choice)) {
       return { type: 'fail', logKey: 'log.occupationFail' }
     }
-    const cost = typed?.costOverride ?? getLessonsCost(player, space.id)
-    const result = playOccupation(player, choice, cost, state, space.id)
+    const occupation = getOccupation(choice)
+    if (!occupation || !player.occupationHand.includes(occupation.id)) {
+      return { type: 'fail', logKey: 'log.occupationFail' }
+    }
+    const baseCost = typed?.costOverride ?? getLessonsCost(player, space.id)
+    // Apply computeCosts hook so card-driven trades (B109 PaperMaker
+    // wood→food) and bonus modifiers participate in the pay leaf's
+    // multi-solution enumeration. Without this the pay leaf only sees the
+    // raw lessons cost and ignores B109's wood-for-food trade.
+    const previewCost = resolveCardPreviewCostByProvider(
+      state,
+      player,
+      'play-occupation',
+      choice,
+      () => baseCost,
+      space.id,
+    )
+    // Only wrap as ComplexCost when listener-collected trades / bonuses
+    // make the cost meaningfully multi-solution. For the common typed-flat
+    // case (just lessons base cost), pass it through as Partial<Resource>
+    // so the pay leaf's typed-flat path uses payTypedFlatCost — that is
+    // where modifier trades (A28 ForestSchool) get cost-replacement
+    // treatment without surfacing a payment prompt.
+    const finalCost: ComplexCost | Partial<PlayerState['resources']> =
+      previewCost && isComplexCost(previewCost)
+        ? previewCost
+        : ((previewCost as Partial<PlayerState['resources']> | null) ?? baseCost)
     if (
       sourceCard
       && sourceCard !== choice
-      && result.type !== 'fail'
     ) {
       // BGA-style gained.occupation: when a card causes an occupation to be
-      // played as a side-effect, the sourceCard accumulates +1.
+      // played as a side-effect, the sourceCard accumulates +1. Track here
+      // (pre-pay) so the credit is not lost if pay later fails — matches
+      // legacy mutate-in-place semantics.
       addCardResourceGained(player, sourceCard, { occupation: 1 })
     }
-    return result
+    return {
+      type: 'flow',
+      flow: {
+        type: 'seq',
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'pay',
+            sourceCard: choice,
+            params: {
+              cost: finalCost,
+              costType: 'occupation',
+              optionPrefix: `pay:occupation:${choice}`,
+            },
+            actionContext: { costType: 'occupation' },
+          },
+          {
+            type: 'leaf',
+            actionId: 'apply-occupation-play',
+            sourceCard: choice,
+            params: { occupationId: choice },
+          },
+        ],
+      },
+    }
   },
 }

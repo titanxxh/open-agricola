@@ -1,0 +1,195 @@
+import type {
+  ActionDefinition,
+  ActionExecutionResult,
+  ActionFlow,
+  GameState,
+  PlayerState,
+  Resource,
+} from '../../game/types'
+import { getOccupation } from '../../game/occupations'
+import { getCardModifiers } from '../../cards/card-modifiers'
+import { activateCard } from './activate-card'
+import { incOccupationBuilt, recordDraftPlayed } from '../../logic/stats'
+import {
+  getRegisteredCardListeners,
+  type CardListenerContext,
+} from '../../cards/card-listeners'
+import type { ActionHookPhase } from '../hooks'
+
+const getPositiveResourceLog = (
+  resources?: Partial<Resource> | null,
+): Partial<Resource> | undefined => {
+  if (!resources) return undefined
+  const positiveEntries = Object.entries(resources).filter(
+    ([, amount]) => (amount ?? 0) > 0,
+  )
+  if (positiveEntries.length === 0) return undefined
+  return Object.fromEntries(positiveEntries) as Partial<Resource>
+}
+
+const readActionBonusSources = (player: PlayerState): string[] | undefined => {
+  const sources = player._activeActionBonusSources
+  if (!sources || sources.length === 0) return undefined
+  return [...sources]
+}
+
+const buildOccupationLogParams = (
+  occupationId: string,
+  costResources: Partial<Resource> | undefined,
+  bonusSources?: string[],
+) => {
+  const params: Record<string, unknown> = {
+    occupations: occupationId,
+    costResources: getPositiveResourceLog(costResources) ?? {},
+  }
+  if (bonusSources && bonusSources.length > 0) {
+    params.bonusSources = [...bonusSources]
+  }
+  return params
+}
+
+export type ApplyOccupationPlayParams = {
+  occupationId: string
+  suppressOnBuyEffects?: boolean
+}
+
+const isApplyOccupationPlayParams = (
+  raw: unknown,
+): raw is ApplyOccupationPlayParams => {
+  if (!raw || typeof raw !== 'object') return false
+  const r = raw as Record<string, unknown>
+  return typeof r.occupationId === 'string' && r.occupationId.length > 0
+}
+
+const applyOccupation = (
+  state: GameState,
+  player: PlayerState,
+  occupationId: string,
+) => {
+  player.occupationHand = player.occupationHand.filter(
+    (id) => id !== occupationId,
+  )
+  if (!player.occupationPlayed.includes(occupationId)) {
+    player.occupationPlayed.push(occupationId)
+  }
+  incOccupationBuilt(player)
+  recordDraftPlayed(player, occupationId, state.round)
+  getCardModifiers(occupationId).forEach((modifier) => {
+    if (!player.activeModifiers.some((m) => JSON.stringify(m) === JSON.stringify(modifier))) {
+      player.activeModifiers.push(modifier)
+    }
+  })
+}
+
+/**
+ * Finalize leaf for the occupation flow. Mirrors apply-improvement: pay leaf
+ * runs first inside `seq:[pay, apply-occupation-play]`, then apply-* mutates
+ * occupation state. The pay leaf stashes paymentInfo via the seq-shared
+ * `_pendingImprovementPaymentInfo` field; we don't read it here today but
+ * the C116 listener (see C116_FurnitureMaker) reads `extraData.resourcesPaid`
+ * straight off the pay leaf event, which is more accurate than the legacy
+ * "reconstruct lessons cost" branch in occupation.ts.
+ */
+export const applyOccupationPlayAction: ActionDefinition = {
+  id: 'apply-occupation-play',
+  // Inherit the play-occupation label so the leaf-action-detail flush emits
+  // log.actionDetail with the wrapper's name (matches B107 / FurnitureMaker
+  // log assertions that look for "play-occupation" in the action key).
+  nameKey: 'actions.lessons.name',
+  descriptionKey: 'actions.apply-occupation-play.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: () => true,
+  execute: ({ player, params, state, sourceCard }): ActionExecutionResult => {
+    if (!isApplyOccupationPlayParams(params)) {
+      return { type: 'fail', logKey: 'log.occupationFail' }
+    }
+    const { occupationId, suppressOnBuyEffects } = params
+    const occupation = getOccupation(occupationId)
+    if (!occupation) {
+      return { type: 'fail', logKey: 'log.occupationFail' }
+    }
+    // Pop the seq-shared stash that the pay leaf wrote so we can echo
+    // `resourcesPaid` back into log.playOccupation. Apply-occupation-play
+    // doesn't currently pass it onwards (no occupation onBuy keys on
+    // returnedCardId today), but pop here regardless so it doesn't leak
+    // into the next pay leaf.
+    const paymentInfo = player._pendingImprovementPaymentInfo
+    delete player._pendingImprovementPaymentInfo
+    void sourceCard
+    const bonusSources = readActionBonusSources(player)
+    applyOccupation(state, player, occupationId)
+    const logParams = buildOccupationLogParams(
+      occupationId,
+      paymentInfo?.resourcesPaid,
+      bonusSources,
+    )
+    const immediateLogs = [{ key: 'log.playOccupation', params: logParams }]
+
+    if (suppressOnBuyEffects) {
+      return {
+        type: 'ok',
+        immediateLogs,
+        logKey: 'log.playOccupation',
+        logParams,
+      }
+    }
+    // Combine effect.onBuy (from card definitions) with the just-played
+    // card's own 'after play-occupation' listener. The outer engine collects
+    // 'after' listeners BEFORE the seq flow runs, so its scope check sees
+    // the pre-mutate occupationPlayed list and misses self-trigger cards
+    // (B155 ArtTeacher, E89 Stallwright, E101 Blighter etc.). We fire those
+    // listeners here, after mutate, mirroring BGA's onPlayerAfterPlayOccupation
+    // semantics on the just-played card.
+    const activation = activateCard(state, player, occupationId, 'onBuy')
+    const selfFlows: ActionFlow[] = []
+    const baseListenerCtx: CardListenerContext = {
+      state,
+      player,
+      space: { id: '' } as never,
+      actionId: 'play-occupation',
+      phase: 'after' as ActionHookPhase,
+      choice: occupationId,
+    } as CardListenerContext
+    for (const reg of getRegisteredCardListeners()) {
+      if (!reg.cardIds || !reg.cardIds.includes(occupationId)) continue
+      if (reg.actions && !reg.actions.includes('play-occupation')) continue
+      if (reg.phases && !reg.phases.includes('after' as ActionHookPhase)) continue
+      const result = reg.handler(baseListenerCtx)
+      if (result?.flow) {
+        selfFlows.push(result.flow)
+      }
+    }
+    let combinedFlow: ActionFlow | null = null
+    if (activation.type === 'flow' && selfFlows.length > 0) {
+      combinedFlow = {
+        type: 'seq',
+        children: [activation.flow, ...selfFlows],
+      }
+    } else if (activation.type === 'flow') {
+      combinedFlow = activation.flow
+    } else if (selfFlows.length === 1) {
+      combinedFlow = selfFlows[0]!
+    } else if (selfFlows.length > 1) {
+      combinedFlow = { type: 'seq', children: selfFlows }
+    }
+    if (combinedFlow) {
+      return {
+        type: 'flow',
+        flow: combinedFlow,
+        immediateLogs:
+          activation.type === 'flow'
+            ? [...immediateLogs, ...(activation.immediateLogs ?? [])]
+            : immediateLogs,
+        logKey: 'log.playOccupation',
+        logParams,
+      }
+    }
+    return {
+      type: 'ok',
+      immediateLogs,
+      logKey: 'log.playOccupation',
+      logParams,
+    }
+  },
+}
