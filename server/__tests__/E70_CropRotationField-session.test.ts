@@ -357,7 +357,7 @@ describe('E70_CropRotationField session', () => {
       const session = setup({ grain: 1 })
 
       // Take grain-utilization action, which offers sow
-      let resp = session.takeAction(0, 'grain-utilization')
+      const resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
       // If sow is available, resolving 'sow' should succeed
       expect(resp.ok).toBe(true)

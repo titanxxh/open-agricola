@@ -223,7 +223,7 @@ describe('B72_LoveforAgriculture session', () => {
       })
 
       // Sow should be doable via the isDoable listener
-      let resp = session.takeAction(0, 'grain-utilization')
+      const resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
@@ -474,7 +474,7 @@ describe('B72_LoveforAgriculture session', () => {
         ],
       })
 
-      let resp = session.takeAction(0, 'grain-utilization')
+      const resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
       expect(resp.ok).toBe(true)
 

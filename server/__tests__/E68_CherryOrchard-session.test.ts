@@ -139,7 +139,7 @@ describe('E68_CherryOrchard session', () => {
       fields: [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] }],
     })
 
-    let resp = session.takeAction(0, 'grain-utilization')
+    const resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
 
     expect(resp.ok).toBe(true)
