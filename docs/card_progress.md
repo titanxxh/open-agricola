@@ -53,6 +53,12 @@
   - `_activeActionBonusSources` 字段保留（兼容 PR-3/4 callsite），新加 `extraData.bonusUsed` 透传契约文档（Task 2.4 plan 偏差：未删字段）
   - **E123 升级**：从 top-1 简化到 BGA full use-top-k（emit N+1 BonusChoice，cost = 资源类数 N）；§2.5 E123 simplification 行下线
   - E54 / E122 / E128 listener 迁 `actions:['pay']`（after-pay phase）
+  - **PR-4 (2026-05-02 sprint-7b1-pr4 worktree)**：
+    - **B18 GrasslandHarrow** — onBuy 改 no-op，新 `actions:['pay']` after listener gate `sourceCard==CARD_ID`，从 supply 后 paid 状态算 reserve（wood+clay+stone+reed），queue future-meeple 至 `current+reserve`，clamp 14。BGA `onPlayerAfterPay` 一致语义（旧 onBuy 路径在 apply-improvement 调 activateCard 时 player.resources 已扣，行为等价）。`writeCardExtraData(targetRound)` 由 listener 写，onRoundStart 仍读它发 optional plow seq。
+    - **C148 MudWallower** — 第 4 个 listener `actions:['pay']` after，`result.resourcesPaid.boar > 0` 时调 `syncHeldDownward`。覆盖 BeggingCard pay / cooking pay / 任意 boar-pay 路径。永不上调 cap（与现有 exchange/place-farmer listener 同语义）。
+    - **D74 RoyalWood** — 由 PR-2 (commit `5392b5d7`) 通过 `actions:['pay']` listener 已迁完，PR-4 跳过。
+    - **Tasks 4.1-4.5 farm-choice engine 化 (room/fence/stable/plow ChoiceNode + apply-*-build leaf + farmPayment 字段废弃) deferred to 7b1c sprint**：实施时识别到主路径破坏 ≥ 30 处（45 文件 grep 命中 `commitFarmChoice|farmPayment`），且单类改动评估 4h × 4 + ad-hoc pending 通道废弃 + 前端 PaymentChoicePrompt 统一 `pay:room/fence/stable/plow` prefix 远超 1 day 预算。`actionContext.farmPayment` 暂保留。Plan §6 Risks 1 「ComplexCost UI 双轨」也推后处理。
+  - **PR-4 测试**：B18 pay-listener 7 例 + C148 pay-listener 6 例；旧 B18-session 重写 4 例（onRoundStart 经由 listener 触发）；regression fast/slow/lint/build 全绿。
 - **2026-05-02 fence-cost-unification（基建 refactor）**：把 fence 折扣从 `CardEffect.computeFenceDiscount` / `computeFenceFreeAvailable` 双轨 hook 迁到统一的 `computeCosts` listener phase（actions: `['fence']`），与 construct 走同一 cost preview 模型。E16 BriarHedge / C16 FieldFences / C1 Overhaul 改为 listener 实现；`canStartFencing(state, player, costOverride?)` 成为权威入口；新增 `collectComputeCostsForFarmChoice` helper 服务 commit/apply 路径；`fenceAction.costPreview` 替换 entry-guard 散点判定。`CardEffect` 删除两个 fence 相关 hook 字段，`collectFenceDiscount` 聚合器删除。详见 ENGINE_ARCHITECTURE.md §15.7。
 - **2026-05-02 Sprint 7a done — §2.2 audit followup（PR #51 merged 6317cd89）**：
   - **新基建（4 项）**：
