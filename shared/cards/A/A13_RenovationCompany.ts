@@ -1,7 +1,13 @@
 import { MinorImprovement } from '../types'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A13_RenovationCompany'
+
+registerPrerequisite(
+  'In Wooden House with Exactly 2 Rooms',
+  (player) => player.houseType === 'wood' && player.rooms === 2,
+)
 
 export const A13_RenovationCompany = new MinorImprovement({
   id: CARD_ID,
