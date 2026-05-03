@@ -69,8 +69,7 @@ import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { allOccupationCards, allMinorImprovementCards } from '../cards/catalog.ts'
 import { majorCardDefinitions } from '../cards/major/index.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
-import { collectLockedFarmTileKeys, getCardEffect } from '../cards/card-effects.ts'
-import { collectComputeCostsForFarmChoice } from '../cards/card-listeners.ts'
+import { getCardEffect } from '../cards/card-effects.ts'
 import { incCardUsed } from '../cards/helpers/card-state.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
 import { runRoundEndHooks, runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks, shouldSkipPlayerTurn } from '../cards/card-effects.ts'
@@ -93,11 +92,6 @@ import {
   getBasicConversionExchange,
 } from '../cards/basic-conversion.ts'
 import {
-  normalizePlayerFarm,
-} from '../logic/farm/fence-validation.ts'
-import { applyFarmChoice, type FarmChoicePayloadMap } from '../logic/farm/farm-choice.ts'
-import { playerCanBuildPalisades } from '../cards/helpers/card-type'
-import {
   applyTradeSideEffect,
 } from '../actions/helpers/payment'
 import {
@@ -108,9 +102,6 @@ import {
   getOccupationActionCost,
   isOccupationPlayable,
 } from '../actions/effects/occupation.ts'
-import {
-  resolveTypedFlatPaymentSelection,
-} from '../actions/helpers/pay-helpers.ts'
 import {
   getFenceCount,
   getPalisadeCount,
@@ -124,13 +115,11 @@ import {
   buildStableFarmInteraction,
 } from '../logic/farm/farm-interaction.ts'
 import { buildOccupationHandSelectionInteraction } from '../logic/farm/occupation-hand-interaction.ts'
-import { readPendingFenceBonus } from '../cards/helpers/pending-fence-bonus.ts'
 import { rebuildActiveModifiers } from '../game/serialization.ts'
 import { addWorkerRef, isSpaceOccupied, removeWorkerRef } from '../game/space.ts'
 import { smallestAvailableWorker } from '../game/player.ts'
 import { computeAllowedPlacementSpaces } from '../actions/helpers/placement-availability.ts'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../actions/helpers/placement-constants.ts'
-import { validateFenceSelection } from '../logic/farm/fence-validation.ts'
 
 type HistoryEntry = {
   state: GameState
@@ -2075,11 +2064,6 @@ export class GameCore {
     const space = this.getSpaceById(this.activeSpaceId)
     if (!player || !space) return this.respond(false, 'invalid state')
 
-    const farmPaymentResponse = this.resolvePendingFarmPaymentChoice(playerIndex, value)
-    if (farmPaymentResponse) {
-      return farmPaymentResponse
-    }
-
     if (pushHistoryEntry) {
       this.pushHistory()
     }
@@ -2709,157 +2693,6 @@ export class GameCore {
 
     this.runEngineSteps()
     return this.respond()
-  }
-
-  private resolvePendingFarmPaymentChoice(
-    playerIndex: number,
-    value: string,
-  ): SessionResponse | null {
-    if (this.pending.type !== 'choice') return null
-    const farmPayment = this.pending.actionContext?.farmPayment as
-      | {
-          farmType?: 'fence'
-          payload?: Record<string, unknown>
-        }
-      | undefined
-    if (!farmPayment || farmPayment.farmType !== 'fence') {
-      return null
-    }
-
-    const player = this.state.players[playerIndex]
-    if (!player) return this.respond(false, 'invalid player')
-
-    const normalized = normalizePlayerFarm(player)
-    const space = this.getSpaceById(this.activeSpaceId) ?? undefined
-    const result = applyFarmChoice(normalized, farmPayment.farmType, farmPayment.payload as FarmChoicePayloadMap[typeof farmPayment.farmType], {
-      costOverride: this.pending.costOverride,
-      paymentChoice: value,
-      state: this.state,
-      space,
-    })
-    if (!result.ok) {
-      return this.respond(false, result.error)
-    }
-
-    this.pushHistory()
-    this.state.players[playerIndex] = result.player as unknown as PlayerState
-    return this.continueAfterResolvedFarmChoice(playerIndex)
-  }
-
-  commitFarmChoice(
-    playerIndex: number,
-    farmType: 'fence',
-    payload: Record<string, unknown>,
-  ): SessionResponse {
-    if (this.pending.type !== 'choice' || this.pending.playerIndex !== playerIndex) {
-      return this.respond(false, 'no pending farm choice for this player')
-    }
-    const player = this.state.players[playerIndex]
-    if (!player) return this.respond(false, 'invalid player')
-
-    const normalized = normalizePlayerFarm(player)
-    const lockedKeys = collectLockedFarmTileKeys(player)
-    let farmChoiceMeta: Record<string, unknown> | undefined
-
-    switch (farmType) {
-      case 'fence': {
-        const { edges, palisadeEdges, extraWood } = payload as { edges?: string[]; palisadeEdges?: string[]; extraWood?: number }
-        const safeEdges = Array.isArray(edges) ? edges : []
-        const safePalisadeEdges = Array.isArray(palisadeEdges) ? palisadeEdges : []
-        const pendingFreeFences =
-          readPendingFenceBonus(normalized)?.freeFences ?? 0
-        // Mirror applyFarmChoice: per-card listeners (E16, C1, C16…) extend the
-        // free-fence count via `computeCosts`, so payment preview must use the
-        // same total or `resolveTypedFlatPaymentSelection` will reject the
-        // payment for cards that bring wood costs to zero.
-        const existingEdgeIdsForDiscount = new Set(
-          (normalized.fenceSegments ?? []).map((seg) => seg.edge),
-        )
-        const newFenceEdgesPreview = safeEdges.filter(
-          (e) => !existingEdgeIdsForDiscount.has(e),
-        )
-        const newPalisadeEdgesPreview = safePalisadeEdges.filter(
-          (e) => !existingEdgeIdsForDiscount.has(e),
-        )
-        const space = this.getSpaceById(this.activeSpaceId) ?? undefined
-        const fenceOverride = collectComputeCostsForFarmChoice(
-          this.state,
-          normalized,
-          'fence',
-          {
-            newFenceEdges: newFenceEdgesPreview,
-            newPalisadeEdges: newPalisadeEdgesPreview,
-          },
-          space,
-        )
-        const hookFreeFences = Math.max(0, Math.abs(fenceOverride.wood ?? 0))
-        const freeFences = pendingFreeFences + hookFreeFences
-        const adjustedExtraWood = extraWood ?? 0
-        const validated = validateFenceSelection(
-          normalized,
-          safeEdges,
-          safePalisadeEdges,
-          adjustedExtraWood,
-          freeFences,
-          {
-            skipPayment: true,
-            allowPalisades: playerCanBuildPalisades(normalized),
-          },
-          lockedKeys,
-        )
-        if (!validated.ok) return this.respond(false, validated.error?.code ?? 'validation failed')
-
-        const payment = resolveTypedFlatPaymentSelection(
-          validated.player as unknown as PlayerState,
-          { wood: validated.payableWoodCost },
-          'pay:fence',
-          undefined,
-          { type: 'fail', logKey: 'log.fencingFail' },
-          'fencing',
-        )
-        if (payment.type === 'choice') {
-          this.pending = {
-            type: 'choice',
-            playerIndex,
-            spaceId: this.activeSpaceId!,
-            options: payment.options ?? [],
-            promptKey: payment.promptKey,
-            sourceCard: this.pending.type === 'choice' ? this.pending.sourceCard : undefined,
-            actionContext: {
-              ...(this.pending.actionContext ?? {}),
-              farmPayment: {
-                farmType: 'fence',
-                payload: {
-                  edges: safeEdges,
-                  palisadeEdges: safePalisadeEdges,
-                  extraWood: extraWood ?? 0,
-                },
-              },
-            },
-          }
-          return this.respond()
-        }
-        if (payment.type === 'fail') {
-          return this.respond(false, 'unable to pay fence cost')
-        }
-
-        const result = applyFarmChoice(normalized, 'fence', {
-          edges: safeEdges,
-          palisadeEdges: safePalisadeEdges,
-          extraWood: extraWood ?? 0,
-        }, {
-          state: this.state,
-          space,
-        })
-        if (!result.ok) return this.respond(false, result.error)
-        this.pushHistory()
-        this.state.players[playerIndex] = result.player as unknown as PlayerState
-        farmChoiceMeta = result.meta
-        break
-      }
-    }
-
-    return this.continueAfterResolvedFarmChoice(playerIndex, farmChoiceMeta)
   }
 
   commitSelectionChoice(

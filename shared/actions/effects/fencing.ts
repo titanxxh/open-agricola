@@ -258,13 +258,6 @@ export const fenceAction: ActionDefinition = {
       return finalizeFence(ctx, edges, palisadeEdges, extraWood, undefined)
     }
 
-    // Transitional no-op: legacy commitFarmChoice flow drives the bare
-    // 'confirm' through the engine after committing externally. Removed in
-    // Task 3 once commitFarmChoice's fence case is gone.
-    if (choice === 'confirm' && !payload && !ctx.actionContext?.farmPayload) {
-      return { type: 'ok' }
-    }
-
     return { type: 'fail', logKey: 'log.fencingFail' }
   },
 }

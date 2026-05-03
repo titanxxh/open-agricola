@@ -1024,13 +1024,6 @@ export const createWsServer = (server: import('node:http').Server) => {
         return
       }
 
-      if (msg.type === 'commitFarm') {
-        if (!assertOwnSeat(msg.playerIndex)) return
-        const resp = callRoom(s => s.commitFarmChoice(currentPlayerIndex, msg.farmType, msg.payload))
-        broadcastState(room, resp, 'choice', msg.requestId)
-        return
-      }
-
       if (msg.type === 'commitSelection') {
         if (!assertOwnSeat(msg.playerIndex)) return
         const resp = callRoom(s => s.commitSelectionChoice(currentPlayerIndex, msg.payload))

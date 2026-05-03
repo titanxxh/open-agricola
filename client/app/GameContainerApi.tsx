@@ -512,19 +512,13 @@ export const GameContainerApi = () => {
   }, [setFenceError, setPlowError, setRoomError, setSowError, setStableError])
 
   const commitFarmWithError = useCallback((
-    playerIndex: number,
-    farmType: FarmCommitType,
-    payload: Record<string, unknown>,
+    _playerIndex: number,
+    _farmType: FarmCommitType,
+    _payload: Record<string, unknown>,
   ) => {
-    void transport.commitFarm(playerIndex, farmType, payload)
-      .then((resp) => {
-        if (!resp.ok) setFarmCommitError(farmType, resp.error)
-      })
-      .catch((e) => {
-        console.error(e)
-        setFarmCommitError(farmType)
-      })
-  }, [transport, setFarmCommitError])
+    // commitFarm transport removed; all farm submits now use resolveChoice with payload.
+    // This wrapper is retained as a stub until the few remaining callers are migrated.
+  }, [])
 
   const resolveChoice = useCallback((value: string) => {
     if (!isInteractive) return

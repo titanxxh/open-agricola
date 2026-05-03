@@ -1,11 +1,11 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { GameSession } from './game/authoritative-session.ts'
 import { serializeState, serializeStateForPlayer } from '../shared/game/serialization.ts'
-import { normalizePlayerFarm } from '../shared/logic/farm/fence-validation.ts'
-import { applyFarmChoice, type FarmChoicePayloadMap } from '../shared/logic/farm/farm-choice.ts'
+import { normalizePlayerFarm, validateFenceSelection } from '../shared/logic/farm/fence-validation.ts'
 import { validatePlowSelection } from '../shared/logic/farm/plow-validation.ts'
 import { validateSowSelection } from '../shared/logic/farm/sow-validation.ts'
 import { validateRoomSelection, validateStableSelection } from '../shared/logic/farm/validators.ts'
+import { playerCanBuildPalisades } from '../shared/cards/helpers/card-type.ts'
 import { collectLockedFarmTileKeys } from '../shared/cards/card-effects.ts'
 import type { FarmTilePosition } from '../shared/game/types.ts'
 import { getDb } from './db.ts'
@@ -327,22 +327,6 @@ export const handleGameRoute = async (
     return true
   }
 
-  if (req.method === 'POST' && req.url === '/api/game/commit-farm') {
-    const body = JSON.parse(await readBody(req)) as {
-      playerIndex?: number
-      farmType?: 'fence'
-      payload?: Record<string, unknown>
-    }
-    if (typeof body.playerIndex !== 'number' || !body.farmType || !body.payload) {
-      sendJson(res, 400, { ok: false, error: 'invalid payload' })
-      return true
-    }
-    if (!enforceSeatBinding(req, res, body.playerIndex)) return true
-    const { resp, result } = callAndRespond(req, s => s.commitFarmChoice(body.playerIndex!, body.farmType!, body.payload!))
-    sendJson(res, resp.ok ? 200 : 400, result)
-    return true
-  }
-
   if (req.method === 'POST' && req.url === '/api/game/validate') {
     const body = JSON.parse(await readBody(req)) as {
       type: 'fence' | 'room' | 'stable' | 'plow' | 'sow'
@@ -358,8 +342,21 @@ export const handleGameRoute = async (
     const player = normalizePlayerFarm(state.players[playerIndex]!)
 
     if (body.type === 'fence') {
-      const result = applyFarmChoice(player, 'fence', body.payload as FarmChoicePayloadMap['fence'], { state })
-      sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error })
+      const fp = body.payload as { edges?: string[]; palisadeEdges?: string[]; extraWood?: number }
+      const edges = Array.isArray(fp.edges) ? fp.edges : []
+      const palisadeEdges = Array.isArray(fp.palisadeEdges) ? fp.palisadeEdges : []
+      const extraWood = fp.extraWood ?? 0
+      const lockedKeys = collectLockedFarmTileKeys(state.players[playerIndex]!)
+      const result = validateFenceSelection(
+        player,
+        edges,
+        palisadeEdges,
+        extraWood,
+        0,
+        { skipPayment: true, allowPalisades: playerCanBuildPalisades(player) },
+        lockedKeys,
+      )
+      sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error?.code ?? 'validation failed' })
       return true
     }
     if (body.type === 'room') {
