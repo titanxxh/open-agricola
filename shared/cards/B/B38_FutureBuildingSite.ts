@@ -2,9 +2,17 @@ import { MinorImprovement } from '../types'
 import type { FarmTilePosition } from '../../game/types'
 import { getAllTilePositions, getUsedFarmyardTileKeys, positionKey } from '../../game/farm'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B38_FutureBuildingSite'
+
+// BGA isBuyable: turn > 4 → false. Already redundantly enforced by maxRound,
+// but register the explicit handler so the prereq label is not silently passed.
+registerPrerequisite('Play in Round 4 or Before', (_player, state) => {
+  if (!state) return true
+  return state.round <= 4
+})
 
 const DELTAS = [
   { dr: -1, dc: 0 },
