@@ -4,6 +4,7 @@ import { serializeState, serializeStateForPlayer } from '../shared/game/serializ
 import { normalizePlayerFarm } from '../shared/logic/farm/fence-validation.ts'
 import { applyFarmChoice, type FarmChoicePayloadMap } from '../shared/logic/farm/farm-choice.ts'
 import { validatePlowSelection } from '../shared/logic/farm/plow-validation.ts'
+import { validateSowSelection } from '../shared/logic/farm/sow-validation.ts'
 import { collectLockedFarmTileKeys } from '../shared/cards/card-effects.ts'
 import type { FarmTilePosition } from '../shared/game/types.ts'
 import { getDb } from './db.ts'
@@ -328,7 +329,7 @@ export const handleGameRoute = async (
   if (req.method === 'POST' && req.url === '/api/game/commit-farm') {
     const body = JSON.parse(await readBody(req)) as {
       playerIndex?: number
-      farmType?: 'fence' | 'room' | 'stable' | 'sow'
+      farmType?: 'fence' | 'room' | 'stable'
       payload?: Record<string, unknown>
     }
     if (typeof body.playerIndex !== 'number' || !body.farmType || !body.payload) {
@@ -378,8 +379,13 @@ export const handleGameRoute = async (
       return true
     }
     if (body.type === 'sow') {
-      const result = applyFarmChoice(player, 'sow', body.payload as FarmChoicePayloadMap['sow'])
-      sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error })
+      const crops = (body.payload as { crops?: unknown }).crops
+      if (!Array.isArray(crops)) {
+        sendJson(res, 200, { valid: false, error: 'NO_SELECTION' })
+        return true
+      }
+      const result = validateSowSelection(player, crops as Parameters<typeof validateSowSelection>[1])
+      sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error?.code ?? 'validation failed' })
       return true
     }
     sendJson(res, 400, { valid: false, error: 'Unknown validation type' })

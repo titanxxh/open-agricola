@@ -20,7 +20,7 @@ import {
   validateFenceSelection,
 } from './fence-validation.ts'
 import { validateRoomSelection, validateStableSelection } from './validators.ts'
-import { validateSowSelection, type SowSelection } from './sow-validation.ts'
+import type { SowSelection } from './sow-validation.ts'
 import {
   consumePendingFenceBonus,
   readPendingFenceBonus,
@@ -28,13 +28,12 @@ import {
 import { collectLockedFarmTileKeys } from '../../cards/card-effects.ts'
 import { collectComputeCostsForFarmChoice } from '../../cards/card-listeners.ts'
 
-export type FarmChoiceType = 'fence' | 'room' | 'stable' | 'sow'
+export type FarmChoiceType = 'fence' | 'room' | 'stable'
 
 export type FarmChoicePayloadMap = {
   fence: { edges: string[]; palisadeEdges?: string[]; extraWood?: number }
   room: { rooms: FarmTilePosition[] }
   stable: { stables: FarmTilePosition[] }
-  sow: { crops: SowSelection[] }
 }
 
 type FarmChoiceOptions = {
@@ -277,13 +276,6 @@ export const applyFarmChoice = <T extends PlayerState>(
           stableTiles: [...nextPlayer.stableTiles, ...stables],
         } as T,
       }
-    }
-    case 'sow': {
-      const { crops } = payload as FarmChoicePayloadMap['sow']
-      const result = validateSowSelection(normalized, crops, options.sowOptions)
-      return result.ok
-        ? { ok: true, player: result.player as T }
-        : { ok: false, error: result.error?.code ?? 'validation failed' }
     }
   }
 }

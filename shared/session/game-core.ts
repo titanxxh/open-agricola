@@ -70,7 +70,7 @@ import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { allOccupationCards, allMinorImprovementCards } from '../cards/catalog.ts'
 import { majorCardDefinitions } from '../cards/major/index.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
-import { handleSowExtraField, collectLockedFarmTileKeys, getCardEffect } from '../cards/card-effects.ts'
+import { collectLockedFarmTileKeys, getCardEffect } from '../cards/card-effects.ts'
 import { collectComputeCostsForFarmChoice } from '../cards/card-listeners.ts'
 import { incCardUsed, addCardResourceGained } from '../cards/helpers/card-state.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
@@ -128,7 +128,6 @@ import {
   buildFenceFarmInteraction,
   buildPlowFarmInteraction,
   buildRoomFarmInteraction,
-  getPermittedExtraSowableFields,
   buildSowFarmInteraction,
   buildStableFarmInteraction,
 } from '../logic/farm/farm-interaction.ts'
@@ -2796,7 +2795,7 @@ export class GameCore {
 
   commitFarmChoice(
     playerIndex: number,
-    farmType: 'fence' | 'room' | 'stable' | 'sow',
+    farmType: 'fence' | 'room' | 'stable',
     payload: Record<string, unknown>,
   ): SessionResponse {
     if (this.pending.type !== 'choice' || this.pending.playerIndex !== playerIndex) {
@@ -3039,44 +3038,6 @@ export class GameCore {
         if (sourceCardForStats && stables.length > 0) {
           addCardResourceGained(this.state.players[playerIndex]!, sourceCardForStats, { stable: stables.length })
         }
-        break
-      }
-      case 'sow': {
-        const maxSelections = typeof this.pending.actionContext?.maxSelections === 'number'
-          ? Math.max(0, Math.floor(this.pending.actionContext.maxSelections))
-          : undefined
-        const excludedFields = Array.isArray(this.pending.actionContext?.excludedFields)
-          ? this.pending.actionContext.excludedFields.filter((field): field is { row: number; col: number } =>
-            typeof (field as { row?: unknown }).row === 'number' &&
-            typeof (field as { col?: unknown }).col === 'number')
-          : undefined
-        // Compute extra sowable fields from card effects (e.g. B72 pasture sowing)
-        const extraFields = getPermittedExtraSowableFields(player, this.pending.actionContext)
-        const extraAllowedCrops = new Map(
-          extraFields.map((field) => [positionKey(field.tile), field.allowedCrops] as const),
-        )
-        const result = applyFarmChoice(normalized, 'sow', payload as FarmChoicePayloadMap['sow'], {
-          sowOptions: {
-            maxSelections,
-            excludedFields,
-            extraAllowedCrops: extraAllowedCrops.size > 0 ? extraAllowedCrops : undefined,
-          },
-        })
-        if (!result.ok) return this.respond(false, result.error)
-        const nextPlayer = result.player as unknown as PlayerState
-        // Handle extra field sowing via card effects
-        if (extraAllowedCrops.size > 0) {
-          const sowPayload = payload as { crops?: { row: number; col: number; crop: 'grain' | 'vegetable' | 'wood' }[] }
-          for (const sel of sowPayload.crops ?? []) {
-            const key = positionKey({ row: sel.row, col: sel.col })
-            if (extraAllowedCrops.has(key)) {
-              const handled = handleSowExtraField(nextPlayer, { row: sel.row, col: sel.col }, sel.crop)
-              if (!handled) return this.respond(false, 'invalid extra sow field')
-            }
-          }
-        }
-        this.pushHistory()
-        this.state.players[playerIndex] = nextPlayer
         break
       }
     }

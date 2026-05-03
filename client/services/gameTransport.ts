@@ -359,7 +359,7 @@ export class WsGameTransport implements GameTransport {
   }
 
   async commitFarm(playerIndex: number, farmType: string, payload: Record<string, unknown>): Promise<GameSyncPayload> {
-    return this.sendCommand({ type: 'commitFarm', playerIndex, farmType: farmType as 'fence' | 'room' | 'stable' | 'sow', payload })
+    return this.sendCommand({ type: 'commitFarm', playerIndex, farmType: farmType as 'fence' | 'room' | 'stable', payload })
   }
 
   async commitSelection(

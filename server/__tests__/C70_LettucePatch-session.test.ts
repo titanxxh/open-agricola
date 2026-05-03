@@ -56,7 +56,6 @@ describe('C70_LettucePatch session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
       expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
@@ -88,8 +87,8 @@ describe('C70_LettucePatch session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
+      // Sow should fail because no fields and card only allows vegetable.
       resp = session.resolveChoice(0, 'sow')
-      // Sow should fail because no fields and card only allows vegetable
       expect(resp.ok).toBe(false)
     })
   })
@@ -100,7 +99,6 @@ describe('C70_LettucePatch session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
 
       resp = session.resolveChoice(0, 'confirm', {
@@ -207,8 +205,8 @@ describe('C70_LettucePatch session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
+      // Should fail — no empty fields and card already has crop.
       resp = session.resolveChoice(0, 'sow')
-      // Should fail - no empty fields and card already has crop
       expect(resp.ok).toBe(false)
     })
   })
@@ -275,7 +273,6 @@ describe('C70_LettucePatch session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
     })

@@ -111,7 +111,6 @@ describe('E70_CropRotationField session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
       expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
@@ -138,7 +137,6 @@ describe('E70_CropRotationField session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
 
       resp = session.resolveChoice(0, 'confirm', {
@@ -362,7 +360,6 @@ describe('E70_CropRotationField session', () => {
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
       // If sow is available, resolving 'sow' should succeed
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
       expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
@@ -376,7 +373,9 @@ describe('E70_CropRotationField session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      // Sow should NOT be doable since card has crop and no regular fields
+      // OR(sow, bake-bread) is structurally doable, but selecting sow when the
+      // card already has a crop and the player has no regular fields surfaces
+      // as fail because canSow returns false.
       resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(false)
     })

@@ -87,7 +87,6 @@ describe('E69_MelonPatch session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
 
