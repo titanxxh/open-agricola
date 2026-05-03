@@ -1,4 +1,5 @@
 import ts from 'typescript'
+import * as fs from 'node:fs'
 
 export interface StaticRef {
   key: string
@@ -80,7 +81,6 @@ export function extractReferencesFromSource(file: string, source: string): Extra
 }
 
 export function extractReferencesFromFiles(filePaths: string[]): ExtractResult {
-  const fs = require('node:fs') as typeof import('node:fs')
   const all: ExtractResult = { static: [], dynamic: [] }
   for (const f of filePaths) {
     const src = fs.readFileSync(f, 'utf8')
