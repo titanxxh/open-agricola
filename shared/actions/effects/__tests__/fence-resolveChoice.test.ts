@@ -207,10 +207,10 @@ describe('fenceAction.resolveChoice', () => {
     expect(ctx.player.fenceSegments).toHaveLength(0)
   })
 
-  it('legacy bare confirm without payload is no-op (transitional)', () => {
+  it('bare confirm without payload returns fail', () => {
     const ctx = makeCtx()
     const result = fenceAction.resolveChoice!(ctx, 'confirm')
-    expect(result.type).toBe('ok')
+    expect(result.type).toBe('fail')
     expect(ctx.player.fenceSegments).toHaveLength(0)
   })
 })

@@ -41,30 +41,6 @@ describe('GameSession contract', () => {
     })
   })
 
-  describe('commitFarmChoice', () => {
-    it('rejects when no pending choice', () => {
-      const resp = session.commitFarmChoice(0, 'fence', { edges: [] })
-      expect(resp.ok).toBe(false)
-      expect(resp.error).toContain('no pending')
-    })
-
-    it('rejects invalid farm type when pending exists', () => {
-      const state = session.getStateForRead()
-      const available = state.actionSpaces.find(
-        (s) => s.takenBy.length === 0 && s.roundAvailable <= 1,
-      )
-      if (!available) return
-
-      session.takeAction(0, available.id)
-      const current = session.getState()
-      if (current.pending.type !== 'choice') return
-
-      const resp = session.commitFarmChoice(0, 'fence', { edges: ['invalid'] })
-      expect(resp.ok).toBe(false)
-    })
-
-  })
-
   describe('undoStep', () => {
     it('fails when no history', () => {
       const resp = session.undoStep()
