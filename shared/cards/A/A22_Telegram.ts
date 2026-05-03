@@ -1,10 +1,15 @@
 import { MinorImprovement } from '../types'
 import { writeCardExtraData, readCardExtraData, writeCardInfobox, setCardFlag, isCardFlagged } from '../helpers/card-state'
-import { getFenceCount } from '../../actions/effects/fencing'
+import { getFenceCount, maxFences } from '../../actions/effects/fencing'
 import { workersAvailable } from '../../game/player'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A22_Telegram'
+
+// BGA isBuyable: Fences::countAvailable($player->getId()) == 0 → false
+// "Fence in Supply" = unplaced fence reserve = max - already-placed
+registerPrerequisite('At Least 1 Fence in Supply', (player) => maxFences - getFenceCount(player) >= 1)
 
 export const A22_Telegram = new MinorImprovement({
   id: CARD_ID,
