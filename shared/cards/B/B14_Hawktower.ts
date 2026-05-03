@@ -1,8 +1,15 @@
 import { MinorImprovement } from '../types'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B14_Hawktower'
+
+// BGA isBuyable: turn > 7 → false
+registerPrerequisite('Play in Round 7 or Before', (_player, state) => {
+  if (!state) return true
+  return state.round <= 7
+})
 
 export const B14_Hawktower = new MinorImprovement({
   id: CARD_ID,
