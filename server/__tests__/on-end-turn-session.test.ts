@@ -96,10 +96,10 @@ describe('onEndTurn session', () => {
     session.loadState(state)
 
     let resp = session.takeAction(0, 'sheep-market')
-    expect(resp.pending.type).toBe('animalReorg')
+    expect(resp.pending.type).toBe('choice')
     expect(resp.state.players[0]!.cardStates?.[TEST_END_TURN_CARD]?.counters?.observedCount).toBeUndefined()
 
-    resp = session.confirmAnimalReorg(0, [
+    resp = session.resolveChoice(0, 'confirm', [
       { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ])
     expect(resp.pending.type).toBe('confirmNextPlayer')

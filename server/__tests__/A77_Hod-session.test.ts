@@ -63,8 +63,8 @@ describe('A77_Hod session', () => {
     expect(resp.ok).toBe(true)
 
     // pig-market gives boar -> animalReorg
-    if (resp.pending.type === 'animalReorg') {
-      resp = session.confirmAnimalReorg(0, [
+    if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(0, 'confirm', [
         { id: 'p1', zoneType: 'pasture', animalType: 'boar', animalCount: 1 },
       ])
     }
@@ -88,8 +88,8 @@ describe('A77_Hod session', () => {
     expect(resp.ok).toBe(true)
 
     // pig-market gives boar -> animalReorg for opponent
-    if (resp.pending.type === 'animalReorg') {
-      resp = session.confirmAnimalReorg(1, [
+    if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(1, 'confirm', [
         { id: 'p2', zoneType: 'pasture', animalType: 'boar', animalCount: 1 },
       ])
     }

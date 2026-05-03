@@ -32,7 +32,8 @@ const createPlayer = (id = 'p1'): PlayerState =>
     pastures: [], fenceSegments: [],
     majorEffects: { wellRounds: 0 }, startPlayer: false,
     activeModifiers: [],
-  }) as PlayerState
+    extraOccupationsFromCards: [], playedCards: [], cardStates: {}, stats: {},
+  }) as unknown as PlayerState
 
 const createState = (...players: PlayerState[]): GameState =>
   ({
@@ -42,7 +43,8 @@ const createState = (...players: PlayerState[]): GameState =>
     gameSeed: 1, availableMajorImprovements: [],
     futureMeeples: [], pendingFutureMeeples: [],
     gameOver: false, workPhaseObtainedResources: {},
-  }) as GameState
+    phase: 'playing', roundPhase: 'work', draft: null, enableCommunityDeck: false,
+  }) as unknown as GameState
 
 const createSpace = (id: string): ActionSpace =>
   ({
@@ -58,11 +60,13 @@ const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id
 const expectPayGainStoneForFood = (result: { flow?: ActionFlow } | undefined) => {
   expect(result).toBeDefined()
   expect(result!.flow!.type).toBe('seq')
-  const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
-  expect(children[0].actionId).toBe('pay-resources')
-  expect(children[0].params).toEqual({ food: 1 })
-  expect(children[1].actionId).toBe('gain')
-  expect(children[1].params).toEqual({ stone: 1 })
+  const children = (result!.flow as Extract<ActionFlow, { children: ActionFlow[] }>).children
+  const child0 = children[0] as Extract<ActionFlow, { type: 'leaf' }>
+  const child1 = children[1] as Extract<ActionFlow, { type: 'leaf' }>
+  expect(child0.actionId).toBe('pay')
+  expect(child0.params).toEqual({ food: 1 })
+  expect(child1.actionId).toBe('gain')
+  expect(child1.params).toEqual({ stone: 1 })
 }
 
 describe('C80_RockyTerrain', () => {

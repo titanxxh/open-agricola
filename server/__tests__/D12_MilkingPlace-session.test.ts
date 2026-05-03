@@ -74,8 +74,8 @@ describe('D12_MilkingPlace session', () => {
     }
 
     // Handle any animal reorgs
-    while (resp.pending.type === 'animalReorg') {
-      resp = session.confirmAnimalReorg(resp.pending.playerIndex, resp.interaction.zones)
+    while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones)
     }
 
     // Player 0 had 1 food, got 1 from MilkingPlace card = 2 food total.
@@ -109,8 +109,8 @@ describe('D12_MilkingPlace session', () => {
       resp = session.confirmHarvestFeed(pidx, [])
     }
 
-    while (resp.pending.type === 'animalReorg') {
-      resp = session.confirmAnimalReorg(resp.pending.playerIndex, resp.interaction.zones)
+    while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones)
     }
 
     // Without the card: 1 food, need 2, so 1 begging

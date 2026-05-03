@@ -353,13 +353,13 @@ export function autoAdvanceRoundEnd(
       resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
       continue
     }
-    if (resp.pending.type === 'animalReorg') {
+    if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
       // Default empty-zones wipes resources.{sheep,boar,cattle}; instead
       // build a zone list that preserves all current animals.
       const pi = resp.pending.playerIndex
       const player = session.getState().state.players[pi]
       const zones = player ? buildPreservingZones(player) : []
-      resp = session.confirmAnimalReorg(pi, zones)
+      resp = session.resolveChoice(pi, 'confirm', zones)
       continue
     }
     if (resp.pending.type === 'confirmNextPlayer') {

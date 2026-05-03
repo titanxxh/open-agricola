@@ -219,6 +219,7 @@ export class GameCore {
   private activeSpaceId: string | null = null
   private activePlayerIndex: number | null = null
   private stageResume: StageResumeState | null = null
+  private pausedEngine: { engine: Engine; engineSource: EngineSource; activeSpaceId: string; activePlayerIndex: number; stageResume: StageResumeState | null; deferredPlayerSwitch: { fromPlayerIndex: number; toPlayerIndex: number } | null } | null = null
   private pending: PendingAction = { type: 'none' }
   private history: HistoryEntry[] = []
   private actionStartIndex: number | null = null
@@ -637,7 +638,7 @@ export class GameCore {
   private getSpaceById(spaceId: string | null): ActionSpace | null {
     if (!spaceId) return null
     return this.state.actionSpaces.find((item) => item.id === spaceId)
-      ?? (spaceId.startsWith('__stage:') ? this.createSyntheticSpace(spaceId) : null)
+      ?? (spaceId.startsWith('__') ? this.createSyntheticSpace(spaceId) : null)
   }
 
   private getPlayerEffectCardIds(player: PlayerState) {
@@ -1684,7 +1685,22 @@ export class GameCore {
             stageResume.extra?.originPlayerIndex ?? null,
           )
         }
-        return
+        if (this.pausedEngine) {
+          const paused = this.pausedEngine
+          this.pausedEngine = null
+          this.engine = paused.engine
+          this.engineSource = paused.engineSource
+          this.activeSpaceId = paused.activeSpaceId
+          this.activePlayerIndex = paused.activePlayerIndex
+          this.stageResume = paused.stageResume
+          this.deferredPlayerSwitch = paused.deferredPlayerSwitch
+          this.runEngineSteps()
+          return
+        }
+        return this.continueAfterReorganize_roundEnd(
+          stageResume.playerIndex,
+          stageResume.extra?.originPlayerIndex ?? null,
+        )
       }
     }
   }
@@ -1719,11 +1735,12 @@ export class GameCore {
         }
         if (this.hasPendingAnimals(player)) {
           const pIdx = this.activePlayerIndex!
+          const originIdx = this.turnOwnerPlayerIndex ?? pIdx
           this.engine = null
           this.engineSource = null
           this.activeSpaceId = null
           this.activePlayerIndex = null
-          this.startReorganizeSubFlow(pIdx, 'anytime')
+          this.startReorganizeSubFlow(pIdx, 'anytime', { originPlayerIndex: originIdx })
           return
         }
         if (this.turnOwnerPlayerIndex !== null) {
@@ -1839,12 +1856,46 @@ export class GameCore {
         this.flushLeafActionDetail(step.actionId, Boolean(step.result.logKey))
       }
 
-      if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
+      if (step.type === 'ok' && step.result.type === 'animalReorg' && this.getAnimalCount(player) === this.getAnimalCount(before)) {
+        // breed action (e.g. B104 last-harvest enforcement) explicitly requests
+        // animalReorg with no new animal. Since getAnimalCount didn't increase,
+        // the general check below won't catch it — handle it here using the same
+        // pausedEngine + anytime pattern as the real-breed case.
         const pIdx = this.activePlayerIndex!
+        this.pausedEngine = {
+          engine: this.engine!,
+          engineSource: this.engineSource!,
+          activeSpaceId: this.activeSpaceId!,
+          activePlayerIndex: this.activePlayerIndex!,
+          stageResume: this.stageResume,
+          deferredPlayerSwitch: this.deferredPlayerSwitch,
+        }
         this.engine = null
         this.engineSource = null
         this.activeSpaceId = null
         this.activePlayerIndex = null
+        this.stageResume = null
+        this.deferredPlayerSwitch = null
+        this.startReorganizeSubFlow(pIdx, 'anytime')
+        return
+      }
+
+      if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
+        const pIdx = this.activePlayerIndex!
+        this.pausedEngine = {
+          engine: this.engine!,
+          engineSource: this.engineSource!,
+          activeSpaceId: this.activeSpaceId!,
+          activePlayerIndex: this.activePlayerIndex!,
+          stageResume: this.stageResume,
+          deferredPlayerSwitch: this.deferredPlayerSwitch,
+        }
+        this.engine = null
+        this.engineSource = null
+        this.activeSpaceId = null
+        this.activePlayerIndex = null
+        this.stageResume = null
+        this.deferredPlayerSwitch = null
         this.startReorganizeSubFlow(pIdx, 'anytime')
         return
       }

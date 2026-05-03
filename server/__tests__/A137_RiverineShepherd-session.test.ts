@@ -52,10 +52,10 @@ describe('A137_RiverineShepherd session', () => {
     // Use sheep-market; sheep collection triggers animalReorg first
     let resp = session.takeAction(0, 'sheep-market')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('animalReorg')
+    expect(resp.pending.type).toBe('choice')
 
     // Confirm animal reorg (place sheep in pasture)
-    resp = session.confirmAnimalReorg(0, [
+    resp = session.resolveChoice(0, 'confirm', [
       { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: 2 },
     ])
 
@@ -74,8 +74,8 @@ describe('A137_RiverineShepherd session', () => {
     }
 
     // Handle possible additional animalReorg if needed
-    if (resp.pending.type === 'animalReorg') {
-      resp = session.confirmAnimalReorg(0, [
+    if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(0, 'confirm', [
         { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: 2 },
       ])
     }
@@ -106,8 +106,8 @@ describe('A137_RiverineShepherd session', () => {
     }
 
     // Handle animalReorg if sheep was gained
-    if (resp.pending.type === 'animalReorg') {
-      resp = session.confirmAnimalReorg(0, [
+    if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(0, 'confirm', [
         { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: sheepBefore + 1 },
       ])
     }
@@ -127,9 +127,9 @@ describe('A137_RiverineShepherd session', () => {
 
     let resp = session.takeAction(0, 'sheep-market')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('animalReorg')
+    expect(resp.pending.type).toBe('choice')
 
-    resp = session.confirmAnimalReorg(0, [
+    resp = session.resolveChoice(0, 'confirm', [
       { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: 2 },
     ])
 
@@ -182,9 +182,9 @@ describe('A137_RiverineShepherd session', () => {
 
     let resp = session.takeAction(0, 'sheep-market')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('animalReorg')
+    expect(resp.pending.type).toBe('choice')
 
-    resp = session.confirmAnimalReorg(0, [
+    resp = session.resolveChoice(0, 'confirm', [
       { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: 2 },
     ])
 

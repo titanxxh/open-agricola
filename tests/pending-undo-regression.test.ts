@@ -348,8 +348,8 @@ describe('pending choice types + undo regression', () => {
       const resp = session.takeAction(0, 'sheep-market')
       if (!resp.ok) return
 
-      expect(resp.pending.type).toBe('animalReorg')
-      if (resp.pending.type === 'animalReorg') {
+      expect(resp.pending.type).toBe('choice')
+      if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
         expect(resp.pending.playerIndex).toBe(0)
       }
     })
@@ -363,9 +363,9 @@ describe('pending choice types + undo regression', () => {
       if (state.round < openRound) return
 
       const takeResp = session.takeAction(0, 'sheep-market')
-      if (!takeResp.ok || takeResp.pending.type !== 'animalReorg') return
+      if (!takeResp.ok || (takeResp.pending.type !== 'choice' || (takeResp.pending as any).promptKey !== 'ui.interactionAnimalReorg')) return
 
-      const resp = session.confirmAnimalReorg(0, [
+      const resp = session.resolveChoice(0, 'confirm', [
         { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
       ])
       expect(resp.ok).toBe(true)
