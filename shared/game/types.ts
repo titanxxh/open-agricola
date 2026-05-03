@@ -429,9 +429,21 @@ export type ActionChoiceOption = {
   disabledReasonKey?: string
 }
 
+/**
+ * `extraData.actionContextWrite` (optional, plain object): when present on a
+ * `{ type: 'choice' }` result, the engine shallow-merges its keys into
+ * `pendingChoiceContext.actionContext`, which then surfaces in
+ * `pending.actionContext` via `engine.snapshot()`. Used by ActionDef.resolveChoice
+ * to persist commit-time payload (e.g. fence geometry) across a payment-combo
+ * second prompt round-trip. Key conflicts: later writes overwrite earlier.
+ *
+ * Lifecycle: only consumed when the result type is 'choice' (which produces a
+ * new pending). For 'ok' / 'fail' / 'flow' results the field is ignored
+ * because pending is being cleared or transformed differently.
+ */
 export type ActionExecutionResult =
   | { type: 'ok'; logKey?: string; resourcesGained?: Partial<Resource>; resourcesPaid?: Partial<Resource>; logParams?: Record<string, unknown>; immediateLogs?: ImmediateLogEntry[]; extraData?: Record<string, unknown> }
-  | { type: 'choice'; promptKey?: string; promptParams?: Record<string, unknown>; options: ActionChoiceOption[] }
+  | { type: 'choice'; promptKey?: string; promptParams?: Record<string, unknown>; options: ActionChoiceOption[]; extraData?: Record<string, unknown> }
   | { type: 'animalReorg'; sourceId: string }
   | { type: 'fail'; logKey: string }
   | { type: 'flow'; flow: ActionFlow; logKey?: string; logParams?: Record<string, unknown>; immediateLogs?: ImmediateLogEntry[]; extraData?: Record<string, unknown> }
@@ -486,6 +498,7 @@ export type ActionDefinition = {
   resolveChoice?: (
     context: ActionExecutionContext,
     choice: string,
+    payload?: Record<string, unknown>,
   ) => ActionExecutionResult
   /**
    * Opt-out: when true the engine builds a bare ActionNode instead of the
