@@ -1,8 +1,14 @@
 import { MinorImprovement } from '../types'
 import { ensureCardState } from '../helpers/card-state'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
+import { familySize, newbornCount } from '../../game/player'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E30_ChildsToy'
+
+// BGA isBuyable: countFarmers(ADULT) != 2 → false. Adults = active workers that
+// are not newborns.
+registerPrerequisite('Exactly 2 Adults', (player) => familySize(player) - newbornCount(player) === 2)
 
 export const E30_ChildsToy = new MinorImprovement({
   id: CARD_ID,
