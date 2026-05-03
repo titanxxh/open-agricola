@@ -102,16 +102,6 @@ export const constructAction: ActionDefinition = {
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
     if (choice === 'cancel') return { type: 'ok' }
 
-    // Legacy compatibility (PR 5 transition): commitFarmChoice('room', ...)
-    // mutates state itself, then drives the engine with `engine.resolveChoice
-    // ('confirm', ..., resolvedResultOverride)` — `payload` is undefined and
-    // there is no farmPayload in actionContext. Treat that bare confirm as a
-    // no-op so after-hooks still fire. Removed in Task 3 once
-    // commitFarmChoice's room branch is gone.
-    if (choice === 'confirm' && !payload && !ctx.actionContext?.farmPayload) {
-      return { type: 'ok' }
-    }
-
     // Second call: payment combo selected after multi-combo prompt.
     if (choice.startsWith('pay:room:')) {
       const farmPayload = ctx.actionContext?.farmPayload as

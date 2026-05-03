@@ -68,14 +68,6 @@ describe('constructAction.resolveChoice', () => {
     expect(result.type).toBe('ok')
   })
 
-  it('legacy bare confirm without payload + no farmPayload returns ok (transitional no-op)', () => {
-    const ctx = makeCtx()
-    const result = constructAction.resolveChoice!(ctx, 'confirm')
-    expect(result.type).toBe('ok')
-    // No state mutation in the no-op branch.
-    expect(ctx.player.rooms).toBe(2)
-  })
-
   it('first call with payload + single payment combo finalizes immediately', () => {
     const room: FarmTilePosition = { row: 0, col: 0 }
     const ctx = makeCtx()
