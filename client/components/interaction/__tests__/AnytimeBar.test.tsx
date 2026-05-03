@@ -8,9 +8,9 @@ describe('AnytimeBar', () => {
   it('falls back to the source card name when the anytime label translation is missing', () => {
     const actions: AnytimeAction[] = [
       {
-        id: 'plow-builder-anytime',
-        labelKey: 'cards.E91_PlowBuilder.anytime',
-        sourceCard: 'E91_PlowBuilder',
+        id: 'fallback-anytime',
+        labelKey: 'cards.TESTONLY_FallbackPlaceholder.anytime',
+        sourceCard: 'TESTONLY_FallbackPlaceholder',
       },
     ]
 
@@ -23,7 +23,7 @@ describe('AnytimeBar', () => {
       />,
     )
 
-    expect(html).toContain('犁具建造者')
-    expect(html).not.toContain('cards.E91_PlowBuilder.anytime')
+    expect(html).toContain('TESTONLY Fallback Placeholder')
+    expect(html).not.toContain('cards.TESTONLY_FallbackPlaceholder.anytime')
   })
 })
