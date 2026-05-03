@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
+import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/B/B18_GrasslandHarrow'
 import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'B18_GrasslandHarrow'
 
-describe('B18_GrasslandHarrow session', () => {
+const findListener = (id: string) => getRegisteredCardListeners().find((l) => l.id === id)
+
+describe('B18_GrasslandHarrow onRoundStart (post 7b1 listener migration)', () => {
   const setupState = (round: number, resources: Partial<Record<string, number>>) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -24,62 +27,57 @@ describe('B18_GrasslandHarrow session', () => {
     return { session, state, player }
   }
 
-  it('onBuy places 1 field on round = current + (WOOD + STONE + CLAY + REED)', () => {
+  const fireAfterPay = (state: ReturnType<typeof setupState>['state'], player: ReturnType<typeof setupState>['player']) => {
+    const listener = findListener('B18-grassland-harrow-after-pay')!
+    executeCardListener(listener, {
+      state, player,
+      space: { id: 'improvement-any' } as never,
+      actionId: 'pay', phase: 'after',
+      sourceCard: CARD_ID,
+      result: { type: 'ok', resourcesPaid: { wood: 2 } },
+    } as unknown as CardListenerContext)
+  }
+
+  it('after-pay listener queues field at current round + reserve', () => {
     const { state, player } = setupState(3, {
       wood: 2, stone: 1, clay: 1, reed: 0, food: 0,
     })
-    // Total building resources = 4, target round = 3 + 4 = 7.
-    const effect = getCardEffect(CARD_ID)
-    expect(effect).toBeDefined()
-    const flow = effect!.onBuy!(state, player)
-    expect(flow).toBeDefined()
-
-    // Verify an entry for round 7 is queued as a future meeple.
-    // queueFutureMeeplesFlow pushes to pendingFutureMeeples until resolved.
+    fireAfterPay(state, player)
     expect(state.pendingFutureMeeples.length).toBe(1)
     const req = state.pendingFutureMeeples[0]!
     if ('entries' in req) {
+      // 2 + 1 + 1 + 0 = 4 → round 7
       expect(req.entries.map((e) => e.round)).toEqual([7])
+    } else {
+      throw new Error('expected entries-shaped future request')
     }
   })
 
-  it('onBuy clamps target round to 14', () => {
-    const { state, player } = setupState(12, {
-      wood: 5, stone: 5, clay: 5, reed: 5, food: 0,
-    })
-    // 12 + 20 = 32 → clamped to 14.
-    const effect = getCardEffect(CARD_ID)
-    effect!.onBuy!(state, player)
-    const req = state.pendingFutureMeeples[0]!
-    if ('entries' in req) {
-      expect(req.entries[0]!.round).toBe(14)
-    }
-  })
-
-  it('onBuy does nothing when player has 0 building resources', () => {
+  it('onBuy is now a no-op (listener drives the future meeple)', () => {
     const { state, player } = setupState(3, {
-      wood: 0, stone: 0, clay: 0, reed: 0, food: 2,
+      wood: 2, stone: 1, clay: 1, reed: 0, food: 0,
     })
     const effect = getCardEffect(CARD_ID)
+    expect(effect).toBeDefined()
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeUndefined()
     expect(state.pendingFutureMeeples.length).toBe(0)
   })
 
-  it('onRoundStart offers optional plow at the target round', () => {
+  it('onRoundStart offers optional plow at the target round (driven by listener-set targetRound)', () => {
     const { state, player } = setupState(3, {
       wood: 1, stone: 1, clay: 0, reed: 0, food: 0,
     })
     player.minorPlayed.push(CARD_ID)
-    const effect = getCardEffect(CARD_ID)
-    effect!.onBuy!(state, player)
+    fireAfterPay(state, player)
     // target round = 3 + 2 = 5
     state.round = 5
+    const effect = getCardEffect(CARD_ID)
     const flow = effect!.onRoundStart!(state, player)
     expect(flow).toBeDefined()
-    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).type).toBe('seq')
-    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
-    expect((flow as Extract<ActionFlow, { type: 'seq' }>).children[0].actionId).toBe('plow')
+    expect((flow as Extract<ActionFlow, { type: 'seq' }>).type).toBe('seq')
+    expect((flow as Extract<ActionFlow, { type: 'seq' }>).optional).toBe(true)
+    expect((flow as Extract<ActionFlow, { type: 'seq' }>).children[0]!.actionId).toBe('plow')
   })
 
   it('onRoundStart returns nothing when it is not the target round', () => {
@@ -87,9 +85,9 @@ describe('B18_GrasslandHarrow session', () => {
       wood: 1, stone: 0, clay: 0, reed: 0,
     })
     player.minorPlayed.push(CARD_ID)
-    const effect = getCardEffect(CARD_ID)
-    effect!.onBuy!(state, player)
+    fireAfterPay(state, player)
     state.round = 6
+    const effect = getCardEffect(CARD_ID)
     const flow = effect!.onRoundStart!(state, player)
     expect(flow).toBeUndefined()
   })
