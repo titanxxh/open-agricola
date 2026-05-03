@@ -399,7 +399,12 @@ export const en = {
     harvestFeedConfirm: 'Confirm feeding',
     harvestFeedProgress: '{fed}/{required} · Begging {begging}',
     heldWorkerOnCard: 'Worker on card',
-  },
+      interactionExchangeChoice: 'Choose exchange',
+    interactionSlurrySow: 'Choose to sow (Slurry)',
+    optionalBuildRoom: 'Optionally build a room',
+    stubBonus: 'Bonus',
+    stubPayGainVpPrompt: 'Pay to gain VP',
+},
   prompt: {
     selectPayment: 'Choose payment method',
     selectPaymentOption: 'Payment option',
@@ -496,7 +501,65 @@ export const en = {
     'emit-choice': { name: 'Emit Choice', description: 'Card-driven player choice' },
     selection: { name: 'Selection', description: 'Select positions or cards from hand' },
     'set-first-player': { name: 'Set First Player', description: 'Mark this player as the new starting player' },
-  },
+      'apply-improvement': {
+      description: 'Play 1 improvement',
+          name: 'Play Improvement',
+},
+    'apply-occupation-play': {
+      description: 'Play 1 occupation',
+    },
+    'apply-renovation': {
+      description: 'Renovate',
+    },
+    'build-farmhand-room': {
+      description: 'Build Farm Hand Room',
+          name: 'Build Farm Hand Room',
+},
+    collect: {
+      description: 'Collect {resources_desc}',
+          name: 'Collect',
+},
+    emitChoice: {
+      description: 'Gain {resources_desc}',
+          name: 'Choose to Gain',
+},
+    exchange: {
+      description: 'Exchange resources',
+          name: 'Exchange',
+},
+    gain: {
+      description: 'Gain {resources_desc}',
+          name: 'Gain',
+},
+    'move-farmer-to-space': {
+      description: 'Move farmer to action space',
+          name: 'Move Farmer',
+},
+    'pay-grain-any': {
+      description: 'Pay any grain',
+          name: 'Pay Grain',
+},
+    'place-farmer': {
+      description: 'Place farmer on {action_space}',
+          name: 'Place Farmer',
+},
+    'pop-card-stack': {
+      description: 'Remove {resources_desc} from {card}',
+          name: 'Remove Resources',
+},
+    'push-to-card-stack': {
+      description: 'Add {resources_desc} to {card}',
+          name: 'Add Resources',
+},
+    'spend-worker': {
+      description: 'Spend 1 worker',
+          name: 'Spend Worker',
+},
+    'take-from-space': {
+      description: 'Take {resources_desc} from {action_space}',
+          name: 'Take from Space',
+},
+},
   improvements: {
     Major_Fireplace1: { name: 'Fireplace', description: 'Bake bread: 1 grain → 2 food' },
     Major_Fireplace2: { name: 'Fireplace', description: 'Bake bread: 1 grain → 2 food' },
@@ -818,7 +881,20 @@ export const en = {
     cardJumpedToSpace: '{player} used {cardName} to jump {worker} to {targetSpace}',
     bakeBreadResult: '{player} bakes bread: {grainUsed} grain → {foodGained} food using {improvement}',
     improvementFail: '{player} failed to take improvement',
-  },
+      actionFail: 'Action failed',
+    actionNoExchange: 'No exchange possible',
+    buildFarmHandRoom: '{actplayer} built a Farm Hand Room',
+    exchangeFail: 'Exchange failed',
+    fencingFail: 'Fencing failed',
+    minorImprovementFail: 'Minor improvement play failed',
+    occupationFail: 'Occupation play failed',
+    payFail: 'Payment failed',
+    renovationFail: 'Renovation failed',
+    specialEffectFail: 'Special effect failed',
+    takeFromSpaceInvalid: 'Invalid take from space',
+    takeFromSpaceNoSpace: 'No space to take from',
+    takeFromSpaceNotEnough: 'Not enough resources on space',
+},
   platform: {
     loading: 'Loading...',
     loginTitle: 'Open Agricola',
@@ -1105,11 +1181,71 @@ export const en = {
       choicePass: 'Give to next player',
       choicePlayDisabled: 'Not enough food (need 2)',
     },
-  },
+      B157_Salter: {
+      anytime: 'Salter: Pay 1 Food → 1 Food',
+    },
+    B69_PottersMarket: {
+      anytime: 'Potter\'s Market: Pay 1 Clay → 1 Food',
+    },
+    B85_FarmHand: {
+      anytime: 'Farm Hand: Pay 1 Food → 1 Grain',
+    },
+    C150_ParrotBreeder: {
+      anytime: 'Parrot Breeder: Pay 1 Food → 1 Food',
+    },
+    C39_StudioBoat: {
+      desc: 'Gain 1 occupation card',
+          name: 'Studio Boat',
+},
+    C57_Crudite: {
+      anytime: 'Crudite: Pay 1 Food → 1 Food',
+    },
+    C69_LandConsolidation: {
+      anytime: 'Land Consolidation: Pay 1 Food → 1 Field',
+    },
+    C94_StableCleaner: {
+      anytime: 'Stable Cleaner: Pay 1 Food → 1 Food',
+    },
+    D106_WhiskyDistiller: {
+      anytime: 'Whisky Distiller: Pay 1 Grain → 1 Food',
+    },
+    D114_SeedTrader: {
+      anytime: 'Seed Trader: Pay 1 Food → 1 Grain',
+    },
+    D13_Trowel: {
+      anytime: 'Trowel: Pay 1 Food → 1 Clay',
+    },
+    D53_TeaHouse: {
+      anytime: 'Tea House: Pay 1 Food → 1 Food',
+    },
+    E13_StoneHouseReconstruction: {
+      anytime: 'Stone House Reconstruction: Pay 1 Food → 1 Stone',
+    },
+    E14_WoodSaw: {
+      anytime: 'Wood Saw: Pay 1 Food → 1 Wood',
+    },
+    E22_GuestRoom: {
+      anytime: 'Guest Room: Pay 1 Food → 1 Food',
+    },
+    E27_PiggyBank: {
+      anytime: 'Piggy Bank: Pay 1 Food → 1 Food',
+    },
+    E62_SourDough: {
+      anytime: 'Sour Dough: Pay 1 Food → 1 Grain',
+    },
+},
   fence: {
     error: {
       EDGE_TYPE_CONFLICT: 'Cannot select fence and palisade on the same segment',
       PALISADES_NOT_UNLOCKED: 'Wood Palisades card not played',
     },
+  },
+  'invalid extra sow field': 'Invalid extra sow field',
+  NO_SELECTION: 'No selection',
+  test: {
+    sink: {
+      description: 'Test: Sink resources',
+          name: 'Test: Sink',
+},
   },
 }

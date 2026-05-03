@@ -386,7 +386,12 @@ export const zh = {
     harvestFeedConfirm: '确认喂养',
     harvestFeedProgress: '{fed}/{required} · 乞讨 {begging}',
     heldWorkerOnCard: '工人寄存在卡上',
-  },
+      interactionExchangeChoice: '选择兑换',
+    interactionSlurrySow: '选择播种（粪肥）',
+    optionalBuildRoom: '选择是否建造房间',
+    stubBonus: '额外奖励',
+    stubPayGainVpPrompt: '支付以获得胜利点',
+},
   prompt: {
     selectPayment: '选择支付方式',
     selectPaymentOption: '支付选项',
@@ -477,7 +482,65 @@ export const zh = {
     'emit-choice': { name: '卡牌抉择', description: '卡牌触发的玩家抉择' },
     selection: { name: '选择', description: '从手牌或农场中选择位置或卡牌' },
     'set-first-player': { name: '设为先手', description: '将该玩家设为新的先手玩家' },
-  },
+      'apply-improvement': {
+      description: '打出 1 张改良',
+          name: '打出改良',
+},
+    'apply-occupation-play': {
+      description: '打出 1 张职业',
+    },
+    'apply-renovation': {
+      description: '翻修',
+    },
+    'build-farmhand-room': {
+      description: '建造帮工房',
+          name: '建造帮工房',
+},
+    collect: {
+      description: '收集 {resources_desc}',
+          name: '收集',
+},
+    emitChoice: {
+      description: '获得 {resources_desc}',
+          name: '选择获得',
+},
+    exchange: {
+      description: '兑换资源',
+          name: '兑换',
+},
+    gain: {
+      description: '获得 {resources_desc}',
+          name: '获得',
+},
+    'move-farmer-to-space': {
+      description: '将农夫移动到行动格',
+          name: '移动农夫',
+},
+    'pay-grain-any': {
+      description: '支付任意谷物',
+          name: '支付谷物',
+},
+    'place-farmer': {
+      description: '将农夫放置到 {action_space}',
+          name: '放置农夫',
+},
+    'pop-card-stack': {
+      description: '从 {card} 移除 {resources_desc}',
+          name: '移除资源',
+},
+    'push-to-card-stack': {
+      description: '将 {resources_desc} 添加到 {card}',
+          name: '添加资源',
+},
+    'spend-worker': {
+      description: '花费 1 名农夫',
+          name: '花费农夫',
+},
+    'take-from-space': {
+      description: '从 {action_space} 拿取 {resources_desc}',
+          name: '从行动格拿取',
+},
+},
   improvements: {
     Major_Fireplace1: { name: '壁炉', description: '烤面包：1 谷物 → 2 食物' },
     Major_Fireplace2: { name: '壁炉', description: '烤面包：1 谷物 → 2 食物' },
@@ -798,7 +861,20 @@ export const zh = {
     cardJumpedToSpace: '{player} 用 {cardName} 把 {worker} 跳到 {targetSpace}',
     bakeBreadResult: '{player} 烤面包: {grainUsed} 谷物 → {foodGained} 食物',
     improvementFail: '{player} 改良失败',
-  },
+      actionFail: '行动失败',
+    actionNoExchange: '无法兑换',
+    buildFarmHandRoom: '{actplayer} 建造了帮工房',
+    exchangeFail: '兑换失败',
+    fencingFail: '围栏失败',
+    minorImprovementFail: '打出小型改良失败',
+    occupationFail: '打出职业失败',
+    payFail: '支付失败',
+    renovationFail: '翻修失败',
+    specialEffectFail: '特殊效果失败',
+    takeFromSpaceInvalid: '从行动格拿取资源无效',
+    takeFromSpaceNoSpace: '没有可拿取资源的行动格',
+    takeFromSpaceNotEnough: '行动格资源不足',
+},
   platform: {
     loading: '加载中...',
     loginTitle: 'Open Agricola',
@@ -1064,11 +1140,122 @@ export const zh = {
       choicePass: '传给下家',
       choicePlayDisabled: '食物不足（需要 2）',
     },
-  },
+      A153_PigOwner: {
+      anytime: '养猪人：付1食物 → 获1猪',
+    },
+    A71_ClearingSpade: {
+      anytime: '清地铲：付1食物 → 获1田地',
+    },
+    B157_Salter: {
+      anytime: '腌肉工：付1食物 → 获1食物',
+    },
+    B35_HookKnife: {
+      anytime: '钩刀：付1食物 → 获1木材',
+    },
+    B69_PottersMarket: {
+      anytime: '陶器市场：付1黏土 → 获1食物',
+    },
+    B85_FarmHand: {
+      anytime: '帮工：付1食物 → 获1谷物',
+    },
+    C101_StallHolder: {
+      anytime: '摊主：付1食物 → 获1食物',
+    },
+    C115_Sower: {
+      anytime: '播种人：付1食物 → 获1谷物',
+    },
+    C143_StoneBuyer: {
+      anytime: '石材买家：付1食物 → 获1石头',
+    },
+    C150_ParrotBreeder: {
+      anytime: '鹦鹉饲养员：付1食物 → 获1食物',
+    },
+    C18_RollOverPlow: {
+      anytime: '翻转犁：付1食物 → 获1田地',
+    },
+    C39_StudioBoat: {
+      desc: '获得 1 张职业卡',
+          name: '工作室船',
+},
+    C46_Mandoline: {
+      anytime: '曼陀林：付1食物 → 获1蔬菜',
+    },
+    C57_Crudite: {
+      anytime: '蔬菜拼盘：付1食物 → 获1食物',
+    },
+    C64_CornSchnappsDistillery: {
+      anytime: '玉米烧酒厂：付1谷物 → 获1食物',
+    },
+    C69_LandConsolidation: {
+      anytime: '土地整合：付1食物 → 获1田地',
+    },
+    C84_PerennialRye: {
+      anytime: '多年生黑麦：付1食物 → 获1谷物',
+    },
+    C85_DenBuilder: {
+      anytime: '兽穴建造者：付1木材 → 获1野猪',
+    },
+    C87_Mason: {
+      anytime: '泥瓦匠：付1食物 → 获1石头',
+    },
+    C94_StableCleaner: {
+      anytime: '马厩清洁工：付1食物 → 获1食物',
+    },
+    D106_WhiskyDistiller: {
+      anytime: '威士忌酿酒师：付1谷物 → 获1食物',
+    },
+    D114_SeedTrader: {
+      anytime: '种子商人：付1食物 → 获1谷物',
+    },
+    D124_Emissary: {
+      anytime: '使者：付1食物 → 获1食物',
+    },
+    D13_Trowel: {
+      anytime: '泥刀：付1食物 → 获1黏土',
+    },
+    D46_PelletPress: {
+      anytime: '颗粒压榨机：付1木材 → 获1食物',
+    },
+    D53_TeaHouse: {
+      anytime: '茶馆：付1食物 → 获1食物',
+    },
+    D71_Changeover: {
+      anytime: '轮作：付1食物 → 获1田地',
+    },
+    D87_MasterBuilder: {
+      anytime: '建筑大师：付1食物 → 获1石头',
+    },
+    E13_StoneHouseReconstruction: {
+      anytime: '石屋重建：付1食物 → 获1石头',
+    },
+    E14_WoodSaw: {
+      anytime: '木锯：付1食物 → 获1木材',
+    },
+    E22_GuestRoom: {
+      anytime: '客房：付1食物 → 获1食物',
+    },
+    E27_PiggyBank: {
+      anytime: '存钱罐：付1食物 → 获1食物',
+    },
+    E62_SourDough: {
+      anytime: '酸面团：付1食物 → 获1谷物',
+    },
+    E91_PlowBuilder: {
+      anytime: '犁地工：付1食物 → 获1田地',
+    },
+},
   fence: {
     error: {
       EDGE_TYPE_CONFLICT: '同一段不能同时选为围栏和木桩',
       PALISADES_NOT_UNLOCKED: '尚未打出 Wood Palisades',
     },
+  },
+  'invalid extra sow field': '无效的额外播种田地',
+  NO_SELECTION: '未选择',
+  test: {
+    sink: {
+      description: '测试：消耗资源',
+          name: '测试：消耗',
+},
   },
 }
