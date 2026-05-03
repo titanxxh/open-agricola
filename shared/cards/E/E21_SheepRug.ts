@@ -1,12 +1,28 @@
 import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionChoiceOption } from '../../game/types'
+import type { ActionChoiceOption, PlayerState } from '../../game/types'
 import { isSpaceOccupied } from '../../game/space'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E21_SheepRug'
+
+const countSheepOnBoard = (player: PlayerState): number => {
+  let total = 0
+  for (const pasture of player.pastures) {
+    if (pasture.animalType === 'sheep') total += pasture.animalCount
+  }
+  if (player.houseAnimalType === 'sheep') total += player.houseAnimalCount
+  for (const animal of Object.values(player.stableAnimals ?? {})) {
+    if (animal === 'sheep') total += 1
+  }
+  return total
+}
+
+// BGA isBuyable: countAnimalsOnBoard()[SHEEP] < 4 → false
+registerPrerequisite('4 Sheep', (player) => countSheepOnBoard(player) >= 4)
 const WISH_SPACE_IDS = ['wish-children', 'urgent-wish-children']
 
 const computeArgsListener: CardListenerRegistration = {
