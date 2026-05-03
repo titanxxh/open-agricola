@@ -1,9 +1,16 @@
 import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C20_MolePlow'
+
+// BGA isBuyable: turn < 9 → false
+registerPrerequisite('Play in Round 9 or Later', (_player, state) => {
+  if (!state) return true
+  return state.round >= 9
+})
 
 const listener: CardListenerRegistration = {
   id: 'C20-mole-plow-after-place-farmer',

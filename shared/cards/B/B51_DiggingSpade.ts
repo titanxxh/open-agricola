@@ -3,6 +3,7 @@ import type { PlayerState, Pasture } from '../../game/types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B51_DiggingSpade'
@@ -12,10 +13,16 @@ const CARD_ID = 'B51_DiggingSpade'
  * you also get a number of FOOD equal to the number of PIG (boar) in your farmyard.
  *
  * BGA (B51_DiggingSpade.php): isBeforeCollectEvent($event, CLAY) → onPlayerPlaceFarmer
- * returns gainNode([FOOD => pigs]). Play-in-round-7-or-later is enforced via isBuyable,
- * not the trigger; we do not replicate the prerequisite here (other cards rely on the
- * card-acquisition pipeline for such constraints).
+ * returns gainNode([FOOD => pigs]). Play-in-round-7-or-later is enforced via isBuyable
+ * which we mirror via the prerequisite registration below. (A52_ThrowingAxe shares the
+ * same label and registers an identical handler.)
  */
+
+// BGA isBuyable: turn < 7 → false.
+registerPrerequisite('Play in Round 7 or Later', (_player, state) => {
+  if (!state) return true
+  return state.round >= 7
+})
 const countBoarInFarmyard = (player: PlayerState): number => {
   const inHouse = player.houseAnimalType === 'boar' ? player.houseAnimalCount : 0
   const inStables = Object.values(player.stableAnimals ?? {}).filter(

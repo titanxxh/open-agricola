@@ -106,17 +106,21 @@ describe('C52_HuntsmansHat', () => {
     }
   })
 
+  // BGA C52 listens to **any** Gain event with `fromActionSpace`. We mirror
+  // that with a `phase: 'after'` listener on { gain | collect | receive } and
+  // gate on resourcesGained.boar > 0.
+
   it('adds food equal to boar gained from pig-market collect', () => {
     const listener = cardApi.getRegisteredCardListeners().find(
-      (entry) => entry.id === 'C52-huntsmans-hat-after-collect',
+      (entry) => entry.id === 'C52-huntsmans-hat-after-boar-gain',
     )
     const player = createPlayer()
     const context = {
       state: createState(),
       player,
       space: { ...createSpace('pig-market'), resources: { ...createSpace('pig-market').resources, boar: 2 } },
-      actionId: 'pig-market',
-      phase: 'immediatelyAfter',
+      actionId: 'collect',
+      phase: 'after',
       result: { type: 'ok', resourcesGained: { boar: 2 } } as ActionExecutionResult,
     }
     const result = listener?.handler(context as unknown as ActionHookContext)
@@ -129,18 +133,38 @@ describe('C52_HuntsmansHat', () => {
     expect(result?.sourceCard).toBe(CARD_ID)
   })
 
-  it('does nothing when collect is not from pig-market', () => {
+  it('also fires for non-pig-market spaces when a boar is gained (BGA generic behavior)', () => {
     const listener = cardApi.getRegisteredCardListeners().find(
-      (entry) => entry.id === 'C52-huntsmans-hat-after-collect',
+      (entry) => entry.id === 'C52-huntsmans-hat-after-boar-gain',
     )
     const player = createPlayer()
     const context = {
       state: createState(),
       player,
       space: createSpace('day-laborer'),
-      actionId: 'pig-market',
-      phase: 'before',
-      result: { type: 'ok', resourcesGained: { boar: 2 } } as ActionExecutionResult,
+      actionId: 'gain',
+      phase: 'after',
+      result: { type: 'ok', resourcesGained: { boar: 1 } } as ActionExecutionResult,
+    }
+    const result = listener?.handler(context as unknown as ActionHookContext)
+    expect(result?.flow).toBeDefined()
+    if (result?.flow?.type === 'leaf') {
+      expect(result.flow.params).toEqual({ food: 1 })
+    }
+  })
+
+  it('does nothing when no boar is gained', () => {
+    const listener = cardApi.getRegisteredCardListeners().find(
+      (entry) => entry.id === 'C52-huntsmans-hat-after-boar-gain',
+    )
+    const player = createPlayer()
+    const context = {
+      state: createState(),
+      player,
+      space: createSpace('day-laborer'),
+      actionId: 'collect',
+      phase: 'after',
+      result: { type: 'ok', resourcesGained: {} } as ActionExecutionResult,
     }
     const result = listener?.handler(context as unknown as ActionHookContext)
     expect(result).toBeUndefined()

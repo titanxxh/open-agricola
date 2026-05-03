@@ -31,7 +31,7 @@ const anytimeListener: CardListenerRegistration = {
           // Pop 'food' from card stack → gives +1 food to player
           { type: 'leaf', actionId: 'pop-card-stack', sourceCard: CARD_ID },
           // Pay the food back → net 0 for player, card loses 1 food
-          { type: 'leaf', actionId: 'pay-resources', params: { food: 1 }, sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'pay', params: { food: 1 }, sourceCard: CARD_ID },
           // Flag card (once per round)
           { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
           // Grow family without room

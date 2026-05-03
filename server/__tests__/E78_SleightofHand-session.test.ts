@@ -83,7 +83,7 @@ describe('E78_SleightofHand session', () => {
         c.children[1].params?.clay === 1,
     )
     expect(woodToClayOption).toBeDefined()
-    expect(woodToClayOption.children[0].actionId).toBe('pay-resources')
+    expect(woodToClayOption.children[0].actionId).toBe('pay')
     expect(woodToClayOption.children[1].actionId).toBe('gain')
   })
 

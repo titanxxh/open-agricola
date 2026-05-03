@@ -19,11 +19,11 @@ registerPlayerActionSpace({
       return otherPlayers.length > 0 && otherPlayers.every((p) => p.rooms > player.rooms)
     },
     execute: () => {
-      // xor of: Day Laborer (gain 2 food), construct (build 1 room), Major Improvement
+      // BGA NODE_OR: all three children may be executed (in any subset).
       return {
         type: 'flow',
         flow: {
-          type: 'xor',
+          type: 'or',
           children: [
             { type: 'leaf', actionId: 'day-laborer', sourceCard: CARD_ID },
             { type: 'leaf', actionId: 'construct', sourceCard: CARD_ID },

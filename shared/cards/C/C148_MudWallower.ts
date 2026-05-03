@@ -92,6 +92,26 @@ const syncHeldAfterPlaceFarmerListener: CardListenerRegistration = {
   },
 }
 
+/**
+ * 7b1 PR-4 migration: cover any pay path that drains pigs (BeggingCard pay,
+ * cooking pay, future improvement-buy pay variants paying boar). When the
+ * pay leaf reports `resourcesPaid.boar > 0`, sync the held cap downward to
+ * match `min(held, boar)`. Always-permanent: never raises the cap.
+ */
+const afterPaySyncListener: CardListenerRegistration = {
+  id: 'C148-mud-wallower-after-pay-sync',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['pay'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    const result = context.result
+    if (!result || result.type !== 'ok') return
+    const resourcesPaid = (result.resourcesPaid as { boar?: number } | undefined) ?? {}
+    if (!resourcesPaid.boar || resourcesPaid.boar <= 0) return
+    syncHeldDownward(context.player)
+  },
+}
+
 export const C148_MudWallower = new Occupation({
   id: CARD_ID,
   name: 'Mud Wallower',
@@ -106,7 +126,7 @@ export const C148_MudWallower = new Occupation({
 })
 
 export const C148_MudWallower_impl = {
-  listeners: [afterPlaceFarmerListener, afterExchangeSyncListener, syncHeldAfterPlaceFarmerListener],
+  listeners: [afterPlaceFarmerListener, afterExchangeSyncListener, syncHeldAfterPlaceFarmerListener, afterPaySyncListener],
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {

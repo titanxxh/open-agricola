@@ -130,7 +130,7 @@ describe('D103_CanalBoatman listener', () => {
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.optional).toBe(true)
     expect(flow.children).toHaveLength(3)
-    expect(flow.children[0].actionId).toBe('pay-resources')
+    expect(flow.children[0].actionId).toBe('pay')
     expect(flow.children[0].params).toEqual({ food: 1 })
     expect(flow.children[1].actionId).toBe('spend-worker')
     expect(flow.children[2].type).toBe('xor')

@@ -1,11 +1,50 @@
 import { MinorImprovement } from '../types'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow, Resource } from '../../game/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B18_GrasslandHarrow'
 const TARGET_ROUND_KEY = 'targetRound'
+
+/**
+ * 7b1 PR-4 migration: queue the future field via an `actions: ['pay']`
+ * after-listener gated on `sourceCard === CARD_ID` (only B18's own purchase
+ * payment counts). Mirrors BGA `onPlayerAfterPay` semantics — reserve is
+ * counted from supply *after* the play cost has been drained, matching the
+ * legacy onBuy-time behaviour exactly because apply-improvement runs onBuy
+ * after pay anyway.
+ */
+const afterPayListener: CardListenerRegistration = {
+  id: 'B18-grassland-harrow-after-pay',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['pay'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.sourceCard !== CARD_ID) return
+    const result = context.result
+    if (!result || result.type !== 'ok') return
+    const supply = context.player.resources as Resource
+    const reserve =
+      (supply.wood ?? 0) +
+      (supply.clay ?? 0) +
+      (supply.stone ?? 0) +
+      (supply.reed ?? 0)
+    if (reserve <= 0) return
+    const targetRound = Math.min(14, context.state.round + reserve)
+    writeCardExtraData(context.player, CARD_ID, TARGET_ROUND_KEY, targetRound)
+    return {
+      flow: queueFutureMeeplesFlow(context.state, {
+        cardId: CARD_ID,
+        playerId: context.player.id,
+        entries: [{ round: targetRound, resources: {} }],
+      }),
+      sourceCard: CARD_ID,
+    }
+  },
+}
 
 export const B18_GrasslandHarrow = new MinorImprovement({
   id: CARD_ID,
@@ -23,23 +62,12 @@ export const B18_GrasslandHarrow = new MinorImprovement({
 })
 
 export const B18_GrasslandHarrow_impl = {
+  listeners: [afterPayListener],
   effect: {
   id: CARD_ID,
-  onBuy: (state, player) => {
-    const buildingResources =
-      (player.resources.wood ?? 0) +
-      (player.resources.stone ?? 0) +
-      (player.resources.clay ?? 0) +
-      (player.resources.reed ?? 0)
-    if (buildingResources <= 0) return
-    const targetRound = Math.min(14, state.round + buildingResources)
-    writeCardExtraData(player, CARD_ID, TARGET_ROUND_KEY, targetRound)
-    return queueFutureMeeplesFlow(state, {
-      cardId: CARD_ID,
-      playerId: player.id,
-      entries: [{ round: targetRound, resources: {} }],
-    })
-  },
+  // onBuy is intentionally a no-op: the after-pay listener queues the future
+  // field. Keeping the entry so onRoundStart still binds via getCardEffect().
+  onBuy: () => undefined,
   onRoundStart: (state, player) => {
     const targetRound = readCardExtraData<number>(player, CARD_ID, TARGET_ROUND_KEY)
     if (targetRound !== state.round) return

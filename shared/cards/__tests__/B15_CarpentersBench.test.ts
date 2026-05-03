@@ -53,7 +53,7 @@ const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
 
 describe('B15_CarpentersBench', () => {
-  it('triggers after collecting from a wood accumulation space', () => {
+  it('triggers after collecting wood from a wood space, max=n+1 with benchWood=n', () => {
     const listener = findListener('B15-carpenters-bench-after-collect')
     expect(listener).toBeDefined()
     const player = createPlayer()
@@ -66,13 +66,60 @@ describe('B15_CarpentersBench', () => {
       space: woodSpace,
       actionId: 'collect',
       phase: 'after',
+      // Actually-collected wood (BGA L42-46 counts wood meeples on space) is
+      // the source of truth for bench cap, not space.gainPerRound.
+      result: { type: 'ok', resourcesGained: { wood: 3 } },
     })
     expect(result).toBeDefined()
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
-    expect(flow.children[0].actionId).toBe('fence')
-    expect(flow.children[0].sourceCard).toBe(CARD_ID)
+    const fenceLeaf = flow.children[0] as Extract<ActionFlow, { type: 'leaf' }>
+    expect(fenceLeaf.actionId).toBe('fence')
+    expect(fenceLeaf.sourceCard).toBe(CARD_ID)
+    // BGA L58-59: max = n+1, benchWood = n
+    expect(fenceLeaf.actionContext?.max).toBe(4)
+    expect(fenceLeaf.actionContext?.benchWood).toBe(3)
+  })
+
+  it('uses actually-collected wood, not gainPerRound', () => {
+    const listener = findListener('B15-carpenters-bench-after-collect')
+    const player = createPlayer()
+    const state = createState(player)
+    // Space declares wood:3 per round, but the player only got 1 wood this
+    // particular collect (e.g. due to other accumulations consumed earlier).
+    const woodSpace = createSpace('forest', { gainPerRound: { wood: 3 } })
+
+    const result = executeCardListener(listener!, {
+      state,
+      player,
+      space: woodSpace,
+      actionId: 'collect',
+      phase: 'after',
+      result: { type: 'ok', resourcesGained: { wood: 1 } },
+    })
+    expect(result).toBeDefined()
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
+    const fenceLeaf = flow.children[0] as Extract<ActionFlow, { type: 'leaf' }>
+    expect(fenceLeaf.actionContext?.max).toBe(2)
+    expect(fenceLeaf.actionContext?.benchWood).toBe(1)
+  })
+
+  it('does not trigger when no wood was actually collected', () => {
+    const listener = findListener('B15-carpenters-bench-after-collect')
+    const player = createPlayer()
+    const state = createState(player)
+    const woodSpace = createSpace('forest', { gainPerRound: { wood: 3 } })
+
+    const result = executeCardListener(listener!, {
+      state,
+      player,
+      space: woodSpace,
+      actionId: 'collect',
+      phase: 'after',
+      result: { type: 'ok', resourcesGained: {} },
+    })
+    expect(result).toBeUndefined()
   })
 
   it('does not trigger for non-wood accumulation spaces', () => {
@@ -87,6 +134,7 @@ describe('B15_CarpentersBench', () => {
       space: claySpace,
       actionId: 'collect',
       phase: 'after',
+      result: { type: 'ok', resourcesGained: { clay: 1 } },
     })
     expect(result).toBeUndefined()
   })

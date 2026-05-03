@@ -77,7 +77,7 @@ const listener: CardListenerRegistration = {
         },
         {
           type: 'leaf',
-          actionId: 'pay-resources',
+          actionId: 'pay',
           sourceCard: CARD_ID,
           params: { sheep: 1, food: 2 },
         },

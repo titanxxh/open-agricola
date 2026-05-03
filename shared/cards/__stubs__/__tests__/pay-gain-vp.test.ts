@@ -13,7 +13,7 @@ import { internalActionDefinitions } from '../../../actions/internal-actions'
 import { computeScores } from '../../../logic/scoring'
 
 const gainAction = internalActionDefinitions.find(a => a.id === 'gain')!
-const payResourcesAction = internalActionDefinitions.find(a => a.id === 'pay-resources')!
+const payResourcesAction = internalActionDefinitions.find(a => a.id === 'pay')!
 const bonusVpAction = internalActionDefinitions.find(a => a.id === 'bonus-vp')!
 
 const makeRenovateAction = (): ActionDefinition => ({

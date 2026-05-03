@@ -3,15 +3,14 @@ import type {
   ActionCostPreview,
   ActionDefinition,
   ActionExecutionResult,
+  ActionFlow,
   PlayerState,
   Resource,
 } from '../../game/types'
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'
 import {
   canAffordTypedFlatCost,
-  executeResolvedTypedFlatPayment,
   payTypedFlatCost,
-  resolveCostPaymentSelection,
 } from '../helpers/pay-helpers'
 
 const RENOVATE_PAYMENT_PREFIX = 'pay:renovate'
@@ -33,6 +32,34 @@ const parseRenovatePaymentChoice = (
 }
 
 type RenovationTarget = Exclude<PlayerState['houseType'], 'wood'>
+
+const buildRenovationFlow = (
+  target: RenovationTarget,
+  totalCost: Partial<Resource>,
+): ActionFlow => ({
+  type: 'seq',
+  children: [
+    {
+      type: 'leaf',
+      actionId: 'pay',
+      // Wrap as ComplexCost so the pay leaf's multi-solution branch runs and
+      // surfaces a `prompt.selectPayment` choice when bonus modifiers (e.g.
+      // A123 FrameBuilder, A87 Conservator) make more than one variant
+      // affordable. A bare Partial<Resource> cost would auto-pay eagerly.
+      params: {
+        cost: { fee: totalCost },
+        costType: 'renovation',
+        optionPrefix: renovatePaymentOptionPrefix(target),
+      },
+      actionContext: { costType: 'renovation' },
+    },
+    {
+      type: 'leaf',
+      actionId: 'apply-renovation',
+      params: { nextType: target },
+    },
+  ],
+})
 
 type RenovationPlan = {
   nextType: RenovationTarget
@@ -171,6 +198,12 @@ export const renovateHouseAction: ActionDefinition = {
   noChoiceLogKey: 'log.renovationFail',
   emitLeafActionDetail: true,
   execute: () => ({ type: 'fail', logKey: 'log.renovationFail' }),
+  // 7b1: rewrite as `seq:[pay, apply-renovation]`. The pay leaf handles the
+  // typed-flat (and any future ComplexCost) selection — including bonus and
+  // surplus solutions — and only on success advances to apply-renovation,
+  // which mutates `player.houseType`. This keeps mutate-after-pay invariant
+  // shared with `apply-improvement`. Stale `pay:renovate:*` choice strings
+  // are intercepted by the pay leaf's own resolveChoice fallback.
   resolveChoice: ({ player, params, costs }, choice) => {
     const failure: ActionExecutionResult = { type: 'fail', logKey: 'log.renovationFail' }
     const payment = typeof choice === 'string' ? parseRenovatePaymentChoice(choice) : null
@@ -182,18 +215,6 @@ export const renovateHouseAction: ActionDefinition = {
     const plan = buildRenovationPlan(player, target)
     if (!plan) return failure
     const totalCost = mergeRenovationCost(plan.cost, costs)
-    const resolved = resolveCostPaymentSelection(
-      player,
-      totalCost,
-      renovatePaymentOptionPrefix(target),
-      payment?.value,
-      failure,
-      { costType: 'renovation' },
-    )
-    if (resolved.type === 'choice') return resolved
-    if (resolved.type !== 'selected') return failure
-    executeResolvedTypedFlatPayment(player, resolved, 'renovation')
-    player.houseType = plan.nextType
-    return { type: 'ok' }
+    return { type: 'flow', flow: buildRenovationFlow(target, totalCost) }
   },
 }

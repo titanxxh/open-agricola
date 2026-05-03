@@ -175,8 +175,6 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 - `onComputeSowableFields`
 - `onSowExtraField`
 - `computeLockedFarmTiles`
-- `computeFenceDiscount`
-- `computeFenceFreeAvailable`
 - `getInvalidAnimals`
 <!-- prompt-sync:end id=card-effect-hooks -->
 
@@ -196,9 +194,9 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 | `onComputeAnimalZones`                       | 接收 `(zones, state, player)` 或 `(state, player, zones)`           | 动物分区扩展（双接口）                                         |
 | `onComputeSowableFields` / `onSowExtraField` | 返回额外可播种田/处理播种                                                    | 播种扩展                                                |
 | `computeLockedFarmTiles`                     | 返回锁定田地位置                                                         | 田地锁定                                                |
-| `computeFenceDiscount`                       | 返回折扣数                                                            | 围栏折扣                                                |
-| `computeFenceFreeAvailable`                  | `(state, player) => number`                                      | 围栏 entry-guard 加成（返回上限免费 fence 数）                     |
 | `handHooks`（meta）                            | `CardEffectHook[]`                                               | 声明哪些 hook 在卡牌还在手牌时也触发                               |
+
+> 围栏折扣（E16 BriarHedge / C16 FieldFences / C1 Overhaul）现走 listener `computeCosts` phase（actions: `['fence']`）；详见 ENGINE_ARCHITECTURE.md §15.7。
 
 
 ### 3.2 `CARD_IMPL.listeners[].phases` 可用 phase

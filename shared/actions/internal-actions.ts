@@ -16,14 +16,16 @@ import { anytimeReorgAction } from './effects/reorganize'
 import { anytimeExchangeAction } from './effects/exchange'
 import { placeFarmerAction } from './effects/place-farmer'
 import { setFirstPlayerAction } from './effects/first-player'
-import { payResourcesAction } from './effects/pay-resources'
+import { payAction } from './effects/pay'
+import { applyImprovementAction } from './effects/apply-improvement'
+import { applyRenovationAction } from './effects/apply-renovation'
+import { applyOccupationPlayAction } from './effects/apply-occupation-play'
 import { returnToSpaceAction } from './effects/internal/return-to-space'
 import { bonusVpAction } from './effects/bonus-vp'
 import { breedAction } from './effects/breed'
 import { takeFromCardAction } from './effects/internal/take-from-card'
 import { takeFromSpaceAction } from './effects/internal/take-from-space'
 import { emitChoiceAction } from './effects/internal/emit-choice'
-import { returnFirstWorkerHomeAction } from './effects/internal/return-first-worker-home'
 import { recallPlacedWorkerAction } from './effects/internal/recall-placed-worker'
 import { reserveFenceBonusAction } from './effects/internal/reserve-fence-bonus'
 import { storeOnCardAction } from './effects/internal/store-on-card'
@@ -54,14 +56,16 @@ export const internalActionDefinitions: ActionDefinition[] = [
   bakeBreadAction,
   anytimeReorgAction,
   anytimeExchangeAction,
-  payResourcesAction,
+  payAction,
+  applyImprovementAction,
+  applyRenovationAction,
+  applyOccupationPlayAction,
   returnToSpaceAction,
   bonusVpAction,
   breedAction,
   takeFromCardAction,
   takeFromSpaceAction,
   emitChoiceAction,
-  returnFirstWorkerHomeAction,
   recallPlacedWorkerAction,
   reserveFenceBonusAction,
   storeOnCardAction,

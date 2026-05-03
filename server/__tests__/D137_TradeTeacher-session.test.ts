@@ -135,7 +135,7 @@ describe('D137_TradeTeacher listener', () => {
     // Each option is a seq of pay-resources + gain.
     for (const child of flow.children) {
       expect(child.type).toBe('seq')
-      expect(child.children[0].actionId).toBe('pay-resources')
+      expect(child.children[0].actionId).toBe('pay')
       expect(child.children[1].actionId).toBe('gain')
     }
   })

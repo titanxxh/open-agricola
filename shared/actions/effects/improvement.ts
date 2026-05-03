@@ -1,7 +1,6 @@
-import type { ActionDefinition, ActionExecutionResult, GameState, PlayerState, ComplexCost, Resource } from '../../game/types'
+import type { ActionDefinition, ActionExecutionResult, ActionFlow, GameState, PlayerState, ComplexCost, Resource } from '../../game/types'
 import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../game/minor-improvements'
-import { getRegisteredMinorImprovement } from '../../cards/types'
 import { payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard, isComplexCost } from '../helpers/payment'
 import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../logic/stats'
 import { majorCardDefinitions } from '../../cards/major'
@@ -15,31 +14,23 @@ import {
   resolvePaymentSolutionSelection,
 } from '../helpers/pay-helpers'
 import { collectComputeChoiceCandidates } from '../../cards/card-listeners'
-import { isMajorCardId } from '../../cards/helpers/card-type'
-
-/** Cards that satisfy a Fireplace return requirement. */
-const FIREPLACE_MAJOR_IDS = ['Major_Fireplace1', 'Major_Fireplace2'] as const
+import { isMajorCardId, isFireplaceIdentityCard } from '../../cards/helpers/card-type'
 
 /**
- * Returns the list of card IDs a player can use to satisfy a cost that requires
- * returning a Fireplace card. This includes both played major Fireplace cards
- * AND any minors with `fireplaceIdentity === true`.
+ * Returns the list of card IDs a player can use to satisfy a cost that
+ * requires returning a Fireplace card — any played card declaring
+ * `fireplaceIdentity` (Major Fireplace 1/2 plus any minor like D25 with the
+ * same marker).
  */
-const getFireplaceReturnPool = (player: PlayerState): string[] => {
-  const majorFireplaces = player.improvements.filter((id) =>
-    FIREPLACE_MAJOR_IDS.includes(id as typeof FIREPLACE_MAJOR_IDS[number]),
-  )
-  const minorFireplaces = player.minorPlayed.filter((id) => {
-    const card = getRegisteredMinorImprovement(id)
-    return !!card?.fireplaceIdentity
-  })
-  return [...majorFireplaces, ...minorFireplaces]
-}
+const getFireplaceReturnPool = (player: PlayerState): string[] => [
+  ...player.improvements.filter(isFireplaceIdentityCard),
+  ...player.minorPlayed.filter(isFireplaceIdentityCard),
+]
 
 /**
- * Returns the effective `playedCards` pool for cost resolution that may include
- * a Fireplace return. If the cost requires returning a Fireplace, include both
- * player.improvements AND any fireplaceIdentity minors.
+ * Returns the effective `playedCards` pool for cost resolution that may
+ * include a Fireplace return. If the cost requires returning a Fireplace,
+ * include both player.improvements AND any fireplaceIdentity minors.
  */
 const getPlayedCardsForCost = (
   player: PlayerState,
@@ -48,10 +39,7 @@ const getPlayedCardsForCost = (
   if (!cost || !isComplexCost(cost)) return player.improvements
   const list = cost.cards?.list
   if (!Array.isArray(list)) return player.improvements
-  const needsFireplace = list.some((id) =>
-    FIREPLACE_MAJOR_IDS.includes(id as typeof FIREPLACE_MAJOR_IDS[number]),
-  )
-  if (!needsFireplace) return player.improvements
+  if (!list.some(isFireplaceIdentityCard)) return player.improvements
   return getFireplaceReturnPool(player)
 }
 
@@ -74,6 +62,23 @@ const parseImprovementChoice = (choice: string): { kind: 'major' | 'minor' | nul
 
 const resolveImprovementActionCardId = (mode: ImprovementPlayMode) =>
   mode === 'minor' ? 'minor-improvement' : 'improvement-any'
+
+/**
+ * BGA `isBuyable` actionType gate: cards flagged
+ * `mustBePlayedViaMajorImprovementAction` (e.g. A10 Wooden Shed) cannot be
+ * bought through the Minor-Improvement action space. Returns false when the
+ * caller's `actionCardId` is `'minor-improvement'` (BGA `actionType=Minor`).
+ *
+ * `improvement-any` (Major Improvement space) always allows it; card-effect
+ * plays without an actionCardId pass through (some listeners replay onBuy
+ * paths without the action context — those should not be blocked).
+ */
+const isBlockedByMajorImprovementActionGate = (
+  improvement: ResolvedMinorImprovement,
+  actionCardId: string | undefined,
+): boolean =>
+  !!improvement.mustBePlayedViaMajorImprovementAction
+    && actionCardId === 'minor-improvement'
 
 const getMinorImprovementBaseCost = (
   improvementId: string,
@@ -303,6 +308,7 @@ export const isMinorImprovementPlayable = (
     return false
   }
   if (!meetsCardPrerequisites(player, improvement, state.round, state)) return false
+  if (isBlockedByMajorImprovementActionGate(improvement, actionCardId)) return false
   return canAffordMinorImprovement(state, player, improvement, actionCardId)
 }
 
@@ -318,6 +324,7 @@ const buildPlayableMinorOptions = (
         !!improvement,
     )
     .filter((improvement) => meetsCardPrerequisites(player, improvement, state.round, state))
+    .filter((improvement) => !isBlockedByMajorImprovementActionGate(improvement, actionCardId))
     .filter((improvement) =>
       canAffordMinorImprovement(state, player, improvement, actionCardId),
     )
@@ -362,6 +369,7 @@ const buildMinorImprovementOptions = (
     .filter((improvement) =>
       !allowedPurchases || allowedPurchases.includes(improvement.id),
     )
+    .filter((improvement) => !isBlockedByMajorImprovementActionGate(improvement, actionCardId))
     .filter((improvement) =>
       canAffordMinorImprovement(state, player, improvement, actionCardId),
     )
@@ -611,6 +619,9 @@ export const playMinorImprovement = (
   if (improvement.mustBePlayedViaMinorAction && playContext !== 'minorAction') {
     return { type: 'fail', logKey: 'log.minorImprovementRequiresMinorAction' }
   }
+  if (isBlockedByMajorImprovementActionGate(improvement, actionCardId)) {
+    return { type: 'fail', logKey: 'log.minorImprovementFail' }
+  }
   if (!player.minorHand.includes(improvement.id)) {
     return { type: 'fail', logKey: 'log.minorImprovementFail' }
   }
@@ -796,8 +807,12 @@ export const minorImprovementAction: ActionDefinition = {
       options,
     }
   },
-  resolveChoice: ({ state, player }, choice) =>
-    playImprovement(state, player, choice, 'any'),
+  resolveChoice: ({ state, player, sourceCard }, choice) => {
+    const actionCardId = sourceCard ?? 'minor-improvement'
+    const flow = buildImprovementFlow(state, player, choice, actionCardId, false)
+    if (!flow) return { type: 'fail', logKey: 'log.minorImprovementFail' }
+    return { type: 'flow', flow }
+  },
 }
 
 /**
@@ -827,6 +842,90 @@ const canAffordInjectedImprovement = (
     return canAffordMinorImprovement(state, player, minor, 'minor-improvement')
   }
   return false
+}
+
+/**
+ * Resolve the player's improvement-any choice (e.g. `major:Major_Fireplace1`)
+ * into an engine flow `seq:[pay, apply-improvement]`. Returns `null` when the
+ * preview cost cannot be derived (e.g. catalog miss) so the legacy
+ * `playImprovement` entry can produce a `fail` result.
+ *
+ * Used by the WS / engine path; the HTTP `playImprovement` entry keeps its
+ * own legacy mutate-in-place flow so it works without engine dispatch.
+ */
+const buildImprovementFlow = (
+  state: GameState,
+  player: PlayerState,
+  choice: string,
+  actionCardId: string,
+  suppressOnBuyEffects: boolean,
+): ActionFlow | null => {
+  const parsed = parseImprovementChoice(choice)
+  let kind: 'major' | 'minor'
+  let id: string
+  if (parsed.kind === 'major') {
+    kind = 'major'
+    id = parsed.id
+  } else if (parsed.kind === 'minor') {
+    kind = 'minor'
+    id = parsed.id
+  } else {
+    if (isMajorCardId(parsed.id)) {
+      kind = 'major'
+      id = parsed.id
+    } else if (getMinorImprovement(parsed.id)) {
+      kind = 'minor'
+      id = parsed.id
+    } else {
+      return null
+    }
+  }
+  const previewCost = kind === 'major'
+    ? getMajorImprovementPreviewCost(state, player, id, actionCardId)
+    : getMinorImprovementPreviewCost(state, player, id, actionCardId)
+  if (!previewCost) return null
+  const optionPrefix = kind === 'major' ? `pay:improvement:${id}` : `pay:improvement:minor:${id}`
+  const includeReturnedCard = isComplexCost(previewCost) && !!previewCost.cards?.list?.length
+  const costType = kind === 'major' ? 'major-improvement' : 'minor-improvement'
+  // For costs that consume a card (e.g. CookingHearth requiring a Fireplace
+  // return), pay needs the eligible-card pool to enumerate `cardUsed`
+  // solutions. fireplaceIdentity minors (D25 etc.) live outside player.improvements
+  // so we precompute the pool here via the same helper the legacy
+  // playMajorImprovement / playMinorImprovement flow used.
+  const playedCards = getPlayedCardsForCost(player, previewCost)
+  const payParams: Record<string, unknown> = {
+    cost: previewCost,
+    costType,
+    optionPrefix,
+    includeReturnedCard,
+    playedCards,
+  }
+  // actionContext is propagated to listener events (engine.buildListenerEvent
+  // spreads actionContext into the listener context). After-pay listeners
+  // (E54 / E122 / E128 / E123 etc.) read `costType` from this to filter
+  // major/minor improvement payments.
+  const payActionContext: Record<string, unknown> = {
+    costType,
+    improvementKind: kind,
+  }
+  return {
+    type: 'seq',
+    children: [
+      {
+        type: 'leaf',
+        actionId: 'pay',
+        sourceCard: id,
+        params: payParams,
+        actionContext: payActionContext,
+      },
+      {
+        type: 'leaf',
+        actionId: 'apply-improvement',
+        sourceCard: id,
+        params: { improvementId: id, kind, suppressOnBuyEffects },
+      },
+    ],
+  }
 }
 
 export const improvementAnyAction: ActionDefinition = {
@@ -875,14 +974,12 @@ export const improvementAnyAction: ActionDefinition = {
       options,
     }
   },
-  resolveChoice: ({ state, player, sourceCard, params }, choice) =>
-    playImprovement(
-      state,
-      player,
-      choice,
-      'any',
-      undefined,
-      sourceCard,
-      (params as { suppressOnBuyEffects?: boolean } | undefined)?.suppressOnBuyEffects === true,
-    ),
+  resolveChoice: ({ state, player, sourceCard, params }, choice) => {
+    const actionCardId = sourceCard ?? resolveImprovementActionCardId('any')
+    const suppressOnBuyEffects =
+      (params as { suppressOnBuyEffects?: boolean } | undefined)?.suppressOnBuyEffects === true
+    const flow = buildImprovementFlow(state, player, choice, actionCardId, suppressOnBuyEffects)
+    if (!flow) return { type: 'fail', logKey: 'log.improvementFail' }
+    return { type: 'flow', flow }
+  },
 }

@@ -1,8 +1,19 @@
 import { MinorImprovement } from '../types'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D47_Churchyard'
+
+// BGA isBuyable: getPlayedCards()->count() < 10 → false. Played cards == all
+// occupations + minor improvements + (major) improvements played in front.
+registerPrerequisite('10 Cards* in Front of You', (player) => {
+  const total =
+    player.occupationPlayed.length
+    + player.minorPlayed.length
+    + player.improvements.length
+  return total >= 10
+})
 
 export const D47_Churchyard = new MinorImprovement({
   id: CARD_ID,

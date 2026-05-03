@@ -17,27 +17,22 @@ import {
   convertResources,
   hasValidResources,
 } from '../effects/exchange'
-import { getRegisteredMinorImprovement } from '../../cards/types'
 import { recordPaymentStats } from '../../cards/helpers/payment-stats'
-
-const FIREPLACE_COST_IDS = ['Major_Fireplace1', 'Major_Fireplace2'] as const
+import { isFireplaceIdentityCard } from '../../cards/helpers/card-type'
 
 /**
  * Returns true if a card in the player's hand satisfies a slot in the cost
- * list. Normal cards must appear verbatim in the list. Minor improvements with
- * `fireplaceIdentity === true` also satisfy any Fireplace-return cost slot.
+ * list. Normal cards must appear verbatim in the list. When the cost list
+ * names any `fireplaceIdentity` card, any other `fireplaceIdentity` card
+ * (Major Fireplace 1/2 or a minor like D25) also satisfies the slot.
  */
 const cardMatchesCostList = (
   cardId: string,
   costList: readonly string[],
 ): boolean => {
   if (costList.includes(cardId)) return true
-  const isFireplaceRequest = costList.some(
-    (id) => (FIREPLACE_COST_IDS as readonly string[]).includes(id),
-  )
-  if (isFireplaceRequest) {
-    const minor = getRegisteredMinorImprovement(cardId)
-    if (minor?.fireplaceIdentity) return true
+  if (costList.some(isFireplaceIdentityCard) && isFireplaceIdentityCard(cardId)) {
+    return true
   }
   return false
 }
@@ -106,6 +101,17 @@ function hashSolution(solution: PaymentSolution): number {
   // Include bonus
   if (solution.bonusUsed) {
     h = ((h + solution.bonusUsed.charCodeAt(0) * 17) * 31) >>> 0
+  }
+  if (solution.bonusChoiceIndex) {
+    const entries = Object.entries(solution.bonusChoiceIndex).sort(
+      (a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
+    )
+    for (const [k, v] of entries) {
+      for (const ch of k) {
+        h = ((h + ch.charCodeAt(0) * 23) * 31) >>> 0
+      }
+      h = ((h + (v + 1) * 41) * 31) >>> 0
+    }
   }
   if (solution.cardUsed) {
     for (const ch of solution.cardUsed) {
@@ -186,6 +192,7 @@ type InternalSolution = {
   resourcesRemaining: Partial<Resource>
   tradesUsed: { trade: Trade; times: number }[]
   bonusUsed?: string
+  bonusChoiceIndex?: Record<string, number>
   feeIndex?: number
 }
 
@@ -535,8 +542,14 @@ export const computeAllBuyableCombinations = (
     for (const tradeCombo of tradeCombos) {
       // Expand bonuses in BGA style: each bonus multiplies the path count.
       // Start with one path = baseFee with no bonuses applied.
-      type BonusPath = { cost: Partial<Resource>; sources: string[] }
-      let bonusPaths: BonusPath[] = [{ cost: baseFee, sources: [] }]
+      type BonusPath = {
+        cost: Partial<Resource>
+        sources: string[]
+        choiceIndices: Record<string, number>
+      }
+      let bonusPaths: BonusPath[] = [
+        { cost: baseFee, sources: [], choiceIndices: {} },
+      ]
 
       for (const bonus of effectiveCost.bonuses ?? []) {
         // Bonus-level conditions: if not satisfied, the entire bonus is a
@@ -549,7 +562,11 @@ export const computeAllBuyableCombinations = (
         // If optional, include a "skip" path that keeps the existing costs.
         if (bonus.optional) {
           for (const path of bonusPaths) {
-            expanded.push({ cost: path.cost, sources: [...path.sources] })
+            expanded.push({
+              cost: path.cost,
+              sources: [...path.sources],
+              choiceIndices: { ...path.choiceIndices },
+            })
           }
         }
         // BonusChoice-level conditions: filter candidates whose conditions
@@ -559,15 +576,24 @@ export const computeAllBuyableCombinations = (
           discount: Partial<Resource>
           sources?: string[]
           conditions?: Record<string, number>
-        }[] =
-          bonus.choices ??
-          [{ discount: bonus.discount!, sources: bonus.sources }]
+          _origIndex: number
+        }[] = bonus.choices
+          ? bonus.choices.map((c, i) => ({ ...c, _origIndex: i }))
+          : [
+              {
+                discount: bonus.discount!,
+                sources: bonus.sources,
+                _origIndex: 0,
+              },
+            ]
         const candidates = rawCandidates.filter((c) =>
           evaluateConditions(player, c.conditions),
         )
         if (candidates.length === 0) {
           continue
         }
+        const isMultiChoice = (bonus.choices?.length ?? 0) > 0
+        const bonusKey = bonus.sources?.[0]
         for (const path of bonusPaths) {
           for (const candidate of candidates) {
             const nextCost = applyBonus(path.cost, candidate.discount)
@@ -577,19 +603,29 @@ export const computeAllBuyableCombinations = (
               ...(candidate.sources ?? []),
             ])
             const nextSources = [...combined]
-            expanded.push({ cost: nextCost, sources: nextSources })
+            const nextChoiceIndices =
+              isMultiChoice && bonusKey
+                ? { ...path.choiceIndices, [bonusKey]: candidate._origIndex }
+                : { ...path.choiceIndices }
+            expanded.push({
+              cost: nextCost,
+              sources: nextSources,
+              choiceIndices: nextChoiceIndices,
+            })
           }
         }
         bonusPaths = expanded
       }
 
-      for (const { cost: effectiveCostFee, sources } of bonusPaths) {
+      for (const { cost: effectiveCostFee, sources, choiceIndices } of bonusPaths) {
         if (canCoverCost(tradeCombo.result, effectiveCostFee)) {
           const remaining = subtractResources(tradeCombo.result, effectiveCostFee)
           rawSolutions.push({
             resourcesRemaining: remaining,
             tradesUsed: tradeCombo.tradesUsed,
             bonusUsed: sources.length > 0 ? sources.join(',') : undefined,
+            bonusChoiceIndex:
+              Object.keys(choiceIndices).length > 0 ? choiceIndices : undefined,
             feeIndex: baseFees.length > 1 ? feeIdx : undefined,
           })
         }
@@ -602,13 +638,29 @@ export const computeAllBuyableCombinations = (
 
   for (const sol of rawSolutions) {
     const resourcesPaid = subtractResources(playerResources, sol.resourcesRemaining)
-    if (costType && Object.values(resourcesPaid).some((value) => (value ?? 0) < 0)) {
+    // Drop solutions whose net payment goes negative when costType is set,
+    // unless the negative is the legitimate one-shot credit surplus from a
+    // single trade fired exactly once. D117 Wood Expert: trade 1 food → 2
+    // wood credit for a 1-wood fee, paying 1 wood from credit and keeping
+    // the remaining 1 wood as `wood: -1` paid. Genuine over-trades —
+    // multiple trade types stacked, OR the same trade fired multiple times
+    // beyond the fee — are pruned (e.g. typed-stables 2-trade combos and
+    // B155 ArtTeacher's 3-times-trade overpay).
+    const tradesActuallyUsed = sol.tradesUsed.filter((entry) => entry.times > 0)
+    const exemptFromNegativeFilter =
+      tradesActuallyUsed.length === 1 && tradesActuallyUsed[0]!.times === 1
+    if (
+      costType
+      && !exemptFromNegativeFilter
+      && Object.values(resourcesPaid).some((value) => (value ?? 0) < 0)
+    ) {
       continue
     }
     const solution: PaymentSolution = {
       resourcesPaid,
       tradesUsed: sol.tradesUsed,
       bonusUsed: sol.bonusUsed,
+      bonusChoiceIndex: sol.bonusChoiceIndex,
       feeIndex: sol.feeIndex,
     }
 

@@ -69,7 +69,7 @@ describe('E27_PiggyBank session', () => {
     expect(flow!.type).toBe('seq')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
     const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
-    expect(children[0].actionId).toBe('pay-resources')
+    expect(children[0].actionId).toBe('pay')
     expect(children[1].actionId).toBe('store-on-card')
   })
 

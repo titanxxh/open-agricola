@@ -64,3 +64,35 @@ export const collectCardsAs = (
   }
   return [...seen]
 }
+
+/**
+ * `fireplaceIdentity` query — true for the Major Fireplace cards plus any
+ * minor declaring the marker (e.g. D25_WitchesDanceFloor). Used by the
+ * "return-a-Fireplace" cost slot machinery in payment / improvement so the
+ * cost handler does not need to enumerate Major_Fireplace1 / Major_Fireplace2
+ * explicitly.
+ */
+export const isFireplaceIdentityCard = (cardId: string): boolean => {
+  if (getMajorCard(cardId)?.fireplaceIdentity) return true
+  if (getRegisteredMinorImprovement(cardId)?.fireplaceIdentity) return true
+  return false
+}
+
+/**
+ * `enablesPalisades` query rolled up to a player — true iff any of the
+ * player's played cards declares the marker that unlocks placing wooden
+ * palisades on fence edges. Currently only B30_WoodPalisades carries it,
+ * but main-path code must query the marker, not the card id, so future
+ * cards with the same ability slot in without further changes.
+ */
+export const playerCanBuildPalisades = (player: PlayerState): boolean => {
+  const has = (id: string): boolean =>
+    !!getRegisteredMinorImprovement(id)?.enablesPalisades
+    || !!getRegisteredOccupation(id)?.enablesPalisades
+    || !!getMajorCard(id)?.enablesPalisades
+  return (
+    player.minorPlayed.some(has)
+    || player.occupationPlayed.some(has)
+    || player.improvements.some(has)
+  )
+}

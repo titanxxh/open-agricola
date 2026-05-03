@@ -63,7 +63,7 @@ describe('D18_SteamPlow', () => {
     // BGA: only plow (ActionFarmland) — no sow leaf
     expect(seq.children).toHaveLength(2)
     // First child: pay 2 wood + 1 food
-    expect(seq.children[0].actionId).toBe('pay-resources')
+    expect(seq.children[0].actionId).toBe('pay')
     expect(seq.children[0].params).toEqual({ wood: 2, food: 1 })
     expect(seq.children[0].sourceCard).toBe(CARD_ID)
     // Second child: plow

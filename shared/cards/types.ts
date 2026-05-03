@@ -58,8 +58,27 @@ export type CardDefinition = {
   extraVp?: boolean
   providesField?: boolean
   providesOccupation?: boolean
+  /**
+   * BGA `$this->field = true`: marks the card itself as a field. C80 Rocky
+   * Terrain triggers off `Improvement` / `Occupation` events whose played
+   * card has `isField === true` (treated as plowing a field). Cards that
+   * also act as a literal sowable field (B68/C70/E68/E69/E70/E72) carry
+   * `isField: true` plus `onComputeSowableFields` / `onSowExtraField` /
+   * `onHarvestFieldPhase` effects; field-only occupations (B113/B141)
+   * carry `isField: true` purely as metadata.
+   */
+  isField?: boolean
   fireplaceIdentity?: boolean
   mustBePlayedViaMinorAction?: boolean
+  /**
+   * BGA `isBuyable` actionType gate ('Major' / 'MajorOrMinor'): A10 Wooden
+   * Shed enforces "this card can only be played via a Major Improvement
+   * action". When set, the minor cannot be bought through the
+   * `minor-improvement` action space (only via `improvement-any` / direct
+   * card-effect plays).
+   */
+  mustBePlayedViaMajorImprovementAction?: boolean
+  enablesPalisades?: boolean
   alsoCountsAs?: CardType[]
   /** Majors-only: scoring tier table read by major-improvements scoring. */
   scoring?: {
@@ -125,8 +144,11 @@ export class CardBase {
   extraVp?: boolean
   providesField?: boolean
   providesOccupation?: boolean
+  isField?: boolean
   fireplaceIdentity?: boolean
   mustBePlayedViaMinorAction?: boolean
+  mustBePlayedViaMajorImprovementAction?: boolean
+  enablesPalisades?: boolean
   alsoCountsAs?: CardType[]
   scoring?: {
     resource: keyof Resource
@@ -169,8 +191,11 @@ export class CardBase {
     if (this.extraVp) def.extraVp = this.extraVp
     if (this.providesField) def.providesField = this.providesField
     if (this.providesOccupation) def.providesOccupation = this.providesOccupation
+    if (this.isField) def.isField = this.isField
     if (this.fireplaceIdentity) def.fireplaceIdentity = this.fireplaceIdentity
     if (this.mustBePlayedViaMinorAction) def.mustBePlayedViaMinorAction = this.mustBePlayedViaMinorAction
+    if (this.mustBePlayedViaMajorImprovementAction) def.mustBePlayedViaMajorImprovementAction = this.mustBePlayedViaMajorImprovementAction
+    if (this.enablesPalisades) def.enablesPalisades = this.enablesPalisades
     if (this.alsoCountsAs) def.alsoCountsAs = this.alsoCountsAs
     if (this.locales) def.locales = this.locales
     return def

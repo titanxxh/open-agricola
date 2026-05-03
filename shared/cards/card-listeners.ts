@@ -1,5 +1,5 @@
-import type { ActionExecutionContext, ActionExecutionResult, GameState, PlayerState, Trade } from '../game/types'
-import type { ActionHookPhase, ActionHookResult } from '../actions/hooks'
+import type { ActionExecutionContext, ActionExecutionResult, ActionSpace, GameState, PlayerState, Resource, Trade } from '../game/types'
+import { runActionHooks, type ActionHookContext, type ActionHookPhase, type ActionHookResult } from '../actions/hooks'
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
 import { exchangeToTrade } from '../actions/effects/exchange'
@@ -218,7 +218,7 @@ export const executeCardListener = (
 const AUTO_LOGGED_CARD_EFFECT_ACTIONS = new Map<string, Set<string>>([
   ['log.cardEffectGain', new Set(['gain', 'take-from-card'])],
   ['log.cardEffectBonusVp', new Set(['bonus-vp'])],
-  ['log.cardEffectPay', new Set(['pay-resources'])],
+  ['log.cardEffectPay', new Set(['pay'])],
   ['log.cardEffectOtherPlayersGain', new Set(['gain'])],
 ])
 
@@ -310,4 +310,55 @@ export const collectComputeExchanges = (
     }
   }
   return out
+}
+
+const makeDummySpace = (actionId: string): ActionSpace => ({
+  id: `${actionId}-cost-preview`,
+  position: 0,
+  players: [],
+  available: true,
+} as unknown as ActionSpace)
+
+/**
+ * Run `computeCosts` phase listeners (action hooks + card listeners) for a
+ * farm-choice commit pass. Used by `commitFarmChoice` / `applyFarmChoice` to
+ * obtain a cost override that includes farm-payload-aware listeners (e.g.
+ * E16 BriarHedge sees `params.newFenceEdges`).
+ *
+ * Mirrors `HookDispatcher.computeCosts` but aggregates results into a
+ * `Partial<Resource>` and accepts an optional `space` (defaults to a dummy
+ * placeholder — listeners must not read `ctx.space`).
+ */
+export const collectComputeCostsForFarmChoice = (
+  state: GameState,
+  player: PlayerState,
+  actionId: string,
+  params: Record<string, unknown>,
+  space?: ActionSpace,
+): Partial<Resource> => {
+  const ctx: ActionHookContext = {
+    state,
+    player,
+    space: space ?? makeDummySpace(actionId),
+    params,
+    actionId,
+    phase: 'computeCosts',
+  }
+  const aggregated: Partial<Resource> = {}
+  const merge = (costs?: Partial<Resource>) => {
+    if (!costs) return
+    for (const [key, value] of Object.entries(costs)) {
+      if (typeof value !== 'number') continue
+      const k = key as keyof Resource
+      aggregated[k] = (aggregated[k] ?? 0) + value
+    }
+  }
+  runActionHooks(ctx).forEach((r: ActionHookResult) => merge(r.costs))
+  for (const entry of getMatchingListeners(ctx)) {
+    const result = executeCardListener(entry.registration, ctx, {
+      ownerPlayerId: entry.ownerPlayerId,
+    })
+    if (result) merge(result.costs)
+  }
+  return aggregated
 }

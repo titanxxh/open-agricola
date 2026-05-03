@@ -1,21 +1,26 @@
 import { Occupation } from '../types'
 import type { ActionFlow, Resource } from '../../game/types'
 import type { CardImpl } from '../registry'
+import { workersAvailable } from '../../game/player'
 
 const CARD_ID = 'C125_Nightworker'
 
 /**
  * C125 Nightworker (Occupation, C, 125)
- * Before the start of each work phase, you can place a person on an accumulation
- * space of a building resource not in your supply.
  *
- * BGA: startOfWork — finds accumulation spaces for building resources (wood/clay/
- * reed/stone) that the player has NONE of, then optionally lets the player place
- * a farmer on one of them.
+ * BGA: `onPlayerStartOfWork` returns an optional `PLACE_FARMER` flow with
+ * `constraints` = list of accumulation-space ids carrying a building resource
+ * the player has 0 of. The placed worker counts as a normal placement (a
+ * family pool worker is consumed; the action space pays out). Players without
+ * any candidate space — i.e. they already have wood/clay/reed/stone or every
+ * accumulation space of the missing type is empty — get no choice. BGA also
+ * marks the card `banned` (cup-pool filter) and `isCorbariusOrDulcinaria` (we
+ * don't model either today).
  *
- * Simplified implementation: at onRoundStart, optionally gain 1 building resource
- * from an accumulation space of a type the player has 0 of. This avoids needing
- * the unsupported "pre-work place-farmer" mechanic. The card is also banned in BGA.
+ * Mirror it via `onRoundStart` (our analogue of startOfWork — fires after
+ * round growth, before currentPlayerIndex is set to start player). The flow
+ * is `optional` so the player can skip; place-farmer's standard worker-count
+ * + occupied-space machinery handles the rest.
  */
 
 const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
@@ -35,37 +40,34 @@ export const C125_Nightworker = new Occupation({
 export const C125_Nightworker_impl = {
   effect: {
   id: CARD_ID,
-  onRoundStart: (state, player) => {
-
-    // Find building resource types the player has 0 of
+  onRoundStart: (state, player): ActionFlow | undefined => {
+    if (workersAvailable(state, player) <= 0) return
+    // Building resource types the player has 0 of
     const missingTypes = BUILDING_RESOURCES.filter(
       (r) => (player.resources[r] ?? 0) === 0,
     )
     if (missingTypes.length === 0) return
 
-    // Find accumulation spaces that have resources of a missing type
-    const choices: ActionFlow[] = []
+    // Accumulation spaces with at least 1 of a missing type, currently
+    // unoccupied (BGA's PLACE_FARMER respects standard occupied rules).
+    const constraints: string[] = []
     for (const space of state.actionSpaces) {
+      if (space.takenBy.length > 0) continue
       for (const resource of missingTypes) {
         if ((space.gainPerRound[resource] ?? 0) <= 0) continue
         if ((space.resources[resource] ?? 0) <= 0) continue
-        choices.push({
-          type: 'leaf',
-          actionId: 'gain',
-          params: { [resource]: space.resources[resource]! },
-          sourceCard: CARD_ID,
-          choiceLabelKey: 'ui.interactionTakeFromSpace',
-          choiceLabelParams: { resource, spaceId: space.id, spaceName: space.nameKey },
-        })
+        constraints.push(space.id)
+        break
       }
     }
-
-    if (choices.length === 0) return
+    if (constraints.length === 0) return
 
     return {
-      type: 'xor',
+      type: 'leaf',
+      actionId: 'place-farmer',
       optional: true,
-      children: choices,
+      sourceCard: CARD_ID,
+      actionContext: { constraints },
     }
   },
 },

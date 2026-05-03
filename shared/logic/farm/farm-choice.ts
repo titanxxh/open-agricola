@@ -1,4 +1,4 @@
-import type { ComplexCost, FarmTilePosition, GameState, PlayerState, Resource } from '../../game/types.ts'
+import type { ActionSpace, ComplexCost, FarmTilePosition, GameState, PlayerState, Resource } from '../../game/types.ts'
 import { applyCostOverride, isComplexCost } from '../../actions/helpers/payment'
 import {
   PAYMENT_CHOICE_REQUIRED_ERROR,
@@ -13,6 +13,7 @@ import {
   resolveRoomPaymentSelection,
 } from '../../actions/helpers/room-payment.ts'
 import { stableWoodCost } from '../../actions/effects/fencing.ts'
+import { playerCanBuildPalisades } from '../../cards/helpers/card-type'
 import {
   normalizePlayerFarm,
   type PlayerFarmState,
@@ -25,7 +26,8 @@ import {
   consumePendingFenceBonus,
   readPendingFenceBonus,
 } from '../../cards/helpers/pending-fence-bonus.ts'
-import { collectFenceDiscount, collectLockedFarmTileKeys } from '../../cards/card-effects.ts'
+import { collectLockedFarmTileKeys } from '../../cards/card-effects.ts'
+import { collectComputeCostsForFarmChoice } from '../../cards/card-listeners.ts'
 
 export type FarmChoiceType = 'fence' | 'room' | 'stable' | 'plow' | 'sow'
 
@@ -42,6 +44,7 @@ type FarmChoiceOptions = {
   maxUnits?: number
   paymentChoice?: string
   state?: GameState
+  space?: ActionSpace
   sowOptions?: {
     maxSelections?: number
     excludedFields?: FarmTilePosition[]
@@ -118,8 +121,7 @@ export const applyFarmChoice = <T extends PlayerState>(
     case 'fence': {
       const { edges, palisadeEdges = [], extraWood } = payload as FarmChoicePayloadMap['fence']
       const freeFences = readPendingFenceBonus(normalized)?.freeFences ?? 0
-      const woodDiscount = Math.max(0, Math.abs(options.costOverride?.wood ?? 0))
-      const adjustedExtraWood = Math.max(0, (extraWood ?? 0) - woodDiscount)
+      const adjustedExtraWood = extraWood ?? 0
       const existingEdgeIds = new Set(
         (normalized.fenceSegments ?? []).map((seg) => seg.edge),
       )
@@ -127,12 +129,19 @@ export const applyFarmChoice = <T extends PlayerState>(
       const newPalisadeEdgesPreview = palisadeEdges.filter(
         (e) => !existingEdgeIds.has(e),
       )
-      const bonusFreeFences = options.state
-        ? collectFenceDiscount(options.state, normalized, {
-            newFenceEdges: newFenceEdgesPreview,
-            newPalisadeEdges: newPalisadeEdgesPreview,
-          })
-        : 0
+      const fenceOverride = options.state
+        ? collectComputeCostsForFarmChoice(
+            options.state,
+            normalized,
+            'fence',
+            {
+              newFenceEdges: newFenceEdgesPreview,
+              newPalisadeEdges: newPalisadeEdgesPreview,
+            },
+            options.space,
+          )
+        : { wood: 0 }
+      const bonusFreeFences = Math.max(0, Math.abs(fenceOverride.wood ?? 0))
       const totalFreeFences = freeFences + bonusFreeFences
       const validated = validateFenceSelection(
         normalized,
@@ -142,7 +151,7 @@ export const applyFarmChoice = <T extends PlayerState>(
         totalFreeFences,
         {
           skipPayment: true,
-          allowPalisades: (normalized.minorPlayed ?? []).includes('B30_WoodPalisades'),
+          allowPalisades: playerCanBuildPalisades(normalized),
         },
         lockedKeys,
       )

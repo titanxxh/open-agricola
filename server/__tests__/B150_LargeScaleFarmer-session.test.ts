@@ -198,7 +198,7 @@ describe('B150_LargeScaleFarmer session', () => {
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
     // First child: pay 1 food
-    expect(flow.children[0].actionId).toBe('pay-resources')
+    expect(flow.children[0].actionId).toBe('pay')
     expect(flow.children[0].params).toEqual({ food: 1 })
     // Second child: place-farmer leaf in jump mode targeting farm-expansion
     const jump = flow.children[1] as Extract<ActionFlow, { type: 'leaf' }>

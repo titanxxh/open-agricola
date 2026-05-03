@@ -4,7 +4,7 @@ import type { GameState, PlayerState, ActionSpace } from '../../game/types'
 import { readCardResourceStats } from '../helpers/card-state'
 
 import '../A/A37_Bucksaw'
-import { payResourcesAction } from '../../actions/effects/pay-resources'
+import { payAction as payResourcesAction } from '../../actions/effects/pay'
 import { bonusVpAction } from '../../actions/effects/bonus-vp'
 import { gainAction } from '../../actions/effects/gain'
 import type { CardListenerContext } from '../card-listeners'
@@ -68,7 +68,7 @@ describe('A37_Bucksaw', () => {
       expect(result.flow.children).toMatchObject([
         {
           type: 'leaf',
-          actionId: 'pay-resources',
+          actionId: 'pay',
           params: { wood: 1 },
           sourceCard: 'A37_Bucksaw',
           choiceLabelKey: 'ui.interactionResourceExchange',

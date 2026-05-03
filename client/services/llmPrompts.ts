@@ -141,8 +141,6 @@ const CARD_IMPL = {
 | onComputeAnimalZones | 修改 zones 数组 | 动物分区扩展 |
 | onComputeSowableFields / onSowExtraField | 返回额外可播种田 | 播种扩展 |
 | computeLockedFarmTiles | 返回锁定位置 | 田地锁定 |
-| computeFenceDiscount | 返回折扣数 | 围栏折扣 |
-| computeFenceFreeAvailable | 返回上限免费 fence 数 | 围栏 entry-guard 加成 |
 | getInvalidAnimals | \`(zone, raise) => Meeple[]\` | 卡牌专属动物分区禁入校验 |
 | resolveChoice | \`(state, player, choice, ctx) => ActionFlow\` | 处理玩家选择 |
 | handHooks (meta) | \`CardEffectHook[]\` | 声明手牌时也触发的 hook |

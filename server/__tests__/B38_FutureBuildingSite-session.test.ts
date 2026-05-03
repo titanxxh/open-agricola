@@ -5,6 +5,7 @@ import type { ActionChoiceOption,  FarmTilePosition } from '../../shared/game/ty
 import { positionKey } from '../../shared/game/farm'
 
 import { B38_FutureBuildingSite } from '../../shared/cards/B/B38_FutureBuildingSite'
+import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 const CARD_ID = 'B38_FutureBuildingSite'
 
@@ -282,5 +283,23 @@ describe('B38 FutureBuildingSite — session', () => {
     )
     expect(b38Entry).toBeDefined()
     expect(b38Entry!.score).toBe(3)
+  })
+
+  describe('prerequisite "Play in Round 4 or Before"', () => {
+    it('blocks when round > 4', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      state.round = 5
+      const player = state.players[0]!
+      expect(meetsCardPrerequisites(player, B38_FutureBuildingSite, state.round, state)).toBe(false)
+    })
+
+    it('allows when round <= 4', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      state.round = 4
+      const player = state.players[0]!
+      expect(meetsCardPrerequisites(player, B38_FutureBuildingSite, state.round, state)).toBe(true)
+    })
   })
 })

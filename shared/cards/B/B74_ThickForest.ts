@@ -1,8 +1,12 @@
 import { MinorImprovement } from '../types'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B74_ThickForest'
+
+// BGA isBuyable: countReserveResource(CLAY) < 5 → false
+registerPrerequisite('5 Clay in Your Supply', (player) => (player.resources.clay ?? 0) >= 5)
 
 export const B74_ThickForest = new MinorImprovement({
   id: CARD_ID,

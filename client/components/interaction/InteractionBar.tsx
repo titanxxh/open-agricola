@@ -95,7 +95,7 @@ const getEffectPreviewSubtitle = (
 ): ReactNode => {
   switch (option.effectPreview?.kind) {
     case 'payment':
-      return translateCardText(locale, 'actions.pay-resources.name')
+      return translateCardText(locale, 'actions.pay.name')
     case 'resourceExchange':
       return translateCardText(locale, 'ui.interactionResourceExchange')
     default:
@@ -242,7 +242,7 @@ function CollectorMultiSelect({ locale, options, needed, resolveChoice, isIntera
               onChange={() => toggle(option.value)}
               disabled={!isInteractive || (!selected.has(option.value) && selected.size >= needed)}
             />
-            <span className={`card-res-icon ${option.value}`} />
+            <span className={`res-icon res-icon-${option.value}`} />
             {translateCardText(locale, option.labelKey)}
           </label>
         ))}
@@ -296,7 +296,7 @@ type Props = {
   hasActionStartSnapshot: boolean
   anytimeActions: AnytimeAction[]
   takeAnytimeAction: (actionId: string) => void
-  hasWoodPalisadesCard?: boolean
+  canBuildPalisades?: boolean
   fencePlacementMode?: 'fence' | 'palisade'
   setFencePlacementMode?: (mode: 'fence' | 'palisade') => void
 }
@@ -339,7 +339,7 @@ export const InteractionBar = ({
   hasActionStartSnapshot,
   anytimeActions,
   takeAnytimeAction,
-  hasWoodPalisadesCard = false,
+  canBuildPalisades = false,
   fencePlacementMode = 'fence',
   setFencePlacementMode,
 }: Props) => {
@@ -466,7 +466,7 @@ export const InteractionBar = ({
                   })}
                 </div>
               ) : null}
-              {isSelectingFences && hasWoodPalisadesCard && setFencePlacementMode ? (
+              {isSelectingFences && canBuildPalisades && setFencePlacementMode ? (
                 <div
                   className="fence-mode-toggle"
                   role="radiogroup"
@@ -507,7 +507,7 @@ export const InteractionBar = ({
               {isSelectingSow && sowErrorText ? (
                 <div className="interaction-error">{sowErrorText}</div>
               ) : null}
-              {pendingChoice.promptKey === 'ui.interactionCollectorSelect' ? (
+              {((pendingChoice.promptParams?.needed as number) ?? 0) > 1 ? (
                 <CollectorMultiSelect
                   locale={locale}
                   options={visibleOptions}

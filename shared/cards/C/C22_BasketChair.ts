@@ -43,7 +43,7 @@ export const C22_BasketChair_impl = {
         {
           type: 'leaf',
           actionId: 'recall-placed-worker',
-          params: { forceFirst: true, targetCardHold: CARD_ID },
+          params: { workerId: first.workerId, targetCardHold: CARD_ID },
           sourceCard: CARD_ID,
         },
         {

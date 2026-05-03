@@ -3,6 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getExtraRoomCapacity } from '../card-effects'
 import { familySize } from '../../game/player'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D21_Recruitment'
@@ -29,6 +30,25 @@ const CARD_ID = 'D21_Recruitment'
  *  - isDoable listener: keeps the action available even when the player has
  *    no affordable improvements, because the replace path can still be taken.
  */
+
+/**
+ * BGA `onBuy` throws when `getNextFarmerAvailable()` is not null — i.e. the
+ * player still has a farmer waiting at home. We model this as the
+ * `prerequisite` handler so the card is filtered from the buy list while any
+ * active farmer is still at home (= not placed on an action space).
+ */
+registerPrerequisite('No People Left in the House', (player, state) => {
+  if (!state) return true
+  const active = (player.workers ?? []).filter((w) => w.isActive)
+  if (active.length === 0) return true
+  const placedIds = new Set<string>()
+  for (const space of state.actionSpaces) {
+    for (const ref of space.takenBy) {
+      if (ref.playerId === player.id) placedIds.add(ref.workerId)
+    }
+  }
+  return active.every((w) => placedIds.has(w.id))
+})
 
 const effectiveRooms = (player: CardListenerContext['player']) =>
   player.rooms + getExtraRoomCapacity(player)

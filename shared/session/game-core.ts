@@ -70,7 +70,8 @@ import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { allOccupationCards, allMinorImprovementCards } from '../cards/catalog.ts'
 import { majorCardDefinitions } from '../cards/major/index.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
-import { handleSowExtraField, collectLockedFarmTileKeys, collectFenceDiscount, getCardEffect } from '../cards/card-effects.ts'
+import { handleSowExtraField, collectLockedFarmTileKeys, getCardEffect } from '../cards/card-effects.ts'
+import { collectComputeCostsForFarmChoice } from '../cards/card-listeners.ts'
 import { incCardUsed, addCardResourceGained } from '../cards/helpers/card-state.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
 import { runRoundEndHooks, runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks, shouldSkipPlayerTurn } from '../cards/card-effects.ts'
@@ -84,6 +85,7 @@ import { recordActionSnapshot } from '../cards/helpers/action-snapshot.ts'
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { recordRoundPlacement, resetRoundPlacements } from '../cards/helpers/round-placement.ts'
 import { familySize, newbornCount, workersAvailable } from '../game/player.ts'
+import { getAssignedAnimalCount } from '../game/animals.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/types.ts'
 import { getExchangesInWindow } from '../actions/effects/exchange.ts'
 import { getMajorCard } from '../cards/major/index.ts'
@@ -95,6 +97,7 @@ import {
   normalizePlayerFarm,
 } from '../logic/farm/fence-validation.ts'
 import { applyFarmChoice, type FarmChoicePayloadMap } from '../logic/farm/farm-choice.ts'
+import { playerCanBuildPalisades } from '../cards/helpers/card-type'
 import {
   applyCostOverride,
   applyTradeSideEffect,
@@ -422,7 +425,7 @@ export class GameCore {
         flow.actionContext,
       )
       const def = this.registry.get(flow.actionId)
-      if (def?.resolveChoice) {
+      if (def?.resolveChoice && !def.skipChoiceWrap) {
         const seq = new SequenceNode(`seq-${flow.actionId}-${counter.value++}`, [
           actionNode,
           new ChoiceNode(`choice-${flow.actionId}-${counter.value++}`, []),
@@ -554,15 +557,8 @@ export class GameCore {
     return p.resources.sheep + p.resources.boar + p.resources.cattle
   }
 
-  private getAssignedAnimalCount(p: PlayerState) {
-    const pasture = p.pastures.reduce((s, pa) => s + pa.animalCount, 0)
-    const house = p.houseAnimalType && p.houseAnimalCount > 0 ? p.houseAnimalCount : 0
-    const stable = Object.values(p.stableAnimals ?? {}).filter(Boolean).length
-    return pasture + house + stable
-  }
-
   private hasPendingAnimals(p: PlayerState) {
-    return this.getAnimalCount(p) > this.getAssignedAnimalCount(p)
+    return this.getAnimalCount(p) > getAssignedAnimalCount(p)
   }
 
   private nextPlayerIdx(players: PlayerState[], current: number) {
@@ -1814,6 +1810,34 @@ export class GameCore {
     return this.respond()
   }
 
+  /**
+   * Returns true when at least one card listener for the `isDoable` phase
+   * explicitly vetoes the action (e.g. C51 FishingNet blocking opponent
+   * fishing on 0 food). Unlike the full `applyIsDoable` path, this skips
+   * `space.canBeExecutedByPlayer` and `applyIsDoableHooks` — those are
+   * conservative for OR-flow actions and would over-block normal cases like
+   * "OR(sow, bake-bread)" where every child is currently undoable but the
+   * engine still wants to enter and present a skip-only choice.
+   */
+  private listenersVetoIsDoable(player: PlayerState, space: ActionSpace): boolean {
+    const ctx: import('../cards/card-listeners.ts').CardListenerContext = {
+      state: this.state,
+      player,
+      space,
+      actionId: space.id,
+      phase: 'isDoable',
+      doable: true,
+    }
+    const matched = getMatchingListeners(ctx)
+    for (const entry of matched) {
+      const result = executeCardListener(entry.registration, ctx, {
+        ownerPlayerId: entry.ownerPlayerId,
+      })
+      if (result && result.doable === false) return true
+    }
+    return false
+  }
+
   private isActionSpaceAvailableToPlayer(player: PlayerState, space: ActionSpace, roundOpen: Map<string, number>): boolean {
     const openRound = roundOpen.get(space.id) ?? space.roundAvailable
     if (this.state.round < openRound) return false
@@ -1973,6 +1997,14 @@ export class GameCore {
     if (isSpaceOccupied(space)) {
       const allowed = computeAllowedPlacementSpaces(this.state, player)
       if (!allowed.some(a => a.spaceId === spaceId)) return this.respond(false, 'space unavailable')
+    }
+    // Honor explicit `isDoable` listener vetoes (e.g. C51 FishingNet blocks
+    // opponents with 0 food). We only check listener-driven `doable: false`
+    // here — `space.canBeExecutedByPlayer` (which is conservatively false for
+    // OR-style flows whose every child is currently undoable) is intentionally
+    // skipped, so the existing fall-through-OR semantic in tests is preserved.
+    if (this.listenersVetoIsDoable(player, space)) {
+      return this.respond(false, 'space unavailable')
     }
 
     this.pushHistory(true)
@@ -2732,6 +2764,7 @@ export class GameCore {
     if (!player) return this.respond(false, 'invalid player')
 
     const normalized = normalizePlayerFarm(player)
+    const space = this.getSpaceById(this.activeSpaceId) ?? undefined
     const result = applyFarmChoice(normalized, farmPayment.farmType, farmPayment.payload as FarmChoicePayloadMap[typeof farmPayment.farmType], {
       costOverride: this.pending.costOverride,
       maxUnits:
@@ -2740,6 +2773,7 @@ export class GameCore {
           : undefined,
       paymentChoice: value,
       state: this.state,
+      space,
     })
     if (!result.ok) {
       return this.respond(false, result.error)
@@ -2782,10 +2816,10 @@ export class GameCore {
         const safePalisadeEdges = Array.isArray(palisadeEdges) ? palisadeEdges : []
         const pendingFreeFences =
           readPendingFenceBonus(normalized)?.freeFences ?? 0
-        // Mirror applyFarmChoice: per-card hooks (E16, C1, C16…) extend the
-        // free-fence count via `computeFenceDiscount`, so payment preview must
-        // use the same total or `resolveTypedFlatPaymentSelection` will reject
-        // the payment for cards that bring wood costs to zero.
+        // Mirror applyFarmChoice: per-card listeners (E16, C1, C16…) extend the
+        // free-fence count via `computeCosts`, so payment preview must use the
+        // same total or `resolveTypedFlatPaymentSelection` will reject the
+        // payment for cards that bring wood costs to zero.
         const existingEdgeIdsForDiscount = new Set(
           (normalized.fenceSegments ?? []).map((seg) => seg.edge),
         )
@@ -2795,13 +2829,20 @@ export class GameCore {
         const newPalisadeEdgesPreview = safePalisadeEdges.filter(
           (e) => !existingEdgeIdsForDiscount.has(e),
         )
-        const hookFreeFences = collectFenceDiscount(this.state, normalized, {
-          newFenceEdges: newFenceEdgesPreview,
-          newPalisadeEdges: newPalisadeEdgesPreview,
-        })
+        const space = this.getSpaceById(this.activeSpaceId) ?? undefined
+        const fenceOverride = collectComputeCostsForFarmChoice(
+          this.state,
+          normalized,
+          'fence',
+          {
+            newFenceEdges: newFenceEdgesPreview,
+            newPalisadeEdges: newPalisadeEdgesPreview,
+          },
+          space,
+        )
+        const hookFreeFences = Math.max(0, Math.abs(fenceOverride.wood ?? 0))
         const freeFences = pendingFreeFences + hookFreeFences
-        const woodDiscount = Math.max(0, Math.abs(override?.wood ?? 0))
-        const adjustedExtraWood = Math.max(0, (extraWood ?? 0) - woodDiscount)
+        const adjustedExtraWood = extraWood ?? 0
         const validated = validateFenceSelection(
           normalized,
           safeEdges,
@@ -2810,7 +2851,7 @@ export class GameCore {
           freeFences,
           {
             skipPayment: true,
-            allowPalisades: (normalized.minorPlayed ?? []).includes('B30_WoodPalisades'),
+            allowPalisades: playerCanBuildPalisades(normalized),
           },
           lockedKeys,
         )
@@ -2831,7 +2872,6 @@ export class GameCore {
             spaceId: this.activeSpaceId!,
             options: payment.options ?? [],
             promptKey: payment.promptKey,
-            costOverride: override,
             sourceCard: this.pending.type === 'choice' ? this.pending.sourceCard : undefined,
             actionContext: {
               ...(this.pending.actionContext ?? {}),
@@ -2856,8 +2896,8 @@ export class GameCore {
           palisadeEdges: safePalisadeEdges,
           extraWood: extraWood ?? 0,
         }, {
-          costOverride: override,
           state: this.state,
+          space,
         })
         if (!result.ok) return this.respond(false, result.error)
         this.pushHistory()

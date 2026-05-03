@@ -1,14 +1,14 @@
 import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { getAssignedAnimalsByType } from '../../game/animals'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B39_Loom'
 
+// BGA: foodMap = [0,1,1,1,2,2,2,3]; index = countAnimalsOnBoard()[SHEEP] (clamped to 7)
 const sheepFoodIncome = (sheep: number): number => {
-  if (sheep >= 7) return 3
-  if (sheep >= 4) return 2
-  if (sheep >= 1) return 1
-  return 0
+  const map = [0, 1, 1, 1, 2, 2, 2, 3]
+  return map[Math.min(sheep, 7)] ?? 3
 }
 
 export const B39_Loom = new MinorImprovement({
@@ -28,12 +28,14 @@ export const B39_Loom_impl = {
   effect: {
   id: CARD_ID,
   onHarvestFieldPhase: (_state, player) => {
-    const gain = sheepFoodIncome(player.resources.sheep ?? 0)
+    const sheep = getAssignedAnimalsByType(player).sheep
+    const gain = sheepFoodIncome(sheep)
     if (gain <= 0) return
     return gainLeaf(CARD_ID, { food: gain })
   },
   computeBonusScore: (_state, player) => {
-    return Math.floor(player.resources.sheep / 3)
+    const sheep = getAssignedAnimalsByType(player).sheep
+    return Math.floor(sheep / 3)
   },
 },
   reaches: [] as readonly string[],

@@ -12,6 +12,7 @@ import {
   clearPaymentCache,
 } from '../../helpers/payment'
 import { buildPaymentChoiceResult, payTypedFlatCost } from '../../helpers/pay-helpers'
+import { payAction } from '../pay'
 
 beforeEach(() => {
   clearPaymentCache()
@@ -863,3 +864,144 @@ describe('Integration: Cooking Hearth upgrade scenario', () => {
     expect(cardSolutions).toHaveLength(0)
   })
 })
+
+const callPay = (
+  player: PlayerState,
+  params: Record<string, unknown>,
+  extra: Partial<{ sourceCard: string; actionContext: Record<string, unknown> }> = {},
+) =>
+  payAction.execute({
+    state: {} as GameState,
+    player,
+    space: { id: 'test', name: '', actionId: 'pay', round: 0 } as unknown as import('../../../game/types').ActionSpace,
+    params,
+    sourceCard: extra.sourceCard,
+    actionContext: extra.actionContext,
+  })
+
+describe('payAction', () => {
+  it('exists with id "pay"', () => {
+    expect(payAction.id).toBe('pay')
+  })
+
+  it('simple Partial<Resource>: pays from resources, returns ok', () => {
+    const player = createMockPlayer({ wood: 3 })
+    const result = callPay(player, { cost: { wood: 2 } })
+    expect(result.type).toBe('ok')
+    expect(player.resources.wood).toBe(1)
+    if (result.type === 'ok') {
+      expect(result.resourcesPaid).toEqual({ wood: 2 })
+    }
+  })
+
+  it('simple Partial<Resource> insufficient: returns fail', () => {
+    const player = createMockPlayer({ wood: 1 })
+    const result = callPay(player, { cost: { wood: 2 } })
+    expect(result.type).toBe('fail')
+    expect(player.resources.wood).toBe(1)
+  })
+
+  it('missing cost params: returns fail', () => {
+    const player = createMockPlayer({ wood: 5 })
+    const result = callPay(player, {})
+    expect(result.type).toBe('fail')
+  })
+})
+
+describe('payAction: ComplexCost typed-flat single solution', () => {
+  it('typed-flat: pays single solution and decrements resources', () => {
+    const player = createMockPlayer({ wood: 5 })
+    const cost: ComplexCost = { fee: { wood: 2 } }
+    const result = callPay(player, { cost, costType: 'construct' })
+    expect(result.type).toBe('ok')
+    expect(player.resources.wood).toBe(3)
+  })
+
+  it('typed-flat insufficient: returns fail and does not mutate', () => {
+    const player = createMockPlayer({ wood: 1 })
+    const cost: ComplexCost = { fee: { wood: 3 } }
+    const result = callPay(player, { cost })
+    expect(result.type).toBe('fail')
+    expect(player.resources.wood).toBe(1)
+  })
+
+})
+
+describe('payAction: ComplexCost multi-solution choice', () => {
+  it('emits choice when multiple solutions exist', () => {
+    const player = createMockPlayer({ food: 2, grain: 1 })
+    const cost: ComplexCost = { fees: [{ food: 2 }, { grain: 1 }] }
+    const result = callPay(player, { cost, optionPrefix: 'pay:test' })
+    expect(result.type).toBe('choice')
+    if (result.type === 'choice') {
+      expect(result.options.length).toBe(2)
+      expect(result.options.every((o) => o.value.startsWith('pay:test:'))).toBe(true)
+    }
+  })
+
+  it('resolveChoice / paymentChoice param applies selected solution', () => {
+    const player = createMockPlayer({ food: 2, grain: 1 })
+    const cost: ComplexCost = { fees: [{ food: 2 }, { grain: 1 }] }
+    const initial = callPay(player, { cost, optionPrefix: 'pay:test' })
+    if (initial.type !== 'choice') throw new Error('expected choice')
+    const grainOption = initial.options.find(
+      (o) =>
+        ((o.labelParams as { resourcesPaid?: Record<string, number> } | undefined)
+          ?.resourcesPaid?.grain ?? 0) === 1,
+    )
+    expect(grainOption).toBeDefined()
+    const result = callPay(player, {
+      cost,
+      optionPrefix: 'pay:test',
+      paymentChoice: grainOption!.value,
+    })
+    expect(result.type).toBe('ok')
+    expect(player.resources.grain).toBe(0)
+    expect(player.resources.food).toBe(2)
+  })
+
+  it('multi-choice bonus: extraData.bonusChoiceIndex carries chosen index', () => {
+    const player = createMockPlayer({ wood: 3, clay: 3 })
+    const cost: ComplexCost = {
+      fee: { wood: 2, clay: 2 },
+      bonuses: [
+        {
+          sources: ['TestBonusCard'],
+          choices: [
+            // discount applies as fee minus discount, so positive 1 = save 1
+            { discount: { wood: 1 } },
+            { discount: { clay: 1 } },
+          ],
+          optional: false,
+        },
+      ],
+    }
+    const initial = callPay(player, { cost, optionPrefix: 'pay:bonus' })
+    expect(initial.type).toBe('choice')
+    if (initial.type !== 'choice') throw new Error('expected choice')
+    // pick the option that saves wood (paid 1 wood + 2 clay)
+    const woodSaveOption = initial.options.find((o) => {
+      const paid = (
+        (o.labelParams as { resourcesPaid?: Record<string, number> } | undefined)
+          ?.resourcesPaid ?? {}
+      ) as Record<string, number>
+      return paid.wood === 1 && paid.clay === 2
+    })
+    expect(woodSaveOption).toBeDefined()
+    const result = callPay(player, {
+      cost,
+      optionPrefix: 'pay:bonus',
+      paymentChoice: woodSaveOption!.value,
+    })
+    expect(result.type).toBe('ok')
+    if (result.type === 'ok') {
+      const extra = result.extraData as
+        | { bonusChoiceIndex?: Record<string, number>; bonusUsed?: string[] }
+        | undefined
+      expect(extra?.bonusChoiceIndex?.['TestBonusCard']).toBe(0)
+      expect(extra?.bonusUsed).toContain('TestBonusCard')
+    }
+  })
+})
+
+

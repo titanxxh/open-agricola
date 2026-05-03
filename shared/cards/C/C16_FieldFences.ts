@@ -1,6 +1,8 @@
 import { MinorImprovement } from '../types'
 import { readCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, FarmTilePosition, PlayerState } from '../../game/types'
 
 const CARD_ID = 'C16_FieldFences'
@@ -19,10 +21,9 @@ const FLAG_KEY = 'c16Active'
  *   1. `special-effect` → set `cardStates.C16_FieldFences.extraData.c16Active = true`
  *   2. `fencing` leaf
  *   3. `special-effect` → unset the flag
- * Discount is delivered through the existing `computeFenceDiscount` /
- * `computeFenceFreeAvailable` hooks, gated by the flag. This mirrors how
- * E16 BriarHedge handles "free border edges" but only while the
- * card-induced fencing flow is active.
+ * Discount is delivered through a `computeCosts` listener on `fence`,
+ * gated by the flag. This mirrors how E16 BriarHedge handles "free border
+ * edges" but only while the card-induced fencing flow is active.
  */
 const fieldEdgeIds = (fields: FarmTilePosition[]): Set<string> => {
   const edges = new Set<string>()
@@ -55,6 +56,26 @@ const setFlagFlow = (value: boolean): ActionFlow => ({
   params: { kind: 'set-extra-data', key: FLAG_KEY, value },
 })
 
+const C16FenceListener: CardListenerRegistration = {
+  id: 'C16-fence-discount',
+  cardIds: [CARD_ID],
+  phases: ['computeCosts' as ActionHookPhase],
+  actions: ['fence'],
+  handler: (ctx: CardListenerContext): ActionHookResult | void => {
+    if (!isC16Active(ctx.player)) return
+    const fieldEdges = fieldEdgeIds(ctx.player.fields.map((f) => ({ row: f.row, col: f.col })))
+    const params = ctx.params as { newFenceEdges?: string[] } | undefined
+    const newFenceEdges = params?.newFenceEdges
+    if (newFenceEdges === undefined) {
+      const built = new Set((ctx.player.fenceSegments ?? []).map((s) => s.edge))
+      let n = 0
+      for (const edge of fieldEdges) if (!built.has(edge)) n += 1
+      return { costs: { wood: -n } }
+    }
+    return { costs: { wood: -newFenceEdges.filter((e) => fieldEdges.has(e)).length } }
+  },
+}
+
 export const C16_FieldFences_impl = {
   effect: {
     id: CARD_ID,
@@ -67,21 +88,7 @@ export const C16_FieldFences_impl = {
         setFlagFlow(false),
       ],
     }),
-    computeFenceDiscount: (_state, player, ctx) => {
-      if (!isC16Active(player)) return 0
-      const fieldEdges = fieldEdgeIds(player.fields.map((f) => ({ row: f.row, col: f.col })))
-      return ctx.newFenceEdges.filter((edge) => fieldEdges.has(edge)).length
-    },
-    computeFenceFreeAvailable: (_state, player) => {
-      if (!isC16Active(player)) return 0
-      const built = new Set((player.fenceSegments ?? []).map((s) => s.edge))
-      const fieldEdges = fieldEdgeIds(player.fields.map((f) => ({ row: f.row, col: f.col })))
-      let count = 0
-      for (const edge of fieldEdges) {
-        if (!built.has(edge)) count += 1
-      }
-      return count
-    },
   },
+  listeners: [C16FenceListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl

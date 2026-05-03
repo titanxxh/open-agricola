@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { setActiveWorkerCount, setWorkersAtHome, workersAvailable, familySize, newbornCount } from '../../shared/game/player'
-import '../../shared/cards/E/E21_SheepRug'
+import { E21_SheepRug } from '../../shared/cards/E/E21_SheepRug'
+import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`
 
@@ -71,5 +72,33 @@ describe('E21_SheepRug session', () => {
     }
 
     expect(resp.pending.type).toBe('confirmNextPlayer')
+  })
+
+  describe('prerequisite "4 Sheep"', () => {
+    it('blocks when player has fewer than 4 sheep on board', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const player = state.players[0]!
+      player.pastures = []
+      player.houseAnimalType = null
+      player.houseAnimalCount = 0
+      player.stableAnimals = {}
+      expect(meetsCardPrerequisites(player, E21_SheepRug, state.round, state)).toBe(false)
+    })
+
+    it('allows when player has 4+ sheep on board (in pasture)', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const player = state.players[0]!
+      player.pastures = [{
+        id: 'p1',
+        tiles: [{ row: 0, col: 0 }, { row: 1, col: 0 }],
+        animalType: 'sheep',
+        animalCount: 4,
+        size: 2,
+        stables: 0,
+      }]
+      expect(meetsCardPrerequisites(player, E21_SheepRug, state.round, state)).toBe(true)
+    })
   })
 })

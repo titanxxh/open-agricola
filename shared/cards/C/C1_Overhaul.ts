@@ -3,6 +3,8 @@ import { readCardExtraData } from '../helpers/card-state'
 import { getFenceCount } from '../../actions/effects/fencing'
 import type { ActionFlow, PlayerState } from '../../game/types'
 import type { CardImpl } from '../registry'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 
 const CARD_ID = 'C1_Overhaul'
 const FLAG_KEY = 'c1Active'
@@ -23,11 +25,11 @@ const MAX_REBUILD_KEY = 'c1MaxRebuild'
  *   - We use the existing `consume-fence` SE to raze (count=n) wood fences.
  *   - We set a `c1Active=true` flag and store `c1MaxRebuild = n+3` on the
  *     card state, then run a `fence` leaf, then clear the flag.
- *   - `computeFenceDiscount` while the flag is set returns
+ *   - A `computeCosts` listener on `fence`, gated by the flag, returns
  *     `min(newFenceEdges, c1MaxRebuild)` — every selected new fence is free
- *     (matches BGA `costs: WOOD => 0`) up to the rebuild cap.
- *   - `computeFenceFreeAvailable` returns `c1MaxRebuild` so the entry
- *     guard sees fencing as doable even with 0 wood.
+ *     (matches BGA `costs: WOOD => 0`) up to the rebuild cap. The same
+ *     listener feeds the `canStartFencing` entry guard so fencing is
+ *     doable even with 0 wood.
  *
  * Deliberate simplification (recorded in card_progress §刻意不同):
  *   - We do NOT enforce BGA's `min: n` (player can decline / build less);
@@ -63,6 +65,23 @@ const setExtraDataFlow = (key: string, value: unknown): ActionFlow => ({
   params: { kind: 'set-extra-data', key, value },
 })
 
+const C1FenceListener: CardListenerRegistration = {
+  id: 'C1-fence-discount',
+  cardIds: [CARD_ID],
+  phases: ['computeCosts' as ActionHookPhase],
+  actions: ['fence'],
+  handler: (ctx: CardListenerContext): ActionHookResult | void => {
+    if (!isC1Active(ctx.player)) return
+    const cap = getC1MaxRebuild(ctx.player)
+    const params = ctx.params as { newFenceEdges?: string[] } | undefined
+    const newFenceEdges = params?.newFenceEdges
+    if (newFenceEdges === undefined) {
+      return { costs: { wood: -cap } }
+    }
+    return { costs: { wood: -Math.min(newFenceEdges.length, cap) } }
+  },
+}
+
 export const C1_Overhaul_impl = {
   effect: {
     id: CARD_ID,
@@ -87,15 +106,7 @@ export const C1_Overhaul_impl = {
         ],
       }
     },
-    computeFenceDiscount: (_state, player, ctx) => {
-      if (!isC1Active(player)) return 0
-      const cap = getC1MaxRebuild(player)
-      return Math.min(ctx.newFenceEdges.length, cap)
-    },
-    computeFenceFreeAvailable: (_state, player) => {
-      if (!isC1Active(player)) return 0
-      return getC1MaxRebuild(player)
-    },
   },
+  listeners: [C1FenceListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl

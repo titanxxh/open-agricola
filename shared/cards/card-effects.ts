@@ -60,7 +60,7 @@ export type CardEffectField = CardEffectHook
   | 'computeBonusScore' | 'computeSharedPostScore' | 'computeCostedBonus'
   | 'computeExtraRoomCapacity'
   | 'onComputeAnimalZones' | 'onComputeSowableFields' | 'onSowExtraField'
-  | 'computeLockedFarmTiles' | 'computeFenceDiscount' | 'computeFenceFreeAvailable'
+  | 'computeLockedFarmTiles'
   | 'getInvalidAnimals'
 
 export const cardEffectHooks: CardEffectField[] = [
@@ -99,8 +99,6 @@ export const cardEffectHooks: CardEffectField[] = [
   'onComputeSowableFields',
   'onSowExtraField',
   'computeLockedFarmTiles',
-  'computeFenceDiscount',
-  'computeFenceFreeAvailable',
   'getInvalidAnimals',
 ]
 
@@ -212,19 +210,16 @@ export type CardEffect = {
   onSowExtraField?: (player: PlayerState, tile: FarmTilePosition, crop: ExtraSowableCrop) => boolean
   /** Return farmyard tiles currently locked by this card. Empty = no lock active. */
   computeLockedFarmTiles?: (player: PlayerState) => FarmTilePosition[]
-  /** Extra free fence segments granted by a card (e.g. E16 BriarHedge for border edges). */
-  computeFenceDiscount?: (
-    state: GameState,
-    player: PlayerState,
-    context: { newFenceEdges: string[]; newPalisadeEdges: string[] },
-  ) => number
   /**
-   * Maximum number of free fence segments this card can currently provide
-   * (e.g. E16 returns the count of unused border edges). Used by the
-   * `canStartFencing` entry-guard to compute total buildable fences,
-   * mirroring BGA `getMaxBuildableFences`.
+   * BGA `enforceReorganizeOnLastHarvest`: cards like B104 SheepWalker, B35
+   * HookKnife, A153 PigOwner force an animal reorg on the round-14 harvest
+   * even when no breeding produced a newborn — to give the rules system a
+   * chance to evict animals (e.g. SheepWalker's "must accommodate before
+   * exchange" implies the final-harvest rearrangement). Returning true makes
+   * `breedAction` emit an `animalReorg` result regardless of `animalCount`.
+   * Only consulted when `state.round === 14` and `sourceCard === 'harvest'`.
    */
-  computeFenceFreeAvailable?: (state: GameState, player: PlayerState) => number
+  enforceReorganizeOnLastHarvest?: (state: GameState, player: PlayerState) => boolean
   /**
    * Declare which hooks should also fire when the card is still in the player's hand
    * (not yet played). The framework iterates hand cards separately from played cards,
@@ -353,6 +348,41 @@ export const runBeforeEndGameHooks = (state: GameState, player: PlayerState): vo
   runHookForAllCards(state, player, 'onBeforeEndGame')
 
 /**
+ * Returns true when any of the player's played cards demand a reorg even on
+ * the round-14 harvest with no newborn (e.g. B104 SheepWalker, B35 HookKnife,
+ * A153 PigOwner). Mirrors BGA's `enforceReorganizeOnLastHarvest` aggregation
+ * in `HarvestTrait::stHarvestBreed`.
+ */
+export const shouldEnforceReorganizeOnLastHarvest = (
+  state: GameState,
+  player: PlayerState,
+): boolean => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    const handler = effect?.enforceReorganizeOnLastHarvest
+    if (!handler) continue
+    try {
+      if (handler(state, player)) return true
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(
+          `[card-effects] custom card ${cardId} enforceReorganizeOnLastHarvest threw, skipping:`,
+          err,
+        )
+        continue
+      }
+      throw err
+    }
+  }
+  return false
+}
+
+/**
  * Run `onBeforePlayerTurn` listeners for every card the player owns and return
  * `true` if any handler asked to skip the turn. Hooks are not allowed to push
  * an ActionFlow here — only to signal skipTurn. Errors from custom cards are
@@ -430,33 +460,6 @@ export const computeExtraSowableFields = (player: PlayerState): ExtraSowableFiel
     }
   }
   return extras
-}
-
-export const collectFenceDiscount = (
-  state: GameState,
-  player: PlayerState,
-  context: { newFenceEdges: string[]; newPalisadeEdges: string[] },
-): number => {
-  const allCards = [
-    ...player.improvements,
-    ...player.minorPlayed,
-    ...player.occupationPlayed,
-  ]
-  let total = 0
-  for (const cardId of allCards) {
-    const effect = getCardEffect(cardId)
-    if (!effect?.computeFenceDiscount) continue
-    try {
-      total += effect.computeFenceDiscount(state, player, context)
-    } catch (err) {
-      if (isCustomCard(cardId)) {
-        console.warn(`[card-effects] custom card ${cardId} computeFenceDiscount threw, skipping:`, err)
-        continue
-      }
-      throw err
-    }
-  }
-  return Math.max(0, total)
 }
 
 /**

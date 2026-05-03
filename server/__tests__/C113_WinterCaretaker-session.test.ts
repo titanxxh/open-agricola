@@ -47,7 +47,7 @@ describe('C113_WinterCaretaker session', () => {
     expect(children).toHaveLength(2)
     // First child: pay 2 food
     expect(children[0].type).toBe('leaf')
-    expect(children[0].actionId).toBe('pay-resources')
+    expect(children[0].actionId).toBe('pay')
     expect(children[0].params).toEqual({ food: 2 })
     // Second child: gain 1 vegetable
     expect(children[1].type).toBe('leaf')

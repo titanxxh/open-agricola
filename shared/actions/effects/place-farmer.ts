@@ -159,7 +159,16 @@ export const placeFarmerAction: ActionDefinition = {
       if (!supply) return { type: 'fail', logKey: 'log.placeFarmerFail' }
       supply.isActive = true
     }
-    const allowed = computeAllowedPlacementSpaces(state, player)
+    let allowed = computeAllowedPlacementSpaces(state, player)
+    // BGA `constraints` (e.g. C125 Nightworker restricts to building-resource
+    // accumulation spaces of types the player has 0 of). Caller passes a
+    // string[] of space ids via `actionContext.constraints`; we intersect it
+    // with the engine-computed allowed set.
+    const constraints = actionContext?.constraints as string[] | undefined
+    if (Array.isArray(constraints) && constraints.length > 0) {
+      const allowSet = new Set(constraints)
+      allowed = allowed.filter((a) => allowSet.has(a.spaceId))
+    }
     if (allowed.length === 0) return { type: 'fail', logKey: 'log.placeFarmerFail' }
     const options = allowed.map((a) => {
       const space = state.actionSpaces.find((s) => s.id === a.spaceId)!

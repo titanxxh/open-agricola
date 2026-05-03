@@ -159,7 +159,7 @@ describe('priority plan implementations', () => {
     expect(flow.optional).toBe(true)
     expect(flow.children[0]).toMatchObject({
       type: 'leaf',
-      actionId: 'pay-resources',
+      actionId: 'pay',
       params: { grain: 1 },
       choiceLabelKey: 'ui.interactionResourceExchange',
       choiceLabelParams: {

@@ -24,7 +24,7 @@ const listener: CardListenerRegistration = {
         children: [
           {
             type: 'leaf',
-            actionId: 'pay-resources',
+            actionId: 'pay',
             params: { wood: 1, grain: 1 },
             sourceCard: CARD_ID,
           },

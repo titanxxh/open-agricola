@@ -81,7 +81,7 @@ describe('D91_Plowman', () => {
     expect(seq.type).toBe('seq')
     expect(seq.optional).toBe(true)
     expect(seq.children).toHaveLength(2)
-    expect(seq.children[0].actionId).toBe('pay-resources')
+    expect(seq.children[0].actionId).toBe('pay')
     expect(seq.children[0].params).toEqual({ food: 1 })
     expect(seq.children[1].actionId).toBe('plow')
   })

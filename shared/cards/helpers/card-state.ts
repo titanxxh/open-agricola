@@ -8,6 +8,31 @@ import type {
 
 const CARD_RESOURCE_STATS_KEY = 'resourceStats'
 
+/**
+ * Generic cardState extraData key used by cards that pre-place a marker on
+ * one or more action spaces (e.g. E148_Lazybones). Frontend renders these
+ * markers by scanning every player's cardStates for entries with this key —
+ * which means new cards with the same ability slot in without the renderer
+ * naming them. Value type: `string[]` (action-space ids).
+ */
+export const RESERVED_ACTION_SPACES_KEY = 'reservedActionSpaces'
+
+/** Read the action-space ids reserved by `cardId` for `player` (empty if none). */
+export const getReservedActionSpaces = (
+  player: PlayerState,
+  cardId: string,
+): string[] =>
+  readCardExtraData<string[]>(player, cardId, RESERVED_ACTION_SPACES_KEY) ?? []
+
+/** Set the action-space ids reserved by `cardId` for `player`. */
+export const setReservedActionSpaces = (
+  player: PlayerState,
+  cardId: string,
+  spaces: string[],
+): void => {
+  writeCardExtraData(player, cardId, RESERVED_ACTION_SPACES_KEY, spaces)
+}
+
 export const ensureCardState = (
   player: PlayerState,
   cardId: string,

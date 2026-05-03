@@ -24,7 +24,7 @@ export const D133_BeerTentOperator_impl = {
       type: 'seq',
       optional: true,
       children: [
-        { type: 'leaf', actionId: 'pay-resources', params: { wood: 1, grain: 1 }, sourceCard: CARD_ID },
+        { type: 'leaf', actionId: 'pay', params: { wood: 1, grain: 1 }, sourceCard: CARD_ID },
         { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID },
         { type: 'leaf', actionId: 'gain', params: { food: 2 }, sourceCard: CARD_ID },
       ],

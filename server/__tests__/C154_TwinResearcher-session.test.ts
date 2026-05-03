@@ -46,7 +46,7 @@ describe('C154_TwinResearcher session', () => {
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
     const childActionIds = flow.children.map((c: ActionFlow) => c.actionId)
-    expect(childActionIds).toContain('pay-resources')
+    expect(childActionIds).toContain('pay')
     expect(childActionIds).toContain('bonus-vp')
   })
 

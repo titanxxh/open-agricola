@@ -13,6 +13,7 @@ export const B113_PatchCaregiver = new Occupation({
   desc: ['When you play this card, you can choose to buy 1 <GRAIN> for 1 <FOOD>, or 1 <VEGETABLE> for 3 <FOOD>. This card is a field.'],
   cost: {},
   players: '1+',
+  isField: true,
 })
 
 export const B113_PatchCaregiver_impl = {

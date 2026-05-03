@@ -26,8 +26,11 @@ describe('C140_PackagingArtist session', () => {
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).sourceCard).toBe(CARD_ID)
   })
 
-  it('before minor-improvement offers optional bake-bread', () => {
-    const listener = findListener('C140-packaging-artist-before-minor-improvement')!
+  // BGA: computeReplaceImprovement returns bakeBreadNode — minor-improvement
+  // action is REPLACED by bake-bread (not "alongside"). Implementation uses a
+  // computeReplace listener with `decline + alternativeFlow: bake-bread leaf`.
+  it('computeReplace replaces minor-improvement with bake-bread (decline + alternativeFlow)', () => {
+    const listener = findListener('C140-packaging-artist-replace-minor-improvement')
     expect(listener).toBeDefined()
     const session = new GameSession()
     const state = session.getState().state
@@ -36,17 +39,64 @@ describe('C140_PackagingArtist session', () => {
     player.occupationPlayed.push(CARD_ID)
     session.loadState(state)
 
-    const result = executeCardListener(listener, {
+    const result = executeCardListener(listener!, {
       state,
       player,
       actionId: 'minor-improvement',
-      phase: 'before',
+      phase: 'computeReplace',
     } as unknown as CardListenerContext)
     expect(result).toBeDefined()
-    const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
+    expect(result!.decline).toBe(true)
+    const leaf = result!.alternativeFlow as Extract<ActionFlow, { type: 'leaf' }>
+    expect(leaf.type).toBe('leaf')
     expect(leaf.actionId).toBe('bake-bread')
-    expect(leaf.optional).toBe(true)
     expect(leaf.sourceCard).toBe(CARD_ID)
   })
 
+  // BGA: onPlayerIsDoable forces minor-improvement to be doable when player
+  // has any "real" minor action context (the card replaces it with bake-bread,
+  // which is always doable as long as the player can bake — the listener
+  // returns `doable: true` so the underlying minor-improvement action stays
+  // enabled even if the player has no minor cards in hand).
+  it('isDoable: minor-improvement stays doable even with no minor cards', () => {
+    const listener = findListener('C140-packaging-artist-isdoable-minor-improvement')
+    expect(listener).toBeDefined()
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    const player = state.players[0]!
+    player.occupationPlayed.push(CARD_ID)
+    player.minorHand = [] // no minor cards
+    session.loadState(state)
+
+    const result = executeCardListener(listener!, {
+      state,
+      player,
+      actionId: 'minor-improvement',
+      phase: 'isDoable',
+      doable: false,
+    } as unknown as CardListenerContext)
+    expect(result?.doable).toBe(true)
+  })
+
+  it('isDoable: keeps doable=true unchanged when already doable', () => {
+    const listener = findListener('C140-packaging-artist-isdoable-minor-improvement')
+    expect(listener).toBeDefined()
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    const player = state.players[0]!
+    player.occupationPlayed.push(CARD_ID)
+    session.loadState(state)
+
+    const result = executeCardListener(listener!, {
+      state,
+      player,
+      actionId: 'minor-improvement',
+      phase: 'isDoable',
+      doable: true,
+    } as unknown as CardListenerContext)
+    // No-op when already doable (don't override true with anything)
+    expect(result === undefined || result.doable === true).toBe(true)
+  })
 })

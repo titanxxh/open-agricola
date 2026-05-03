@@ -52,6 +52,7 @@ export const E70_CropRotationField = new MinorImprovement({
   cost: {},
   prerequisite: '1 Occupation',
   occupationPrerequisites: { min: 1 },
+  isField: true,
 })
 
 export const E70_CropRotationField_impl = {

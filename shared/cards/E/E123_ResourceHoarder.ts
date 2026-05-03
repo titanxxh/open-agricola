@@ -37,13 +37,11 @@ const updateInfobox = (player: Parameters<typeof writeCardInfobox>[0]) => {
 
 /**
  * computeCosts listener: for construct, improvement-any, minor-improvement, and renovate,
- * offer a discount of the top resource from the stack as an optional bonus.
+ * offer use-top-k discounts (k=0..N) as a single Bonus with N+1 BonusChoice entries.
  *
- * Simplified vs BGA: BGA emits N choices (use top 0..N items). We emit a single
- * optional choice for the top item only (deliberate divergence — see card_progress.md
- * §2.5). Using the bonus framework (vs flat `costs`) routes through
- * paymentSolution and populates `_activeActionBonusSources` so the after-pay
- * listener pops only when the bonus actually fired.
+ * BGA full alignment (Sprint 7b1 Task 2.9): k=0 means "skip" (zero discount),
+ * k=N means "use the entire stack". The afterPay listener pops the chosen
+ * count from the top of the stack via `bonusChoiceIndex[CARD_ID]`.
  */
 const computeCostsListener: CardListenerRegistration = {
   id: 'E123-resource-hoarder-compute-costs',
@@ -52,11 +50,21 @@ const computeCostsListener: CardListenerRegistration = {
   actions: ['construct', 'improvement-any', 'minor-improvement', 'renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const stack = getStack(context.player)
-    if (stack.length === 0) return
+    const N = stack.length
+    if (N === 0) return
 
-    const topResource = stack[stack.length - 1]!
+    const choices = []
+    for (let k = 0; k <= N; k++) {
+      const discount: Partial<Record<string, number>> = {}
+      // top k items: indices stack.length-1 .. stack.length-k
+      for (let i = 0; i < k; i++) {
+        const res = stack[stack.length - 1 - i]!
+        discount[res] = (discount[res] ?? 0) + 1
+      }
+      choices.push({ discount: discount as import('../../game/types').BonusChoice['discount'] })
+    }
     const bonus: Bonus = {
-      discount: { [topResource]: 1 },
+      choices,
       optional: true,
       sources: [CARD_ID],
     }
@@ -68,26 +76,53 @@ const computeCostsListener: CardListenerRegistration = {
  * After paying for construct/improvement/renovate: remove the top resource from
  * stack ONLY when this card's bonus actually fired during the payment.
  *
- * Bug fix: previously the listener popped unconditionally, so any
- * construct/improvement/renovate would drain the stack even when the cost did
- * not include the top resource (i.e., the bonus was rejected by the payment
- * solver). We gate on `player._activeActionBonusSources` — populated by
- * `executePaymentSolution` with bonus.sources of solutions that were used —
- * which is the canonical "this card's bonus was actually applied" signal.
+ * 7b1 migration: dual-path listener.
+ * - `actions: ['pay']` is the new path (improvement-any flow's pay leaf
+ *   triggers it via the after phase). Reads `context.result.extraData.bonusUsed`
+ *   from the pay leaf's transparent extra data.
+ * - `actions: ['construct', 'renovate-house']` is the legacy path (those
+ *   action definitions still call `executePaymentSolution` directly). Reads
+ *   `player._activeActionBonusSources` populated by that helper.
+ *
+ * Both paths gate on "this card's BonusModifier.sources actually fired"
+ * — the canonical signal that the discount was applied. Top-1 simplification
+ * preserved here; full BGA use-top-k upgrade is deferred to Task 2.9.
  */
 const afterPayListener: CardListenerRegistration = {
   id: 'E123-resource-hoarder-after-pay',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['construct', 'improvement-any', 'minor-improvement', 'renovate-house'],
+  actions: ['pay', 'construct', 'renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const stack = getStack(context.player)
     if (stack.length === 0) return
-    const sources = context.player._activeActionBonusSources ?? []
-    if (!sources.includes(CARD_ID)) return
+    let fired = false
+    let k = 1 // default k=1 for the legacy path (bonusChoiceIndex unavailable)
+    const result = context.result as
+      | { extraData?: { bonusUsed?: string[]; bonusChoiceIndex?: Record<string, number> } }
+      | undefined
+    const extraBonusUsed = result?.extraData?.bonusUsed
+    if (Array.isArray(extraBonusUsed) && extraBonusUsed.includes(CARD_ID)) {
+      fired = true
+      const idx = result?.extraData?.bonusChoiceIndex?.[CARD_ID]
+      if (typeof idx === 'number') k = idx
+    }
+    if (!fired) {
+      // Legacy path (construct / renovate-house still mutate
+      // _activeActionBonusSources via executePaymentSolution). They use the
+      // pre-7b1 single-choice bonus shape, so k=1 (top-1) matches the
+      // discount that the payment solver actually applied.
+      const sources = context.player._activeActionBonusSources ?? []
+      if (sources.includes(CARD_ID)) {
+        fired = true
+        k = 1
+      }
+    }
+    if (!fired || k <= 0) return
 
-    // Pop the top resource from the stack (it was used as a discount)
-    stack.pop()
+    // Pop k items from the top of the stack (each was used as a 1-resource discount)
+    const popCount = Math.min(k, stack.length)
+    stack.length = stack.length - popCount
     updateInfobox(context.player)
   },
 }

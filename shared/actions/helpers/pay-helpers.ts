@@ -274,6 +274,7 @@ const normalizePaymentChoiceValue = (
 type ResolveCostPaymentSelectionOptions = {
   costType?: CostModifierType
   includeReturnedCard?: boolean
+  playedCards?: string[]
 }
 
 export const resolveCostPaymentSelection = (
@@ -295,7 +296,7 @@ export const resolveCostPaymentSelection = (
   const solutions = computeAllBuyableCombinations(
     player,
     normalizedCost,
-    undefined,
+    options.playedCards,
     options.costType,
   )
   return resolvePaymentSolutionSelection(
@@ -359,6 +360,37 @@ export const payTypedFlatCost = (
   }
   executePaymentSolution(player, resolved.solution, { costType, state })
   return true
+}
+
+/**
+ * Like `payTypedFlatCost` but returns the actual `resourcesPaid` (after
+ * trade-modifier cost replacement and bonus-discount fan-out). Used by the
+ * `pay` leaf so its `extraData.resourcesPaid` reflects what was really
+ * deducted — listeners (C116 FurnitureMaker) read this to compute their
+ * downstream effect amounts.
+ */
+export const payTypedFlatCostDetailed = (
+  player: PlayerState,
+  baseCost: Partial<Resource>,
+  costType?: CostModifierType,
+  state?: GameState,
+):
+  | { ok: true; resourcesPaid: Partial<Resource>; bonusUsed?: string; cardUsed?: string; feeIndex?: number }
+  | { ok: false } => {
+  const resolved = resolveTypedFlatPaymentSolution(player, baseCost, costType)
+  if (!resolved) return { ok: false }
+  if (resolved.type === 'direct') {
+    payResources(player, resolved.directCost)
+    return { ok: true, resourcesPaid: resolved.directCost }
+  }
+  executePaymentSolution(player, resolved.solution, { costType, state })
+  return {
+    ok: true,
+    resourcesPaid: resolved.solution.resourcesPaid,
+    bonusUsed: resolved.solution.bonusUsed,
+    cardUsed: resolved.solution.cardUsed,
+    feeIndex: resolved.solution.feeIndex,
+  }
 }
 
 export const resolveActionPreviewCost = (

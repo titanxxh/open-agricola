@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/game/player'
-import '../../shared/cards/E/E71_CowPatty'
+import { E71_CowPatty } from '../../shared/cards/E/E71_CowPatty'
+import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 const CARD_ID = 'E71_CowPatty'
 
@@ -318,5 +319,33 @@ describe('E71_CowPatty session', () => {
     // Total should be 7 (3 + 3 + 1 bonus on selected field)
     const total = (f0?.stacks[0]?.remaining ?? 0 ?? 0) + (f4?.stacks[0]?.remaining ?? 0 ?? 0)
     expect(total).toBe(7)
+  })
+
+  describe('prerequisite "1 Cattle"', () => {
+    it('blocks when player has no cattle on board', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const player = state.players[0]!
+      player.pastures = []
+      player.houseAnimalType = null
+      player.houseAnimalCount = 0
+      player.stableAnimals = {}
+      expect(meetsCardPrerequisites(player, E71_CowPatty, state.round, state)).toBe(false)
+    })
+
+    it('allows when player has at least 1 cattle on board', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const player = state.players[0]!
+      player.pastures = [{
+        id: 'p1',
+        tiles: [{ row: 0, col: 0 }],
+        animalType: 'cattle',
+        animalCount: 1,
+        size: 1,
+        stables: 0,
+      }]
+      expect(meetsCardPrerequisites(player, E71_CowPatty, state.round, state)).toBe(true)
+    })
   })
 })
