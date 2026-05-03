@@ -1,46 +1,39 @@
 import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { Resource } from '../../game/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C116_FurnitureMaker'
 
-const afterOccupationListener: CardListenerRegistration = {
-  id: 'C116-furniture-maker-after-occupation',
+// 7b1 migration: listens on `actions: ['pay']` with `costType === 'occupation'`
+// instead of the legacy `actions: ['play-occupation']` after-listener that
+// reconstructed the lessons cost from spaceId + occupation count. The new
+// listener reads the real `extraData.resourcesPaid.food` written by the pay
+// leaf, so:
+//   - lessons-4 + B109 PaperMaker trade (player swaps wood→food and the
+//     actual resourcesPaid is { wood: 1 }, food: 0) correctly emits 0 wood.
+//   - cost-discount modifiers reduce food paid; C116's wood gain shrinks in
+//     lockstep without any special-case logic here.
+//   - listener never fires for C116's own play (sourceCard === CARD_ID),
+//     mirroring the legacy `choice === CARD_ID` guard.
+const afterPayListener: CardListenerRegistration = {
+  id: 'C116-furniture-maker-after-pay',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['play-occupation'],
+  actions: ['pay'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    // Don't trigger on playing this card itself
-    if (context.choice === CARD_ID) return
-    // Calculate the food cost that was paid. The lessons cost depends on the
-    // number of occupations already played and the space (lessons vs lessons-4).
-    // At this point the occupation was already added to occupationPlayed,
-    // so we need to reconstruct the cost at the time of payment.
-    // The space ID tells us which lessons action space was used.
-    const spaceId = context.space?.id ?? 'lessons'
-    // Reconstruct the player state as it was before the occupation was played:
-    // - occupationPlayed length was 1 less (the just-played card is now in the list)
-    const occCountBefore = context.player.occupationPlayed.length - 1
-    // Lessons cost: 0 food if first occupation, 1 food otherwise
-    // Lessons-4 cost: 1 food if <= 1 occupation, 2 food otherwise
-    let food: number
-    if (spaceId === 'lessons-4') {
-      food = occCountBefore <= 1 ? 1 : 2
-    } else {
-      food = occCountBefore === 0 ? 0 : 1
+    const ctx = context as unknown as {
+      costType?: string
+      result?: { extraData?: { resourcesPaid?: Partial<Resource> } }
+      sourceCard?: string
     }
-    // Apply modifier discounts (B109_PaperMaker etc.)
-    for (const mod of context.player.activeModifiers ?? []) {
-      if (mod.type === 'bonus' && mod.appliesTo.includes('occupation') && mod.discount) {
-        if (mod.discount.food && food > 0) {
-          food = Math.max(0, food - mod.discount.food)
-        }
-      }
-    }
-    if (food <= 0) return
-    return { flow: gainLeaf(CARD_ID, { wood: food }), sourceCard: CARD_ID }
+    if (ctx.costType !== 'occupation') return
+    if (ctx.sourceCard === CARD_ID) return
+    const foodPaid = ctx.result?.extraData?.resourcesPaid?.food ?? 0
+    if (foodPaid <= 0) return
+    return { flow: gainLeaf(CARD_ID, { wood: foodPaid }), sourceCard: CARD_ID }
   },
 }
 
@@ -58,10 +51,10 @@ export const C116_FurnitureMaker = new Occupation({
 })
 
 export const C116_FurnitureMaker_impl = {
-  listeners: [afterOccupationListener],
+  listeners: [afterPayListener],
   effect: {
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { wood: 1 }),
-},
+    id: CARD_ID,
+    onBuy: () => gainLeaf(CARD_ID, { wood: 1 }),
+  },
   reaches: [] as readonly string[],
 } satisfies CardImpl
