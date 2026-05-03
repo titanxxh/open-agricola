@@ -3,11 +3,27 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { positionKey } from '../../game/farm'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
-import type { ActionFlow } from '../../game/types'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
+import type { ActionFlow, PlayerState } from '../../game/types'
 import { fieldTopStack } from '../../game/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E71_CowPatty'
+
+const countCattleOnBoard = (player: PlayerState): number => {
+  let total = 0
+  for (const pasture of player.pastures) {
+    if (pasture.animalType === 'cattle') total += pasture.animalCount
+  }
+  if (player.houseAnimalType === 'cattle') total += player.houseAnimalCount
+  for (const animal of Object.values(player.stableAnimals ?? {})) {
+    if (animal === 'cattle') total += 1
+  }
+  return total
+}
+
+// BGA isBuyable: countAnimalsOnBoard()[CATTLE] == 0 → false
+registerPrerequisite('1 Cattle', (player) => countCattleOnBoard(player) >= 1)
 
 /**
  * E71 Cow Patty (Minor Improvement):
