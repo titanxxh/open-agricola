@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { workersAvailable } from '../../shared/game/player'
-import '../../shared/cards/E/E3_TeaTime'
+import { E3_TeaTime } from '../../shared/cards/E/E3_TeaTime'
+import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 const CARD_ID = 'E3_TeaTime'
 
@@ -64,5 +65,25 @@ describe('E3_TeaTime session', () => {
     expect(space.takenBy.some((t) => t.playerId === state.players[1]!.id)).toBe(true)
     // No extra worker returned to owner
     expect(workersAvailable(after, after.players[0]!)).toBe(workersBefore)
+  })
+
+  describe('prerequisite "Own Person on Grain Utilization"', () => {
+    it('blocks when no own worker is on Grain Utilization', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const player = state.players[0]!
+      const space = state.actionSpaces.find((s) => s.id === 'grain-utilization')
+      if (space) space.takenBy = []
+      expect(meetsCardPrerequisites(player, E3_TeaTime, state.round, state)).toBe(false)
+    })
+
+    it('allows when own worker sits on Grain Utilization', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const player = state.players[0]!
+      const space = state.actionSpaces.find((s) => s.id === 'grain-utilization')!
+      space.takenBy = [{ playerId: player.id, workerId: player.workers[0]!.id }]
+      expect(meetsCardPrerequisites(player, E3_TeaTime, state.round, state)).toBe(true)
+    })
   })
 })
