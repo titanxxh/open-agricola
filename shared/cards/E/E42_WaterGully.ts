@@ -1,8 +1,12 @@
 import { MinorImprovement } from '../types'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E42_WaterGully'
+
+// BGA isBuyable: !hasPlayedCard('Major_Well') → false
+registerPrerequisite('Major Well', (player) => player.improvements.includes('Major_Well'))
 
 export const E42_WaterGully = new MinorImprovement({
   id: CARD_ID,
