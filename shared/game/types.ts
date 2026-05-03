@@ -448,6 +448,7 @@ export type ActionExecutionResult =
   | { type: 'ok'; logKey?: string; resourcesGained?: Partial<Resource>; resourcesPaid?: Partial<Resource>; logParams?: Record<string, unknown>; immediateLogs?: ImmediateLogEntry[]; extraData?: Record<string, unknown> }
   | { type: 'choice'; promptKey?: string; promptParams?: Record<string, unknown>; options: ActionChoiceOption[]; extraData?: Record<string, unknown> }
   | { type: 'animalReorg'; sourceId: string }
+  | { type: 'request'; request: InteractionRequest; promptKey?: string; promptParams?: Record<string, unknown>; sourceCard?: string; extraData?: Record<string, unknown> }
   | { type: 'fail'; logKey: string }
   | { type: 'flow'; flow: ActionFlow; logKey?: string; logParams?: Record<string, unknown>; immediateLogs?: ImmediateLogEntry[]; extraData?: Record<string, unknown> }
 export type ActionFlow =
@@ -575,6 +576,25 @@ export type PendingAction =
   | { type: 'confirmPlayerSwitch'; fromPlayerIndex: number; toPlayerIndex: number }
   | { type: 'cardDraft'; round: number; totalRounds: number; allSubmitted: boolean }
   | { type: 'none' }
+
+export type SubFlowKind =
+  | 'choice'
+  | 'animal-reorg'
+  | 'confirm-next-player'
+  | 'confirm-player-switch'
+  | 'feed'
+
+export type InteractionRequest =
+  | { kind: 'choice'; options: ActionChoiceOption[] }
+  | { kind: 'animal-reorg'; zones: InteractionAnimalReorgZone[] }
+  | { kind: 'confirm-next-player'; nextPlayerIndex: number }
+  | { kind: 'confirm-player-switch'; fromPlayerIndex: number; toPlayerIndex: number }
+  | {
+      kind: 'feed'
+      remaining: number
+      foodUsed: number
+      feedQueue?: { index: number; remaining: number; foodUsed: number }[]
+    }
 
 export type InteractionCommand =
   | 'takeAction'
