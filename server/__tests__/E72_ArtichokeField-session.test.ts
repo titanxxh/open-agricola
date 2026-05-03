@@ -119,7 +119,7 @@ describe('E72_ArtichokeField session', () => {
         fields: [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] }], // no empty fields
       })
 
-      let resp = session.takeAction(0, 'grain-utilization')
+      const resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
