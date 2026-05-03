@@ -15,7 +15,21 @@ import { flattenDictionary } from './i18n/flatten-dictionary'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const REPO_ROOT = path.resolve(__dirname, '..')
-const BGA_ROOT = path.resolve(REPO_ROOT, '../bga-agricola')
+
+function resolveBgaRoot(): string {
+  if (process.env.BGA_AGRICOLA_PATH) return process.env.BGA_AGRICOLA_PATH
+  const candidates = [
+    path.resolve(REPO_ROOT, '../bga-agricola'),
+    path.resolve(REPO_ROOT, '../../bga-agricola'),
+    path.resolve(REPO_ROOT, '../../../bga-agricola'),
+  ]
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c
+  }
+  return candidates[0]
+}
+
+const BGA_ROOT = resolveBgaRoot()
 
 export interface GapEntry {
   raw: string

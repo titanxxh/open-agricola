@@ -1,0 +1,1602 @@
+# BGA `clienttranslate` Coverage Report
+
+Generated: 2026-05-03T10:20:13.201Z
+
+> **Note**: BGA strings are not 1:1 with our semantically-named i18n keys. Numbers below are reference only, not mandatory backlog.
+
+## Summary
+
+- BGA unique strings (single-line literal extraction): **1732**
+- Covered by our `shared/i18n/en.ts` value set: **255**
+- Gap (BGA has, we don't): **1477**
+- Unextracted variants (multi-line / self::_ / nested): **740** (not counted in totals above)
+
+## Top 100 by frequency
+
+| count | string | sample location |
+|---|---|---|
+| 30 | 2 Occupations | modules/php/Cards/A/A24_ThreshingBoard.php:25 |
+| 24 | 1 Occupation | modules/php/Cards/A/A21_FamilyFriendHome.php:28 |
+| 19 | 3 Occupations | modules/php/Cards/B/B41_Hauberg.php:22 |
+| 11 | [__Bake Bread__ action:] | modules/php/Cards/A/A60_OrientalFireplace.php:23 |
+| 7 | [Anytime] | modules/php/Cards/A/A60_OrientalFireplace.php:20 |
+| 6 | Add {resources_desc} to {card} | modules/php/Cards/B/B48_ForestStone.php:61 |
+| 5 | Gain {resources_desc} | modules/php/Actions/Gain.php:115 |
+| 5 | 1 Grain Field | modules/php/Cards/B/B32_Kettle.php:24 |
+| 5 | [Scoring] | modules/php/Cards/D/D60_LargePottery.php:23 |
+| 4 | Breed {animal_type} | modules/php/Cards/A/A165_PigBreeder.php:55 |
+| 4 | 1 Pasture | modules/php/Cards/A/A73_AgriculturalFertilizers.php:21 |
+| 4 | [then] | modules/php/Cards/Actions/ActionFarmRedevelopment.php:16 |
+| 4 | Meeting place | modules/php/Cards/Actions/ActionMeetingPlace.php:11 |
+| 4 | see below | modules/php/Cards/B/B36_Bottles.php:18 |
+| 4 | Discard {resources_desc} from {card} | modules/php/Cards/C/C115_Sower.php:79 |
+| 4 | [Harvest] | modules/php/Cards/E/E132_VeggieLover.php:18 |
+| 3 | Build stables | modules/php/Actions/Stables.php:14 |
+| 3 | Still in Wooden House | modules/php/Cards/A/A10_WoodenShed.php:24 |
+| 3 | Take {resources_desc} from {action_space} | modules/php/Cards/A/A137_RiverineShepherd.php:62 |
+| 3 | 2 Grain Fields | modules/php/Cards/A/A26_SleepingCorner.php:27 |
+| 3 | [and/or] | modules/php/Cards/Actions/ActionCultivation.php:15 |
+| 3 | [Renovation] | modules/php/Cards/Actions/ActionFarmRedevelopment.php:14 |
+| 3 | Play exactly one occupation card from your hand | modules/php/Cards/Actions/ActionLessons.php:19 |
+| 3 | Convert  to  | modules/php/Cards/B/B157_Salter.php:43 |
+| 3 | Receive {resources_desc} from {card} | modules/php/Cards/B/B21_HayloftBarn.php:201 |
+| 3 |  / 4 | modules/php/Cards/C/C148_MudWallower.php:98 |
+| 3 | No Occupations | modules/php/Cards/C/C23_JobContract.php:26 |
+| 3 | {player_name} receives {resources_desc} | modules/php/Core/Notifications.php:312 |
+| 3 | You do not have enough %s | modules/php/Managers/Meeples.php:385 |
+| 2 | Bake bread | modules/php/Actions/Exchange.php:26 |
+| 2 | major | modules/php/Actions/Improvement.php:44 |
+| 2 | minor | modules/php/Actions/Improvement.php:47 |
+| 2 | major/minor | modules/php/Actions/Improvement.php:50 |
+| 2 | Pay {resources_desc} | modules/php/Actions/Pay.php:32 |
+| 2 | Harvest | modules/php/Actions/Pay.php:355 |
+| 2 | Place {resources_desc} for future rounds | modules/php/Actions/PlaceFutureMeeples.php:62 |
+| 2 | Reorganize animals | modules/php/Actions/Reorganize.php:16 |
+| 2 | You must build at least 1 stable. | modules/php/Actions/Stables.php:338 |
+| 2 | Pay , buy goods | modules/php/Cards/A/A102_Grocer.php:110 |
+| 2 | For each new field tile you get, you also get 1  and 1 . | modules/php/Cards/A/A105_BarrowPusher.php:14 |
+| 2 | Lutenist's effect | modules/php/Cards/A/A160_Lutenist.php:35 |
+| 2 | Round  | modules/php/Cards/A/A22_Telegram.php:47 |
+| 2 | {player_name} can place an extra person from their supply this round | modules/php/Cards/A/A22_Telegram.php:85 |
+| 2 | Exactly 2 Occupations | modules/php/Cards/A/A44_PondHut.php:23 |
+| 2 | Play in Round 7 or Later | modules/php/Cards/A/A52_ThrowingAxe.php:24 |
+| 2 | At Most 3 Occupations | modules/php/Cards/A/A54_Credit.php:20 |
+| 2 | Take  from field | modules/php/Cards/A/A58_AsparagusKnife.php:127 |
+| 2 | 3 Fields | modules/php/Cards/A/A65_SeedPellets.php:19 |
+| 2 | Gain additional goods in your fields | modules/php/Cards/A/A72_CalciumFertilizers.php:111 |
+| 2 | 2 Fields | modules/php/Cards/A/A84_Silage.php:24 |
+| 2 | End of round | modules/php/Cards/A/A92_AdoptiveParents.php:107 |
+| 2 | Animal market | modules/php/Cards/Actions/ActionAnimalMarketAdd.php:12 |
+| 2 | Accumulate 1 clay each turn | modules/php/Cards/Actions/ActionClayPit.php:14 |
+| 2 | Accumulate 1 wood each turn | modules/php/Cards/Actions/ActionCopse.php:12 |
+| 2 | [Plow a field] | modules/php/Cards/Actions/ActionCultivation.php:13 |
+| 2 | [Sow] | modules/php/Cards/Actions/ActionCultivation.php:16 |
+| 2 | Accumulate 1 stone each turn | modules/php/Cards/Actions/ActionEasternQuarry.php:12 |
+| 2 | [Build fences] | modules/php/Cards/Actions/ActionFarmRedevelopment.php:17 |
+| 2 | Accumulate 1 food each turn | modules/php/Cards/Actions/ActionFishing.php:12 |
+| 2 | Accumulate 2 wood each turn | modules/php/Cards/Actions/ActionForestSolo.php:13 |
+| 2 | You are not allowed to renovate your house twice in a single action. | modules/php/Cards/Actions/ActionHouseRedevelopment.php:17 |
+| 2 | [Pay 2] | modules/php/Cards/Actions/ActionLessons3.php:17 |
+| 2 | Accumulate 1 food each turn. | modules/php/Cards/Actions/ActionMeetingPlaceBeginner.php:17 |
+| 2 | {{  [Growth with room only] }} | modules/php/Cards/Actions/ActionWishChildren.php:14 |
+| 2 | Add additional {resource} | modules/php/Cards/B/B115_TinsmithMaster.php:86 |
+| 2 | Choose fields to put additional crops in | modules/php/Cards/B/B115_TinsmithMaster.php:130 |
+| 2 | Convert animals to  | modules/php/Cards/B/B157_Salter.php:59 |
+| 2 | Gain 1  | modules/php/Cards/B/B21_HayloftBarn.php:142 |
+| 2 | Market Stall | modules/php/Cards/B/B8_MarketStall.php:10 |
+| 2 | Beating Rod | modules/php/Cards/B/B9_BeatingRod.php:13 |
+| 2 | occupation | modules/php/Cards/C/C104_Collector.php:57 |
+| 2 | {resources_desc} for other players | modules/php/Cards/C/C142_MarketCrier.php:65 |
+| 2 | Select exactly one field. | modules/php/Cards/C/C18_RollOverPlow.php:64 |
+| 2 | That field is not eligible. | modules/php/Cards/C/C18_RollOverPlow.php:76 |
+| 2 | Plow additional fields | modules/php/Cards/C/C19_SwingPlow.php:51 |
+| 2 | Fields are checked after the final harvest is completed. | modules/php/Cards/C/C33_GreeningPlan.php:27 |
+| 2 | Discard field  for 4 | modules/php/Cards/C/C57_Crudite.php:90 |
+| 2 | Lawn Fertilizer | modules/php/Cards/D/D11_LawnFertilizer.php:10 |
+| 2 | Return the Pottery | modules/php/Cards/D/D60_LargePottery.php:33 |
+| 2 | At Most 1 Occupation | modules/php/Cards/D/D72_StableManure.php:25 |
+| 2 | 4 Occupations | modules/php/Cards/E/E18_SeedAlmanac.php:25 |
+| 2 | Return stables to your supply | modules/php/Cards/E/E76_LumberPile.php:141 |
+| 2 | [When you build it, you can Bake immediately] | modules/php/Cards/Major/Major_ClayOven.php:20 |
+| 2 | Return Fireplace or | modules/php/Cards/Major/Major_CookingHearth1.php:24 |
+| 2 | Pass | modules/php/Core/Engine/AbstractNode.php:336 |
+| 2 | {player_name} constructs one room | modules/php/Core/Notifications.php:233 |
+| 2 | {player_name} constructs {nb} rooms | modules/php/Core/Notifications.php:234 |
+| 2 | grain | modules/php/Core/Notifications.php:968 |
+| 2 | vegetable | modules/php/Core/Notifications.php:969 |
+| 2 | sheep | modules/php/Core/Notifications.php:970 |
+| 2 | pig | modules/php/Core/Notifications.php:971 |
+| 2 | cattle | modules/php/Core/Notifications.php:972 |
+| 2 | Please enter a valid seed to load the game | states.inc.php:48 |
+| 2 | {you} may construct up to {max} fence(s) | states.inc.php:234 |
+| 1 | Collect {resources_desc} | modules/php/Actions/Collect.php:26 |
+| 1 | Construction | modules/php/Actions/Construct.php:97 |
+| 1 | Bake bread / Replace bake bread | modules/php/Actions/Exchange.php:28 |
+| 1 | Cook / Exchange resources | modules/php/Actions/Exchange.php:31 |
+| 1 | Build fences | modules/php/Actions/Fencing.php:18 |
+| 1 | Build a minor improvement | modules/php/Actions/Improvement.php:47 |
+
+## Full gap (collapsed)
+
+<details>
+<summary>1477 entries</summary>
+
+- (30) 2 Occupations
+- (24) 1 Occupation
+- (19) 3 Occupations
+- (11) [__Bake Bread__ action:]
+- (7) [Anytime]
+- (6) Add {resources_desc} to {card}
+- (5) Gain {resources_desc}
+- (5) 1 Grain Field
+- (5) [Scoring]
+- (4) Breed {animal_type}
+- (4) 1 Pasture
+- (4) [then]
+- (4) Meeting place
+- (4) see below
+- (4) Discard {resources_desc} from {card}
+- (4) [Harvest]
+- (3) Build stables
+- (3) Still in Wooden House
+- (3) Take {resources_desc} from {action_space}
+- (3) 2 Grain Fields
+- (3) [and/or]
+- (3) [Renovation]
+- (3) Play exactly one occupation card from your hand
+- (3) Convert  to 
+- (3) Receive {resources_desc} from {card}
+- (3)  / 4
+- (3) No Occupations
+- (3) {player_name} receives {resources_desc}
+- (3) You do not have enough %s
+- (2) Bake bread
+- (2) major
+- (2) minor
+- (2) major/minor
+- (2) Pay {resources_desc}
+- (2) Harvest
+- (2) Place {resources_desc} for future rounds
+- (2) Reorganize animals
+- (2) You must build at least 1 stable.
+- (2) Pay , buy goods
+- (2) For each new field tile you get, you also get 1  and 1 .
+- (2) Lutenist's effect
+- (2) Round 
+- (2) {player_name} can place an extra person from their supply this round
+- (2) Exactly 2 Occupations
+- (2) Play in Round 7 or Later
+- (2) At Most 3 Occupations
+- (2) Take  from field
+- (2) 3 Fields
+- (2) Gain additional goods in your fields
+- (2) 2 Fields
+- (2) End of round
+- (2) Animal market
+- (2) Accumulate 1 clay each turn
+- (2) Accumulate 1 wood each turn
+- (2) [Plow a field]
+- (2) [Sow]
+- (2) Accumulate 1 stone each turn
+- (2) [Build fences]
+- (2) Accumulate 1 food each turn
+- (2) Accumulate 2 wood each turn
+- (2) You are not allowed to renovate your house twice in a single action.
+- (2) [Pay 2]
+- (2) Accumulate 1 food each turn.
+- (2) {{  [Growth with room only] }}
+- (2) Add additional {resource}
+- (2) Choose fields to put additional crops in
+- (2) Convert animals to 
+- (2) Gain 1 
+- (2) Market Stall
+- (2) Beating Rod
+- (2) occupation
+- (2) {resources_desc} for other players
+- (2) Select exactly one field.
+- (2) That field is not eligible.
+- (2) Plow additional fields
+- (2) Fields are checked after the final harvest is completed.
+- (2) Discard field  for 4
+- (2) Lawn Fertilizer
+- (2) Return the Pottery
+- (2) At Most 1 Occupation
+- (2) 4 Occupations
+- (2) Return stables to your supply
+- (2) [When you build it, you can Bake immediately]
+- (2) Return Fireplace or
+- (2) Pass
+- (2) {player_name} constructs one room
+- (2) {player_name} constructs {nb} rooms
+- (2) grain
+- (2) vegetable
+- (2) sheep
+- (2) pig
+- (2) cattle
+- (2) Please enter a valid seed to load the game
+- (2) {you} may construct up to {max} fence(s)
+- (1) Collect {resources_desc}
+- (1) Construction
+- (1) Bake bread / Replace bake bread
+- (1) Cook / Exchange resources
+- (1) Build fences
+- (1) Build a minor improvement
+- (1) Build a major or minor improvement
+- (1) Build a major improvement / Replace action
+- (1) Build a minor improvement / Replace action
+- (1) Build a major or minor improvement / Replace action
+- (1) Pay cost
+- (1) Pay {resources_desc} to feed your family
+- (1) Pay {resources_desc} and take {n} beggar cards to feed your family
+- (1) Place a person
+- (1) Place a person{fromSupply}{source}
+- (1) You cannot place a person here
+- (1) {player_name} is using a temporary person from their supply
+- (1) Place {resources_desc} on round {round}
+- (1) Place {resources_desc} on {spaces}
+- (1) Plow a field
+- (1) Reap {resources_desc}
+- (1) Allow {player_name} to receive {resources_desc}
+- (1) Receive {resources_desc}
+- (1) {player_name} can't plow the received field
+- (1) {player_name} can't build the received room
+- (1) Renovate
+- (1) Renovation
+- (1) Sow / Replace sow
+- (1) You do not have enough stables in your reserve. Remaining stables: %s
+- (1) Curator
+- (1) Cookery Outfitter
+- (1) During scoring, you get 1 bonus  for each cooking improvement you have. (Ovens are not considered cooking improvements.)
+- (1) Ovens do not count towards this card.
+- (1) Grocer
+- (1) {actplayer} may buy the top goods from Grocer for 1  each
+- (1) Choose how many Grocer goods to buy
+- (1) Portmonger
+- (1) Wood Harvester
+- (1) Catcher
+- (1) You may take 0  from a wood accumulation space and still use this effect.
+- (1) This card only triggers if you get a literal __Major or Minor Improvement__ action.
+- (1) Does not trigger if you play a minor improvement in any other way, for example using the __Meeting Place__ action space.
+- (1) May not be played on the __House Redevelopment__ action space, as the __Renovate__ action is mandatory and comes before the improvement action.
+- (1) May be played through the effect of a card, such as __Angler__ (A095).
+- (1) Wall Builder
+- (1) Harvest additional grain
+- (1) {actplayer} may harvest additional grain (Scythe Worker)
+- (1) {you} may choose grain fields from which to harvest 1 extra  (Scythe Worker)
+- (1) Seasonal Worker
+- (1) Chief Forester
+- (1) Each time you use a wood accumulation space, you also get a __Sow__ action for exactly 1 field.
+- (1) Wood Cutter
+- (1) Each time you use a wood accumulation space, you get 1 additional .
+- (1) Wood Carrier
+- (1) When you play this card, you immediately get 1  for each improvement in front of you.
+- (1) Treegardener
+- (1) Mud Patch
+- (1) Clay Hut Builder
+- (1) Clay Puncher
+- (1) Pan Baker
+- (1) Each time you use the __Grain Utilization__ action space, you also get 2  and 1 .
+- (1) The effect may be applied once for each room built.
+- (1) Knapper
+- (1) Each time before you use an action space card on round spaces 5 to 7, you get 1 .
+- (1) Priest
+- (1) You must play this card after renovating to  in order for it to have any effect.
+- (1) Swagman
+- (1) Drinking Trough
+- (1) Each of your pastures (with or without a stable) can hold up to 2 more animals.
+- (1) Cards holding animals are not pastures unless explicitly stated.
+- (1) Craft Teacher
+- (1) This card triggers every time you build one of the mentioned major improvements in any way.
+- (1) Publican
+- (1) The __Publican__ offer will not be made if the only legal way for the sowing player to sow is for the __Publican__ owner to give them . Otherwise the sowing player is stuck with an impossible __Sow__ action if the __Publican__ owner declines the offer.
+- (1) Braggart
+- (1) Full Farmer
+- (1) Animal Reeve
+- (1) The resources worth bonus points for the __Joinery__, __Pottery__ or __Basketmaker's Workshop__ are spent and do not count towards this card's bonus effect.
+- (1) These resources do count towards the tiebreaker.
+- (1) Choose how many sets of building resources to score
+- (1) Harpooner
+- (1) Hollow Warden
+- (1) Renovation Company
+- (1) In Wooden House with Exactly 2 Rooms
+- (1) The renovation can be declined, but if you decline you cannot renovate for free later.
+- (1) Shovel Bearer
+- (1) Turnip Farmer
+- (1) Cordmaker
+- (1) Stonecutter
+- (1) Every improvement, room, and renovation costs you 1  less.
+- (1) Ropemaker
+- (1) At the end of each harvest, you get 1  from the general supply.
+- (1) Storehouse Steward
+- (1) Animal Dealer
+- (1) This card can hold a number of  equal to the number of completed feeding phases.
+- (1) House Artist
+- (1) Stagehand
+- (1) Minstrel
+- (1) Night-School Student
+- (1) Pig Owner
+- (1) Paymaster
+- (1) Conjurer
+- (1) Buyer
+- (1) Bohemian
+- (1) Culinary Artist
+- (1) Joiner of the Sea
+- (1) Lutenist
+- (1) Patch Caretaker
+- (1) Building Expert
+- (1) Wood Worker
+- (1) If you take less than 1  from a  accumulation space, you may still use this card.
+- (1) You may immediately convert the  to  in order to use the __Shifting Cultivator__ (A091).
+- (1) Haydryer
+- (1) Breeder Buyer
+- (1) Animal Teacher
+- (1) Rammed Clay
+- (1) You can use both  and  for the same __Build Fences__ action.
+- (1) It is legal to avoid accommodating all animals even if you can, e.g. by cooking them with a Fireplace.
+- (1) Wheel Plow
+- (1) Plow additional fields (Wheel Plow)
+- (1) Plow additional field (Wheel Plow)
+- (1) Plow 2 additional fields
+- (1) Handplow
+- (1) Shelter
+- (1) Double-Turn Plow
+- (1) When you play this card, you can immediately plow up to 2 fields.
+- (1) Play in Round 3 (5) or Before
+- (1) Family Friendly Home
+- (1) This card is only triggered by a __Build Rooms__ action exactly, not cards that simply let you build a room such as __Cottager__ (B087).
+- (1) At Least 1 Fence in Supply
+- (1) Confirm Telegram
+- (1) Threshing Board
+- (1) Bassinet
+- (1) This refers to 1 specific space, not 1 space for every player's first non-accumulating action space.
+- (1) The relevant space can be provided by another card, such as the one from __Forest Tallyman__ (A162).
+- (1) Sleeping Corner
+- (1) Oven Site
+- (1) Both Fireplace and Cooking Hearth
+- (1) __Oriental Fireplace__ (A060) counts as a Fireplace for this prerequisite.
+- (1) Shifting Cultivation
+- (1) Immediately plow 1 field.
+- (1) Baking Sheet
+- (1) No Grain Field
+- (1) Debt Security
+- (1) Manger
+- (1) Big Country
+- (1) For each complete round left to play, you immediately get 1 bonus  and 2 .
+- (1) All Farmyard Spaces Used
+- (1) Loppers
+- (1) Swimming Class
+- (1) If you used __Adoptive Parents__ (A092), there is no longer a newborn to return home.
+- (1) Facades Carving
+- (1) Wood in Your Supply >= Current Round
+- (1) Each time you renovate, you can also pay 1  to get 1 bonus  and 1 .
+- (1) Wool Blankets
+- (1) During scoring, if you live in a wooden/clay/stone house by then, you get 3/2/0 bonus .
+- (1) 5 Sheep
+- (1) You cannot play this card if you have 2 or fewer occupations in your hand.
+- (1) Select 3 occupations in your hand
+- (1) {actplayer} must choose 3 occupations in their hand (Paper Knife)
+- (1) Choose 3 occupations (Paper Knife)
+- (1) Play {card_name} for free
+- (1) At Most 7 Unused Farmyard Spaces
+- (1) Forest Lake Hut
+- (1) Each time you use the __Fishing__/__Forest__ accumulation space, you also get 1 /.
+- (1) Farmyard Manure
+- (1) 1 Animal
+- (1) Pond Hut
+- (1) Fire Protection Pond
+- (1) Claw Knife
+- (1) Exactly 1 Pasture
+- (1) Trellises
+- (1) Shaving Horse
+- (1) Nest Site
+- (1) Baseboards
+- (1) Milk Jug
+- (1) Drift-Net Boat
+- (1) Each time you use the __Fishing__ accumulation space, you get an additional 2 .
+- (1) Throwing Axe
+- (1) Count the total of all gains during the work phase, even if building resources were lost in the process.
+- (1) Building resources gained at the start of a round don't count.
+- (1) Credit
+- (1) Each time after you build an improvement, including this one, you get 1 .
+- (1) Basket
+- (1) You may take less than 2  from a wood accumulation space and still use this effect.
+- (1) Milking Parlor
+- (1) At Least 4 Unused Farmyard Spaces
+- (1) Choose one vegetable field
+- (1) {actplayer} must choose vegetable field (Asparagus Knife)
+- (1) Choose vegetable field (Asparagus Knife)
+- (1) Potato Ridger
+- (1) Clay Embankment
+- (1) You immediately get 1  for every 2  you already have in your supply.
+- (1) Oriental Fireplace
+- (1) Return Fireplace/ Cooking Hearth
+- (1) If returned to pay for a Cooking Hearth, remove this card from the game.
+- (1) Winnowing Fan
+- (1) Beer Keg
+- (1) 2 Grain in Your Supply
+- (1) Dutch Windmill
+- (1) In the field phase of each harvest, you get 1  for each grain field that you harvest.
+- (1) Each time before you take an unconditional __Sow__ action, you get 1 .
+- (1) Feeding Dish
+- (1) If you use __Animal Dealer__ (A147) to buy an animal before taking the animal from the space, this card will trigger.
+- (1) Corn Scoop
+- (1) Each time you use the __Grain Seeds__ action space, you get 1 additional .
+- (1) Asparagus Gift
+- (1) 1 Unplanted Field
+- (1) Large Greenhouse
+- (1) Storage Barn
+- (1) Take 1 from one of your fields
+- (1) {actplayer} may take 1 from one of their fields (Lifting Machine)
+- (1) {you} may take 1 from one of your fields (Lifting Machine)
+- (1) Move crop
+- (1) {actplayer} may move one crop (Clearing Spade)
+- (1) Select the giving and receiving field (Clearing Spade)
+- (1) No Field Tiles
+- (1) Agricultural Fertilizers
+- (1) This is not triggered by cards that give you one plow in addition to a regular plow action, such as __Plow Maker__ (D090) or __Moldboard Plow__ (B019).
+- (1) Stables which are not built during your turn, e.g. with __Stable Planner__ (A089) or __Groom__ (B089), do not trigger this card.
+- (1) Lumber Mill
+- (1) Every improvement costs you 1  less.
+- (1) At most 3 Occupations
+- (1) Cob
+- (1) Hod
+- (1) Canoe
+- (1) Stone Tongs
+- (1) Each time you use a stone accumulation space, you get 1 additional .
+- (1) Place {resources_desc} on {card}
+- (1) Gain all resources on {card}
+- (1) Building 2 such pastures at once gives you 4 .
+- (1) Remove 1 from a field
+- (1) {actplayer} may discard 1  from a field to breed (Silage)
+- (1) Select field (Silage)
+- (1) Only field tiles on your farm, not field cards, can count as adjacent.
+- (1) If the room later loses adjacency to the field and/or pasture, the capacity for an additional person is lost, for example after playing __Overhaul__ (C001).
+- (1) Animal Tamer
+- (1) You may decline this ability.
+- (1) You may spend 0  to build 1-3 fences.
+- (1) __Mini Pasture__ (B002), __Overhaul__ (C001), and other fencing effects that are not the literal __Build Fences__ action, do not trigger this card.
+- (1) Stables built this way are not built on your turn and do not trigger __Stable Tree__ (A074) or __Farmyard Manure__ (A043).
+- (1) Food Basket
+- (1) You immediately get 1  and 1 .
+- (1) 2 Occupations and 2 Improvements
+- (1) Plow Driver
+- (1) Shifting Cultivator
+- (1) Each time you use a wood accumulation space, you can also pay 3  to plow 1 field.
+- (1)  obtained via the __Basket__ (A056), or any other effect “after” using the space may not be used to pay for this effect.
+- (1) Shifting Cultivator's effect
+- (1) This card may be played and triggered any time after growth in the same round's work phase.
+- (1) If this effect is used in a round that ends with a Harvest, the person must be fed 2  in the Harvest (3 for solo game.)
+- (1) Return child at home
+- (1) {player_name} chose not to use Adoptive Parents effect, their round is now over
+- (1) Bed Maker
+- (1) No card, including this one, can allow you to use __Meeting Place__ if it is already occupied.
+- (1) You may repeat this effect on action spaces that allow you to decline such a “Sow” action (e.g. only plowing on __Cultivation__ multiple times.)
+- (1) You can only use this effect if you have a person not yet placed on an action space this round. This effect does not allow you to place a person from your supply.
+- (1) Angler
+- (1) Task Artisan
+- (1) The effect is limited to once per turn, so for example cannot be triggered multiple times in the same turn with __Bread Paddle__ (B025).
+- (1) You may use the __Grain Utilization__ space while being unable to __Sow__ or __Bake Bread__, as this card substitutes the __Bake Bread__ action.
+- (1) Stable Architect
+- (1) During scoring, you get 1 bonus  for each unfenced stable in your farmyard.
+- (1) Fellow Grazer
+- (1) Young Animal Market
+- (1) You immediately get 1 . (Effectively, you are exchanging 1  for 1 .)
+- (1) Choose one: receive 1 sheep and 1 food, or receive 1 wild boar, or buy 1 cattle for 1 food
+- (1) Accumulate 1 cattle each turn
+- (1) [Build rooms]
+- (1) You can only build one stable per farmyard space.
+- (1) You can plow one field
+- (1) You can build any number of fences, paying 1 wood for each new fence you build.
+- (1) Accumulate 3 wood each turn
+- (1) [Bake bread]
+- (1) How to sow is explained on page 9 of the rule book.
+- (1) Various oven improvements allow you to turn your grain into even more food
+- (1) Accumulate 2 clay each turn
+- (1) You may only build a major improvement or play a minor improvement if you renovate first.
+- (1) You may only build a major improvement if you renovate first.
+- (1) [Pay] 1*
+- (1) [Pay 1]
+- (1) * The first occupation you play in the game is free
+- (1) [Pay] 2
+- (1) [Pay] 2*
+- (1) * The first two occupations you play in the game cost 1 food
+- (1) [Build 1 major improvement or play 1 minor improvement]
+- (1) You can either build 1 major improvement or play 1 minor improvement
+- (1) [Build 1 major improvement]
+- (1) You can build 1 major improvement
+- (1) and/or
+- (1) Additionally, you can play exactly one minor improvement from your hand
+- (1) You can play exactly one minor improvement from your hand
+- (1) Accumulate 1 wild boar each turn
+- (1) Accumulate 1 reed each turn
+- (1) Take your choice of 1 reed or 1 stone as well as 1 food
+- (1) Gain 1 reed, 1 stone and 1 food
+- (1) Gain 1 stone and 1 food
+- (1) Accumulate 1 sheep each turn
+- (1) Side Job
+- (1) Build 1 stable for 1 wood and/or bake bread
+- (1) {{  [Growth without room] }}
+- (1) The number of rooms in your house does not matter for this effect.
+- (1) The new room is immediately occupied by the person who did not have a room of their own yet.
+- (1)  [▷] 1
+- (1) You may not skip the family growth only to play a minor improvement.
+- (1) Growth with room only
+- (1) not before turn 5
+- (1) 
+- (1) Furniture Carpenter
+- (1) Consultant
+- (1) __Merchant__ (C096) does not double a decline.
+- (1) Improvements played with __Stone Company__ (A023) are conditional on spending  and can't be declined.
+- (1) Sheep Walker
+- (1) The  must be accommodated on your farmyard before being exchanged.
+- (1) Case Builder
+- (1) Moral Crusader
+- (1) Manservant
+- (1) Oven Firing Boy
+- (1) Each time you use a wood accumulation space, you get an additional __Bake Bread__ action.
+- (1) Paper Maker effect
+- (1) Pavior
+- (1) Rustic
+- (1) Silokeeper
+- (1) Patch Caregiver
+- (1) Childless
+- (1) This effect places one extra crop on top of the usual stack, not a second stack in each field.
+- (1) This does not add a condition to sowing.
+- (1) {actplayer} may choose fields to put additional crops in (Tinsmith Master)
+- (1) {you} may choose fields to put additional crops in (Tinsmith Master)
+- (1) Shoreforester
+- (1) Informant
+- (1) Small-scale Farmer
+- (1) Lumberjack
+- (1) Feedyard
+- (1) Sweep
+- (1) Each time before you use the action space above the most recent round 1-14 action space, you get 2 .
+- (1) Geologist
+- (1) Mineralogist
+- (1) Roof Ballaster
+- (1) The 1  cost is in total, not per room. It is paid in addition to the occupation cost.
+- (1) Estate Worker
+- (1) Carpenter
+- (1) Seducer
+- (1) Plumber
+- (1) Seatmate
+- (1) Stockyard
+- (1) Full Peasant
+- (1) Equipper
+- (1) This is not a __Minor Improvement__ action and does not combo with cards that require a __Minor Improvement__ action, such as __Blueprint__ (C027).
+- (1) Estate Master
+- (1) Village Peasant
+- (1) Housebook Master
+- (1) Nutrition Expert
+- (1) Wholesaler
+- (1) Forest Guardian
+- (1) Forest Scientist
+- (1) Wooden rooms only cost you 2  and 2  each.
+- (1) Farmyard Worker
+- (1) At the end of each work phase in which you placed at least 1 good on 1 of your farmyard spaces, you get 2 .
+- (1) You may not trigger this card by only moving an existing good.
+- (1) Field Caretaker
+- (1) Greengrocer
+- (1) Each time you use the __Grain Seeds__ action space, you also get 1 .
+- (1) Clay Warden
+- (1) Collier
+- (1) Brushwood Collector
+- (1) Select 1 card in your hand
+- (1) {actplayer} must choose 1 card in their hand (Illusionist)
+- (1) Choose 1 card (Illusionist)
+- (1) Huntsman
+- (1) Each time after you use a wood accumulation space, you can pay 1  to get 1 .
+- (1) Pet Broker
+- (1) You may not build the removed stables later.
+- (1) Hawktower
+- (1) Play in Round 7 or Before
+- (1) Large-Scale Farmer
+- (1) Junior Artist
+- (1) Housemaster
+- (1) Storehouse Keeper
+- (1) Salter
+- (1) {actplayer} may salt animals
+- (1) {you} may salt animals
+- (1) District Manager
+- (1) Lieutenant General
+- (1) Subdividing a pasture does not qualify as building.
+- (1) Pub Owner
+- (1) Weakling
+- (1) Forest Clearer
+- (1) Pastor
+- (1) Sheep Whisperer
+- (1) gain pigs
+- (1) Remove 1  from fields
+- (1) {actplayer} may discard 1  from fields to get  (Game Provider)
+- (1) Select fields (Game Provider)
+- (1) Cattle Feeder
+- (1) Each time you use the __Grain Seeds__ action space, you can also buy 1  for 1 .
+- (1) Stable Sergeant
+- (1) Pasture Master
+- (1) Mining Hammer
+- (1) Forest Plow
+- (1) You may take less than 2  from the space and still use this card's effect.
+- (1) Grassland Harrow
+- (1) 2 Occ., 1 Resource After Payment
+- (1) Upscale Lifestyle
+- (1) Chain Float
+- (1) Walking Boots
+- (1) At Most 4 People
+- (1) Round 13 or Before
+- (1) Lasso
+- (1) Bread Paddle
+- (1) Agrarian Fences
+- (1) You can take a __Build Fences__ action in this way without the ability to sow or bake.
+- (1) Toolbox
+- (1) Pay the cost of the major improvement normally.
+- (1) Forestry Studies
+- (1) Cookery Lesson
+- (1) Cooking improvements have the bowl icon.
+- (1) Wood Palisades
+- (1) Fence spaces with 2  enclose pastures, but are not fences for the purposes of other cards such as __Blackberry Farmer__ (E108).
+- (1) Fence spaces with 2  are not removed or rebuilt by __Overhaul__ (C001).
+- (1) Pottery Yard
+- (1) Pottery (or an Upgrade Thereof)
+- (1) Kettle
+- (1) At any time, you can exchange 1/3/5  for 3/4/5  and 0/1/2 bonus .
+- (1) Mantlepiece
+- (1) Clay or Stone House
+- (1) No Animal
+- (1) Hook Knife
+- (1) Bottles
+- (1) For each person you have, you must pay an additional 1  and 1  to play this card.
+- (1) Grange
+- (1) When you play this card, you immediately get 1 .
+- (1) 6 Field Tiles and All Animal Types
+- (1) Play in Round 4 or Before
+- (1) Loom
+- (1) If you cannot pay to play an occupation and/or its additional cost, that occupation must be passed left (or removed from play in a solo game.)
+- (1) Play {card_name} for {resources_desc}
+- (1) Discard {card_name}
+- (1) Pass {card_name} to {player_name}
+- (1) Brewery Pond
+- (1) Hauberg
+- (1) Play in Round 6 or Before
+- (1) Chophouse
+- (1) Chick Stable
+- (1) Strawberry Patch
+- (1) 2 Vegetable Fields
+- (1) Club House
+- (1) Herring Pot
+- (1) Scales
+- (1) No Occupation
+- (1) Passing cards will not trigger this effect, as they are never in front of you.
+- (1) Occupations which let the player immediately build/play an improvement such as __Task Artisan__ (A096) only trigger Scales after both cards are played, thereby giving 0 or 4 .
+- (1) Wood Pile
+- (1) Butter Churn
+- (1) Digging Spade
+- (1) Growing Farm
+- (1) Sculpture Course
+- (1) Tumbrel
+- (1) Brook
+- (1) 1 of Your People on Fishing
+- (1) Scullery
+- (1) At the start of each round, if you live in a wooden house, you get 1 .
+- (1) Crack Weeder
+- (1) Food Chest
+- (1) Store of Experience
+- (1) If you have 0-4/5/6/7 occupations left in hand, you immediately get 1 ///.
+- (1) Brewing Water
+- (1) Three-Field Rotation
+- (1) Pitchfork
+- (1) Tasting
+- (1) Mill Wheel
+- (1) Place {n}  on future spaces
+- (1) Sack Cart
+- (1) You must bake if you receive the .
+- (1) Beanfield
+- (1) This card is a field that can only grow vegetables.
+- (1) Potters Market
+- (1) Excursion to the Quarry
+- (1) You immediately get a number of  equal to the number of people you have.
+- (1) New Purchase
+- (1) Harvest House
+- (1) Love for Agriculture
+- (1) Pastures are only considered fields for as long as they have crops sown in them. Therefore they cannot score points for __Greening Plan__ (C033) or __Garden Designer__ (C099), and cannot receive crops from __Clearing Spade__ (A071).
+- (1) Gift Basket
+- (1) Thick Forest
+- (1) 5 Clay in Your Supply
+- (1) Each time before you play or build an improvement, you get 1 .
+- (1) You can pay for an improvement with the  given by this card.
+- (1) Remove {resources_desc} promised by {card}
+- (1) Loam Pit
+- (1) Each time you use the __Day Laborer__ action space, you also get 3 .
+- (1) Reed Belt
+- (1) Corf
+- (1) Wage
+- (1) Hard Porcelain
+- (1) At any time, you can exchange 2/3/4  for 1/2/3 .
+- (1) Value Assets
+- (1) Muddy Puddles
+- (1) {actplayer} may buy the top goods from Muddy Puddles for 1  each
+- (1) Choose how many Muddy Puddles goods to buy
+- (1) Acorns Basket
+- (1) Farm Hand
+- (1) You can only build the Farm Hand stable during a __Build Stables__ action exactly, which does not include cards such as __Lazybones__ (E148) or __Stable Planner__ (A089) that only let you build a stable.
+- (1) You can return the Farm Hand stable using __Sample Stable Maker__ (D102) or __Lumber Pile__ (E076). If you do, any person who was living in the Farm Hand stable moves into your other rooms.
+- (1) Build Farm Hand stable
+- (1) {actplayer} may choose the top-left field of a 2x2 block of fields for the Farm Hand stable
+- (1) Choose the top-left field of a 2x2 block of fields for the Farm Hand stable
+- (1) You have already used Farm Hand this game.
+- (1) You cannot use Farm Hand right now.
+- (1) You must choose a place for the Farm Hand stable.
+- (1) Invalid Farm Hand stable position.
+- (1) Cottager
+- (1) Established Person
+- (1) Groom
+- (1) Cooperative Plower
+- (1) Assistant Tiller
+- (1) Each time you use the __Day Laborer__ action space, you can also plow 1 field.
+- (1) Little Stick Knitter
+- (1) Confidant
+- (1) Place {n}  for future rounds
+- (1) Master Bricklayer
+- (1) Tree Farm Joiner
+- (1) Scholar
+- (1) If you use Scholar to play a card with text such as “remaining rounds” such as __Manservant__ (B107), it will not trigger in time for the current round.
+- (1) Organic Farmer
+- (1) Tutor
+- (1) During scoring, you get 1 bonus  for each occupation played after this one.
+- (1) You can immediately choose to either get 1  or exchange 1  for 1 .
+- (1) Butler
+- (1) Stall Holder
+- (1) Tree Guard
+- (1) Green Grocer
+- (1) {actplayer} must select different goods to get (Collector)
+- (1) Select {nb} different goods to get (Collector)
+- (1) Basket Carrier
+- (1) Once each harvest, you can buy 1 , 1 , and 1  for 2  total.
+- (1) Potato Harvester
+- (1) Baker
+- (1) Layabout
+- (1) {player_name} will skip next harvest phase.
+- (1) Schnapps Distiller
+- (1) 2 Major Improvements
+- (1) Home Brewer
+- (1) Small Animal Breeder
+- (1) Thresher
+- (1) Winter Caretaker
+- (1) Soil Scientist
+- (1) Furniture Maker
+- (1) Legworker
+- (1) Wood Collector
+- (1) Skillful Renovator
+- (1) If you renovate with your 3rd person placed in a round, this card triggers a payout of 3 .
+- (1) Newborns do not count as people placed this round.
+- (1) Wildlife Reserve
+- (1) This card can hold up to 1 , 1 , and 1 .
+- (1) This card does not count as a pasture.
+- (1) Place 8  on this card. For each  you obtain, you also get 1  from this card.
+- (1) Clay Kneader
+- (1) Bricklayer
+- (1) Freemason
+- (1) Stone Importer
+- (1) Nightworker
+- (1) Excavator
+- (1) Lover
+- (1) Wooden Hut Extender
+- (1) Second Spouse
+- (1) Cattle Farm
+- (1) For each pasture you have, you can keep 1  on this card.
+- (1) You may use the ability multiple times in a row.
+- (1) Add 2{resources_desc} on {action_space}
+- (1) Private Teacher
+- (1) If the played occupation has an effect each time you use __Grain Seeds__, it also triggers immediately.
+- (1) Timber Shingle Maker
+- (1) Choose how many pairs of  +  you want to score (Soldier)
+- (1) Cow Prince
+- (1) Ranch Provost
+- (1) Charcoal Burner
+- (1) Packaging Artist
+- (1) Sheep Provider
+- (1) Stone Buyer
+- (1) Reed Roof Renovator
+- (1) Forest Reviewer
+- (1) There are six possible unique pairs of different building resources (+, +, +, +, +, +). So you can place at most six pairs of building resources on this card.
+- (1) Choose pairs to place on Workshop Assistant
+- (1) {actplayer} must choose resource pairs (Workshop Assistant)
+- (1) {you} must choose resource pairs to place (Workshop Assistant)
+- (1) Take a pair from Workshop Assistant
+- (1) {actplayer} may take a resource pair (Workshop Assistant)
+- (1) {you} may take a resource pair (Workshop Assistant)
+- (1) Cowherd
+- (1) Each time you use the __Cattle Market__ accumulation space, you get 1 additional .
+- (1) This card only holds  received via this effect.
+- (1) The  may participate in breeding (but the newborn  must find space elsewhere.)
+- (1) If you move a  from this card, the capacity of this card is permanently reduced.
+- (1) Resource Recycler
+- (1) If another player renovates from wood to stone, this card's effect is still triggered.
+- (1) Straw-Thatched Roof
+- (1) You no longer need  to renovate or build a room.
+- (1) 3 Grain Fields
+- (1) Parrot Breeder
+- (1) Sowing Director
+- (1) Puppeteer
+- (1) Pattern Maker
+- (1) Twin Researcher
+- (1) Food Distributor
+- (1) For example, if afterwards there are 2  on the space, you receive 2  and 2 .
+- (1) Resource Analyzer
+- (1) Forest Campaigner
+- (1) Trellis
+- (1) Outrider
+- (1) Potato Digger
+- (1) Material Deliveryman
+- (1) German Heath Keeper
+- (1) Game Catcher
+- (1) Cattle Whisperer
+- (1) Cattle Buyer
+- (1) Field Fences
+- (1) Exactly 3 Field Tiles
+- (1) Discard all crops from a field, plow
+- (1) {actplayer} may discard all crops from a field to plow (Roll-Over Plow)
+- (1) Select a field to discard all crops (Roll-Over Plow)
+- (1) Plow additional field (Swing Plow)
+- (1) This counts as building fences for the purposes of other cards.
+- (1) Mole Plow
+- (1) Play in Round 9 or Later
+- (1) Heart of Stone
+- (1) Basket Chair
+- (1) Only works in the next harvest after it is played.
+- (1) The newborn must be fed.
+- (1) End of turn
+- (1) {player_name} uses Steam Machine effect, their round is over
+- (1) Flail
+- (1) You must get a literal __Minor Improvement__ action, not just the ability to build a minor improvement such as from __Equipper__ (B131).
+- (1) No Grain in Your Supply
+- (1) Half-Timbered House
+- (1) Abort Oriel
+- (1) This card may be played as your fifth card.
+- (1) Greening Plan
+- (1)  held on unplanted field tiles from __Mud Patch__ (A011) do not affect scoring of this card.
+- (1) Elephantgrass Plant
+- (1) Lantern House
+- (1) No occupation
+- (1) Clay Deposit
+- (1) From now on, you must pay 1  for each new field tile that you place in your farmyard.
+- (1) Play in Round 3 or Before
+- (1) Christianity
+- (1) When you play this card, all other players get 1  each.
+- (1) Exactly 1 Sheep
+- (1) Studio Boat
+- (1) Carriage Trip
+- (1) If you play this card in the work phase, you can immediately place another person.
+- (1) 1 Person yet to Place
+- (1) Canvas Sack
+- (1) When you play this card paying / for it, you immediately get 1 /4 .
+- (1) Farm Store
+- (1) Ravenous Hunger
+- (1) Farm Building
+- (1) Chicken Coop
+- (1) Stew
+- (1) Mandoline
+- (1) Garden Claw
+- (1) Farmstead
+- (1) After each turn in which you make at least one unused farmyard space used, you get 1 .
+- (1) Beer Stall
+- (1) Writing Boards
+- (1) You immediately get 1  for each occupation you have in front of you.
+- (1) Stable Yard
+- (1) 3 Stables and 3 Pastures
+- (1) Others must have 1  before using __Fishing__ in order to pay the __Fishing Net__ effect.
+- (1)  from the __Fishing__ action space may not be used to pay the card owner.
+- (1) The 2  is only placed for rounds in which another player used __Fishing__.
+- (1) For each new  you get from the effect of an action space, you also get 1 .
+- (1) Cooking Improvement
+- (1) Market Booth
+- (1) Studio
+- (1) Feed Fence
+- (1) {actplayer} may discard 1  from each selected field to get 4  per field (Crudité)
+- (1) Select field(s) (Crudité)
+- (1) Woodcraft
+- (1) This effect is checked before cards that trigger “after”, e.g. __Tree Guard__ (C102).
+- (1) Schnapps Distillery
+- (1) Remodeling
+- (1) You immediately get 1  for each clay room and for each major improvement you have.
+- (1) With this card in play, you can take a __Bake Bread__ action even without a baking improvement, so long as you can build the Clay Oven or Stone Oven before baking.
+- (1) Return the Clay Oven or Stone Oven
+- (1) Beer Stein
+- (1) Cookery Extension
+- (1) Remove 1  from a field
+- (1) {actplayer} may discard 1  from a field and 1  from their supply to get 2 bonus  and 4  (Craft Brewery)
+- (1) Select field (Craft Brewery)
+- (1) Corn Schnapps Distillery
+- (1) Granary
+- (1) Eternal Rye Cultivation
+- (1) Mineral Feeder
+- (1) Check {card_name} for 
+- (1) Bookcase
+- (1) Each time after you play an occupation, you get 1 .
+- (1) Land Consolidation
+- (1) At any time, if you have a grain field with exactly 3 sown , you can exchange the  on the field for 1  on the field.
+- (1) Exchange 3  in a field for 1 
+- (1) {actplayer} may exchange 3  in a field for 1  (Land Consolidation)
+- (1) Select a field with exactly 3  (Land Consolidation)
+- (1) Stone Clearing
+- (1) Lettuce Patch
+- (1) Festival Planning
+- (1) Seaweed Fertilizer
+- (1) Private Forest
+- (1) __Oriental Fireplace__ (A060) counts as a Fireplace.
+- (1) Wood Cart
+- (1) Each time you use a wood accumulation space, you get 2 additional .
+- (1) Clay Supply
+- (1) Reed-Hatted Toad
+- (1) Stone Cart
+- (1) Blade Shears
+- (1) You immediately get your choice of 3 , or 1  for each sheep you have. (Keep the sheep.)
+- (1) Rocky Terrain
+- (1) Each time you plow a field (tile or card), you can also buy 1  for 1 .
+- (1) Playing field cards counts as plowing a field.
+- (1) Material Hub
+- (1) Hardware Store
+- (1) Early Cattle
+- (1) When you play this card, you immediately get 2 .
+- (1) Stable Master
+- (1)  on unplanted fields from __Mud Patch__ (A011) do not apply for this effect.
+- (1) Field Watchman
+- (1) Each time you use the __Grain Seeds__ action space, you can also plow 1 field.
+- (1) Plow Hero
+- (1) Autumn Mother
+- (1) You may use this ability twice on the same turn.
+- (1) Add {resources_desc} on {action_space}
+- (1) Stable Cleaner
+- (1) Basket Weaver
+- (1) Seed Researcher
+- (1) Cube Cutter
+- (1) Automatic Water Trough
+- (1) Return stable to your supply
+- (1) Return one built stable to your supply
+- (1) {actplayer} may return one built stable to your supply (Sample Stable Maker)
+- (1) {you} may return one built stable to your supply (Sample Stable Maker)
+- (1) Select exactly 1 stable.
+- (1) Return Farm Hand stable to your supply
+- (1) {actplayer} may return the Farm Hand stable to their supply (Sample Stable Maker)
+- (1) {you} may return the Farm Hand stable to your supply (Sample Stable Maker)
+- (1) Place your next farmer on {action_space}
+- (1) Cultivator
+- (1) Sculptor
+- (1) Whisky Distiller
+- (1) Discard all {resources_desc}
+- (1) Stone Carver
+- (1) Each harvest, you can use this card to turn exactly 1  into 3 .
+- (1) Sowing Master
+- (1) 5 Occupations
+- (1) This effect can only be used once per round.
+- (1) Stork Nest effect
+- (1) Fish Farmer
+- (1) Interior Decorator
+- (1) Young Farmer
+- (1) Food Merchant
+- (1) Seed Trader
+- (1) Wood Expert
+- (1) Bonehead
+- (1) Wood Barterer
+- (1) This card does not trigger from actions given by cards, such as from __Cottager__ (B087).
+- (1) Clay Deliveryman
+- (1) Clay Plasterer
+- (1) Clay Carrier
+- (1) Renovation Preparer
+- (1) For each new wood/clay room you build, you get 2 /2 .
+- (1) Forest Trader
+- (1) Building Tycoon
+- (1) Lumber Virtuoso
+- (1) A __Build Wooden Rooms__ action is a __Build Rooms__ action limited to a wooden house.
+- (1) Milking Place
+- (1) Recreational Carpenter
+- (1) Pay food for unused farmyard spaces
+- (1) Beer Tent Operator
+- (1) Gardening Head Official
+- (1) Animal Activist
+- (1) Buy goods
+- (1) {actplayer} may buy goods (Trade Teacher)
+- (1) Select up to 2 different goods to buy (Trade Teacher)
+- (1) Pet Lover
+- (1) You may use __Animal Dealer__ (A147) to acquire a second animal of the taken type.
+- (1) Chairman
+- (1) Trowel
+- (1) Loudmouth
+- (1) Seed Seller
+- (1) Potato Planter
+- (1) Tree Cutter
+- (1) Water Worker
+- (1) Roof Examiner
+- (1) Porter
+- (1) Trap Builder
+- (1) Domestician Expert
+- (1) You can keep 2 sheep on the border between each pair of orthogonally adjacent rooms.
+- (1) Casual Worker
+- (1) Spin Doctor
+- (1) Patron
+- (1) Wealthy Man
+- (1) Chimney Sweep
+- (1) Ebonist
+- (1) Each harvest, you can use this card to turn exactly 1  into 1  and 1 .
+- (1) Retail Dealer
+- (1) Clay Supports
+- (1) Midwife
+- (1) Cabbage Buyer
+- (1) Clay Firer
+- (1) Journeyman Bricklayer
+- (1) Pig Stalker
+- (1) Stable Milker
+- (1) Each time you build at least 2 stables on the same turn, you also get 1 .
+- (1) Stockman
+- (1) Wooden Whey Bucket
+- (1) Drill Harrow
+- (1) Drill Harrow's effect
+- (1) Steam Plow
+- (1) Pulverizer Plow
+- (1) Zigzag Harrow
+- (1) 3 Fields in an "L" Shape
+- (1) Plow additional field (Turnwrest Plow)
+- (1) Recruitment
+- (1) No People Left in the House
+- (1) At Least 1 Building Resource
+- (1) Confirm Work Permit
+- (1) Brotherly Love
+- (1) Build {card}
+- (1) Retraining Effect
+- (1) Writing Desk
+- (1) Muck Rake
+- (1) Dwelling Plan
+- (1) You can immediately take a __Renovation__ action.
+- (1) Artisan District
+- (1) Storeroom
+- (1) Wood Rake
+- (1) Summer House
+- (1) Luxurious Hostel
+- (1) Fodder Chamber
+- (1) No Sheep
+- (1) Sculpture
+- (1) Milking Stool
+- (1) Truffle Slicer
+- (1) Play in Round 8 or Later
+- (1) Furrows
+- (1) You can immediately sow in exactly 1 field.
+- (1) Cesspit
+- (1) 2 Fields and 1 Occupation
+- (1) Horse-Drawn Boat
+- (1) Education Bonus
+- (1) 2 Imps
+- (1) Hutch
+- (1) Forest Well
+- (1) Sheep Well
+- (1) Pellet Press
+- (1) Churchyard
+- (1) 10 Cards* in Front of You
+- (1) Civic Facade
+- (1) 3 Rooms
+- (1) Bookshelf
+- (1) Cross-Cut Wood
+- (1) You immediately get a number of  equal to the number of  in your supply.
+- (1) Foreign Aid
+- (1) Play in Round 11 or Before
+- (1) You cannot move a farmer from Archway to an occupied space, even if another card would otherwise allow you to treat that space as unoccupied. Exception: if you have played __Forest School__ (A028), you can move to an occupied __Lessons__ action space.
+- (1) Move your person from Archway to another action space
+- (1) {actplayer} may move their person from Archway to another action space
+- (1) {you} may move your person from Archway to another action space
+- (1) Rolling Pin
+- (1) Play in Round 6 or Later
+- (1) Trout Pool
+- (1) Each time you use an action space card on round spaces 8 to 11, you get 1 additional .
+- (1) Fatstock Stretcher
+- (1) Wholesale Market
+- (1) Place 1  on each remaining round space. At the start of these rounds, you get the .
+- (1) Gritter
+- (1) Play in Round 5 or Later
+- (1) Earth Oven
+- (1) Return Fireplace
+- (1) Field Clay
+- (1) You immediately get 1  for each planted field you have.
+- (1) 1 Planted Field
+- (1) Large Pottery
+- (1) Return Pottery
+- (1) Bale of Straw
+- (1) Beer Tap
+- (1) Lynchet
+- (1) Baking Course
+- (1) Grain Sieve
+- (1) Each time before you take a __Bake Bread__ action, you can exchange 1  for 1 .
+- (1) Reap Hook
+- (1) Small Basket
+- (1) Small Greenhouse
+- (1) Small Greenhouse effect
+- (1) Petrified Wood
+- (1) Immediately exchange up to 3  for 1  each.
+- (1) Add 1  to 1 or 2 field(s)
+- (1) {actplayer} may pay 1  from supply to add 1  to each of up to 2 vegetable fields (Straw Manure)
+- (1) Select field(s) (Straw Manure)
+- (1) Remove 1 crop from a field
+- (1) {actplayer} may discard 1 crop from a field to sow (Changeover)
+- (1) Select field (Changeover)
+- (1) Harvest additional good
+- (1) {actplayer} may harvest additional goods (Stable Manure)
+- (1) {you} may choose fields from which to harvest 1 extra good (Stable Manure)
+- (1) Supply Boat
+- (1) Wood Field
+- (1) Planted  may not be spent during scoring for the Joinery.
+- (1) Social Benefits
+- (1) Recycled Brick
+- (1) Reed Pond
+- (1) Carrot Museum
+- (1) Play in Round 8 or Before
+- (1) Trident
+- (1) If you play this card in round 3/6/9/12, you immediately get 3/4/5/6 .
+- (1) Play in Round 3, 6, 9, or 12
+- (1) Brick Hammer
+- (1) Each time after you build an improvement costing at least 2 , you get 1 .
+- (1) Roof Ladder
+- (1) Each time you renovate, you pay 1 fewer  and, at the end of the action, you get 1 .
+- (1) Hunting Trophy
+- (1) Return or Cook 1 Wild Boar
+- (1) Cook {resources_desc}
+- (1) Pigswill
+- (1) Each time you use the __Fencing__ action space, you also get 1 .
+- (1) You receive the  before building fences.
+- (1) Feed Pellets
+- (1) Sheep Agent
+- (1) Master Builder
+- (1) Millwright
+- (1) Allows 1 or 2 substitutions per type of thing built.
+- (1) You need to pay 1  for each individual building resource you replace, not just 1  in total.
+- (1) Stablehand
+- (1) Fern Seeds
+- (1) You get 2  and 1 , which you must sow immediately.
+- (1) 1 Empty and 2 Planted Fields
+- (1) Plow Maker
+- (1) Plow Maker's effect
+- (1) Plowman
+- (1) Plowman effect
+- (1) Return a person to your home
+- (1) {actplayer} may return a farmer to their home (Sheep Inspector)
+- (1) {you} may return a farmer to your home (Sheep Inspector)
+- (1) Furnisher
+- (1) The improvement does not need to cost any .
+- (1) Begging Student
+- (1) Collect all building resources
+- (1) Earthenware Potter
+- (1) Game Trade
+- (1) Museum Caretaker
+- (1) Blighter
+- (1) Acquirer
+- (1) Receive top {resources_desc} goods from {card}
+- (1) Spice Trader
+- (1) Pioneer
+- (1) Emergency Seller
+- (1) When you play this card, you can immediately turn as many building resources into food as you have people:
+- (1) Sell building resources
+- (1) {actplayer} may sell up to {nb} building resources
+- (1) {you} may sell up to {nb} building resources
+- (1) Land Surveyor
+- (1) In the field phase of each harvest, if you have at least 2/4/6/7 fields, you get 1/2/3/4 .
+- (1) Blackberry Farmer
+- (1) Move your person from Farmland to another action space
+- (1) {actplayer} may move their person from Farmland to another action space (Straw Hat)
+- (1) {you} may move your person from Farmland to another action space (Straw Hat)
+- (1) Dentist
+- (1) Recluse
+- (1) Gain grain from supply instead of harvesting
+- (1) {actplayer} may choose grain fields not to harvest (Grain Thief)
+- (1) {you} may choose grain fields not to harvest (Grain Thief)
+- (1) Godmother
+- (1) Each time you take a __Family Growth__ action, you also get 1 .
+- (1) Shed Builder
+- (1) Seed Servant
+- (1) Fir Cutter
+- (1) Pipe Smoker
+- (1) At the start of each harvest, if you have at least 1 grain field, you get 2 .
+- (1) Kindling Gatherer
+- (1) Each time you get  from an action space, you get 1 additional .
+- (1) Land Heir
+- (1) Petting Zoo
+- (1) Scrap Collector
+- (1) Hill Cultivator
+- (1) Cottar
+- (1) Use top {resources_desc} goods from {card}
+- (1) Delayed Wayfarer
+- (1) Tax Collector
+- (1) Diligent Farmer
+- (1) Saddler
+- (1) Each time after you build a major improvement, you can pay 1  to plow 1 field.
+- (1) Imitator
+- (1) Animal Bedding
+- (1) Market Master
+- (1) Shearer
+- (1) Veggie Lover
+- (1) If crops are exchanged for bonus points, they do not count in the normal scoring.
+- (1) Once goods are on this card, they are unusable except to score points with this card.
+- (1) Pickler
+- (1) Includes  in fields and in supply.
+- (1) Animal Husbandry Worker
+- (1) This card only gives a __Build Fences__ action if there are at least 3 complete rounds left to play.
+- (1) Flax Farmer
+- (1) Livestock Expert
+- (1) Bunny Breeder
+- (1) Stone House Reconstruction
+- (1) Carter
+- (1) Vegetable Vendor
+- (1) Smuggler
+- (1) You can use the 2 exchanges to turn 1  into 1 .
+- (1) Hewer
+- (1) Wares Salesman
+- (1) Parvenu
+- (1) Reseller
+- (1) Animal Driver
+- (1) {actplayer} may place stables on action spaces (Lazybones)
+- (1) {you} may place stables on action spaces (Lazybones)
+- (1) Midnight Fencer
+- (1) Wood Saw
+- (1) Each time all other players have more people than you, you can take a __Build Rooms__ action without placing a person.
+- (1) Rock Beater
+- (1) Bargain Hunter
+- (1) Each harvest, you can use this card to exchange exactly 1  for 1 bonus  and 1 .
+- (1) Margrave
+- (1) Claypit Owner
+- (1) Usufructuary
+- (1) Stone Custodian
+- (1) Nail Basket
+- (1) Kelp Gatherer
+- (1) Patroness
+- (1) Mountain Plowman
+- (1) Each time you plow at least 1 field, you get 1  for each field that you just plowed.
+- (1) Master Huntsman
+- (1) When you play this card and each time you build a major improvement, you get 1 .
+- (1) Move {resources_desc} from {action_space1} to {action_space2}
+- (1) {resources_desc} for all players
+- (1) 1 Animal of Each Type
+- (1) Skimmer Plow
+- (1) Seed Almanac
+- (1) Ox Goad
+- (1) Pole Barns
+- (1) You can immediately build up to 3 stables at no cost. (You must pay the cost of this card though.)
+- (1) 15 Fences Built
+- (1) Iron Hoe
+- (1) Sheep Rug
+- (1) 4 Sheep
+- (1) {player_name} discards {resources_desc} from Guest Room
+- (1) Place food on Guest Room
+- (1) {actplayer} must decide how much food to pay (Guest Room)
+- (1) Choose any number of food to pay (Guest Room)
+- (1) {player_name} chose not to use Guest Room effect, their round is now over
+- (1) Apiary
+- (1) At the end of each work phase, you can sow exactly 1 crop on 1 field.
+- (1) Ambition
+- (1) Bumper Crop
+- (1) Sundial
+- (1) Bookmark
+- (1) Please pass it, it is only the round marker for Bookmark
+- (1) Heirloom
+- (1) (This card has no additional effect.)
+- (1) Your Person on Day Laborer
+- (1) Renovation Materials
+- (1) Immediately renovate to clay at no cost. (You must pay the cost of this card though.)
+- (1) During the feeding phase of each harvest, your newborns require 2  (instead of 1).
+- (1) Exactly 2 Adults
+- (1) Upholstery
+- (1) Nave
+- (1) 1 Fenced Stable
+- (1) Land Register
+- (1) During scoring, if your farm has no unused spaces, you get 2 bonus .
+- (1) Misanthropy
+- (1) During scoring, if you have exactly 4/3/2 people, you get 2/3/5 bonus .
+- (1) Ox Skull
+- (1) During scoring, if you have no , you get 3 bonus .
+- (1) 1 cattle
+- (1) Rod Collection
+- (1) Paintbrush
+- (1) Each harvest, you can exchange exactly 1  for your choice of 2  or 1 bonus .
+- (1) 1 pig
+- (1) Tea Time
+- (1) Own Person on Grain Utilization
+- (1) Bee Statue
+- (1) Muddy Waters
+- (1) 5 Cards in Play
+- (1) Water Gully
+- (1) Major Well
+- (1) Barn Cats
+- (1) 1 Stable
+- (1) Fodder Beets
+- (1) 3 Field Tiles
+- (1) Fruit Ladder
+- (1) Waterlily Pond
+- (1) Syrup Tap
+- (1) Town Hall
+- (1) Twibil
+- (1) Each time after any player (including you) builds at least 1 wood room, you get 1 .
+- (1) Discard {grain_count}, gain {wood_count}
+- (1) Discard all grains from one field
+- (1) {actplayer} may discard grain from one of their fields (Thunderbolt)
+- (1) {you} may discard grain from one of your fields (Thunderbolt)
+- (1) Wild Greens
+- (1) Each time you sow, you get 1  for every different type of good that you sow.
+- (1) Contraband
+- (1) Stone Weir
+- (1) Roman Pot
+- (1) Cheese Fondue
+- (1) Lunchtime Beer
+- (1) {player_name} will skip the field and breeding phase of this harvest
+- (1) Skip field and breeding phase
+- (1) Comb and Cutter
+- (1) {actplayer} must select 2 different building resources (Night Loot)
+- (1) Select {nb} different building resources (Night Loot)
+- (1) Working Gloves
+- (1) Raised Bed
+- (1) At the start of each harvest, you get 4 .
+- (1) 3 Occupations and 1 Baking Improvement
+- (1) Almsbag
+- (1) When you play this card, you immediately get 1  for every 2 completed rounds.
+- (1) Barn Shed
+- (1) Grain Bag
+- (1) Cherry Orchard
+- (1) Melon Patch
+- (1) Recount
+- (1) Crop Rotation Field
+- (1) 1 Cattle
+- (1) {actplayer} may choose fields to put additional crops in (Cow Patty)
+- (1) {you} may choose fields to put additional crops in (Cow Patty)
+- (1) Artichoke Field
+- (1) Choose a field to harvest completely
+- (1) {actplayer} may choose a field to harvest completely (Scythe)
+- (1) {you} may choose a field to harvest completely (Scythe)
+- (1) 2 Planted Fields
+- (1) Choose how many free fences you want to use from (Ash Trees)
+- (1) Return Farm Hand stable or pass
+- (1) {actplayer} may return stables to their supply (Lumber Pile)
+- (1) {you} may return stables to your supply (Lumber Pile)
+- (1) Invalid choice.
+- (1) {actplayer} may return up to 3 stables to their supply (Lumber Pile)
+- (1) {you} may return up to 3 stables to your supply (Lumber Pile)
+- (1) {actplayer} may return up to 2 more stables to their supply (Lumber Pile)
+- (1) {you} may return up to 2 more stables to your supply (Lumber Pile)
+- (1) Invalid selection.
+- (1) You selected too many stables.
+- (1) Mattock
+- (1) Each time you get  and/or  from an action space, you get 1 additional .
+- (1) Exchange building resources
+- (1) {actplayer} may exchange up to 4 building resources
+- (1) {you} may exchange up to 4 building resources
+- (1) Field Spade
+- (1) Each time after you sow in at least 1 field, you get 1 .
+- (1) Pumpernickel
+- (1) You immediately get 4 . (Effectively, you are turning 1  into 4 .)
+- (1) Rock Garden
+- (1) 1 Sheep
+- (1) Choose how many  you want to move to (Master Tanner), max {n}
+- (1) Increase animal capacity of {card}
+- (1) Master Renovator
+- (1) Master Fencer
+- (1) Stallwright
+- (1) Farmers Market
+- (1) You immediately get 1 . (Effectively, you are buying 1  for 2 .)
+- (1) Each time you get 2 or more newborn animals, you can pay 1  to plow 1 field.
+- (1) Miller
+- (1) Elder
+- (1) Beneficiary
+- (1) Prodigy
+- (1) Uncaring Parents
+- (1) At the end of each harvest, if you live in a stone house, you get 1 bonus .
+- (1) Bartering Hut
+- (1) Basketmaker's Workshop
+- (1) [Put 1  on the 5 next turns. At the start of each turn, collect the ]
+- (1) Allow {player_name} to take a triggered action
+- (1) Want to play with the same configuration? Here is the seed of your game: {seed}
+- (1) {player_name} restarts their turn
+- (1) Starting round n°{round}
+- (1) Action __{action}__ is revealed
+- (1) Accumulation spaces are being filled in
+- (1) {player_name} places a person on card {card_name} ({source})
+- (1) {player_name} places a person on card {card_name}
+- (1) {player_name} family grows
+- (1) {nb} child(ren) become(s) adult(s)
+- (1) {player_name} constructs one fence
+- (1) {player_name} constructs {nb} fences
+- (1) {player_name} plows one field ({source})
+- (1) {player_name} plows one field
+- (1) {player_name} places {resources_desc} on unused farmyard spaces
+- (1) {player_name} sows {resources_desc}
+- (1) {player_name} constructs one room ({source})
+- (1) {player_name} renovates their house ({nb} rooms)
+- (1) {player_name} constructs one stable
+- (1) {player_name} constructs {nb} stables
+- (1) {player_name} collects {resources_desc}
+- (1) {player_name} returns {resources_desc} to their reserve
+- (1) {player_name} gains {resources_desc} ({source})
+- (1) {player_name} gains {resources_desc}
+- (1) {player_name} breeds {resources_desc} ({source})
+- (1) {player_name} breeds {resources_desc}
+- (1) {player_name} pays {resources_desc} for {source}
+- (1) {player_name} pays {resources_desc} for {source} ({cards})
+- (1) {player_name} pays {resources_desc} to {player_name2} for {source}
+- (1) {player_name} returns {card_name} for {source}
+- (1) {player_name} pays {resources_desc} from their fields for {source}
+- (1) {player_name} pays {resources_desc} from {source}
+- (1) {player_name} discards {resources_desc} as no more room in the meadows
+- (1) {player_name} pays {resources_desc} for bonus of {source}
+- (1) End of turn. All people return home
+- (1) All temporary people return to the supply
+- (1) {player_name} returns a farmer to their home
+- (1) {player_name} returns a farmer to their supply
+- (1) {player_name} takes the First player token
+- (1) {player_name} reorganizes their animals
+- (1) Start of harvest phase
+- (1) {player_name} harvests {resources_desc}
+- (1) {player_name} buys {card_name} ({card_type})
+- (1) {player_name} buys {card_name} ({card_type}) and passes it to {player_name2}
+- (1) {player_name} buys {card_name} ({card_type}) and removes it from the game
+- (1) {player_name} passes {card_name} ({card_type}) to {player_name2}
+- (1) {player_name} removes {card_name} ({card_type}) from the game
+- (1) {player_name} puts {resources_desc} on the action card of round {turns}
+- (1) {player_name} puts {resources_desc} on the action cards of rounds {turns}
+- (1) {player_name} places {resources_desc} on {spaces} ({source})
+- (1) {player_name} converts {resources_desc} into {resources2_desc}
+- (1) {player_name} converts {resources_desc} into {resources2_desc} ({source})
+- (1) {player_name} discards {resources_desc} from their supply
+- (1) {player_name} gets {resources_desc} as food is missing
+- (1) {player_name} picks {card_name} ({card_type})
+- (1) Draft is over, starting the game now
+- (1) {player_name} declines {card_name}; it is discarded
+- (1) {player_name} keeps {card_name}
+- (1) {player_name} moves {resources_desc} on empty fields (Clearing Spade's effect)
+- (1) {resources_desc} are put on Fishing space (Fishing Net's effect)
+- (1) {resources_desc} are discarded from the field to the supply (Thunderbolt's effect)
+- (1) {player_name} builds a Farm Hand stable
+- (1) {player_name} returns the Farm Hand stable to their reserve
+- (1) wood
+- (1) clay
+- (1) reed
+- (1) stone
+- (1) food
+- (1) This card counts as either 1 minor improvement or 1 major improvement, whichever is most convenient when considering another effect. But it never counts as 2 improvements at once.
+- (1)  obtained from this effect may not be used to pay for __Shifting Cultivator__ (A091).
+- (1) This card allows exactly 1 growth action regardless of how many rooms are built.
+- (1) Resources gained from this card cannot be used to pay for the effect of __Cottager__ (B087).
+- (1) You cannot use the effects of __Junior Artist__ (B152) and __Job Contract__ (C023) with the same farmer.
+- (1) The person ends on the second action space used.
+- (1) You must also bake normally in order to make this exchange.
+- (1) This exchange can be performed in the Exchange Center window.
+- (1) This effect is negated by __Milking Place__ (D012).
+- (1) If you remove a farmer from play because of this card, you can never have 5 family members.
+- (1) You must be able to accommodate each newborn animal in order to get it.
+- (1) Stables not built during a player's turn, for example with __Stable Planner__ (A089) or __Groom__ (B089), do not trigger this card.
+- (1) The “jump” to a second action space may only be done once per turn.
+- (1) This only refers to cards played by the owner.
+- (1) Taking, but not fully accommodating, the animals neither triggers nor voids the effect.
+- (1) Cards that provide room for a person do not count for this effect.
+- (1) If played by __Scholar__ (B097), the effect can be used immediately.
+- (1) This card effect happens when you land on the action space, before the effect of the space.
+- (1) This card text was updated for the digital implementation of the game.
+- (1)  and  are not crops and cannot be acted on by this card.
+- (1) You cannot discard cards with __Illusionist__ (B146) if you have played __Lantern House__ (C035).
+- (1) Sows
+- (1) Improvements built
+- (1) Animals bought
+- (1) Animals received
+- (1) Goods bought
+- (1) Actions taken
+- (1) Farmers returned home
+- (1) Times baked
+- (1) Number of crops moved
+- (1) Grain given
+- (1) Cards discarded
+- (1)  converted
+- (1) Pairs taken
+- (1) Harvests skipped
+- (1) Fields harvested
+- (1) {player_name} has {n} {category} and hence loses {score} point(s)
+- (1) {player_name} does not have any {category} and hence earns no point
+- (1) {player_name} has {n} {category} and hence earns {score} point(s)
+- (1) field
+- (1) fields
+- (1) pasture
+- (1) pastures
+- (1) grains
+- (1) vegetables
+- (1) sheeps
+- (1) pigs
+- (1) cattles
+- (1) unused space
+- (1) unused spaces
+- (1) fenced stable
+- (1) fenced stables
+- (1) clay room
+- (1) clay rooms
+- (1) stone room
+- (1) stone rooms
+- (1) person
+- (1) people
+- (1) begging
+- (1) beggings
+- (1) You do not have any stables left in reserve for Farm Hand.
+- (1) major improvement
+- (1) minor improvement
+- (1) {player_name} earns {score} for owning {card_name}
+- (1) {player_name} earns {score} for bonus of {card_name}
+- (1) Use {action_space} ({position})
+- (1) Use {action_space}
+- (1) 1 minor improvement and 1 occupation
+- (1) {n} minor improvements and {n} occupations
+- (1) 1 occupation
+- (1) {occupation} occupations
+- (1) 1 minor improvement
+- (1) {minor} minor improvements
+- (1) {minor} minor improvement(s) and {occupation} occupation(s)
+- (1) an occupation
+- (1) a minor improvement
+- (1) You must choose a card from the Living Hand offer
+- (1) this card
+- (1) Snake opening: in Round 1, the second farmer is placed in reverse turn order.
+- (1) {player_name} is skipped due to a card effect
+- (1) ({turn}/{total}) Draft: players are choosing their cards
+- (1) ({turn}/{total}) Draft: {you} must choose {draftChoice}
+- (1) Living Hand: {actplayer} must refill hand
+- (1) Living Hand: refill hand up to at least 4 occupations and 4 minor improvements
+- (1) Living Hand: {actplayer} must decide whether to keep {card_name}
+- (1) Living Hand: {you} must decide whether to keep {card_name}
+- (1) {actplayer} must confirm or restart their turn
+- (1) {you} must confirm or restart your turn
+- (1) {actplayer} must switch to {player_name} for {card_name}
+- (1) {actplayer} must confirm the switch of player
+- (1) {actplayer} must choose an action
+- (1) {you} must choose an action
+- (1) {actplayer} must place a person
+- (1) {you} must place a person
+- (1) {actplayer} may place a person
+- (1) {you} may place a person
+- (1) {actplayer} must build fence(s)
+- (1) {actplayer} may build fence(s)
+- (1) {actplayer} must fence a farmyard space
+- (1) {you} must fence a farmyard space
+- (1) {actplayer} must build fence(s). Fences adjacent to fields are free
+- (1) {you} must build fence(s). Fences adjacent to fields are free
+- (1) {actplayer} must choose how to pay for {source}
+- (1) {you} must choose how to pay for {source}
+- (1) {actplayer} pays for {source}
+- (1) {you} pay for {source}
+- (1) {actplayer} must play an occupation
+- (1) {you} must play an occupation
+- (1) {actplayer} may play an occupation
+- (1) {you} may play an occupation
+- (1) {actplayer} must plow a field
+- (1) {you} must plow a field
+- (1) {actplayer} may plow a field
+- (1) {you} may plow a field
+- (1) {actplayer} must build room(s)
+- (1) {you} must build up to {max} room(s)
+- (1) {actplayer} may build room(s)
+- (1) {you} may build up to {max} room(s)
+- (1) {actplayer} must sow their fields
+- (1) {you} must sow your field(s)
+- (1) {actplayer} may sow their fields
+- (1) {you} may sow your field(s)
+- (1) {actplayer} must build stable(s)
+- (1) {you} must build up to {max} stable(s)
+- (1) {actplayer} may build stable(s)
+- (1) {you} may build up to {max} stable(s)
+- (1) {actplayer} must renovate
+- (1) {you} must renovate
+- (1) {actplayer} may renovate
+- (1) {you} may renovate
+- (1) {actplayer} must play a {strTypes} improvement
+- (1) {you} must play a {strTypes} improvement
+- (1) {actplayer} may play a {strTypes} improvement
+- (1) {you} may play a {strTypes} improvement
+- (1) You must reorganize your animals inside your pastures, rooms and stables
+- (1) {actplayer} may exchange resources
+- (1) You may exchange resources
+- (1) {actplayer} must bake bread
+- (1) You must bake bread
+- (1) {actplayer} may bake bread
+- (1) You may bake bread
+- (1) {actplayer} may exchange resources before feeding their family
+- (1) You may exchange resources before feeding your family
+- (1) {actplayer} is cooking their animals
+- (1) You are cooking your animals
+- (1) End of game
+
+</details>
