@@ -1,7 +1,12 @@
 import { MinorImprovement } from '../types'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
+import { hasNoUnusedFarmyardSpaces } from '../../game/farm'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A33_BigCountry'
+
+// BGA isBuyable: !empty(getFreeZones()) → false (i.e. zero free zones required).
+registerPrerequisite('All Farmyard Spaces Used', hasNoUnusedFarmyardSpaces)
 
 export const A33_BigCountry = new MinorImprovement({
   id: CARD_ID,
