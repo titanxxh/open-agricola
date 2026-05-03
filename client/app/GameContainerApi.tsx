@@ -556,9 +556,14 @@ export const GameContainerApi = () => {
         return
       }
       if (interaction.farm.farmType === 'room') {
-        commitFarmWithError(pendingPlayerIndex, 'room', {
-          rooms: pendingRoomTiles,
-        })
+        void transport.resolveChoice(pendingPlayerIndex, 'confirm', { rooms: pendingRoomTiles })
+          .then((resp) => {
+            if (!resp.ok) setFarmCommitError('room', resp.error)
+          })
+          .catch((e) => {
+            console.error(e)
+            setFarmCommitError('room')
+          })
         return
       }
       if (interaction.farm.farmType === 'stable') {
