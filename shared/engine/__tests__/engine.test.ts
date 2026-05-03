@@ -12,7 +12,7 @@ import { Engine } from '../engine'
 import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
-import { ActionNode, ChoiceNode, SequenceNode } from '../nodes'
+import { ActionNode, InteractionNode, SequenceNode } from '../nodes'
 import { clearActionHooks } from '../../actions/hooks'
 
 const createState = () =>
@@ -99,7 +99,7 @@ const buildEngine = (action: ActionDefinition, withChoice: boolean) => {
   const root = withChoice
     ? new SequenceNode(`sequence-${action.id}`, [
         new ActionNode(`action-${action.id}`, action.id),
-        new ChoiceNode(`choice-${action.id}`, []),
+        new InteractionNode(`choice-${action.id}`, []),
       ])
     : new ActionNode(`action-${action.id}`, action.id)
   return new Engine({

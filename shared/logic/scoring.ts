@@ -346,7 +346,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
     let cardStateBonusVp = 0
     if (player.cardStates) {
       Object.entries(player.cardStates).forEach(([cardId, cardState]) => {
-        if (cardId === '__pendingChoice__') return
+        if (cardId === '__pendingInteraction__') return
         const vp = cardState.counters?.bonusVp ?? 0
         if (vp > 0) {
           cardStateBonusVp += vp

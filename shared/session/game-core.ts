@@ -21,7 +21,7 @@ import type { DraftPickPayload } from '../draft/types.ts'
 import {
   ActionNode,
   ActionRegistry,
-  ChoiceNode,
+  InteractionNode,
   Engine,
   EngineTree,
   HookDispatcher,
@@ -389,7 +389,7 @@ export class GameCore {
       if (def?.resolveChoice && !def.skipChoiceWrap) {
         const seq = new SequenceNode(`seq-${flow.actionId}-${counter.value++}`, [
           actionNode,
-          new ChoiceNode(`choice-${flow.actionId}-${counter.value++}`, []),
+          new InteractionNode(`choice-${flow.actionId}-${counter.value++}`, []),
         ])
         return flow.optional ? new OptionalNode(`opt-${counter.value++}`, seq, flow.promptKey) : seq
       }
@@ -519,7 +519,7 @@ export class GameCore {
     const root = action?.flow
       ? this.buildEngineNode(action.flow, counter)
       : action?.resolveChoice
-        ? new SequenceNode(`seq-${actionId}`, [an, new ChoiceNode(`choice-${actionId}`, [])])
+        ? new SequenceNode(`seq-${actionId}`, [an, new InteractionNode(`choice-${actionId}`, [])])
         : an
     return new Engine({
       tree: new EngineTree(root),
@@ -1774,7 +1774,7 @@ export class GameCore {
 
       if (step.type === 'choice') {
         // Lazy confirmation: if we silently switched players and now hit a choice,
-        // show confirmPlayerSwitch first. The ChoiceNode stays unresolved in the engine.
+        // show confirmPlayerSwitch first. The InteractionNode stays unresolved in the engine.
         if (this.deferredPlayerSwitch) {
           this.pending = {
             type: 'confirmPlayerSwitch',
@@ -1788,7 +1788,7 @@ export class GameCore {
           let autoOptions = step.choice.options
           while (autoOptions.length === 1) {
             const auto = autoOptions[0]
-            const resolvedActionId = this.engine?.snapshot().pendingChoiceActionId ?? undefined
+            const resolvedActionId = this.engine?.snapshot().pendingInteractionActionId ?? undefined
             const result = this.engine!.resolveChoice(auto.value, { state: this.state, player, space })
             this.flushEngineLog()
             if (result.type === 'ok' && resolvedActionId) {
@@ -1804,8 +1804,8 @@ export class GameCore {
                 options: result.options ?? [], promptKey: result.promptKey,
                 promptParams: result.promptParams,
                 costOverride: this.engine?.getLastComputedCosts(),
-                sourceCard: this.engine?.snapshot().pendingChoiceContext?.sourceCard ?? undefined,
-                actionContext: this.engine?.snapshot().pendingChoiceContext?.actionContext ?? undefined,
+                sourceCard: this.engine?.snapshot().pendingInteractionContext?.sourceCard ?? undefined,
+                actionContext: this.engine?.snapshot().pendingInteractionContext?.actionContext ?? undefined,
               }
               return
             }
@@ -1835,8 +1835,8 @@ export class GameCore {
           options: step.choice.options, promptKey: step.choice.promptKey,
           promptParams: step.choice.promptParams,
           costOverride: this.engine?.getLastComputedCosts(),
-          sourceCard: this.engine?.snapshot().pendingChoiceContext?.sourceCard ?? undefined,
-          actionContext: this.engine?.snapshot().pendingChoiceContext?.actionContext ?? undefined,
+          sourceCard: this.engine?.snapshot().pendingInteractionContext?.sourceCard ?? undefined,
+          actionContext: this.engine?.snapshot().pendingInteractionContext?.actionContext ?? undefined,
         }
         return
       }
@@ -2228,7 +2228,7 @@ export class GameCore {
         }
       }
     }
-    const resolvedActionId = this.engine.snapshot().pendingChoiceActionId ?? undefined
+    const resolvedActionId = this.engine.snapshot().pendingInteractionActionId ?? undefined
     const result = this.engine.resolveChoice(value, { state: this.state, player, space }, payload)
     this.flushEngineLog()
     if (result.type === 'ok' && resolvedActionId) {
@@ -2240,8 +2240,8 @@ export class GameCore {
         options: result.options ?? [], promptKey: result.promptKey,
         promptParams: result.promptParams,
         costOverride: this.engine.getLastComputedCosts(),
-        sourceCard: this.engine.snapshot().pendingChoiceContext?.sourceCard ?? undefined,
-        actionContext: this.engine.snapshot().pendingChoiceContext?.actionContext ?? undefined,
+        sourceCard: this.engine.snapshot().pendingInteractionContext?.sourceCard ?? undefined,
+        actionContext: this.engine.snapshot().pendingInteractionContext?.actionContext ?? undefined,
       }
       return this.respond()
     }
@@ -2714,8 +2714,8 @@ export class GameCore {
         options: result.options ?? [], promptKey: result.promptKey,
         promptParams: result.promptParams,
         costOverride: this.engine.getLastComputedCosts(),
-        sourceCard: this.engine.snapshot().pendingChoiceContext?.sourceCard ?? undefined,
-        actionContext: this.engine.snapshot().pendingChoiceContext?.actionContext ?? undefined,
+        sourceCard: this.engine.snapshot().pendingInteractionContext?.sourceCard ?? undefined,
+        actionContext: this.engine.snapshot().pendingInteractionContext?.actionContext ?? undefined,
       }
       return this.respond()
     }

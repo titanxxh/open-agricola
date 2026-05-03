@@ -3,6 +3,7 @@ import type {
   ChoiceEffectPreview,
   ActionExecutionContext,
   ActionExecutionResult,
+  InteractionRequest,
   Resource,
 } from '../game/types'
 import type { EngineNode, EngineNodeType, NodeState } from './types'
@@ -88,13 +89,15 @@ export class ActionNode extends BaseNode {
   }
 }
 
-export class ChoiceNode extends BaseNode {
+export class InteractionNode extends BaseNode {
   public choices: ActionChoiceOption[]
   public promptKey?: string
+  public request?: InteractionRequest
 
-  constructor(id: string, choices: ActionChoiceOption[]) {
+  constructor(id: string, choices: ActionChoiceOption[], request?: InteractionRequest) {
     super(id, 'choice')
     this.choices = choices
+    this.request = request
   }
 
   setChoice(promptKey: string | undefined, choices: ActionChoiceOption[]) {

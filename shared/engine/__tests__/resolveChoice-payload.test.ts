@@ -12,7 +12,7 @@ import { Engine } from '../engine'
 import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
-import { ActionNode, ChoiceNode, SequenceNode } from '../nodes'
+import { ActionNode, InteractionNode, SequenceNode } from '../nodes'
 import { clearActionHooks } from '../../actions/hooks'
 
 const createState = () =>
@@ -96,7 +96,7 @@ const buildEngine = (action: ActionDefinition) => {
   registry.register(action)
   const root = new SequenceNode(`sequence-${action.id}`, [
     new ActionNode(`action-${action.id}`, action.id),
-    new ChoiceNode(`choice-${action.id}`, []),
+    new InteractionNode(`choice-${action.id}`, []),
   ])
   return new Engine({
     tree: new EngineTree(root),
@@ -144,7 +144,7 @@ describe('engine resolveChoice payload', () => {
     expect(receivedPayload).toEqual({ foo: 'bar' })
   })
 
-  it('merges result.extraData.actionContextWrite into pendingChoiceContext.actionContext', () => {
+  it('merges result.extraData.actionContextWrite into pendingInteractionContext.actionContext', () => {
     let callCount = 0
     const action: ActionDefinition = {
       id: 'merge-action',
@@ -178,7 +178,7 @@ describe('engine resolveChoice payload', () => {
     engine.proceed({ state, player, space })
     engine.resolveChoice('commit', { state, player, space })
     const snapshot = engine.snapshot()
-    expect(snapshot.pendingChoiceContext?.actionContext).toEqual({ stashed: { foo: 42 } })
+    expect(snapshot.pendingInteractionContext?.actionContext).toEqual({ stashed: { foo: 42 } })
     expect(callCount).toBe(1)
   })
 
@@ -222,6 +222,6 @@ describe('engine resolveChoice payload', () => {
     engine.proceed({ state, player, space })
     engine.resolveChoice('a', { state, player, space })
     engine.resolveChoice('b', { state, player, space })
-    expect(engine.snapshot().pendingChoiceContext?.actionContext).toEqual({ x: 1, y: 99, z: 3 })
+    expect(engine.snapshot().pendingInteractionContext?.actionContext).toEqual({ x: 1, y: 99, z: 3 })
   })
 })

@@ -5,7 +5,7 @@ export { HookDispatcher } from './dispatcher'
 export { LogStore } from './log-store'
 export {
   ActionNode,
-  ChoiceNode,
+  InteractionNode,
   SequenceNode,
   ParallelNode,
   OrNode,

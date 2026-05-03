@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach } from 'vitest'
 import { ActionRegistry } from '../registry'
 import { CardRegistry } from '../../cards/registry'
 import { setActiveCardRegistry, requireActiveCardRegistry } from '../../cards/active-registry'
-import { ActionNode, ChoiceNode, OptionalNode, OrNode, SequenceNode, XorNode } from '../nodes'
+import { ActionNode, InteractionNode, OptionalNode, OrNode, SequenceNode, XorNode } from '../nodes'
 import { Engine } from '../engine'
 import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
@@ -372,7 +372,7 @@ describe('engine follow-up actions', () => {
     const tree = new EngineTree(
       new SequenceNode('seq', [
         new ActionNode('action-main', 'resolve-flow-main'),
-        new ChoiceNode('choice-main', []),
+        new InteractionNode('choice-main', []),
       ]),
     )
     const engine = new Engine({

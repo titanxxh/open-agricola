@@ -432,7 +432,7 @@ export type ActionChoiceOption = {
 /**
  * `extraData.actionContextWrite` (optional, plain object): when present on a
  * `{ type: 'choice' }` result, the engine shallow-merges its keys into
- * `pendingChoiceContext.actionContext`, which then surfaces in
+ * `pendingInteractionContext.actionContext`, which then surfaces in
  * `pending.actionContext` via `engine.snapshot()`. Used by ActionDef.resolveChoice
  * to persist commit-time payload (e.g. fence geometry) across a payment-combo
  * second prompt round-trip. Key conflicts: later writes overwrite earlier.
@@ -506,11 +506,11 @@ export type ActionDefinition = {
   ) => ActionExecutionResult
   /**
    * Opt-out: when true the engine builds a bare ActionNode instead of the
-   * default `Sequence([ActionNode, ChoiceNode])` wrap that is normally
+   * default `Sequence([ActionNode, InteractionNode])` wrap that is normally
    * triggered by the presence of `resolveChoice`. Used by leaf actions whose
-   * `execute` typically returns `ok` (so the paired ChoiceNode would dangle
+   * `execute` typically returns `ok` (so the paired InteractionNode would dangle
    * empty and block the seq), and which only emit `choice` for one specific
-   * branch (handled via the engine's fallback `pendingChoiceNodeId = node.id`
+   * branch (handled via the engine's fallback `pendingInteractionNodeId = node.id`
    * path that already routes the player choice back through `resolveChoice`).
    * Currently set on the `pay` leaf — typed-flat costs resolve eagerly while
    * ComplexCost multi-solution still emits a payment choice.
