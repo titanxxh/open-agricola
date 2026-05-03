@@ -1,7 +1,15 @@
 import { MinorImprovement } from '../types'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D1_ZigzagHarrow'
+
+// BGA isBuyable: $player->board()->zigzag() returns the set of plow-completing
+// L-shape tiles; falsey count blocks the buy. We do not have a board-geometry
+// helper for the L-shape check (tracked as deferred — see card_progress §刻意简化),
+// so register a weaker lower bound: at least 2 existing fields (an L shape needs
+// 3 fields total; 2 must already exist for the buy to make sense).
+registerPrerequisite('3 Fields in an "L" Shape', (player) => player.fields.length >= 2)
 
 /**
  * D1 Zigzag Harrow — Minor Improvement
