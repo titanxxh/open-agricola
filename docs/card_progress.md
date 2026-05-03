@@ -47,6 +47,8 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-05-03 i18n 真 bug fix + BGA 集合差报告（基建 sprint）**：新增 `scripts/i18n-audit.ts`（TS Compiler API 静态扫描 `t('...')` / `*Key:` 引用 → 与 `shared/i18n/{zh,en}.ts` 字典做集合差）+ `scripts/i18n-fill.ts`（Gemini 2.5 Flash 批量翻译 + ts AST 写回字典，只增不改）+ `scripts/i18n-bga-coverage.ts`（输出 `docs/i18n-bga-coverage-report.md`：BGA 1732 unique `clienttranslate` 字符串，我方覆盖 255，gap 1477，作为后续 sprint 的可观测 backlog，**非必修**——架构非 1:1）。新增 `pnpm run lint:i18n` + GitHub Actions CI 接入：玩家可见 i18n bug（85 个 zh/en 缺 value）补完，CI 守门避免回潮。本批补 85 zh + 68 en key（既有 value 一字不改，写回靠 typescript Compiler API 文本插入）。沿用项目已有 `tests/llm-card-gen/llm-client.ts` 的 `callLLM` + `MY_TEST_GEMINI_APIKEY`，零新增 npm 依赖（除 `glob` for audit globs）。`AnytimeBar` fallback 测试更新为合成 cardId（`TESTONLY_FallbackPlaceholder`），避免依赖具体卡的 i18n 缺失态。详见 `docs/superpowers/specs/2026-05-03-i18n-clienttranslate-fill-design.md` / plan 同名。
+
 - **2026-05-03 Sprint 7e — prereq dual-mode registration（38 张 fix + 5 张免修确认）**：
   - **背景**：Sprint 7d prereq 双模扫描发现 41 张候选卡设了 `prerequisite` label string 但缺 `registerPrerequisite` handler；`meetsCardPrerequisites` 走 generic-parser 时找不到 handler 即 **silently 视为通过**，相当于 BGA `isBuyable` 检查被绕过。Sprint 7e 集中修复。
   - **完成 38 张 fix**（A12 + B10 + C2 + D4 + E10；A3_PaperKnife 在审计前已存在 handler 故跳过 commit）：A13 / A20 / A22 / A27 / A30 / A33 / A36 / A40 / A46 / A52 / A57 / A68 / B14 / B22 / B23 / B31 / B33 / B38 / B45 / B51 / B52 / B74 / C20 / C81 / D1 / D22 / D47 / D48 / E1 / E2 / E21 / E30 / E3 / E41 / E42 / E43 / E71. 每张 commit `fix(7e): register '<label>' prereq for <CARD>` + 1-3 例 session test（直接调 `meetsCardPrerequisites`）。
