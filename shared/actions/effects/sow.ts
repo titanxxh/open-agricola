@@ -103,21 +103,18 @@ export const sowAction: ActionDefinition = {
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
     if (choice === 'cancel') return { type: 'ok' }
 
-    // Legacy compatibility (PR 3 transition): commitFarmChoice('sow', ...)
-    // mutates state itself, then drives the engine with bare 'confirm' (no
-    // payload, no farmPayload). Treat that as a no-op so after-hooks still
-    // fire. Removed in Task 3 once commitFarmChoice's sow branch is gone.
-    if (choice === 'confirm' && !payload && !ctx.actionContext?.farmPayload) {
-      return { type: 'ok' }
-    }
-
     // First call: client submitted crops alongside `confirm`.
-    if (payload && choice === 'confirm') {
+    if (choice === 'confirm' && payload) {
       const crops = (payload as { crops?: SowSelection[] }).crops
       if (!Array.isArray(crops)) return { type: 'fail', logKey: 'log.action' }
       return finalizeSow(ctx, crops)
     }
 
-    return { type: 'fail', logKey: 'log.action' }
+    // Legacy compatibility (PR 3 transition): commitFarmChoice('sow', ...)
+    // mutates state itself, then drives the engine with a bare 'confirm' (no
+    // payload). Treat any non-confirm/cancel choice as a no-op so after-hooks
+    // still fire. Mirrors the original `() => ({ type: 'ok' })` behavior.
+    // Removed in Task 3 once commitFarmChoice's sow branch is gone.
+    return { type: 'ok' }
   },
 }
