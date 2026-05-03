@@ -2638,10 +2638,7 @@ export class GameCore {
     return this.state
   }
 
-  private continueAfterResolvedFarmChoice(
-    playerIndex: number,
-    farmChoiceMeta?: Record<string, unknown>,
-  ): SessionResponse {
+  private continueAfterResolvedFarmChoice(playerIndex: number): SessionResponse {
     if (!this.engine) {
       this.pending = { type: 'none' }
       return this.respond()
@@ -2651,15 +2648,9 @@ export class GameCore {
     const updatedPlayer = this.state.players[playerIndex]!
     if (!space) return this.respond(false, 'invalid state')
 
-    const resultOverride =
-      farmChoiceMeta && Object.keys(farmChoiceMeta).length > 0
-        ? { type: 'ok' as const, extraData: farmChoiceMeta }
-        : undefined
     const result = this.engine.resolveChoice(
       'confirm',
       { state: this.state, player: updatedPlayer, space },
-      undefined,
-      resultOverride,
     )
     this.flushEngineLog()
 

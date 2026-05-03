@@ -1414,15 +1414,11 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
   /**
    * Resolve a pending choice. Threading the optional `payload` lets ActionDef.resolveChoice
    * receive client-supplied submission data (e.g. fence edges, plow tile).
-   * @param resolvedResultOverride DEPRECATED — used by `commitFarmChoice` to inject a fake
-   *   `{type:'ok'}` while migrating farmType into ActionDef.resolveChoice (PR 2-6).
-   *   Will be removed in PR 7 once commitFarmChoice is gone.
    */
   resolveChoice(
     choice: string,
     context: EngineContext,
     payload?: Record<string, unknown>,
-    resolvedResultOverride?: ActionExecutionResult,
   ): ActionExecutionResult {
     if (this.pendingChoiceNodeId) {
       const node = this.tree.findNodeById(this.pendingChoiceNodeId)
@@ -1684,9 +1680,7 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
       selectedOption: choice,
     }
     let result: ActionExecutionResult
-    if (resolvedResultOverride) {
-      result = resolvedResultOverride
-    } else if (action.resolveChoice) {
+    if (action.resolveChoice) {
       result = action.resolveChoice(executionContext, choice, payload)
     } else {
       return { type: 'ok' }
