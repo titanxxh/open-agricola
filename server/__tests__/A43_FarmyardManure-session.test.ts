@@ -34,7 +34,7 @@ describe('A43_FarmyardManure session', () => {
     if (resp.interaction.farm.farmType !== 'stable') return
 
     const stable = resp.interaction.farm.selectableTiles[0]!
-    resp = session.commitFarmChoice(0, 'stable', { stables: [stable] })
+    resp = session.resolveChoice(0, 'confirm', { stables: [stable] })
     expect(resp.ok).toBe(true)
 
     // Expect 3 future-meeple entries owned by our player for the next 3 rounds.
@@ -59,7 +59,7 @@ describe('A43_FarmyardManure session', () => {
     if (resp.interaction.farm.farmType !== 'stable') return
 
     const [t1, t2] = resp.interaction.farm.selectableTiles
-    resp = session.commitFarmChoice(0, 'stable', { stables: [t1!, t2!] })
+    resp = session.resolveChoice(0, 'confirm', { stables: [t1!, t2!] })
     expect(resp.ok).toBe(true)
 
     const entries = resp.state.futureMeeples.filter((e) => e.cardId === CARD_ID)
@@ -84,7 +84,7 @@ describe('A43_FarmyardManure session', () => {
     if (resp.interaction.farm.farmType !== 'stable') return
 
     const stable = resp.interaction.farm.selectableTiles[0]!
-    resp = session.commitFarmChoice(0, 'stable', { stables: [stable] })
+    resp = session.resolveChoice(0, 'confirm', { stables: [stable] })
     expect(resp.ok).toBe(true)
     const entries = resp.state.futureMeeples.filter((e) => e.cardId === CARD_ID)
     expect(entries).toHaveLength(0)
