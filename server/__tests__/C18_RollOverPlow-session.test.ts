@@ -80,7 +80,7 @@ describe('C18_RollOverPlow session', () => {
     // Commit the plow choice
     const tile = resp.interaction.farm.selectableTiles[0]
     expect(tile).toBeDefined()
-    resp = session.commitFarmChoice(0, 'plow', { tile })
+    resp = session.resolveChoice(0, 'confirm', { tile })
     expect(resp.ok).toBe(true)
 
     // Should have gained a new field from plowing

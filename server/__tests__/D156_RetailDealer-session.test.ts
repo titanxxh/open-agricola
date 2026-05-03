@@ -98,7 +98,7 @@ describe('D156_RetailDealer session', () => {
     resp = session.confirmNextPlayer()
     resp = session.takeAction(1, 'farmland')
     const tile = resp.interaction?.farm?.selectableTiles?.[0]
-    if (tile) resp = session.commitFarmChoice(1, 'plow', { tile })
+    if (tile) resp = session.resolveChoice(1, 'confirm', { tile })
     resp = session.confirmNextPlayer()
 
     // Reset resource-market-4 again

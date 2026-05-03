@@ -90,7 +90,7 @@ describe('card flow regressions', () => {
     const tile = resp.interaction.farm.selectableTiles[0]
     expect(tile).toBeDefined()
 
-    resp = session.commitFarmChoice(0, 'plow', { tile })
+    resp = session.resolveChoice(0, 'confirm', { tile })
     expect(resp.state.players[0]!.fields.length).toBe(1)
     expect(resp.state.players[0]!.cardStates?.A17_ReclamationPlow?.flagged).toBe(true)
     expect(resp.state.players[0]!.cardStates?.A17_ReclamationPlow?.infobox).toBe('✓')

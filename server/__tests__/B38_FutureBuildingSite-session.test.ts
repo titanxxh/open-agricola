@@ -129,9 +129,13 @@ describe('B38 FutureBuildingSite — session', () => {
       expect(selectableKeys.has(lk)).toBe(false)
     }
 
-    // Try to directly plow a locked tile — should fail
-    resp = session.commitFarmChoice(0, 'plow', { tile: { row: 0, col: 0 } })
-    expect(resp.ok).toBe(false)
+    // Try to directly plow a locked tile — plowAction.resolveChoice returns
+    // fail, which the engine surfaces as ok=true with pending cleared and no
+    // field added (different shape than the legacy commitFarmChoice path,
+    // which returned ok=false). Regardless, the plow must not have happened.
+    const fieldsBefore = resp.state.players[0]!.fields.length
+    resp = session.resolveChoice(0, 'confirm', { tile: { row: 0, col: 0 } })
+    expect(resp.state.players[0]!.fields.length).toBe(fieldsBefore)
   })
 
   it('plow on non-locked free tile is allowed', () => {
@@ -146,7 +150,7 @@ describe('B38 FutureBuildingSite — session', () => {
     const selectableKeys = new Set(selectableTiles.map(positionKey))
     expect(selectableKeys.has(positionKey(tile))).toBe(true)
 
-    resp = session.commitFarmChoice(0, 'plow', { tile })
+    resp = session.resolveChoice(0, 'confirm', { tile })
     expect(resp.ok).toBe(true)
   })
 
