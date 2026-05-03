@@ -57,7 +57,6 @@ describe('shared protocol types', () => {
     const variants: PendingAction[] = [
       { type: 'none' },
       { type: 'choice', playerIndex: 0, spaceId: 'test', options: [] },
-      { type: 'animalReorg', playerIndex: 0, spaceId: 'test' },
       { type: 'harvestFeed', playerIndex: 0, remaining: 5, foodUsed: 0 },
       {
         type: 'harvestFeed',
@@ -68,7 +67,7 @@ describe('shared protocol types', () => {
       },
       { type: 'confirmNextPlayer', nextPlayerIndex: 1 },
     ]
-    expect(variants.length).toBe(6)
+    expect(variants.length).toBe(5)
     variants.forEach((v) => expect(v.type).toBeDefined())
   })
 
@@ -77,7 +76,6 @@ describe('shared protocol types', () => {
       { type: 'action', spaceId: 'test' },
       { type: 'choice', value: 'confirm' },
       { type: 'anytime', actionId: 'bake-bread' },
-      { type: 'reorg', zones: [] },
       { type: 'feed', selections: [] },
       { type: 'nextPlayer' },
       { type: 'roundEnd' },
@@ -85,7 +83,7 @@ describe('shared protocol types', () => {
       { type: 'createRoom', maxPlayers: 2 },
       { type: 'joinRoom', roomId: 'abc', requestedPlayerIndex: 0 },
     ]
-    expect(commands.length).toBe(10)
+    expect(commands.length).toBe(9)
   })
 
   it('ServerEvent discriminates on type', () => {

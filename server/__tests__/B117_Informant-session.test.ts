@@ -150,8 +150,6 @@ describe('B117_Informant session', () => {
         } else {
           resp = session.resolveChoice(resp.pending.playerIndex ?? 0, resp.pending.options[0]!.value)
         }
-      } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
-        resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones)
       } else {
         break
       }
