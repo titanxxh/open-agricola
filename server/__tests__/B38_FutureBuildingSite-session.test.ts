@@ -130,11 +130,10 @@ describe('B38 FutureBuildingSite — session', () => {
     }
 
     // Try to directly plow a locked tile — plowAction.resolveChoice returns
-    // fail, which the engine surfaces as ok=true with pending cleared and no
-    // field added (different shape than the legacy commitFarmChoice path,
-    // which returned ok=false). Regardless, the plow must not have happened.
+    // fail, which surfaces as ok=false with pending cleared and no field added.
     const fieldsBefore = resp.state.players[0]!.fields.length
     resp = session.resolveChoice(0, 'confirm', { tile: { row: 0, col: 0 } })
+    expect(resp.ok).toBe(false)
     expect(resp.state.players[0]!.fields.length).toBe(fieldsBefore)
   })
 

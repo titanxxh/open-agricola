@@ -3,6 +3,9 @@ import { GameSession } from './game/authoritative-session.ts'
 import { serializeState, serializeStateForPlayer } from '../shared/game/serialization.ts'
 import { normalizePlayerFarm } from '../shared/logic/farm/fence-validation.ts'
 import { applyFarmChoice, type FarmChoicePayloadMap } from '../shared/logic/farm/farm-choice.ts'
+import { validatePlowSelection } from '../shared/logic/farm/plow-validation.ts'
+import { collectLockedFarmTileKeys } from '../shared/cards/card-effects.ts'
+import type { FarmTilePosition } from '../shared/game/types.ts'
 import { getDb } from './db.ts'
 import { validateSession, extractToken } from './auth.ts'
 import type { CustomCardData } from '../shared/cards/session-card-context.ts'
@@ -325,7 +328,7 @@ export const handleGameRoute = async (
   if (req.method === 'POST' && req.url === '/api/game/commit-farm') {
     const body = JSON.parse(await readBody(req)) as {
       playerIndex?: number
-      farmType?: 'fence' | 'room' | 'stable' | 'plow' | 'sow'
+      farmType?: 'fence' | 'room' | 'stable' | 'sow'
       payload?: Record<string, unknown>
     }
     if (typeof body.playerIndex !== 'number' || !body.farmType || !body.payload) {
@@ -368,8 +371,10 @@ export const handleGameRoute = async (
       return true
     }
     if (body.type === 'plow') {
-      const result = applyFarmChoice(player, 'plow', body.payload as FarmChoicePayloadMap['plow'])
-      sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error })
+      const tile = (body.payload as { tile?: FarmTilePosition }).tile
+      const lockedKeys = collectLockedFarmTileKeys(state.players[playerIndex]!)
+      const result = validatePlowSelection(player, tile, lockedKeys)
+      sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error?.code ?? 'validation failed' })
       return true
     }
     if (body.type === 'sow') {

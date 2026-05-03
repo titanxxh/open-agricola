@@ -9,11 +9,11 @@ import type {
 } from '../../game/types'
 import { getAllTilePositions, positionKey } from '../../game/farm'
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'
-import { applyFarmChoice } from '../../logic/farm/farm-choice'
 import { validatePlowSelection } from '../../logic/farm/plow-validation'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import {
+  executeResolvedTypedFlatPayment,
   resolveTypedFlatPaymentSelection,
 } from '../helpers/pay-helpers'
 
@@ -93,12 +93,22 @@ const finalizePlow = (
   tile: FarmTilePosition,
   paymentChoice: string | undefined,
 ): ActionExecutionResult => {
-  const result = applyFarmChoice(ctx.player, 'plow', { tile }, {
-    costOverride: ctx.costs,
+  const lockedKeys = collectLockedFarmTileKeys(ctx.player)
+  const validated = validatePlowSelection(ctx.player, tile, lockedKeys)
+  if (!validated.ok) return { type: 'fail', logKey: validated.error?.code ?? 'log.action' }
+  const plowCost = sanitizePayableCost(ctx.costs)
+  const payment = resolveTypedFlatPaymentSelection(
+    validated.player as unknown as PlayerState,
+    plowCost,
+    'pay:plow',
     paymentChoice,
-  })
-  if (!result.ok) return { type: 'fail', logKey: 'log.action' }
-  applyPlayerMutation(ctx.player, result.player as unknown as PlayerState)
+    { type: 'fail', logKey: 'log.action' },
+    'plow',
+  )
+  if (payment.type !== 'selected') return { type: 'fail', logKey: 'log.action' }
+  const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
+  executeResolvedTypedFlatPayment(nextPlayer, payment, 'plow')
+  applyPlayerMutation(ctx.player, nextPlayer)
   if (ctx.sourceCard) {
     addCardResourceGained(ctx.player, ctx.sourceCard, { field: 1 })
   }
@@ -124,16 +134,6 @@ export const plowAction: ActionDefinition = {
   }),
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
     if (choice === 'cancel') return { type: 'ok' }
-
-    // Legacy compatibility (PR 2-6 transition): commitFarmChoice('plow', ...)
-    // mutates state itself, then drives the engine with `engine.resolveChoice
-    // ('confirm', ..., resolvedResultOverride)` — `payload` is undefined and
-    // there is no farmPayload in actionContext. Treat that bare confirm as a
-    // no-op so after-hooks (B19, etc.) still fire. Removed in PR 4 once
-    // commitFarmChoice's plow branch is gone.
-    if (choice === 'confirm' && !payload && !ctx.actionContext?.farmPayload) {
-      return { type: 'ok' }
-    }
 
     const lockedKeys = collectLockedFarmTileKeys(ctx.player)
 

@@ -139,7 +139,6 @@ import { addWorkerRef, isSpaceOccupied, removeWorkerRef } from '../game/space.ts
 import { smallestAvailableWorker } from '../game/player.ts'
 import { computeAllowedPlacementSpaces } from '../actions/helpers/placement-availability.ts'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../actions/helpers/placement-constants.ts'
-import { validatePlowSelection } from '../logic/farm/plow-validation.ts'
 import { validateRoomSelection, validateStableSelection } from '../logic/farm/validators.ts'
 import { validateFenceSelection } from '../logic/farm/fence-validation.ts'
 
@@ -2168,7 +2167,7 @@ export class GameCore {
       this.actionStartPlayerSnapshot = null
       delete player._activeActionBonusSources
       this.turnOwnerPlayerIndex = null
-      return this.respond()
+      return this.respond(false, result.logKey ?? 'action failed')
     }
     this.runEngineSteps()
     return this.respond()
@@ -2752,7 +2751,7 @@ export class GameCore {
     if (this.pending.type !== 'choice') return null
     const farmPayment = this.pending.actionContext?.farmPayment as
       | {
-          farmType?: 'fence' | 'room' | 'stable' | 'plow'
+          farmType?: 'fence' | 'room' | 'stable'
           payload?: Record<string, unknown>
         }
       | undefined
@@ -2760,8 +2759,7 @@ export class GameCore {
       !farmPayment ||
       (farmPayment.farmType !== 'fence' &&
         farmPayment.farmType !== 'room' &&
-        farmPayment.farmType !== 'stable' &&
-        farmPayment.farmType !== 'plow')
+        farmPayment.farmType !== 'stable')
     ) {
       return null
     }
@@ -2798,7 +2796,7 @@ export class GameCore {
 
   commitFarmChoice(
     playerIndex: number,
-    farmType: 'fence' | 'room' | 'stable' | 'plow' | 'sow',
+    farmType: 'fence' | 'room' | 'stable' | 'sow',
     payload: Record<string, unknown>,
   ): SessionResponse {
     if (this.pending.type !== 'choice' || this.pending.playerIndex !== playerIndex) {
@@ -3040,55 +3038,6 @@ export class GameCore {
         this.state.players[playerIndex] = result.player as unknown as PlayerState
         if (sourceCardForStats && stables.length > 0) {
           addCardResourceGained(this.state.players[playerIndex]!, sourceCardForStats, { stable: stables.length })
-        }
-        break
-      }
-      case 'plow': {
-        const sourceCardForStats = this.pending.type === 'choice' ? this.pending.sourceCard : undefined
-        const tile = (payload as { tile?: FarmTilePosition }).tile
-        const selection = validatePlowSelection(normalized, tile, lockedKeys)
-        if (!selection.ok) return this.respond(false, selection.error?.code ?? 'validation failed')
-        const selectedTile = tile as FarmTilePosition
-
-        const payment = resolveTypedFlatPaymentSelection(
-          selection.player as unknown as PlayerState,
-          sanitizePayableCost(override),
-          'pay:plow',
-          undefined,
-          { type: 'fail', logKey: 'log.action' },
-          'plow',
-        )
-        if (payment.type === 'choice') {
-          this.pending = {
-            type: 'choice',
-            playerIndex,
-            spaceId: this.activeSpaceId!,
-            options: payment.options ?? [],
-            promptKey: payment.promptKey,
-            costOverride: override,
-            sourceCard: this.pending.type === 'choice' ? this.pending.sourceCard : undefined,
-            actionContext: {
-              ...(this.pending.actionContext ?? {}),
-              farmPayment: {
-                farmType: 'plow',
-                payload: { tile: selectedTile },
-              },
-            },
-          }
-          return this.respond()
-        }
-        if (payment.type === 'fail') {
-          return this.respond(false, 'unable to pay plow cost')
-        }
-
-        const result = applyFarmChoice(normalized, 'plow', { tile: selectedTile }, {
-          costOverride: override,
-        })
-        if (!result.ok) return this.respond(false, result.error)
-        this.pushHistory()
-        this.state.players[playerIndex] = result.player as unknown as PlayerState
-        if (sourceCardForStats) {
-          addCardResourceGained(this.state.players[playerIndex]!, sourceCardForStats, { field: 1 })
         }
         break
       }

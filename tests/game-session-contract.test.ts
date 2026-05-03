@@ -85,31 +85,6 @@ describe('GameSession contract', () => {
       expect(resp.state.players[0]?.stableTiles).toContainEqual({ row: 0, col: 1 })
     })
 
-    it('applies plow costOverride on commit', () => {
-      const state = createInitialState(42)
-      state.players[0]!.resources.food = 1
-      const customSession = new GameSession(state)
-      ;(customSession as any).pending = {
-        type: 'choice',
-        playerIndex: 0,
-        spaceId: 'farmland',
-        options: [],
-        promptKey: 'ui.interactionPlowSelect',
-        costOverride: { food: 1 },
-      }
-
-      const resp = customSession.commitFarmChoice(0, 'plow', {
-        tile: { row: 0, col: 1 },
-      })
-
-      expect(resp.ok).toBe(true)
-      expect(resp.state.players[0]?.resources.food).toBe(0)
-      expect(resp.state.players[0]?.fields).toContainEqual({
-        stacks: [],
-        row: 0,
-        col: 1,
-      })
-    })
   })
 
   describe('undoStep', () => {
