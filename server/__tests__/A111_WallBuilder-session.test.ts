@@ -42,7 +42,7 @@ describe('A111_WallBuilder session', () => {
     if (resp.interaction.farm.farmType !== 'room') return
 
     const room = resp.interaction.farm.selectableTiles[0]!
-    resp = session.commitFarmChoice(0, 'room', { rooms: [room] })
+    resp = session.resolveChoice(0, 'confirm', { rooms: [room] })
     expect(resp.ok).toBe(true)
 
     const playerId = resp.state.players[0]!.id
@@ -81,7 +81,7 @@ describe('A111_WallBuilder session', () => {
     if (resp.interaction.farm.farmType !== 'room') return
 
     const room = resp.interaction.farm.selectableTiles[0]!
-    resp = session.commitFarmChoice(0, 'room', { rooms: [room] })
+    resp = session.resolveChoice(0, 'confirm', { rooms: [room] })
     expect(resp.ok).toBe(true)
     const entries = resp.state.futureMeeples.filter((e) => e.cardId === CARD_ID)
     expect(entries).toHaveLength(0)

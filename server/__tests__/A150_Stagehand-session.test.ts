@@ -89,7 +89,7 @@ describe('A150_Stagehand session', () => {
     expect(resp.interaction.farm.maxSelections).toBeGreaterThan(1)
 
     // Build a room
-    resp = session.commitFarmChoice(0, 'room', { rooms: [{ row: 0, col: 0 }] })
+    resp = session.resolveChoice(0, 'confirm', { rooms: [{ row: 0, col: 0 }] })
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.rooms).toBe(3)
 
