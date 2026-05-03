@@ -1,7 +1,15 @@
 import { MinorImprovement } from '../types'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B31_PotteryYard'
+
+// BGA isBuyable: requires Major_Pottery or D60_LargePottery.
+const POTTERY_IDS = ['Major_Pottery', 'D60_LargePottery']
+registerPrerequisite('Pottery (or an Upgrade Thereof)', (player) => {
+  const owned = new Set<string>([...player.improvements, ...player.minorPlayed])
+  return POTTERY_IDS.some((id) => owned.has(id))
+})
 
 export const B31_PotteryYard = new MinorImprovement({
   id: CARD_ID,
