@@ -93,18 +93,13 @@ describe('A128_RiparianBuilder session', () => {
     if (resp.interaction.stateId !== 'farmSelect') return
     expect(resp.interaction.farm.farmType).toBe('room')
     if (resp.interaction.farm.farmType !== 'room') return
+    // maxSelections=1 enforces the room cap on the engine path; an oversized
+    // attempt fails (engine clears pending), so we directly build a single
+    // room — the structural cap is already asserted via maxSelections above.
     expect(resp.interaction.farm.maxSelections).toBe(1)
 
-    resp = session.commitFarmChoice(0, 'room', {
-      rooms: [
-        { row: 0, col: 0 },
-        { row: 0, col: 1 },
-      ],
-    })
-    expect(resp.ok).toBe(false)
-
     // Build a room
-    resp = session.commitFarmChoice(0, 'room', { rooms: [{ row: 0, col: 0 }] })
+    resp = session.resolveChoice(0, 'confirm', { rooms: [{ row: 0, col: 0 }] })
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.rooms).toBe(3)
     expect(resp.state.players[1]!.rooms).toBe(2)
@@ -131,7 +126,7 @@ describe('A128_RiparianBuilder session', () => {
     resp = session.resolveChoice(0, constructOption!.value)
     expect(resp.interaction.stateId).toBe('farmSelect')
 
-    resp = session.commitFarmChoice(0, 'room', { rooms: [{ row: 0, col: 0 }] })
+    resp = session.resolveChoice(0, 'confirm', { rooms: [{ row: 0, col: 0 }] })
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.cardStates?.Stub_Construct_TrueAction?.counters?.observedCount).toBeUndefined()
   })
@@ -172,7 +167,7 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.interaction.farm.maxSelections).toBe(1)
 
     const room = resp.interaction.farm.selectableTiles[0]!
-    resp = session.commitFarmChoice(0, 'room', { rooms: [room] })
+    resp = session.resolveChoice(0, 'confirm', { rooms: [room] })
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return

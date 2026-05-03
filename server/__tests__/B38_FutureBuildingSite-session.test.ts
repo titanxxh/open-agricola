@@ -159,13 +159,14 @@ describe('B38 FutureBuildingSite — session', () => {
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
 
-    // Select room building
-    if (resp.pending.type === 'choice') {
-      const roomOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === 'construct')
-      if (roomOpt) {
-        resp = session.resolveChoice(0, roomOpt.value)
-      }
-    }
+    // Select room building (or-leaf value is engine-generated like 'seq-construct-N').
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+    const roomOpt = resp.pending.options?.find((o: ActionChoiceOption) =>
+      o.labelKey === 'actions.construct.name',
+    )
+    expect(roomOpt).toBeDefined()
+    resp = session.resolveChoice(0, roomOpt!.value)
 
     // Locked tiles should not be in selectable tiles for room
     if (resp.interaction?.farm?.selectableTiles) {
@@ -175,8 +176,8 @@ describe('B38 FutureBuildingSite — session', () => {
       }
     }
 
-    // Try building room on locked tile (2,1) — should fail
-    resp = session.commitFarmChoice(0, 'room', { rooms: [{ row: 2, col: 1 }] })
+    // Try building room on locked tile (2,1) — engine path returns fail.
+    resp = session.resolveChoice(0, 'confirm', { rooms: [{ row: 2, col: 1 }] })
     expect(resp.ok).toBe(false)
   })
 

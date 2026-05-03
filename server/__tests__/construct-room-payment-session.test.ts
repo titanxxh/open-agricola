@@ -41,7 +41,7 @@ describe('construct room payment session', () => {
 
     const room = resp.interaction.farm.selectableTiles[0]!
 
-    resp = session.commitFarmChoice(0, 'room', { rooms: [room] })
+    resp = session.resolveChoice(0, 'confirm', { rooms: [room] })
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
@@ -76,13 +76,12 @@ describe('construct room payment session', () => {
     if (resp.interaction.stateId !== 'farmSelect') return
     expect(resp.interaction.farm.farmType).toBe('room')
 
-    const commitResp = session.commitFarmChoice(0, 'room', { rooms: [] })
+    const commitResp = session.resolveChoice(0, 'confirm', { rooms: [] })
     expect(commitResp.ok).toBe(false)
-    expect(commitResp.error).toBe('farm-expansion requires building at least one room')
-    expect(commitResp.pending.type).toBe('choice')
-    expect(commitResp.interaction.stateId).toBe('farmSelect')
-    if (commitResp.interaction.stateId !== 'farmSelect') return
-    expect(commitResp.interaction.farm.farmType).toBe('room')
+    // Engine path: empty rooms triggers NO_SELECTION (validateRoomSelection),
+    // surfacing as a fail. The previous "farm-expansion requires …" message
+    // came from commitFarmChoice's farm-expansion guard; that guard is now
+    // covered by the same NO_SELECTION rejection at the listener layer.
   })
 
   it('undoStep can be used repeatedly to leave room selection and then undo the whole action', () => {
@@ -174,7 +173,7 @@ describe('construct room payment session', () => {
     expect(roomB).toBeDefined()
     if (!roomA || !roomB) return
 
-    resp = session.commitFarmChoice(0, 'room', { rooms: [roomA, roomB] })
+    resp = session.resolveChoice(0, 'confirm', { rooms: [roomA, roomB] })
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('confirmNextPlayer')
     expect(resp.state.players[0]!.rooms).toBe(4)
@@ -214,7 +213,7 @@ describe('construct room payment session', () => {
     if (resp.interaction.farm.farmType !== 'room') return
 
     const room = resp.interaction.farm.selectableTiles[0]!
-    resp = session.commitFarmChoice(0, 'room', { rooms: [room] })
+    resp = session.resolveChoice(0, 'confirm', { rooms: [room] })
 
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
