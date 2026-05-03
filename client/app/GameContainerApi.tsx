@@ -598,7 +598,14 @@ export const GameContainerApi = () => {
           setSowError('NO_SELECTION')
           return
         }
-        commitFarmWithError(pendingPlayerIndex, 'sow', { crops })
+        void transport.resolveChoice(pendingPlayerIndex, 'confirm', { crops })
+          .then((resp) => {
+            if (!resp.ok) setFarmCommitError('sow', resp.error)
+          })
+          .catch((e) => {
+            console.error(e)
+            setFarmCommitError('sow')
+          })
         return
       }
       return
