@@ -2,9 +2,13 @@ import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A46_ClawKnife'
+
+// BGA isBuyable: count(getPastures(true)) != 1 → false
+registerPrerequisite('Exactly 1 Pasture', (player) => player.pastures.length === 1)
 
 // A46 Claw Knife: Each time you use the Sheep Market accumulation space, place 1 FOOD on each
 // of the next 2 round spaces. At the start of these rounds, you get the FOOD.
