@@ -38,6 +38,7 @@ export function extractReferencesFromSource(file: string, source: string): Extra
 
   const recordArg = (arg: ts.Expression) => {
     if (ts.isStringLiteral(arg) || ts.isNoSubstitutionTemplateLiteral(arg)) {
+      if (arg.text === '') return
       out.static.push({ key: arg.text, file, line: lineOf(arg) })
     } else if (ts.isTemplateExpression(arg)) {
       out.dynamic.push({ template: arg.getText(sf), file, line: lineOf(arg) })
@@ -67,7 +68,9 @@ export function extractReferencesFromSource(file: string, source: string): Extra
       if (KEY_PROP_NAMES.has(node.name.text)) {
         const init = node.initializer
         if (ts.isStringLiteral(init) || ts.isNoSubstitutionTemplateLiteral(init)) {
-          out.static.push({ key: init.text, file, line: lineOf(init) })
+          if (init.text !== '') {
+            out.static.push({ key: init.text, file, line: lineOf(init) })
+          }
         } else if (ts.isTemplateExpression(init)) {
           out.dynamic.push({ template: init.getText(sf), file, line: lineOf(init) })
         }
