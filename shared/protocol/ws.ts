@@ -28,7 +28,7 @@ type ClientCommandBody =
   | {
       type: 'commitFarm'
       playerIndex: number
-      farmType: 'fence' | 'room' | 'stable' | 'plow' | 'sow'
+      farmType: 'fence' | 'room' | 'stable' | 'sow'
       payload: Record<string, unknown>
     }
   | {

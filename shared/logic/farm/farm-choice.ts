@@ -20,7 +20,6 @@ import {
   validateFenceSelection,
 } from './fence-validation.ts'
 import { validateRoomSelection, validateStableSelection } from './validators.ts'
-import { validatePlowSelection } from './plow-validation.ts'
 import { validateSowSelection, type SowSelection } from './sow-validation.ts'
 import {
   consumePendingFenceBonus,
@@ -29,13 +28,12 @@ import {
 import { collectLockedFarmTileKeys } from '../../cards/card-effects.ts'
 import { collectComputeCostsForFarmChoice } from '../../cards/card-listeners.ts'
 
-export type FarmChoiceType = 'fence' | 'room' | 'stable' | 'plow' | 'sow'
+export type FarmChoiceType = 'fence' | 'room' | 'stable' | 'sow'
 
 export type FarmChoicePayloadMap = {
   fence: { edges: string[]; palisadeEdges?: string[]; extraWood?: number }
   room: { rooms: FarmTilePosition[] }
   stable: { stables: FarmTilePosition[] }
-  plow: { tile: FarmTilePosition }
   sow: { crops: SowSelection[] }
 }
 
@@ -279,32 +277,6 @@ export const applyFarmChoice = <T extends PlayerState>(
           stableTiles: [...nextPlayer.stableTiles, ...stables],
         } as T,
       }
-    }
-    case 'plow': {
-      const { tile } = payload as FarmChoicePayloadMap['plow']
-      const result = validatePlowSelection(normalized, tile, lockedKeys)
-      if (!result.ok) return { ok: false, error: result.error?.code ?? 'validation failed' }
-      const plowCost = sanitizePayableCost(options.costOverride)
-      const resolvedPayment = resolveTypedFlatPaymentSelection(
-        result.player,
-        plowCost,
-        'pay:plow',
-        options.paymentChoice,
-        { type: 'fail', logKey: 'log.action' },
-        'plow',
-      )
-      if (resolvedPayment.type !== 'selected') {
-        if (resolvedPayment.type === 'choice') {
-          return { ok: false, error: PAYMENT_CHOICE_REQUIRED_ERROR }
-        }
-        if (options.paymentChoice) {
-          return { ok: false, error: 'invalid payment choice' }
-        }
-        return { ok: false, error: getInsufficientResourceError(result.player, plowCost) }
-      }
-      const nextPlayer = JSON.parse(JSON.stringify(result.player)) as PlayerState
-      executeResolvedTypedFlatPayment(nextPlayer, resolvedPayment, 'plow')
-      return { ok: true, player: nextPlayer as unknown as T }
     }
     case 'sow': {
       const { crops } = payload as FarmChoicePayloadMap['sow']
