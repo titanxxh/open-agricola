@@ -4,9 +4,14 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { getFenceCount } from '../../actions/effects/fencing'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
+import { fieldIsEmpty } from '../../game/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A68_AsparagusGift'
+
+// BGA isBuyable: countEmptyLogicalFields() == 0 → false (require >= 1 empty field)
+registerPrerequisite('1 Unplanted Field', (player) => player.fields.some(fieldIsEmpty))
 const FENCES_BEFORE_KEY = 'fencesBefore'
 
 // A68 Asparagus Gift: Each time you build a number of fences equal to or greater than
