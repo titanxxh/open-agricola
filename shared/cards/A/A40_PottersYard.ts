@@ -3,10 +3,17 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
+import { countUnusedFarmyardSpaces } from '../../game/farm'
 import type { ActionFlow } from '../../game/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A40_PottersYard'
+
+// BGA isBuyable: count(getFreeZones()) > 7 → false (at most 7 unused spaces)
+registerPrerequisite('At Most 7 Unused Farmyard Spaces', (player) =>
+  countUnusedFarmyardSpaces(player) <= 7,
+)
 
 /**
  * A40 Potter's Yard:
