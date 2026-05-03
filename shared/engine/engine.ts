@@ -801,7 +801,7 @@ export class Engine {
         ...(executionContext.params ?? {}),
         selectedOption: value,
       }
-      return action.resolveChoice(executionContext, value)
+      return action.resolveChoice(executionContext, value, undefined)
     }
     return {
       type: 'choice',
@@ -1414,6 +1414,7 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
   resolveChoice(
     choice: string,
     context: EngineContext,
+    payload?: Record<string, unknown>,
     resolvedResultOverride?: ActionExecutionResult,
   ): ActionExecutionResult {
     if (this.pendingChoiceNodeId) {
@@ -1679,7 +1680,7 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
     if (resolvedResultOverride) {
       result = resolvedResultOverride
     } else if (action.resolveChoice) {
-      result = action.resolveChoice(executionContext, choice)
+      result = action.resolveChoice(executionContext, choice, payload)
     } else {
       return { type: 'ok' }
     }
