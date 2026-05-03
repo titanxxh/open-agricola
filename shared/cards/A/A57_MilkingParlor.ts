@@ -1,7 +1,14 @@
 import { MinorImprovement } from '../types'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
+import { countUnusedFarmyardSpaces } from '../../game/farm'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A57_MilkingParlor'
+
+// BGA isBuyable: count(getFreeZones()) < 4 → false
+registerPrerequisite('At Least 4 Unused Farmyard Spaces', (player) =>
+  countUnusedFarmyardSpaces(player) >= 4,
+)
 
 export const A57_MilkingParlor = new MinorImprovement({
   id: CARD_ID,
