@@ -2,9 +2,17 @@ import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A52_ThrowingAxe'
+
+// BGA isBuyable: turn < 7 → false. Same label is also used by B51_DiggingSpade;
+// both register the equivalent predicate (last-write-wins, identical handler).
+registerPrerequisite('Play in Round 7 or Later', (_player, state) => {
+  if (!state) return true
+  return state.round >= 7
+})
 
 const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =>
   (space.gainPerRound?.wood ?? 0) > 0
