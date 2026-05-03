@@ -19,9 +19,13 @@ const driveAccepts = (
   while (maxIters-- > 0 && resp.pending.type === 'choice') {
     const opts = resp.pending.options ?? []
     const skip = opts.find((o) => o.value === '__skip__')
-    const nonSkip = opts.find((o) => o.value !== '__skip__')
-    if (nonSkip) {
-      resp = session.resolveChoice(0, nonSkip.value)
+    const cancel = opts.find((o) => o.value === 'cancel')
+    // Cancel out of stable/room/plow farm-select prompts before falling through.
+    const nonSkipNonCancel = opts.find((o) => o.value !== '__skip__' && o.value !== 'cancel' && o.value !== 'confirm')
+    if (nonSkipNonCancel) {
+      resp = session.resolveChoice(0, nonSkipNonCancel.value)
+    } else if (cancel) {
+      resp = session.resolveChoice(0, 'cancel')
     } else if (skip) {
       resp = session.resolveChoice(0, '__skip__')
     } else if (opts.length > 0) {

@@ -63,28 +63,6 @@ describe('GameSession contract', () => {
       expect(resp.ok).toBe(false)
     })
 
-    it('applies stable costOverride on commit', () => {
-      const state = createInitialState(42)
-      state.players[0]!.resources.wood = 1
-      const customSession = new GameSession(state)
-      ;(customSession as any).pending = {
-        type: 'choice',
-        playerIndex: 0,
-        spaceId: 'farm-expansion',
-        options: [],
-        promptKey: 'ui.interactionStableSelect',
-        costOverride: { wood: -1 },
-      }
-
-      const resp = customSession.commitFarmChoice(0, 'stable', {
-        stables: [{ row: 0, col: 1 }],
-      })
-
-      expect(resp.ok).toBe(true)
-      expect(resp.state.players[0]?.resources.wood).toBe(0)
-      expect(resp.state.players[0]?.stableTiles).toContainEqual({ row: 0, col: 1 })
-    })
-
   })
 
   describe('undoStep', () => {

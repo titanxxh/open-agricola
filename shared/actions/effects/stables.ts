@@ -178,11 +178,6 @@ export const stablesAction: ActionDefinition = {
       return finalizeStables(ctx, stables, undefined)
     }
 
-    // Transitional: legacy commitFarmChoice still drives stable for now (Task 3 removes this).
-    if (choice === 'confirm' && !payload && !ctx.actionContext?.farmPayload) {
-      return { type: 'ok' }
-    }
-
     return { type: 'fail', logKey: 'log.buildStableFail' }
   },
 }

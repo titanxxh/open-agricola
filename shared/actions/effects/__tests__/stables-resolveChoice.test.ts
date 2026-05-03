@@ -143,11 +143,4 @@ describe('stablesAction.resolveChoice', () => {
     expect(stats?.gained?.stable).toBe(1)
   })
 
-  it('transitional no-op confirm without payload returns ok (legacy commitFarmChoice path)', () => {
-    const ctx = makeCtx()
-    const result = stablesAction.resolveChoice!(ctx, 'confirm')
-    expect(result.type).toBe('ok')
-    // No stable was placed — legacy path drives the actual placement via commitFarmChoice.
-    expect(ctx.player.stableTiles.length).toBe(0)
-  })
 })
