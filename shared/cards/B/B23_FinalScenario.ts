@@ -1,8 +1,15 @@
 import { MinorImprovement } from '../types'
 import { writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B23_FinalScenario'
+
+// BGA isBuyable: turn == 14 → false
+registerPrerequisite('Round 13 or Before', (_player, state) => {
+  if (!state) return true
+  return state.round <= 13
+})
 
 export const B23_FinalScenario = new MinorImprovement({
   id: CARD_ID,
