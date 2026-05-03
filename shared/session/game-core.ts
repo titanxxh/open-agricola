@@ -2086,6 +2086,7 @@ export class GameCore {
     playerIndex: number,
     value: string,
     pushHistoryEntry: boolean,
+    payload?: Record<string, unknown>,
   ): SessionResponse {
     const pending = this.pending
     if (pending.type !== 'choice' || pending.playerIndex !== playerIndex) {
@@ -2134,7 +2135,7 @@ export class GameCore {
       }
     }
     const resolvedActionId = this.engine.snapshot().pendingChoiceActionId ?? undefined
-    const result = this.engine.resolveChoice(value, { state: this.state, player, space })
+    const result = this.engine.resolveChoice(value, { state: this.state, player, space }, payload)
     this.flushEngineLog()
     if (result.type === 'ok' && resolvedActionId) {
       this.flushLeafActionDetail(resolvedActionId, Boolean(result.logKey))
@@ -2173,8 +2174,12 @@ export class GameCore {
     return this.respond()
   }
 
-  resolveChoice(playerIndex: number, value: string): SessionResponse {
-    return this.resolvePendingChoice(playerIndex, value, true)
+  resolveChoice(
+    playerIndex: number,
+    value: string,
+    payload?: Record<string, unknown>,
+  ): SessionResponse {
+    return this.resolvePendingChoice(playerIndex, value, true, payload)
   }
 
   startDevFenceSelect(playerIndex: number): SessionResponse {
