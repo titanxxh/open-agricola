@@ -129,6 +129,47 @@ describe('WsGameTransport request correlation', () => {
     transport.destroy()
   })
 
+  it('threads optional payload into choice msg', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test')
+    await transport.connect()
+
+    const socket = FakeWebSocket.instances[0]!
+    const ctx = { animal: 'sheep', count: 2 }
+    const choicePromise = transport.resolveChoice(0, 'option-a', ctx)
+
+    expect(socket.sent[0]).toMatchObject({
+      type: 'choice',
+      value: 'option-a',
+      payload: ctx,
+    })
+
+    socket.emit(buildEnvelope(String(socket.sent[0]?.requestId), 9))
+    await expect(choicePromise).resolves.toMatchObject({ historyLength: 9 })
+
+    transport.destroy()
+  })
+
+  it('omits payload field when not provided in choice msg', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test')
+    await transport.connect()
+
+    const socket = FakeWebSocket.instances[0]!
+    const choicePromise = transport.resolveChoice(0, 'option-b')
+
+    expect(socket.sent[0]).toMatchObject({
+      type: 'choice',
+      value: 'option-b',
+    })
+    expect(socket.sent[0]?.payload).toBeUndefined()
+
+    socket.emit(buildEnvelope(String(socket.sent[0]?.requestId), 10))
+    await expect(choicePromise).resolves.toMatchObject({ historyLength: 10 })
+
+    transport.destroy()
+  })
+
   it('sends draftSubmit with playerId and pick payload', async () => {
     const { WsGameTransport } = await import('../gameTransport')
     const transport = new WsGameTransport('ws://test')
@@ -191,6 +232,59 @@ describe('HttpGameTransport draftSubmit', () => {
       const body = JSON.parse(String(calls[0]?.init?.body)) as unknown
       expect(body).toEqual({ playerId: 'p2', pick })
       expect(payload).toEqual(fakePayload)
+
+      transport.destroy()
+    } finally {
+      vi.unstubAllGlobals()
+      vi.resetModules()
+    }
+  })
+})
+
+describe('HttpGameTransport resolveChoice', () => {
+  it('POSTs to /api/game/choice with playerIndex, value and optional payload', async () => {
+    const fakePayload = {
+      state: serializeState(createInitialState(42)),
+      pending: { type: 'none' },
+      interaction: { stateId: 'idle', allowedCommands: [], anytimeActions: [] },
+      scores: null,
+      historyLength: 8,
+      hasActionStartSnapshot: false,
+      ok: true,
+    }
+    const calls: Array<{ url: string; init: RequestInit | undefined }> = []
+    const fakeFetch = vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, init })
+      return {
+        ok: true,
+        json: async () => fakePayload,
+      } as unknown as Response
+    })
+    vi.stubGlobal('window', { location: { hostname: 'localhost' } })
+    vi.stubGlobal('fetch', fakeFetch)
+    vi.stubGlobal('localStorage', {
+      getItem: () => null,
+      setItem: () => undefined,
+      removeItem: () => undefined,
+    })
+
+    try {
+      const { HttpGameTransport } = await import('../gameTransport')
+      const transport = new HttpGameTransport()
+
+      const ctx = { animal: 'cattle', count: 1 }
+      await transport.resolveChoice(0, 'opt-x', ctx)
+      expect(calls).toHaveLength(1)
+      expect(calls[0]?.url).toMatch(/\/api\/game\/choice$/)
+      expect(calls[0]?.init?.method).toBe('POST')
+      const bodyWithPayload = JSON.parse(String(calls[0]?.init?.body)) as unknown
+      expect(bodyWithPayload).toEqual({ playerIndex: 0, value: 'opt-x', payload: ctx })
+
+      await transport.resolveChoice(1, 'opt-y')
+      expect(calls).toHaveLength(2)
+      const bodyWithoutPayload = JSON.parse(String(calls[1]?.init?.body)) as Record<string, unknown>
+      expect(bodyWithoutPayload).toMatchObject({ playerIndex: 1, value: 'opt-y' })
+      expect(bodyWithoutPayload.payload).toBeUndefined()
 
       transport.destroy()
     } finally {
