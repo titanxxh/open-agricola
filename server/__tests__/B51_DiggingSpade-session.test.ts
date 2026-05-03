@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/game/player'
-import '../../shared/cards/B/B51_DiggingSpade'
+import { B51_DiggingSpade } from '../../shared/cards/B/B51_DiggingSpade'
+import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 const CARD_ID = 'B51_DiggingSpade'
 
@@ -67,5 +68,23 @@ describe('B51_DiggingSpade session', () => {
     expect(resp.ok).toBe(true)
     const after = resp.state.players[0]!
     expect(after.resources.food).toBe(before)
+  })
+
+  describe('prerequisite "Play in Round 7 or Later"', () => {
+    it('blocks when round < 7', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      state.round = 6
+      const player = state.players[0]!
+      expect(meetsCardPrerequisites(player, B51_DiggingSpade, state.round, state)).toBe(false)
+    })
+
+    it('allows when round >= 7', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      state.round = 7
+      const player = state.players[0]!
+      expect(meetsCardPrerequisites(player, B51_DiggingSpade, state.round, state)).toBe(true)
+    })
   })
 })
