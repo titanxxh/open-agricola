@@ -116,6 +116,7 @@ describe('A129_Swagman session', () => {
     while (resp.pending.type === 'choice' && safety > 0) {
       const opts = resp.pending.options ?? []
       const skipOpt = opts.find((o: ActionChoiceOption) => o.value === '__skip__')
+      const cancelOpt = opts.find((o: ActionChoiceOption) => o.value === 'cancel')
       const swagmanOpt = opts.find((o: ActionChoiceOption) => o.sourceCard === 'A129_Swagman')
       if (swagmanOpt && !swagmanSeen) {
         swagmanSeen = true
@@ -128,6 +129,9 @@ describe('A129_Swagman session', () => {
         }
       } else if (skipOpt) {
         resp = session.resolveChoice(0, '__skip__')
+      } else if (cancelOpt) {
+        // Stable/room/plow farm-select prompts: cancel out of irrelevant choices.
+        resp = session.resolveChoice(0, 'cancel')
       } else if (opts.length > 0) {
         // unrecognized mandatory choice (e.g. construct/stables OR) — pick first
         resp = session.resolveChoice(0, opts[0]!.value)

@@ -5,6 +5,7 @@ import { normalizePlayerFarm } from '../shared/logic/farm/fence-validation.ts'
 import { applyFarmChoice, type FarmChoicePayloadMap } from '../shared/logic/farm/farm-choice.ts'
 import { validatePlowSelection } from '../shared/logic/farm/plow-validation.ts'
 import { validateSowSelection } from '../shared/logic/farm/sow-validation.ts'
+import { validateStableSelection } from '../shared/logic/farm/validators.ts'
 import { collectLockedFarmTileKeys } from '../shared/cards/card-effects.ts'
 import type { FarmTilePosition } from '../shared/game/types.ts'
 import { getDb } from './db.ts'
@@ -329,7 +330,7 @@ export const handleGameRoute = async (
   if (req.method === 'POST' && req.url === '/api/game/commit-farm') {
     const body = JSON.parse(await readBody(req)) as {
       playerIndex?: number
-      farmType?: 'fence' | 'room' | 'stable'
+      farmType?: 'fence' | 'room'
       payload?: Record<string, unknown>
     }
     if (typeof body.playerIndex !== 'number' || !body.farmType || !body.payload) {
@@ -367,8 +368,10 @@ export const handleGameRoute = async (
       return true
     }
     if (body.type === 'stable') {
-      const result = applyFarmChoice(player, 'stable', body.payload as FarmChoicePayloadMap['stable'])
-      sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error })
+      const stables = (body.payload as { stables?: FarmTilePosition[] }).stables ?? []
+      const lockedKeys = collectLockedFarmTileKeys(state.players[playerIndex]!)
+      const result = validateStableSelection(player, stables, lockedKeys)
+      sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.code ?? 'validation failed' })
       return true
     }
     if (body.type === 'plow') {

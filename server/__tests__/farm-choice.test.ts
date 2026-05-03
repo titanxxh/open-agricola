@@ -6,25 +6,6 @@ import { buildRoomFarmInteraction } from '../../shared/logic/farm/farm-interacti
 import { A14_CarpentersHammer } from '../../shared/cards/A/A14_CarpentersHammer'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 
-const stableTradeModifiers: PlayerState['activeModifiers'] = [
-  {
-    type: 'trade',
-    cardId: 'Test_Stable_Clay',
-    appliesTo: ['stables'],
-    from: { clay: 2 },
-    to: { wood: 2 },
-    max: 2,
-  },
-  {
-    type: 'trade',
-    cardId: 'Test_Stable_Stone',
-    appliesTo: ['stables'],
-    from: { stone: 2 },
-    to: { wood: 2 },
-    max: 2,
-  },
-]
-
 const fenceTradeModifiers: PlayerState['activeModifiers'] = [
   {
     type: 'trade',
@@ -208,18 +189,4 @@ describe('farm choice', () => {
     expect(result.error).toBe('too many rooms selected')
   })
 
-  it('requires an explicit payment choice when multiple stable payments are legal', () => {
-    const player = createPlayer()
-    player.resources.clay = 2
-    player.resources.stone = 2
-    player.activeModifiers = [...stableTradeModifiers]
-
-    const result = applyFarmChoice(player, 'stable', {
-      stables: [{ row: 0, col: 1 }],
-    })
-
-    expect(result.ok).toBe(false)
-    if (result.ok) return
-    expect(result.error).toBe('payment choice required')
-  })
 })

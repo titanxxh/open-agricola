@@ -1,5 +1,5 @@
 import type { ActionSpace, ComplexCost, FarmTilePosition, GameState, PlayerState, Resource } from '../../game/types.ts'
-import { applyCostOverride, isComplexCost } from '../../actions/helpers/payment'
+import { isComplexCost } from '../../actions/helpers/payment'
 import {
   PAYMENT_CHOICE_REQUIRED_ERROR,
   executeResolvedTypedFlatPayment,
@@ -12,15 +12,13 @@ import {
   getMaxBuildableRooms,
   resolveRoomPaymentSelection,
 } from '../../actions/helpers/room-payment.ts'
-import { stableWoodCost } from '../../actions/effects/fencing.ts'
 import { playerCanBuildPalisades } from '../../cards/helpers/card-type'
 import {
   normalizePlayerFarm,
   type PlayerFarmState,
   validateFenceSelection,
 } from './fence-validation.ts'
-import { validateRoomSelection, validateStableSelection } from './validators.ts'
-import type { SowSelection } from './sow-validation.ts'
+import { validateRoomSelection } from './validators.ts'
 import {
   consumePendingFenceBonus,
   readPendingFenceBonus,
@@ -28,12 +26,11 @@ import {
 import { collectLockedFarmTileKeys } from '../../cards/card-effects.ts'
 import { collectComputeCostsForFarmChoice } from '../../cards/card-listeners.ts'
 
-export type FarmChoiceType = 'fence' | 'room' | 'stable'
+export type FarmChoiceType = 'fence' | 'room'
 
 export type FarmChoicePayloadMap = {
   fence: { edges: string[]; palisadeEdges?: string[]; extraWood?: number }
   room: { rooms: FarmTilePosition[] }
-  stable: { stables: FarmTilePosition[] }
 }
 
 type FarmChoiceOptions = {
@@ -42,11 +39,6 @@ type FarmChoiceOptions = {
   paymentChoice?: string
   state?: GameState
   space?: ActionSpace
-  sowOptions?: {
-    maxSelections?: number
-    excludedFields?: FarmTilePosition[]
-    extraAllowedCrops?: Map<string, SowSelection['crop'][]>
-  }
 }
 
 export type FarmChoiceApplyResult<T extends PlayerState = PlayerState> =
@@ -62,29 +54,6 @@ export type FarmChoiceApplyResult<T extends PlayerState = PlayerState> =
       }
     }
   | { ok: false; error: string }
-
-const sanitizePayableCost = (
-  cost: Partial<Resource> | undefined,
-): Partial<Resource> => {
-  const payable: Partial<Resource> = {}
-  Object.entries(cost ?? {}).forEach(([key, value]) => {
-    if (typeof value !== 'number' || value <= 0) return
-    payable[key as keyof Resource] = value
-  })
-  return payable
-}
-
-const scaleCost = (
-  costPerUnit: Partial<Resource>,
-  count: number,
-): Partial<Resource> => {
-  const total: Partial<Resource> = {}
-  Object.entries(costPerUnit).forEach(([key, value]) => {
-    if (typeof value !== 'number') return
-    total[key as keyof Resource] = value * count
-  })
-  return sanitizePayableCost(total)
-}
 
 const getInsufficientResourceError = (
   player: PlayerFarmState,
@@ -238,42 +207,6 @@ export const applyFarmChoice = <T extends PlayerState>(
           ...(nextPlayer as unknown as T),
           roomTiles: [...nextPlayer.roomTiles, ...rooms],
           rooms: nextPlayer.rooms + rooms.length,
-        } as T,
-      }
-    }
-    case 'stable': {
-      const { stables } = payload as FarmChoicePayloadMap['stable']
-      const selection = validateStableSelection(normalized, stables, lockedKeys)
-      if (!selection.ok) return { ok: false, error: selection.code }
-      const costPerStable = applyCostOverride(
-        { wood: stableWoodCost },
-        options.costOverride,
-      )
-      const totalCost = scaleCost(costPerStable, stables.length)
-      const resolvedPayment = resolveTypedFlatPaymentSelection(
-        normalized,
-        totalCost,
-        'pay:stable',
-        options.paymentChoice,
-        { type: 'fail', logKey: 'log.buildStableFail' },
-        'stables',
-      )
-      if (resolvedPayment.type !== 'selected') {
-        if (resolvedPayment.type === 'choice') {
-          return { ok: false, error: PAYMENT_CHOICE_REQUIRED_ERROR }
-        }
-        if (options.paymentChoice) {
-          return { ok: false, error: 'invalid payment choice' }
-        }
-        return { ok: false, error: getInsufficientResourceError(normalized, totalCost) }
-      }
-      const nextPlayer = JSON.parse(JSON.stringify(normalized)) as PlayerState
-      executeResolvedTypedFlatPayment(nextPlayer, resolvedPayment, 'stables')
-      return {
-        ok: true,
-        player: {
-          ...(nextPlayer as unknown as T),
-          stableTiles: [...nextPlayer.stableTiles, ...stables],
         } as T,
       }
     }
