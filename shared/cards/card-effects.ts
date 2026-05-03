@@ -221,16 +221,6 @@ export type CardEffect = {
    */
   enforceReorganizeOnLastHarvest?: (state: GameState, player: PlayerState) => boolean
   /**
-   * BGA `enforceReorganizeOnLastHarvest`: cards like B104 SheepWalker, B35
-   * HookKnife, A153 PigOwner force an animal reorg on the round-14 harvest
-   * even when no breeding produced a newborn — to give the rules system a
-   * chance to evict animals (e.g. SheepWalker's "must accommodate before
-   * exchange" implies the final-harvest rearrangement). Returning true makes
-   * `breedAction` emit an `animalReorg` result regardless of `animalCount`.
-   * Only consulted when `state.round === 14` and `sourceCard === 'harvest'`.
-   */
-  enforceReorganizeOnLastHarvest?: (state: GameState, player: PlayerState) => boolean
-  /**
    * Declare which hooks should also fire when the card is still in the player's hand
    * (not yet played). The framework iterates hand cards separately from played cards,
    * so there is no overlap — once a card is played it moves out of the hand arrays
