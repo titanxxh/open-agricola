@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import type { GameState, PlayerState } from '../../shared/game/types'
 
-import '../../shared/cards/D/D22_WorkPermit'
+import { D22_WorkPermit } from '../../shared/cards/D/D22_WorkPermit'
+import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
+import { GameSession } from '../game/authoritative-session'
 import type { ActionFlow } from '../../shared/game/types'
 
 const CARD_ID = 'D22_WorkPermit'
@@ -120,5 +122,37 @@ describe('D22_WorkPermit card effect', () => {
     expect(first).toBeDefined()
     const second = effect!.onRoundStart!(state, player)
     expect(second).toBeUndefined()
+  })
+
+  describe('prerequisite "At Least 1 Building Resource"', () => {
+    it('blocks when player has no building resources', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const player = state.players[0]!
+      player.resources.wood = 0
+      player.resources.stone = 0
+      player.resources.clay = 0
+      player.resources.reed = 0
+      expect(meetsCardPrerequisites(player, D22_WorkPermit, state.round, state)).toBe(false)
+    })
+
+    it('blocks when no worker is available even with resources', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const player = state.players[0]!
+      player.resources.wood = 1
+      // Place all workers on action spaces
+      const space = state.actionSpaces[0]!
+      space.takenBy = player.workers.map((w) => ({ playerId: player.id, workerId: w.id }))
+      expect(meetsCardPrerequisites(player, D22_WorkPermit, state.round, state)).toBe(false)
+    })
+
+    it('allows when player has at least 1 resource and a worker in reserve', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const player = state.players[0]!
+      player.resources.wood = 1
+      expect(meetsCardPrerequisites(player, D22_WorkPermit, state.round, state)).toBe(true)
+    })
   })
 })
