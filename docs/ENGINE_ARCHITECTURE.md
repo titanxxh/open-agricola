@@ -384,7 +384,7 @@ type SessionResponse = {
 
 - `takeAction()` / `takeAnytimeAction()`
 - `resolveChoice()`
-- `commitFarmChoice()` / `commitSelectionChoice()`（farmSelect / selection 提交入口）
+- `commitSelectionChoice()`（selection 提交入口；farmSelect 通过通用 `resolveChoice(playerIndex, value, payload?)` 入口走 ActionDef.resolveChoice 路径）
 - `confirmAnimalReorg()` / `confirmHarvestFeed()`
 - `confirmNextPlayer()` / `confirmPlayerSwitch()`
 - `performRoundEnd()`
@@ -1182,7 +1182,7 @@ type ActionHookContext = {
 }
 ```
 
-其中 `result` 不只是 `ok/fail/choice` 的类型标签，也允许携带额外执行上下文。例如 `commitFarmChoice('fence')` 会把本次新建 pasture 的 delta 透传成 `result.extraData.newPastures/newEdges`，这样 `ImmediatelyAfter(Fencing)` / `After(Fencing)` listener 可以直接按“本次新增围栏结果”判断，而不是回头从整张农场快照里猜增量。
+其中 `result` 不只是 `ok/fail/choice` 的类型标签，也允许携带额外执行上下文。例如 `fenceAction.resolveChoice` 在 finalize 时会把本次新建 pasture 的 delta 透传成 `result.extraData.newPastures/newEdges`，这样 `ImmediatelyAfter(Fencing)` / `After(Fencing)` listener 可以直接按"本次新增围栏结果"判断，而不是回头从整张农场快照里猜增量。
 
 推荐返回值：
 
@@ -1367,13 +1367,16 @@ PlayerSwitchNode(→ p1)
 
 #### 11.6.2d costOverride 机制
 
-引擎在 `computeCosts` 阶段计算的成本修改结果通过 `engine.getLastComputedCosts()` 暴露给 `GameSession`。当引擎步骤产生 `choice` pending 时，`costOverride` 被附加到 `pending.costOverride`，传递给 `commitFarmChoice()`。除 `costOverride` 外，`ActionExecutionResult.extraData` 也承担“稳定可供 listener 读取的结算元数据”职责，例如 `improvement-any` 购买完成后的 `improvementPayment`（`A41_VegetableSlicer` 用它区分 Fireplace → Cooking Hearth 升级），以及 `commitFarmChoice()` 返回的若干 farm delta。
+引擎在 `computeCosts` 阶段计算的成本修改结果通过 `engine.getLastComputedCosts()` 暴露给 `GameSession`。当引擎步骤产生 `choice` pending 时，`costOverride` 被附加到 `pending.costOverride`，再通过 `engine.resolveChoice(value, ctx, payload)` 传给 `ActionDef.resolveChoice`。除 `costOverride` 外，`ActionExecutionResult.extraData` 也承担"稳定可供 listener 读取的结算元数据"职责，例如 `improvement-any` 购买完成后的 `improvementPayment`（`A41_VegetableSlicer` 用它区分 Fireplace → Cooking Hearth 升级），以及 farm 类 ActionDef.resolveChoice 返回的 farm delta（`newFenceEdges` / `newPastures` / `plowedTile` 等）。
 
-在 `commitFarmChoice` 中：
-- `room` 路径：先用 `shared/actions/effects/room-payment.ts` 展开“每间房”的费用变体，再按已选房间数合成为总成本；若存在多个可行支付解，会先转成统一的 `prompt.selectPayment` pending，待玩家选定后再真正落房与扣费
-- `stable` / `plow` 路径：改为复用 typed flat payment 解析；即使当前多数情况下仍只有单一支付法，也不再各自手写 `canPayResources/payResources`，后续若接入 trade / bonus modifier 可直接复用同一套 payment choice 协议
-- `fence` 路径：先校验选边/连通/封闭区域，并在得到 `newEdges` 后计算最终 payable wood（考虑 `freeFences`、`extraWood`，以及从 `override.wood` 提取出来的额外折扣）；`fencing` 类型的 `TradeModifier` 可走 `computeAllBuyableCombinations`（与 BGA 一致，例如 `A88_HedgeKeeper` 使用空 `from`、`to: { wood: 1 }`、`max: 3` 表示至多三段围栏免木）；`pay-helpers` 对同类 modifier 在 typed flat 的 direct 路径上会先尝试等价的「虚拟抵扣」，仅在 trade 仍无收益时才回退原始 `baseCost`，以保证 `canAffordTypedFlatCost` / `payTypedFlatCost` 与组合支付结果一致。若存在多个围栏支付解，同样先进入统一的 `prompt.selectPayment` 再落围栏
-- payment option 文案：`prompt.selectPayment` 中若方案带 `cardUsed`（如 `returnCards`），文案层会优先把 card id 映射为可读卡名，避免直接显示 `Major_*` 这类内部标识
+farm-type 提交路径（5 种 farmType 全部由各自的 ActionDef.resolveChoice 处理）：
+- `room` 路径（`shared/actions/effects/construct.ts:resolveChoice`）：先用 `room-payment.ts` 展开"每间房"的费用变体，再按已选房间数合成为总成本；若存在多个可行支付解，返回 `{type:'choice', extraData:{actionContextWrite:{farmPayload:{rooms}}}}`，待玩家选 payment combo 后通过 `pay:room:*` 二轮 prompt finalize
+- `stable` / `plow` 路径（`stables.ts` / `plow.ts` 的 `resolveChoice`）：复用 typed flat payment 解析；即使当前多数情况下仅单一支付法，也不再手写 `canPayResources/payResources`
+- `fence` 路径（`fencing.ts:resolveChoice`）：先校验选边/连通/封闭区域，并在得到 `newEdges` 后计算最终 payable wood（考虑 `freeFences`、`extraWood`、以及从 fence-cost-unification 引入的 `collectComputeCostsForFarmChoice` Pass #2 cost override）；`fencing` 类型的 `TradeModifier` 可走 `computeAllBuyableCombinations`（与 BGA 一致，例如 `A88_HedgeKeeper` 使用空 `from`、`to: { wood: 1 }`、`max: 3` 表示至多三段围栏免木）；多支付解同样进入 `pay:fence:*` 二轮 prompt
+- `sow` 路径（`sow.ts:resolveChoice`）：直接 validate + finalize（无 payment combo）；含 extra-field card effect（如 `getPermittedExtraSowableFields` + `handleSowExtraField`）
+- payment option 文案：payment-combo prompt 中若方案带 `cardUsed`（如 `returnCards`），文案层会优先把 card id 映射为可读卡名，避免直接显示 `Major_*` 这类内部标识
+
+farmType 第一轮提交携带的 payload（`{ tile }` / `{ rooms }` / `{ stables }` / `{ edges, palisadeEdges, extraWood }` / `{ crops }`）从 ws msg `{ type: 'choice', value: 'confirm', payload: ... }` 经 `resolveChoice` 入口透传到 ActionDef；当 ActionDef 需要二轮 prompt（payment combo），它通过 `extraData.actionContextWrite: { farmPayload: ... }` 把第一轮 payload 持久化到 `pending.actionContext.farmPayload`，二轮 prompt 解析时 ActionDef 从 `ctx.actionContext.farmPayload` 读回。详见 §15.6 `actionContextWrite` 契约。
 
 #### 11.6.2e gain params（参数化资源获取）
 
@@ -1911,7 +1914,7 @@ listener phase 实现，与 construct（B126 Carpenter 等）走同一 cost prev
       // Pass #1（entry-guard，dispatcher 在 Engine 主路径调用）
       // 返回该卡当前能贡献的「潜在最大段数」当 wood delta
     } else {
-      // Pass #2（commit，commitFarmChoice 通过 collectComputeCostsForFarmChoice 调用）
+      // Pass #2（commit，fenceAction.resolveChoice 通过 collectComputeCostsForFarmChoice 调用）
       // 按真实 edge 集合返回精确折扣段数
     }
   }
@@ -1923,7 +1926,7 @@ listener phase 实现，与 construct（B126 Carpenter 等）走同一 cost prev
 - **Pass #1**：`Engine.proceed()` 在 fence ActionNode 入场时跑 `HookDispatcher.computeCosts`，
   随后 `applyCostPreviewDoable` 用 override 喂给 `fenceAction.costPreview.canExecute(ctx, override)`，
   最终调 `canStartFencing(state, player, override)`。
-- **Pass #2**：`GameSession.commitFarmChoice('fence', ...)` 与 `applyFarmChoice('fence', ...)`
+- **Pass #2**：`fenceAction.resolveChoice(ctx, 'confirm', payload)` 在 finalize 阶段
   通过 `collectComputeCostsForFarmChoice(state, player, 'fence', { newFenceEdges, newPalisadeEdges }, space)`
   跑同一 phase（params 带 edges），按 `Math.abs(override.wood)` 取得 freeFences。
 
