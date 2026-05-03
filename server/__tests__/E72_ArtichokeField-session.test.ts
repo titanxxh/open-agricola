@@ -78,12 +78,11 @@ describe('E72_ArtichokeField session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
 
       // Sow grain into virtual card tile
-      resp = session.commitFarmChoice(0, 'sow', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: -1, col: 72, crop: 'grain' }],
       })
       expect(resp.ok).toBe(true)
@@ -101,10 +100,9 @@ describe('E72_ArtichokeField session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
 
-      resp = session.commitFarmChoice(0, 'sow', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: -1, col: 72, crop: 'vegetable' }],
       })
       expect(resp.ok).toBe(true)
@@ -121,9 +119,8 @@ describe('E72_ArtichokeField session', () => {
         fields: [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] }], // no empty fields
       })
 
-      let resp = session.takeAction(0, 'grain-utilization')
+      const resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
     })

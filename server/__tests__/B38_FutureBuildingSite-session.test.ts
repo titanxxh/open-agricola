@@ -129,9 +129,12 @@ describe('B38 FutureBuildingSite — session', () => {
       expect(selectableKeys.has(lk)).toBe(false)
     }
 
-    // Try to directly plow a locked tile — should fail
-    resp = session.commitFarmChoice(0, 'plow', { tile: { row: 0, col: 0 } })
+    // Try to directly plow a locked tile — plowAction.resolveChoice returns
+    // fail, which surfaces as ok=false with pending cleared and no field added.
+    const fieldsBefore = resp.state.players[0]!.fields.length
+    resp = session.resolveChoice(0, 'confirm', { tile: { row: 0, col: 0 } })
     expect(resp.ok).toBe(false)
+    expect(resp.state.players[0]!.fields.length).toBe(fieldsBefore)
   })
 
   it('plow on non-locked free tile is allowed', () => {
@@ -146,7 +149,7 @@ describe('B38 FutureBuildingSite — session', () => {
     const selectableKeys = new Set(selectableTiles.map(positionKey))
     expect(selectableKeys.has(positionKey(tile))).toBe(true)
 
-    resp = session.commitFarmChoice(0, 'plow', { tile })
+    resp = session.resolveChoice(0, 'confirm', { tile })
     expect(resp.ok).toBe(true)
   })
 
@@ -156,13 +159,14 @@ describe('B38 FutureBuildingSite — session', () => {
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
 
-    // Select room building
-    if (resp.pending.type === 'choice') {
-      const roomOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === 'construct')
-      if (roomOpt) {
-        resp = session.resolveChoice(0, roomOpt.value)
-      }
-    }
+    // Select room building (or-leaf value is engine-generated like 'seq-construct-N').
+    expect(resp.pending.type).toBe('choice')
+    if (resp.pending.type !== 'choice') return
+    const roomOpt = resp.pending.options?.find((o: ActionChoiceOption) =>
+      o.labelKey === 'actions.construct.name',
+    )
+    expect(roomOpt).toBeDefined()
+    resp = session.resolveChoice(0, roomOpt!.value)
 
     // Locked tiles should not be in selectable tiles for room
     if (resp.interaction?.farm?.selectableTiles) {
@@ -172,8 +176,8 @@ describe('B38 FutureBuildingSite — session', () => {
       }
     }
 
-    // Try building room on locked tile (2,1) — should fail
-    resp = session.commitFarmChoice(0, 'room', { rooms: [{ row: 2, col: 1 }] })
+    // Try building room on locked tile (2,1) — engine path returns fail.
+    resp = session.resolveChoice(0, 'confirm', { rooms: [{ row: 2, col: 1 }] })
     expect(resp.ok).toBe(false)
   })
 
@@ -183,9 +187,11 @@ describe('B38 FutureBuildingSite — session', () => {
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
 
-    // Select stable building
+    // Select stable building (option value is `seq-stables-<n>`)
     if (resp.pending.type === 'choice') {
-      const stableOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === 'stables')
+      const stableOpt = resp.pending.options?.find(
+        (o: ActionChoiceOption) => o.labelKey === 'actions.stables.name',
+      )
       if (stableOpt) {
         resp = session.resolveChoice(0, stableOpt.value)
       }
@@ -199,9 +205,13 @@ describe('B38 FutureBuildingSite — session', () => {
       }
     }
 
-    // Try building stable on locked tile (0,0) — should fail
-    resp = session.commitFarmChoice(0, 'stable', { stables: [{ row: 0, col: 0 }] })
+    // Try building stable on locked tile (0,0) — stablesAction.resolveChoice
+    // returns fail, surfaced as ok=false with pending cleared and no stable
+    // added.
+    const stablesBefore = resp.state.players[0]!.stableTiles.length
+    resp = session.resolveChoice(0, 'confirm', { stables: [{ row: 0, col: 0 }] })
     expect(resp.ok).toBe(false)
+    expect(resp.state.players[0]!.stableTiles.length).toBe(stablesBefore)
   })
 
   it('fence enclosing locked tile is rejected', () => {
@@ -212,7 +222,7 @@ describe('B38 FutureBuildingSite — session', () => {
 
     // Try to fence tile (0,0) which is locked
     // Edges around (0,0): H-0-0 (top), H-1-0 (bottom), V-0-0 (left), V-0-1 (right)
-    resp = session.commitFarmChoice(0, 'fence', {
+    resp = session.resolveChoice(0, 'confirm', {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
       extraWood: 0,
@@ -257,7 +267,7 @@ describe('B38 FutureBuildingSite — session', () => {
     expect(resp.ok).toBe(true)
 
     // Try to fence locked tile (0,0) — should succeed now
-    resp = session.commitFarmChoice(0, 'fence', {
+    resp = session.resolveChoice(0, 'confirm', {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
       extraWood: 0,

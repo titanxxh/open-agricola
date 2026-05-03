@@ -32,7 +32,7 @@ describe('B94_StockProtector session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('farmSelect')
 
-    resp = session.commitFarmChoice(0, 'fence', {
+    resp = session.resolveChoice(0, 'confirm', {
       edges: edgesForTile(1, 1),
       extraWood: 0,
     })

@@ -63,7 +63,7 @@ describe('E74_AshTrees session flow', () => {
     expect(resp.interaction.stateId === 'farmSelect' ? resp.interaction.farm.farmType : undefined)
       .toBe('fence')
 
-    resp = session.commitFarmChoice(0, 'fence', {
+    resp = session.resolveChoice(0, 'confirm', {
       edges: edgesForTile(1, 1),
       extraWood: 0,
     })
@@ -108,7 +108,7 @@ describe('E74_AshTrees session flow', () => {
     // Palisades must be on border: H-0-0 (top), V-0-0 (left).
     // Fences on internal edges: H-1-0, V-0-1.
     // Cost: 2 fences × 1 = 2, minus 2 freeFences = 0; 2 palisades × 2 = 4. Total = 4 wood.
-    resp = session.commitFarmChoice(0, 'fence', {
+    resp = session.resolveChoice(0, 'confirm', {
       edges: ['H-1-0', 'V-0-1'],
       palisadeEdges: ['H-0-0', 'V-0-0'],
       extraWood: 0,

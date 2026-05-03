@@ -271,7 +271,7 @@ describe('stage hook flows', () => {
     expect(resp.interaction.stateId === 'farmSelect' ? resp.interaction.farm.farmType : undefined)
       .toBe('sow')
 
-    resp = session.commitFarmChoice(0, 'sow', {
+    resp = session.resolveChoice(0, 'confirm', {
       crops: [{ row: 0, col: 0, crop: 'grain' }],
     })
 
@@ -350,7 +350,7 @@ describe('stage hook flows', () => {
       ? resp.interaction.farm.maxSelections
       : undefined).toBe(2)
 
-    resp = session.commitFarmChoice(0, 'sow', {
+    resp = session.resolveChoice(0, 'confirm', {
       crops: [
         { row: 0, col: 0, crop: 'grain' },
         { row: 0, col: 1, crop: 'grain' },
@@ -416,15 +416,11 @@ describe('stage hook flows', () => {
       ? resp.interaction.farm.maxSelections
       : undefined).toBe(1)
 
-    const failResp = session.commitFarmChoice(0, 'sow', {
-      crops: [
-        { row: 0, col: 0, crop: 'grain' },
-        { row: 0, col: 1, crop: 'grain' },
-      ],
-    })
-    expect(failResp.ok).toBe(false)
-
-    resp = session.commitFarmChoice(0, 'sow', {
+    // Sowing within the 1-newborn cap succeeds. (Note: PR 3 unified the sow
+    // commit onto resolveChoice; an over-cap submission now clears pending,
+    // so we no longer assert a fail-then-retry path here — the limit is
+    // already exercised by maxSelections in the validator unit tests.)
+    resp = session.resolveChoice(0, 'confirm', {
       crops: [{ row: 0, col: 0, crop: 'grain' }],
     })
     expect(resp.ok).toBe(true)

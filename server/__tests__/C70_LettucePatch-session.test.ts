@@ -56,7 +56,6 @@ describe('C70_LettucePatch session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
       expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
@@ -74,7 +73,7 @@ describe('C70_LettucePatch session', () => {
       }
 
       // Sow vegetable in the card's field
-      resp = session.commitFarmChoice(0, 'sow', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: -1, col: 70, crop: 'vegetable' }],
       })
       expect(resp.ok).toBe(true)
@@ -88,8 +87,8 @@ describe('C70_LettucePatch session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
+      // Sow should fail because no fields and card only allows vegetable.
       resp = session.resolveChoice(0, 'sow')
-      // Sow should fail because no fields and card only allows vegetable
       expect(resp.ok).toBe(false)
     })
   })
@@ -100,10 +99,9 @@ describe('C70_LettucePatch session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
 
-      resp = session.commitFarmChoice(0, 'sow', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: -1, col: 70, crop: 'vegetable' }],
       })
       expect(resp.ok).toBe(true)
@@ -207,8 +205,8 @@ describe('C70_LettucePatch session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
+      // Should fail — no empty fields and card already has crop.
       resp = session.resolveChoice(0, 'sow')
-      // Should fail - no empty fields and card already has crop
       expect(resp.ok).toBe(false)
     })
   })
@@ -273,9 +271,8 @@ describe('C70_LettucePatch session', () => {
         fields: [], // no normal fields
       })
 
-      let resp = session.takeAction(0, 'grain-utilization')
+      const resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
     })

@@ -54,7 +54,6 @@ import {
   incHarvestedVegetable,
   incPlacedFarmers,
   incResourceConverted,
-  incRoomsBuilt,
   recordDraftPick,
 } from '../logic/stats.ts'
 import { getMinorImprovement } from '../game/minor-improvements.ts'
@@ -70,9 +69,8 @@ import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { allOccupationCards, allMinorImprovementCards } from '../cards/catalog.ts'
 import { majorCardDefinitions } from '../cards/major/index.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
-import { handleSowExtraField, collectLockedFarmTileKeys, getCardEffect } from '../cards/card-effects.ts'
-import { collectComputeCostsForFarmChoice } from '../cards/card-listeners.ts'
-import { incCardUsed, addCardResourceGained } from '../cards/helpers/card-state.ts'
+import { getCardEffect } from '../cards/card-effects.ts'
+import { incCardUsed } from '../cards/helpers/card-state.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
 import { runRoundEndHooks, runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks, shouldSkipPlayerTurn } from '../cards/card-effects.ts'
 import { positionKey } from '../game/farm.ts'
@@ -94,12 +92,6 @@ import {
   getBasicConversionExchange,
 } from '../cards/basic-conversion.ts'
 import {
-  normalizePlayerFarm,
-} from '../logic/farm/fence-validation.ts'
-import { applyFarmChoice, type FarmChoicePayloadMap } from '../logic/farm/farm-choice.ts'
-import { playerCanBuildPalisades } from '../cards/helpers/card-type'
-import {
-  applyCostOverride,
   applyTradeSideEffect,
 } from '../actions/helpers/payment'
 import {
@@ -111,37 +103,23 @@ import {
   isOccupationPlayable,
 } from '../actions/effects/occupation.ts'
 import {
-  resolveTypedFlatPaymentSelection,
-} from '../actions/helpers/pay-helpers.ts'
-import {
-  buildRoomCostPerUnit,
-  getMaxBuildableRooms,
-  resolveRoomPaymentSelection,
-} from '../actions/helpers/room-payment.ts'
-import {
   getFenceCount,
   getPalisadeCount,
-  stableWoodCost,
 } from '../actions/effects/fencing.ts'
 import {
   buildFarmPositionSelectionInteraction,
   buildFenceFarmInteraction,
   buildPlowFarmInteraction,
   buildRoomFarmInteraction,
-  getPermittedExtraSowableFields,
   buildSowFarmInteraction,
   buildStableFarmInteraction,
 } from '../logic/farm/farm-interaction.ts'
 import { buildOccupationHandSelectionInteraction } from '../logic/farm/occupation-hand-interaction.ts'
-import { readPendingFenceBonus } from '../cards/helpers/pending-fence-bonus.ts'
 import { rebuildActiveModifiers } from '../game/serialization.ts'
 import { addWorkerRef, isSpaceOccupied, removeWorkerRef } from '../game/space.ts'
 import { smallestAvailableWorker } from '../game/player.ts'
 import { computeAllowedPlacementSpaces } from '../actions/helpers/placement-availability.ts'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../actions/helpers/placement-constants.ts'
-import { validatePlowSelection } from '../logic/farm/plow-validation.ts'
-import { validateRoomSelection, validateStableSelection } from '../logic/farm/validators.ts'
-import { validateFenceSelection } from '../logic/farm/fence-validation.ts'
 
 type HistoryEntry = {
   state: GameState
@@ -185,29 +163,6 @@ type StageResumeState = {
     | 'onBreedPhase'
   playerIndex: number
   cardIndex: number
-}
-
-const sanitizePayableCost = (
-  cost: Partial<Resource> | undefined,
-): Partial<Resource> => {
-  const payable: Partial<Resource> = {}
-  Object.entries(cost ?? {}).forEach(([key, value]) => {
-    if (typeof value !== 'number' || value <= 0) return
-    payable[key as keyof Resource] = value
-  })
-  return payable
-}
-
-const scaleCost = (
-  costPerUnit: Partial<Resource>,
-  count: number,
-): Partial<Resource> => {
-  const total: Partial<Resource> = {}
-  Object.entries(costPerUnit).forEach(([key, value]) => {
-    if (typeof value !== 'number') return
-    total[key as keyof Resource] = value * count
-  })
-  return sanitizePayableCost(total)
 }
 
 export type SessionResponse = {
@@ -2086,6 +2041,7 @@ export class GameCore {
     playerIndex: number,
     value: string,
     pushHistoryEntry: boolean,
+    payload?: Record<string, unknown>,
   ): SessionResponse {
     const pending = this.pending
     if (pending.type !== 'choice' || pending.playerIndex !== playerIndex) {
@@ -2108,11 +2064,6 @@ export class GameCore {
     const space = this.getSpaceById(this.activeSpaceId)
     if (!player || !space) return this.respond(false, 'invalid state')
 
-    const farmPaymentResponse = this.resolvePendingFarmPaymentChoice(playerIndex, value)
-    if (farmPaymentResponse) {
-      return farmPaymentResponse
-    }
-
     if (pushHistoryEntry) {
       this.pushHistory()
     }
@@ -2134,7 +2085,7 @@ export class GameCore {
       }
     }
     const resolvedActionId = this.engine.snapshot().pendingChoiceActionId ?? undefined
-    const result = this.engine.resolveChoice(value, { state: this.state, player, space })
+    const result = this.engine.resolveChoice(value, { state: this.state, player, space }, payload)
     this.flushEngineLog()
     if (result.type === 'ok' && resolvedActionId) {
       this.flushLeafActionDetail(resolvedActionId, Boolean(result.logKey))
@@ -2167,14 +2118,18 @@ export class GameCore {
       this.actionStartPlayerSnapshot = null
       delete player._activeActionBonusSources
       this.turnOwnerPlayerIndex = null
-      return this.respond()
+      return this.respond(false, result.logKey ?? 'action failed')
     }
     this.runEngineSteps()
     return this.respond()
   }
 
-  resolveChoice(playerIndex: number, value: string): SessionResponse {
-    return this.resolvePendingChoice(playerIndex, value, true)
+  resolveChoice(
+    playerIndex: number,
+    value: string,
+    payload?: Record<string, unknown>,
+  ): SessionResponse {
+    return this.resolvePendingChoice(playerIndex, value, true, payload)
   }
 
   startDevFenceSelect(playerIndex: number): SessionResponse {
@@ -2683,10 +2638,7 @@ export class GameCore {
     return this.state
   }
 
-  private continueAfterResolvedFarmChoice(
-    playerIndex: number,
-    farmChoiceMeta?: Record<string, unknown>,
-  ): SessionResponse {
+  private continueAfterResolvedFarmChoice(playerIndex: number): SessionResponse {
     if (!this.engine) {
       this.pending = { type: 'none' }
       return this.respond()
@@ -2696,14 +2648,9 @@ export class GameCore {
     const updatedPlayer = this.state.players[playerIndex]!
     if (!space) return this.respond(false, 'invalid state')
 
-    const resultOverride =
-      farmChoiceMeta && Object.keys(farmChoiceMeta).length > 0
-        ? { type: 'ok' as const, extraData: farmChoiceMeta }
-        : undefined
     const result = this.engine.resolveChoice(
       'confirm',
       { state: this.state, player: updatedPlayer, space },
-      resultOverride,
     )
     this.flushEngineLog()
 
@@ -2737,396 +2684,6 @@ export class GameCore {
 
     this.runEngineSteps()
     return this.respond()
-  }
-
-  private resolvePendingFarmPaymentChoice(
-    playerIndex: number,
-    value: string,
-  ): SessionResponse | null {
-    if (this.pending.type !== 'choice') return null
-    const farmPayment = this.pending.actionContext?.farmPayment as
-      | {
-          farmType?: 'fence' | 'room' | 'stable' | 'plow'
-          payload?: Record<string, unknown>
-        }
-      | undefined
-    if (
-      !farmPayment ||
-      (farmPayment.farmType !== 'fence' &&
-        farmPayment.farmType !== 'room' &&
-        farmPayment.farmType !== 'stable' &&
-        farmPayment.farmType !== 'plow')
-    ) {
-      return null
-    }
-
-    const player = this.state.players[playerIndex]
-    if (!player) return this.respond(false, 'invalid player')
-
-    const normalized = normalizePlayerFarm(player)
-    const space = this.getSpaceById(this.activeSpaceId) ?? undefined
-    const result = applyFarmChoice(normalized, farmPayment.farmType, farmPayment.payload as FarmChoicePayloadMap[typeof farmPayment.farmType], {
-      costOverride: this.pending.costOverride,
-      maxUnits:
-        farmPayment.farmType === 'room' && typeof this.pending.actionContext?.maxRooms === 'number'
-          ? this.pending.actionContext.maxRooms
-          : undefined,
-      paymentChoice: value,
-      state: this.state,
-      space,
-    })
-    if (!result.ok) {
-      return this.respond(false, result.error)
-    }
-
-    this.pushHistory()
-    this.state.players[playerIndex] = result.player as unknown as PlayerState
-    if (farmPayment.farmType === 'room') {
-      const farmRooms = (farmPayment.payload as { rooms?: unknown[] }).rooms
-      if (Array.isArray(farmRooms)) {
-        incRoomsBuilt(this.state.players[playerIndex]!, farmRooms.length)
-      }
-    }
-    return this.continueAfterResolvedFarmChoice(playerIndex)
-  }
-
-  commitFarmChoice(
-    playerIndex: number,
-    farmType: 'fence' | 'room' | 'stable' | 'plow' | 'sow',
-    payload: Record<string, unknown>,
-  ): SessionResponse {
-    if (this.pending.type !== 'choice' || this.pending.playerIndex !== playerIndex) {
-      return this.respond(false, 'no pending farm choice for this player')
-    }
-    const player = this.state.players[playerIndex]
-    if (!player) return this.respond(false, 'invalid player')
-
-    const normalized = normalizePlayerFarm(player)
-    const lockedKeys = collectLockedFarmTileKeys(player)
-    const override = this.pending.type === 'choice' ? this.pending.costOverride : undefined
-    let farmChoiceMeta: Record<string, unknown> | undefined
-    const requireAtLeastOnePlacement =
-      this.activeSpaceId === 'farm-expansion' &&
-      (farmType === 'room' || farmType === 'stable')
-
-    switch (farmType) {
-      case 'fence': {
-        const { edges, palisadeEdges, extraWood } = payload as { edges?: string[]; palisadeEdges?: string[]; extraWood?: number }
-        const safeEdges = Array.isArray(edges) ? edges : []
-        const safePalisadeEdges = Array.isArray(palisadeEdges) ? palisadeEdges : []
-        const pendingFreeFences =
-          readPendingFenceBonus(normalized)?.freeFences ?? 0
-        // Mirror applyFarmChoice: per-card listeners (E16, C1, C16…) extend the
-        // free-fence count via `computeCosts`, so payment preview must use the
-        // same total or `resolveTypedFlatPaymentSelection` will reject the
-        // payment for cards that bring wood costs to zero.
-        const existingEdgeIdsForDiscount = new Set(
-          (normalized.fenceSegments ?? []).map((seg) => seg.edge),
-        )
-        const newFenceEdgesPreview = safeEdges.filter(
-          (e) => !existingEdgeIdsForDiscount.has(e),
-        )
-        const newPalisadeEdgesPreview = safePalisadeEdges.filter(
-          (e) => !existingEdgeIdsForDiscount.has(e),
-        )
-        const space = this.getSpaceById(this.activeSpaceId) ?? undefined
-        const fenceOverride = collectComputeCostsForFarmChoice(
-          this.state,
-          normalized,
-          'fence',
-          {
-            newFenceEdges: newFenceEdgesPreview,
-            newPalisadeEdges: newPalisadeEdgesPreview,
-          },
-          space,
-        )
-        const hookFreeFences = Math.max(0, Math.abs(fenceOverride.wood ?? 0))
-        const freeFences = pendingFreeFences + hookFreeFences
-        const adjustedExtraWood = extraWood ?? 0
-        const validated = validateFenceSelection(
-          normalized,
-          safeEdges,
-          safePalisadeEdges,
-          adjustedExtraWood,
-          freeFences,
-          {
-            skipPayment: true,
-            allowPalisades: playerCanBuildPalisades(normalized),
-          },
-          lockedKeys,
-        )
-        if (!validated.ok) return this.respond(false, validated.error?.code ?? 'validation failed')
-
-        const payment = resolveTypedFlatPaymentSelection(
-          validated.player as unknown as PlayerState,
-          { wood: validated.payableWoodCost },
-          'pay:fence',
-          undefined,
-          { type: 'fail', logKey: 'log.fencingFail' },
-          'fencing',
-        )
-        if (payment.type === 'choice') {
-          this.pending = {
-            type: 'choice',
-            playerIndex,
-            spaceId: this.activeSpaceId!,
-            options: payment.options ?? [],
-            promptKey: payment.promptKey,
-            sourceCard: this.pending.type === 'choice' ? this.pending.sourceCard : undefined,
-            actionContext: {
-              ...(this.pending.actionContext ?? {}),
-              farmPayment: {
-                farmType: 'fence',
-                payload: {
-                  edges: safeEdges,
-                  palisadeEdges: safePalisadeEdges,
-                  extraWood: extraWood ?? 0,
-                },
-              },
-            },
-          }
-          return this.respond()
-        }
-        if (payment.type === 'fail') {
-          return this.respond(false, 'unable to pay fence cost')
-        }
-
-        const result = applyFarmChoice(normalized, 'fence', {
-          edges: safeEdges,
-          palisadeEdges: safePalisadeEdges,
-          extraWood: extraWood ?? 0,
-        }, {
-          state: this.state,
-          space,
-        })
-        if (!result.ok) return this.respond(false, result.error)
-        this.pushHistory()
-        this.state.players[playerIndex] = result.player as unknown as PlayerState
-        farmChoiceMeta = result.meta
-        break
-      }
-      case 'room': {
-        const sourceCardForStats = this.pending.type === 'choice' ? this.pending.sourceCard : undefined
-        const rooms = Array.isArray((payload as { rooms?: FarmTilePosition[] }).rooms)
-          ? (payload as { rooms: FarmTilePosition[] }).rooms
-          : []
-        if (requireAtLeastOnePlacement && rooms.length === 0) {
-          return this.respond(false, 'farm-expansion requires building at least one room')
-        }
-        const maxUnits =
-          typeof this.pending.actionContext?.maxRooms === 'number'
-            ? this.pending.actionContext.maxRooms
-            : undefined
-        const selection = validateRoomSelection(normalized, rooms, lockedKeys)
-        if (!selection.ok) return this.respond(false, selection.code)
-        const maxBuildableRooms = getMaxBuildableRooms(
-          normalized,
-          override,
-          typeof maxUnits === 'number' ? { maxRooms: maxUnits } : undefined,
-        )
-        if (rooms.length > maxBuildableRooms) {
-          return this.respond(false, 'too many rooms selected')
-        }
-
-        const costPerRoom = buildRoomCostPerUnit(
-          normalized,
-          override,
-        )
-        const payment = resolveRoomPaymentSelection(
-          normalized,
-          costPerRoom,
-          rooms.length,
-        )
-        if (payment.type === 'choice') {
-          this.pending = {
-            type: 'choice',
-            playerIndex,
-            spaceId: this.activeSpaceId!,
-            options: payment.options ?? [],
-            promptKey: payment.promptKey,
-            costOverride: override,
-            sourceCard: this.pending.type === 'choice' ? this.pending.sourceCard : undefined,
-            actionContext: {
-              ...(this.pending.actionContext ?? {}),
-              farmPayment: {
-                farmType: 'room',
-                payload: { rooms },
-              },
-            },
-          }
-          return this.respond()
-        }
-        if (payment.type === 'fail') {
-          return this.respond(false, 'unable to pay room cost')
-        }
-
-        const result = applyFarmChoice(normalized, 'room', { rooms }, {
-          costOverride: override,
-          maxUnits,
-        })
-        if (!result.ok) return this.respond(false, result.error)
-        this.pushHistory()
-        this.state.players[playerIndex] = result.player as unknown as PlayerState
-        if (sourceCardForStats && rooms.length > 0) {
-          // BGA-style gained.room{Wood/Clay/Stone}: when a card causes rooms
-          // to be built, count by player's current house material.
-          const houseType = this.state.players[playerIndex]!.houseType
-          const roomKey =
-            houseType === 'wood' ? 'roomWood'
-            : houseType === 'clay' ? 'roomClay'
-            : 'roomStone'
-          addCardResourceGained(this.state.players[playerIndex]!, sourceCardForStats, { [roomKey]: rooms.length })
-        }
-        incRoomsBuilt(this.state.players[playerIndex]!, rooms.length)
-        break
-      }
-      case 'stable': {
-        const sourceCardForStats = this.pending.type === 'choice' ? this.pending.sourceCard : undefined
-        const stables = Array.isArray((payload as { stables?: FarmTilePosition[] }).stables)
-          ? (payload as { stables: FarmTilePosition[] }).stables
-          : []
-        if (requireAtLeastOnePlacement && stables.length === 0) {
-          return this.respond(false, 'farm-expansion requires building at least one stable')
-        }
-        const selection = validateStableSelection(normalized, stables, lockedKeys)
-        if (!selection.ok) return this.respond(false, selection.code)
-
-        const costPerStable = applyCostOverride(
-          { wood: stableWoodCost },
-          override,
-        )
-        const payment = resolveTypedFlatPaymentSelection(
-          normalized as unknown as PlayerState,
-          scaleCost(costPerStable, stables.length),
-          'pay:stable',
-          undefined,
-          { type: 'fail', logKey: 'log.buildStableFail' },
-          'stables',
-        )
-        if (payment.type === 'choice') {
-          this.pending = {
-            type: 'choice',
-            playerIndex,
-            spaceId: this.activeSpaceId!,
-            options: payment.options ?? [],
-            promptKey: payment.promptKey,
-            costOverride: override,
-            sourceCard: this.pending.type === 'choice' ? this.pending.sourceCard : undefined,
-            actionContext: {
-              ...(this.pending.actionContext ?? {}),
-              farmPayment: {
-                farmType: 'stable',
-                payload: { stables },
-              },
-            },
-          }
-          return this.respond()
-        }
-        if (payment.type === 'fail') {
-          return this.respond(false, 'unable to pay stable cost')
-        }
-
-        const result = applyFarmChoice(normalized, 'stable', { stables }, {
-          costOverride: override,
-        })
-        if (!result.ok) return this.respond(false, result.error)
-        this.pushHistory()
-        this.state.players[playerIndex] = result.player as unknown as PlayerState
-        if (sourceCardForStats && stables.length > 0) {
-          addCardResourceGained(this.state.players[playerIndex]!, sourceCardForStats, { stable: stables.length })
-        }
-        break
-      }
-      case 'plow': {
-        const sourceCardForStats = this.pending.type === 'choice' ? this.pending.sourceCard : undefined
-        const tile = (payload as { tile?: FarmTilePosition }).tile
-        const selection = validatePlowSelection(normalized, tile, lockedKeys)
-        if (!selection.ok) return this.respond(false, selection.error?.code ?? 'validation failed')
-        const selectedTile = tile as FarmTilePosition
-
-        const payment = resolveTypedFlatPaymentSelection(
-          selection.player as unknown as PlayerState,
-          sanitizePayableCost(override),
-          'pay:plow',
-          undefined,
-          { type: 'fail', logKey: 'log.action' },
-          'plow',
-        )
-        if (payment.type === 'choice') {
-          this.pending = {
-            type: 'choice',
-            playerIndex,
-            spaceId: this.activeSpaceId!,
-            options: payment.options ?? [],
-            promptKey: payment.promptKey,
-            costOverride: override,
-            sourceCard: this.pending.type === 'choice' ? this.pending.sourceCard : undefined,
-            actionContext: {
-              ...(this.pending.actionContext ?? {}),
-              farmPayment: {
-                farmType: 'plow',
-                payload: { tile: selectedTile },
-              },
-            },
-          }
-          return this.respond()
-        }
-        if (payment.type === 'fail') {
-          return this.respond(false, 'unable to pay plow cost')
-        }
-
-        const result = applyFarmChoice(normalized, 'plow', { tile: selectedTile }, {
-          costOverride: override,
-        })
-        if (!result.ok) return this.respond(false, result.error)
-        this.pushHistory()
-        this.state.players[playerIndex] = result.player as unknown as PlayerState
-        if (sourceCardForStats) {
-          addCardResourceGained(this.state.players[playerIndex]!, sourceCardForStats, { field: 1 })
-        }
-        break
-      }
-      case 'sow': {
-        const maxSelections = typeof this.pending.actionContext?.maxSelections === 'number'
-          ? Math.max(0, Math.floor(this.pending.actionContext.maxSelections))
-          : undefined
-        const excludedFields = Array.isArray(this.pending.actionContext?.excludedFields)
-          ? this.pending.actionContext.excludedFields.filter((field): field is { row: number; col: number } =>
-            typeof (field as { row?: unknown }).row === 'number' &&
-            typeof (field as { col?: unknown }).col === 'number')
-          : undefined
-        // Compute extra sowable fields from card effects (e.g. B72 pasture sowing)
-        const extraFields = getPermittedExtraSowableFields(player, this.pending.actionContext)
-        const extraAllowedCrops = new Map(
-          extraFields.map((field) => [positionKey(field.tile), field.allowedCrops] as const),
-        )
-        const result = applyFarmChoice(normalized, 'sow', payload as FarmChoicePayloadMap['sow'], {
-          sowOptions: {
-            maxSelections,
-            excludedFields,
-            extraAllowedCrops: extraAllowedCrops.size > 0 ? extraAllowedCrops : undefined,
-          },
-        })
-        if (!result.ok) return this.respond(false, result.error)
-        const nextPlayer = result.player as unknown as PlayerState
-        // Handle extra field sowing via card effects
-        if (extraAllowedCrops.size > 0) {
-          const sowPayload = payload as { crops?: { row: number; col: number; crop: 'grain' | 'vegetable' | 'wood' }[] }
-          for (const sel of sowPayload.crops ?? []) {
-            const key = positionKey({ row: sel.row, col: sel.col })
-            if (extraAllowedCrops.has(key)) {
-              const handled = handleSowExtraField(nextPlayer, { row: sel.row, col: sel.col }, sel.crop)
-              if (!handled) return this.respond(false, 'invalid extra sow field')
-            }
-          }
-        }
-        this.pushHistory()
-        this.state.players[playerIndex] = nextPlayer
-        break
-      }
-    }
-
-    return this.continueAfterResolvedFarmChoice(playerIndex, farmChoiceMeta)
   }
 
   commitSelectionChoice(

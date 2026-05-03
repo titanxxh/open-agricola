@@ -34,11 +34,17 @@ describe('A→A self-jump recursion guard', () => {
       // accept any non-skip option (drives Swagman accept on first prompt; afterwards
       // skips remaining optional follow-ups; mandatory choices fall through to first opt)
       const skip = opts.find(o => o.value === '__skip__')
+      const cancel = opts.find(o => o.value === 'cancel')
       const swagmanOpt = opts.find(o => o.sourceCard === 'A129_Swagman')
+      const hasConfirm = opts.some(o => o.value === 'confirm')
       if (swagmanOpt) {
         resp = session.resolveChoice(0, swagmanOpt.value)
+      } else if (cancel && hasConfirm) {
+        resp = session.resolveChoice(0, cancel.value)
       } else if (skip) {
         resp = session.resolveChoice(0, '__skip__')
+      } else if (cancel) {
+        resp = session.resolveChoice(0, 'cancel')
       } else if (opts.length > 0) {
         resp = session.resolveChoice(0, opts[0]!.value)
       } else {
@@ -72,11 +78,17 @@ describe('A→A self-jump recursion guard', () => {
     while (safety-- > 0 && resp.pending.type === 'choice') {
       const opts = resp.pending.options ?? []
       const skip = opts.find(o => o.value === '__skip__')
+      const cancel = opts.find(o => o.value === 'cancel')
       const swagmanOpt = opts.find(o => o.sourceCard === 'A129_Swagman')
+      const hasConfirm = opts.some(o => o.value === 'confirm')
       if (swagmanOpt) {
         resp = session.resolveChoice(0, swagmanOpt.value)
+      } else if (cancel && hasConfirm) {
+        resp = session.resolveChoice(0, cancel.value)
       } else if (skip) {
         resp = session.resolveChoice(0, '__skip__')
+      } else if (cancel) {
+        resp = session.resolveChoice(0, 'cancel')
       } else if (opts.length > 0) {
         resp = session.resolveChoice(0, opts[0]!.value)
       } else {
@@ -115,11 +127,17 @@ describe('place-farmer jump runs full ActionNode path (parity smoke)', () => {
         break
       }
       const skip = opts.find(o => o.value === '__skip__')
+      const cancel = opts.find(o => o.value === 'cancel')
       const b150Opt = opts.find(o => o.sourceCard === 'B150_LargeScaleFarmer')
+      const hasConfirm = opts.some(o => o.value === 'confirm')
       if (b150Opt) {
         resp = session.resolveChoice(0, b150Opt.value)
+      } else if (cancel && hasConfirm) {
+        resp = session.resolveChoice(0, cancel.value)
       } else if (skip) {
         resp = session.resolveChoice(0, '__skip__')
+      } else if (cancel) {
+        resp = session.resolveChoice(0, 'cancel')
       } else if (opts.length > 0) {
         resp = session.resolveChoice(0, opts[0]!.value)
       } else {

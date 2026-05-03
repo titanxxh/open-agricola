@@ -160,11 +160,10 @@ describe('B115_TinsmithMaster session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
 
       // Sow grain in the field
-      resp = session.commitFarmChoice(0, 'sow', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: 0, col: 0, crop: 'grain' }],
       })
       expect(resp.ok).toBe(true)
@@ -188,10 +187,9 @@ describe('B115_TinsmithMaster session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
 
-      resp = session.commitFarmChoice(0, 'sow', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: 0, col: 0, crop: 'vegetable' }],
       })
       expect(resp.ok).toBe(true)
@@ -214,10 +212,9 @@ describe('B115_TinsmithMaster session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
 
-      resp = session.commitFarmChoice(0, 'sow', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: 0, col: 0, crop: 'grain' }],
       })
       expect(resp.ok).toBe(true)
@@ -241,11 +238,10 @@ describe('B115_TinsmithMaster session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
 
       // Sow grain in both fields
-      resp = session.commitFarmChoice(0, 'sow', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [
           { row: 0, col: 0, crop: 'grain' },
           { row: 0, col: 1, crop: 'grain' },

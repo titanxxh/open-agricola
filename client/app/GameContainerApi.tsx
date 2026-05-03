@@ -512,19 +512,13 @@ export const GameContainerApi = () => {
   }, [setFenceError, setPlowError, setRoomError, setSowError, setStableError])
 
   const commitFarmWithError = useCallback((
-    playerIndex: number,
-    farmType: FarmCommitType,
-    payload: Record<string, unknown>,
+    _playerIndex: number,
+    _farmType: FarmCommitType,
+    _payload: Record<string, unknown>,
   ) => {
-    void transport.commitFarm(playerIndex, farmType, payload)
-      .then((resp) => {
-        if (!resp.ok) setFarmCommitError(farmType, resp.error)
-      })
-      .catch((e) => {
-        console.error(e)
-        setFarmCommitError(farmType)
-      })
-  }, [transport, setFarmCommitError])
+    // commitFarm transport removed; all farm submits now use resolveChoice with payload.
+    // This wrapper is retained as a stub until the few remaining callers are migrated.
+  }, [])
 
   const resolveChoice = useCallback((value: string) => {
     if (!isInteractive) return
@@ -548,23 +542,44 @@ export const GameContainerApi = () => {
         return
       }
       if (interaction.farm.farmType === 'fence') {
-        commitFarmWithError(pendingPlayerIndex, 'fence', {
+        void transport.resolveChoice(pendingPlayerIndex, 'confirm', {
           edges: pendingFenceEdges,
           palisadeEdges: pendingPalisadeEdges,
           extraWood: interaction.farm.extraWood ?? 0,
         })
+          .then((resp) => {
+            if (!resp.ok) setFarmCommitError('fence', resp.error)
+          })
+          .catch((e) => {
+            console.error(e)
+            setFarmCommitError('fence')
+          })
         return
       }
       if (interaction.farm.farmType === 'room') {
-        commitFarmWithError(pendingPlayerIndex, 'room', {
-          rooms: pendingRoomTiles,
-        })
+        void transport.resolveChoice(pendingPlayerIndex, 'confirm', { rooms: pendingRoomTiles })
+          .then((resp) => {
+            if (!resp.ok) setFarmCommitError('room', resp.error)
+          })
+          .catch((e) => {
+            console.error(e)
+            setFarmCommitError('room')
+          })
         return
       }
       if (interaction.farm.farmType === 'stable') {
-        commitFarmWithError(pendingPlayerIndex, 'stable', {
-          stables: pendingStableTiles,
-        })
+        if (pendingStableTiles.length === 0) {
+          setStableError('NO_SELECTION')
+          return
+        }
+        void transport.resolveChoice(pendingPlayerIndex, 'confirm', { stables: pendingStableTiles })
+          .then((resp) => {
+            if (!resp.ok) setFarmCommitError('stable', resp.error)
+          })
+          .catch((e) => {
+            console.error(e)
+            setFarmCommitError('stable')
+          })
         return
       }
       if (interaction.farm.farmType === 'plow') {
@@ -572,9 +587,14 @@ export const GameContainerApi = () => {
           setPlowError('NO_SELECTION')
           return
         }
-        commitFarmWithError(pendingPlayerIndex, 'plow', {
-          tile: pendingPlowTile,
-        })
+        void transport.resolveChoice(pendingPlayerIndex, 'confirm', { tile: pendingPlowTile })
+          .then((resp) => {
+            if (!resp.ok) setFarmCommitError('plow', resp.error)
+          })
+          .catch((e) => {
+            console.error(e)
+            setFarmCommitError('plow')
+          })
         return
       }
       if (interaction.farm.farmType === 'sow') {
@@ -593,14 +613,21 @@ export const GameContainerApi = () => {
           setSowError('NO_SELECTION')
           return
         }
-        commitFarmWithError(pendingPlayerIndex, 'sow', { crops })
+        void transport.resolveChoice(pendingPlayerIndex, 'confirm', { crops })
+          .then((resp) => {
+            if (!resp.ok) setFarmCommitError('sow', resp.error)
+          })
+          .catch((e) => {
+            console.error(e)
+            setFarmCommitError('sow')
+          })
         return
       }
       return
     }
     if (interaction.stateId !== 'choice') return
     void transport.resolveChoice(interaction.playerIndex, value).catch((e) => console.error(e))
-  }, [interaction, currentPlayer, pendingFenceEdges, pendingPalisadeEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, setPlowError, setSowError, isInteractive, commitFarmWithError])
+  }, [interaction, currentPlayer, pendingFenceEdges, pendingPalisadeEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, setPlowError, setSowError, setStableError, isInteractive, commitFarmWithError, setFarmCommitError])
 
   const updateBakeExchangeCount = (id: string, delta: number) => {
     if (!bakeExchangePlayer) return

@@ -12,9 +12,12 @@ export type SnapshotListener = (payload: GameSyncPayload) => void
 export interface GameTransport {
   getState(): Promise<GameSyncPayload>
   takeAction(playerIndex: number, spaceId: string): Promise<GameSyncPayload>
-  resolveChoice(playerIndex: number, value: string): Promise<GameSyncPayload>
+  resolveChoice(
+    playerIndex: number,
+    value: string,
+    payload?: Record<string, unknown>,
+  ): Promise<GameSyncPayload>
   takeAnytimeAction(playerIndex: number, actionId: string): Promise<GameSyncPayload>
-  commitFarm(playerIndex: number, farmType: string, payload: Record<string, unknown>): Promise<GameSyncPayload>
   commitSelection(playerIndex: number, payload: {
     positions?: { row: number; col: number }[]
     cardIds?: string[]
@@ -124,16 +127,12 @@ export class HttpGameTransport implements GameTransport {
     return this.send(() => post('/api/game/action', { playerIndex, spaceId }))
   }
 
-  resolveChoice(playerIndex: number, value: string) {
-    return this.send(() => post('/api/game/choice', { playerIndex, value }))
+  resolveChoice(playerIndex: number, value: string, payload?: Record<string, unknown>) {
+    return this.send(() => post('/api/game/choice', { playerIndex, value, payload }))
   }
 
   takeAnytimeAction(playerIndex: number, actionId: string) {
     return this.send(() => post('/api/game/anytime', { playerIndex, actionId }))
-  }
-
-  commitFarm(playerIndex: number, farmType: string, payload: Record<string, unknown>) {
-    return this.send(() => post('/api/game/commit-farm', { playerIndex, farmType, payload }))
   }
 
   commitSelection(
@@ -342,16 +341,16 @@ export class WsGameTransport implements GameTransport {
     return this.sendCommand({ type: 'action', spaceId })
   }
 
-  async resolveChoice(_playerIndex: number, value: string): Promise<GameSyncPayload> {
-    return this.sendCommand({ type: 'choice', value })
+  async resolveChoice(
+    _playerIndex: number,
+    value: string,
+    payload?: Record<string, unknown>,
+  ): Promise<GameSyncPayload> {
+    return this.sendCommand({ type: 'choice', value, payload })
   }
 
   async takeAnytimeAction(_playerIndex: number, actionId: string): Promise<GameSyncPayload> {
     return this.sendCommand({ type: 'anytime', actionId })
-  }
-
-  async commitFarm(playerIndex: number, farmType: string, payload: Record<string, unknown>): Promise<GameSyncPayload> {
-    return this.sendCommand({ type: 'commitFarm', playerIndex, farmType: farmType as 'fence' | 'room' | 'stable' | 'plow' | 'sow', payload })
   }
 
   async commitSelection(

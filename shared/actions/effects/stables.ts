@@ -1,10 +1,24 @@
-import type { ActionCostPreview, ActionDefinition, ActionExecutionResult, PlayerState, Resource } from '../../game/types'
+import type {
+  ActionCostPreview,
+  ActionDefinition,
+  ActionExecutionContext,
+  ActionExecutionResult,
+  FarmTilePosition,
+  PlayerState,
+  Resource,
+} from '../../game/types'
 import { getNextEmptyTileForPlayer } from '../../game/farm'
-import { payResources } from '../helpers/payment'
+import { payResources, applyCostOverride } from '../helpers/payment'
 import { stableWoodCost } from './fencing'
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'
-import { canAffordCost } from '../helpers/pay-helpers'
-import { applyCostOverride } from '../helpers/payment'
+import {
+  canAffordCost,
+  executeResolvedTypedFlatPayment,
+  resolveTypedFlatPaymentSelection,
+} from '../helpers/pay-helpers'
+import { validateStableSelection } from '../../logic/farm/validators'
+import { collectLockedFarmTileKeys } from '../../cards/card-effects'
+import { addCardResourceGained } from '../../cards/helpers/card-state'
 
 export const buildStable = (player: PlayerState): ActionExecutionResult => {
   const next = getNextEmptyTileForPlayer(player)
@@ -32,6 +46,68 @@ const readCostOverride = (
   return override as Partial<Resource>
 }
 
+const sanitizePayableCost = (
+  cost: Partial<Resource> | undefined,
+): Partial<Resource> => {
+  const payable: Partial<Resource> = {}
+  Object.entries(cost ?? {}).forEach(([key, value]) => {
+    if (typeof value !== 'number' || value <= 0) return
+    payable[key as keyof Resource] = value
+  })
+  return payable
+}
+
+const scaleCost = (
+  costPerUnit: Partial<Resource>,
+  count: number,
+): Partial<Resource> => {
+  const total: Partial<Resource> = {}
+  Object.entries(costPerUnit).forEach(([key, value]) => {
+    if (typeof value !== 'number') return
+    total[key as keyof Resource] = value * count
+  })
+  return sanitizePayableCost(total)
+}
+
+const applyPlayerMutation = (target: PlayerState, source: PlayerState) => {
+  for (const key of Object.keys(target) as Array<keyof PlayerState>) {
+    if (!(key in source)) {
+      delete (target as Record<string, unknown>)[key as string]
+    }
+  }
+  Object.assign(target, source)
+}
+
+const finalizeStables = (
+  ctx: ActionExecutionContext,
+  stables: FarmTilePosition[],
+  paymentChoice: string | undefined,
+): ActionExecutionResult => {
+  const lockedKeys = collectLockedFarmTileKeys(ctx.player)
+  const validated = validateStableSelection(ctx.player, stables, lockedKeys)
+  if (!validated.ok) return { type: 'fail', logKey: validated.code ?? 'log.buildStableFail' }
+  const costOverride = readCostOverride(ctx.actionContext) ?? ctx.costs
+  const costPerStable = applyCostOverride({ wood: stableWoodCost }, costOverride)
+  const totalCost = scaleCost(costPerStable, stables.length)
+  const payment = resolveTypedFlatPaymentSelection(
+    ctx.player,
+    totalCost,
+    'pay:stable',
+    paymentChoice,
+    { type: 'fail', logKey: 'log.buildStableFail' },
+    'stables',
+  )
+  if (payment.type !== 'selected') return { type: 'fail', logKey: 'log.buildStableFail' }
+  const nextPlayer = JSON.parse(JSON.stringify(ctx.player)) as PlayerState
+  executeResolvedTypedFlatPayment(nextPlayer, payment, 'stables')
+  nextPlayer.stableTiles = [...nextPlayer.stableTiles, ...stables]
+  applyPlayerMutation(ctx.player, nextPlayer)
+  if (ctx.sourceCard) {
+    addCardResourceGained(ctx.player, ctx.sourceCard, { stable: stables.length })
+  }
+  return { type: 'ok', extraData: { builtStables: stables } }
+}
+
 export const stablesAction: ActionDefinition = {
   id: 'stables',
   nameKey: 'actions.stables.name',
@@ -49,7 +125,61 @@ export const stablesAction: ActionDefinition = {
       { value: 'cancel', labelKey: 'ui.interactionStableCancel' },
     ],
   }),
-  resolveChoice: () => ({ type: 'ok' }),
+  resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
+    if (choice === 'cancel') return { type: 'ok' }
+
+    // Second call: payment combo selected after multi-combo prompt.
+    if (choice.startsWith('pay:stable:')) {
+      const farmPayload = ctx.actionContext?.farmPayload as
+        | { stables?: FarmTilePosition[] }
+        | undefined
+      const stables = farmPayload?.stables
+      if (!Array.isArray(stables) || stables.length === 0) {
+        return { type: 'fail', logKey: 'log.buildStableFail' }
+      }
+      return finalizeStables(ctx, stables, choice)
+    }
+
+    // First call: client submitted stable geometry alongside `confirm`.
+    if (payload && choice === 'confirm') {
+      const stables = (payload as { stables?: FarmTilePosition[] }).stables
+      if (!Array.isArray(stables) || stables.length === 0) {
+        return { type: 'fail', logKey: 'NO_SELECTION' }
+      }
+      const lockedKeys = collectLockedFarmTileKeys(ctx.player)
+      const validated = validateStableSelection(ctx.player, stables, lockedKeys)
+      if (!validated.ok) {
+        return { type: 'fail', logKey: validated.code ?? 'log.buildStableFail' }
+      }
+      const costOverride = readCostOverride(ctx.actionContext) ?? ctx.costs
+      const costPerStable = applyCostOverride({ wood: stableWoodCost }, costOverride)
+      const totalCost = scaleCost(costPerStable, stables.length)
+      const payment = resolveTypedFlatPaymentSelection(
+        ctx.player,
+        totalCost,
+        'pay:stable',
+        undefined,
+        { type: 'fail', logKey: 'log.buildStableFail' },
+        'stables',
+      )
+      if (payment.type === 'choice') {
+        return {
+          type: 'choice',
+          promptKey: payment.promptKey,
+          options: payment.options ?? [],
+          extraData: {
+            actionContextWrite: { farmPayload: { stables } },
+          },
+        }
+      }
+      if (payment.type === 'fail') {
+        return { type: 'fail', logKey: 'log.buildStableFail' }
+      }
+      return finalizeStables(ctx, stables, undefined)
+    }
+
+    return { type: 'fail', logKey: 'log.buildStableFail' }
+  },
 }
 
 // re-export for external callers building actionContext

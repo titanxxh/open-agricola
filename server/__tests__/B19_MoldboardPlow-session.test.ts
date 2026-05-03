@@ -43,7 +43,7 @@ describe('B19_MoldboardPlow session', () => {
     // Complete the farmland plow
     const tile1 = resp.interaction.farm.selectableTiles[0]
     expect(tile1).toBeDefined()
-    resp = session.commitFarmChoice(0, 'plow', { tile: tile1 })
+    resp = session.resolveChoice(0, 'confirm', { tile: tile1 })
     expect(resp.ok).toBe(true)
 
     // After farmland plow, B19 after-hook offers optional extra plow
@@ -61,7 +61,7 @@ describe('B19_MoldboardPlow session', () => {
     expect(resp.interaction.stateId).toBe('farmSelect')
     const tile2 = resp.interaction.farm.selectableTiles[0]
     expect(tile2).toBeDefined()
-    resp = session.commitFarmChoice(0, 'plow', { tile: tile2 })
+    resp = session.resolveChoice(0, 'confirm', { tile: tile2 })
     expect(resp.ok).toBe(true)
 
     // Stack should have 1 field left
@@ -79,7 +79,7 @@ describe('B19_MoldboardPlow session', () => {
     expect(resp.ok).toBe(true)
 
     const tile1 = resp.interaction.farm.selectableTiles[0]
-    resp = session.commitFarmChoice(0, 'plow', { tile: tile1 })
+    resp = session.resolveChoice(0, 'confirm', { tile: tile1 })
     expect(resp.ok).toBe(true)
 
     // Decline the optional extra plow
@@ -105,7 +105,7 @@ describe('B19_MoldboardPlow session', () => {
     expect(resp.ok).toBe(true)
 
     const tile = resp.interaction.farm.selectableTiles[0]
-    resp = session.commitFarmChoice(0, 'plow', { tile })
+    resp = session.resolveChoice(0, 'confirm', { tile })
     expect(resp.ok).toBe(true)
 
     // Should not get optional choice — goes straight to confirmNextPlayer
@@ -118,11 +118,11 @@ describe('B19_MoldboardPlow session', () => {
     // First farmland action — use 1 field from card
     let resp = session.takeAction(0, 'farmland')
     const tile1 = resp.interaction.farm.selectableTiles[0]
-    resp = session.commitFarmChoice(0, 'plow', { tile: tile1 })
+    resp = session.resolveChoice(0, 'confirm', { tile: tile1 })
     const accept1 = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     resp = session.resolveChoice(0, accept1!.value)
     const tile2 = resp.interaction.farm.selectableTiles[0]
-    resp = session.commitFarmChoice(0, 'plow', { tile: tile2 })
+    resp = session.resolveChoice(0, 'confirm', { tile: tile2 })
     expect(resp.ok).toBe(true)
 
     expect(getCardStack(resp.state.players[0]!, 'B19_MoldboardPlow').length).toBe(1)

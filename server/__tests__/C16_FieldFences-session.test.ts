@@ -84,7 +84,7 @@ describe('C16 FieldFences session', () => {
     const session = setup({ wood: 3, withField: true })
     playC16(session)
 
-    const resp = session.commitFarmChoice(0, 'fence', {
+    const resp = session.resolveChoice(0, 'confirm', {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
       extraWood: 0,
@@ -108,7 +108,7 @@ describe('C16 FieldFences session', () => {
 
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
-    resp = session.commitFarmChoice(0, 'fence', {
+    resp = session.resolveChoice(0, 'confirm', {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
       extraWood: 0,
@@ -138,7 +138,7 @@ describe('C16 FieldFences session', () => {
 
     playC16(session)
 
-    const resp = session.commitFarmChoice(0, 'fence', {
+    const resp = session.resolveChoice(0, 'confirm', {
       edges: ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'],
       palisadeEdges: [],
       extraWood: 0,
@@ -155,7 +155,7 @@ describe('C16 FieldFences session', () => {
     const session = setup({ wood: 5, withField: true })
     playC16(session)
 
-    let resp = session.commitFarmChoice(0, 'fence', {
+    let resp = session.resolveChoice(0, 'confirm', {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
       extraWood: 0,

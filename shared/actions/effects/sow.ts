@@ -1,5 +1,14 @@
-import type { ActionDefinition, ActionExecutionResult, PlayerState } from '../../game/types'
+import type {
+  ActionDefinition,
+  ActionExecutionContext,
+  ActionExecutionResult,
+  PlayerState,
+} from '../../game/types'
 import { fieldIsEmpty } from '../../game/field'
+import { positionKey } from '../../game/farm'
+import { getPermittedExtraSowableFields } from '../../logic/farm/farm-interaction'
+import { handleSowExtraField } from '../../cards/card-effects'
+import { validateSowSelection, type SowSelection } from '../../logic/farm/sow-validation'
 
 export const getEmptyFields = (player: PlayerState) =>
   player.fields.filter(fieldIsEmpty)
@@ -26,6 +35,55 @@ export const sowCrop = (
   return { type: 'ok', logKey: 'log.sow' }
 }
 
+const applyPlayerMutation = (target: PlayerState, source: PlayerState) => {
+  for (const key of Object.keys(target) as Array<keyof PlayerState>) {
+    if (!(key in source)) {
+      delete (target as Record<string, unknown>)[key as string]
+    }
+  }
+  Object.assign(target, source)
+}
+
+const finalizeSow = (
+  ctx: ActionExecutionContext,
+  crops: SowSelection[],
+): ActionExecutionResult => {
+  const player = ctx.player
+  const maxSelections = typeof ctx.actionContext?.maxSelections === 'number'
+    ? Math.max(0, Math.floor(ctx.actionContext.maxSelections as number))
+    : undefined
+  const excludedFields = Array.isArray(ctx.actionContext?.excludedFields)
+    ? (ctx.actionContext.excludedFields as Array<{ row?: unknown; col?: unknown }>).filter(
+        (field): field is { row: number; col: number } =>
+          typeof field.row === 'number' && typeof field.col === 'number',
+      )
+    : undefined
+  const extraFields = getPermittedExtraSowableFields(player, ctx.actionContext)
+  const extraAllowedCrops = new Map(
+    extraFields.map((field) => [positionKey(field.tile), field.allowedCrops] as const),
+  )
+  const validated = validateSowSelection(player, crops, {
+    maxSelections,
+    excludedFields,
+    extraAllowedCrops: extraAllowedCrops.size > 0 ? extraAllowedCrops : undefined,
+  })
+  if (!validated.ok) {
+    return { type: 'fail', logKey: validated.error?.code ?? 'log.action' }
+  }
+  const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
+  if (extraAllowedCrops.size > 0) {
+    for (const sel of crops) {
+      const key = positionKey({ row: sel.row, col: sel.col })
+      if (extraAllowedCrops.has(key)) {
+        const handled = handleSowExtraField(nextPlayer, { row: sel.row, col: sel.col }, sel.crop)
+        if (!handled) return { type: 'fail', logKey: 'invalid extra sow field' }
+      }
+    }
+  }
+  applyPlayerMutation(player, nextPlayer)
+  return { type: 'ok' }
+}
+
 export const sowAction: ActionDefinition = {
   id: 'sow',
   nameKey: 'actions.sow.name',
@@ -41,5 +99,13 @@ export const sowAction: ActionDefinition = {
       { value: 'cancel', labelKey: 'ui.interactionSowCancel' },
     ],
   }),
-  resolveChoice: () => ({ type: 'ok' }),
+  resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
+    if (choice === 'cancel') return { type: 'ok' }
+    if (choice === 'confirm' && payload) {
+      const crops = (payload as { crops?: SowSelection[] }).crops
+      if (!Array.isArray(crops)) return { type: 'fail', logKey: 'log.action' }
+      return finalizeSow(ctx, crops)
+    }
+    return { type: 'fail', logKey: 'log.action' }
+  },
 }

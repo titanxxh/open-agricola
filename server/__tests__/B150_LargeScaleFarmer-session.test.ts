@@ -98,7 +98,9 @@ describe('B150_LargeScaleFarmer session', () => {
       // Alternative: just use the first available option
       resp = session.resolveChoice(0, resp.pending.options[0]!.value)
     }
-    // Navigate through any sub-interactions until we hit the B150 optional (has __skip__)
+    // Navigate through any sub-interactions until we hit the B150 optional (has __skip__).
+    // For engine-driven farm prompts (room/stable confirm/cancel), prefer 'cancel' so we
+    // never block the chain by trying to commit a tile without a payload.
     let safety = 15
     let foundOptional = false
     while (safety-- > 0) {
@@ -108,7 +110,16 @@ describe('B150_LargeScaleFarmer session', () => {
           foundOptional = true
           break
         }
-        resp = session.resolveChoice(0, resp.pending.options[0]!.value)
+        const cancel = resp.pending.options.find((o) => o.value === 'cancel')
+        const done = resp.pending.options.find((o) => o.value === '__done__')
+        const hasConfirm = resp.pending.options.some((o) => o.value === 'confirm')
+        if (cancel && hasConfirm) {
+          resp = session.resolveChoice(0, cancel.value)
+        } else if (done) {
+          resp = session.resolveChoice(0, done.value)
+        } else {
+          resp = session.resolveChoice(0, resp.pending.options[0]!.value)
+        }
       } else {
         break
       }

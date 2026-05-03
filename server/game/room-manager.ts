@@ -983,7 +983,7 @@ export const createWsServer = (server: import('node:http').Server) => {
       }
 
       if (msg.type === 'choice') {
-        const resp = callRoom(s => s.resolveChoice(currentPlayerIndex, msg.value))
+        const resp = callRoom(s => s.resolveChoice(currentPlayerIndex, msg.value, msg.payload))
         broadcastState(room, resp, 'choice', msg.requestId)
         return
       }
@@ -1021,13 +1021,6 @@ export const createWsServer = (server: import('node:http').Server) => {
       if (msg.type === 'roundEnd') {
         const resp = callRoom(s => s.performRoundEnd())
         broadcastState(room, resp, 'action', msg.requestId)
-        return
-      }
-
-      if (msg.type === 'commitFarm') {
-        if (!assertOwnSeat(msg.playerIndex)) return
-        const resp = callRoom(s => s.commitFarmChoice(currentPlayerIndex, msg.farmType, msg.payload))
-        broadcastState(room, resp, 'choice', msg.requestId)
         return
       }
 

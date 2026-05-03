@@ -26,13 +26,20 @@ describe('gained.field pseudo-stat', () => {
     const resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
 
-    // Inject sourceCard onto the pending choice for this assertion.
+    // Inject sourceCard onto the pending choice for this assertion. The
+    // engine-driven path reads sourceCard from `engine.pendingChoiceContext`
+    // (not the GameSession's `pending` mirror), so we patch both to keep this
+    // test functional without a real plow-card scenario.
     const pending = session.getState().pending
     if (pending.type === 'choice') {
       pending.sourceCard = 'TEST_PlowCard'
     }
+    const engineRef = (session as unknown as { engine: { pendingChoiceContext: { sourceCard?: string } | null } }).engine
+    if (engineRef?.pendingChoiceContext) {
+      engineRef.pendingChoiceContext.sourceCard = 'TEST_PlowCard'
+    }
 
-    const farmResp = session.commitFarmChoice(0, 'plow', { tile: { row: 0, col: 0 } })
+    const farmResp = session.resolveChoice(0, 'confirm', { tile: { row: 0, col: 0 } })
     expect(farmResp.ok).toBe(true)
 
     const stats = readCardResourceStats(session.getState().state.players[0]!, 'TEST_PlowCard')
@@ -41,7 +48,7 @@ describe('gained.field pseudo-stat', () => {
 })
 
 describe('gained.stable pseudo-stat', () => {
-  it('writes gained.stable to sourceCard when commitFarmChoice builds stables', () => {
+  it('writes gained.stable to sourceCard when resolveChoice builds stables', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -54,12 +61,20 @@ describe('gained.stable pseudo-stat', () => {
     const resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
 
+    // Inject sourceCard onto the pending choice for this assertion. The
+    // engine-driven path reads sourceCard from `engine.pendingChoiceContext`
+    // (not the GameSession's `pending` mirror), so we patch both to keep this
+    // test functional without a real stable-card scenario.
     const pending = session.getState().pending
     if (pending.type === 'choice') {
       pending.sourceCard = 'TEST_StableCard'
     }
+    const engineRef = (session as unknown as { engine: { pendingChoiceContext: { sourceCard?: string } | null } }).engine
+    if (engineRef?.pendingChoiceContext) {
+      engineRef.pendingChoiceContext.sourceCard = 'TEST_StableCard'
+    }
 
-    const farmResp = session.commitFarmChoice(0, 'stable', { stables: [{ row: 0, col: 0 }] })
+    const farmResp = session.resolveChoice(0, 'confirm', { stables: [{ row: 0, col: 0 }] })
     expect(farmResp.ok).toBe(true)
 
     const stats = readCardResourceStats(session.getState().state.players[0]!, 'TEST_StableCard')

@@ -111,13 +111,12 @@ describe('E70_CropRotationField session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
       expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
 
       // Sow grain on the virtual tile
-      resp = session.commitFarmChoice(0, 'sow', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: -1, col: 70, crop: 'grain' }],
       })
       expect(resp.ok).toBe(true)
@@ -138,10 +137,9 @@ describe('E70_CropRotationField session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
 
-      resp = session.commitFarmChoice(0, 'sow', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: -1, col: 70, crop: 'vegetable' }],
       })
       expect(resp.ok).toBe(true)
@@ -198,7 +196,7 @@ describe('E70_CropRotationField session', () => {
       }
       ;(session as unknown as { activeSpaceId: string | null }).activeSpaceId = 'grain-utilization'
 
-      const resp = session.commitFarmChoice(0, 'sow', {
+      const resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: -1, col: 69, crop: 'vegetable' }],
       })
 
@@ -359,10 +357,9 @@ describe('E70_CropRotationField session', () => {
       const session = setup({ grain: 1 })
 
       // Take grain-utilization action, which offers sow
-      let resp = session.takeAction(0, 'grain-utilization')
+      const resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
       // If sow is available, resolving 'sow' should succeed
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
       expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
@@ -376,7 +373,9 @@ describe('E70_CropRotationField session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      // Sow should NOT be doable since card has crop and no regular fields
+      // OR(sow, bake-bread) is structurally doable, but selecting sow when the
+      // card already has a crop and the player has no regular fields surfaces
+      // as fail because canSow returns false.
       resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(false)
     })

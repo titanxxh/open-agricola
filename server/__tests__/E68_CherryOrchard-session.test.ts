@@ -116,10 +116,9 @@ describe('E68_CherryOrchard session', () => {
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
 
-    resp = session.resolveChoice(0, 'sow')
     expect(resp.ok).toBe(true)
 
-    resp = session.commitFarmChoice(0, 'sow', {
+    resp = session.resolveChoice(0, 'confirm', {
       crops: [{ row: VIRTUAL_TILE.row, col: VIRTUAL_TILE.col, crop: 'wood' }],
     })
     expect(resp.ok).toBe(true)
@@ -140,10 +139,9 @@ describe('E68_CherryOrchard session', () => {
       fields: [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] }],
     })
 
-    let resp = session.takeAction(0, 'grain-utilization')
+    const resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
 
-    resp = session.resolveChoice(0, 'sow')
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('farmSelect')
 
@@ -170,10 +168,9 @@ describe('E68_CherryOrchard session', () => {
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
 
-    resp = session.resolveChoice(0, 'sow')
     expect(resp.ok).toBe(true)
 
-    resp = session.commitFarmChoice(0, 'sow', {
+    resp = session.resolveChoice(0, 'confirm', {
       crops: [{ row: VIRTUAL_TILE.row, col: VIRTUAL_TILE.col, crop: 'grain' }],
     })
     expect(resp.ok).toBe(false)

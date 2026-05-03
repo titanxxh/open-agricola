@@ -79,7 +79,6 @@ describe('B72_LoveforAgriculture session', () => {
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
       // Choose sow
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
       expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
@@ -95,7 +94,7 @@ describe('B72_LoveforAgriculture session', () => {
       }
 
       // Sow grain in the pasture tile
-      resp = session.commitFarmChoice(0, 'sow', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: 2, col: 2, crop: 'grain' }],
       })
       expect(resp.ok).toBe(true)
@@ -130,10 +129,9 @@ describe('B72_LoveforAgriculture session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
 
-      resp = session.commitFarmChoice(0, 'sow', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: 2, col: 2, crop: 'vegetable' }],
       })
       expect(resp.ok).toBe(true)
@@ -162,8 +160,8 @@ describe('B72_LoveforAgriculture session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
+      // Sow should fail because no fields or eligible pastures.
       resp = session.resolveChoice(0, 'sow')
-      // Sow should fail because no fields or eligible pastures
       expect(resp.ok).toBe(false)
     })
 
@@ -185,11 +183,10 @@ describe('B72_LoveforAgriculture session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
 
       // Sow in both field and pasture
-      resp = session.commitFarmChoice(0, 'sow', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [
           { row: 0, col: 0, crop: 'grain' },
           { row: 2, col: 2, crop: 'grain' },
@@ -226,9 +223,8 @@ describe('B72_LoveforAgriculture session', () => {
       })
 
       // Sow should be doable via the isDoable listener
-      let resp = session.takeAction(0, 'grain-utilization')
+      const resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
       expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
@@ -257,8 +253,7 @@ describe('B72_LoveforAgriculture session', () => {
 
       // First sow
       let resp = session.takeAction(0, 'grain-utilization')
-      resp = session.resolveChoice(0, 'sow')
-      resp = session.commitFarmChoice(0, 'sow', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: 2, col: 2, crop: 'grain' }],
       })
       expect(resp.ok).toBe(true)
@@ -479,9 +474,8 @@ describe('B72_LoveforAgriculture session', () => {
         ],
       })
 
-      let resp = session.takeAction(0, 'grain-utilization')
+      const resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
 
       if (resp.interaction.stateId === 'farmSelect' && resp.interaction.farm.farmType === 'sow') {

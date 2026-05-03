@@ -4,7 +4,7 @@ import type { DraftMode, DraftPickPayload } from '../draft/types'
 type ClientCommandBody =
   | { type: 'auth'; token: string }
   | { type: 'action'; spaceId: string }
-  | { type: 'choice'; value: string }
+  | { type: 'choice'; value: string; payload?: Record<string, unknown> }
   | { type: 'anytime'; actionId: string }
   | {
       type: 'reorg'
@@ -24,12 +24,6 @@ type ClientCommandBody =
         /** Entry-index pointer into card.exchanges[] (D3 unified path). */
         exchangeIndex: number
       }[]
-    }
-  | {
-      type: 'commitFarm'
-      playerIndex: number
-      farmType: 'fence' | 'room' | 'stable' | 'plow' | 'sow'
-      payload: Record<string, unknown>
     }
   | {
       type: 'commitSelection'

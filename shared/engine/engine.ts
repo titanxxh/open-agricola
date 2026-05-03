@@ -801,7 +801,7 @@ export class Engine {
         ...(executionContext.params ?? {}),
         selectedOption: value,
       }
-      return action.resolveChoice(executionContext, value)
+      return action.resolveChoice(executionContext, value, undefined)
     }
     return {
       type: 'choice',
@@ -1411,10 +1411,14 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
     return { type: 'blocked', nodeId: node.id }
   }
 
+  /**
+   * Resolve a pending choice. Threading the optional `payload` lets ActionDef.resolveChoice
+   * receive client-supplied submission data (e.g. fence edges, plow tile).
+   */
   resolveChoice(
     choice: string,
     context: EngineContext,
-    resolvedResultOverride?: ActionExecutionResult,
+    payload?: Record<string, unknown>,
   ): ActionExecutionResult {
     if (this.pendingChoiceNodeId) {
       const node = this.tree.findNodeById(this.pendingChoiceNodeId)
@@ -1676,15 +1680,23 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
       selectedOption: choice,
     }
     let result: ActionExecutionResult
-    if (resolvedResultOverride) {
-      result = resolvedResultOverride
-    } else if (action.resolveChoice) {
-      result = action.resolveChoice(executionContext, choice)
+    if (action.resolveChoice) {
+      result = action.resolveChoice(executionContext, choice, payload)
     } else {
       return { type: 'ok' }
     }
     this.hooks.during({ ...executionContext, actionId }, result)
     if (result.type === 'choice') {
+      // Merge ActionDef-declared actionContext patches into pendingChoiceContext.actionContext.
+      // Used by farm ActionDefs to persist payload (e.g. fence geometry) across payment-combo
+      // second prompts. Shallow merge; later writes overwrite earlier.
+      const contextWritePatch =
+        result.extraData && typeof result.extraData === 'object'
+          ? (result.extraData.actionContextWrite as Record<string, unknown> | undefined)
+          : undefined
+      const mergedActionContext = contextWritePatch
+        ? { ...(executionContext.actionContext ?? {}), ...contextWritePatch }
+        : executionContext.actionContext
       if (this.pendingChoiceNodeId) {
         const node = this.tree.findNodeById(this.pendingChoiceNodeId)
         if (node instanceof ChoiceNode) {
@@ -1694,7 +1706,7 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
             params: executionContext.params,
             costs: executionContext.costs,
             sourceCard: this.resolveChoiceSourceCard(executionContext.sourceCard, result.options),
-            actionContext: executionContext.actionContext,
+            actionContext: mergedActionContext,
           }
           return result
         }
@@ -1704,7 +1716,7 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
         params: executionContext.params,
         costs: executionContext.costs,
         sourceCard: this.resolveChoiceSourceCard(executionContext.sourceCard, result.options),
-        actionContext: executionContext.actionContext,
+        actionContext: mergedActionContext,
       }
       // Don't clear pendingChoiceActionId - the action still needs to resolve its choice
       return result
