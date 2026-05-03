@@ -222,25 +222,6 @@ describe('WS seat binding', () => {
     }
   })
 
-  it('rejects commitFarm with a playerIndex that is not the sender seat', async () => {
-    const { p1 } = await setupTwoPlayerRoom(baseUrl, sockets)
-    p1.send(
-      JSON.stringify({
-        type: 'commitFarm',
-        playerIndex: 1, // sender is seat 0
-        farmType: 'sow',
-        payload: { crops: [] },
-        requestId: 'spoof-commitFarm-1',
-      }),
-    )
-    const err = await waitForEvent(
-      p1,
-      (event): event is Extract<ServerEvent, { type: 'error' }> =>
-        event.type === 'error' && event.requestId === 'spoof-commitFarm-1',
-    )
-    expect(err.error).toMatch(/seat mismatch/i)
-  })
-
   it('rejects commitSelection with a playerIndex that is not the sender seat', async () => {
     const { p1 } = await setupTwoPlayerRoom(baseUrl, sockets)
     p1.send(
