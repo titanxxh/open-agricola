@@ -192,13 +192,13 @@ export const handleGameRoute = async (
   }
 
   if (req.method === 'POST' && req.url === '/api/game/choice') {
-    const body = JSON.parse(await readBody(req)) as { playerIndex?: number; value?: string }
+    const body = JSON.parse(await readBody(req)) as { playerIndex?: number; value?: string; payload?: Record<string, unknown> }
     if (typeof body.playerIndex !== 'number' || typeof body.value !== 'string') {
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
     if (!enforceSeatBinding(req, res, body.playerIndex)) return true
-    const { resp, result } = callAndRespond(req, s => s.resolveChoice(body.playerIndex!, body.value!))
+    const { resp, result } = callAndRespond(req, s => s.resolveChoice(body.playerIndex!, body.value!, body.payload))
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
