@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 
 import { A27_OvenSite } from '../../shared/cards/A/A27_OvenSite'
 import { minorImprovements } from '../../shared/game/minor-improvements'
+import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 const CARD_ID = 'A27_OvenSite'
 
@@ -159,5 +160,23 @@ describe('A27_OvenSite session', () => {
     expect(resp.pending.sourceCard).toBe('Major_ClayOven')
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe('Major_ClayOven')
     expect(resp.pending.options.find((option) => option.value !== '__skip__')?.sourceCard).toBe('Major_ClayOven')
+  })
+
+  describe('prerequisite "Both Fireplace and Cooking Hearth"', () => {
+    it('blocks when player owns no Fireplace + Hearth pair', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const player = state.players[0]!
+      player.improvements = []
+      expect(meetsCardPrerequisites(player, A27_OvenSite, state.round, state)).toBe(false)
+    })
+
+    it('allows when player owns Fireplace1 and CookingHearth1', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const player = state.players[0]!
+      player.improvements = ['Major_Fireplace1', 'Major_CookingHearth1']
+      expect(meetsCardPrerequisites(player, A27_OvenSite, state.round, state)).toBe(true)
+    })
   })
 })
