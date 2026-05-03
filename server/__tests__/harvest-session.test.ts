@@ -75,12 +75,16 @@ describe('harvest session flow', () => {
 
     resp = session.confirmHarvestFeed(0, [])
 
-    while (resp.pending.type === 'animalReorg') {
-      expect(resp.interaction.stateId).toBe('animalReorg')
-      if (resp.interaction.stateId !== 'animalReorg') {
-        throw new Error('expected animalReorg interaction')
-      }
-      resp = session.confirmAnimalReorg(resp.pending.playerIndex, resp.interaction.zones)
+    while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      const pi = resp.pending.playerIndex
+      const p = resp.state.players[pi]!
+      const zones = p.pastures.map((pasture) => ({
+        id: pasture.id,
+        zoneType: 'pasture' as const,
+        animalType: pasture.animalType ?? null,
+        animalCount: pasture.animalCount + (pasture.animalType ? 1 : 0),
+      }))
+      resp = session.resolveChoice(pi, 'confirm', zones as unknown as Record<string, unknown>)
     }
 
     expect(resp.pending.type).toBe('none')

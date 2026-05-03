@@ -66,9 +66,9 @@ describe('C84_PerennialRye session', () => {
     expect(resp2.ok).toBe(true)
 
     // Gaining an animal triggers animal reorganization
-    if (resp2.pending.type === 'animalReorg') {
+    if (resp2.pending.type === 'choice' && (resp2.pending as any).promptKey === 'ui.interactionAnimalReorg') {
       // Place all 4 sheep in the pasture
-      resp2 = session.confirmAnimalReorg(0, [
+      resp2 = session.resolveChoice(0, 'confirm', [
         { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: 4 },
       ])
       expect(resp2.ok).toBe(true)

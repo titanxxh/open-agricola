@@ -57,9 +57,19 @@ const driveToCompletion = (
 ) => {
   let resp = initialResp
   // First, satisfy animalReorg by placing boar in house
-  if (resp.pending.type === 'animalReorg') {
-    const zones = (resp.interaction?.zones ?? []) as AnimalZone[]
-    resp = session.confirmAnimalReorg(0, placeBoarInHouse(zones))
+  if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    const p = resp.state.players[0]!
+    const zones: AnimalZone[] = [
+      { id: 'house', zoneType: 'house', animalType: null, animalCount: 0, capacity: 1 },
+      ...p.pastures.map((pasture) => ({
+        id: pasture.id,
+        zoneType: 'pasture' as const,
+        animalType: pasture.animalType ?? null,
+        animalCount: pasture.animalCount,
+        capacity: pasture.size * (1 + (pasture.stables ?? 0)),
+      })),
+    ]
+    resp = session.resolveChoice(0, 'confirm', placeBoarInHouse(zones) as unknown as Record<string, unknown>)
   }
   // Then resolve E53 prompt chain
   let safety = 30
@@ -127,7 +137,7 @@ describe('E53_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
 
     const initial = session.takeAction(0, 'pig-market')
     expect(initial.ok).toBe(true)
-    expect(initial.pending.type).toBe('animalReorg')
+    expect(initial.pending.type).toBe('choice')
 
     const resp = driveToCompletion(session, initial, /* acceptE53Trade */ true)
     expect(resp.state.players[0]!.resources.boar).toBe(0)

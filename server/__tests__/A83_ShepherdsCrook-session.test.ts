@@ -40,7 +40,7 @@ describe('A83_ShepherdsCrook session flow', () => {
       extraWood: 0,
     })
 
-    expect(resp.pending.type).toBe('animalReorg')
+    expect(resp.pending.type).toBe('choice')
     expect(resp.state.players[0]!.resources.sheep).toBe(2)
     expect(readCardResourceStats(resp.state.players[0]!, 'A83_ShepherdsCrook')).toMatchObject({
       paid: {},

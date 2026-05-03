@@ -75,8 +75,8 @@ describe('D72_StableManure session', () => {
     while (resp.pending.type === 'harvestFeed') {
       resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
     }
-    while (resp.pending.type === 'animalReorg') {
-      resp = session.confirmAnimalReorg(resp.pending.playerIndex, resp.interaction.zones)
+    while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones)
     }
 
     const p = resp.state.players[0]!
@@ -109,8 +109,8 @@ describe('D72_StableManure session', () => {
     while (resp.pending.type === 'harvestFeed') {
       resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
     }
-    while (resp.pending.type === 'animalReorg') {
-      resp = session.confirmAnimalReorg(resp.pending.playerIndex, resp.interaction.zones)
+    while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones)
     }
 
     const p = resp.state.players[0]!

@@ -88,8 +88,8 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
         } else {
           resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
         }
-      } else if (resp.pending.type === 'animalReorg') {
-        resp = session.confirmAnimalReorg(resp.pending.playerIndex, resp.interaction.zones)
+      } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+        resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones)
       } else if (resp.pending.type === 'choice') {
         const skip = resp.pending.options?.find((o) => o.value === '__skip__')
         if (skip) {
@@ -142,8 +142,8 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
     while (safety-- > 0 && resp.pending.type !== 'none') {
       if (resp.pending.type === 'harvestFeed') {
         resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
-      } else if (resp.pending.type === 'animalReorg') {
-        resp = session.confirmAnimalReorg(resp.pending.playerIndex, resp.interaction.zones)
+      } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+        resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones)
       } else if (resp.pending.type === 'choice') {
         const skip = resp.pending.options?.find((o) => o.value === '__skip__')
         resp = session.resolveChoice(

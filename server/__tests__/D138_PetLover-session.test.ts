@@ -52,8 +52,8 @@ describe('D138_PetLover session', () => {
     expect(resp.ok).toBe(true)
 
     // Normal collect path needs animal reorg for the freshly taken sheep.
-    expect(resp.pending.type).toBe('animalReorg')
-    resp = session.confirmAnimalReorg(0, [
+    expect(resp.pending.type).toBe('choice')
+    resp = session.resolveChoice(0, 'confirm', [
       { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ])
     expect(resp.ok).toBe(true)
@@ -82,8 +82,8 @@ describe('D138_PetLover session', () => {
     expect(resp.ok).toBe(true)
 
     // The bonus animal needs to be placed too.
-    if (resp.pending.type === 'animalReorg') {
-      resp = session.confirmAnimalReorg(0, [
+    if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(0, 'confirm', [
         { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
       ])
     }
@@ -104,8 +104,8 @@ describe('D138_PetLover session', () => {
     let resp = session.takeAction(0, 'sheep-market')
     expect(resp.ok).toBe(true)
     // No XOR because totalAnimals !== 1, so we go straight into animal reorg.
-    expect(resp.pending.type).toBe('animalReorg')
-    resp = session.confirmAnimalReorg(0, [
+    expect(resp.pending.type).toBe('choice')
+    resp = session.resolveChoice(0, 'confirm', [
       { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 2 },
     ])
     expect(resp.ok).toBe(true)
@@ -123,8 +123,8 @@ describe('D138_PetLover session', () => {
     let resp = session.takeAction(0, 'sheep-market')
     expect(resp.ok).toBe(true)
     // No PetLover -> no XOR -> straight to animal reorg.
-    expect(resp.pending.type).toBe('animalReorg')
-    resp = session.confirmAnimalReorg(0, [
+    expect(resp.pending.type).toBe('choice')
+    resp = session.resolveChoice(0, 'confirm', [
       { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ])
     expect(resp.ok).toBe(true)
