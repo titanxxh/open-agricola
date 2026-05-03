@@ -14,3 +14,12 @@ export {
   PlayerSwitchNode,
 } from './nodes'
 export type { EngineNode, EngineStepResult } from './types'
+export {
+  EngineStack,
+  type EngineFrame,
+  type EngineFrameCursor,
+  type EngineStackCursor,
+  type EngineSource,
+  type SubFlowReason,
+  type StageResumeState,
+} from './engine-stack'
