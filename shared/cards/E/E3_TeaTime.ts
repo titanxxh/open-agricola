@@ -1,8 +1,17 @@
 import { MinorImprovement } from '../types'
 import { recallWorkerById } from '../helpers/recall-worker'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E3_TeaTime'
+
+// BGA isBuyable: Farmers::getOnCard('ActionGrainUtilization', $pid)->empty() → false
+registerPrerequisite('Own Person on Grain Utilization', (player, state) => {
+  if (!state) return true
+  const space = state.actionSpaces.find((s) => s.id === 'grain-utilization')
+  if (!space) return false
+  return space.takenBy.some((t) => t.playerId === player.id)
+})
 
 export const E3_TeaTime = new MinorImprovement({
   id: CARD_ID,
