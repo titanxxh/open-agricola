@@ -36,9 +36,6 @@ describe('A→A self-jump recursion guard', () => {
       const skip = opts.find(o => o.value === '__skip__')
       const cancel = opts.find(o => o.value === 'cancel')
       const swagmanOpt = opts.find(o => o.sourceCard === 'A129_Swagman')
-      // Engine-driven farm prompts: cancel out of the farm-select branch so
-      // the placement chain can keep running (no payload to commit a tile).
-      const cancel = opts.find(o => o.value === 'cancel')
       const hasConfirm = opts.some(o => o.value === 'confirm')
       if (swagmanOpt) {
         resp = session.resolveChoice(0, swagmanOpt.value)
@@ -83,7 +80,6 @@ describe('A→A self-jump recursion guard', () => {
       const skip = opts.find(o => o.value === '__skip__')
       const cancel = opts.find(o => o.value === 'cancel')
       const swagmanOpt = opts.find(o => o.sourceCard === 'A129_Swagman')
-      const cancel = opts.find(o => o.value === 'cancel')
       const hasConfirm = opts.some(o => o.value === 'confirm')
       if (swagmanOpt) {
         resp = session.resolveChoice(0, swagmanOpt.value)
@@ -133,7 +129,6 @@ describe('place-farmer jump runs full ActionNode path (parity smoke)', () => {
       const skip = opts.find(o => o.value === '__skip__')
       const cancel = opts.find(o => o.value === 'cancel')
       const b150Opt = opts.find(o => o.sourceCard === 'B150_LargeScaleFarmer')
-      const cancel = opts.find(o => o.value === 'cancel')
       const hasConfirm = opts.some(o => o.value === 'confirm')
       if (b150Opt) {
         resp = session.resolveChoice(0, b150Opt.value)
