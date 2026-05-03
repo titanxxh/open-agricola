@@ -19,6 +19,7 @@ import { setFirstPlayerAction } from './effects/first-player'
 import { payAction } from './effects/pay'
 import { applyImprovementAction } from './effects/apply-improvement'
 import { applyRenovationAction } from './effects/apply-renovation'
+import { applyOccupationPlayAction } from './effects/apply-occupation-play'
 import { returnToSpaceAction } from './effects/internal/return-to-space'
 import { bonusVpAction } from './effects/bonus-vp'
 import { breedAction } from './effects/breed'
@@ -58,6 +59,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
   payAction,
   applyImprovementAction,
   applyRenovationAction,
+  applyOccupationPlayAction,
   returnToSpaceAction,
   bonusVpAction,
   breedAction,
