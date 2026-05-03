@@ -9,6 +9,7 @@ import { setWorkersAtHome } from '../../shared/game/player'
 import type { ActionFlow } from '../../shared/game/types'
 
 import { B22_WalkingBoots } from '../../shared/cards/B/B22_WalkingBoots'
+import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 const CARD_ID = 'B22_WalkingBoots'
 
@@ -112,5 +113,26 @@ describe('B22_WalkingBoots session', () => {
     session.loadState(state)
     // CardBase exposes `passing` via toJSON(); test uses the imported class.
     expect((B22_WalkingBoots as { passing?: boolean }).passing).toBeFalsy()
+  })
+
+  describe('prerequisite "At Most 4 People"', () => {
+    it('blocks when player already has 5 farmers', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const player = state.players[0]!
+      const next: typeof player.workers = []
+      for (let i = 0; i < 5; i += 1) {
+        next.push({ id: `worker-${i}`, isActive: true, isNewborn: false })
+      }
+      player.workers = next
+      expect(meetsCardPrerequisites(player, B22_WalkingBoots, state.round, state)).toBe(false)
+    })
+
+    it('allows when player has 4 or fewer farmers', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const player = state.players[0]!
+      expect(meetsCardPrerequisites(player, B22_WalkingBoots, state.round, state)).toBe(true)
+    })
   })
 })

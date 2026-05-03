@@ -4,10 +4,16 @@ import {
   readCardExtraData,
   writeCardExtraData,
 } from '../helpers/card-state'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
+import { familySize } from '../../game/player'
 import type { ActionFlow } from '../../game/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B22_WalkingBoots'
+
+// BGA isBuyable: countFarmers() == 5 → false. We mirror via familySize() which
+// counts active workers (the equivalent of BGA's "farmers").
+registerPrerequisite('At Most 4 People', (player) => familySize(player) <= 4)
 
 /**
  * B22 Walking Boots — Minor Improvement
