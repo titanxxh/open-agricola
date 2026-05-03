@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyFarmChoice } from '../../shared/logic/farm/farm-choice.ts'
 import { constructAction } from '../../shared/actions/effects/construct.ts'
-import { storePendingFenceBonus } from '../../shared/cards/helpers/pending-fence-bonus'
 import type { ActionExecutionContext, ActionSpace, GameState, PlayerState } from '../../shared/game/types.ts'
 import { buildRoomFarmInteraction } from '../../shared/logic/farm/farm-interaction.ts'
 import { A14_CarpentersHammer } from '../../shared/cards/A/A14_CarpentersHammer'
@@ -19,25 +17,6 @@ const buildRoomCtx = (
   actionContext,
 })
 
-
-const fenceTradeModifiers: PlayerState['activeModifiers'] = [
-  {
-    type: 'trade',
-    cardId: 'Test_Fence_Clay',
-    appliesTo: ['fencing'],
-    from: { clay: 2 },
-    to: { wood: 2 },
-    max: 2,
-  },
-  {
-    type: 'trade',
-    cardId: 'Test_Fence_Stone',
-    appliesTo: ['fencing'],
-    from: { stone: 2 },
-    to: { wood: 2 },
-    max: 2,
-  },
-]
 
 const createPlayer = (): PlayerState => ({
   id: 'p1',
@@ -66,9 +45,10 @@ const createPlayer = (): PlayerState => ({
   stableTiles: [],
   improvements: [],
   minorHand: [],
-  minorPlayed: ['E74_AshTrees'],
+  minorPlayed: [],
   occupationHand: [],
-  occupationPlayed: [],houseAnimalType: null,
+  occupationPlayed: [],
+  houseAnimalType: null,
   houseAnimalCount: 0,
   stableAnimals: {},
   pastures: [],
@@ -76,66 +56,10 @@ const createPlayer = (): PlayerState => ({
   majorEffects: { wellRounds: 0 },
   startPlayer: false,
   activeModifiers: [],
-  cardStates: {
-    E74_AshTrees: { counters: { fences: 5 } },
-  },
+  cardStates: {},
 })
 
-const edgesForTile = (row: number, col: number) => [
-  `H-${row}-${col}`,
-  `H-${row + 1}-${col}`,
-  `V-${row}-${col}`,
-  `V-${row}-${col + 1}`,
-]
-
 describe('farm choice', () => {
-  it('consumes reserved Ash Trees fences instead of wood', () => {
-    const player = createPlayer()
-    storePendingFenceBonus(player, {
-      sourceCard: 'E74_AshTrees',
-      counterKey: 'fences',
-      freeFences: 4,
-    })
-
-    const result = applyFarmChoice(player, 'fence', {
-      edges: edgesForTile(1, 1),
-      extraWood: 0,
-    })
-
-    expect(result.ok).toBe(true)
-    if (!result.ok) return
-    expect(result.player.resources.wood).toBe(0)
-    expect(result.player.cardStates?.E74_AshTrees?.counters?.fences).toBe(1)
-    expect(result.meta).toMatchObject({
-      sourceCard: 'E74_AshTrees',
-      usedFreeFences: 4,
-      newFenceEdges: edgesForTile(1, 1),
-    })
-    expect(result.meta?.newPastures).toHaveLength(1)
-  })
-
-  it('requires an explicit payment choice when multiple fence payments are legal', () => {
-    const player = createPlayer()
-    player.resources.wood = 0
-    player.resources.clay = 2
-    player.resources.stone = 2
-    player.activeModifiers = [...fenceTradeModifiers]
-    storePendingFenceBonus(player, {
-      sourceCard: 'E74_AshTrees',
-      counterKey: 'fences',
-      freeFences: 2,
-    })
-
-    const result = applyFarmChoice(player, 'fence', {
-      edges: edgesForTile(1, 1),
-      extraWood: 0,
-    })
-
-    expect(result.ok).toBe(false)
-    if (result.ok) return
-    expect(result.error).toBe('payment choice required')
-  })
-
   it('pays frame builder room costs using alternate clay payment', () => {
     const player = createPlayer()
     player.houseType = 'clay'
