@@ -2,10 +2,17 @@ import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getStoredResource } from '../helpers/card-storage'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { PlayerState } from '../../game/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C81_MaterialHub'
+
+// BGA isBuyable: countReserveResource(REED) == 0 || countReserveResource(STONE) == 0 → false
+// Whole-string handler so the registry takes priority over the " and " split parser.
+registerPrerequisite('1 reed and 1 stone in your supply', (player) =>
+  (player.resources.reed ?? 0) >= 1 && (player.resources.stone ?? 0) >= 1,
+)
 
 const THRESHOLDS: Record<string, number> = {
   wood: 5,
