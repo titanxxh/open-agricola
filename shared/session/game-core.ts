@@ -161,8 +161,13 @@ type StageResumeState = {
     | 'onBeforeReturnHome'
     | 'onAllWorkersPlaced'
     | 'onBreedPhase'
+    | 'onReorganizeComplete'
   playerIndex: number
   cardIndex: number
+  extra?: {
+    trigger?: import('../actions/effects/reorganize').ReorganizeTrigger
+    originPlayerIndex?: number | null
+  }
 }
 
 export type SessionResponse = {
@@ -479,6 +484,31 @@ export class GameCore {
       hooks: this.hookDispatcher,
       log: this.engineLog,
     })
+  }
+
+  private startReorganizeSubFlow(
+    playerIndex: number,
+    trigger: import('../actions/effects/reorganize').ReorganizeTrigger,
+    resumeExtra: { originPlayerIndex?: number | null } = {},
+  ): void {
+    const player = this.state.players[playerIndex]
+    if (!player) return
+    const flow: ActionFlow = {
+      type: 'leaf',
+      actionId: 'reorganize',
+      actionContext: { trigger },
+    }
+    this.engine = this.createFlowEngine(flow)
+    this.engineSource = { kind: 'flow', flow }
+    this.activePlayerIndex = playerIndex
+    this.activeSpaceId = '__reorganize__'
+    this.stageResume = {
+      hook: 'onReorganizeComplete',
+      playerIndex,
+      cardIndex: 0,
+      extra: { trigger, originPlayerIndex: resumeExtra.originPlayerIndex ?? null },
+    }
+    this.runEngineSteps()
   }
 
   private createEngine(actionId: string): Engine {
@@ -1537,6 +1567,44 @@ export class GameCore {
     return this.respond()
   }
 
+  private continueAfterReorganize_returningHome(_playerIndex: number): void {
+    const nextPending = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
+    if (nextPending !== -1) {
+      this.startReorganizeSubFlow(nextPending, 'returning-home')
+      return
+    }
+    if (harvestRounds.includes(this.state.round)) {
+      this.startHarvest()
+      return
+    }
+    this.finalizeRound()
+  }
+
+  private continueAfterReorganize_harvestBreed(playerIndex: number): void {
+    const nextPending = this.findNextHarvestReorgPlayer(playerIndex)
+    if (nextPending !== -1) {
+      this.startReorganizeSubFlow(nextPending, 'harvest-breed')
+      return
+    }
+    this.continueEndHarvestEffects()
+  }
+
+  private continueAfterReorganize_roundEnd(
+    playerIndex: number,
+    originPlayerIndex: number | null,
+  ): void {
+    if (originPlayerIndex !== null) {
+      this.continueEndTurnHooks(originPlayerIndex)
+      return
+    }
+    this.finalizeActionLog(this.state.players[playerIndex]!)
+    const allUsed = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)
+    if (!allUsed) {
+      const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
+      this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
+    }
+  }
+
   private resumeStageFlow(stageResume: StageResumeState) {
     switch (stageResume.hook) {
       case 'onBeforeHarvest':
@@ -1602,6 +1670,22 @@ export class GameCore {
       case 'onBreedPhase':
         this.continueEndHarvestEffects()
         return
+      case 'onReorganizeComplete': {
+        const trigger = stageResume.extra?.trigger ?? 'anytime'
+        if (trigger === 'returning-home') {
+          return this.continueAfterReorganize_returningHome(stageResume.playerIndex)
+        }
+        if (trigger === 'harvest-breed') {
+          return this.continueAfterReorganize_harvestBreed(stageResume.playerIndex)
+        }
+        if (trigger === 'round-end') {
+          return this.continueAfterReorganize_roundEnd(
+            stageResume.playerIndex,
+            stageResume.extra?.originPlayerIndex ?? null,
+          )
+        }
+        return
+      }
     }
   }
 
@@ -1634,7 +1718,12 @@ export class GameCore {
           continue
         }
         if (this.hasPendingAnimals(player)) {
-          this.pending = { type: 'animalReorg', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId }
+          const pIdx = this.activePlayerIndex!
+          this.engine = null
+          this.engineSource = null
+          this.activeSpaceId = null
+          this.activePlayerIndex = null
+          this.startReorganizeSubFlow(pIdx, 'anytime')
           return
         }
         if (this.turnOwnerPlayerIndex !== null) {
@@ -1709,7 +1798,12 @@ export class GameCore {
               return
             }
             if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
-              this.pending = { type: 'animalReorg', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId }
+              const pIdx = this.activePlayerIndex!
+              this.engine = null
+              this.engineSource = null
+              this.activeSpaceId = null
+              this.activePlayerIndex = null
+              this.startReorganizeSubFlow(pIdx, 'anytime')
               return
             }
             break
@@ -1723,15 +1817,6 @@ export class GameCore {
           costOverride: this.engine?.getLastComputedCosts(),
           sourceCard: this.engine?.snapshot().pendingChoiceContext?.sourceCard ?? undefined,
           actionContext: this.engine?.snapshot().pendingChoiceContext?.actionContext ?? undefined,
-        }
-        return
-      }
-
-      if (step.type === 'ok' && step.result.type === 'animalReorg') {
-        this.pending = {
-          type: 'animalReorg',
-          playerIndex: this.activePlayerIndex,
-          spaceId: step.result.sourceId,
         }
         return
       }
@@ -1755,7 +1840,12 @@ export class GameCore {
       }
 
       if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
-        this.pending = { type: 'animalReorg', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId }
+        const pIdx = this.activePlayerIndex!
+        this.engine = null
+        this.engineSource = null
+        this.activeSpaceId = null
+        this.activePlayerIndex = null
+        this.startReorganizeSubFlow(pIdx, 'anytime')
         return
       }
     }
@@ -2098,14 +2188,6 @@ export class GameCore {
         costOverride: this.engine.getLastComputedCosts(),
         sourceCard: this.engine.snapshot().pendingChoiceContext?.sourceCard ?? undefined,
         actionContext: this.engine.snapshot().pendingChoiceContext?.actionContext ?? undefined,
-      }
-      return this.respond()
-    }
-    if (result.type === 'animalReorg') {
-      this.pending = {
-        type: 'animalReorg',
-        playerIndex,
-        spaceId: result.sourceId,
       }
       return this.respond()
     }
@@ -2453,7 +2535,8 @@ export class GameCore {
 
     const pendingAnimal = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
     if (pendingAnimal !== -1) {
-      this.pending = { type: 'animalReorg', playerIndex: pendingAnimal, spaceId: 'round-end' }
+      this.startReorganizeSubFlow(pendingAnimal, 'round-end',
+        { originPlayerIndex: this.turnOwnerPlayerIndex })
       return this.respond()
     }
 
@@ -2493,7 +2576,7 @@ export class GameCore {
 
     const pendingAnimal = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
     if (pendingAnimal !== -1) {
-      this.pending = { type: 'animalReorg', playerIndex: pendingAnimal, spaceId: 'returning-home' }
+      this.startReorganizeSubFlow(pendingAnimal, 'returning-home')
       return this.respond()
     }
 
@@ -2662,14 +2745,6 @@ export class GameCore {
         costOverride: this.engine.getLastComputedCosts(),
         sourceCard: this.engine.snapshot().pendingChoiceContext?.sourceCard ?? undefined,
         actionContext: this.engine.snapshot().pendingChoiceContext?.actionContext ?? undefined,
-      }
-      return this.respond()
-    }
-    if (result.type === 'animalReorg') {
-      this.pending = {
-        type: 'animalReorg',
-        playerIndex,
-        spaceId: result.sourceId,
       }
       return this.respond()
     }
