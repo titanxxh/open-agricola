@@ -119,7 +119,7 @@ describe('E68_CherryOrchard session', () => {
     resp = session.resolveChoice(0, 'sow')
     expect(resp.ok).toBe(true)
 
-    resp = session.commitFarmChoice(0, 'sow', {
+    resp = session.resolveChoice(0, 'confirm', {
       crops: [{ row: VIRTUAL_TILE.row, col: VIRTUAL_TILE.col, crop: 'wood' }],
     })
     expect(resp.ok).toBe(true)
@@ -173,7 +173,7 @@ describe('E68_CherryOrchard session', () => {
     resp = session.resolveChoice(0, 'sow')
     expect(resp.ok).toBe(true)
 
-    resp = session.commitFarmChoice(0, 'sow', {
+    resp = session.resolveChoice(0, 'confirm', {
       crops: [{ row: VIRTUAL_TILE.row, col: VIRTUAL_TILE.col, crop: 'grain' }],
     })
     expect(resp.ok).toBe(false)

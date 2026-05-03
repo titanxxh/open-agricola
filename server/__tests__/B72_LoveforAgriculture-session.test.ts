@@ -95,7 +95,7 @@ describe('B72_LoveforAgriculture session', () => {
       }
 
       // Sow grain in the pasture tile
-      resp = session.commitFarmChoice(0, 'sow', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: 2, col: 2, crop: 'grain' }],
       })
       expect(resp.ok).toBe(true)
@@ -133,7 +133,7 @@ describe('B72_LoveforAgriculture session', () => {
       resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
 
-      resp = session.commitFarmChoice(0, 'sow', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: 2, col: 2, crop: 'vegetable' }],
       })
       expect(resp.ok).toBe(true)
@@ -189,7 +189,7 @@ describe('B72_LoveforAgriculture session', () => {
       expect(resp.ok).toBe(true)
 
       // Sow in both field and pasture
-      resp = session.commitFarmChoice(0, 'sow', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [
           { row: 0, col: 0, crop: 'grain' },
           { row: 2, col: 2, crop: 'grain' },
@@ -258,7 +258,7 @@ describe('B72_LoveforAgriculture session', () => {
       // First sow
       let resp = session.takeAction(0, 'grain-utilization')
       resp = session.resolveChoice(0, 'sow')
-      resp = session.commitFarmChoice(0, 'sow', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: 2, col: 2, crop: 'grain' }],
       })
       expect(resp.ok).toBe(true)

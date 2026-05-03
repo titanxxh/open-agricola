@@ -200,7 +200,7 @@ describe('pending choice types + undo regression', () => {
         allowedCrops: ['grain'],
       })
 
-      resp = session.commitFarmChoice(0, 'sow', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: 0, col: 0, crop: 'grain' }],
       })
       expect(resp.ok).toBe(true)

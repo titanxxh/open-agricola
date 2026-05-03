@@ -80,7 +80,7 @@ describe('A132_Publican session', () => {
     expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
 
     // Commit the sow with 1 grain crop
-    resp = session.commitFarmChoice(1, 'sow', {
+    resp = session.resolveChoice(1, 'confirm', {
       crops: [{ row: 0, col: 0, crop: 'grain' }],
     })
     expect(resp.ok).toBe(true)
@@ -131,7 +131,7 @@ describe('A132_Publican session', () => {
     expect(resp.pending.type).toBe('choice')
     expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
 
-    resp = session.commitFarmChoice(1, 'sow', {
+    resp = session.resolveChoice(1, 'confirm', {
       crops: [{ row: 0, col: 0, crop: 'grain' }],
     })
     expect(resp.ok).toBe(true)
@@ -178,7 +178,7 @@ describe('A132_Publican session', () => {
     expect(resp.pending.type).toBe('choice')
     expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
 
-    resp = session.commitFarmChoice(0, 'sow', {
+    resp = session.resolveChoice(0, 'confirm', {
       crops: [{ row: 0, col: 0, crop: 'grain' }],
     })
     expect(resp.ok).toBe(true)

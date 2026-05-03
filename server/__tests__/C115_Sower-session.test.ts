@@ -176,7 +176,7 @@ describe('C115_Sower session', () => {
     expect(stack.length).toBe(0)
 
     // Complete the sow by committing a crop
-    const resp3 = session.commitFarmChoice(0, 'sow', {
+    const resp3 = session.resolveChoice(0, 'confirm', {
       crops: [{ row: 0, col: 0, crop: 'grain' }],
     })
     expect(resp3.ok).toBe(true)

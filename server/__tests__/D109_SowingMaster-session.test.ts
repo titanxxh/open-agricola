@@ -62,7 +62,7 @@ describe('D109_SowingMaster session', () => {
     }
     // Handle farm selections if needed
     if (resp.interaction?.stateId === 'farmSelect') {
-      resp = session.commitFarmChoice(0, 'sow', { sow: [{ row: 0, col: 0, crop: 'grain' }] })
+      resp = session.resolveChoice(0, 'confirm', { sow: [{ row: 0, col: 0, crop: 'grain' }] })
     }
 
     while (resp.pending.type === 'confirmPlayerSwitch') {

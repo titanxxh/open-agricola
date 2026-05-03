@@ -79,7 +79,7 @@ describe('D71_Changeover session', () => {
       if (resp.pending.type === 'choice' && resp.pending.promptKey === 'ui.interactionSowSelect') {
         expect(resp.interaction.stateId).toBe('farmSelect')
         // Sow grain into the empty field 0-2
-        resp = session.commitFarmChoice(0, 'sow', {
+        resp = session.resolveChoice(0, 'confirm', {
           crops: [{ row: 0, col: 2, crop: 'grain' }],
         })
         expect(resp.ok).toBe(true)
