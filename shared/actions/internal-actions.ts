@@ -12,7 +12,7 @@ import { stablesAction } from './effects/stables'
 import { plowAction } from './effects/plow'
 import { sowAction } from './effects/sow'
 import { bakeBreadAction } from './effects/bake-bread'
-import { anytimeReorgAction } from './effects/reorganize'
+import { reorganizeAction } from './effects/reorganize'
 import { anytimeExchangeAction } from './effects/exchange'
 import { placeFarmerAction } from './effects/place-farmer'
 import { setFirstPlayerAction } from './effects/first-player'
@@ -54,7 +54,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
   plowAction,
   sowAction,
   bakeBreadAction,
-  anytimeReorgAction,
+  reorganizeAction,
   anytimeExchangeAction,
   payAction,
   applyImprovementAction,
