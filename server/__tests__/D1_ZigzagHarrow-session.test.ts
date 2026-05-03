@@ -3,7 +3,8 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import type { ActionFlow } from '../../shared/game/types'
 
-import '../../shared/cards/D/D1_ZigzagHarrow'
+import { D1_ZigzagHarrow } from '../../shared/cards/D/D1_ZigzagHarrow'
+import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 /**
  * D1 Zigzag Harrow (verify-only, Sprint 7a F1).
@@ -37,5 +38,26 @@ describe('D1_ZigzagHarrow session (verify-only)', () => {
     expect(leaf.sourceCard).toBe('D1_ZigzagHarrow')
     // Deliberate divergence: no `actionContext.allowedTiles` threading.
     expect(leaf.actionContext).toBeUndefined()
+  })
+
+  describe('prerequisite (simplified)', () => {
+    it('blocks when player has fewer than 2 fields', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const player = state.players[0]!
+      player.fields = [{ row: 0, col: 0, stacks: [] }]
+      expect(meetsCardPrerequisites(player, D1_ZigzagHarrow, state.round, state)).toBe(false)
+    })
+
+    it('allows (simplified) when player has at least 2 fields', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const player = state.players[0]!
+      player.fields = [
+        { row: 0, col: 0, stacks: [] },
+        { row: 0, col: 1, stacks: [] },
+      ]
+      expect(meetsCardPrerequisites(player, D1_ZigzagHarrow, state.round, state)).toBe(true)
+    })
   })
 })
