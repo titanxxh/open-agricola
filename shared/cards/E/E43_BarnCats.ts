@@ -1,8 +1,12 @@
 import { MinorImprovement } from '../types'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E43_BarnCats'
+
+// BGA isBuyable: countStablesForCards() == 0 → false (require >= 1 stable)
+registerPrerequisite('1 Stable', (player) => player.stableTiles.length >= 1)
 
 export const E43_BarnCats = new MinorImprovement({
   id: CARD_ID,
