@@ -1,7 +1,14 @@
 import { MinorImprovement } from '../types'
+import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A36_FacadesCarving'
+
+// BGA isBuyable: countReserveResource(WOOD) < Globals::getTurn() → false
+registerPrerequisite('Wood in Your Supply >= Current Round', (player, state) => {
+  if (!state) return true
+  return (player.resources.wood ?? 0) >= state.round
+})
 
 // Maps current round to number of completed harvests
 const HARVEST_MAP: Record<number, number> = {
