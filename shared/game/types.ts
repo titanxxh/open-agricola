@@ -440,6 +440,9 @@ export type ActionChoiceOption = {
  * Lifecycle: only consumed when the result type is 'choice' (which produces a
  * new pending). For 'ok' / 'fail' / 'flow' results the field is ignored
  * because pending is being cleared or transformed differently.
+ *
+ * Writes are shallow: top-level keys are merged, nested objects replace (not deep-merge).
+ * Use plain JSON-serializable values; Map/Set/Date are not preserved across snapshot/rehydrate.
  */
 export type ActionExecutionResult =
   | { type: 'ok'; logKey?: string; resourcesGained?: Partial<Resource>; resourcesPaid?: Partial<Resource>; logParams?: Record<string, unknown>; immediateLogs?: ImmediateLogEntry[]; extraData?: Record<string, unknown> }
