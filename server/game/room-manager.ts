@@ -983,7 +983,7 @@ export const createWsServer = (server: import('node:http').Server) => {
       }
 
       if (msg.type === 'choice') {
-        const resp = callRoom(s => s.resolveChoice(currentPlayerIndex, msg.value))
+        const resp = callRoom(s => s.resolveChoice(currentPlayerIndex, msg.value, msg.payload))
         broadcastState(room, resp, 'choice', msg.requestId)
         return
       }

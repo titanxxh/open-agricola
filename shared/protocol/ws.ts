@@ -4,7 +4,7 @@ import type { DraftMode, DraftPickPayload } from '../draft/types'
 type ClientCommandBody =
   | { type: 'auth'; token: string }
   | { type: 'action'; spaceId: string }
-  | { type: 'choice'; value: string }
+  | { type: 'choice'; value: string; payload?: Record<string, unknown> }
   | { type: 'anytime'; actionId: string }
   | {
       type: 'reorg'
