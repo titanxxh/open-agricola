@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { markAllWorkersUsed, setActiveWorkerCount, setNewbornCount, newbornCount } from '../../shared/game/player'
-import '../../shared/cards/E/E30_ChildsToy'
+import { E30_ChildsToy } from '../../shared/cards/E/E30_ChildsToy'
+import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import type { ActionChoiceOption } from '../../shared/game/types'
 
 const CARD_ID = 'E30_ChildsToy'
@@ -216,5 +217,34 @@ describe('E30_ChildsToy session', () => {
     expect(p1.resources.food).toBe(4) // 10 - 6
     // Sanity: newborn flag at end-of-round is cleared by engine (independent of E30).
     expect(newbornCount(p1)).toBe(0)
+  })
+
+  describe('prerequisite "Exactly 2 Adults"', () => {
+    it('blocks when player has only 1 adult', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const player = state.players[0]!
+      setActiveWorkerCount(player, 1)
+      setNewbornCount(player, 0)
+      expect(meetsCardPrerequisites(player, E30_ChildsToy, state.round, state)).toBe(false)
+    })
+
+    it('blocks when one active worker is a newborn (1 adult + 1 newborn)', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const player = state.players[0]!
+      setActiveWorkerCount(player, 2)
+      setNewbornCount(player, 1)
+      expect(meetsCardPrerequisites(player, E30_ChildsToy, state.round, state)).toBe(false)
+    })
+
+    it('allows when player has exactly 2 adults (no newborns)', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      const player = state.players[0]!
+      setActiveWorkerCount(player, 2)
+      setNewbornCount(player, 0)
+      expect(meetsCardPrerequisites(player, E30_ChildsToy, state.round, state)).toBe(true)
+    })
   })
 })
