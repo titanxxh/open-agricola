@@ -160,7 +160,6 @@ describe('B115_TinsmithMaster session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
 
       // Sow grain in the field
@@ -188,7 +187,6 @@ describe('B115_TinsmithMaster session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
 
       resp = session.resolveChoice(0, 'confirm', {
@@ -214,7 +212,6 @@ describe('B115_TinsmithMaster session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
 
       resp = session.resolveChoice(0, 'confirm', {
@@ -241,7 +238,6 @@ describe('B115_TinsmithMaster session', () => {
 
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
       expect(resp.ok).toBe(true)
 
       // Sow grain in both fields

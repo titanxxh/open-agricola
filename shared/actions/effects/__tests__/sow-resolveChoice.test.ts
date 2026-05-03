@@ -96,26 +96,12 @@ describe('sowAction.resolveChoice', () => {
     expect(result.type).toBe('fail')
   })
 
-  it('bare confirm with no payload is transitional no-op', () => {
-    // PR 3 transition: legacy commitFarmChoice('sow', ...) drives engine with
-    // bare 'confirm'. Listener returns ok so after-hooks still fire and the
-    // sow ChoiceNode resolves cleanly.
+  it('bare confirm with no payload returns fail', () => {
+    // The legacy compatibility branch was removed in Task 3; a confirm without
+    // a crops payload is no longer a valid commit and surfaces as fail.
     const ctx = makeCtx()
-    const before = JSON.stringify(ctx.player)
     const result = sowAction.resolveChoice!(ctx, 'confirm')
-    expect(result.type).toBe('ok')
-    expect(JSON.stringify(ctx.player)).toBe(before)
-  })
-
-  it('unknown choice (e.g. parent OR re-dispatch) is transitional no-op', () => {
-    // Some session tests issue resolveChoice('sow') redundantly after the
-    // parent OR has already auto-collapsed. Mirrors the legacy `() => ({ type:
-    // 'ok' })` behavior so those tests keep working until Task 3.
-    const ctx = makeCtx()
-    const before = JSON.stringify(ctx.player)
-    const result = sowAction.resolveChoice!(ctx, 'sow')
-    expect(result.type).toBe('ok')
-    expect(JSON.stringify(ctx.player)).toBe(before)
+    expect(result.type).toBe('fail')
   })
 
   it('confirm with non-crops payload returns fail', () => {

@@ -67,7 +67,6 @@ describe('E71_CowPatty session', () => {
 
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
-    resp = session.resolveChoice(0, 'sow')
     expect(resp.ok).toBe(true)
 
     resp = session.resolveChoice(0, 'confirm', {
@@ -105,7 +104,6 @@ describe('E71_CowPatty session', () => {
 
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
-    resp = session.resolveChoice(0, 'sow')
     expect(resp.ok).toBe(true)
 
     resp = session.resolveChoice(0, 'confirm', {
@@ -141,7 +139,6 @@ describe('E71_CowPatty session', () => {
 
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
-    resp = session.resolveChoice(0, 'sow')
     expect(resp.ok).toBe(true)
 
     resp = session.resolveChoice(0, 'confirm', {
@@ -166,7 +163,6 @@ describe('E71_CowPatty session', () => {
 
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
-    resp = session.resolveChoice(0, 'sow')
     expect(resp.ok).toBe(true)
 
     resp = session.resolveChoice(0, 'confirm', {
@@ -201,7 +197,6 @@ describe('E71_CowPatty session', () => {
 
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
-    resp = session.resolveChoice(0, 'sow')
     expect(resp.ok).toBe(true)
 
     resp = session.resolveChoice(0, 'confirm', {
@@ -241,7 +236,6 @@ describe('E71_CowPatty session', () => {
 
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
-    resp = session.resolveChoice(0, 'sow')
     expect(resp.ok).toBe(true)
 
     resp = session.resolveChoice(0, 'confirm', {
@@ -291,7 +285,6 @@ describe('E71_CowPatty session', () => {
 
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
-    resp = session.resolveChoice(0, 'sow')
     expect(resp.ok).toBe(true)
 
     resp = session.resolveChoice(0, 'confirm', {
