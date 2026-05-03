@@ -1,6 +1,21 @@
-import type { ActionCostPreview, ActionDefinition, FarmTilePosition, PlayerState } from '../../game/types'
+import type {
+  ActionCostPreview,
+  ActionDefinition,
+  ActionExecutionContext,
+  ActionExecutionResult,
+  FarmTilePosition,
+  PlayerState,
+  Resource,
+} from '../../game/types'
 import { getAllTilePositions, positionKey } from '../../game/farm'
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'
+import { applyFarmChoice } from '../../logic/farm/farm-choice'
+import { validatePlowSelection } from '../../logic/farm/plow-validation'
+import { collectLockedFarmTileKeys } from '../../cards/card-effects'
+import { addCardResourceGained } from '../../cards/helpers/card-state'
+import {
+  resolveTypedFlatPaymentSelection,
+} from '../helpers/pay-helpers'
 
 const getOccupiedKeys = (player: PlayerState) => {
   const keys = new Set<string>()
@@ -53,6 +68,43 @@ const plowCostPreview: ActionCostPreview = {
   getBaseCost: () => ({}),
 }
 
+const sanitizePayableCost = (
+  cost: Partial<Resource> | undefined,
+): Partial<Resource> => {
+  const payable: Partial<Resource> = {}
+  Object.entries(cost ?? {}).forEach(([key, value]) => {
+    if (typeof value !== 'number' || value <= 0) return
+    payable[key as keyof Resource] = value
+  })
+  return payable
+}
+
+const applyPlayerMutation = (target: PlayerState, source: PlayerState) => {
+  for (const key of Object.keys(target) as Array<keyof PlayerState>) {
+    if (!(key in source)) {
+      delete (target as Record<string, unknown>)[key as string]
+    }
+  }
+  Object.assign(target, source)
+}
+
+const finalizePlow = (
+  ctx: ActionExecutionContext,
+  tile: FarmTilePosition,
+  paymentChoice: string | undefined,
+): ActionExecutionResult => {
+  const result = applyFarmChoice(ctx.player, 'plow', { tile }, {
+    costOverride: ctx.costs,
+    paymentChoice,
+  })
+  if (!result.ok) return { type: 'fail', logKey: 'log.action' }
+  applyPlayerMutation(ctx.player, result.player as unknown as PlayerState)
+  if (ctx.sourceCard) {
+    addCardResourceGained(ctx.player, ctx.sourceCard, { field: 1 })
+  }
+  return { type: 'ok', extraData: { plowedTile: tile } }
+}
+
 export const plowAction: ActionDefinition = {
   id: 'plow',
   nameKey: 'actions.plow.name',
@@ -70,5 +122,67 @@ export const plowAction: ActionDefinition = {
       { value: 'cancel', labelKey: 'ui.interactionPlowCancel' },
     ],
   }),
-  resolveChoice: () => ({ type: 'ok' }),
+  resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
+    if (choice === 'cancel') return { type: 'ok' }
+
+    // Legacy compatibility (PR 2-6 transition): commitFarmChoice('plow', ...)
+    // mutates state itself, then drives the engine with `engine.resolveChoice
+    // ('confirm', ..., resolvedResultOverride)` — `payload` is undefined and
+    // there is no farmPayload in actionContext. Treat that bare confirm as a
+    // no-op so after-hooks (B19, etc.) still fire. Removed in PR 4 once
+    // commitFarmChoice's plow branch is gone.
+    if (choice === 'confirm' && !payload && !ctx.actionContext?.farmPayload) {
+      return { type: 'ok' }
+    }
+
+    const lockedKeys = collectLockedFarmTileKeys(ctx.player)
+
+    // Second call: payment combo selected after multi-combo prompt.
+    if (choice.startsWith('pay:plow:')) {
+      const farmPayload = ctx.actionContext?.farmPayload as
+        | { tile?: FarmTilePosition }
+        | undefined
+      const tile = farmPayload?.tile
+      if (!tile) return { type: 'fail', logKey: 'log.action' }
+      const validated = validatePlowSelection(ctx.player, tile, lockedKeys)
+      if (!validated.ok) {
+        return { type: 'fail', logKey: validated.error?.code ?? 'log.action' }
+      }
+      return finalizePlow(ctx, tile, choice)
+    }
+
+    // First call: client submitted tile geometry alongside `confirm`.
+    if (payload && choice === 'confirm') {
+      const tile = (payload as { tile?: FarmTilePosition }).tile
+      const validated = validatePlowSelection(ctx.player, tile, lockedKeys)
+      if (!validated.ok) {
+        return { type: 'fail', logKey: validated.error?.code ?? 'log.action' }
+      }
+      const selectedTile = tile as FarmTilePosition
+      const payment = resolveTypedFlatPaymentSelection(
+        validated.player as unknown as PlayerState,
+        sanitizePayableCost(ctx.costs),
+        'pay:plow',
+        undefined,
+        { type: 'fail', logKey: 'log.action' },
+        'plow',
+      )
+      if (payment.type === 'choice') {
+        return {
+          type: 'choice',
+          promptKey: payment.promptKey,
+          options: payment.options ?? [],
+          extraData: {
+            actionContextWrite: { farmPayload: { tile: selectedTile } },
+          },
+        }
+      }
+      if (payment.type === 'fail') {
+        return { type: 'fail', logKey: 'log.action' }
+      }
+      return finalizePlow(ctx, selectedTile, undefined)
+    }
+
+    return { type: 'fail', logKey: 'log.action' }
+  },
 }
