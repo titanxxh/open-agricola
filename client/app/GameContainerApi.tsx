@@ -542,11 +542,18 @@ export const GameContainerApi = () => {
         return
       }
       if (interaction.farm.farmType === 'fence') {
-        commitFarmWithError(pendingPlayerIndex, 'fence', {
+        void transport.resolveChoice(pendingPlayerIndex, 'confirm', {
           edges: pendingFenceEdges,
           palisadeEdges: pendingPalisadeEdges,
           extraWood: interaction.farm.extraWood ?? 0,
         })
+          .then((resp) => {
+            if (!resp.ok) setFarmCommitError('fence', resp.error)
+          })
+          .catch((e) => {
+            console.error(e)
+            setFarmCommitError('fence')
+          })
         return
       }
       if (interaction.farm.farmType === 'room') {
