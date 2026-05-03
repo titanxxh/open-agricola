@@ -22,10 +22,6 @@ export interface GameTransport {
     positions?: { row: number; col: number }[]
     cardIds?: string[]
   }): Promise<GameSyncPayload>
-  confirmReorg(playerIndex: number, zones: {
-    id: string; zoneType: 'pasture' | 'house' | 'stable'
-    animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number
-  }[]): Promise<GameSyncPayload>
   confirmFeed(playerIndex: number, selections: {
     count: number;
     sourceName?: string;
@@ -140,10 +136,6 @@ export class HttpGameTransport implements GameTransport {
     payload: { positions?: { row: number; col: number }[]; cardIds?: string[] },
   ) {
     return this.send(() => post('/api/game/commit-selection', { playerIndex, payload }))
-  }
-
-  confirmReorg(playerIndex: number, zones: Parameters<GameTransport['confirmReorg']>[1]) {
-    return this.send(() => post('/api/game/reorg', { playerIndex, zones }))
   }
 
   confirmFeed(playerIndex: number, selections: Parameters<GameTransport['confirmFeed']>[1]) {
@@ -358,10 +350,6 @@ export class WsGameTransport implements GameTransport {
     payload: { positions?: { row: number; col: number }[]; cardIds?: string[] },
   ): Promise<GameSyncPayload> {
     return this.sendCommand({ type: 'commitSelection', playerIndex, payload })
-  }
-
-  async confirmReorg(_playerIndex: number, zones: Parameters<GameTransport['confirmReorg']>[1]): Promise<GameSyncPayload> {
-    return this.sendCommand({ type: 'reorg', zones })
   }
 
   async confirmFeed(_playerIndex: number, selections: Parameters<GameTransport['confirmFeed']>[1]): Promise<GameSyncPayload> {

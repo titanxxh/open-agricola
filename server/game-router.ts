@@ -220,18 +220,6 @@ export const handleGameRoute = async (
     return true
   }
 
-  if (req.method === 'POST' && req.url === '/api/game/reorg') {
-    const body = JSON.parse(await readBody(req)) as { playerIndex?: number; zones?: unknown[] }
-    if (typeof body.playerIndex !== 'number' || !Array.isArray(body.zones)) {
-      sendJson(res, 400, { ok: false, error: 'invalid payload' })
-      return true
-    }
-    if (!enforceSeatBinding(req, res, body.playerIndex)) return true
-    const { resp, result } = callAndRespond(req, s => s.confirmAnimalReorg(body.playerIndex!, body.zones as Parameters<GameSession['confirmAnimalReorg']>[1]))
-    sendJson(res, resp.ok ? 200 : 400, result)
-    return true
-  }
-
   if (req.method === 'POST' && req.url === '/api/game/feed') {
     const body = JSON.parse(await readBody(req)) as { playerIndex?: number; selections?: unknown[] }
     if (typeof body.playerIndex !== 'number' || !Array.isArray(body.selections)) {

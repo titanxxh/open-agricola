@@ -11,7 +11,6 @@ import { emptyResources, resourceKeyList } from '../../shared/logic/state-consta
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, parseDraftParamsFromQuery, type GameTransport } from '../services/gameTransport'
 import type { GameSyncPayload } from '../../shared/protocol/game'
-import { rehydrateStateForClient } from '../services/rehydrate'
 import { playerCanBuildPalisades } from '../../shared/cards/helpers/card-type'
 import { useFarmSelection } from '../hooks/useFarmSelection'
 import { buildHarvestFeedOptions } from './hooks/use-harvest-flow'
@@ -386,12 +385,6 @@ export const GameContainerApi = () => {
         zones: payload.interaction.zones,
         confirmDiscard: false,
       })
-    } else if (payload.pending.type === 'animalReorg') {
-      const hydrated = rehydrateStateForClient(payload.state)
-      const player = hydrated.players[payload.pending.playerIndex]
-      if (player) {
-        setAnimalReorg(null)
-      }
     } else {
       setAnimalReorg(null)
     }
@@ -625,9 +618,17 @@ export const GameContainerApi = () => {
       }
       return
     }
+    if (interaction.stateId === 'animalReorg') {
+      if (value === 'confirm' && animalReorg) {
+        void transport.resolveChoice(interaction.playerIndex, 'confirm', { zones: animalReorg.zones }).catch((e) => console.error(e))
+      } else {
+        void transport.resolveChoice(interaction.playerIndex, value).catch((e) => console.error(e))
+      }
+      return
+    }
     if (interaction.stateId !== 'choice') return
     void transport.resolveChoice(interaction.playerIndex, value).catch((e) => console.error(e))
-  }, [interaction, currentPlayer, pendingFenceEdges, pendingPalisadeEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, setPlowError, setSowError, setStableError, isInteractive, commitFarmWithError, setFarmCommitError])
+  }, [interaction, currentPlayer, animalReorg, pendingFenceEdges, pendingPalisadeEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, setPlowError, setSowError, setStableError, isInteractive, commitFarmWithError, setFarmCommitError])
 
   const updateBakeExchangeCount = (id: string, delta: number) => {
     if (!bakeExchangePlayer) return
@@ -668,10 +669,8 @@ export const GameContainerApi = () => {
     void transport.confirmPlayerSwitch().catch((e) => console.error(e))
   }, [transport, isInteractive])
   const confirmAnimalReorg = useCallback(() => {
-    if (!isInteractive) return
-    if (pending.type !== 'animalReorg' || !animalReorg) return
-    void transport.confirmReorg(pending.playerIndex, animalReorg.zones).catch((e) => console.error(e))
-  }, [pending, animalReorg, transport, isInteractive])
+    resolveChoice('confirm')
+  }, [resolveChoice])
   const resetGame = useCallback(() => {
     if (!isInteractive) return
     const seed = resetSeedInput ? Number(resetSeedInput) : undefined

@@ -564,7 +564,6 @@ export type PendingAction =
       sourceCard?: string
       actionContext?: Record<string, unknown>
     }
-  | { type: 'animalReorg'; playerIndex: number; spaceId: string }
   | {
       type: 'harvestFeed'
       playerIndex: number
@@ -583,7 +582,6 @@ export type InteractionCommand =
   | 'commitFarm'
   | 'commitSelection'
   | 'takeAnytimeAction'
-  | 'confirmReorg'
   | 'confirmFeed'
   | 'confirmNextPlayer'
   | 'confirmPlayerSwitch'

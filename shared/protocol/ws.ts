@@ -7,15 +7,6 @@ type ClientCommandBody =
   | { type: 'choice'; value: string; payload?: Record<string, unknown> }
   | { type: 'anytime'; actionId: string }
   | {
-      type: 'reorg'
-      zones: {
-        id: string
-        zoneType: 'pasture' | 'house' | 'stable'
-        animalType: 'sheep' | 'boar' | 'cattle' | null
-        animalCount: number
-      }[]
-    }
-  | {
       type: 'feed'
       selections: {
         count: number

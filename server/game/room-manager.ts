@@ -994,12 +994,6 @@ export const createWsServer = (server: import('node:http').Server) => {
         return
       }
 
-      if (msg.type === 'reorg') {
-        const resp = callRoom(s => s.confirmAnimalReorg(currentPlayerIndex, msg.zones))
-        broadcastState(room, resp, 'reorg', msg.requestId)
-        return
-      }
-
       if (msg.type === 'feed') {
         const resp = callRoom(s => s.confirmHarvestFeed(currentPlayerIndex, msg.selections))
         broadcastState(room, resp, 'feed', msg.requestId)

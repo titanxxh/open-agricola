@@ -759,7 +759,10 @@ export class GameCore {
     if (this.stageResume) return []
     const context = this.getActiveInteractionContext()
     if (!context) return []
-    if (this.pending.type === 'animalReorg' || this.pending.type === 'harvestFeed') {
+    if (this.pending.type === 'harvestFeed') {
+      return []
+    }
+    if (this.pending.type === 'choice' && this.pending.promptKey === 'ui.interactionAnimalReorg') {
       return []
     }
     // Suppress anytime actions during sub-choice resolution (e.g. bake-bread, exchange)
@@ -839,14 +842,14 @@ export class GameCore {
 
   private buildInteraction(): InteractionState {
     // Fast paths: skip expensive anytime/farm computation for states that don't need them
-    if (this.pending.type === 'animalReorg') {
+    if (this.pending.type === 'choice' && this.pending.promptKey === 'ui.interactionAnimalReorg') {
       const player = this.state.players[this.pending.playerIndex]
       return {
         stateId: 'animalReorg',
         playerIndex: this.pending.playerIndex,
         spaceId: this.pending.spaceId,
         zones: player ? this.buildAnimalReorgZones(player) : [],
-        allowedCommands: ['confirmReorg', 'undoStep', 'undoAction'],
+        allowedCommands: ['resolveChoice', 'undoStep', 'undoAction'],
         anytimeActions: [],
       }
     }
@@ -2280,89 +2283,6 @@ export class GameCore {
         { value: 'confirm', labelKey: 'ui.interactionFenceConfirm' },
         { value: 'cancel', labelKey: 'ui.interactionFenceCancel' },
       ],
-    }
-    return this.respond()
-  }
-
-  confirmAnimalReorg(playerIndex: number, zones: {
-    id: string; zoneType: 'pasture' | 'house' | 'stable'
-    animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number
-  }[]): SessionResponse {
-    if (this.pending.type !== 'animalReorg' || this.pending.playerIndex !== playerIndex) {
-      return this.respond(false, 'no pending reorg')
-    }
-    this.pushHistory()
-    const player = this.state.players[playerIndex]
-    if (!player) return this.respond(false, 'invalid player')
-
-    const totals = zones.reduce((acc, z) => {
-      if (z.animalType) acc[z.animalType] += z.animalCount
-      return acc
-    }, { sheep: 0, boar: 0, cattle: 0 })
-
-    const computedZones = computeAnimalZones(player)
-    const zoneCapacity = (id: string) => computedZones.find((z) => z.id === id)?.capacity ?? 0
-    const pastureZones = zones.filter((z) => z.zoneType === 'pasture')
-    player.pastures = player.pastures.map((pasture) => {
-      const assigned = pastureZones.find((z) => z.id === pasture.id)
-      if (!assigned || !assigned.animalType) return { ...pasture, animalType: null, animalCount: 0 }
-      const capacity = zoneCapacity(pasture.id)
-      const count = Math.max(0, Math.min(capacity, assigned.animalCount))
-      return { ...pasture, animalType: count > 0 ? assigned.animalType : null, animalCount: count }
-    })
-    const houseZone = zones.find((z) => z.zoneType === 'house')
-    player.houseAnimalType = houseZone?.animalType ?? null
-    player.houseAnimalCount = houseZone?.animalType && houseZone.animalCount > 0 ? 1 : 0
-    const stableAnimals: Record<string, 'sheep' | 'boar' | 'cattle' | null> = {}
-    zones.filter((z) => z.zoneType === 'stable').forEach((z) => {
-      stableAnimals[z.id.replace('stable:', '')] = z.animalType ?? null
-    })
-    player.stableAnimals = stableAnimals
-    player.resources.sheep = totals.sheep
-    player.resources.boar = totals.boar
-    player.resources.cattle = totals.cattle
-
-    const source = this.pending.spaceId
-    if (source === 'anytime-reorg') {
-      this.pending = { type: 'none' }
-      if (this.engine) {
-        this.runEngineSteps()
-        return this.respond()
-      }
-      return this.respond()
-    }
-    if (source === 'returning-home') {
-      const nextPending = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
-      if (nextPending !== -1) {
-        this.pending = { type: 'animalReorg', playerIndex: nextPending, spaceId: 'returning-home' }
-        return this.respond()
-      }
-      if (harvestRounds.includes(this.state.round)) {
-        return this.startHarvest()
-      }
-      return this.finalizeRound()
-    }
-    if (source === 'harvest-breed') {
-      const nextPending = this.findNextHarvestReorgPlayer(this.pending.playerIndex)
-      if (nextPending !== -1) {
-        this.pending = { type: 'animalReorg', playerIndex: nextPending, spaceId: 'harvest-breed' }
-        return this.respond()
-      }
-      return this.continueEndHarvestEffects()
-    }
-    if (this.engine) {
-      this.runEngineSteps()
-      return this.respond()
-    }
-    if (this.turnOwnerPlayerIndex !== null) {
-      this.continueEndTurnHooks(this.turnOwnerPlayerIndex)
-      return this.respond()
-    }
-    this.finalizeActionLog(player)
-    const allWorkersUsed = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)
-    if (!allWorkersUsed) {
-      const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
-      this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
     }
     return this.respond()
   }
