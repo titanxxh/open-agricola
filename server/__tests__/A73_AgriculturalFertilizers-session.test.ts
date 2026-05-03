@@ -110,7 +110,7 @@ describe('A73_AgriculturalFertilizers session', () => {
     expect(tiles.length).toBeGreaterThanOrEqual(2)
     const [s1, s2] = tiles
 
-    resp = session.commitFarmChoice(0, 'stable', { stables: [s1!, s2!] })
+    resp = session.resolveChoice(0, 'confirm', { stables: [s1!, s2!] })
     expect(resp.ok).toBe(true)
     // 2 stables built => 2 new used spaces => optional sow offered
     expect(resp.pending.type).toBe('choice')

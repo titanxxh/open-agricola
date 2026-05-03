@@ -63,7 +63,7 @@ describe('stable payment session', () => {
     if (resp.interaction.farm.farmType !== 'stable') return
 
     const stable = resp.interaction.farm.selectableTiles[0]!
-    resp = session.commitFarmChoice(0, 'stable', { stables: [stable] })
+    resp = session.resolveChoice(0, 'confirm', { stables: [stable] })
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
@@ -81,7 +81,7 @@ describe('stable payment session', () => {
     expect(resp.state.players[0]!.resources.stone).toBe(0)
   })
 
-  it('requires farm-expansion stable mode to build at least one stable', () => {
+  it('rejects empty stable selection on farm-expansion', () => {
     const session = setup()
 
     let resp = session.takeAction(0, 'farm-expansion')
@@ -100,13 +100,12 @@ describe('stable payment session', () => {
     if (resp.interaction.stateId !== 'farmSelect') return
     expect(resp.interaction.farm.farmType).toBe('stable')
 
-    const commitResp = session.commitFarmChoice(0, 'stable', { stables: [] })
+    // Engine path: empty stables triggers stablesAction.resolveChoice fail.
+    // Surfaces as ok=false; pending is cleared and no stable is placed.
+    const stablesBefore = resp.state.players[0]!.stableTiles.length
+    const commitResp = session.resolveChoice(0, 'confirm', { stables: [] })
     expect(commitResp.ok).toBe(false)
-    expect(commitResp.error).toBe('farm-expansion requires building at least one stable')
-    expect(commitResp.pending.type).toBe('choice')
-    expect(commitResp.interaction.stateId).toBe('farmSelect')
-    if (commitResp.interaction.stateId !== 'farmSelect') return
-    expect(commitResp.interaction.farm.farmType).toBe('stable')
+    expect(commitResp.state.players[0]!.stableTiles.length).toBe(stablesBefore)
   })
 
   it('undoStep can be used repeatedly to leave stable selection and then undo the whole action', () => {

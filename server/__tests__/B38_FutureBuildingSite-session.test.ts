@@ -186,9 +186,11 @@ describe('B38 FutureBuildingSite — session', () => {
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
 
-    // Select stable building
+    // Select stable building (option value is `seq-stables-<n>`)
     if (resp.pending.type === 'choice') {
-      const stableOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === 'stables')
+      const stableOpt = resp.pending.options?.find(
+        (o: ActionChoiceOption) => o.labelKey === 'actions.stables.name',
+      )
       if (stableOpt) {
         resp = session.resolveChoice(0, stableOpt.value)
       }
@@ -202,9 +204,13 @@ describe('B38 FutureBuildingSite — session', () => {
       }
     }
 
-    // Try building stable on locked tile (0,0) — should fail
-    resp = session.commitFarmChoice(0, 'stable', { stables: [{ row: 0, col: 0 }] })
+    // Try building stable on locked tile (0,0) — stablesAction.resolveChoice
+    // returns fail, surfaced as ok=false with pending cleared and no stable
+    // added.
+    const stablesBefore = resp.state.players[0]!.stableTiles.length
+    resp = session.resolveChoice(0, 'confirm', { stables: [{ row: 0, col: 0 }] })
     expect(resp.ok).toBe(false)
+    expect(resp.state.players[0]!.stableTiles.length).toBe(stablesBefore)
   })
 
   it('fence enclosing locked tile is rejected', () => {
