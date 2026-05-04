@@ -802,9 +802,9 @@ export const minorImprovementAction: ActionDefinition = {
       return { type: 'ok' }
     }
     return {
-      type: 'choice',
+      type: 'request',
+      request: { kind: 'choice', options },
       promptKey: 'ui.interactionChooseMinorImprovement',
-      options,
     }
   },
   resolveChoice: ({ state, player, sourceCard }, choice) => {
@@ -969,9 +969,9 @@ export const improvementAnyAction: ActionDefinition = {
       return { type: 'fail', logKey: 'log.improvementFail' }
     }
     return {
-      type: 'choice',
+      type: 'request',
+      request: { kind: 'choice', options },
       promptKey: 'ui.interactionChooseImprovement',
-      options,
     }
   },
   resolveChoice: ({ state, player, sourceCard, params }, choice) => {

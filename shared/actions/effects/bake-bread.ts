@@ -92,13 +92,16 @@ const resolveBakeBreadChoice = (
       return bakeBread(player, choice, maxCount)
     }
     return {
-      type: 'choice',
+      type: 'request',
+      request: {
+        kind: 'choice',
+        options: Array.from({ length: maxCount }, (_, index) => ({
+          value: `count-${choice}-${index + 1}`,
+          labelKey: 'ui.interactionBakeBreadCountLabel',
+          labelParams: { count: index + 1 },
+        })),
+      },
       promptKey: 'ui.interactionBakeBreadCount',
-      options: Array.from({ length: maxCount }, (_, index) => ({
-        value: `count-${choice}-${index + 1}`,
-        labelKey: 'ui.interactionBakeBreadCountLabel',
-        labelParams: { count: index + 1 },
-      })),
     }
   }
   return { type: 'ok' }
@@ -113,9 +116,9 @@ export const bakeBreadAction: ActionDefinition = {
   canBeExecutedByPlayer: (_, player) =>
     player.resources.grain > 0 && hasAnyBakingImprovement(player),
   execute: ({ player }) => ({
-    type: 'choice',
+    type: 'request',
+    request: { kind: 'choice', options: buildBakeBreadOptions(player) },
     promptKey: 'ui.interactionBakeBreadChoice',
-    options: buildBakeBreadOptions(player),
   }),
   resolveChoice: ({ player }, choice) => resolveBakeBreadChoice(player, choice),
 }

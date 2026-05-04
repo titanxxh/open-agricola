@@ -28,13 +28,16 @@ registerPlayerActionSpace({
       }
       // Rounds 6-8: choice of vegetable, pig, or cattle
       return {
-        type: 'choice',
+        type: 'request',
+        request: {
+          kind: 'choice',
+          options: [
+            { value: 'vegetable', labelKey: 'resources.vegetable', sourceCard: CARD_ID },
+            { value: 'boar', labelKey: 'resources.boar', sourceCard: CARD_ID },
+            { value: 'cattle', labelKey: 'resources.cattle', sourceCard: CARD_ID },
+          ],
+        },
         promptKey: 'ui.interactionPioneeringSpirit',
-        options: [
-          { value: 'vegetable', labelKey: 'resources.vegetable', sourceCard: CARD_ID },
-          { value: 'boar', labelKey: 'resources.boar', sourceCard: CARD_ID },
-          { value: 'cattle', labelKey: 'resources.cattle', sourceCard: CARD_ID },
-        ],
       }
     },
     resolveChoice: ({ player }, choice) => {

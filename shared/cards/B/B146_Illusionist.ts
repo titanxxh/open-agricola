@@ -28,9 +28,9 @@ const discardFromHandAction: ActionDefinition = {
     ]
     if (options.length === 0) return { type: 'fail', logKey: 'log.actionFail' }
     return {
-      type: 'choice',
+      type: 'request',
+      request: { kind: 'choice', options },
       promptKey: 'ui.interactionDiscardFromHand',
-      options,
     }
   },
   resolveChoice: ({ player }, choice) => {

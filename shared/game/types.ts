@@ -431,14 +431,15 @@ export type ActionChoiceOption = {
 
 /**
  * `extraData.actionContextWrite` (optional, plain object): when present on a
- * `{ type: 'choice' }` result, the engine shallow-merges its keys into
- * `pendingInteractionContext.actionContext`, which then surfaces in
- * `pending.actionContext` via `engine.snapshot()`. Used by ActionDef.resolveChoice
- * to persist commit-time payload (e.g. fence geometry) across a payment-combo
- * second prompt round-trip. Key conflicts: later writes overwrite earlier.
+ * `{ type: 'request', request: { kind: 'choice' } }` result, the engine
+ * shallow-merges its keys into `pendingInteractionContext.actionContext`,
+ * which then surfaces in `pending.actionContext` via `engine.snapshot()`.
+ * Used by ActionDef.resolveChoice to persist commit-time payload (e.g. fence
+ * geometry) across a payment-combo second prompt round-trip. Key conflicts:
+ * later writes overwrite earlier.
  *
- * Lifecycle: only consumed when the result type is 'choice' (which produces a
- * new pending). For 'ok' / 'fail' / 'flow' results the field is ignored
+ * Lifecycle: only consumed when the result type is 'request' (which produces
+ * a new pending). For 'ok' / 'fail' / 'flow' results the field is ignored
  * because pending is being cleared or transformed differently.
  *
  * Writes are shallow: top-level keys are merged, nested objects replace (not deep-merge).
@@ -446,8 +447,6 @@ export type ActionChoiceOption = {
  */
 export type ActionExecutionResult =
   | { type: 'ok'; logKey?: string; resourcesGained?: Partial<Resource>; resourcesPaid?: Partial<Resource>; logParams?: Record<string, unknown>; immediateLogs?: ImmediateLogEntry[]; extraData?: Record<string, unknown> }
-  | { type: 'choice'; promptKey?: string; promptParams?: Record<string, unknown>; options: ActionChoiceOption[]; extraData?: Record<string, unknown> }
-  | { type: 'animalReorg'; sourceId: string }
   | { type: 'request'; request: InteractionRequest; promptKey?: string; promptParams?: Record<string, unknown>; sourceCard?: string; extraData?: Record<string, unknown> }
   | { type: 'fail'; logKey: string }
   | { type: 'flow'; flow: ActionFlow; logKey?: string; logParams?: Record<string, unknown>; immediateLogs?: ImmediateLogEntry[]; extraData?: Record<string, unknown> }

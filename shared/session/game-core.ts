@@ -1773,6 +1773,39 @@ export class GameCore {
       }
 
       if (step.type === 'choice') {
+        // breed action (e.g. harvest reap or B104 last-harvest enforcement)
+        // emits ActionExecutionResult { type: 'request', request: { kind:
+        // 'animal-reorg' } } — the engine wraps it in the new 'request'
+        // branch and surfaces it as step.type === 'choice', losing the
+        // direct kind discriminator. Detect it via the InteractionNode's
+        // request field and pivot to the same pausedEngine + anytime
+        // sub-flow path the legacy 'animalReorg' result took.
+        const interaction = this.engine?.peekInteraction()
+        const isReorgSubFlow =
+          this.engineSource?.kind === 'flow'
+          && (this.engineSource.flow as { actionId?: string }).actionId === 'reorganize'
+        if (
+          interaction?.request?.kind === 'animal-reorg'
+          && !isReorgSubFlow
+        ) {
+          const pIdx = this.activePlayerIndex!
+          this.pausedEngine = {
+            engine: this.engine!,
+            engineSource: this.engineSource!,
+            activeSpaceId: this.activeSpaceId!,
+            activePlayerIndex: this.activePlayerIndex!,
+            stageResume: this.stageResume,
+            deferredPlayerSwitch: this.deferredPlayerSwitch,
+          }
+          this.engine = null
+          this.engineSource = null
+          this.activeSpaceId = null
+          this.activePlayerIndex = null
+          this.stageResume = null
+          this.deferredPlayerSwitch = null
+          this.startReorganizeSubFlow(pIdx, 'anytime')
+          return
+        }
         // Lazy confirmation: if we silently switched players and now hit a choice,
         // show confirmPlayerSwitch first. The InteractionNode stays unresolved in the engine.
         if (this.deferredPlayerSwitch) {
@@ -1794,14 +1827,15 @@ export class GameCore {
             if (result.type === 'ok' && resolvedActionId) {
               this.flushLeafActionDetail(resolvedActionId, Boolean(result.logKey))
             }
-            if (result.type === 'choice') {
-              if ((result.options?.length ?? 0) === 1) {
-                autoOptions = result.options!
+            if (result.type === 'request' && result.request.kind === 'choice') {
+              const requestOptions = result.request.options
+              if (requestOptions.length === 1) {
+                autoOptions = requestOptions
                 continue
               }
               this.pending = {
                 type: 'choice', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId,
-                options: result.options ?? [], promptKey: result.promptKey,
+                options: requestOptions, promptKey: result.promptKey,
                 promptParams: result.promptParams,
                 costOverride: this.engine?.getLastComputedCosts(),
                 sourceCard: this.engine?.snapshot().pendingInteractionContext?.sourceCard ?? undefined,
@@ -1859,29 +1893,17 @@ export class GameCore {
         this.flushLeafActionDetail(step.actionId, Boolean(step.result.logKey))
       }
 
-      if (step.type === 'ok' && step.result.type === 'animalReorg' && this.getAnimalCount(player) === this.getAnimalCount(before)) {
-        // breed action (e.g. B104 last-harvest enforcement) explicitly requests
-        // animalReorg with no new animal. Since getAnimalCount didn't increase,
-        // the general check below won't catch it — handle it here using the same
-        // pausedEngine + anytime pattern as the real-breed case.
-        const pIdx = this.activePlayerIndex!
-        this.pausedEngine = {
-          engine: this.engine!,
-          engineSource: this.engineSource!,
-          activeSpaceId: this.activeSpaceId!,
-          activePlayerIndex: this.activePlayerIndex!,
-          stageResume: this.stageResume,
-          deferredPlayerSwitch: this.deferredPlayerSwitch,
-        }
-        this.engine = null
-        this.engineSource = null
-        this.activeSpaceId = null
-        this.activePlayerIndex = null
-        this.stageResume = null
-        this.deferredPlayerSwitch = null
-        this.startReorganizeSubFlow(pIdx, 'anytime')
-        return
-      }
+      // NOTE: the legacy `step.result.type === 'animalReorg'` block lived
+      // here, used to handle `breed` returning that variant explicitly when
+      // animal count did not change (B104 last-harvest enforcement). Since
+      // Task 5 migrated breed to emit `'request' + kind: 'animal-reorg'`,
+      // the engine now wraps it in step.type === 'choice' (handled in the
+      // dedicated reorg branch in the `step.type === 'choice'` block above
+      // via `peekInteraction()?.request.kind === 'animal-reorg'`). The
+      // generic `getAnimalCount > before` check below still picks up the
+      // animals-bred path where breed returns `'ok'` so engine after-hooks
+      // (D60 LargePottery, B104 SheepWalker, ...) keep firing on the
+      // post-mutate state.
 
       if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
         const pIdx = this.activePlayerIndex!
@@ -2234,10 +2256,10 @@ export class GameCore {
     if (result.type === 'ok' && resolvedActionId) {
       this.flushLeafActionDetail(resolvedActionId, Boolean(result.logKey))
     }
-    if (result.type === 'choice') {
+    if (result.type === 'request' && result.request.kind === 'choice') {
       this.pending = {
         type: 'choice', playerIndex, spaceId: this.activeSpaceId!,
-        options: result.options ?? [], promptKey: result.promptKey,
+        options: result.request.options, promptKey: result.promptKey,
         promptParams: result.promptParams,
         costOverride: this.engine.getLastComputedCosts(),
         sourceCard: this.engine.snapshot().pendingInteractionContext?.sourceCard ?? undefined,
@@ -2708,10 +2730,10 @@ export class GameCore {
     )
     this.flushEngineLog()
 
-    if (result.type === 'choice') {
+    if (result.type === 'request' && result.request.kind === 'choice') {
       this.pending = {
         type: 'choice', playerIndex, spaceId: this.activeSpaceId!,
-        options: result.options ?? [], promptKey: result.promptKey,
+        options: result.request.options, promptKey: result.promptKey,
         promptParams: result.promptParams,
         costOverride: this.engine.getLastComputedCosts(),
         sourceCard: this.engine.snapshot().pendingInteractionContext?.sourceCard ?? undefined,

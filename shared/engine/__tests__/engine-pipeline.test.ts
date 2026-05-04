@@ -153,9 +153,9 @@ describe('Engine pipeline phase order', () => {
       execute: () => {
         phases.push('execute')
         return {
-          type: 'choice',
+          type: 'request',
+          request: { kind: 'choice', options: [{ value: 'a', labelKey: 'A' }] },
           promptKey: 'choose',
-          options: [{ value: 'a', labelKey: 'A' }],
         }
       },
       resolveChoice: () => ({ type: 'ok' }),
@@ -250,9 +250,9 @@ describe('Engine pipeline phase order', () => {
       gainPerRound: {},
       canBeExecutedByPlayer: () => true,
       execute: () => ({
-        type: 'choice',
+        type: 'request',
+        request: { kind: 'choice', options: [{ value: 'base', labelKey: 'Base' }] },
         promptKey: 'choose',
-        options: [{ value: 'base', labelKey: 'Base' }],
       }),
       resolveChoice: () => ({ type: 'ok' }),
     }

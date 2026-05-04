@@ -170,12 +170,15 @@ export const fenceAction: ActionDefinition = {
       canStartFencing(ctx.state, ctx.player, costOverride),
   },
   execute: () => ({
-    type: 'choice',
+    type: 'request',
+    request: {
+      kind: 'choice',
+      options: [
+        { value: 'confirm', labelKey: 'ui.interactionFenceConfirm' },
+        { value: 'cancel', labelKey: 'ui.interactionFenceCancel' },
+      ],
+    },
     promptKey: 'ui.interactionFenceSelect',
-    options: [
-      { value: 'confirm', labelKey: 'ui.interactionFenceConfirm' },
-      { value: 'cancel', labelKey: 'ui.interactionFenceCancel' },
-    ],
   }),
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
     if (choice === 'cancel') return { type: 'ok' }
@@ -240,11 +243,12 @@ export const fenceAction: ActionDefinition = {
         { type: 'fail', logKey: 'log.fencingFail' },
         'fencing',
       )
-      if (payment.type === 'choice') {
+      if (payment.type === 'request') {
+        const options = payment.request.kind === 'choice' ? payment.request.options : []
         return {
-          type: 'choice',
+          type: 'request',
+          request: { kind: 'choice', options },
           promptKey: payment.promptKey,
-          options: payment.options ?? [],
           extraData: {
             actionContextWrite: {
               farmPayload: { edges, palisadeEdges, extraWood },
