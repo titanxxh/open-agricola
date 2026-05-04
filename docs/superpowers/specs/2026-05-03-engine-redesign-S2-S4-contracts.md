@@ -156,28 +156,87 @@ S2 完成后 `InteractionRequest` 的 kind 集合**锁定**为：
 - `shared/actions/effects/improvement.ts`（985 行）—— S3 同期瘦身 ≤ 400
 - 各 effect 文件（占用、minor、major 卡牌）
 
-### 2.2 终态：三个 public 接口 [L]
+### 2.2 终态：三个 core public + 一个 utility [L]
 
-合并到 `shared/actions/payment/` 模块，**对外仅三个 public**：
+合并到 `shared/actions/payment/` 模块，**对外 public**：
 
 ```
+// 三个 core public
 PaymentSolver.computeOptions(state, idx, cost, ctx) → Option[]
 PaymentSolver.canAfford(state, idx, cost, ctx)     → boolean
 PaymentSolver.execute(state, idx, cost, choice, ctx) → state'
+
+// 一个 utility（2026-05-04 grilled）
+PaymentSolver.pickAuto(options: Option[]): Option | undefined
+//   返回唯一解（length === 1）或 undefined（length 0 / >1）；
+//   未来"何谓自动"扩展（如多 option 同价取 cheapest）改这里即可。
 ```
+
+**Export 风格 [L]**（2026-05-04 grilled）：namespace object，不是 class。
+
+```ts
+// shared/actions/payment/index.ts
+export { PaymentSolver } from './solver'
+export type { PaymentCtx, Cost, Option, PaymentChoice } from './types'
+
+// shared/actions/payment/solver.ts
+const computeOptions = (...) => { ... }
+// ... 4 个函数
+export const PaymentSolver = { computeOptions, canAfford, execute, pickAuto } as const
+```
+
+调用方统一 `PaymentSolver.xxx(...)`，与契约文档命名 1:1 一致。`solutionCache` 沿用 module-level（不进 instance；多 session 共享，cache key 含 player resources，安全）。
 
 **红线**：
 
-- 行动层付款只能调这三个；任何 effect 直接 import `pay-helpers` / `room-payment` 在 S3 完成后属于 lint error
-- `computeOptions` / `canAfford` 必须共享内部计算（不重复枚举）
+- 行动层付款只能调上述 4 个 export；任何 effect 直接 import `pay-helpers` / `room-payment` 在 S3 完成后属于 lint error
+- `computeOptions` / `canAfford` 必须共享内部计算（不重复枚举）。`canAfford` 实现 = `isComplexCost(cost) ? computeOptions(...).length > 0 : canPayResources fast-path`；不写第 2 套枚举；依赖 `solutionCache` 让"先 canAfford 后 computeOptions"链路第 2 次 O(1)（2026-05-04 grilled）
 - `execute` 必须从 `computeOptions` 返回的 `Option[]` 里挑（`choice` 是 `Option` 的 ID 或子集），杜绝外部独立构造 payment 路径
+- effect 层"自动 vs 弹 choice" 判定 **必须** 通过 `pickAuto`，禁止 effect 直接写 `options.length === 1`
 
-### 2.3 `Cost` / `Option` / `PaymentChoice` 类型 [S]
+### 2.3 `Cost` / `Option` / `PaymentChoice` / `PaymentCtx` 类型
 
-- `Cost`：现有 `Partial<Resource>` 加 hook 修饰（`computeCosts` phase 已锁，沿用）
-- `Option`：付款分解 + 来源 tag（资源 / 卡牌效果 / 房间转换 / hook 替换）
-- `PaymentChoice`：玩家选择（option ID + 必要 disambiguation）
-- 内部字段细节 [O]，sprint 启动时 grill
+- `Cost` [S]：现有 `Partial<Resource>` 加 hook 修饰（`computeCosts` phase 已锁，沿用）
+- `Option` [S]：付款分解 + 来源 tag（资源 / 卡牌效果 / 房间转换 / hook 替换）
+- `PaymentChoice` [S]：玩家选择（option ID + 必要 disambiguation）
+- **`PaymentCtx`** [L]（2026-05-04 grilled）：
+
+  ```ts
+  type PaymentCtx = {
+    actionId: string                  // hook 触发必需
+    costType: CostModifierType        // applyCostModifiers 必需；无 modifier 时传 'none' sentinel
+    sourceCard?: string               // 付款 source card（improvement / occupation cardId）
+    spaceId?: string                  // action space（trade side effect 用）
+    playedCards?: string[]            // buildable combinations 卡牌依赖
+  }
+  ```
+
+  **约束 [L]**：
+  - hook 触发在 PaymentSolver **内部**完成（`computeCosts` 是 cost-modifier，外部不传 hook 结果）
+  - 内部 `solutionCache` 沿用，cache key 包含 ctx
+  - `actionId` / `costType` 必填；其余可选
+
+- **`PaymentExecuteResult`** [L]（2026-05-04 grilled）：
+
+  ```ts
+  type PaymentExecuteResult =
+    | { ok: true; state: GameState }
+    | { ok: false; reason: PaymentExecuteError }
+
+  type PaymentExecuteError =
+    | 'invalid-choice'   // PaymentChoice 在 Option[] 里找不到
+    | 'cannot-afford'    // execute 时再 check cost 失败
+    | 'unknown-option'   // 内部 enumeration 与 choice 不一致
+  ```
+
+  **错误处理约束 [L]**：
+  - **不变量违反**（Bonus 配置错、internal invariant broken）→ throw（fail-fast，不应在生产流程发生）；当前 `payment.ts:498/504` 风格沿用
+  - **运行时无效输入** → 返回 `{ ok: false; reason }` Result-like
+  - `computeOptions` 不可负担 → 返回**空数组**（非错误）；`canAfford` 直接 `boolean`；`pickAuto` undefined 表示"无法自动"（非错误）
+  - `reason` enum 出现新 case 必须更新本契约（不得静默扩）
+  - effect 层 `return failure` 沿用，但 `reason` 来自 PaymentSolver enum，不用 string 拼
+
+- 其他内部字段细节 [O]，sprint 启动时 grill
 
 ### 2.4 调用方迁移规则 [L]
 

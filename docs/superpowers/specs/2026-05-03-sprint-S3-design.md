@@ -55,7 +55,7 @@ S3 把当前 1974 行 / 41 export 的 payment 三件套（`payment.ts` / `pay-he
 | `improvement.ts` 不再 import payment 三件套 | grep import 路径 |
 | `improvement.ts` ≤ 400 行 | `wc -l` |
 | `shared/actions/helpers/payment.ts` / `pay-helpers.ts` / `room-payment.ts` 不存在 | `ls` |
-| `shared/actions/payment/` 模块对外 export ≤ 4 个（三 public + 类型 namespace） | grep `^export` |
+| `shared/actions/payment/` 模块对外 export ≤ 5 个（三 core public + `pickAuto` utility + 类型 namespace） | grep `^export` |
 | 「强制 green 子集」全绿 | `pnpm test:fast` |
 | 卡牌效果 session 测试零回归（不算 S2 累计 skip） | `pnpm test:slow` 对比基线 |
 
@@ -98,12 +98,12 @@ S3 与 S1 / S2 / S4 均无强前置（见契约 §4.2）。本 sprint 在独立 
 
 ## 8. 待 sprint 启动时 grill 的开放问题
 
-1. **`PaymentSolver` 的 `ctx` 形状**：是否承载 hook 触发结果？还是 hook 在 PaymentSolver 内部触发，ctx 仅承载"调用方语境"（spaceId / sourceCard / actionId）？倾向后者。
-2. **`Option` 类型是否区分"自动"vs"手动"**：有些付款无歧义可自动选；有些必须玩家选。是否在 Option 上加 `requiresChoice: boolean`？还是在 `computeOptions` 返回 `{ auto: Option | null; choices: Option[] }`？
-3. **`canAfford` 是否复用 `computeOptions`**：实现简洁但性能差。是否需要专门的"短路 first-hit"路径？
-4. **`improvement-pool.ts` 的边界**：池子管理（哪些已被 minor / major 拿走）属于 PaymentSolver 还是 improvement domain？倾向后者。
-5. **payment module 的 export 风格**：`PaymentSolver` 是 namespace 还是 class？还是 plain functions（`computeOptions(...)`）？卡牌闭环原则下 plain functions 更合适，但 namespace 利于 grep / 文档可读性。
-6. **错误处理**：`execute` 在 invalid choice 时抛错还是返回 `{ ok: false; reason }`？倾向 `Result<state>` 风格，但要与 `GameSession.takeAction` 现有错误模型一致。
+1. ~~**`PaymentSolver` 的 `ctx` 形状**~~ **[✓ grilled 2026-05-04]** —— 决议：5 字段 `PaymentCtx`（`actionId` / `costType` 必填，`sourceCard` / `spaceId` / `playedCards` 可选）；hook 在 PaymentSolver 内部触发。详见契约 §2.3。
+2. ~~**`Option` 类型是否区分"自动"vs"手动"**~~ **[✓ grilled 2026-05-04]** —— 决议：Option 不带 `requiresChoice`；新增 `PaymentSolver.pickAuto(options)` utility（第 4 个 public）封装"length === 1 → 自动" pattern；effect 层禁止直接写 `options.length === 1`。详见契约 §2.2。
+3. ~~**`canAfford` 是否复用 `computeOptions`**~~ **[✓ grilled 2026-05-04]** —— 决议：复用，不写专门 first-hit 路径；fast-path 仅限非 ComplexCost；依赖 `solutionCache` 让"先 canAfford 后 computeOptions"链路 O(1)。详见契约 §2.2。
+4. ~~**`improvement-pool.ts` 的边界**~~ **[✓ grilled 2026-05-04]** —— 决议：pool 属于 improvement domain，PaymentSolver 禁止 import improvement-pool；improvement.ts 同时 import 三件（PaymentSolver / improvement-options / improvement-pool）；S4 时再考虑迁入 domain 聚合。
+5. ~~**payment module 的 export 风格**~~ **[✓ grilled 2026-05-04]** —— 决议：namespace object（`export const PaymentSolver = { ... } as const`），不是 class，不是 plain functions；调用方统一 `PaymentSolver.xxx(...)`；solutionCache 沿用 module-level。详见契约 §2.2。
+6. ~~**错误处理**~~ **[✓ grilled 2026-05-04]** —— 决议：discriminated union `PaymentExecuteResult = { ok: true; state } | { ok: false; reason }`；reason enum 3 case（`invalid-choice` / `cannot-afford` / `unknown-option`）；不变量违反保留 throw；`computeOptions` 不可负担返回空数组（非错误）。详见契约 §2.3。
 
 ---
 
