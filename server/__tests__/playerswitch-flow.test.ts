@@ -22,10 +22,17 @@ describe('ActionFlow playerSwitch', () => {
 
   const startFlowEngine = (session: GameSession, flow: ActionFlow, playerIndex: number) => {
     const s = session as unknown as {
-      activePlayerIndex: number | null
-      activeSpaceId: string | null
-      engine: unknown
-      engineSource: unknown
+      engineStack: {
+        push: (frame: {
+          engine: unknown
+          source: unknown
+          spaceId: string
+          ownerPlayerIndex: number
+          stageResume: null
+          deferredPlayerSwitch: null
+          reason: string
+        }) => void
+      }
       pending: { type: string }
       createFlowEngine: (flow: ActionFlow) => unknown
       runEngineSteps: () => void
@@ -50,10 +57,15 @@ describe('ActionFlow playerSwitch', () => {
       execute: () => ({ type: 'ok' }),
     } as any)
     session.loadState(state)
-    s.activePlayerIndex = playerIndex
-    s.activeSpaceId = spaceId
-    s.engine = s.createFlowEngine(flow)
-    s.engineSource = { kind: 'flow', flow }
+    s.engineStack.push({
+      engine: s.createFlowEngine(flow),
+      source: { kind: 'flow', flow },
+      spaceId,
+      ownerPlayerIndex: playerIndex,
+      stageResume: null,
+      deferredPlayerSwitch: null,
+      reason: 'card-draft',
+    })
     s.pending = { type: 'none' }
     s.runEngineSteps()
   }

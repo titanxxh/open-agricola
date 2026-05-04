@@ -57,6 +57,10 @@ export class EngineStack {
     return this.frames.length
   }
 
+  clear(): void {
+    this.frames.length = 0
+  }
+
   peekInteraction(): import('./nodes').InteractionNode | null {
     return this.current()?.engine.peekInteraction() ?? null
   }
