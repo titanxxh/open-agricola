@@ -16,7 +16,6 @@ export {
   keepOnlyOptimals,
   applyTradeSideEffect,
   executePaymentSolution,
-  returnCardToBoard,
   getCheapestSolution,
   clearPaymentCache,
 } from '../payment/internal'
