@@ -13,7 +13,7 @@ import {
   payResources,
   executePaymentSolution,
   clearPaymentCache,
-} from '../helpers/payment'
+} from './internal'
 
 const computeOptions = (
   state: GameState,
