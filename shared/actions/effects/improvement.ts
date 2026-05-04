@@ -1,7 +1,7 @@
 import type { ActionDefinition, ActionExecutionResult, ActionFlow, GameState, PlayerState, ComplexCost, Resource } from '../../game/types'
 import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../game/minor-improvements'
-import { payResources, computeAllBuyableCombinations, executePaymentSolution, returnCardToBoard, isComplexCost } from '../helpers/payment'
+import { payResources, executePaymentSolution, returnCardToBoard } from '../helpers/payment'
 import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../logic/stats'
 import { majorCardDefinitions } from '../../cards/major'
 import { getMajorCard } from '../../cards/major'
@@ -9,10 +9,11 @@ import { getCardModifiers } from '../../cards/card-modifiers'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
 import { activateCard } from './activate-card'
 import {
-  canAffordCost,
   resolveCardPreviewCostByProvider,
   resolvePaymentSolutionSelection,
 } from '../helpers/pay-helpers'
+import { PaymentSolver } from '../payment'
+import type { PaymentCtx } from '../payment'
 import { collectComputeChoiceCandidates } from '../../cards/card-listeners'
 import { isMajorCardId, isFireplaceIdentityCard } from '../../cards/helpers/card-type'
 
@@ -36,7 +37,7 @@ const getPlayedCardsForCost = (
   player: PlayerState,
   cost: Partial<PlayerState['resources']> | ComplexCost | null,
 ): string[] => {
-  if (!cost || !isComplexCost(cost)) return player.improvements
+  if (!cost || !PaymentSolver.isComplexCost(cost)) return player.improvements
   const list = cost.cards?.list
   if (!Array.isArray(list)) return player.improvements
   if (!list.some(isFireplaceIdentityCard)) return player.improvements
@@ -184,7 +185,7 @@ const attachRequiredReturnCards = (
   if (!cost || !returnCards || returnCards.length === 0) {
     return cost
   }
-  if (isComplexCost(cost)) {
+  if (PaymentSolver.isComplexCost(cost)) {
     return {
       ...cost,
       cards: {
@@ -247,16 +248,16 @@ const canAffordMajorImprovement = (
 ) => {
   const previewCost = getMajorImprovementPreviewCost(state, player, improvementId, actionCardId)
   if (!previewCost) return false
-  if (isComplexCost(previewCost)) {
-    return (
-      computeAllBuyableCombinations(
-        player,
-        previewCost,
-        getPlayedCardsForCost(player, previewCost),
-      ).length > 0
-    )
+  const rawIndex = state.players.indexOf(player)
+  const effectiveState = rawIndex >= 0 ? state : { ...state, players: [player] }
+  const playerIndex = rawIndex >= 0 ? rawIndex : 0
+  const ctx: PaymentCtx = {
+    actionId: 'improvement-major',
+    costType: 'none',
+    sourceCard: improvementId,
+    playedCards: getPlayedCardsForCost(player, previewCost),
   }
-  return canAffordCost(player, previewCost)
+  return PaymentSolver.canAfford(effectiveState, playerIndex, previewCost, ctx)
 }
 
 export const isMajorImprovementPlayable = (
@@ -285,14 +286,16 @@ const canAffordMinorImprovement = (
     actionCardId,
   )
   if (!previewCost) return false
-  if (isComplexCost(previewCost)) {
-    return computeAllBuyableCombinations(
-      player,
-      previewCost,
-      getPlayedCardsForCost(player, previewCost),
-    ).length > 0
+  const rawIndex = state.players.indexOf(player)
+  const effectiveState = rawIndex >= 0 ? state : { ...state, players: [player] }
+  const playerIndex = rawIndex >= 0 ? rawIndex : 0
+  const ctx: PaymentCtx = {
+    actionId: 'improvement-minor',
+    costType: 'none',
+    sourceCard: improvement.id,
+    playedCards: getPlayedCardsForCost(player, previewCost),
   }
-  return canAffordCost(player, previewCost)
+  return PaymentSolver.canAfford(effectiveState, playerIndex, previewCost, ctx)
 }
 
 export const isMinorImprovementPlayable = (
@@ -509,6 +512,8 @@ const finalizeMinorImprovementPurchase = (
 }
 
 const resolveImprovementPayment = (
+  state: GameState,
+  playerIndex: number,
   player: PlayerState,
   cost: Partial<PlayerState['resources']> | ComplexCost,
   paymentChoice: string | undefined,
@@ -516,6 +521,7 @@ const resolveImprovementPayment = (
   includeReturnedCard: boolean,
   failure: ActionExecutionResult,
   playedCards?: string[],
+  improvementId?: string,
 ):
   | ActionExecutionResult
   | {
@@ -524,15 +530,23 @@ const resolveImprovementPayment = (
       feeIndex?: number
       returnedCardId?: string
     } => {
-  if (!isComplexCost(cost)) {
-    if (!canAffordCost(player, cost)) {
+  const effectiveState = playerIndex >= 0 ? state : { ...state, players: [player] }
+  const effectiveIndex = playerIndex >= 0 ? playerIndex : 0
+  const ctx: PaymentCtx = {
+    actionId: 'improvement-any',
+    costType: 'none',
+    sourceCard: improvementId,
+    playedCards,
+  }
+  if (!PaymentSolver.isComplexCost(cost)) {
+    if (!PaymentSolver.canAfford(effectiveState, effectiveIndex, cost, ctx)) {
       return failure
     }
     payResources(player, cost)
     return { type: 'selected', resourcesPaid: cost }
   }
 
-  const solutions = computeAllBuyableCombinations(player, cost, playedCards)
+  const solutions = PaymentSolver.computeOptions(effectiveState, effectiveIndex, cost, ctx)
   const resolved = resolvePaymentSolutionSelection(
     solutions,
     paymentChoice,
@@ -576,6 +590,8 @@ const playMajorImprovement = (
     actionCardId,
   ) ?? {}
   const resolvedPayment = resolveImprovementPayment(
+    state,
+    state.players.indexOf(player),
     player,
     cost,
     paymentChoice,
@@ -583,6 +599,7 @@ const playMajorImprovement = (
     true,
     { type: 'fail', logKey: 'log.improvementFail' },
     getPlayedCardsForCost(player, cost),
+    improvementId,
   )
   if (resolvedPayment.type !== 'selected') {
     return resolvedPayment
@@ -635,13 +652,16 @@ export const playMinorImprovement = (
   }
 
   const resolvedPayment = resolveImprovementPayment(
+    state,
+    state.players.indexOf(player),
     player,
     modifiedCost,
     paymentChoice,
     `pay:minor:${improvementId}`,
-    !!(isComplexCost(modifiedCost) && modifiedCost.cards?.list?.length),
+    !!(PaymentSolver.isComplexCost(modifiedCost) && modifiedCost.cards?.list?.length),
     { type: 'fail', logKey: 'log.minorImprovementFail' },
     getPlayedCardsForCost(player, modifiedCost),
+    improvementId,
   )
   if (resolvedPayment.type !== 'selected') {
     return resolvedPayment
@@ -885,7 +905,7 @@ const buildImprovementFlow = (
     : getMinorImprovementPreviewCost(state, player, id, actionCardId)
   if (!previewCost) return null
   const optionPrefix = kind === 'major' ? `pay:improvement:${id}` : `pay:improvement:minor:${id}`
-  const includeReturnedCard = isComplexCost(previewCost) && !!previewCost.cards?.list?.length
+  const includeReturnedCard = PaymentSolver.isComplexCost(previewCost) && !!previewCost.cards?.list?.length
   const costType = kind === 'major' ? 'major-improvement' : 'minor-improvement'
   // For costs that consume a card (e.g. CookingHearth requiring a Fireplace
   // return), pay needs the eligible-card pool to enumerate `cardUsed`
