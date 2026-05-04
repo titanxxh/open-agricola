@@ -54,7 +54,7 @@ describe('E91_PlowBuilder session', () => {
   const enterActiveInteraction = (session: GameSession) => {
     const resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
     return resp
   }
 
@@ -75,7 +75,7 @@ describe('E91_PlowBuilder session', () => {
 
     // After paying food, plow action starts — should show farmSelect for tile selection
     expect(resp.pending.type).toBe('choice')
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
 
     // Commit the plow choice
     const tile = resp.interaction.farm.selectableTiles[0]

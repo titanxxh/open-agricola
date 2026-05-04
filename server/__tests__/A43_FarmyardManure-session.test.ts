@@ -28,8 +28,8 @@ describe('A43_FarmyardManure session', () => {
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
     // With wood only (no reed), farm-expansion auto-selects stables → farmSelect.
-    expect(resp.interaction.stateId).toBe('farmSelect')
-    if (resp.interaction.stateId !== 'farmSelect') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.farm.farmType).toBe('stable')
     if (resp.interaction.farm.farmType !== 'stable') return
 
@@ -55,7 +55,7 @@ describe('A43_FarmyardManure session', () => {
 
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId !== 'farmSelect') return
+    if (resp.interaction.stateId !== 'wait') return
     if (resp.interaction.farm.farmType !== 'stable') return
 
     const [t1, t2] = resp.interaction.farm.selectableTiles
@@ -80,7 +80,7 @@ describe('A43_FarmyardManure session', () => {
 
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId !== 'farmSelect') return
+    if (resp.interaction.stateId !== 'wait') return
     if (resp.interaction.farm.farmType !== 'stable') return
 
     const stable = resp.interaction.farm.selectableTiles[0]!

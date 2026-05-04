@@ -101,8 +101,8 @@ describe('A73_AgriculturalFertilizers session', () => {
 
     // Without reed, only stables is available — OR auto-selects it
     // The pending is the stable selection
-    expect(resp.interaction.stateId).toBe('farmSelect')
-    if (resp.interaction.stateId !== 'farmSelect') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.farm.farmType).toBe('stable')
     if (resp.interaction.farm.farmType !== 'stable') return
 

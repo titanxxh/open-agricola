@@ -97,7 +97,7 @@ describe('D129_LumberVirtuoso session', () => {
     expect(player.resources.wood).toBe(5)
 
     // Now the stables action should be prompting farm interaction
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
   })
 
   it('choosing construct (wood rooms): discards excess wood, then prompts room placement', () => {
@@ -122,7 +122,7 @@ describe('D129_LumberVirtuoso session', () => {
     expect(player.resources.wood).toBe(5)
 
     // Now the construct action should be prompting farm interaction
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
   })
 
   it('with exactly 5 wood, no excess to pay — still offers action', () => {

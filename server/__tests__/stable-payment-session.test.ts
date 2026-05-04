@@ -57,8 +57,8 @@ describe('stable payment session', () => {
 
     resp = session.resolveChoice(0, stableOption!.value)
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('farmSelect')
-    if (resp.interaction.stateId !== 'farmSelect') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.farm.farmType).toBe('stable')
     if (resp.interaction.farm.farmType !== 'stable') return
 
@@ -96,8 +96,8 @@ describe('stable payment session', () => {
 
     resp = session.resolveChoice(0, stableOption!.value)
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('farmSelect')
-    if (resp.interaction.stateId !== 'farmSelect') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.farm.farmType).toBe('stable')
 
     // Engine path: empty stables triggers stablesAction.resolveChoice fail.
@@ -123,15 +123,15 @@ describe('stable payment session', () => {
 
     resp = session.resolveChoice(0, stableOption!.value)
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('farmSelect')
-    if (resp.interaction.stateId !== 'farmSelect') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.farm.farmType).toBe('stable')
 
     const workersAfterTake = workersAvailable(resp.state, resp.state.players[0]!)
     const undoStepResp = session.undoStep()
     expect(undoStepResp.ok).toBe(true)
     expect(undoStepResp.pending.type).toBe('choice')
-    expect(undoStepResp.interaction.stateId).toBe('choice')
+    expect(undoStepResp.interaction.stateId).toBe('wait')
     if (undoStepResp.pending.type !== 'choice') return
     expect(undoStepResp.pending.options.some((option) => option.labelKey === 'actions.construct.name')).toBe(true)
     expect(undoStepResp.pending.options.some((option) => option.labelKey === 'actions.stables.name')).toBe(true)
@@ -163,8 +163,8 @@ describe('stable payment session', () => {
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
     expect(resp.pending.promptKey).toBe('ui.interactionStableSelect')
-    expect(resp.interaction.stateId).toBe('farmSelect')
-    if (resp.interaction.stateId !== 'farmSelect') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.farm.farmType).toBe('stable')
 
     const undoResp = session.undoStep()

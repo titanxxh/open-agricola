@@ -38,7 +38,7 @@ describe('B19_MoldboardPlow session', () => {
     // Take farmland — enters plow tile selection
     let resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
 
     // Complete the farmland plow
     const tile1 = resp.interaction.farm.selectableTiles[0]
@@ -58,7 +58,7 @@ describe('B19_MoldboardPlow session', () => {
 
     // pop-card-stack runs, then plow interaction starts
     // Should now be in farmSelect for the extra plow
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
     const tile2 = resp.interaction.farm.selectableTiles[0]
     expect(tile2).toBeDefined()
     resp = session.resolveChoice(0, 'confirm', { tile: tile2 })

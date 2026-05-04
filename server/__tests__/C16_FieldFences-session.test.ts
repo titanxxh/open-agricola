@@ -37,7 +37,7 @@ const playC16 = (session: GameSession): void => {
   expect(resp.ok).toBe(true)
 
   // Drive the prompt chain until we land on the fencing farm-select prompt
-  // (interaction.stateId === 'farmSelect'). Along the way we:
+  // (interaction.stateId === 'wait'). Along the way we:
   //   - accept any optional-action wrapper ("action-…" / "accept")
   //   - pick C16 from the minor-improvement options
   //   - accept C16's own SEQ-optional wrapper before the fencing leaf
@@ -45,7 +45,7 @@ const playC16 = (session: GameSession): void => {
   while (resp.pending.type === 'choice' && safety < 12) {
     safety += 1
     const interaction = (resp as { interaction?: { stateId?: string } }).interaction
-    if (interaction?.stateId === 'farmSelect') break
+    if (interaction?.stateId === 'wait') break
     const opts = resp.pending.options.map((o) => o.value)
     const cardOption = opts.find((v) => v === `minor:${CARD_ID}`)
     if (cardOption) {

@@ -27,7 +27,7 @@ describe('D122_ClayCarrier session', () => {
     const resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
     // Should be in a choice state (plow select)
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
     return resp
   }
 

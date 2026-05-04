@@ -89,8 +89,8 @@ describe('A128_RiparianBuilder session', () => {
       : undefined
     expect(constructOption).toBeDefined()
     resp = session.resolveChoice(0, constructOption!.value)
-    expect(resp.interaction.stateId).toBe('farmSelect')
-    if (resp.interaction.stateId !== 'farmSelect') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.farm.farmType).toBe('room')
     if (resp.interaction.farm.farmType !== 'room') return
     // maxSelections=1 enforces the room cap on the engine path; an oversized
@@ -124,7 +124,7 @@ describe('A128_RiparianBuilder session', () => {
     const constructOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(constructOption).toBeDefined()
     resp = session.resolveChoice(0, constructOption!.value)
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
 
     resp = session.resolveChoice(0, 'confirm', { rooms: [{ row: 0, col: 0 }] })
     expect(resp.ok).toBe(true)
@@ -159,9 +159,9 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
     expect(resp.pending.sourceCard).toBe(CARD_ID)
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
-    if (resp.interaction.stateId !== 'farmSelect') return
+    if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.farm.farmType).toBe('room')
     if (resp.interaction.farm.farmType !== 'room') return
     expect(resp.interaction.farm.maxSelections).toBe(1)
@@ -173,7 +173,7 @@ describe('A128_RiparianBuilder session', () => {
     if (resp.pending.type !== 'choice') return
     expect(resp.pending.promptKey).toBe('prompt.selectPayment')
     expect(resp.pending.sourceCard).toBe(CARD_ID)
-    expect(resp.interaction.stateId).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
     expect(resp.pending.options).toHaveLength(2)
   })

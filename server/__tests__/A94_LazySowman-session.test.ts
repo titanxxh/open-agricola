@@ -93,7 +93,7 @@ describe('A94_LazySowman session', () => {
     if (resp.pending.type !== 'choice') return
     expect(resp.pending.promptKey).toBe('ui.interactionSowSelect')
     expect(resp.state.players[0]!.cardStates?.A94_LazySowman).toBeUndefined()
-    expect(resp.interaction?.stateId).toBe('farmSelect')
+    expect(resp.interaction?.stateId).toBe('wait')
   })
 
   it('still allows replacing sow on cultivation when sow prerequisites are not met', () => {

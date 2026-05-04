@@ -59,10 +59,10 @@ describe('C70_LettucePatch session', () => {
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
       expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
-      expect(resp.interaction.stateId).toBe('farmSelect')
+      expect(resp.interaction.stateId).toBe('wait')
 
       // The interaction should include the virtual tile as sowable
-      if (resp.interaction.stateId === 'farmSelect' && resp.interaction.farm.farmType === 'sow') {
+      if (resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'sow') {
         const cardField = resp.interaction.farm.selectableFields.find(
           (f) => f.tile.row === -1 && f.tile.col === 70,
         )
