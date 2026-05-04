@@ -90,4 +90,5 @@ export const PaymentSolver = {
   execute,
   pickAuto,
   clearCache,
+  isComplexCost,
 } as const

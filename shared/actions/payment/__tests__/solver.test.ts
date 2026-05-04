@@ -110,4 +110,18 @@ describe('PaymentSolver', () => {
       expect(() => PaymentSolver.clearCache()).not.toThrow()
     })
   })
+
+  describe('isComplexCost', () => {
+    it('returns false for simple Partial<Resource>', () => {
+      expect(PaymentSolver.isComplexCost({ wood: 3 })).toBe(false)
+    })
+
+    it('returns true for ComplexCost with fee', () => {
+      expect(PaymentSolver.isComplexCost({ fee: { wood: 3 } })).toBe(true)
+    })
+
+    it('returns true for ComplexCost with cards', () => {
+      expect(PaymentSolver.isComplexCost({ cards: { type: 'Major', list: ['K2'], required: true } })).toBe(true)
+    })
+  })
 })
