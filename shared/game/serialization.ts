@@ -1,4 +1,5 @@
 import type { ActionSpace, GameState } from './types'
+import type { EngineStack, EngineStackCursor } from '../engine'
 import { createActionSpaces } from '../actions'
 import { normalizeState } from '../logic/state'
 import { getCardModifiers } from '../cards/card-modifiers'
@@ -16,9 +17,19 @@ export type SerializedGameState = Omit<
 > & {
   actionSpaces: SerializedActionSpace[]
   roundStartSnapshot: null
+  engineStack: EngineStackCursor
 }
 
-export const serializeState = (state: GameState): SerializedGameState => {
+export type SerializeStateContext = {
+  engineStack: EngineStack
+}
+
+const EMPTY_ENGINE_STACK_CURSOR: EngineStackCursor = { frames: [] }
+
+export const serializeState = (
+  state: GameState,
+  ctx?: SerializeStateContext,
+): SerializedGameState => {
   const { actionSpaces, ...rest } = state
   return {
     ...rest,
@@ -27,6 +38,7 @@ export const serializeState = (state: GameState): SerializedGameState => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       ({ canBeExecutedByPlayer, execute, resolveChoice, flow, ...s }) => s,
     ),
+    engineStack: ctx ? ctx.engineStack.toCursor() : EMPTY_ENGINE_STACK_CURSOR,
   }
 }
 
@@ -48,8 +60,9 @@ export const serializeState = (state: GameState): SerializedGameState => {
 export const serializeStateForPlayer = (
   state: GameState,
   viewerPlayerId: string | null,
+  ctx?: SerializeStateContext,
 ): SerializedGameState => {
-  const base = serializeState(state)
+  const base = serializeState(state, ctx)
   const filteredPlayers = base.players.map((p) =>
     p.id === viewerPlayerId
       ? p
@@ -106,9 +119,15 @@ export const rebuildActiveModifiers = (state: GameState): GameState => {
   return state
 }
 
-export const rehydrateState = (raw: SerializedGameState): GameState => {
+export type RehydratedState = {
+  state: GameState
+  engineStackCursor: EngineStackCursor
+}
+
+export const rehydrateState = (raw: SerializedGameState): RehydratedState => {
   const templates = createActionSpaces(raw.players?.length)
-  const restored = rebuildActiveModifiers(normalizeState(raw as unknown as GameState))
+  const { engineStack, ...rawWithoutCursor } = raw
+  const restored = rebuildActiveModifiers(normalizeState(rawWithoutCursor as unknown as GameState))
   restored.actionSpaces = templates.map((template) => {
     const saved = raw.actionSpaces?.find((s) => s.id === template.id)
     return {
@@ -127,5 +146,8 @@ export const rehydrateState = (raw: SerializedGameState): GameState => {
     }
     restored.actionSpaces.push(pas)
   }
-  return restored
+  return {
+    state: restored,
+    engineStackCursor: engineStack ?? EMPTY_ENGINE_STACK_CURSOR,
+  }
 }

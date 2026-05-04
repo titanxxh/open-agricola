@@ -34,7 +34,7 @@ import {
   SequenceNode,
   XorNode,
 } from '../engine/index.ts'
-import type { EngineNode, EngineSource, SubFlowReason } from '../engine/index.ts'
+import type { EngineNode, EngineSource, EngineStackCursor, SubFlowReason } from '../engine/index.ts'
 import {
   createInitialState,
   createRoundOpenById,
@@ -197,9 +197,37 @@ export type SessionResponse = {
  * subclasses (`GameSession`) and other consumers can inject dependencies
  * without importing Node-only modules into the shared layer.
  */
+/**
+ * Pre-built state plus an `EngineStack` cursor produced by
+ * `rehydrateState`. When supplied, `GameCore` will rebuild every
+ * sub-flow frame in the stack via `Engine.restore` so that an in-flight
+ * pending interaction (reorganize, choice, ...) survives a cold restart.
+ */
+export type StateWithCursor = {
+  state: GameState
+  engineStackCursor: EngineStackCursor
+}
+
+const isStateWithCursor = (value: unknown): value is StateWithCursor => {
+  if (!value || typeof value !== 'object') return false
+  const v = value as Record<string, unknown>
+  return (
+    'state' in v &&
+    'engineStackCursor' in v &&
+    typeof v.state === 'object' &&
+    v.state !== null &&
+    typeof v.engineStackCursor === 'object' &&
+    v.engineStackCursor !== null &&
+    Array.isArray((v.engineStackCursor as { frames?: unknown }).frames)
+  )
+}
+
 export interface GameCoreOptions {
-  /** Pre-built state (object) or deterministic seed (number). */
-  stateOrSeed?: GameState | number
+  /**
+   * Pre-built state (object), seeded fresh state (number), or a state +
+   * engine-stack cursor pair returned from `rehydrateState`.
+   */
+  stateOrSeed?: GameState | number | StateWithCursor
   /** Workshop custom cards to register into a per-session context. */
   customCards?: CustomCardData[]
   /** Options forwarded to `createInitialState`. */
@@ -322,6 +350,12 @@ export class GameCore {
     }
 
     if (stateOrSeed && typeof stateOrSeed === 'object') {
+      if (isStateWithCursor(stateOrSeed)) {
+        this.state = normalizeState(stateOrSeed.state)
+        this.syncDynamicActionSpaces()
+        this.restoreEngineStackFromCursor(stateOrSeed.engineStackCursor)
+        return
+      }
       this.state = normalizeState(stateOrSeed)
     } else {
       const seed = typeof stateOrSeed === 'number' ? stateOrSeed : undefined
@@ -334,6 +368,29 @@ export class GameCore {
       })
     }
     this.syncDynamicActionSpaces()
+  }
+
+  /**
+   * Read-only access to the EngineStack so that the serialization layer can
+   * call `engineStack.toCursor()` when persisting the session. All writes
+   * still go through GameCore's existing engineStack.push/pop sites.
+   */
+  getEngineStack(): EngineStack {
+    return this.engineStack
+  }
+
+  private restoreEngineStackFromCursor(cursor: EngineStackCursor): void {
+    if (!cursor || cursor.frames.length === 0) return
+    this.engineStack = EngineStack.fromCursor(cursor, (source, snapshot) => {
+      const engine = this.createEngineFromSource(source)
+      engine.restore(snapshot)
+      return engine
+    })
+    // Re-derive `this.pending` from the restored engine state. The engine's
+    // `proceed` is idempotent for already-pending interactions: it re-emits
+    // `step.type === 'choice'` for unresolved InteractionNodes, which lets
+    // `runEngineSteps` rebuild the corresponding `PendingAction` shape.
+    this.runEngineSteps()
   }
 
   private syncDynamicActionSpaces() {
@@ -2729,7 +2786,15 @@ export class GameCore {
   }
 
   loadState(raw: unknown): SessionResponse {
-    this.state = rebuildActiveModifiers(normalizeState(raw as GameState))
+    let nextState: GameState
+    let cursor: EngineStackCursor | null = null
+    if (isStateWithCursor(raw)) {
+      nextState = raw.state
+      cursor = raw.engineStackCursor
+    } else {
+      nextState = raw as GameState
+    }
+    this.state = rebuildActiveModifiers(normalizeState(nextState))
     this.syncDynamicActionSpaces()
     if (!this.state.roundStartSnapshot) {
       this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
@@ -2739,6 +2804,9 @@ export class GameCore {
     this.history = []
     this.actionStartIndex = null
     this.turnOwnerPlayerIndex = null
+    if (cursor && cursor.frames.length > 0) {
+      this.restoreEngineStackFromCursor(cursor)
+    }
     return this.respond()
   }
 
