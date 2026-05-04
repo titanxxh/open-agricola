@@ -1338,11 +1338,26 @@ export class Engine {
       )
       if (result.type === 'request') {
         node.resolve(result)
+        // Mirror the resolveChoice second-pass: ActionDef-declared
+        // actionContext patches in result.extraData.actionContextWrite are
+        // shallow-merged into the pending-interaction context so subsequent
+        // prompts see the patched context. None of today's emitters use
+        // this path (the patches arrive on resolveChoice), but emitters in
+        // future tasks (S2/S3) may need it; mirror it here for symmetry.
+        const contextWritePatch =
+          result.extraData && typeof result.extraData === 'object'
+            ? (result.extraData.actionContextWrite as Record<string, unknown> | undefined)
+            : undefined
+        const mergedActionContext = contextWritePatch
+          ? { ...(executionContext.actionContext ?? {}), ...contextWritePatch }
+          : executionContext.actionContext
         let choiceOptions: ActionChoiceOption[]
+        let updatedRequest: InteractionRequest = result.request
         if (result.request.kind === 'choice') {
           // computeArgs hook can inject extra options (e.g. D50 ForeignAid
           // filter, A94 LazySowman extras). Skip when the action provides its
           // own getBaseChoiceOptions builder (already authoritative).
+          let mergedOptions = result.request.options
           if (!action.getBaseChoiceOptions) {
             const argResults = this.hooks.computeArgs(
               { ...executionContext, actionId: replacedActionId },
@@ -1353,10 +1368,14 @@ export class Engine {
               .flatMap((entry) => entry.extraOptions ?? [])
               .filter((option) => option && !existingValues.has(option.value))
             if (extraOptions.length > 0) {
-              result.request.options = [...result.request.options, ...extraOptions]
+              mergedOptions = [...result.request.options, ...extraOptions]
+              // Build a fresh request instead of mutating the action's
+              // returned object — input-mutation breaks immutability and
+              // surprises emitters that reuse a constant request literal.
+              updatedRequest = { ...result.request, options: mergedOptions }
             }
           }
-          choiceOptions = result.request.options
+          choiceOptions = mergedOptions
         } else if (result.request.kind === 'animal-reorg') {
           // Compatibility shim until Task 6/7 lifts GameCore detection off
           // pending.options. Re-emit confirm/cancel from the legacy 'choice'
@@ -1398,7 +1417,7 @@ export class Engine {
         this.applyInteractionRequest({
           targetNode: choiceNode ?? null,
           fallbackNodeId: node.id,
-          request: result.request,
+          request: updatedRequest,
           promptKey: result.promptKey,
           choiceOptions,
           actionId: replacedActionId,
@@ -1406,7 +1425,7 @@ export class Engine {
           params: executionContext.params,
           costs: executionContext.costs,
           sourceCard: executionContext.sourceCard ?? result.sourceCard,
-          actionContext: executionContext.actionContext,
+          actionContext: mergedActionContext,
         })
         if (duringActivateNodes.length > 0) {
           this.tree.insertAfter(node.id, [...duringActivateNodes])
@@ -1657,20 +1676,10 @@ export class Engine {
         this.hooks.during({ ...executionContext, actionId }, result)
         if (result.type === 'request' && result.request.kind === 'choice') {
           child.resolve(result)
-          const choiceNode = targetNode ? this.findInteractionNode(targetNode) : null
-          this.applyInteractionRequest({
-            targetNode: choiceNode ?? null,
-            fallbackNodeId: child.id,
-            request: result.request,
-            promptKey: result.promptKey,
-            choiceOptions: result.request.options,
-            actionId,
-            ownerNodeId: node instanceof XorNode ? node.id : null,
-            params: executionContext.params,
-            costs: executionContext.costs,
-            sourceCard: executionContext.sourceCard,
-            actionContext: executionContext.actionContext,
-          })
+          // Merge computeArgs extraOptions BEFORE applyInteractionRequest so
+          // both the InteractionNode.choices and the returned result.request
+          // see the same final option list. Build a fresh request rather
+          // than mutating the action's returned object.
           const argResults = this.hooks.computeArgs(
             { ...executionContext, actionId },
             result,
@@ -1679,10 +1688,29 @@ export class Engine {
           const extraOptions = argResults
             .flatMap((entry) => entry.extraOptions ?? [])
             .filter((option) => option && !existingValues.has(option.value))
-          if (extraOptions.length > 0) {
-            result.request.options = [...result.request.options, ...extraOptions]
-          }
-          return result
+          const mergedOptions = extraOptions.length > 0
+            ? [...result.request.options, ...extraOptions]
+            : result.request.options
+          const updatedRequest: InteractionRequest = extraOptions.length > 0
+            ? { ...result.request, options: mergedOptions }
+            : result.request
+          const choiceNode = targetNode ? this.findInteractionNode(targetNode) : null
+          this.applyInteractionRequest({
+            targetNode: choiceNode ?? null,
+            fallbackNodeId: child.id,
+            request: updatedRequest,
+            promptKey: result.promptKey,
+            choiceOptions: mergedOptions,
+            actionId,
+            ownerNodeId: node instanceof XorNode ? node.id : null,
+            params: executionContext.params,
+            costs: executionContext.costs,
+            sourceCard: executionContext.sourceCard,
+            actionContext: executionContext.actionContext,
+          })
+          return extraOptions.length > 0
+            ? { ...result, request: updatedRequest }
+            : result
         }
         if (result.type === 'ok' || result.type === 'flow') {
           collectImmediateLogs(context.player.name, result).forEach((entry) => {
