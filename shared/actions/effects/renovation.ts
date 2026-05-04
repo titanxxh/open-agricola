@@ -16,7 +16,7 @@ import { canExecuteWithCostPreview } from '../helpers/cost-preview'
 import {
   canAffordTypedFlatCost,
   payTypedFlatCost,
-} from '../helpers/pay-helpers'
+} from '../payment/internal'
 
 const RENOVATE_PAYMENT_PREFIX = 'pay:renovate'
 

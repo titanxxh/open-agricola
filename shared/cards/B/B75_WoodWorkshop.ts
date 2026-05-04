@@ -7,7 +7,7 @@ import { meetsCardPrerequisites } from '../helpers/prerequisites'
 import {
   canAffordCardPreviewCostByProvider,
   resolveCardPreviewCostByProvider,
-} from '../../actions/helpers/pay-helpers'
+} from '../../actions/payment/internal'
 import { PaymentSolver } from '../../actions/payment'
 import type { PaymentCtx } from '../../actions/payment'
 import { gainLeaf } from '../helpers/pay-gain-node'

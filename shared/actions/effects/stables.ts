@@ -9,7 +9,7 @@ import type {
   Resource,
 } from '../../game/types'
 import { getNextEmptyTileForPlayer } from '../../game/farm'
-import { payResources, applyCostOverride } from '../helpers/payment'
+import { payResources, applyCostOverride } from '../payment/internal'
 import { stableWoodCost } from './fencing'
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'
 // PaymentSolver namespace (S3 Task 7a): core payment APIs migrated to
@@ -20,7 +20,7 @@ import type { PaymentCtx } from '../payment'
 import {
   executeResolvedTypedFlatPayment,
   resolveTypedFlatPaymentSelection,
-} from '../helpers/pay-helpers'
+} from '../payment/internal'
 import { validateStableSelection } from '../../logic/farm/validators'
 import { buildStableFarmInteraction } from '../../logic/farm/farm-interaction'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'

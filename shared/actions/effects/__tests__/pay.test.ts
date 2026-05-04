@@ -9,9 +9,9 @@ import {
   executePaymentSolution,
   getCheapestSolution,
   clearPaymentCache,
-} from '../../helpers/payment'
+} from '../../payment/internal'
 import { returnCardToBoard } from '../../../cards/helpers/return-card'
-import { buildPaymentChoiceResult, payTypedFlatCost } from '../../helpers/pay-helpers'
+import { buildPaymentChoiceResult, payTypedFlatCost } from '../../payment/internal'
 import { payAction } from '../pay'
 
 beforeEach(() => {
