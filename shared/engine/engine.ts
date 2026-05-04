@@ -1553,11 +1553,18 @@ export class Engine {
             trigger === 'anytime'
               ? [confirm, { value: 'cancel', labelKey: 'ui.interactionAnimalReorgCancel' }]
               : [confirm]
+        } else if (result.request.kind === 'farm-select') {
+          // Task 5/6: farm-select leaves emit InteractionFarmSelection plus an
+          // optional `options` list (confirm/cancel) so resolvePendingChoice's
+          // pending.options.find() validator still has a value to match.
+          choiceOptions = result.request.options ?? [
+            { value: 'confirm', labelKey: 'ui.interactionFarmSelectConfirm' },
+            { value: 'cancel', labelKey: 'ui.interactionFarmSelectCancel' },
+          ]
         } else if (
           result.request.kind === 'confirm-next-player' ||
           result.request.kind === 'confirm-player-switch' ||
           result.request.kind === 'feed' ||
-          result.request.kind === 'farm-select' ||
           result.request.kind === 'selection' ||
           result.request.kind === 'card-draft'
         ) {
@@ -1565,10 +1572,10 @@ export class Engine {
           // current effect emits them, so they fall through to empty choices
           // here. The exhaustive check below ensures any future kind added to
           // InteractionRequest forces this branch to be revisited.
-          // farm-select / selection / card-draft were added in S2 Task 2; their
-          // emitters land in Tasks 5/6/7/12 — until then they share this same
-          // not-yet-wired path so typecheck stays green without granting them
-          // a real options surface.
+          // selection / card-draft were added in S2 Task 2; their emitters
+          // land in Tasks 7/12 — until then they share this same not-yet-wired
+          // path so typecheck stays green without granting them a real options
+          // surface.
           choiceOptions = []
         } else {
           // Exhaustive check: every InteractionRequest kind must be handled

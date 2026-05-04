@@ -1239,6 +1239,21 @@ export class GameCore {
           allowedCommands: ['confirmFeed', 'undoStep', 'undoAction'],
           anytimeActions: [],
         }
+      case 'farm-select':
+        return {
+          stateId: 'wait',
+          playerIndex,
+          spaceId,
+          promptKey,
+          promptParams,
+          sourceCard,
+          request,
+          options: choiceOptions,
+          costOverride,
+          farm: request.farm,
+          allowedCommands: ['resolveChoice', 'commitFarm', 'takeAnytimeAction', 'undoStep', 'undoAction'],
+          anytimeActions,
+        }
       case 'choice':
       default: {
         const selectionKind = this.isSelectionPromptKey(promptKey)
@@ -2689,7 +2704,12 @@ export class GameCore {
     // dispatched by the public `resolveChoice` to dedicated handlers and
     // never reach this method.
     const isInteractionNodeTarget =
-      node && (!node.request || node.request.kind === 'choice' || node.request.kind === 'animal-reorg')
+      node &&
+      (!node.request ||
+        node.request.kind === 'choice' ||
+        node.request.kind === 'animal-reorg' ||
+        node.request.kind === 'farm-select' ||
+        node.request.kind === 'selection')
     const isResolveChoiceTarget = Boolean(isInteractionNodeTarget || composite)
     if (!isResolveChoiceTarget || pendingPlayerIndex !== playerIndex) {
       return this.respond(false, 'no pending choice for this player')
