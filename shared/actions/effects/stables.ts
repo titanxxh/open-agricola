@@ -26,14 +26,24 @@ import { buildStableFarmInteraction } from '../../logic/farm/farm-interaction'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 
+/**
+ * Construct a minimal GameState wrapping a single player. Used by
+ * buildStable's PaymentSolver.canAfford call where the function signature
+ * doesn't carry GameState. Safe ONLY for simple-cost (non-ComplexCost)
+ * affordability checks — those route through canPayResources which only
+ * reads player.resources. Do not pass to ComplexCost paths or hook-firing
+ * code paths.
+ */
+const buildSingletonState = (player: PlayerState): GameState =>
+  ({ ...({} as GameState), players: [player] })
+
 export const buildStable = (player: PlayerState): ActionExecutionResult => {
   const next = getNextEmptyTileForPlayer(player)
   if (!next) {
     return { type: 'fail', logKey: 'log.buildStableFail' }
   }
   const stableCtx: PaymentCtx = { actionId: 'stables', costType: 'none' }
-  const ephemeralState: GameState = { ...({} as GameState), players: [player] }
-  if (!PaymentSolver.canAfford(ephemeralState, 0, { wood: stableWoodCost }, stableCtx)) {
+  if (!PaymentSolver.canAfford(buildSingletonState(player), 0, { wood: stableWoodCost }, stableCtx)) {
     return { type: 'fail', logKey: 'log.buildStableFail' }
   }
   payResources(player, { wood: stableWoodCost })
