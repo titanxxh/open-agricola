@@ -552,6 +552,20 @@ export type ActionSpace = ActionDefinition & {
   takenBy: WorkerRef[]
 }
 
+/**
+ * Single entry in a harvest-feed queue: pinpoints which player still owes
+ * food and how much, plus the food already consumed from that player's
+ * mandatory pre-deduction (so the UI can display it). Shared between the
+ * legacy `PendingAction.harvestFeed` shape, the engine's
+ * `InteractionRequest` payload, and `GameCore.startFeedSubFlow` so all
+ * three sites refer to the same canonical type.
+ */
+export type FeedQueueEntry = {
+  index: number
+  remaining: number
+  foodUsed: number
+}
+
 export type PendingAction =
   | {
       type: 'choice'
@@ -569,7 +583,7 @@ export type PendingAction =
       playerIndex: number
       remaining: number
       foodUsed: number
-      feedQueue?: { index: number; remaining: number; foodUsed: number }[]
+      feedQueue?: FeedQueueEntry[]
     }
   | { type: 'confirmNextPlayer'; nextPlayerIndex: number }
   | { type: 'confirmPlayerSwitch'; fromPlayerIndex: number; toPlayerIndex: number }
@@ -592,7 +606,7 @@ export type InteractionRequest =
       kind: 'feed'
       remaining: number
       foodUsed: number
-      feedQueue?: { index: number; remaining: number; foodUsed: number }[]
+      feedQueue?: FeedQueueEntry[]
     }
 
 export type InteractionCommand =
@@ -717,7 +731,7 @@ export type InteractionState =
       playerIndex: number
       remaining: number
       foodUsed: number
-      feedQueue?: { index: number; remaining: number; foodUsed: number }[]
+      feedQueue?: FeedQueueEntry[]
     })
   | (InteractionBase & {
       stateId: 'confirmNextPlayer'

@@ -128,6 +128,36 @@ export class Engine {
   }
 
   /**
+   * Replace this engine's tree with a single synthetic InteractionNode and pin
+   * the pending-interaction pointers at it. Used by GameCore.startConfirm*/
+  /* startFeedSubFlow when promoting GameCore-driven prompts (confirmNextPlayer,
+   * confirmPlayerSwitch, harvest-feed) into the InteractionNode pipeline. The
+   * parent context (current player, space) is owned by the EngineStack frame
+   * GameCore pushes — the engine itself just hosts the InteractionNode so
+   * `peekInteraction()` / `snapshot()` round-trip the pending request.
+   *
+   * We swap the entire tree root rather than `insertBefore` because the
+   * synthetic frames pushed for confirm/feed have no real action body; the
+   * InteractionNode IS the only thing the engine should surface.
+   */
+  injectInteraction(node: InteractionNode): void {
+    this.tree.root = node
+    this.pendingInteractionNodeId = node.id
+    // Synthetic action id — never resolves through the registry. Engine paths
+    // that look up `pendingInteractionActionId` (e.g. flushLeafActionDetail)
+    // tolerate unknown ids gracefully.
+    this.pendingInteractionActionId = '__interaction_only__'
+    this.pendingInteractionOwnerNodeId = null
+    this.pendingInteractionContext = {
+      params: undefined,
+      costs: undefined,
+      sourceCard: undefined,
+      actionContext: undefined,
+    }
+    this.lastComputedCosts = undefined
+  }
+
+  /**
    * Apply an InteractionRequest emitted by an action.execute / resolveChoice
    * call to the engine's pending-interaction state. Centralises the three
    * mirror branches (top-level execute, XorNode follow-up execute,
