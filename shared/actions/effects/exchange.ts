@@ -9,6 +9,11 @@ import type {
   Trade,
   ResourceKey,
 } from '../../game/types'
+// PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
+// the new payment module. Other helpers (preview-cost / typed-flat /
+// room-payment / cost-modifier internals) remain on the shim through S3.
+// exchange.ts only uses applyTradeSideEffect (shim scope), so no PaymentSolver
+// call sites exist here yet.
 import { applyTradeSideEffect } from '../helpers/payment'
 import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
 import { addFoodFromConversion, incResourceConverted } from '../../logic/stats'
