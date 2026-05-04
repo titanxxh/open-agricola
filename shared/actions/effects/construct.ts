@@ -6,6 +6,11 @@ import type {
   FarmTilePosition,
   PlayerState,
 } from '../../game/types'
+// PaymentSolver namespace (S3 Task 7a): core payment APIs migrated to
+// the new payment module. Other helpers (preview-cost / typed-flat /
+// room-payment / cost-modifier internals) remain on the shim through S3.
+// construct.ts only uses room-payment helpers (S4 domain aggregate scope),
+// so no PaymentSolver call sites exist here yet.
 import {
   buildRoomCostPerUnit,
   executeResolvedRoomPayment,
