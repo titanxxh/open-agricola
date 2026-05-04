@@ -228,7 +228,10 @@ export const handleGameRoute = async (
       return true
     }
     if (!enforceSeatBinding(req, res, body.playerIndex)) return true
-    const { resp, result } = callAndRespond(req, s => s.confirmHarvestFeed(body.playerIndex!, body.selections as Parameters<GameSession['confirmHarvestFeed']>[1]))
+    // Task 9: forwarded through the unified resolveChoice dispatcher.
+    const { resp, result } = callAndRespond(req, (s) =>
+      s.resolveChoice(body.playerIndex!, 'confirm', { selections: body.selections }),
+    )
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
@@ -257,13 +260,22 @@ export const handleGameRoute = async (
   }
 
   if (req.method === 'POST' && req.url === '/api/game/next-player') {
-    const { resp, result } = callAndRespond(req, s => s.confirmNextPlayer())
+    // Task 9: forwarded through resolveChoice; the synthetic
+    // confirm-next-player InteractionNode supplies `nextPlayerIndex`.
+    const { resp, result } = callAndRespond(req, (s) => {
+      const idx = s.getState().state.currentPlayerIndex
+      return s.resolveChoice(idx, 'confirm')
+    })
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
   if (req.method === 'POST' && req.url === '/api/game/confirm-player-switch') {
-    const { resp, result } = callAndRespond(req, s => s.confirmPlayerSwitch())
+    // Task 9: forwarded through resolveChoice.
+    const { resp, result } = callAndRespond(req, (s) => {
+      const idx = s.getState().state.currentPlayerIndex
+      return s.resolveChoice(idx, 'confirm')
+    })
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
