@@ -21,6 +21,7 @@ import type { DraftPickPayload } from '../draft/types.ts'
 import {
   ActionNode,
   ActionRegistry,
+  EngineStack,
   InteractionNode,
   Engine,
   EngineTree,
@@ -33,7 +34,7 @@ import {
   SequenceNode,
   XorNode,
 } from '../engine/index.ts'
-import type { EngineNode } from '../engine/index.ts'
+import type { EngineNode, EngineSource } from '../engine/index.ts'
 import {
   createInitialState,
   createRoundOpenById,
@@ -134,10 +135,6 @@ type HistoryEntry = {
   undoBoundary?: boolean
 }
 
-type EngineSource =
-  | { kind: 'action'; actionId: string }
-  | { kind: 'flow'; flow: ActionFlow }
-
 type StageResumeState = {
   hook:
     | 'onBeforeHarvest'
@@ -214,12 +211,16 @@ export interface GameCoreOptions {
 
 export class GameCore {
   private state: GameState
-  private engine: Engine | null = null
-  private engineSource: EngineSource | null = null
-  private activeSpaceId: string | null = null
-  private activePlayerIndex: number | null = null
-  private stageResume: StageResumeState | null = null
-  private pausedEngine: { engine: Engine; engineSource: EngineSource; activeSpaceId: string; activePlayerIndex: number; stageResume: StageResumeState | null; deferredPlayerSwitch: { fromPlayerIndex: number; toPlayerIndex: number } | null } | null = null
+  private engineStack = new EngineStack()
+  // Read-only views backed by engineStack.current(). All writes go through
+  // engineStack.push/pop or by mutating engineStack.current() fields directly.
+  private get engine(): Engine | null { return this.engineStack.current()?.engine ?? null }
+  private get engineSource(): EngineSource | null { return this.engineStack.current()?.source ?? null }
+  private get activeSpaceId(): string | null { return this.engineStack.current()?.spaceId ?? null }
+  private get activePlayerIndex(): number | null { return this.engineStack.current()?.ownerPlayerIndex ?? null }
+  private get stageResume(): StageResumeState | null {
+    return (this.engineStack.current()?.stageResume ?? null) as StageResumeState | null
+  }
   private pending: PendingAction = { type: 'none' }
   private history: HistoryEntry[] = []
   private actionStartIndex: number | null = null
@@ -235,7 +236,6 @@ export class GameCore {
     costs: {},
   }
   private nextActionToken = 1
-  private deferredPlayerSwitch: { fromPlayerIndex: number; toPlayerIndex: number } | null = null
   private turnOwnerPlayerIndex: number | null = null
 
   private registry: ActionRegistry
@@ -467,13 +467,16 @@ export class GameCore {
     }
     if (nodes.length === 0) return false
     const root = nodes.length === 1 ? nodes[0] : new SequenceNode(`pf-after-seq`, nodes)
-    this.engine = new Engine({
+    const newEngine = new Engine({
       tree: new EngineTree(root),
       registry: this.registry,
       hooks: this.hookDispatcher,
       log: this.engineLog,
     })
-    this.engineSource = { kind: 'flow', flow: { type: 'seq', children: [] } }
+    const frame = this.engineStack.current()
+    if (!frame) return false
+    frame.engine = newEngine
+    frame.source = { kind: 'flow', flow: { type: 'seq', children: [] } }
     return true
   }
 
@@ -499,16 +502,20 @@ export class GameCore {
       actionId: 'reorganize',
       actionContext: { trigger },
     }
-    this.engine = this.createFlowEngine(flow)
-    this.engineSource = { kind: 'flow', flow }
-    this.activePlayerIndex = playerIndex
-    this.activeSpaceId = '__reorganize__'
-    this.stageResume = {
-      hook: 'onReorganizeComplete',
-      playerIndex,
-      cardIndex: 0,
-      extra: { trigger, originPlayerIndex: resumeExtra.originPlayerIndex ?? null },
-    }
+    this.engineStack.push({
+      engine: this.createFlowEngine(flow),
+      source: { kind: 'flow', flow },
+      ownerPlayerIndex: playerIndex,
+      spaceId: '__reorganize__',
+      stageResume: {
+        hook: 'onReorganizeComplete',
+        playerIndex,
+        cardIndex: 0,
+        extra: { trigger, originPlayerIndex: resumeExtra.originPlayerIndex ?? null },
+      },
+      deferredPlayerSwitch: null,
+      reason: 'reorganize',
+    })
     this.runEngineSteps()
   }
 
@@ -1042,18 +1049,27 @@ export class GameCore {
   private restoreHistory(entry: HistoryEntry) {
     this.state = cloneState(entry.state)
     this.pending = this.clonePending(entry.pending)
-    this.activeSpaceId = entry.activeSpaceId
-    this.activePlayerIndex = entry.activePlayerIndex
-    this.engineSource = entry.engineSource
+    this.turnOwnerPlayerIndex = entry.turnOwnerPlayerIndex
+    this.engineStack.clear()
+    const source = entry.engineSource
       ? JSON.parse(JSON.stringify(entry.engineSource)) as EngineSource
       : null
-    this.stageResume = entry.stageResume ? { ...entry.stageResume } : null
-    this.turnOwnerPlayerIndex = entry.turnOwnerPlayerIndex
-    if (entry.engineSnapshot && this.engineSource) {
-      this.engine = this.createEngineFromSource(this.engineSource)
-      this.engine.restore(entry.engineSnapshot)
-    } else {
-      this.engine = null
+    if (source && entry.activeSpaceId !== null && entry.activePlayerIndex !== null) {
+      const engine = this.createEngineFromSource(source)
+      if (entry.engineSnapshot) {
+        engine.restore(entry.engineSnapshot)
+      }
+      this.engineStack.push({
+        engine,
+        source,
+        ownerPlayerIndex: entry.activePlayerIndex,
+        spaceId: entry.activeSpaceId,
+        stageResume: entry.stageResume ? { ...entry.stageResume } : null,
+        deferredPlayerSwitch: null,
+        // Task 7 will introduce a 'top-level' reason for action engines and
+        // tighten the union; placeholder until the cursor flows that field.
+        reason: 'card-draft',
+      })
     }
   }
 
@@ -1296,11 +1312,15 @@ export class GameCore {
     playerIndex: number,
     nextCardIndex: number,
   ) {
-    this.engine = this.createFlowEngine(flow)
-    this.engineSource = { kind: 'flow', flow }
-    this.activeSpaceId = `__stage:${hook}`
-    this.activePlayerIndex = playerIndex
-    this.stageResume = { hook, playerIndex, cardIndex: nextCardIndex }
+    this.engineStack.push({
+      engine: this.createFlowEngine(flow),
+      source: { kind: 'flow', flow },
+      spaceId: `__stage:${hook}`,
+      ownerPlayerIndex: playerIndex,
+      stageResume: { hook, playerIndex, cardIndex: nextCardIndex },
+      deferredPlayerSwitch: null,
+      reason: 'card-draft',
+    })
     this.pending = { type: 'none' }
     this.runEngineSteps()
   }
@@ -1354,8 +1374,7 @@ export class GameCore {
     if (!player) return this.respond(false, 'invalid player')
     this.finalizeActionLog(player)
     this.turnOwnerPlayerIndex = null
-    this.activeSpaceId = null
-    this.activePlayerIndex = null
+    this.engineStack.clear()
     const allWorkersUsed = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)
     if (!allWorkersUsed) {
       const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
@@ -1561,11 +1580,7 @@ export class GameCore {
     this.state.log.unshift({ key: 'log.enterRound', params: { round: this.state.round } })
     this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
     this.pending = { type: 'none' }
-    this.engine = null
-    this.engineSource = null
-    this.activeSpaceId = null
-    this.activePlayerIndex = null
-    this.stageResume = null
+    this.engineStack.clear()
     this.history = []
     this.actionStartIndex = null
     return this.respond()
@@ -1688,15 +1703,12 @@ export class GameCore {
             stageResume.extra?.originPlayerIndex ?? null,
           )
         }
-        if (this.pausedEngine) {
-          const paused = this.pausedEngine
-          this.pausedEngine = null
-          this.engine = paused.engine
-          this.engineSource = paused.engineSource
-          this.activeSpaceId = paused.activeSpaceId
-          this.activePlayerIndex = paused.activePlayerIndex
-          this.stageResume = paused.stageResume
-          this.deferredPlayerSwitch = paused.deferredPlayerSwitch
+        // After Task 6: the reorganize frame has already been popped in
+        // runEngineSteps' done/blocked branch. If a parent frame remains on
+        // the stack, we are returning from an "anytime" sub-flow detour
+        // (formerly the `pausedEngine` save/restore path) — just resume the
+        // parent engine.
+        if (this.engineStack.depth() > 0) {
           this.runEngineSteps()
           return
         }
@@ -1709,65 +1721,65 @@ export class GameCore {
   }
 
   private runEngineSteps(): void {
-    if (!this.engine || this.activePlayerIndex === null || !this.activeSpaceId) return
-    let player = this.state.players[this.activePlayerIndex]
-    let space = this.getSpaceById(this.activeSpaceId)
+    let frame = this.engineStack.current()
+    if (!frame || frame.ownerPlayerIndex === null || !frame.spaceId) return
+    let player = this.state.players[frame.ownerPlayerIndex]
+    let space = this.getSpaceById(frame.spaceId)
     if (!player || !space) return
 
     while (true) {
       const before = this.clonePlayer(player)
-      const step = this.engine!.proceed({ state: this.state, player, space })
+      const step = frame.engine.proceed({ state: this.state, player, space })
       this.flushEngineLog()
 
       if (step.type === 'blocked' || step.type === 'done') {
-        this.deferredPlayerSwitch = null
-        const isActionEngine = this.engineSource?.kind === 'action'
-        const stageResume = this.stageResume
-        this.engine = null
-        this.engineSource = null
+        // Snapshot the relevant fields from the current frame BEFORE deciding
+        // whether to pop. runPlaceFarmerAfterHooks mutates the same frame's
+        // engine, so we keep the frame on the stack for that branch.
+        frame.deferredPlayerSwitch = null
+        const isActionEngine = frame.source.kind === 'action'
+        const stageResume = (frame.stageResume ?? null) as StageResumeState | null
+        const ownerIdx = frame.ownerPlayerIndex
         if (stageResume) {
-          this.stageResume = null
+          this.engineStack.pop()
           this.pending = { type: 'none' }
-          this.activeSpaceId = null
-          this.activePlayerIndex = null
           this.resumeStageFlow(stageResume)
           return
         }
         if (isActionEngine && this.runPlaceFarmerAfterHooks(player, space)) {
+          // The frame's engine/source were replaced in-place; loop again with
+          // the same frame.
+          frame = this.engineStack.current()!
           continue
         }
         if (this.hasPendingAnimals(player)) {
-          const pIdx = this.activePlayerIndex!
-          const originIdx = this.turnOwnerPlayerIndex ?? pIdx
-          this.engine = null
-          this.engineSource = null
-          this.activeSpaceId = null
-          this.activePlayerIndex = null
-          this.startReorganizeSubFlow(pIdx, 'anytime', { originPlayerIndex: originIdx })
+          const originIdx = this.turnOwnerPlayerIndex ?? ownerIdx
+          this.engineStack.pop()
+          this.startReorganizeSubFlow(ownerIdx, 'anytime', { originPlayerIndex: originIdx })
           return
         }
         if (this.turnOwnerPlayerIndex !== null) {
-          const ownerIndex = this.turnOwnerPlayerIndex
+          const ownerIndexLocal = this.turnOwnerPlayerIndex
           this.pending = { type: 'none' }
           this.finalizeActionLog(player)
-          this.activeSpaceId = null
-          this.activePlayerIndex = null
-          this.continueEndTurnHooks(ownerIndex)
+          this.engineStack.pop()
+          this.continueEndTurnHooks(ownerIndexLocal)
           return
         }
         this.finalizeActionLog(player)
+        this.engineStack.pop()
         return
       }
 
       if (step.type === 'playerSwitch') {
         const toIndex = this.state.players.findIndex((p) => p.id === step.targetPlayerId)
-        if (toIndex !== -1 && toIndex !== this.activePlayerIndex) {
+        if (toIndex !== -1 && toIndex !== frame.ownerPlayerIndex) {
           this.pushHistory(false, true)
-          const fromIndex = this.activePlayerIndex!
-          this.activePlayerIndex = toIndex
-          player = this.state.players[this.activePlayerIndex]!
-          space = this.getSpaceById(this.activeSpaceId!) ?? space
-          this.deferredPlayerSwitch = { fromPlayerIndex: fromIndex, toPlayerIndex: toIndex }
+          const fromIndex = frame.ownerPlayerIndex
+          frame.ownerPlayerIndex = toIndex
+          player = this.state.players[toIndex]!
+          space = this.getSpaceById(frame.spaceId) ?? space
+          frame.deferredPlayerSwitch = { fromPlayerIndex: fromIndex, toPlayerIndex: toIndex }
         }
         continue
       }
@@ -1778,51 +1790,38 @@ export class GameCore {
         // 'animal-reorg' } } — the engine wraps it in the new 'request'
         // branch and surfaces it as step.type === 'choice', losing the
         // direct kind discriminator. Detect it via the InteractionNode's
-        // request field and pivot to the same pausedEngine + anytime
-        // sub-flow path the legacy 'animalReorg' result took.
-        const interaction = this.engine?.peekInteraction()
+        // request field and pivot to the same anytime sub-flow path the
+        // legacy 'animalReorg' result took. After Task 6 we leave the parent
+        // frame on the stack and push a reorganize sub-flow frame.
+        const interaction = frame.engine.peekInteraction()
         const isReorgSubFlow =
-          this.engineSource?.kind === 'flow'
-          && (this.engineSource.flow as { actionId?: string }).actionId === 'reorganize'
+          frame.source.kind === 'flow'
+          && (frame.source.flow as { actionId?: string }).actionId === 'reorganize'
         if (
           interaction?.request?.kind === 'animal-reorg'
           && !isReorgSubFlow
         ) {
-          const pIdx = this.activePlayerIndex!
-          this.pausedEngine = {
-            engine: this.engine!,
-            engineSource: this.engineSource!,
-            activeSpaceId: this.activeSpaceId!,
-            activePlayerIndex: this.activePlayerIndex!,
-            stageResume: this.stageResume,
-            deferredPlayerSwitch: this.deferredPlayerSwitch,
-          }
-          this.engine = null
-          this.engineSource = null
-          this.activeSpaceId = null
-          this.activePlayerIndex = null
-          this.stageResume = null
-          this.deferredPlayerSwitch = null
+          const pIdx = frame.ownerPlayerIndex
           this.startReorganizeSubFlow(pIdx, 'anytime')
           return
         }
         // Lazy confirmation: if we silently switched players and now hit a choice,
         // show confirmPlayerSwitch first. The InteractionNode stays unresolved in the engine.
-        if (this.deferredPlayerSwitch) {
+        if (frame.deferredPlayerSwitch) {
           this.pending = {
             type: 'confirmPlayerSwitch',
-            fromPlayerIndex: this.deferredPlayerSwitch.fromPlayerIndex,
-            toPlayerIndex: this.deferredPlayerSwitch.toPlayerIndex,
+            fromPlayerIndex: frame.deferredPlayerSwitch.fromPlayerIndex,
+            toPlayerIndex: frame.deferredPlayerSwitch.toPlayerIndex,
           }
-          this.deferredPlayerSwitch = null
+          frame.deferredPlayerSwitch = null
           return
         }
         if (step.choice.options.length === 1) {
           let autoOptions = step.choice.options
           while (autoOptions.length === 1) {
             const auto = autoOptions[0]
-            const resolvedActionId = this.engine?.snapshot().pendingInteractionActionId ?? undefined
-            const result = this.engine!.resolveChoice(auto.value, { state: this.state, player, space })
+            const resolvedActionId = frame.engine.snapshot().pendingInteractionActionId ?? undefined
+            const result = frame.engine.resolveChoice(auto.value, { state: this.state, player, space })
             this.flushEngineLog()
             if (result.type === 'ok' && resolvedActionId) {
               this.flushLeafActionDetail(resolvedActionId, Boolean(result.logKey))
@@ -1834,29 +1833,27 @@ export class GameCore {
                 continue
               }
               this.pending = {
-                type: 'choice', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId,
+                type: 'choice', playerIndex: frame.ownerPlayerIndex, spaceId: frame.spaceId,
                 options: requestOptions, promptKey: result.promptKey,
                 promptParams: result.promptParams,
-                costOverride: this.engine?.getLastComputedCosts(),
-                sourceCard: this.engine?.snapshot().pendingInteractionContext?.sourceCard ?? undefined,
-                actionContext: this.engine?.snapshot().pendingInteractionContext?.actionContext ?? undefined,
+                costOverride: frame.engine.getLastComputedCosts(),
+                sourceCard: frame.engine.snapshot().pendingInteractionContext?.sourceCard ?? undefined,
+                actionContext: frame.engine.snapshot().pendingInteractionContext?.actionContext ?? undefined,
               }
               return
             }
             if (result.type === 'fail') {
               this.pending = { type: 'none' }
-              this.engine = null
-              this.engineSource = null
-              this.stageResume = null
+              this.engineStack.pop()
               this.actionStartIndex = null
               return
             }
             if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
-              const pIdx = this.activePlayerIndex!
-              this.engine = null
-              this.engineSource = null
-              this.activeSpaceId = null
-              this.activePlayerIndex = null
+              const pIdx = frame.ownerPlayerIndex
+              // Match legacy behaviour: this is a fall-through reorganize
+              // detour from auto-resolved choice — the parent frame is
+              // discarded (no resume) before the sub-flow starts.
+              this.engineStack.pop()
               this.startReorganizeSubFlow(pIdx, 'anytime')
               return
             }
@@ -1865,22 +1862,21 @@ export class GameCore {
           continue
         }
         this.pending = {
-          type: 'choice', playerIndex: this.activePlayerIndex, spaceId: this.activeSpaceId,
+          type: 'choice', playerIndex: frame.ownerPlayerIndex, spaceId: frame.spaceId,
           options: step.choice.options, promptKey: step.choice.promptKey,
           promptParams: step.choice.promptParams,
-          costOverride: this.engine?.getLastComputedCosts(),
-          sourceCard: this.engine?.snapshot().pendingInteractionContext?.sourceCard ?? undefined,
-          actionContext: this.engine?.snapshot().pendingInteractionContext?.actionContext ?? undefined,
+          costOverride: frame.engine.getLastComputedCosts(),
+          sourceCard: frame.engine.snapshot().pendingInteractionContext?.sourceCard ?? undefined,
+          actionContext: frame.engine.snapshot().pendingInteractionContext?.actionContext ?? undefined,
         }
         return
       }
 
       if (step.type === 'ok' && step.result.type === 'fail') {
-        if (!this.stageResume) {
+        if (!frame.stageResume) {
           removeWorkerRef(space, player.id)
         }
-        this.engine = null
-        this.engineSource = null
+        this.engineStack.pop()
         this.pending = { type: 'none' }
         this.actionStartIndex = null
         this.actionStartPlayerSnapshot = null
@@ -1906,21 +1902,10 @@ export class GameCore {
       // post-mutate state.
 
       if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
-        const pIdx = this.activePlayerIndex!
-        this.pausedEngine = {
-          engine: this.engine!,
-          engineSource: this.engineSource!,
-          activeSpaceId: this.activeSpaceId!,
-          activePlayerIndex: this.activePlayerIndex!,
-          stageResume: this.stageResume,
-          deferredPlayerSwitch: this.deferredPlayerSwitch,
-        }
-        this.engine = null
-        this.engineSource = null
-        this.activeSpaceId = null
-        this.activePlayerIndex = null
-        this.stageResume = null
-        this.deferredPlayerSwitch = null
+        const pIdx = frame.ownerPlayerIndex
+        // Parent frame stays on the stack; reorganize sub-flow is pushed on
+        // top. When it completes, resumeStageFlow's onReorganizeComplete
+        // branch detects the parent frame and calls runEngineSteps again.
         this.startReorganizeSubFlow(pIdx, 'anytime')
         return
       }
@@ -2142,11 +2127,17 @@ export class GameCore {
     incPlacedFarmers(player)
     this.state.log.unshift({ key: 'log.placeFarmer', params: { player: player.name, action: space.nameKey } })
 
-    this.engine = this.createEngine(spaceId)
-    this.engineSource = { kind: 'action', actionId: spaceId }
-    this.activeSpaceId = spaceId
-    this.activePlayerIndex = playerIndex
-    this.stageResume = null
+    this.engineStack.push({
+      engine: this.createEngine(spaceId),
+      source: { kind: 'action', actionId: spaceId },
+      spaceId,
+      ownerPlayerIndex: playerIndex,
+      stageResume: null,
+      deferredPlayerSwitch: null,
+      // Task 7 will introduce a 'top-level' reason for action engines; reusing
+      // 'card-draft' here as a placeholder since the field is not yet read.
+      reason: 'card-draft',
+    })
 
     const beforeListenerContext = {
       state: this.state,
@@ -2162,12 +2153,12 @@ export class GameCore {
         ownerPlayerId: entry.ownerPlayerId,
       })
       if (result?.flow) {
-        beforeFlowNodes.push(this.engine.buildFlowNodePublic(result.flow))
+        beforeFlowNodes.push(this.engine!.buildFlowNodePublic(result.flow))
       }
     }
     if (beforeFlowNodes.length > 0) {
       const injectedIds = new Set(beforeFlowNodes.map(n => n.id))
-      this.engine.injectBeforeNodes(beforeFlowNodes)
+      this.engine!.injectBeforeNodes(beforeFlowNodes)
       let safety = beforeFlowNodes.length * 3
       while (safety-- > 0 && this.engine) {
         const next = this.engine.peekNextUnresolved()
@@ -2269,9 +2260,7 @@ export class GameCore {
     }
     if (result.type === 'fail') {
       this.pending = { type: 'none' }
-      this.engine = null
-      this.engineSource = null
-      this.stageResume = null
+      this.engineStack.pop()
       this.actionStartIndex = null
       this.actionStartPlayerSnapshot = null
       delete player._activeActionBonusSources
@@ -2458,8 +2447,11 @@ export class GameCore {
   confirmPlayerSwitch(): SessionResponse {
     if (this.pending.type !== 'confirmPlayerSwitch') return this.respond(false, 'no pending player switch')
     this.pushHistory(false, true)
-    this.activePlayerIndex = this.pending.toPlayerIndex
-    this.deferredPlayerSwitch = null
+    const frame = this.engineStack.current()
+    if (frame) {
+      frame.ownerPlayerIndex = this.pending.toPlayerIndex
+      frame.deferredPlayerSwitch = null
+    }
     this.pending = { type: 'none' }
     this.runEngineSteps()
     return this.respond()
@@ -2470,11 +2462,7 @@ export class GameCore {
     this.pushHistory()
     this.state.currentPlayerIndex = this.pending.nextPlayerIndex
     this.pending = { type: 'none' }
-    this.engine = null
-    this.engineSource = null
-    this.activeSpaceId = null
-    this.activePlayerIndex = null
-    this.stageResume = null
+    this.engineStack.clear()
     this.actionStartIndex = null
     this.history = [] // Clear undo history when switching players
     this.turnOwnerPlayerIndex = null
@@ -2698,11 +2686,7 @@ export class GameCore {
     if (!this.state.roundStartSnapshot) {
       this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
     }
-    this.engine = null
-    this.engineSource = null
-    this.stageResume = null
-    this.activeSpaceId = null
-    this.activePlayerIndex = null
+    this.engineStack.clear()
     this.pending = { type: 'none' }
     this.history = []
     this.actionStartIndex = null
@@ -2743,9 +2727,7 @@ export class GameCore {
     }
     if (result.type === 'fail') {
       this.pending = { type: 'none' }
-      this.engine = null
-      this.engineSource = null
-      this.stageResume = null
+      this.engineStack.pop()
       this.actionStartIndex = null
       return this.respond()
     }
