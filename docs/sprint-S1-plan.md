@@ -635,6 +635,27 @@ Also remove the `'animalReorg'` handling block in `shared/session/game-core.ts` 
 
 The current block (line 1862+) constructs sub-flow when breed action emits `animalReorg`. Replace with: emit `{ type: 'request', request: { kind: 'animal-reorg', zones } }` from the breed effect directly. Find caller in `shared/actions/effects/breed.ts` if exists, or change in `place-farmer.ts` after-hook chain.
 
+> **Implementation note (Task 5 → Task 7 retro):** The actual breed
+> migration split into two paths instead of one unconditional `'request'`
+> emit:
+>
+> 1. **Animals-actually-bred path** (default `breed.ts`): emit `'ok'` so
+>    that engine after-hooks (D60 LargePottery, B104 SheepWalker, ...)
+>    fire on the post-breed state. GameCore detects "animal count went
+>    up" via the existing `getAnimalCount(player) > getAnimalCount(before)`
+>    heuristic in `runEngineSteps` and starts the reorganize sub-flow on
+>    its own.
+> 2. **Round-14 enforcement path** (B104 SheepWalker last-harvest): emit
+>    `{ type: 'request', request: { kind: 'animal-reorg', zones } }` so
+>    the player is forced through the reorg interaction even when the
+>    animal count did not change. GameCore detects this via
+>    `engineStack.peekInteraction()?.request.kind === 'animal-reorg'` in
+>    the choice branch (Task 7 R2).
+>
+> The dual path was chosen so card after-hooks (which need the
+> mutated breed state) keep working without an extra protocol round-trip
+> for the common case.
+
 - [ ] **Step 5.4: Run typecheck**
 
 Run: `pnpm exec tsc -p tsconfig.app.json --noEmit`
