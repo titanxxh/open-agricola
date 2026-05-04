@@ -156,24 +156,25 @@ S2 完成后 `InteractionRequest` 的 kind 集合**锁定**为：
 - `shared/actions/effects/improvement.ts`（985 行）—— S3 同期瘦身 ≤ 400
 - 各 effect 文件（占用、minor、major 卡牌）
 
-### 2.2 终态：三个 core public + 一个 utility [L]
+### 2.2 终态：4 core public + 2 utility（namespace 共 6 成员） [L]
 
-合并到 `shared/actions/payment/` 模块，**对外 public**：
+合并到 `shared/actions/payment/` 模块，**对外 public**（2026-05-04 audit 校准）：
 
 ```
-// 三个 core public
+// 4 core public（行动层付款入口）
 PaymentSolver.computeOptions(state, idx, cost, ctx) → Option[]
 PaymentSolver.canAfford(state, idx, cost, ctx)     → boolean
 PaymentSolver.execute(state, idx, cost, choice, ctx) → state'
-
-// 一个 utility（2026-05-04 grilled）
 PaymentSolver.pickAuto(options: Option[]): Option | undefined
 //   返回唯一解（length === 1）或 undefined（length 0 / >1）；
 //   未来"何谓自动"扩展（如多 option 同价取 cheapest）改这里即可。
 
-// 一个测试 utility（2026-05-04 audit）
+// 2 utility（非"行动层付款入口"，但 namespace 暴露）
 PaymentSolver.clearCache(): void
-//   清空 solutionCache，主要用于测试间 reset；非"行动层付款入口"。
+//   清空 solutionCache，主要用于测试间 reset。
+PaymentSolver.isComplexCost(cost): cost is ComplexCost
+//   type guard；effect 层用来分支 simple vs complex cost。
+//   是 payment 域唯一对外暴露的 type-narrowing 入口（替代原 helpers/payment.isComplexCost）。
 ```
 
 **Export 风格 [L]**（2026-05-04 grilled）：namespace object，不是 class。
