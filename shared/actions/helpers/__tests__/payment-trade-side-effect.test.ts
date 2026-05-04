@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { GameState, PlayerState } from '../../../game/types'
-import { applyTradeSideEffect } from '../payment'
+import { applyTradeSideEffect } from '../../payment/internal'
 
 const baseState = (food: number): GameState =>
   ({

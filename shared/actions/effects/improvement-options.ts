@@ -5,7 +5,7 @@ import { PaymentSolver } from '../payment'
 import type { PaymentCtx } from '../payment'
 import { majorCardDefinitions, getMajorCard } from '../../cards/major'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
-import { resolveCardPreviewCostByProvider } from '../helpers/pay-helpers'
+import { resolveCardPreviewCostByProvider } from '../payment/internal'
 import { isMajorCardId, isFireplaceIdentityCard } from '../../cards/helpers/card-type'
 import { isBlockedByMajorImprovementActionGate } from './improvement-pool'
 

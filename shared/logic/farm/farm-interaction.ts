@@ -5,9 +5,9 @@ import type {
   PlayerState,
   Resource,
 } from '../../game/types.ts'
-import { applyCostOverride } from '../../actions/helpers/payment'
-import { canAffordTypedFlatCost } from '../../actions/helpers/pay-helpers.ts'
-import { getMaxBuildableRooms } from '../../actions/helpers/room-payment.ts'
+import { applyCostOverride } from '../../actions/payment/internal'
+import { canAffordTypedFlatCost } from '../../actions/payment/internal'
+import { getMaxBuildableRooms } from '../../actions/payment/internal'
 import { readCardExtraData } from '../../cards/helpers/card-state.ts'
 import { stableWoodCost } from '../../actions/effects/fencing.ts'
 import { getAllTilePositions, positionKey } from '../../game/farm.ts'

@@ -17,7 +17,7 @@ import {
   canAffordTypedFlatCost,
   executeResolvedTypedFlatPayment,
   resolveTypedFlatPaymentSelection,
-} from '../helpers/pay-helpers'
+} from '../payment/internal'
 import {
   normalizePlayerFarm,
   validateFenceSelection,

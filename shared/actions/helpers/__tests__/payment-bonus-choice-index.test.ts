@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeAllBuyableCombinations } from '../payment'
+import { computeAllBuyableCombinations } from '../../payment/internal'
 import type { PlayerState, ComplexCost } from '../../../game/types'
 
 const mkPlayer = (resources: Partial<PlayerState['resources']>): PlayerState =>

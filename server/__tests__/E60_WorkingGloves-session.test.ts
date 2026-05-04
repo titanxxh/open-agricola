@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { computeAllBuyableCombinations } from '../../shared/actions/helpers/payment'
+import { computeAllBuyableCombinations } from '../../shared/actions/payment/internal'
 import '../../shared/cards/E/E60_WorkingGloves'
 
 const CARD_ID = 'E60_WorkingGloves'

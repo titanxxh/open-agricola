@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getExchangesInWindow, applyTrade } from '../../shared/actions/effects/exchange'
-import { applyTradeSideEffect } from '../../shared/actions/helpers/payment'
+import { applyTradeSideEffect } from '../../shared/actions/payment/internal'
 
 import '../../shared/cards/C/C62_CookeryExtension'
 

@@ -5,7 +5,7 @@ import type {
 import {
   canAffordActionPreviewCost,
   resolveActionPreviewCost as resolveActionPreviewCostFromPay,
-} from './pay-helpers'
+} from '../payment/internal'
 
 export const resolveActionPreviewCost = (
   preview: ActionCostPreview,
