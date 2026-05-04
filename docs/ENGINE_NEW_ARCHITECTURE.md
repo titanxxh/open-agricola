@@ -1010,12 +1010,14 @@ S6 物理分层完成后专设 S7"卡牌效果测试回归"：
   - `ClientCommand` 选择类命令只剩 `resolveChoice`
   - `selection.ts` 不再用 `choice.split(',')` 字符串拼接（payload 走结构化字段）
 
-### Sprint S3：Payment 收口 + Improvement 瘦身（**可与 S1 / S2 并行**）
+### Sprint S3：Payment 收口 + Improvement 瘦身 ✅ 完成（2026-05-04）
 
-- `payment.ts` + `pay-helpers.ts` + `room-payment.ts` 合并为 `shared/actions/payment/` 模块
-- `PaymentSolver` 三个 public（`computeOptions / canAfford / execute`）
-- `improvement.ts` 985 → ≤ 400，拆出 `improvement-options.ts` + `improvement-pool.ts`
-- 专项 DoD：`PaymentSolver` 是行动层付款唯一入口；`improvement.ts` 不再 import payment 三件套
+- ✅ `payment.ts` + `pay-helpers.ts` + `room-payment.ts`（1974 行 / 41 export）合并为 `shared/actions/payment/`
+- ✅ `PaymentSolver` namespace 6 成员：4 core public（`computeOptions / canAfford / execute / pickAuto`）+ 2 utility（`clearCache / isComplexCost`）；详见 ADR-0006 D5
+- ✅ `improvement.ts` 1014 → 575（拆出 `improvement-options.ts` 364 + `improvement-pool.ts` 86）；plan ≤ 400 目标超 175 行（Task 9 commit message 记录权衡）
+- ✅ ESLint `no-restricted-imports` 守门：`shared/actions/effects/**` 与 `shared/cards/**` 禁 import `helpers/payment*`
+- ✅ 0 卡牌测试新增 skip；强制 green 子集 baseline 一致（1 pre-existing failure 与 S3 无关）
+- **完成度量**：21 commits on `sprint-S3-payment-solver` branch；ADR-0006 全部 6 个子决议（D1-D6）落地
 - **依赖关系**：与 S1 / S2 / S4 均无强前置（详见 `docs/superpowers/specs/2026-05-03-engine-redesign-S2-S4-contracts.md` §4.2）。在独立 worktree 推进，effect 改写严格限定在 `improvement.ts` 拆分相关
 
 ### Sprint S4：领域聚合层 `shared/domain/`
