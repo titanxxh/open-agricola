@@ -23,7 +23,7 @@ S2 完成 `InteractionRequest` sum type 完整推广（8 种 kind）+ `harvestFe
 - **协议层简化**：`InteractionState` stateId 8 → 3（`idle` / `wait` / `gameover`），`request: InteractionRequest` 单字段
 - **ClientCommand 收敛**：删 `commitFarm` / `commitSelection` / `commitChoice` / `confirmFeed`，全部 `resolveChoice`
 - **harvestFeed 推广**：参考 BGA `HarvestTrait` 264 行；落地 `feed` request kind
-- **cardDraft 推广**：参考 BGA `DraftTrait` 1050 行；落地 `card-draft` request kind
+- **cardDraft 推广**：把现有 `shared/draft/draft-manager.ts`（153 行 simultaneous 模型）包装到 `card-draft` request kind；删 `PendingAction.cardDraft` 挂牌 + `'draftSubmit'` ClientCommand + `/api/game/draft-submit` HTTP 端点，统一走 `resolveChoice`；`DraftOverlay` UI 不重写，只换数据源；**不引入 BGA 风格轮抽**
 - **Session 拆 traits**：`game-core.ts` 拆 `session-core.ts` + 4 个 phase mixin（仍在 `shared/session/`，不物理迁移）
 - **`PendingAction` union 完全删除**
 
@@ -71,7 +71,7 @@ S2 完成 `InteractionRequest` sum type 完整推广（8 种 kind）+ `harvestFe
 | 风险 | 概率 | 影响 | 缓解 | 回滚信号 |
 |---|---|---|---|---|
 | `farm-select` payload 设计不兼容 5 种 farmType（plow/sow/fence/room/stable）的差异 | 中 | 高（要回头改 protocol） | sprint 启动时先做 5 种 farmType 的字段差异 audit；payload 用 `farm: { farmType; ...specific }` 嵌套而非平铺 | 5 种之中 ≥ 1 种需要破坏性 payload 改动 |
-| `cardDraft` 推广撞到 BGA `DraftTrait` 1050 行的复杂细节 | 中 | 中 | sprint 启动时先做 `DraftTrait` audit，把"必须复制"和"刻意简化"列清单；先实现 MVP kind，复杂分支留 Q&A | MVP 完成后发现 ≥ 3 处必须扩 kind |
+| cardDraft 包装到 InteractionRequest 时 `DraftOverlay` UI 状态过渡 / 历史房间快照不兼容 | 中 | 低 | UI 数据源切换前后 snapshot 写一组对照测试；持久化房间（含 `phase: 'draft'` 的存档）走 rehydrate 兼容路径 | 已存在的 draft 中房间 rehydrate 后 UI 黑屏 |
 | ClientCommand 切换到 `resolveChoice` 后 e2e 测试大面积 skip | 高 | 中 | 提前建 `docs/skip-tracker.md`；codemod 工具一次性把测试切到新命令；e2e 用契约层断言（state / pending / log），不断言按钮文案 | 累计 skip > 阈值（sprint 启动时定） |
 | Session traits 拆分时 4 个 phase mixin 边界划错（method 漂移到错的 phase） | 中 | 中 | sprint 启动时按 BGA `BaseTrait` / `HarvestTrait` / `RoundTrait` / `DraftTrait` 对照划边界 | 任一 mixin > 600 行（说明仍是单 class） |
 | `promptKey` / `promptParams` 拆解为具名字段时旧文案 i18n key 失配 | 中 | 低 | 保留 i18n key，只改 payload 字段；i18n key 单独留兼容期 | i18n 测试整批失败 |
@@ -102,7 +102,7 @@ S2 完成 `InteractionRequest` sum type 完整推广（8 种 kind）+ `harvestFe
 
 ## 8. 待 sprint 启动时 grill 的开放问题
 
-1. **`card-draft` payload 字段清单**：BGA `DraftTrait` 哪些字段必须、哪些可省、是否需要 `pickPolicy`（先抽后选 vs 同时选）？
+1. **`card-draft` 是否暴露 per-connection 视角（issue #7）**：当前 `DraftView = DraftState` 全员可见对手 picks；是否在本 sprint 顺手做视角化，还是仍留 issue #7？倾向留——本 sprint 仅做 InteractionRequest 包装。
 2. **`feed` payload 是否拆 `feedQueue` 为独立 kind**：当前 `harvestFeed` 把"逐玩家喂食队列"塞 `feedQueue` 字段；是否更适合用嵌套 sub-flow + 单玩家 `feed` request？
 3. **Session traits 4 mixin 的命名与边界**：候选 `Setup / Round / Harvest / Draft` 还是 `Setup / Work / Harvest / Breeding`？BGA 对照后定。
 4. **`farm-select` 5 种 farmType 是否再分 sub-kind**：当前 sub-kind 在 `farm` 字段内嵌；是否提升为顶层 kind（`farm-plow` / `farm-sow` / ...）？决策点：哪种更利于 leaf action 的 `execute()` 简洁。
@@ -114,9 +114,9 @@ S2 完成 `InteractionRequest` sum type 完整推广（8 种 kind）+ `harvestFe
 
 - 8 种 kind 的 payload schema 落地：~3 PR
 - harvestFeed 推广 + Session HarvestTrait：~2 PR
-- cardDraft 推广 + Session DraftTrait：~3 PR（BGA 1050 行风险）
+- cardDraft 包装到 InteractionRequest（不重写规则）：~1 PR
 - Session 拆 traits + game-core 瘦身：~2 PR
 - ClientCommand 收敛 + selection.ts 字符串拼接清理：~1 PR
 - 测试 codemod + skip 登记：~1 PR
 
-**估算总量：12 PR 上下，1.5–2 周。** 真实估算 sprint 启动时复核。
+**估算总量：10 PR 上下，1.5 周。** 真实估算 sprint 启动时复核。

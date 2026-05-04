@@ -55,7 +55,7 @@ S2 完成后 `InteractionRequest` 的 kind 集合**锁定**为：
 | `farm-select` | `farmSelect` | plow / sow / fence / room / stable 五种 farmType |
 | `selection` | `selection` | farm-position / occupation-hand 两种 selectionType |
 | `feed` | `harvestFeed` | 收获喂食（S2 推广模式） |
-| `card-draft` | （新增） | cardDraft（S2 推广模式） |
+| `card-draft` | （新增；当前 `PendingAction.cardDraft` 仅作"挂牌"，UI 走专用 `DraftOverlay`） | simultaneous 卡牌轮抽；S2 把现有 `shared/draft/` 153 行 module 包装到 InteractionRequest（不引入 BGA 轮抽语义） |
 
 **红线**：
 
@@ -74,7 +74,7 @@ S2 完成后 `InteractionRequest` 的 kind 集合**锁定**为：
 - **`farm-select`**：`farm: { farmType: 'plow' | 'sow' | 'fence' | 'room' | 'stable'; ... }` + `options` + 标准上下文字段 —— 取代当前 `farmSelect` + `buildPlowInteraction` / `buildSowInteraction` / `buildFenceInteraction` / `buildFarmInteraction`
 - **`selection`**：`selection: { selectionType: 'farm-position' | 'occupation-hand'; ... }` + `options` + 标准上下文字段 —— 取代当前 `selection` + `buildSelectionInteraction`
 - **`feed`**：`remaining: number`、`foodUsed: number`、可选 `feedQueue: { index; remaining; foodUsed }[]` —— 来自 `harvestFeed`
-- **`card-draft`**：[O] sprint 启动时根据 BGA `DraftTrait` 1050 行复核字段；初步候选 `pool`、`pickedCount`、`limit`、`drafterIndex`
+- **`card-draft`**：沿用现有 `shared/draft/` 的 simultaneous 模型（**不引入 BGA 风格轮抽**）。字段直接来自 `DraftState`：`mode: 'simultaneous'`、`round`、`totalRounds`、`poolSize`、`seatOrder`、`pools: Record<pid, { occ; minor }>`、`pendingPicks`、`kept`（per-connection 视角化由后续 issue #7 处理，本次不做） —— 当前 `shared/draft/draft-manager.ts` 153 行纯函数 module 不动
 
 **字段标准化要求 [L]**：
 
