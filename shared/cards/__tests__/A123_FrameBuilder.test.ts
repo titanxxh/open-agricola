@@ -1,9 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { A123_FrameBuilder } from '../A/A123_FrameBuilder'
-import {
-  computeAllBuyableCombinations,
-  clearPaymentCache,
-} from '../../actions/helpers/payment'
+import { PaymentSolver } from '../../actions/payment'
+import { computeAllBuyableCombinations } from '../../actions/payment/internal'
 import type {
   BonusModifier,
   ComplexCost,
@@ -58,7 +56,7 @@ const createMockPlayer = (resources: Partial<Resource>): PlayerState => ({
 })
 
 beforeEach(() => {
-  clearPaymentCache()
+  PaymentSolver.clearCache()
 })
 
 describe('A123_FrameBuilder', () => {

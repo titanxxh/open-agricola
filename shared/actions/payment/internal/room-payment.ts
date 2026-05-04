@@ -1,3 +1,14 @@
+/**
+ * Room construction payment: buildRoomCostPerUnit, getBuildRoomCost,
+ * getMaxBuildableRooms, executeResolvedRoomPayment, resolveRoomPaymentSelection.
+ * Variant of the payment path scoped to per-unit room construction with
+ * dynamic cost-per-unit derivation.
+ *
+ * Internal to shared/actions/payment/. Not exported from the package
+ * barrel (shared/actions/payment/index.ts). Use PaymentSolver from
+ * the public API instead.
+ */
+
 import type {
   ActionExecutionResult,
   Bonus,
@@ -6,20 +17,15 @@ import type {
   PaymentSolution,
   PlayerState,
   Resource,
-} from '../../game/types'
-import { getAllTilePositions, positionKey } from '../../game/farm'
-import {
-  resolveCostPaymentSelection,
-  executeResolvedTypedFlatPayment,
-} from './pay-helpers'
-import {
-  applyCostOverride,
-  canPayCost,
-  getModifiersForCostType,
-  isComplexCost,
-} from '../helpers/payment'
+} from '../../../game/types'
+import { getAllTilePositions, positionKey } from '../../../game/farm'
+import { resolveCostPaymentSelection } from './payment-choice-result'
+import { executeResolvedTypedFlatPayment } from './typed-flat'
+import { applyCostOverride, isComplexCost } from './affordability'
+import { canPayCost } from './enumerate'
+import { getModifiersForCostType } from './cost-modifiers'
 
-export type RoomUnitCost = Partial<Resource> | ComplexCost
+type RoomUnitCost = Partial<Resource> | ComplexCost
 
 export const getBuildRoomCost = (houseType: PlayerState['houseType']) => {
   if (houseType === 'clay') return { clay: 5, reed: 2 }
@@ -27,12 +33,6 @@ export const getBuildRoomCost = (houseType: PlayerState['houseType']) => {
   return { wood: 5, reed: 2 }
 }
 
-/**
- * Enforce the invariant that a BonusModifier has exactly one of `discount` or
- * `choices`, and that `choices` (when present) is non-empty. Mirrors the
- * `validateBonus` check in pay.ts to guarantee consistent behavior across the
- * two cost-evaluation paths (per-action and per-room-count).
- */
 const validateBonusModifier = (modifier: BonusModifier): void => {
   const hasDiscount = modifier.discount !== undefined
   const hasChoices = modifier.choices !== undefined
@@ -69,12 +69,6 @@ const applyBonusToFee = (
   return applyDiscountToFee(cost, bonus.discount)
 }
 
-/**
- * Expand a bonus with `choices` into alternative fees.
- * Each choice's discount becomes one additional fee alternative. The caller
- * decides whether the original (un-discounted) fee remains in the alternatives
- * set (it does when the bonus is optional).
- */
 const expandBonusChoicesToFees = (
   fee: Partial<Resource>,
   bonus: Bonus,
@@ -112,7 +106,7 @@ type SelectedRoomPayment = {
   solution: PaymentSolution
 }
 
-export type RoomPaymentSelectionResult = ActionExecutionResult | SelectedRoomPayment
+type RoomPaymentSelectionResult = ActionExecutionResult | SelectedRoomPayment
 
 const ROOM_PAYMENT_FAILURE: ActionExecutionResult = {
   type: 'fail',
@@ -228,18 +222,11 @@ export const buildRoomCostPerUnit = (
         if (modifier.conditions && Object.keys(modifier.conditions).length > 0) {
           return
         }
-        // Top-level discount: a guaranteed per-unit reduction.
         if (modifier.discount) {
           const discount = modifier.discount
           const discounted = fees.map((fee) => applyDiscountToFee(fee, discount))
           cardAlternatives.push(...discounted)
         }
-        // choices: each choice is an alternative per-unit replacement. The
-        // BGA semantics for `addBonusChoices(..., optional:true)` is "pick at
-        // most one choice per action (per room, in the construct path)". The
-        // fee-alternatives model captures this by emitting one alternative per
-        // choice; the un-discounted fee is already kept in `cardAlternatives`
-        // so "skip" is naturally represented when the bonus is optional.
         if (modifier.choices && modifier.choices.length > 0) {
           modifier.choices.forEach((choice) => {
             const discounted = fees.map((fee) => applyDiscountToFee(fee, choice.discount))
@@ -292,9 +279,6 @@ const applyRoomCountBonuses = (
   const mandatoryBonuses = bonuses.filter((bonus) => bonus.optional === false)
   const optionalBonuses = bonuses.filter((bonus) => bonus.optional !== false)
 
-  // Apply one mandatory bonus to every fee in a fee-list, accumulating both
-  // the `discount` and any `choices` (a mandatory bonus with choices expands
-  // into "one alternative per choice" — at least one must be picked).
   const applyMandatoryBonus = (fees: Partial<Resource>[], bonus: Bonus): Partial<Resource>[] => {
     const withDiscount = bonus.discount
       ? fees.map((fee) => applyBonusToFee(fee, bonus))
@@ -303,9 +287,6 @@ const applyRoomCountBonuses = (
     return withDiscount.flatMap((fee) => expandBonusChoicesToFees(fee, bonus))
   }
 
-  // Apply one optional bonus to every fee in a fee-list; the result is the
-  // union of "skip this bonus" (original) and "pick this bonus" (discount
-  // applied + each choice).
   const applyOptionalBonus = (fees: Partial<Resource>[], bonus: Bonus): Partial<Resource>[] => {
     const variants: Partial<Resource>[] = [...fees]
     if (bonus.discount) {
@@ -335,7 +316,7 @@ const applyRoomCountBonuses = (
   return discountedFees.length === 1 ? discountedFees[0]! : { fees: discountedFees }
 }
 
-export const buildTotalRoomCost = (
+const buildTotalRoomCost = (
   costPerRoom: RoomUnitCost,
   roomCount: number,
   player?: PlayerState,

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setCardFlag } from '../../shared/cards/helpers/card-state'
-import { resolveCardCostWithModifiers } from '../../shared/actions/helpers/pay-helpers'
-import { isComplexCost } from '../../shared/actions/helpers/payment'
+import { resolveCardCostWithModifiers } from '../../shared/actions/payment/internal'
+import { isComplexCost } from '../../shared/actions/payment/internal'
 import '../../shared/cards/D/D82_HuntingTrophy'
 import '../../shared/cards/B/B81_Handcart'
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { executePaymentSolution } from '../../helpers/payment'
+import { executePaymentSolution } from '../../payment/internal'
 import { readCardResourceStats } from '../../../cards/helpers/card-state'
 import type { PaymentSolution, PlayerState } from '../../../game/types'
 

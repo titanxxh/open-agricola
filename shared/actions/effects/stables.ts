@@ -4,29 +4,46 @@ import type {
   ActionExecutionContext,
   ActionExecutionResult,
   FarmTilePosition,
+  GameState,
   PlayerState,
   Resource,
 } from '../../game/types'
 import { getNextEmptyTileForPlayer } from '../../game/farm'
-import { payResources, applyCostOverride } from '../helpers/payment'
+import { payResources, applyCostOverride } from '../payment/internal'
 import { stableWoodCost } from './fencing'
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'
+// PaymentSolver namespace (S3 Task 7a): core payment APIs migrated to
+// the new payment module. Other helpers (preview-cost / typed-flat /
+// room-payment / cost-modifier internals) remain on the shim through S3.
+import { PaymentSolver } from '../payment'
+import type { PaymentCtx } from '../payment'
 import {
-  canAffordCost,
   executeResolvedTypedFlatPayment,
   resolveTypedFlatPaymentSelection,
-} from '../helpers/pay-helpers'
+} from '../payment/internal'
 import { validateStableSelection } from '../../logic/farm/validators'
 import { buildStableFarmInteraction } from '../../logic/farm/farm-interaction'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
+
+/**
+ * Construct a minimal GameState wrapping a single player. Used by
+ * buildStable's PaymentSolver.canAfford call where the function signature
+ * doesn't carry GameState. Safe ONLY for simple-cost (non-ComplexCost)
+ * affordability checks — those route through canPayResources which only
+ * reads player.resources. Do not pass to ComplexCost paths or hook-firing
+ * code paths.
+ */
+const buildSingletonState = (player: PlayerState): GameState =>
+  ({ ...({} as GameState), players: [player] })
 
 export const buildStable = (player: PlayerState): ActionExecutionResult => {
   const next = getNextEmptyTileForPlayer(player)
   if (!next) {
     return { type: 'fail', logKey: 'log.buildStableFail' }
   }
-  if (!canAffordCost(player, { wood: stableWoodCost })) {
+  const stableCtx: PaymentCtx = { actionId: 'stables', costType: 'none' }
+  if (!PaymentSolver.canAfford(buildSingletonState(player), 0, { wood: stableWoodCost }, stableCtx)) {
     return { type: 'fail', logKey: 'log.buildStableFail' }
   }
   payResources(player, { wood: stableWoodCost })

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
-import { computeAllBuyableCombinations } from '../../shared/actions/helpers/payment'
+import { computeAllBuyableCombinations } from '../../shared/actions/payment/internal'
 import '../../shared/cards/E/E87_MasterRenovator'
 
 const CARD_ID = 'E87_MasterRenovator'
