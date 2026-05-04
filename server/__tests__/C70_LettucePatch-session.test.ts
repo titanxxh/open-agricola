@@ -82,8 +82,7 @@ describe('C70_LettucePatch session', () => {
       expect(resp.state.players[0]!.resources.vegetable).toBe(1)
     })
 
-    // SKIP[S1]: 'choice'→'request' shape mismatch, see docs/skip-tracker.md
-    it.skip('does NOT allow sowing grain in the card field', () => {
+    it('does NOT allow sowing grain in the card field', () => {
       const session = setup({ grain: 2, vegetable: 0 })
 
       let resp = session.takeAction(0, 'grain-utilization')
@@ -191,8 +190,7 @@ describe('C70_LettucePatch session', () => {
   })
 
   describe('not sowable when crop exists', () => {
-    // SKIP[S1]: 'choice'→'request' shape mismatch, see docs/skip-tracker.md
-    it.skip('does not show card field as sowable when crop already exists', () => {
+    it('does not show card field as sowable when crop already exists', () => {
       const session = setup({ vegetable: 2 })
 
       // Manually set crop data
@@ -279,8 +277,7 @@ describe('C70_LettucePatch session', () => {
       expect(resp.pending.type).toBe('choice')
     })
 
-    // SKIP[S1]: 'choice'→'request' shape mismatch, see docs/skip-tracker.md
-    it.skip('sow NOT doable without the card', () => {
+    it('sow NOT doable without the card', () => {
       const session = setup({
         withCard: false,
         vegetable: 1,
