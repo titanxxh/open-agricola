@@ -2730,12 +2730,23 @@ export class GameCore {
     const node = this.engineStack.peekInteraction()
     const request = node?.request
     if (request) {
+      // Reviewer C-1: validate `value` against the InteractionNode's known
+      // choices before dispatching. Pre-S1, `resolvePendingChoice` rejected
+      // any call whose top-of-stack pending wasn't a plain `choice`; the
+      // S1 dispatch widens the entry-point to also handle confirm/feed kinds,
+      // but a stray client value must still be rejected (otherwise an
+      // unrelated submission like `resolveChoice('sow')` against a
+      // `confirm-next-player` frame silently advances the turn).
+      const isValidValue = node!.choices.some((opt) => opt.value === value)
       switch (request.kind) {
         case 'confirm-next-player':
+          if (!isValidValue) return this.respond(false, 'invalid choice value')
           return this.handleConfirmNextPlayerResolved(request.nextPlayerIndex)
         case 'confirm-player-switch':
+          if (!isValidValue) return this.respond(false, 'invalid choice value')
           return this.handleConfirmPlayerSwitchResolved(request.toPlayerIndex)
         case 'feed': {
+          if (!isValidValue) return this.respond(false, 'invalid choice value')
           const sels = (payload as { selections?: FeedSelections } | undefined)?.selections
             ?? (Array.isArray(payload) ? (payload as unknown as FeedSelections) : [])
           return this.handleFeedResolved(playerIndex, sels)
@@ -2744,7 +2755,8 @@ export class GameCore {
         case 'choice':
           // animal-reorg today still flows through the legacy commit pathway;
           // plain choice (ChoiceNode-emitted requests not yet typed) follows
-          // the existing options-driven pending model.
+          // the existing options-driven pending model. `resolvePendingChoice`
+          // already validates `value` against pendingOptions/composite cache.
           return this.resolvePendingChoice(playerIndex, value, true, payload)
         default: {
           const _exhaustive: never = request

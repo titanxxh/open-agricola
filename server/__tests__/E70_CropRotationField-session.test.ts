@@ -366,8 +366,7 @@ describe('E70_CropRotationField session', () => {
       expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
     })
 
-    // SKIP[S1]: 'choice'→'request' shape mismatch, see docs/skip-tracker.md
-    it.skip('sow is not doable when card already has crop and no regular fields', () => {
+    it('sow is not doable when card already has crop and no regular fields', () => {
       const session = setup({
         grain: 1,
         cardCrop: { crop: 'grain', remaining: 3 },
