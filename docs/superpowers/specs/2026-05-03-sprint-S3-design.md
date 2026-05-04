@@ -92,7 +92,7 @@ S3 与 S1 / S2 / S4 均无强前置（见契约 §4.2）。本 sprint 在独立 
 - **无强前置 sprint**：可立即启动
 - **PR 链冲突管理**：S3 内 effect 改写**严格限定**在 `improvement.ts` 拆分相关；不动 `selection.ts` / farm-related effect（留 S2）/ 其他 effect 文件
 - **rebase 节奏**：每天与 main 同步一次（S1 / S2 已合 main 的 commit）；冲突优先在 S3 worktree 内解决
-- ADR-0006 草稿（sprint 启动时起草，不阻塞实施）
+- ADR-0006 [`0006-payment-solver-deep-module.md`](../../adr/0006-payment-solver-deep-module.md) — **Accepted 2026-05-04**（grill-with-docs session 沉淀，6 个子决议固化）
 
 ---
 

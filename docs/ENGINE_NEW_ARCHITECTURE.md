@@ -1078,6 +1078,6 @@ S6 物理分层完成后专设 S7"卡牌效果测试回归"：
 | 节点充血（学 BGA AbstractNode） | `0003-rich-node-vs-anemic-node.md`（待写） | 节点贫血是 engine.ts 1828 行单体的根因 |
 | 引入 `shared/domain/` 聚合层 | `0004-domain-aggregate-layer.md`（待写） | 行动层超 BGA 3300 行的反向来源 |
 | 不照搬 BGA 充血 Action | `0005-action-as-data-not-class.md`（待写） | 自定义卡 DSL 要求 Action 数据化 |
-| Payment 收口为单深 module | `0006-payment-solver-deep-module.md`（待写） | 当前 33 export 工具袋接口爆炸 |
+| Payment 收口为单深 module | [`0006-payment-solver-deep-module.md`](./adr/0006-payment-solver-deep-module.md)（Accepted 2026-05-04） | 当前 41 export 工具袋接口爆炸 |
 
 ADR 在 sprint 落地时同步建立；本文档在每个 sprint 完成后回流更新。
