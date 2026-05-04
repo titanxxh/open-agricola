@@ -1010,12 +1010,13 @@ S6 物理分层完成后专设 S7"卡牌效果测试回归"：
   - `ClientCommand` 选择类命令只剩 `resolveChoice`
   - `selection.ts` 不再用 `choice.split(',')` 字符串拼接（payload 走结构化字段）
 
-### Sprint S3：Payment 收口 + Improvement 瘦身
+### Sprint S3：Payment 收口 + Improvement 瘦身（**可与 S1 / S2 并行**）
 
 - `payment.ts` + `pay-helpers.ts` + `room-payment.ts` 合并为 `shared/actions/payment/` 模块
 - `PaymentSolver` 三个 public（`computeOptions / canAfford / execute`）
 - `improvement.ts` 985 → ≤ 400，拆出 `improvement-options.ts` + `improvement-pool.ts`
 - 专项 DoD：`PaymentSolver` 是行动层付款唯一入口；`improvement.ts` 不再 import payment 三件套
+- **依赖关系**：与 S1 / S2 / S4 均无强前置（详见 `docs/superpowers/specs/2026-05-03-engine-redesign-S2-S4-contracts.md` §4.2）。在独立 worktree 推进，effect 改写严格限定在 `improvement.ts` 拆分相关
 
 ### Sprint S4：领域聚合层 `shared/domain/`
 

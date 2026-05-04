@@ -1,9 +1,10 @@
 # Sprint S3 — 预 Spec（精简）
 
-- **日期：** 2026-05-03（提前对齐草稿）
+- **日期：** 2026-05-03（首版预对齐）；2026-05-04（决议提前启动，独立 worktree）
 - **覆盖：** ENGINE_NEW_ARCHITECTURE.md §15 Sprint S3
-- **接口契约：** `2026-05-03-engine-redesign-S2-S4-contracts.md`
-- **本 spec 角色：** sprint 启动前的范围 / DoD / 风险预对齐；**真正启动时按 normal flow 重新 brainstorm + grill 一次**
+- **接口契约：** `2026-05-03-engine-redesign-S2-S4-contracts.md`（§4.2 含 S3 提前启动的依据）
+- **本 spec 角色：** sprint 启动前的范围 / DoD / 风险对齐；启动时仍需按 normal flow grill §8 开放问题
+- **Worktree：** `.worktree/sprint-S3-payment-solver`（branch `sprint-S3-payment-solver`，2026-05-04 自 main `9725cb0b` 切出）
 
 ---
 
@@ -86,10 +87,11 @@ S3 把当前 1974 行 / 41 export 的 payment 三件套（`payment.ts` / `pay-he
 
 ## 7. 前置依赖
 
-- **S2 必须完成**：
-  - `InteractionRequest` 8 kind freeze（PaymentSolver 的 `ctx` 形状依赖此）
-  - `PendingAction` 删除（避免 PaymentSolver 内部还要兼容旧 pending）
-  - `game-core.ts` 拆 traits 完成（避免 PaymentSolver 还要适配单 class）
+S3 与 S1 / S2 / S4 均无强前置（见契约 §4.2）。本 sprint 在独立 worktree 推进，与 S1 / S2 并行。
+
+- **无强前置 sprint**：可立即启动
+- **PR 链冲突管理**：S3 内 effect 改写**严格限定**在 `improvement.ts` 拆分相关；不动 `selection.ts` / farm-related effect（留 S2）/ 其他 effect 文件
+- **rebase 节奏**：每天与 main 同步一次（S1 / S2 已合 main 的 commit）；冲突优先在 S3 worktree 内解决
 - ADR-0006 草稿（sprint 启动时起草，不阻塞实施）
 
 ---
