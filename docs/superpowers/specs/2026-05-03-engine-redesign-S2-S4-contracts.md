@@ -76,6 +76,25 @@ S2 完成后 `InteractionRequest` 的 kind 集合**锁定**为：
 - **`feed`**：`remaining: number`、`foodUsed: number`、可选 `feedQueue: { index; remaining; foodUsed }[]` —— 来自 `harvestFeed`
 - **`card-draft`**：沿用现有 `shared/draft/` 的 simultaneous 模型（**不引入 BGA 风格轮抽**）。字段直接来自 `DraftState`：`mode: 'simultaneous'`、`round`、`totalRounds`、`poolSize`、`seatOrder`、`pools: Record<pid, { occ; minor }>`、`pendingPicks`、`kept`（per-connection 视角化由后续 issue #7 处理，本次不做） —— 当前 `shared/draft/draft-manager.ts` 153 行纯函数 module 不动
 
+**易混淆 kind 边界判定 [L]**
+
+`choice` / `selection` / `farm-select` 三者容易混淆。S2 落地时按以下判定，**不得**让相同语义跨 kind 实现：
+
+| 维度 | `choice` | `selection` | `farm-select` |
+|---|---|---|---|
+| 本质语义 | 走哪条**分支** | 从池子里挑出**子集** | 在农场上执行**操作 + 目标位置** |
+| 选几个 | 恰好 1 | `min..max` 范围（多选） | 取决于 farmType（plow=1 格 / fence=多格 / room=1+ 格 ...） |
+| payload 主字段 | `options: ActionChoiceOption[]` | `selection: { kind: 'farm-position' \| 'occupation-hand'; selectableXxx[]; min/max }` | `farm: { farmType: 'plow' \| 'sow' \| 'fence' \| 'room' \| 'stable'; ...specific }` |
+| 选项预生成？ | 是（options 在 request 里） | 是（selectableXxx 在 request 里） | 否（合法位置在 client 由 farm validators 派生） |
+| 典型用例 | "取 3 木 vs 取 1 木 + 1 砖"、"是 / 否" 分支 | 选 N 张职业牌弃掉、选 N 个农场格子 sow | 第一张 plow、围一圈栅栏、盖房间 |
+
+**判定规则**：
+
+1. 如果是从**预先列举**的离散方案里挑 1 个 → `choice`
+2. 如果是从**可枚举元素集**里挑 ≥ 1 个，且元素是数据（非农场操作）→ `selection`
+3. 如果**结果是改农场结构**（plow / sow / fence / room / stable）→ `farm-select`
+4. 卡牌效果若需要"在农场上选格子做某事"——大多数场景应是 `farm-select` 而非 `selection`（除非 select 出来的格子只是用作引用、不改变结构）
+
 **字段标准化要求 [L]**：
 
 - 所有 kind 必须有 `kind` discriminator 字段
