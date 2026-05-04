@@ -6,7 +6,10 @@ import {
   payTypedFlatCost,
   resolveCardPreviewCostByProvider,
 } from '../helpers/pay-helpers'
-import { isComplexCost } from '../helpers/payment'
+// PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
+// the new payment module. Other helpers (preview-cost / typed-flat /
+// room-payment / cost-modifier internals) remain on the shim through S3.
+import { PaymentSolver } from '../payment'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { activateCard } from './activate-card'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
@@ -327,7 +330,7 @@ export const playOccupationAction: ActionDefinition = {
     // where modifier trades (A28 ForestSchool) get cost-replacement
     // treatment without surfacing a payment prompt.
     const finalCost: ComplexCost | Partial<PlayerState['resources']> =
-      previewCost && isComplexCost(previewCost)
+      previewCost && PaymentSolver.isComplexCost(previewCost)
         ? previewCost
         : ((previewCost as Partial<PlayerState['resources']> | null) ?? baseCost)
     if (
