@@ -32,6 +32,7 @@ import { getListenerById, executeCardListener, shouldSkipImmediateListenerLog } 
 import { incCardUsed } from '../cards/helpers/card-state'
 import { EngineTree } from './tree'
 import { LogStore } from './log-store'
+import { INTERACTION_ONLY_ACTION_ID } from './engine-stack'
 import type { ReorganizeTrigger } from '../actions/effects/reorganize'
 
 type EngineContext = {
@@ -104,9 +105,56 @@ export class Engine {
   private flowNodeCounter = 0
   private beforePhaseFlowNodeIds = new Set<string>()
   private lastComputedCosts: Partial<import('../game/types').Resource> | undefined = undefined
+  /**
+   * Cache of the most recent {@link proceed} result of `type: 'choice'`. Used
+   * by GameCore (Task 10) to surface a `PendingAction` of `type: 'choice'`
+   * even when the pending choice is hosted on a non-InteractionNode (OrNode,
+   * XorNode, OptionalNode) — those nodes don't carry their own option list,
+   * but the engine has just computed it. Cleared whenever the engine resolves
+   * the pending choice or transitions to a non-choice step.
+   *
+   * Note: this field is intentionally NOT persisted in {@link snapshot} /
+   * {@link restore}. Cursor round-trip leaves the cache empty; a fresh
+   * `proceed()` after rehydrate will re-emit the same `type: 'choice'` step
+   * and re-populate the cache. GameCore tolerates a missing cache by also
+   * checking `peekInteraction()`.
+   */
+  private lastEmittedChoice: {
+    nodeId: string
+    promptKey?: string
+    options: ActionChoiceOption[]
+  } | null = null
+
+  /**
+   * Read-only accessor for the cached pending-choice info. Returns null when
+   * the engine isn't currently waiting on a non-InteractionNode choice.
+   */
+  peekPendingChoiceFromComposite(): {
+    nodeId: string
+    promptKey?: string
+    options: ActionChoiceOption[]
+  } | null {
+    if (this.pendingInteractionNodeId === null) return null
+    if (!this.lastEmittedChoice) return null
+    if (this.lastEmittedChoice.nodeId !== this.pendingInteractionNodeId) return null
+    return this.lastEmittedChoice
+  }
 
   getLastComputedCosts() {
     return this.lastComputedCosts
+  }
+
+  /**
+   * Read-only accessor for the engine's pending-interaction context (sourceCard,
+   * actionContext, params, costs). Used by `GameCore.buildInteraction` /
+   * `GameCore.getCurrentPending` to surface fields previously stored on
+   * `this.pending` (now derived from engineStack — Task 10).
+   */
+  getPendingInteractionContext(): Pick<
+    ActionExecutionContext,
+    'params' | 'costs' | 'sourceCard' | 'actionContext'
+  > | null {
+    return this.pendingInteractionContext
   }
 
   injectBeforeNodes(nodes: EngineNode[]) {
@@ -146,7 +194,7 @@ export class Engine {
     // Synthetic action id — never resolves through the registry. Engine paths
     // that look up `pendingInteractionActionId` (e.g. flushLeafActionDetail)
     // tolerate unknown ids gracefully.
-    this.pendingInteractionActionId = '__interaction_only__'
+    this.pendingInteractionActionId = INTERACTION_ONLY_ACTION_ID
     this.pendingInteractionOwnerNodeId = null
     this.pendingInteractionContext = {
       params: undefined,
@@ -178,6 +226,7 @@ export class Engine {
     fallbackNodeId: string | null
     request: InteractionRequest
     promptKey?: string
+    promptParams?: Record<string, unknown>
     choiceOptions: ActionChoiceOption[]
     actionId: string
     ownerNodeId: string | null
@@ -195,9 +244,9 @@ export class Engine {
      *  owner pointer). */
     preserveOwner?: boolean
   }): void {
-    const { targetNode, fallbackNodeId, request, promptKey, choiceOptions, actionId, ownerNodeId } = args
+    const { targetNode, fallbackNodeId, request, promptKey, promptParams, choiceOptions, actionId, ownerNodeId } = args
     if (targetNode) {
-      targetNode.setChoice(promptKey, choiceOptions)
+      targetNode.setChoice(promptKey, choiceOptions, promptParams)
       targetNode.request = request
       this.pendingInteractionNodeId = targetNode.id
     } else {
@@ -951,6 +1000,11 @@ export class Engine {
       pendingInteractionOwnerNodeId: this.pendingInteractionOwnerNodeId,
       pendingInteractionContext: this.pendingInteractionContext,
       choiceData,
+      // Task 10: persist the composite-node choice cache so OrNode / XorNode /
+      // OptionalNode pending choices survive cursor round-trip and undo
+      // restoreHistory. Without this, getCurrentPending returns 'none' after
+      // restore even though pendingInteractionNodeId points at an OrNode.
+      lastEmittedChoice: this.lastEmittedChoice,
     }
   }
 
@@ -982,6 +1036,11 @@ export class Engine {
       choices: ActionChoiceOption[]
       request?: import('../game/types').InteractionRequest
     } | null
+    lastEmittedChoice?: {
+      nodeId: string
+      promptKey?: string
+      options: ActionChoiceOption[]
+    } | null
   }) {
     // Synthetic interaction-only frames (pushed by GameCore.startConfirm*/
     // startFeedSubFlow) have a single InteractionNode at root. The cursor
@@ -990,7 +1049,7 @@ export class Engine {
     // normal nodeStates pass so subsequent `nextUnresolved()` finds the same
     // InteractionNode the original session held.
     if (
-      snapshot.pendingInteractionActionId === '__interaction_only__' &&
+      snapshot.pendingInteractionActionId === INTERACTION_ONLY_ACTION_ID &&
       snapshot.choiceData
     ) {
       const restored = new InteractionNode(
@@ -1046,6 +1105,7 @@ export class Engine {
     this.pendingInteractionActionId = snapshot.pendingInteractionActionId
     this.pendingInteractionOwnerNodeId = snapshot.pendingInteractionOwnerNodeId
     this.pendingInteractionContext = snapshot.pendingInteractionContext
+    this.lastEmittedChoice = snapshot.lastEmittedChoice ?? null
   }
 
   constructor(params: {
@@ -1143,11 +1203,17 @@ export class Engine {
         sourceCard: this.resolveChoiceSourceCard(this.getNodeSourceCard(node), options),
         actionContext: undefined,
       }
+      const compositePromptKey = node.promptKey ?? 'ui.interactionFlowSelect'
+      this.lastEmittedChoice = {
+        nodeId: node.id,
+        promptKey: compositePromptKey,
+        options,
+      }
       return {
         type: 'choice',
         nodeId: node.id,
         choice: {
-          promptKey: node.promptKey ?? 'ui.interactionFlowSelect',
+          promptKey: compositePromptKey,
           options,
         },
       }
@@ -1210,21 +1276,28 @@ export class Engine {
         labelKey: actionNode.choiceLabelKey ?? action.nameKey,
         labelParams: actionNode.choiceLabelParams,
       }
+      const optionalPromptKey = node.promptKey ?? 'ui.interactionOptionalAction'
+      const optionalOptions: ActionChoiceOption[] = [
+        {
+          value: actionNode.id,
+          labelKey: label.labelKey,
+          labelParams: label.labelParams,
+          sourceCard: actionNode.sourceCard,
+          effectPreview: this.getNodeEffectPreview(node.child),
+        },
+        { value: '__skip__', labelKey: 'ui.interactionOptionalSkip' },
+      ]
+      this.lastEmittedChoice = {
+        nodeId: node.id,
+        promptKey: optionalPromptKey,
+        options: optionalOptions,
+      }
       return {
         type: 'choice',
         nodeId: node.id,
         choice: {
-          promptKey: node.promptKey ?? 'ui.interactionOptionalAction',
-          options: [
-            {
-              value: actionNode.id,
-              labelKey: label.labelKey,
-              labelParams: label.labelParams,
-              sourceCard: actionNode.sourceCard,
-              effectPreview: this.getNodeEffectPreview(node.child),
-            },
-            { value: '__skip__', labelKey: 'ui.interactionOptionalSkip' },
-          ],
+          promptKey: optionalPromptKey,
+          options: optionalOptions,
         },
       }
     }
@@ -1500,6 +1573,7 @@ export class Engine {
           fallbackNodeId: node.id,
           request: updatedRequest,
           promptKey: result.promptKey,
+          promptParams: result.promptParams,
           choiceOptions,
           actionId: replacedActionId,
           ownerNodeId: null,
@@ -1792,6 +1866,7 @@ export class Engine {
             fallbackNodeId: child.id,
             request: updatedRequest,
             promptKey: result.promptKey,
+            promptParams: result.promptParams,
             choiceOptions: mergedOptions,
             actionId,
             ownerNodeId: node instanceof XorNode ? node.id : null,
@@ -1928,6 +2003,7 @@ export class Engine {
         fallbackNodeId: null,
         request: result.request,
         promptKey: result.promptKey,
+        promptParams: result.promptParams,
         choiceOptions: requestOptions,
         actionId,
         // resolveChoice second-pass keeps the existing owner pointer (e.g.

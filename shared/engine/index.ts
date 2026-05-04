@@ -16,6 +16,8 @@ export {
 export type { EngineNode, EngineStepResult } from './types'
 export {
   EngineStack,
+  INTERACTION_ONLY_ACTION_ID,
+  isSyntheticInteractionFrame,
   type EngineFrame,
   type EngineFrameCursor,
   type EngineStackCursor,

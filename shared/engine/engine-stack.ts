@@ -5,6 +5,18 @@ export type EngineSource =
   | { kind: 'action'; actionId: string }
   | { kind: 'flow'; flow: ActionFlow }
 
+/**
+ * Synthetic action id used for `__interaction_only__` engine frames pushed by
+ * `GameCore.startConfirmNextPlayer` / `startConfirmPlayerSwitch` /
+ * `startFeedSubFlow`. The engine treats this as a no-body action: the frame's
+ * sole purpose is to host an `InteractionNode` that surfaces a typed
+ * `InteractionRequest` (confirm-next-player / confirm-player-switch / feed)
+ * which is resolved by `resolveChoice`. The id never resolves through the
+ * `ActionRegistry`; consumers (`Engine.restore`, `runEngineSteps`) recognise
+ * the literal and skip registry lookup / auto-resolve paths.
+ */
+export const INTERACTION_ONLY_ACTION_ID = '__interaction_only__'
+
 export type SubFlowReason =
   | 'top-level'
   | 'stage-hook'
@@ -43,6 +55,20 @@ export type EngineFrameCursor = {
 
 export type EngineStackCursor = {
   frames: EngineFrameCursor[]
+}
+
+/**
+ * Predicate for synthetic interaction-only frames (the `__interaction_only__`
+ * leaf-flow frames pushed by start* triggers in `GameCore`). These frames
+ * carry an `InteractionNode` but have no real action body — `runEngineSteps`
+ * / `Engine.restore` use this predicate to short-circuit auto-resolve and
+ * registry lookup paths that would otherwise infinite-loop.
+ */
+export function isSyntheticInteractionFrame(frame: EngineFrame): boolean {
+  return (
+    frame.source.kind === 'flow' &&
+    (frame.source.flow as { actionId?: string }).actionId === INTERACTION_ONLY_ACTION_ID
+  )
 }
 
 export class EngineStack {
