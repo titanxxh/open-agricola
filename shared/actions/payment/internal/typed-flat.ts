@@ -1,3 +1,15 @@
+/**
+ * Typed-flat cost path: payTypedFlatCost, payTypedFlatCostDetailed,
+ * canAffordTypedFlatCost, executeResolvedTypedFlatPayment,
+ * resolveTypedFlatPaymentSelection, canAffordCost. Variant of the payment
+ * path for costs typed by category (e.g. "construct" vs "renovation") with
+ * cost-modifier matching.
+ *
+ * Internal to shared/actions/payment/. Not exported from the package
+ * barrel (shared/actions/payment/index.ts). Use PaymentSolver from
+ * the public API instead.
+ */
+
 import type {
   ActionExecutionResult,
   CostModifier,

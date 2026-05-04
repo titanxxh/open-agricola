@@ -1,3 +1,12 @@
+/**
+ * Card-cost hook firing context: buildCardCostListenerContext + helpers.
+ * Glue between PaymentSolver and the card hook system (computeCosts phase).
+ *
+ * Internal to shared/actions/payment/. Not exported from the package
+ * barrel (shared/actions/payment/index.ts). Use PaymentSolver from
+ * the public API instead.
+ */
+
 import type { ActionSpace, GameState, PlayerState, Resource } from '../../../game/types'
 import type { CardListenerContext } from '../../../cards/card-listeners'
 
