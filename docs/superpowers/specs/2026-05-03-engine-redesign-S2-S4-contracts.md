@@ -170,6 +170,10 @@ PaymentSolver.execute(state, idx, cost, choice, ctx) → state'
 PaymentSolver.pickAuto(options: Option[]): Option | undefined
 //   返回唯一解（length === 1）或 undefined（length 0 / >1）；
 //   未来"何谓自动"扩展（如多 option 同价取 cheapest）改这里即可。
+
+// 一个测试 utility（2026-05-04 audit）
+PaymentSolver.clearCache(): void
+//   清空 solutionCache，主要用于测试间 reset；非"行动层付款入口"。
 ```
 
 **Export 风格 [L]**（2026-05-04 grilled）：namespace object，不是 class。
