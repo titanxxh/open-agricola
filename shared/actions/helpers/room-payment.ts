@@ -19,7 +19,7 @@ import {
   isComplexCost,
 } from '../helpers/payment'
 
-export type RoomUnitCost = Partial<Resource> | ComplexCost
+type RoomUnitCost = Partial<Resource> | ComplexCost
 
 export const getBuildRoomCost = (houseType: PlayerState['houseType']) => {
   if (houseType === 'clay') return { clay: 5, reed: 2 }
@@ -112,7 +112,7 @@ type SelectedRoomPayment = {
   solution: PaymentSolution
 }
 
-export type RoomPaymentSelectionResult = ActionExecutionResult | SelectedRoomPayment
+type RoomPaymentSelectionResult = ActionExecutionResult | SelectedRoomPayment
 
 const ROOM_PAYMENT_FAILURE: ActionExecutionResult = {
   type: 'fail',
@@ -335,7 +335,7 @@ const applyRoomCountBonuses = (
   return discountedFees.length === 1 ? discountedFees[0]! : { fees: discountedFees }
 }
 
-export const buildTotalRoomCost = (
+const buildTotalRoomCost = (
   costPerRoom: RoomUnitCost,
   roomCount: number,
   player?: PlayerState,

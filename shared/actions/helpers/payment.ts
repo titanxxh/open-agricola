@@ -282,7 +282,7 @@ const comparePositiveResourceEntries = (
   return 0
 }
 
-export const sortPaymentSolutions = (
+const sortPaymentSolutions = (
   solutions: PaymentSolution[],
 ): PaymentSolution[] => {
   return [...solutions].sort((left, right) => {
@@ -406,7 +406,7 @@ const canCoverCost = (
  * roomCount (semantically "after building N rooms"), which differs from the
  * player-state evaluation here.
  */
-export const evaluateConditions = (
+const evaluateConditions = (
   player: PlayerState,
   conditions: Record<string, number> | undefined,
 ): boolean => {
