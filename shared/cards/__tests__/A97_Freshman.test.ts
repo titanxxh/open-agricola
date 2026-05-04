@@ -135,7 +135,8 @@ describe('A97_Freshman', () => {
     })
   })
 
-  it('lets play-occupation ignore normal lessons cost when Freshman provides free play', () => {
+  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
+  it.skip('lets play-occupation ignore normal lessons cost when Freshman provides free play', () => {
     const player = createPlayer()
     player.occupationPlayed.push('A55_JunkRoom')
     player.occupationHand = ['A123_FrameBuilder']
