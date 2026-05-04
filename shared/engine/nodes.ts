@@ -95,7 +95,7 @@ export class InteractionNode extends BaseNode {
   public request?: InteractionRequest
 
   constructor(id: string, choices: ActionChoiceOption[], request?: InteractionRequest) {
-    super(id, 'choice')
+    super(id, 'interaction')
     this.choices = choices
     this.request = request
   }
