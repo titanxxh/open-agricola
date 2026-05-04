@@ -20,7 +20,7 @@ const buildSelectionChoice = (needed: number) => ({
       sourceCard: CARD_ID,
     })),
   },
-  promptKey: 'ui.interactionCollectorSelect',
+  promptKey: 'ui.interactionCollectorSelect' as const,
   promptParams: { needed },
 })
 

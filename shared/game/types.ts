@@ -1,3 +1,5 @@
+import type { PromptKey } from './prompt-keys'
+
 export type Resource = {
   wood: number
   clay: number
@@ -447,7 +449,7 @@ export type ActionChoiceOption = {
  */
 export type ActionExecutionResult =
   | { type: 'ok'; logKey?: string; resourcesGained?: Partial<Resource>; resourcesPaid?: Partial<Resource>; logParams?: Record<string, unknown>; immediateLogs?: ImmediateLogEntry[]; extraData?: Record<string, unknown> }
-  | { type: 'request'; request: InteractionRequest; promptKey?: string; promptParams?: Record<string, unknown>; sourceCard?: string; extraData?: Record<string, unknown> }
+  | { type: 'request'; request: InteractionRequest; promptKey?: PromptKey; promptParams?: Record<string, unknown>; sourceCard?: string; extraData?: Record<string, unknown> }
   | { type: 'fail'; logKey: string }
   | { type: 'flow'; flow: ActionFlow; logKey?: string; logParams?: Record<string, unknown>; immediateLogs?: ImmediateLogEntry[]; extraData?: Record<string, unknown> }
 export type ActionFlow =
@@ -455,7 +457,7 @@ export type ActionFlow =
       type: 'leaf'
       actionId: string
       optional?: boolean
-      promptKey?: string
+      promptKey?: PromptKey
       params?: Record<string, unknown>
       sourceCard?: string
       actionContext?: Record<string, unknown>
@@ -475,7 +477,7 @@ export type ActionFlow =
     }
   | {
       type: 'seq' | 'or' | 'xor' | 'parallel'
-      promptKey?: string
+      promptKey?: PromptKey
       children: ActionFlow[]
       optional?: boolean
       choiceLabelKey?: string
@@ -531,7 +533,7 @@ export type ActionDefinition = {
     context: ActionExecutionContext,
   ) => ActionChoiceOption[]
   /** Prompt key used when `getBaseChoiceOptions` produces a multi-option choice. */
-  choicePromptKey?: string
+  choicePromptKey?: PromptKey
   /** Log key used when no candidate is affordable in the opt-in choice path. */
   noChoiceLogKey?: string
   /**
@@ -572,7 +574,7 @@ export type PendingAction =
       playerIndex: number
       spaceId: string
       options: ActionChoiceOption[]
-      promptKey?: string
+      promptKey?: PromptKey
       promptParams?: Record<string, unknown>
       costOverride?: Partial<Resource>
       sourceCard?: string
@@ -743,7 +745,7 @@ export type InteractionState =
       stateId: 'choice'
       playerIndex: number
       spaceId: string
-      promptKey?: string
+      promptKey?: PromptKey
       promptParams?: Record<string, unknown>
       options: ActionChoiceOption[]
       costOverride?: Partial<Resource>
@@ -753,7 +755,7 @@ export type InteractionState =
       stateId: 'farmSelect'
       playerIndex: number
       spaceId: string
-      promptKey?: string
+      promptKey?: PromptKey
       promptParams?: Record<string, unknown>
       options: ActionChoiceOption[]
       costOverride?: Partial<Resource>
@@ -764,7 +766,7 @@ export type InteractionState =
       stateId: 'selection'
       playerIndex: number
       spaceId: string
-      promptKey?: string
+      promptKey?: PromptKey
       promptParams?: Record<string, unknown>
       options: ActionChoiceOption[]
       costOverride?: Partial<Resource>
