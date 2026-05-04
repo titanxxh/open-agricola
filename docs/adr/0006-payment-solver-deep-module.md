@@ -135,7 +135,12 @@ export const PaymentSolver = { computeOptions, canAfford, execute, pickAuto } as
 
 调用方统一 `PaymentSolver.xxx(...)`，与契约文档命名 1:1。
 
-**Test utility note (audit-discovered 2026-05-04):** `clearCache` is exposed as a 5th member of the `PaymentSolver` namespace, used primarily by tests to reset `solutionCache` between cases. It does not count as a "core public" in the §2.2 红线 sense (行动层付款入口仍是 4 个：computeOptions / canAfford / execute / pickAuto), but is part of the namespace surface. Total `PaymentSolver` namespace members: 5.
+**Implementation note (audit-discovered 2026-05-04):** Two utilities are exposed beyond the 4 core public:
+
+1. `clearCache` — used by tests to reset `solutionCache` between cases.
+2. `isComplexCost(cost): cost is ComplexCost` — type guard; effect layer uses it to branch simple vs ComplexCost paths. Migrated into the namespace (replacing direct import from `helpers/payment`) so `PaymentSolver` is the single payment-domain entry surface for callers.
+
+Neither counts as a "core public" in the §2.2 红线 sense (行动层付款入口仍是 4 个：computeOptions / canAfford / execute / pickAuto), but both are part of the namespace surface. **Total `PaymentSolver` namespace members: 6** (4 core + 2 utility).
 
 #### D6. 错误处理 — discriminated union + reason enum
 
