@@ -1,3 +1,14 @@
+/**
+ * Room construction payment: buildRoomCostPerUnit, getBuildRoomCost,
+ * getMaxBuildableRooms, executeResolvedRoomPayment, resolveRoomPaymentSelection.
+ * Variant of the payment path scoped to per-unit room construction with
+ * dynamic cost-per-unit derivation.
+ *
+ * Internal to shared/actions/payment/. Not exported from the package
+ * barrel (shared/actions/payment/index.ts). Use PaymentSolver from
+ * the public API instead.
+ */
+
 import type {
   ActionExecutionResult,
   Bonus,

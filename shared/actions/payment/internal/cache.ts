@@ -1,3 +1,16 @@
+/**
+ * Module-level solution cache for the payment solver. Holds the result of
+ * computeAllBuyableCombinations keyed by (player, cost, costType, playedCards).
+ *
+ * Cache is shared across GameSession instances — the cache key fully captures
+ * the state-dependent inputs, so cross-session leak is impossible. Tests
+ * call PaymentSolver.clearCache() between cases via the public namespace.
+ *
+ * Internal to shared/actions/payment/. Not exported from the package
+ * barrel (shared/actions/payment/index.ts). Use PaymentSolver from
+ * the public API instead.
+ */
+
 import type { ComplexCost, CostModifierType, PaymentSolution, PlayerState } from '../../../game/types'
 
 class LRUCache<K, V> {

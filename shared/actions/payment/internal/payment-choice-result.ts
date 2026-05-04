@@ -1,3 +1,15 @@
+/**
+ * Choice request constructors: buildPaymentChoiceResult,
+ * resolvePaymentSolutionSelection, resolveCostPaymentSelection. Glue between
+ * PaymentSolver options and the engine's ActionExecutionResult choice
+ * mechanism. Builds the choice prompt that effect layer surfaces to the
+ * player when length > 1; resolves the selection on the way back.
+ *
+ * Internal to shared/actions/payment/. Not exported from the package
+ * barrel (shared/actions/payment/index.ts). Use PaymentSolver from
+ * the public API instead.
+ */
+
 import type {
   ActionExecutionResult,
   ComplexCost,

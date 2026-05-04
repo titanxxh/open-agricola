@@ -1,3 +1,13 @@
+/**
+ * Affordability primitives: payResources, canPayResources, canPayCost,
+ * applyCostOverride, isComplexCost. Used by PaymentSolver.canAfford fast-path
+ * (simple cost) and by enumerate.ts during ComplexCost enumeration.
+ *
+ * Internal to shared/actions/payment/. Not exported from the package
+ * barrel (shared/actions/payment/index.ts). Use PaymentSolver from
+ * the public API instead.
+ */
+
 import type { ComplexCost, PlayerState, Resource } from '../../../game/types'
 
 export const payResources = (
