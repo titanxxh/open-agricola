@@ -300,31 +300,48 @@ playerBoard(state, idx).animals.zones
 ## 4. 跨 Sprint 接口依赖图
 
 ```
-S1（当前）：reorganize 模式推广 + InteractionNode 骨架（4 kind）
+S1（在跑）：reorganize 模式推广 + InteractionNode 骨架（4 kind）
               │
               ▼ S2 启动前提：S1 引入的 4 kind 已稳定
 S2：InteractionNode 完整化 + Session 拆 traits
-        │   │
-        │   └────────► S2 必须 freeze InteractionRequest 8 kind 才能进 S3
-        │                 InteractionRequest 形状决定 PaymentSolver `ctx` 形状
-        │
-        ▼ S3 / S4 可并行启动
-S3：PaymentSolver 收口      S4：shared/domain + 节点充血
-        │                          │
-        └──────────┬───────────────┘
-                   ▼
+              │
+              ▼
+S4：shared/domain + 节点充血
+
+S3：PaymentSolver 收口（独立 worktree，与 S1 / S2 并行）
+   - 与 S1 / S2 PR 链无重合（S3 触及 actions/helpers/payment*.ts +
+     actions/effects/improvement.ts；S1 / S2 触及 engine / session /
+     protocol / 其他 effect）
+   - PaymentSolver 不感知 InteractionRequest 8 kind 集合；effect 层
+     负责 Option[] → ActionChoiceOption[] 的转换
+              │
+              ▼（S3 完成后的 effect 入口稳定，对 S4 改写有利但非强前置）
 S5/S6/S7：room-manager 拆分 / 物理分层 / 测试回归
 ```
 
 ### 4.1 关键路径
 
 - **S1 → S2** 是关键路径：S2 必须等 S1 的 4 kind 稳定
-- **S2 → S3 / S4** 是关键路径：S3 / S4 都 reference InteractionRequest（PaymentSolver ctx、domain 聚合调用 effect）
-- **S3 与 S4 可并行**：domain 聚合层不 import payment；payment 不 import domain（hook 修饰发生在 effect 层，由 effect 把 domain 视图传给 PaymentSolver.ctx）
+- **S2 → S4** 是关键路径：S4 改写 effect 时 InteractionRequest 形状必须已 freeze
+- **S3 独立**：与 S1 / S2 / S4 均无强前置；可在任意时间启动并并行推进
 
-### 4.2 并行机会
+### 4.2 S3 提前启动的依据（2026-05-04 决议）
 
-S3 与 S4 启动时机：S2 完成 InteractionRequest freeze + Session traits 拆分后即可。两个 sprint 各自一条 PR 链，互不干涉。**[O] 是否真并行**取决于届时人手；本契约只保证接口上无强依赖。
+之前版本把 S3 列为 S2 的强后置，重新审视后发现**三条理由都不成立**：
+
+| 旧理由 | 重新分析 |
+|---|---|
+| "InteractionRequest freeze 才能定 PaymentSolver `ctx`" | `ctx` 承载的是调用语境（`actionId` / `spaceId` / `sourceCard`），与 InteractionRequest kind 集合无关 |
+| "PendingAction 删除避免兼容旧 pending" | PaymentSolver 不读 `pending`；effect 层负责把 `Option[]` 塞进 pending/InteractionRequest |
+| "拆 traits 才能让 PaymentSolver 不适配单 class" | 当前 `helpers/payment.ts` 已与 `game-core.ts` 解耦 |
+
+**真实耦合点（弱）**：当 cost 有多 option 需玩家选时，effect 把 `Option[]` 转 `ActionChoiceOption[]` 塞进 `choice` request——此转换在 effect 层，对 PaymentSolver 透明。
+
+### 4.3 并行机会
+
+- **S3 与 S1 并行**：触及文件几乎不重合；唯一交集是若 S3 的迁移 PR 改了 effect 内部 import，可能与 S1 的 effect codemod（推广 reorganize 模式）冲突——以最小冲突为目标，S3 内 effect 修改限定在 `improvement.ts` 拆分相关
+- **S3 与 S2 并行**：同理，S2 的 effect 改造主要针对 `selection.ts` / farm-related effect，与 S3 的 `improvement.ts` 无重合
+- **S3 与 S4 并行**：domain 聚合层不 import payment；payment 不 import domain
 
 ---
 
