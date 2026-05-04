@@ -12,6 +12,11 @@ import { canExecuteWithCostPreview } from '../helpers/cost-preview'
 import { validatePlowSelection } from '../../logic/farm/plow-validation'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
+// PaymentSolver namespace (S3 Task 7a): core payment APIs migrated to
+// the new payment module. Other helpers (preview-cost / typed-flat /
+// room-payment / cost-modifier internals) remain on the shim through S3.
+// plow.ts only uses typed-flat helpers (shim scope), so no PaymentSolver
+// call sites exist here yet.
 import {
   executeResolvedTypedFlatPayment,
   resolveTypedFlatPaymentSelection,
