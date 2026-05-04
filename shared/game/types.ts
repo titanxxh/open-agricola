@@ -596,6 +596,12 @@ export type SubFlowKind =
   | 'confirm-next-player'
   | 'confirm-player-switch'
   | 'feed'
+  | 'farm-select'
+  | 'selection'
+  | 'card-draft'
+
+export type FarmSelectType = 'plow' | 'sow' | 'fence' | 'room' | 'stable'
+export type SelectionKind = 'farm-position' | 'occupation-hand'
 
 export type InteractionRequest =
   | { kind: 'choice'; options: ActionChoiceOption[] }
@@ -607,6 +613,51 @@ export type InteractionRequest =
       remaining: number
       foodUsed: number
       feedQueue?: FeedQueueEntry[]
+    }
+  | {
+      kind: 'farm-select'
+      farm:
+        | { farmType: 'plow'; selectableTiles: FarmTilePosition[] }
+        | {
+            farmType: 'sow'
+            selectableFields: {
+              tile: FarmTilePosition
+              allowedCrops: ('grain' | 'vegetable' | 'wood')[]
+              sourceCard?: string
+            }[]
+            maxSelections?: number
+          }
+        | { farmType: 'fence'; selectableEdges: string[]; extraWood?: number }
+        | { farmType: 'room'; selectableTiles: FarmTilePosition[]; maxSelections: number }
+        | { farmType: 'stable'; selectableTiles: FarmTilePosition[]; maxSelections: number }
+      options?: ActionChoiceOption[]
+    }
+  | {
+      kind: 'selection'
+      selection:
+        | {
+            selectionType: 'farm-position'
+            selectablePositions: FarmTilePosition[]
+            minSelections?: number
+            maxSelections: number
+          }
+        | {
+            selectionType: 'occupation-hand'
+            selectableCards: string[]
+            minSelections: number
+            maxSelections: number
+          }
+    }
+  | {
+      kind: 'card-draft'
+      mode: 'simultaneous'
+      round: number
+      totalRounds: number
+      poolSize: number
+      seatOrder: string[]
+      pools: Record<string, { occ: string[]; minor: string[] }>
+      pendingPicks: string[]
+      kept: Record<string, { occ: string[]; minor: string[] }>
     }
 
 export type InteractionCommand =
