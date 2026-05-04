@@ -4,6 +4,7 @@ import type {
   ActionExecutionContext,
   ActionExecutionResult,
   FarmTilePosition,
+  GameState,
   PlayerState,
   Resource,
 } from '../../game/types'
@@ -11,8 +12,12 @@ import { getNextEmptyTileForPlayer } from '../../game/farm'
 import { payResources, applyCostOverride } from '../helpers/payment'
 import { stableWoodCost } from './fencing'
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'
+// PaymentSolver namespace (S3 Task 7a): core payment APIs migrated to
+// the new payment module. Other helpers (preview-cost / typed-flat /
+// room-payment / cost-modifier internals) remain on the shim through S3.
+import { PaymentSolver } from '../payment'
+import type { PaymentCtx } from '../payment'
 import {
-  canAffordCost,
   executeResolvedTypedFlatPayment,
   resolveTypedFlatPaymentSelection,
 } from '../helpers/pay-helpers'
@@ -26,7 +31,9 @@ export const buildStable = (player: PlayerState): ActionExecutionResult => {
   if (!next) {
     return { type: 'fail', logKey: 'log.buildStableFail' }
   }
-  if (!canAffordCost(player, { wood: stableWoodCost })) {
+  const stableCtx: PaymentCtx = { actionId: 'stables', costType: 'none' }
+  const ephemeralState: GameState = { ...({} as GameState), players: [player] }
+  if (!PaymentSolver.canAfford(ephemeralState, 0, { wood: stableWoodCost }, stableCtx)) {
     return { type: 'fail', logKey: 'log.buildStableFail' }
   }
   payResources(player, { wood: stableWoodCost })
