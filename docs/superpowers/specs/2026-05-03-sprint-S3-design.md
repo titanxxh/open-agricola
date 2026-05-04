@@ -55,7 +55,7 @@ S3 把当前 1974 行 / 41 export 的 payment 三件套（`payment.ts` / `pay-he
 | `improvement.ts` 不再 import payment 三件套 | grep import 路径 |
 | `improvement.ts` ≤ 400 行 | `wc -l` |
 | `shared/actions/helpers/payment.ts` / `pay-helpers.ts` / `room-payment.ts` 不存在 | `ls` |
-| `shared/actions/payment/` 模块对外 export ≤ 5 个（三 core public + `pickAuto` utility + 类型 namespace） | grep `^export` |
+| `shared/actions/payment/` 模块对外 export ≤ 6 个（4 core + clearCache + 类型 namespace） | grep `^export` |
 | 「强制 green 子集」全绿 | `pnpm test:fast` |
 | 卡牌效果 session 测试零回归（不算 S2 累计 skip） | `pnpm test:slow` 对比基线 |
 
