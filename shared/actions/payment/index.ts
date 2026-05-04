@@ -1,3 +1,4 @@
+export { PaymentSolver } from './solver'
 export type {
   Cost,
   Option,
