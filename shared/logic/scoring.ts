@@ -346,7 +346,16 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
     let cardStateBonusVp = 0
     if (player.cardStates) {
       Object.entries(player.cardStates).forEach(([cardId, cardState]) => {
-        if (cardId === '__pendingInteraction__') return
+        // Defensive sentinel filter for any synthetic `__pendingChoice__`
+        // cardStates entry that historical paths used to stash transient
+        // choice-resolution context. The key is no longer written by any
+        // current path (verified by grep), so this branch is effectively
+        // dead — keep it as a guard against accidental reintroduction.
+        // NOTE: a Task 3 sed pass renamed this string to
+        // '__pendingInteraction__'; that rename was a false-positive (the
+        // sed targeted the field rename `pending.type === 'choice'`, not
+        // string sentinels). Restored to the original name here.
+        if (cardId === '__pendingChoice__') return
         const vp = cardState.counters?.bonusVp ?? 0
         if (vp > 0) {
           cardStateBonusVp += vp
