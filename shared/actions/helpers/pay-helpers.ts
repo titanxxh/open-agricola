@@ -10,6 +10,7 @@ import type {
   PaymentSolution,
   PlayerState,
   Resource,
+  ResourceKey,
   Trade,
 } from '../../game/types'
 import {
@@ -21,7 +22,6 @@ import {
   getModifiersForCostType,
   isComplexCost,
   payResources,
-  sortPaymentSolutions,
 } from '../helpers/payment'
 import { executeCardListener, getMatchingListeners, type CardListenerContext } from '../../cards/card-listeners'
 
@@ -129,19 +129,6 @@ export const canAffordCost = (
   if (!cost) return true
   return canPayCost(player, cost)
 }
-
-const resolveFlatCost = (
-  baseCost: Partial<Resource>,
-  costOverride?: Partial<Resource>,
-) => applyCostOverride(baseCost, costOverride)
-
-export const canAffordFlatCost = (
-  player: PlayerState,
-  baseCost: Partial<Resource>,
-  costOverride?: Partial<Resource>,
-) => canAffordCost(player, resolveFlatCost(baseCost, costOverride))
-
-export const PAYMENT_CHOICE_REQUIRED_ERROR = 'payment choice required'
 
 const getTypedCostModifiers = (
   player: PlayerState,
@@ -594,12 +581,67 @@ const describePaymentEffectPreview = (
 }
 
 
+const PAYMENT_SORT_ORDER: ResourceKey[] = [
+  'wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep', 'boar', 'cattle', 'begging',
+]
+
+const getPositiveEntries = (solution: PaymentSolution) =>
+  PAYMENT_SORT_ORDER
+    .map((key) => [key, solution.resourcesPaid[key] ?? 0] as const)
+    .filter(([, amount]) => amount > 0)
+
+const compareEntries = (
+  left: ReturnType<typeof getPositiveEntries>,
+  right: ReturnType<typeof getPositiveEntries>,
+) => {
+  const maxLength = Math.max(left.length, right.length)
+  for (let index = 0; index < maxLength; index += 1) {
+    const a = left[index]
+    const b = right[index]
+    if (!a && !b) return 0
+    if (!a) return -1
+    if (!b) return 1
+    const keyCompare = PAYMENT_SORT_ORDER.indexOf(a[0]) - PAYMENT_SORT_ORDER.indexOf(b[0])
+    if (keyCompare !== 0) return keyCompare
+    if (a[1] !== b[1]) return a[1] - b[1]
+  }
+  return 0
+}
+
+const sortSolutions = (solutions: PaymentSolution[]): PaymentSolution[] =>
+  [...solutions].sort((left, right) => {
+    const leftEntries = getPositiveEntries(left)
+    const rightEntries = getPositiveEntries(right)
+    const leftTotal = leftEntries.reduce((sum, [, amount]) => sum + amount, 0)
+    const rightTotal = rightEntries.reduce((sum, [, amount]) => sum + amount, 0)
+    if (leftTotal !== rightTotal) return leftTotal - rightTotal
+    if (leftEntries.length !== rightEntries.length) return leftEntries.length - rightEntries.length
+    const leftTradeTimes = left.tradesUsed.reduce((sum, entry) => sum + entry.times, 0)
+    const rightTradeTimes = right.tradesUsed.reduce((sum, entry) => sum + entry.times, 0)
+    if (leftTradeTimes !== rightTradeTimes) return leftTradeTimes - rightTradeTimes
+    const leftTradeKinds = left.tradesUsed.filter((entry) => entry.times > 0).length
+    const rightTradeKinds = right.tradesUsed.filter((entry) => entry.times > 0).length
+    if (leftTradeKinds !== rightTradeKinds) return leftTradeKinds - rightTradeKinds
+    const entryCompare = compareEntries(leftEntries, rightEntries)
+    if (entryCompare !== 0) return entryCompare
+    const leftBonus = left.bonusUsed ?? ''
+    const rightBonus = right.bonusUsed ?? ''
+    if (leftBonus !== rightBonus) return leftBonus.localeCompare(rightBonus)
+    const leftCard = left.cardUsed ?? ''
+    const rightCard = right.cardUsed ?? ''
+    if (leftCard !== rightCard) return leftCard.localeCompare(rightCard)
+    const leftFeeIndex = left.feeIndex ?? -1
+    const rightFeeIndex = right.feeIndex ?? -1
+    if (leftFeeIndex !== rightFeeIndex) return leftFeeIndex - rightFeeIndex
+    return JSON.stringify(left.tradesUsed).localeCompare(JSON.stringify(right.tradesUsed))
+  })
+
 export const buildPaymentChoiceResult = (
   solutions: PaymentSolution[],
   optionValuePrefix: string,
   includeReturnedCard = false,
 ): ActionExecutionResult => {
-  const orderedSolutions = sortPaymentSolutions(solutions)
+  const orderedSolutions = sortSolutions(solutions)
   return {
     type: 'choice',
   promptKey: 'prompt.selectPayment',
@@ -621,7 +663,7 @@ export const resolvePaymentSolutionSelection = (
 ):
   | ActionExecutionResult
   | { type: 'selected'; solution: PaymentSolution } => {
-  const orderedSolutions = sortPaymentSolutions(solutions)
+  const orderedSolutions = sortSolutions(solutions)
   if (orderedSolutions.length === 0) {
     return failure
   }
