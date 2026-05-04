@@ -1,6 +1,14 @@
 import type { ActionDefinition, ActionExecutionResult, ActionFlow, GameState, PlayerState, ComplexCost, Resource } from '../../game/types'
 import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../game/minor-improvements'
+// PaymentSolver namespace (S3 Task 6): core payment APIs migrated to the
+// new payment module. Legacy helpers (payResources / executePaymentSolution
+// / returnCardToBoard / resolvePaymentSolutionSelection / preview-cost
+// family) remain on the shim through S3 and migrate in Task 9 (split) or
+// S4 (preview-cost domain aggregation per Decision C). The mixed import
+// pattern below is intentional during this period.
+import { PaymentSolver } from '../payment'
+import type { PaymentCtx } from '../payment'
 import { payResources, executePaymentSolution, returnCardToBoard } from '../helpers/payment'
 import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../logic/stats'
 import { majorCardDefinitions } from '../../cards/major'
@@ -12,8 +20,6 @@ import {
   resolveCardPreviewCostByProvider,
   resolvePaymentSolutionSelection,
 } from '../helpers/pay-helpers'
-import { PaymentSolver } from '../payment'
-import type { PaymentCtx } from '../payment'
 import { collectComputeChoiceCandidates } from '../../cards/card-listeners'
 import { isMajorCardId, isFireplaceIdentityCard } from '../../cards/helpers/card-type'
 
@@ -516,6 +522,7 @@ const resolveImprovementPayment = (
   playerIndex: number,
   player: PlayerState,
   cost: Partial<PlayerState['resources']> | ComplexCost,
+  actionId: 'improvement-major' | 'improvement-minor' | 'improvement-any',
   paymentChoice: string | undefined,
   optionValuePrefix: string,
   includeReturnedCard: boolean,
@@ -533,7 +540,7 @@ const resolveImprovementPayment = (
   const effectiveState = playerIndex >= 0 ? state : { ...state, players: [player] }
   const effectiveIndex = playerIndex >= 0 ? playerIndex : 0
   const ctx: PaymentCtx = {
-    actionId: 'improvement-any',
+    actionId,
     costType: 'none',
     sourceCard: improvementId,
     playedCards,
@@ -594,6 +601,7 @@ const playMajorImprovement = (
     state.players.indexOf(player),
     player,
     cost,
+    'improvement-major',
     paymentChoice,
     `pay:${improvementId}`,
     true,
@@ -656,6 +664,7 @@ export const playMinorImprovement = (
     state.players.indexOf(player),
     player,
     modifiedCost,
+    'improvement-minor',
     paymentChoice,
     `pay:minor:${improvementId}`,
     !!(PaymentSolver.isComplexCost(modifiedCost) && modifiedCost.cards?.list?.length),
