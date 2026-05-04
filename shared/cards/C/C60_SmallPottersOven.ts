@@ -3,20 +3,24 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { Resource } from '../../game/types'
 import { getMajorCard } from '../major'
-import { canAffordCost } from '../../actions/helpers/pay-helpers'
+import { PaymentSolver } from '../../actions/payment'
+import type { PaymentCtx } from '../../actions/payment'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C60_SmallPottersOven'
 const OVEN_IDS = ['Major_ClayOven', 'Major_StoneOven'] as const
 
-const getAvailableOvenChoices = (context: CardListenerContext) =>
-  OVEN_IDS.filter((id) => {
+const getAvailableOvenChoices = (context: CardListenerContext) => {
+  const playerIdx = context.state.players.indexOf(context.player)
+  const ctx: PaymentCtx = { actionId: CARD_ID, costType: 'none' }
+  return OVEN_IDS.filter((id) => {
     if (!context.state.availableMajorImprovements.includes(id)) return false
     const effect = getMajorCard(id)
     if (!effect?.cost) return false
-    return canAffordCost(context.player, effect.cost)
+    return PaymentSolver.canAfford(context.state, playerIdx, effect.cost, ctx)
   })
+}
 
 const beforeBakeListener: CardListenerRegistration = {
   id: 'C60-small-potters-oven-before-bake',
