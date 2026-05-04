@@ -73,7 +73,7 @@ S2 完成 `InteractionRequest` sum type 完整推广（8 种 kind）+ `harvestFe
 | `farm-select` payload 设计不兼容 5 种 farmType（plow/sow/fence/room/stable）的差异 | 中 | 高（要回头改 protocol） | sprint 启动时先做 5 种 farmType 的字段差异 audit；payload 用 `farm: { farmType; ...specific }` 嵌套而非平铺 | 5 种之中 ≥ 1 种需要破坏性 payload 改动 |
 | cardDraft 包装到 InteractionRequest 时 `DraftOverlay` UI 状态过渡 / 历史房间快照不兼容 | 中 | 低 | UI 数据源切换前后 snapshot 写一组对照测试；持久化房间（含 `phase: 'draft'` 的存档）走 rehydrate 兼容路径 | 已存在的 draft 中房间 rehydrate 后 UI 黑屏 |
 | ClientCommand 切换到 `resolveChoice` 后 e2e 测试大面积 skip | 高 | 中 | 提前建 `docs/skip-tracker.md`；codemod 工具一次性把测试切到新命令；e2e 用契约层断言（state / pending / log），不断言按钮文案 | 累计 skip > 阈值（sprint 启动时定） |
-| Session traits 拆分时 4 个 phase mixin 边界划错（method 漂移到错的 phase） | 中 | 中 | sprint 启动时按 BGA `BaseTrait` / `HarvestTrait` / `RoundTrait` / `DraftTrait` 对照划边界 | 任一 mixin > 600 行（说明仍是单 class） |
+| Session traits 拆分时 4 个 phase mixin 边界划错（method 漂移到错的 phase） | 中 | 中 | sprint 启动时按 BGA `BaseTrait` / `HarvestTrait` / `RoundTrait` 对照划边界（仅作代码组织参考）；Draft 相关 mixin 直接基于现有 `shared/draft/draft-manager.ts` 已有的职责边界划分，**不学 BGA `DraftTrait`** | 任一 mixin > 600 行（说明仍是单 class） |
 | `promptKey` / `promptParams` 拆解为具名字段时旧文案 i18n key 失配 | 中 | 低 | 保留 i18n key，只改 payload 字段；i18n key 单独留兼容期 | i18n 测试整批失败 |
 | 强制 green 子集回归（cursor 序列化 round-trip 测试在 InteractionRequest 重构中破） | 低 | 高 | 把 cursor round-trip 测试列为本 sprint 第一周必跑；任何破裂立刻定位 | 强制 green 子集挂 ≥ 1 项 |
 
