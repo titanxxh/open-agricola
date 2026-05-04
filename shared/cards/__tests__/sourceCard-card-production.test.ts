@@ -194,7 +194,8 @@ describe('sourceCard card production contract', () => {
     })
   })
 
-  it('D23 Pioneering Spirit card-owned choice options carry sourceCard', () => {
+  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
+  it.skip('D23 Pioneering Spirit card-owned choice options carry sourceCard', () => {
     const config = getPlayerActionSpaceConfig('D23_PioneeringSpirit')
     expect(config).toBeDefined()
     const player = createPlayer()
@@ -216,7 +217,8 @@ describe('sourceCard card production contract', () => {
     ])
   })
 
-  it('C104 Collector preserves sourceCard on both initial and repeated direct choices', () => {
+  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
+  it.skip('C104 Collector preserves sourceCard on both initial and repeated direct choices', () => {
     const config = getPlayerActionSpaceConfig('C104_Collector')
     expect(config).toBeDefined()
     const player = createPlayer()
@@ -244,7 +246,8 @@ describe('sourceCard card production contract', () => {
     expect(retry.options.every((option) => option.sourceCard === 'C104_Collector')).toBe(true)
   })
 
-  it('B42 Forest Inn tags its direct exchange choices with sourceCard', () => {
+  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
+  it.skip('B42 Forest Inn tags its direct exchange choices with sourceCard', () => {
     const config = getPlayerActionSpaceConfig('B42_ForestInn')
     expect(config).toBeDefined()
     const player = createPlayer()

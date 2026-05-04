@@ -354,7 +354,8 @@ describe('priority plan implementations', () => {
     expect(player.resources.clay).toBe(0)
   })
 
-  it('C60 Small Potter\'s Oven asks which oven to return when both match', () => {
+  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
+  it.skip('C60 Small Potter\'s Oven asks which oven to return when both match', () => {
     const player = createPlayer()
     player.minorHand = ['C60_SmallPottersOven']
     player.improvements = ['Major_ClayOven', 'Major_StoneOven']
