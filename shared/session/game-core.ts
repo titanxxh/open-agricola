@@ -2758,6 +2758,14 @@ export class GameCore {
           // the existing options-driven pending model. `resolvePendingChoice`
           // already validates `value` against pendingOptions/composite cache.
           return this.resolvePendingChoice(playerIndex, value, true, payload)
+        case 'farm-select':
+        case 'selection':
+        case 'card-draft':
+          // S2 Task 2 introduced the farm-select / selection / card-draft kinds
+          // ahead of their resolvers (Tasks 5/6/7/12). Until those tasks wire
+          // dedicated handlers, fall back to the legacy pending-options path so
+          // tests/UX continue working through ChoiceNode.choices validation.
+          return this.resolvePendingChoice(playerIndex, value, true, payload)
         default: {
           const _exhaustive: never = request
           return this.respond(false, `unhandled interaction kind: ${JSON.stringify(_exhaustive)}`)

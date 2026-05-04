@@ -1555,12 +1555,19 @@ export class Engine {
         } else if (
           result.request.kind === 'confirm-next-player' ||
           result.request.kind === 'confirm-player-switch' ||
-          result.request.kind === 'feed'
+          result.request.kind === 'feed' ||
+          result.request.kind === 'farm-select' ||
+          result.request.kind === 'selection' ||
+          result.request.kind === 'card-draft'
         ) {
           // Task 9 will add explicit emitters for these kinds. Until then no
           // current effect emits them, so they fall through to empty choices
           // here. The exhaustive check below ensures any future kind added to
           // InteractionRequest forces this branch to be revisited.
+          // farm-select / selection / card-draft were added in S2 Task 2; their
+          // emitters land in Tasks 5/6/7/12 — until then they share this same
+          // not-yet-wired path so typecheck stays green without granting them
+          // a real options surface.
           choiceOptions = []
         } else {
           // Exhaustive check: every InteractionRequest kind must be handled
