@@ -1377,12 +1377,25 @@ export class Engine {
           }
           choiceOptions = mergedOptions
         } else if (result.request.kind === 'animal-reorg') {
-          // Compatibility shim until Task 6/7 lifts GameCore detection off
-          // pending.options. Re-emit confirm/cancel from the legacy 'choice'
-          // shape so GameCore's pending sub-flow surface (and tests that
-          // assert on `pending.options`) keep working unchanged. The cancel
-          // option is omitted for non-anytime triggers, mirroring the
-          // pre-migration `buildOptions(trigger)` helper.
+          // Compatibility shim — RETAINED through Task 7 (re-evaluated).
+          //
+          // GameCore.resolvePendingChoice still validates the player's
+          // submitted value via `pending.options.find((o) => o.value === value)`
+          // (shared/session/game-core.ts ~L2249). Reorg confirm/cancel
+          // therefore must surface as concrete options on the pending
+          // surface or the validator rejects the resolution.
+          //
+          // Removing this shim requires teaching resolvePendingChoice to
+          // bypass the options.find check for `request.kind === 'animal-reorg'`
+          // (or to read the allowed values off InteractionNode.choices /
+          // request directly). Task 7 deliberately did not modify
+          // resolvePendingChoice (out of scope per task constraints), so
+          // the shim stays. Task 9 or Task 10 (when buildInteraction is
+          // rewritten and pending.options is removed) is the natural
+          // place to delete it.
+          //
+          // The cancel option is omitted for non-anytime triggers,
+          // mirroring the pre-migration `buildOptions(trigger)` helper.
           const trigger =
             (executionContext.actionContext?.trigger as ReorganizeTrigger | undefined) ?? 'anytime'
           const confirm: ActionChoiceOption = {
