@@ -995,13 +995,13 @@ S6 物理分层完成后专设 S7"卡牌效果测试回归"：
   - 实现 `'farm-select'` request kind（含 plow/sow/fence/room/stable 5 种 farmType）
   - 实现 `'selection'` request kind（含 farm-position/occupation-hand）
   - 实现 `'feed'` request kind（harvestFeed 用）
-  - 实现 `'card-draft'` request kind（cardDraft 用）
+  - 实现 `'card-draft'` request kind（cardDraft 用，沿用 `shared/draft/`）
   - 删除 GameCore.buildPlowInteraction / buildSowInteraction / buildFenceInteraction / buildSelectionInteraction / buildFarmInteraction —— 这些"集中派生"逻辑下沉到对应 leaf action 的 `execute()`
   - 删除 `isFarmPromptKey()` / `isSelectionPromptKey()` 等字符串嗅探
 - **协议层 InteractionState 简化**：8 stateId → 3（idle / wait / gameover）；`request: InteractionRequest` 单字段
 - **ClientCommand 收敛**：删除 `commitFarm / commitSelection / commitChoice / confirmFeed`，全部 `resolveChoice`
 - 推广模式到 `harvestFeed`（参考 BGA `HarvestTrait` 264 行）→ 实际就是 `feed` request kind
-- 推广模式到 `cardDraft`（参考 BGA `DraftTrait` 1050 行）→ 实际就是 `card-draft` request kind
+- `cardDraft` 包装到 `card-draft` request kind：复用现有 `shared/draft/draft-manager.ts` 153 行 simultaneous 模型，删 `'draftSubmit'` ClientCommand + `/api/game/draft-submit` HTTP 端点，统一走 `resolveChoice`；**不引入 BGA 风格轮抽**（pass-card-around）
 - `game-core.ts` 拆成 `session-core.ts` + 4 个 phase mixin（仍在原 `shared/session/` 目录，物理迁移留 S6）
 - 专项 DoD：
   - `PendingAction` union 完全删除
