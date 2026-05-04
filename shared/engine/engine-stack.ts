@@ -5,7 +5,14 @@ export type EngineSource =
   | { kind: 'action'; actionId: string }
   | { kind: 'flow'; flow: ActionFlow }
 
-export type SubFlowReason = 'reorganize' | 'feed' | 'card-draft' | 'confirm-next-player' | 'confirm-player-switch'
+export type SubFlowReason =
+  | 'top-level'
+  | 'stage-hook'
+  | 'reorganize'
+  | 'feed'
+  | 'card-draft'
+  | 'confirm-next-player'
+  | 'confirm-player-switch'
 
 export type StageResumeState = {
   hook: string

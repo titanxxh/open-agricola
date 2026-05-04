@@ -1077,7 +1077,13 @@ export class GameCore {
     const source = entry.engineSource
       ? JSON.parse(JSON.stringify(entry.engineSource)) as EngineSource
       : null
-    if (source && entry.activeSpaceId !== null && entry.activePlayerIndex !== null) {
+    // pushHistory invariant: when there's a live frame on the stack, all of
+    // (engineSource, activeSpaceId, activePlayerIndex) come off the same
+    // frame and are non-null together; when the stack is empty, all three
+    // are null. So `source` is a sufficient gate — the previous extra
+    // null-checks on activeSpaceId/activePlayerIndex were defensive but
+    // redundant. Use a non-null assertion on the two synced fields.
+    if (source) {
       const engine = this.createEngineFromSource(source)
       if (entry.engineSnapshot) {
         engine.restore(entry.engineSnapshot)
@@ -1085,13 +1091,14 @@ export class GameCore {
       this.engineStack.push({
         engine,
         source,
-        ownerPlayerIndex: entry.activePlayerIndex,
-        spaceId: entry.activeSpaceId,
+        ownerPlayerIndex: entry.activePlayerIndex!,
+        spaceId: entry.activeSpaceId!,
         stageResume: entry.stageResume ? { ...entry.stageResume } : null,
         deferredPlayerSwitch: null,
-        // Task 7 will introduce a 'top-level' reason for action engines and
-        // tighten the union; placeholder until the cursor flows that field.
-        reason: 'card-draft',
+        // Restore-from-history frames default to 'top-level' since the
+        // history snapshot does not yet carry a reason. Task 8 will round-
+        // trip the reason through HistoryEntry alongside the cursor.
+        reason: 'top-level',
       })
     }
   }
@@ -1342,7 +1349,7 @@ export class GameCore {
       ownerPlayerIndex: playerIndex,
       stageResume: { hook, playerIndex, cardIndex: nextCardIndex },
       deferredPlayerSwitch: null,
-      reason: 'card-draft',
+      reason: 'stage-hook',
     })
     this.pending = { type: 'none' }
     this.runEngineSteps()
@@ -2175,9 +2182,9 @@ export class GameCore {
       ownerPlayerIndex: playerIndex,
       stageResume: null,
       deferredPlayerSwitch: null,
-      // Task 7 will introduce a 'top-level' reason for action engines; reusing
-      // 'card-draft' here as a placeholder since the field is not yet read.
-      reason: 'card-draft',
+      // Top-level player action engine (frame is the player's current action
+      // space, not a sub-flow detour).
+      reason: 'top-level',
     })
 
     const beforeListenerContext = {
