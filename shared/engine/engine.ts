@@ -903,6 +903,7 @@ export class Engine {
             id: choiceNode.id,
             promptKey: choiceNode.promptKey,
             choices: choiceNode.choices,
+            request: choiceNode.request,
           }
         : null
     return {
@@ -941,6 +942,7 @@ export class Engine {
       id: string
       promptKey?: string
       choices: ActionChoiceOption[]
+      request?: import('../game/types').InteractionRequest
     } | null
   }) {
     const nodeMap = new Map(
@@ -969,6 +971,9 @@ export class Engine {
       const node = nodeMap.get(snapshot.choiceData.id)
       if (node instanceof InteractionNode) {
         node.setChoice(snapshot.choiceData.promptKey, snapshot.choiceData.choices)
+        if (snapshot.choiceData.request) {
+          node.request = snapshot.choiceData.request
+        }
       }
     }
     this.pendingInteractionNodeId = snapshot.pendingInteractionNodeId
