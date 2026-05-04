@@ -153,12 +153,13 @@ const respondWith = (
   session?: GameSession,
   viewerPlayerId: string | null = null,
 ) => {
+  const ctx = session ? { engineStack: session.getEngineStack() } : undefined
   const result: Record<string, unknown> = {
     ...resp,
     state:
       viewerPlayerId != null
-        ? serializeStateForPlayer(resp.state, viewerPlayerId)
-        : serializeState(resp.state),
+        ? serializeStateForPlayer(resp.state, viewerPlayerId, ctx)
+        : serializeState(resp.state, ctx),
   }
   // Include custom card definitions so the frontend can register them
   // in its card registry — custom cards render identically to built-in cards.
