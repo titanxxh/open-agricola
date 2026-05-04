@@ -1,3 +1,14 @@
+/**
+ * Side-effecting execution path: executePaymentSolution, applyTradeSideEffect,
+ * returnCardToBoard, getCheapestSolution, buildBonusReductions. Mutates the
+ * player state to apply a chosen PaymentSolution (deduct resources, fire trade
+ * side effects, record bonus attribution).
+ *
+ * Internal to shared/actions/payment/. Not exported from the package
+ * barrel (shared/actions/payment/index.ts). Use PaymentSolver from
+ * the public API instead.
+ */
+
 import type {
   BonusModifier,
   CostModifierType,

@@ -1,3 +1,14 @@
+/**
+ * Cost-modifier engine: applyCostModifiers, evaluateConditions,
+ * getModifiersForCostType, validateBonus. Throws on invariant violations
+ * (Bonus configuration errors) — these are programmer errors and surface
+ * via Error rather than the Result-style PaymentExecuteResult.
+ *
+ * Internal to shared/actions/payment/. Not exported from the package
+ * barrel (shared/actions/payment/index.ts). Use PaymentSolver from
+ * the public API instead.
+ */
+
 import type {
   Bonus,
   BonusModifier,

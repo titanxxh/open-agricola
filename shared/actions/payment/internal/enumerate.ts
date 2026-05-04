@@ -1,3 +1,18 @@
+/**
+ * Combinatorial core: computeAllBuyableCombinations, keepOnlyOptimals,
+ * sortPaymentSolutions, generateTradeCombinations. Builds the full set of
+ * payment decompositions for a ComplexCost given the player's resources,
+ * trade options, bonuses, and played cards.
+ *
+ * Largest internal file (~481 lines). Future split candidate: split the
+ * enumeration core from the post-processing (Pareto filter + sort) if it
+ * grows further.
+ *
+ * Internal to shared/actions/payment/. Not exported from the package
+ * barrel (shared/actions/payment/index.ts). Use PaymentSolver from
+ * the public API instead.
+ */
+
 import type {
   ComplexCost,
   CostModifierType,

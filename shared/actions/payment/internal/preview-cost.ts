@@ -1,3 +1,17 @@
+/**
+ * Preview-cost family: resolveCardCostWithModifiers,
+ * canAffordCardPreviewCostByProvider, payCardPreviewCostByProvider,
+ * resolveCardPreviewCostByProvider, canAffordActionPreviewCost,
+ * resolveActionPreviewCost.
+ *
+ * "Preview" semantics — used to display projected cost in UI affordability
+ * checks before the player commits. May migrate to cards/UI domain in S4.
+ *
+ * Internal to shared/actions/payment/. Not exported from the package
+ * barrel (shared/actions/payment/index.ts). Use PaymentSolver from
+ * the public API instead.
+ */
+
 import type {
   ActionAvailabilityContext,
   Bonus,
