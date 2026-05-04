@@ -3,16 +3,19 @@ import type {
   ActionExecutionResult,
   ComplexCost,
   CostModifierType,
+  GameState,
   PaymentSolution,
+  PlayerState,
   Resource,
 } from '../../game/types'
 import { addCardResourcePaid } from '../../cards/helpers/card-state'
+// PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
+// the new payment module. Other helpers (preview-cost / typed-flat /
+// room-payment / cost-modifier internals) remain on the shim through S3.
+import { PaymentSolver } from '../payment'
+import type { PaymentCtx } from '../payment'
 import {
-  canPayCost,
-  canPayResources,
-  computeAllBuyableCombinations,
   executePaymentSolution,
-  isComplexCost,
   payResources,
   returnCardToBoard,
 } from '../helpers/payment'
@@ -20,6 +23,16 @@ import {
   payTypedFlatCostDetailed,
   resolveCostPaymentSelection,
 } from '../helpers/pay-helpers'
+
+/**
+ * Construct a minimal GameState wrapping a single player. Used by
+ * pay's PaymentSolver.canAfford / computeOptions calls where the function
+ * signature doesn't carry GameState (canExecute callback). Safe ONLY for
+ * simple-cost and ComplexCost affordability checks — do not pass to
+ * hook-firing code paths.
+ */
+const buildSingletonState = (player: PlayerState): GameState =>
+  ({ ...({} as GameState), players: [player] })
 
 export type PayParams = {
   cost: Partial<Resource> | ComplexCost
@@ -177,7 +190,7 @@ export const payAction: ActionDefinition = {
     getBaseCost: ({ params }) => {
       const p = normalizePayParams(params)
       if (!p?.cost) return {}
-      if (isComplexCost(p.cost)) return p.cost.fee ?? {}
+      if (PaymentSolver.isComplexCost(p.cost)) return p.cost.fee ?? {}
       return p.cost
     },
     // ComplexCost may be affordable only via bonus/trade variants. The default
@@ -189,22 +202,17 @@ export const payAction: ActionDefinition = {
     canExecute: ({ player, params }) => {
       const p = normalizePayParams(params)
       if (!p?.cost) return false
-      if (!isComplexCost(p.cost)) {
-        return canPayCost(player, p.cost, p.costType)
+      const ctx: PaymentCtx = { actionId: 'pay', costType: p.costType ?? 'none', playedCards: p.playedCards }
+      if (!PaymentSolver.isComplexCost(p.cost)) {
+        return PaymentSolver.canAfford(buildSingletonState(player), 0, p.cost, ctx)
       }
-      const solutions = computeAllBuyableCombinations(
-        player,
-        p.cost,
-        p.playedCards,
-        p.costType,
-      )
-      return solutions.length > 0
+      return PaymentSolver.computeOptions(buildSingletonState(player), 0, p.cost, ctx).length > 0
     },
   },
   execute: ({ player, params, sourceCard, state }) => {
     const p = normalizePayParams(params)
     if (!p?.cost) return { type: 'fail', logKey: 'log.payFail' }
-    if (isComplexCost(p.cost)) {
+    if (PaymentSolver.isComplexCost(p.cost)) {
       const optionPrefix = p.optionPrefix ?? 'pay:generic'
       const selection = resolveCostPaymentSelection(
         player,
@@ -277,7 +285,7 @@ export const payAction: ActionDefinition = {
       }
       return { type: 'ok', resourcesPaid, extraData }
     }
-    if (!canPayResources(player, flat)) {
+    if (!PaymentSolver.canAfford(buildSingletonState(player), 0, flat, { actionId: 'pay', costType: 'none' })) {
       return { type: 'fail', logKey: 'log.payFail' }
     }
     payResources(player, flat)
@@ -302,7 +310,7 @@ export const payAction: ActionDefinition = {
   resolveChoice: ({ player, params, sourceCard, state }, choice) => {
     const p = normalizePayParams(params)
     if (!p?.cost) return { type: 'fail', logKey: 'log.payFail' }
-    if (!isComplexCost(p.cost)) {
+    if (!PaymentSolver.isComplexCost(p.cost)) {
       // Non-ComplexCost paths never reach resolveChoice (execute paid eagerly
       // and returned `ok`). Treat any stray invocation as a no-op success.
       return { type: 'ok' }
