@@ -1007,19 +1007,28 @@ export const createWsServer = (server: import('node:http').Server) => {
       }
 
       if (msg.type === 'feed') {
-        const resp = callRoom(s => s.confirmHarvestFeed(currentPlayerIndex, msg.selections))
+        // Task 9: legacy 'feed' command routes through the unified
+        // resolveChoice dispatcher; the InteractionNode at the top of the
+        // engineStack carries the queue context.
+        const resp = callRoom((s) =>
+          s.resolveChoice(currentPlayerIndex, 'confirm', { selections: msg.selections }),
+        )
         broadcastState(room, resp, 'feed', msg.requestId)
         return
       }
 
       if (msg.type === 'nextPlayer') {
-        const resp = callRoom(s => s.confirmNextPlayer())
+        // Task 9: forwards to resolveChoice; the synthetic
+        // confirm-next-player InteractionNode supplies `nextPlayerIndex`.
+        const resp = callRoom((s) => s.resolveChoice(currentPlayerIndex, 'confirm'))
         broadcastState(room, resp, 'action', msg.requestId)
         return
       }
 
       if (msg.type === 'confirmPlayerSwitch') {
-        const resp = callRoom(s => s.confirmPlayerSwitch())
+        // Task 9: forwards to resolveChoice; the synthetic
+        // confirm-player-switch InteractionNode supplies `toPlayerIndex`.
+        const resp = callRoom((s) => s.resolveChoice(currentPlayerIndex, 'confirm'))
         broadcastState(room, resp, 'action', msg.requestId)
         return
       }
