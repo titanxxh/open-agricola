@@ -164,49 +164,89 @@ type ResolveChoicePayload =
 S2 删除：
 - `commitFarm` / `commitSelection` / `commitChoice` / `confirmFeed` / `feed` / `nextPlayer` / `confirmPlayerSwitch` / `confirmHarvestFeed`（HTTP）/ `confirmAnimalReorg`（HTTP，已 S1 删）
 
-### 3.4 promptKey 闭 union + promptParams 具名 schema（P3 / Q5 决议）
+### 3.4 promptKey 闭 union + promptParams 具名 schema（P3 / Q5 决议 + Path C 决议）
+
+**Path C（Task 3 落地决议）**：S2 brainstorm 阶段曾考虑把现有 60+ 个分散的 i18n promptKey 字面量收拢到 ~16 个语义化 key。落地时改用 Path C — 把 union **枚举到现有所有 ~56 个字面量**，外加 `ui.cards.${string}` template literal 作为新卡牌的逃逸出口。这样：
+
+- 协议层得到完整 typecheck 强约束（plain `string` 不再被接受），命中所有"漏网之鱼"卡牌字面量
+- i18n 翻译键 1:1 保留，无需 server-side / client-side 翻译表迁移
+- 后续若想做语义化合并（如把 `ui.interactionPlow` / `ui.interactionPlowSelect` 合一），是独立的纯重命名工作，不在 S2 范围
+
+最终 union（截至 Task 3）：
 
 ```ts
-// shared/game/prompt-keys.ts （新建）
+// shared/game/prompt-keys.ts
 
 export type PromptKey =
+  // Core interaction prompts
   | 'ui.interactionAnimalReorg'
   | 'ui.confirmNextPlayer'
   | 'ui.confirmPlayerSwitch'
   | 'ui.harvestFeed'
-  | 'ui.interactionPlow'
-  | 'ui.interactionSow'
-  | 'ui.interactionFence'
-  | 'ui.interactionRoom'
-  | 'ui.interactionStable'
+  | 'ui.interactionFlowSelect'         // OrNode / XorNode 通用
+  | 'ui.interactionOptionalAction'     // OptionalNode 通用
+  // Farm action prompts (with both bare and -Select suffix variants)
+  | 'ui.interactionPlow' | 'ui.interactionPlowSelect'
+  | 'ui.interactionSow'  | 'ui.interactionSowSelect'
+  | 'ui.interactionFence' | 'ui.interactionFenceSelect'
+  | 'ui.interactionRoom'  | 'ui.interactionRoomSelect'
+  | 'ui.interactionStable' | 'ui.interactionStableSelect'
+  // Selection / draft / common multi-step
   | 'ui.interactionSelection'
   | 'ui.interactionOccupationHand'
   | 'ui.interactionCardDraft'
-  | 'ui.interactionExchange'
-  | 'ui.interactionBakeBread'
-  | 'ui.interactionFlowSelect'      // OrNode/XorNode 通用
-  | 'ui.interactionOptionalAction'  // OptionalNode 通用
-  // 卡牌特定 promptKey 通过 'ui.cards.${cardId}' 命名约定
+  | 'ui.interactionExchange' | 'ui.interactionExchangeChoice'
+  | 'ui.interactionBakeBread' | 'ui.interactionBakeBreadCount' | 'ui.interactionBakeBreadChoice'
+  // Other ad-hoc engine / improvement / occupation prompts
+  | 'ui.interactionChooseImprovement' | 'ui.interactionChooseMinorImprovement'
+  | 'ui.interactionChooseOccupation'  | 'ui.interactionGrainUtilizationChoice'
+  | 'ui.interactionPlaceFarmerExtra'  | 'ui.interactionRecallPlacedWorker'
+  | 'ui.interactionMoveFarmerToSpace' | 'ui.interactionFarmExpansionSelect'
+  | 'ui.interactionCultivationSelect' | 'ui.interactionDiscardFromHand'
+  | 'ui.interactionChooseRenovationTarget'
+  | 'ui.optionalBuildRoom' | 'ui.selectImprovement' | 'ui.stubPayGainVpPrompt'
+  // Card-specific ad-hoc prompts (~30 cards — kept enumerated for typecheck strictness)
+  | 'ui.interactionAleBenches' | 'ui.interactionAshTrees' | 'ui.interactionBellfounder'
+  | 'ui.interactionBucksawPrompt' | 'ui.interactionCob' | 'ui.interactionCollectorSelect'
+  | 'ui.interactionDairyCrierChoice' | 'ui.interactionEarthenwarePotter'
+  | 'ui.interactionFieldMerchantChoose' | 'ui.interactionFirewoodExchange'
+  | 'ui.interactionFodderPlanterSow' | 'ui.interactionForestInn'
+  | 'ui.interactionFreshmanOccupation' | 'ui.interactionGodlySpouse'
+  | 'ui.interactionHammerCrusherBuild' | 'ui.interactionHaydryer'
+  | 'ui.interactionLazySowmanPlace' | 'ui.interactionMerchantPrompt'
+  | 'ui.interactionNewPurchaseGrain' | 'ui.interactionNewPurchaseVegetable'
+  | 'ui.interactionOverachieverImprovement' | 'ui.interactionPioneeringSpirit'
+  | 'ui.interactionReclamationPlow' | 'ui.interactionReclamationPlowAmbiguous'
+  | 'ui.interactionRiparianBuilderConstruct' | 'ui.interactionSaddlerPlow'
+  | 'ui.interactionSilage' | 'ui.interactionSlurrySow' | 'ui.interactionSlurrySpreaderSow'
+  | 'ui.interactionSmallPottersOvenBuild' | 'ui.interactionStockProtectorPlace'
+  | 'ui.interactionToolboxImprovement' | 'ui.interactionWoodBartererPrompt'
+  | 'ui.interactionWorkshopAssistantSelect'
+  // Action / payment infrastructure prompt keys (non `ui.*` namespace)
+  | 'actions.resource-market.description'
+  | 'prompt.selectPayment'
+  // Forward-compat template literal escape hatch for new card hooks
   | `ui.cards.${string}`
 
 export type PromptParams<K extends PromptKey> =
-  K extends 'ui.harvestFeed'           ? { remaining: number; foodUsed: number }
+  K extends 'ui.harvestFeed'              ? { remaining: number; foodUsed: number }
   : K extends 'ui.interactionAnimalReorg' ? { trigger: ReorganizeTrigger }
-  : K extends 'ui.interactionSow'       ? { allowedCrops?: CropType[]; needed?: number }
-  : K extends 'ui.interactionRoom'      ? { needed?: number; maxSelections?: number }
-  : K extends 'ui.interactionStable'    ? { needed?: number; maxSelections?: number }
-  : K extends 'ui.interactionFence'     ? { extraWood?: number }
-  : K extends 'ui.interactionSelection' ? { maxSelections: number; minSelections?: number }
+  : K extends 'ui.interactionSow' | 'ui.interactionSowSelect'         ? { allowedCrops?: CropType[]; needed?: number }
+  : K extends 'ui.interactionRoom' | 'ui.interactionRoomSelect'       ? { needed?: number; maxSelections?: number }
+  : K extends 'ui.interactionStable' | 'ui.interactionStableSelect'   ? { needed?: number; maxSelections?: number }
+  : K extends 'ui.interactionFence' | 'ui.interactionFenceSelect'     ? { extraWood?: number }
+  : K extends 'ui.interactionSelection'   ? { maxSelections: number; minSelections?: number }
   : K extends 'ui.interactionOccupationHand' ? { maxSelections: number; minSelections: number }
-  : K extends `ui.cards.${string}`     ? Record<string, unknown>   // 卡牌特殊场景保留 escape hatch
-  : Record<string, never>              // 默认无 params
+  : K extends `ui.cards.${string}`        ? Record<string, unknown>
+  : Record<string, never>
 ```
 
 红线：
 - 协议层 `promptKey` 字段类型 = `PromptKey`（闭 union），不允许 plain `string`
 - `promptParams` 字段类型 = `PromptParamsFor<promptKey>` 条件类型派生
-- 现有 i18n key 全部保留（破坏迁移成本太高）；只是协议层加类型约束
+- 现有 i18n key 全部保留（Path C 决议 — 翻译表 1:1 不动）
 - 卡牌特殊文案走 `'ui.cards.${cardId}'` 命名约定，逃逸到 `Record<string, unknown>`
+- `-Select` 后缀变体（plow/sow/fence/room/stable）暂时保留双枚举；S2 后续 leaf-emit 任务（Task 5/6）若把 farm-select 整合到统一 InteractionRequest，则可在 Task 13 cleanup 阶段合并
 
 ### 3.5 `ChoiceNode` 完全消除（S1 已完成；S2 确认）
 

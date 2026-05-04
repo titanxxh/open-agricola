@@ -13,6 +13,7 @@ import type {
   LogEntry,
   Resource,
 } from '../game/types'
+import type { PromptKey } from '../game/prompt-keys'
 import type { FollowUpAction } from '../actions/hooks'
 import {
   ActionNode,
@@ -123,7 +124,7 @@ export class Engine {
    */
   private lastEmittedChoice: {
     nodeId: string
-    promptKey?: string
+    promptKey?: PromptKey
     promptParams?: Record<string, unknown>
     options: ActionChoiceOption[]
   } | null = null
@@ -134,7 +135,7 @@ export class Engine {
    */
   peekPendingChoiceFromComposite(): {
     nodeId: string
-    promptKey?: string
+    promptKey?: PromptKey
     promptParams?: Record<string, unknown>
     options: ActionChoiceOption[]
   } | null {
@@ -229,7 +230,7 @@ export class Engine {
     targetNode: InteractionNode | null
     fallbackNodeId: string | null
     request: InteractionRequest
-    promptKey?: string
+    promptKey?: PromptKey
     promptParams?: Record<string, unknown>
     choiceOptions: ActionChoiceOption[]
     actionId: string
@@ -1036,13 +1037,13 @@ export class Engine {
     pendingInteractionContext: Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'> | null
     choiceData: {
       id: string
-      promptKey?: string
+      promptKey?: PromptKey
       choices: ActionChoiceOption[]
       request?: InteractionRequest
     } | null
     lastEmittedChoice?: {
       nodeId: string
-      promptKey?: string
+      promptKey?: PromptKey
       promptParams?: Record<string, unknown>
       options: ActionChoiceOption[]
     } | null

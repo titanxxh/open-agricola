@@ -6,6 +6,7 @@ import type {
   InteractionRequest,
   Resource,
 } from '../game/types'
+import type { PromptKey } from '../game/prompt-keys'
 import type { EngineNode, EngineNodeType, NodeState } from './types'
 import type { ActionHookPhase } from '../actions/hooks'
 
@@ -91,7 +92,7 @@ export class ActionNode extends BaseNode {
 
 export class InteractionNode extends BaseNode {
   public choices: ActionChoiceOption[]
-  public promptKey?: string
+  public promptKey?: PromptKey
   /**
    * Optional i18n params passed alongside `promptKey`. Lifted out of the
    * legacy `this.pending` field (Task 10) so the InteractionNode is now the
@@ -109,7 +110,7 @@ export class InteractionNode extends BaseNode {
   }
 
   setChoice(
-    promptKey: string | undefined,
+    promptKey: PromptKey | undefined,
     choices: ActionChoiceOption[],
     promptParams?: Record<string, unknown>,
   ) {
@@ -165,9 +166,9 @@ export class ParallelNode extends BaseNode {
 
 export class OrNode extends BaseNode {
   public children: EngineNode[]
-  public promptKey?: string
+  public promptKey?: PromptKey
 
-  constructor(id: string, children: EngineNode[], promptKey?: string) {
+  constructor(id: string, children: EngineNode[], promptKey?: PromptKey) {
     super(id, 'or')
     this.children = children
     this.promptKey = promptKey
@@ -176,9 +177,9 @@ export class OrNode extends BaseNode {
 
 export class XorNode extends BaseNode {
   public children: EngineNode[]
-  public promptKey?: string
+  public promptKey?: PromptKey
 
-  constructor(id: string, children: EngineNode[], promptKey?: string) {
+  constructor(id: string, children: EngineNode[], promptKey?: PromptKey) {
     super(id, 'xor')
     this.children = children
     this.promptKey = promptKey
@@ -187,10 +188,10 @@ export class XorNode extends BaseNode {
 
 export class OptionalNode extends BaseNode {
   public child: EngineNode
-  public promptKey?: string
+  public promptKey?: PromptKey
   public active = false
 
-  constructor(id: string, child: EngineNode, promptKey?: string) {
+  constructor(id: string, child: EngineNode, promptKey?: PromptKey) {
     super(id, 'optional')
     this.child = child
     this.promptKey = promptKey

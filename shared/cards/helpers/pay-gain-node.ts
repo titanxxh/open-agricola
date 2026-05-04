@@ -1,12 +1,13 @@
 import type { ChoiceEffectPreview, Resource } from '../../game/types'
 import type { ActionFlow } from '../../game/types'
+import type { PromptKey } from '../../game/prompt-keys'
 import type { ActionHookResult } from '../../actions/hooks'
 import { splitCardGain, type CardGain } from './card-gain'
 
 type SequenceFlow = {
   type: 'seq'
   optional?: boolean
-  promptKey?: string
+  promptKey?: PromptKey
   children: ActionFlow[]
 }
 
@@ -14,7 +15,7 @@ type PayGainNodeOptions = {
   cardId: string
   cost: Partial<Resource>
   gain?: CardGain
-  promptKey?: string
+  promptKey?: PromptKey
   choiceLabelKey?: string
   choiceLabelParams?: Record<string, unknown>
   followUp?: ActionFlow[]
@@ -23,7 +24,7 @@ type PayGainNodeOptions = {
 type PayThenActionFlowOptions = {
   cardId: string
   cost: Partial<Resource>
-  promptKey?: string
+  promptKey?: PromptKey
   action: ActionFlow
   choiceLabelKey?: string
   choiceLabelParams?: Record<string, unknown>
@@ -33,12 +34,12 @@ type ReturnToSpaceThenGainFlowOptions = {
   cardId: string
   cost: Partial<Resource>
   gain: CardGain
-  promptKey?: string
+  promptKey?: PromptKey
   choiceLabelKey?: string
 }
 
 const buildSequenceNode = (
-  promptKey: string | undefined,
+  promptKey: PromptKey | undefined,
   children: ActionFlow[],
   optional = false,
 ): SequenceFlow => ({

@@ -75,7 +75,7 @@ const sumPairs = (selected: string[]): Partial<Resource> => {
 const buildSelectionChoice = (needed: number) => ({
   type: 'request' as const,
   request: { kind: 'choice' as const, options: buildOptions() },
-  promptKey: 'ui.interactionWorkshopAssistantSelect',
+  promptKey: 'ui.interactionWorkshopAssistantSelect' as const,
   promptParams: { needed },
 })
 

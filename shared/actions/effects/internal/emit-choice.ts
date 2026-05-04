@@ -1,4 +1,5 @@
 import type { ActionChoiceOption, ActionDefinition } from '../../../game/types'
+import type { PromptKey } from '../../../game/prompt-keys'
 
 /**
  * `emit-choice` — a dedicated leaf action for cards that need to surface a
@@ -21,9 +22,9 @@ export const emitChoiceAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
   execute: ({ params }) => {
-    const options = (params as { options?: ActionChoiceOption[]; promptKey?: string } | undefined)?.options
+    const options = (params as { options?: ActionChoiceOption[]; promptKey?: PromptKey } | undefined)?.options
     if (Array.isArray(options) && options.length > 0) {
-      const promptKey = (params as { promptKey?: string } | undefined)?.promptKey
+      const promptKey = (params as { promptKey?: PromptKey } | undefined)?.promptKey
       return {
         type: 'request',
         request: { kind: 'choice', options },
