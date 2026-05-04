@@ -75,7 +75,7 @@ const computeArgsListener: CardListenerRegistration = {
   phases: ['computeArgs' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.result?.type !== 'choice') return
+    if (context.result?.type !== 'request' || context.result.request.kind !== 'choice') return
     if (context.sourceCard !== CARD_ID) return
     const extraOptions: ActionChoiceOption[] = context.state.actionSpaces
       .filter((space) =>

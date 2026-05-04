@@ -335,9 +335,9 @@ describe('engine follow-up actions', () => {
       gainPerRound: {},
       canBeExecutedByPlayer: () => true,
       execute: () => ({
-        type: 'choice' as const,
+        type: 'request' as const,
+        request: { kind: 'choice' as const, options: [{ value: 'opt-a', labelKey: 'A' }] },
         promptKey: 'choose',
-        options: [{ value: 'opt-a', labelKey: 'A' }],
       }),
       resolveChoice: () => {
         executed.push('resolveChoice')

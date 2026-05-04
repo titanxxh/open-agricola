@@ -811,9 +811,9 @@ export class Engine {
       return action.resolveChoice(executionContext, value, undefined)
     }
     return {
-      type: 'choice',
+      type: 'request',
+      request: { kind: 'choice', options: affordable },
       promptKey: action.choicePromptKey,
-      options: affordable,
     }
   }
 
@@ -1286,6 +1286,22 @@ export class Engine {
         node.resolve(result)
         let choiceOptions: ActionChoiceOption[]
         if (result.request.kind === 'choice') {
+          // computeArgs hook can inject extra options (e.g. D50 ForeignAid
+          // filter, A94 LazySowman extras). Skip when the action provides its
+          // own getBaseChoiceOptions builder (already authoritative).
+          if (!action.getBaseChoiceOptions) {
+            const argResults = this.hooks.computeArgs(
+              { ...executionContext, actionId: replacedActionId },
+              result,
+            )
+            const existingValues = new Set(result.request.options.map((o) => o.value))
+            const extraOptions = argResults
+              .flatMap((entry) => entry.extraOptions ?? [])
+              .filter((option) => option && !existingValues.has(option.value))
+            if (extraOptions.length > 0) {
+              result.request.options = [...result.request.options, ...extraOptions]
+            }
+          }
           choiceOptions = result.request.options
         } else if (result.request.kind === 'animal-reorg') {
           // Compatibility shim until Task 6/7 lifts GameCore detection off
@@ -1358,47 +1374,6 @@ export class Engine {
             options: choiceOptions,
           },
         }
-      }
-if (result.type === 'choice') {
-node.resolve(result)
-if (!action.getBaseChoiceOptions) {
-const argResults = this.hooks.computeArgs(
-{ ...executionContext, actionId: replacedActionId },
-result,
-)
-const existingValues = new Set(result.options.map((o) => o.value))
-const extraOptions = argResults
-.flatMap((entry) => entry.extraOptions ?? [])
-.filter((option) => option && !existingValues.has(option.value))
-if (extraOptions.length > 0) {
-result.options = [...result.options, ...extraOptions]
-          }
-        }
-        const choiceNode = this.findPairedInteractionNode(node) ?? this.findInteractionNode(this.tree.root)
-        if (choiceNode) {
-          choiceNode.setChoice(result.promptKey, result.options)
-          this.pendingInteractionNodeId = choiceNode.id
-          this.pendingInteractionActionId = replacedActionId
-          this.pendingInteractionOwnerNodeId = null
-        } else {
-          this.pendingInteractionNodeId = node.id
-          this.pendingInteractionActionId = replacedActionId
-          this.pendingInteractionOwnerNodeId = null
-        }
-        this.pendingInteractionContext = {
-          params: executionContext.params,
-          costs: executionContext.costs,
-          sourceCard: this.resolveChoiceSourceCard(executionContext.sourceCard, result.options),
-          actionContext: executionContext.actionContext,
-        }
-        if (duringActivateNodes.length > 0) {
-          this.tree.insertAfter(node.id, [...duringActivateNodes])
-        }
-return {
-type: 'choice',
-nodeId: this.pendingInteractionNodeId ?? node.id,
-choice: { promptKey: result.promptKey, promptParams: result.promptParams, options: result.options },
-}
       }
       this.findPairedInteractionNode(node)?.setState('resolved')
       if (result.type === 'ok' || result.type === 'flow') {
@@ -1634,11 +1609,12 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
         }
         const result = action.execute(executionContext)
         this.hooks.during({ ...executionContext, actionId }, result)
-        if (result.type === 'choice') {
+        if (result.type === 'request' && result.request.kind === 'choice') {
           child.resolve(result)
           const choiceNode = targetNode ? this.findInteractionNode(targetNode) : null
           if (choiceNode) {
-            choiceNode.setChoice(result.promptKey, result.options)
+            choiceNode.setChoice(result.promptKey, result.request.options)
+            choiceNode.request = result.request
             this.pendingInteractionNodeId = choiceNode.id
             this.pendingInteractionActionId = actionId
             this.pendingInteractionOwnerNodeId = node instanceof XorNode ? node.id : null
@@ -1650,19 +1626,19 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
           this.pendingInteractionContext = {
             params: executionContext.params,
             costs: executionContext.costs,
-            sourceCard: this.resolveChoiceSourceCard(executionContext.sourceCard, result.options),
+            sourceCard: this.resolveChoiceSourceCard(executionContext.sourceCard, result.request.options),
             actionContext: executionContext.actionContext,
           }
           const argResults = this.hooks.computeArgs(
             { ...executionContext, actionId },
             result,
           )
-          const existingValues = new Set(result.options.map((o) => o.value))
+          const existingValues = new Set(result.request.options.map((o) => o.value))
           const extraOptions = argResults
             .flatMap((entry) => entry.extraOptions ?? [])
             .filter((option) => option && !existingValues.has(option.value))
           if (extraOptions.length > 0) {
-            result.options = [...result.options, ...extraOptions]
+            result.request.options = [...result.request.options, ...extraOptions]
           }
           return result
         }
@@ -1770,7 +1746,7 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
       return { type: 'ok' }
     }
     this.hooks.during({ ...executionContext, actionId }, result)
-    if (result.type === 'choice') {
+    if (result.type === 'request' && result.request.kind === 'choice') {
       // Merge ActionDef-declared actionContext patches into pendingInteractionContext.actionContext.
       // Used by farm ActionDefs to persist payload (e.g. fence geometry) across payment-combo
       // second prompts. Shallow merge; later writes overwrite earlier.
@@ -1781,15 +1757,17 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
       const mergedActionContext = contextWritePatch
         ? { ...(executionContext.actionContext ?? {}), ...contextWritePatch }
         : executionContext.actionContext
+      const requestOptions = result.request.options
       if (this.pendingInteractionNodeId) {
         const node = this.tree.findNodeById(this.pendingInteractionNodeId)
         if (node instanceof InteractionNode) {
-          node.setChoice(result.promptKey, result.options)
+          node.setChoice(result.promptKey, requestOptions)
+          node.request = result.request
           this.pendingInteractionActionId = actionId
           this.pendingInteractionContext = {
             params: executionContext.params,
             costs: executionContext.costs,
-            sourceCard: this.resolveChoiceSourceCard(executionContext.sourceCard, result.options),
+            sourceCard: this.resolveChoiceSourceCard(executionContext.sourceCard, requestOptions),
             actionContext: mergedActionContext,
           }
           return result
@@ -1799,7 +1777,7 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
       this.pendingInteractionContext = {
         params: executionContext.params,
         costs: executionContext.costs,
-        sourceCard: this.resolveChoiceSourceCard(executionContext.sourceCard, result.options),
+        sourceCard: this.resolveChoiceSourceCard(executionContext.sourceCard, requestOptions),
         actionContext: mergedActionContext,
       }
       // Don't clear pendingInteractionActionId - the action still needs to resolve its choice

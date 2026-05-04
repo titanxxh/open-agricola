@@ -39,8 +39,13 @@ const computeArgsListener: CardListenerRegistration = {
     if (blocked.size === 0) return
     // Mutate the result options to filter out blocked spaces
     const result = context.result
-    if (result && result.type === 'choice' && Array.isArray(result.options)) {
-      result.options = result.options.filter(
+    if (
+      result
+      && result.type === 'request'
+      && result.request.kind === 'choice'
+      && Array.isArray(result.request.options)
+    ) {
+      result.request.options = result.request.options.filter(
         (opt) => !blocked.has(opt.value),
       )
     }

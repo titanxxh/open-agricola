@@ -17,13 +17,16 @@ export const selectionAction: ActionDefinition = {
         : 'ui.interactionSelection'
     const maxSelections = (actionContext?.maxSelections as number) ?? 1
     return {
-      type: 'choice',
+      type: 'request',
+      request: {
+        kind: 'choice',
+        options: [
+          { value: 'confirm', labelKey: 'ui.interactionSelectionConfirm' },
+          { value: 'cancel', labelKey: 'ui.interactionCancel' },
+        ],
+      },
       promptKey,
       promptParams: { maxSelections },
-      options: [
-        { value: 'confirm', labelKey: 'ui.interactionSelectionConfirm' },
-        { value: 'cancel', labelKey: 'ui.interactionCancel' },
-      ],
     }
   },
   resolveChoice: ({ player, sourceCard, actionContext, state }, choice) => {

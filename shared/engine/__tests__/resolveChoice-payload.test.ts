@@ -122,9 +122,9 @@ describe('engine resolveChoice payload', () => {
       gainPerRound: {},
       canBeExecutedByPlayer: () => true,
       execute: () => ({
-        type: 'choice',
+        type: 'request',
+        request: { kind: 'choice', options: [{ value: 'confirm', labelKey: 'ok' }] },
         promptKey: 'test',
-        options: [{ value: 'confirm', labelKey: 'ok' }],
       }),
       resolveChoice: (_ctx, _choice, payload) => {
         receivedPayload = payload
@@ -154,17 +154,17 @@ describe('engine resolveChoice payload', () => {
       gainPerRound: {},
       canBeExecutedByPlayer: () => true,
       execute: () => ({
-        type: 'choice',
+        type: 'request',
+        request: { kind: 'choice', options: [{ value: 'commit', labelKey: 'ok' }] },
         promptKey: 'test',
-        options: [{ value: 'commit', labelKey: 'ok' }],
       }),
       resolveChoice: (_ctx, choice) => {
         callCount += 1
         if (choice === 'commit') {
           return {
-            type: 'choice',
+            type: 'request',
+            request: { kind: 'choice', options: [{ value: 'pay:wood3', labelKey: 'ok' }] },
             promptKey: 'pay',
-            options: [{ value: 'pay:wood3', labelKey: 'ok' }],
             extraData: { actionContextWrite: { stashed: { foo: 42 } } },
           }
         }
@@ -191,24 +191,24 @@ describe('engine resolveChoice payload', () => {
       gainPerRound: {},
       canBeExecutedByPlayer: () => true,
       execute: () => ({
-        type: 'choice',
+        type: 'request',
+        request: { kind: 'choice', options: [{ value: 'a', labelKey: 'ok' }] },
         promptKey: 'test',
-        options: [{ value: 'a', labelKey: 'ok' }],
       }),
       resolveChoice: (_ctx, choice) => {
         if (choice === 'a') {
           return {
-            type: 'choice',
+            type: 'request',
+            request: { kind: 'choice', options: [{ value: 'b', labelKey: 'ok' }] },
             promptKey: 'b',
-            options: [{ value: 'b', labelKey: 'ok' }],
             extraData: { actionContextWrite: { x: 1, y: 2 } },
           }
         }
         if (choice === 'b') {
           return {
-            type: 'choice',
+            type: 'request',
+            request: { kind: 'choice', options: [{ value: 'c', labelKey: 'ok' }] },
             promptKey: 'c',
-            options: [{ value: 'c', labelKey: 'ok' }],
             extraData: { actionContextWrite: { y: 99, z: 3 } },
           }
         }

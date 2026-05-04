@@ -116,9 +116,9 @@ describe('Engine flow nodes', () => {
       gainPerRound: {},
       canBeExecutedByPlayer: () => true,
       execute: () => ({
-        type: 'choice',
+        type: 'request',
+        request: { kind: 'choice', options: [{ value: 'confirm', labelKey: 'ui.interactionRoomConfirm' }] },
         promptKey: 'ui.interactionRoomSelect',
-        options: [{ value: 'confirm', labelKey: 'ui.interactionRoomConfirm' }],
       }),
       resolveChoice: () => ({ type: 'ok' }),
     }
@@ -155,7 +155,7 @@ describe('Engine flow nodes', () => {
     expect(optionIds).toContain('seq-rooms')
     expect(optionIds).toContain('action-stables')
     const selectRooms = engine.resolveChoice('seq-rooms', { state, player, space })
-    expect(selectRooms.type).toBe('choice')
+    expect(selectRooms.type).toBe('request')
     const confirm = engine.resolveChoice('confirm', { state, player, space })
     expect(confirm.type).toBe('ok')
     const next = engine.proceed({ state, player, space })
@@ -220,9 +220,9 @@ describe('Engine flow nodes', () => {
       gainPerRound: {},
       canBeExecutedByPlayer: () => true,
       execute: () => ({
-        type: 'choice',
+        type: 'request',
+        request: { kind: 'choice', options: [{ value: 'confirm', labelKey: 'ui.interactionPlowConfirm' }] },
         promptKey: 'ui.interactionPlowSelect',
-        options: [{ value: 'confirm', labelKey: 'ui.interactionPlowConfirm' }],
       }),
       resolveChoice: () => ({ type: 'ok' }),
     }
@@ -261,7 +261,7 @@ describe('Engine flow nodes', () => {
     if (first.type !== 'choice') return
 
     const choosePlow = engine.resolveChoice('seq-plow', { state, player, space })
-    expect(choosePlow.type).toBe('choice')
+    expect(choosePlow.type).toBe('request')
 
     const confirm = engine.resolveChoice('confirm', { state, player, space })
     expect(confirm.type).toBe('ok')

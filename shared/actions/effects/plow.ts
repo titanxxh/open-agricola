@@ -125,12 +125,15 @@ export const plowAction: ActionDefinition = {
     canExecuteWithCostPreview(plowCostPreview, { state, player }),
   costPreview: plowCostPreview,
   execute: () => ({
-    type: 'choice',
+    type: 'request',
+    request: {
+      kind: 'choice',
+      options: [
+        { value: 'confirm', labelKey: 'ui.interactionPlowConfirm' },
+        { value: 'cancel', labelKey: 'ui.interactionPlowCancel' },
+      ],
+    },
     promptKey: 'ui.interactionPlowSelect',
-    options: [
-      { value: 'confirm', labelKey: 'ui.interactionPlowConfirm' },
-      { value: 'cancel', labelKey: 'ui.interactionPlowCancel' },
-    ],
   }),
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
     if (choice === 'cancel') return { type: 'ok' }
@@ -167,11 +170,12 @@ export const plowAction: ActionDefinition = {
         { type: 'fail', logKey: 'log.action' },
         'plow',
       )
-      if (payment.type === 'choice') {
+      if (payment.type === 'request') {
+        const options = payment.request.kind === 'choice' ? payment.request.options : []
         return {
-          type: 'choice',
+          type: 'request',
+          request: { kind: 'choice', options },
           promptKey: payment.promptKey,
-          options: payment.options ?? [],
           extraData: {
             actionContextWrite: { farmPayload: { tile: selectedTile } },
           },

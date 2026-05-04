@@ -125,9 +125,9 @@ describe('Engine tree flow', () => {
       gainPerRound: {},
       canBeExecutedByPlayer: () => true,
       execute: () => ({
-        type: 'choice',
+        type: 'request',
+        request: { kind: 'choice', options: [{ value: 'a', labelKey: 'a' }] },
         promptKey: 'choose',
-        options: [{ value: 'a', labelKey: 'a' }],
       }),
       resolveChoice: () => ({ type: 'ok' }),
     }

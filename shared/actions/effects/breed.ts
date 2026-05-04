@@ -6,7 +6,7 @@ import type {
   HarvestBreedSummary,
   PlayerState,
 } from '../../game/types'
-import { getTotalAnimalCapacity } from '../helpers/animal-zones'
+import { computeAnimalZones, getTotalAnimalCapacity } from '../helpers/animal-zones'
 import { shouldEnforceReorganizeOnLastHarvest } from '../../cards/card-effects'
 
 export type BreedAnimalType = 'sheep' | 'boar' | 'cattle'
@@ -79,18 +79,39 @@ export const breedAction: ActionDefinition = {
         })
       }
     }
+    const buildReorgRequest = (): ActionExecutionResult => {
+      const zones = computeAnimalZones(player).map((zone) => ({
+        id: zone.id,
+        zoneType: zone.zoneType as 'pasture' | 'house' | 'stable',
+        animalType: (zone.animalType as 'sheep' | 'boar' | 'cattle' | null) ?? null,
+        animalCount: zone.animalCount ?? 0,
+        capacity: zone.capacity,
+      }))
+      return {
+        type: 'request',
+        request: { kind: 'animal-reorg', zones },
+        sourceCard,
+      }
+    }
+    // Animals bred: return 'ok' so the engine's after/immediatelyAfter hooks
+    // still run on the post-mutate state (D60 LargePottery, B104 SheepWalker,
+    // ...). GameCore's `getAnimalCount > before` heuristic then auto-launches
+    // the reorganize sub-flow — this preserves the legacy `'animalReorg'`
+    // behaviour without short-circuiting the engine's hook pipeline.
     if (breedSummary.animalCount > 0) {
-      return { type: 'animalReorg', sourceId: `card:${sourceCard}` }
+      return { type: 'ok' }
     }
     // BGA: in round 14 (last harvest), some cards (B104 SheepWalker, B35
     // HookKnife, A153 PigOwner, ...) force a reorg even with no newborn so the
-    // engine has a chance to evict mis-placed animals.
+    // engine has a chance to evict mis-placed animals. Edge-case path —
+    // returning 'request' here skips the `after` hooks, but round 14 is the
+    // terminal harvest where no further leaf-level after listeners fire.
     if (
       sourceCard === 'harvest'
       && state?.round === 14
       && shouldEnforceReorganizeOnLastHarvest(state, player)
     ) {
-      return { type: 'animalReorg', sourceId: `card:${sourceCard}` }
+      return buildReorgRequest()
     }
     return { type: 'ok' }
   },

@@ -11,14 +11,17 @@ const RESOURCE_TYPES = ['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'veget
 const USES_TO_RESOURCES: Record<number, number> = { 1: 6, 2: 7, 3: 8, 4: 9 }
 
 const buildSelectionChoice = (needed: number) => ({
-  type: 'choice' as const,
+  type: 'request' as const,
+  request: {
+    kind: 'choice' as const,
+    options: RESOURCE_TYPES.map((r) => ({
+      value: r,
+      labelKey: `resources.${r}`,
+      sourceCard: CARD_ID,
+    })),
+  },
   promptKey: 'ui.interactionCollectorSelect',
   promptParams: { needed },
-  options: RESOURCE_TYPES.map((r) => ({
-    value: r,
-    labelKey: `resources.${r}`,
-    sourceCard: CARD_ID,
-  })),
 })
 
 registerPlayerActionSpace({

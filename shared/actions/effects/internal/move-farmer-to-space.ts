@@ -32,9 +32,12 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
     const spaces = state.actionSpaces.filter((s) => isSelectableSpace(s, excludeId, allowed))
     if (spaces.length === 0) return { type: 'fail', logKey: 'log.actionFail' }
     return {
-      type: 'choice',
+      type: 'request',
+      request: {
+        kind: 'choice',
+        options: spaces.map((s) => ({ value: s.id, labelKey: s.nameKey })),
+      },
       promptKey: 'ui.interactionMoveFarmerToSpace',
-      options: spaces.map((s) => ({ value: s.id, labelKey: s.nameKey })),
     }
   },
   resolveChoice: ({ state, player }, choice) => {

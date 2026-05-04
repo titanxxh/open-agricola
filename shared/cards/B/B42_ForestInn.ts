@@ -34,9 +34,9 @@ registerPlayerActionSpace({
       if (player.resources.wood >= 9) options.push({ value: '9', labelKey: 'ui.interactionForestInn9', sourceCard: CARD_ID })
       if (options.length === 0) return { type: 'ok' }
       return {
-        type: 'choice',
+        type: 'request',
+        request: { kind: 'choice', options },
         promptKey: 'ui.interactionForestInn',
-        options,
       }
     },
     resolveChoice: ({ player }, choice) => {

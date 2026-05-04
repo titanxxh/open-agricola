@@ -286,9 +286,9 @@ export const playOccupationAction: ActionDefinition = {
       return { type: 'ok' }
     }
     return {
-      type: 'choice',
+      type: 'request',
+      request: { kind: 'choice', options: playableOptions },
       promptKey: 'ui.interactionChooseOccupation',
-      options: playableOptions,
     }
   },
   // 7b1: rewrite as seq:[pay, apply-occupation-play]. The pay leaf wraps the

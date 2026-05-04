@@ -178,9 +178,9 @@ export const placeFarmerAction: ActionDefinition = {
       }
     })
     return {
-      type: 'choice',
+      type: 'request',
+      request: { kind: 'choice', options },
       promptKey: 'ui.interactionPlaceFarmerExtra',
-      options,
     }
   },
   resolveChoice: ({ state, player, sourceCard, actionContext }, choice) => {

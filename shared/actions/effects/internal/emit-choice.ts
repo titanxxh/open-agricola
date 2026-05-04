@@ -24,7 +24,11 @@ export const emitChoiceAction: ActionDefinition = {
     const options = (params as { options?: ActionChoiceOption[]; promptKey?: string } | undefined)?.options
     if (Array.isArray(options) && options.length > 0) {
       const promptKey = (params as { promptKey?: string } | undefined)?.promptKey
-      return { type: 'choice', promptKey, options }
+      return {
+        type: 'request',
+        request: { kind: 'choice', options },
+        promptKey,
+      }
     }
     return { type: 'ok' }
   },

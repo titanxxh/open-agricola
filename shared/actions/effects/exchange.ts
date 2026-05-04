@@ -495,9 +495,9 @@ export const anytimeExchangeAction: ActionDefinition = {
     }
 
     return {
-      type: 'choice' as const,
+      type: 'request' as const,
+      request: { kind: 'choice' as const, options: filtered },
       promptKey: 'ui.interactionExchangeChoice',
-      options: filtered,
     }
   },
   resolveChoice: ({ state, player, actionContext }, choice) =>

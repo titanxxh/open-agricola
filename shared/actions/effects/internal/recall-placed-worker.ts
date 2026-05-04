@@ -118,12 +118,15 @@ export const recallPlacedWorkerAction: ActionDefinition = {
     }
 
     return {
-      type: 'choice',
+      type: 'request',
+      request: {
+        kind: 'choice',
+        options: candidates.map((space) => ({
+          value: space.id,
+          labelKey: space.nameKey,
+        })),
+      },
       promptKey: 'ui.interactionRecallPlacedWorker',
-      options: candidates.map((space) => ({
-        value: space.id,
-        labelKey: space.nameKey,
-      })),
     }
   },
   resolveChoice: ({ state, player, params, sourceCard }, choice) => {
