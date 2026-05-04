@@ -59,6 +59,26 @@ export default defineConfig([
       }],
     },
   },
+  // S3 ADR-0006 invariant: effect layer must use PaymentSolver namespace,
+  // not the now-deleted helpers/{payment,pay-helpers,room-payment} shim.
+  // Files no longer exist; rule prevents accidental re-introduction.
+  {
+    files: ['shared/actions/effects/**/*.{ts,tsx}', 'shared/cards/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          {
+            group: [
+              '**/helpers/payment',
+              '**/helpers/pay-helpers',
+              '**/helpers/room-payment',
+            ],
+            message: 'Use PaymentSolver namespace from shared/actions/payment instead. See ADR-0006.',
+          },
+        ],
+      }],
+    },
+  },
   {
     files: ['server/**/*.{ts,tsx}'],
     ignores: ['server/**/__tests__/**'],
