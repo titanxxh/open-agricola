@@ -185,6 +185,11 @@ export class Engine {
     costs: ActionExecutionContext['costs']
     sourceCard: string | undefined
     actionContext: Record<string, unknown> | undefined
+    /** Optional ActionDef-declared actionContext patch (typically extracted
+     *  from `result.extraData.actionContextWrite`). When provided the helper
+     *  performs the shallow merge so all three call sites can stop repeating
+     *  the same boilerplate inline. */
+    contextWritePatch?: Record<string, unknown>
     /** When true, leave `pendingInteractionOwnerNodeId` untouched (used by
      *  the resolveChoice second-pass that wants to preserve the existing
      *  owner pointer). */
@@ -202,11 +207,14 @@ export class Engine {
     if (!args.preserveOwner) {
       this.pendingInteractionOwnerNodeId = ownerNodeId
     }
+    const mergedActionContext = args.contextWritePatch
+      ? { ...(args.actionContext ?? {}), ...args.contextWritePatch }
+      : args.actionContext
     this.pendingInteractionContext = {
       params: args.params,
       costs: args.costs,
       sourceCard: this.resolveChoiceSourceCard(args.sourceCard, choiceOptions),
-      actionContext: args.actionContext,
+      actionContext: mergedActionContext,
     }
   }
 
@@ -975,6 +983,34 @@ export class Engine {
       request?: import('../game/types').InteractionRequest
     } | null
   }) {
+    // Synthetic interaction-only frames (pushed by GameCore.startConfirm*/
+    // startFeedSubFlow) have a single InteractionNode at root. The cursor
+    // serializes them with `pendingInteractionActionId === '__interaction_only__'`
+    // and the InteractionNode's request in `choiceData`. Re-inject before the
+    // normal nodeStates pass so subsequent `nextUnresolved()` finds the same
+    // InteractionNode the original session held.
+    if (
+      snapshot.pendingInteractionActionId === '__interaction_only__' &&
+      snapshot.choiceData
+    ) {
+      const restored = new InteractionNode(
+        snapshot.choiceData.id,
+        snapshot.choiceData.choices,
+        snapshot.choiceData.request,
+      )
+      restored.promptKey = snapshot.choiceData.promptKey
+      this.injectInteraction(restored)
+      this.pendingInteractionContext = snapshot.pendingInteractionContext
+      // Replay the node state in case the interaction was already
+      // partially resolved before serialization.
+      const nodeStateEntry = snapshot.nodeStates.find(
+        (entry) => entry.id === snapshot.choiceData!.id,
+      )
+      if (nodeStateEntry) {
+        restored.setState(nodeStateEntry.state)
+      }
+      return
+    }
     const nodeMap = new Map(
       this.tree.allNodes().map((node) => [node.id, node]),
     )
@@ -1376,16 +1412,13 @@ export class Engine {
         // Mirror the resolveChoice second-pass: ActionDef-declared
         // actionContext patches in result.extraData.actionContextWrite are
         // shallow-merged into the pending-interaction context so subsequent
-        // prompts see the patched context. None of today's emitters use
-        // this path (the patches arrive on resolveChoice), but emitters in
-        // future tasks (S2/S3) may need it; mirror it here for symmetry.
+        // prompts see the patched context. The merge itself is delegated to
+        // `applyInteractionRequest` via `contextWritePatch` for parity with
+        // the XorNode follow-up branch and the resolveChoice second-pass.
         const contextWritePatch =
           result.extraData && typeof result.extraData === 'object'
             ? (result.extraData.actionContextWrite as Record<string, unknown> | undefined)
             : undefined
-        const mergedActionContext = contextWritePatch
-          ? { ...(executionContext.actionContext ?? {}), ...contextWritePatch }
-          : executionContext.actionContext
         let choiceOptions: ActionChoiceOption[]
         let updatedRequest: InteractionRequest = result.request
         if (result.request.kind === 'choice') {
@@ -1473,7 +1506,8 @@ export class Engine {
           params: executionContext.params,
           costs: executionContext.costs,
           sourceCard: executionContext.sourceCard ?? result.sourceCard,
-          actionContext: mergedActionContext,
+          actionContext: executionContext.actionContext,
+          contextWritePatch,
         })
         if (duringActivateNodes.length > 0) {
           this.tree.insertAfter(node.id, [...duringActivateNodes])
@@ -1742,6 +1776,16 @@ export class Engine {
           const updatedRequest: InteractionRequest = extraOptions.length > 0
             ? { ...result.request, options: mergedOptions }
             : result.request
+          // Carry-over (Task 7 reviewer S1): the XorNode follow-up branch
+          // previously skipped the actionContextWrite shallow-merge that the
+          // L1410 (main 'request') and L1899 (resolveChoice second-pass)
+          // branches already perform. Pass the patch via the
+          // applyInteractionRequest helper so all three sites share one
+          // implementation.
+          const contextWritePatch =
+            result.extraData && typeof result.extraData === 'object'
+              ? (result.extraData.actionContextWrite as Record<string, unknown> | undefined)
+              : undefined
           const choiceNode = targetNode ? this.findInteractionNode(targetNode) : null
           this.applyInteractionRequest({
             targetNode: choiceNode ?? null,
@@ -1755,6 +1799,7 @@ export class Engine {
             costs: executionContext.costs,
             sourceCard: executionContext.sourceCard,
             actionContext: executionContext.actionContext,
+            contextWritePatch,
           })
           return extraOptions.length > 0
             ? { ...result, request: updatedRequest }
@@ -1867,14 +1912,12 @@ export class Engine {
     if (result.type === 'request' && result.request.kind === 'choice') {
       // Merge ActionDef-declared actionContext patches into pendingInteractionContext.actionContext.
       // Used by farm ActionDefs to persist payload (e.g. fence geometry) across payment-combo
-      // second prompts. Shallow merge; later writes overwrite earlier.
+      // second prompts. The shallow merge itself happens inside
+      // `applyInteractionRequest` so all three sites share one implementation.
       const contextWritePatch =
         result.extraData && typeof result.extraData === 'object'
           ? (result.extraData.actionContextWrite as Record<string, unknown> | undefined)
           : undefined
-      const mergedActionContext = contextWritePatch
-        ? { ...(executionContext.actionContext ?? {}), ...contextWritePatch }
-        : executionContext.actionContext
       const requestOptions = result.request.options
       const existingNode = this.pendingInteractionNodeId
         ? this.tree.findNodeById(this.pendingInteractionNodeId)
@@ -1895,7 +1938,8 @@ export class Engine {
         params: executionContext.params,
         costs: executionContext.costs,
         sourceCard: executionContext.sourceCard,
-        actionContext: mergedActionContext,
+        actionContext: executionContext.actionContext,
+        contextWritePatch,
       })
       // Don't clear pendingInteractionActionId — the action still needs to resolve its choice.
       return result

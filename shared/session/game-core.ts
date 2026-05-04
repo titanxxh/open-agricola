@@ -3,6 +3,7 @@ import type {
   ActionSpace,
   AnytimeAction,
   FarmTilePosition,
+  FeedQueueEntry,
   GameState,
   InteractionFarmSelection,
   InteractionSelection,
@@ -132,6 +133,21 @@ const SUBFLOW_SPACE_PREFIX = '__subflow:' as const
 
 const subflowSpaceId = (reason: SubFlowReason): string =>
   `${SUBFLOW_SPACE_PREFIX}${reason}`
+
+/**
+ * Selection payload sent by the client to resolve a pending `harvestFeed`
+ * interaction. Each entry references one row of `card.exchanges[]` via
+ * `(sourceId, exchangeIndex)`; `count` is the requested number of times to
+ * apply the exchange (subject to per-card `max` capping).
+ */
+export type FeedSelection = {
+  count: number
+  sourceName?: string
+  sourceId: string
+  /** Entry-index pointer into card.exchanges[] (D3 unified path). */
+  exchangeIndex: number
+}
+export type FeedSelections = FeedSelection[]
 
 type HistoryEntry = {
   state: GameState
@@ -386,11 +402,38 @@ export class GameCore {
       engine.restore(snapshot)
       return engine
     })
+    // Capture the pre-`runEngineSteps` interaction node id so the dev-only
+    // assert below can detect a non-idempotent `proceed()` (Task 8 reviewer
+    // Important): if `runEngineSteps` advances the interaction node out from
+    // under the freshly-restored cursor we silently lose the client's
+    // already-shown prompt and the next ServerEvent surfaces a different
+    // request. The assert is a cheap canary — it has no production cost
+    // because the comparison is a string equality.
+    const preRestoreNodeId = this.engineStack.peekInteraction()?.id ?? null
     // Re-derive `this.pending` from the restored engine state. The engine's
     // `proceed` is idempotent for already-pending interactions: it re-emits
     // `step.type === 'choice'` for unresolved InteractionNodes, which lets
     // `runEngineSteps` rebuild the corresponding `PendingAction` shape.
     this.runEngineSteps()
+    // Cross-platform NODE_ENV check that works in both Node (server) and
+    // browser (esbuild-style `process.env.NODE_ENV` replacement). Vite/Rollup
+    // shim `process.env.NODE_ENV` for browser bundles, while Node has the
+    // real `process`; both expose the value via this guarded access.
+    const env =
+      (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV
+    if (env !== 'production') {
+      const postRestoreNodeId = this.engineStack.peekInteraction()?.id ?? null
+      if (
+        preRestoreNodeId !== null &&
+        postRestoreNodeId !== null &&
+        preRestoreNodeId !== postRestoreNodeId
+      ) {
+        throw new Error(
+          `non-idempotent proceed detected during restoreEngineStackFromCursor: ` +
+            `pre=${preRestoreNodeId} post=${postRestoreNodeId}`,
+        )
+      }
+    }
   }
 
   private syncDynamicActionSpaces() {
@@ -585,6 +628,112 @@ export class GameCore {
       reason: 'reorganize',
     })
     this.runEngineSteps()
+  }
+
+  /**
+   * Synthetic frame factory used by the start*-confirm/start*-feed triggers.
+   * Pushes an `__interaction_only__` leaf flow frame, then immediately
+   * `injectInteraction(node)` so the engine yields the request via
+   * `peekInteraction()`. Frame deserialization (cursor round-trip) recreates
+   * the same shape via `Engine.restore`'s synthetic-frame branch.
+   */
+  private pushInteractionFrame(
+    node: InteractionNode,
+    ownerPlayerIndex: number,
+    reason: SubFlowReason,
+  ): void {
+    const flow: ActionFlow = { type: 'leaf', actionId: '__interaction_only__' }
+    const engine = this.createFlowEngine(flow)
+    engine.injectInteraction(node)
+    this.engineStack.push({
+      engine,
+      source: { kind: 'flow', flow },
+      ownerPlayerIndex,
+      spaceId: subflowSpaceId(reason),
+      stageResume: null,
+      deferredPlayerSwitch: null,
+      reason,
+    })
+  }
+
+  private nextSyntheticNodeId(prefix: string): string {
+    return `${prefix}-${this.nextActionToken++}`
+  }
+
+  /**
+   * Promote `confirmNextPlayer` from the legacy `state.pending` model to an
+   * InteractionNode hosted by a synthetic engine-stack frame. After Task 9
+   * the three sites that used to write `this.pending = { type:
+   * 'confirmNextPlayer', ... }` call this instead. The accompanying
+   * `handleConfirmNextPlayerResolved` resolves it via `resolveChoice`.
+   */
+  private startConfirmNextPlayer(nextPlayerIndex: number): void {
+    // confirmNextPlayer is only emitted after `engineStack.clear()` in
+    // finishCompletedActionTurn / continueAfterReorganize_roundEnd, so we
+    // always push a fresh synthetic frame.
+    const node = new InteractionNode(
+      this.nextSyntheticNodeId('interaction:confirm-next-player'),
+      [{ value: 'confirm', labelKey: 'ui.interactionConfirm' }],
+      { kind: 'confirm-next-player', nextPlayerIndex },
+    )
+    node.promptKey = 'ui.confirmNextPlayer'
+    this.pushInteractionFrame(node, nextPlayerIndex, 'confirm-next-player')
+    // Mirror the old code path: keep `this.pending` populated so today's
+    // `buildInteraction()` (still pending-driven; rewritten by Task 10)
+    // surfaces the same `confirmNextPlayer` stateId to the frontend without
+    // any client-side change.
+    this.pending = { type: 'confirmNextPlayer', nextPlayerIndex }
+  }
+
+  /**
+   * Mirror of `startConfirmNextPlayer` for the `playerSwitch` flow node /
+   * deferredPlayerSwitch detour. Leaves the outer engine frame intact
+   * underneath so resolution can pop only the synthetic prompt frame and
+   * resume the parent action.
+   */
+  private startConfirmPlayerSwitch(
+    fromPlayerIndex: number,
+    toPlayerIndex: number,
+  ): void {
+    const node = new InteractionNode(
+      this.nextSyntheticNodeId('interaction:confirm-player-switch'),
+      [{ value: 'confirm', labelKey: 'ui.interactionConfirm' }],
+      { kind: 'confirm-player-switch', fromPlayerIndex, toPlayerIndex },
+    )
+    node.promptKey = 'ui.confirmPlayerSwitch'
+    this.pushInteractionFrame(node, toPlayerIndex, 'confirm-player-switch')
+    this.pending = {
+      type: 'confirmPlayerSwitch',
+      fromPlayerIndex,
+      toPlayerIndex,
+    }
+  }
+
+  /**
+   * Promote `harvestFeed` to an InteractionNode-hosted sub-flow. Each player
+   * in the feed queue gets a fresh synthetic frame (recursively pushed by
+   * `handleFeedResolved` once the previous player's selections apply).
+   */
+  private startFeedSubFlow(
+    playerIndex: number,
+    remaining: number,
+    foodUsed: number,
+    feedQueue?: FeedQueueEntry[],
+  ): void {
+    const node = new InteractionNode(
+      this.nextSyntheticNodeId('interaction:feed'),
+      [{ value: 'confirm', labelKey: 'ui.interactionConfirm' }],
+      { kind: 'feed', remaining, foodUsed, feedQueue },
+    )
+    node.promptKey = 'ui.harvestFeed'
+    this.pushInteractionFrame(node, playerIndex, 'feed')
+    this.pending = {
+      type: 'harvestFeed',
+      playerIndex,
+      remaining,
+      foodUsed,
+      feedQueue,
+    }
   }
 
   private createEngine(actionId: string): Engine {
@@ -1465,10 +1614,10 @@ export class GameCore {
     const allWorkersUsed = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)
     if (!allWorkersUsed) {
       const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
-      this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
+      this.startConfirmNextPlayer(next)
     } else {
       const startIdx = this.state.players.findIndex((p) => p.startPlayer)
-      this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: startIdx === -1 ? 0 : startIdx }
+      this.startConfirmNextPlayer(startIdx === -1 ? 0 : startIdx)
     }
     return this.respond()
   }
@@ -1620,13 +1769,12 @@ export class GameCore {
 
     if (feedQueue.length > 0) {
       const first = feedQueue[0]!
-      this.pending = {
-        type: 'harvestFeed',
-        playerIndex: first.index,
-        remaining: first.remaining,
-        foodUsed: first.foodUsed,
-        feedQueue: feedQueue.slice(1),
-      }
+      this.startFeedSubFlow(
+        first.index,
+        first.remaining,
+        first.foodUsed,
+        feedQueue.slice(1),
+      )
       return this.respond()
     }
 
@@ -1707,7 +1855,7 @@ export class GameCore {
     const allUsed = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)
     if (!allUsed) {
       const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
-      this.pending = { type: 'confirmNextPlayer', nextPlayerIndex: next }
+      this.startConfirmNextPlayer(next)
     }
   }
 
@@ -1913,12 +2061,9 @@ export class GameCore {
         // Lazy confirmation: if we silently switched players and now hit a choice,
         // show confirmPlayerSwitch first. The InteractionNode stays unresolved in the engine.
         if (frame.deferredPlayerSwitch) {
-          this.pending = {
-            type: 'confirmPlayerSwitch',
-            fromPlayerIndex: frame.deferredPlayerSwitch.fromPlayerIndex,
-            toPlayerIndex: frame.deferredPlayerSwitch.toPlayerIndex,
-          }
+          const { fromPlayerIndex, toPlayerIndex } = frame.deferredPlayerSwitch
           frame.deferredPlayerSwitch = null
+          this.startConfirmPlayerSwitch(fromPlayerIndex, toPlayerIndex)
           return
         }
         if (step.choice.options.length === 1) {
@@ -2376,11 +2521,45 @@ export class GameCore {
     return this.respond()
   }
 
+  /**
+   * Unified entry-point for resolving any InteractionNode hosted on the
+   * engineStack. Dispatches on the top-of-stack InteractionRequest's `kind`
+   * discriminator so the legacy `confirmNextPlayer` / `confirmPlayerSwitch` /
+   * `confirmHarvestFeed` / `commitAnimalReorg` paths collapse into one
+   * client-facing call. Falls back to the legacy `state.pending`-driven
+   * `resolvePendingChoice` for plain `choice` interactions (still the path
+   * for ChoiceNode emissions that haven't been promoted to typed requests).
+   */
   resolveChoice(
     playerIndex: number,
     value: string,
     payload?: Record<string, unknown>,
   ): SessionResponse {
+    const node = this.engineStack.peekInteraction()
+    const request = node?.request
+    if (request) {
+      switch (request.kind) {
+        case 'confirm-next-player':
+          return this.handleConfirmNextPlayerResolved(request.nextPlayerIndex)
+        case 'confirm-player-switch':
+          return this.handleConfirmPlayerSwitchResolved(request.toPlayerIndex)
+        case 'feed': {
+          const sels = (payload as { selections?: FeedSelections } | undefined)?.selections
+            ?? (Array.isArray(payload) ? (payload as unknown as FeedSelections) : [])
+          return this.handleFeedResolved(playerIndex, sels)
+        }
+        case 'animal-reorg':
+        case 'choice':
+          // animal-reorg today still flows through the legacy commit pathway;
+          // plain choice (ChoiceNode-emitted requests not yet typed) follows
+          // the existing options-driven pending model.
+          return this.resolvePendingChoice(playerIndex, value, true, payload)
+        default: {
+          const _exhaustive: never = request
+          return this.respond(false, `unhandled interaction kind: ${JSON.stringify(_exhaustive)}`)
+        }
+      }
+    }
     return this.resolvePendingChoice(playerIndex, value, true, payload)
   }
 
@@ -2403,15 +2582,24 @@ export class GameCore {
     return this.respond()
   }
 
+  /**
+   * Public adapter retained during the Task 9 transitional period: forwards to
+   * the InteractionNode-aware {@link handleFeedResolved}. Task 11 will codemod
+   * call sites to {@link resolveChoice} and this method can then be removed.
+   */
   confirmHarvestFeed(
     playerIndex: number,
-    selections: {
-      count: number
-      sourceName?: string
-      sourceId: string
-      /** Entry-index pointer into card.exchanges[] (D3 unified path). */
-      exchangeIndex: number
-    }[],
+    selections: FeedSelections,
+  ): SessionResponse {
+    if (this.pending.type !== 'harvestFeed' || this.pending.playerIndex !== playerIndex) {
+      return this.respond(false, 'no pending feed')
+    }
+    return this.handleFeedResolved(playerIndex, selections)
+  }
+
+  private handleFeedResolved(
+    playerIndex: number,
+    selections: FeedSelections,
   ): SessionResponse {
     if (this.pending.type !== 'harvestFeed' || this.pending.playerIndex !== playerIndex) {
       return this.respond(false, 'no pending feed')
@@ -2534,39 +2722,70 @@ export class GameCore {
     this.logHarvestResourceEntry('log.harvestFeedDetail', player, usedResources)
 
     const feedQueue = this.pending.feedQueue ?? []
+    // Pop the current feed synthetic frame before either pushing the next
+    // player's frame (queue still has entries) or returning to the breed
+    // phase (queue empty). Without this pop the engineStack would accumulate
+    // one residual `__interaction_only__` frame per resolved player.
+    const top = this.engineStack.current()
+    if (top?.reason === 'feed') this.engineStack.pop()
     if (feedQueue.length > 0) {
       const next = feedQueue[0]!
-      this.pending = { 
-        type: 'harvestFeed', 
-        playerIndex: next.index, 
-        remaining: next.remaining,
-        foodUsed: next.foodUsed,
-        feedQueue: feedQueue.slice(1)
-      }
+      this.startFeedSubFlow(
+        next.index,
+        next.remaining,
+        next.foodUsed,
+        feedQueue.slice(1),
+      )
       return this.respond()
     }
 
+    this.pending = { type: 'none' }
     return this.startBreedPhase()
   }
 
+  /**
+   * Public adapter retained during the Task 9 transitional period: forwards
+   * to {@link handleConfirmPlayerSwitchResolved}. Task 11 will codemod the
+   * call sites to {@link resolveChoice} and the adapter can then be removed.
+   */
   confirmPlayerSwitch(): SessionResponse {
     if (this.pending.type !== 'confirmPlayerSwitch') return this.respond(false, 'no pending player switch')
+    return this.handleConfirmPlayerSwitchResolved(this.pending.toPlayerIndex)
+  }
+
+  private handleConfirmPlayerSwitchResolved(toPlayerIndex: number): SessionResponse {
     this.pushHistory(false, true)
-    const frame = this.engineStack.current()
-    if (frame) {
-      frame.ownerPlayerIndex = this.pending.toPlayerIndex
-      frame.deferredPlayerSwitch = null
+    // Pop the synthetic confirm-player-switch frame; the parent action frame
+    // beneath it must remain so the deferred sub-flow can resume.
+    const top = this.engineStack.current()
+    if (top?.reason === 'confirm-player-switch') this.engineStack.pop()
+    const parent = this.engineStack.current()
+    if (parent) {
+      parent.ownerPlayerIndex = toPlayerIndex
+      parent.deferredPlayerSwitch = null
     }
     this.pending = { type: 'none' }
     this.runEngineSteps()
     return this.respond()
   }
 
+  /**
+   * Public adapter retained during the Task 9 transitional period: forwards
+   * to {@link handleConfirmNextPlayerResolved}. Task 11 will codemod the call
+   * sites to {@link resolveChoice} and the adapter can then be removed.
+   */
   confirmNextPlayer(): SessionResponse {
     if (this.pending.type !== 'confirmNextPlayer') return this.respond(false, 'no pending transition')
+    return this.handleConfirmNextPlayerResolved(this.pending.nextPlayerIndex)
+  }
+
+  private handleConfirmNextPlayerResolved(nextPlayerIndex: number): SessionResponse {
     this.pushHistory()
-    this.state.currentPlayerIndex = this.pending.nextPlayerIndex
+    this.state.currentPlayerIndex = nextPlayerIndex
     this.pending = { type: 'none' }
+    // Clear engine state — the synthetic confirm-next-player frame is the only
+    // frame on the stack at this point (parent was already cleared by the
+    // caller before `startConfirmNextPlayer` pushed us).
     this.engineStack.clear()
     this.actionStartIndex = null
     this.history = [] // Clear undo history when switching players
