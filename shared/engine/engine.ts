@@ -113,15 +113,18 @@ export class Engine {
    * but the engine has just computed it. Cleared whenever the engine resolves
    * the pending choice or transitions to a non-choice step.
    *
-   * Note: this field is intentionally NOT persisted in {@link snapshot} /
-   * {@link restore}. Cursor round-trip leaves the cache empty; a fresh
-   * `proceed()` after rehydrate will re-emit the same `type: 'choice'` step
-   * and re-populate the cache. GameCore tolerates a missing cache by also
-   * checking `peekInteraction()`.
+   * Persistence: this field IS persisted in {@link snapshot} / {@link restore}
+   * so OrNode / XorNode / OptionalNode pending choices survive cursor
+   * round-trip and undo restoreHistory. Without persistence,
+   * `getCurrentPending` would return `'none'` after restore even though
+   * `pendingInteractionNodeId` still points at a composite node. GameCore
+   * additionally tolerates a missing cache by falling back to
+   * `peekInteraction()`.
    */
   private lastEmittedChoice: {
     nodeId: string
     promptKey?: string
+    promptParams?: Record<string, unknown>
     options: ActionChoiceOption[]
   } | null = null
 
@@ -132,6 +135,7 @@ export class Engine {
   peekPendingChoiceFromComposite(): {
     nodeId: string
     promptKey?: string
+    promptParams?: Record<string, unknown>
     options: ActionChoiceOption[]
   } | null {
     if (this.pendingInteractionNodeId === null) return null
@@ -1039,6 +1043,7 @@ export class Engine {
     lastEmittedChoice?: {
       nodeId: string
       promptKey?: string
+      promptParams?: Record<string, unknown>
       options: ActionChoiceOption[]
     } | null
   }) {

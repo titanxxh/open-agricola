@@ -1147,7 +1147,7 @@ export class GameCore {
     const spaceId = frame.spaceId
     const request = node?.request
     const promptKey = node?.promptKey ?? composite?.promptKey
-    const promptParams: Record<string, unknown> | undefined = undefined
+    const promptParams = node?.promptParams ?? composite?.promptParams
     const ctx = frame.engine.getPendingInteractionContext()
     const sourceCard = ctx?.sourceCard
     const costOverride = frame.engine.getLastComputedCosts()
