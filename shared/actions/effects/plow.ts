@@ -20,7 +20,7 @@ import { addCardResourceGained } from '../../cards/helpers/card-state'
 import {
   executeResolvedTypedFlatPayment,
   resolveTypedFlatPaymentSelection,
-} from '../helpers/pay-helpers'
+} from '../payment/internal'
 
 const getOccupiedKeys = (player: PlayerState) => {
   const keys = new Set<string>()

@@ -9,7 +9,7 @@ import {
   applyCostModifiers,
   computeAllBuyableCombinations,
   clearPaymentCache,
-} from '../payment'
+} from '../../payment/internal'
 
 beforeEach(() => {
   clearPaymentCache()

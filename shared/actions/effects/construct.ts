@@ -17,7 +17,7 @@ import {
   getBuildRoomCost,
   getMaxBuildableRooms,
   resolveRoomPaymentSelection,
-} from '../helpers/room-payment'
+} from '../payment/internal'
 import { validateRoomSelection } from '../../logic/farm/validators'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { addCardResourceGained } from '../../cards/helpers/card-state'

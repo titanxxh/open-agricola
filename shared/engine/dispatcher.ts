@@ -12,7 +12,7 @@ import {
 } from '../actions/hooks'
 import { getMatchingListeners, executeCardListener, type MatchedCardListener, type CardListenerContext } from '../cards/card-listeners'
 import { resolveActionPreviewCost } from '../actions/helpers/cost-preview'
-import { canPayResources } from '../actions/helpers/payment'
+import { canPayResources } from '../actions/payment/internal'
 
 export type EffectPhaseResult = {
   actionHookResults: ActionHookResult[]

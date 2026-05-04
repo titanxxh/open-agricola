@@ -17,12 +17,12 @@ import type { PaymentCtx } from '../payment'
 import {
   executePaymentSolution,
   payResources,
-} from '../helpers/payment'
+} from '../payment/internal'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
 import {
   payTypedFlatCostDetailed,
   resolveCostPaymentSelection,
-} from '../helpers/pay-helpers'
+} from '../payment/internal'
 
 /**
  * Construct a minimal GameState wrapping a single player. Used by

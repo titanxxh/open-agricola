@@ -5,7 +5,7 @@ import {
   payCardPreviewCostByProvider,
   payTypedFlatCost,
   resolveCardPreviewCostByProvider,
-} from '../helpers/pay-helpers'
+} from '../payment/internal'
 // PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
 // the new payment module. Other helpers (preview-cost / typed-flat /
 // room-payment / cost-modifier internals) remain on the shim through S3.

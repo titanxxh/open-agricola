@@ -7,7 +7,7 @@ import {
 import {
   stubBonusChoiceModifier,
 } from '../Stub_BonusChoiceModifier'
-import { resolveCardCostWithModifiers } from '../../../actions/helpers/pay-helpers'
+import { resolveCardCostWithModifiers } from '../../../actions/payment/internal'
 import { PaymentSolver } from '../../../actions/payment'
 import { computeAllBuyableCombinations } from '../../../actions/payment/internal'
 import type { GameState, PlayerState, ComplexCost } from '../../../game/types'

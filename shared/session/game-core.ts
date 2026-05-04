@@ -93,7 +93,7 @@ import {
 } from '../cards/basic-conversion.ts'
 import {
   applyTradeSideEffect,
-} from '../actions/helpers/payment'
+} from '../actions/payment/internal'
 import {
   isMajorImprovementPlayable,
   isMinorImprovementPlayable,

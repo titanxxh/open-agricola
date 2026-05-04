@@ -14,7 +14,7 @@ import type {
 // room-payment / cost-modifier internals) remain on the shim through S3.
 // exchange.ts only uses applyTradeSideEffect (shim scope), so no PaymentSolver
 // call sites exist here yet.
-import { applyTradeSideEffect } from '../helpers/payment'
+import { applyTradeSideEffect } from '../payment/internal'
 import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
 import { addFoodFromConversion, incResourceConverted } from '../../logic/stats'
 import {
