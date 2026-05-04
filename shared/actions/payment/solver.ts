@@ -8,7 +8,6 @@ import type {
 } from './types'
 import {
   computeAllBuyableCombinations,
-  canPayCost,
   isComplexCost,
   canPayResources,
   payResources,
@@ -44,8 +43,7 @@ const canAfford = (
   if (!isComplexCost(cost)) {
     return canPayResources(player, cost as Parameters<typeof canPayResources>[1])
   }
-  const costTypeArg = ctx.costType === 'none' ? undefined : ctx.costType
-  return canPayCost(player, cost, costTypeArg)
+  return computeOptions(state, idx, cost, ctx).length > 0
 }
 
 const execute = (
