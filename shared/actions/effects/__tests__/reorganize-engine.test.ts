@@ -8,7 +8,7 @@ import type {
 } from '../../../game/types'
 
 const dummySpace: ActionSpace = {
-  id: '__reorganize__',
+  id: '__subflow:reorganize',
   nameKey: '',
   kind: 'synthetic',
 } as unknown as ActionSpace

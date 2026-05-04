@@ -34,7 +34,7 @@ import {
   SequenceNode,
   XorNode,
 } from '../engine/index.ts'
-import type { EngineNode, EngineSource } from '../engine/index.ts'
+import type { EngineNode, EngineSource, SubFlowReason } from '../engine/index.ts'
 import {
   createInitialState,
   createRoundOpenById,
@@ -121,6 +121,17 @@ import { addWorkerRef, isSpaceOccupied, removeWorkerRef } from '../game/space.ts
 import { smallestAvailableWorker } from '../game/player.ts'
 import { computeAllowedPlacementSpaces } from '../actions/helpers/placement-availability.ts'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../actions/helpers/placement-constants.ts'
+
+/**
+ * Synthetic action-space ID prefix for sub-flow frames pushed onto the
+ * engine stack (e.g. reorganize, future feed/confirm sub-flows). Centralised
+ * here so `getSpaceById` can recognise sub-flow IDs without matching every
+ * leading underscore.
+ */
+const SUBFLOW_SPACE_PREFIX = '__subflow:' as const
+
+const subflowSpaceId = (reason: SubFlowReason): string =>
+  `${SUBFLOW_SPACE_PREFIX}${reason}`
 
 type HistoryEntry = {
   state: GameState
@@ -506,7 +517,7 @@ export class GameCore {
       engine: this.createFlowEngine(flow),
       source: { kind: 'flow', flow },
       ownerPlayerIndex: playerIndex,
-      spaceId: '__reorganize__',
+      spaceId: subflowSpaceId('reorganize'),
       stageResume: {
         hook: 'onReorganizeComplete',
         playerIndex,
@@ -645,7 +656,9 @@ export class GameCore {
   private getSpaceById(spaceId: string | null): ActionSpace | null {
     if (!spaceId) return null
     return this.state.actionSpaces.find((item) => item.id === spaceId)
-      ?? (spaceId.startsWith('__') ? this.createSyntheticSpace(spaceId) : null)
+      ?? (spaceId.startsWith(SUBFLOW_SPACE_PREFIX) || spaceId.startsWith('__stage:')
+        ? this.createSyntheticSpace(spaceId)
+        : null)
   }
 
   private getPlayerEffectCardIds(player: PlayerState) {
@@ -769,7 +782,11 @@ export class GameCore {
     if (this.pending.type === 'harvestFeed') {
       return []
     }
-    if (this.pending.type === 'choice' && this.pending.promptKey === 'ui.interactionAnimalReorg') {
+    // Suppress anytime entries while a reorganize sub-flow is awaiting input.
+    // Detect via the InteractionNode's typed `request.kind` (R2 strong-typing)
+    // instead of the legacy `promptKey === 'ui.interactionAnimalReorg'` literal.
+    const interactionNode = this.engineStack.peekInteraction()
+    if (interactionNode?.request?.kind === 'animal-reorg') {
       return []
     }
     // Suppress anytime actions during sub-choice resolution (e.g. bake-bread, exchange)
@@ -848,8 +865,14 @@ export class GameCore {
   }
 
   private buildInteraction(): InteractionState {
-    // Fast paths: skip expensive anytime/farm computation for states that don't need them
-    if (this.pending.type === 'choice' && this.pending.promptKey === 'ui.interactionAnimalReorg') {
+    // Fast paths: skip expensive anytime/farm computation for states that don't need them.
+    // Detect reorganize sub-flow via the typed InteractionNode.request.kind
+    // (R2 strong-typing) instead of the legacy promptKey literal.
+    const interactionNode = this.engineStack.peekInteraction()
+    if (
+      interactionNode?.request?.kind === 'animal-reorg'
+      && this.pending.type === 'choice'
+    ) {
       const player = this.state.players[this.pending.playerIndex]
       return {
         stateId: 'animalReorg',
@@ -1689,35 +1712,53 @@ export class GameCore {
       case 'onBreedPhase':
         this.continueEndHarvestEffects()
         return
-      case 'onReorganizeComplete': {
-        const trigger = stageResume.extra?.trigger ?? 'anytime'
-        if (trigger === 'returning-home') {
-          return this.continueAfterReorganize_returningHome(stageResume.playerIndex)
-        }
-        if (trigger === 'harvest-breed') {
-          return this.continueAfterReorganize_harvestBreed(stageResume.playerIndex)
-        }
-        if (trigger === 'round-end') {
-          return this.continueAfterReorganize_roundEnd(
-            stageResume.playerIndex,
-            stageResume.extra?.originPlayerIndex ?? null,
-          )
-        }
-        // After Task 6: the reorganize frame has already been popped in
-        // runEngineSteps' done/blocked branch. If a parent frame remains on
-        // the stack, we are returning from an "anytime" sub-flow detour
-        // (formerly the `pausedEngine` save/restore path) — just resume the
-        // parent engine.
-        if (this.engineStack.depth() > 0) {
-          this.runEngineSteps()
-          return
-        }
+      case 'onReorganizeComplete':
+        return this.continueAfterSubFlow(stageResume)
+    }
+  }
+
+  /**
+   * Umbrella resume entry-point for sub-flow frames that complete via stage
+   * resume. Today only `onReorganizeComplete` flows through here — it
+   * dispatches to one of the trigger-specific continueAfterReorganize_*
+   * helpers based on `extra.trigger`. Future sub-flows (feed, confirm) will
+   * register their own switch arms here as Task 9 introduces them.
+   *
+   * For non-reorganize hooks, callers continue to use `resumeStageFlow`
+   * directly (those branches are not stack-aware sub-flows yet).
+   */
+  private continueAfterSubFlow(stageResume: StageResumeState) {
+    if (stageResume.hook === 'onReorganizeComplete') {
+      const trigger = stageResume.extra?.trigger ?? 'anytime'
+      if (trigger === 'returning-home') {
+        return this.continueAfterReorganize_returningHome(stageResume.playerIndex)
+      }
+      if (trigger === 'harvest-breed') {
+        return this.continueAfterReorganize_harvestBreed(stageResume.playerIndex)
+      }
+      if (trigger === 'round-end') {
         return this.continueAfterReorganize_roundEnd(
           stageResume.playerIndex,
           stageResume.extra?.originPlayerIndex ?? null,
         )
       }
+      // 'anytime': the reorganize frame has already been popped in
+      // runEngineSteps' done/blocked branch. If a parent frame remains on
+      // the stack, we are returning from an "anytime" sub-flow detour
+      // (formerly the `pausedEngine` save/restore path) — just resume the
+      // parent engine.
+      if (this.engineStack.depth() > 0) {
+        this.runEngineSteps()
+        return
+      }
+      return this.continueAfterReorganize_roundEnd(
+        stageResume.playerIndex,
+        stageResume.extra?.originPlayerIndex ?? null,
+      )
     }
+    // Fall-through: delegate to the legacy stage flow resolver for hooks
+    // that have not (yet) been migrated to the sub-flow umbrella model.
+    this.resumeStageFlow(stageResume)
   }
 
   private runEngineSteps(): void {
@@ -1793,7 +1834,7 @@ export class GameCore {
         // request field and pivot to the same anytime sub-flow path the
         // legacy 'animalReorg' result took. After Task 6 we leave the parent
         // frame on the stack and push a reorganize sub-flow frame.
-        const interaction = frame.engine.peekInteraction()
+        const interaction = this.engineStack.peekInteraction()
         const isReorgSubFlow =
           frame.source.kind === 'flow'
           && (frame.source.flow as { actionId?: string }).actionId === 'reorganize'
