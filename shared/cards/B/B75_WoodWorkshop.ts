@@ -1,15 +1,15 @@
 import { MinorImprovement, getRegisteredMinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ComplexCost, PlayerState } from '../../game/types'
+import type { ComplexCost, GameState, PlayerState } from '../../game/types'
 import { getMajorCard } from '../major'
 import { meetsCardPrerequisites } from '../helpers/prerequisites'
 import {
   canAffordCardPreviewCostByProvider,
-  canAffordCost,
   resolveCardPreviewCostByProvider,
 } from '../../actions/helpers/pay-helpers'
-import { computeAllBuyableCombinations, isComplexCost } from '../../actions/helpers/payment'
+import { PaymentSolver } from '../../actions/payment'
+import type { PaymentCtx } from '../../actions/payment'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -30,7 +30,7 @@ const attachRequiredReturnCards = (
   if (!cost || !returnCards || returnCards.length === 0) {
     return cost
   }
-  if (isComplexCost(cost)) {
+  if (PaymentSolver.isComplexCost(cost)) {
     return {
       ...cost,
       cards: {
@@ -82,14 +82,17 @@ const canPlayAnyMinorImprovement = (context: CardListenerContext, player: Player
       improvement.returnCards,
     )
     if (!previewCost) return false
-    if (isComplexCost(previewCost)) {
-      return computeAllBuyableCombinations(
-        player,
-        previewCost,
-        player.improvements,
-      ).length > 0
+    // Preview player (createPreviewPlayer with +1 wood) is not in
+    // context.state.players, so wrap it in a singleton GameState to call
+    // PaymentSolver. Same pattern as stables.ts buildSingletonState.
+    const singletonState = { ...({} as GameState), players: [player] } as GameState
+    const ctx: PaymentCtx = {
+      actionId: context.actionId,
+      costType: 'none',
+      sourceCard: CARD_ID,
+      playedCards: player.improvements,
     }
-    return canAffordCost(player, previewCost)
+    return PaymentSolver.canAfford(singletonState, 0, previewCost, ctx)
   })
 
 const beforeListener: CardListenerRegistration = {

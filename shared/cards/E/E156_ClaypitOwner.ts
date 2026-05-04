@@ -4,7 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getMajorCard } from '../major'
 import { isMajorCardId } from '../helpers/card-type'
-import { isComplexCost } from '../../actions/helpers/payment'
+import { PaymentSolver } from '../../actions/payment'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E156_ClaypitOwner'
@@ -26,7 +26,7 @@ const hasPrintedClayCost = (cardId: string): boolean => {
     const major = getMajorCard(cardId)
     if (major?.cost) {
       const cost = major.cost
-      if (isComplexCost(cost)) {
+      if (PaymentSolver.isComplexCost(cost)) {
         return (cost.fees ?? []).some((fee) => (fee.clay ?? 0) > 0)
           || (cost.fee ? (cost.fee.clay ?? 0) > 0 : false)
       }
