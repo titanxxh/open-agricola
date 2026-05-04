@@ -410,6 +410,38 @@ export class GameCore {
     // request. The assert is a cheap canary — it has no production cost
     // because the comparison is a string equality.
     const preRestoreNodeId = this.engineStack.peekInteraction()?.id ?? null
+    // Task 9 dual-write: rebuild `this.pending` from any synthetic
+    // confirm-next-player / confirm-player-switch / feed InteractionNode
+    // that survived the round-trip. The handle*Resolved paths still gate on
+    // `this.pending` until Task 10 deletes the field; without this rebuild
+    // the very first resolveChoice() after restore would `respond(false,
+    // 'no pending feed')` because the freshly-constructed GameCore starts
+    // with `this.pending = { type: 'none' }`.
+    const restoredInteraction = this.engineStack.peekInteraction()
+    const restoredFrame = this.engineStack.current()
+    const restoredKind = restoredInteraction?.request?.kind
+    if (restoredKind === 'confirm-next-player') {
+      this.pending = {
+        type: 'confirmNextPlayer',
+        nextPlayerIndex: restoredInteraction!.request!.nextPlayerIndex,
+      }
+    } else if (restoredKind === 'confirm-player-switch') {
+      const req = restoredInteraction!.request!
+      this.pending = {
+        type: 'confirmPlayerSwitch',
+        fromPlayerIndex: req.fromPlayerIndex,
+        toPlayerIndex: req.toPlayerIndex,
+      }
+    } else if (restoredKind === 'feed') {
+      const req = restoredInteraction!.request!
+      this.pending = {
+        type: 'harvestFeed',
+        playerIndex: restoredFrame?.ownerPlayerIndex ?? 0,
+        remaining: req.remaining,
+        foodUsed: req.foodUsed,
+        feedQueue: req.feedQueue,
+      }
+    }
     // Re-derive `this.pending` from the restored engine state. The engine's
     // `proceed` is idempotent for already-pending interactions: it re-emits
     // `step.type === 'choice'` for unresolved InteractionNodes, which lets
@@ -2056,6 +2088,22 @@ export class GameCore {
         ) {
           const pIdx = frame.ownerPlayerIndex
           this.startReorganizeSubFlow(pIdx, 'anytime')
+          return
+        }
+        // Task 9: synthetic confirm-next-player / confirm-player-switch /
+        // feed frames must NOT enter the auto-resolve path below. The
+        // engine has no registered handler for `__interaction_only__`, so
+        // resolveChoice would silently no-op without resolving the
+        // InteractionNode and the next proceed() would surface the same
+        // step again — an infinite loop. The pending state is already
+        // populated (dual-write in start* triggers); just yield to the
+        // client and wait for the matching resolveChoice command.
+        const syntheticKind = interaction?.request?.kind
+        if (
+          syntheticKind === 'confirm-next-player'
+          || syntheticKind === 'confirm-player-switch'
+          || syntheticKind === 'feed'
+        ) {
           return
         }
         // Lazy confirmation: if we silently switched players and now hit a choice,
