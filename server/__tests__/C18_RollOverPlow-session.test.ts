@@ -32,7 +32,7 @@ describe('C18_RollOverPlow session', () => {
   const enterActiveInteraction = (session: GameSession) => {
     const resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
     return resp
   }
 
@@ -55,7 +55,7 @@ describe('C18_RollOverPlow session', () => {
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') throw new Error('expected selection choice')
     expect(resp.pending.sourceCard).toBe(CARD_ID)
-    expect(resp.interaction.stateId).toBe('selection')
+    expect(resp.interaction.stateId).toBe('wait')
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
 
     // Select field 0-2 (grain with remaining 3)
@@ -68,7 +68,7 @@ describe('C18_RollOverPlow session', () => {
     if (resp.pending.type !== 'choice') throw new Error('expected plow choice')
     expect(resp.pending.promptKey).toBe('ui.interactionPlowSelect')
     expect(resp.pending.sourceCard).toBe(CARD_ID)
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
 
     // Verify the field was discarded

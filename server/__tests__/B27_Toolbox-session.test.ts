@@ -62,7 +62,7 @@ describe('B27 Toolbox session', () => {
       }
       // Engine farm prompt: confirm with the first selectable room tile so we
       // actually build (B27 needs a real construct to trigger onEndTurn).
-      if (promptKey === 'ui.interactionRoomSelect' && resp.interaction.stateId === 'farmSelect' && resp.interaction.farm.farmType === 'room') {
+      if (promptKey === 'ui.interactionRoomSelect' && resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'room') {
         const tile = resp.interaction.farm.selectableTiles[0]!
         resp = session.resolveChoice(0, 'confirm', { rooms: [tile] })
         continue
@@ -135,7 +135,7 @@ describe('B27 Toolbox session', () => {
       const promptKey = (resp.pending as { promptKey?: string }).promptKey
       // Engine farm prompt: confirm with the first selectable room tile so we
       // actually build (test asserts construct → setFlag flow).
-      if (promptKey === 'ui.interactionRoomSelect' && resp.interaction.stateId === 'farmSelect' && resp.interaction.farm.farmType === 'room') {
+      if (promptKey === 'ui.interactionRoomSelect' && resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'room') {
         const tile = resp.interaction.farm.selectableTiles[0]!
         resp = session.resolveChoice(0, 'confirm', { rooms: [tile] })
         continue

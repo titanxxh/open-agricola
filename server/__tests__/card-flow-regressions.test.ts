@@ -82,8 +82,8 @@ describe('card flow regressions', () => {
     expect(resp.pending.type).toBe('choice')
     expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
       .toBe('ui.interactionPlowSelect')
-    expect(resp.interaction.stateId).toBe('farmSelect')
-    if (resp.interaction.stateId !== 'farmSelect') {
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') {
       throw new Error('expected plow farm interaction')
     }
 

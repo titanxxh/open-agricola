@@ -380,9 +380,12 @@ export const GameContainerApi = () => {
 
   const handleSnapshot = useCallback((payload: GameSyncPayload) => {
     applySnapshot(payload)
-    if (payload.interaction.stateId === 'animalReorg') {
+    if (
+      payload.interaction.stateId === 'wait' &&
+      payload.interaction.request.kind === 'animal-reorg'
+    ) {
       setAnimalReorg({
-        zones: payload.interaction.zones,
+        zones: payload.interaction.zones ?? [],
         confirmDiscard: false,
       })
     } else {
@@ -425,11 +428,12 @@ export const GameContainerApi = () => {
   const displayPlayer = isWs
     ? ((viewPlayerId ? viewedPlayer : selfPlayer ?? currentPlayer) ?? state?.players[0] ?? null)
     : (selfPlayer ?? currentPlayer ?? state?.players[0] ?? null)
-  const activePlayer = interaction.stateId === 'confirmPlayerSwitch'
-    ? state?.players[interaction.fromPlayerIndex] ?? currentPlayer
-    : ('playerIndex' in interaction && typeof interaction.playerIndex === 'number')
-      ? state?.players[interaction.playerIndex] ?? currentPlayer
-      : currentPlayer
+  const activePlayer =
+    interaction.stateId === 'wait' && interaction.request.kind === 'confirm-player-switch'
+      ? state?.players[interaction.fromPlayerIndex ?? 0] ?? currentPlayer
+      : interaction.stateId === 'wait' && typeof interaction.playerIndex === 'number'
+        ? state?.players[interaction.playerIndex] ?? currentPlayer
+        : currentPlayer
   const isMyTurn = !!(activePlayer && selfPlayer && activePlayer.id === selfPlayer.id)
   // In HTTP (non-WS) mode, one human controls all players — always interactive
   const isInteractive = isWs
@@ -516,7 +520,7 @@ export const GameContainerApi = () => {
   const resolveChoice = useCallback((value: string) => {
     if (!isInteractive) return
     if (!currentPlayer) return
-    if (interaction.stateId === 'selection') {
+    if (interaction.stateId === 'wait' && interaction.selection) {
       const pendingPlayerIndex = interaction.playerIndex
       if (value === 'cancel') {
         void transport.resolveChoice(pendingPlayerIndex, value).catch((e) => console.error(e))
@@ -528,17 +532,18 @@ export const GameContainerApi = () => {
       void transport.commitSelection(pendingPlayerIndex, { positions }).catch((e) => console.error(e))
       return
     }
-    if (interaction.stateId === 'farmSelect') {
+    if (interaction.stateId === 'wait' && interaction.farm) {
       const pendingPlayerIndex = interaction.playerIndex
+      const farm = interaction.farm
       if (value === 'cancel') {
         void transport.resolveChoice(pendingPlayerIndex, value).catch((e) => console.error(e))
         return
       }
-      if (interaction.farm.farmType === 'fence') {
+      if (farm.farmType === 'fence') {
         void transport.resolveChoice(pendingPlayerIndex, 'confirm', {
           edges: pendingFenceEdges,
           palisadeEdges: pendingPalisadeEdges,
-          extraWood: interaction.farm.extraWood ?? 0,
+          extraWood: farm.extraWood ?? 0,
         })
           .then((resp) => {
             if (!resp.ok) setFarmCommitError('fence', resp.error)
@@ -549,7 +554,7 @@ export const GameContainerApi = () => {
           })
         return
       }
-      if (interaction.farm.farmType === 'room') {
+      if (farm.farmType === 'room') {
         void transport.resolveChoice(pendingPlayerIndex, 'confirm', { rooms: pendingRoomTiles })
           .then((resp) => {
             if (!resp.ok) setFarmCommitError('room', resp.error)
@@ -560,7 +565,7 @@ export const GameContainerApi = () => {
           })
         return
       }
-      if (interaction.farm.farmType === 'stable') {
+      if (farm.farmType === 'stable') {
         if (pendingStableTiles.length === 0) {
           setStableError('NO_SELECTION')
           return
@@ -575,7 +580,7 @@ export const GameContainerApi = () => {
           })
         return
       }
-      if (interaction.farm.farmType === 'plow') {
+      if (farm.farmType === 'plow') {
         if (!pendingPlowTile) {
           setPlowError('NO_SELECTION')
           return
@@ -590,7 +595,7 @@ export const GameContainerApi = () => {
           })
         return
       }
-      if (interaction.farm.farmType === 'sow') {
+      if (farm.farmType === 'sow') {
         const crops = Object.entries(pendingSowSelections)
           .map(([key, crop]) => {
             const tile = parsePositionKey(key)
@@ -618,7 +623,7 @@ export const GameContainerApi = () => {
       }
       return
     }
-    if (interaction.stateId === 'animalReorg') {
+    if (interaction.stateId === 'wait' && interaction.request.kind === 'animal-reorg') {
       if (value === 'confirm' && animalReorg) {
         void transport.resolveChoice(interaction.playerIndex, 'confirm', { zones: animalReorg.zones }).catch((e) => console.error(e))
       } else {
@@ -626,7 +631,7 @@ export const GameContainerApi = () => {
       }
       return
     }
-    if (interaction.stateId !== 'choice') return
+    if (interaction.stateId !== 'wait' || interaction.request.kind !== 'choice') return
     void transport.resolveChoice(interaction.playerIndex, value).catch((e) => console.error(e))
   }, [interaction, currentPlayer, animalReorg, pendingFenceEdges, pendingPalisadeEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, setPlowError, setSowError, setStableError, isInteractive, commitFarmWithError, setFarmCommitError])
 
@@ -678,40 +683,47 @@ export const GameContainerApi = () => {
   }, [transport, isInteractive, resetSeedInput])
 
   const pendingChoice =
-    interaction.stateId === 'choice' || interaction.stateId === 'farmSelect' || interaction.stateId === 'selection'
+    interaction.stateId === 'wait' &&
+    (interaction.request.kind === 'choice' ||
+      interaction.request.kind === 'farm-select' ||
+      interaction.request.kind === 'selection' ||
+      interaction.farm !== undefined ||
+      interaction.selection !== undefined)
       ? {
           promptKey: interaction.promptKey,
           promptParams: interaction.promptParams,
-          options: interaction.options,
+          options: interaction.options ?? [],
           playerIndex: interaction.playerIndex,
-          spaceId: interaction.spaceId,
+          spaceId: interaction.spaceId ?? '',
           sourceCard: interaction.sourceCard,
           fenceExtraWood:
-            interaction.stateId === 'farmSelect' && interaction.farm.farmType === 'fence'
+            interaction.farm?.farmType === 'fence'
               ? interaction.farm.extraWood ?? 0
               : undefined,
         }
       : null
   const pendingNextPlayerIndex =
-    interaction.stateId === 'confirmNextPlayer' ? interaction.nextPlayerIndex : null
+    interaction.stateId === 'wait' && interaction.request.kind === 'confirm-next-player'
+      ? interaction.nextPlayerIndex ?? null
+      : null
   const pendingPlayerSwitch =
-    interaction.stateId === 'confirmPlayerSwitch'
+    interaction.stateId === 'wait' && interaction.request.kind === 'confirm-player-switch'
       ? {
-          fromPlayerIndex: interaction.fromPlayerIndex,
-          toPlayerIndex: interaction.toPlayerIndex,
+          fromPlayerIndex: interaction.fromPlayerIndex ?? 0,
+          toPlayerIndex: interaction.toPlayerIndex ?? 0,
         }
       : null
   const pendingAnimalReorg =
-    interaction.stateId === 'animalReorg'
-      ? { playerIndex: interaction.playerIndex, spaceId: interaction.spaceId }
+    interaction.stateId === 'wait' && interaction.request.kind === 'animal-reorg'
+      ? { playerIndex: interaction.playerIndex, spaceId: interaction.spaceId ?? '' }
       : null
   const harvestPending =
-    interaction.stateId === 'harvestFeed' && state
+    interaction.stateId === 'wait' && interaction.request.kind === 'feed' && state
       ? {
           playerIndex: interaction.playerIndex,
           playerName: state.players[interaction.playerIndex]?.name ?? '',
-          remaining: interaction.remaining,
-          foodUsed: interaction.foodUsed,
+          remaining: interaction.remaining ?? 0,
+          foodUsed: interaction.foodUsed ?? 0,
         }
       : null
   const canTakeActionForBoard = useCallback((space: ActionSpace, _player: PlayerState) => {
@@ -855,9 +867,10 @@ export const GameContainerApi = () => {
   const hasBakeSummary =
     summaryResources.food > 0 || summaryResources.grain > 0
 
-  const isHarvestFeedExchange = interaction.stateId === 'harvestFeed'
+  const isHarvestFeedExchange =
+    interaction.stateId === 'wait' && interaction.request.kind === 'feed'
   const harvestFeedPlayer =
-    isHarvestFeedExchange && state
+    isHarvestFeedExchange && state && interaction.stateId === 'wait'
       ? state.players[interaction.playerIndex] ?? null
       : null
   const harvestFeedOptions = useMemo(
@@ -982,13 +995,15 @@ export const GameContainerApi = () => {
   const pendingPalisadeSet = useMemo(() => new Set(pendingPalisadeEdges), [pendingPalisadeEdges])
 
   const farmInteraction =
-    interaction.stateId === 'farmSelect' ? interaction.farm : null
+    interaction.stateId === 'wait' ? interaction.farm ?? null : null
   const selectionInteraction =
-    interaction.stateId === 'selection' ? interaction.selection : null
+    interaction.stateId === 'wait' ? interaction.selection ?? null : null
 
   const occupationHandInteraction = useMemo(
     () =>
-      interaction.stateId === 'selection' && interaction.selection.kind === 'occupation-hand'
+      interaction.stateId === 'wait' &&
+      interaction.selection &&
+      interaction.selection.kind === 'occupation-hand'
         ? interaction.selection
         : null,
     [interaction],
@@ -1839,7 +1854,8 @@ export const GameContainerApi = () => {
               occupationHandSelection={occupationHandInteraction ?? undefined}
               onConfirmOccupationHandSelection={(ids) => {
                 if (!isInteractive) return
-                const pendingPlayerIndex = interaction.stateId === 'selection' ? interaction.playerIndex : 0
+                const pendingPlayerIndex =
+                  interaction.stateId === 'wait' && interaction.selection ? interaction.playerIndex : 0
                 void transport.commitSelection(pendingPlayerIndex, { cardIds: ids }).catch((e) => console.error(e))
               }}
             />

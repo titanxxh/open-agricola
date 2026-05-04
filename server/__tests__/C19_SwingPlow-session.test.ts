@@ -37,7 +37,7 @@ describe('C19_SwingPlow session', () => {
     // Take farmland
     let resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
 
     // Complete farmland plow
     const tile1 = resp.interaction.farm.selectableTiles[0]
@@ -52,7 +52,7 @@ describe('C19_SwingPlow session', () => {
     expect(resp.ok).toBe(true)
 
     // pop-card-stack runs, then plow tile selection
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
     const tile2 = resp.interaction.farm.selectableTiles[0]
     resp = session.resolveChoice(0, 'confirm', { tile: tile2 })
     expect(resp.ok).toBe(true)
@@ -64,7 +64,7 @@ describe('C19_SwingPlow session', () => {
     resp = session.resolveChoice(0, accept2!.value)
     expect(resp.ok).toBe(true)
 
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
     const tile3 = resp.interaction.farm.selectableTiles[0]
     resp = session.resolveChoice(0, 'confirm', { tile: tile3 })
     expect(resp.ok).toBe(true)

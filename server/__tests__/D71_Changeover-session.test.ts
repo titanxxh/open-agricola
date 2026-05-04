@@ -30,7 +30,7 @@ describe('D71_Changeover session', () => {
   const enterActiveInteraction = (session: GameSession) => {
     const resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
     return resp
   }
 
@@ -77,7 +77,7 @@ describe('D71_Changeover session', () => {
         }
       }
       if (resp.pending.type === 'choice' && resp.pending.promptKey === 'ui.interactionSowSelect') {
-        expect(resp.interaction.stateId).toBe('farmSelect')
+        expect(resp.interaction.stateId).toBe('wait')
         // Sow grain into the empty field 0-2
         resp = session.resolveChoice(0, 'confirm', {
           crops: [{ row: 0, col: 2, crop: 'grain' }],

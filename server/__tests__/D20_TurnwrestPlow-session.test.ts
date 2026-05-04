@@ -34,7 +34,7 @@ describe('D20_TurnwrestPlow session', () => {
 
     let resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
 
     const tile1 = resp.interaction.farm.selectableTiles[0]
     resp = session.resolveChoice(0, 'confirm', { tile: tile1 })
@@ -47,7 +47,7 @@ describe('D20_TurnwrestPlow session', () => {
     resp = session.resolveChoice(0, accept1!.value)
     expect(resp.ok).toBe(true)
 
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
     const tile2 = resp.interaction.farm.selectableTiles[0]
     resp = session.resolveChoice(0, 'confirm', { tile: tile2 })
     expect(resp.ok).toBe(true)
@@ -59,7 +59,7 @@ describe('D20_TurnwrestPlow session', () => {
     resp = session.resolveChoice(0, accept2!.value)
     expect(resp.ok).toBe(true)
 
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
     const tile3 = resp.interaction.farm.selectableTiles[0]
     resp = session.resolveChoice(0, 'confirm', { tile: tile3 })
     expect(resp.ok).toBe(true)
@@ -79,7 +79,7 @@ describe('D20_TurnwrestPlow session', () => {
     let resp = session.takeAction(0, 'cultivation')
     expect(resp.ok).toBe(true)
     // Cultivation includes plow + optional sow
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
 
     // Complete the cultivation plow
     const tile1 = resp.interaction.farm.selectableTiles[0]
@@ -100,7 +100,7 @@ describe('D20_TurnwrestPlow session', () => {
     expect(resp.ok).toBe(true)
 
     // Plow from card
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
     const tile2 = resp.interaction.farm.selectableTiles[0]
     resp = session.resolveChoice(0, 'confirm', { tile: tile2 })
     expect(resp.ok).toBe(true)

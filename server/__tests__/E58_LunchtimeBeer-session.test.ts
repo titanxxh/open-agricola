@@ -31,7 +31,7 @@ const drainHarvest = (session: GameSession) => {
     if (resp.pending.type === 'harvestFeed') {
       resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
     } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
-      const interaction = resp.interaction.stateId === 'animalReorg' ? resp.interaction : null
+      const interaction = resp.interaction.stateId === 'wait' ? resp.interaction : null
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', interaction?.zones ?? [])
     } else if (resp.pending.type === 'choice') {
       const opts = resp.pending.options ?? []

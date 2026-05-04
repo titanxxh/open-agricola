@@ -217,7 +217,7 @@ const makeSession = (opts: { wood?: number; gameSeed?: number; occHand?: string[
 /**
  * Drive the meeting-place -> A3 onBuy path.
  * Returns the resp AFTER resolving 'minor:A3_PaperKnife'.
- * In the target impl this should leave interaction.stateId === 'selection'
+ * In the target impl this should leave interaction.stateId === 'wait'
  * with kind 'occupation-hand'.
  */
 const playA3 = (session: GameSession) => {
@@ -238,9 +238,9 @@ describe('A3_PaperKnife session-tier: BGA-aligned flow', () => {
 
     expect(resp.ok).toBe(true)
     // TARGET: interaction.stateId must be 'selection', not 'choice' or 'idle'
-    expect(resp.interaction.stateId).toBe('selection')
+    expect(resp.interaction.stateId).toBe('wait')
 
-    const interaction = resp.interaction as Extract<InteractionState, { stateId: 'selection' }>
+    const interaction = resp.interaction as Extract<InteractionState, { stateId: 'wait' }>
     // kind must be occupation-hand
     expect(interaction.selection?.kind).toBe('occupation-hand')
     // selectableCards must be the player's full occupation hand in order
@@ -271,8 +271,8 @@ describe('A3_PaperKnife session-tier: BGA-aligned flow', () => {
 
     const a3Resp = playA3(session)
     // TARGET: selection pending
-    expect(a3Resp.interaction.stateId).toBe('selection')
-    if (a3Resp.interaction.stateId !== 'selection') return
+    expect(a3Resp.interaction.stateId).toBe('wait')
+    if (a3Resp.interaction.stateId !== 'wait') return
 
     // Commit OCC_A, OCC_B, OCC_C; OCC_D is excluded
     const commitValue = [OCC_A, OCC_B, OCC_C].join(',')
@@ -341,8 +341,8 @@ describe('A3_PaperKnife session-tier: BGA-aligned flow', () => {
     const session = makeSession({ wood: 1 })
 
     const a3Resp = playA3(session)
-    expect(a3Resp.interaction.stateId).toBe('selection')
-    if (a3Resp.interaction.stateId !== 'selection') return
+    expect(a3Resp.interaction.stateId).toBe('wait')
+    if (a3Resp.interaction.stateId !== 'wait') return
 
     // Commit — triggers the roll, sets pendingUndoBoundary, auto-plays the occupation
     const commitResp = session.resolveChoice(0, [OCC_A, OCC_B, OCC_C].join(','))
@@ -419,8 +419,8 @@ describe('A3_PaperKnife session-tier: BGA-aligned flow', () => {
     expect(mpResp.ok).toBe(true)
     const a3Resp = session.resolveChoice(0, `minor:${SESSION_CARD_ID}`)
     // TARGET: selection pending emitted
-    expect(a3Resp.interaction.stateId).toBe('selection')
-    if (a3Resp.interaction.stateId !== 'selection') return
+    expect(a3Resp.interaction.stateId).toBe('wait')
+    if (a3Resp.interaction.stateId !== 'wait') return
 
     // Record wood after A3's wood cost was paid
     const woodAfterA3Pay = a3Resp.state.players[0]!.resources.wood

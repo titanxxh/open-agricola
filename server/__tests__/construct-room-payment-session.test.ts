@@ -34,8 +34,8 @@ describe('construct room payment session', () => {
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('choice')
-    expect(resp.interaction.stateId).toBe('farmSelect')
-    if (resp.interaction.stateId !== 'farmSelect') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.farm.farmType).toBe('room')
     if (resp.interaction.farm.farmType !== 'room') return
 
@@ -72,8 +72,8 @@ describe('construct room payment session', () => {
 
     const resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('farmSelect')
-    if (resp.interaction.stateId !== 'farmSelect') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.farm.farmType).toBe('room')
 
     const commitResp = session.resolveChoice(0, 'confirm', { rooms: [] })
@@ -108,15 +108,15 @@ describe('construct room payment session', () => {
 
     resp = session.resolveChoice(0, constructOption!.value)
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('farmSelect')
-    if (resp.interaction.stateId !== 'farmSelect') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.farm.farmType).toBe('room')
 
     const workersAfterTake = workersAvailable(resp.state, resp.state.players[0]!)
     const undoStepResp = session.undoStep()
     expect(undoStepResp.ok).toBe(true)
     expect(undoStepResp.pending.type).toBe('choice')
-    expect(undoStepResp.interaction.stateId).toBe('choice')
+    expect(undoStepResp.interaction.stateId).toBe('wait')
     if (undoStepResp.pending.type !== 'choice') return
     expect(undoStepResp.pending.options.some((option) => option.labelKey === 'actions.construct.name')).toBe(true)
     expect(undoStepResp.pending.options.some((option) => option.labelKey === 'actions.stables.name')).toBe(true)
@@ -162,8 +162,8 @@ describe('construct room payment session', () => {
 
     resp = session.resolveChoice(0, constructOption!.value)
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('farmSelect')
-    if (resp.interaction.stateId !== 'farmSelect') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.farm.farmType).toBe('room')
     if (resp.interaction.farm.farmType !== 'room') return
     expect(resp.interaction.farm.maxSelections).toBe(2)
@@ -207,8 +207,8 @@ describe('construct room payment session', () => {
 
     resp = session.resolveChoice(0, constructOption!.value)
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('farmSelect')
-    if (resp.interaction.stateId !== 'farmSelect') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.farm.farmType).toBe('room')
     if (resp.interaction.farm.farmType !== 'room') return
 

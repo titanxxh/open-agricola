@@ -5,7 +5,9 @@ import type {
   FarmTilePosition,
   FeedQueueEntry,
   GameState,
+  InteractionCommand,
   InteractionFarmSelection,
+  InteractionRequest,
   InteractionSelection,
   InteractionState,
   PendingAction,
@@ -1135,16 +1137,23 @@ export class GameCore {
    * passes the cardDraft pending into a separate code path).
    */
   private buildInteraction(): InteractionState {
+    if (this.state.gameOver) {
+      return {
+        stateId: 'gameover',
+        winners: this.computeWinnerIds(),
+        scores: this.computeScoreSummary(),
+        allowedCommands: [],
+        anytimeActions: [],
+      }
+    }
     const frame = this.engineStack.current()
     const node = this.engineStack.peekInteraction()
     // Fallback for composite-node pending choices (OrNode / XorNode /
     // OptionalNode): the engine has a pending choice but no InteractionNode
-    // wraps it. Surface the cached options so the legacy `stateId: 'choice'`
-    // shape is preserved.
+    // wraps it. Surface the cached options so the wait+choice shape works.
     const composite = !node ? frame?.engine.peekPendingChoiceFromComposite() ?? null : null
 
     if (!frame || (!node && !composite)) {
-      // No interaction pending: only compute anytime actions for idle state.
       const anytimeActions = this.buildAnytimeEntries().map((entry) => entry.descriptor)
       return {
         stateId: 'idle',
@@ -1155,39 +1164,61 @@ export class GameCore {
 
     const playerIndex = frame.ownerPlayerIndex
     const spaceId = frame.spaceId
-    const request = node?.request
     const promptKey = node?.promptKey ?? composite?.promptKey
     const promptParams = node?.promptParams ?? composite?.promptParams
     const ctx = frame.engine.getPendingInteractionContext()
     const sourceCard = ctx?.sourceCard
     const costOverride = frame.engine.getLastComputedCosts()
-    const options =
-      request?.kind === 'choice'
+
+    // Resolve the InteractionRequest for the wait state. node.request is the
+    // primary source; composite-fallback synthesises a `choice` request from
+    // the cached options.
+    const request: InteractionRequest =
+      node?.request ??
+      ({ kind: 'choice', options: composite?.options ?? node?.choices ?? [] } as InteractionRequest)
+    const choiceOptions =
+      request.kind === 'choice'
         ? request.options
         : (node?.choices ?? composite?.options ?? [])
+    const player = this.state.players[playerIndex]
+    const anytimeActions = this.buildAnytimeEntries().map((entry) => entry.descriptor)
 
-    switch (request?.kind) {
-      case 'animal-reorg': {
-        const player = this.state.players[playerIndex]
+    switch (request.kind) {
+      case 'animal-reorg':
         return {
-          stateId: 'animalReorg',
+          stateId: 'wait',
           playerIndex,
           spaceId,
+          promptKey,
+          promptParams,
+          sourceCard,
+          request,
           zones: player ? this.buildAnimalReorgZones(player) : [],
           allowedCommands: ['resolveChoice', 'undoStep', 'undoAction'],
           anytimeActions: [],
         }
-      }
       case 'confirm-next-player':
         return {
-          stateId: 'confirmNextPlayer',
+          stateId: 'wait',
+          playerIndex,
+          spaceId,
+          promptKey,
+          promptParams,
+          sourceCard,
+          request,
           nextPlayerIndex: request.nextPlayerIndex,
           allowedCommands: ['confirmNextPlayer', 'undoStep', 'undoAction'],
           anytimeActions: [],
         }
       case 'confirm-player-switch':
         return {
-          stateId: 'confirmPlayerSwitch',
+          stateId: 'wait',
+          playerIndex,
+          spaceId,
+          promptKey,
+          promptParams,
+          sourceCard,
+          request,
           fromPlayerIndex: request.fromPlayerIndex,
           toPlayerIndex: request.toPlayerIndex,
           allowedCommands: ['confirmPlayerSwitch', 'undoStep', 'undoAction'],
@@ -1195,8 +1226,13 @@ export class GameCore {
         }
       case 'feed':
         return {
-          stateId: 'harvestFeed',
+          stateId: 'wait',
           playerIndex,
+          spaceId,
+          promptKey,
+          promptParams,
+          sourceCard,
+          request,
           remaining: request.remaining,
           foodUsed: request.foodUsed,
           feedQueue: request.feedQueue,
@@ -1205,63 +1241,69 @@ export class GameCore {
         }
       case 'choice':
       default: {
-        // Plain `choice` (typed via `request.kind === 'choice'`) and any
-        // legacy ChoiceNode-emitted untyped request flow through here.
-        // Dispatch farm-select / selection / plain-choice via promptKey.
-        // Composite-node (OrNode/XorNode/OptionalNode) emitted choices skip
-        // the farm/selection helpers (they require an InteractionNode) and
-        // fall straight through to the plain-choice shape.
-        const anytimeActions = this.buildAnytimeEntries().map((entry) => entry.descriptor)
-        const player = this.state.players[playerIndex]
         const selectionKind = this.isSelectionPromptKey(promptKey)
         if (node && selectionKind && player) {
           return {
-            stateId: 'selection',
+            stateId: 'wait',
             playerIndex,
             spaceId,
             promptKey,
             promptParams,
-            options,
-            costOverride,
             sourceCard,
+            request,
+            options: choiceOptions,
+            costOverride,
             selection: this.buildSelectionInteractionFromNode(node, player),
             allowedCommands: ['resolveChoice', 'commitSelection', 'takeAnytimeAction', 'undoStep', 'undoAction'],
             anytimeActions,
           }
         }
         const farm = node && player ? this.buildFarmInteractionFromNode(node, player) : null
-        const allowedCommands = farm
-          ? ['resolveChoice', 'commitFarm', 'takeAnytimeAction', 'undoStep', 'undoAction'] as const
-          : ['resolveChoice', 'takeAnytimeAction', 'undoStep', 'undoAction'] as const
+        const allowedCommands: InteractionCommand[] = farm
+          ? ['resolveChoice', 'commitFarm', 'takeAnytimeAction', 'undoStep', 'undoAction']
+          : ['resolveChoice', 'takeAnytimeAction', 'undoStep', 'undoAction']
         if (farm) {
           return {
-            stateId: 'farmSelect',
+            stateId: 'wait',
             playerIndex,
             spaceId,
             promptKey,
             promptParams,
-            options,
-            costOverride,
             sourceCard,
+            request,
+            options: choiceOptions,
+            costOverride,
             farm,
-            allowedCommands: [...allowedCommands],
+            allowedCommands,
             anytimeActions,
           }
         }
         return {
-          stateId: 'choice',
+          stateId: 'wait',
           playerIndex,
           spaceId,
           promptKey,
           promptParams,
-          options,
-          costOverride,
           sourceCard,
-          allowedCommands: [...allowedCommands],
+          request,
+          options: choiceOptions,
+          costOverride,
+          allowedCommands,
           anytimeActions,
         }
       }
     }
+  }
+
+  private computeWinnerIds(): string[] {
+    const summary = computeScores(this.state)
+    if (summary.length === 0) return []
+    const top = summary.reduce((a, b) => (a.total >= b.total ? a : b))
+    return summary.filter((s) => s.total === top.total).map((s) => s.playerId)
+  }
+
+  private computeScoreSummary() {
+    return computeScores(this.state).map((s) => ({ playerId: s.playerId, total: s.total }))
   }
 
   private computeCardDraftPending(): Extract<PendingAction, { type: 'cardDraft' }> | null {
@@ -3508,7 +3550,8 @@ export class GameCore {
         cancelResult.pending.type === 'choice' &&
         cancelResult.pending.promptKey === currentPromptKey &&
         cancelResult.pending.spaceId === currentSpaceId &&
-        cancelResult.interaction.stateId === 'farmSelect'
+        cancelResult.interaction.stateId === 'wait' &&
+        cancelResult.interaction.farm !== undefined
       if (!stillOnSameFarmPrompt) {
         return cancelResult
       }

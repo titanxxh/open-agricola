@@ -82,10 +82,10 @@ describe('B72_LoveforAgriculture session', () => {
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('choice')
       expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
-      expect(resp.interaction.stateId).toBe('farmSelect')
+      expect(resp.interaction.stateId).toBe('wait')
 
       // The interaction should include the pasture tile as sowable
-      if (resp.interaction.stateId === 'farmSelect' && resp.interaction.farm.farmType === 'sow') {
+      if (resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'sow') {
         const pastureField = resp.interaction.farm.selectableFields.find(
           (f) => f.tile.row === 2 && f.tile.col === 2,
         )
@@ -230,7 +230,7 @@ describe('B72_LoveforAgriculture session', () => {
       expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
 
       // Should only show the pasture tile as sowable
-      if (resp.interaction.stateId === 'farmSelect' && resp.interaction.farm.farmType === 'sow') {
+      if (resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'sow') {
         expect(resp.interaction.farm.selectableFields.length).toBe(1)
         expect(resp.interaction.farm.selectableFields[0].tile).toEqual({ row: 2, col: 2 })
       }
@@ -478,7 +478,7 @@ describe('B72_LoveforAgriculture session', () => {
       expect(resp.ok).toBe(true)
       expect(resp.ok).toBe(true)
 
-      if (resp.interaction.stateId === 'farmSelect' && resp.interaction.farm.farmType === 'sow') {
+      if (resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'sow') {
         // Should only show the field, not the pasture
         expect(resp.interaction.farm.selectableFields.length).toBe(1)
         expect(resp.interaction.farm.selectableFields[0].tile).toEqual({ row: 0, col: 0 })

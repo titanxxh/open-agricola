@@ -143,9 +143,9 @@ describe('E68_CherryOrchard session', () => {
     expect(resp.ok).toBe(true)
 
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
 
-    if (resp.interaction.stateId !== 'farmSelect' || resp.interaction.farm.farmType !== 'sow') {
+    if (resp.interaction.stateId !== 'wait' || resp.interaction.farm.farmType !== 'sow') {
       throw new Error('expected sow interaction')
     }
 

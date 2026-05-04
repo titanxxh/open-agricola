@@ -142,8 +142,8 @@ describe('shared/game/serialization', () => {
 
       resp = session.resolveChoice(0, constructOption!.value)
       expect(resp.ok).toBe(true)
-      expect(resp.interaction.stateId).toBe('farmSelect')
-      if (resp.interaction.stateId !== 'farmSelect') return
+      expect(resp.interaction.stateId).toBe('wait')
+      if (resp.interaction.stateId !== 'wait') return
       expect(resp.interaction.farm.farmType).toBe('room')
       if (resp.interaction.farm.farmType !== 'room') return
       expect(resp.interaction.farm.maxSelections).toBe(2)

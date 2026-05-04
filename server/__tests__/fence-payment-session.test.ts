@@ -57,8 +57,8 @@ describe('fence payment session', () => {
 
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('farmSelect')
-    if (resp.interaction.stateId !== 'farmSelect') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.farm.farmType).toBe('fence')
 
     resp = session.resolveChoice(0, 'confirm', {

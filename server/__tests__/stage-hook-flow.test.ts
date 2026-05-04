@@ -267,8 +267,8 @@ describe('stage hook flows', () => {
     expect(resp.pending.type).toBe('choice')
     expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
       .toBe('ui.interactionSowSelect')
-    expect(resp.interaction.stateId).toBe('farmSelect')
-    expect(resp.interaction.stateId === 'farmSelect' ? resp.interaction.farm.farmType : undefined)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.farm.farmType : undefined)
       .toBe('sow')
 
     resp = session.resolveChoice(0, 'confirm', {
@@ -343,10 +343,10 @@ describe('stage hook flows', () => {
     expect(resp.pending.type).toBe('choice')
     expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
       .toBe('ui.interactionSowSelect')
-    expect(resp.interaction.stateId).toBe('farmSelect')
-    expect(resp.interaction.stateId === 'farmSelect' ? resp.interaction.farm.farmType : undefined)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.farm.farmType : undefined)
       .toBe('sow')
-    expect(resp.interaction.stateId === 'farmSelect' && resp.interaction.farm.farmType === 'sow'
+    expect(resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'sow'
       ? resp.interaction.farm.maxSelections
       : undefined).toBe(2)
 
@@ -411,8 +411,8 @@ describe('stage hook flows', () => {
       .toBe('ui.interactionFodderPlanterSow')
 
     resp = chooseFirstOption(session, 0)
-    expect(resp.interaction.stateId).toBe('farmSelect')
-    expect(resp.interaction.stateId === 'farmSelect' && resp.interaction.farm.farmType === 'sow'
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'sow'
       ? resp.interaction.farm.maxSelections
       : undefined).toBe(1)
 

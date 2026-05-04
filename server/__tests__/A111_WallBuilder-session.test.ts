@@ -36,8 +36,8 @@ describe('A111_WallBuilder session', () => {
       expect(constructOption).toBeDefined()
       resp = session.resolveChoice(0, constructOption!.value)
     }
-    expect(resp.interaction.stateId).toBe('farmSelect')
-    if (resp.interaction.stateId !== 'farmSelect') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.farm.farmType).toBe('room')
     if (resp.interaction.farm.farmType !== 'room') return
 
@@ -77,7 +77,7 @@ describe('A111_WallBuilder session', () => {
       )
       resp = session.resolveChoice(0, constructOption!.value)
     }
-    if (resp.interaction.stateId !== 'farmSelect') return
+    if (resp.interaction.stateId !== 'wait') return
     if (resp.interaction.farm.farmType !== 'room') return
 
     const room = resp.interaction.farm.selectableTiles[0]!

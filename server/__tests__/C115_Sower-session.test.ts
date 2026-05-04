@@ -24,7 +24,7 @@ describe('C115_Sower session', () => {
   const enterActiveInteraction = (session: GameSession) => {
     const resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
     return resp
   }
 

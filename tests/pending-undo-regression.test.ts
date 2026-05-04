@@ -190,9 +190,9 @@ describe('pending choice types + undo regression', () => {
       expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
         .toBe('ui.interactionSowSelect')
       expect(resp.state.players[0]!.resources.grain).toBe(1)
-      expect(resp.interaction.stateId).toBe('farmSelect')
+      expect(resp.interaction.stateId).toBe('wait')
       expect(
-        resp.interaction.stateId === 'farmSelect' && resp.interaction.farm.farmType === 'sow'
+        resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'sow'
           ? resp.interaction.farm.selectableFields
           : [],
       ).toContainEqual({
@@ -311,8 +311,8 @@ describe('pending choice types + undo regression', () => {
 
       const resp = session.takeAction(0, farmland.spaceId)
       expect(resp.ok).toBe(true)
-      expect(resp.interaction.stateId).toBe('farmSelect')
-      if (resp.interaction.stateId !== 'farmSelect') return
+      expect(resp.interaction.stateId).toBe('wait')
+      if (resp.interaction.stateId !== 'wait') return
 
       expect(resp.interaction.farm.farmType).toBe('plow')
       // bake-bread is NOT an anytime action — only exchange-type actions are

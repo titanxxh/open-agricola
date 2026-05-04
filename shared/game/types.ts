@@ -739,59 +739,38 @@ type InteractionBase = {
   anytimeActions: AnytimeAction[]
 }
 
+export type PlayerScoreSummaryLite = {
+  playerId: string
+  total: number
+}
+
 export type InteractionState =
   | (InteractionBase & { stateId: 'idle' })
   | (InteractionBase & {
-      stateId: 'choice'
+      stateId: 'wait'
       playerIndex: number
-      spaceId: string
+      spaceId?: string
       promptKey?: PromptKey
       promptParams?: Record<string, unknown>
-      options: ActionChoiceOption[]
-      costOverride?: Partial<Resource>
       sourceCard?: string
-    })
-  | (InteractionBase & {
-      stateId: 'farmSelect'
-      playerIndex: number
-      spaceId: string
-      promptKey?: PromptKey
-      promptParams?: Record<string, unknown>
-      options: ActionChoiceOption[]
+      request: InteractionRequest
+      // Transitional kind-specific accessor fields (Task 4 → cleaned up in Task 13).
+      // Frontend / tests can read these directly while we migrate callers off
+      // the legacy stateId switches.
+      options?: ActionChoiceOption[]
       costOverride?: Partial<Resource>
-      sourceCard?: string
-      farm: InteractionFarmSelection
-    })
-  | (InteractionBase & {
-      stateId: 'selection'
-      playerIndex: number
-      spaceId: string
-      promptKey?: PromptKey
-      promptParams?: Record<string, unknown>
-      options: ActionChoiceOption[]
-      costOverride?: Partial<Resource>
-      sourceCard?: string
-      selection: InteractionSelection
-    })
-  | (InteractionBase & {
-      stateId: 'animalReorg'
-      playerIndex: number
-      spaceId: string
-      zones: InteractionAnimalReorgZone[]
-    })
-  | (InteractionBase & {
-      stateId: 'harvestFeed'
-      playerIndex: number
-      remaining: number
-      foodUsed: number
+      farm?: InteractionFarmSelection
+      selection?: InteractionSelection
+      zones?: InteractionAnimalReorgZone[]
+      remaining?: number
+      foodUsed?: number
       feedQueue?: FeedQueueEntry[]
+      nextPlayerIndex?: number
+      fromPlayerIndex?: number
+      toPlayerIndex?: number
     })
   | (InteractionBase & {
-      stateId: 'confirmNextPlayer'
-      nextPlayerIndex: number
-    })
-  | (InteractionBase & {
-      stateId: 'confirmPlayerSwitch'
-      fromPlayerIndex: number
-      toPlayerIndex: number
+      stateId: 'gameover'
+      winners?: string[]
+      scores?: PlayerScoreSummaryLite[]
     })
