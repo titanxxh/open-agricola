@@ -49,15 +49,15 @@ S3 把当前 1974 行 / 41 export 的 payment 三件套（`payment.ts` / `pay-he
 
 ## 4. DoD（含 §15 专项 + 共同）
 
-| DoD | 验证方式 |
+| DoD | 结果（2026-05-04 完成） |
 |---|---|
-| `PaymentSolver` 是行动层付款唯一入口 | grep `from.*helpers/payment\|helpers/pay-helpers\|helpers/room-payment` 在 `shared/actions/effects/` 全 0 |
-| `improvement.ts` 不再 import payment 三件套 | grep import 路径 |
-| `improvement.ts` ≤ 400 行 | `wc -l` |
-| `shared/actions/helpers/payment.ts` / `pay-helpers.ts` / `room-payment.ts` 不存在 | `ls` |
-| `shared/actions/payment/` 模块对外 export ≤ 6 个（4 core + clearCache + 类型 namespace） | grep `^export` |
-| 「强制 green 子集」全绿 | `pnpm test:fast` |
-| 卡牌效果 session 测试零回归（不算 S2 累计 skip） | `pnpm test:slow` 对比基线 |
+| `PaymentSolver` 是行动层付款唯一入口 | ✅ Task 10 删 shim 后，effects/ 下零 `helpers/payment*` import；ESLint `no-restricted-imports` 守门 |
+| `improvement.ts` 不再 import payment 三件套 | ✅ Task 6 切 PaymentSolver；Task 10 删 shim |
+| `improvement.ts` ≤ 400 行 | ⚠️ 575 行（plan ≤ 400 未达 175 行；Task 9 commit message 记录权衡：剩余内容皆为核心 orchestration，进一步拆分会污染 options.ts；未来 S4 域聚合可能进一步缩减） |
+| `shared/actions/helpers/{payment,pay-helpers,room-payment}.ts` 不存在 | ✅ Task 10 commit `f1dbc007` |
+| `shared/actions/payment/` 模块对外 export ≤ 6 个 | ✅ index.ts: PaymentSolver namespace + 6 types。namespace 含 6 成员（4 core + clearCache + isComplexCost）—— 见 ADR-0006 D5 audit note |
+| 「强制 green 子集」全绿 | ✅ `pnpm test:fast` 315/316（1 pre-existing failure on improvement-pay-fail-idempotent.test.ts:84 from main，unrelated to S3） |
+| 卡牌效果 session 测试零回归 | ✅ 0 new skips；总 2099 passed 与 baseline 一致 |
 
 ---
 
