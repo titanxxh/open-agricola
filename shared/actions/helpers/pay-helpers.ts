@@ -580,7 +580,10 @@ const describePaymentEffectPreview = (
   }
 }
 
-
+// NOTE: Duplicated from payment.ts (PAYMENT_RESOURCE_ORDER + getPositiveResourceEntries
+// + comparePositiveResourceEntries) during S3 Task 1 to allow that file to drop the
+// `sortPaymentSolutions` export. Task 4 consolidates both into payment/internal/. If
+// you change one, change the other.
 const PAYMENT_SORT_ORDER: ResourceKey[] = [
   'wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep', 'boar', 'cattle', 'begging',
 ]
