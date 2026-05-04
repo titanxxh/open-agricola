@@ -302,11 +302,21 @@ export class GameCore {
    * synthetic id (e.g. `interaction:feed-7`); after `loadState` the freshly-
    * constructed `GameCore` resets `nextActionToken` to 1, so the next
    * `startConfirm*` call mints `interaction:confirm-next-player-1`.
-   * Collisions are impossible because each synthetic id lives on a separate
-   * `Engine` instance (one per stack frame), and `injectInteraction`
-   * replaces the engine tree's root wholesale — there is no shared id-space
-   * between frames. The counter restart is therefore safe; no cursor
-   * round-trip of the counter value is needed.
+   * Collisions on synthetic *node ids* are impossible because each id lives
+   * on a separate `Engine` instance (one per stack frame) and
+   * `injectInteraction` replaces the engine tree's root wholesale.
+   *
+   * Caveat (Task 10 S-2 / Task 11 carry-over): the same counter also stamps
+   * per-player action snapshots (`recordActionSnapshot(player, token)`).
+   * Those tokens persist into `player.actionSnapshots` and survive
+   * serialize/rehydrate; a cold-restart `GameCore` will start emitting fresh
+   * tokens from `1` again, so post-restart snapshot tokens are not globally
+   * monotonic across the session boundary. Today the only consumers compare
+   * tokens within a single session run (undo/replay within one process), so
+   * the restart is benign — but if any future feature wants a stable
+   * "this happened before that" ordering across restarts, the counter will
+   * need to ride the cursor (or be derived from `max(actionSnapshots) + 1`
+   * during rehydrate). Logged here so the next change-author sees the gap.
    */
   private nextActionToken = 1
   private turnOwnerPlayerIndex: number | null = null
@@ -973,7 +983,7 @@ export class GameCore {
       spaceId: frame?.spaceId ?? '',
       options: (node.request?.kind === 'choice' ? node.request.options : node.choices) ?? [],
       promptKey: node.promptKey,
-      promptParams: undefined,
+      promptParams: node.promptParams,
       costOverride: frame?.engine.getLastComputedCosts(),
       sourceCard: frame?.engine.getPendingInteractionContext()?.sourceCard,
       actionContext: ctx,
@@ -1413,9 +1423,12 @@ export class GameCore {
     }
     const entry: HistoryEntry = {
       state: cloneState(this.state),
-      // Task 10: legacy `this.pending` field is gone; derive the snapshot
-      // from `engineStack.peekInteraction()`. The HistoryEntry schema is
-      // unchanged so undo/restore wire-compat survives.
+      // Task 10/11: `this.pending` field is gone; derive the snapshot from
+      // `engineStack.peekInteraction()`. The HistoryEntry.pending field
+      // remains live — `undoStep()` reads `entry.pending.type === 'choice'`
+      // to recognise prior-choice farm-prompt restore points (see
+      // `canRestorePriorChoice` branch). Do NOT remove this field without
+      // migrating that read site.
       pending: this.clonePending(this.getCurrentPending()),
       activeSpaceId: this.activeSpaceId,
       activePlayerIndex: this.activePlayerIndex,
@@ -1436,11 +1449,11 @@ export class GameCore {
 
   private restoreHistory(entry: HistoryEntry) {
     this.state = cloneState(entry.state)
-    // Task 10: `this.pending` deleted. The `entry.pending` snapshot is
-    // retained on the HistoryEntry schema (read-only legacy artefact for
-    // wire compat) but no longer needs to be re-applied — every consumer
-    // derives PendingAction from `engineStack.peekInteraction()` via
-    // `getCurrentPending()` after the engineStack itself is restored.
+    // Task 10/11: `this.pending` field deleted from `GameState`. The
+    // `entry.pending` snapshot persists on HistoryEntry for `undoStep()`'s
+    // `canRestorePriorChoice` discriminator (read-only here). Live pending
+    // shape is rederived from `engineStack.peekInteraction()` after the
+    // stack is restored below.
     this.turnOwnerPlayerIndex = entry.turnOwnerPlayerIndex
     this.engineStack.clear()
     const source = entry.engineSource
@@ -1464,9 +1477,12 @@ export class GameCore {
         spaceId: entry.activeSpaceId!,
         stageResume: entry.stageResume ? { ...entry.stageResume } : null,
         deferredPlayerSwitch: null,
-        // Restore-from-history frames default to 'top-level' since the
-        // history snapshot does not yet carry a reason. Task 8 will round-
-        // trip the reason through HistoryEntry alongside the cursor.
+        // Restore-from-history frames default to 'top-level' because the
+        // HistoryEntry schema does not persist a sub-flow `reason`. Cursor-
+        // based serialize/rehydrate (Task 8) round-trips reason through
+        // `EngineFrameCursor.reason`; the in-memory undo path is independent
+        // and only ever rebuilds top-level frames here. See
+        // `docs/sprint-S1-spec.md` D-a for the persisted form.
         reason: 'top-level',
       })
     }

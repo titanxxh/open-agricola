@@ -1038,7 +1038,7 @@ export class Engine {
       id: string
       promptKey?: string
       choices: ActionChoiceOption[]
-      request?: import('../game/types').InteractionRequest
+      request?: InteractionRequest
     } | null
     lastEmittedChoice?: {
       nodeId: string
