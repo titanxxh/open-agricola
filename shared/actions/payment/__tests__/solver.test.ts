@@ -48,6 +48,19 @@ describe('PaymentSolver', () => {
       const state = makeState(makePlayerWithResources({ wood: 5 }))
       expect(PaymentSolver.canAfford(state, 0, { wood: 3 }, ctx)).toBe(true)
     })
+
+    it('agrees with computeOptions for card-payment cost (D3 cache sharing)', () => {
+      const state = makeState(makePlayerWithResources({ wood: 5 }))
+      const ctxWithCards: PaymentCtx = {
+        actionId: 'test-card-cost',
+        costType: 'none',
+        playedCards: ['some-card-id'],
+      }
+      const complexCost = { fee: { wood: 2 } }
+      const optionCount = PaymentSolver.computeOptions(state, 0, complexCost, ctxWithCards).length
+      const canAffordResult = PaymentSolver.canAfford(state, 0, complexCost, ctxWithCards)
+      expect(canAffordResult).toBe(optionCount > 0)
+    })
   })
 
   describe('execute', () => {
