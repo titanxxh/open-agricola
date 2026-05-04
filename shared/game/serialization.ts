@@ -1,5 +1,5 @@
 import type { ActionSpace, GameState } from './types'
-import type { EngineStack, EngineStackCursor } from '../engine'
+import type { EngineFrameCursor, EngineStack, EngineStackCursor } from '../engine'
 import { createActionSpaces } from '../actions'
 import { normalizeState } from '../logic/state'
 import { getCardModifiers } from '../cards/card-modifiers'
@@ -24,7 +24,20 @@ export type SerializeStateContext = {
   engineStack: EngineStack
 }
 
-const EMPTY_ENGINE_STACK_CURSOR: EngineStackCursor = { frames: [] }
+/**
+ * Frozen empty-stack sentinel for callers that have no `EngineStack` to
+ * thread (pure unit tests, draft round-trip helpers, contract tests, etc.).
+ *
+ * Production callers in `server/game-router.ts` and
+ * `server/game/room-manager.ts` always pass a real `ctx.engineStack`. Keeping
+ * `ctx?: SerializeStateContext` optional avoids forcing every test to
+ * construct a `GameSession` just to call `serializeState()`. The frozen
+ * `frames` array prevents callers landing on the fallback path from
+ * accidentally mutating cross-test state.
+ */
+const EMPTY_ENGINE_STACK_CURSOR: Readonly<EngineStackCursor> = Object.freeze({
+  frames: Object.freeze([]) as readonly EngineFrameCursor[],
+}) as Readonly<EngineStackCursor>
 
 export const serializeState = (
   state: GameState,
