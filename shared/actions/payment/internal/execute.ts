@@ -1,8 +1,8 @@
 /**
  * Side-effecting execution path: executePaymentSolution, applyTradeSideEffect,
- * returnCardToBoard, getCheapestSolution, buildBonusReductions. Mutates the
- * player state to apply a chosen PaymentSolution (deduct resources, fire trade
- * side effects, record bonus attribution).
+ * getCheapestSolution, buildBonusReductions. Mutates the player state to apply
+ * a chosen PaymentSolution (deduct resources, fire trade side effects, record
+ * bonus attribution).
  *
  * Internal to shared/actions/payment/. Not exported from the package
  * barrel (shared/actions/payment/index.ts). Use PaymentSolver from
@@ -132,32 +132,6 @@ export const executePaymentSolution = (
     recordPaymentStats(player, solution, bonusReductions)
   }
   return solution.cardUsed
-}
-
-export const returnCardToBoard = (
-  player: PlayerState,
-  cardId: string,
-  state?: Pick<GameState, 'availableMajorImprovements'>,
-): void => {
-  const improvementIndex = player.improvements.indexOf(cardId)
-  if (improvementIndex > -1) {
-    player.improvements.splice(improvementIndex, 1)
-    if (state && !state.availableMajorImprovements.includes(cardId)) {
-      state.availableMajorImprovements.push(cardId)
-    }
-  }
-  const minorPlayedIndex = player.minorPlayed.indexOf(cardId)
-  if (minorPlayedIndex > -1) {
-    player.minorPlayed.splice(minorPlayedIndex, 1)
-    if (player.extraOccupationsFromCards) {
-      player.extraOccupationsFromCards = player.extraOccupationsFromCards.filter(
-        (id) => id !== cardId,
-      )
-    }
-    if (player.cardStates) {
-      delete player.cardStates[cardId]
-    }
-  }
 }
 
 export const getCheapestSolution = (
