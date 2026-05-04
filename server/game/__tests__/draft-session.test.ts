@@ -277,11 +277,11 @@ describe('GameSession — draft persistence (serialize → rehydrate)', () => {
     expect(json.draft.kept.p1.occ).toEqual([p1.occCardId])
 
     const rehydrated = rehydrateState(json)
-    expect(rehydrated.phase).toBe('draft')
-    expect(rehydrated.draft).not.toBeNull()
-    expect(rehydrated.draft!.round).toBe(2)
-    expect(rehydrated.draft!.kept.p1.occ).toEqual([p1.occCardId])
-    expect(rehydrated.draft!.kept.p2.minor).toEqual([p2.minorCardId])
+    expect(rehydrated.state.phase).toBe('draft')
+    expect(rehydrated.state.draft).not.toBeNull()
+    expect(rehydrated.state.draft!.round).toBe(2)
+    expect(rehydrated.state.draft!.kept.p1.occ).toEqual([p1.occCardId])
+    expect(rehydrated.state.draft!.kept.p2.minor).toEqual([p2.minorCardId])
 
     // Load into a fresh session and continue the draft to completion.
     const revived = new GameSession(rehydrated)
