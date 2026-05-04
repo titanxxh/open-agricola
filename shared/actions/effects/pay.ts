@@ -17,8 +17,8 @@ import type { PaymentCtx } from '../payment'
 import {
   executePaymentSolution,
   payResources,
-  returnCardToBoard,
 } from '../helpers/payment'
+import { returnCardToBoard } from '../../cards/helpers/return-card'
 import {
   payTypedFlatCostDetailed,
   resolveCostPaymentSelection,

@@ -8,9 +8,9 @@ import {
   canPayCost,
   executePaymentSolution,
   getCheapestSolution,
-  returnCardToBoard,
   clearPaymentCache,
 } from '../../helpers/payment'
+import { returnCardToBoard } from '../../../cards/helpers/return-card'
 import { buildPaymentChoiceResult, payTypedFlatCost } from '../../helpers/pay-helpers'
 import { payAction } from '../pay'
 
