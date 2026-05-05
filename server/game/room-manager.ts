@@ -417,39 +417,6 @@ function ensurePersistentRooms(): void {
   }
 }
 
-/**
- * Batch-mark long-stale rooms as `'finished'` so the in-process cleanup TTL
- * effectively crosses server restarts. Returns the number of rows touched.
- *
- * Exported for tests and the cleanup script.
- */
-export function pruneStaleRoomRows(
-  db: Pick<import('better-sqlite3').Database, 'prepare'>,
-  now: number,
-  waitingTtlMs: number,
-  fixedIds: ReadonlyArray<string> = FIXED_DEV_ROOMS.map((r) => r.id),
-  playingTtlMs = waitingTtlMs,
-): number {
-  const placeholders = fixedIds.map(() => '?').join(', ') || "''"
-  const staleWaitingCutoff = now - waitingTtlMs
-  const stalePlayingCutoff = now - playingTtlMs
-  try {
-    const res = db.prepare(
-      `UPDATE rooms
-       SET status = 'finished', updated_at = ?
-       WHERE status != 'finished'
-         AND (
-           (status = 'playing' AND updated_at < ?)
-           OR (status != 'playing' AND updated_at < ?)
-         )
-         AND id NOT IN (${placeholders})`,
-    ).run(now, stalePlayingCutoff, staleWaitingCutoff, ...fixedIds) as { changes: number }
-    return res.changes
-  } catch (err) {
-    console.warn('[room-manager] stale-room prune failed:', err)
-    return 0
-  }
-}
 
 /**
  * Restore non-stale rooms into memory via the persistence adapter.
