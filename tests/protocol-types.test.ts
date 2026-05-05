@@ -77,14 +77,12 @@ describe('shared protocol types', () => {
       { type: 'action', spaceId: 'test' },
       { type: 'choice', value: 'confirm' },
       { type: 'anytime', actionId: 'bake-bread' },
-      { type: 'feed', selections: [] },
-      { type: 'nextPlayer' },
       { type: 'roundEnd' },
       { type: 'getState' },
       { type: 'createRoom', maxPlayers: 2 },
       { type: 'joinRoom', roomId: 'abc', requestedPlayerIndex: 0 },
     ]
-    expect(commands.length).toBe(9)
+    expect(commands.length).toBe(7)
   })
 
   it('ServerEvent discriminates on type', () => {

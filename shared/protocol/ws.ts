@@ -7,16 +7,6 @@ type ClientCommandBody =
   | { type: 'choice'; value: string; payload?: Record<string, unknown> }
   | { type: 'anytime'; actionId: string }
   | {
-      type: 'feed'
-      selections: {
-        count: number
-        sourceName?: string
-        sourceId: string
-        /** Entry-index pointer into card.exchanges[] (D3 unified path). */
-        exchangeIndex: number
-      }[]
-    }
-  | {
       type: 'commitSelection'
       playerIndex: number
       payload: {
@@ -24,8 +14,6 @@ type ClientCommandBody =
         cardIds?: string[]
       }
     }
-  | { type: 'nextPlayer' }
-  | { type: 'confirmPlayerSwitch' }
   | { type: 'roundEnd' }
   | { type: 'undoStep' }
   | { type: 'undoAction' }
