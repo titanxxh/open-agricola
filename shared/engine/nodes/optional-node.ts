@@ -1,6 +1,6 @@
 import type { ActionChoiceOption, InteractionRequest } from '../../game/types'
 import type { PromptKey } from '../../game/prompt-keys'
-import type { EngineNode } from '../types'
+import type { EngineNode, EngineContext, NodeStepResult } from '../types'
 import { BaseNode } from './base'
 
 export class OptionalNode extends BaseNode {
@@ -32,5 +32,23 @@ export class OptionalNode extends BaseNode {
 
   resolve() {
     this.nodeState = 'resolved'
+  }
+
+  step(_ctx: EngineContext): NodeStepResult {
+    if (this.getState() === 'resolved') return { kind: 'done' }
+    if (this.active && this.child.getState() === 'resolved') return { kind: 'done' }
+    return { kind: 'continue' }
+  }
+
+  protected cursorData() {
+    return {
+      childId: this.child.id,
+      active: this.active,
+      promptKey: this.promptKey,
+      emittedChoices: this.emittedChoices,
+      emittedPromptKey: this.emittedPromptKey,
+      emittedPromptParams: this.emittedPromptParams,
+      emittedRequest: this.emittedRequest,
+    }
   }
 }
