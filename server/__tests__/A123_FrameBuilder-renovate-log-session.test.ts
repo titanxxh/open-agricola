@@ -44,14 +44,14 @@ describe('A123_FrameBuilder renovation action log attribution', () => {
     // Walk through any choice prompts until the flow finishes or asks for the
     // optional improvement step.
     let guard = 8
-    while (guard-- > 0 && resp.pending.type === 'choice') {
-      const promptKey = resp.pending.promptKey
+    while (guard-- > 0 && resp.interaction.stateId === 'wait') {
+      const promptKey = resp.interaction.promptKey
       if (promptKey === 'ui.interactionChooseRenovationTarget') {
         resp = session.resolveChoice(0, 'clay')
         continue
       }
       // Skip the optional improvement-any leaf if we're prompted for it.
-      const skip = resp.pending.options.find(
+      const skip = resp.interaction.options?.find(
         (opt) => opt.value === '__skip__' || opt.value === 'skip',
       )
       if (skip) {
@@ -106,13 +106,13 @@ describe('A123_FrameBuilder renovation action log attribution', () => {
     let resp = session.takeAction(0, 'house-redevelopment')
     expect(resp.ok).toBe(true)
     let guard = 8
-    while (guard-- > 0 && resp.pending.type === 'choice') {
-      const promptKey = resp.pending.promptKey
+    while (guard-- > 0 && resp.interaction.stateId === 'wait') {
+      const promptKey = resp.interaction.promptKey
       if (promptKey === 'ui.interactionChooseRenovationTarget') {
         resp = session.resolveChoice(0, 'clay')
         continue
       }
-      const skip = resp.pending.options.find(
+      const skip = resp.interaction.options?.find(
         (opt) => opt.value === '__skip__' || opt.value === 'skip',
       )
       if (skip) {

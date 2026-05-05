@@ -53,8 +53,8 @@ describe('A132_Publican session', () => {
     expect(resp.ok).toBe(true)
 
     // If it's a choice (sow/bake-bread), pick sow
-    if (resp.pending.type === 'choice' && resp.pending.promptKey === 'ui.interactionGrainUtilizationChoice') {
-      const sowOption = resp.pending.options?.find(
+    if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionGrainUtilizationChoice') {
+      const sowOption = resp.interaction.options?.find(
         (o: ActionChoiceOption) => o.labelKey === 'actions.sow.name' || o.value === 'sow',
       )
       if (sowOption) {
@@ -66,10 +66,10 @@ describe('A132_Publican session', () => {
     resp = advancePastPlayerSwitches(session, resp)
 
     // The optional flow should present a choice to accept or skip
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    const acceptOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const acceptOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
 
@@ -77,7 +77,7 @@ describe('A132_Publican session', () => {
     resp = advancePastPlayerSwitches(session, resp)
 
     // Now the sow farm interaction should be presented for opponent
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
 
     // Commit the sow with 1 grain crop
@@ -107,8 +107,8 @@ describe('A132_Publican session', () => {
     expect(resp.ok).toBe(true)
 
     // If it's a choice, pick sow
-    if (resp.pending.type === 'choice' && resp.pending.promptKey === 'ui.interactionGrainUtilizationChoice') {
-      const sowOption = resp.pending.options?.find(
+    if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionGrainUtilizationChoice') {
+      const sowOption = resp.interaction.options?.find(
         (o: ActionChoiceOption) => o.labelKey === 'actions.sow.name' || o.value === 'sow',
       )
       if (sowOption) {
@@ -120,8 +120,8 @@ describe('A132_Publican session', () => {
     resp = advancePastPlayerSwitches(session, resp)
 
     // The optional flow should present a choice
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // Decline
     resp = session.resolveChoice(0, '__skip__')
@@ -129,7 +129,7 @@ describe('A132_Publican session', () => {
     resp = advancePastPlayerSwitches(session, resp)
 
     // Now sow farm interaction for opponent
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
 
     resp = session.resolveChoice(1, 'confirm', {
@@ -163,8 +163,8 @@ describe('A132_Publican session', () => {
     expect(resp.ok).toBe(true)
 
     // If it's a choice, pick sow
-    if (resp.pending.type === 'choice' && resp.pending.promptKey === 'ui.interactionGrainUtilizationChoice') {
-      const sowOption = resp.pending.options?.find(
+    if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionGrainUtilizationChoice') {
+      const sowOption = resp.interaction.options?.find(
         (o: ActionChoiceOption) => o.labelKey === 'actions.sow.name' || o.value === 'sow',
       )
       if (sowOption) {
@@ -176,7 +176,7 @@ describe('A132_Publican session', () => {
     resp = advancePastPlayerSwitches(session, resp)
 
     // Should go directly to sow interaction
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
 
     resp = session.resolveChoice(0, 'confirm', {

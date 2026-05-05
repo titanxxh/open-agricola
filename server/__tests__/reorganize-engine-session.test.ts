@@ -36,7 +36,7 @@ describe('reorganizeAction engine sub-flow integration', () => {
     const session = setupWorkPhase()
     const resp = session.takeAction(0, 'pig-market')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     const pending = resp.pending as { type: 'choice'; promptKey?: string; options: { value: string }[] }
     expect(pending.promptKey).toBe('ui.interactionAnimalReorg')
     const values = pending.options.map((o) => o.value).sort()
@@ -50,7 +50,7 @@ describe('reorganizeAction engine sub-flow integration', () => {
     const resp = session.resolveChoice(0, 'confirm', [
       { id: 'pasture-1', zoneType: 'pasture', animalType: 'boar', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.boar).toBe(1)
     expect(resp.state.players[0]!.pastures[0]!.animalType).toBe('boar')
     expect(resp.state.players[0]!.pastures[0]!.animalCount).toBe(1)
@@ -66,7 +66,7 @@ describe('reorganizeAction engine sub-flow integration', () => {
 
     const resp = session.resolveChoice(0, 'cancel')
     expect(resp.state.players[0]!.resources.boar).toBe(1)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     const pending = resp.pending as { promptKey?: string }
     expect(pending.promptKey).toBe('ui.interactionAnimalReorg')
   })

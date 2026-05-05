@@ -74,7 +74,7 @@ describe('E91_PlowBuilder session', () => {
     expect(resp.ok).toBe(true)
 
     // After paying food, plow action starts — should show farmSelect for tile selection
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.stateId).toBe('wait')
 
     // Commit the plow choice

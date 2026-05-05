@@ -351,13 +351,13 @@ export function autoAdvanceRoundEnd(
   while (iter++ < max) {
     if (resp.interaction.stateId !== 'wait' && session.getState().state.gameOver) return
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
       continue
     }
-    if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
       // Default empty-zones wipes resources.{sheep,boar,cattle}; instead
       // build a zone list that preserves all current animals.
-      const pi = resp.pending.playerIndex
+      const pi = resp.interaction.playerIndex
       const player = session.getState().state.players[pi]
       const zones = player ? buildPreservingZones(player) : []
       resp = session.resolveChoice(pi, 'confirm', zones)
@@ -371,7 +371,7 @@ export function autoAdvanceRoundEnd(
       resp = confirmPlayerSwitch(session)
       continue
     }
-    if (resp.pending.type === 'choice') {
+    if (resp.interaction.stateId === 'wait') {
       throw new Error(
         `autoAdvanceRoundEnd hit a choice pending — fixture must pre-clear cards that prompt choices during round-end. choice: ${JSON.stringify(resp.pending).slice(0, 200)}`,
       )

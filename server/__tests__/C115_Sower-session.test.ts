@@ -41,10 +41,10 @@ describe('C115_Sower session', () => {
 
     let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') throw new Error('expected choice')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected choice')
 
-    const fireplace = resp.pending.options.find(
+    const fireplace = resp.interaction.options?.find(
       (option) => option.value === 'major:Major_Fireplace1',
     )
     expect(fireplace).toBeDefined()
@@ -121,10 +121,10 @@ describe('C115_Sower session', () => {
     const resp = session.takeAnytimeAction(0, 'C115-sower-anytime')
     expect(resp.ok).toBe(true)
     // XOR presents options; choose the first one (Option A: take reed)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    const optionA = resp.pending.options[0]!
+    const optionA = resp.interaction.options[0]!
     const resp2 = session.resolveChoice(0, optionA.value)
     expect(resp2.ok).toBe(true)
 
@@ -154,18 +154,18 @@ describe('C115_Sower session', () => {
 
     const resp = session.takeAnytimeAction(0, 'C115-sower-anytime')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // Choose Option B (second option — sow)
-    const optionB = resp.pending.options[1]!
+    const optionB = resp.interaction.options[1]!
     const resp2 = session.resolveChoice(0, optionB.value)
     expect(resp2.ok).toBe(true)
 
     // After choosing sow, the sow interaction should be presented
-    expect(resp2.pending.type).toBe('choice')
-    if (resp2.pending.type !== 'choice') return
-    expect(resp2.pending.promptKey).toBe('ui.interactionSowSelect')
+    expect(resp2.interaction.stateId).toBe('wait')
+    if (resp2.interaction.stateId !== 'wait') return
+    expect(resp2.interaction.promptKey).toBe('ui.interactionSowSelect')
 
     // Reed should not have been gained (pop + pay = net zero)
     const updatedPlayer = resp2.state.players[0]!
@@ -205,9 +205,9 @@ describe('C115_Sower session', () => {
     // Take reed via anytime (Option A)
     let resp = session.takeAnytimeAction(0, 'C115-sower-anytime')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    resp = session.resolveChoice(0, resp.pending.options[0]!.value)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
     expect(resp.ok).toBe(true)
 
     let updatedPlayer = resp.state.players[0]!
@@ -218,9 +218,9 @@ describe('C115_Sower session', () => {
     // Take another reed
     resp = session.takeAnytimeAction(0, 'C115-sower-anytime')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    resp = session.resolveChoice(0, resp.pending.options[0]!.value)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
     expect(resp.ok).toBe(true)
 
     updatedPlayer = resp.state.players[0]!
@@ -231,9 +231,9 @@ describe('C115_Sower session', () => {
     // Take the last reed
     resp = session.takeAnytimeAction(0, 'C115-sower-anytime')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    resp = session.resolveChoice(0, resp.pending.options[0]!.value)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
     expect(resp.ok).toBe(true)
 
     updatedPlayer = resp.state.players[0]!

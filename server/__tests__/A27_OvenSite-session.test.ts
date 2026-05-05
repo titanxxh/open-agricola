@@ -45,10 +45,10 @@ describe('A27_OvenSite session', () => {
     const session = new GameSession()
     let resp = playA27(session)
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    const a27Option = resp.pending.options.find(
+    const a27Option = resp.interaction.options?.find(
       (o) => o.value === `minor:${CARD_ID}`,
     )
     expect(a27Option).toBeDefined()
@@ -68,9 +68,9 @@ describe('A27_OvenSite session', () => {
     // Walk pending choices until either oven purchase offer or done
     const maxSteps = 10
     let steps = 0
-    while (resp.pending.type === 'choice' && steps < maxSteps) {
+    while (resp.interaction.stateId === 'wait' && steps < maxSteps) {
       steps += 1
-      const options = resp.pending.options ?? []
+      const options = resp.interaction.options ?? []
       const skip = options.find((o) => o.value === '__skip__')
       if (skip) {
         resp = session.resolveChoice(0, skip.value)
@@ -97,9 +97,9 @@ describe('A27_OvenSite session', () => {
     const maxSteps = 12
     let steps = 0
     let clayOvenBought = false
-    while (resp.pending.type === 'choice' && steps < maxSteps) {
+    while (resp.interaction.stateId === 'wait' && steps < maxSteps) {
       steps += 1
-      const options = resp.pending.options ?? []
+      const options = resp.interaction.options ?? []
       const clayOven = options.find(
         (o) => o.value === 'major:Major_ClayOven' || o.value === 'Major_ClayOven',
       )
@@ -137,9 +137,9 @@ describe('A27_OvenSite session', () => {
 
     const maxSteps = 12
     let steps = 0
-    while (resp.pending.type === 'choice' && steps < maxSteps) {
+    while (resp.interaction.stateId === 'wait' && steps < maxSteps) {
       steps += 1
-      const options = resp.pending.options ?? []
+      const options = resp.interaction.options ?? []
       const clayOven = options.find(
         (o) => o.value === 'major:Major_ClayOven' || o.value === 'Major_ClayOven',
       )
@@ -155,11 +155,11 @@ describe('A27_OvenSite session', () => {
       throw new Error('expected Clay Oven offer before immediate bake prompt')
     }
 
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.sourceCard).toBe('Major_ClayOven')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.sourceCard).toBe('Major_ClayOven')
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe('Major_ClayOven')
-    expect(resp.pending.options.find((option) => option.value !== '__skip__')?.sourceCard).toBe('Major_ClayOven')
+    expect(resp.interaction.options?.find((option) => option.value !== '__skip__')?.sourceCard).toBe('Major_ClayOven')
   })
 
   describe('prerequisite "Both Fireplace and Cooking Hearth"', () => {

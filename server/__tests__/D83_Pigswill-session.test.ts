@@ -38,9 +38,9 @@ describe('D83_Pigswill session — altCosts', () => {
     const session = setup({ food: 2, grain: 0 })
     let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type !== 'choice') return
+    if (resp.interaction.stateId !== 'wait') return
     resp = session.resolveChoice(0, `minor:${CARD_ID}`)
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.food).toBe(0)
   })
 
@@ -48,28 +48,28 @@ describe('D83_Pigswill session — altCosts', () => {
     const session = setup({ food: 0, grain: 1 })
     let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type !== 'choice') return
+    if (resp.interaction.stateId !== 'wait') return
     resp = session.resolveChoice(0, `minor:${CARD_ID}`)
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.grain).toBe(0)
   })
 
   it('food=2, grain=1 → multi-solution → selectPayment choice', () => {
     const session = setup({ food: 2, grain: 1 })
     let resp = session.takeAction(0, 'major-improvement')
-    if (resp.pending.type !== 'choice') return
+    if (resp.interaction.stateId !== 'wait') return
     resp = session.resolveChoice(0, `minor:${CARD_ID}`)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.promptKey).toBe('prompt.selectPayment')
-    expect(resp.pending.options.length).toBeGreaterThanOrEqual(2)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
+    expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)
   })
 
   it('food=1, grain=0 → not buyable', () => {
     const session = setup({ food: 1, grain: 0 })
     const resp = session.takeAction(0, 'major-improvement')
-    if (resp.pending.type !== 'choice') return
-    const d83Option = resp.pending.options.find((o) => o.value === `minor:${CARD_ID}`)
+    if (resp.interaction.stateId !== 'wait') return
+    const d83Option = resp.interaction.options?.find((o) => o.value === `minor:${CARD_ID}`)
     expect(d83Option).toBeUndefined()
   })
 })

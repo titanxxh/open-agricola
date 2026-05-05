@@ -124,16 +124,16 @@ describe('D113_FoodMerchant session', () => {
     // Should get a choice for the optional exchange
     // The choice pending means the card effect triggered
     let sawChoice = false
-    while (resp.pending.type === 'choice') {
+    while (resp.interaction.stateId === 'wait') {
       sawChoice = true
       // Accept the exchange
-      resp = session.resolveChoice(resp.pending.playerIndex, 'ok')
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'ok')
     }
     while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
     }
-    while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones as any)
+    while (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones as any)
     }
 
     // If the card effect triggered, player should have gained vegetable

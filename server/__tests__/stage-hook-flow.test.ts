@@ -36,17 +36,17 @@ describe('stage hook flows', () => {
 
     session.loadState(state)
     let resp = session.performRoundEnd()
-    expect(resp.pending.type).toBe('choice')
-    expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionNewPurchaseGrain')
 
     resp = chooseFirstOption(session, 0)
-    expect(resp.pending.type).toBe('choice')
-    expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionNewPurchaseVegetable')
 
     resp = chooseFirstOption(session, 0)
-    expect(resp.pending.type).toBe('none')
+    expect(resp.interaction.stateId).not.toBe('wait')
     expect(resp.state.round).toBe(4)
     expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.players[0]!.resources.food).toBe(0)
@@ -83,18 +83,18 @@ describe('stage hook flows', () => {
 
     session.loadState(state)
     let resp = session.performRoundEnd()
-    expect(resp.pending.type).toBe('choice')
-    expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionHaydryer')
 
     resp = chooseFirstOption(session, 0)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
 
     resp = session.resolveChoice(0, 'confirm', [
       { id: 'p1', zoneType: 'pasture', animalType: 'cattle', animalCount: 1 },
     ])
 
-    expect(resp.pending.type).toBe('none')
+    expect(resp.interaction.stateId).not.toBe('wait')
     expect(resp.state.players[0]!.resources.food).toBe(3)
     expect(resp.state.players[0]!.resources.cattle).toBe(1)
     expect(readCardResourceStats(resp.state.players[0]!, 'A166_Haydryer')).toMatchObject({
@@ -123,12 +123,12 @@ describe('stage hook flows', () => {
 
     session.loadState(state)
     let resp = session.performRoundEnd()
-    expect(resp.pending.type).toBe('choice')
-    expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionEarthenwarePotter')
 
     resp = chooseFirstOption(session, 0)
-    expect(resp.pending.type).toBe('none')
+    expect(resp.interaction.stateId).not.toBe('wait')
     expect(resp.state.gameOver).toBe(true)
     expect(resp.state.players[0]!.resources.clay).toBe(0)
     expect(resp.state.players[0]!.cardStates?.D99_EarthenwarePotter?.counters?.bonusVp).toBe(2)
@@ -158,7 +158,7 @@ describe('stage hook flows', () => {
     session.loadState(state)
     const resp = session.performRoundEnd()
 
-    expect(resp.pending.type).toBe('none')
+    expect(resp.interaction.stateId).not.toBe('wait')
     expect(resp.state.round).toBe(5)
     expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.players[0]!.resources.food).toBe(8)
@@ -200,7 +200,7 @@ describe('stage hook flows', () => {
     session.loadState(state)
     const resp = session.performRoundEnd()
 
-    expect(resp.pending.type).toBe('none')
+    expect(resp.interaction.stateId).not.toBe('wait')
     expect(resp.state.round).toBe(5)
     expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.players[0]!.resources.food).toBe(6)
@@ -253,19 +253,19 @@ describe('stage hook flows', () => {
 
     session.loadState(state)
     let resp = session.performRoundEnd()
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
 
     resp = session.resolveChoice(0, 'confirm', [
       { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: 3 },
       { id: 'p2', zoneType: 'pasture', animalType: 'boar', animalCount: 3 },
     ])
-    expect(resp.pending.type).toBe('choice')
-    expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionSlurrySpreaderSow')
 
     resp = chooseFirstOption(session, 0)
-    expect(resp.pending.type).toBe('choice')
-    expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionSowSelect')
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.farm.farmType : undefined)
@@ -275,7 +275,7 @@ describe('stage hook flows', () => {
       crops: [{ row: 0, col: 0, crop: 'grain' }],
     })
 
-    expect(resp.pending.type).toBe('none')
+    expect(resp.interaction.stateId).not.toBe('wait')
     expect(resp.state.round).toBe(5)
     expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.players[0]!.resources.food).toBe(6)
@@ -329,19 +329,19 @@ describe('stage hook flows', () => {
 
     session.loadState(state)
     let resp = session.performRoundEnd()
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
 
     resp = session.resolveChoice(0, 'confirm', [
       { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: 3 },
       { id: 'p2', zoneType: 'pasture', animalType: 'boar', animalCount: 3 },
     ])
-    expect(resp.pending.type).toBe('choice')
-    expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionFodderPlanterSow')
 
     resp = chooseFirstOption(session, 0)
-    expect(resp.pending.type).toBe('choice')
-    expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionSowSelect')
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.farm.farmType : undefined)
@@ -357,7 +357,7 @@ describe('stage hook flows', () => {
       ],
     })
 
-    expect(resp.pending.type).toBe('none')
+    expect(resp.interaction.stateId).not.toBe('wait')
     expect(resp.state.round).toBe(5)
     expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.players[0]!.resources.food).toBe(6)
@@ -401,13 +401,13 @@ describe('stage hook flows', () => {
 
     session.loadState(state)
     let resp = session.performRoundEnd()
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
 
     resp = session.resolveChoice(0, 'confirm', [
       { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: 3 },
     ])
-    expect(resp.pending.type).toBe('choice')
-    expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionFodderPlanterSow')
 
     resp = chooseFirstOption(session, 0)

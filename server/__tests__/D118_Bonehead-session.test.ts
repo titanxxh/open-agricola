@@ -53,11 +53,11 @@ describe('D118_Bonehead session', () => {
     expect(resp.ok).toBe(true)
 
     // Should be in choice to select which occupation to play
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') throw new Error('expected occupation choice')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected occupation choice')
 
     // Select A102_Grocer
-    const grocerOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value === 'A102_Grocer')
+    const grocerOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === 'A102_Grocer')
     expect(grocerOption).toBeDefined()
     resp = session.resolveChoice(0, 'A102_Grocer')
     expect(resp.ok).toBe(true)
@@ -80,7 +80,7 @@ describe('D118_Bonehead session', () => {
     let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
 
-    const grocerOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value === 'A102_Grocer')
+    const grocerOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === 'A102_Grocer')
     expect(grocerOption).toBeDefined()
     resp = session.resolveChoice(0, 'A102_Grocer')
     expect(resp.ok).toBe(true)

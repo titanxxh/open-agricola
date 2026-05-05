@@ -112,7 +112,7 @@ describe('E70_CropRotationField session', () => {
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
       expect(resp.ok).toBe(true)
-      expect(resp.pending.type).toBe('choice')
+      expect(resp.interaction.stateId).toBe('wait')
       expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
 
       // Sow grain on the virtual tile
@@ -362,7 +362,7 @@ describe('E70_CropRotationField session', () => {
       expect(resp.ok).toBe(true)
       // If sow is available, resolving 'sow' should succeed
       expect(resp.ok).toBe(true)
-      expect(resp.pending.type).toBe('choice')
+      expect(resp.interaction.stateId).toBe('wait')
       expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
     })
 

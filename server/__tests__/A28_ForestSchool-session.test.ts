@@ -41,7 +41,7 @@ describe('A28_ForestSchool session', () => {
   it('makes occupied lessons available only when the card is played', () => {
     const withCard = setup(true).getState()
     expect(withCard.ok).toBe(true)
-    expect(withCard.pending.type).toBe('none')
+    expect(withCard.interaction.stateId).not.toBe('wait')
     expect(withCard.actionAvailability?.lessons).toBe(true)
 
     const withoutCardSession = setup(false)
@@ -58,7 +58,7 @@ describe('A28_ForestSchool session', () => {
 
     const resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)
     expect(resp.state.players[0]!.resources.wood).toBe(0)
     // D152_Patron grants 2 food before playing an occupation

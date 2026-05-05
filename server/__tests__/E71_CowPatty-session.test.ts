@@ -75,8 +75,8 @@ describe('E71_CowPatty session', () => {
     expect(resp.ok).toBe(true)
 
     // Continue through any remaining choices
-    while (resp.pending.type === 'choice') {
-      resp = session.resolveChoice(resp.pending.playerIndex, resp.pending.options[0]?.value ?? 'ok')
+    while (resp.interaction.stateId === 'wait') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options[0]?.value ?? 'ok')
     }
 
     // Field should have 4 grain (3 normal + 1 bonus)
@@ -111,8 +111,8 @@ describe('E71_CowPatty session', () => {
     })
     expect(resp.ok).toBe(true)
 
-    while (resp.pending.type === 'choice') {
-      resp = session.resolveChoice(resp.pending.playerIndex, resp.pending.options[0]?.value ?? 'ok')
+    while (resp.interaction.stateId === 'wait') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options[0]?.value ?? 'ok')
     }
 
     // Field should have 3 grain (normal, no bonus)
@@ -146,8 +146,8 @@ describe('E71_CowPatty session', () => {
     })
     expect(resp.ok).toBe(true)
 
-    while (resp.pending.type === 'choice') {
-      resp = session.resolveChoice(resp.pending.playerIndex, resp.pending.options[0]?.value ?? 'ok')
+    while (resp.interaction.stateId === 'wait') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options[0]?.value ?? 'ok')
     }
 
     const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 2)
@@ -170,8 +170,8 @@ describe('E71_CowPatty session', () => {
     })
     expect(resp.ok).toBe(true)
 
-    while (resp.pending.type === 'choice') {
-      resp = session.resolveChoice(resp.pending.playerIndex, resp.pending.options[0]?.value ?? 'ok')
+    while (resp.interaction.stateId === 'wait') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options[0]?.value ?? 'ok')
     }
 
     const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 2)
@@ -204,8 +204,8 @@ describe('E71_CowPatty session', () => {
     })
     expect(resp.ok).toBe(true)
 
-    while (resp.pending.type === 'choice') {
-      resp = session.resolveChoice(resp.pending.playerIndex, resp.pending.options[0]?.value ?? 'ok')
+    while (resp.interaction.stateId === 'wait') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options[0]?.value ?? 'ok')
     }
 
     const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 2)
@@ -247,8 +247,8 @@ describe('E71_CowPatty session', () => {
     expect(resp.ok).toBe(true)
 
     // Continue through any remaining choices
-    while (resp.pending.type === 'choice') {
-      resp = session.resolveChoice(resp.pending.playerIndex, resp.pending.options[0]?.value ?? 'ok')
+    while (resp.interaction.stateId === 'wait') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options[0]?.value ?? 'ok')
     }
 
     const player = resp.state.players[0]!
@@ -296,14 +296,14 @@ describe('E71_CowPatty session', () => {
     expect(resp.ok).toBe(true)
 
     // Should get a selection choice for which field gets the bonus
-    if (resp.pending.type === 'choice') {
+    if (resp.interaction.stateId === 'wait') {
       resp = session.resolveChoice(0, '0-2')
       expect(resp.ok).toBe(true)
     }
 
     // Continue through any remaining choices
-    while (resp.pending.type === 'choice') {
-      resp = session.resolveChoice(resp.pending.playerIndex, resp.pending.options[0]?.value ?? 'ok')
+    while (resp.interaction.stateId === 'wait') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options[0]?.value ?? 'ok')
     }
 
     const player = resp.state.players[0]!

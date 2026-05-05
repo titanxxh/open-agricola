@@ -58,11 +58,11 @@ describe('B25_BreadPaddle session', () => {
     // Use lessons to play occupation (first occupation is free)
     let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // Choose the occupation
-    const occOption = resp.pending.options.find((o: ActionChoiceOption) => o.value === occId)
+    const occOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === occId)
     expect(occOption).toBeDefined()
     resp = session.resolveChoice(0, occId)
     expect(resp.ok).toBe(true)
@@ -97,16 +97,16 @@ describe('B25_BreadPaddle session', () => {
 
     let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     resp = session.resolveChoice(0, 'A114_SeasonalWorker')
     expect(resp.ok).toBe(true)
 
     let steps = 0
-    while (resp.pending.type === 'choice' && steps < 6) {
+    while (resp.interaction.stateId === 'wait' && steps < 6) {
       steps++
-      const options = resp.pending.options ?? []
+      const options = resp.interaction.options ?? []
       const next = options.find((option) => option.value !== '__skip__' && option.value !== 'cancel')
       expect(next).toBeDefined()
       resp = session.resolveChoice(0, next!.value)
@@ -144,7 +144,7 @@ describe('B25_BreadPaddle session', () => {
 
     let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type !== 'choice') return
+    if (resp.interaction.stateId !== 'wait') return
 
     resp = session.resolveChoice(0, occId)
     expect(resp.ok).toBe(true)

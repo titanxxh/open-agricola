@@ -41,8 +41,8 @@ describe('D20_TurnwrestPlow session', () => {
     expect(resp.ok).toBe(true)
 
     // First optional plow
-    expect(resp.pending.type).toBe('choice')
-    const accept1 = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    expect(resp.interaction.stateId).toBe('wait')
+    const accept1 = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(accept1).toBeDefined()
     resp = session.resolveChoice(0, accept1!.value)
     expect(resp.ok).toBe(true)
@@ -53,8 +53,8 @@ describe('D20_TurnwrestPlow session', () => {
     expect(resp.ok).toBe(true)
 
     // Second optional plow
-    expect(resp.pending.type).toBe('choice')
-    const accept2 = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    expect(resp.interaction.stateId).toBe('wait')
+    const accept2 = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(accept2).toBeDefined()
     resp = session.resolveChoice(0, accept2!.value)
     expect(resp.ok).toBe(true)
@@ -82,8 +82,8 @@ describe('D20_TurnwrestPlow session', () => {
     // S2 Task 5/8 (post-farm-select kind): D20's `after place-farmer` hook
     // prepends its OptionalNode wrapper before cultivation's main OrNode,
     // so the first surfaced choice is the D20 'do/skip' prompt — accept it.
-    if (resp.pending.type === 'choice' && resp.pending.promptKey === 'ui.interactionOptionalAction') {
-      const acceptStack = resp.pending.options.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionOptionalAction') {
+      const acceptStack = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
       expect(acceptStack).toBeDefined()
       resp = session.resolveChoice(0, acceptStack!.value)
     }
@@ -97,13 +97,13 @@ describe('D20_TurnwrestPlow session', () => {
 
     // After D20 plow, the cultivation OrNode 'plow vs sow' choice surfaces.
     // Walk through sow if offered (decline it).
-    if (resp.pending.type === 'choice' && resp.pending.options?.some((o: ActionChoiceOption) => o.labelKey?.includes('sow') || o.labelKey?.includes('Sow'))) {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.options?.some((o: ActionChoiceOption) => o.labelKey?.includes('sow') || o.labelKey?.includes('Sow'))) {
       resp = session.resolveChoice(0, '__skip__')
     }
 
     // Cultivation's main plow choice (or another D20 optional plow) surfaces next.
-    expect(resp.pending.type).toBe('choice')
-    const accept1 = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    expect(resp.interaction.stateId).toBe('wait')
+    const accept1 = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     if (accept1) {
       resp = session.resolveChoice(0, accept1!.value)
       expect(resp.ok).toBe(true)
@@ -127,7 +127,7 @@ describe('D20_TurnwrestPlow session', () => {
     resp = session.resolveChoice(0, 'confirm', { tile: tile1 })
 
     // Skip optional
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     resp = session.resolveChoice(0, '__skip__')
     expect(resp.ok).toBe(true)
 

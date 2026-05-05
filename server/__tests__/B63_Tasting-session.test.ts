@@ -48,7 +48,7 @@ describe('B63_Tasting session', () => {
     let safety = 30
     // Accept Tasting exchange if presented
     while (safety-- > 0 && resp.pending?.type === 'choice') {
-      const options = resp.pending.options ?? []
+      const options = resp.interaction.options ?? []
       // Look for the grain-pay option
       const payOpt = options.find((o: ActionChoiceOption) =>
         o.value?.startsWith?.('pay') ||
@@ -84,7 +84,7 @@ describe('B63_Tasting session', () => {
     expect(resp.ok).toBe(true)
     let safety = 30
     while (safety-- > 0 && resp.pending?.type === 'choice') {
-      const options = resp.pending.options ?? []
+      const options = resp.interaction.options ?? []
       const skipOpt = options.find((o: ActionChoiceOption) => o.value === '__skip__')
       const occOpt = options.find((o: ActionChoiceOption) => o.value === 'A93_BedMaker')
       if (skipOpt) {

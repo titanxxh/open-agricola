@@ -169,17 +169,17 @@ describe('D103_CanalBoatman session', () => {
     expect(resp.ok).toBe(true)
     expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)
     expect(resp.state.players[0]!.resources.food).toBe(3)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    const acceptOption = resp.pending.options.find((option) => option.value !== '__skip__')
+    const acceptOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
 
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    resp = session.resolveChoice(0, resp.pending.options[0]!.value)
+    resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
 
     const player = resp.state.players[0]!
     expect(workersAvailable(resp.state, player)).toBe(0)
@@ -195,17 +195,17 @@ describe('D103_CanalBoatman session', () => {
     let resp = session.takeAction(0, 'fishing')
     expect(resp.ok).toBe(true)
     expect(getRoundPlacementOrder(resp.state.players[0]!)).toHaveLength(1)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    const acceptOption = resp.pending.options.find((option) => option.value !== '__skip__')
+    const acceptOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
 
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    resp = session.resolveChoice(0, resp.pending.options[0]!.value)
+    resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
 
     expect(getRoundPlacementOrder(resp.state.players[0]!)).toHaveLength(2)
   })
@@ -231,17 +231,17 @@ describe('D103_CanalBoatman session', () => {
     session.loadState(state)
 
     let resp = session.takeAction(0, 'fishing')
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    const acceptOption = resp.pending.options.find((option) => option.value !== '__skip__')
+    const acceptOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
 
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    resp = session.resolveChoice(0, resp.pending.options[0]!.value)
+    resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
 
     const nextState = session.getState().state
     nextState.currentPlayerIndex = 0
@@ -249,10 +249,10 @@ describe('D103_CanalBoatman session', () => {
 
     resp = session.takeAction(0, 'wish-children')
     expect(getRoundPlacementOrder(resp.state.players[0]!)).toHaveLength(3)
-    if (resp.pending.type === 'choice') {
-      expect(resp.pending.promptKey).not.toBe('ui.interactionGodlySpouse')
+    if (resp.interaction.stateId === 'wait') {
+      expect(resp.interaction.promptKey).not.toBe('ui.interactionGodlySpouse')
       expect(
-        resp.pending.options.some((option) => option.labelKey === 'ui.interactionGodlySpouseUse'),
+        resp.interaction.options?.some((option) => option.labelKey === 'ui.interactionGodlySpouseUse'),
       ).toBe(false)
     }
   })

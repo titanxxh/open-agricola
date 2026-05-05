@@ -16,8 +16,8 @@ const driveAccepts = (
   maxIters = 30,
 ): ReturnType<GameSession['takeAction']> => {
   let resp = initialResp
-  while (maxIters-- > 0 && resp.pending.type === 'choice') {
-    const opts = resp.pending.options ?? []
+  while (maxIters-- > 0 && resp.interaction.stateId === 'wait') {
+    const opts = resp.interaction.options ?? []
     const skip = opts.find((o) => o.value === '__skip__')
     // Engine-driven farm prompts (room/stable/etc.) require a payload-bearing
     // 'confirm' to actually commit; the legacy "no-op confirm" path is gone.

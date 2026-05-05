@@ -43,11 +43,11 @@ const playC16 = (session: GameSession): void => {
   //   - pick C16 from the minor-improvement options
   //   - accept C16's own SEQ-optional wrapper before the fencing leaf
   let safety = 0
-  while (resp.pending.type === 'choice' && safety < 12) {
+  while (resp.interaction.stateId === 'wait' && safety < 12) {
     safety += 1
     const interaction = (resp as { interaction?: { stateId?: string } }).interaction
     if (interaction?.stateId === 'wait') break
-    const opts = resp.pending.options.map((o) => o.value)
+    const opts = resp.interaction.options?.map((o) => o.value)
     const cardOption = opts.find((v) => v === `minor:${CARD_ID}`)
     if (cardOption) {
       resp = session.resolveChoice(0, cardOption)

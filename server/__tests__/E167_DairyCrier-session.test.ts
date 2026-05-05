@@ -41,9 +41,9 @@ const setup = () => {
 const drainPending = (session: GameSession, resp: ReturnType<GameSession['getState']>) => {
   let safety = 30
   while (safety-- > 0) {
-    if (resp.pending.type === 'choice') {
-      const playerIdx = resp.pending.playerIndex ?? 0
-      resp = session.resolveChoice(playerIdx, resp.pending.options[0]!.value)
+    if (resp.interaction.stateId === 'wait') {
+      const playerIdx = resp.interaction.playerIndex ?? 0
+      resp = session.resolveChoice(playerIdx, resp.interaction.options[0]!.value)
     } else if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     } else {
@@ -62,11 +62,11 @@ describe('E167_DairyCrier session', () => {
     // Play via lessons action to trigger the onBuy flow
     let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // Choose E167_DairyCrier from the occupation options
-    const cardOption = resp.pending.options.find((o) => o.value === CARD_ID)
+    const cardOption = resp.interaction.options?.find((o) => o.value === CARD_ID)
     expect(cardOption).toBeDefined()
     resp = session.resolveChoice(0, CARD_ID)
     expect(resp.ok).toBe(true)

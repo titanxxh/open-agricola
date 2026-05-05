@@ -49,12 +49,12 @@ describe('B130_FullPeasant session', () => {
     expect(resp.ok).toBe(true)
     // Grain utilization auto-resolves (no field to sow, no oven to bake); the
     // B130 after-place-farmer optional chain becomes the first pending choice.
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    const hasSkip = resp.pending.options.some((o) => o.value === '__skip__')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const hasSkip = resp.interaction.options?.some((o) => o.value === '__skip__')
     expect(hasSkip).toBe(true)
     // The non-skip option is the pay-resources leaf for the optional seq
-    const payOption = resp.pending.options.find((o) => o.value !== '__skip__')
+    const payOption = resp.interaction.options?.find((o) => o.value !== '__skip__')
     expect(payOption).toBeDefined()
   })
 
@@ -63,11 +63,11 @@ describe('B130_FullPeasant session', () => {
     const placedBefore = session.getState().state.players[0]!.stats?.placedFarmers ?? 0
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // Accept the B130 chain (non-skip option activates the optional seq)
-    const accept = resp.pending.options.find((o) => o.value !== '__skip__')
+    const accept = resp.interaction.options?.find((o) => o.value !== '__skip__')
     expect(accept).toBeDefined()
     resp = session.resolveChoice(0, accept!.value)
     // Food should be -1 after pay (from 3 to 2)
@@ -87,7 +87,7 @@ describe('B130_FullPeasant session', () => {
     const placedBefore = session.getState().state.players[0]!.stats?.placedFarmers ?? 0
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type !== 'choice') return
+    if (resp.interaction.stateId !== 'wait') return
     resp = session.resolveChoice(0, '__skip__')
     const grainSpace = resp.state.actionSpaces.find((s) => s.id === 'grain-utilization')!
     const fencingSpace = resp.state.actionSpaces.find((s) => s.id === 'fencing')!
@@ -102,8 +102,8 @@ describe('B130_FullPeasant session', () => {
     const activeBefore = stateBefore.players[0]!.workers.filter((w) => w.isActive).length
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type !== 'choice') return
-    const accept = resp.pending.options.find((o) => o.value !== '__skip__')!
+    if (resp.interaction.stateId !== 'wait') return
+    const accept = resp.interaction.options?.find((o) => o.value !== '__skip__')!
     resp = session.resolveChoice(0, accept.value)
     expect(resp.state.players[0]!.workers.filter((w) => w.isActive).length).toBe(activeBefore)
   })
@@ -112,7 +112,7 @@ describe('B130_FullPeasant session', () => {
     const session = setup({ withCard: true, food: 3, fencingOccupied: true })
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type !== 'choice') return
+    if (resp.interaction.stateId !== 'wait') return
     // Skip grain-utilization's sow/bake
     resp = session.resolveChoice(0, '__skip__')
     // After place-farmer hooks: B130 should NOT have triggered (fencing occupied).
@@ -124,7 +124,7 @@ describe('B130_FullPeasant session', () => {
     const session = setup({ withCard: true, food: 0 })
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type !== 'choice') return
+    if (resp.interaction.stateId !== 'wait') return
     resp = session.resolveChoice(0, '__skip__')
     expect(resp.pending.type).not.toBe('choice')
   })
@@ -133,7 +133,7 @@ describe('B130_FullPeasant session', () => {
     const session = setup({ withCard: false, food: 3 })
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type !== 'choice') return
+    if (resp.interaction.stateId !== 'wait') return
     resp = session.resolveChoice(0, '__skip__')
     expect(resp.pending.type).not.toBe('choice')
   })

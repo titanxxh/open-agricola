@@ -69,13 +69,13 @@ describe('D12_MilkingPlace session', () => {
 
     // Process harvest feed for all players
     while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      const pidx = resp.pending.playerIndex
+      const pidx = resp.interaction.playerIndex
       resp = session.resolveChoice(pidx, 'confirm', { selections: [] })
     }
 
     // Handle any animal reorgs
-    while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones)
+    while (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
     }
 
     // Player 0 had 1 food, got 1 from MilkingPlace card = 2 food total.
@@ -105,12 +105,12 @@ describe('D12_MilkingPlace session', () => {
     let resp = session.performRoundEnd()
 
     while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      const pidx = resp.pending.playerIndex
+      const pidx = resp.interaction.playerIndex
       resp = session.resolveChoice(pidx, 'confirm', { selections: [] })
     }
 
-    while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones)
+    while (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
     }
 
     // Without the card: 1 food, need 2, so 1 begging

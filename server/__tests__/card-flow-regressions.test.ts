@@ -25,25 +25,25 @@ describe('card flow regressions', () => {
     session.loadState(state)
 
     let resp = session.takeAction(0, 'sheep-market')
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
 
     resp = session.resolveChoice(0, 'confirm', [
       { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ])
-    expect(resp.pending.type).toBe('choice')
-    expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionReclamationPlow')
 
-    if (resp.pending.type !== 'choice') {
+    if (resp.interaction.stateId !== 'wait') {
       throw new Error('expected reclamation plow choice')
     }
-    const skip = resp.pending.options.find((option) => option.labelKey === 'ui.interactionOptionalSkip')
+    const skip = resp.interaction.options?.find((option) => option.labelKey === 'ui.interactionOptionalSkip')
     expect(skip).toBeDefined()
 
     resp = session.resolveChoice(0, skip!.value)
     expect(resp.state.players[0]!.cardStates?.A17_ReclamationPlow?.flagged).toBeFalsy()
     expect(resp.state.players[0]!.cardStates?.A17_ReclamationPlow?.infobox).toBeUndefined()
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 
   it('A17_ReclamationPlow does not prompt again after confirming the plow choice', () => {
@@ -62,25 +62,25 @@ describe('card flow regressions', () => {
     session.loadState(state)
 
     let resp = session.takeAction(0, 'sheep-market')
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
 
     resp = session.resolveChoice(0, 'confirm', [
       { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ])
-    expect(resp.pending.type).toBe('choice')
-    expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionReclamationPlow')
 
-    if (resp.pending.type !== 'choice') {
+    if (resp.interaction.stateId !== 'wait') {
       throw new Error('expected reclamation plow choice')
     }
 
-    const use = resp.pending.options.find((option) => option.labelKey === 'ui.interactionReclamationPlowUse')
+    const use = resp.interaction.options?.find((option) => option.labelKey === 'ui.interactionReclamationPlowUse')
     expect(use).toBeDefined()
 
     resp = session.resolveChoice(0, use!.value)
-    expect(resp.pending.type).toBe('choice')
-    expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionPlowSelect')
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') {
@@ -119,14 +119,14 @@ describe('card flow regressions', () => {
     session.loadState(state)
 
     let resp = session.takeAction(0, 'wish-children')
-    expect(resp.pending.type).toBe('choice')
-    expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionGodlySpouse')
 
-    if (resp.pending.type !== 'choice') {
+    if (resp.interaction.stateId !== 'wait') {
       throw new Error('expected godly spouse choice')
     }
-    const use = resp.pending.options.find((option) => option.labelKey === 'ui.interactionGodlySpouseUse')
+    const use = resp.interaction.options?.find((option) => option.labelKey === 'ui.interactionGodlySpouseUse')
     expect(use).toBeDefined()
 
     resp = session.resolveChoice(0, use!.value)

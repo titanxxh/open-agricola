@@ -39,8 +39,8 @@ describe('B155 ArtTeacher onBuy listener', () => {
 
     let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type === 'choice') {
-      const opt = resp.pending.options.find((o) => o.value === CARD_ID)
+    if (resp.interaction.stateId === 'wait') {
+      const opt = resp.interaction.options?.find((o) => o.value === CARD_ID)
       expect(opt).toBeDefined()
       resp = session.resolveChoice(0, opt!.value)
     }
@@ -132,7 +132,7 @@ describe('B155 ArtTeacher computeCosts (TP food trade)', () => {
 
     let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type === 'choice') {
+    if (resp.interaction.stateId === 'wait') {
       resp = session.resolveChoice(0, CARD_ID)
     }
     expect(resp.state.players[0]!.occupationPlayed).toContain(CARD_ID)

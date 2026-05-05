@@ -52,10 +52,10 @@ describe('A156_Buyer session', () => {
     }
 
     // The optional flow should present a choice to accept or skip
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type === 'choice') {
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId === 'wait') {
       // Find the non-skip option (accept)
-      const acceptOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+      const acceptOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
       expect(acceptOption).toBeDefined()
       resp = session.resolveChoice(0, acceptOption!.value)
     }
@@ -89,8 +89,8 @@ describe('A156_Buyer session', () => {
     }
 
     // The optional flow should present a choice
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type === 'choice') {
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId === 'wait') {
       // Decline by choosing __skip__
       resp = session.resolveChoice(0, '__skip__')
     }
@@ -117,7 +117,7 @@ describe('A156_Buyer session', () => {
     expect(resp.ok).toBe(true)
 
     // Sheep collection triggers animalReorg for opponent first
-    if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(1, 'confirm', [])
     }
 
@@ -127,16 +127,16 @@ describe('A156_Buyer session', () => {
     }
 
     // Accept the optional exchange
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type === 'choice') {
-      const acceptOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId === 'wait') {
+      const acceptOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
       expect(acceptOption).toBeDefined()
       resp = session.resolveChoice(0, acceptOption!.value)
     }
 
     // Handle animalReorg for buyer if needed (gaining sheep requires placement)
-    if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
-      expect(resp.pending.playerIndex).toBe(0)
+    if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      expect(resp.interaction.playerIndex).toBe(0)
       resp = session.resolveChoice(0, 'confirm', [
         { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
       ])

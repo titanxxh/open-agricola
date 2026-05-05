@@ -30,17 +30,17 @@ const drainHarvest = (session: GameSession, feedSelections: Record<number, FeedS
   let resp = session.performRoundEnd()
   while (resp.interaction.stateId === 'wait') {
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      const idx = resp.pending.playerIndex
+      const idx = resp.interaction.playerIndex
       const sel = feedSelections[idx] ?? []
       resp = session.resolveChoice(idx, 'confirm', { selections: sel })
-    } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    } else if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
       const interaction = resp.interaction.stateId === 'wait' ? resp.interaction : null
-      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', interaction?.zones ?? [])
-    } else if (resp.pending.type === 'choice') {
-      const opts = resp.pending.options ?? []
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', interaction?.zones ?? [])
+    } else if (resp.interaction.stateId === 'wait') {
+      const opts = resp.interaction.options ?? []
       const next = opts.find((o) => o.value === '__skip__') ?? opts[0]
       if (!next) break
-      resp = session.resolveChoice(resp.pending.playerIndex ?? 0, next.value)
+      resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, next.value)
     } else {
       break
     }

@@ -35,7 +35,7 @@ describe('C141_SheepProvider session', () => {
     // Opponent takes sheep-market; sheep collection triggers animalReorg first
     let resp = session.takeAction(1, 'sheep-market')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
 
     // Confirm animal reorg for opponent (p1) — engine finishes, after-hooks fire
     resp = session.resolveChoice(1, 'confirm', [])
@@ -52,7 +52,7 @@ describe('C141_SheepProvider session', () => {
     // Owner takes sheep-market; sheep collection triggers animalReorg first
     let resp = session.takeAction(0, 'sheep-market')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
 
     // Confirm animal reorg for owner — engine finishes, after-hooks fire
     // No PlayerSwitch needed since owner triggered it

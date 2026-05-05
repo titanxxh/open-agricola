@@ -47,8 +47,8 @@ describe('D95_SiteManager session', () => {
   const playOccupation = (session: GameSession) => {
     const resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type !== 'choice') return resp
-    const opt = resp.pending.options?.find((o) => o.value === CARD_ID)
+    if (resp.interaction.stateId !== 'wait') return resp
+    const opt = resp.interaction.options?.find((o) => o.value === CARD_ID)
     expect(opt).toBeDefined()
     return session.resolveChoice(0, opt!.value)
   }
@@ -63,9 +63,9 @@ describe('D95_SiteManager session', () => {
     // choice and assert we see Fireplace1 as a major option.
     let steps = 0
     let foundFireplace = false
-    while (resp.pending.type === 'choice' && steps < 10) {
+    while (resp.interaction.stateId === 'wait' && steps < 10) {
       steps++
-      const options = resp.pending.options ?? []
+      const options = resp.interaction.options ?? []
       if (options.some((o) => o.value === 'major:Major_Fireplace1')) {
         foundFireplace = true
         break
@@ -107,9 +107,9 @@ describe('D95_SiteManager session', () => {
     // Walk until we find and pick Fireplace1
     let steps = 0
     let bought = false
-    while (resp.pending.type === 'choice' && steps < 12) {
+    while (resp.interaction.stateId === 'wait' && steps < 12) {
       steps++
-      const options = resp.pending.options ?? []
+      const options = resp.interaction.options ?? []
       const fireplace = options.find(
         (o) => o.value === 'major:Major_Fireplace1' || o.value === 'Major_Fireplace1',
       )
@@ -166,13 +166,13 @@ describe('D95_SiteManager session', () => {
     // Walk into the improvement flow and pick Joinery, stop at the payment prompt.
     let steps = 0
     let sawPaymentPrompt = false
-    while (resp.pending.type === 'choice' && steps < 12) {
+    while (resp.interaction.stateId === 'wait' && steps < 12) {
       steps++
-      if (resp.pending.promptKey === 'prompt.selectPayment') {
+      if (resp.interaction.promptKey === 'prompt.selectPayment') {
         sawPaymentPrompt = true
         break
       }
-      const options = resp.pending.options ?? []
+      const options = resp.interaction.options ?? []
       const joinery = options.find(
         (o) => o.value === 'major:Major_Joinery' || o.value === 'Major_Joinery',
       )
@@ -188,8 +188,8 @@ describe('D95_SiteManager session', () => {
     }
 
     expect(sawPaymentPrompt).toBe(true)
-    if (resp.pending.type !== 'choice') return
-    const paymentOptions = resp.pending.options ?? []
+    if (resp.interaction.stateId !== 'wait') return
+    const paymentOptions = resp.interaction.options ?? []
     expect(paymentOptions.length).toBeGreaterThanOrEqual(2)
 
     type PaymentLabel = {
@@ -234,9 +234,9 @@ describe('D95_SiteManager session', () => {
     // Player has enough clay for Fireplace (2) → no food substitution.
     let steps = 0
     let bought = false
-    while (resp.pending.type === 'choice' && steps < 12) {
+    while (resp.interaction.stateId === 'wait' && steps < 12) {
       steps++
-      const options = resp.pending.options ?? []
+      const options = resp.interaction.options ?? []
       const fireplace = options.find(
         (o) => o.value === 'major:Major_Fireplace1' || o.value === 'Major_Fireplace1',
       )
@@ -286,9 +286,9 @@ describe('D95_SiteManager session', () => {
     // Drive through the optional improvement-any flow to the end.
     let steps = 0
     let bought = false
-    while (resp.pending.type === 'choice' && steps < 12) {
+    while (resp.interaction.stateId === 'wait' && steps < 12) {
       steps++
-      const options = resp.pending.options ?? []
+      const options = resp.interaction.options ?? []
       const fireplace = options.find(
         (o) => o.value === 'major:Major_Fireplace1' || o.value === 'Major_Fireplace1',
       )
@@ -341,14 +341,14 @@ describe('D95_SiteManager session', () => {
 
     let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type !== 'choice') return
+    if (resp.interaction.stateId !== 'wait') return
     resp = session.resolveChoice(0, CARD_ID)
 
     let steps = 0
     let bought = false
-    while (resp.pending.type === 'choice' && steps < 12) {
+    while (resp.interaction.stateId === 'wait' && steps < 12) {
       steps++
-      const options = resp.pending.options ?? []
+      const options = resp.interaction.options ?? []
       const fireplace = options.find(
         (o) => o.value === 'major:Major_Fireplace1' || o.value === 'Major_Fireplace1',
       )

@@ -37,19 +37,19 @@ describe('E24_Ambition session', () => {
 
     let resp = session.takeAction(0, 'meeting-place')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    const enterImprovement = resp.pending.options.find((option) => option.value !== '__skip__')
+    const enterImprovement = resp.interaction.options?.find((option) => option.value !== '__skip__')
     expect(enterImprovement).toBeDefined()
 
     resp = session.resolveChoice(0, enterImprovement!.value)
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    expect(resp.pending.promptKey).toBe('ui.interactionChooseImprovement')
-    expect(resp.pending.sourceCard).toBe(CARD_ID)
+    expect(resp.interaction.promptKey).toBe('ui.interactionChooseImprovement')
+    expect(resp.interaction.sourceCard).toBe(CARD_ID)
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
   })
 
@@ -58,10 +58,10 @@ describe('E24_Ambition session', () => {
 
     const resp = session.takeAction(0, 'meeting-place')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    const enterImprovement = resp.pending.options.find((option) => option.value !== '__skip__')
+    const enterImprovement = resp.interaction.options?.find((option) => option.value !== '__skip__')
     expect(enterImprovement).toBeDefined()
   })
 })

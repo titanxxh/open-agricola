@@ -121,7 +121,7 @@ describe('ActionFlow playerSwitch', () => {
 
     // Should be confirmPlayerSwitch (deferred), not choice
     const resp1 = session.getState()
-    expect(resp1.pending.type).toBe('confirmPlayerSwitch')
+    expect(resp1.interaction.stateId === 'wait' ? resp1.interaction.request.kind : resp1.interaction.stateId).toBe('confirm-player-switch')
 
     // Confirm the switch
     const resp2 = confirmPlayerSwitch(session)
@@ -129,7 +129,7 @@ describe('ActionFlow playerSwitch', () => {
 
     // Now should be a choice (XOR)
     const resp3 = session.getState()
-    expect(resp3.pending.type).toBe('choice')
+    expect(resp3.interaction.stateId).toBe('wait')
   })
 
   it('multiple ok steps then choice still shows confirmPlayerSwitch', () => {
@@ -165,11 +165,11 @@ describe('ActionFlow playerSwitch', () => {
     expect(resp1.state.players[1]!.resources.wood).toBe(p2WoodBefore + 1)
 
     // But pending should be confirmPlayerSwitch (not choice)
-    expect(resp1.pending.type).toBe('confirmPlayerSwitch')
+    expect(resp1.interaction.stateId === 'wait' ? resp1.interaction.request.kind : resp1.interaction.stateId).toBe('confirm-player-switch')
 
     // Confirm, then should see choice
     confirmPlayerSwitch(session)
     const resp2 = session.getState()
-    expect(resp2.pending.type).toBe('choice')
+    expect(resp2.interaction.stateId).toBe('wait')
   })
 })

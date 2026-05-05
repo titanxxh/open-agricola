@@ -28,10 +28,10 @@ const playLessons = (
   // Lessons emits an occupation choice (auto-resolves when a single option),
   // and may follow up with a payment-choice prompt. Walk both.
   let guard = 6
-  while (guard-- > 0 && resp.pending.type === 'choice') {
+  while (guard-- > 0 && resp.interaction.stateId === 'wait') {
     const opt =
-      resp.pending.options.find((o) => o.value === occupationId)
-      ?? resp.pending.options[0]
+      resp.interaction.options?.find((o) => o.value === occupationId)
+      ?? resp.interaction.options[0]
     if (!opt) break
     resp = session.resolveChoice(0, opt.value)
   }

@@ -239,13 +239,13 @@ describe('A87_Conservator session sourceCard', () => {
 
     const resp = session.takeAction(0, 'house-redevelopment')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    expect(resp.pending.promptKey).toBe('ui.interactionChooseRenovationTarget')
-    expect(resp.pending.sourceCard).toBeUndefined()
+    expect(resp.interaction.promptKey).toBe('ui.interactionChooseRenovationTarget')
+    expect(resp.interaction.sourceCard).toBeUndefined()
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBeUndefined()
-    expect(resp.pending.options.find((option) => option.value === 'clay')?.sourceCard).toBeUndefined()
-    expect(resp.pending.options.find((option) => option.value === 'stone')?.sourceCard).toBe(CARD_ID)
+    expect(resp.interaction.options?.find((option) => option.value === 'clay')?.sourceCard).toBeUndefined()
+    expect(resp.interaction.options?.find((option) => option.value === 'stone')?.sourceCard).toBe(CARD_ID)
   })
 })

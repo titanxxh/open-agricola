@@ -41,15 +41,15 @@ describe('A143 + B95 stacking', () => {
     const session = setup(4)
     let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type !== 'choice') return
-    const basket = resp.pending.options.find((o) => o.value === 'major:Major_Basket')
+    if (resp.interaction.stateId !== 'wait') return
+    const basket = resp.interaction.options?.find((o) => o.value === 'major:Major_Basket')
     expect(basket).toBeDefined()
 
     resp = session.resolveChoice(0, basket!.value)
     let steps = 0
-    while (resp.pending.type === 'choice' && steps < 8) {
+    while (resp.interaction.stateId === 'wait' && steps < 8) {
       steps++
-      const next = resp.pending.options.find((o) => o.value !== 'cancel')
+      const next = resp.interaction.options?.find((o) => o.value !== 'cancel')
       if (!next) break
       resp = session.resolveChoice(0, next.value)
     }
@@ -63,13 +63,13 @@ describe('A143 + B95 stacking', () => {
   it('only Stonecutter applies when rooms=2 (B95 gives 0 discount)', () => {
     const session = setup(2) // no extra rooms, B95 no-op
     let resp = session.takeAction(0, 'major-improvement')
-    if (resp.pending.type !== 'choice') return
-    const basket = resp.pending.options.find((o) => o.value === 'major:Major_Basket')
+    if (resp.interaction.stateId !== 'wait') return
+    const basket = resp.interaction.options?.find((o) => o.value === 'major:Major_Basket')
     resp = session.resolveChoice(0, basket!.value)
     let steps = 0
-    while (resp.pending.type === 'choice' && steps < 8) {
+    while (resp.interaction.stateId === 'wait' && steps < 8) {
       steps++
-      const next = resp.pending.options.find((o) => o.value !== 'cancel')
+      const next = resp.interaction.options?.find((o) => o.value !== 'cancel')
       if (!next) break
       resp = session.resolveChoice(0, next.value)
     }

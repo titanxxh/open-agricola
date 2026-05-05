@@ -36,8 +36,8 @@ describe('C95_BasketWeaver session', () => {
   const playOccupation = (session: GameSession) => {
     const resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type === 'choice') {
-      const opt = resp.pending.options?.find((o) => o.value === CARD_ID)
+    if (resp.interaction.stateId === 'wait') {
+      const opt = resp.interaction.options?.find((o) => o.value === CARD_ID)
       expect(opt).toBeDefined()
       return session.resolveChoice(0, opt!.value)
     }
@@ -53,9 +53,9 @@ describe('C95_BasketWeaver session', () => {
     // Find and take the basket purchase option
     let steps = 0
     let bought = false
-    while (resp.pending.type === 'choice' && steps < 10) {
+    while (resp.interaction.stateId === 'wait' && steps < 10) {
       steps++
-      const options = resp.pending.options ?? []
+      const options = resp.interaction.options ?? []
       const basket = options.find(
         (o) => o.value === 'major:Major_Basket' || o.value === 'Major_Basket',
       )
@@ -86,9 +86,9 @@ describe('C95_BasketWeaver session', () => {
     let resp = playOccupation(session)
     // Skip the optional improvement
     let steps = 0
-    while (resp.pending.type === 'choice' && steps < 10) {
+    while (resp.interaction.stateId === 'wait' && steps < 10) {
       steps++
-      const options = resp.pending.options ?? []
+      const options = resp.interaction.options ?? []
       const skip = options.find((o) => o.value === '__skip__')
       if (skip) {
         resp = session.resolveChoice(0, skip.value)

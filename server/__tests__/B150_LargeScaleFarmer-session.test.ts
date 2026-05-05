@@ -51,29 +51,29 @@ describe('B150_LargeScaleFarmer session', () => {
     const session = setup({ withCard: true, food: 3 })
     const resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
   })
 
   it('after buying a major improvement, B150 optional chain triggers', () => {
     const session = setup({ withCard: true, food: 5 })
     let resp = session.takeAction(0, 'major-improvement')
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     // Pick Fireplace1 (costs 2 clay) — player has 10 clay
-    const fireplace = resp.pending.options.find((o) => o.value === 'major:Major_Fireplace1')
+    const fireplace = resp.interaction.options?.find((o) => o.value === 'major:Major_Fireplace1')
     expect(fireplace).toBeDefined()
     resp = session.resolveChoice(0, fireplace!.value)
     // Potentially there's a payment sub-choice; keep draining valid options
     // until we reach the B150 optional chain.
     let safety = 10
-    while (safety-- > 0 && resp.pending.type === 'choice') {
-      const hasSkip = resp.pending.options.some((o) => o.value === '__skip__')
+    while (safety-- > 0 && resp.interaction.stateId === 'wait') {
+      const hasSkip = resp.interaction.options?.some((o) => o.value === '__skip__')
       if (hasSkip) {
         // This is likely the B150 optional; stop here.
         break
       }
       // Pick the first non-skip option
-      const first = resp.pending.options[0]
+      const first = resp.interaction.options[0]
       if (!first) break
       resp = session.resolveChoice(0, first.value)
     }
@@ -88,15 +88,15 @@ describe('B150_LargeScaleFarmer session', () => {
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
     // First choice is OR(construct, stables) — required, not optional
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     // Pick stables (simpler — 1 wood per stable)
-    const stables = resp.pending.options.find((o) => o.labelKey?.includes('stables') || o.value === 'stables')
+    const stables = resp.interaction.options?.find((o) => o.labelKey?.includes('stables') || o.value === 'stables')
     if (stables) {
       resp = session.resolveChoice(0, stables.value)
     } else {
       // Alternative: just use the first available option
-      resp = session.resolveChoice(0, resp.pending.options[0]!.value)
+      resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
     }
     // Navigate through any sub-interactions until we hit the B150 optional (has __skip__).
     // For engine-driven farm prompts (room/stable confirm/cancel), prefer 'cancel' so we
@@ -104,28 +104,28 @@ describe('B150_LargeScaleFarmer session', () => {
     let safety = 15
     let foundOptional = false
     while (safety-- > 0) {
-      if (resp.pending.type === 'choice') {
-        const hasSkip = resp.pending.options.some((o) => o.value === '__skip__')
+      if (resp.interaction.stateId === 'wait') {
+        const hasSkip = resp.interaction.options?.some((o) => o.value === '__skip__')
         if (hasSkip) {
           foundOptional = true
           break
         }
-        const cancel = resp.pending.options.find((o) => o.value === 'cancel')
-        const done = resp.pending.options.find((o) => o.value === '__done__')
-        const hasConfirm = resp.pending.options.some((o) => o.value === 'confirm')
+        const cancel = resp.interaction.options?.find((o) => o.value === 'cancel')
+        const done = resp.interaction.options?.find((o) => o.value === '__done__')
+        const hasConfirm = resp.interaction.options?.some((o) => o.value === 'confirm')
         if (cancel && hasConfirm) {
           resp = session.resolveChoice(0, cancel.value)
         } else if (done) {
           resp = session.resolveChoice(0, done.value)
         } else {
-          resp = session.resolveChoice(0, resp.pending.options[0]!.value)
+          resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
         }
       } else {
         break
       }
     }
-    if (foundOptional && resp.pending.type === 'choice') {
-      const accept = resp.pending.options.find((o) => o.value !== '__skip__')
+    if (foundOptional && resp.interaction.stateId === 'wait') {
+      const accept = resp.interaction.options?.find((o) => o.value !== '__skip__')
       if (accept) {
         resp = session.resolveChoice(0, accept.value)
         // Food should be paid (3 -> 2)

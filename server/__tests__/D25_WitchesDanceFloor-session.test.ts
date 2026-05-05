@@ -335,11 +335,11 @@ describe('D25_WitchesDanceFloor session', () => {
       // Step 1: take the major-improvement action
       let resp = session.takeAction(0, 'major-improvement')
       expect(resp.ok).toBe(true)
-      expect(resp.pending.type).toBe('choice')
+      expect(resp.interaction.stateId).toBe('wait')
 
       // Step 2: choose Major_CookingHearth1
-      const cookingHearthOption = resp.pending.type === 'choice'
-        ? resp.pending.options.find((o) => o.value === 'major:Major_CookingHearth1')
+      const cookingHearthOption = resp.interaction.stateId === 'wait'
+        ? resp.interaction.options?.find((o) => o.value === 'major:Major_CookingHearth1')
         : undefined
       expect(cookingHearthOption).toBeDefined()
       resp = session.resolveChoice(0, cookingHearthOption!.value)
@@ -347,11 +347,11 @@ describe('D25_WitchesDanceFloor session', () => {
 
       // Resolve any remaining pending choices (e.g. payment selection, card-return selection)
       let maxSteps = 10
-      while (resp.pending.type === 'choice' && maxSteps-- > 0) {
+      while (resp.interaction.stateId === 'wait' && maxSteps-- > 0) {
         // Prefer the D25 return option if present, otherwise pick the first option
-        const d25Option = resp.pending.options.find((o) => o.value.includes(CARD_ID))
-        const skipOption = resp.pending.options.find((o) => o.value === '__skip__')
-        const choiceValue = d25Option?.value ?? skipOption?.value ?? resp.pending.options[0]?.value
+        const d25Option = resp.interaction.options?.find((o) => o.value.includes(CARD_ID))
+        const skipOption = resp.interaction.options?.find((o) => o.value === '__skip__')
+        const choiceValue = d25Option?.value ?? skipOption?.value ?? resp.interaction.options[0]?.value
         if (!choiceValue) break
         resp = session.resolveChoice(0, choiceValue)
       }

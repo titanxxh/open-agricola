@@ -54,8 +54,8 @@ describe('D109_SowingMaster session', () => {
 
     // grain-utilization may require sowing choices — handle them. Stop when the
     // farm-select interaction comes up so we can submit the crops payload.
-    while (resp.pending.type === 'choice' && resp.interaction?.stateId !== 'wait') {
-      const nonSkip = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    while (resp.interaction.stateId === 'wait' && resp.interaction?.stateId !== 'wait') {
+      const nonSkip = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
       if (nonSkip) {
         resp = session.resolveChoice(0, nonSkip.value)
       } else {

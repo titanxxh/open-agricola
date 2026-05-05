@@ -31,8 +31,8 @@ describe('A83_ShepherdsCrook session flow', () => {
     session.loadState(state)
 
     let resp = session.takeAction(0, 'fencing')
-    expect(resp.pending.type).toBe('choice')
-    expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionFenceSelect')
 
     resp = session.resolveChoice(0, 'confirm', {
@@ -40,7 +40,7 @@ describe('A83_ShepherdsCrook session flow', () => {
       extraWood: 0,
     })
 
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     expect(resp.state.players[0]!.resources.sheep).toBe(2)
     expect(readCardResourceStats(resp.state.players[0]!, 'A83_ShepherdsCrook')).toMatchObject({
       paid: {},

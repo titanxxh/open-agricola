@@ -49,20 +49,20 @@ describe('D117_WoodExpert session — computeCosts trades', () => {
     const session = setup({ food: 10, wood: 2, minor: 'B81_Handcart' })
     let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type !== 'choice') return
+    if (resp.interaction.stateId !== 'wait') return
     resp = session.resolveChoice(0, 'minor:B81_Handcart')
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.promptKey).toBe('prompt.selectPayment')
-    expect(resp.pending.options.length).toBeGreaterThanOrEqual(2)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
+    expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)
   })
 
   it('cost wood minor + food=10 wood=0 → only trade affordable, auto-select (1 wood credit kept as surplus)', () => {
     const session = setup({ food: 10, wood: 0, minor: 'B81_Handcart' })
     let resp = session.takeAction(0, 'major-improvement')
-    if (resp.pending.type !== 'choice') return
+    if (resp.interaction.stateId !== 'wait') return
     resp = session.resolveChoice(0, 'minor:B81_Handcart')
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.food).toBe(9) // -1 food (trade)
     // Trade gives 2 wood credit, fee.wood=1 → 1 wood surplus stays in player resources
     expect(resp.state.players[0]!.resources.wood).toBe(1)
@@ -71,9 +71,9 @@ describe('D117_WoodExpert session — computeCosts trades', () => {
   it('cost wood minor + food=0 wood=2 → only base affordable, auto-select', () => {
     const session = setup({ food: 0, wood: 2, minor: 'B81_Handcart' })
     let resp = session.takeAction(0, 'major-improvement')
-    if (resp.pending.type !== 'choice') return
+    if (resp.interaction.stateId !== 'wait') return
     resp = session.resolveChoice(0, 'minor:B81_Handcart')
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.wood).toBe(1) // -1 wood
     expect(resp.state.players[0]!.resources.food).toBe(0)
   })
@@ -81,11 +81,11 @@ describe('D117_WoodExpert session — computeCosts trades', () => {
   it('cost wood:1 minor → trade max=1 + base wood=1 → both solutions affordable', () => {
     const session = setup({ food: 10, wood: 1, minor: 'B81_Handcart' })
     let resp = session.takeAction(0, 'major-improvement')
-    if (resp.pending.type !== 'choice') return
+    if (resp.interaction.stateId !== 'wait') return
     resp = session.resolveChoice(0, 'minor:B81_Handcart')
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.options.length).toBeGreaterThanOrEqual(2)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)
   })
 
   it('altCosts minor (B43 Chophouse altCosts:[{wood:2},{clay:2}]) → wood-base + wood-trade + clay-base', () => {
@@ -97,25 +97,25 @@ describe('D117_WoodExpert session — computeCosts trades', () => {
     // are applied to non-wood fees; we only assert the spec-mandated three.
     const session = setup({ food: 10, wood: 2, clay: 2, minor: 'B43_Chophouse' })
     let resp = session.takeAction(0, 'major-improvement')
-    if (resp.pending.type !== 'choice') return
+    if (resp.interaction.stateId !== 'wait') return
     resp = session.resolveChoice(0, 'minor:B43_Chophouse')
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.promptKey).toBe('prompt.selectPayment')
-    expect(resp.pending.options.length).toBeGreaterThanOrEqual(3)
-    const getPaid = (o: typeof resp.pending.options[number]) =>
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
+    expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(3)
+    const getPaid = (o: typeof resp.interaction.options[number]) =>
       (o.labelParams as Record<string, unknown> | undefined)?.resourcesPaid as
         | Record<string, number>
         | undefined
-    const woodBase = resp.pending.options.find((o) => {
+    const woodBase = resp.interaction.options?.find((o) => {
       const paid = getPaid(o)
       return !!paid && (paid.wood ?? 0) === 2 && (paid.clay ?? 0) === 0 && (paid.food ?? 0) === 0
     })
-    const woodTrade = resp.pending.options.find((o) => {
+    const woodTrade = resp.interaction.options?.find((o) => {
       const paid = getPaid(o)
       return !!paid && (paid.wood ?? 0) === 0 && (paid.clay ?? 0) === 0 && (paid.food ?? 0) === 1
     })
-    const clayBase = resp.pending.options.find((o) => {
+    const clayBase = resp.interaction.options?.find((o) => {
       const paid = getPaid(o)
       return !!paid && (paid.wood ?? 0) === 0 && (paid.clay ?? 0) === 2 && (paid.food ?? 0) === 0
     })
@@ -129,20 +129,20 @@ describe('D117_WoodExpert session — computeCosts trades', () => {
     // are affordable; clay-base alt (clay:2) is not.
     const session = setup({ food: 10, wood: 2, clay: 0, minor: 'B43_Chophouse' })
     let resp = session.takeAction(0, 'major-improvement')
-    if (resp.pending.type !== 'choice') return
+    if (resp.interaction.stateId !== 'wait') return
     resp = session.resolveChoice(0, 'minor:B43_Chophouse')
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.options.length).toBeGreaterThanOrEqual(2)
-    const getPaid = (o: typeof resp.pending.options[number]) =>
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)
+    const getPaid = (o: typeof resp.interaction.options[number]) =>
       (o.labelParams as Record<string, unknown> | undefined)?.resourcesPaid as
         | Record<string, number>
         | undefined
-    const woodBase = resp.pending.options.find((o) => {
+    const woodBase = resp.interaction.options?.find((o) => {
       const paid = getPaid(o)
       return !!paid && (paid.wood ?? 0) === 2 && (paid.clay ?? 0) === 0 && (paid.food ?? 0) === 0
     })
-    const woodTrade = resp.pending.options.find((o) => {
+    const woodTrade = resp.interaction.options?.find((o) => {
       const paid = getPaid(o)
       return !!paid && (paid.wood ?? 0) === 0 && (paid.clay ?? 0) === 0 && (paid.food ?? 0) === 1
     })

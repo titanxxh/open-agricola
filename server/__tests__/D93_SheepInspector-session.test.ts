@@ -264,7 +264,7 @@ describe('D93_SheepInspector end-to-end via GameSession', () => {
     // `forest` is a candidate (excluding the just-placed `day-laborer`), so the
     // helper auto-resolves. But if it pops a choice for recall, resolve it.
     if (resp.pending?.type === 'choice') {
-      const opts = resp.pending.options ?? []
+      const opts = resp.interaction.options ?? []
       const forestOption = opts.find((o: ActionChoiceOption) => String(o.value) === 'forest')
       expect(forestOption).toBeDefined()
       resp = session.resolveChoice(0, forestOption!.value)

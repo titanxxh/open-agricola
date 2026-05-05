@@ -27,7 +27,7 @@ describe('B109_PaperMaker session', () => {
   it('makes lessons available when wood can cover the food cost via preview payment', () => {
     const resp = setup().getState()
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('none')
+    expect(resp.interaction.stateId).not.toBe('wait')
     expect(resp.actionAvailability?.lessons).toBe(true)
   })
 
@@ -36,7 +36,7 @@ describe('B109_PaperMaker session', () => {
 
     const resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.wood).toBe(0)
     expect(resp.state.players[0]!.resources.food).toBe(0)
     expect(resp.state.players[0]!.occupationPlayed).toContain('A123_FrameBuilder')

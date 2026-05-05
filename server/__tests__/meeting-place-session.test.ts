@@ -23,11 +23,11 @@ describe('meeting-place session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.startPlayer).toBe(false)
     expect(resp.state.players[1]!.startPlayer).toBe(true)
-    if (resp.pending.type === 'choice') {
+    if (resp.interaction.stateId === 'wait') {
       resp = session.resolveChoice(1, '__skip__')
       expect(resp.ok).toBe(true)
     }
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
 
     resp = confirmNextPlayer(session)
     expect(resp.ok).toBe(true)

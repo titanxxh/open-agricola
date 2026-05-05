@@ -55,11 +55,11 @@ describe('A73_AgriculturalFertilizers session', () => {
     })
     expect(resp.ok).toBe(true)
     // After fencing 2 tiles, optional sow should be offered
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.promptKey).toBe('ui.interactionOptionalAction')
-    expect(resp.pending.options.some((o) => o.labelKey === 'actions.sow.name')).toBe(true)
-    expect(resp.pending.options.some((o) => o.labelKey === 'ui.interactionOptionalSkip')).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
+    expect(resp.interaction.options?.some((o) => o.labelKey === 'actions.sow.name')).toBe(true)
+    expect(resp.interaction.options?.some((o) => o.labelKey === 'ui.interactionOptionalSkip')).toBe(true)
   })
 
   it('does NOT grant sow after fencing only 1 tile', () => {
@@ -96,8 +96,8 @@ describe('A73_AgriculturalFertilizers session', () => {
 
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // Without reed, only stables is available — OR auto-selects it
     // The pending is the stable selection
@@ -113,10 +113,10 @@ describe('A73_AgriculturalFertilizers session', () => {
     resp = session.resolveChoice(0, 'confirm', { stables: [s1!, s2!] })
     expect(resp.ok).toBe(true)
     // 2 stables built => 2 new used spaces => optional sow offered
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.promptKey).toBe('ui.interactionOptionalAction')
-    expect(resp.pending.options.some((o) => o.labelKey === 'actions.sow.name')).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
+    expect(resp.interaction.options?.some((o) => o.labelKey === 'actions.sow.name')).toBe(true)
   })
 
   it('cannot play A73 without at least 1 pasture (prerequisite)', () => {
@@ -141,11 +141,11 @@ describe('A73_AgriculturalFertilizers session', () => {
 
     const resp = session.takeAction(0, 'meeting-place')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // A73 should not be in the playable options (no pasture)
-    const a73Option = resp.pending.options.find(
+    const a73Option = resp.interaction.options?.find(
       (option) => option.value === CARD_ID,
     )
     expect(a73Option).toBeUndefined()

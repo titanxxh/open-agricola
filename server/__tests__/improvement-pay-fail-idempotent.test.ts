@@ -81,9 +81,9 @@ describe('improvement: pay fail idempotent', () => {
     session.loadState(state)
     let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type !== 'choice') throw new Error('expected choice')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected choice')
     // Affordable case sanity check:
-    const opt = resp.pending.options.find((o) => o.value === 'major:Major_Fireplace1')
+    const opt = resp.interaction.options?.find((o) => o.value === 'major:Major_Fireplace1')
     expect(opt).toBeDefined()
     // resolve choice -> happy path, build succeeds
     resp = session.resolveChoice(0, opt!.value)

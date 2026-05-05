@@ -223,7 +223,7 @@ const makeSession = (opts: { wood?: number; gameSeed?: number; occHand?: string[
 const playA3 = (session: GameSession) => {
   const mpResp = session.takeAction(0, 'meeting-place')
   expect(mpResp.ok).toBe(true)
-  expect(mpResp.pending.type).toBe('choice')
+  expect(mpResp.interaction.stateId).toBe('wait')
   return session.resolveChoice(0, `minor:${SESSION_CARD_ID}`)
 }
 
@@ -250,9 +250,9 @@ describe('A3_PaperKnife session-tier: BGA-aligned flow', () => {
     expect(interaction.selection?.maxSelections).toBe(3)
 
     // pending.sourceCard must be A3
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.sourceCard).toBe(SESSION_CARD_ID)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.sourceCard).toBe(SESSION_CARD_ID)
 
     // A3 must have moved from minorHand to minorPlayed (standard onBuy cost commitment)
     const p0 = resp.state.players[0]!
@@ -380,12 +380,12 @@ describe('A3_PaperKnife session-tier: BGA-aligned flow', () => {
     expect(mpResp.ok).toBe(true)
 
     // If the pending type is not 'choice', A3 was filtered and the action ended early — pass.
-    if (mpResp.pending.type !== 'choice') {
+    if (mpResp.interaction.stateId !== 'wait') {
       // meeting-place ended without offering A3 (prerequisite enforced at offer time) — OK
       return
     }
 
-    const a3Option = mpResp.pending.options.find(o => o.value === `minor:${SESSION_CARD_ID}`)
+    const a3Option = mpResp.interaction.options?.find(o => o.value === `minor:${SESSION_CARD_ID}`)
     if (!a3Option) {
       // A3 was correctly excluded from the choice options — prerequisite enforced at offer time
       return
