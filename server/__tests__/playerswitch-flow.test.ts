@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import type { ActionFlow } from '../../shared/game/types'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 /**
  * Tests for ActionFlow playerSwitch support with lazy confirmation.
@@ -123,7 +124,7 @@ describe('ActionFlow playerSwitch', () => {
     expect(resp1.pending.type).toBe('confirmPlayerSwitch')
 
     // Confirm the switch
-    const resp2 = session.confirmPlayerSwitch()
+    const resp2 = confirmPlayerSwitch(session)
     expect(resp2.ok).toBe(true)
 
     // Now should be a choice (XOR)
@@ -167,7 +168,7 @@ describe('ActionFlow playerSwitch', () => {
     expect(resp1.pending.type).toBe('confirmPlayerSwitch')
 
     // Confirm, then should see choice
-    session.confirmPlayerSwitch()
+    confirmPlayerSwitch(session)
     const resp2 = session.getState()
     expect(resp2.pending.type).toBe('choice')
   })

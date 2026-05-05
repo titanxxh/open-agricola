@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { confirmNextPlayer } from './_helpers/legacy-confirms'
 
 describe('undo history on player switch', () => {
   let session: GameSession
@@ -23,7 +24,7 @@ describe('undo history on player switch', () => {
     expect(takeResult.historyLength).toBeGreaterThan(0)
 
     // Player 1 confirms next player
-    const confirmResult = session.confirmNextPlayer()
+    const confirmResult = confirmNextPlayer(session)
     expect(confirmResult.ok).toBe(true)
     
     // After switching, history should be cleared
@@ -36,7 +37,7 @@ describe('undo history on player switch', () => {
     session.takeAction(0, 'forest')
     
     // Player 1 confirms next player
-    session.confirmNextPlayer()
+    confirmNextPlayer(session)
     
     // Try to undo - should fail because history is cleared
     const undoResult = session.undoStep()
@@ -49,7 +50,7 @@ describe('undo history on player switch', () => {
     session.takeAction(0, 'forest')
     
     // Player 1 confirms next player
-    session.confirmNextPlayer()
+    confirmNextPlayer(session)
     
     // Try to undo action - should fail because no action snapshot
     const undoActionResult = session.undoAction()
@@ -60,7 +61,7 @@ describe('undo history on player switch', () => {
   it('should allow new player to build their own undo history', () => {
     // Player 1 takes an action and switches
     session.takeAction(0, 'forest')
-    session.confirmNextPlayer()
+    confirmNextPlayer(session)
     
     // History should be empty for new player
     const resp = session.getState()

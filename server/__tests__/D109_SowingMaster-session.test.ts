@@ -5,6 +5,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import '../../shared/cards/D/D109_SowingMaster'
 import type { ActionChoiceOption } from '../../shared/game/types'
 import type { ActionFlow } from '../../shared/game/types'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 const CARD_ID = 'D109_SowingMaster'
 
@@ -67,7 +68,7 @@ describe('D109_SowingMaster session', () => {
     }
 
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state
@@ -82,7 +83,7 @@ describe('D109_SowingMaster session', () => {
     expect(resp.ok).toBe(true)
 
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state

@@ -8,6 +8,7 @@ import '../../shared/cards/B/B16_MiningHammer'
 import '../../shared/cards/B/B124_Trimmer'
 import '../../shared/cards/A/A82_WorkCertificate'
 import type { ActionChoiceOption } from '../../shared/game/types'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 // ===== A54 Credit session tests =====
 describe('A54_Credit session', () => {
@@ -141,7 +142,7 @@ describe('A129_Swagman session', () => {
       safety--
     }
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
     return resp
   }
@@ -234,7 +235,7 @@ describe('A82_WorkCertificate session', () => {
         break
       }
       if (resp.pending.type === 'confirmPlayerSwitch') {
-        resp = session.confirmPlayerSwitch()
+        resp = confirmPlayerSwitch(session)
       } else {
         break
       }
@@ -269,7 +270,7 @@ describe('A82_WorkCertificate session', () => {
         break
       }
       if (resp.pending.type === 'confirmPlayerSwitch') {
-        resp = session.confirmPlayerSwitch()
+        resp = confirmPlayerSwitch(session)
       } else {
         break
       }
@@ -277,7 +278,7 @@ describe('A82_WorkCertificate session', () => {
     }
     // Walk remaining
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
     const after = session.getState().state
     // Should have gained at least 1 building resource
@@ -328,14 +329,14 @@ describe('A82_WorkCertificate session', () => {
         break
       }
       if (resp.pending.type === 'confirmPlayerSwitch') {
-        resp = session.confirmPlayerSwitch()
+        resp = confirmPlayerSwitch(session)
       } else {
         break
       }
       safety--
     }
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     expect(acceptedTake).toBe(true)

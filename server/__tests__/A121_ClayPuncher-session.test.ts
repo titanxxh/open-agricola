@@ -6,6 +6,7 @@ import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A121_ClayPuncher'
 import type { ActionChoiceOption } from '../../shared/game/types'
 import type { ActionFlow } from '../../shared/game/types'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 describe('A121_ClayPuncher session', () => {
   const setup = () => {
@@ -79,7 +80,7 @@ describe('A121_ClayPuncher session', () => {
 
     // Walk through player switches
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state

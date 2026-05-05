@@ -3,6 +3,7 @@ import { GameSession } from '../server/game/authoritative-session'
 import { createInitialState } from '../shared/logic/state'
 import { getAllTilePositions } from '../shared/game/farm'
 import type { PendingAction } from '../shared/game/types'
+import { confirmNextPlayer } from '../server/__tests__/_helpers/legacy-confirms'
 
 describe('pending choice types + undo regression', () => {
   let session: GameSession
@@ -247,7 +248,7 @@ describe('pending choice types + undo regression', () => {
       if (!dayLaborer) return
 
       session.takeAction(0, dayLaborer.spaceId)
-      const resp = session.confirmNextPlayer()
+      const resp = confirmNextPlayer(session)
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('none')
       expect(resp.state.currentPlayerIndex).toBe(1)

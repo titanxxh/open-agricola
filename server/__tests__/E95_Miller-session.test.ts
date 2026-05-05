@@ -4,6 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/E/E95_Miller'
 import type { ActionChoiceOption } from '../../shared/game/types'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 describe('E95_Miller session', () => {
   /**
@@ -49,7 +50,7 @@ describe('E95_Miller session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('confirmPlayerSwitch')
 
-    resp = session.confirmPlayerSwitch()
+    resp = confirmPlayerSwitch(session)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
     expect(resp.pending.playerIndex).toBe(0)
@@ -102,7 +103,7 @@ describe('E95_Miller session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('confirmPlayerSwitch')
 
-    resp = session.confirmPlayerSwitch()
+    resp = confirmPlayerSwitch(session)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
 

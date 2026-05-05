@@ -35,6 +35,7 @@ import {
   workersAvailable,
 } from '../../shared/game/player'
 import { GameSession } from '../../server/game/authoritative-session'
+import { confirmNextPlayer, confirmPlayerSwitch } from '../../server/__tests__/_helpers/legacy-confirms'
 
 export type CardType = 'minor' | 'occupation'
 
@@ -363,11 +364,11 @@ export function autoAdvanceRoundEnd(
       continue
     }
     if (resp.pending.type === 'confirmNextPlayer') {
-      resp = session.confirmNextPlayer()
+      resp = confirmNextPlayer(session)
       continue
     }
     if (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
       continue
     }
     if (resp.pending.type === 'choice') {

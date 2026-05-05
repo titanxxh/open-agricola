@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/game/player'
 import { getFenceCount } from '../../shared/actions/effects/fencing'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 import '../../shared/cards/C/C16_FieldFences'
 
@@ -166,7 +167,7 @@ describe('C16 FieldFences session', () => {
 
     // Walk past any switch / done pendings until back to 'none'
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     // Now ensure flag cleared by inspecting cardState

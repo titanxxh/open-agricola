@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/D/D134_OysterEater'
 import type { SessionResponse } from '../../shared/session/session-core'
+import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 const drainPending = (session: GameSession, resp: SessionResponse) => {
   let safety = 25
@@ -13,8 +14,8 @@ const drainPending = (session: GameSession, resp: SessionResponse) => {
   ) {
     resp =
       resp.pending.type === 'confirmPlayerSwitch'
-        ? session.confirmPlayerSwitch()
-        : session.confirmNextPlayer()
+        ? confirmPlayerSwitch(session)
+        : confirmNextPlayer(session)
   }
   return resp
 }

@@ -5,6 +5,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A77_Hod'
 import type { ActionFlow } from '../../shared/game/types'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 describe('A77_Hod session', () => {
   const setup = (currentPlayerIndex = 0) => {
@@ -71,7 +72,7 @@ describe('A77_Hod session', () => {
 
     // Walk through player switches
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state
@@ -96,7 +97,7 @@ describe('A77_Hod session', () => {
 
     // Walk through player switches for card effect
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state

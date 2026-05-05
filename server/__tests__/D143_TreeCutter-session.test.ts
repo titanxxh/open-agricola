@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 import '../../shared/cards/D/D143_TreeCutter'
 
@@ -35,7 +36,7 @@ describe('D143_TreeCutter session', () => {
     expect(resp.ok).toBe(true)
 
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state
@@ -59,7 +60,7 @@ describe('D143_TreeCutter session', () => {
     expect(resp.ok).toBe(true)
 
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state
@@ -82,7 +83,7 @@ describe('D143_TreeCutter session', () => {
     expect(resp.ok).toBe(true)
 
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state
@@ -104,7 +105,7 @@ describe('D143_TreeCutter session', () => {
     expect(resp.ok).toBe(true)
 
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state

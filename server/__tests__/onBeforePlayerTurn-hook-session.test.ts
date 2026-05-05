@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getActiveCardRegistry } from '../../shared/cards/active-registry'
 import type { CardEffect } from '../../shared/cards/card-effects'
+import { confirmNextPlayer } from './_helpers/legacy-confirms'
 
 const TEST_CARD = '__TEST_skipTurn__'
 
@@ -48,7 +49,7 @@ describe('onBeforePlayerTurn hook (game-core skip-turn dispatch)', () => {
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('confirmNextPlayer')
 
-    resp = session.confirmNextPlayer()
+    resp = confirmNextPlayer(session)
     expect(resp.ok).toBe(true)
     // p1 was skipped, so currentPlayerIndex should be back to p0 (the only
     // other player with an available worker).
@@ -72,7 +73,7 @@ describe('onBeforePlayerTurn hook (game-core skip-turn dispatch)', () => {
 
     let resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
-    resp = session.confirmNextPlayer()
+    resp = confirmNextPlayer(session)
     expect(resp.ok).toBe(true)
     expect(resp.state.currentPlayerIndex).toBe(1)
   })
@@ -97,7 +98,7 @@ describe('onBeforePlayerTurn hook (game-core skip-turn dispatch)', () => {
 
     let resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
-    resp = session.confirmNextPlayer()
+    resp = confirmNextPlayer(session)
     expect(resp.ok).toBe(true)
     // After at most players.length skip checks, the loop must terminate.
     // The exact landing player is implementation-defined; the key invariant

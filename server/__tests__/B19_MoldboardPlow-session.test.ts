@@ -4,6 +4,7 @@ import { getCardStack } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/B/B19_MoldboardPlow'
 import type { ActionChoiceOption } from '../../shared/game/types'
+import { confirmNextPlayer } from './_helpers/legacy-confirms'
 
 describe('B19_MoldboardPlow session', () => {
   const setup = () => {
@@ -129,12 +130,12 @@ describe('B19_MoldboardPlow session', () => {
 
     // Advance to next turn so player can use farmland again
     // Player 1 takes an action, then player 0 gets another turn
-    let resp2 = session.confirmNextPlayer()
+    let resp2 = confirmNextPlayer(session)
     resp2 = session.takeAction(1, 'grain-seeds')
     if (resp2.pending.type === 'choice') {
       resp2 = session.resolveChoice(1, '__skip__')
     }
-    resp2 = session.confirmNextPlayer()
+    resp2 = confirmNextPlayer(session)
 
     // Second farmland action — use last field from card
     // Use cultivation (round 5+ action) instead? No, farmland is always available.

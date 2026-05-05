@@ -5,6 +5,7 @@ import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/D/D160_Midwife'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import type { ActionChoiceOption } from '../../shared/game/types'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 describe('D160_Midwife session', () => {
   const setup = (currentPlayerIndex = 0) => {
@@ -57,7 +58,7 @@ describe('D160_Midwife session', () => {
 
     // Walk through player switches and choices for card effect
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     // Handle minor improvement choice from wish-children flow (skip it)
@@ -69,7 +70,7 @@ describe('D160_Midwife session', () => {
     }
 
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state
@@ -88,7 +89,7 @@ describe('D160_Midwife session', () => {
     if (!resp.ok) return
 
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     // Skip minor improvement
@@ -120,14 +121,14 @@ describe('D160_Midwife session', () => {
     if (!resp.ok) return
 
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
     if (resp.pending.type === 'choice') {
       const skipOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
       if (skipOption) resp = session.resolveChoice(1, '__skip__')
     }
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state
