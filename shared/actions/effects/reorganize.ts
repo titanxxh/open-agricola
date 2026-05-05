@@ -4,7 +4,7 @@ import type {
   GameState,
   PlayerState,
 } from '../../game/types'
-import { computeAnimalZones } from '../helpers/animal-zones'
+import { playerBoard } from '../../domain'
 
 export type ReorganizeTrigger =
   | 'anytime'
@@ -24,7 +24,6 @@ export const applyReorganizeMutate = (
   player: PlayerState,
   zones: ZoneAssignment[],
 ): void => {
-  void state
   const totals = zones.reduce(
     (acc, z) => {
       if (z.animalType) acc[z.animalType] += z.animalCount
@@ -33,7 +32,8 @@ export const applyReorganizeMutate = (
     { sheep: 0, boar: 0, cattle: 0 },
   )
 
-  const computed = computeAnimalZones(player)
+  const idx = state.players.indexOf(player)
+  const computed = playerBoard(state, idx).animals.zones()
   const cap = (id: string) => computed.find((z) => z.id === id)?.capacity ?? 0
 
   const pastureZones = zones.filter((z) => z.zoneType === 'pasture')
@@ -79,7 +79,8 @@ export const reorganizeAction: ActionDefinition = {
     // recomputes zones via buildAnimalReorgZones() during the transitional
     // period. Task 6/7 will rewire GameCore to consume zones from the
     // engineStack.peekInteraction()?.request, eliminating the duplicate compute.
-    const zones = computeAnimalZones(ctx.player).map((zone) => ({
+    const idx = ctx.state.players.indexOf(ctx.player)
+    const zones = playerBoard(ctx.state, idx).animals.zones().map((zone) => ({
       id: zone.id,
       zoneType: zone.zoneType as 'pasture' | 'house' | 'stable',
       animalType: (zone.animalType as 'sheep' | 'boar' | 'cattle' | null) ?? null,

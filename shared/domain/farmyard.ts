@@ -81,9 +81,13 @@ export class Farmyard {
     return this.state
   }
 
-  /** Validate a single plow tile selection. */
+  /**
+   * Validate a single plow tile selection. `coord` may be undefined to
+   * mirror legacy `validatePlowSelection` behavior — that returns
+   * `NO_SELECTION` rather than throwing.
+   */
   canPlow(
-    coord: FarmTilePosition,
+    coord: FarmTilePosition | undefined,
     lockedKeys?: Set<string>,
   ): PlowValidationResult<PlayerState> {
     return validatePlowSelection(this.player, coord, lockedKeys)
@@ -110,20 +114,30 @@ export class Farmyard {
     )
   }
 
-  /** Validate a room-build selection (one or more contiguous tiles). */
+  /**
+   * Validate a room-build selection. Accepts either a single tile or an
+   * array of contiguous tiles (multi-room build, e.g. via construct.ts
+   * with cards that reduce per-room cost).
+   */
   canBuildRoom(
-    coord: FarmTilePosition,
+    rooms: FarmTilePosition | FarmTilePosition[],
     lockedKeys?: Set<string>,
   ): RoomSelectionResult {
-    return validateRoomSelection(this.player, [coord], lockedKeys)
+    const list = Array.isArray(rooms) ? rooms : [rooms]
+    return validateRoomSelection(this.player, list, lockedKeys)
   }
 
-  /** Validate a stable-build selection. */
+  /**
+   * Validate a stable-build selection. Accepts either a single tile or
+   * an array of tiles (multi-stable build via stables.ts with cards
+   * granting extra stables in one action).
+   */
   canBuildStable(
-    coord: FarmTilePosition,
+    stables: FarmTilePosition | FarmTilePosition[],
     lockedKeys?: Set<string>,
   ): StableSelectionResult {
-    return validateStableSelection(this.player, [coord], lockedKeys)
+    const list = Array.isArray(stables) ? stables : [stables]
+    return validateStableSelection(this.player, list, lockedKeys)
   }
 
   /** Derived pasture view (projected from `player.pastures`). */
@@ -140,7 +154,20 @@ export class Farmyard {
    * Build farm-select interaction payload for a given farm-select kind.
    * Wraps `farm-interaction.ts`. Caller passes opts matching the underlying
    * function's optional parameters (costOverride / actionContext / spaceId).
+   *
+   * Overloads narrow the return type so callers expecting an
+   * `InteractionFarmSelection` (plow/sow/fence/room/stable) don't have
+   * to widen to the `InteractionSelection` union just for the
+   * `farm-position` case.
    */
+  selectableTiles(
+    kind: 'plow' | 'sow' | 'fence' | 'room' | 'stable',
+    opts?: SelectableTilesOpts,
+  ): InteractionFarmSelection
+  selectableTiles(
+    kind: 'farm-position',
+    opts?: SelectableTilesOpts,
+  ): InteractionSelection
   selectableTiles(
     kind: FarmSelectKind,
     opts?: SelectableTilesOpts,

@@ -1,10 +1,11 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { GameSession } from './game/authoritative-session.ts'
 import { serializeState, serializeStateForPlayer } from '../shared/game/serialization.ts'
-import { normalizePlayerFarm, validateFenceSelection } from '../shared/logic/farm/fence-validation.ts'
-import { validatePlowSelection } from '../shared/logic/farm/plow-validation.ts'
-import { validateSowSelection } from '../shared/logic/farm/sow-validation.ts'
-import { validateRoomSelection, validateStableSelection } from '../shared/logic/farm/validators.ts'
+// TODO(PR5): inline `normalizePlayerFarm` into a domain helper or
+// drop it once shared/logic/farm/ is removed.
+import { normalizePlayerFarm } from '../shared/logic/farm/fence-validation.ts'
+import type { SowSelection } from '../shared/logic/farm/sow-validation.ts'
+import { playerBoard } from '../shared/domain/index.ts'
 import { playerCanBuildPalisades } from '../shared/cards/helpers/card-type.ts'
 import { collectLockedFarmTileKeys } from '../shared/cards/card-effects.ts'
 import type { FarmTilePosition } from '../shared/game/types.ts'
@@ -339,6 +340,13 @@ export const handleGameRoute = async (
       return true
     }
     const player = normalizePlayerFarm(state.players[playerIndex]!)
+    // Validate against the normalized player by swapping it into a
+    // shallow state clone — preserves the legacy router behavior of
+    // running validators on the normalized view, not the raw state.
+    const normalizedPlayers = state.players.slice()
+    normalizedPlayers[playerIndex] = player
+    const normalizedState = { ...state, players: normalizedPlayers }
+    const board = playerBoard(normalizedState, playerIndex)
 
     if (body.type === 'fence') {
       const fp = body.payload as { edges?: string[]; palisadeEdges?: string[]; extraWood?: number }
@@ -346,36 +354,35 @@ export const handleGameRoute = async (
       const palisadeEdges = Array.isArray(fp.palisadeEdges) ? fp.palisadeEdges : []
       const extraWood = fp.extraWood ?? 0
       const lockedKeys = collectLockedFarmTileKeys(state.players[playerIndex]!)
-      const result = validateFenceSelection(
-        player,
+      const result = board.farmyard.canBuildFence({
         edges,
         palisadeEdges,
         extraWood,
-        0,
-        { skipPayment: true, allowPalisades: playerCanBuildPalisades(player) },
+        freeFences: 0,
+        options: { skipPayment: true, allowPalisades: playerCanBuildPalisades(player) },
         lockedKeys,
-      )
+      })
       sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error?.code ?? 'validation failed' })
       return true
     }
     if (body.type === 'room') {
       const rooms = (body.payload as { rooms?: FarmTilePosition[] }).rooms
       const lockedKeys = collectLockedFarmTileKeys(state.players[playerIndex]!)
-      const result = validateRoomSelection(player, Array.isArray(rooms) ? rooms : [], lockedKeys)
+      const result = board.farmyard.canBuildRoom(Array.isArray(rooms) ? rooms : [], lockedKeys)
       sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.code })
       return true
     }
     if (body.type === 'stable') {
       const stables = (body.payload as { stables?: FarmTilePosition[] }).stables ?? []
       const lockedKeys = collectLockedFarmTileKeys(state.players[playerIndex]!)
-      const result = validateStableSelection(player, stables, lockedKeys)
+      const result = board.farmyard.canBuildStable(stables, lockedKeys)
       sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.code ?? 'validation failed' })
       return true
     }
     if (body.type === 'plow') {
       const tile = (body.payload as { tile?: FarmTilePosition }).tile
       const lockedKeys = collectLockedFarmTileKeys(state.players[playerIndex]!)
-      const result = validatePlowSelection(player, tile, lockedKeys)
+      const result = board.farmyard.canPlow(tile, lockedKeys)
       sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error?.code ?? 'validation failed' })
       return true
     }
@@ -385,7 +392,7 @@ export const handleGameRoute = async (
         sendJson(res, 200, { valid: false, error: 'NO_SELECTION' })
         return true
       }
-      const result = validateSowSelection(player, crops as Parameters<typeof validateSowSelection>[1])
+      const result = board.farmyard.canSow({ fields: crops as SowSelection[] })
       sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error?.code ?? 'validation failed' })
       return true
     }
