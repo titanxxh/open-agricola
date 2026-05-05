@@ -26,6 +26,10 @@ import {
   SequenceNode,
   XorNode,
 } from './nodes'
+import {
+  getOptionsSourceCard,
+  resolveChoiceSourceCard,
+} from './nodes/interaction-node'
 import type { EngineNode, EngineStepResult } from './types'
 import { ActionRegistry } from './registry'
 import { HookDispatcher } from './dispatcher'
@@ -248,39 +252,46 @@ export class Engine {
     preserveOwner?: boolean
   }): void {
     const { targetNode, fallbackNodeId, request, promptKey, promptParams, choiceOptions, actionId, ownerNodeId } = args
+    let ctxSnapshot
     if (targetNode) {
-      targetNode.setChoice(promptKey, choiceOptions, promptParams)
-      targetNode.request = request
+      // S4b Task 12 — delegate the heavy lift (setChoice + request + node
+      // pending fields + context snapshot) to InteractionNode.emit().
+      ctxSnapshot = targetNode.emit({
+        request,
+        promptKey,
+        promptParams,
+        choiceOptions,
+        actionId,
+        ownerNodeId,
+        params: args.params,
+        costs: args.costs,
+        sourceCard: args.sourceCard,
+        actionContext: args.actionContext,
+        contextWritePatch: args.contextWritePatch,
+        preserveOwner: args.preserveOwner,
+      })
       this.pendingInteractionNodeId = targetNode.id
     } else {
       this.pendingInteractionNodeId = fallbackNodeId
+      const mergedActionContext = args.contextWritePatch
+        ? { ...(args.actionContext ?? {}), ...args.contextWritePatch }
+        : args.actionContext
+      ctxSnapshot = {
+        params: args.params,
+        costs: args.costs,
+        sourceCard: resolveChoiceSourceCard(args.sourceCard, choiceOptions),
+        actionContext: mergedActionContext,
+      }
     }
     this.pendingInteractionActionId = actionId
     if (!args.preserveOwner) {
       this.pendingInteractionOwnerNodeId = ownerNodeId
     }
-    const mergedActionContext = args.contextWritePatch
-      ? { ...(args.actionContext ?? {}), ...args.contextWritePatch }
-      : args.actionContext
-    const ctxSnapshot = {
-      params: args.params,
-      costs: args.costs,
-      sourceCard: this.resolveChoiceSourceCard(args.sourceCard, choiceOptions),
-      actionContext: mergedActionContext,
-    }
-    this.pendingInteractionContext = ctxSnapshot
-    // S4b Task 11 — mirror onto InteractionNode (the authoritative owner
-    // post-PR3). Engine top-level fields stay populated to preserve the
-    // existing snapshot()/getPendingInteractionContext() public surface and
-    // the `engine.pendingInteractionContext.sourceCard = ...` mutation hook
+    // Engine top-level fields stay populated to preserve the existing
+    // snapshot()/getPendingInteractionContext() public surface and the
+    // `engine.pendingInteractionContext.sourceCard = ...` mutation hook
     // used by stats-gained-pseudo-session.test.ts.
-    if (targetNode) {
-      targetNode.pendingActionId = actionId
-      if (!args.preserveOwner) {
-        targetNode.ownerNodeId = ownerNodeId ?? undefined
-      }
-      targetNode.contextSnapshot = ctxSnapshot
-    }
+    this.pendingInteractionContext = ctxSnapshot
   }
 
   buildFlowNodePublic(flow: ActionFlow): EngineNode {
@@ -576,25 +587,6 @@ export class Engine {
     }
     visit(node)
     return sourceCards.size === 1 ? [...sourceCards][0] : undefined
-  }
-
-  private getOptionsSourceCard(options: ActionChoiceOption[]): string | undefined {
-    if (options.length === 0) return undefined
-    const normalized = options.map((option) =>
-      typeof option.sourceCard === 'string' && option.sourceCard.length > 0
-        ? option.sourceCard
-        : null,
-    )
-    if (normalized.some((sourceCard) => sourceCard === null)) return undefined
-    const sourceCards = [...new Set(normalized)] as string[]
-    return sourceCards.length === 1 ? sourceCards[0] : undefined
-  }
-
-  private resolveChoiceSourceCard(
-    sourceCard: string | undefined,
-    options: ActionChoiceOption[],
-  ): string | undefined {
-    return sourceCard ?? this.getOptionsSourceCard(options)
   }
 
   private sanitizePreviewResources(
@@ -1273,7 +1265,7 @@ export class Engine {
       this.pendingInteractionContext = {
         params: undefined,
         costs: undefined,
-        sourceCard: this.resolveChoiceSourceCard(this.getNodeSourceCard(node), options),
+        sourceCard: resolveChoiceSourceCard(this.getNodeSourceCard(node), options),
         actionContext: undefined,
       }
       const compositePromptKey = node.promptKey ?? 'ui.interactionFlowSelect'
@@ -1382,7 +1374,7 @@ export class Engine {
           this.pendingInteractionContext = {
             params: undefined,
             costs: undefined,
-            sourceCard: this.getOptionsSourceCard(node.choices),
+            sourceCard: getOptionsSourceCard(node.choices),
             actionContext: undefined,
           }
         }
