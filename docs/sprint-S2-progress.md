@@ -3,7 +3,7 @@
 **生成时间**：2026-05-05  
 **起点 base**：`main` (commit `9725cb0b`)  
 **结束 head**：`sprint-S2-interaction-request` (HEAD = Task 13 摘要 commit)  
-**测试基线**：`pnpm test:fast` 2095 passed / 35 skipped；`pnpm exec tsc -b` 0 error；`pnpm run lint` 0 error / 324 pre-existing warnings
+**测试基线**：`pnpm test:fast` 2099 passed / 35 skipped；`pnpm exec tsc -b` 0 error；`pnpm run lint` 0 error / 324 pre-existing warnings
 
 ## 1. 完成度概览
 
@@ -21,7 +21,7 @@
 | **10** | Round mixin 抽取 | ⚠️ 部分（抽 `nextSeatedPlayerIdx` + `computeStartPlayerIdx`；takeAction / confirm-* 主体留 GameCore） |
 | **11** | Harvest mixin 抽取（含 12 hook handler） | ⚠️ 部分（抽 `getHarvestPlayerIndices`；12 stage-hook + field/feed/breed entry 留 GameCore） |
 | **12** | Draft mixin + card-draft kind 包装 | ⚠️ 部分（抽 `computeCardDraftPending`；submit/advance/finalize 留 GameCore） |
-| **13** | final cleanup（删 PendingAction / 3 confirm shim / EMPTY_CURSOR / 68 测试 codemod / 8 kind 序列化往返） | ⏳ 未执行（每条都是独立大型 refactor，回归面广，超出本会话预算） |
+| **13** | final cleanup（删 PendingAction / 3 confirm shim / EMPTY_CURSOR / 68 测试 codemod / 8 kind 序列化往返） | ⚠️ 部分（step 1 + step 10 完成；step 3/4/5/6/7 延后，cascading codemod 200+ 处） |
 
 ## 2. 实质落地的协议层改造（核心价值）
 
@@ -66,16 +66,31 @@ Plan §3.10 要求把 `Engine.lastEmittedChoice` 缓存换成在 OrNode/XorNode/
 
 每条路径都是一次独立 sprint 量级的工作。本次仅做了"启动 mixin 文件 + 抽 pure helper"的 baseline。
 
-### 3.4 Task 13 cleanup 完整执行
+### 3.4 Task 13 cleanup 部分完成
 
-Task 13 的所有清理点（删 PendingAction union / 删 3 confirm shim / 删 EMPTY_ENGINE_STACK_CURSOR + ctx 改必填 / 重命名 game-core.ts → session-core.ts / 68 session test codemod / 添加 farm-select-selection-card-draft 三个 kind 的 cursor round-trip 测试）都需要逐个跑回归套确认；每条都涉及 30–70 个测试调用点的同步。本次未执行。
+Task 13 各 step 当前状态：
+
+| Step | 内容 | 状态 |
+|---|---|---|
+| 13.1 | 删 EMPTY_ENGINE_STACK_CURSOR + ctx 改必填 | ✅ 完成（commit `f937f9d6`，38 处测试 codemod） |
+| 13.3 | 删 3 个 GameCore confirm shim | ⏳ 延后（162 处 callsite 涉及读 nextPlayerIndex/fromPlayerIndex 私字段，cascading codemod） |
+| 13.4 | 删 ClientCommand 'feed'/'nextPlayer'/'confirmPlayerSwitch' variants | ⏳ 延后（前端 gameTransport.ts + 后端 room-manager.ts 同步迁移到 resolveChoice） |
+| 13.5 | 删 GameSyncPayload.pending | ⏳ 延后（前端 useGameSync hook 仍读，需要前端解耦） |
+| 13.6 | 删 PendingAction union | ⏳ 延后（依赖 13.5 + 13.7） |
+| 13.7 | 68 个 session test confirm shim codemod | ⏳ 延后 |
+| 13.10 | 添加 farm-select / selection / card-draft cursor round-trip 测试 | ✅ 完成（commit `2477c60c`，4 个新测试） |
+
+step 13.3-13.7 共涉及 200+ 处 callsite cascading codemod，每一组都需要独立 sprint 量级的 refactor。建议作为"S2-followup cleanup" 单独排期。
 
 ## 4. 提交链（Task 1–13 partial）
 
 ```
-adb8bc89 docs(s3-rebase): record rebase conflict analysis
+2477c60c test(serialization): add cursor round-trip for new kinds (Task 13 step 10)
+f937f9d6 refactor(serialization): make ctx required, delete EMPTY_ENGINE_STACK_CURSOR (Task 13 step 1)
+16725542 docs(sprint-s2): record final progress report (Task 13 partial)
 3ff7c266 refactor(session): extract round/harvest/draft phase pure helpers (Tasks 10-12 partial)
 4c9d0c9c refactor(session): extract setup-phase pure helpers (Task 9 partial)
+adb8bc89 docs(s3-rebase): record rebase conflict analysis
 6ac8ab8d refactor(actions): selection accepts structured payload (Task 7 partial)
 57a0742c refactor(protocol): protocol + engine farm-select kind support (Task 5 partial)
 576e8277 refactor(protocol): collapse InteractionState stateId 8 → 3 (idle/wait/gameover)
@@ -86,7 +101,7 @@ f2ce080f feat(types): add PromptKey closed union + PromptParams<K> conditional t
 6c044fc5 docs(sprint-s2): add S2 implementation spec
 ```
 
-加上 S1 的 carry-over commits，共 9 个实质 commits 改动 sprint-S2-interaction-request 分支。
+加上 S1 的 carry-over commits，共 11 个实质 commits 改动 sprint-S2-interaction-request 分支。
 
 ## 5. 后续建议
 
