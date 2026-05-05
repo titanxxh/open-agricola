@@ -1,3 +1,5 @@
+import type { PromptKey } from './prompt-keys'
+
 export type Resource = {
   wood: number
   clay: number
@@ -431,14 +433,15 @@ export type ActionChoiceOption = {
 
 /**
  * `extraData.actionContextWrite` (optional, plain object): when present on a
- * `{ type: 'choice' }` result, the engine shallow-merges its keys into
- * `pendingChoiceContext.actionContext`, which then surfaces in
- * `pending.actionContext` via `engine.snapshot()`. Used by ActionDef.resolveChoice
- * to persist commit-time payload (e.g. fence geometry) across a payment-combo
- * second prompt round-trip. Key conflicts: later writes overwrite earlier.
+ * `{ type: 'request', request: { kind: 'choice' } }` result, the engine
+ * shallow-merges its keys into `pendingInteractionContext.actionContext`,
+ * which then surfaces in `pending.actionContext` via `engine.snapshot()`.
+ * Used by ActionDef.resolveChoice to persist commit-time payload (e.g. fence
+ * geometry) across a payment-combo second prompt round-trip. Key conflicts:
+ * later writes overwrite earlier.
  *
- * Lifecycle: only consumed when the result type is 'choice' (which produces a
- * new pending). For 'ok' / 'fail' / 'flow' results the field is ignored
+ * Lifecycle: only consumed when the result type is 'request' (which produces
+ * a new pending). For 'ok' / 'fail' / 'flow' results the field is ignored
  * because pending is being cleared or transformed differently.
  *
  * Writes are shallow: top-level keys are merged, nested objects replace (not deep-merge).
@@ -446,9 +449,7 @@ export type ActionChoiceOption = {
  */
 export type ActionExecutionResult =
   | { type: 'ok'; logKey?: string; resourcesGained?: Partial<Resource>; resourcesPaid?: Partial<Resource>; logParams?: Record<string, unknown>; immediateLogs?: ImmediateLogEntry[]; extraData?: Record<string, unknown> }
-  | { type: 'choice'; promptKey?: string; promptParams?: Record<string, unknown>; options: ActionChoiceOption[]; extraData?: Record<string, unknown> }
-  | { type: 'animalReorg'; sourceId: string }
-  | { type: 'request'; request: InteractionRequest; promptKey?: string; promptParams?: Record<string, unknown>; sourceCard?: string; extraData?: Record<string, unknown> }
+  | { type: 'request'; request: InteractionRequest; promptKey?: PromptKey; promptParams?: Record<string, unknown>; sourceCard?: string; extraData?: Record<string, unknown> }
   | { type: 'fail'; logKey: string }
   | { type: 'flow'; flow: ActionFlow; logKey?: string; logParams?: Record<string, unknown>; immediateLogs?: ImmediateLogEntry[]; extraData?: Record<string, unknown> }
 export type ActionFlow =
@@ -456,7 +457,7 @@ export type ActionFlow =
       type: 'leaf'
       actionId: string
       optional?: boolean
-      promptKey?: string
+      promptKey?: PromptKey
       params?: Record<string, unknown>
       sourceCard?: string
       actionContext?: Record<string, unknown>
@@ -476,7 +477,7 @@ export type ActionFlow =
     }
   | {
       type: 'seq' | 'or' | 'xor' | 'parallel'
-      promptKey?: string
+      promptKey?: PromptKey
       children: ActionFlow[]
       optional?: boolean
       choiceLabelKey?: string
@@ -506,11 +507,11 @@ export type ActionDefinition = {
   ) => ActionExecutionResult
   /**
    * Opt-out: when true the engine builds a bare ActionNode instead of the
-   * default `Sequence([ActionNode, ChoiceNode])` wrap that is normally
+   * default `Sequence([ActionNode, InteractionNode])` wrap that is normally
    * triggered by the presence of `resolveChoice`. Used by leaf actions whose
-   * `execute` typically returns `ok` (so the paired ChoiceNode would dangle
+   * `execute` typically returns `ok` (so the paired InteractionNode would dangle
    * empty and block the seq), and which only emit `choice` for one specific
-   * branch (handled via the engine's fallback `pendingChoiceNodeId = node.id`
+   * branch (handled via the engine's fallback `pendingInteractionNodeId = node.id`
    * path that already routes the player choice back through `resolveChoice`).
    * Currently set on the `pay` leaf — typed-flat costs resolve eagerly while
    * ComplexCost multi-solution still emits a payment choice.
@@ -532,7 +533,7 @@ export type ActionDefinition = {
     context: ActionExecutionContext,
   ) => ActionChoiceOption[]
   /** Prompt key used when `getBaseChoiceOptions` produces a multi-option choice. */
-  choicePromptKey?: string
+  choicePromptKey?: PromptKey
   /** Log key used when no candidate is affordable in the opt-in choice path. */
   noChoiceLogKey?: string
   /**
@@ -553,13 +554,27 @@ export type ActionSpace = ActionDefinition & {
   takenBy: WorkerRef[]
 }
 
+/**
+ * Single entry in a harvest-feed queue: pinpoints which player still owes
+ * food and how much, plus the food already consumed from that player's
+ * mandatory pre-deduction (so the UI can display it). Shared between the
+ * legacy `PendingAction.harvestFeed` shape, the engine's
+ * `InteractionRequest` payload, and `GameCore.startFeedSubFlow` so all
+ * three sites refer to the same canonical type.
+ */
+export type FeedQueueEntry = {
+  index: number
+  remaining: number
+  foodUsed: number
+}
+
 export type PendingAction =
   | {
       type: 'choice'
       playerIndex: number
       spaceId: string
       options: ActionChoiceOption[]
-      promptKey?: string
+      promptKey?: PromptKey
       promptParams?: Record<string, unknown>
       costOverride?: Partial<Resource>
       sourceCard?: string
@@ -570,7 +585,7 @@ export type PendingAction =
       playerIndex: number
       remaining: number
       foodUsed: number
-      feedQueue?: { index: number; remaining: number; foodUsed: number }[]
+      feedQueue?: FeedQueueEntry[]
     }
   | { type: 'confirmNextPlayer'; nextPlayerIndex: number }
   | { type: 'confirmPlayerSwitch'; fromPlayerIndex: number; toPlayerIndex: number }
@@ -583,6 +598,12 @@ export type SubFlowKind =
   | 'confirm-next-player'
   | 'confirm-player-switch'
   | 'feed'
+  | 'farm-select'
+  | 'selection'
+  | 'card-draft'
+
+export type FarmSelectType = 'plow' | 'sow' | 'fence' | 'room' | 'stable'
+export type SelectionKind = 'farm-position' | 'occupation-hand'
 
 export type InteractionRequest =
   | { kind: 'choice'; options: ActionChoiceOption[] }
@@ -593,7 +614,52 @@ export type InteractionRequest =
       kind: 'feed'
       remaining: number
       foodUsed: number
-      feedQueue?: { index: number; remaining: number; foodUsed: number }[]
+      feedQueue?: FeedQueueEntry[]
+    }
+  | {
+      kind: 'farm-select'
+      farm:
+        | { farmType: 'plow'; selectableTiles: FarmTilePosition[] }
+        | {
+            farmType: 'sow'
+            selectableFields: {
+              tile: FarmTilePosition
+              allowedCrops: ('grain' | 'vegetable' | 'wood')[]
+              sourceCard?: string
+            }[]
+            maxSelections?: number
+          }
+        | { farmType: 'fence'; selectableEdges: string[]; extraWood?: number }
+        | { farmType: 'room'; selectableTiles: FarmTilePosition[]; maxSelections: number }
+        | { farmType: 'stable'; selectableTiles: FarmTilePosition[]; maxSelections: number }
+      options?: ActionChoiceOption[]
+    }
+  | {
+      kind: 'selection'
+      selection:
+        | {
+            selectionType: 'farm-position'
+            selectablePositions: FarmTilePosition[]
+            minSelections?: number
+            maxSelections: number
+          }
+        | {
+            selectionType: 'occupation-hand'
+            selectableCards: string[]
+            minSelections: number
+            maxSelections: number
+          }
+    }
+  | {
+      kind: 'card-draft'
+      mode: 'simultaneous'
+      round: number
+      totalRounds: number
+      poolSize: number
+      seatOrder: string[]
+      pools: Record<string, { occ: string[]; minor: string[] }>
+      pendingPicks: string[]
+      kept: Record<string, { occ: string[]; minor: string[] }>
     }
 
 export type InteractionCommand =
@@ -673,59 +739,38 @@ type InteractionBase = {
   anytimeActions: AnytimeAction[]
 }
 
+export type PlayerScoreSummaryLite = {
+  playerId: string
+  total: number
+}
+
 export type InteractionState =
   | (InteractionBase & { stateId: 'idle' })
   | (InteractionBase & {
-      stateId: 'choice'
+      stateId: 'wait'
       playerIndex: number
-      spaceId: string
-      promptKey?: string
+      spaceId?: string
+      promptKey?: PromptKey
       promptParams?: Record<string, unknown>
-      options: ActionChoiceOption[]
-      costOverride?: Partial<Resource>
       sourceCard?: string
-    })
-  | (InteractionBase & {
-      stateId: 'farmSelect'
-      playerIndex: number
-      spaceId: string
-      promptKey?: string
-      promptParams?: Record<string, unknown>
-      options: ActionChoiceOption[]
+      request: InteractionRequest
+      // Transitional kind-specific accessor fields (Task 4 → cleaned up in Task 13).
+      // Frontend / tests can read these directly while we migrate callers off
+      // the legacy stateId switches.
+      options?: ActionChoiceOption[]
       costOverride?: Partial<Resource>
-      sourceCard?: string
-      farm: InteractionFarmSelection
+      farm?: InteractionFarmSelection
+      selection?: InteractionSelection
+      zones?: InteractionAnimalReorgZone[]
+      remaining?: number
+      foodUsed?: number
+      feedQueue?: FeedQueueEntry[]
+      nextPlayerIndex?: number
+      fromPlayerIndex?: number
+      toPlayerIndex?: number
     })
   | (InteractionBase & {
-      stateId: 'selection'
-      playerIndex: number
-      spaceId: string
-      promptKey?: string
-      promptParams?: Record<string, unknown>
-      options: ActionChoiceOption[]
-      costOverride?: Partial<Resource>
-      sourceCard?: string
-      selection: InteractionSelection
-    })
-  | (InteractionBase & {
-      stateId: 'animalReorg'
-      playerIndex: number
-      spaceId: string
-      zones: InteractionAnimalReorgZone[]
-    })
-  | (InteractionBase & {
-      stateId: 'harvestFeed'
-      playerIndex: number
-      remaining: number
-      foodUsed: number
-      feedQueue?: { index: number; remaining: number; foodUsed: number }[]
-    })
-  | (InteractionBase & {
-      stateId: 'confirmNextPlayer'
-      nextPlayerIndex: number
-    })
-  | (InteractionBase & {
-      stateId: 'confirmPlayerSwitch'
-      fromPlayerIndex: number
-      toPlayerIndex: number
+      stateId: 'gameover'
+      winners?: string[]
+      scores?: PlayerScoreSummaryLite[]
     })

@@ -93,7 +93,7 @@ describe('PlayerStats action tracking', () => {
     if (!constructOption) throw new Error('construct option missing')
     resp = session.resolveChoice(0, constructOption.value)
     expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId !== 'farmSelect') {
+    if (resp.interaction.stateId !== 'wait') {
       throw new Error('expected farmSelect interaction')
     }
     if (resp.interaction.farm.farmType !== 'room') {

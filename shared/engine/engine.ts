@@ -9,14 +9,16 @@ import type {
   GameState,
   ActionChoiceOption,
   ImmediateLogEntry,
+  InteractionRequest,
   LogEntry,
   Resource,
 } from '../game/types'
+import type { PromptKey } from '../game/prompt-keys'
 import type { FollowUpAction } from '../actions/hooks'
 import {
   ActionNode,
   ActivateCardNode,
-  ChoiceNode,
+  InteractionNode,
   OptionalNode,
   OrNode,
   ParallelNode,
@@ -31,6 +33,8 @@ import { getListenerById, executeCardListener, shouldSkipImmediateListenerLog } 
 import { incCardUsed } from '../cards/helpers/card-state'
 import { EngineTree } from './tree'
 import { LogStore } from './log-store'
+import { INTERACTION_ONLY_ACTION_ID } from './engine-stack'
+import type { ReorganizeTrigger } from '../actions/effects/reorganize'
 
 type EngineContext = {
   state: GameState
@@ -93,18 +97,69 @@ export class Engine {
   private registry: ActionRegistry
   private hooks: HookDispatcher
   private log: LogStore
-  private pendingChoiceNodeId: string | null = null
-  private pendingChoiceActionId: string | null = null
-  private pendingChoiceOwnerNodeId: string | null = null
-  private pendingChoiceContext:
+  private pendingInteractionNodeId: string | null = null
+  private pendingInteractionActionId: string | null = null
+  private pendingInteractionOwnerNodeId: string | null = null
+  private pendingInteractionContext:
     | Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'>
     | null = null
   private flowNodeCounter = 0
   private beforePhaseFlowNodeIds = new Set<string>()
   private lastComputedCosts: Partial<import('../game/types').Resource> | undefined = undefined
+  /**
+   * Cache of the most recent {@link proceed} result of `type: 'choice'`. Used
+   * by GameCore (Task 10) to surface a `PendingAction` of `type: 'choice'`
+   * even when the pending choice is hosted on a non-InteractionNode (OrNode,
+   * XorNode, OptionalNode) — those nodes don't carry their own option list,
+   * but the engine has just computed it. Cleared whenever the engine resolves
+   * the pending choice or transitions to a non-choice step.
+   *
+   * Persistence: this field IS persisted in {@link snapshot} / {@link restore}
+   * so OrNode / XorNode / OptionalNode pending choices survive cursor
+   * round-trip and undo restoreHistory. Without persistence,
+   * `getCurrentPending` would return `'none'` after restore even though
+   * `pendingInteractionNodeId` still points at a composite node. GameCore
+   * additionally tolerates a missing cache by falling back to
+   * `peekInteraction()`.
+   */
+  private lastEmittedChoice: {
+    nodeId: string
+    promptKey?: PromptKey
+    promptParams?: Record<string, unknown>
+    options: ActionChoiceOption[]
+  } | null = null
+
+  /**
+   * Read-only accessor for the cached pending-choice info. Returns null when
+   * the engine isn't currently waiting on a non-InteractionNode choice.
+   */
+  peekPendingChoiceFromComposite(): {
+    nodeId: string
+    promptKey?: PromptKey
+    promptParams?: Record<string, unknown>
+    options: ActionChoiceOption[]
+  } | null {
+    if (this.pendingInteractionNodeId === null) return null
+    if (!this.lastEmittedChoice) return null
+    if (this.lastEmittedChoice.nodeId !== this.pendingInteractionNodeId) return null
+    return this.lastEmittedChoice
+  }
 
   getLastComputedCosts() {
     return this.lastComputedCosts
+  }
+
+  /**
+   * Read-only accessor for the engine's pending-interaction context (sourceCard,
+   * actionContext, params, costs). Used by `GameCore.buildInteraction` /
+   * `GameCore.getCurrentPending` to surface fields previously stored on
+   * `this.pending` (now derived from engineStack — Task 10).
+   */
+  getPendingInteractionContext(): Pick<
+    ActionExecutionContext,
+    'params' | 'costs' | 'sourceCard' | 'actionContext'
+  > | null {
+    return this.pendingInteractionContext
   }
 
   injectBeforeNodes(nodes: EngineNode[]) {
@@ -117,6 +172,104 @@ export class Engine {
 
   peekNextUnresolved(): EngineNode | null {
     return this.tree.nextUnresolved()
+  }
+
+  peekInteraction(): InteractionNode | null {
+    if (this.pendingInteractionNodeId === null) return null
+    const node = this.tree.findNodeById(this.pendingInteractionNodeId)
+    return node instanceof InteractionNode ? node : null
+  }
+
+  /**
+   * Replace this engine's tree with a single synthetic InteractionNode and pin
+   * the pending-interaction pointers at it. Used by GameCore.startConfirm*/
+  /* startFeedSubFlow when promoting GameCore-driven prompts (confirmNextPlayer,
+   * confirmPlayerSwitch, harvest-feed) into the InteractionNode pipeline. The
+   * parent context (current player, space) is owned by the EngineStack frame
+   * GameCore pushes — the engine itself just hosts the InteractionNode so
+   * `peekInteraction()` / `snapshot()` round-trip the pending request.
+   *
+   * We swap the entire tree root rather than `insertBefore` because the
+   * synthetic frames pushed for confirm/feed have no real action body; the
+   * InteractionNode IS the only thing the engine should surface.
+   */
+  injectInteraction(node: InteractionNode): void {
+    this.tree.root = node
+    this.pendingInteractionNodeId = node.id
+    // Synthetic action id — never resolves through the registry. Engine paths
+    // that look up `pendingInteractionActionId` (e.g. flushLeafActionDetail)
+    // tolerate unknown ids gracefully.
+    this.pendingInteractionActionId = INTERACTION_ONLY_ACTION_ID
+    this.pendingInteractionOwnerNodeId = null
+    this.pendingInteractionContext = {
+      params: undefined,
+      costs: undefined,
+      sourceCard: undefined,
+      actionContext: undefined,
+    }
+    this.lastComputedCosts = undefined
+  }
+
+  /**
+   * Apply an InteractionRequest emitted by an action.execute / resolveChoice
+   * call to the engine's pending-interaction state. Centralises the three
+   * mirror branches (top-level execute, XorNode follow-up execute,
+   * resolveChoice second-pass) so that every interaction request goes
+   * through the same setChoice + pending-interaction wiring path.
+   *
+   * Caller is responsible for:
+   *   - locating the right InteractionNode (paired with an ActionNode, child
+   *     of the XorNode, or pending node from tree lookup) — pass it as
+   *     `targetNode` (null when no node exists; pendingNodeId falls back to
+   *     `fallbackNodeId`).
+   *   - building the final `choiceOptions` (e.g. animal-reorg confirm/cancel
+   *     shim, computeArgs extraOptions merge).
+   *   - any prior shallow-merge of actionContextWrite from extraData.
+   */
+  private applyInteractionRequest(args: {
+    targetNode: InteractionNode | null
+    fallbackNodeId: string | null
+    request: InteractionRequest
+    promptKey?: PromptKey
+    promptParams?: Record<string, unknown>
+    choiceOptions: ActionChoiceOption[]
+    actionId: string
+    ownerNodeId: string | null
+    params: ActionExecutionContext['params']
+    costs: ActionExecutionContext['costs']
+    sourceCard: string | undefined
+    actionContext: Record<string, unknown> | undefined
+    /** Optional ActionDef-declared actionContext patch (typically extracted
+     *  from `result.extraData.actionContextWrite`). When provided the helper
+     *  performs the shallow merge so all three call sites can stop repeating
+     *  the same boilerplate inline. */
+    contextWritePatch?: Record<string, unknown>
+    /** When true, leave `pendingInteractionOwnerNodeId` untouched (used by
+     *  the resolveChoice second-pass that wants to preserve the existing
+     *  owner pointer). */
+    preserveOwner?: boolean
+  }): void {
+    const { targetNode, fallbackNodeId, request, promptKey, promptParams, choiceOptions, actionId, ownerNodeId } = args
+    if (targetNode) {
+      targetNode.setChoice(promptKey, choiceOptions, promptParams)
+      targetNode.request = request
+      this.pendingInteractionNodeId = targetNode.id
+    } else {
+      this.pendingInteractionNodeId = fallbackNodeId
+    }
+    this.pendingInteractionActionId = actionId
+    if (!args.preserveOwner) {
+      this.pendingInteractionOwnerNodeId = ownerNodeId
+    }
+    const mergedActionContext = args.contextWritePatch
+      ? { ...(args.actionContext ?? {}), ...args.contextWritePatch }
+      : args.actionContext
+    this.pendingInteractionContext = {
+      params: args.params,
+      costs: args.costs,
+      sourceCard: this.resolveChoiceSourceCard(args.sourceCard, choiceOptions),
+      actionContext: mergedActionContext,
+    }
   }
 
   buildFlowNodePublic(flow: ActionFlow): EngineNode {
@@ -203,13 +356,13 @@ export class Engine {
     return null
   }
 
-  private findPairedChoiceNode(node: ActionNode): ChoiceNode | null {
+  private findPairedInteractionNode(node: ActionNode): InteractionNode | null {
     const parent = this.tree.findParent(node.id)
     if (!(parent instanceof SequenceNode)) return null
     const index = parent.children.findIndex((child) => child.id === node.id)
     if (index === -1) return null
     const candidate = parent.children[index + 1]
-    return candidate instanceof ChoiceNode ? candidate : null
+    return candidate instanceof InteractionNode ? candidate : null
   }
 
   private buildActivateCardNodes(
@@ -254,8 +407,8 @@ export class Engine {
       clone.beforePhaseResolved = node.beforePhaseResolved
       return clone
     }
-    if (node instanceof ChoiceNode) {
-      const clone = new ChoiceNode(
+    if (node instanceof InteractionNode) {
+      const clone = new InteractionNode(
         `${node.id}-clone-${this.flowNodeCounter++}`,
         [...node.choices],
       )
@@ -334,7 +487,7 @@ export class Engine {
       node.resolve()
       return
     }
-    if (node instanceof ActionNode || node instanceof ChoiceNode) {
+    if (node instanceof ActionNode || node instanceof InteractionNode) {
       node.setState('resolved')
       return
     }
@@ -475,7 +628,7 @@ export class Engine {
 
   private collectOrderedActionNodes(node: EngineNode): ActionNode[] | null {
     if (node instanceof ActionNode) return [node]
-    if (node instanceof ChoiceNode) return []
+    if (node instanceof InteractionNode) return []
     if (node instanceof OptionalNode) {
       return this.collectOrderedActionNodes(node.child)
     }
@@ -646,7 +799,7 @@ export class Engine {
       if (definition?.resolveChoice && !definition.skipChoiceWrap) {
         const sequence = new SequenceNode(nextId(), [
           actionNode,
-          new ChoiceNode(nextId(), []),
+          new InteractionNode(nextId(), []),
         ])
         const node = flow.optional
           ? new OptionalNode(nextId(), sequence, flow.promptKey)
@@ -720,15 +873,15 @@ export class Engine {
     }
   }
 
-  private findChoiceNode(node: EngineNode): ChoiceNode | null {
-    if (node instanceof ChoiceNode) return node
+  private findInteractionNode(node: EngineNode): InteractionNode | null {
+    if (node instanceof InteractionNode) return node
     if (node instanceof OptionalNode) {
-      return this.findChoiceNode(node.child)
+      return this.findInteractionNode(node.child)
     }
     if ('children' in node) {
       const composite = node as { children: EngineNode[] }
       for (const child of composite.children) {
-        const found = this.findChoiceNode(child)
+        const found = this.findInteractionNode(child)
         if (found) return found
       }
     }
@@ -804,9 +957,9 @@ export class Engine {
       return action.resolveChoice(executionContext, value, undefined)
     }
     return {
-      type: 'choice',
+      type: 'request',
+      request: { kind: 'choice', options: affordable },
       promptKey: action.choicePromptKey,
-      options: affordable,
     }
   }
 
@@ -833,30 +986,36 @@ export class Engine {
       active: node instanceof OptionalNode ? node.active : undefined,
     }))
     const choiceNode =
-      this.pendingChoiceNodeId !== null
-        ? this.tree.findNodeById(this.pendingChoiceNodeId)
+      this.pendingInteractionNodeId !== null
+        ? this.tree.findNodeById(this.pendingInteractionNodeId)
         : null
     const choiceData =
-      choiceNode instanceof ChoiceNode
+      choiceNode instanceof InteractionNode
         ? {
             id: choiceNode.id,
             promptKey: choiceNode.promptKey,
             choices: choiceNode.choices,
+            request: choiceNode.request,
           }
         : null
     return {
       nodeStates,
-      pendingChoiceNodeId: this.pendingChoiceNodeId,
-      pendingChoiceActionId: this.pendingChoiceActionId,
-      pendingChoiceOwnerNodeId: this.pendingChoiceOwnerNodeId,
-      pendingChoiceContext: this.pendingChoiceContext,
+      pendingInteractionNodeId: this.pendingInteractionNodeId,
+      pendingInteractionActionId: this.pendingInteractionActionId,
+      pendingInteractionOwnerNodeId: this.pendingInteractionOwnerNodeId,
+      pendingInteractionContext: this.pendingInteractionContext,
       choiceData,
+      // Task 10: persist the composite-node choice cache so OrNode / XorNode /
+      // OptionalNode pending choices survive cursor round-trip and undo
+      // restoreHistory. Without this, getCurrentPending returns 'none' after
+      // restore even though pendingInteractionNodeId points at an OrNode.
+      lastEmittedChoice: this.lastEmittedChoice,
     }
   }
 
   hasPendingChoiceCompositeAncestor() {
-    if (!this.pendingChoiceNodeId) return false
-    let parent = this.tree.findParent(this.pendingChoiceNodeId)
+    if (!this.pendingInteractionNodeId) return false
+    let parent = this.tree.findParent(this.pendingInteractionNodeId)
     while (parent) {
       if (parent instanceof OrNode || parent instanceof XorNode) {
         return true
@@ -872,23 +1031,58 @@ export class Engine {
       state: 'ready' | 'resolved' | 'blocked'
       active?: boolean
     }[]
-    pendingChoiceNodeId: string | null
-    pendingChoiceActionId: string | null
-    pendingChoiceOwnerNodeId: string | null
-    pendingChoiceContext: Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'> | null
+    pendingInteractionNodeId: string | null
+    pendingInteractionActionId: string | null
+    pendingInteractionOwnerNodeId: string | null
+    pendingInteractionContext: Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'> | null
     choiceData: {
       id: string
-      promptKey?: string
+      promptKey?: PromptKey
       choices: ActionChoiceOption[]
+      request?: InteractionRequest
+    } | null
+    lastEmittedChoice?: {
+      nodeId: string
+      promptKey?: PromptKey
+      promptParams?: Record<string, unknown>
+      options: ActionChoiceOption[]
     } | null
   }) {
+    // Synthetic interaction-only frames (pushed by GameCore.startConfirm*/
+    // startFeedSubFlow) have a single InteractionNode at root. The cursor
+    // serializes them with `pendingInteractionActionId === '__interaction_only__'`
+    // and the InteractionNode's request in `choiceData`. Re-inject before the
+    // normal nodeStates pass so subsequent `nextUnresolved()` finds the same
+    // InteractionNode the original session held.
+    if (
+      snapshot.pendingInteractionActionId === INTERACTION_ONLY_ACTION_ID &&
+      snapshot.choiceData
+    ) {
+      const restored = new InteractionNode(
+        snapshot.choiceData.id,
+        snapshot.choiceData.choices,
+        snapshot.choiceData.request,
+      )
+      restored.promptKey = snapshot.choiceData.promptKey
+      this.injectInteraction(restored)
+      this.pendingInteractionContext = snapshot.pendingInteractionContext
+      // Replay the node state in case the interaction was already
+      // partially resolved before serialization.
+      const nodeStateEntry = snapshot.nodeStates.find(
+        (entry) => entry.id === snapshot.choiceData!.id,
+      )
+      if (nodeStateEntry) {
+        restored.setState(nodeStateEntry.state)
+      }
+      return
+    }
     const nodeMap = new Map(
       this.tree.allNodes().map((node) => [node.id, node]),
     )
     snapshot.nodeStates.forEach(({ id, state }) => {
       const node = nodeMap.get(id)
       if (!node) return
-      if (node instanceof ChoiceNode) {
+      if (node instanceof InteractionNode) {
         node.setState(state)
         return
       }
@@ -906,14 +1100,18 @@ export class Engine {
     })
     if (snapshot.choiceData) {
       const node = nodeMap.get(snapshot.choiceData.id)
-      if (node instanceof ChoiceNode) {
+      if (node instanceof InteractionNode) {
         node.setChoice(snapshot.choiceData.promptKey, snapshot.choiceData.choices)
+        if (snapshot.choiceData.request) {
+          node.request = snapshot.choiceData.request
+        }
       }
     }
-    this.pendingChoiceNodeId = snapshot.pendingChoiceNodeId
-    this.pendingChoiceActionId = snapshot.pendingChoiceActionId
-    this.pendingChoiceOwnerNodeId = snapshot.pendingChoiceOwnerNodeId
-    this.pendingChoiceContext = snapshot.pendingChoiceContext
+    this.pendingInteractionNodeId = snapshot.pendingInteractionNodeId
+    this.pendingInteractionActionId = snapshot.pendingInteractionActionId
+    this.pendingInteractionOwnerNodeId = snapshot.pendingInteractionOwnerNodeId
+    this.pendingInteractionContext = snapshot.pendingInteractionContext
+    this.lastEmittedChoice = snapshot.lastEmittedChoice ?? null
   }
 
   constructor(params: {
@@ -1003,19 +1201,25 @@ export class Engine {
         }
         return { type: 'blocked', nodeId: node.id }
       }
-      this.pendingChoiceNodeId = node.id
-      this.pendingChoiceActionId = null
-      this.pendingChoiceContext = {
+      this.pendingInteractionNodeId = node.id
+      this.pendingInteractionActionId = null
+      this.pendingInteractionContext = {
         params: undefined,
         costs: undefined,
         sourceCard: this.resolveChoiceSourceCard(this.getNodeSourceCard(node), options),
         actionContext: undefined,
       }
+      const compositePromptKey = node.promptKey ?? 'ui.interactionFlowSelect'
+      this.lastEmittedChoice = {
+        nodeId: node.id,
+        promptKey: compositePromptKey,
+        options,
+      }
       return {
         type: 'choice',
         nodeId: node.id,
         choice: {
-          promptKey: node.promptKey ?? 'ui.interactionFlowSelect',
+          promptKey: compositePromptKey,
           options,
         },
       }
@@ -1066,9 +1270,9 @@ export class Engine {
         node.resolve()
         return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
       }
-      this.pendingChoiceNodeId = node.id
-      this.pendingChoiceActionId = null
-      this.pendingChoiceContext = {
+      this.pendingInteractionNodeId = node.id
+      this.pendingInteractionActionId = null
+      this.pendingInteractionContext = {
         params: actionNode.params,
         costs: undefined,
         sourceCard: actionNode.sourceCard,
@@ -1078,28 +1282,35 @@ export class Engine {
         labelKey: actionNode.choiceLabelKey ?? action.nameKey,
         labelParams: actionNode.choiceLabelParams,
       }
+      const optionalPromptKey = node.promptKey ?? 'ui.interactionOptionalAction'
+      const optionalOptions: ActionChoiceOption[] = [
+        {
+          value: actionNode.id,
+          labelKey: label.labelKey,
+          labelParams: label.labelParams,
+          sourceCard: actionNode.sourceCard,
+          effectPreview: this.getNodeEffectPreview(node.child),
+        },
+        { value: '__skip__', labelKey: 'ui.interactionOptionalSkip' },
+      ]
+      this.lastEmittedChoice = {
+        nodeId: node.id,
+        promptKey: optionalPromptKey,
+        options: optionalOptions,
+      }
       return {
         type: 'choice',
         nodeId: node.id,
         choice: {
-          promptKey: node.promptKey ?? 'ui.interactionOptionalAction',
-          options: [
-            {
-              value: actionNode.id,
-              labelKey: label.labelKey,
-              labelParams: label.labelParams,
-              sourceCard: actionNode.sourceCard,
-              effectPreview: this.getNodeEffectPreview(node.child),
-            },
-            { value: '__skip__', labelKey: 'ui.interactionOptionalSkip' },
-          ],
+          promptKey: optionalPromptKey,
+          options: optionalOptions,
         },
       }
     }
-    if (node instanceof ChoiceNode) {
+    if (node instanceof InteractionNode) {
       if (node.choices.length > 0) {
-        if (!this.pendingChoiceContext) {
-          this.pendingChoiceContext = {
+        if (!this.pendingInteractionContext) {
+          this.pendingInteractionContext = {
             params: undefined,
             costs: undefined,
             sourceCard: this.getOptionsSourceCard(node.choices),
@@ -1275,48 +1486,137 @@ export class Engine {
       const duringActivateNodes = this.buildActivateCardNodes(
         duringPhase.matchedListeners, 'during', replacedActionId,
       )
-if (result.type === 'choice') {
-node.resolve(result)
-if (!action.getBaseChoiceOptions) {
-const argResults = this.hooks.computeArgs(
-{ ...executionContext, actionId: replacedActionId },
-result,
-)
-const existingValues = new Set(result.options.map((o) => o.value))
-const extraOptions = argResults
-.flatMap((entry) => entry.extraOptions ?? [])
-.filter((option) => option && !existingValues.has(option.value))
-if (extraOptions.length > 0) {
-result.options = [...result.options, ...extraOptions]
+      if (result.type === 'request') {
+        node.resolve(result)
+        // Mirror the resolveChoice second-pass: ActionDef-declared
+        // actionContext patches in result.extraData.actionContextWrite are
+        // shallow-merged into the pending-interaction context so subsequent
+        // prompts see the patched context. The merge itself is delegated to
+        // `applyInteractionRequest` via `contextWritePatch` for parity with
+        // the XorNode follow-up branch and the resolveChoice second-pass.
+        const contextWritePatch =
+          result.extraData && typeof result.extraData === 'object'
+            ? (result.extraData.actionContextWrite as Record<string, unknown> | undefined)
+            : undefined
+        let choiceOptions: ActionChoiceOption[]
+        let updatedRequest: InteractionRequest = result.request
+        if (result.request.kind === 'choice') {
+          // computeArgs hook can inject extra options (e.g. D50 ForeignAid
+          // filter, A94 LazySowman extras). Skip when the action provides its
+          // own getBaseChoiceOptions builder (already authoritative).
+          let mergedOptions = result.request.options
+          if (!action.getBaseChoiceOptions) {
+            const argResults = this.hooks.computeArgs(
+              { ...executionContext, actionId: replacedActionId },
+              result,
+            )
+            const existingValues = new Set(result.request.options.map((o) => o.value))
+            const extraOptions = argResults
+              .flatMap((entry) => entry.extraOptions ?? [])
+              .filter((option) => option && !existingValues.has(option.value))
+            if (extraOptions.length > 0) {
+              mergedOptions = [...result.request.options, ...extraOptions]
+              // Build a fresh request instead of mutating the action's
+              // returned object — input-mutation breaks immutability and
+              // surprises emitters that reuse a constant request literal.
+              updatedRequest = { ...result.request, options: mergedOptions }
+            }
           }
-        }
-        const choiceNode = this.findPairedChoiceNode(node) ?? this.findChoiceNode(this.tree.root)
-        if (choiceNode) {
-          choiceNode.setChoice(result.promptKey, result.options)
-          this.pendingChoiceNodeId = choiceNode.id
-          this.pendingChoiceActionId = replacedActionId
-          this.pendingChoiceOwnerNodeId = null
+          choiceOptions = mergedOptions
+        } else if (result.request.kind === 'animal-reorg') {
+          // Compatibility shim — RETAINED through Task 7 (re-evaluated).
+          //
+          // GameCore.resolvePendingChoice still validates the player's
+          // submitted value via `pending.options.find((o) => o.value === value)`
+          // (shared/session/game-core.ts ~L2249). Reorg confirm/cancel
+          // therefore must surface as concrete options on the pending
+          // surface or the validator rejects the resolution.
+          //
+          // Removing this shim requires teaching resolvePendingChoice to
+          // bypass the options.find check for `request.kind === 'animal-reorg'`
+          // (or to read the allowed values off InteractionNode.choices /
+          // request directly). Task 7 deliberately did not modify
+          // resolvePendingChoice (out of scope per task constraints), so
+          // the shim stays. Task 9 or Task 10 (when buildInteraction is
+          // rewritten and pending.options is removed) is the natural
+          // place to delete it.
+          //
+          // The cancel option is omitted for non-anytime triggers,
+          // mirroring the pre-migration `buildOptions(trigger)` helper.
+          const trigger =
+            (executionContext.actionContext?.trigger as ReorganizeTrigger | undefined) ?? 'anytime'
+          const confirm: ActionChoiceOption = {
+            value: 'confirm',
+            labelKey: 'ui.interactionAnimalReorgConfirm',
+          }
+          choiceOptions =
+            trigger === 'anytime'
+              ? [confirm, { value: 'cancel', labelKey: 'ui.interactionAnimalReorgCancel' }]
+              : [confirm]
+        } else if (result.request.kind === 'farm-select') {
+          // Task 5/6: farm-select leaves emit InteractionFarmSelection plus an
+          // optional `options` list (confirm/cancel) so resolvePendingChoice's
+          // pending.options.find() validator still has a value to match.
+          choiceOptions = result.request.options ?? [
+            { value: 'confirm', labelKey: 'ui.interactionFarmSelectConfirm' },
+            { value: 'cancel', labelKey: 'ui.interactionFarmSelectCancel' },
+          ]
+        } else if (
+          result.request.kind === 'confirm-next-player' ||
+          result.request.kind === 'confirm-player-switch' ||
+          result.request.kind === 'feed' ||
+          result.request.kind === 'selection' ||
+          result.request.kind === 'card-draft'
+        ) {
+          // Task 9 will add explicit emitters for these kinds. Until then no
+          // current effect emits them, so they fall through to empty choices
+          // here. The exhaustive check below ensures any future kind added to
+          // InteractionRequest forces this branch to be revisited.
+          // selection / card-draft were added in S2 Task 2; their emitters
+          // land in Tasks 7/12 — until then they share this same not-yet-wired
+          // path so typecheck stays green without granting them a real options
+          // surface.
+          choiceOptions = []
         } else {
-          this.pendingChoiceNodeId = node.id
-          this.pendingChoiceActionId = replacedActionId
-          this.pendingChoiceOwnerNodeId = null
+          // Exhaustive check: every InteractionRequest kind must be handled
+          // above. If a new kind is added to InteractionRequest without
+          // updating this branch, the assignment below produces a typecheck
+          // failure here, signalling that Task 6/7 should have removed this
+          // shim OR the new kind needs an explicit branch.
+          const _exhaustive: never = result.request
+          void _exhaustive
+          choiceOptions = []
         }
-        this.pendingChoiceContext = {
+        const choiceNode = this.findPairedInteractionNode(node) ?? this.findInteractionNode(this.tree.root)
+        this.applyInteractionRequest({
+          targetNode: choiceNode ?? null,
+          fallbackNodeId: node.id,
+          request: updatedRequest,
+          promptKey: result.promptKey,
+          promptParams: result.promptParams,
+          choiceOptions,
+          actionId: replacedActionId,
+          ownerNodeId: null,
           params: executionContext.params,
           costs: executionContext.costs,
-          sourceCard: this.resolveChoiceSourceCard(executionContext.sourceCard, result.options),
+          sourceCard: executionContext.sourceCard ?? result.sourceCard,
           actionContext: executionContext.actionContext,
-        }
+          contextWritePatch,
+        })
         if (duringActivateNodes.length > 0) {
           this.tree.insertAfter(node.id, [...duringActivateNodes])
         }
-return {
-type: 'choice',
-nodeId: this.pendingChoiceNodeId ?? node.id,
-choice: { promptKey: result.promptKey, promptParams: result.promptParams, options: result.options },
-}
+        return {
+          type: 'choice',
+          nodeId: this.pendingInteractionNodeId ?? node.id,
+          choice: {
+            promptKey: result.promptKey,
+            promptParams: result.promptParams,
+            options: choiceOptions,
+          },
+        }
       }
-      this.findPairedChoiceNode(node)?.setState('resolved')
+      this.findPairedInteractionNode(node)?.setState('resolved')
       if (result.type === 'ok' || result.type === 'flow') {
         collectImmediateLogs(context.player.name, result).forEach((entry) => {
           this.log.append(entry)
@@ -1420,30 +1720,30 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
     context: EngineContext,
     payload?: Record<string, unknown>,
   ): ActionExecutionResult {
-    if (this.pendingChoiceNodeId) {
-      const node = this.tree.findNodeById(this.pendingChoiceNodeId)
+    if (this.pendingInteractionNodeId) {
+      const node = this.tree.findNodeById(this.pendingInteractionNodeId)
       if (node instanceof OptionalNode) {
         if (choice === '__skip__') {
           node.resolve()
-          this.pendingChoiceNodeId = null
-          this.pendingChoiceActionId = null
-          this.pendingChoiceOwnerNodeId = null
-          this.pendingChoiceContext = null
+          this.pendingInteractionNodeId = null
+          this.pendingInteractionActionId = null
+          this.pendingInteractionOwnerNodeId = null
+          this.pendingInteractionContext = null
           return { type: 'ok' }
         }
         node.active = true
-        this.pendingChoiceNodeId = null
-        this.pendingChoiceActionId = null
-        this.pendingChoiceOwnerNodeId = null
-        this.pendingChoiceContext = null
+        this.pendingInteractionNodeId = null
+        this.pendingInteractionActionId = null
+        this.pendingInteractionOwnerNodeId = null
+        this.pendingInteractionContext = null
         return { type: 'ok' }
       }
       if (node instanceof OrNode || node instanceof XorNode) {
         if (choice === '__done__' && node instanceof OrNode) {
           node.resolve(choice)
-          this.pendingChoiceNodeId = null
-          this.pendingChoiceOwnerNodeId = null
-          this.pendingChoiceContext = null
+          this.pendingInteractionNodeId = null
+          this.pendingInteractionOwnerNodeId = null
+          this.pendingInteractionContext = null
           return { type: 'ok' }
         }
         if (choice === '__skip__') {
@@ -1451,19 +1751,19 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
           if (parent instanceof OptionalNode) {
             this.resolveSubtree(node)
             parent.resolve()
-            this.pendingChoiceNodeId = null
-            this.pendingChoiceActionId = null
-            this.pendingChoiceOwnerNodeId = null
-            this.pendingChoiceContext = null
+            this.pendingInteractionNodeId = null
+            this.pendingInteractionActionId = null
+            this.pendingInteractionOwnerNodeId = null
+            this.pendingInteractionContext = null
             return { type: 'ok' }
           }
         }
         const targetNode = node.children.find((item) => item.id === choice)
         const child = targetNode ? this.findActionNode(targetNode) : null
         if (!child) {
-          this.pendingChoiceNodeId = null
-          this.pendingChoiceOwnerNodeId = null
-          this.pendingChoiceContext = null
+          this.pendingInteractionNodeId = null
+          this.pendingInteractionOwnerNodeId = null
+          this.pendingInteractionContext = null
           return { type: 'ok' }
         }
         const executionContext: ActionExecutionContext = {
@@ -1494,17 +1794,17 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
           this.tree.insertAfter(node.id, [flowNode])
           targetNode!.resolve(choice)
           node.resolve(choice)
-          this.pendingChoiceNodeId = null
-          this.pendingChoiceActionId = null
-          this.pendingChoiceOwnerNodeId = null
-          this.pendingChoiceContext = null
+          this.pendingInteractionNodeId = null
+          this.pendingInteractionActionId = null
+          this.pendingInteractionOwnerNodeId = null
+          this.pendingInteractionContext = null
           return { type: 'ok' }
         }
         const action = this.registry.get(actionId)
         if (!action) {
-          this.pendingChoiceNodeId = null
-          this.pendingChoiceOwnerNodeId = null
-          this.pendingChoiceContext = null
+          this.pendingInteractionNodeId = null
+          this.pendingInteractionOwnerNodeId = null
+          this.pendingInteractionContext = null
           return { type: 'fail', logKey: 'log.buildRoomFail' }
         }
         const costResults = this.hooks.computeCosts({
@@ -1542,45 +1842,63 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
             node.resolve(choice)
           }
           this.tree.insertBefore(node.id, [...beforeActivateNodes, deferredTarget])
-          this.pendingChoiceNodeId = null
-          this.pendingChoiceActionId = null
-          this.pendingChoiceOwnerNodeId = null
-          this.pendingChoiceContext = null
+          this.pendingInteractionNodeId = null
+          this.pendingInteractionActionId = null
+          this.pendingInteractionOwnerNodeId = null
+          this.pendingInteractionContext = null
           return { type: 'ok' }
         }
         const result = action.execute(executionContext)
         this.hooks.during({ ...executionContext, actionId }, result)
-        if (result.type === 'choice') {
+        if (result.type === 'request' && result.request.kind === 'choice') {
           child.resolve(result)
-          const choiceNode = targetNode ? this.findChoiceNode(targetNode) : null
-          if (choiceNode) {
-            choiceNode.setChoice(result.promptKey, result.options)
-            this.pendingChoiceNodeId = choiceNode.id
-            this.pendingChoiceActionId = actionId
-            this.pendingChoiceOwnerNodeId = node instanceof XorNode ? node.id : null
-          } else {
-            this.pendingChoiceNodeId = child.id
-            this.pendingChoiceActionId = actionId
-            this.pendingChoiceOwnerNodeId = node instanceof XorNode ? node.id : null
-          }
-          this.pendingChoiceContext = {
-            params: executionContext.params,
-            costs: executionContext.costs,
-            sourceCard: this.resolveChoiceSourceCard(executionContext.sourceCard, result.options),
-            actionContext: executionContext.actionContext,
-          }
+          // Merge computeArgs extraOptions BEFORE applyInteractionRequest so
+          // both the InteractionNode.choices and the returned result.request
+          // see the same final option list. Build a fresh request rather
+          // than mutating the action's returned object.
           const argResults = this.hooks.computeArgs(
             { ...executionContext, actionId },
             result,
           )
-          const existingValues = new Set(result.options.map((o) => o.value))
+          const existingValues = new Set(result.request.options.map((o) => o.value))
           const extraOptions = argResults
             .flatMap((entry) => entry.extraOptions ?? [])
             .filter((option) => option && !existingValues.has(option.value))
-          if (extraOptions.length > 0) {
-            result.options = [...result.options, ...extraOptions]
-          }
-          return result
+          const mergedOptions = extraOptions.length > 0
+            ? [...result.request.options, ...extraOptions]
+            : result.request.options
+          const updatedRequest: InteractionRequest = extraOptions.length > 0
+            ? { ...result.request, options: mergedOptions }
+            : result.request
+          // Carry-over (Task 7 reviewer S1): the XorNode follow-up branch
+          // previously skipped the actionContextWrite shallow-merge that the
+          // L1410 (main 'request') and L1899 (resolveChoice second-pass)
+          // branches already perform. Pass the patch via the
+          // applyInteractionRequest helper so all three sites share one
+          // implementation.
+          const contextWritePatch =
+            result.extraData && typeof result.extraData === 'object'
+              ? (result.extraData.actionContextWrite as Record<string, unknown> | undefined)
+              : undefined
+          const choiceNode = targetNode ? this.findInteractionNode(targetNode) : null
+          this.applyInteractionRequest({
+            targetNode: choiceNode ?? null,
+            fallbackNodeId: child.id,
+            request: updatedRequest,
+            promptKey: result.promptKey,
+            promptParams: result.promptParams,
+            choiceOptions: mergedOptions,
+            actionId,
+            ownerNodeId: node instanceof XorNode ? node.id : null,
+            params: executionContext.params,
+            costs: executionContext.costs,
+            sourceCard: executionContext.sourceCard,
+            actionContext: executionContext.actionContext,
+            contextWritePatch,
+          })
+          return extraOptions.length > 0
+            ? { ...result, request: updatedRequest }
+            : result
         }
         if (result.type === 'ok' || result.type === 'flow') {
           collectImmediateLogs(context.player.name, result).forEach((entry) => {
@@ -1658,23 +1976,23 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
         if (node instanceof XorNode) {
           node.resolve(choice)
         }
-        this.pendingChoiceNodeId = null
-        this.pendingChoiceOwnerNodeId = null
-        this.pendingChoiceContext = null
+        this.pendingInteractionNodeId = null
+        this.pendingInteractionOwnerNodeId = null
+        this.pendingInteractionContext = null
         return result
       }
     }
-    const actionId = this.pendingChoiceActionId
+    const actionId = this.pendingInteractionActionId
     if (!actionId) {
-      this.pendingChoiceContext = null
+      this.pendingInteractionContext = null
       return { type: 'ok' }
     }
     const action = this.registry.get(actionId)
     if (!action) {
-      this.pendingChoiceContext = null
+      this.pendingInteractionContext = null
       return { type: 'ok' }
     }
-    const executionContext = this.buildChoiceExecutionContext(context, this.pendingChoiceContext)
+    const executionContext = this.buildChoiceExecutionContext(context, this.pendingInteractionContext)
     executionContext.params = {
       ...(executionContext.params ?? {}),
       selectedOption: choice,
@@ -1686,39 +2004,40 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
       return { type: 'ok' }
     }
     this.hooks.during({ ...executionContext, actionId }, result)
-    if (result.type === 'choice') {
-      // Merge ActionDef-declared actionContext patches into pendingChoiceContext.actionContext.
+    if (result.type === 'request' && result.request.kind === 'choice') {
+      // Merge ActionDef-declared actionContext patches into pendingInteractionContext.actionContext.
       // Used by farm ActionDefs to persist payload (e.g. fence geometry) across payment-combo
-      // second prompts. Shallow merge; later writes overwrite earlier.
+      // second prompts. The shallow merge itself happens inside
+      // `applyInteractionRequest` so all three sites share one implementation.
       const contextWritePatch =
         result.extraData && typeof result.extraData === 'object'
           ? (result.extraData.actionContextWrite as Record<string, unknown> | undefined)
           : undefined
-      const mergedActionContext = contextWritePatch
-        ? { ...(executionContext.actionContext ?? {}), ...contextWritePatch }
-        : executionContext.actionContext
-      if (this.pendingChoiceNodeId) {
-        const node = this.tree.findNodeById(this.pendingChoiceNodeId)
-        if (node instanceof ChoiceNode) {
-          node.setChoice(result.promptKey, result.options)
-          this.pendingChoiceActionId = actionId
-          this.pendingChoiceContext = {
-            params: executionContext.params,
-            costs: executionContext.costs,
-            sourceCard: this.resolveChoiceSourceCard(executionContext.sourceCard, result.options),
-            actionContext: mergedActionContext,
-          }
-          return result
-        }
-      }
-      this.pendingChoiceNodeId = null
-      this.pendingChoiceContext = {
+      const requestOptions = result.request.options
+      const existingNode = this.pendingInteractionNodeId
+        ? this.tree.findNodeById(this.pendingInteractionNodeId)
+        : null
+      const interactionTarget = existingNode instanceof InteractionNode ? existingNode : null
+      this.applyInteractionRequest({
+        targetNode: interactionTarget,
+        fallbackNodeId: null,
+        request: result.request,
+        promptKey: result.promptKey,
+        promptParams: result.promptParams,
+        choiceOptions: requestOptions,
+        actionId,
+        // resolveChoice second-pass keeps the existing owner pointer (e.g.
+        // XorNode owner when the second prompt is still nested under the
+        // same parent). Don't clobber it.
+        ownerNodeId: this.pendingInteractionOwnerNodeId,
+        preserveOwner: true,
         params: executionContext.params,
         costs: executionContext.costs,
-        sourceCard: this.resolveChoiceSourceCard(executionContext.sourceCard, result.options),
-        actionContext: mergedActionContext,
-      }
-      // Don't clear pendingChoiceActionId - the action still needs to resolve its choice
+        sourceCard: executionContext.sourceCard,
+        actionContext: executionContext.actionContext,
+        contextWritePatch,
+      })
+      // Don't clear pendingInteractionActionId — the action still needs to resolve its choice.
       return result
     }
     if (result.type === 'ok' || result.type === 'flow') {
@@ -1726,7 +2045,7 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
         this.log.append(entry)
       })
     }
-    const insertionTargetId = this.pendingChoiceOwnerNodeId ?? this.pendingChoiceNodeId
+    const insertionTargetId = this.pendingInteractionOwnerNodeId ?? this.pendingInteractionNodeId
     const immediatePhase = this.hooks.immediatelyAfter({ ...executionContext, actionId, choice }, result, choice)
     const afterPhase = this.hooks.after({ ...executionContext, actionId, choice }, result, choice)
 
@@ -1790,9 +2109,9 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
         }
       }
     }
-    if (this.pendingChoiceNodeId) {
-      const node = this.tree.findNodeById(this.pendingChoiceNodeId)
-      if (node instanceof ChoiceNode) {
+    if (this.pendingInteractionNodeId) {
+      const node = this.tree.findNodeById(this.pendingInteractionNodeId)
+      if (node instanceof InteractionNode) {
         if (
           node.promptKey === 'ui.interactionBakeBreadChoice' &&
           choice.startsWith('bulk:')
@@ -1803,24 +2122,24 @@ choice: { promptKey: result.promptKey, promptParams: result.promptParams, option
         }
       }
     }
-    if (this.pendingChoiceOwnerNodeId) {
-      const ownerNode = this.tree.findNodeById(this.pendingChoiceOwnerNodeId)
+    if (this.pendingInteractionOwnerNodeId) {
+      const ownerNode = this.tree.findNodeById(this.pendingInteractionOwnerNodeId)
       if (ownerNode instanceof XorNode) {
         ownerNode.resolve()
       }
     }
-    this.pendingChoiceNodeId = null
-    this.pendingChoiceActionId = null
-    this.pendingChoiceOwnerNodeId = null
-    this.pendingChoiceContext = null
+    this.pendingInteractionNodeId = null
+    this.pendingInteractionActionId = null
+    this.pendingInteractionOwnerNodeId = null
+    this.pendingInteractionContext = null
     return result
   }
 
   /** Insert an ActionFlow to run after the pending choice is resolved. Precondition: a
-   *  pending choice is currently active (pendingChoiceNodeId is set). No-op otherwise.
+   *  pending choice is currently active (pendingInteractionNodeId is set). No-op otherwise.
    *  Mirrors the `{ type: 'flow' }` branch of resolveChoice. */
   insertFlowAfterPendingChoice(flow: ActionFlow): void {
-    const insertionTargetId = this.pendingChoiceOwnerNodeId ?? this.pendingChoiceNodeId
+    const insertionTargetId = this.pendingInteractionOwnerNodeId ?? this.pendingInteractionNodeId
     if (!insertionTargetId) return
     const flowNode = this.buildFlowNode(flow)
     this.tree.insertAfter(insertionTargetId, [flowNode])

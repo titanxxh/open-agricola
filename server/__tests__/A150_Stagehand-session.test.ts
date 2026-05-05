@@ -81,8 +81,8 @@ describe('A150_Stagehand session', () => {
     const constructOption = xorOptions.find((o: ActionChoiceOption) => o.labelKey?.includes('construct'))
     expect(constructOption).toBeDefined()
     resp = session.resolveChoice(0, constructOption!.value)
-    expect(resp.interaction.stateId).toBe('farmSelect')
-    if (resp.interaction.stateId !== 'farmSelect') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.farm.farmType).toBe('room')
     if (resp.interaction.farm.farmType !== 'room') return
     // BGA: Stagehand's construct does not cap room count (unlike A128/D128).

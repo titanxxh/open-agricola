@@ -166,10 +166,10 @@ export const payAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   // Typed-flat costs resolve eagerly inside execute() and return `ok`, so
-  // the default Sequence([ActionNode, ChoiceNode]) wrap would leave a
-  // dangling empty ChoiceNode that blocks the surrounding seq (D129 etc.).
+  // the default Sequence([ActionNode, InteractionNode]) wrap would leave a
+  // dangling empty InteractionNode that blocks the surrounding seq (D129 etc.).
   // ComplexCost multi-solution emits a payment choice via the engine's
-  // fallback `pendingChoiceNodeId = node.id` path, which still routes the
+  // fallback `pendingInteractionNodeId = node.id` path, which still routes the
   // player choice back through resolveChoice.
   skipChoiceWrap: true,
   canBeExecutedByPlayer: () => true,
@@ -309,7 +309,7 @@ export const payAction: ActionDefinition = {
     }
     // If the value isn't one of the payment-prefix options the player saw,
     // assume it's a stale/improvement-level choice that landed here because
-    // game-core's pendingChoiceActionId now points at `pay` (vs the
+    // game-core's pendingInteractionActionId now points at `pay` (vs the
     // improvement-any it would point at in the legacy mutate-in-place path).
     // Re-emit the same selectPayment prompt by re-invoking execute so the
     // player can pick again, matching BGA's "missed the prompt → ask again"

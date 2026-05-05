@@ -19,14 +19,6 @@ export type ZoneAssignment = {
   animalCount: number
 }
 
-const buildOptions = (trigger: ReorganizeTrigger) => {
-  const confirm = { value: 'confirm', labelKey: 'ui.interactionAnimalReorgConfirm' }
-  if (trigger === 'anytime') {
-    return [confirm, { value: 'cancel', labelKey: 'ui.interactionAnimalReorgCancel' }]
-  }
-  return [confirm]
-}
-
 export const applyReorganizeMutate = (
   state: GameState,
   player: PlayerState,
@@ -82,11 +74,23 @@ export const reorganizeAction: ActionDefinition = {
   },
   execute: (ctx): ActionExecutionResult => {
     const trigger = (ctx.actionContext?.trigger as ReorganizeTrigger) ?? 'anytime'
+    // NOTE: zones are computed here at emit-time and travel inside `request`.
+    // However, GameCore.buildInteraction() in shared/session/game-core.ts still
+    // recomputes zones via buildAnimalReorgZones() during the transitional
+    // period. Task 6/7 will rewire GameCore to consume zones from the
+    // engineStack.peekInteraction()?.request, eliminating the duplicate compute.
+    const zones = computeAnimalZones(ctx.player).map((zone) => ({
+      id: zone.id,
+      zoneType: zone.zoneType as 'pasture' | 'house' | 'stable',
+      animalType: (zone.animalType as 'sheep' | 'boar' | 'cattle' | null) ?? null,
+      animalCount: zone.animalCount ?? 0,
+      capacity: zone.capacity,
+    }))
     return {
-      type: 'choice',
+      type: 'request',
+      request: { kind: 'animal-reorg', zones },
       promptKey: 'ui.interactionAnimalReorg',
       promptParams: { trigger },
-      options: buildOptions(trigger),
     }
   },
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {

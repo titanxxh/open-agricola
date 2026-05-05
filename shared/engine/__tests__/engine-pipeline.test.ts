@@ -12,7 +12,7 @@ import { Engine } from '../engine'
 import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
-import { ActionNode, ChoiceNode, SequenceNode } from '../nodes'
+import { ActionNode, InteractionNode, SequenceNode } from '../nodes'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
 
 const createState = (): GameState =>
@@ -153,9 +153,9 @@ describe('Engine pipeline phase order', () => {
       execute: () => {
         phases.push('execute')
         return {
-          type: 'choice',
+          type: 'request',
+          request: { kind: 'choice', options: [{ value: 'a', labelKey: 'A' }] },
           promptKey: 'choose',
-          options: [{ value: 'a', labelKey: 'A' }],
         }
       },
       resolveChoice: () => ({ type: 'ok' }),
@@ -177,7 +177,7 @@ describe('Engine pipeline phase order', () => {
       tree: new EngineTree(
         new SequenceNode('seq', [
           new ActionNode('a', 'choice-action'),
-          new ChoiceNode('c', []),
+          new InteractionNode('c', []),
         ]),
       ),
       registry,
@@ -250,9 +250,9 @@ describe('Engine pipeline phase order', () => {
       gainPerRound: {},
       canBeExecutedByPlayer: () => true,
       execute: () => ({
-        type: 'choice',
+        type: 'request',
+        request: { kind: 'choice', options: [{ value: 'base', labelKey: 'Base' }] },
         promptKey: 'choose',
-        options: [{ value: 'base', labelKey: 'Base' }],
       }),
       resolveChoice: () => ({ type: 'ok' }),
     }
@@ -272,7 +272,7 @@ describe('Engine pipeline phase order', () => {
       tree: new EngineTree(
         new SequenceNode('seq', [
           new ActionNode('a', 'args-action'),
-          new ChoiceNode('c', []),
+          new InteractionNode('c', []),
         ]),
       ),
       registry,

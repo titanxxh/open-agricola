@@ -92,12 +92,15 @@ export const constructAction: ActionDefinition = {
   canBeExecutedByPlayer: (_state, player) => getMaxBuildableRooms(player) > 0,
   costPreview: constructCostPreview,
   execute: () => ({
-    type: 'choice',
+    type: 'request',
+    request: {
+      kind: 'choice',
+      options: [
+        { value: 'confirm', labelKey: 'ui.interactionRoomConfirm' },
+        { value: 'cancel', labelKey: 'ui.interactionRoomCancel' },
+      ],
+    },
     promptKey: 'ui.interactionRoomSelect',
-    options: [
-      { value: 'confirm', labelKey: 'ui.interactionRoomConfirm' },
-      { value: 'cancel', labelKey: 'ui.interactionRoomCancel' },
-    ],
   }),
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
     if (choice === 'cancel') return { type: 'ok' }
@@ -145,11 +148,12 @@ export const constructAction: ActionDefinition = {
         costPerRoom,
         rooms.length,
       )
-      if (payment.type === 'choice') {
+      if (payment.type === 'request') {
+        const options = payment.request.kind === 'choice' ? payment.request.options : []
         return {
-          type: 'choice',
+          type: 'request',
+          request: { kind: 'choice', options },
           promptKey: payment.promptKey,
-          options: payment.options ?? [],
           extraData: {
             actionContextWrite: { farmPayload: { rooms } },
           },

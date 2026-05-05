@@ -602,7 +602,9 @@ const sendTo = (ws: WebSocket, message: ServerEvent) => {
 
 const toSyncPayload = (resp: SessionResponse, session?: GameSession): GameSyncPayload => {
   const payload: GameSyncPayload = {
-    state: serializeState(resp.state),
+    state: session
+      ? serializeState(resp.state, { engineStack: session.getEngineStack() })
+      : serializeState(resp.state),
     pending: resp.pending,
     interaction: resp.interaction,
     scores: resp.scores ?? null,
@@ -637,7 +639,9 @@ const toSyncPayloadForViewer = (
   const base = toSyncPayload(resp, session)
   return {
     ...base,
-    state: serializeStateForPlayer(resp.state, viewerPlayerId),
+    state: session
+      ? serializeStateForPlayer(resp.state, viewerPlayerId, { engineStack: session.getEngineStack() })
+      : serializeStateForPlayer(resp.state, viewerPlayerId),
   }
 }
 
@@ -674,7 +678,11 @@ const broadcastState = (
   }
   // Persist unfiltered authoritative state on every change for sqlite, only dev room for json
   if (PERSIST_ROOMS === 'sqlite' || isFixedDevRoom(room.id)) {
-    savePersistedState(room.id, serializeState(resp.state), room)
+    savePersistedState(
+      room.id,
+      serializeState(resp.state, { engineStack: room.session.getEngineStack() }),
+      room,
+    )
   }
   // Mark room as finished in SQLite when game ends
   if (PERSIST_ROOMS === 'sqlite' && resp.state.gameOver) {
@@ -853,7 +861,11 @@ export const createWsServer = (server: import('node:http').Server) => {
         // this, a restart before the room fills would drop back to a fresh
         // default session and lose `state.draft` / `phase`.
         if (PERSIST_ROOMS === 'sqlite' || isFixedDevRoom(room.id)) {
-          savePersistedState(room.id, serializeState(room.session.getState().state), room)
+          savePersistedState(
+            room.id,
+            serializeState(room.session.getState().state, { engineStack: room.session.getEngineStack() }),
+            room,
+          )
         }
         if (currentUserId) upsertRoomPlayer(roomId, currentUserId, 0)
         sendTo(ws, { type: 'roomCreated', roomId, playerIndex: 0, maxPlayers })
@@ -995,19 +1007,28 @@ export const createWsServer = (server: import('node:http').Server) => {
       }
 
       if (msg.type === 'feed') {
-        const resp = callRoom(s => s.confirmHarvestFeed(currentPlayerIndex, msg.selections))
+        // Task 9: legacy 'feed' command routes through the unified
+        // resolveChoice dispatcher; the InteractionNode at the top of the
+        // engineStack carries the queue context.
+        const resp = callRoom((s) =>
+          s.resolveChoice(currentPlayerIndex, 'confirm', { selections: msg.selections }),
+        )
         broadcastState(room, resp, 'feed', msg.requestId)
         return
       }
 
       if (msg.type === 'nextPlayer') {
-        const resp = callRoom(s => s.confirmNextPlayer())
+        // Task 9: forwards to resolveChoice; the synthetic
+        // confirm-next-player InteractionNode supplies `nextPlayerIndex`.
+        const resp = callRoom((s) => s.resolveChoice(currentPlayerIndex, 'confirm'))
         broadcastState(room, resp, 'action', msg.requestId)
         return
       }
 
       if (msg.type === 'confirmPlayerSwitch') {
-        const resp = callRoom(s => s.confirmPlayerSwitch())
+        // Task 9: forwards to resolveChoice; the synthetic
+        // confirm-player-switch InteractionNode supplies `toPlayerIndex`.
+        const resp = callRoom((s) => s.resolveChoice(currentPlayerIndex, 'confirm'))
         broadcastState(room, resp, 'action', msg.requestId)
         return
       }

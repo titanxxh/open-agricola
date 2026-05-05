@@ -8,7 +8,7 @@ import type {
 } from '../../../game/types'
 
 const dummySpace: ActionSpace = {
-  id: '__reorganize__',
+  id: '__subflow:reorganize',
   nameKey: '',
   kind: 'synthetic',
 } as unknown as ActionSpace
@@ -60,23 +60,27 @@ const makeCtx = (opts: {
 }
 
 describe('reorganizeAction.execute', () => {
-  it('anytime trigger emits choice with confirm + cancel options', () => {
+  it('anytime trigger emits animal-reorg request with zones', () => {
     const ctx = makeCtx({ actionContext: { trigger: 'anytime' } })
     const result = reorganizeAction.execute(ctx)
-    expect(result.type).toBe('choice')
-    if (result.type !== 'choice') throw new Error('not choice')
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') throw new Error(`expected 'request', got ${result.type}`)
     expect(result.promptKey).toBe('ui.interactionAnimalReorg')
     expect(result.promptParams).toEqual({ trigger: 'anytime' })
-    expect(result.options.map((o) => o.value).sort()).toEqual(['cancel', 'confirm'])
+    expect(result.request.kind).toBe('animal-reorg')
+    if (result.request.kind !== 'animal-reorg') throw new Error('not animal-reorg')
+    expect(result.request.zones).toBeInstanceOf(Array)
   })
 
-  it('returning-home trigger has confirm only (no cancel)', () => {
+  it('returning-home trigger emits animal-reorg request with same zone shape', () => {
     const ctx = makeCtx({ actionContext: { trigger: 'returning-home' } })
     const result = reorganizeAction.execute(ctx)
-    expect(result.type).toBe('choice')
-    if (result.type !== 'choice') throw new Error('not choice')
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') throw new Error(`expected 'request', got ${result.type}`)
     expect(result.promptParams).toEqual({ trigger: 'returning-home' })
-    expect(result.options.map((o) => o.value)).toEqual(['confirm'])
+    expect(result.request.kind).toBe('animal-reorg')
+    if (result.request.kind !== 'animal-reorg') throw new Error('not animal-reorg')
+    expect(result.request.zones).toBeInstanceOf(Array)
   })
 })
 

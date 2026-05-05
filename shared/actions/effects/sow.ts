@@ -92,12 +92,15 @@ export const sowAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: (_, player) => canSow(player),
   execute: () => ({
-    type: 'choice',
+    type: 'request',
+    request: {
+      kind: 'choice',
+      options: [
+        { value: 'confirm', labelKey: 'ui.interactionSowConfirm' },
+        { value: 'cancel', labelKey: 'ui.interactionSowCancel' },
+      ],
+    },
     promptKey: 'ui.interactionSowSelect',
-    options: [
-      { value: 'confirm', labelKey: 'ui.interactionSowConfirm' },
-      { value: 'cancel', labelKey: 'ui.interactionSowCancel' },
-    ],
   }),
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
     if (choice === 'cancel') return { type: 'ok' }

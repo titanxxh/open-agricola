@@ -55,7 +55,7 @@ describe('shared/game/serialization', () => {
   describe('rehydrateState', () => {
     it('restores function fields on action spaces', () => {
       const serialized = serializeState(state)
-      const restored = rehydrateState(serialized)
+      const { state: restored } = rehydrateState(serialized)
       for (const space of restored.actionSpaces) {
         expect(typeof space.canBeExecutedByPlayer).toBe('function')
         expect(typeof space.execute).toBe('function')
@@ -70,7 +70,7 @@ describe('shared/game/serialization', () => {
         space.takenBy = [{ playerId: 'p1', workerId: '1' }]
       }
       const serialized = serializeState(modified)
-      const restored = rehydrateState(serialized)
+      const { state: restored } = rehydrateState(serialized)
       if (space) {
         const restoredSpace = restored.actionSpaces.find((s) => s.id === space.id)
         expect(restoredSpace?.resources.wood).toBe(99)
@@ -80,7 +80,7 @@ describe('shared/game/serialization', () => {
 
     it('round-trips correctly', () => {
       const serialized = serializeState(state)
-      const restored = rehydrateState(serialized)
+      const { state: restored } = rehydrateState(serialized)
       expect(restored.round).toBe(state.round)
       expect(restored.players.length).toBe(state.players.length)
       expect(restored.actionSpaces.length).toBeGreaterThan(0)
@@ -90,7 +90,7 @@ describe('shared/game/serialization', () => {
       for (const playerCount of [2, 3, 4] as const) {
         const original = createInitialState(42, { playerCount })
         const serialized = serializeState(original)
-        const restored = rehydrateState(serialized)
+        const { state: restored } = rehydrateState(serialized)
         const originalIds = original.actionSpaces.map((space) => space.id).sort()
         const restoredIds = restored.actionSpaces.map((space) => space.id).sort()
         expect(restoredIds).toEqual(originalIds)
@@ -106,7 +106,7 @@ describe('shared/game/serialization', () => {
       const serialized = serializeState(modified)
       serialized.players[0]!.activeModifiers = []
 
-      const restored = rehydrateState(serialized)
+      const { state: restored } = rehydrateState(serialized)
       expect(getCardModifiers('A14_CarpentersHammer')).not.toHaveLength(0)
       expect(restored.players[0]!.activeModifiers).toEqual(
         getCardModifiers('A14_CarpentersHammer'),
@@ -142,8 +142,8 @@ describe('shared/game/serialization', () => {
 
       resp = session.resolveChoice(0, constructOption!.value)
       expect(resp.ok).toBe(true)
-      expect(resp.interaction.stateId).toBe('farmSelect')
-      if (resp.interaction.stateId !== 'farmSelect') return
+      expect(resp.interaction.stateId).toBe('wait')
+      if (resp.interaction.stateId !== 'wait') return
       expect(resp.interaction.farm.farmType).toBe('room')
       if (resp.interaction.farm.farmType !== 'room') return
       expect(resp.interaction.farm.maxSelections).toBe(2)

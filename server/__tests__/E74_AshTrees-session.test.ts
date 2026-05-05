@@ -59,8 +59,8 @@ describe('E74_AshTrees session flow', () => {
     expect(useAll).toBeDefined()
 
     resp = session.resolveChoice(0, useAll!.value)
-    expect(resp.interaction.stateId).toBe('farmSelect')
-    expect(resp.interaction.stateId === 'farmSelect' ? resp.interaction.farm.farmType : undefined)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.farm.farmType : undefined)
       .toBe('fence')
 
     resp = session.resolveChoice(0, 'confirm', {

@@ -8,7 +8,7 @@ export type NodeState = 'ready' | 'resolved' | 'blocked'
 
 export type EngineNodeType =
   | 'action'
-  | 'choice'
+  | 'interaction'
   | 'sequence'
   | 'parallel'
   | 'or'

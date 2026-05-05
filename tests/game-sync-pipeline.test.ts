@@ -30,7 +30,7 @@ describe('game sync pipeline (applySnapshot path)', () => {
 
   it('rehydrates a snapshot payload into a functional GameState', () => {
     const payload = buildPayload()
-    const state = rehydrateState(payload.state)
+    const { state } = rehydrateState(payload.state)
     expect(state.round).toBe(1)
     expect(state.players.length).toBe(2)
     for (const space of state.actionSpaces) {
@@ -97,7 +97,7 @@ describe('game sync pipeline (applySnapshot path)', () => {
       hasActionStartSnapshot: false,
       ok: true,
     }
-    const restored = rehydrateState(payload.state)
+    const { state: restored } = rehydrateState(payload.state)
     expect(restored.players[0]!.resources.wood).toBe(50)
     expect(restored.players[0]!.resources.food).toBe(100)
   })
@@ -107,7 +107,7 @@ describe('game sync pipeline (applySnapshot path)', () => {
     const first = modified.actionSpaces[0]!
     first.takenBy = [{ playerId: 'p1', workerId: '1' }]
     const payload = buildPayload({ state: serializeState(modified) })
-    const restored = rehydrateState(payload.state)
+    const { state: restored } = rehydrateState(payload.state)
     const restoredSpace = restored.actionSpaces.find((s) => s.id === first.id)
     expect(restoredSpace?.takenBy).toEqual([{ playerId: 'p1', workerId: '1' }])
   })

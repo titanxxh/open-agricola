@@ -1,4 +1,5 @@
 import type { ActionChoiceOption, ActionDefinition } from '../../../game/types'
+import type { PromptKey } from '../../../game/prompt-keys'
 
 /**
  * `emit-choice` — a dedicated leaf action for cards that need to surface a
@@ -21,15 +22,19 @@ export const emitChoiceAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
   execute: ({ params }) => {
-    const options = (params as { options?: ActionChoiceOption[]; promptKey?: string } | undefined)?.options
+    const options = (params as { options?: ActionChoiceOption[]; promptKey?: PromptKey } | undefined)?.options
     if (Array.isArray(options) && options.length > 0) {
-      const promptKey = (params as { promptKey?: string } | undefined)?.promptKey
-      return { type: 'choice', promptKey, options }
+      const promptKey = (params as { promptKey?: PromptKey } | undefined)?.promptKey
+      return {
+        type: 'request',
+        request: { kind: 'choice', options },
+        promptKey,
+      }
     }
     return { type: 'ok' }
   },
   /**
-   * Stub so the engine creates a paired ChoiceNode in buildFlowNode.
+   * Stub so the engine creates a paired InteractionNode in buildFlowNode.
    * The real resolution is done by the card's CardEffect.resolveChoice hook
    * which fires before this stub (in GameSession.resolvePendingChoice).
    */

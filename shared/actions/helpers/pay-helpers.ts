@@ -600,15 +600,16 @@ export const buildPaymentChoiceResult = (
   includeReturnedCard = false,
 ): ActionExecutionResult => {
   const orderedSolutions = sortPaymentSolutions(solutions)
-  return {
-    type: 'choice',
-  promptKey: 'prompt.selectPayment',
-  options: orderedSolutions.map((solution, idx) => ({
+  const options = orderedSolutions.map((solution, idx) => ({
     value: `${optionValuePrefix}:${idx}`,
     labelKey: 'prompt.selectPaymentOption',
     labelParams: describePaymentSolution(solution, includeReturnedCard) as unknown as Record<string, string | number>,
     effectPreview: describePaymentEffectPreview(solution, includeReturnedCard),
-  })),
+  }))
+  return {
+    type: 'request',
+    request: { kind: 'choice', options },
+    promptKey: 'prompt.selectPayment',
   }
 }
 

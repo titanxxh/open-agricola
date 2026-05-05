@@ -3,6 +3,9 @@ import type { ActionFlow, GameState, PlayerState } from '../../game/types'
 export type SelectionEffectContext = {
   player: PlayerState
   positions: string[]
+  /** Forward-compat: structured card-id selections from `selection` kind requests
+   *  (e.g. occupation-hand picks). Empty array when no card-id payload was supplied. */
+  cards: string[]
   sourceCard: string | undefined
   state: GameState
 }

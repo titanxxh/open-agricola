@@ -30,7 +30,7 @@ describe('B94_StockProtector session', () => {
 
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('farmSelect')
+    expect(resp.interaction.stateId).toBe('wait')
 
     resp = session.resolveChoice(0, 'confirm', {
       edges: edgesForTile(1, 1),
@@ -41,7 +41,7 @@ describe('B94_StockProtector session', () => {
     if (resp.pending.type !== 'choice') return
     expect(resp.pending.promptKey).toBe('ui.interactionStockProtectorPlace')
     expect(resp.pending.sourceCard).toBe(CARD_ID)
-    expect(resp.interaction.stateId).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
   })
 })

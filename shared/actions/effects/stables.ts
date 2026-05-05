@@ -118,12 +118,15 @@ export const stablesAction: ActionDefinition = {
     canExecuteWithCostPreview(stablesCostPreview, { state, player }, readCostOverride(opts?.actionContext)),
   costPreview: stablesCostPreview,
   execute: () => ({
-    type: 'choice',
+    type: 'request',
+    request: {
+      kind: 'choice',
+      options: [
+        { value: 'confirm', labelKey: 'ui.interactionStableConfirm' },
+        { value: 'cancel', labelKey: 'ui.interactionStableCancel' },
+      ],
+    },
     promptKey: 'ui.interactionStableSelect',
-    options: [
-      { value: 'confirm', labelKey: 'ui.interactionStableConfirm' },
-      { value: 'cancel', labelKey: 'ui.interactionStableCancel' },
-    ],
   }),
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
     if (choice === 'cancel') return { type: 'ok' }
@@ -162,11 +165,12 @@ export const stablesAction: ActionDefinition = {
         { type: 'fail', logKey: 'log.buildStableFail' },
         'stables',
       )
-      if (payment.type === 'choice') {
+      if (payment.type === 'request') {
+        const options = payment.request.kind === 'choice' ? payment.request.options : []
         return {
-          type: 'choice',
+          type: 'request',
+          request: { kind: 'choice', options },
           promptKey: payment.promptKey,
-          options: payment.options ?? [],
           extraData: {
             actionContextWrite: { farmPayload: { stables } },
           },
