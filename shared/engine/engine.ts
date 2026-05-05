@@ -108,6 +108,14 @@ export class Engine {
   private registry: ActionRegistry
   private hooks: HookDispatcher
   private log: LogStore
+  // TODO(PR5): Remove these 4 mirror fields. Currently load-bearing for the
+  // `engine.snapshot()` shape consumed by session-core.ts:2258,2599 and the
+  // direct mutation hook in stats-gained-pseudo-session.test.ts:35-37.
+  // PR3 absorbed the authoritative values onto InteractionNode
+  // (`pendingActionId / ownerNodeId / contextSnapshot`); PR5 work: migrate
+  // snapshot consumers off top-level pendingInteractionXxx, then these
+  // mirrors and the writes in `applyInteractionRequest` / `injectInteraction`
+  // can be deleted.
   private pendingInteractionNodeId: string | null = null
   private pendingInteractionActionId: string | null = null
   private pendingInteractionOwnerNodeId: string | null = null
@@ -872,6 +880,11 @@ export class Engine {
         : null
     return {
       nodeStates,
+      // TODO(PR5): These 4 top-level pending* fields mirror the
+      // InteractionNode-owned authoritative state (PR3). When PR5 migrates
+      // snapshot consumers to read pending data off the InteractionNode in
+      // `choiceData` (or off the composite emit metadata for Or/Xor/Optional),
+      // these top-level entries can be removed from the snapshot shape.
       pendingInteractionNodeId: this.pendingInteractionNodeId,
       pendingInteractionActionId: this.pendingInteractionActionId,
       pendingInteractionOwnerNodeId: this.pendingInteractionOwnerNodeId,
@@ -1244,7 +1257,17 @@ export class Engine {
       }
     }
     if (node instanceof InteractionNode) {
-      if (node.choices.length > 0) {
+      // S4b Task 14 — InteractionNode owns its lifecycle dispatch via
+      // `node.step(ctx)`. The engine main loop only needs to translate the
+      // node-level NodeStepResult ('choice' / 'blocked' / 'done') into the
+      // top-level EngineStepResult shape and handle the engine-level
+      // pending-context backfill (when no prior emit installed one).
+      const ctx = {
+        resolveSubtree: (n: EngineNode) => this.resolveSubtree(n),
+        emitChoice: () => {},
+      }
+      const stepResult = node.step(ctx)
+      if (stepResult.kind === 'choice') {
         if (!this.pendingInteractionContext) {
           this.pendingInteractionContext = {
             params: undefined,
@@ -1259,6 +1282,9 @@ export class Engine {
           choice: { promptKey: node.promptKey, options: node.choices },
         }
       }
+      // 'blocked' (no choices) or 'done' (already resolved) — both surface
+      // as a blocked step at this level; the resolved case is unreachable
+      // here because nextUnresolved() filters resolved nodes.
       return { type: 'blocked', nodeId: node.id }
     }
     if (node instanceof PlayerSwitchNode) {
