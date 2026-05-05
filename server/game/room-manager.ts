@@ -600,11 +600,9 @@ const sendTo = (ws: WebSocket, message: ServerEvent) => {
   if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(message))
 }
 
-const toSyncPayload = (resp: SessionResponse, session?: GameSession): GameSyncPayload => {
+const toSyncPayload = (resp: SessionResponse, session: GameSession): GameSyncPayload => {
   const payload: GameSyncPayload = {
-    state: session
-      ? serializeState(resp.state, { engineStack: session.getEngineStack() })
-      : serializeState(resp.state),
+    state: serializeState(resp.state, { engineStack: session.getEngineStack() }),
     pending: resp.pending,
     interaction: resp.interaction,
     scores: resp.scores ?? null,
@@ -633,15 +631,15 @@ const toSyncPayload = (resp: SessionResponse, session?: GameSession): GameSyncPa
  */
 const toSyncPayloadForViewer = (
   resp: SessionResponse,
-  session: GameSession | undefined,
+  session: GameSession,
   viewerPlayerId: string | null,
 ): GameSyncPayload => {
   const base = toSyncPayload(resp, session)
   return {
     ...base,
-    state: session
-      ? serializeStateForPlayer(resp.state, viewerPlayerId, { engineStack: session.getEngineStack() })
-      : serializeStateForPlayer(resp.state, viewerPlayerId),
+    state: serializeStateForPlayer(resp.state, viewerPlayerId, {
+      engineStack: session.getEngineStack(),
+    }),
   }
 }
 

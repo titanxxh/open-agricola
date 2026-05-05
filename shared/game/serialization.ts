@@ -1,5 +1,5 @@
 import type { ActionSpace, GameState } from './types'
-import type { EngineFrameCursor, EngineStack, EngineStackCursor } from '../engine'
+import type { EngineStack, EngineStackCursor } from '../engine'
 import { createActionSpaces } from '../actions'
 import { normalizeState } from '../logic/state'
 import { getCardModifiers } from '../cards/card-modifiers'
@@ -24,24 +24,9 @@ export type SerializeStateContext = {
   engineStack: EngineStack
 }
 
-/**
- * Frozen empty-stack sentinel for callers that have no `EngineStack` to
- * thread (pure unit tests, draft round-trip helpers, contract tests, etc.).
- *
- * Production callers in `server/game-router.ts` and
- * `server/game/room-manager.ts` always pass a real `ctx.engineStack`. Keeping
- * `ctx?: SerializeStateContext` optional avoids forcing every test to
- * construct a `GameSession` just to call `serializeState()`. The frozen
- * `frames` array prevents callers landing on the fallback path from
- * accidentally mutating cross-test state.
- */
-const EMPTY_ENGINE_STACK_CURSOR: Readonly<EngineStackCursor> = Object.freeze({
-  frames: Object.freeze([]) as readonly EngineFrameCursor[],
-}) as Readonly<EngineStackCursor>
-
 export const serializeState = (
   state: GameState,
-  ctx?: SerializeStateContext,
+  ctx: SerializeStateContext,
 ): SerializedGameState => {
   const { actionSpaces, ...rest } = state
   return {
@@ -51,7 +36,7 @@ export const serializeState = (
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       ({ canBeExecutedByPlayer, execute, resolveChoice, flow, ...s }) => s,
     ),
-    engineStack: ctx ? ctx.engineStack.toCursor() : EMPTY_ENGINE_STACK_CURSOR,
+    engineStack: ctx.engineStack.toCursor(),
   }
 }
 
@@ -73,7 +58,7 @@ export const serializeState = (
 export const serializeStateForPlayer = (
   state: GameState,
   viewerPlayerId: string | null,
-  ctx?: SerializeStateContext,
+  ctx: SerializeStateContext,
 ): SerializedGameState => {
   const base = serializeState(state, ctx)
   const filteredPlayers = base.players.map((p) =>
@@ -161,6 +146,6 @@ export const rehydrateState = (raw: SerializedGameState): RehydratedState => {
   }
   return {
     state: restored,
-    engineStackCursor: engineStack ?? EMPTY_ENGINE_STACK_CURSOR,
+    engineStackCursor: engineStack ?? { frames: [] },
   }
 }

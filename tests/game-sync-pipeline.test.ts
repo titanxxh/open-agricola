@@ -3,6 +3,9 @@ import { serializeState, rehydrateState } from '../shared/game/serialization'
 import type { GameSyncPayload } from '../shared/protocol/game'
 import type { PendingAction } from '../shared/game/types'
 import { createInitialState } from '../shared/logic/state'
+import { EngineStack } from '../shared/engine'
+
+const emptyCtx = () => ({ engineStack: new EngineStack() })
 
 /**
  * Tests the full data pipeline that useGameSync.applySnapshot relies on:
@@ -13,7 +16,7 @@ describe('game sync pipeline (applySnapshot path)', () => {
 
   function buildPayload(overrides?: Partial<GameSyncPayload>): GameSyncPayload {
     return {
-      state: serializeState(rawState),
+      state: serializeState(rawState, emptyCtx()),
       pending: { type: 'none' },
       interaction: {
         stateId: 'idle',
@@ -85,7 +88,7 @@ describe('game sync pipeline (applySnapshot path)', () => {
     modified.players[0]!.resources.wood = 50
     modified.players[0]!.resources.food = 100
     const payload: GameSyncPayload = {
-      state: serializeState(modified),
+      state: serializeState(modified, emptyCtx()),
       pending: { type: 'none' },
       interaction: {
         stateId: 'idle',
@@ -106,7 +109,7 @@ describe('game sync pipeline (applySnapshot path)', () => {
     const modified = createInitialState(42)
     const first = modified.actionSpaces[0]!
     first.takenBy = [{ playerId: 'p1', workerId: '1' }]
-    const payload = buildPayload({ state: serializeState(modified) })
+    const payload = buildPayload({ state: serializeState(modified, emptyCtx()) })
     const { state: restored } = rehydrateState(payload.state)
     const restoredSpace = restored.actionSpaces.find((s) => s.id === first.id)
     expect(restoredSpace?.takenBy).toEqual([{ playerId: 'p1', workerId: '1' }])
