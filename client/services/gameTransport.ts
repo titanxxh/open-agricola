@@ -353,15 +353,17 @@ export class WsGameTransport implements GameTransport {
   }
 
   async confirmFeed(_playerIndex: number, selections: Parameters<GameTransport['confirmFeed']>[1]): Promise<GameSyncPayload> {
-    return this.sendCommand({ type: 'feed', selections })
+    // S2 Task 13.4: route through resolveChoice — engine.ts dispatches on
+    // InteractionRequest.kind === 'feed' and pulls payload.selections.
+    return this.sendCommand({ type: 'choice', value: 'confirm', payload: { selections } })
   }
 
   async confirmNextPlayer(): Promise<GameSyncPayload> {
-    return this.sendCommand({ type: 'nextPlayer' })
+    return this.sendCommand({ type: 'choice', value: 'confirm' })
   }
 
   async confirmPlayerSwitch(): Promise<GameSyncPayload> {
-    return this.sendCommand({ type: 'confirmPlayerSwitch' })
+    return this.sendCommand({ type: 'choice', value: 'confirm' })
   }
 
   async performRoundEnd(): Promise<GameSyncPayload> {
