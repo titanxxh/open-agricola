@@ -59,4 +59,20 @@ describe('InMemoryRoomPersistence', () => {
     })
     expect(restored.map((s) => s.id).sort()).toEqual(['fresh'])
   })
+
+  it('listRestorable updates updatedAt when marking stale rows as finished', () => {
+    const NOW = 10_000_000
+    p.save('stale', STATE, { ...META, status: 'playing' })
+    p.__setUpdatedAtForTest('stale', NOW - 99_999_999)
+
+    p.listRestorable({
+      now: NOW,
+      waitingTtlMs: 1000,
+      playingTtlMs: 1000,
+    })
+
+    const after = p.load('stale')
+    expect(after?.meta.status).toBe('finished')
+    expect(after?.updatedAt).toBe(NOW)
+  })
 })

@@ -17,7 +17,7 @@ export class InMemoryRoomPersistence implements RoomPersistence {
     return {
       id,
       serialized: row.serialized,
-      meta: { ...row.meta, players: row.meta.players.map((p) => ({ ...p })) },
+      meta: { ...row.meta, customCardDbIds: [...row.meta.customCardDbIds], players: row.meta.players.map((p) => ({ ...p })) },
       updatedAt: row.updatedAt,
     }
   }
@@ -25,7 +25,7 @@ export class InMemoryRoomPersistence implements RoomPersistence {
   save(id: string, serialized: SerializedGameState, meta: RoomMeta): void {
     this.rooms.set(id, {
       serialized,
-      meta: { ...meta, players: meta.players.map((p) => ({ ...p })) },
+      meta: { ...meta, customCardDbIds: [...meta.customCardDbIds], players: meta.players.map((p) => ({ ...p })) },
       updatedAt: Date.now(),
     })
   }
@@ -50,9 +50,10 @@ export class InMemoryRoomPersistence implements RoomPersistence {
       const ttl = row.meta.status === 'playing' ? opts.playingTtlMs : opts.waitingTtlMs
       if (opts.now - row.updatedAt > ttl) {
         row.meta = { ...row.meta, status: 'finished' }
+        row.updatedAt = opts.now
         continue
       }
-      out.push({ id, serialized: row.serialized, meta: { ...row.meta }, updatedAt: row.updatedAt })
+      out.push({ id, serialized: row.serialized, meta: { ...row.meta, customCardDbIds: [...row.meta.customCardDbIds], players: row.meta.players.map((p) => ({ ...p })) }, updatedAt: row.updatedAt })
     }
     return out
   }
