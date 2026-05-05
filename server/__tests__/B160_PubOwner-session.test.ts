@@ -124,7 +124,7 @@ describe('B160_PubOwner session', () => {
 
     // Drive through any pending choices
     let safety = 30
-    while (safety-- > 0 && resp.pending.type !== 'none') {
+    while (safety-- > 0 && resp.interaction.stateId === 'wait') {
       if (resp.pending.type === 'choice') {
         const skipOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
         if (skipOpt) {

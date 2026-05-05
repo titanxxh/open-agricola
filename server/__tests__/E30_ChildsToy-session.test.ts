@@ -38,7 +38,7 @@ describe('E30_ChildsToy session', () => {
 
     // Drive through all pending states
     let safety = 30
-    while (safety-- > 0 && resp.pending.type !== 'none') {
+    while (safety-- > 0 && resp.interaction.stateId === 'wait') {
       if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
         resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
       } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
@@ -90,7 +90,7 @@ describe('E30_ChildsToy session', () => {
 
     // Drive through all pending states
     let safety = 30
-    while (safety-- > 0 && resp.pending.type !== 'none') {
+    while (safety-- > 0 && resp.interaction.stateId === 'wait') {
       if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
         resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
       } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
@@ -141,7 +141,7 @@ describe('E30_ChildsToy session', () => {
     let resp = session.performRoundEnd()
 
     let safety = 30
-    while (safety-- > 0 && resp.pending.type !== 'none') {
+    while (safety-- > 0 && resp.interaction.stateId === 'wait') {
       if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
         resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
       } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
@@ -186,7 +186,7 @@ describe('E30_ChildsToy session', () => {
 
     let resp = session.performRoundEnd()
     let safety = 30
-    while (safety-- > 0 && resp.pending.type !== 'none') {
+    while (safety-- > 0 && resp.interaction.stateId === 'wait') {
       if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
         resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
       } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {

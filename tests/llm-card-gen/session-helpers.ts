@@ -349,7 +349,7 @@ export function autoAdvanceRoundEnd(
   let iter = 0
   let resp = session.performRoundEnd()
   while (iter++ < max) {
-    if (resp.pending.type === 'none' && session.getState().state.gameOver) return
+    if (resp.interaction.stateId !== 'wait' && session.getState().state.gameOver) return
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
       continue

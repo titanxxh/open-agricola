@@ -38,7 +38,7 @@ const setupForHarvestField = () => {
 const drainPending = (session: GameSession, accept: boolean) => {
   let resp = session.performRoundEnd()
   let safety = 30
-  while (safety-- > 0 && resp.pending.type !== 'none') {
+  while (safety-- > 0 && resp.interaction.stateId === 'wait') {
     if (resp.pending.type === 'choice') {
       const opts = resp.pending.options ?? []
       // Optional SEQ surfaces as 2-option choice: [actionNode, __skip__].
