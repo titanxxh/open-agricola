@@ -2842,9 +2842,10 @@ export class GameCore {
   }
 
   /**
-   * Public adapter retained during the Task 9 transitional period: forwards to
-   * the InteractionNode-aware {@link handleFeedResolved}. Task 11 will codemod
-   * call sites to {@link resolveChoice} and this method can then be removed.
+   * @deprecated Prefer `resolveChoice(playerIndex, 'confirm', { selections })`.
+   * Retained as a thin alias because 24 session-test files still call this
+   * method by name; replacement is a mechanical sed-codemod queued for a
+   * follow-up sprint per `docs/sprint-S2-progress.md` §3.4.
    */
   confirmHarvestFeed(
     playerIndex: number,
@@ -3019,9 +3020,12 @@ export class GameCore {
   }
 
   /**
-   * Public adapter retained during the Task 9 transitional period: forwards
-   * to {@link handleConfirmPlayerSwitchResolved}. Task 11 will codemod the
-   * call sites to {@link resolveChoice} and the adapter can then be removed.
+   * @deprecated Prefer `resolveChoice(toPlayerIndex, 'confirm')` after
+   * reading `toPlayerIndex` off `interaction.request.toPlayerIndex` (or the
+   * legacy `pending.toPlayerIndex`). Retained as a thin alias because 35
+   * session-test files still call this method by name; replacement is a
+   * mechanical sed-codemod queued for a follow-up sprint per
+   * `docs/sprint-S2-progress.md` §3.4.
    */
   confirmPlayerSwitch(): SessionResponse {
     const node = this.engineStack.peekInteraction()
@@ -3047,9 +3051,12 @@ export class GameCore {
   }
 
   /**
-   * Public adapter retained during the Task 9 transitional period: forwards
-   * to {@link handleConfirmNextPlayerResolved}. Task 11 will codemod the call
-   * sites to {@link resolveChoice} and the adapter can then be removed.
+   * @deprecated Prefer `resolveChoice(nextPlayerIndex, 'confirm')` after
+   * reading `nextPlayerIndex` off `interaction.request.nextPlayerIndex` (or
+   * the legacy `pending.nextPlayerIndex`). Retained as a thin alias because
+   * 17 session-test files still call this method by name; replacement is a
+   * mechanical sed-codemod queued for a follow-up sprint per
+   * `docs/sprint-S2-progress.md` §3.4.
    */
   confirmNextPlayer(): SessionResponse {
     const node = this.engineStack.peekInteraction()

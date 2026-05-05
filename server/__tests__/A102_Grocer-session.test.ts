@@ -4,7 +4,7 @@ import { getCardStack } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/A/A102_Grocer'
 import type { AnytimeAction } from '../../shared/game/types';
-import type { SessionResponse } from '../../shared/session/game-core'
+import type { SessionResponse } from '../../shared/session/session-core'
 
 describe('A102_Grocer session', () => {
   const setup = () => {

@@ -1528,7 +1528,7 @@ export class Engine {
           //
           // GameCore.resolvePendingChoice still validates the player's
           // submitted value via `pending.options.find((o) => o.value === value)`
-          // (shared/session/game-core.ts ~L2249). Reorg confirm/cancel
+          // (shared/session/session-core.ts ~L2249). Reorg confirm/cancel
           // therefore must surface as concrete options on the pending
           // surface or the validator rejects the resolution.
           //

@@ -12,7 +12,7 @@ import type {
 
 import '../../shared/cards/D/D93_SheepInspector'
 import type { ActionChoiceOption , ActionFlow } from '../../shared/game/types'
-import type { SessionResponse } from '../../shared/session/game-core'
+import type { SessionResponse } from '../../shared/session/session-core'
 
 const CARD_ID = 'D93_SheepInspector'
 

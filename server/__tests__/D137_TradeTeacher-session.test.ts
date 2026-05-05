@@ -10,7 +10,7 @@ import type {
 } from '../../shared/game/types'
 
 import '../../shared/cards/D/D137_TradeTeacher'
-import type { SessionResponse } from '../../shared/session/game-core'
+import type { SessionResponse } from '../../shared/session/session-core'
 
 
 const CARD_ID = 'D137_TradeTeacher'

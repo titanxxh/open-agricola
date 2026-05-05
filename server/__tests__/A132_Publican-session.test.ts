@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/A/A132_Publican'
 import type { ActionChoiceOption, PendingAction } from '../../shared/game/types'
-import type { SessionResponse } from '../../shared/session/game-core'
+import type { SessionResponse } from '../../shared/session/session-core'
 
 describe('A132_Publican session', () => {
   const setup = (currentPlayerIndex: number) => {
