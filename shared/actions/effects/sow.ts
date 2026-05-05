@@ -6,9 +6,8 @@ import type {
 } from '../../game/types'
 import { fieldIsEmpty } from '../../game/field'
 import { positionKey } from '../../game/farm'
-import { playerBoard } from '../../domain'
+import { playerBoard, type SowSelection } from '../../domain'
 import { handleSowExtraField } from '../../cards/card-effects'
-import type { SowSelection } from '../../logic/farm/sow-validation'
 
 export const getEmptyFields = (player: PlayerState) =>
   player.fields.filter(fieldIsEmpty)

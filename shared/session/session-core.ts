@@ -83,8 +83,7 @@ import type { CardEffectHook } from '../cards/card-effects.ts'
 import { runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks } from '../cards/card-effects.ts'
 import { positionKey } from '../game/farm.ts'
 import { getMatchingListeners, executeCardListener, shouldSkipImmediateListenerLog } from '../cards/card-listeners.ts'
-import { computeScores, type PlayerScoreSummary } from '../logic/scoring.ts'
-import { computeAnimalZones } from '../actions/helpers/animal-zones'
+import { Scoring, playerBoard, type PlayerScoreSummary } from '../domain'
 import { reap } from '../actions/effects/reap.ts'
 import { breedLeaf } from '../actions/effects/breed'
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
@@ -113,14 +112,9 @@ import {
   getFenceCount,
   getPalisadeCount,
 } from '../actions/effects/fencing.ts'
-import {
-  buildFarmPositionSelectionInteraction,
-  buildFenceFarmInteraction,
-  buildPlowFarmInteraction,
-  buildRoomFarmInteraction,
-  buildSowFarmInteraction,
-  buildStableFarmInteraction,
-} from '../logic/farm/farm-interaction.ts'
+// TODO(PR5): inline `buildOccupationHandSelectionInteraction` into shared/domain
+// (Farmyard or a dedicated occupation aggregate). It's the last farm-interaction
+// helper not yet on the facade — same pattern as `normalizePlayerFarm` (PR2).
 import { buildOccupationHandSelectionInteraction } from '../logic/farm/occupation-hand-interaction.ts'
 import { rebuildActiveModifiers } from '../game/serialization.ts'
 import { isSpaceOccupied, removeWorkerRef } from '../game/space.ts'
@@ -1024,7 +1018,11 @@ export class GameCore {
     costOverride?: Partial<Resource>,
     actionContext?: Record<string, unknown>,
   ): InteractionFarmSelection {
-    return buildRoomFarmInteraction(player, costOverride, actionContext)
+    const idx = this.state.players.indexOf(player)
+    return playerBoard(this.state, idx).farmyard.selectableTiles('room', {
+      costOverride,
+      actionContext,
+    })
   }
 
   private buildStableInteraction(
@@ -1034,33 +1032,40 @@ export class GameCore {
   ): InteractionFarmSelection {
     const zoneFilter = actionContext?.zoneFilter
     const max = actionContext?.max
-    return buildStableFarmInteraction(player, costOverride, {
+    const idx = this.state.players.indexOf(player)
+    return playerBoard(this.state, idx).farmyard.selectableTiles('stable', {
+      costOverride,
       zoneFilter: zoneFilter === 'pasture-1' ? 'pasture-1' : undefined,
       max: typeof max === 'number' ? max : undefined,
     })
   }
 
   private buildPlowInteraction(player: PlayerState, costOverride?: Partial<Resource>): InteractionFarmSelection {
-    return buildPlowFarmInteraction(player, costOverride)
+    const idx = this.state.players.indexOf(player)
+    return playerBoard(this.state, idx).farmyard.selectableTiles('plow', { costOverride })
   }
 
   private buildSowInteraction(player: PlayerState): InteractionFarmSelection {
     const actionContext = this.getActionContextFromTopFrame()
-    return buildSowFarmInteraction(player, actionContext)
+    const idx = this.state.players.indexOf(player)
+    return playerBoard(this.state, idx).farmyard.selectableTiles('sow', { actionContext })
   }
 
   /**
    * Refactored from `buildFenceInteraction(pending)` to take the
    * InteractionNode + player directly (Task 10: `this.pending` deleted).
-   * `buildFenceFarmInteraction` only needs the active space id (used to
-   * detect the `farm-redevelopment` `extraWood` adjustment).
+   * `selectableTiles('fence', ...)` only needs the active space id (used
+   * to detect the `farm-redevelopment` `extraWood` adjustment).
    */
   private buildFenceInteractionFromNode(
     _node: InteractionNode,
     player: PlayerState,
   ): InteractionFarmSelection {
     const frame = this.engineStack.current()
-    return buildFenceFarmInteraction(player, frame?.spaceId ?? '')
+    const idx = this.state.players.indexOf(player)
+    return playerBoard(this.state, idx).farmyard.selectableTiles('fence', {
+      spaceId: frame?.spaceId ?? '',
+    })
   }
 
   private buildSelectionInteractionFromNode(
@@ -1072,7 +1077,8 @@ export class GameCore {
     if (kind === 'occupation-hand') {
       return buildOccupationHandSelectionInteraction(player, actionContext)
     }
-    return buildFarmPositionSelectionInteraction(player, actionContext)
+    const idx = this.state.players.indexOf(player)
+    return playerBoard(this.state, idx).farmyard.selectableTiles('farm-position', { actionContext })
   }
 
   private buildFarmInteractionFromNode(
@@ -1190,7 +1196,8 @@ export class GameCore {
   private buildAnimalReorgZones(
     player: PlayerState,
   ): InteractionAnimalReorgZone[] {
-    return computeAnimalZones(player).map((zone) => ({
+    const idx = this.state.players.indexOf(player)
+    return playerBoard(this.state, idx).animals.zones().map((zone) => ({
       id: zone.id,
       zoneType: zone.zoneType as 'pasture' | 'house' | 'stable',
       animalType: (zone.animalType as 'sheep' | 'boar' | 'cattle' | null) ?? null,
@@ -1382,14 +1389,14 @@ export class GameCore {
   }
 
   private computeWinnerIds(): string[] {
-    const summary = computeScores(this.state)
+    const summary = Scoring.computeAll(this.state)
     if (summary.length === 0) return []
     const top = summary.reduce((a, b) => (a.total >= b.total ? a : b))
     return summary.filter((s) => s.total === top.total).map((s) => s.playerId)
   }
 
   private computeScoreSummary() {
-    return computeScores(this.state).map((s) => ({ playerId: s.playerId, total: s.total }))
+    return Scoring.computeAll(this.state).map((s) => ({ playerId: s.playerId, total: s.total }))
   }
 
   private respond(ok = true, error?: string): SessionResponse {
@@ -1407,7 +1414,7 @@ export class GameCore {
       interaction,
       historyLength: this.history.length,
       hasActionStartSnapshot: this.actionStartIndex !== null,
-      scores: computeScores(this.state),
+      scores: Scoring.computeAll(this.state),
       pastureCapacities: this.getPastureCapacities(),
     }
     // Include backend-computed availability for the current player when
@@ -2508,8 +2515,8 @@ export class GameCore {
 
   getPastureCapacities(): Record<string, Record<string, number>> {
     const result: Record<string, Record<string, number>> = {}
-    this.state.players.forEach((player) => {
-      const zones = computeAnimalZones(player)
+    this.state.players.forEach((player, idx) => {
+      const zones = playerBoard(this.state, idx).animals.zones()
       result[player.id] = Object.fromEntries(
         zones.filter((z) => z.zoneType === 'pasture').map((z) => [z.id, z.capacity]),
       )
