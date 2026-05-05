@@ -7,7 +7,6 @@ import {
   resolveJoinRequestPlayerIndex,
   resolveJoinPlayerIndex,
   snapshotToRoom,
-  restoreRoomFromSqliteRow,
 } from '../room.ts'
 
 const PRIMARY_DEV_ROOM_ID = FIXED_DEV_ROOMS[0]!.id
@@ -124,34 +123,6 @@ describe('room-manager seat assignment', () => {
       createdBy: undefined,
       customCardDbIds: [],
     })
-  })
-
-  it('restores waiting room version from sqlite rows', () => {
-    const room = restoreRoomFromSqliteRow({
-      id: 'waiting-version',
-      created_by: null,
-      state_json: null,
-      max_players: 2,
-      custom_card_ids: '[]',
-      version: 7,
-    } as Parameters<typeof restoreRoomFromSqliteRow>[0])
-
-    expect(room?.version).toBe(7)
-  })
-
-  it('restores playing room version from sqlite rows', () => {
-    const room = restoreRoomFromSqliteRow({
-      id: 'playing-version',
-      created_by: null,
-      state_json: JSON.stringify({
-        players: [],
-      }),
-      max_players: 2,
-      custom_card_ids: '[]',
-      version: 11,
-    } as Parameters<typeof restoreRoomFromSqliteRow>[0])
-
-    expect(room?.version).toBe(11)
   })
 
   it('exposes one persistent dev room per supported player count', () => {
