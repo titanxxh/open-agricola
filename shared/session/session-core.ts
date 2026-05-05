@@ -19,7 +19,7 @@ import type { ActionDetailParts } from '../protocol/game.ts'
 import { actionDefinitions, getActionDefinition } from '../actions/index.ts'
 import { internalActionDefinitions } from '../actions/internal-actions.ts'
 import { clearActionHooks } from '../actions/hooks.ts'
-import { processSubmit, tryAdvanceRound, finalizeDraft } from '../draft/draft-manager.ts'
+import { finalizeDraft } from '../draft/draft-manager.ts'
 import type { DraftPickPayload } from '../draft/types.ts'
 import {
   ActionNode,
@@ -60,7 +60,6 @@ import {
   incHarvestedGrain,
   incHarvestedVegetable,
   incResourceConverted,
-  recordDraftPick,
 } from '../logic/stats.ts'
 import { getMinorImprovement } from '../game/minor-improvements.ts'
 import {
@@ -454,6 +453,15 @@ export class GameCore {
   findNextHarvestReorgPlayerIndex(playerIndex: number): number { return this.findNextHarvestReorgPlayer(playerIndex) }
   /** @internal Harvest phase — onEndHarvest stage hook chain trampoline. */
   invokeEndHarvestEffects(): SessionResponse { return this.continueEndHarvestEffects() }
+  /** @internal Draft phase — assign processed draft state back. */
+  setDraftState(draft: GameState['draft']): void { this.state.draft = draft }
+  /** @internal Draft phase — finalize the draft (copies kept piles back to hands). */
+  applyDraftFinalize(): void {
+    this.state = finalizeDraft(this.state)
+    // Refresh round-start snapshot so that subsequent takeAction / undo logic
+    // sees the post-draft hands rather than the initial empty-handed snapshot.
+    this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
+  }
   /** @internal phase access — build a fresh Engine for a top-level action space. */
   createEngineForSpace(actionId: string): Engine { return this.createEngine(actionId) }
   /** @internal phase access — push a synthetic interaction-only frame. */
@@ -3182,30 +3190,9 @@ export class GameCore {
    * No-op for non-draft phases, unknown players, out-of-pool picks, or double
    * submits in the same round — each returns `ok:false` with an error message.
    */
+  /** S2 Task 12 part 2: thin delegator — body lives in `phases/draft.ts`. */
   submitDraftPick(playerId: string, pick: DraftPickPayload): SessionResponse {
-    if (this.state.phase !== 'draft' || !this.state.draft) {
-      return this.respond(false, 'not in draft phase')
-    }
-    const sub = processSubmit(this.state.draft, playerId, pick)
-    if (sub.error) {
-      return this.respond(false, sub.error)
-    }
-    this.state.draft = sub.draft
-    const player = this.state.players.find((p) => p.id === playerId)
-    if (player) {
-      const draftTurn = this.state.draft.round
-      recordDraftPick(player, pick.occCardId, draftTurn)
-      recordDraftPick(player, pick.minorCardId, draftTurn)
-    }
-    const advance = tryAdvanceRound(this.state.draft)
-    this.state.draft = advance.draft
-    if (advance.finished) {
-      this.state = finalizeDraft(this.state)
-      // Refresh round-start snapshot so that subsequent takeAction / undo logic
-      // sees the post-draft hands rather than the initial empty-handed snapshot.
-      this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
-    }
-    return this.respond()
+    return draftPhase.submitDraftPick(this, playerId, pick)
   }
 
   loadState(raw: unknown): SessionResponse {
