@@ -568,6 +568,17 @@ export type FeedQueueEntry = {
   foodUsed: number
 }
 
+/**
+ * @deprecated S2 Task 13.6 — `PendingAction` is a transitional view-model
+ * that `GameCore.getCurrentPending()` derives from the authoritative
+ * `InteractionRequest` (engine-stack `InteractionNode.request`) plus the
+ * draft-phase shim. Read `SessionResponse.interaction` (an
+ * `InteractionState`) for new code; this type and `SessionResponse.pending`
+ * are retained only to support 332 still-extant test assertions of the
+ * form `resp.pending.type === 'X'`. Tests scheduled for codemod once
+ * `InteractionState`-form helpers stabilize. Do NOT add new internal
+ * consumers of this union.
+ */
 export type PendingAction =
   | {
       type: 'choice'

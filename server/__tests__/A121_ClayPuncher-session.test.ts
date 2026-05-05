@@ -79,7 +79,7 @@ describe('A121_ClayPuncher session', () => {
     }
 
     // Walk through player switches
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 

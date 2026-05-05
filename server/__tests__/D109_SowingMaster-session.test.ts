@@ -67,7 +67,7 @@ describe('D109_SowingMaster session', () => {
       resp = session.resolveChoice(0, 'confirm', { crops: [{ row: 0, col: 0, crop: 'grain' }] })
     }
 
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 
@@ -82,7 +82,7 @@ describe('D109_SowingMaster session', () => {
     let resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
 
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 

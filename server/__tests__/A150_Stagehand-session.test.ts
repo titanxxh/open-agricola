@@ -32,7 +32,7 @@ describe('A150_Stagehand session', () => {
     const resp = session.takeAction(1, 'traveling-players')
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('confirmPlayerSwitch')
-    if (resp.pending.type !== 'confirmPlayerSwitch') return
+    if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch')) return
     expect(resp.pending.fromPlayerIndex).toBe(1)
     expect(resp.pending.toPlayerIndex).toBe(0)
     const grantedLog = resp.state.log.find((entry) => entry.key === 'log.cardGrantedAction')

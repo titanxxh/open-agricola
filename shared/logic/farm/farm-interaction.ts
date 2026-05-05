@@ -2,7 +2,6 @@ import type {
   FarmTilePosition,
   InteractionFarmSelection,
   InteractionSelection,
-  PendingAction,
   PlayerState,
   Resource,
 } from '../../game/types.ts'
@@ -309,12 +308,12 @@ export const buildFarmPositionSelectionInteraction = (
 
 export const buildFenceFarmInteraction = (
   player: PlayerState,
-  pending: Extract<PendingAction, { type: 'choice' }>,
+  spaceId: string,
 ): InteractionFarmSelection => {
   const normalized = normalizePlayerFarm(player)
   const existing = new Set((normalized.fenceSegments ?? []).map((s) => s.edge))
   const selectableEdges = getAllEdgeIds().filter((edgeId) => !existing.has(edgeId))
-  const extraWood = pending.spaceId === 'farm-redevelopment' ? 1 : 0
+  const extraWood = spaceId === 'farm-redevelopment' ? 1 : 0
   return {
     farmType: 'fence',
     selectableEdges,

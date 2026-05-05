@@ -47,7 +47,7 @@ describe('B104_SheepWalker session — last harvest enforcement', () => {
 
     let resp = session.performRoundEnd()
     // Feed phase — playerA has 10 food, no begging.
-    if (resp.pending.type === 'harvestFeed') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(0, 'confirm', { selections: [] })
     }
 
@@ -72,7 +72,7 @@ describe('B104_SheepWalker session — last harvest enforcement', () => {
     session.loadState(state)
 
     let resp = session.performRoundEnd()
-    if (resp.pending.type === 'harvestFeed') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(0, 'confirm', { selections: [] })
     }
 
@@ -110,7 +110,7 @@ describe('B104_SheepWalker session — last harvest enforcement', () => {
     session.loadState(state)
 
     let resp = session.performRoundEnd()
-    if (resp.pending.type === 'harvestFeed') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(0, 'confirm', { selections: [] })
     }
     // In a normal round, 1 sheep does not trigger reorg.

@@ -238,7 +238,7 @@ describe('pending choice types + undo regression', () => {
       const resp = session.takeAction(0, dayLaborer.spaceId)
       expect(resp.ok).toBe(true)
       expect(resp.pending.type).toBe('confirmNextPlayer')
-      if (resp.pending.type === 'confirmNextPlayer') {
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player') {
         expect(resp.pending.nextPlayerIndex).toBe(1)
       }
     })

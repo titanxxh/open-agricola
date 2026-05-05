@@ -47,7 +47,7 @@ describe('A156_Buyer session', () => {
     expect(resp.ok).toBe(true)
 
     // After opponent's action, after-hooks fire and create PlayerSwitch to buyer owner
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 
@@ -61,7 +61,7 @@ describe('A156_Buyer session', () => {
     }
 
     // Walk through any remaining player switches
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 
@@ -84,7 +84,7 @@ describe('A156_Buyer session', () => {
     expect(resp.ok).toBe(true)
 
     // After opponent's action, after-hooks fire and create PlayerSwitch to buyer owner
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 
@@ -96,7 +96,7 @@ describe('A156_Buyer session', () => {
     }
 
     // Walk through any remaining player switches
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 
@@ -122,7 +122,7 @@ describe('A156_Buyer session', () => {
     }
 
     // After opponent's action, after-hooks fire with PlayerSwitch
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 
@@ -143,7 +143,7 @@ describe('A156_Buyer session', () => {
     }
 
     // Walk through any remaining player switches
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 
@@ -161,7 +161,7 @@ describe('A156_Buyer session', () => {
     expect(resp.ok).toBe(true)
 
     // Walk through any pending player switches (there should be none for buyer)
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 
@@ -180,7 +180,7 @@ describe('A156_Buyer session', () => {
     expect(resp.ok).toBe(true)
 
     // Walk through any pending player switches
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 

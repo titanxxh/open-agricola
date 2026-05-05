@@ -38,7 +38,7 @@ describe('E95_Miller session', () => {
     expect(resp.ok).toBe(true)
     // Should trigger a player switch to the Miller owner
     expect(resp.pending.type).toBe('confirmPlayerSwitch')
-    if (resp.pending.type !== 'confirmPlayerSwitch') return
+    if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch')) return
     expect(resp.pending.fromPlayerIndex).toBe(1)
     expect(resp.pending.toPlayerIndex).toBe(0)
   })

@@ -29,7 +29,7 @@ const setupHarvestRound = (round = 4) => {
 const drainHarvest = (session: GameSession, feedSelections: Record<number, FeedSelection[]> = {}) => {
   let resp = session.performRoundEnd()
   while (resp.pending.type !== 'none') {
-    if (resp.pending.type === 'harvestFeed') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       const idx = resp.pending.playerIndex
       const sel = feedSelections[idx] ?? []
       resp = session.resolveChoice(idx, 'confirm', { selections: sel })

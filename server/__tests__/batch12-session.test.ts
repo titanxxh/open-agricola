@@ -141,7 +141,7 @@ describe('A129_Swagman session', () => {
       }
       safety--
     }
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
     return resp
@@ -234,7 +234,7 @@ describe('A82_WorkCertificate session', () => {
         }
         break
       }
-      if (resp.pending.type === 'confirmPlayerSwitch') {
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
         resp = confirmPlayerSwitch(session)
       } else {
         break
@@ -269,7 +269,7 @@ describe('A82_WorkCertificate session', () => {
         }
         break
       }
-      if (resp.pending.type === 'confirmPlayerSwitch') {
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
         resp = confirmPlayerSwitch(session)
       } else {
         break
@@ -277,7 +277,7 @@ describe('A82_WorkCertificate session', () => {
       safety--
     }
     // Walk remaining
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
     const after = session.getState().state
@@ -328,14 +328,14 @@ describe('A82_WorkCertificate session', () => {
         }
         break
       }
-      if (resp.pending.type === 'confirmPlayerSwitch') {
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
         resp = confirmPlayerSwitch(session)
       } else {
         break
       }
       safety--
     }
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 

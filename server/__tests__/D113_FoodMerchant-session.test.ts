@@ -129,7 +129,7 @@ describe('D113_FoodMerchant session', () => {
       // Accept the exchange
       resp = session.resolveChoice(resp.pending.playerIndex, 'ok')
     }
-    while (resp.pending.type === 'harvestFeed') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
     }
     while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {

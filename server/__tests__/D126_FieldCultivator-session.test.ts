@@ -62,7 +62,7 @@ describe('D126_FieldCultivator session', () => {
     let resp = session.performRoundEnd()
 
     // Walk through any pending states (harvestFeed, etc.)
-    while (resp.pending.type === 'harvestFeed') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
     }
     while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
@@ -85,7 +85,7 @@ describe('D126_FieldCultivator session', () => {
     })
 
     let resp = session.performRoundEnd()
-    while (resp.pending.type === 'harvestFeed') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
     }
     while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
@@ -110,7 +110,7 @@ describe('D126_FieldCultivator session', () => {
     session.loadState(state)
 
     let resp = session.performRoundEnd()
-    while (resp.pending.type === 'harvestFeed') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
     }
     while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
@@ -137,7 +137,7 @@ describe('D126_FieldCultivator session', () => {
     session.loadState(state)
 
     let resp = session.performRoundEnd()
-    while (resp.pending.type === 'harvestFeed') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
     }
     while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {

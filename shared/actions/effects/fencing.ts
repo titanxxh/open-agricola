@@ -171,12 +171,7 @@ export const fenceAction: ActionDefinition = {
       canStartFencing(ctx.state, ctx.player, costOverride),
   },
   execute: ({ player, space }): ActionExecutionResult => {
-    const farm = buildFenceFarmInteraction(player, {
-      type: 'choice',
-      playerIndex: 0,
-      spaceId: space.id,
-      options: [],
-    })
+    const farm = buildFenceFarmInteraction(player, space.id)
     return {
       type: 'request',
       request: {

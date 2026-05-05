@@ -27,11 +27,11 @@ describe('D134_OysterEater session', () => {
     let safety = 25
     while (
       safety-- > 0 &&
-      (resp.pending.type === 'confirmPlayerSwitch' ||
-        resp.pending.type === 'confirmNextPlayer')
+      (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch' ||
+        resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player')
     ) {
       resp =
-        resp.pending.type === 'confirmPlayerSwitch'
+        resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch'
           ? confirmPlayerSwitch(session)
           : confirmNextPlayer(session)
     }

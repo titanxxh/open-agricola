@@ -203,6 +203,13 @@ type StageResumeState = {
 export type SessionResponse = {
   ok: boolean
   state: GameState
+  /**
+   * @deprecated S2 Task 13.6 — derived view-model. Read `interaction`
+   * (`InteractionState`) instead. This field is `getCurrentPending()`-derived
+   * from `engineStack.peekInteraction()` and the draft-phase shim; it is
+   * retained only for legacy test assertions of the form
+   * `resp.pending.type === 'X'`.
+   */
   pending: PendingAction
   interaction: InteractionState
   historyLength: number
@@ -1048,28 +1055,15 @@ export class GameCore {
   /**
    * Refactored from `buildFenceInteraction(pending)` to take the
    * InteractionNode + player directly (Task 10: `this.pending` deleted).
-   * `buildFenceFarmInteraction` historically destructured `pending.options`
-   * and `pending.costOverride` — we synthesize an equivalent shape from the
-   * node + frame engine context.
+   * `buildFenceFarmInteraction` only needs the active space id (used to
+   * detect the `farm-redevelopment` `extraWood` adjustment).
    */
   private buildFenceInteractionFromNode(
-    node: InteractionNode,
+    _node: InteractionNode,
     player: PlayerState,
   ): InteractionFarmSelection {
     const frame = this.engineStack.current()
-    const ctx = this.getActionContextFromTopFrame()
-    const choiceLikeShim: Extract<PendingAction, { type: 'choice' }> = {
-      type: 'choice',
-      playerIndex: frame?.ownerPlayerIndex ?? 0,
-      spaceId: frame?.spaceId ?? '',
-      options: (node.request?.kind === 'choice' ? node.request.options : node.choices) ?? [],
-      promptKey: node.promptKey,
-      promptParams: node.promptParams,
-      costOverride: frame?.engine.getLastComputedCosts(),
-      sourceCard: frame?.engine.getPendingInteractionContext()?.sourceCard,
-      actionContext: ctx,
-    }
-    return buildFenceFarmInteraction(player, choiceLikeShim)
+    return buildFenceFarmInteraction(player, frame?.spaceId ?? '')
   }
 
   private buildSelectionInteractionFromNode(

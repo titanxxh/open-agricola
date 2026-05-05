@@ -57,7 +57,7 @@ describe('harvest session flow', () => {
 
     let resp = session.performRoundEnd()
     expect(resp.pending.type).toBe('harvestFeed')
-    if (resp.pending.type !== 'harvestFeed') {
+    if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) {
       throw new Error('expected harvestFeed pending')
     }
     expect(resp.pending.playerIndex).toBe(1)
@@ -68,7 +68,7 @@ describe('harvest session flow', () => {
     ] })
 
     expect(resp.pending.type).toBe('harvestFeed')
-    if (resp.pending.type !== 'harvestFeed') {
+    if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) {
       throw new Error('expected second harvestFeed pending')
     }
     expect(resp.pending.playerIndex).toBe(0)
@@ -192,7 +192,7 @@ describe('harvest session flow', () => {
 
     let resp = session.performRoundEnd()
     expect(resp.pending.type).toBe('harvestFeed')
-    if (resp.pending.type !== 'harvestFeed') throw new Error('expected harvestFeed pending')
+    if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) throw new Error('expected harvestFeed pending')
     expect(resp.pending.playerIndex).toBe(0)
     expect(resp.pending.remaining).toBe(2)
 
@@ -216,7 +216,7 @@ describe('harvest session flow', () => {
     session.loadState(state)
 
     let resp = session.performRoundEnd()
-    if (resp.pending.type !== 'harvestFeed') throw new Error('expected harvestFeed pending')
+    if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) throw new Error('expected harvestFeed pending')
 
     resp = session.resolveChoice(0, 'confirm', { selections: [
       { sourceId: 'D60_LargePottery', exchangeIndex: 0, count: 1, sourceName: 'Large Pottery' },
@@ -255,7 +255,7 @@ describe('harvest session flow', () => {
     session.loadState(state)
 
     let resp = session.performRoundEnd()
-    if (resp.pending.type !== 'harvestFeed') throw new Error('expected harvestFeed pending')
+    if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) throw new Error('expected harvestFeed pending')
 
     // SheepWalker exchanges: idx 0 sheep->boar, idx 1 sheep->vegetable, idx 2 sheep->stone
     // Test sheep->stone: produces no food; full deficit goes to begging.

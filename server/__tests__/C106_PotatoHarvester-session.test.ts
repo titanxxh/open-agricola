@@ -104,7 +104,7 @@ describe('C106_PotatoHarvester session', () => {
     while (resp.pending.type === 'choice') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'ok')
     }
-    while (resp.pending.type === 'harvestFeed') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
     }
     while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
@@ -128,7 +128,7 @@ describe('C106_PotatoHarvester session', () => {
 
     let resp = session.performRoundEnd()
 
-    while (resp.pending.type === 'harvestFeed') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
     }
     while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {

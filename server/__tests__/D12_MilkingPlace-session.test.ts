@@ -68,7 +68,7 @@ describe('D12_MilkingPlace session', () => {
     let resp = session.performRoundEnd()
 
     // Process harvest feed for all players
-    while (resp.pending.type === 'harvestFeed') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       const pidx = resp.pending.playerIndex
       resp = session.resolveChoice(pidx, 'confirm', { selections: [] })
     }
@@ -104,7 +104,7 @@ describe('D12_MilkingPlace session', () => {
 
     let resp = session.performRoundEnd()
 
-    while (resp.pending.type === 'harvestFeed') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       const pidx = resp.pending.playerIndex
       resp = session.resolveChoice(pidx, 'confirm', { selections: [] })
     }

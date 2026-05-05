@@ -35,7 +35,7 @@ describe('D146_Porter session', () => {
     let resp = session.takeAction(0, 'clay-pit')
     expect(resp.ok).toBe(true)
 
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 
@@ -59,7 +59,7 @@ describe('D146_Porter session', () => {
     let resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
 
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 
@@ -83,7 +83,7 @@ describe('D146_Porter session', () => {
     let resp = session.takeAction(0, 'clay-pit')
     expect(resp.ok).toBe(true)
 
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 
@@ -113,7 +113,7 @@ describe('D146_Porter session', () => {
       ])
     }
 
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 

@@ -301,7 +301,7 @@ describe('serialization cursor round-trip', () => {
     // doesn't accumulate.
     const remainingFeedFrames = restored.getEngineStack().depth() > 0
       && restored.getEngineStack().current()?.reason === 'feed'
-    if (after.pending.type === 'harvestFeed') {
+    if (after.interaction.stateId === 'wait' && after.interaction.request.kind === 'feed') {
       expect(remainingFeedFrames).toBe(true)
     } else {
       expect(after.pending.type).toBe('none')

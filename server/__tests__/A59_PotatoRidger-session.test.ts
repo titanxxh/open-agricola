@@ -133,7 +133,7 @@ describe('A59_PotatoRidger session', () => {
       // Mandatory flow — should auto-execute or we accept it
       resp = session.resolveChoice(resp.pending.playerIndex, 'ok')
     }
-    while (resp.pending.type === 'harvestFeed') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
     }
     while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
@@ -158,7 +158,7 @@ describe('A59_PotatoRidger session', () => {
     let resp = session.performRoundEnd()
 
     // Should NOT get a choice for this card since 2 < 3
-    while (resp.pending.type === 'harvestFeed') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
     }
     while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {

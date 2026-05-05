@@ -350,7 +350,7 @@ export function autoAdvanceRoundEnd(
   let resp = session.performRoundEnd()
   while (iter++ < max) {
     if (resp.pending.type === 'none' && session.getState().state.gameOver) return
-    if (resp.pending.type === 'harvestFeed') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
       continue
     }
@@ -363,11 +363,11 @@ export function autoAdvanceRoundEnd(
       resp = session.resolveChoice(pi, 'confirm', zones)
       continue
     }
-    if (resp.pending.type === 'confirmNextPlayer') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player') {
       resp = confirmNextPlayer(session)
       continue
     }
-    if (resp.pending.type === 'confirmPlayerSwitch') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
       continue
     }

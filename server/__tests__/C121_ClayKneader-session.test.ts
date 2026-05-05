@@ -46,7 +46,7 @@ describe('C121_ClayKneader session', () => {
     expect(resp.ok).toBe(true)
 
     // Walk through any pending player switches
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 
@@ -69,7 +69,7 @@ describe('C121_ClayKneader session', () => {
     let resp = session.takeAction(0, 'vegetable-seeds')
     expect(resp.ok).toBe(true)
 
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 
@@ -84,7 +84,7 @@ describe('C121_ClayKneader session', () => {
     let resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
 
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 
