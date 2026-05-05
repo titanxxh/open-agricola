@@ -177,8 +177,10 @@ describe('engine resolveChoice payload', () => {
     const space = createSpace(action)
     engine.proceed({ state, player, space })
     engine.resolveChoice('commit', { state, player, space })
-    const snapshot = engine.snapshot()
-    expect(snapshot.pendingInteractionContext?.actionContext).toEqual({ stashed: { foo: 42 } })
+    // S4b PR5: read pending interaction context off the InteractionNode (host) directly.
+    const host = engine.peekInteractionHost()
+    const ctx = host instanceof InteractionNode ? host.contextSnapshot : undefined
+    expect(ctx?.actionContext).toEqual({ stashed: { foo: 42 } })
     expect(callCount).toBe(1)
   })
 
@@ -222,6 +224,9 @@ describe('engine resolveChoice payload', () => {
     engine.proceed({ state, player, space })
     engine.resolveChoice('a', { state, player, space })
     engine.resolveChoice('b', { state, player, space })
-    expect(engine.snapshot().pendingInteractionContext?.actionContext).toEqual({ x: 1, y: 99, z: 3 })
+    // S4b PR5: read pending interaction context off the InteractionNode (host) directly.
+    const host = engine.peekInteractionHost()
+    const ctx = host instanceof InteractionNode ? host.contextSnapshot : undefined
+    expect(ctx?.actionContext).toEqual({ x: 1, y: 99, z: 3 })
   })
 })
