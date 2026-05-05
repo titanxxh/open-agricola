@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/A/A156_Buyer'
 import type { ActionChoiceOption } from '../../shared/game/types'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 describe('A156_Buyer session', () => {
   const setup = (currentPlayerIndex: number) => {
@@ -47,7 +48,7 @@ describe('A156_Buyer session', () => {
 
     // After opponent's action, after-hooks fire and create PlayerSwitch to buyer owner
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     // The optional flow should present a choice to accept or skip
@@ -61,7 +62,7 @@ describe('A156_Buyer session', () => {
 
     // Walk through any remaining player switches
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state
@@ -84,7 +85,7 @@ describe('A156_Buyer session', () => {
 
     // After opponent's action, after-hooks fire and create PlayerSwitch to buyer owner
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     // The optional flow should present a choice
@@ -96,7 +97,7 @@ describe('A156_Buyer session', () => {
 
     // Walk through any remaining player switches
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state
@@ -122,7 +123,7 @@ describe('A156_Buyer session', () => {
 
     // After opponent's action, after-hooks fire with PlayerSwitch
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     // Accept the optional exchange
@@ -143,7 +144,7 @@ describe('A156_Buyer session', () => {
 
     // Walk through any remaining player switches
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state
@@ -161,7 +162,7 @@ describe('A156_Buyer session', () => {
 
     // Walk through any pending player switches (there should be none for buyer)
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     // No food should be lost
@@ -180,7 +181,7 @@ describe('A156_Buyer session', () => {
 
     // Walk through any pending player switches
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     // Owner should have gained reed from the space but not triggered buyer's own-exchange

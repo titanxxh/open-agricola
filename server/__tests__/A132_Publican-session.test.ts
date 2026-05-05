@@ -4,6 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import '../../shared/cards/A/A132_Publican'
 import type { ActionChoiceOption, PendingAction } from '../../shared/game/types'
 import type { SessionResponse } from '../../shared/session/session-core'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 describe('A132_Publican session', () => {
   const setup = (currentPlayerIndex: number) => {
@@ -34,7 +35,7 @@ describe('A132_Publican session', () => {
 
   const advancePastPlayerSwitches = (session: GameSession, resp: SessionResponse) => {
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
     return resp
   }

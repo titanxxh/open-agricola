@@ -4,6 +4,7 @@ import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 import type { ActionChoiceOption,  PlayerState } from '../../shared/game/types.ts'
 
 import { setWorkersAtHome } from '../../shared/game/player'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 import '../../shared/cards/A/A128_RiparianBuilder'
 import '../../shared/cards/__stubs__/Stub_Construct_TrueAction'
 
@@ -60,7 +61,7 @@ describe('A128_RiparianBuilder session', () => {
       toPlayerIndex: 0,
     })
 
-    resp = session.confirmPlayerSwitch()
+    resp = confirmPlayerSwitch(session)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
     expect(resp.pending.playerIndex).toBe(0)
@@ -80,7 +81,7 @@ describe('A128_RiparianBuilder session', () => {
       toPlayerIndex: 0,
     })
 
-    resp = session.confirmPlayerSwitch()
+    resp = confirmPlayerSwitch(session)
     expect(resp.pending.type).toBe('choice')
 
     // Choose to construct
@@ -117,7 +118,7 @@ describe('A128_RiparianBuilder session', () => {
     let resp = session.takeAction(1, 'reed-bank')
     expect(resp.pending.type).toBe('confirmPlayerSwitch')
 
-    resp = session.confirmPlayerSwitch()
+    resp = confirmPlayerSwitch(session)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
 
@@ -146,7 +147,7 @@ describe('A128_RiparianBuilder session', () => {
     let resp = session.takeAction(1, 'reed-bank')
     expect(resp.pending.type).toBe('confirmPlayerSwitch')
 
-    resp = session.confirmPlayerSwitch()
+    resp = confirmPlayerSwitch(session)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
     expect(resp.pending.sourceCard).toBe(CARD_ID)

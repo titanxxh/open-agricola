@@ -4,6 +4,7 @@ import { markAllWorkersUsed, setActiveWorkerCount, setNewbornCount } from '../..
 import { C105_BasketCarrier } from '../../shared/cards/C/C105_BasketCarrier'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
 import type { PlayerState, Resource } from '../../shared/game/types'
+import { confirmNextPlayer } from './_helpers/legacy-confirms'
 
 const CARD_ID = 'C105_BasketCarrier'
 
@@ -98,7 +99,7 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
           resp = session.resolveChoice(resp.pending.playerIndex ?? 0, resp.pending.options[0]!.value)
         }
       } else if (resp.pending.type === 'confirmNextPlayer') {
-        resp = session.confirmNextPlayer()
+        resp = confirmNextPlayer(session)
       } else {
         break
       }
@@ -151,7 +152,7 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
           skip ? '__skip__' : resp.pending.options[0]!.value,
         )
       } else if (resp.pending.type === 'confirmNextPlayer') {
-        resp = session.confirmNextPlayer()
+        resp = confirmNextPlayer(session)
       } else {
         break
       }

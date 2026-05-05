@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 import '../../shared/cards/C/C164_GermanHeathKeeper'
 
@@ -40,7 +41,7 @@ describe('C164_GermanHeathKeeper session', () => {
 
     // Handle player switch if needed (sheep gain from card)
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     // Handle animalReorg for sheep from card
@@ -71,7 +72,7 @@ describe('C164_GermanHeathKeeper session', () => {
 
     // Handle player switch to owner for sheep gain
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     // Handle animalReorg for owner's sheep
@@ -82,7 +83,7 @@ describe('C164_GermanHeathKeeper session', () => {
     }
 
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state
@@ -97,7 +98,7 @@ describe('C164_GermanHeathKeeper session', () => {
     expect(resp.ok).toBe(true)
 
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state

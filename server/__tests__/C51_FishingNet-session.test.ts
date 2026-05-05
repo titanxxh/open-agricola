@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/game/player'
+import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/legacy-confirms'
 import '../../shared/cards/C/C51_FishingNet'
 
 describe('C51_FishingNet session', () => {
@@ -37,9 +38,9 @@ describe('C51_FishingNet session', () => {
     while (resp.pending.type === 'confirmPlayerSwitch' || resp.pending.type === 'confirmNextPlayer') {
       if (--safety <= 0) break
       if (resp.pending.type === 'confirmPlayerSwitch') {
-        resp = session.confirmPlayerSwitch()
+        resp = confirmPlayerSwitch(session)
       } else {
-        resp = session.confirmNextPlayer()
+        resp = confirmNextPlayer(session)
       }
     }
 
@@ -57,7 +58,7 @@ describe('C51_FishingNet session', () => {
 
     // Walk through pending player switches
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state
@@ -97,9 +98,9 @@ describe('C51_FishingNet session', () => {
     while (resp.pending.type === 'confirmPlayerSwitch' || resp.pending.type === 'confirmNextPlayer') {
       if (--safety <= 0) break
       if (resp.pending.type === 'confirmPlayerSwitch') {
-        resp = session.confirmPlayerSwitch()
+        resp = confirmPlayerSwitch(session)
       } else {
-        resp = session.confirmNextPlayer()
+        resp = confirmNextPlayer(session)
       }
     }
 
@@ -112,9 +113,9 @@ describe('C51_FishingNet session', () => {
     while (resp.pending.type === 'confirmPlayerSwitch' || resp.pending.type === 'confirmNextPlayer') {
       if (--safety <= 0) break
       if (resp.pending.type === 'confirmPlayerSwitch') {
-        resp = session.confirmPlayerSwitch()
+        resp = confirmPlayerSwitch(session)
       } else {
-        resp = session.confirmNextPlayer()
+        resp = confirmNextPlayer(session)
       }
     }
 
@@ -140,7 +141,7 @@ describe('C51_FishingNet session', () => {
 
     // Walk through any pending player switches (there should be none for this card)
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state
@@ -165,9 +166,9 @@ describe('C51_FishingNet session', () => {
     while (resp.pending.type === 'confirmPlayerSwitch' || resp.pending.type === 'confirmNextPlayer') {
       if (--safety <= 0) break
       if (resp.pending.type === 'confirmPlayerSwitch') {
-        resp = session.confirmPlayerSwitch()
+        resp = confirmPlayerSwitch(session)
       } else {
-        resp = session.confirmNextPlayer()
+        resp = confirmNextPlayer(session)
       }
     }
 

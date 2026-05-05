@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { setFencesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
 
 import { setWorkersAtHome } from '../../shared/game/player'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 import '../../shared/cards/C/C168_AnimalCatcher'
 
 const CARD_ID = 'C168_AnimalCatcher'
@@ -50,7 +51,7 @@ const drainPending = (session: GameSession, resp: ReturnType<GameSession['getSta
       const playerIdx = resp.pending.playerIndex ?? 0
       resp = session.resolveChoice(playerIdx, resp.pending.options[0]!.value)
     } else if (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     } else {
       break
     }

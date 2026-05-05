@@ -668,9 +668,6 @@ export type InteractionCommand =
   | 'commitFarm'
   | 'commitSelection'
   | 'takeAnytimeAction'
-  | 'confirmFeed'
-  | 'confirmNextPlayer'
-  | 'confirmPlayerSwitch'
   | 'undoStep'
   | 'undoAction'
 

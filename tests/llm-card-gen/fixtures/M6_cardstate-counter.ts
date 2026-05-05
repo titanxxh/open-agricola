@@ -5,6 +5,7 @@ import {
   setWorkersAtHome,
 } from '../session-helpers'
 import type { CardFixture, FixtureContext, FixtureResult, TriggerResult } from './types'
+import { confirmNextPlayer } from '../../../server/__tests__/_helpers/legacy-confirms'
 
 const CARD_ID = 'CUSTOM_M6_ActionTallyman'
 
@@ -70,7 +71,7 @@ const fixture: CardFixture = {
       const resp = session.takeAction(0, spaceId) as { pending?: { type?: string }; ok: boolean }
       steps.push({ label: `takeAction(0,'${spaceId}')`, resp })
       if (resp.pending?.type === 'confirmNextPlayer') {
-        const cnp = session.confirmNextPlayer()
+        const cnp = confirmNextPlayer(session)
         steps.push({ label: 'confirmNextPlayer', resp: cnp })
       }
     }

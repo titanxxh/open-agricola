@@ -5,6 +5,7 @@ import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B63_Tasting'
 import type { ActionChoiceOption } from '../../shared/game/types'
 import type { SessionResponse } from '../../shared/session/session-core'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 const CARD_ID = 'B63_Tasting'
 
@@ -33,7 +34,7 @@ describe('B63_Tasting session', () => {
     let r = resp
     let safety = 30
     while (safety-- > 0 && r.pending?.type === 'confirmPlayerSwitch') {
-      r = session.confirmPlayerSwitch()
+      r = confirmPlayerSwitch(session)
     }
     return r
   }

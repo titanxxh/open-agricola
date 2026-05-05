@@ -4,6 +4,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/C/C121_ClayKneader'
 import type { ActionFlow } from '../../shared/game/types'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 const CARD_ID = 'C121_ClayKneader'
 
@@ -46,7 +47,7 @@ describe('C121_ClayKneader session', () => {
 
     // Walk through any pending player switches
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state
@@ -69,7 +70,7 @@ describe('C121_ClayKneader session', () => {
     expect(resp.ok).toBe(true)
 
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state
@@ -84,7 +85,7 @@ describe('C121_ClayKneader session', () => {
     expect(resp.ok).toBe(true)
 
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state

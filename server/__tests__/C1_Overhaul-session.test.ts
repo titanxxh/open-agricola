@@ -6,6 +6,7 @@ import {
   getPalisadeCount,
 } from '../../shared/actions/effects/fencing'
 import { setFencesForTest, setPalisadesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 import '../../shared/cards/C/C1_Overhaul'
 
@@ -150,7 +151,7 @@ describe('C1 Overhaul session', () => {
     })
     expect(resp.ok).toBe(true)
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
     const player = session.getState().state.players[0]!
     const flag = player.cardStates?.[CARD_ID]?.extraData?.c1Active

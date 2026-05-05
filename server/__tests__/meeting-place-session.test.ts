@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/game/player'
+import { confirmNextPlayer } from './_helpers/legacy-confirms'
 
 describe('meeting-place session', () => {
   it('grants start player immediately and starts the next round with that player', () => {
@@ -28,7 +29,7 @@ describe('meeting-place session', () => {
     }
     expect(resp.pending.type).toBe('confirmNextPlayer')
 
-    resp = session.confirmNextPlayer()
+    resp = confirmNextPlayer(session)
     expect(resp.ok).toBe(true)
     expect(resp.state.round).toBe(14)
     expect(resp.state.currentPlayerIndex).toBe(1)

@@ -5,6 +5,7 @@ import { incCounter } from '../../shared/cards/__stubs__/helpers'
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A128_RiparianBuilder'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 const TEST_END_TURN_CARD = 'TEST_OnEndTurnCounter'
 
@@ -69,7 +70,7 @@ describe('onEndTurn session', () => {
     expect(resp.pending.type).toBe('confirmPlayerSwitch')
     expect(resp.state.players[0]!.cardStates?.[TEST_END_TURN_CARD]?.counters?.observedCount).toBeUndefined()
 
-    resp = session.confirmPlayerSwitch()
+    resp = confirmPlayerSwitch(session)
     expect(resp.pending.type).toBe('choice')
     expect(resp.state.players[1]!.cardStates?.[TEST_END_TURN_CARD]?.counters?.observedCount).toBeUndefined()
 

@@ -13,6 +13,7 @@ import type {
 import '../../shared/cards/D/D93_SheepInspector'
 import type { ActionChoiceOption , ActionFlow } from '../../shared/game/types'
 import type { SessionResponse } from '../../shared/session/session-core'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 const CARD_ID = 'D93_SheepInspector'
 
@@ -232,7 +233,7 @@ describe('D93_SheepInspector end-to-end via GameSession', () => {
     let safety = 30
     while (safety-- > 0) {
       if (r.pending?.type === 'confirmPlayerSwitch') {
-        r = session.confirmPlayerSwitch()
+        r = confirmPlayerSwitch(session)
         continue
       }
       break

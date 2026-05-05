@@ -4,6 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import '../../shared/cards/A/A132_Publican'
 import type { ActionChoiceOption, PendingAction } from '../../shared/game/types'
 import type { SessionResponse } from '../../shared/session/session-core'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 describe('stats: gain with recipientPlayerId records resourcesFromCards on target', () => {
   const advancePastPlayerSwitches = (
@@ -11,7 +12,7 @@ describe('stats: gain with recipientPlayerId records resourcesFromCards on targe
     resp: SessionResponse,
   ) => {
     while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
     return resp
   }

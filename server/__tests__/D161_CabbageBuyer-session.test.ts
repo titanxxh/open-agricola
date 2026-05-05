@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/game/player'
 import type { PendingAction } from '../../shared/game/types'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 import '../../shared/cards/D/D161_CabbageBuyer'
 import '../../shared/cards/A/A55_JunkRoom'
 
@@ -188,7 +189,7 @@ const walkPlayerSwitch = (session: GameSession, resp: ReturnType<GameSession['ta
   let r = resp
   let safety = 5
   while (r.pending.type === 'confirmPlayerSwitch' && safety-- > 0) {
-    r = session.confirmPlayerSwitch()
+    r = confirmPlayerSwitch(session)
   }
   return r
 }
@@ -359,7 +360,7 @@ describe('D161_CabbageBuyer session', () => {
       safety-- > 0
     ) {
       if (resp.pending.type === 'confirmPlayerSwitch') {
-        resp = session.confirmPlayerSwitch()
+        resp = confirmPlayerSwitch(session)
         continue
       }
       const opts = resp.pending.options ?? []
@@ -390,7 +391,7 @@ describe('D161_CabbageBuyer session', () => {
     // Walk any player switches — if D161 fires (it shouldn't), we'd get a choice for p0
     let safety = 5
     while (resp.pending.type === 'confirmPlayerSwitch' && safety-- > 0) {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     // p0 cannot afford cost=3, so no offer should appear
@@ -442,7 +443,7 @@ describe('D161_CabbageBuyer session', () => {
     // Walk any player switches
     let safety = 5
     while (resp.pending.type === 'confirmPlayerSwitch' && safety-- > 0) {
-      resp = session.confirmPlayerSwitch()
+      resp = confirmPlayerSwitch(session)
     }
 
     // No D161 offer should appear — pending should be 'none' or 'confirmNextPlayer'

@@ -1286,7 +1286,7 @@ export class GameCore {
           sourceCard,
           request,
           nextPlayerIndex: request.nextPlayerIndex,
-          allowedCommands: ['confirmNextPlayer', 'undoStep', 'undoAction'],
+          allowedCommands: ['resolveChoice', 'undoStep', 'undoAction'],
           anytimeActions: [],
         }
       case 'confirm-player-switch':
@@ -1300,7 +1300,7 @@ export class GameCore {
           request,
           fromPlayerIndex: request.fromPlayerIndex,
           toPlayerIndex: request.toPlayerIndex,
-          allowedCommands: ['confirmPlayerSwitch', 'undoStep', 'undoAction'],
+          allowedCommands: ['resolveChoice', 'undoStep', 'undoAction'],
           anytimeActions: [],
         }
       case 'feed':
@@ -1315,7 +1315,7 @@ export class GameCore {
           remaining: request.remaining,
           foodUsed: request.foodUsed,
           feedQueue: request.feedQueue,
-          allowedCommands: ['confirmFeed', 'undoStep', 'undoAction'],
+          allowedCommands: ['resolveChoice', 'undoStep', 'undoAction'],
           anytimeActions: [],
         }
       case 'farm-select':
@@ -2965,41 +2965,9 @@ export class GameCore {
     return this.startBreedPhase()
   }
 
-  /**
-   * @deprecated Prefer `resolveChoice(toPlayerIndex, 'confirm')` after
-   * reading `toPlayerIndex` off `interaction.request.toPlayerIndex` (or the
-   * legacy `pending.toPlayerIndex`). Retained as a thin alias because 35
-   * session-test files still call this method by name; replacement is a
-   * mechanical sed-codemod queued for a follow-up sprint per
-   * `docs/sprint-S2-progress.md` §3.4.
-   */
-  confirmPlayerSwitch(): SessionResponse {
-    const node = this.engineStack.peekInteraction()
-    if (node?.request?.kind !== 'confirm-player-switch') {
-      return this.respond(false, 'no pending player switch')
-    }
-    return this.handleConfirmPlayerSwitchResolved(node.request.toPlayerIndex)
-  }
-
   /** S2 Task 10 part 3: thin delegator — body lives in `phases/round.ts`. */
   private handleConfirmPlayerSwitchResolved(toPlayerIndex: number): SessionResponse {
     return roundPhase.handleConfirmPlayerSwitchResolved(this, toPlayerIndex)
-  }
-
-  /**
-   * @deprecated Prefer `resolveChoice(nextPlayerIndex, 'confirm')` after
-   * reading `nextPlayerIndex` off `interaction.request.nextPlayerIndex` (or
-   * the legacy `pending.nextPlayerIndex`). Retained as a thin alias because
-   * 17 session-test files still call this method by name; replacement is a
-   * mechanical sed-codemod queued for a follow-up sprint per
-   * `docs/sprint-S2-progress.md` §3.4.
-   */
-  confirmNextPlayer(): SessionResponse {
-    const node = this.engineStack.peekInteraction()
-    if (node?.request?.kind !== 'confirm-next-player') {
-      return this.respond(false, 'no pending transition')
-    }
-    return this.handleConfirmNextPlayerResolved(node.request.nextPlayerIndex)
   }
 
   /** S2 Task 10 part 3: thin delegator — body lives in `phases/round.ts`. */

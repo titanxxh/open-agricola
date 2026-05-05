@@ -16,6 +16,7 @@
  */
 import { describe, expect, it, beforeEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { confirmNextPlayer } from './_helpers/legacy-confirms'
 
 describe('state.pendingUndoBoundary consumed by pushHistory', () => {
   let session: GameSession
@@ -86,7 +87,7 @@ describe('state.pendingUndoBoundary consumed by pushHistory', () => {
     // Undo that action to get back to a state where we can take another action.
     // (Undo won't work because it's a boundary — we need to take an action for p1.)
     // Instead confirm next player and let p2 take an action; the flag must NOT be set.
-    session.confirmNextPlayer()
+    confirmNextPlayer(session)
 
     session.takeAction(1, 'clay-pit')
 

@@ -4,6 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A150_Stagehand'
 import type { ActionChoiceOption } from '../../shared/game/types'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 describe('A150_Stagehand session', () => {
   const setup = () => {
@@ -48,7 +49,7 @@ describe('A150_Stagehand session', () => {
       toPlayerIndex: 0,
     })
 
-    resp = session.confirmPlayerSwitch()
+    resp = confirmPlayerSwitch(session)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
     expect(resp.pending.playerIndex).toBe(0)
@@ -69,7 +70,7 @@ describe('A150_Stagehand session', () => {
       toPlayerIndex: 0,
     })
 
-    resp = session.confirmPlayerSwitch()
+    resp = confirmPlayerSwitch(session)
     expect(resp.pending.type).toBe('choice')
     if (resp.pending.type !== 'choice') return
 
