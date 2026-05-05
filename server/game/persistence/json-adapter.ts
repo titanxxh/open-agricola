@@ -10,6 +10,12 @@ import type { SerializedGameState } from '../../../shared/game/serialization.ts'
 
 const sanitise = (id: string) => id.replace(/[^a-zA-Z0-9._-]/g, '_')
 
+/**
+ * Fallback metadata returned by `load`. JSON files only persist the serialized
+ * state; meta fields are reconstructed with safe defaults. Status defaults to
+ * `'playing'` because the JSON adapter does not participate in startup restore
+ * (`listRestorable` returns `[]`), so this value is informational only.
+ */
 const FALLBACK_META: RoomMeta = {
   createdBy: null,
   maxPlayers: 2,
@@ -42,6 +48,12 @@ export class JsonRoomPersistence implements RoomPersistence {
     }
   }
 
+  /**
+   * Save the serialized state only. The `_meta` parameter is intentionally
+   * ignored — the JSON backend is state-only by design (see RoomPersistence
+   * interface JSDoc). Callers that need round-tripped meta must use the
+   * sqlite or memory adapter.
+   */
   save(id: string, serialized: SerializedGameState, _meta: RoomMeta): void {
     try {
       mkdirSync(this.dir, { recursive: true })
