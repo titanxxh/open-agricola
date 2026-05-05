@@ -124,7 +124,6 @@ export class Engine {
     | null = null
   private flowNodeCounter = 0
   private beforePhaseFlowNodeIds = new Set<string>()
-  private lastComputedCosts: Partial<import('../game/types').Resource> | undefined = undefined
   /**
   /**
    * S2 Task 8: returns the pending-choice metadata regardless of whether the
@@ -155,23 +154,6 @@ export class Engine {
       }
     }
     return null
-  }
-
-  getLastComputedCosts() {
-    return this.lastComputedCosts
-  }
-
-  /**
-   * Read-only accessor for the engine's pending-interaction context (sourceCard,
-   * actionContext, params, costs). Used by `GameCore.buildInteraction` /
-   * `GameCore.getCurrentPending` to surface fields previously stored on
-   * `this.pending` (now derived from engineStack — Task 10).
-   */
-  getPendingInteractionContext(): Pick<
-    ActionExecutionContext,
-    'params' | 'costs' | 'sourceCard' | 'actionContext'
-  > | null {
-    return this.pendingInteractionContext
   }
 
   injectBeforeNodes(nodes: EngineNode[]) {
@@ -239,7 +221,6 @@ export class Engine {
     node.pendingActionId = INTERACTION_ONLY_ACTION_ID
     node.ownerNodeId = undefined
     node.contextSnapshot = ctxSnapshot
-    this.lastComputedCosts = undefined
   }
 
   /**
@@ -1451,7 +1432,6 @@ export class Engine {
       )
       executionContext.costs =
         Object.keys(costOverride).length > 0 ? costOverride : undefined
-      this.lastComputedCosts = executionContext.costs
       if (!this.beforePhaseFlowNodeIds.has(node.id)) {
         const beforePhase = this.hooks.before({ ...executionContext, actionId: replacedActionId })
         const beforeActivateNodes = this.buildActivateCardNodes(
