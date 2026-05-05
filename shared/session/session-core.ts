@@ -82,7 +82,7 @@ import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { getCardEffect } from '../cards/card-effects.ts'
 import { incCardUsed } from '../cards/helpers/card-state.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
-import { runRoundEndHooks, runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks, shouldSkipPlayerTurn } from '../cards/card-effects.ts'
+import { runRoundEndHooks, runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks } from '../cards/card-effects.ts'
 import { positionKey } from '../game/farm.ts'
 import { getMatchingListeners, executeCardListener, shouldSkipImmediateListenerLog } from '../cards/card-listeners.ts'
 import { computeScores, type PlayerScoreSummary } from '../logic/scoring.ts'
@@ -419,6 +419,27 @@ export class GameCore {
   invokeHarvestFromBeforeHarvest(): SessionResponse { return this.continueHarvestFromBeforeHarvest() }
   /** @internal Harvest phase trampoline — kicks off the breed-phase continuation chain. */
   invokeAfterFeedingPhase(): SessionResponse { return this.continueAfterFeedingPhase() }
+  /** @internal Round phase trampoline — onAllWorkersPlaced + performRoundEnd cascade. */
+  invokeAllWorkersPlacedHooks(): SessionResponse { return this.continueAllWorkersPlacedHooks() }
+  /** @internal Round phase — set state.currentPlayerIndex (only by handleConfirmNextPlayerResolved). */
+  setCurrentPlayerIndex(idx: number): void { this.state.currentPlayerIndex = idx }
+  /** @internal Round phase — read activePlayerIndex view (engineStack-derived). */
+  readActivePlayerIndex(): number | null { return this.activePlayerIndex }
+  /** @internal Round phase — read activeSpaceId view (engineStack-derived). */
+  readActiveSpaceId(): string | null { return this.activeSpaceId }
+  /** @internal Round phase — pushHistory + undoBoundary helper exposed for handlers. */
+  appendHistoryWithUndoBoundary(): void { this.pushHistory(false, true) }
+  /** @internal Round phase — read engine on the current frame (used by takeAnytimeAction). */
+  peekEngine(): import('../engine').Engine | null { return this.engine }
+  /** @internal Round phase — read engineSource (used by takeAnytimeAction). */
+  peekEngineSource(): EngineSource | null { return this.engineSource }
+  /** @internal Round phase — engine context for ad-hoc anytime invocations. */
+  buildAdhocEngineFrame(actionId: string, sourceCard: string | undefined): {
+    engine: import('../engine').Engine; source: EngineSource
+  } {
+    const flow: ActionFlow = { type: 'leaf', actionId, sourceCard }
+    return { engine: this.createFlowEngine(flow), source: { kind: 'flow', flow } }
+  }
   /** @internal phase access — build a fresh Engine for a top-level action space. */
   createEngineForSpace(actionId: string): Engine { return this.createEngine(actionId) }
   /** @internal phase access — push a synthetic interaction-only frame. */
@@ -3010,19 +3031,9 @@ export class GameCore {
     return this.handleConfirmPlayerSwitchResolved(node.request.toPlayerIndex)
   }
 
+  /** S2 Task 10 part 3: thin delegator — body lives in `phases/round.ts`. */
   private handleConfirmPlayerSwitchResolved(toPlayerIndex: number): SessionResponse {
-    this.pushHistory(false, true)
-    // Pop the synthetic confirm-player-switch frame; the parent action frame
-    // beneath it must remain so the deferred sub-flow can resume.
-    const top = this.engineStack.current()
-    if (top?.reason === 'confirm-player-switch') this.engineStack.pop()
-    const parent = this.engineStack.current()
-    if (parent) {
-      parent.ownerPlayerIndex = toPlayerIndex
-      parent.deferredPlayerSwitch = null
-    }
-    this.runEngineSteps()
-    return this.respond()
+    return roundPhase.handleConfirmPlayerSwitchResolved(this, toPlayerIndex)
   }
 
   /**
@@ -3041,50 +3052,9 @@ export class GameCore {
     return this.handleConfirmNextPlayerResolved(node.request.nextPlayerIndex)
   }
 
+  /** S2 Task 10 part 3: thin delegator — body lives in `phases/round.ts`. */
   private handleConfirmNextPlayerResolved(nextPlayerIndex: number): SessionResponse {
-    this.pushHistory()
-    this.state.currentPlayerIndex = nextPlayerIndex
-    // Clear engine state — the synthetic confirm-next-player frame is the only
-    // frame on the stack at this point (parent was already cleared by the
-    // caller before `startConfirmNextPlayer` pushed us).
-    this.engineStack.clear()
-    this.actionStartIndex = null
-    this.history = [] // Clear undo history when switching players
-    this.turnOwnerPlayerIndex = null
-
-    // Mirrors BGA `stLabor()` SkipNext consumption: dispatch
-    // `onBeforePlayerTurn` for the freshly-active player; if any card asks to
-    // skip, advance to the next eligible player. Cap at `players.length` to
-    // guarantee termination if every player is asked to skip.
-    let safety = this.state.players.length
-    while (safety-- > 0) {
-      const allWorkersUsedNow = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)
-      if (allWorkersUsedNow) break
-      const current = this.state.players[this.state.currentPlayerIndex]
-      if (!current) break
-      if (workersAvailable(this.state, current) <= 0) {
-        const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
-        if (next === this.state.currentPlayerIndex) break
-        this.state.currentPlayerIndex = next
-        continue
-      }
-      if (!shouldSkipPlayerTurn(this.state, current)) break
-      this.state.log.unshift({
-        key: 'log.playerSkipped',
-        params: { playerName: current.name },
-      })
-      const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
-      if (next === this.state.currentPlayerIndex) break
-      this.state.currentPlayerIndex = next
-    }
-
-    // Check if all workers are used (round end condition)
-    const allWorkersUsed = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)
-    if (allWorkersUsed) {
-      return this.continueAllWorkersPlacedHooks()
-    }
-
-    return this.respond()
+    return roundPhase.handleConfirmNextPlayerResolved(this, nextPlayerIndex)
   }
 
   private continueAllWorkersPlacedHooks(playerIndex = 0, cardIndex = 0): SessionResponse {

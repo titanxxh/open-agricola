@@ -19,6 +19,7 @@ import { incPlacedFarmers } from '../../logic/stats.ts'
 import { recordActionSnapshot } from '../../cards/helpers/action-snapshot.ts'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement.ts'
 import { executeCardListener, getMatchingListeners } from '../../cards/card-listeners.ts'
+import { shouldSkipPlayerTurn } from '../../cards/card-effects.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
 import { InteractionNode, type EngineNode } from '../../engine/index.ts'
 import type { FeedQueueEntry } from '../../game/types.ts'
@@ -210,4 +211,82 @@ export const startFeedSubFlow = (
   )
   node.promptKey = 'ui.harvestFeed'
   core.pushSyntheticInteractionFrame(node, playerIndex, 'feed')
+}
+
+/**
+ * Resolve the synthetic `confirm-player-switch` InteractionNode frame:
+ * pop the prompt frame, transfer ownership to `toPlayerIndex` on the
+ * parent frame underneath, and resume engine stepping. Migrated from
+ * GameCore.handleConfirmPlayerSwitchResolved (S2 Task 10 part 3).
+ */
+export const handleConfirmPlayerSwitchResolved = (
+  core: GameCore,
+  toPlayerIndex: number,
+): SessionResponse => {
+  core.appendHistoryWithUndoBoundary()
+  // Pop the synthetic confirm-player-switch frame; the parent action frame
+  // beneath it must remain so the deferred sub-flow can resume.
+  const top = core.peekEngineFrame()
+  if (top?.reason === 'confirm-player-switch') core.popEngineFrame()
+  const parent = core.peekEngineFrame()
+  if (parent) {
+    parent.ownerPlayerIndex = toPlayerIndex
+    parent.deferredPlayerSwitch = null
+  }
+  core.driveEngineSteps()
+  return core.emitResponse()
+}
+
+/**
+ * Resolve the synthetic `confirm-next-player` InteractionNode frame:
+ * advance state.currentPlayerIndex, clear engine stack + history, then
+ * run the BGA `stLabor()` skip-next loop. If every player's workers are
+ * spent, trampoline into `onAllWorkersPlaced` -> performRoundEnd.
+ * Migrated from GameCore.handleConfirmNextPlayerResolved (S2 Task 10 part 3).
+ */
+export const handleConfirmNextPlayerResolved = (
+  core: GameCore,
+  nextPlayerIndex: number,
+): SessionResponse => {
+  core.appendHistory()
+  core.setCurrentPlayerIndex(nextPlayerIndex)
+  // Clear engine state — the synthetic confirm-next-player frame is the only
+  // frame on the stack at this point (parent was already cleared by the
+  // caller before `startConfirmNextPlayer` pushed us).
+  core.clearEngineStack()
+  core.setActionStartIndex(null)
+  core.clearHistory() // Clear undo history when switching players
+  core.setTurnOwner(null)
+
+  const state = core.state
+  // Mirrors BGA `stLabor()` SkipNext consumption: dispatch
+  // `onBeforePlayerTurn` for the freshly-active player; if any card asks to
+  // skip, advance to the next eligible player. Cap at `players.length` to
+  // guarantee termination if every player is asked to skip.
+  let safety = state.players.length
+  while (safety-- > 0) {
+    const allWorkersUsedNow = state.players.every((p) => workersAvailable(state, p) <= 0)
+    if (allWorkersUsedNow) break
+    const current = state.players[state.currentPlayerIndex]
+    if (!current) break
+    if (workersAvailable(state, current) <= 0) {
+      const next = nextSeatedPlayerIdx(state, state.players, state.currentPlayerIndex)
+      if (next === state.currentPlayerIndex) break
+      state.currentPlayerIndex = next
+      continue
+    }
+    if (!shouldSkipPlayerTurn(state, current)) break
+    state.log.unshift({ key: 'log.playerSkipped', params: { playerName: current.name } })
+    const next = nextSeatedPlayerIdx(state, state.players, state.currentPlayerIndex)
+    if (next === state.currentPlayerIndex) break
+    state.currentPlayerIndex = next
+  }
+
+  // Check if all workers are used (round end condition)
+  const allWorkersUsed = state.players.every((p) => workersAvailable(state, p) <= 0)
+  if (allWorkersUsed) {
+    return core.invokeAllWorkersPlacedHooks()
+  }
+
+  return core.emitResponse()
 }
