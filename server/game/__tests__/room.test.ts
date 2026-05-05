@@ -108,7 +108,7 @@ describe('room-manager seat assignment', () => {
       id: 'waiting1',
       serialized: null,
       meta: {
-        createdBy: undefined,
+        createdBy: null,
         maxPlayers: 3,
         customCardDbIds: [],
         status: 'waiting',
@@ -174,7 +174,7 @@ describe('room-manager seat assignment', () => {
     }
     room.players[0]!.ws = ws
 
-    const result = removePlayerFromRoom(room, ws, 1234)
+    const result = removePlayerFromRoom(room, ws)
 
     expect(result).toBe('empty')
     expect(room.players).toEqual([])
