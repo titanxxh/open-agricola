@@ -4,6 +4,7 @@ import { getCardStack } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/B/B19_MoldboardPlow'
 import type { ActionChoiceOption } from '../../shared/game/types'
+import { confirmNextPlayer, isLegacyChoicePending } from './_helpers/legacy-confirms'
 
 describe('B19_MoldboardPlow session', () => {
   const setup = () => {
@@ -47,9 +48,9 @@ describe('B19_MoldboardPlow session', () => {
     expect(resp.ok).toBe(true)
 
     // After farmland plow, B19 after-hook offers optional extra plow
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') throw new Error('expected optional choice')
-    const acceptOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected optional choice')
+    const acceptOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(acceptOption).toBeDefined()
 
     // Accept the optional plow from card
@@ -83,7 +84,7 @@ describe('B19_MoldboardPlow session', () => {
     expect(resp.ok).toBe(true)
 
     // Decline the optional extra plow
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     resp = session.resolveChoice(0, '__skip__')
     expect(resp.ok).toBe(true)
 
@@ -109,7 +110,7 @@ describe('B19_MoldboardPlow session', () => {
     expect(resp.ok).toBe(true)
 
     // Should not get optional choice — goes straight to confirmNextPlayer
-    expect(resp.pending.type).not.toBe('choice')
+    expect(isLegacyChoicePending(resp)).toBe(false)
   })
 
   it('stack depletes after using both fields', () => {
@@ -119,7 +120,7 @@ describe('B19_MoldboardPlow session', () => {
     let resp = session.takeAction(0, 'farmland')
     const tile1 = resp.interaction.farm.selectableTiles[0]
     resp = session.resolveChoice(0, 'confirm', { tile: tile1 })
-    const accept1 = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const accept1 = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     resp = session.resolveChoice(0, accept1!.value)
     const tile2 = resp.interaction.farm.selectableTiles[0]
     resp = session.resolveChoice(0, 'confirm', { tile: tile2 })
@@ -129,12 +130,12 @@ describe('B19_MoldboardPlow session', () => {
 
     // Advance to next turn so player can use farmland again
     // Player 1 takes an action, then player 0 gets another turn
-    let resp2 = session.confirmNextPlayer()
+    let resp2 = confirmNextPlayer(session)
     resp2 = session.takeAction(1, 'grain-seeds')
-    if (resp2.pending.type === 'choice') {
+    if (resp2.interaction.stateId === 'wait') {
       resp2 = session.resolveChoice(1, '__skip__')
     }
-    resp2 = session.confirmNextPlayer()
+    resp2 = confirmNextPlayer(session)
 
     // Second farmland action — use last field from card
     // Use cultivation (round 5+ action) instead? No, farmland is always available.

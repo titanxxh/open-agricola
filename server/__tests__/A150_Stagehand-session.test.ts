@@ -4,6 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A150_Stagehand'
 import type { ActionChoiceOption } from '../../shared/game/types'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 describe('A150_Stagehand session', () => {
   const setup = () => {
@@ -30,10 +31,10 @@ describe('A150_Stagehand session', () => {
     const session = setup()
     const resp = session.takeAction(1, 'traveling-players')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('confirmPlayerSwitch')
-    if (resp.pending.type !== 'confirmPlayerSwitch') return
-    expect(resp.pending.fromPlayerIndex).toBe(1)
-    expect(resp.pending.toPlayerIndex).toBe(0)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-player-switch')
+    if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch')) return
+    expect(resp.interaction.fromPlayerIndex).toBe(1)
+    expect(resp.interaction.toPlayerIndex).toBe(0)
     const grantedLog = resp.state.log.find((entry) => entry.key === 'log.cardGrantedAction')
     expect(grantedLog?.params?.player).toBe(resp.state.players[0]!.name)
   })
@@ -42,39 +43,41 @@ describe('A150_Stagehand session', () => {
     const session = setup()
 
     let resp = session.takeAction(1, 'traveling-players')
-    expect(resp.pending).toMatchObject({
-      type: 'confirmPlayerSwitch',
-      fromPlayerIndex: 1,
-      toPlayerIndex: 0,
-    })
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId === 'wait') {
+      expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+      expect(resp.interaction.fromPlayerIndex).toBe(1)
+      expect(resp.interaction.toPlayerIndex).toBe(0)
+    }
 
-    resp = session.confirmPlayerSwitch()
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.playerIndex).toBe(0)
+    resp = confirmPlayerSwitch(session)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.playerIndex).toBe(0)
 
     // First choice: optional "do or skip" wrapping the XOR
     resp = session.resolveChoice(0, '__skip__')
     // Switch-back happens automatically (no choice follows), so we go straight to confirmNextPlayer
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 
   it('owner can choose Build Rooms (construct) from the XOR choice', () => {
     const session = setup()
 
     let resp = session.takeAction(1, 'traveling-players')
-    expect(resp.pending).toMatchObject({
-      type: 'confirmPlayerSwitch',
-      fromPlayerIndex: 1,
-      toPlayerIndex: 0,
-    })
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId === 'wait') {
+      expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+      expect(resp.interaction.fromPlayerIndex).toBe(1)
+      expect(resp.interaction.toPlayerIndex).toBe(0)
+    }
 
-    resp = session.confirmPlayerSwitch()
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    resp = confirmPlayerSwitch(session)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // One-step XOR: fence, stables, construct, skip
-    const xorOptions = resp.pending.options?.filter((o: ActionChoiceOption) => o.value !== '__skip__') ?? []
+    const xorOptions = resp.interaction.options?.filter((o: ActionChoiceOption) => o.value !== '__skip__') ?? []
     expect(xorOptions.length).toBe(3)
 
     // Choose construct (find it by label)
@@ -94,7 +97,7 @@ describe('A150_Stagehand session', () => {
     expect(resp.state.players[0]!.rooms).toBe(3)
 
     // Switch-back happens automatically (no choice follows), so we go straight to confirmNextPlayer
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 
   it('does not trigger when owner uses traveling-players', () => {
@@ -107,7 +110,7 @@ describe('A150_Stagehand session', () => {
     const resp = session.takeAction(0, 'traveling-players')
     expect(resp.ok).toBe(true)
     // Owner using the space should NOT trigger stagehand (scope: opponent)
-    expect(resp.pending.type).not.toBe('confirmPlayerSwitch')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).not.toBe('confirm-player-switch')
   })
 
   it('does not trigger for non-matching action spaces', () => {
@@ -115,6 +118,6 @@ describe('A150_Stagehand session', () => {
     const resp = session.takeAction(1, 'day-laborer')
     expect(resp.ok).toBe(true)
     // No player switch should happen for a different space
-    expect(resp.pending.type).not.toBe('confirmPlayerSwitch')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).not.toBe('confirm-player-switch')
   })
 })

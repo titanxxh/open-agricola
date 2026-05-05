@@ -11,7 +11,7 @@ const CARD_ID = 'CUSTOM_M3_HarvestHelper'
 // IMPLEMENTATION NOTES (engine quirks discovered while writing this fixture):
 //
 // 1. There is no `harvest-feed` listener action. The feeding phase
-//    (`executeFeedingLogic` in shared/session/game-core.ts) consumes
+//    (`executeFeedingLogic` in shared/session/session-core.ts) consumes
 //    `player.resources.food` directly — it is not dispatched through the
 //    listener pipeline, so a `listeners: [{ actions: ['harvest-feed'], ... }]`
 //    handler can never fire here.
@@ -85,13 +85,13 @@ const fixture: CardFixture = {
     const steps: TriggerResult['steps'] = []
     let resp = session.performRoundEnd() as {
       ok: boolean
-      pending?: { type?: string; playerIndex?: number }
+      interaction: { stateId: string; playerIndex?: number; request: { kind: string } }
     }
     steps.push({ label: 'performRoundEnd', resp })
     let safety = 0
-    while (resp.pending?.type === 'harvestFeed' && safety++ < 10) {
-      const pi = resp.pending.playerIndex!
-      resp = session.confirmHarvestFeed(pi, []) as typeof resp
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed' && safety++ < 10) {
+      const pi = resp.interaction.playerIndex!
+      resp = session.resolveChoice(pi, 'confirm', { selections: [] }) as typeof resp
       steps.push({ label: `confirmHarvestFeed(${pi}, [])`, resp })
     }
     return { steps }

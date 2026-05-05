@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 
 import { setWorkersAtHome } from '../../shared/game/player'
+import { confirmNextPlayer } from './_helpers/legacy-confirms'
 import '../../shared/cards/B/B48_ForestStone'
 
 const CARD_ID = 'B48_ForestStone'
@@ -108,8 +109,8 @@ describe('B48_ForestStone session', () => {
     let resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
     expect(readCardExtraData<number>(resp.state.players[0]!, CARD_ID, 'foodCount')).toBe(1)
-    if (resp.pending.type === 'confirmNextPlayer') {
-      resp = session.confirmNextPlayer()
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player') {
+      resp = confirmNextPlayer(session)
       expect(resp.ok).toBe(true)
     }
 

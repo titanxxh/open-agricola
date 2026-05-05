@@ -10,7 +10,8 @@ import type {
 } from '../../shared/game/types'
 
 import '../../shared/cards/D/D137_TradeTeacher'
-import type { SessionResponse } from '../../shared/session/game-core'
+import type { SessionResponse } from '../../shared/session/session-core'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 
 const CARD_ID = 'D137_TradeTeacher'
@@ -228,8 +229,8 @@ describe('D137_TradeTeacher end-to-end via GameSession', () => {
     let r = resp
     let safety = 50
     while (safety-- > 0) {
-      if (r.pending?.type === 'confirmPlayerSwitch') {
-        r = session.confirmPlayerSwitch()
+      if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-player-switch') {
+        r = confirmPlayerSwitch(session)
         continue
       }
       break

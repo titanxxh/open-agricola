@@ -27,7 +27,7 @@ describe('A55_JunkRoom session log dedupe', () => {
 
     let resp = session.takeAction(0, 'meeting-place')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
 
     resp = session.resolveChoice(0, 'minor:A37_Bucksaw')
     expect(resp.ok).toBe(true)

@@ -4,7 +4,8 @@ import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B63_Tasting'
 import type { ActionChoiceOption } from '../../shared/game/types'
-import type { SessionResponse } from '../../shared/session/game-core'
+import type { SessionResponse } from '../../shared/session/session-core'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 const CARD_ID = 'B63_Tasting'
 
@@ -32,8 +33,8 @@ describe('B63_Tasting session', () => {
   const drainSwitches = (session: GameSession, resp: SessionResponse) => {
     let r = resp
     let safety = 30
-    while (safety-- > 0 && r.pending?.type === 'confirmPlayerSwitch') {
-      r = session.confirmPlayerSwitch()
+    while (safety-- > 0 && r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-player-switch') {
+      r = confirmPlayerSwitch(session)
     }
     return r
   }
@@ -46,8 +47,8 @@ describe('B63_Tasting session', () => {
     // The first pending choice should be the Tasting exchange (pay grain vs skip).
     let safety = 30
     // Accept Tasting exchange if presented
-    while (safety-- > 0 && resp.pending?.type === 'choice') {
-      const options = resp.pending.options ?? []
+    while (safety-- > 0 && resp.interaction.stateId === 'wait') {
+      const options = resp.interaction.options ?? []
       // Look for the grain-pay option
       const payOpt = options.find((o: ActionChoiceOption) =>
         o.value?.startsWith?.('pay') ||
@@ -82,8 +83,8 @@ describe('B63_Tasting session', () => {
     let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
     let safety = 30
-    while (safety-- > 0 && resp.pending?.type === 'choice') {
-      const options = resp.pending.options ?? []
+    while (safety-- > 0 && resp.interaction.stateId === 'wait') {
+      const options = resp.interaction.options ?? []
       const skipOpt = options.find((o: ActionChoiceOption) => o.value === '__skip__')
       const occOpt = options.find((o: ActionChoiceOption) => o.value === 'A93_BedMaker')
       if (skipOpt) {

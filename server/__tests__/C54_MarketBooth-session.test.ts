@@ -38,18 +38,18 @@ const setupForHarvestField = () => {
 const drainPending = (session: GameSession, accept: boolean) => {
   let resp = session.performRoundEnd()
   let safety = 30
-  while (safety-- > 0 && resp.pending.type !== 'none') {
-    if (resp.pending.type === 'choice') {
-      const opts = resp.pending.options ?? []
+  while (safety-- > 0 && resp.interaction.stateId === 'wait') {
+    if (resp.interaction.stateId === 'wait') {
+      const opts = resp.interaction.options ?? []
       // Optional SEQ surfaces as 2-option choice: [actionNode, __skip__].
       // Accepting picks the non-skip option; declining picks __skip__.
       const skipOpt = opts.find((o: ActionChoiceOption) => o.value === '__skip__')
       const nonSkip = opts.find((o: ActionChoiceOption) => o.value !== '__skip__')
       const target = accept ? nonSkip ?? opts[0] : skipOpt ?? nonSkip ?? opts[0]
       if (!target) break
-      resp = session.resolveChoice(resp.pending.playerIndex ?? 0, target.value)
-    } else if (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+      resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, target.value)
+    } else if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
     } else {
       break
     }

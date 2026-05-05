@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
+import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/D/D60_LargePottery'
 import '../../shared/cards/B/B104_SheepWalker'
 describe('harvest session flow', () => {
@@ -56,27 +57,27 @@ describe('harvest session flow', () => {
     session.loadState(state)
 
     let resp = session.performRoundEnd()
-    expect(resp.pending.type).toBe('harvestFeed')
-    if (resp.pending.type !== 'harvestFeed') {
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('feed')
+    if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) {
       throw new Error('expected harvestFeed pending')
     }
-    expect(resp.pending.playerIndex).toBe(1)
-    expect(resp.pending.remaining).toBe(2)
+    expect(resp.interaction.playerIndex).toBe(1)
+    expect(resp.interaction.remaining).toBe(2)
 
-    resp = session.confirmHarvestFeed(1, [
+    resp = session.resolveChoice(1, 'confirm', { selections: [
       { sourceId: '__basic__', exchangeIndex: 0, count: 1, sourceName: '基础转化' },
-    ])
+    ] })
 
-    expect(resp.pending.type).toBe('harvestFeed')
-    if (resp.pending.type !== 'harvestFeed') {
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('feed')
+    if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) {
       throw new Error('expected second harvestFeed pending')
     }
-    expect(resp.pending.playerIndex).toBe(0)
+    expect(resp.interaction.playerIndex).toBe(0)
 
-    resp = session.confirmHarvestFeed(0, [])
+    resp = session.resolveChoice(0, 'confirm', { selections: [] })
 
-    while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
-      const pi = resp.pending.playerIndex
+    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
+      const pi = resp.interaction.playerIndex
       const p = resp.state.players[pi]!
       const zones = p.pastures.map((pasture) => ({
         id: pasture.id,
@@ -87,7 +88,7 @@ describe('harvest session flow', () => {
       resp = session.resolveChoice(pi, 'confirm', zones as unknown as Record<string, unknown>)
     }
 
-    expect(resp.pending.type).toBe('none')
+    expect(isLegacyChoicePending(resp)).toBe(false)
     expect(resp.state.round).toBe(5)
     expect(resp.state.roundPhase).toBe('work')
 
@@ -191,14 +192,14 @@ describe('harvest session flow', () => {
     session.loadState(state)
 
     let resp = session.performRoundEnd()
-    expect(resp.pending.type).toBe('harvestFeed')
-    if (resp.pending.type !== 'harvestFeed') throw new Error('expected harvestFeed pending')
-    expect(resp.pending.playerIndex).toBe(0)
-    expect(resp.pending.remaining).toBe(2)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('feed')
+    if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) throw new Error('expected harvestFeed pending')
+    expect(resp.interaction.playerIndex).toBe(0)
+    expect(resp.interaction.remaining).toBe(2)
 
-    resp = session.confirmHarvestFeed(0, [
+    resp = session.resolveChoice(0, 'confirm', { selections: [
       { sourceId: '__basic__', exchangeIndex: 0, count: 2, sourceName: 'Basic conversion' },
-    ])
+    ] })
 
     const p = resp.state.players[0]!
     expect(p.resources.grain).toBe(0)
@@ -216,11 +217,11 @@ describe('harvest session flow', () => {
     session.loadState(state)
 
     let resp = session.performRoundEnd()
-    if (resp.pending.type !== 'harvestFeed') throw new Error('expected harvestFeed pending')
+    if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) throw new Error('expected harvestFeed pending')
 
-    resp = session.confirmHarvestFeed(0, [
+    resp = session.resolveChoice(0, 'confirm', { selections: [
       { sourceId: 'D60_LargePottery', exchangeIndex: 0, count: 1, sourceName: 'Large Pottery' },
-    ])
+    ] })
 
     const p = resp.state.players[0]!
     // 1 clay -> 2 food; need 2 food, all consumed; no begging
@@ -255,13 +256,13 @@ describe('harvest session flow', () => {
     session.loadState(state)
 
     let resp = session.performRoundEnd()
-    if (resp.pending.type !== 'harvestFeed') throw new Error('expected harvestFeed pending')
+    if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) throw new Error('expected harvestFeed pending')
 
     // SheepWalker exchanges: idx 0 sheep->boar, idx 1 sheep->vegetable, idx 2 sheep->stone
     // Test sheep->stone: produces no food; full deficit goes to begging.
-    resp = session.confirmHarvestFeed(0, [
+    resp = session.resolveChoice(0, 'confirm', { selections: [
       { sourceId: 'B104_SheepWalker', exchangeIndex: 2, count: 1, sourceName: 'Sheep Walker' },
-    ])
+    ] })
 
     const p = resp.state.players[0]!
     expect(p.resources.sheep).toBe(0)

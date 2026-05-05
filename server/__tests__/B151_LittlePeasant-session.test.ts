@@ -71,7 +71,7 @@ describe('B151_LittlePeasant session', () => {
 
     const resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)
     expect(resp.state.players[0]!.resources.wood).toBeGreaterThan(0)
     expect(resp.state.actionSpaces.find((space) => space.id === 'forest')?.takenBy.some((t) => t.playerId === resp.state.players[1]!.id)).toBe(true)
@@ -82,7 +82,7 @@ describe('B151_LittlePeasant session', () => {
 
     const resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.occupationPlayed).toContain('B151_LittlePeasant')
     expect(resp.state.players[0]!.resources.stone).toBe(1)
   })

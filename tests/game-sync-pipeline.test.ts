@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { serializeState, rehydrateState } from '../shared/game/serialization'
 import type { GameSyncPayload } from '../shared/protocol/game'
-import type { PendingAction } from '../shared/game/types'
 import { createInitialState } from '../shared/logic/state'
+import { EngineStack } from '../shared/engine'
+
+const emptyCtx = () => ({ engineStack: new EngineStack() })
 
 /**
  * Tests the full data pipeline that useGameSync.applySnapshot relies on:
@@ -13,8 +15,7 @@ describe('game sync pipeline (applySnapshot path)', () => {
 
   function buildPayload(overrides?: Partial<GameSyncPayload>): GameSyncPayload {
     return {
-      state: serializeState(rawState),
-      pending: { type: 'none' },
+      state: serializeState(rawState, emptyCtx()),
       interaction: {
         stateId: 'idle',
         allowedCommands: ['takeAction', 'undoStep', 'undoAction'],
@@ -39,22 +40,32 @@ describe('game sync pipeline (applySnapshot path)', () => {
     }
   })
 
-  it('preserves pending action through the pipeline', () => {
-    const choicePending: PendingAction = {
-      type: 'choice',
-      playerIndex: 0,
-      spaceId: 'grain-utilization',
-      options: [
-        { value: 'confirm', labelKey: 'ui.confirm' },
-        { value: 'cancel', labelKey: 'ui.cancel' },
-      ],
-      promptKey: 'ui.interactionFenceSelect',
-    }
-    const payload = buildPayload({ pending: choicePending })
-    expect(payload.pending.type).toBe('choice')
-    if (payload.pending.type === 'choice') {
-      expect(payload.pending.options.length).toBe(2)
-      expect(payload.pending.spaceId).toBe('grain-utilization')
+  it('preserves interaction state through the pipeline', () => {
+    const payload = buildPayload({
+      interaction: {
+        stateId: 'wait',
+        playerIndex: 0,
+        spaceId: 'grain-utilization',
+        promptKey: 'ui.interactionFenceSelect',
+        request: {
+          kind: 'choice',
+          options: [
+            { value: 'confirm', labelKey: 'ui.confirm' },
+            { value: 'cancel', labelKey: 'ui.cancel' },
+          ],
+        },
+        options: [
+          { value: 'confirm', labelKey: 'ui.confirm' },
+          { value: 'cancel', labelKey: 'ui.cancel' },
+        ],
+        allowedCommands: ['resolveChoice', 'undoStep', 'undoAction'],
+        anytimeActions: [],
+      },
+    })
+    expect(payload.interaction.stateId).toBe('wait')
+    if (payload.interaction.stateId === 'wait') {
+      expect(payload.interaction.options?.length).toBe(2)
+      expect(payload.interaction.spaceId).toBe('grain-utilization')
     }
   })
 
@@ -66,8 +77,8 @@ describe('game sync pipeline (applySnapshot path)', () => {
 
   it('carries scores when provided', () => {
     const scores = [
-      { playerIndex: 0, name: 'P1', total: 30, categories: {} as Record<string, number> },
-      { playerIndex: 1, name: 'P2', total: 25, categories: {} as Record<string, number> },
+      { playerId: 'p1', playerName: 'P1', total: 30, categories: [] },
+      { playerId: 'p2', playerName: 'P2', total: 25, categories: [] },
     ]
     const payload = buildPayload({ scores })
     expect(payload.scores?.length).toBe(2)
@@ -85,8 +96,7 @@ describe('game sync pipeline (applySnapshot path)', () => {
     modified.players[0]!.resources.wood = 50
     modified.players[0]!.resources.food = 100
     const payload: GameSyncPayload = {
-      state: serializeState(modified),
-      pending: { type: 'none' },
+      state: serializeState(modified, emptyCtx()),
       interaction: {
         stateId: 'idle',
         allowedCommands: ['takeAction', 'undoStep', 'undoAction'],
@@ -106,24 +116,9 @@ describe('game sync pipeline (applySnapshot path)', () => {
     const modified = createInitialState(42)
     const first = modified.actionSpaces[0]!
     first.takenBy = [{ playerId: 'p1', workerId: '1' }]
-    const payload = buildPayload({ state: serializeState(modified) })
+    const payload = buildPayload({ state: serializeState(modified, emptyCtx()) })
     const { state: restored } = rehydrateState(payload.state)
     const restoredSpace = restored.actionSpaces.find((s) => s.id === first.id)
     expect(restoredSpace?.takenBy).toEqual([{ playerId: 'p1', workerId: '1' }])
-  })
-
-  it('all pending action variants are valid payload values', () => {
-    const variants: PendingAction[] = [
-      { type: 'none' },
-      { type: 'choice', playerIndex: 0, spaceId: 's', options: [] },
-      { type: 'harvestFeed', playerIndex: 0, remaining: 5, foodUsed: 0 },
-      { type: 'confirmNextPlayer', nextPlayerIndex: 1 },
-    ]
-    for (const pending of variants) {
-      const payload = buildPayload({ pending })
-      expect(payload.pending.type).toBe(pending.type)
-      const json = JSON.stringify(payload)
-      expect(json).toBeTruthy()
-    }
   })
 })

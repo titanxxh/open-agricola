@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session'
 import { setWorkersAtHome } from '../player'
 import { rehydrateState, serializeState } from '../serialization'
+import { isLegacyChoicePending } from '../../../server/__tests__/_helpers/legacy-confirms'
 
 describe('serialization cursor round-trip', () => {
   // ── reorganize sub-flow ────────────────────────────────────────────────
@@ -47,9 +48,9 @@ describe('serialization cursor round-trip', () => {
 
     // Sanity: a real animal-reorg pending interaction is in-flight.
     const before = session.getState()
-    expect(before.pending.type).toBe('choice')
-    if (before.pending.type === 'choice') {
-      expect(before.pending.promptKey).toBe('ui.interactionAnimalReorg')
+    expect(before.interaction.stateId).toBe('wait')
+    if (before.interaction.stateId === 'wait') {
+      expect(before.interaction.promptKey).toBe('ui.interactionAnimalReorg')
     }
     // Stack depth is 2: the outer pig-market action frame + the pushed
     // reorganize sub-flow frame on top.
@@ -102,7 +103,7 @@ describe('serialization cursor round-trip', () => {
 
     const resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     expect(session.getEngineStack().depth()).toBeGreaterThanOrEqual(1)
 
     const serialized = serializeState(session.getState().state, {
@@ -123,12 +124,12 @@ describe('serialization cursor round-trip', () => {
     // session had pre-serialize.
     const restoredResp = restored.getState()
     const beforeResp = session.getState()
-    expect(restoredResp.pending.type).toBe(beforeResp.pending.type)
-    if (restoredResp.pending.type === 'choice' && beforeResp.pending.type === 'choice') {
+    expect(restoredResp.interaction.stateId).toBe(beforeResp.interaction.stateId)
+    if (restoredResp.interaction.stateId === 'wait' && beforeResp.interaction.stateId === 'wait') {
       // Same prompt + same set of choice values across the round-trip.
-      expect(restoredResp.pending.promptKey).toBe(beforeResp.pending.promptKey)
-      expect(restoredResp.pending.options.map((o) => o.value).sort()).toEqual(
-        beforeResp.pending.options.map((o) => o.value).sort(),
+      expect(restoredResp.interaction.promptKey).toBe(beforeResp.interaction.promptKey)
+      expect(restoredResp.interaction.options?.map((o) => o.value).sort()).toEqual(
+        beforeResp.interaction.options?.map((o) => o.value).sort(),
       )
     }
   })
@@ -152,7 +153,7 @@ describe('serialization cursor round-trip', () => {
     session.loadState(state)
     const resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
 
     const stack = session.getEngineStack()
     expect(stack.depth()).toBe(1)
@@ -177,7 +178,7 @@ describe('serialization cursor round-trip', () => {
     // Resolving the prompt advances to the next player and clears the stack.
     const after = restored.resolveChoice(0, 'confirm')
     expect(after.ok).toBe(true)
-    expect(after.pending.type).toBe('none')
+    expect(isLegacyChoicePending(after)).toBe(false)
     expect(after.state.currentPlayerIndex).toBe(1)
     expect(restored.getEngineStack().depth()).toBe(0)
   })
@@ -209,7 +210,7 @@ describe('serialization cursor round-trip', () => {
     session.loadState(state)
     const resp = session.takeAction(1, 'reed-bank')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('confirmPlayerSwitch')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-player-switch')
 
     const stack = session.getEngineStack()
     expect(stack.depth()).toBeGreaterThanOrEqual(2)
@@ -269,7 +270,7 @@ describe('serialization cursor round-trip', () => {
     session.loadState(state)
     const resp = session.performRoundEnd()
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('harvestFeed')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('feed')
 
     const stack = session.getEngineStack()
     expect(stack.depth()).toBeGreaterThanOrEqual(1)
@@ -301,10 +302,10 @@ describe('serialization cursor round-trip', () => {
     // doesn't accumulate.
     const remainingFeedFrames = restored.getEngineStack().depth() > 0
       && restored.getEngineStack().current()?.reason === 'feed'
-    if (after.pending.type === 'harvestFeed') {
+    if (after.interaction.stateId === 'wait' && after.interaction.request.kind === 'feed') {
       expect(remainingFeedFrames).toBe(true)
     } else {
-      expect(after.pending.type).toBe('none')
+      expect(isLegacyChoicePending(after)).toBe(false)
     }
   })
 })

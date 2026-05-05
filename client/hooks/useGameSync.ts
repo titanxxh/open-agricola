@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { GameState, InteractionState, PendingAction } from '../../shared/game/types'
+import type { GameState, InteractionState } from '../../shared/game/types'
 import type { PlayerScoreSummary } from '../../shared/logic/scoring'
 import type { GameSyncPayload } from '../../shared/protocol/game'
 import { rehydrateStateForClient } from '../services/rehydrate'
 import { registerCustomCard } from '../../shared/cards/custom-registry'
 
-export type SyncedPending = PendingAction
-
 export const useGameSync = () => {
   const [state, setState] = useState<GameState | null>(null)
-  const [pending, setPending] = useState<SyncedPending>({ type: 'none' })
   const [interaction, setInteraction] = useState<InteractionState>({
     stateId: 'idle',
     allowedCommands: [],
@@ -42,7 +39,6 @@ export const useGameSync = () => {
     }
     const hydrated = rehydrateStateForClient(payload.state)
     setState(hydrated)
-    setPending(payload.pending)
     setInteraction(payload.interaction)
     setScores(payload.scores ?? null)
     setPastureCapacities(payload.pastureCapacities ?? {})
@@ -55,7 +51,6 @@ export const useGameSync = () => {
 
   return {
     state,
-    pending,
     interaction,
     scores,
     pastureCapacities,

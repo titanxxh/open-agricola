@@ -48,16 +48,16 @@ describe('A94_LazySowman session', () => {
 
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.promptKey).toBe('ui.interactionPlaceFarmerExtra')
-    expect(resp.pending.options.map((option) => option.value)).toContain('allow-occupied:day-laborer')
-    expect(resp.pending.options.map((option) => option.value)).not.toContain('allow-occupied:meeting-place')
-    expect(resp.pending.options.find((option) => option.value === 'allow-occupied:day-laborer')?.sourceCard).toBe(CARD_ID)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('ui.interactionPlaceFarmerExtra')
+    expect(resp.interaction.options?.map((option) => option.value)).toContain('allow-occupied:day-laborer')
+    expect(resp.interaction.options?.map((option) => option.value)).not.toContain('allow-occupied:meeting-place')
+    expect(resp.interaction.options?.find((option) => option.value === 'allow-occupied:day-laborer')?.sourceCard).toBe(CARD_ID)
 
     resp = session.resolveChoice(0, 'allow-occupied:day-laborer')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(0)
     expect(resp.state.players[0]!.resources.food).toBe(4)
     expect(resp.state.actionSpaces.find((space) => space.id === 'day-laborer')?.takenBy.some((t) => t.playerId === resp.state.players[1]!.id)).toBe(true)
@@ -68,7 +68,7 @@ describe('A94_LazySowman session', () => {
 
     const resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(0)
     expect(resp.state.players[0]!.cardStates?.A94_LazySowman).toBeUndefined()
   })
@@ -78,20 +78,20 @@ describe('A94_LazySowman session', () => {
 
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.options.map((option) => option.labelKey)).toContain('actions.sow.name')
-    expect(resp.pending.options.map((option) => option.labelKey)).toContain('ui.interactionUseCard')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.options?.map((option) => option.labelKey)).toContain('actions.sow.name')
+    expect(resp.interaction.options?.map((option) => option.labelKey)).toContain('ui.interactionUseCard')
     expect(resp.state.players[0]!.cardStates?.A94_LazySowman).toBeUndefined()
 
-    const sowOption = resp.pending.options.find((option) => option.labelKey === 'actions.sow.name')
+    const sowOption = resp.interaction.options?.find((option) => option.labelKey === 'actions.sow.name')
     expect(sowOption).toBeDefined()
 
     resp = session.resolveChoice(0, sowOption!.value)
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.promptKey).toBe('ui.interactionSowSelect')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('ui.interactionSowSelect')
     expect(resp.state.players[0]!.cardStates?.A94_LazySowman).toBeUndefined()
     expect(resp.interaction?.stateId).toBe('wait')
   })
@@ -101,20 +101,20 @@ describe('A94_LazySowman session', () => {
 
     let resp = session.takeAction(0, 'cultivation')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.sourceCard).toBeUndefined()
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.sourceCard).toBeUndefined()
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBeUndefined()
-    expect(resp.pending.options.map((option) => option.labelKey)).toContain('ui.interactionActionOrReplace')
-    const sowOption = resp.pending.options.find((option) => option.labelKey === 'ui.interactionActionOrReplace')
+    expect(resp.interaction.options?.map((option) => option.labelKey)).toContain('ui.interactionActionOrReplace')
+    const sowOption = resp.interaction.options?.find((option) => option.labelKey === 'ui.interactionActionOrReplace')
     expect(sowOption).toBeDefined()
     expect(sowOption?.sourceCard).toBe(CARD_ID)
 
     resp = session.resolveChoice(0, sowOption!.value)
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.promptKey).toBe('ui.interactionPlaceFarmerExtra')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('ui.interactionPlaceFarmerExtra')
   })
 
   it('shows both sow and replacement after choosing cultivation -> sow when sow is executable', () => {
@@ -122,20 +122,20 @@ describe('A94_LazySowman session', () => {
 
     let resp = session.takeAction(0, 'cultivation')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.sourceCard).toBeUndefined()
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.sourceCard).toBeUndefined()
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBeUndefined()
-    expect(resp.pending.options.map((option) => option.labelKey)).toContain('ui.interactionActionOrReplace')
-    const sowOption = resp.pending.options.find((option) => option.labelKey === 'ui.interactionActionOrReplace')
+    expect(resp.interaction.options?.map((option) => option.labelKey)).toContain('ui.interactionActionOrReplace')
+    const sowOption = resp.interaction.options?.find((option) => option.labelKey === 'ui.interactionActionOrReplace')
     expect(sowOption).toBeDefined()
     expect(sowOption?.sourceCard).toBe(CARD_ID)
 
     resp = session.resolveChoice(0, sowOption!.value)
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.options.map((option) => option.labelKey)).toContain('actions.sow.name')
-    expect(resp.pending.options.map((option) => option.labelKey)).toContain('ui.interactionUseCard')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.options?.map((option) => option.labelKey)).toContain('actions.sow.name')
+    expect(resp.interaction.options?.map((option) => option.labelKey)).toContain('ui.interactionUseCard')
   })
 })

@@ -4,8 +4,9 @@ import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/D/D129_LumberVirtuoso'
 import type { ActionChoiceOption } from '../../shared/game/types'
-import type { SessionResponse } from '../../shared/session/game-core'
+import type { SessionResponse } from '../../shared/session/session-core'
 import type { GameState } from '../../shared/game/types'
+import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 
 describe('D129_LumberVirtuoso session', () => {
   /**
@@ -41,18 +42,18 @@ describe('D129_LumberVirtuoso session', () => {
     const session = setup({ wood: 8 })
     const resp = session.performRoundEnd()
     // onStartHarvest returns an optional flow → choice pending
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     // Should have __skip__ option (optional) and real options
-    const skipOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+    const skipOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
     expect(skipOption).toBeDefined()
   })
 
   it('can skip the optional flow and continue harvest normally', () => {
     const session = setup({ wood: 8 })
     let resp = session.performRoundEnd()
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // Skip the optional choice
     resp = session.resolveChoice(0, '__skip__')
@@ -67,7 +68,7 @@ describe('D129_LumberVirtuoso session', () => {
     const resp = session.performRoundEnd()
     // With wood < 5, no optional flow from the card — harvest proceeds normally
     // (feeding or none)
-    expect(resp.pending.type).not.toBe('choice')
+    expect(isLegacyChoicePending(resp)).toBe(false)
   })
 
   it('NOT triggered in non-harvest round', () => {
@@ -82,11 +83,11 @@ describe('D129_LumberVirtuoso session', () => {
   it('choosing stables: discards excess wood, then prompts stable placement', () => {
     const session = setup({ wood: 8, houseType: 'wood' })
     let resp = session.performRoundEnd()
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // One-step XOR: stables / construct / skip
-    const xorOptions = resp.pending.options?.filter((o: ActionChoiceOption) => o.value !== '__skip__') ?? []
+    const xorOptions = resp.interaction.options?.filter((o: ActionChoiceOption) => o.value !== '__skip__') ?? []
     expect(xorOptions.length).toBe(2)
 
     // Choose first option (stables)
@@ -108,10 +109,10 @@ describe('D129_LumberVirtuoso session', () => {
     session.loadState(state)
 
     let resp = session.performRoundEnd()
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    const xorOptions = resp.pending.options?.filter((o: ActionChoiceOption) => o.value !== '__skip__') ?? []
+    const xorOptions = resp.interaction.options?.filter((o: ActionChoiceOption) => o.value !== '__skip__') ?? []
     expect(xorOptions.length).toBe(2)
 
     // Choose second option (construct)
@@ -128,22 +129,22 @@ describe('D129_LumberVirtuoso session', () => {
   it('with exactly 5 wood, no excess to pay — still offers action', () => {
     const session = setup({ wood: 5 })
     const resp = session.performRoundEnd()
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // Should present the optional choice
-    const activateOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const activateOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(activateOption).toBeDefined()
   })
 
   it('clay house: only stables option (no construct for non-wood house)', () => {
     const session = setup({ wood: 8, houseType: 'clay' })
     let resp = session.performRoundEnd()
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // Activate the optional flow
-    const activateOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const activateOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(activateOption).toBeDefined()
     resp = session.resolveChoice(0, activateOption!.value)
 
@@ -163,23 +164,23 @@ function drainHarvest(session: GameSession, resp: SessionResponse): SessionRespo
   let current = resp
   let safety = 50
   while (safety-- > 0) {
-    if (current.pending.type === 'none') return current.state
-    if (current.pending.type === 'harvestFeed') {
-      current = session.confirmHarvestFeed(current.pending.playerIndex, [])
-    } else if (current.pending.type === 'choice' && (current.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (current.interaction.stateId !== 'wait') return current.state
+    if (current.interaction.stateId === 'wait' && current.interaction.request.kind === 'feed') {
+      current = session.resolveChoice(current.interaction.playerIndex, 'confirm', { selections: [] })
+    } else if (current.interaction.stateId === 'wait' && current.interaction.stateId === 'wait' ? current.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       current = session.resolveChoice(
-        current.pending.playerIndex, 'confirm',
+        current.interaction.playerIndex, 'confirm',
         current.interaction.zones,
       )
-    } else if (current.pending.type === 'choice') {
+    } else if (current.interaction.stateId === 'wait') {
       // Skip any remaining choices
-      const skipOpt = current.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+      const skipOpt = current.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
       if (skipOpt) {
-        current = session.resolveChoice(current.pending.playerIndex ?? 0, '__skip__')
+        current = session.resolveChoice(current.interaction.playerIndex ?? 0, '__skip__')
       } else {
         current = session.resolveChoice(
-          current.pending.playerIndex ?? 0,
-          current.pending.options[0]!.value,
+          current.interaction.playerIndex ?? 0,
+          current.interaction.options[0]!.value,
         )
       }
     } else {

@@ -142,7 +142,7 @@ describe('A25_Bassinet session', () => {
     expect(newbornCount(fgResp.state.players[0]!)).toBe(1)
 
     // Resolve the optional minor-improvement choice that FG offers (skip)
-    if (fgResp.pending.type === 'choice') {
+    if (fgResp.interaction.stateId === 'wait') {
       session.resolveChoice(0, '__skip__')
     }
 
@@ -170,22 +170,22 @@ describe('A25_Bassinet session', () => {
     // P1 does FG
     const fgResp = session.takeAction(0, 'wish-children')
     expect(fgResp.ok).toBe(true)
-    expect(fgResp.pending.type).toBe('choice')
+    expect(fgResp.interaction.stateId).toBe('wait')
 
     // Depending on the dealt hand, wish-children may first offer its own
     // optional minor-improvement tail. If so, skip it to reach the A92 offer.
-    const fgChoice = fgResp.pending.type === 'choice' ? fgResp.pending : null
+    const fgInteraction = fgResp.interaction.stateId === 'wait' ? fgResp.interaction : null
     const showsWishChildrenMinorTail =
-      fgChoice?.options.some((o) => o.labelKey === 'actions.minor-improvement.name') ?? false
+      fgInteraction?.options?.some((o) => o.labelKey === 'actions.minor-improvement.name') ?? false
     const a92Resp = showsWishChildrenMinorTail
       ? session.resolveChoice(0, '__skip__')
       : fgResp
     expect(a92Resp.ok).toBe(true)
-    expect(a92Resp.pending.type).toBe('choice')
+    expect(a92Resp.interaction.stateId).toBe('wait')
 
     // Accept A92 offer (pay 1 food, reclaim newborn, extra place-farmer)
-    if (a92Resp.pending.type !== 'choice') throw new Error('expected choice')
-    const acceptOption = a92Resp.pending.options.find((o) => o.value !== '__skip__')
+    if (a92Resp.interaction.stateId !== 'wait') throw new Error('expected choice')
+    const acceptOption = a92Resp.interaction.options?.find((o) => o.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     const afterAccept = session.resolveChoice(0, acceptOption!.value)
     expect(afterAccept.ok).toBe(true)
@@ -205,11 +205,11 @@ describe('A25_Bassinet session', () => {
     // However `pending` is internal to session; load the state and ensure it
     // carries no pending by running undoAction or manipulate directly.
     // Simpler: cancel the extra place-farmer by resolving with cancel if it's a choice.
-    if (afterAccept.pending.type === 'choice') {
+    if (afterAccept.interaction.stateId === 'wait') {
       // Try cancel
       const cancelResp = session.resolveChoice(0, 'cancel')
       // cancel may or may not succeed; if still pending, try skip
-      if (cancelResp.pending.type === 'choice') {
+      if (cancelResp.interaction.stateId === 'wait') {
         session.resolveChoice(0, '__skip__')
       }
     }

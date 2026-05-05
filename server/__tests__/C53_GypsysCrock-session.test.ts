@@ -44,7 +44,7 @@ describe('C53_GypsysCrock session', () => {
     // Take exchange action
     let resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
 
     // Cook 2 sheep at once using bulk format
     // Fireplace trade index 0 = sheep->2food

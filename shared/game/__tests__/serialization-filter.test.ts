@@ -3,6 +3,9 @@ import type { GameState } from '../types'
 import type { DraftState } from '../../draft/types'
 import { createInitialState } from '../../logic/state'
 import { serializeState, serializeStateForPlayer } from '../serialization'
+import { EngineStack } from '../../engine'
+
+const emptyCtx = () => ({ engineStack: new EngineStack() })
 
 // ---------- helpers ----------
 
@@ -55,7 +58,7 @@ describe('serializeStateForPlayer', () => {
     const p2Occ = [...state.players[1].occupationHand]
     const p2Minor = [...state.players[1].minorHand]
 
-    const out = serializeStateForPlayer(state, 'p1')
+    const out = serializeStateForPlayer(state, 'p1', emptyCtx())
     const outP1 = out.players.find((p) => p.id === 'p1')!
     const outP2 = out.players.find((p) => p.id === 'p2')!
 
@@ -70,8 +73,8 @@ describe('serializeStateForPlayer', () => {
 
   it('preserves all non-secret fields (resources, fields, played cards, rooms)', () => {
     const state = makePlayingState()
-    const raw = serializeState(state)
-    const filtered = serializeStateForPlayer(state, 'p1')
+    const raw = serializeState(state, emptyCtx())
+    const filtered = serializeStateForPlayer(state, 'p1', emptyCtx())
 
     // Top-level scalars / public structures should match verbatim.
     expect(filtered.round).toBe(raw.round)
@@ -110,7 +113,7 @@ describe('serializeStateForPlayer', () => {
   it('when draft is null, behaves like serializeState for draft', () => {
     const state = makePlayingState()
     expect(state.draft).toBeNull()
-    const out = serializeStateForPlayer(state, 'p1')
+    const out = serializeStateForPlayer(state, 'p1', emptyCtx())
     expect(out.draft).toBeNull()
   })
 
@@ -121,7 +124,7 @@ describe('serializeStateForPlayer', () => {
     const p2PoolOcc = [...state.draft!.pools.p2.occ]
     const p2PoolMinor = [...state.draft!.pools.p2.minor]
 
-    const out = serializeStateForPlayer(state, 'p1')
+    const out = serializeStateForPlayer(state, 'p1', emptyCtx())
     expect(out.draft).not.toBeNull()
     const draft = out.draft as DraftState
 
@@ -133,8 +136,8 @@ describe('serializeStateForPlayer', () => {
 
   it('preserves draft.kept, draft.pendingPicks, draft.round, draft.seatOrder', () => {
     const state = makeDraftState()
-    const raw = serializeState(state)
-    const filtered = serializeStateForPlayer(state, 'p1')
+    const raw = serializeState(state, emptyCtx())
+    const filtered = serializeStateForPlayer(state, 'p1', emptyCtx())
     expect(raw.draft).not.toBeNull()
     expect(filtered.draft).not.toBeNull()
 
@@ -151,7 +154,7 @@ describe('serializeStateForPlayer', () => {
 
   it('viewerPlayerId=null → all hands + pools masked (spectator mode)', () => {
     const state = makeDraftState()
-    const out = serializeStateForPlayer(state, null)
+    const out = serializeStateForPlayer(state, null, emptyCtx())
     for (const p of out.players) {
       expect(p.occupationHand.every((c) => c === '?')).toBe(true)
       expect(p.minorHand.every((c) => c === '?')).toBe(true)
@@ -165,7 +168,7 @@ describe('serializeStateForPlayer', () => {
 
   it('viewer not in players → treated as spectator', () => {
     const state = makeDraftState()
-    const out = serializeStateForPlayer(state, 'nonexistent')
+    const out = serializeStateForPlayer(state, 'nonexistent', emptyCtx())
     for (const p of out.players) {
       expect(p.occupationHand.every((c) => c === '?')).toBe(true)
       expect(p.minorHand.every((c) => c === '?')).toBe(true)
@@ -179,19 +182,19 @@ describe('serializeStateForPlayer', () => {
   it('does not mutate input state', () => {
     const state = makeDraftState()
     const snapshot = JSON.parse(
-      JSON.stringify(serializeState(state)),
+      JSON.stringify(serializeState(state, emptyCtx())),
     )
-    serializeStateForPlayer(state, 'p1')
-    serializeStateForPlayer(state, null)
-    serializeStateForPlayer(state, 'p2')
-    expect(JSON.parse(JSON.stringify(serializeState(state)))).toEqual(snapshot)
+    serializeStateForPlayer(state, 'p1', emptyCtx())
+    serializeStateForPlayer(state, null, emptyCtx())
+    serializeStateForPlayer(state, 'p2', emptyCtx())
+    expect(JSON.parse(JSON.stringify(serializeState(state, emptyCtx())))).toEqual(snapshot)
   })
 
   it('masks empty hands as empty arrays (no spurious ? added)', () => {
     const state = makePlayingState()
     state.players[1].occupationHand = []
     state.players[1].minorHand = []
-    const out = serializeStateForPlayer(state, 'p1')
+    const out = serializeStateForPlayer(state, 'p1', emptyCtx())
     const p2 = out.players.find((p) => p.id === 'p2')!
     expect(p2.occupationHand).toEqual([])
     expect(p2.minorHand).toEqual([])

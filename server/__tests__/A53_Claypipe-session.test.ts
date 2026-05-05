@@ -4,6 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import { playImprovement } from '../../shared/actions/effects/improvement'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
+import { confirmNextPlayer, isLegacyChoicePending } from './_helpers/legacy-confirms'
 describe('A53_Claypipe session flow', () => {
   it('triggers Claypipe at round 7 round-end after being played mid-work phase', () => {
     const session = new GameSession()
@@ -32,7 +33,7 @@ describe('A53_Claypipe session flow', () => {
     const resp = session.performRoundEnd()
 
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('none')
+    expect(isLegacyChoicePending(resp)).toBe(false)
     expect(resp.state.round).toBe(8)
     expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.players[0]!.cardStates?.A53_Claypipe?.infobox).toBe('0 / 7')
@@ -71,25 +72,25 @@ describe('A53_Claypipe session flow', () => {
 
     expect(resp.ok).toBe(true)
     expect(resp.state.workPhaseObtainedResources[resp.state.players[0]!.id]).toEqual({ clay: 8 })
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
 
-    resp = session.confirmNextPlayer()
+    resp = confirmNextPlayer(session)
     expect(resp.ok).toBe(true)
     expect(resp.state.currentPlayerIndex).toBe(0)
 
     resp = session.takeAction(0, 'meeting-place')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
 
     resp = session.resolveChoice(0, 'minor:A53_Claypipe')
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.cardStates?.A53_Claypipe?.infobox).toBe('8 / 7')
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
 
-    resp = session.confirmNextPlayer()
+    resp = confirmNextPlayer(session)
 
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('none')
+    expect(isLegacyChoicePending(resp)).toBe(false)
     expect(resp.state.round).toBe(8)
     expect(resp.state.roundPhase).toBe('work')
 

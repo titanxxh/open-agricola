@@ -5,6 +5,7 @@ import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/D/D160_Midwife'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import type { ActionChoiceOption } from '../../shared/game/types'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 describe('D160_Midwife session', () => {
   const setup = (currentPlayerIndex = 0) => {
@@ -56,20 +57,20 @@ describe('D160_Midwife session', () => {
     if (!resp.ok) return // space may not be open yet
 
     // Walk through player switches and choices for card effect
-    while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
     }
 
     // Handle minor improvement choice from wish-children flow (skip it)
-    if (resp.pending.type === 'choice') {
-      const skipOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+    if (resp.interaction.stateId === 'wait') {
+      const skipOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
       if (skipOption) {
         resp = session.resolveChoice(1, '__skip__')
       }
     }
 
-    while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state
@@ -87,13 +88,13 @@ describe('D160_Midwife session', () => {
     let resp = session.takeAction(0, 'wish-children')
     if (!resp.ok) return
 
-    while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
     }
 
     // Skip minor improvement
-    if (resp.pending.type === 'choice') {
-      const skipOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+    if (resp.interaction.stateId === 'wait') {
+      const skipOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
       if (skipOption) {
         resp = session.resolveChoice(0, '__skip__')
       }
@@ -119,15 +120,15 @@ describe('D160_Midwife session', () => {
     let resp = session.takeAction(1, 'wish-children')
     if (!resp.ok) return
 
-    while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
     }
-    if (resp.pending.type === 'choice') {
-      const skipOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+    if (resp.interaction.stateId === 'wait') {
+      const skipOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
       if (skipOption) resp = session.resolveChoice(1, '__skip__')
     }
-    while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state

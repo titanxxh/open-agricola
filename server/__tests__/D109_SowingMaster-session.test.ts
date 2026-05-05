@@ -5,6 +5,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import '../../shared/cards/D/D109_SowingMaster'
 import type { ActionChoiceOption } from '../../shared/game/types'
 import type { ActionFlow } from '../../shared/game/types'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 const CARD_ID = 'D109_SowingMaster'
 
@@ -53,8 +54,8 @@ describe('D109_SowingMaster session', () => {
 
     // grain-utilization may require sowing choices — handle them. Stop when the
     // farm-select interaction comes up so we can submit the crops payload.
-    while (resp.pending.type === 'choice' && resp.interaction?.stateId !== 'wait') {
-      const nonSkip = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    while (resp.interaction.stateId === 'wait' && resp.interaction?.stateId !== 'wait') {
+      const nonSkip = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
       if (nonSkip) {
         resp = session.resolveChoice(0, nonSkip.value)
       } else {
@@ -66,8 +67,8 @@ describe('D109_SowingMaster session', () => {
       resp = session.resolveChoice(0, 'confirm', { crops: [{ row: 0, col: 0, crop: 'grain' }] })
     }
 
-    while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state
@@ -81,8 +82,8 @@ describe('D109_SowingMaster session', () => {
     let resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
 
-    while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state

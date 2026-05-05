@@ -5,6 +5,7 @@ import {
   setWorkersAtHome,
 } from '../session-helpers'
 import type { CardFixture, FixtureContext, FixtureResult, TriggerResult } from './types'
+import { confirmNextPlayer } from '../../../server/__tests__/_helpers/legacy-confirms'
 
 const CARD_ID = 'CUSTOM_M8_NeighborlyHelp'
 
@@ -59,10 +60,10 @@ const fixture: CardFixture = {
 
   trigger(session): TriggerResult {
     const steps: TriggerResult['steps'] = []
-    const r1 = session.takeAction(1, 'forest') as { ok: boolean; pending?: { type?: string } }
+    const r1 = session.takeAction(1, 'forest') as { ok: boolean }
     steps.push({ label: "takeAction(1,'forest')", resp: r1 })
-    if (r1.pending?.type === 'confirmNextPlayer') {
-      steps.push({ label: 'confirmNextPlayer', resp: session.confirmNextPlayer() })
+    if (r1.interaction.stateId === 'wait' && r1.interaction.request.kind === 'confirm-next-player') {
+      steps.push({ label: 'confirmNextPlayer', resp: confirmNextPlayer(session) })
     }
     return { steps }
   },

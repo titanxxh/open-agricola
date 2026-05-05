@@ -110,7 +110,7 @@ describe('GameSession — room-level draft wiring', () => {
       draftPoolSize: 10,
     })
     const serialized = JSON.parse(
-      JSON.stringify(serializeState(original.getState().state)),
+      JSON.stringify(serializeState(original.getState().state, { engineStack: original.getEngineStack() })),
     )
     const rehydrated = rehydrateState(serialized)
     const restored = new GameSession(rehydrated)

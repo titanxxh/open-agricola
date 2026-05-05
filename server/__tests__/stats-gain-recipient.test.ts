@@ -2,16 +2,17 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/A/A132_Publican'
-import type { ActionChoiceOption, PendingAction } from '../../shared/game/types'
-import type { SessionResponse } from '../../shared/session/game-core'
+import type { ActionChoiceOption } from '../../shared/game/types'
+import type { SessionResponse } from '../../shared/session/session-core'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 describe('stats: gain with recipientPlayerId records resourcesFromCards on target', () => {
   const advancePastPlayerSwitches = (
     session: GameSession,
     resp: SessionResponse,
   ) => {
-    while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
     }
     return resp
   }
@@ -42,10 +43,10 @@ describe('stats: gain with recipientPlayerId records resourcesFromCards on targe
     expect(resp.ok).toBe(true)
 
     if (
-      resp.pending.type === 'choice' &&
-      resp.pending.promptKey === 'ui.interactionGrainUtilizationChoice'
+      resp.interaction.stateId === 'wait' &&
+      resp.interaction.promptKey === 'ui.interactionGrainUtilizationChoice'
     ) {
-      const sowOption = resp.pending.options?.find(
+      const sowOption = resp.interaction.options?.find(
         (o: ActionChoiceOption) =>
           o.labelKey === 'actions.sow.name' || o.value === 'sow',
       )
@@ -55,19 +56,19 @@ describe('stats: gain with recipientPlayerId records resourcesFromCards on targe
     }
 
     resp = advancePastPlayerSwitches(session, resp)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    const acceptOption = resp.pending.options?.find(
+    const acceptOption = resp.interaction.options?.find(
       (o: ActionChoiceOption) => o.value !== '__skip__',
     )
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
 
     resp = advancePastPlayerSwitches(session, resp)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     expect(
-      (resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey,
+      resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined,
     ).toBe('ui.interactionSowSelect')
 
     resp = session.resolveChoice(1, 'confirm', {

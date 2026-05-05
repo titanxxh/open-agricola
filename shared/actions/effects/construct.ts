@@ -14,6 +14,7 @@ import {
   resolveRoomPaymentSelection,
 } from '../helpers/room-payment'
 import { validateRoomSelection } from '../../logic/farm/validators'
+import { buildRoomFarmInteraction } from '../../logic/farm/farm-interaction'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { incRoomsBuilt } from '../../logic/stats'
@@ -91,17 +92,21 @@ export const constructAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: (_state, player) => getMaxBuildableRooms(player) > 0,
   costPreview: constructCostPreview,
-  execute: () => ({
-    type: 'request',
-    request: {
-      kind: 'choice',
-      options: [
-        { value: 'confirm', labelKey: 'ui.interactionRoomConfirm' },
-        { value: 'cancel', labelKey: 'ui.interactionRoomCancel' },
-      ],
-    },
-    promptKey: 'ui.interactionRoomSelect',
-  }),
+  execute: ({ player, costs, actionContext }): ActionExecutionResult => {
+    const farm = buildRoomFarmInteraction(player, costs, actionContext)
+    return {
+      type: 'request',
+      request: {
+        kind: 'farm-select',
+        farm,
+        options: [
+          { value: 'confirm', labelKey: 'ui.interactionRoomConfirm' },
+          { value: 'cancel', labelKey: 'ui.interactionRoomCancel' },
+        ],
+      },
+      promptKey: 'ui.interactionRoomSelect',
+    }
+  },
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
     if (choice === 'cancel') return { type: 'ok' }
 

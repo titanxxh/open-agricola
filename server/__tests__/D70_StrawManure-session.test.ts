@@ -37,28 +37,28 @@ describe('D70_StrawManure session', () => {
 
     let resp = session.performRoundEnd()
     // First choice: optional accept/skip for the Straw Manure sequence
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') throw new Error('expected choice')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected choice')
 
     // Accept the optional sequence
-    const acceptOption = resp.pending.options.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const acceptOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
 
     // Second choice: selection for vegetable fields
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') throw new Error('expected selection choice')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
 
     // Select both vegetable fields: 0-0 and 0-1
     resp = session.resolveChoice(0, '0-0,0-1')
     expect(resp.ok).toBe(true)
 
     // After resolving, continue through harvest phases (feed, breed)
-    while (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
     }
-    while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones)
+    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
     }
 
     const p = resp.state.players[0]!
@@ -85,18 +85,18 @@ describe('D70_StrawManure session', () => {
     const { session } = setupHarvest()
 
     let resp = session.performRoundEnd()
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') throw new Error('expected choice')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected choice')
 
     // Skip the optional
     resp = session.resolveChoice(0, '__skip__')
 
     // Continue through harvest
-    while (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
     }
-    while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones)
+    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
     }
 
     const p = resp.state.players[0]!
@@ -125,8 +125,8 @@ describe('D70_StrawManure session', () => {
     session.loadState(state)
     const resp = session.performRoundEnd()
     // No optional choice since grain = 0
-    if (resp.pending.type === 'choice') {
-      expect(resp.pending.promptKey).not.toBe('ui.interactionOptionalAction')
+    if (resp.interaction.stateId === 'wait') {
+      expect(resp.interaction.promptKey).not.toBe('ui.interactionOptionalAction')
     }
   })
 
@@ -151,8 +151,8 @@ describe('D70_StrawManure session', () => {
     session.loadState(state)
     const resp = session.performRoundEnd()
     // No choice for Straw Manure since no vegetable fields
-    if (resp.pending.type === 'choice') {
-      expect(resp.pending.promptKey).not.toBe('ui.interactionOptionalAction')
+    if (resp.interaction.stateId === 'wait') {
+      expect(resp.interaction.promptKey).not.toBe('ui.interactionOptionalAction')
     }
   })
 })

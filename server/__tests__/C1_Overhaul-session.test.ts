@@ -6,6 +6,7 @@ import {
   getPalisadeCount,
 } from '../../shared/actions/effects/fencing'
 import { setFencesForTest, setPalisadesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 import '../../shared/cards/C/C1_Overhaul'
 
@@ -50,11 +51,11 @@ const playC1 = (session: GameSession): { resp: ReturnType<GameSession['takeActio
   let resp = session.takeAction(0, 'meeting-place')
   expect(resp.ok).toBe(true)
   let safety = 0
-  while (resp.pending.type === 'choice' && safety < 12) {
+  while (resp.interaction.stateId === 'wait' && safety < 12) {
     safety += 1
     const interaction = (resp as { interaction?: { stateId?: string } }).interaction
     if (interaction?.stateId === 'wait') break
-    const opts = resp.pending.options.map((o) => o.value)
+    const opts = resp.interaction.options?.map((o) => o.value)
     const cardOption = opts.find((v) => v === `minor:${CARD_ID}`)
     if (cardOption) {
       resp = session.resolveChoice(0, cardOption)
@@ -76,7 +77,7 @@ describe('C1 Overhaul session', () => {
     const { resp } = playC1(session)
     // No fences ⇒ onBuy returns nothing (or a no-op SEQ that auto-resolves);
     // either way we should not be sitting on a farmSelect prompt.
-    if (resp.pending.type === 'choice') {
+    if (resp.interaction.stateId === 'wait') {
       const interaction = (resp as { interaction?: { stateId?: string } }).interaction
       expect(interaction?.stateId).not.toBe('farmSelect')
     }
@@ -149,8 +150,8 @@ describe('C1 Overhaul session', () => {
       extraWood: 0,
     })
     expect(resp.ok).toBe(true)
-    while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
     }
     const player = session.getState().state.players[0]!
     const flag = player.cardStates?.[CARD_ID]?.extraData?.c1Active

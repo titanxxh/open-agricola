@@ -600,12 +600,9 @@ const sendTo = (ws: WebSocket, message: ServerEvent) => {
   if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(message))
 }
 
-const toSyncPayload = (resp: SessionResponse, session?: GameSession): GameSyncPayload => {
+const toSyncPayload = (resp: SessionResponse, session: GameSession): GameSyncPayload => {
   const payload: GameSyncPayload = {
-    state: session
-      ? serializeState(resp.state, { engineStack: session.getEngineStack() })
-      : serializeState(resp.state),
-    pending: resp.pending,
+    state: serializeState(resp.state, { engineStack: session.getEngineStack() }),
     interaction: resp.interaction,
     scores: resp.scores ?? null,
     pastureCapacities: resp.pastureCapacities,
@@ -633,15 +630,15 @@ const toSyncPayload = (resp: SessionResponse, session?: GameSession): GameSyncPa
  */
 const toSyncPayloadForViewer = (
   resp: SessionResponse,
-  session: GameSession | undefined,
+  session: GameSession,
   viewerPlayerId: string | null,
 ): GameSyncPayload => {
   const base = toSyncPayload(resp, session)
   return {
     ...base,
-    state: session
-      ? serializeStateForPlayer(resp.state, viewerPlayerId, { engineStack: session.getEngineStack() })
-      : serializeStateForPlayer(resp.state, viewerPlayerId),
+    state: serializeStateForPlayer(resp.state, viewerPlayerId, {
+      engineStack: session.getEngineStack(),
+    }),
   }
 }
 
@@ -1006,32 +1003,10 @@ export const createWsServer = (server: import('node:http').Server) => {
         return
       }
 
-      if (msg.type === 'feed') {
-        // Task 9: legacy 'feed' command routes through the unified
-        // resolveChoice dispatcher; the InteractionNode at the top of the
-        // engineStack carries the queue context.
-        const resp = callRoom((s) =>
-          s.resolveChoice(currentPlayerIndex, 'confirm', { selections: msg.selections }),
-        )
-        broadcastState(room, resp, 'feed', msg.requestId)
-        return
-      }
-
-      if (msg.type === 'nextPlayer') {
-        // Task 9: forwards to resolveChoice; the synthetic
-        // confirm-next-player InteractionNode supplies `nextPlayerIndex`.
-        const resp = callRoom((s) => s.resolveChoice(currentPlayerIndex, 'confirm'))
-        broadcastState(room, resp, 'action', msg.requestId)
-        return
-      }
-
-      if (msg.type === 'confirmPlayerSwitch') {
-        // Task 9: forwards to resolveChoice; the synthetic
-        // confirm-player-switch InteractionNode supplies `toPlayerIndex`.
-        const resp = callRoom((s) => s.resolveChoice(currentPlayerIndex, 'confirm'))
-        broadcastState(room, resp, 'action', msg.requestId)
-        return
-      }
+      // S2 Task 13.4: legacy 'feed' / 'nextPlayer' / 'confirmPlayerSwitch'
+      // ClientCommand variants are gone — clients now send a unified
+      // `{ type: 'choice', value: 'confirm', payload? }` and resolveChoice
+      // dispatches on the top-of-stack InteractionRequest.kind.
 
       if (msg.type === 'roundEnd') {
         const resp = callRoom(s => s.performRoundEnd())

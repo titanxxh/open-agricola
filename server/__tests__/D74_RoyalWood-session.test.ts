@@ -44,11 +44,11 @@ const playOneWoodMinorTurn = (session: GameSession, minorId: string) => {
 
   let resp = session.takeAction(0, 'major-improvement')
   expect(resp.ok).toBe(true)
-  expect(resp.pending.type).toBe('choice')
+  expect(resp.interaction.stateId).toBe('wait')
 
   resp = session.resolveChoice(0, `minor:${minorId}`)
   expect(resp.ok).toBe(true)
-  expect(resp.pending.type).toBe('confirmNextPlayer')
+  expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   return resp
 }
 
@@ -64,11 +64,11 @@ describe('D74_RoyalWood session', () => {
     session.loadState(state)
 
     let resp = session.takeAction(0, 'major-improvement')
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
 
     resp = session.resolveChoice(0, 'major:Major_Joinery')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.wood).toBe(4)
     expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.woodSpent).toBe(0)
   })
@@ -89,7 +89,7 @@ describe('D74_RoyalWood session', () => {
     const session = setup({ wood: 10 })
     const resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.wood).toBe(10)
   })
 

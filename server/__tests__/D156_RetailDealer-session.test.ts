@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import { setWorkersAtHome } from '../../shared/game/player'
+import { confirmNextPlayer } from './_helpers/legacy-confirms'
 
 import '../../shared/cards/D/D156_RetailDealer'
 
@@ -73,12 +74,12 @@ describe('D156_RetailDealer session', () => {
     expect(remaining).toBe(2)
 
     // Advance turn: p1 takes an action, then p0 gets another turn
-    resp = session.confirmNextPlayer()
+    resp = confirmNextPlayer(session)
     resp = session.takeAction(1, 'grain-seeds')
-    if (resp.pending.type === 'choice') {
+    if (resp.interaction.stateId === 'wait') {
       resp = session.resolveChoice(1, '__skip__')
     }
-    resp = session.confirmNextPlayer()
+    resp = confirmNextPlayer(session)
 
     // Reset resource-market-4 for re-use
     const state2 = session.getState().state
@@ -95,11 +96,11 @@ describe('D156_RetailDealer session', () => {
     expect(remaining).toBe(1)
 
     // Advance turn again
-    resp = session.confirmNextPlayer()
+    resp = confirmNextPlayer(session)
     resp = session.takeAction(1, 'farmland')
     const tile = resp.interaction?.farm?.selectableTiles?.[0]
     if (tile) resp = session.resolveChoice(1, 'confirm', { tile })
-    resp = session.confirmNextPlayer()
+    resp = confirmNextPlayer(session)
 
     // Reset resource-market-4 again
     const state3 = session.getState().state

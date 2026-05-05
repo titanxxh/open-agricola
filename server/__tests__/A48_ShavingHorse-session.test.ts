@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/game/player'
+import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/A/A48_ShavingHorse'
 
 const CARD_ID = 'A48_ShavingHorse'
@@ -40,7 +41,7 @@ describe('A48_ShavingHorse session', () => {
     const session = setup({ forestWood: 3, playerWood: 4, cardPlayed: false })
     const resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).not.toBe('choice')
+    expect(isLegacyChoicePending(resp)).toBe(false)
     expect(resp.state.players[0]!.resources.wood).toBe(7)
     expect(resp.state.players[0]!.resources.food).toBe(0)
   })
@@ -49,7 +50,7 @@ describe('A48_ShavingHorse session', () => {
     const session = setup({ forestWood: 3, playerWood: 1 })
     const resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).not.toBe('choice')
+    expect(isLegacyChoicePending(resp)).toBe(false)
     expect(resp.state.players[0]!.resources.wood).toBe(4)
     expect(resp.state.players[0]!.resources.food).toBe(0)
   })
@@ -58,7 +59,7 @@ describe('A48_ShavingHorse session', () => {
     const session = setup({ forestWood: 0, playerWood: 6 })
     const resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).not.toBe('choice')
+    expect(isLegacyChoicePending(resp)).toBe(false)
     expect(resp.state.players[0]!.resources.wood).toBe(6)
     expect(resp.state.players[0]!.resources.food).toBe(0)
   })
@@ -67,15 +68,15 @@ describe('A48_ShavingHorse session', () => {
     const session = setup({ forestWood: 3, playerWood: 2 }) // after collect: 5
     const resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.options).toHaveLength(2)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.options).toHaveLength(2)
     // player resources not yet charged
     expect(resp.state.players[0]!.resources.wood).toBe(5)
     expect(resp.state.players[0]!.resources.food).toBe(0)
 
     // Accept (first option is the action node; '__skip__' is the decline option)
-    const acceptOption = resp.pending.options.find((o) => o.value !== '__skip__')!
+    const acceptOption = resp.interaction.options?.find((o) => o.value !== '__skip__')!
     const resp2 = session.resolveChoice(0, acceptOption.value)
     expect(resp2.ok).toBe(true)
     expect(resp2.state.players[0]!.resources.wood).toBe(4)
@@ -86,8 +87,8 @@ describe('A48_ShavingHorse session', () => {
     const session = setup({ forestWood: 3, playerWood: 2 })
     const resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     const resp2 = session.resolveChoice(0, '__skip__')
     expect(resp2.ok).toBe(true)
@@ -100,7 +101,7 @@ describe('A48_ShavingHorse session', () => {
     const resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
     // No choice prompt — mandatory flow runs through automatically
-    expect(resp.pending.type).not.toBe('choice')
+    expect(isLegacyChoicePending(resp)).toBe(false)
     expect(resp.state.players[0]!.resources.wood).toBe(6)
     expect(resp.state.players[0]!.resources.food).toBe(3)
   })

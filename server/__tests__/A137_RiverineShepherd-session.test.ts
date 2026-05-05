@@ -52,7 +52,7 @@ describe('A137_RiverineShepherd session', () => {
     // Use sheep-market; sheep collection triggers animalReorg first
     let resp = session.takeAction(0, 'sheep-market')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
 
     // Confirm animal reorg (place sheep in pasture)
     resp = session.resolveChoice(0, 'confirm', [
@@ -63,9 +63,9 @@ describe('A137_RiverineShepherd session', () => {
     // It may auto-accept or present a choice depending on flow handling
     // Check that reed was gained
     const p = resp.state.players[0]!
-    if (resp.pending.type === 'choice') {
+    if (resp.interaction.stateId === 'wait') {
       // Accept the optional reed
-      const acceptOption = resp.pending.options.find(
+      const acceptOption = resp.interaction.options?.find(
         (o) => o.value !== '__skip__',
       )
       if (acceptOption) {
@@ -74,7 +74,7 @@ describe('A137_RiverineShepherd session', () => {
     }
 
     // Handle possible additional animalReorg if needed
-    if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
         { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: 2 },
       ])
@@ -95,9 +95,9 @@ describe('A137_RiverineShepherd session', () => {
 
     // Reed-bank gives reed, then the card offers optional sheep
     const p = resp.state.players[0]!
-    if (resp.pending.type === 'choice') {
+    if (resp.interaction.stateId === 'wait') {
       // Accept the optional sheep
-      const acceptOption = resp.pending.options.find(
+      const acceptOption = resp.interaction.options?.find(
         (o) => o.value !== '__skip__',
       )
       if (acceptOption) {
@@ -106,7 +106,7 @@ describe('A137_RiverineShepherd session', () => {
     }
 
     // Handle animalReorg if sheep was gained
-    if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
         { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: sheepBefore + 1 },
       ])
@@ -127,7 +127,7 @@ describe('A137_RiverineShepherd session', () => {
 
     let resp = session.takeAction(0, 'sheep-market')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
 
     resp = session.resolveChoice(0, 'confirm', [
       { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: 2 },
@@ -182,7 +182,7 @@ describe('A137_RiverineShepherd session', () => {
 
     let resp = session.takeAction(0, 'sheep-market')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
 
     resp = session.resolveChoice(0, 'confirm', [
       { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: 2 },

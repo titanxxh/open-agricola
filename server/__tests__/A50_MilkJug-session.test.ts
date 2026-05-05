@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/game/player'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 import '../../shared/cards/A/A50_MilkJug'
 
 describe('A50_MilkJug session', () => {
@@ -52,15 +53,15 @@ describe('A50_MilkJug session', () => {
     expect(resp.ok).toBe(true)
 
     // cattle-market gives cattle -> animalReorg
-    if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
         { id: 'p1', zoneType: 'pasture', animalType: 'cattle', animalCount: 1 },
       ])
     }
 
     // Walk through player switches for card effect
-    while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state
@@ -77,15 +78,15 @@ describe('A50_MilkJug session', () => {
     expect(resp.ok).toBe(true)
 
     // cattle-market gives cattle -> animalReorg for opponent
-    if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(1, 'confirm', [
         { id: 'p2', zoneType: 'pasture', animalType: 'cattle', animalCount: 1 },
       ])
     }
 
     // Walk through player switches for card effect
-    while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state

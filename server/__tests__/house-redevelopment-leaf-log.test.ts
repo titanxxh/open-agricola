@@ -31,22 +31,22 @@ describe('house-redevelopment leaf-flush logging', () => {
 
     const resp = session.takeAction(0, 'house-redevelopment')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    expect(resp.pending.promptKey).toBe('ui.interactionOptionalAction')
-    expect(resp.pending.options.some((option) => option.value === '__skip__')).toBe(true)
+    expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
+    expect(resp.interaction.options?.some((option) => option.value === '__skip__')).toBe(true)
 
-    const playImprovement = resp.pending.options.find((option) => option.value !== '__skip__')
+    const playImprovement = resp.interaction.options?.find((option) => option.value !== '__skip__')
     expect(playImprovement).toBeDefined()
 
     const resp2 = session.resolveChoice(0, playImprovement!.value)
     expect(resp2.ok).toBe(true)
-    expect(resp2.pending.type).toBe('choice')
-    if (resp2.pending.type !== 'choice') return
+    expect(resp2.interaction.stateId).toBe('wait')
+    if (resp2.interaction.stateId !== 'wait') return
 
-    expect(resp2.pending.promptKey).toBe('ui.interactionChooseImprovement')
-    expect(resp2.pending.options.map((option) => option.value)).toEqual(
+    expect(resp2.interaction.promptKey).toBe('ui.interactionChooseImprovement')
+    expect(resp2.interaction.options?.map((option) => option.value)).toEqual(
       expect.arrayContaining(['major:Major_Fireplace1', 'minor:A55_JunkRoom']),
     )
   })

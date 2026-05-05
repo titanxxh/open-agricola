@@ -169,8 +169,8 @@ describe('B115_TinsmithMaster session', () => {
       expect(resp.ok).toBe(true)
 
       // Continue through any remaining choices
-      while (resp.pending.type === 'choice') {
-        resp = session.resolveChoice(resp.pending.playerIndex, resp.pending.options[0]?.value ?? 'ok')
+      while (resp.interaction.stateId === 'wait') {
+        resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options[0]?.value ?? 'ok')
       }
 
       // Field should have 4 grain (3 normal + 1 bonus from card)
@@ -194,8 +194,8 @@ describe('B115_TinsmithMaster session', () => {
       })
       expect(resp.ok).toBe(true)
 
-      while (resp.pending.type === 'choice') {
-        resp = session.resolveChoice(resp.pending.playerIndex, resp.pending.options[0]?.value ?? 'ok')
+      while (resp.interaction.stateId === 'wait') {
+        resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options[0]?.value ?? 'ok')
       }
 
       const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 0)
@@ -219,8 +219,8 @@ describe('B115_TinsmithMaster session', () => {
       })
       expect(resp.ok).toBe(true)
 
-      while (resp.pending.type === 'choice') {
-        resp = session.resolveChoice(resp.pending.playerIndex, resp.pending.options[0]?.value ?? 'ok')
+      while (resp.interaction.stateId === 'wait') {
+        resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options[0]?.value ?? 'ok')
       }
 
       const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 0)
@@ -250,8 +250,8 @@ describe('B115_TinsmithMaster session', () => {
       expect(resp.ok).toBe(true)
 
       // No selection prompt — both fields get +1 automatically (BGA actAddAdditionalGood)
-      while (resp.pending.type === 'choice') {
-        resp = session.resolveChoice(resp.pending.playerIndex, resp.pending.options[0]?.value ?? 'ok')
+      while (resp.interaction.stateId === 'wait') {
+        resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options[0]?.value ?? 'ok')
       }
 
       const player = resp.state.players[0]!

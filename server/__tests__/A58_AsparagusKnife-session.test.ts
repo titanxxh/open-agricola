@@ -186,25 +186,25 @@ describe('A58_AsparagusKnife session', () => {
 
     // Should get an optional choice for the card effect
     // Walk through choices: accept the optional, select the field, etc.
-    while (resp.pending.type === 'choice') {
-      const skipOption = resp.pending.options.find((o: ActionChoiceOption) => o.value === '__skip__')
-      const acceptOption = resp.pending.options.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    while (resp.interaction.stateId === 'wait') {
+      const skipOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+      const acceptOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
       if (skipOption && acceptOption) {
         // This is the optional choice — accept it
-        resp = session.resolveChoice(resp.pending.playerIndex, acceptOption.value)
-      } else if (resp.pending.promptKey === 'ui.interactionSelection') {
+        resp = session.resolveChoice(resp.interaction.playerIndex, acceptOption.value)
+      } else if (resp.interaction.promptKey === 'ui.interactionSelection') {
         // Select the vegetable field
-        resp = session.resolveChoice(resp.pending.playerIndex, '0-0')
+        resp = session.resolveChoice(resp.interaction.playerIndex, '0-0')
       } else {
-        resp = session.resolveChoice(resp.pending.playerIndex, resp.pending.options[0]?.value ?? 'ok')
+        resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options[0]?.value ?? 'ok')
       }
     }
     // Handle any remaining pending states
-    while (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
     }
-    while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones as any)
+    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones as any)
     }
 
     const player = resp.state.players[0]!
@@ -229,19 +229,19 @@ describe('A58_AsparagusKnife session', () => {
     let resp = session.performRoundEnd()
 
     // Skip the optional effect
-    while (resp.pending.type === 'choice') {
-      const skipOption = resp.pending.options.find((o: ActionChoiceOption) => o.value === '__skip__')
+    while (resp.interaction.stateId === 'wait') {
+      const skipOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
       if (skipOption) {
-        resp = session.resolveChoice(resp.pending.playerIndex, skipOption.value)
+        resp = session.resolveChoice(resp.interaction.playerIndex, skipOption.value)
       } else {
-        resp = session.resolveChoice(resp.pending.playerIndex, resp.pending.options[0]?.value ?? 'ok')
+        resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options[0]?.value ?? 'ok')
       }
     }
-    while (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
     }
-    while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones as any)
+    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones as any)
     }
 
     const player = resp.state.players[0]!
@@ -265,14 +265,14 @@ describe('A58_AsparagusKnife session', () => {
     let resp = session.performRoundEnd()
 
     // Should go through harvest without the asparagus knife choice
-    while (resp.pending.type === 'choice') {
-      resp = session.resolveChoice(resp.pending.playerIndex, 'ok')
+    while (resp.interaction.stateId === 'wait') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'ok')
     }
-    while (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
     }
-    while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones as any)
+    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones as any)
     }
 
     const player = resp.state.players[0]!

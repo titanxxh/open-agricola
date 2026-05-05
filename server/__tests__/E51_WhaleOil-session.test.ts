@@ -88,11 +88,11 @@ describe('E51_WhaleOil session', () => {
     expect(resp.ok).toBe(true)
 
     // Should prompt to choose which occupation to play
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // Choose the occupation
-    const occupationOption = resp.pending.options.find((o) => o.value === 'A101_Mendicant')
+    const occupationOption = resp.interaction.options?.find((o) => o.value === 'A101_Mendicant')
     if (!occupationOption) {
       // The occupation may have already been auto-selected or the choice format differs
       return
@@ -118,8 +118,8 @@ describe('E51_WhaleOil session', () => {
     const resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
 
-    if (resp.pending.type !== 'choice') return
-    const occupationOption = resp.pending.options.find((o) => o.value === 'A101_Mendicant')
+    if (resp.interaction.stateId !== 'wait') return
+    const occupationOption = resp.interaction.options?.find((o) => o.value === 'A101_Mendicant')
     if (!occupationOption) return
     const resp2 = session.resolveChoice(0, occupationOption.value)
 

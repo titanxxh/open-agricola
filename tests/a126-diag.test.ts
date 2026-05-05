@@ -16,7 +16,7 @@ describe('A126 MasterWorkman integration', () => {
     const resp = session.takeAction(0, 'sheep-market')
     const woodAfter = resp.state.players[0].resources.wood
     console.log('Wood before:', woodBefore, 'Wood after:', woodAfter)
-    console.log('Pending:', resp.pending.type)
+    console.log('Interaction:', resp.interaction.stateId)
     console.log('Log:', JSON.stringify(resp.state.log.slice(0, 5), null, 2))
 
     expect(woodAfter).toBeGreaterThan(woodBefore)
@@ -50,11 +50,11 @@ describe('A126 MasterWorkman integration', () => {
 
     const resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    expect(resp.pending.promptKey).toBe('ui.interactionPlowSelect')
-    expect(resp.pending.options).toEqual([
+    expect(resp.interaction.promptKey).toBe('ui.interactionPlowSelect')
+    expect(resp.interaction.options).toEqual([
       { value: 'confirm', labelKey: 'ui.interactionPlowConfirm' },
       { value: 'cancel', labelKey: 'ui.interactionPlowCancel' },
     ])

@@ -38,7 +38,7 @@ describe('C52_HuntsmansHat server session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0].resources.boar).toBe(2)
 
-    if (resp.pending?.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
         { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
       ] as unknown as Record<string, unknown>)

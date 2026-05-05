@@ -4,6 +4,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/C/C121_ClayKneader'
 import type { ActionFlow } from '../../shared/game/types'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 const CARD_ID = 'C121_ClayKneader'
 
@@ -45,8 +46,8 @@ describe('C121_ClayKneader session', () => {
     expect(resp.ok).toBe(true)
 
     // Walk through any pending player switches
-    while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state
@@ -68,8 +69,8 @@ describe('C121_ClayKneader session', () => {
     let resp = session.takeAction(0, 'vegetable-seeds')
     expect(resp.ok).toBe(true)
 
-    while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state
@@ -83,8 +84,8 @@ describe('C121_ClayKneader session', () => {
     let resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
 
-    while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state

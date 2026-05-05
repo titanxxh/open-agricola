@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/game/player'
 import { getFenceCount } from '../../shared/actions/effects/fencing'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 import '../../shared/cards/C/C16_FieldFences'
 
@@ -42,11 +43,11 @@ const playC16 = (session: GameSession): void => {
   //   - pick C16 from the minor-improvement options
   //   - accept C16's own SEQ-optional wrapper before the fencing leaf
   let safety = 0
-  while (resp.pending.type === 'choice' && safety < 12) {
+  while (resp.interaction.stateId === 'wait' && safety < 12) {
     safety += 1
     const interaction = (resp as { interaction?: { stateId?: string } }).interaction
     if (interaction?.stateId === 'wait') break
-    const opts = resp.pending.options.map((o) => o.value)
+    const opts = (resp.interaction.options ?? []).map((o) => o.value)
     const cardOption = opts.find((v) => v === `minor:${CARD_ID}`)
     if (cardOption) {
       resp = session.resolveChoice(0, cardOption)
@@ -73,7 +74,7 @@ describe('C16 FieldFences session', () => {
     expect(player.resources.food).toBe(0)
     // After buying C16, the engine should be waiting on the fencing
     // farm-select prompt (or an accept/decline wrapper around it).
-    expect(session.getState().pending.type).toBe('choice')
+    expect(session.getState().interaction.stateId).toBe('wait')
   })
 
   it('field-adjacent edges are free of wood; non-adjacent edges still cost wood', () => {
@@ -165,8 +166,8 @@ describe('C16 FieldFences session', () => {
     expect(resp.state.players[0]!.resources.wood).toBe(2)
 
     // Walk past any switch / done pendings until back to 'none'
-    while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
     }
 
     // Now ensure flag cleared by inspecting cardState

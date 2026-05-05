@@ -5,6 +5,7 @@ import {
   setWorkersAtHome,
 } from '../session-helpers'
 import type { CardFixture, FixtureContext, FixtureResult, TriggerResult } from './types'
+import { confirmNextPlayer } from '../../../server/__tests__/_helpers/legacy-confirms'
 
 const CARD_ID = 'CUSTOM_M6_ActionTallyman'
 
@@ -67,10 +68,10 @@ const fixture: CardFixture = {
     const steps: TriggerResult['steps'] = []
     const sequence = ['forest', 'fishing', 'clay-pit', 'reed-bank'] as const
     for (const spaceId of sequence) {
-      const resp = session.takeAction(0, spaceId) as { pending?: { type?: string }; ok: boolean }
+      const resp = session.takeAction(0, spaceId) as { ok: boolean }
       steps.push({ label: `takeAction(0,'${spaceId}')`, resp })
-      if (resp.pending?.type === 'confirmNextPlayer') {
-        const cnp = session.confirmNextPlayer()
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player') {
+        const cnp = confirmNextPlayer(session)
         steps.push({ label: 'confirmNextPlayer', resp: cnp })
       }
     }

@@ -50,8 +50,8 @@ describe('D71_Changeover session', () => {
     expect(resp.ok).toBe(true)
 
     // Should be in selection choice
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') throw new Error('expected selection choice')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
 
     // Select field 0-2 (grain with remaining 1)
     resp = session.resolveChoice(0, '0-2')
@@ -66,17 +66,17 @@ describe('D71_Changeover session', () => {
     // The sow action is optional. If it produces a choice, we should see sow select.
     // The player has grain=2 and there's an empty field (0-2 was just cleared),
     // so sow should be offered.
-    if (resp.pending.type === 'choice') {
+    if (resp.interaction.stateId === 'wait') {
       // Could be sow select or an optional skip
-      const promptKey = resp.pending.promptKey
+      const promptKey = resp.interaction.promptKey
       if (promptKey === 'ui.interactionOptionalAction') {
         // Accept the optional sow
-        const acceptOption = resp.pending.options.find((o: ActionChoiceOption) => o.value !== '__skip__')
+        const acceptOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
         if (acceptOption) {
           resp = session.resolveChoice(0, acceptOption.value)
         }
       }
-      if (resp.pending.type === 'choice' && resp.pending.promptKey === 'ui.interactionSowSelect') {
+      if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionSowSelect') {
         expect(resp.interaction.stateId).toBe('wait')
         // Sow grain into the empty field 0-2
         resp = session.resolveChoice(0, 'confirm', {

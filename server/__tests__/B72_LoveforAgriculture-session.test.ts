@@ -5,7 +5,7 @@ import { computeAnimalZones } from '../../shared/actions/helpers/animal-zones'
 import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/B/B72_LoveforAgriculture'
 import type { AnimalZone } from '../../shared/actions/helpers/animal-zones'
-import type { PendingAction } from '../../shared/game/types'
+
 
 type PastureCrop = { pastureId: string; crop: 'grain' | 'vegetable'; remaining: number }
 
@@ -80,8 +80,8 @@ describe('B72_LoveforAgriculture session', () => {
       expect(resp.ok).toBe(true)
       // Choose sow
       expect(resp.ok).toBe(true)
-      expect(resp.pending.type).toBe('choice')
-      expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
+      expect(resp.interaction.stateId).toBe('wait')
+      expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined).toBe('ui.interactionSowSelect')
       expect(resp.interaction.stateId).toBe('wait')
 
       // The interaction should include the pasture tile as sowable
@@ -226,8 +226,8 @@ describe('B72_LoveforAgriculture session', () => {
       const resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
       expect(resp.ok).toBe(true)
-      expect(resp.pending.type).toBe('choice')
-      expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
+      expect(resp.interaction.stateId).toBe('wait')
+      expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined).toBe('ui.interactionSowSelect')
 
       // Should only show the pasture tile as sowable
       if (resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'sow') {

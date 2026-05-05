@@ -66,22 +66,22 @@ const fixture: CardFixture = {
     // CARD_ID and the play happens before pending settles to confirmNextPlayer.
     const r1 = session.takeAction(0, 'meeting-place') as {
       ok: boolean
-      pending?: { type?: string; options?: Array<{ value: string }> }
+      interaction: { stateId: string; options?: Array<{ value: string }> }
     }
     steps.push({ label: "takeAction(0,'meeting-place')", resp: r1 })
-    if (r1.pending?.type !== 'choice') return { steps }
+    if (r1.interaction.stateId !== 'wait') return { steps }
 
-    const acceptOpt = (r1.pending.options ?? []).find((o) => o.value !== '__skip__')
+    const acceptOpt = (r1.interaction.options ?? []).find((o) => o.value !== '__skip__')
     if (!acceptOpt) return { steps }
     const r2 = session.resolveChoice(0, acceptOpt.value) as {
       ok: boolean
-      pending?: { type?: string; options?: Array<{ value: string }> }
+      interaction: { stateId: string; options?: Array<{ value: string }> }
     }
     steps.push({ label: `resolveChoice(0, ${acceptOpt.value}) [accept-minor]`, resp: r2 })
 
     // If a further minor-selection choice surfaces, resolve it; otherwise the
     // sole option was auto-resolved.
-    if (r2.pending?.type === 'choice') {
+    if (r2.interaction.stateId === 'wait') {
       const r3 = session.resolveChoice(0, CARD_ID)
       steps.push({ label: `resolveChoice(0, ${CARD_ID})`, resp: r3 })
     }
@@ -92,15 +92,15 @@ const fixture: CardFixture = {
     const r1 = result.steps[0]!.resp as {
       ok: boolean
       error?: string
-      pending?: { type?: string; options?: Array<{ value: string }> }
+      interaction: { stateId: string }
     }
     if (!r1.ok) {
       return { ok: false, reason: `takeAction(meeting-place) not ok: ${r1.error ?? '?'}` }
     }
-    if (r1.pending?.type !== 'choice') {
+    if (r1.interaction.stateId !== 'wait') {
       return {
         ok: false,
-        reason: `expected pending.type='choice' (skip/accept) after meeting-place, got ${JSON.stringify(r1.pending)}`,
+        reason: `expected wait interaction (skip/accept) after meeting-place, got ${r1.interaction.stateId}`,
       }
     }
     // Verify CARD_ID survived the cost/prerequisite filter — it must appear

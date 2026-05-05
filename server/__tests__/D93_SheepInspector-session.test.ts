@@ -12,7 +12,8 @@ import type {
 
 import '../../shared/cards/D/D93_SheepInspector'
 import type { ActionChoiceOption , ActionFlow } from '../../shared/game/types'
-import type { SessionResponse } from '../../shared/session/game-core'
+import type { SessionResponse } from '../../shared/session/session-core'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 const CARD_ID = 'D93_SheepInspector'
 
@@ -231,8 +232,8 @@ describe('D93_SheepInspector end-to-end via GameSession', () => {
     let r = resp
     let safety = 30
     while (safety-- > 0) {
-      if (r.pending?.type === 'confirmPlayerSwitch') {
-        r = session.confirmPlayerSwitch()
+      if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-player-switch') {
+        r = confirmPlayerSwitch(session)
         continue
       }
       break
@@ -252,8 +253,8 @@ describe('D93_SheepInspector end-to-end via GameSession', () => {
     resp = walkToChoice(session, resp)
 
     // Should now be at the optional-seq prompt (choice with skip / accept).
-    expect(resp.pending?.type).toBe('choice')
-    const options = resp.pending?.options ?? []
+    expect(resp.interaction.stateId).toBe('wait')
+    const options = resp.interaction.options ?? []
     const acceptOption = options.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
@@ -262,8 +263,8 @@ describe('D93_SheepInspector end-to-end via GameSession', () => {
     // If multiple candidate spaces existed we'd see another choice; here only
     // `forest` is a candidate (excluding the just-placed `day-laborer`), so the
     // helper auto-resolves. But if it pops a choice for recall, resolve it.
-    if (resp.pending?.type === 'choice') {
-      const opts = resp.pending.options ?? []
+    if (resp.interaction.stateId === 'wait') {
+      const opts = resp.interaction.options ?? []
       const forestOption = opts.find((o: ActionChoiceOption) => String(o.value) === 'forest')
       expect(forestOption).toBeDefined()
       resp = session.resolveChoice(0, forestOption!.value)
@@ -294,7 +295,7 @@ describe('D93_SheepInspector end-to-end via GameSession', () => {
     resp = walkToChoice(session, resp)
 
     // Decline the optional seq.
-    expect(resp.pending?.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     resp = session.resolveChoice(0, '__skip__')
     resp = walkToChoice(session, resp)
 

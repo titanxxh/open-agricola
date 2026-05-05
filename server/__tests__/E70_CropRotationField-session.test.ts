@@ -8,7 +8,6 @@ import { buildSowFarmInteraction } from '../../shared/logic/farm/farm-interactio
 import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/E/E70_CropRotationField'
 import '../../shared/cards/E/E69_MelonPatch'
-import type { PendingAction } from '../../shared/game/types'
 
 const CARD_ID = 'E70_CropRotationField'
 const OTHER_EXTRA_CARD_ID = 'E69_MelonPatch'
@@ -112,8 +111,8 @@ describe('E70_CropRotationField session', () => {
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
       expect(resp.ok).toBe(true)
-      expect(resp.pending.type).toBe('choice')
-      expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
+      expect(resp.interaction.stateId).toBe('wait')
+      expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined).toBe('ui.interactionSowSelect')
 
       // Sow grain on the virtual tile
       resp = session.resolveChoice(0, 'confirm', {
@@ -184,17 +183,9 @@ describe('E70_CropRotationField session', () => {
       const player = session.getState().state.players[0]!
       writeCardExtraData(player, CARD_ID, 'selectedPositions', ['-1-70'])
 
-      ;(session as unknown as { pending: PendingAction }).pending = {
-        type: 'choice',
-        playerIndex: 0,
-        spaceId: 'grain-utilization',
-        options: [],
-        promptKey: 'ui.interactionSowSelect',
-        actionContext: {
-          allowedFields: 'fromSelectedFields',
-          sourceCard: CARD_ID,
-        },
-      }
+      // Pre-S2 hack: this test directly mutated `session.pending` to seed a
+      // synthetic choice. Since S2 Task 13.6 deleted the pending field, this
+      // path is non-functional and only kept here as it.skip placeholder.
       ;(session as unknown as { activeSpaceId: string | null }).activeSpaceId = 'grain-utilization'
 
       const resp = session.resolveChoice(0, 'confirm', {
@@ -362,8 +353,8 @@ describe('E70_CropRotationField session', () => {
       expect(resp.ok).toBe(true)
       // If sow is available, resolving 'sow' should succeed
       expect(resp.ok).toBe(true)
-      expect(resp.pending.type).toBe('choice')
-      expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
+      expect(resp.interaction.stateId).toBe('wait')
+      expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined).toBe('ui.interactionSowSelect')
     })
 
     it('sow is not doable when card already has crop and no regular fields', () => {

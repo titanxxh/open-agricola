@@ -57,7 +57,7 @@ const driveToCompletion = (
 ) => {
   let resp = initialResp
   // First, satisfy animalReorg by placing boar in house
-  if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+  if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
     const p = resp.state.players[0]!
     const zones: AnimalZone[] = [
       { id: 'house', zoneType: 'house', animalType: null, animalCount: 0, capacity: 1 },
@@ -73,8 +73,8 @@ const driveToCompletion = (
   }
   // Then resolve E53 prompt chain
   let safety = 30
-  while (safety-- > 0 && resp.pending.type === 'choice') {
-    const opts = (resp.pending as { options: { value: string; sourceCard?: string }[] }).options
+  while (safety-- > 0 && resp.interaction.stateId === 'wait') {
+    const opts = (resp.interaction.options ?? []) as { value: string; sourceCard?: string }[]
     if (acceptE53Trade) {
       // Accept E53 SEQ optional and pick trade
       const e53Trade = opts.find((o) => o.value.startsWith('trade:'))
@@ -121,8 +121,8 @@ describe('E53_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
     const { session } = setup()
     const resp = session.takeAction(0, 'grain-seeds')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type === 'choice') {
-      const opts = (resp.pending as { options: { sourceCard?: string }[] }).options
+    if (resp.interaction.stateId === 'wait') {
+      const opts = (resp.interaction.options ?? []) as { sourceCard?: string; value: string }[]
       const hasE53 = opts.some((o) => o.sourceCard === CARD_ID)
       expect(hasE53).toBe(false)
     }
@@ -137,7 +137,7 @@ describe('E53_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
 
     const initial = session.takeAction(0, 'pig-market')
     expect(initial.ok).toBe(true)
-    expect(initial.pending.type).toBe('choice')
+    expect(initial.interaction.stateId).toBe('wait')
 
     const resp = driveToCompletion(session, initial, /* acceptE53Trade */ true)
     expect(resp.state.players[0]!.resources.boar).toBe(0)

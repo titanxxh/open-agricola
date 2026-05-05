@@ -19,6 +19,7 @@ import { occupations } from '../../shared/game/occupations'
 import { setWorkersAtHome } from '../../shared/game/player'
 import type { ActionFlow } from '../../shared/game/types'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
+import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 
 const TEST_CARD_ID = '__TEST_RC_CARD__'
 
@@ -117,14 +118,14 @@ describe('CardEffect.resolveChoice hook', () => {
     // XOR and blocks, leaving pending.type === 'choice' with sourceCard === TEST_CARD_ID.
     let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // The pending choice should be the onBuy XOR, attributed to our test card
-    expect(resp.pending.sourceCard).toBe(TEST_CARD_ID)
+    expect(resp.interaction.sourceCard).toBe(TEST_CARD_ID)
 
     // Resolve the XOR choice → our resolveChoice handler should fire
-    const xorOption = resp.pending.options[0]
+    const xorOption = resp.interaction.options[0]
     expect(xorOption).toBeDefined()
     resp = session.resolveChoice(0, xorOption!.value)
     expect(resp.ok).toBe(true)
@@ -154,12 +155,12 @@ describe('CardEffect.resolveChoice hook', () => {
     // lessons auto-resolves the play-occupation (one card in hand) → onBuy XOR
     let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.sourceCard).toBe(TEST_CARD_ID)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.sourceCard).toBe(TEST_CARD_ID)
 
     const foodBefore = resp.state.players[0]!.resources.food
-    const xorOption = resp.pending.options[0]
+    const xorOption = resp.interaction.options[0]
     expect(xorOption).toBeDefined()
 
     // resolveChoice fires our handler, which inserts a gain-food flow.
@@ -189,7 +190,7 @@ describe('CardEffect.resolveChoice hook', () => {
     // day-laborer: no pending choice produced (all resources granted immediately)
     const resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).not.toBe('choice')
+    expect(isLegacyChoicePending(resp)).toBe(false)
     expect(handlerCalled).toBe(false)
   })
 })

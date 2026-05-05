@@ -39,17 +39,17 @@ describe('A143_Stonecutter session', () => {
     // Major_Basket base cost: 2 reed + 2 stone. With Stonecutter: 2 reed + 1 stone.
     let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type !== 'choice') return
-    const basket = resp.pending.options.find((o) => o.value === 'major:Major_Basket')
+    if (resp.interaction.stateId !== 'wait') return
+    const basket = resp.interaction.options?.find((o) => o.value === 'major:Major_Basket')
     expect(basket).toBeDefined()
 
     resp = session.resolveChoice(0, basket!.value)
 
     // Drain any remaining payment choices
     let steps = 0
-    while (resp.pending.type === 'choice' && steps < 8) {
+    while (resp.interaction.stateId === 'wait' && steps < 8) {
       steps++
-      const next = resp.pending.options.find((o) => o.value !== 'cancel')
+      const next = resp.interaction.options?.find((o) => o.value !== 'cancel')
       if (!next) break
       resp = session.resolveChoice(0, next.value)
     }

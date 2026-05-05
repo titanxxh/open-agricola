@@ -36,10 +36,10 @@ describe('reorganizeAction engine sub-flow integration', () => {
     const session = setupWorkPhase()
     const resp = session.takeAction(0, 'pig-market')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    const pending = resp.pending as { type: 'choice'; promptKey?: string; options: { value: string }[] }
-    expect(pending.promptKey).toBe('ui.interactionAnimalReorg')
-    const values = pending.options.map((o) => o.value).sort()
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
+    expect(resp.interaction.promptKey).toBe('ui.interactionAnimalReorg')
+    const values = (resp.interaction.options ?? []).map((o) => o.value).sort()
     expect(values).toEqual(['cancel', 'confirm'])
   })
 
@@ -50,7 +50,7 @@ describe('reorganizeAction engine sub-flow integration', () => {
     const resp = session.resolveChoice(0, 'confirm', [
       { id: 'pasture-1', zoneType: 'pasture', animalType: 'boar', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.boar).toBe(1)
     expect(resp.state.players[0]!.pastures[0]!.animalType).toBe('boar')
     expect(resp.state.players[0]!.pastures[0]!.animalCount).toBe(1)
@@ -66,9 +66,9 @@ describe('reorganizeAction engine sub-flow integration', () => {
 
     const resp = session.resolveChoice(0, 'cancel')
     expect(resp.state.players[0]!.resources.boar).toBe(1)
-    expect(resp.pending.type).toBe('choice')
-    const pending = resp.pending as { promptKey?: string }
-    expect(pending.promptKey).toBe('ui.interactionAnimalReorg')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
+    expect(resp.interaction.promptKey).toBe('ui.interactionAnimalReorg')
   })
 
   it('anytime trigger includes cancel option; non-anytime triggers do not', () => {
@@ -78,8 +78,8 @@ describe('reorganizeAction engine sub-flow integration', () => {
     // (which directly calls reorganizeAction.execute with trigger='returning-home').
     const session = setupWorkPhase()
     const resp = session.takeAction(0, 'pig-market')
-    const pending = resp.pending as { options: { value: string }[] }
-    const hasCancel = pending.options.some((o) => o.value === 'cancel')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
+    const hasCancel = (resp.interaction.options ?? []).some((o) => o.value === 'cancel')
     expect(hasCancel).toBe(true)
   })
 })

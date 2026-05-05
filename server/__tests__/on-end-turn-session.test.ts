@@ -5,6 +5,7 @@ import { incCounter } from '../../shared/cards/__stubs__/helpers'
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A128_RiparianBuilder'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 const TEST_END_TURN_CARD = 'TEST_OnEndTurnCounter'
 
@@ -38,7 +39,7 @@ describe('onEndTurn session', () => {
     const resp = session.takeAction(0, 'day-laborer')
 
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.cardStates?.[TEST_END_TURN_CARD]?.counters?.observedCount).toBe(1)
   })
 
@@ -66,15 +67,15 @@ describe('onEndTurn session', () => {
     session.loadState(state)
 
     let resp = session.takeAction(1, 'reed-bank')
-    expect(resp.pending.type).toBe('confirmPlayerSwitch')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-player-switch')
     expect(resp.state.players[0]!.cardStates?.[TEST_END_TURN_CARD]?.counters?.observedCount).toBeUndefined()
 
-    resp = session.confirmPlayerSwitch()
-    expect(resp.pending.type).toBe('choice')
+    resp = confirmPlayerSwitch(session)
+    expect(resp.interaction.stateId).toBe('wait')
     expect(resp.state.players[1]!.cardStates?.[TEST_END_TURN_CARD]?.counters?.observedCount).toBeUndefined()
 
     resp = session.resolveChoice(0, '__skip__')
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.cardStates?.[TEST_END_TURN_CARD]?.counters?.observedCount).toBeUndefined()
     expect(resp.state.players[1]!.cardStates?.[TEST_END_TURN_CARD]?.counters?.observedCount).toBe(1)
   })
@@ -96,13 +97,13 @@ describe('onEndTurn session', () => {
     session.loadState(state)
 
     let resp = session.takeAction(0, 'sheep-market')
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     expect(resp.state.players[0]!.cardStates?.[TEST_END_TURN_CARD]?.counters?.observedCount).toBeUndefined()
 
     resp = session.resolveChoice(0, 'confirm', [
       { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ])
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.cardStates?.[TEST_END_TURN_CARD]?.counters?.observedCount).toBe(1)
   })
 })

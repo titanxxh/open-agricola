@@ -196,7 +196,7 @@ describe('HTTP privacy + seat binding', () => {
   })
 
   describe('filtered response shape', () => {
-    it('preserves pending/scores/ok fields when filtering state', async () => {
+    it('preserves interaction/scores/ok fields when filtering state', async () => {
       const req = mockReq('GET', '/api/game/state', null, { 'x-viewer-player': 'p1' })
       const res = mockRes()
       await handleGameRoute(req, res)
@@ -204,7 +204,7 @@ describe('HTTP privacy + seat binding', () => {
       expect(data).toHaveProperty('ok')
       expect(data).toHaveProperty('state')
       expect(data).toHaveProperty('scores')
-      expect(data).toHaveProperty('pending')
+      expect(data).toHaveProperty('interaction')
     })
 
     it('masked hand length matches the unfiltered length', async () => {

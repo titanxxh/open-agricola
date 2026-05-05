@@ -40,19 +40,19 @@ describe('D138_PetLover session', () => {
     let resp = session.takeAction(0, 'sheep-market')
     expect(resp.ok).toBe(true)
     // PetLover wraps the collect flow in an XOR, so the player must choose first.
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.options.length).toBe(2)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.options?.length).toBe(2)
 
     // Pick the option that does NOT come from PetLover (sourceCard !== CARD_ID).
     const normalOption =
-      resp.pending.options.find((opt) => opt.sourceCard !== CARD_ID)
-      ?? resp.pending.options[resp.pending.options.length - 1]!
+      resp.interaction.options?.find((opt) => opt.sourceCard !== CARD_ID)
+      ?? resp.interaction.options[resp.interaction.options?.length - 1]!
     resp = session.resolveChoice(0, normalOption.value)
     expect(resp.ok).toBe(true)
 
     // Normal collect path needs animal reorg for the freshly taken sheep.
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     resp = session.resolveChoice(0, 'confirm', [
       { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ])
@@ -71,18 +71,18 @@ describe('D138_PetLover session', () => {
     const session = setup({ withCard: true, sheepOnSpace: 1 })
     let resp = session.takeAction(0, 'sheep-market')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // Pick the PetLover branch (sourceCard === CARD_ID).
     const petLoverOption =
-      resp.pending.options.find((opt) => opt.sourceCard === CARD_ID)
-      ?? resp.pending.options[0]!
+      resp.interaction.options?.find((opt) => opt.sourceCard === CARD_ID)
+      ?? resp.interaction.options[0]!
     resp = session.resolveChoice(0, petLoverOption.value)
     expect(resp.ok).toBe(true)
 
     // The bonus animal needs to be placed too.
-    if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
         { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
       ])
@@ -104,7 +104,7 @@ describe('D138_PetLover session', () => {
     let resp = session.takeAction(0, 'sheep-market')
     expect(resp.ok).toBe(true)
     // No XOR because totalAnimals !== 1, so we go straight into animal reorg.
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     resp = session.resolveChoice(0, 'confirm', [
       { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 2 },
     ])
@@ -123,7 +123,7 @@ describe('D138_PetLover session', () => {
     let resp = session.takeAction(0, 'sheep-market')
     expect(resp.ok).toBe(true)
     // No PetLover -> no XOR -> straight to animal reorg.
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     resp = session.resolveChoice(0, 'confirm', [
       { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
     ])

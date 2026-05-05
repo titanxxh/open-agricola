@@ -93,17 +93,17 @@ describe('B58_CrackWeeder session', () => {
 
     // Drive through all pending states
     let safety = 30
-    while (safety-- > 0 && resp.pending.type !== 'none') {
-      if (resp.pending.type === 'harvestFeed') {
-        resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
-      } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
-        resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones)
-      } else if (resp.pending.type === 'choice') {
-        const skipOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+    while (safety-- > 0 && resp.interaction.stateId === 'wait') {
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
+        resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
+      } else if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
+        resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
+      } else if (resp.interaction.stateId === 'wait') {
+        const skipOpt = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
         if (skipOpt) {
-          resp = session.resolveChoice(resp.pending.playerIndex ?? 0, '__skip__')
+          resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, '__skip__')
         } else {
-          resp = session.resolveChoice(resp.pending.playerIndex ?? 0, resp.pending.options[0]!.value)
+          resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, resp.interaction.options[0]!.value)
         }
       } else {
         break

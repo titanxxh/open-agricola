@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
+import type { FeedSelection } from '../../shared/session/session-core'
 
 import '../../shared/cards/E/E153_StoneSculptor'
 
@@ -25,21 +26,21 @@ const setupHarvestRound = (round = 4) => {
   return { session, state }
 }
 
-const drainHarvest = (session: GameSession, feedSelections: Record<number, Parameters<GameSession['confirmHarvestFeed']>[1]> = {}) => {
+const drainHarvest = (session: GameSession, feedSelections: Record<number, FeedSelection[]> = {}) => {
   let resp = session.performRoundEnd()
-  while (resp.pending.type !== 'none') {
-    if (resp.pending.type === 'harvestFeed') {
-      const idx = resp.pending.playerIndex
+  while (resp.interaction.stateId === 'wait') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
+      const idx = resp.interaction.playerIndex
       const sel = feedSelections[idx] ?? []
-      resp = session.confirmHarvestFeed(idx, sel)
-    } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(idx, 'confirm', { selections: sel })
+    } else if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       const interaction = resp.interaction.stateId === 'wait' ? resp.interaction : null
-      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', interaction?.zones ?? [])
-    } else if (resp.pending.type === 'choice') {
-      const opts = resp.pending.options ?? []
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', interaction?.zones ?? [])
+    } else if (resp.interaction.stateId === 'wait') {
+      const opts = resp.interaction.options ?? []
       const next = opts.find((o) => o.value === '__skip__') ?? opts[0]
       if (!next) break
-      resp = session.resolveChoice(resp.pending.playerIndex ?? 0, next.value)
+      resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, next.value)
     } else {
       break
     }

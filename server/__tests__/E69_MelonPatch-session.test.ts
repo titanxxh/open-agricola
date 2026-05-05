@@ -88,7 +88,7 @@ describe('E69_MelonPatch session', () => {
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
       expect(resp.ok).toBe(true)
-      expect(resp.pending.type).toBe('choice')
+      expect(resp.interaction.stateId).toBe('wait')
 
       resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: -1, col: 69, crop: 'vegetable' }],

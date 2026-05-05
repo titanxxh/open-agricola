@@ -8,6 +8,7 @@ import '../../shared/cards/B/B16_MiningHammer'
 import '../../shared/cards/B/B124_Trimmer'
 import '../../shared/cards/A/A82_WorkCertificate'
 import type { ActionChoiceOption } from '../../shared/game/types'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 // ===== A54 Credit session tests =====
 describe('A54_Credit session', () => {
@@ -113,8 +114,8 @@ describe('A129_Swagman session', () => {
     let resp = initialResp
     let safety = 20
     let swagmanSeen = false
-    while (resp.pending.type === 'choice' && safety > 0) {
-      const opts = resp.pending.options ?? []
+    while (resp.interaction.stateId === 'wait' && safety > 0) {
+      const opts = resp.interaction.options ?? []
       const skipOpt = opts.find((o: ActionChoiceOption) => o.value === '__skip__')
       const cancelOpt = opts.find((o: ActionChoiceOption) => o.value === 'cancel')
       const swagmanOpt = opts.find((o: ActionChoiceOption) => o.sourceCard === 'A129_Swagman')
@@ -140,8 +141,8 @@ describe('A129_Swagman session', () => {
       }
       safety--
     }
-    while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
     }
     return resp
   }
@@ -224,8 +225,8 @@ describe('A82_WorkCertificate session', () => {
     let foundChoice = false
     let safety = 10
     while (safety > 0) {
-      if (resp.pending.type === 'choice') {
-        const skipOpt = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+      if (resp.interaction.stateId === 'wait') {
+        const skipOpt = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
         if (skipOpt) {
           foundChoice = true
           resp = session.resolveChoice(0, '__skip__')
@@ -233,8 +234,8 @@ describe('A82_WorkCertificate session', () => {
         }
         break
       }
-      if (resp.pending.type === 'confirmPlayerSwitch') {
-        resp = session.confirmPlayerSwitch()
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+        resp = confirmPlayerSwitch(session)
       } else {
         break
       }
@@ -253,8 +254,8 @@ describe('A82_WorkCertificate session', () => {
     // Find and accept a wood option
     let safety = 10
     while (safety > 0) {
-      if (resp.pending.type === 'choice') {
-        const options = resp.pending.options ?? []
+      if (resp.interaction.stateId === 'wait') {
+        const options = resp.interaction.options ?? []
         // Try to find a non-skip option (take wood)
         const woodOpt = options.find((o: ActionChoiceOption) => o.value !== '__skip__')
         if (woodOpt) {
@@ -268,16 +269,16 @@ describe('A82_WorkCertificate session', () => {
         }
         break
       }
-      if (resp.pending.type === 'confirmPlayerSwitch') {
-        resp = session.confirmPlayerSwitch()
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+        resp = confirmPlayerSwitch(session)
       } else {
         break
       }
       safety--
     }
     // Walk remaining
-    while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
     }
     const after = session.getState().state
     // Should have gained at least 1 building resource
@@ -312,8 +313,8 @@ describe('A82_WorkCertificate session', () => {
     let safety = 10
     let acceptedTake = false
     while (safety > 0) {
-      if (resp.pending.type === 'choice') {
-        const options = resp.pending.options ?? []
+      if (resp.interaction.stateId === 'wait') {
+        const options = resp.interaction.options ?? []
         const takeOpt = options.find((o: ActionChoiceOption) => o.value !== '__skip__')
         if (takeOpt) {
           resp = session.resolveChoice(0, takeOpt.value)
@@ -327,15 +328,15 @@ describe('A82_WorkCertificate session', () => {
         }
         break
       }
-      if (resp.pending.type === 'confirmPlayerSwitch') {
-        resp = session.confirmPlayerSwitch()
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+        resp = confirmPlayerSwitch(session)
       } else {
         break
       }
       safety--
     }
-    while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
     }
 
     expect(acceptedTake).toBe(true)

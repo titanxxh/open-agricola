@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
+import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/A/A106_SlurrySpreader'
 
 const CARD_ID = 'A106_SlurrySpreader'
@@ -105,28 +106,33 @@ describe('A106_SlurrySpreader session', () => {
     let resp = session.performRoundEnd()
     let safety = 20
 
-    while (safety-- > 0 && resp.pending.type !== 'none') {
-      if (resp.pending.type === 'harvestFeed') {
-        resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+    while (safety-- > 0 && resp.interaction.stateId === 'wait') {
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
+        resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
         continue
       }
 
-      if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
-        resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones)
+      if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionAnimalReorg') {
+        resp = session.resolveChoice(
+          resp.interaction.playerIndex,
+          'confirm',
+          { zones: resp.interaction.zones } as unknown as Record<string, unknown>,
+        )
         continue
       }
 
-      if (resp.pending.type === 'choice') {
-        const skipOption = resp.pending.options.find((option) => option.value === '__skip__')
-        const choiceValue = skipOption?.value ?? resp.pending.options[0]!.value
-        resp = session.resolveChoice(resp.pending.playerIndex, choiceValue)
+      if (resp.interaction.stateId === 'wait') {
+        const options = resp.interaction.options ?? []
+        const skipOption = options.find((option) => option.value === '__skip__')
+        const choiceValue = skipOption?.value ?? options[0]!.value
+        resp = session.resolveChoice(resp.interaction.playerIndex, choiceValue)
         continue
       }
 
-      throw new Error(`unexpected pending state: ${resp.pending.type}`)
+      throw new Error('unexpected interaction state')
     }
 
-    expect(resp.pending.type).toBe('none')
+    expect(isLegacyChoicePending(resp)).toBe(false)
     const playerAfter = resp.state.players[0]!
     expect(playerAfter.resources.food).toBe(0)
     expect(playerAfter.resources.grain).toBe(1)

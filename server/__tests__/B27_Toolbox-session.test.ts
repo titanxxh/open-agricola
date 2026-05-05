@@ -38,16 +38,16 @@ describe('B27 Toolbox session', () => {
     const session = setupPlayed()
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // 推进到 ToolboxImprovement prompt：
     // farm-expansion OR → 选 construct seq → room select confirm w/ rooms payload → OR done → ToolboxImprovement
     let safety = 30
     let reachedBuyMajor = false
-    while (resp.pending.type === 'choice' && safety-- > 0) {
-      const opts = resp.pending.options
-      const promptKey = (resp.pending as { promptKey?: string }).promptKey
+    while (resp.interaction.stateId === 'wait' && safety-- > 0) {
+      const opts = resp.interaction.options ?? []
+      const promptKey = (resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       if (promptKey === 'ui.interactionToolboxImprovement') {
         reachedBuyMajor = true
         // 外层 optional 的 sourceCard 应是 B27
@@ -74,7 +74,7 @@ describe('B27 Toolbox session', () => {
       resp = session.resolveChoice(0, choice.value)
     }
     expect(reachedBuyMajor).toBe(true)
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 
   it('什么都没造 → onEndTurn 不弹', () => {
@@ -82,7 +82,7 @@ describe('B27 Toolbox session', () => {
     const resp = session.takeAction(0, 'grain-seeds')
     expect(resp.ok).toBe(true)
     // grain-seeds 直接 gain 1 grain，不修房 / 围栏 / stable
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(isCardFlagged(resp.state.players[0]!, CARD_ID)).toBe(false)
   })
 
@@ -130,9 +130,9 @@ describe('B27 Toolbox session', () => {
     expect(resp.ok).toBe(true)
 
     let safety = 50
-    while (resp.pending.type === 'choice' && safety-- > 0) {
-      const opts = resp.pending.options
-      const promptKey = (resp.pending as { promptKey?: string }).promptKey
+    while (resp.interaction.stateId === 'wait' && safety-- > 0) {
+      const opts = resp.interaction.options ?? []
+      const promptKey = (resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       // Engine farm prompt: confirm with the first selectable room tile so we
       // actually build (test asserts construct → setFlag flow).
       if (promptKey === 'ui.interactionRoomSelect' && resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'room') {
@@ -148,7 +148,7 @@ describe('B27 Toolbox session', () => {
       resp = session.resolveChoice(0, choice.value)
     }
 
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(isCardFlagged(resp.state.players[0]!, CARD_ID)).toBe(false)
   })
 })

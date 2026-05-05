@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/game/player'
+import { confirmNextPlayer } from './_helpers/legacy-confirms'
 
 describe('meeting-place session', () => {
   it('grants start player immediately and starts the next round with that player', () => {
@@ -22,13 +23,13 @@ describe('meeting-place session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.startPlayer).toBe(false)
     expect(resp.state.players[1]!.startPlayer).toBe(true)
-    if (resp.pending.type === 'choice') {
+    if (resp.interaction.stateId === 'wait') {
       resp = session.resolveChoice(1, '__skip__')
       expect(resp.ok).toBe(true)
     }
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
 
-    resp = session.confirmNextPlayer()
+    resp = confirmNextPlayer(session)
     expect(resp.ok).toBe(true)
     expect(resp.state.round).toBe(14)
     expect(resp.state.currentPlayerIndex).toBe(1)

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/game/player'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 import '../../shared/cards/B/B143_ClayWarden'
 
 describe('B143_ClayWarden session', () => {
@@ -45,8 +46,8 @@ describe('B143_ClayWarden session', () => {
     expect(resp.ok).toBe(true)
 
     // Walk through player switches for card effect
-    while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state
@@ -105,8 +106,8 @@ describe('B143_ClayWarden session', () => {
     let resp = session.takeAction(1, 'hollow')
     expect(resp.ok).toBe(true)
 
-    while (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
     }
 
     const after = session.getState().state

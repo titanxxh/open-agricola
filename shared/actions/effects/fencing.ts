@@ -17,6 +17,7 @@ import {
   normalizePlayerFarm,
   validateFenceSelection,
 } from '../../logic/farm/fence-validation'
+import { buildFenceFarmInteraction } from '../../logic/farm/farm-interaction'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { collectComputeCostsForFarmChoice } from '../../cards/card-listeners'
 import { playerCanBuildPalisades } from '../../cards/helpers/card-type'
@@ -169,17 +170,21 @@ export const fenceAction: ActionDefinition = {
     canExecute: (ctx, costOverride) =>
       canStartFencing(ctx.state, ctx.player, costOverride),
   },
-  execute: () => ({
-    type: 'request',
-    request: {
-      kind: 'choice',
-      options: [
-        { value: 'confirm', labelKey: 'ui.interactionFenceConfirm' },
-        { value: 'cancel', labelKey: 'ui.interactionFenceCancel' },
-      ],
-    },
-    promptKey: 'ui.interactionFenceSelect',
-  }),
+  execute: ({ player, space }): ActionExecutionResult => {
+    const farm = buildFenceFarmInteraction(player, space.id)
+    return {
+      type: 'request',
+      request: {
+        kind: 'farm-select',
+        farm,
+        options: [
+          { value: 'confirm', labelKey: 'ui.interactionFenceConfirm' },
+          { value: 'cancel', labelKey: 'ui.interactionFenceCancel' },
+        ],
+      },
+      promptKey: 'ui.interactionFenceSelect',
+    }
+  },
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
     if (choice === 'cancel') return { type: 'ok' }
 

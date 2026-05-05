@@ -5,6 +5,7 @@ import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 import type { PlayerState } from '../../shared/game/types.ts'
 
 import { workersAvailable } from '../../shared/game/player'
+import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 describe('construct room payment session', () => {
   const setup = () => {
     const session = new GameSession()
@@ -33,7 +34,7 @@ describe('construct room payment session', () => {
 
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.farm.farmType).toBe('room')
@@ -43,12 +44,12 @@ describe('construct room payment session', () => {
 
     resp = session.resolveChoice(0, 'confirm', { rooms: [room] })
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.promptKey).toBe('prompt.selectPayment')
-    expect(resp.pending.options).toHaveLength(2)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
+    expect(resp.interaction.options).toHaveLength(2)
 
-    const woodSwapOption = resp.pending.options.find(
+    const woodSwapOption = resp.interaction.options?.find(
       (option) =>
         typeof option.labelParams === 'object' &&
         typeof (option.labelParams as { resourcesPaid?: { wood?: number; stone?: number } }).resourcesPaid?.stone === 'number' &&
@@ -98,10 +99,10 @@ describe('construct room payment session', () => {
 
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    const constructOption = resp.pending.options.find(
+    const constructOption = resp.interaction.options?.find(
       (option) => option.labelKey === 'actions.construct.name',
     )
     expect(constructOption).toBeDefined()
@@ -115,11 +116,11 @@ describe('construct room payment session', () => {
     const workersAfterTake = workersAvailable(resp.state, resp.state.players[0]!)
     const undoStepResp = session.undoStep()
     expect(undoStepResp.ok).toBe(true)
-    expect(undoStepResp.pending.type).toBe('choice')
     expect(undoStepResp.interaction.stateId).toBe('wait')
-    if (undoStepResp.pending.type !== 'choice') return
-    expect(undoStepResp.pending.options.some((option) => option.labelKey === 'actions.construct.name')).toBe(true)
-    expect(undoStepResp.pending.options.some((option) => option.labelKey === 'actions.stables.name')).toBe(true)
+    expect(undoStepResp.interaction.stateId).toBe('wait')
+    if (undoStepResp.interaction.stateId !== 'wait') return
+    expect(undoStepResp.interaction.options?.some((option) => option.labelKey === 'actions.construct.name')).toBe(true)
+    expect(undoStepResp.interaction.options?.some((option) => option.labelKey === 'actions.stables.name')).toBe(true)
     expect(workersAvailable(undoStepResp.state, undoStepResp.state.players[0]!)).toBe(workersAfterTake)
     expect(
       undoStepResp.state.actionSpaces.find((space) => space.id === 'farm-expansion')?.takenBy[0]?.playerId,
@@ -127,7 +128,7 @@ describe('construct room payment session', () => {
 
     const secondUndoStepResp = session.undoStep()
     expect(secondUndoStepResp.ok).toBe(true)
-    expect(secondUndoStepResp.pending.type).toBe('none')
+    expect(isLegacyChoicePending(secondUndoStepResp)).toBe(false)
     expect(workersAvailable(secondUndoStepResp.state, secondUndoStepResp.state.players[0]!)).toBe(2)
     expect(secondUndoStepResp.state.actionSpaces.find((space) => space.id === 'farm-expansion')?.takenBy).toEqual([])
   })
@@ -152,10 +153,10 @@ describe('construct room payment session', () => {
 
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    const constructOption = resp.pending.options.find(
+    const constructOption = resp.interaction.options?.find(
       (option) => option.labelKey === 'actions.construct.name',
     )
     expect(constructOption).toBeDefined()
@@ -175,7 +176,7 @@ describe('construct room payment session', () => {
 
     resp = session.resolveChoice(0, 'confirm', { rooms: [roomA, roomB] })
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.rooms).toBe(4)
     expect(resp.state.players[0]!.resources.wood).toBe(0)
     expect(resp.state.players[0]!.resources.reed).toBe(0)
@@ -197,10 +198,10 @@ describe('construct room payment session', () => {
 
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    const constructOption = resp.pending.options.find(
+    const constructOption = resp.interaction.options?.find(
       (option) => option.labelKey === 'actions.construct.name',
     )
     expect(constructOption).toBeDefined()
@@ -216,10 +217,10 @@ describe('construct room payment session', () => {
     resp = session.resolveChoice(0, 'confirm', { rooms: [room] })
 
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.promptKey).toBe('ui.interactionFarmExpansionSelect')
-    expect(resp.pending.options.some((option) => option.labelKey === 'ui.interactionFlowDone')).toBe(true)
-    expect(resp.pending.options.some((option) => option.labelKey === 'actions.stables.name')).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('ui.interactionFarmExpansionSelect')
+    expect(resp.interaction.options?.some((option) => option.labelKey === 'ui.interactionFlowDone')).toBe(true)
+    expect(resp.interaction.options?.some((option) => option.labelKey === 'actions.stables.name')).toBe(true)
   })
 })

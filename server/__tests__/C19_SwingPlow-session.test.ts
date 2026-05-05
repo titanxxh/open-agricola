@@ -4,6 +4,7 @@ import { getCardStack } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/C/C19_SwingPlow'
 import type { ActionChoiceOption } from '../../shared/game/types'
+import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 
 describe('C19_SwingPlow session', () => {
   const setup = (stackSize = 4) => {
@@ -45,8 +46,8 @@ describe('C19_SwingPlow session', () => {
     expect(resp.ok).toBe(true)
 
     // First optional plow from card
-    expect(resp.pending.type).toBe('choice')
-    const accept1 = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    expect(resp.interaction.stateId).toBe('wait')
+    const accept1 = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(accept1).toBeDefined()
     resp = session.resolveChoice(0, accept1!.value)
     expect(resp.ok).toBe(true)
@@ -58,8 +59,8 @@ describe('C19_SwingPlow session', () => {
     expect(resp.ok).toBe(true)
 
     // Second optional plow from card
-    expect(resp.pending.type).toBe('choice')
-    const accept2 = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    expect(resp.interaction.stateId).toBe('wait')
+    const accept2 = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(accept2).toBeDefined()
     resp = session.resolveChoice(0, accept2!.value)
     expect(resp.ok).toBe(true)
@@ -85,13 +86,13 @@ describe('C19_SwingPlow session', () => {
     resp = session.resolveChoice(0, 'confirm', { tile: tile1 })
 
     // Accept first optional plow
-    const accept1 = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const accept1 = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     resp = session.resolveChoice(0, accept1!.value)
     const tile2 = resp.interaction.farm.selectableTiles[0]
     resp = session.resolveChoice(0, 'confirm', { tile: tile2 })
 
     // Skip second optional plow
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     resp = session.resolveChoice(0, '__skip__')
     expect(resp.ok).toBe(true)
 
@@ -110,7 +111,7 @@ describe('C19_SwingPlow session', () => {
     resp = session.resolveChoice(0, 'confirm', { tile: tile1 })
 
     // Skip first optional plow
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     resp = session.resolveChoice(0, '__skip__')
     expect(resp.ok).toBe(true)
 
@@ -129,8 +130,8 @@ describe('C19_SwingPlow session', () => {
     resp = session.resolveChoice(0, 'confirm', { tile: tile1 })
 
     // Accept the single optional plow
-    expect(resp.pending.type).toBe('choice')
-    const accept1 = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    expect(resp.interaction.stateId).toBe('wait')
+    const accept1 = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     resp = session.resolveChoice(0, accept1!.value)
     const tile2 = resp.interaction.farm.selectableTiles[0]
     resp = session.resolveChoice(0, 'confirm', { tile: tile2 })
@@ -150,7 +151,7 @@ describe('C19_SwingPlow session', () => {
     resp = session.resolveChoice(0, 'confirm', { tile: tile1 })
 
     // No optional choice
-    expect(resp.pending.type).not.toBe('choice')
+    expect(isLegacyChoicePending(resp)).toBe(false)
     expect(resp.state.players[0]!.fields.length).toBe(1)
   })
 })

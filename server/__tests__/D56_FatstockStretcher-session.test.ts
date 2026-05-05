@@ -43,7 +43,7 @@ describe('D56_FatstockStretcher session', () => {
 
     let resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
 
     // Cook 2 sheep (Fireplace trade index 0 = sheep->2food)
     resp = session.resolveChoice(0, 'bulk:0=2')

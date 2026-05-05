@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/game/player'
+import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/C/C112_Thresher'
 
 const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`
@@ -44,10 +45,10 @@ describe('C112_Thresher session', () => {
     const resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
     // The before-hook should offer a pay-gain choice (optional)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     // Should have skip option and exchange option
-    const hasSkip = resp.pending.options.some((o) => o.value === '__skip__')
+    const hasSkip = resp.interaction.options?.some((o) => o.value === '__skip__')
     expect(hasSkip).toBe(true)
   })
 
@@ -60,11 +61,11 @@ describe('C112_Thresher session', () => {
 
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // Accept the exchange (not skip)
-    const exchangeOption = resp.pending.options.find((o) => o.value !== '__skip__')
+    const exchangeOption = resp.interaction.options?.find((o) => o.value !== '__skip__')
     if (!exchangeOption) return
     resp = session.resolveChoice(0, exchangeOption.value)
     expect(resp.ok).toBe(true)
@@ -84,12 +85,12 @@ describe('C112_Thresher session', () => {
     // the standard grain-utilization OR(sow, bake-bread) flow, which itself
     // becomes a choice (or confirmNextPlayer if both inner actions are
     // undoable). We assert the before-hook's skip option isn't present.
-    if (resp.pending.type === 'choice') {
-      const hasSkip = resp.pending.options.some((o) => o.value === '__skip__')
+    if (resp.interaction.stateId === 'wait') {
+      const hasSkip = resp.interaction.options?.some((o) => o.value === '__skip__')
       // No before-hook skip token specifically — but any skip would be a
       // false positive only if it carried Thresher labelling. We tolerate
       // any non-Thresher choice here.
-      expect(hasSkip || resp.pending.options.length > 0).toBe(true)
+      expect(hasSkip || resp.interaction.options?.length > 0).toBe(true)
     }
   })
 
@@ -98,7 +99,7 @@ describe('C112_Thresher session', () => {
     const resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
     // Without the card, no exchange offered before normal flow
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
   })
 
   it('also triggers for farmland space', () => {
@@ -106,9 +107,9 @@ describe('C112_Thresher session', () => {
     const resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
     // The before-hook should fire for farmland too
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    const hasSkip = resp.pending.options.some((o) => o.value === '__skip__')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const hasSkip = resp.interaction.options?.some((o) => o.value === '__skip__')
     expect(hasSkip).toBe(true)
   })
 
@@ -117,9 +118,9 @@ describe('C112_Thresher session', () => {
     const resp = session.takeAction(0, 'cultivation')
     expect(resp.ok).toBe(true)
     // The before-hook should fire for cultivation too
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    const hasSkip = resp.pending.options.some((o) => o.value === '__skip__')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const hasSkip = resp.interaction.options?.some((o) => o.value === '__skip__')
     expect(hasSkip).toBe(true)
   })
 
@@ -149,11 +150,11 @@ describe('C112_Thresher session', () => {
     expect(resp.ok).toBe(true)
     // Must reach the before-hook (so player can buy grain), not skip past
     // it because every inner action was "undoable".
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     // The first prompt should be Thresher's pay-1-food → 1-grain offer
     // (its before-hook + an optional skip).
-    const hasSkip = resp.pending.options.some((o) => o.value === '__skip__')
+    const hasSkip = resp.interaction.options?.some((o) => o.value === '__skip__')
     expect(hasSkip).toBe(true)
   })
 
@@ -172,6 +173,6 @@ describe('C112_Thresher session', () => {
     // undoable. The action resolves immediately without offering a choice,
     // ending in confirmNextPlayer (or none) rather than choice.
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).not.toBe('choice')
+    expect(isLegacyChoicePending(resp)).toBe(false)
   })
 })

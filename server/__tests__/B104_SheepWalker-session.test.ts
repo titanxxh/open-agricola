@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
+import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 
 import '../../shared/cards/B/B104_SheepWalker'
 
@@ -47,15 +48,15 @@ describe('B104_SheepWalker session — last harvest enforcement', () => {
 
     let resp = session.performRoundEnd()
     // Feed phase — playerA has 10 food, no begging.
-    if (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(0, [])
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
+      resp = session.resolveChoice(0, 'confirm', { selections: [] })
     }
 
     // Without B104, breed phase ends here with no animals (1 sheep < 2). With
     // the fix, B104.enforceReorganizeOnLastHarvest must force animalReorg.
-    expect(resp.pending.type).toBe('choice')
-    if ((resp.pending.type !== 'choice' || (resp.pending as any).promptKey !== 'ui.interactionAnimalReorg')) return
-    expect(resp.pending.playerIndex).toBe(0)
+    expect(resp.interaction.stateId).toBe('wait')
+    if ((resp.interaction.stateId !== 'wait' || resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined !== 'ui.interactionAnimalReorg')) return
+    expect(resp.interaction.playerIndex).toBe(0)
 
     // Confirm reorg leaving the sheep on its pasture.
     resp = session.resolveChoice(0, 'confirm', [
@@ -72,12 +73,12 @@ describe('B104_SheepWalker session — last harvest enforcement', () => {
     session.loadState(state)
 
     let resp = session.performRoundEnd()
-    if (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(0, [])
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
+      resp = session.resolveChoice(0, 'confirm', { selections: [] })
     }
 
     // No sheep -> no reorg forcing -> game ends normally.
-    expect(resp.pending.type).toBe('none')
+    expect(isLegacyChoicePending(resp)).toBe(false)
     expect(resp.state.gameOver).toBe(true)
   })
 
@@ -110,11 +111,11 @@ describe('B104_SheepWalker session — last harvest enforcement', () => {
     session.loadState(state)
 
     let resp = session.performRoundEnd()
-    if (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(0, [])
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
+      resp = session.resolveChoice(0, 'confirm', { selections: [] })
     }
     // In a normal round, 1 sheep does not trigger reorg.
-    expect(resp.pending.type).toBe('none')
+    expect(isLegacyChoicePending(resp)).toBe(false)
     expect(resp.state.round).toBe(5)
   })
 })

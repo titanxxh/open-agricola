@@ -130,7 +130,7 @@ describe('B137_Wholesaler session', () => {
     expect(resp.ok).toBe(true)
 
     // pig-market is accumulating — triggers animalReorg
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     // Place all boar (2 from pig-market) into pasture p1
     resp = session.resolveChoice(0, 'confirm', [
       { id: 'p1', zoneType: 'pasture', animalType: 'boar', animalCount: 2 },
@@ -138,7 +138,7 @@ describe('B137_Wholesaler session', () => {
 
     // After reorg, card after-hook fires and gives +1 boar
     // This may trigger another animalReorg
-    if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
         { id: 'p1', zoneType: 'pasture', animalType: 'boar', animalCount: 3 },
       ])
@@ -183,14 +183,14 @@ describe('B137_Wholesaler session', () => {
     expect(resp.ok).toBe(true)
 
     // cattle-market triggers animalReorg
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     // Place all cattle (2 from cattle-market) into pasture p2
     resp = session.resolveChoice(0, 'confirm', [
       { id: 'p2', zoneType: 'pasture', animalType: 'cattle', animalCount: 2 },
     ])
 
     // After reorg, card after-hook fires and gives +1 cattle
-    if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
         { id: 'p2', zoneType: 'pasture', animalType: 'cattle', animalCount: 3 },
       ])

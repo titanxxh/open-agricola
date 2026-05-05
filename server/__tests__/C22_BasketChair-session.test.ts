@@ -76,16 +76,16 @@ const setup = (options?: { activeWorkers?: number }) => {
  */
 const buyC22ViaMeetingPlace = (session: GameSession) => {
   let resp = session.takeAction(0, 'meeting-place')
-  if (resp.pending.type !== 'choice') {
-    throw new Error(`expected optional minor-improvement choice, got ${resp.pending.type}`)
+  if (resp.interaction.stateId !== 'wait') {
+    throw new Error(`expected optional minor-improvement choice, got ${resp.interaction.stateId}`)
   }
-  const acceptMinor = resp.pending.options.find((o) => o.value !== '__skip__')
+  const acceptMinor = resp.interaction.options?.find((o) => o.value !== '__skip__')
   if (!acceptMinor) throw new Error('accept-minor-improvement option missing')
   resp = session.resolveChoice(0, acceptMinor.value)
-  if (resp.pending.type !== 'choice') {
-    throw new Error(`expected minor-selection choice, got ${resp.pending.type}`)
+  if (resp.interaction.stateId !== 'wait') {
+    throw new Error(`expected minor-selection choice, got ${resp.interaction.stateId}`)
   }
-  const c22Option = resp.pending.options.find((o) => o.value === CARD_ID)
+  const c22Option = resp.interaction.options?.find((o) => o.value === CARD_ID)
   if (!c22Option) throw new Error('C22 option missing from minor selection')
   return session.resolveChoice(0, c22Option.value)
 }
@@ -101,11 +101,11 @@ describe('C22_BasketChair session', () => {
     expect(resp.state.players[0]!.resources.reed).toBe(0)
 
     // onBuy should present an optional accept/skip for the recall+place seq.
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    const acceptOption = resp.pending.options.find((o) => o.value !== '__skip__')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const acceptOption = resp.interaction.options?.find((o) => o.value !== '__skip__')
     expect(acceptOption).toBeDefined()
-    expect(resp.pending.options.some((o) => o.value === '__skip__')).toBe(true)
+    expect(resp.interaction.options?.some((o) => o.value === '__skip__')).toBe(true)
 
     // Accept → recall worker 1 onto C22 and open place-farmer choice.
     resp = session.resolveChoice(0, acceptOption!.value)
@@ -118,12 +118,12 @@ describe('C22_BasketChair session', () => {
     expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)
 
     // Next pending is the place-farmer choice.
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    const clayPitOption = resp.pending.options.find((o) => o.value === 'clay-pit')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const clayPitOption = resp.interaction.options?.find((o) => o.value === 'clay-pit')
     expect(clayPitOption).toBeDefined()
     // The freed Forest must also be available as a placement option.
-    expect(resp.pending.options.some((o) => o.value === 'forest')).toBe(true)
+    expect(resp.interaction.options?.some((o) => o.value === 'forest')).toBe(true)
 
     resp = session.resolveChoice(0, clayPitOption!.value)
     expect(resp.ok).toBe(true)
@@ -142,8 +142,8 @@ describe('C22_BasketChair session', () => {
 
     let resp = buyC22ViaMeetingPlace(session)
     expect(resp.state.players[0]!.minorPlayed).toContain(CARD_ID)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     resp = session.resolveChoice(0, '__skip__')
     expect(resp.ok).toBe(true)
@@ -197,8 +197,8 @@ describe('C22_BasketChair session', () => {
     expect(resp.state.players[0]!.minorPlayed).toContain(CARD_ID)
     // Nothing from C22 should still be pending: no accept/skip prompt,
     // definitely no holdWorkerOnCard mutation.
-    if (resp.pending.type === 'choice') {
-      const c22Accept = resp.pending.options.find(
+    if (resp.interaction.stateId === 'wait') {
+      const c22Accept = resp.interaction.options?.find(
         (o) => (o as { sourceCard?: string }).sourceCard === CARD_ID,
       )
       expect(c22Accept).toBeUndefined()
@@ -219,14 +219,14 @@ describe('C22_BasketChair session', () => {
     simulatePlacement(session, 0, 'forest', '1')
 
     let resp = buyC22ViaMeetingPlace(session)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    const acceptOption = resp.pending.options.find((o) => o.value !== '__skip__')!
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const acceptOption = resp.interaction.options?.find((o) => o.value !== '__skip__')!
 
     resp = session.resolveChoice(0, acceptOption.value)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.options.some((o) => o.value === 'forest')).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.options?.some((o) => o.value === 'forest')).toBe(true)
 
     const woodBefore = resp.state.players[0]!.resources.wood
     resp = session.resolveChoice(0, 'forest')
@@ -247,10 +247,10 @@ describe('C22_BasketChair session', () => {
 
     // Golden-path buy + accept + place on clay-pit, matching case 1.
     let resp = buyC22ViaMeetingPlace(session)
-    if (resp.pending.type !== 'choice') throw new Error('expected accept/skip choice')
-    const acceptOption = resp.pending.options.find((o) => o.value !== '__skip__')!
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected accept/skip choice')
+    const acceptOption = resp.interaction.options?.find((o) => o.value !== '__skip__')!
     resp = session.resolveChoice(0, acceptOption.value)
-    if (resp.pending.type !== 'choice') throw new Error('expected place-farmer choice')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected place-farmer choice')
     resp = session.resolveChoice(0, 'clay-pit')
     expect(getWorkerHeldOnCard(resp.state.players[0]!, CARD_ID)).toBe('1')
 

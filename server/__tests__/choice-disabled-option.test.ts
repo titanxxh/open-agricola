@@ -17,6 +17,7 @@ import { occupations } from '../../shared/game/occupations'
 import { setWorkersAtHome } from '../../shared/game/player'
 import type { ActionFlow } from '../../shared/game/types'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
+import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 
 const TEST_CARD_ID = '__TEST_DISABLED_OPTION_CARD__'
 
@@ -78,20 +79,20 @@ describe('disabled option in pending choice', () => {
     // Play the occupation → triggers onBuy XOR choice
     let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // Get the first option (wood) and mutate it to be disabled
-    const firstOption = resp.pending.options[0]!
+    const firstOption = resp.interaction.options[0]!
     expect(firstOption).toBeDefined()
 
-    // Task 10: GameState.pending is gone. The engine caches the composite-
-    // node (XorNode here) emitted choice on `lastEmittedChoice` — mutate
-    // that to flip the `disabled` flag for the disabled-guard test.
-    const engine = session.getEngineStack().current()!.engine as unknown as {
-      lastEmittedChoice: { options: { disabled?: boolean }[] }
-    }
-    engine.lastEmittedChoice.options[0].disabled = true
+    // S2 Task 8: composite-node emit metadata now lives on the node itself
+    // (XorNode.emittedChoices). Mutate that to flip the `disabled` flag.
+    const composite = session
+      .getEngineStack()
+      .current()!
+      .engine.peekPendingChoiceFromComposite()!
+    composite.options[0]!.disabled = true
 
     // Attempt to resolve with the disabled option → should be rejected
     resp = session.resolveChoice(0, firstOption.value)
@@ -105,24 +106,25 @@ describe('disabled option in pending choice', () => {
     // Play the occupation → triggers onBuy XOR choice
     let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    const firstOption = resp.pending.options[0]!
-    const secondOption = resp.pending.options[1]!
+    const firstOption = resp.interaction.options[0]!
+    const secondOption = resp.interaction.options[1]!
     expect(firstOption).toBeDefined()
     expect(secondOption).toBeDefined()
 
-    // Task 10: GameState.pending is gone. Mutate the engine's cached
-    // composite-node choice to flip the `disabled` flag.
-    const engine = session.getEngineStack().current()!.engine as unknown as {
-      lastEmittedChoice: { options: { disabled?: boolean }[] }
-    }
-    engine.lastEmittedChoice.options[0].disabled = true
+    // S2 Task 8: composite-node emit metadata now lives on the node itself
+    // (XorNode.emittedChoices). Mutate that to flip the `disabled` flag.
+    const composite = session
+      .getEngineStack()
+      .current()!
+      .engine.peekPendingChoiceFromComposite()!
+    composite.options[0]!.disabled = true
 
     // Attempt to resolve with the second (non-disabled) option → should succeed
     resp = session.resolveChoice(0, secondOption.value)
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).not.toBe('choice')
+    expect(isLegacyChoicePending(resp)).toBe(false)
   })
 })

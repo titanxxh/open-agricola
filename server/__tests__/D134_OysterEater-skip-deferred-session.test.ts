@@ -2,19 +2,20 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/D/D134_OysterEater'
-import type { SessionResponse } from '../../shared/session/game-core'
+import type { SessionResponse } from '../../shared/session/session-core'
+import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 const drainPending = (session: GameSession, resp: SessionResponse) => {
   let safety = 25
   while (
     safety-- > 0 &&
-    (resp.pending.type === 'confirmPlayerSwitch' ||
-      resp.pending.type === 'confirmNextPlayer')
+    (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch' ||
+      resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player')
   ) {
     resp =
-      resp.pending.type === 'confirmPlayerSwitch'
-        ? session.confirmPlayerSwitch()
-        : session.confirmNextPlayer()
+      resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch'
+        ? confirmPlayerSwitch(session)
+        : confirmNextPlayer(session)
   }
   return resp
 }

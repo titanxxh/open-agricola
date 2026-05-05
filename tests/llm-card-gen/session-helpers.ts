@@ -35,6 +35,7 @@ import {
   workersAvailable,
 } from '../../shared/game/player'
 import { GameSession } from '../../server/game/authoritative-session'
+import { confirmNextPlayer, confirmPlayerSwitch } from '../../server/__tests__/_helpers/legacy-confirms'
 
 export type CardType = 'minor' | 'occupation'
 
@@ -348,31 +349,31 @@ export function autoAdvanceRoundEnd(
   let iter = 0
   let resp = session.performRoundEnd()
   while (iter++ < max) {
-    if (resp.pending.type === 'none' && session.getState().state.gameOver) return
-    if (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+    if (resp.interaction.stateId !== 'wait' && session.getState().state.gameOver) return
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
       continue
     }
-    if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       // Default empty-zones wipes resources.{sheep,boar,cattle}; instead
       // build a zone list that preserves all current animals.
-      const pi = resp.pending.playerIndex
+      const pi = resp.interaction.playerIndex
       const player = session.getState().state.players[pi]
       const zones = player ? buildPreservingZones(player) : []
       resp = session.resolveChoice(pi, 'confirm', zones)
       continue
     }
-    if (resp.pending.type === 'confirmNextPlayer') {
-      resp = session.confirmNextPlayer()
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player') {
+      resp = confirmNextPlayer(session)
       continue
     }
-    if (resp.pending.type === 'confirmPlayerSwitch') {
-      resp = session.confirmPlayerSwitch()
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
       continue
     }
-    if (resp.pending.type === 'choice') {
+    if (resp.interaction.stateId === 'wait') {
       throw new Error(
-        `autoAdvanceRoundEnd hit a choice pending — fixture must pre-clear cards that prompt choices during round-end. choice: ${JSON.stringify(resp.pending).slice(0, 200)}`,
+        `autoAdvanceRoundEnd hit a choice pending — fixture must pre-clear cards that prompt choices during round-end. choice: ${JSON.stringify(resp.interaction).slice(0, 200)}`,
       )
     }
     // pending.type === 'none' but game not over → kick next round

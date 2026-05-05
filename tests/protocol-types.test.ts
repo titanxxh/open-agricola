@@ -1,16 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import type { GameSyncPayload, StateUpdateCause, StateUpdateEnvelope } from '../shared/protocol/game'
 import type { ClientCommand, ServerEvent, RoomSummary } from '../shared/protocol/ws'
-import type { PendingAction } from '../shared/game/types'
+import type { InteractionRequest } from '../shared/game/types'
 import { serializeState } from '../shared/game/serialization'
 import { createInitialState } from '../shared/logic/state'
+import { EngineStack } from '../shared/engine'
+
+const emptyCtx = () => ({ engineStack: new EngineStack() })
 
 describe('shared protocol types', () => {
   it('GameSyncPayload can be constructed from SessionResponse', () => {
     const state = createInitialState(42)
     const payload: GameSyncPayload = {
-      state: serializeState(state),
-      pending: { type: 'none' },
+      state: serializeState(state, emptyCtx()),
       interaction: {
         stateId: 'idle',
         allowedCommands: ['takeAction', 'undoStep', 'undoAction'],
@@ -23,7 +25,7 @@ describe('shared protocol types', () => {
     }
     expect(payload.ok).toBe(true)
     expect(payload.state.round).toBe(1)
-    expect(payload.pending.type).toBe('none')
+    expect(payload.interaction.stateId).toBe('idle')
   })
 
   it('StateUpdateEnvelope wraps a GameSyncPayload', () => {
@@ -35,8 +37,7 @@ describe('shared protocol types', () => {
       sync: 'snapshot',
       cause: 'action',
       payload: {
-        state: serializeState(state),
-        pending: { type: 'none' },
+        state: serializeState(state, emptyCtx()),
         interaction: {
           stateId: 'idle',
           allowedCommands: ['takeAction', 'undoStep', 'undoAction'],
@@ -53,22 +54,45 @@ describe('shared protocol types', () => {
     expect(envelope.version).toBe(1)
   })
 
-  it('PendingAction covers all variants', () => {
-    const variants: PendingAction[] = [
-      { type: 'none' },
-      { type: 'choice', playerIndex: 0, spaceId: 'test', options: [] },
-      { type: 'harvestFeed', playerIndex: 0, remaining: 5, foodUsed: 0 },
+  it('InteractionRequest covers all variants', () => {
+    const variants: InteractionRequest[] = [
+      { kind: 'choice', options: [] },
+      { kind: 'animal-reorg', zones: [] },
+      { kind: 'confirm-next-player', nextPlayerIndex: 1 },
+      { kind: 'confirm-player-switch', fromPlayerIndex: 0, toPlayerIndex: 1 },
+      { kind: 'feed', remaining: 5, foodUsed: 0 },
       {
-        type: 'harvestFeed',
-        playerIndex: 0,
+        kind: 'feed',
         remaining: 3,
         foodUsed: 1,
         feedQueue: [{ index: 1, remaining: 2, foodUsed: 0 }],
       },
-      { type: 'confirmNextPlayer', nextPlayerIndex: 1 },
+      {
+        kind: 'farm-select',
+        farm: { farmType: 'plow', selectableTiles: [] },
+      },
+      {
+        kind: 'selection',
+        selection: {
+          selectionType: 'farm-position',
+          selectablePositions: [],
+          maxSelections: 1,
+        },
+      },
+      {
+        kind: 'card-draft',
+        mode: 'simultaneous',
+        round: 1,
+        totalRounds: 7,
+        poolSize: 7,
+        seatOrder: [],
+        pools: {},
+        pendingPicks: [],
+        kept: {},
+      },
     ]
-    expect(variants.length).toBe(5)
-    variants.forEach((v) => expect(v.type).toBeDefined())
+    expect(variants.length).toBe(9)
+    variants.forEach((v) => expect(v.kind).toBeDefined())
   })
 
   it('ClientCommand covers all action types', () => {
@@ -76,20 +100,18 @@ describe('shared protocol types', () => {
       { type: 'action', spaceId: 'test' },
       { type: 'choice', value: 'confirm' },
       { type: 'anytime', actionId: 'bake-bread' },
-      { type: 'feed', selections: [] },
-      { type: 'nextPlayer' },
       { type: 'roundEnd' },
       { type: 'getState' },
       { type: 'createRoom', maxPlayers: 2 },
       { type: 'joinRoom', roomId: 'abc', requestedPlayerIndex: 0 },
     ]
-    expect(commands.length).toBe(9)
+    expect(commands.length).toBe(7)
   })
 
   it('ServerEvent discriminates on type', () => {
     const events: ServerEvent[] = [
       { type: 'error', error: 'test' },
-      { type: 'roomCreated', roomId: 'abc', playerIndex: 0 },
+      { type: 'roomCreated', roomId: 'abc', playerIndex: 0, maxPlayers: 2 },
       { type: 'roomJoined', roomId: 'abc', playerIndex: 1 },
       { type: 'gameStarted' },
       { type: 'playerDisconnected', playerIndex: 0 },

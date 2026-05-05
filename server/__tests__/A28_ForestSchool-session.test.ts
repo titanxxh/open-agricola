@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { A28_ForestSchool as A28Card } from '../../shared/cards/A/A28_ForestSchool'
 
 import { setWorkersAtHome, workersAvailable } from '../../shared/game/player'
+import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/A/A28_ForestSchool'
 import '../../shared/cards/A/A123_FrameBuilder'
 
@@ -41,7 +42,7 @@ describe('A28_ForestSchool session', () => {
   it('makes occupied lessons available only when the card is played', () => {
     const withCard = setup(true).getState()
     expect(withCard.ok).toBe(true)
-    expect(withCard.pending.type).toBe('none')
+    expect(isLegacyChoicePending(withCard)).toBe(false)
     expect(withCard.actionAvailability?.lessons).toBe(true)
 
     const withoutCardSession = setup(false)
@@ -58,7 +59,7 @@ describe('A28_ForestSchool session', () => {
 
     const resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)
     expect(resp.state.players[0]!.resources.wood).toBe(0)
     // D152_Patron grants 2 food before playing an occupation

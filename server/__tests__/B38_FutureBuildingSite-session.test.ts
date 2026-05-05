@@ -90,14 +90,14 @@ describe('B38 FutureBuildingSite — session', () => {
     // (accept-execute / __skip__).
     let resp = session.takeAction(0, 'meeting-place')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // Sole choice surfaced: the OptionalNode wrapping `minor-improvement`
     // (accept-execute / __skip__). Because B38 is the only playable minor in the
     // player's hand, `minor-improvement.execute` short-circuits the per-card
     // choice and B38's onBuy runs immediately.
-    const acceptMinor = resp.pending.options.find((o) => o.value !== '__skip__')
+    const acceptMinor = resp.interaction.options?.find((o) => o.value !== '__skip__')
     expect(acceptMinor).toBeDefined()
     resp = session.resolveChoice(0, acceptMinor!.value)
     expect(resp.ok).toBe(true)
@@ -160,9 +160,9 @@ describe('B38 FutureBuildingSite — session', () => {
     expect(resp.ok).toBe(true)
 
     // Select room building (or-leaf value is engine-generated like 'seq-construct-N').
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    const roomOpt = resp.pending.options?.find((o: ActionChoiceOption) =>
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const roomOpt = resp.interaction.options?.find((o: ActionChoiceOption) =>
       o.labelKey === 'actions.construct.name',
     )
     expect(roomOpt).toBeDefined()
@@ -188,8 +188,8 @@ describe('B38 FutureBuildingSite — session', () => {
     expect(resp.ok).toBe(true)
 
     // Select stable building (option value is `seq-stables-<n>`)
-    if (resp.pending.type === 'choice') {
-      const stableOpt = resp.pending.options?.find(
+    if (resp.interaction.stateId === 'wait') {
+      const stableOpt = resp.interaction.options?.find(
         (o: ActionChoiceOption) => o.labelKey === 'actions.stables.name',
       )
       if (stableOpt) {

@@ -84,10 +84,10 @@ describe('PlayerStats action tracking', () => {
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
     // First a choice: construct (rooms) vs stables. Pick construct.
-    if (resp.pending.type !== 'choice') {
+    if (resp.interaction.stateId !== 'wait') {
       throw new Error('expected initial farm-expansion choice')
     }
-    const constructOption = resp.pending.options.find((o) =>
+    const constructOption = resp.interaction.options?.find((o) =>
       typeof o.value === 'string' && o.value.startsWith('seq-construct'),
     )
     if (!constructOption) throw new Error('construct option missing')
@@ -123,11 +123,11 @@ describe('PlayerStats action tracking', () => {
 
     let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type !== 'choice') throw new Error('expected occupation choice')
-    const opt = resp.pending.options.find((o) => o.value === occId)
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected occupation choice')
+    const opt = resp.interaction.options?.find((o) => o.value === occId)
     if (!opt) {
       // fallback: pick first non-skip option
-      const first = resp.pending.options.find((o) => o.value !== '__skip__')
+      const first = resp.interaction.options?.find((o) => o.value !== '__skip__')
       if (!first) throw new Error('no occupation option found')
       resp = session.resolveChoice(0, first.value)
     } else {
@@ -157,8 +157,8 @@ describe('PlayerStats action tracking', () => {
 
     let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type !== 'choice') throw new Error('expected major choice')
-    const opt = resp.pending.options.find((o) => o.value === 'major:Major_Fireplace1')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected major choice')
+    const opt = resp.interaction.options?.find((o) => o.value === 'major:Major_Fireplace1')
     if (!opt) throw new Error('Fireplace1 option missing')
     resp = session.resolveChoice(0, opt.value)
     expect(resp.ok).toBe(true)
