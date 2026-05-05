@@ -415,6 +415,10 @@ export class GameCore {
   listenersVetoIsDoableCheck(player: PlayerState, space: ActionSpace): boolean {
     return this.listenersVetoIsDoable(player, space)
   }
+  /** @internal Harvest phase trampoline — kicks off the beforeHarvest stage hook chain. */
+  invokeHarvestFromBeforeHarvest(): SessionResponse { return this.continueHarvestFromBeforeHarvest() }
+  /** @internal Harvest phase trampoline — kicks off the breed-phase continuation chain. */
+  invokeAfterFeedingPhase(): SessionResponse { return this.continueAfterFeedingPhase() }
   /** @internal phase access — build a fresh Engine for a top-level action space. */
   createEngineForSpace(actionId: string): Engine { return this.createEngine(actionId) }
   /** @internal phase access — push a synthetic interaction-only frame. */
@@ -3148,16 +3152,9 @@ export class GameCore {
     return this.finalizeRound()
   }
 
-  private startHarvest(): SessionResponse {
-    this.state.roundPhase = 'harvest'
-    this.state.log.unshift({ key: 'log.harvest', params: { round: this.state.round } })
-    return this.continueHarvestFromBeforeHarvest()
-  }
-
-  private startBreedPhase(): SessionResponse {
-    this.state.roundPhase = 'breeding'
-    return this.continueAfterFeedingPhase()
-  }
+  /** S2 Task 11: thin delegators — bodies live in `phases/harvest.ts`. */
+  private startHarvest(): SessionResponse { return harvestPhase.startHarvest(this) }
+  private startBreedPhase(): SessionResponse { return harvestPhase.startBreedPhase(this) }
 
   private continueAfterFeedingPhase(playerIndex = 0, cardIndex = 0): SessionResponse {
     if (this.continueStageHook('onEndHarvestFeedingPhase', playerIndex, cardIndex)) {
