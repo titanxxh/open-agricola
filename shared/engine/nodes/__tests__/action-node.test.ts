@@ -5,9 +5,14 @@ import type { EngineContext } from '../../types'
 const stubCtx: EngineContext = { resolveSubtree: () => {}, emitChoice: () => {} }
 
 describe('ActionNode.step', () => {
-  it('returns continue when not resolved', () => {
+  it('returns execute (with nodeId + actionId) when not resolved', () => {
     const node = new ActionNode('a1', 'gain-wood')
-    expect(node.step(stubCtx).kind).toBe('continue')
+    const result = node.step(stubCtx)
+    expect(result.kind).toBe('execute')
+    if (result.kind === 'execute') {
+      expect(result.nodeId).toBe('a1')
+      expect(result.actionId).toBe('gain-wood')
+    }
   })
 
   it('returns done after setState(resolved)', () => {

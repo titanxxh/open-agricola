@@ -49,15 +49,17 @@ export class ActionNode extends BaseNode {
   }
 
   /**
-   * S4b Task 16 — leaf-node medium richness. ActionNode signals 'continue'
-   * when not yet resolved (engine main loop drives the actual executor /
-   * hook orchestration via `node.execute`); 'done' once resolved. Keeping
-   * the signal minimal preserves all pre-PR4 dispatch semantics — the
-   * engine still owns the cost/replace/before-phase/insertAfter machinery.
+   * S4b Task 16 / PR5 sub-commit 4 — ActionNode signals `'execute'` (with
+   * its `nodeId` + `actionId`) so the engine main loop can dispatch the
+   * cost/replace/before-phase/hook/executor pipeline without an
+   * `instanceof ActionNode` test. Once resolved → `'done'`. The engine
+   * still owns the dispatch implementation (heavy: hook system, tree
+   * mutations, log emission) — this signal is purely the "what kind of
+   * leaf am I?" answer.
    */
   step(_ctx: EngineContext): NodeStepResult {
     if (this.getState() === 'resolved') return { kind: 'done' }
-    return { kind: 'continue' }
+    return { kind: 'execute', nodeId: this.id, actionId: this.actionId }
   }
 
   protected cursorData() {
