@@ -6,8 +6,9 @@ import {
   removePlayerFromRoom,
   resolveJoinRequestPlayerIndex,
   resolveJoinPlayerIndex,
-  restoreRoomFromSqliteRow,
-} from '../game/room-manager.ts'
+  snapshotToRoom,
+} from '../room.ts'
+import { restoreRoomFromSqliteRow } from '../room-manager.ts'
 
 const PRIMARY_DEV_ROOM_ID = FIXED_DEV_ROOMS[0]!.id
 
@@ -103,12 +104,17 @@ describe('room-manager seat assignment', () => {
   })
 
   it('restores waiting rooms without serialized state', () => {
-    const room = restoreRoomFromSqliteRow({
+    const room = snapshotToRoom({
       id: 'waiting1',
-      created_by: null,
-      state_json: null,
-      max_players: 3,
-      custom_card_ids: '[]',
+      serialized: null,
+      meta: {
+        createdBy: undefined,
+        maxPlayers: 3,
+        customCardDbIds: [],
+        status: 'waiting',
+        players: [],
+      },
+      updatedAt: 0,
     })
 
     expect(room).toMatchObject({
