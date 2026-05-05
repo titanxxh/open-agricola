@@ -962,7 +962,7 @@ S6 物理分层完成后专设 S7"卡牌效果测试回归"：
 
 ## 15. Sprint 演进路线
 
-按"先验证模式 → 再清架构 → 再瘦行动 → 再引入聚合 → 最后物理分层 + 测试回归"排：
+按"先验证模式 → 再清架构 → 再瘦行动 → 再引入聚合 → 最后物理分层 + 测试回归"排。**剩余 sprint 的并行机会见 §15bis**——双 owner 节奏可把 S4–S7 从 5–7 周压到 4–5 周。
 
 每个 sprint 共同 DoD（除强制 green 子集外）：
 
@@ -1086,6 +1086,96 @@ S6 物理分层完成后专设 S7"卡牌效果测试回归"：
 - 每张卡按现行规则 codemod 调用方式（`confirmXxx` → `resolveChoice + payload`）
 - 卡牌实际行为退化（不是测试 codemod 出问题，是真规则坏了）记录到 `docs/card_progress.md` §5（刻意不同）或修复
 - 专项 DoD：`skip-tracker.md` 清空；254 个卡牌效果 session 测试全绿；fast + slow project 都全绿
+
+---
+
+## 15bis. 剩余 sprint 并行执行方案
+
+S1–S3 已串行完成。S4–S7 之间存在两组**互不重叠的修改面**，双 owner 配置下可显著缩短总工期。
+
+### 15bis.1 依赖图
+
+```text
+S4 (domain + 节点充血) ───────┐
+   touch: shared/logic/farm/  │ 删 logic/farm 是 S6 物理分层的前提
+          shared/engine/      │
+          shared/actions/     │
+                              ▼
+                          S6 (物理分层 contract / cards-display / sandbox)
+                              touch: 全 shared/* + client/sandbox/
+                              │
+                              ▼
+                          S7 后半段 (behavior-regression skip 解锁)
+
+S5 (server room-manager 拆) ──┐ 与 S4 / S6 完全无重叠（server-only）
+   touch: server/connection/  │ 任意时点可插入
+          server/game/        │
+          server/persistence/ │
+                              ▼ 
+                          独立合并
+
+S7 前半段 (shape-mismatch skip codemod) ── S4 完成后即可启动
+                              ▲ 与 S6 cards-display 拆分有目录冲突
+                              │ 需协调 batch（每个 deck 合一批 S6 → S7 跟 codemod）
+```
+
+### 15bis.2 三个并行窗口
+
+**窗口 1：S4 ‖ S5（最优 — 零物理重叠）**
+
+| 维度 | S4 | S5 |
+|---|---|---|
+| 主要 touch 目录 | `shared/logic/`、`shared/engine/`、`shared/actions/effects/` | `server/room-manager.ts`、`server/connection/`、`server/game/persistence/` |
+| 估算文件数 | ~80 | ~10 |
+| 估算行数变化 | 净 -1500（删 > 增） | 净 +200（重排 + in-memory adapter） |
+| 互相依赖 | 无 | 无 |
+| 摩擦点 | 极小（仅 server/game/authoritative-session.ts 可能因 GameSession imports 重排冲突，rebase 简单） | 同左 |
+
+可在两个 worktree 同步推进，2 周内同时收口。
+
+**窗口 2：S6 ‖ S7-shape**
+
+| 维度 | S6 | S7 前半段 |
+|---|---|---|
+| 主要 touch 目录 | `shared/cards/*` → 拆 `shared/cards-display/*`（每张卡 +1 file，含 824 张内置卡） | `server/__tests__/{A,B,C,D,E}NN_*-session.test.ts` 中 shape-mismatch 类 skip（~150 张） |
+| 摩擦点 | **会撞 `shared/cards/*` 目录**：S6 拆 display vs impl 时，S7 同期改卡牌测试的 import 路径 |
+| 缓解 | 按 deck 分批：S6 每合一个 deck 的 cards-display 拆出，S7 跟着 codemod 该 deck 的测试。共 5 deck（A/B/C/D/E），分 5 个 batch 走 |
+| 估算节省 | 约 0.5 周 |
+
+**窗口 3：S7 后半段（无并行）**
+
+解 "behavior-regression" 类 skip 需要稳定的 contract 边界（即 S6 完成）。串行执行。
+
+### 15bis.3 节奏建议
+
+**双 owner 路径（推荐）**：
+
+| 周 | Owner A | Owner B |
+|---|---|---|
+| 1–2 | **S4** domain 聚合 + 节点充血 | **S5** server 三层拆分 |
+| 3 | **S6** 启动（S4 已合 / cards-display 按 deck 拆） | S5 收尾 + S6 review |
+| 4 | S6 收口 | **S7 前半段** shape-mismatch codemod（按 deck batch 跟 S6） |
+| 5 | S7 后半段 behavior-regression 修复 | — |
+
+**总周数：约 5 周**（vs 单线 7 周，节省 2 周）。
+
+**单 owner 路径**：
+
+按 §15 顺序串行 S4 → S5 → S6 → S7，5–7 周。**S5 可在 S4 PR review 等待期"插空"做**——它 server-only 且独立，不阻塞 S4 主线。
+
+### 15bis.4 风险与协调
+
+| 风险 | 缓解 |
+|---|---|
+| S4 + S5 并行：两边都可能动 `server/game/authoritative-session.ts` 的 GameSession imports | S5 不动行为，仅重排目录；rebase 简单。约定 S5 owner 先 freeze authoritative-session import 形态后再开 PR |
+| S6 + S7 cards 目录撞工 | 按 deck 切 batch（A→B→C→D→E）；每 deck S6 先合，S7 当周跟。避免 S6 + S7 同 deck 同时改 |
+| S7 真规则退化超预期 | 退化登记到 `docs/card_progress.md` §2.5（刻意不同）或修复。预留缓冲：单 owner 路径 +1 周，双 owner 路径 +0.5 周 |
+| 双 owner PR review 互相阻塞 | S4 / S5 PR 拆细（每周 ≥ 2 PR），review 队列不超过 2 个。S6 因 churn 大，每个 deck 一 PR |
+
+### 15bis.5 决策
+
+- 当前若有两个 owner 可分配 → 走双 owner 路径，**先开 S4 ‖ S5**；S5 worktree 已做过 server-only 改动（S2 拆 GameSession 时验证过），并行风险低
+- 若单 owner → 仍按 §15 顺序，**S5 插空策略**保持机会（S4 PR 等 review 时启动）
 
 ---
 
