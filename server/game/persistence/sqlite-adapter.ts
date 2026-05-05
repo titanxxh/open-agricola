@@ -33,7 +33,11 @@ const toStatus = (raw: string): RoomStatus =>
   raw === 'playing' || raw === 'finished' || raw === 'waiting' ? raw : 'waiting'
 
 export class SqliteRoomPersistence implements RoomPersistence {
-  constructor(private readonly db: Pick<Database.Database, 'prepare'>) {}
+  private readonly db: Pick<Database.Database, 'prepare'>
+
+  constructor(db: Pick<Database.Database, 'prepare'>) {
+    this.db = db
+  }
 
   load(id: string): RoomSnapshot | null {
     const row = this.db.prepare(
