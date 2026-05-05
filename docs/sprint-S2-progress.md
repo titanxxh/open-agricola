@@ -21,7 +21,7 @@
 | **10** | Round mixin 抽取 | ✅ 主体完整（13 method 迁移到 phases/round.ts：takeAction / startConfirmNextPlayer / startConfirmPlayerSwitch / startFeedSubFlow / handleConfirmNextPlayerResolved / handleConfirmPlayerSwitchResolved / takeAnytimeAction / continueAfterReorganize_returningHome / continueAfterReorganize_roundEnd / finalizeActionLog / finishCompletedActionTurn / performRoundEnd / finalizeRound + helpers；12 stage-hook trampoline chain 按设计保留 GameCore） |
 | **11** | Harvest mixin 抽取（含 12 hook handler） | ✅ 主体完整（startHarvest / startBreedPhase / continueAfterReorganize_harvestBreed / getHarvestPlayerIndices；handleFeedResolved 按设计保留 GameCore） |
 | **12** | Draft mixin + card-draft kind 包装 | ✅ 主体完整（submitDraftPick / computeCardDraftPending；card-draft kind InteractionRequest 包装延后） |
-| **13** | final cleanup（删 PendingAction / 3 confirm shim / EMPTY_CURSOR / 68 测试 codemod / 8 kind 序列化往返） | ⚠️ 7/8 完成（13.1 / 13.4 / 13.5 / 13.8 / 13.10 ✅；13.3 + 13.7 part 1：删 confirmHarvestFeed shim + 24 callsite codemod；confirmNextPlayer/confirmPlayerSwitch shim 保留 deprecated；13.6 PendingAction union 仍延后） |
+| **13** | final cleanup（删 PendingAction / 3 confirm shim / EMPTY_CURSOR / 68 测试 codemod / 8 kind 序列化往返） | ✅ 实质完成（13.1 / 13.4 / 13.5 / 13.8 / 13.10 ✅；13.3 + 13.7 part 1：删 confirmHarvestFeed shim；13.7 part 2：删 confirmNextPlayer / confirmPlayerSwitch shim + 105 callsite codemod；13.6：PendingAction 标 @deprecated + ~600 处测试侧 pending.X 字段访问 + ~330 处 pending.type 断言全部 codemod 到 interaction.X；HistoryEntry.pending 收紧为 `hadChoicePending: boolean`；clonePending 删除）|
 
 ## 2. 实质落地的协议层改造（核心价值）
 
@@ -80,12 +80,12 @@ Task 13 各 step 当前状态：
 | 13.3 | 删 3 个 GameCore confirm shim | ⚠️ 改 deprecation 标记（commit `43693517`）；实质删除延后（162 callsite codemod queue） |
 | 13.4 | 删 ClientCommand 'feed'/'nextPlayer'/'confirmPlayerSwitch' variants | ✅ 完成（commit `27a5a8e9`） |
 | 13.5 | 删 GameSyncPayload.pending | ✅ 完成（commit `d3db5148`） |
-| 13.6 | 删 PendingAction union | ⏳ 延后（PendingAction 退化成 SessionResponse 内部类型，162 处 `resp.pending.type` 测试断言阻塞实质删除） |
-| 13.7 | 68 个 session test confirm shim codemod | ⏳ 延后（依赖 13.3 实质删除） |
+| 13.6 | 删 PendingAction union | ⚠️ 实质完成（type 加 @deprecated；6 stage codemod 把 ~600 处 `resp.pending.X` 字段访问 + ~330 处 `resp.pending.type === 'X'` 断言全部迁到 `resp.interaction.X` / `interaction.stateId` / `interaction.request.kind`；HistoryEntry 退化成 `hadChoicePending: boolean`；clonePending 删除；`buildFenceFarmInteraction` 签名简化删 PendingAction 入参；测试侧引入 `isLegacyChoicePending(resp)` helper 和 _helpers/legacy-confirms.ts。Union 本身保留：仍 covers cardDraft（§3.7 deferred），且 protocol-types contract test 锁定形态。） |
+| 13.7 | 68 个 session test confirm shim codemod | ✅ 完成（part 1 删 confirmHarvestFeed shim + 24 callsite；part 2 删 confirmNextPlayer/confirmPlayerSwitch shim + 105 callsite，引入 `_helpers/legacy-confirms.ts`） |
 | 13.8 | 重命名 game-core.ts → session-core.ts | ✅ 完成（commit `43693517`） |
 | 13.10 | 添加 farm-select / selection / card-draft cursor round-trip 测试 | ✅ 完成（commit `2477c60c`，4 个新测试） |
 
-完成 6/8 step。step 13.3 实质删除 / 13.6 PendingAction union 删除 / 13.7 162 callsite codemod 三者形成耦合簇——`SessionResponse.pending: PendingAction` 字段是 internal session API，已经从 protocol 层（GameSyncPayload）解耦。删除该 internal 字段需要同步重写 162 个 session test 的 `resp.pending.type === 'X'` 断言，建议作为单独的"S2-followup cleanup" sprint。
+完成 8/8 step（含 13.6 / 13.7 part 2 在 2026-05-05 dedicated session 收尾）。`SessionResponse.pending: PendingAction` 字段保留作 @deprecated transitional view（仍由 `getCurrentPending()` derived from InteractionRequest），但所有 production 与 test 读取已迁到 `resp.interaction`。下一个 sprint 删除 union 本身的代价已经压缩到：移除 cardDraft 路径（§3.7 — 把 'cardDraft' 升级为 InteractionRequest 'card-draft' kind） + 移除 `protocol-types.test.ts` 的 contract guard + 删 `getCurrentPending()` helper + 删 SessionResponse.pending 字段。
 
 ## 4. 提交链（Task 1–13）
 
