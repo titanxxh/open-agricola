@@ -14,6 +14,35 @@ import { getDb } from '../db.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../../shared/custom-code/types.ts'
 import type { RoomPersistence, RoomMeta } from './persistence/room-persistence.ts'
+import { RoomRegistry } from './room-registry.ts'
+import {
+  FIXED_DEV_ROOMS,
+  FIXED_DEV_ROOM_IDS,
+  WAITING_EMPTY_ROOM_TTL_MS,
+  PLAYING_EMPTY_ROOM_TTL_MS,
+  emptyRoomTtlMs,
+  isFixedDevRoom,
+  removePlayerFromRoom,
+  resolveJoinPlayerIndex,
+  resolveJoinRequestPlayerIndex,
+  snapshotToRoom,
+  summarizeRoomsForLobby,
+  toRoomMeta,
+  type Room,
+  type RoomPlayer,
+} from './room.ts'
+import type { Lobby } from './lobby.ts'
+
+export {
+  FIXED_DEV_ROOMS,
+  FIXED_DEV_ROOM_IDS,
+  isFixedDevRoom,
+  removePlayerFromRoom,
+  resolveJoinPlayerIndex,
+  resolveJoinRequestPlayerIndex,
+  summarizeRoomsForLobby,
+  type Room,
+}
 
 /** Default pool size for simultaneous draft when the client doesn't specify one. */
 const DRAFT_POOL_SIZE_DEFAULT = 7
@@ -93,25 +122,6 @@ function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): Cus
   return result
 }
 
-/**
- * Fixed dev rooms: one per supported player count. Each survives backend restarts
- * and is persisted independently in SQLite (or output/<id>.json in json mode).
- *
- * Connect with `?room=devN&player=pK&transport=ws` (N = 2/3/4, K = 1..N).
- */
-export const FIXED_DEV_ROOMS: ReadonlyArray<{ id: string; playerCount: number }> = [
-  { id: 'dev2', playerCount: 2 },
-  { id: 'dev3', playerCount: 3 },
-  { id: 'dev4', playerCount: 4 },
-]
-
-export const FIXED_DEV_ROOM_IDS: ReadonlySet<string> = new Set(
-  FIXED_DEV_ROOMS.map((r) => r.id),
-)
-
-export const isFixedDevRoom = (roomId: string): boolean =>
-  FIXED_DEV_ROOM_IDS.has(roomId)
-
 // ── Persistence adapter ──────────────────────────────────────────────────────
 
 let _persistence: RoomPersistence | null = null
@@ -119,6 +129,22 @@ export function setPersistence(p: RoomPersistence): void { _persistence = p }
 function getPersistence(): RoomPersistence {
   if (!_persistence) throw new Error('RoomPersistence not initialized; call setPersistence() at startup')
   return _persistence
+}
+
+// ── Registry + Lobby DI ──────────────────────────────────────────────────────
+
+let _registry: RoomRegistry | null = null
+export function setRegistry(r: RoomRegistry): void { _registry = r }
+function getRegistry(): RoomRegistry {
+  if (!_registry) throw new Error('RoomRegistry not initialized; call setRegistry() at startup')
+  return _registry
+}
+
+let _lobby: Lobby | null = null
+export function setLobby(l: Lobby): void { _lobby = l }
+function getLobby(): Lobby {
+  if (!_lobby) throw new Error('Lobby not initialized; call setLobby() at startup')
+  return _lobby
 }
 
 /**
@@ -149,43 +175,7 @@ const ALLOW_ANONYMOUS_WS: boolean = (() => {
 /** Seconds to wait for auth message before closing unauthenticated connection. */
 const WS_AUTH_TIMEOUT_MS = 5000
 
-type RoomPlayer = {
-  ws: WebSocket
-  playerIndex: number
-  name: string
-  userId?: string
-}
-
 type RoomStatus = 'waiting' | 'playing'
-
-type Room = {
-  id: string
-  session: GameSession
-  players: RoomPlayer[]
-  maxPlayers: number
-  version: number
-  status: RoomStatus
-  createdBy?: string
-  customCardDbIds?: string[]
-}
-
-const rooms = new Map<string, Room>()
-
-function toRoomMetaLocal(room: Room): RoomMeta {
-  return {
-    createdBy: room.createdBy ?? null,
-    maxPlayers: room.maxPlayers,
-    customCardDbIds: room.customCardDbIds ?? [],
-    status: room.status,
-    players: room.players
-      .filter((p): p is RoomPlayer & { userId: string } => typeof p.userId === 'string')
-      .map((p) => ({ userId: p.userId, playerIndex: p.playerIndex })),
-  }
-}
-
-type JoinSeatResolution =
-  | { ok: true; playerIndex: number; replacedExistingPlayer: boolean }
-  | { ok: false; error: string }
 
 type PersistedRoomRow = {
   id: string
@@ -218,9 +208,6 @@ const createSessionForRoom = (
   playerCount?: number,
 ): GameSession => {
   const customCards = loadCustomCardsFromDb(customCardDbIds, requestUserId)
-  // playerCount only applies when GameSession seeds a fresh state (i.e. when
-  // no serialized state is supplied). When `stateOrSeed` is a serialized
-  // state, the player count is already encoded in `state.players`.
   const initialOptions =
     playerCount && (stateOrSeed === undefined || typeof stateOrSeed === 'number')
       ? { playerCount }
@@ -236,85 +223,25 @@ const createSessionForRoom = (
   )
 }
 
-export const resolveJoinPlayerIndex = (
-  room: Pick<Room, 'id' | 'maxPlayers' | 'players'>,
-  requestedPlayerIndex?: number,
-  userId?: string,
-): JoinSeatResolution => {
-  if (requestedPlayerIndex !== undefined) {
-    if (
-      !Number.isInteger(requestedPlayerIndex) ||
-      requestedPlayerIndex < 0 ||
-      requestedPlayerIndex >= room.maxPlayers
-    ) {
-      return { ok: false, error: 'invalid player slot' }
-    }
-    const occupied = room.players.find(
-      (player) => player.playerIndex === requestedPlayerIndex,
-    )
-    if (occupied) {
-      // Allow reconnection if same userId, or in dev room
-      if (!isFixedDevRoom(room.id) && !(userId && occupied.userId === userId)) {
-        return { ok: false, error: 'player slot occupied' }
-      }
-      return {
-        ok: true,
-        playerIndex: requestedPlayerIndex,
-        replacedExistingPlayer: true,
-      }
-    }
-    return {
-      ok: true,
-      playerIndex: requestedPlayerIndex,
-      replacedExistingPlayer: false,
-    }
-  }
-
-  const takenIndices = new Set(room.players.map((player) => player.playerIndex))
-  for (let index = 0; index < room.maxPlayers; index += 1) {
-    if (!takenIndices.has(index)) {
-      return { ok: true, playerIndex: index, replacedExistingPlayer: false }
-    }
-  }
-  return { ok: false, error: 'room full' }
-}
-
-export const resolveJoinRequestPlayerIndex = (
-  room: Pick<Room, 'players'>,
-  requestedPlayerIndex: number | undefined,
-  userId: string | undefined,
-): { ok: true; requestedPlayerIndex: number | undefined } | { ok: false; error: string } => {
-  if (!userId) return { ok: true, requestedPlayerIndex }
-  const existingSeat = room.players.find(p => p.userId === userId)
-  if (!existingSeat) return { ok: true, requestedPlayerIndex }
-  if (requestedPlayerIndex === undefined) {
-    return { ok: true, requestedPlayerIndex: existingSeat.playerIndex }
-  }
-  if (requestedPlayerIndex === existingSeat.playerIndex) {
-    return { ok: true, requestedPlayerIndex }
-  }
-  return { ok: false, error: 'you are already in this room' }
-}
-
 // ── Persistence helpers ──────────────────────────────────────────────────────
 
 function savePersistedState(roomId: string, serialized: SerializedGameState, room?: Room): void {
-  const meta = room ? toRoomMetaLocal(room) : { createdBy: null, maxPlayers: 2, customCardDbIds: [], status: 'playing' as const, players: [] }
+  const meta: RoomMeta = room ? toRoomMeta(room) : { createdBy: null, maxPlayers: 2, customCardDbIds: [], status: 'playing' as const, players: [] }
   getPersistence().save(roomId, serialized, meta)
 }
 
 /** Write a placeholder row when a room is first created (before any state). */
 function ensureRoomRowSqlite(room: Room): void {
   if (PERSIST_ROOMS !== 'sqlite') return
-  getPersistence().save(room.id, null, toRoomMetaLocal(room))
+  getPersistence().save(room.id, null, toRoomMeta(room))
 }
 
 /** In the new adapter model, player info is written via meta.players on the next save(). */
 function upsertRoomPlayer(roomId: string, userId: string, playerIndex: number): void {
   if (PERSIST_ROOMS !== 'sqlite' || !userId) return
-  const room = rooms.get(roomId)
+  const room = getRegistry().get(roomId)
   if (!room) return
-  getPersistence().save(roomId, null, toRoomMetaLocal(room))
+  getPersistence().save(roomId, null, toRoomMeta(room))
   void playerIndex
 }
 
@@ -374,26 +301,9 @@ export function restoreRoomFromSqliteRow(row: PersistedRoomRow): Room | null {
   }
 }
 
-export const removePlayerFromRoom = (
-  room: Pick<Room, 'id' | 'players'>,
-  ws: WebSocket,
-  now = Date.now(),
-): 'not-present' | 'empty' | 'remaining' => {
-  const beforeCount = room.players.length
-  room.players = room.players.filter((player) => player.ws !== ws)
-  if (room.players.length === beforeCount) return 'not-present'
-  if (room.players.length === 0) {
-    if (!isFixedDevRoom(room.id)) {
-      roomLastActivity.set(room.id, now)
-    }
-    return 'empty'
-  }
-  return 'remaining'
-}
-
 function ensurePersistentRooms(): void {
   for (const { id, playerCount } of FIXED_DEV_ROOMS) {
-    if (rooms.has(id)) continue
+    if (getRegistry().has(id)) continue
     const snap = getPersistence().load(id)
     let session: GameSession
     if (snap?.serialized) {
@@ -406,7 +316,7 @@ function ensurePersistentRooms(): void {
     } else {
       session = new GameSession(undefined, undefined, { playerCount })
     }
-    rooms.set(id, {
+    getRegistry().set({
       id,
       session,
       players: [],
@@ -433,20 +343,11 @@ function restoreRoomsFromSqlite(now = Date.now()): void {
     excludeIds: fixedIds,
   })
   for (const snap of snapshots) {
-    if (rooms.has(snap.id)) continue
-    const room = restoreRoomFromSqliteRow({
-      id: snap.id,
-      created_by: snap.meta.createdBy,
-      state_json: snap.serialized ? JSON.stringify(snap.serialized) : null,
-      max_players: snap.meta.maxPlayers,
-      custom_card_ids: JSON.stringify(snap.meta.customCardDbIds),
-      status: snap.meta.status as RoomStatus,
-      version: 0,
-      updated_at: snap.updatedAt,
-    })
+    if (getRegistry().has(snap.id)) continue
+    const room = snapshotToRoom(snap)
     if (!room) continue
-    rooms.set(snap.id, room)
-    if (snap.updatedAt > 0) roomLastActivity.set(snap.id, snap.updatedAt)
+    getRegistry().set(room)
+    if (snap.updatedAt > 0) getRegistry().touchActivity(snap.id, snap.updatedAt)
     console.log(`[room-manager] restored room ${snap.id} via persistence adapter`)
   }
 }
@@ -458,6 +359,11 @@ const broadcast = (room: Room, message: ServerEvent) => {
   room.players.forEach((p) => {
     if (p.ws.readyState === p.ws.OPEN) p.ws.send(data)
   })
+}
+
+/** Internal: bridge for lobby's RoomBroadcaster contract. PR-S5-3 will replace. */
+export const __internalBroadcastEvent = (room: Room, event: ServerEvent): void => {
+  broadcast(room, event)
 }
 
 const sendTo = (ws: WebSocket, message: ServerEvent) => {
@@ -574,35 +480,26 @@ const sendStateTo = (
 
 // ── WebSocket server ─────────────────────────────────────────────────────────
 
-/** TTL for empty waiting rooms (no connected players) before cleanup. */
-const WAITING_EMPTY_ROOM_TTL_MS = 30 * 60 * 1000  // 30 minutes
-/** TTL for empty games that have already started before cleanup. */
-const PLAYING_EMPTY_ROOM_TTL_MS = 24 * 60 * 60 * 1000  // 1 day
-const roomLastActivity = new Map<string, number>()
-
-const emptyRoomTtlMs = (room: Pick<Room, 'status'>): number =>
-  room.status === 'playing' ? PLAYING_EMPTY_ROOM_TTL_MS : WAITING_EMPTY_ROOM_TTL_MS
-
 const isDevCommandAllowed = (room: Pick<Room, 'id'>): boolean =>
   isFixedDevRoom(room.id)
 
 function startRoomCleanup(): void {
   setInterval(() => {
     const now = Date.now()
-    for (const [roomId, room] of rooms) {
-      if (isFixedDevRoom(roomId)) continue
+    for (const room of getRegistry().iter()) {
+      if (isFixedDevRoom(room.id)) continue
       if (room.players.length > 0) {
-        roomLastActivity.set(roomId, now)
+        getRegistry().touchActivity(room.id, now)
         continue
       }
-      const lastSeen = roomLastActivity.get(roomId) ?? now
+      const lastSeen = getRegistry().lastActivityOf(room.id) ?? now
       if (now - lastSeen > emptyRoomTtlMs(room)) {
-        rooms.delete(roomId)
-        roomLastActivity.delete(roomId)
+        getRegistry().delete(room.id)
+        getRegistry().clearActivity(room.id)
         if (PERSIST_ROOMS === 'sqlite') {
-          getPersistence().markFinished(roomId, now)
+          getPersistence().markFinished(room.id, now)
         }
-        console.log(`[room-manager] cleaned up empty room ${roomId}`)
+        console.log(`[room-manager] cleaned up empty room ${room.id}`)
       }
     }
   }, 5 * 60 * 1000) // check every 5 minutes
@@ -701,7 +598,7 @@ export const createWsServer = (server: import('node:http').Server) => {
           createdBy: currentUserId,
           customCardDbIds,
         }
-        rooms.set(roomId, room)
+        getRegistry().set(room)
         currentRoom = room
         currentPlayerIndex = 0
         const name = typeof (msg as Record<string, unknown>).name === 'string'
@@ -729,7 +626,7 @@ export const createWsServer = (server: import('node:http').Server) => {
 
       if (msg.type === 'joinRoom') {
         const roomId = msg.roomId
-        const room = rooms.get(roomId)
+        const room = getRegistry().get(roomId)
         if (!room) { sendCommandError('room not found'); return }
         const rawRequestedPlayerIndex =
           typeof msg.requestedPlayerIndex === 'number'
@@ -788,20 +685,8 @@ export const createWsServer = (server: import('node:http').Server) => {
 
       if (msg.type === 'dissolveRoom') {
         if (!currentRoom) { sendCommandError('not in a room'); return }
-        const room = currentRoom
-        if (isFixedDevRoom(room.id)) { sendCommandError('cannot dissolve dev room'); return }
-        if (room.createdBy !== currentUserId) { sendCommandError('only the room creator can dissolve'); return }
-        broadcast(room, { type: 'roomDissolved', roomId: room.id })
-        for (const p of room.players) {
-          if (p.ws !== ws) {
-            try { p.ws.close() } catch { /* ignore */ }
-          }
-        }
-        rooms.delete(room.id)
-        roomLastActivity.delete(room.id)
-        if (PERSIST_ROOMS === 'sqlite') {
-          getPersistence().delete(room.id)
-        }
+        const result = getLobby().dissolveRoomById(currentRoom.id, currentUserId)
+        if (!result.ok) { sendCommandError(result.error ?? 'dissolve failed'); return }
         currentRoom = null
         return
       }
@@ -962,6 +847,9 @@ export const createWsServer = (server: import('node:http').Server) => {
       clearTimeout(authTimer)
       if (currentRoom) {
         const removal = removePlayerFromRoom(currentRoom, ws)
+        if (removal === 'empty' && !isFixedDevRoom(currentRoom.id)) {
+          getRegistry().touchActivity(currentRoom.id, Date.now())
+        }
         if (removal === 'remaining') {
           broadcast(currentRoom, {
             type: 'playerDisconnected',
@@ -975,50 +863,7 @@ export const createWsServer = (server: import('node:http').Server) => {
   return wss
 }
 
-type RoomLikeForSummary = Pick<Room, 'id' | 'players' | 'maxPlayers' | 'createdBy'>
+export const getRooms = (limit?: number): RoomSummary[] => getLobby().getRooms(limit)
 
-/**
- * Pure helper used by `getRooms` and tested directly. Hide rooms whose
- * creator/all players have disconnected — they are zombie shells that aren't
- * joinable until the cleanup loop expires them, and they pollute the lobby.
- * Fixed dev rooms are kept so dev URLs still discover them.
- */
-export function summarizeRoomsForLobby(
-  source: Iterable<RoomLikeForSummary>,
-  limit?: number,
-  isFixedDev: (id: string) => boolean = isFixedDevRoom,
-): RoomSummary[] {
-  const list: RoomSummary[] = []
-  for (const r of source) {
-    if (r.players.length === 0 && !isFixedDev(r.id)) continue
-    list.push({
-      id: r.id,
-      playerCount: r.players.length,
-      maxPlayers: r.maxPlayers,
-      createdBy: r.createdBy,
-      status: r.players.length < r.maxPlayers ? 'waiting' as const : 'playing' as const,
-    })
-    if (typeof limit === 'number' && list.length >= limit) break
-  }
-  return list
-}
-
-export const getRooms = (limit?: number): RoomSummary[] =>
-  summarizeRoomsForLobby(rooms.values(), limit)
-
-export const dissolveRoomById = (roomId: string, userId: string): { ok: boolean; error?: string } => {
-  const room = rooms.get(roomId)
-  if (!room) return { ok: false, error: 'room not found' }
-  if (isFixedDevRoom(room.id)) return { ok: false, error: 'cannot dissolve dev room' }
-  if (room.createdBy !== userId) return { ok: false, error: 'only the room creator can dissolve' }
-  broadcast(room, { type: 'roomDissolved', roomId: room.id })
-  for (const p of room.players) {
-    try { p.ws.close() } catch { /* ignore */ }
-  }
-  rooms.delete(room.id)
-  roomLastActivity.delete(room.id)
-  if (PERSIST_ROOMS === 'sqlite') {
-    getPersistence().delete(room.id)
-  }
-  return { ok: true }
-}
+export const dissolveRoomById = (roomId: string, userId: string): { ok: boolean; error?: string } =>
+  getLobby().dissolveRoomById(roomId, userId)
