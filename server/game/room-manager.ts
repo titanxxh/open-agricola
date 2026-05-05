@@ -1,6 +1,4 @@
 import type { IncomingMessage } from 'node:http'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
-import { join } from 'node:path'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { GameSession, type SessionResponse } from './authoritative-session.ts'
 import {
@@ -15,6 +13,7 @@ import { validateSession } from '../auth.ts'
 import { getDb } from '../db.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../../shared/custom-code/types.ts'
+import type { RoomPersistence, RoomMeta } from './persistence/room-persistence.ts'
 
 /** Default pool size for simultaneous draft when the client doesn't specify one. */
 const DRAFT_POOL_SIZE_DEFAULT = 7
@@ -113,7 +112,14 @@ export const FIXED_DEV_ROOM_IDS: ReadonlySet<string> = new Set(
 export const isFixedDevRoom = (roomId: string): boolean =>
   FIXED_DEV_ROOM_IDS.has(roomId)
 
-const PERSISTED_ROOMS_DIR = process.env.PERSISTED_ROOMS_DIR ?? join(process.cwd(), 'output')
+// ── Persistence adapter ──────────────────────────────────────────────────────
+
+let _persistence: RoomPersistence | null = null
+export function setPersistence(p: RoomPersistence): void { _persistence = p }
+function getPersistence(): RoomPersistence {
+  if (!_persistence) throw new Error('RoomPersistence not initialized; call setPersistence() at startup')
+  return _persistence
+}
 
 /**
  * Persistence backend for rooms:
@@ -165,15 +171,21 @@ type Room = {
 
 const rooms = new Map<string, Room>()
 
+function toRoomMetaLocal(room: Room): RoomMeta {
+  return {
+    createdBy: room.createdBy ?? null,
+    maxPlayers: room.maxPlayers,
+    customCardDbIds: room.customCardDbIds ?? [],
+    status: room.status,
+    players: room.players
+      .filter((p): p is RoomPlayer & { userId: string } => typeof p.userId === 'string')
+      .map((p) => ({ userId: p.userId, playerIndex: p.playerIndex })),
+  }
+}
+
 type JoinSeatResolution =
   | { ok: true; playerIndex: number; replacedExistingPlayer: boolean }
   | { ok: false; error: string }
-
-const toPersistedRoomFileName = (roomId: string) =>
-  `${roomId.replace(/[^a-zA-Z0-9._-]/g, '_')}.json`
-
-const getPersistedRoomFile = (roomId: string) =>
-  join(PERSISTED_ROOMS_DIR, toPersistedRoomFileName(roomId))
 
 type PersistedRoomRow = {
   id: string
@@ -187,9 +199,6 @@ type PersistedRoomRow = {
   updated_at?: number
 }
 
-const serializeCustomCardDbIds = (room?: Pick<Room, 'customCardDbIds'>) =>
-  JSON.stringify(room?.customCardDbIds ?? [])
-
 const parseCustomCardDbIds = (raw: string | null | undefined): string[] => {
   if (!raw) return []
   try {
@@ -201,9 +210,6 @@ const parseCustomCardDbIds = (raw: string | null | undefined): string[] => {
     return []
   }
 }
-
-const getRoomStatus = (room?: Pick<Room, 'players' | 'maxPlayers' | 'status'>): RoomStatus =>
-  room?.status ?? ((room && room.players.length >= room.maxPlayers) ? 'playing' : 'waiting')
 
 const createSessionForRoom = (
   stateOrSeed?: SerializedGameState | number,
@@ -293,95 +299,23 @@ export const resolveJoinRequestPlayerIndex = (
 // ── Persistence helpers ──────────────────────────────────────────────────────
 
 function savePersistedState(roomId: string, serialized: SerializedGameState, room?: Room): void {
-  if (PERSIST_ROOMS === 'sqlite') {
-    savePersistedStateSqlite(roomId, serialized, room)
-  } else {
-    savePersistedStateJson(roomId, serialized)
-  }
+  const meta = room ? toRoomMetaLocal(room) : { createdBy: null, maxPlayers: 2, customCardDbIds: [], status: 'playing' as const, players: [] }
+  getPersistence().save(roomId, serialized, meta)
 }
 
-function loadPersistedStateJson(roomId: string): SerializedGameState | null {
-  const filePath = getPersistedRoomFile(roomId)
-  if (existsSync(filePath)) {
-    try {
-      const raw = readFileSync(filePath, 'utf-8')
-      return JSON.parse(raw) as SerializedGameState
-    } catch {
-      /* fall through */
-    }
-  }
-  return null
-}
-
-function savePersistedStateJson(roomId: string, serialized: SerializedGameState): void {
-  try {
-    mkdirSync(PERSISTED_ROOMS_DIR, { recursive: true })
-    writeFileSync(
-      getPersistedRoomFile(roomId),
-      JSON.stringify(serialized, null, 0),
-      'utf-8',
-    )
-  } catch (err) {
-    console.warn('[room-manager] persist (json) failed:', err)
-  }
-}
-
-function savePersistedStateSqlite(roomId: string, serialized: SerializedGameState, room?: Room): void {
-  try {
-    const db = getDb()
-    const now = Date.now()
-    const stateJson = JSON.stringify(serialized)
-    const customCardIdsJson = serializeCustomCardDbIds(room)
-    const status = getRoomStatus(room)
-    const existing = db.prepare('SELECT id FROM rooms WHERE id = ?').get(roomId)
-    if (existing) {
-      db.prepare(
-        'UPDATE rooms SET state_json = ?, status = ?, custom_card_ids = ?, version = version + 1, updated_at = ? WHERE id = ?',
-      ).run(stateJson, status, customCardIdsJson, now, roomId)
-    } else {
-      db.prepare(
-        'INSERT INTO rooms (id, created_by, state_json, max_players, status, version, custom_card_ids, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)',
-      ).run(roomId, room?.createdBy ?? null, stateJson, room?.maxPlayers ?? 2, status, customCardIdsJson, now, now)
-    }
-  } catch (err) {
-    console.warn('[room-manager] persist (sqlite) save failed:', err)
-  }
-}
-
-/** Write a room row to SQLite when it is first created (before any state). */
+/** Write a placeholder row when a room is first created (before any state). */
 function ensureRoomRowSqlite(room: Room): void {
   if (PERSIST_ROOMS !== 'sqlite') return
-  try {
-    const db = getDb()
-    const now = Date.now()
-    const exists = db.prepare('SELECT 1 FROM rooms WHERE id = ?').get(room.id)
-    if (!exists) {
-      db.prepare(
-        'INSERT INTO rooms (id, created_by, state_json, max_players, status, version, custom_card_ids, created_at, updated_at) VALUES (?, ?, NULL, ?, ?, 0, ?, ?, ?)',
-      ).run(room.id, room.createdBy ?? null, room.maxPlayers, 'waiting', serializeCustomCardDbIds(room), now, now)
-    }
-  } catch (err) {
-    console.warn('[room-manager] ensureRoomRow failed:', err)
-  }
+  getPersistence().save(room.id, null, toRoomMetaLocal(room))
 }
 
-/** Upsert a player row in room_players. */
+/** In the new adapter model, player info is written via meta.players on the next save(). */
 function upsertRoomPlayer(roomId: string, userId: string, playerIndex: number): void {
   if (PERSIST_ROOMS !== 'sqlite' || !userId) return
-  try {
-    const db = getDb()
-    const now = Date.now()
-    const exists = db.prepare(
-      'SELECT 1 FROM room_players WHERE room_id = ? AND user_id = ?',
-    ).get(roomId, userId)
-    if (!exists) {
-      db.prepare(
-        'INSERT INTO room_players (room_id, user_id, player_index, joined_at) VALUES (?, ?, ?, ?)',
-      ).run(roomId, userId, playerIndex, now)
-    }
-  } catch (err) {
-    console.warn('[room-manager] upsertRoomPlayer failed:', err)
-  }
+  const room = rooms.get(roomId)
+  if (!room) return
+  getPersistence().save(roomId, null, toRoomMetaLocal(room))
+  void playerIndex
 }
 
 // ── Room lifecycle ───────────────────────────────────────────────────────────
@@ -460,30 +394,11 @@ export const removePlayerFromRoom = (
 function ensurePersistentRooms(): void {
   for (const { id, playerCount } of FIXED_DEV_ROOMS) {
     if (rooms.has(id)) continue
-    if (PERSIST_ROOMS === 'sqlite') {
-      try {
-        const db = getDb()
-        const row = db.prepare(
-          'SELECT id, created_by, state_json, max_players, custom_card_ids, version FROM rooms WHERE id = ?',
-        ).get(id) as PersistedRoomRow | undefined
-        if (row) {
-          const restored = restoreRoomFromSqliteRow(row)
-          if (restored) {
-            rooms.set(id, restored)
-            continue
-          }
-        }
-      } catch (err) {
-        console.warn(`[room-manager] failed to restore persistent room ${id} from SQLite:`, err)
-      }
-    }
-
-    const serialized = loadPersistedStateJson(id)
+    const snap = getPersistence().load(id)
     let session: GameSession
-    if (serialized) {
-      session = new GameSession()
+    if (snap?.serialized) {
       try {
-        session.loadState(rehydrateState(serialized))
+        session = new GameSession(rehydrateState(snap.serialized))
       } catch (err) {
         console.warn(`[room-manager] load persisted state for ${id} failed, starting fresh:`, err)
         session = new GameSession(undefined, undefined, { playerCount })
@@ -537,53 +452,35 @@ export function pruneStaleRoomRows(
 }
 
 /**
- * In SQLite mode: restore non-stale rooms into memory and prune the rest.
- *
- * Stale = `updated_at` is older than the status-specific empty-room TTL. Without
- * players to keep `roomLastActivity` warm in memory, the in-process cleanup
- * loop never notices these and they pile up across restarts. We make the TTL
- * cross restart-boundaries by:
- *   1. batch-marking stale rows as 'finished' before restore;
- *   2. only loading rooms whose `updated_at` is within the TTL window;
- *   3. seeding `roomLastActivity` with the persisted `updated_at` so the
- *      cleanup loop can prune them at the right moment after restart.
- *
+ * Restore non-stale rooms into memory via the persistence adapter.
+ * The adapter handles TTL pruning internally (listRestorable).
  * Fixed dev rooms are excluded — `ensurePersistentRooms` already loaded them.
  */
 function restoreRoomsFromSqlite(now = Date.now()): void {
   if (PERSIST_ROOMS !== 'sqlite') return
-  try {
-    const db = getDb()
-    const fixedIds = FIXED_DEV_ROOMS.map((r) => r.id)
-    const placeholders = fixedIds.map(() => '?').join(', ')
-
-    const prunedCount = pruneStaleRoomRows(db, now, WAITING_EMPTY_ROOM_TTL_MS, fixedIds, PLAYING_EMPTY_ROOM_TTL_MS)
-    if (prunedCount > 0) {
-      console.log(`[room-manager] pruned ${prunedCount} stale room(s) older than TTL`)
-    }
-
-    const rows = db.prepare(
-      `SELECT id, created_by, state_json, max_players, status, custom_card_ids, version, updated_at FROM rooms WHERE status != 'finished' AND id NOT IN (${placeholders})`,
-    ).all(...fixedIds) as PersistedRoomRow[]
-    for (const row of rows) {
-      if (rooms.has(row.id)) continue
-      try {
-        const room = restoreRoomFromSqliteRow(row)
-        if (!room) continue
-        rooms.set(row.id, room)
-        // Seed the cleanup TTL with the persisted timestamp so the loop can
-        // expire the room at the right moment instead of waiting another full
-        // TTL window after the restart.
-        if (typeof row.updated_at === 'number') {
-          roomLastActivity.set(row.id, row.updated_at)
-        }
-        console.log(`[room-manager] restored room ${row.id} from SQLite`)
-      } catch (err) {
-        console.warn(`[room-manager] failed to restore room ${row.id}:`, err)
-      }
-    }
-  } catch (err) {
-    console.warn('[room-manager] restoreRoomsFromSqlite failed:', err)
+  const fixedIds = FIXED_DEV_ROOMS.map((r) => r.id)
+  const snapshots = getPersistence().listRestorable({
+    now,
+    waitingTtlMs: WAITING_EMPTY_ROOM_TTL_MS,
+    playingTtlMs: PLAYING_EMPTY_ROOM_TTL_MS,
+    excludeIds: fixedIds,
+  })
+  for (const snap of snapshots) {
+    if (rooms.has(snap.id)) continue
+    const room = restoreRoomFromSqliteRow({
+      id: snap.id,
+      created_by: snap.meta.createdBy,
+      state_json: snap.serialized ? JSON.stringify(snap.serialized) : null,
+      max_players: snap.meta.maxPlayers,
+      custom_card_ids: JSON.stringify(snap.meta.customCardDbIds),
+      status: snap.meta.status as RoomStatus,
+      version: 0,
+      updated_at: snap.updatedAt,
+    })
+    if (!room) continue
+    rooms.set(snap.id, room)
+    if (snap.updatedAt > 0) roomLastActivity.set(snap.id, snap.updatedAt)
+    console.log(`[room-manager] restored room ${snap.id} via persistence adapter`)
   }
 }
 
@@ -683,10 +580,7 @@ const broadcastState = (
   }
   // Mark room as finished in SQLite when game ends
   if (PERSIST_ROOMS === 'sqlite' && resp.state.gameOver) {
-    try {
-      getDb().prepare("UPDATE rooms SET status = 'finished', updated_at = ? WHERE id = ?")
-        .run(Date.now(), room.id)
-    } catch { /* non-critical */ }
+    getPersistence().markFinished(room.id, Date.now())
   }
 }
 
@@ -739,10 +633,7 @@ function startRoomCleanup(): void {
         rooms.delete(roomId)
         roomLastActivity.delete(roomId)
         if (PERSIST_ROOMS === 'sqlite') {
-          try {
-            getDb().prepare("UPDATE rooms SET status = 'finished', updated_at = ? WHERE id = ?")
-              .run(now, roomId)
-          } catch { /* non-critical */ }
+          getPersistence().markFinished(roomId, now)
         }
         console.log(`[room-manager] cleaned up empty room ${roomId}`)
       }
@@ -942,9 +833,7 @@ export const createWsServer = (server: import('node:http').Server) => {
         rooms.delete(room.id)
         roomLastActivity.delete(room.id)
         if (PERSIST_ROOMS === 'sqlite') {
-          try {
-            getDb().prepare("DELETE FROM rooms WHERE id = ?").run(room.id)
-          } catch { /* non-critical */ }
+          getPersistence().delete(room.id)
         }
         currentRoom = null
         return
@@ -1162,9 +1051,7 @@ export const dissolveRoomById = (roomId: string, userId: string): { ok: boolean;
   rooms.delete(room.id)
   roomLastActivity.delete(room.id)
   if (PERSIST_ROOMS === 'sqlite') {
-    try {
-      getDb().prepare("DELETE FROM rooms WHERE id = ?").run(room.id)
-    } catch { /* non-critical */ }
+    getPersistence().delete(room.id)
   }
   return { ok: true }
 }
