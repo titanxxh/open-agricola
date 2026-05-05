@@ -76,7 +76,7 @@ describe('E159_OldMiser session', () => {
       while (safety-- > 0 && resp.interaction.stateId === 'wait') {
         if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
           resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
-        } else if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+        } else if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
           resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
         } else if (resp.interaction.stateId === 'wait') {
           const skipOpt = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
@@ -128,7 +128,7 @@ describe('E159_OldMiser session', () => {
       while (safety-- > 0 && resp.interaction.stateId === 'wait') {
         if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
           resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
-        } else if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+        } else if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
           resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
         } else if (resp.interaction.stateId === 'wait') {
           const skipOpt = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
@@ -174,7 +174,7 @@ describe('E159_OldMiser session', () => {
       while (safety-- > 0 && resp.interaction.stateId === 'wait') {
         if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
           resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
-        } else if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+        } else if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
           resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
         } else if (resp.interaction.stateId === 'wait') {
           const skipOpt = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')

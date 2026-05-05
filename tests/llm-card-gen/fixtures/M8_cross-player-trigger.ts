@@ -60,9 +60,9 @@ const fixture: CardFixture = {
 
   trigger(session): TriggerResult {
     const steps: TriggerResult['steps'] = []
-    const r1 = session.takeAction(1, 'forest') as { ok: boolean; pending?: { type?: string } }
+    const r1 = session.takeAction(1, 'forest') as { ok: boolean }
     steps.push({ label: "takeAction(1,'forest')", resp: r1 })
-    if (r1.pending?.type === 'confirmNextPlayer') {
+    if (r1.interaction.stateId === 'wait' && r1.interaction.request.kind === 'confirm-next-player') {
       steps.push({ label: 'confirmNextPlayer', resp: confirmNextPlayer(session) })
     }
     return { steps }

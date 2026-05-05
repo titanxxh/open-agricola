@@ -40,7 +40,7 @@ const firstPick = (session: GameSession, pid: string) => {
 describe('GameSession — draft mode setup', () => {
   it('seeds phase=draft with populated per-player pools and empty player hands', () => {
     const session = makeDraftSession(2, 7)
-    const { state, pending } = session.getState()
+    const { state } = session.getState()
 
     expect(state.phase).toBe('draft')
     expect(state.draft).not.toBeNull()
@@ -58,20 +58,23 @@ describe('GameSession — draft mode setup', () => {
       expect(state.draft!.kept[p.id].minor).toEqual([])
     }
 
-    expect(pending.type).toBe('cardDraft')
-    if (pending.type === 'cardDraft') {
-      expect(pending.round).toBe(1)
-      expect(pending.totalRounds).toBe(7)
-      expect(pending.allSubmitted).toBe(false)
-    }
+    // Draft progress is tracked on state.draft directly (replaces the deleted
+    // PendingAction.cardDraft view-model). DraftOverlay reads these fields.
+    expect(state.draft!.round).toBe(1)
+    expect(state.draft!.totalRounds).toBe(7)
+    const allSubmitted = state.draft!.seatOrder.every(
+      (pid) => state.draft!.pendingPicks[pid]?.occ != null
+        && state.draft!.pendingPicks[pid]?.minor != null,
+    )
+    expect(allSubmitted).toBe(false)
   })
 
   it('falls back to the normal playing phase when draftMode is omitted', () => {
     const session = new GameSession(1234, undefined, { playerCount: 2 })
-    const { state, pending } = session.getState()
+    const { state, interaction } = session.getState()
     expect(state.phase).toBe('playing')
     expect(state.draft).toBeNull()
-    expect(pending.type).toBe('none')
+    expect(interaction.stateId).toBe('idle')
     for (const p of state.players) {
       expect(p.occupationHand.length).toBe(7)
       expect(p.minorHand.length).toBe(7)
@@ -91,10 +94,12 @@ describe('GameSession.submitDraftPick — happy paths', () => {
       const p1Pick = firstPick(session, 'p1')
       const r1 = session.submitDraftPick('p1', p1Pick)
       expect(r1.ok).toBe(true)
-      expect(r1.pending.type).toBe('cardDraft')
-      if (r1.pending.type === 'cardDraft') {
-        expect(r1.pending.allSubmitted).toBe(false)
-      }
+      expect(r1.state.phase).toBe('draft')
+      const allSubmitted1 = r1.state.draft!.seatOrder.every(
+        (pid) => r1.state.draft!.pendingPicks[pid]?.occ != null
+          && r1.state.draft!.pendingPicks[pid]?.minor != null,
+      )
+      expect(allSubmitted1).toBe(false)
 
       const p2Pick = firstPick(session, 'p2')
       const r2 = session.submitDraftPick('p2', p2Pick)
@@ -104,7 +109,7 @@ describe('GameSession.submitDraftPick — happy paths', () => {
     const finalResp = session.getState()
     expect(finalResp.state.phase).toBe('playing')
     expect(finalResp.state.draft).toBeNull()
-    expect(finalResp.pending.type).toBe('none')
+    expect(finalResp.interaction.stateId).toBe('idle')
     for (const p of finalResp.state.players) {
       expect(p.occupationHand.length).toBe(7)
       expect(p.minorHand.length).toBe(7)
@@ -121,10 +126,12 @@ describe('GameSession.submitDraftPick — happy paths', () => {
     expect(r1.state.draft!.pendingPicks.p1.minor).toBe(p1Pick.minorCardId)
     expect(r1.state.draft!.pendingPicks.p2.occ).toBeNull()
     expect(r1.state.draft!.pendingPicks.p2.minor).toBeNull()
-    expect(r1.pending.type).toBe('cardDraft')
-    if (r1.pending.type === 'cardDraft') {
-      expect(r1.pending.allSubmitted).toBe(false)
-    }
+    expect(r1.state.phase).toBe('draft')
+    const allSubmittedR1 = r1.state.draft!.seatOrder.every(
+      (pid) => r1.state.draft!.pendingPicks[pid]?.occ != null
+        && r1.state.draft!.pendingPicks[pid]?.minor != null,
+    )
+    expect(allSubmittedR1).toBe(false)
 
     const p2Pick = firstPick(session, 'p2')
     const r2 = session.submitDraftPick('p2', p2Pick)
@@ -286,7 +293,7 @@ describe('GameSession — draft persistence (serialize → rehydrate)', () => {
     // Load into a fresh session and continue the draft to completion.
     const revived = new GameSession(rehydrated)
     expect(revived.getState().state.phase).toBe('draft')
-    expect(revived.getState().pending.type).toBe('cardDraft')
+    expect(revived.getState().state.draft).not.toBeNull()
 
     for (let round = 2; round <= 7; round += 1) {
       const pa = firstPick(revived, 'p1')

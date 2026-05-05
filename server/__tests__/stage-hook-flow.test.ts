@@ -13,12 +13,13 @@ import '../../shared/cards/D/D99_EarthenwarePotter'
 import '../../shared/cards/D/D115_FodderPlanter'
 
 const chooseFirstOption = (session: GameSession, playerIndex: number) => {
-  const pending = session.getState().pending
-  expect(pending.type).toBe('choice')
-  if (pending.type !== 'choice') {
+  const interaction = session.getState().interaction
+  expect(interaction.stateId).toBe('wait')
+  if (interaction.stateId !== 'wait') {
     throw new Error('expected pending choice')
   }
-  return session.resolveChoice(playerIndex, pending.options[0]!.value)
+  const options = interaction.options ?? []
+  return session.resolveChoice(playerIndex, options[0]!.value)
 }
 
 describe('stage hook flows', () => {

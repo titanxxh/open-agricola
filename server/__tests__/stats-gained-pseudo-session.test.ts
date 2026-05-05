@@ -30,10 +30,8 @@ describe('gained.field pseudo-stat', () => {
     // engine-driven path reads sourceCard from `engine.pendingInteractionContext`
     // (not the GameSession's `pending` mirror), so we patch both to keep this
     // test functional without a real plow-card scenario.
-    const pending = session.getState().pending
-    if (pending.type === 'choice') {
-      pending.sourceCard = 'TEST_PlowCard'
-    }
+    // The engine reads sourceCard from `engine.pendingInteractionContext`,
+    // which is the actual source of truth — patch it directly.
     const engineRef = (session as unknown as { engine: { pendingInteractionContext: { sourceCard?: string } | null } }).engine
     if (engineRef?.pendingInteractionContext) {
       engineRef.pendingInteractionContext.sourceCard = 'TEST_PlowCard'
@@ -65,10 +63,6 @@ describe('gained.stable pseudo-stat', () => {
     // engine-driven path reads sourceCard from `engine.pendingInteractionContext`
     // (not the GameSession's `pending` mirror), so we patch both to keep this
     // test functional without a real stable-card scenario.
-    const pending = session.getState().pending
-    if (pending.type === 'choice') {
-      pending.sourceCard = 'TEST_StableCard'
-    }
     const engineRef = (session as unknown as { engine: { pendingInteractionContext: { sourceCard?: string } | null } }).engine
     if (engineRef?.pendingInteractionContext) {
       engineRef.pendingInteractionContext.sourceCard = 'TEST_StableCard'
@@ -105,8 +99,7 @@ describe('gained.occupation pseudo-stat', () => {
     expect(lessonsResp.ok).toBe(true)
 
     // Resolve the choice -> play A116
-    const pending = session.getState().pending
-    if (pending.type === 'choice') {
+    if (session.getState().interaction.stateId === 'wait') {
       session.resolveChoice(0, 'A116_WoodCutter')
     }
 

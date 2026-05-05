@@ -85,11 +85,11 @@ const fixture: CardFixture = {
     const steps: TriggerResult['steps'] = []
     let resp = session.performRoundEnd() as {
       ok: boolean
-      pending?: { type?: string; playerIndex?: number }
+      interaction: { stateId: string; playerIndex?: number; request: { kind: string } }
     }
     steps.push({ label: 'performRoundEnd', resp })
     let safety = 0
-    while (resp.pending?.type === 'harvestFeed' && safety++ < 10) {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed' && safety++ < 10) {
       const pi = resp.interaction.playerIndex!
       resp = session.resolveChoice(pi, 'confirm', { selections: [] }) as typeof resp
       steps.push({ label: `confirmHarvestFeed(${pi}, [])`, resp })

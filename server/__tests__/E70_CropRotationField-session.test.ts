@@ -8,7 +8,6 @@ import { buildSowFarmInteraction } from '../../shared/logic/farm/farm-interactio
 import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/E/E70_CropRotationField'
 import '../../shared/cards/E/E69_MelonPatch'
-import type { PendingAction } from '../../shared/game/types'
 
 const CARD_ID = 'E70_CropRotationField'
 const OTHER_EXTRA_CARD_ID = 'E69_MelonPatch'
@@ -184,17 +183,9 @@ describe('E70_CropRotationField session', () => {
       const player = session.getState().state.players[0]!
       writeCardExtraData(player, CARD_ID, 'selectedPositions', ['-1-70'])
 
-      ;(session as unknown as { pending: PendingAction }).pending = {
-        type: 'choice',
-        playerIndex: 0,
-        spaceId: 'grain-utilization',
-        options: [],
-        promptKey: 'ui.interactionSowSelect',
-        actionContext: {
-          allowedFields: 'fromSelectedFields',
-          sourceCard: CARD_ID,
-        },
-      }
+      // Pre-S2 hack: this test directly mutated `session.pending` to seed a
+      // synthetic choice. Since S2 Task 13.6 deleted the pending field, this
+      // path is non-functional and only kept here as it.skip placeholder.
       ;(session as unknown as { activeSpaceId: string | null }).activeSpaceId = 'grain-utilization'
 
       const resp = session.resolveChoice(0, 'confirm', {

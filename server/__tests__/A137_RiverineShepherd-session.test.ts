@@ -74,7 +74,7 @@ describe('A137_RiverineShepherd session', () => {
     }
 
     // Handle possible additional animalReorg if needed
-    if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
         { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: 2 },
       ])
@@ -106,7 +106,7 @@ describe('A137_RiverineShepherd session', () => {
     }
 
     // Handle animalReorg if sheep was gained
-    if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
         { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: sheepBefore + 1 },
       ])

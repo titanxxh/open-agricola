@@ -53,7 +53,7 @@ describe('A50_MilkJug session', () => {
     expect(resp.ok).toBe(true)
 
     // cattle-market gives cattle -> animalReorg
-    if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
         { id: 'p1', zoneType: 'pasture', animalType: 'cattle', animalCount: 1 },
       ])
@@ -78,7 +78,7 @@ describe('A50_MilkJug session', () => {
     expect(resp.ok).toBe(true)
 
     // cattle-market gives cattle -> animalReorg for opponent
-    if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(1, 'confirm', [
         { id: 'p2', zoneType: 'pasture', animalType: 'cattle', animalCount: 1 },
       ])

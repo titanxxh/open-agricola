@@ -138,7 +138,7 @@ describe('B137_Wholesaler session', () => {
 
     // After reorg, card after-hook fires and gives +1 boar
     // This may trigger another animalReorg
-    if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
         { id: 'p1', zoneType: 'pasture', animalType: 'boar', animalCount: 3 },
       ])
@@ -190,7 +190,7 @@ describe('B137_Wholesaler session', () => {
     ])
 
     // After reorg, card after-hook fires and gives +1 cattle
-    if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
         { id: 'p2', zoneType: 'pasture', animalType: 'cattle', animalCount: 3 },
       ])

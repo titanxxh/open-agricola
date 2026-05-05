@@ -74,7 +74,7 @@ describe('D12_MilkingPlace session', () => {
     }
 
     // Handle any animal reorgs
-    while (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
     }
 
@@ -109,7 +109,7 @@ describe('D12_MilkingPlace session', () => {
       resp = session.resolveChoice(pidx, 'confirm', { selections: [] })
     }
 
-    while (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
     }
 

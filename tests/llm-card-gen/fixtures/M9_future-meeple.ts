@@ -75,10 +75,10 @@ const fixture: CardFixture = {
     // it presents a single-option choice that auto-resolves the play.
     const r1 = session.takeAction(0, 'lessons') as {
       ok: boolean
-      pending?: { type?: string; options?: Array<{ value: string }> }
+      interaction: { stateId: string; options?: Array<{ value: string }> }
     }
     steps.push({ label: "takeAction(0,'lessons')", resp: r1 })
-    if (r1.pending?.type === 'choice') {
+    if (r1.interaction.stateId === 'wait') {
       const r2 = session.resolveChoice(0, CARD_ID)
       steps.push({ label: `resolveChoice(0, ${CARD_ID})`, resp: r2 })
     }

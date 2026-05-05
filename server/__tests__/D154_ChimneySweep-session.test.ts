@@ -98,9 +98,9 @@ describe('D154_ChimneySweep renovation cost hook', () => {
 
     // Two options (clay/stone): engine emits a choice. Pick 'stone'.
     let resp = session.takeAction(0, 'house-redevelopment')
-    if (!resp.ok && resp.pending?.type === 'choice') {
+    if (!resp.ok && resp.interaction.stateId === 'wait') {
       resp = session.resolveChoice(0, 'stone')
-    } else if (resp.ok && resp.pending?.type === 'choice') {
+    } else if (resp.ok && resp.interaction.stateId === 'wait') {
       resp = session.resolveChoice(0, 'stone')
     }
 

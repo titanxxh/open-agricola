@@ -33,7 +33,7 @@ const drainHarvest = (session: GameSession, feedSelections: Record<number, FeedS
       const idx = resp.interaction.playerIndex
       const sel = feedSelections[idx] ?? []
       resp = session.resolveChoice(idx, 'confirm', { selections: sel })
-    } else if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    } else if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       const interaction = resp.interaction.stateId === 'wait' ? resp.interaction : null
       resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', interaction?.zones ?? [])
     } else if (resp.interaction.stateId === 'wait') {

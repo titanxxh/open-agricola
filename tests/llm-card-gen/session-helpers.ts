@@ -354,7 +354,7 @@ export function autoAdvanceRoundEnd(
       resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
       continue
     }
-    if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       // Default empty-zones wipes resources.{sheep,boar,cattle}; instead
       // build a zone list that preserves all current animals.
       const pi = resp.interaction.playerIndex
@@ -373,7 +373,7 @@ export function autoAdvanceRoundEnd(
     }
     if (resp.interaction.stateId === 'wait') {
       throw new Error(
-        `autoAdvanceRoundEnd hit a choice pending — fixture must pre-clear cards that prompt choices during round-end. choice: ${JSON.stringify(resp.pending).slice(0, 200)}`,
+        `autoAdvanceRoundEnd hit a choice pending — fixture must pre-clear cards that prompt choices during round-end. choice: ${JSON.stringify(resp.interaction).slice(0, 200)}`,
       )
     }
     // pending.type === 'none' but game not over → kick next round

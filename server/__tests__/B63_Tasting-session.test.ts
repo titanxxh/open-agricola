@@ -33,7 +33,7 @@ describe('B63_Tasting session', () => {
   const drainSwitches = (session: GameSession, resp: SessionResponse) => {
     let r = resp
     let safety = 30
-    while (safety-- > 0 && r.pending?.type === 'confirmPlayerSwitch') {
+    while (safety-- > 0 && r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-player-switch') {
       r = confirmPlayerSwitch(session)
     }
     return r
@@ -47,7 +47,7 @@ describe('B63_Tasting session', () => {
     // The first pending choice should be the Tasting exchange (pay grain vs skip).
     let safety = 30
     // Accept Tasting exchange if presented
-    while (safety-- > 0 && resp.pending?.type === 'choice') {
+    while (safety-- > 0 && resp.interaction.stateId === 'wait') {
       const options = resp.interaction.options ?? []
       // Look for the grain-pay option
       const payOpt = options.find((o: ActionChoiceOption) =>
@@ -83,7 +83,7 @@ describe('B63_Tasting session', () => {
     let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
     let safety = 30
-    while (safety-- > 0 && resp.pending?.type === 'choice') {
+    while (safety-- > 0 && resp.interaction.stateId === 'wait') {
       const options = resp.interaction.options ?? []
       const skipOpt = options.find((o: ActionChoiceOption) => o.value === '__skip__')
       const occOpt = options.find((o: ActionChoiceOption) => o.value === 'A93_BedMaker')

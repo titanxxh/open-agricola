@@ -114,8 +114,8 @@ describe('A165 PigBreeder session integration', () => {
     const resp = session.performRoundEnd()
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.boar).toBe(3)
-    expect(resp.pending?.type).toBe('choice')
-    expect(resp.pending?.playerIndex).toBe(0)
+    expect(resp.interaction.stateId).toBe("wait")
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.playerIndex : -1).toBe(0)
   })
 
   it('round 12 finalize: triggers onBreed-style after listener with sourceCard A165', () => {
