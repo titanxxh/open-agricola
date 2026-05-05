@@ -4,6 +4,7 @@ import type {
   ActionExecutionResult,
   Resource,
 } from '../../game/types'
+import type { EngineContext, NodeStepResult } from '../types'
 import { BaseNode } from './base'
 
 export class ActionNode extends BaseNode {
@@ -45,5 +46,30 @@ export class ActionNode extends BaseNode {
 
   isDoable() {
     return true
+  }
+
+  /**
+   * S4b Task 16 — leaf-node medium richness. ActionNode signals 'continue'
+   * when not yet resolved (engine main loop drives the actual executor /
+   * hook orchestration via `node.execute`); 'done' once resolved. Keeping
+   * the signal minimal preserves all pre-PR4 dispatch semantics — the
+   * engine still owns the cost/replace/before-phase/insertAfter machinery.
+   */
+  step(_ctx: EngineContext): NodeStepResult {
+    if (this.getState() === 'resolved') return { kind: 'done' }
+    return { kind: 'continue' }
+  }
+
+  protected cursorData() {
+    return {
+      actionId: this.actionId,
+      sourceCard: this.sourceCard,
+      params: this.params,
+      actionContext: this.actionContext,
+      effectPreview: this.effectPreview,
+      choiceLabelKey: this.choiceLabelKey,
+      choiceLabelParams: this.choiceLabelParams,
+      beforePhaseResolved: this.beforePhaseResolved,
+    }
   }
 }
