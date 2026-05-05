@@ -191,6 +191,10 @@ export function buildReplaceChoiceFlow(
  * `applyFallbackSourceCardToFlow` parameter is injected because that helper
  * still lives on Engine in PR3 (it manipulates flow trees rather than nodes
  * and may move in PR4/5 if/when followUp wiring also relocates).
+ *
+ * TODO(PR5): When `applyFallbackSourceCardToFlow` and the rest of the flow
+ * helpers move out of Engine (alongside the followUp / hookFlow wiring),
+ * collapse this parameter and read the helper directly from the new home.
  */
 export function getReplaceAwareChoiceLabel(
   actionNode: ActionNode,

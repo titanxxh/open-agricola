@@ -76,14 +76,6 @@ export class InteractionNode extends BaseNode {
   public pendingActionId?: string
   public ownerNodeId?: string
   public contextSnapshot?: InteractionContextSnapshot
-  /**
-   * S4b Task 11 — replaces the engine-level `lastEmittedChoice` cache that
-   * pre-Task-8 held composite emit metadata. Kept on InteractionNode for
-   * leaf-paired interactions (composite Or/Xor/Optional already moved to
-   * `emittedChoices` per S2 Task 8).
-   */
-  public lastEmittedChoices?: ActionChoiceOption[]
-
   constructor(id: string, choices: ActionChoiceOption[], request?: InteractionRequest) {
     super(id, 'interaction')
     this.choices = choices
@@ -98,7 +90,6 @@ export class InteractionNode extends BaseNode {
     this.promptKey = promptKey
     this.choices = choices
     this.promptParams = promptParams
-    this.lastEmittedChoices = choices
     this.nodeState = 'ready'
   }
 
@@ -165,15 +156,20 @@ export class InteractionNode extends BaseNode {
   }
 
   /**
-   * S4b Task 14 — InteractionNode owns its lifecycle. `done` when already
-   * resolved, `blocked` when validateSelection rejects (handled by
-   * resolve()), otherwise emit a `choice` step result for the engine main
-   * loop to surface.
+   * S4b Task 14 — reproduces the pre-PR3 `instanceof InteractionNode`
+   * dispatch in `Engine.proceed`: `choices.length > 0 → choice`, otherwise
+   * `blocked`. Crucially `step()` does NOT inspect `nodeState` — the
+   * `'ready' | 'resolved' | 'blocked'` lifecycle is managed by the broader
+   * engine flow (`resolve()` / `block()` callers and `nextUnresolved()`
+   * filtering), so reading state here would diverge from the pre-PR3
+   * semantic and regress test cases where a resolved-but-still-presented
+   * InteractionNode hits this path (see improvement-pay-fail-idempotent).
    */
   step(_ctx: EngineContext): NodeStepResult {
-    if (this.getState() === 'resolved') return { kind: 'done' }
-    if (this.choices.length === 0) return { kind: 'blocked', reason: 'no choices' }
-    return { kind: 'choice', nodeId: this.id }
+    if (this.choices.length > 0) {
+      return { kind: 'choice', nodeId: this.id }
+    }
+    return { kind: 'blocked', reason: 'no choices' }
   }
 
   /**
@@ -194,7 +190,6 @@ export class InteractionNode extends BaseNode {
       pendingActionId: this.pendingActionId,
       ownerNodeId: this.ownerNodeId,
       contextSnapshot: this.contextSnapshot,
-      lastEmittedChoices: this.lastEmittedChoices,
     }
   }
 }
