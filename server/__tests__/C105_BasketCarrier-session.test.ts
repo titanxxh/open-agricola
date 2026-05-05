@@ -81,12 +81,12 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
       if (resp.pending.type === 'harvestFeed') {
         if (resp.pending.playerIndex === 0 && !confirmedReverse) {
           // Submit reverse trade selection: 1 invocation of C105 trade.
-          resp = session.confirmHarvestFeed(0, [
+          resp = session.resolveChoice(0, 'confirm', { selections: [
             { sourceId: CARD_ID, exchangeIndex: 0, count: 1 },
-          ])
+          ] })
           confirmedReverse = true
         } else {
-          resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+          resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
         }
       } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
         resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones)
@@ -141,7 +141,7 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
     let safety = 30
     while (safety-- > 0 && resp.pending.type !== 'none') {
       if (resp.pending.type === 'harvestFeed') {
-        resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+        resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
       } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
         resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones)
       } else if (resp.pending.type === 'choice') {

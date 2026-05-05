@@ -63,9 +63,9 @@ describe('harvest session flow', () => {
     expect(resp.pending.playerIndex).toBe(1)
     expect(resp.pending.remaining).toBe(2)
 
-    resp = session.confirmHarvestFeed(1, [
+    resp = session.resolveChoice(1, 'confirm', { selections: [
       { sourceId: '__basic__', exchangeIndex: 0, count: 1, sourceName: '基础转化' },
-    ])
+    ] })
 
     expect(resp.pending.type).toBe('harvestFeed')
     if (resp.pending.type !== 'harvestFeed') {
@@ -73,7 +73,7 @@ describe('harvest session flow', () => {
     }
     expect(resp.pending.playerIndex).toBe(0)
 
-    resp = session.confirmHarvestFeed(0, [])
+    resp = session.resolveChoice(0, 'confirm', { selections: [] })
 
     while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
       const pi = resp.pending.playerIndex
@@ -196,9 +196,9 @@ describe('harvest session flow', () => {
     expect(resp.pending.playerIndex).toBe(0)
     expect(resp.pending.remaining).toBe(2)
 
-    resp = session.confirmHarvestFeed(0, [
+    resp = session.resolveChoice(0, 'confirm', { selections: [
       { sourceId: '__basic__', exchangeIndex: 0, count: 2, sourceName: 'Basic conversion' },
-    ])
+    ] })
 
     const p = resp.state.players[0]!
     expect(p.resources.grain).toBe(0)
@@ -218,9 +218,9 @@ describe('harvest session flow', () => {
     let resp = session.performRoundEnd()
     if (resp.pending.type !== 'harvestFeed') throw new Error('expected harvestFeed pending')
 
-    resp = session.confirmHarvestFeed(0, [
+    resp = session.resolveChoice(0, 'confirm', { selections: [
       { sourceId: 'D60_LargePottery', exchangeIndex: 0, count: 1, sourceName: 'Large Pottery' },
-    ])
+    ] })
 
     const p = resp.state.players[0]!
     // 1 clay -> 2 food; need 2 food, all consumed; no begging
@@ -259,9 +259,9 @@ describe('harvest session flow', () => {
 
     // SheepWalker exchanges: idx 0 sheep->boar, idx 1 sheep->vegetable, idx 2 sheep->stone
     // Test sheep->stone: produces no food; full deficit goes to begging.
-    resp = session.confirmHarvestFeed(0, [
+    resp = session.resolveChoice(0, 'confirm', { selections: [
       { sourceId: 'B104_SheepWalker', exchangeIndex: 2, count: 1, sourceName: 'Sheep Walker' },
-    ])
+    ] })
 
     const p = resp.state.players[0]!
     expect(p.resources.sheep).toBe(0)

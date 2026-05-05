@@ -48,7 +48,7 @@ describe('B104_SheepWalker session — last harvest enforcement', () => {
     let resp = session.performRoundEnd()
     // Feed phase — playerA has 10 food, no begging.
     if (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(0, [])
+      resp = session.resolveChoice(0, 'confirm', { selections: [] })
     }
 
     // Without B104, breed phase ends here with no animals (1 sheep < 2). With
@@ -73,7 +73,7 @@ describe('B104_SheepWalker session — last harvest enforcement', () => {
 
     let resp = session.performRoundEnd()
     if (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(0, [])
+      resp = session.resolveChoice(0, 'confirm', { selections: [] })
     }
 
     // No sheep -> no reorg forcing -> game ends normally.
@@ -111,7 +111,7 @@ describe('B104_SheepWalker session — last harvest enforcement', () => {
 
     let resp = session.performRoundEnd()
     if (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(0, [])
+      resp = session.resolveChoice(0, 'confirm', { selections: [] })
     }
     // In a normal round, 1 sheep does not trigger reorg.
     expect(resp.pending.type).toBe('none')

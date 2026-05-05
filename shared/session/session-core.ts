@@ -2808,27 +2808,6 @@ export class GameCore {
     return this.respond()
   }
 
-  /**
-   * @deprecated Prefer `resolveChoice(playerIndex, 'confirm', { selections })`.
-   * Retained as a thin alias because 24 session-test files still call this
-   * method by name; replacement is a mechanical sed-codemod queued for a
-   * follow-up sprint per `docs/sprint-S2-progress.md` §3.4.
-   */
-  confirmHarvestFeed(
-    playerIndex: number,
-    selections: FeedSelections,
-  ): SessionResponse {
-    const node = this.engineStack.peekInteraction()
-    const frame = this.engineStack.current()
-    if (
-      node?.request?.kind !== 'feed' ||
-      frame?.ownerPlayerIndex !== playerIndex
-    ) {
-      return this.respond(false, 'no pending feed')
-    }
-    return this.handleFeedResolved(playerIndex, selections)
-  }
-
   private handleFeedResolved(
     playerIndex: number,
     selections: FeedSelections,

@@ -63,7 +63,7 @@ describe('D126_FieldCultivator session', () => {
 
     // Walk through any pending states (harvestFeed, etc.)
     while (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
     }
     while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones as any)
@@ -86,7 +86,7 @@ describe('D126_FieldCultivator session', () => {
 
     let resp = session.performRoundEnd()
     while (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
     }
     while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones as any)
@@ -111,7 +111,7 @@ describe('D126_FieldCultivator session', () => {
 
     let resp = session.performRoundEnd()
     while (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
     }
     while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones as any)
@@ -138,7 +138,7 @@ describe('D126_FieldCultivator session', () => {
 
     let resp = session.performRoundEnd()
     while (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
     }
     while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones as any)

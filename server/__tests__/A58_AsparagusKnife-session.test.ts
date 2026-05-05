@@ -201,7 +201,7 @@ describe('A58_AsparagusKnife session', () => {
     }
     // Handle any remaining pending states
     while (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
     }
     while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones as any)
@@ -238,7 +238,7 @@ describe('A58_AsparagusKnife session', () => {
       }
     }
     while (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
     }
     while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones as any)
@@ -269,7 +269,7 @@ describe('A58_AsparagusKnife session', () => {
       resp = session.resolveChoice(resp.pending.playerIndex, 'ok')
     }
     while (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
     }
     while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones as any)

@@ -42,14 +42,14 @@ describe('C59_SchnappsDistillery harvest max enforcement (server-side)', () => {
     expect(resp.pending.remaining).toBe(2)
 
     // Client sends 2 vegetable conversions for C59 (max=1). Server must cap.
-    resp = session.confirmHarvestFeed(0, [
+    resp = session.resolveChoice(0, 'confirm', { selections: [
       {
         sourceId: 'C59_SchnappsDistillery',
         exchangeIndex: 0,
         count: 2,
         sourceName: 'Schnapps Distillery',
       },
-    ])
+    ] })
 
     const playerA = resp.state.players[0]!
     // Only 1 vegetable consumed (max=1), not 2
@@ -67,14 +67,14 @@ describe('C59_SchnappsDistillery harvest max enforcement (server-side)', () => {
     let resp = session.performRoundEnd()
     if (resp.pending.type !== 'harvestFeed') throw new Error('expected harvestFeed pending')
 
-    resp = session.confirmHarvestFeed(0, [
+    resp = session.resolveChoice(0, 'confirm', { selections: [
       {
         sourceId: 'C59_SchnappsDistillery',
         exchangeIndex: 0,
         count: 1,
         sourceName: 'Schnapps Distillery',
       },
-    ])
+    ] })
 
     const playerA = resp.state.players[0]!
     expect(playerA.resources.vegetable).toBe(1)
@@ -91,14 +91,14 @@ describe('C59_SchnappsDistillery harvest max enforcement (server-side)', () => {
 
     // Server cannot resolve the exchange -> selection is dropped; player must
     // beg for the full 2-food deficit, vegetables untouched.
-    resp = session.confirmHarvestFeed(0, [
+    resp = session.resolveChoice(0, 'confirm', { selections: [
       {
         sourceId: 'NoSuchCard',
         exchangeIndex: 0,
         count: 2,
         sourceName: 'Schnapps Distillery',
       },
-    ])
+    ] })
 
     const playerA = resp.state.players[0]!
     expect(playerA.resources.vegetable).toBe(2)
