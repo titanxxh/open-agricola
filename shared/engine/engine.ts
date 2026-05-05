@@ -30,6 +30,13 @@ import {
   getOptionsSourceCard,
   resolveChoiceSourceCard,
 } from './nodes/interaction-node'
+import {
+  attachChoiceLabel,
+  buildReplaceChoiceFlow,
+  getChoiceLabel,
+  getNodeSourceCard,
+  getReplaceAwareChoiceLabel,
+} from './nodes/interaction-helpers'
 import type { EngineNode, EngineStepResult } from './types'
 import { ActionRegistry } from './registry'
 import { HookDispatcher } from './dispatcher'
@@ -516,79 +523,6 @@ export class Engine {
     node.resolve()
   }
 
-  private attachChoiceLabel(
-    node: EngineNode,
-    choiceLabelKey?: string,
-    choiceLabelParams?: Record<string, unknown>,
-  ) {
-    if (!choiceLabelKey) return node
-    const labeledNode = node as EngineNode & {
-      choiceLabelKey?: string
-      choiceLabelParams?: Record<string, unknown>
-    }
-    labeledNode.choiceLabelKey = choiceLabelKey
-    labeledNode.choiceLabelParams = choiceLabelParams
-    return node
-  }
-
-  private getChoiceLabel(
-    node: EngineNode,
-  ): { labelKey: string; labelParams?: Record<string, unknown> } | null {
-    const labeledNode = node as EngineNode & {
-      choiceLabelKey?: string
-      choiceLabelParams?: Record<string, unknown>
-    }
-    if (labeledNode.choiceLabelKey) {
-      return {
-        labelKey: labeledNode.choiceLabelKey,
-        labelParams: labeledNode.choiceLabelParams,
-      }
-    }
-    if (node instanceof OptionalNode) {
-      return this.getChoiceLabel(node.child)
-    }
-    if (node instanceof ActionNode) {
-      const action = this.registry.get(node.actionId)
-      if (!action) return null
-      return {
-        labelKey: node.choiceLabelKey ?? action.nameKey,
-        labelParams: node.choiceLabelParams,
-      }
-    }
-    if ('children' in node) {
-      const composite = node as { children: EngineNode[] }
-      for (const child of composite.children) {
-        const label = this.getChoiceLabel(child)
-        if (label) return label
-      }
-    }
-    return null
-  }
-
-  private getNodeSourceCard(node: EngineNode): string | undefined {
-    const sourceCards = new Set<string>()
-    const visit = (entry: EngineNode) => {
-      if (entry instanceof ActionNode) {
-        if (entry.sourceCard) sourceCards.add(entry.sourceCard)
-        return
-      }
-      if (entry instanceof OptionalNode) {
-        visit(entry.child)
-        return
-      }
-      if (
-        entry instanceof SequenceNode ||
-        entry instanceof ParallelNode ||
-        entry instanceof OrNode ||
-        entry instanceof XorNode
-      ) {
-        entry.children.forEach(visit)
-      }
-    }
-    visit(node)
-    return sourceCards.size === 1 ? [...sourceCards][0] : undefined
-  }
-
   private sanitizePreviewResources(
     resources?: Partial<Resource>,
   ): Partial<Resource> | undefined {
@@ -703,71 +637,6 @@ export class Engine {
     return undefined
   }
 
-  private getFlowSourceCard(flow: ActionFlow): string | undefined {
-    if (flow.type === 'leaf') return flow.sourceCard
-    if (flow.type === 'playerSwitch') return undefined
-    const sourceCards = [...new Set(
-      flow.children
-        .map((child) => this.getFlowSourceCard(child))
-        .filter((sourceCard): sourceCard is string => typeof sourceCard === 'string' && sourceCard.length > 0),
-    )]
-    return sourceCards.length === 1 ? sourceCards[0] : undefined
-  }
-
-  private markCheckedReplaceAction(actionContext?: Record<string, unknown>) {
-    return {
-      ...(actionContext ?? {}),
-      checkedReplaceAction: true,
-    }
-  }
-
-  private buildReplaceChoiceFlow(
-    actionNode: Pick<ActionNode, 'actionId' | 'params' | 'sourceCard' | 'actionContext' | 'choiceLabelKey' | 'choiceLabelParams'>,
-    alternativeFlow: ActionFlow,
-    replacedActionId: string,
-  ): ActionFlow {
-    return {
-      type: 'xor',
-      children: [
-        alternativeFlow,
-        {
-          type: 'leaf',
-          actionId: replacedActionId,
-          params: actionNode.params,
-          sourceCard: actionNode.sourceCard,
-          actionContext: this.markCheckedReplaceAction(actionNode.actionContext),
-          choiceLabelKey: actionNode.choiceLabelKey,
-          choiceLabelParams: actionNode.choiceLabelParams,
-        },
-      ],
-    }
-  }
-
-  private getReplaceAwareChoiceLabel(
-    actionNode: ActionNode,
-    executionContext: ActionExecutionContext,
-    defaultLabel: { labelKey: string; labelParams?: Record<string, unknown> },
-  ) {
-    const replaceResult = this.hooks.applyComputeReplace({
-      ...executionContext,
-      actionId: actionNode.actionId,
-    })
-    const replaceSourceCard = replaceResult.sourceCard ?? actionNode.sourceCard
-    if (actionNode.choiceLabelKey) return { ...defaultLabel, sourceCard: replaceSourceCard }
-    if (!replaceResult.declined || !replaceResult.alternativeFlow) {
-      return { ...defaultLabel, sourceCard: replaceSourceCard }
-    }
-    const alternativeFlow = this.applyFallbackSourceCardToFlow(
-      replaceResult.alternativeFlow,
-      replaceResult.sourceCard,
-    )
-    return {
-      labelKey: 'ui.interactionActionOrReplace',
-      labelParams: { actionNameKey: defaultLabel.labelKey },
-      sourceCard: this.getFlowSourceCard(alternativeFlow),
-    }
-  }
-
   private buildFlowNode(flow: ActionFlow): EngineNode {
     const nextId = () => `flow-${this.flowNodeCounter++}`
     if (flow.type === 'playerSwitch') {
@@ -807,12 +676,12 @@ export class Engine {
         const node = flow.optional
           ? new OptionalNode(nextId(), sequence, flow.promptKey)
           : sequence
-        return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
+        return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
       }
       const node = flow.optional
         ? new OptionalNode(nextId(), actionNode, flow.promptKey)
         : actionNode
-      return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
+      return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
     }
     const children = flow.children.map((child) => this.buildFlowNode(child))
     if (flow.type === 'seq') {
@@ -820,23 +689,23 @@ export class Engine {
       const node = flow.optional
         ? new OptionalNode(nextId(), sequence, flow.promptKey)
         : sequence
-      return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
+      return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
     }
     if (flow.type === 'parallel') {
       const parallel = new ParallelNode(nextId(), children)
       const node = flow.optional
         ? new OptionalNode(nextId(), parallel, flow.promptKey)
         : parallel
-      return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
+      return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
     }
     if (flow.type === 'xor') {
       const xor = new XorNode(nextId(), children, flow.promptKey)
       const node = flow.optional ? new OptionalNode(nextId(), xor, flow.promptKey) : xor
-      return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
+      return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
     }
     const or = new OrNode(nextId(), children, flow.promptKey)
     const node = flow.optional ? new OptionalNode(nextId(), or, flow.promptKey) : or
-    return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
+    return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
   }
 
   /**
@@ -1225,14 +1094,20 @@ export class Engine {
             ),
           )
           if (!doable) return null
-          const baseLabel = this.getChoiceLabel(entry.node)
+          const baseLabel = getChoiceLabel(entry.node, this.registry)
           if (!baseLabel) return null
-          const label = this.getReplaceAwareChoiceLabel(entry.actionNode, executionContext, baseLabel)
+          const label = getReplaceAwareChoiceLabel(
+            entry.actionNode,
+            executionContext,
+            baseLabel,
+            this.hooks,
+            (flow, sc) => this.applyFallbackSourceCardToFlow(flow, sc),
+          )
           return {
             value: entry.nodeId,
             labelKey: label.labelKey,
             labelParams: label.labelParams,
-            sourceCard: label.sourceCard ?? this.getNodeSourceCard(entry.node),
+            sourceCard: label.sourceCard ?? getNodeSourceCard(entry.node),
             effectPreview: this.getNodeEffectPreview(entry.node),
           }
         })
@@ -1265,7 +1140,7 @@ export class Engine {
       this.pendingInteractionContext = {
         params: undefined,
         costs: undefined,
-        sourceCard: resolveChoiceSourceCard(this.getNodeSourceCard(node), options),
+        sourceCard: resolveChoiceSourceCard(getNodeSourceCard(node), options),
         actionContext: undefined,
       }
       const compositePromptKey = node.promptKey ?? 'ui.interactionFlowSelect'
@@ -1338,7 +1213,7 @@ export class Engine {
         sourceCard: actionNode.sourceCard,
         actionContext: actionNode.actionContext,
       }
-      const label = this.getChoiceLabel(node) ?? {
+      const label = getChoiceLabel(node, this.registry) ?? {
         labelKey: actionNode.choiceLabelKey ?? action.nameKey,
         labelParams: actionNode.choiceLabelParams,
       }
@@ -1467,7 +1342,7 @@ export class Engine {
       const replaceSourceCard = replaceResult.sourceCard ?? node.sourceCard
       if (replaceResult.declined && replaceResult.alternativeFlow) {
         const flowNode = this.buildFlowNode(
-          this.buildReplaceChoiceFlow(
+          buildReplaceChoiceFlow(
             node,
             this.applyFallbackSourceCardToFlow(
               replaceResult.alternativeFlow,
@@ -1843,7 +1718,7 @@ export class Engine {
         executionContext.sourceCard = replaceResult.sourceCard ?? child.sourceCard
         if (replaceResult.declined && replaceResult.alternativeFlow) {
           const flowNode = this.buildFlowNode(
-            this.buildReplaceChoiceFlow(
+            buildReplaceChoiceFlow(
               child,
               this.applyFallbackSourceCardToFlow(
                 replaceResult.alternativeFlow,

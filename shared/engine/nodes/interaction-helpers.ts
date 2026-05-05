@@ -1,0 +1,227 @@
+/**
+ * S4b Task 13 — sourceCard / label / replace-aware helpers absorbed from
+ * `shared/engine/engine.ts`. These are pure (or dependency-injected) helpers
+ * operating on EngineNode subtrees; the engine no longer holds them as
+ * instance methods. Pre-PR3 they lived as `Engine.attachChoiceLabel /
+ * getChoiceLabel / getNodeSourceCard / buildReplaceChoiceFlow /
+ * getReplaceAwareChoiceLabel`. Two of them (`getChoiceLabel`,
+ * `getReplaceAwareChoiceLabel`) accept the engine's `ActionRegistry` /
+ * `HookDispatcher` as explicit parameters because they read the action's
+ * default `nameKey` and run the `computeReplace` hook respectively.
+ */
+
+import type {
+  ActionExecutionContext,
+  ActionFlow,
+  ActionChoiceOption,
+} from '../../game/types'
+import type { ActionRegistry } from '../registry'
+import type { HookDispatcher } from '../dispatcher'
+import type { EngineNode } from '../types'
+import { ActionNode } from './action-node'
+import { OptionalNode } from './optional-node'
+import { SequenceNode } from './sequence-node'
+import { ParallelNode } from './parallel-node'
+import { OrNode } from './or-node'
+import { XorNode } from './xor-node'
+
+/**
+ * Stamp `choiceLabelKey` / `choiceLabelParams` onto an EngineNode. The fields
+ * live on `BaseNode` (assignable on every node subclass) so the cast is
+ * structural only. No-op when `choiceLabelKey` is undefined.
+ */
+export function attachChoiceLabel(
+  node: EngineNode,
+  choiceLabelKey?: string,
+  choiceLabelParams?: Record<string, unknown>,
+): EngineNode {
+  if (!choiceLabelKey) return node
+  const labeledNode = node as EngineNode & {
+    choiceLabelKey?: string
+    choiceLabelParams?: Record<string, unknown>
+  }
+  labeledNode.choiceLabelKey = choiceLabelKey
+  labeledNode.choiceLabelParams = choiceLabelParams
+  return node
+}
+
+/**
+ * Walk an EngineNode subtree to derive the choice label: explicit
+ * `choiceLabelKey` wins; OptionalNode unwraps to its child; ActionNode falls
+ * back to its registered action's `nameKey`; composite nodes recurse into
+ * their first labelled descendant. Returns `null` when no label is found.
+ *
+ * Needs the `ActionRegistry` to look up `nameKey` for ActionNode fallbacks.
+ */
+export function getChoiceLabel(
+  node: EngineNode,
+  registry: ActionRegistry,
+): { labelKey: string; labelParams?: Record<string, unknown> } | null {
+  const labeledNode = node as EngineNode & {
+    choiceLabelKey?: string
+    choiceLabelParams?: Record<string, unknown>
+  }
+  if (labeledNode.choiceLabelKey) {
+    return {
+      labelKey: labeledNode.choiceLabelKey,
+      labelParams: labeledNode.choiceLabelParams,
+    }
+  }
+  if (node instanceof OptionalNode) {
+    return getChoiceLabel(node.child, registry)
+  }
+  if (node instanceof ActionNode) {
+    const action = registry.get(node.actionId)
+    if (!action) return null
+    return {
+      labelKey: node.choiceLabelKey ?? action.nameKey,
+      labelParams: node.choiceLabelParams,
+    }
+  }
+  if ('children' in node) {
+    const composite = node as { children: EngineNode[] }
+    for (const child of composite.children) {
+      const label = getChoiceLabel(child, registry)
+      if (label) return label
+    }
+  }
+  return null
+}
+
+/**
+ * Aggregate the sourceCard advertised by every descendant `ActionNode` of
+ * `node`. Returns the unique value when all leaves agree, otherwise
+ * `undefined` (mixed or absent sourceCards). Pure recursion — no
+ * dependencies.
+ */
+export function getNodeSourceCard(node: EngineNode): string | undefined {
+  const sourceCards = new Set<string>()
+  const visit = (entry: EngineNode) => {
+    if (entry instanceof ActionNode) {
+      if (entry.sourceCard) sourceCards.add(entry.sourceCard)
+      return
+    }
+    if (entry instanceof OptionalNode) {
+      visit(entry.child)
+      return
+    }
+    if (
+      entry instanceof SequenceNode ||
+      entry instanceof ParallelNode ||
+      entry instanceof OrNode ||
+      entry instanceof XorNode
+    ) {
+      entry.children.forEach(visit)
+    }
+  }
+  visit(node)
+  return sourceCards.size === 1 ? [...sourceCards][0] : undefined
+}
+
+/**
+ * Recursively walk an `ActionFlow` (the declarative tree, not the live
+ * EngineNode tree) and return the unique `sourceCard` if every leaf agrees.
+ * Used by `getReplaceAwareChoiceLabel` to pick the alternative-flow card.
+ * Pure recursion — no dependencies.
+ */
+export function getFlowSourceCard(flow: ActionFlow): string | undefined {
+  if (flow.type === 'leaf') return flow.sourceCard
+  if (flow.type === 'playerSwitch') return undefined
+  const sourceCards = [...new Set(
+    flow.children
+      .map((child) => getFlowSourceCard(child))
+      .filter((sourceCard): sourceCard is string => typeof sourceCard === 'string' && sourceCard.length > 0),
+  )]
+  return sourceCards.length === 1 ? sourceCards[0] : undefined
+}
+
+/**
+ * Mark the action context as having been processed by `computeReplace`,
+ * preventing infinite re-entry when the alternative flow itself runs through
+ * the same hook. Returns a fresh shallow copy.
+ */
+function markCheckedReplaceAction(
+  actionContext?: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    ...(actionContext ?? {}),
+    checkedReplaceAction: true,
+  }
+}
+
+/**
+ * Wrap an alternative flow + the original (now declined) action into a `xor`
+ * flow node so the engine can present "do alternative / take original" as
+ * two choices. Pure transformation — no dependencies.
+ */
+export function buildReplaceChoiceFlow(
+  actionNode: Pick<
+    ActionNode,
+    'actionId' | 'params' | 'sourceCard' | 'actionContext' | 'choiceLabelKey' | 'choiceLabelParams'
+  >,
+  alternativeFlow: ActionFlow,
+  replacedActionId: string,
+): ActionFlow {
+  return {
+    type: 'xor',
+    children: [
+      alternativeFlow,
+      {
+        type: 'leaf',
+        actionId: replacedActionId,
+        params: actionNode.params,
+        sourceCard: actionNode.sourceCard,
+        actionContext: markCheckedReplaceAction(actionNode.actionContext),
+        choiceLabelKey: actionNode.choiceLabelKey,
+        choiceLabelParams: actionNode.choiceLabelParams,
+      },
+    ],
+  }
+}
+
+/**
+ * Compute the choice label that an OrNode/XorNode option should surface,
+ * accounting for the `computeReplace` hook. When the hook declines, the
+ * label flips to `ui.interactionActionOrReplace` so the player sees a
+ * "do action OR alternative" prompt; otherwise the original label stands.
+ * Always returns a `sourceCard` field so callers don't need to fall back
+ * to `getNodeSourceCard` themselves.
+ *
+ * Needs the `HookDispatcher` to invoke `computeReplace`. The
+ * `applyFallbackSourceCardToFlow` parameter is injected because that helper
+ * still lives on Engine in PR3 (it manipulates flow trees rather than nodes
+ * and may move in PR4/5 if/when followUp wiring also relocates).
+ */
+export function getReplaceAwareChoiceLabel(
+  actionNode: ActionNode,
+  executionContext: ActionExecutionContext,
+  defaultLabel: { labelKey: string; labelParams?: Record<string, unknown> },
+  hooks: HookDispatcher,
+  applyFallbackSourceCardToFlow: (flow: ActionFlow, sourceCard?: string) => ActionFlow,
+): { labelKey: string; labelParams?: Record<string, unknown>; sourceCard?: string } {
+  const replaceResult = hooks.applyComputeReplace({
+    ...executionContext,
+    actionId: actionNode.actionId,
+  })
+  const replaceSourceCard = replaceResult.sourceCard ?? actionNode.sourceCard
+  if (actionNode.choiceLabelKey) return { ...defaultLabel, sourceCard: replaceSourceCard }
+  if (!replaceResult.declined || !replaceResult.alternativeFlow) {
+    return { ...defaultLabel, sourceCard: replaceSourceCard }
+  }
+  const alternativeFlow = applyFallbackSourceCardToFlow(
+    replaceResult.alternativeFlow,
+    replaceResult.sourceCard,
+  )
+  return {
+    labelKey: 'ui.interactionActionOrReplace',
+    labelParams: { actionNameKey: defaultLabel.labelKey },
+    sourceCard: getFlowSourceCard(alternativeFlow),
+  }
+}
+
+// Re-export ActionChoiceOption-derived helpers from interaction-node so
+// callers that already import the helpers module see one cohesive surface.
+export { getOptionsSourceCard, resolveChoiceSourceCard } from './interaction-node'
+// Suppress unused-import warning for ActionChoiceOption — it's part of the
+// re-export's transitive type surface.
+export type { ActionChoiceOption }
