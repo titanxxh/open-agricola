@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { computeAnimalZones } from '../../actions/helpers/animal-zones'
+import { playerBoard } from '../../domain'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A134_FullFarmer'
@@ -21,8 +21,9 @@ export const A134_FullFarmer_impl = {
   effect: {
   id: CARD_ID,
   onBuy: () => gainLeaf(CARD_ID, { wood: 1, clay: 1 }),
-  computeBonusScore: (_state, player) => {
-    const zones = computeAnimalZones(player)
+  computeBonusScore: (state, player) => {
+    const idx = state.players.indexOf(player)
+    const zones = playerBoard(state, idx).animals.zones()
     return zones.filter((z) => z.zoneType === 'pasture' && z.capacity > 0 && (z.animalCount ?? 0) >= z.capacity).length
   },
 },

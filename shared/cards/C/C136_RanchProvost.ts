@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import type { CardImpl } from '../registry'
-import { computeAnimalZones } from '../../actions/helpers/animal-zones'
+import { playerBoard } from '../../domain'
 
 const CARD_ID = 'C136_RanchProvost'
 
@@ -34,8 +34,8 @@ export const C136_RanchProvost_impl = {
     }
   },
   computeSharedPostScore: (state) => {
-    const bestPerPlayer = state.players.map((player) => {
-      const zones = computeAnimalZones(player)
+    const bestPerPlayer = state.players.map((_player, idx) => {
+      const zones = playerBoard(state, idx).animals.zones()
       const pastureCaps = zones.filter((z) => z.zoneType === 'pasture').map((z) => z.capacity)
       return pastureCaps.length > 0 ? Math.max(...pastureCaps) : 0
     })

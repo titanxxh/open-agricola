@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
-import { getTotalAnimalCapacity } from '../../actions/helpers/animal-zones'
+import { playerBoard } from '../../domain'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E84_DollysMother'
@@ -19,14 +19,15 @@ export const E84_DollysMother = new MinorImprovement({
 export const E84_DollysMother_impl = {
   effect: {
   id: CARD_ID,
-  onEndHarvestFeedingPhase: (_state, player) => {
+  onEndHarvestFeedingPhase: (state, player) => {
     // Only help if player has exactly 1 sheep (not enough for normal breeding which requires >= 2)
     if (player.resources.sheep !== 1) return
     // Check animal capacity — need room for the bred offspring
     const totalAnimals = (['sheep', 'boar', 'cattle'] as const).reduce(
       (sum, t) => sum + player.resources[t], 0,
     )
-    if (totalAnimals >= getTotalAnimalCapacity(player)) return
+    const idx = state.players.indexOf(player)
+    if (totalAnimals >= playerBoard(state, idx).animals.totalCapacity()) return
     // Add virtual sheep so breedAnimals sees 2 and breeds
     player.resources.sheep += 1
     writeCardExtraData(player, CARD_ID, 'virtualSheepAdded', true)
