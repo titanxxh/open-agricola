@@ -194,12 +194,17 @@ export class Engine {
     // tolerate unknown ids gracefully.
     this.pendingInteractionActionId = INTERACTION_ONLY_ACTION_ID
     this.pendingInteractionOwnerNodeId = null
-    this.pendingInteractionContext = {
+    const ctxSnapshot = {
       params: undefined,
       costs: undefined,
       sourceCard: undefined,
       actionContext: undefined,
     }
+    this.pendingInteractionContext = ctxSnapshot
+    // S4b Task 11 — mirror onto the injected node (authoritative owner).
+    node.pendingActionId = INTERACTION_ONLY_ACTION_ID
+    node.ownerNodeId = undefined
+    node.contextSnapshot = ctxSnapshot
     this.lastComputedCosts = undefined
   }
 
@@ -257,11 +262,24 @@ export class Engine {
     const mergedActionContext = args.contextWritePatch
       ? { ...(args.actionContext ?? {}), ...args.contextWritePatch }
       : args.actionContext
-    this.pendingInteractionContext = {
+    const ctxSnapshot = {
       params: args.params,
       costs: args.costs,
       sourceCard: this.resolveChoiceSourceCard(args.sourceCard, choiceOptions),
       actionContext: mergedActionContext,
+    }
+    this.pendingInteractionContext = ctxSnapshot
+    // S4b Task 11 — mirror onto InteractionNode (the authoritative owner
+    // post-PR3). Engine top-level fields stay populated to preserve the
+    // existing snapshot()/getPendingInteractionContext() public surface and
+    // the `engine.pendingInteractionContext.sourceCard = ...` mutation hook
+    // used by stats-gained-pseudo-session.test.ts.
+    if (targetNode) {
+      targetNode.pendingActionId = actionId
+      if (!args.preserveOwner) {
+        targetNode.ownerNodeId = ownerNodeId ?? undefined
+      }
+      targetNode.contextSnapshot = ctxSnapshot
     }
   }
 
