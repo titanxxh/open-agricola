@@ -214,6 +214,55 @@ export const startFeedSubFlow = (
 }
 
 /**
+ * Continuation after the player finishes their reorganize sub-flow during
+ * the returning-home phase. Walk to the next pending-animal player; if
+ * none, either start the harvest phase (when the round is a harvest round)
+ * or finalize the round directly. Migrated from
+ * GameCore.continueAfterReorganize_returningHome (S2 Task 10 part 5).
+ */
+export const continueAfterReorganizeReturningHome = (core: GameCore): void => {
+  const nextPending = core.state.players.findIndex((p) => core.hasPendingAnimalsCheck(p))
+  if (nextPending !== -1) {
+    core.startReorgSubFlow(nextPending, 'returning-home')
+    return
+  }
+  if (core.isHarvestRound(core.state.round)) {
+    // Harvest phase entry — call through GameCore so internal accessors
+    // still apply (the trampoline wraps continueHarvestFromBeforeHarvest).
+    core.invokeHarvestFromBeforeHarvest()
+    return
+  }
+  core.invokeFinalizeRound()
+}
+
+/**
+ * Continuation after a player's reorganize sub-flow during round-end. If
+ * the reorganize was triggered mid-action (originPlayerIndex set), defer
+ * to the originating player's onEndTurn hook chain; otherwise finalize
+ * the action log and either advance to the next seated player via
+ * confirm-next-player or fall through (all-workers-used path is handled
+ * by the caller). Migrated from GameCore.continueAfterReorganize_roundEnd
+ * (S2 Task 10 part 5).
+ */
+export const continueAfterReorganizeRoundEnd = (
+  core: GameCore,
+  playerIndex: number,
+  originPlayerIndex: number | null,
+): void => {
+  if (originPlayerIndex !== null) {
+    core.invokeEndTurnHooks(originPlayerIndex)
+    return
+  }
+  const player = core.state.players[playerIndex]!
+  core.invokeFinalizeActionLog(player)
+  const allUsed = core.state.players.every((p) => workersAvailable(core.state, p) <= 0)
+  if (!allUsed) {
+    const next = nextSeatedPlayerIdx(core.state, core.state.players, core.state.currentPlayerIndex)
+    startConfirmNextPlayer(core, next)
+  }
+}
+
+/**
  * Anytime-action entry: prepend the chosen anytime entry's flow onto the
  * currently active engine and drive engine steps. Migrated from
  * GameCore.takeAnytimeAction (S2 Task 10 part 4).
