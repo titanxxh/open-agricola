@@ -107,4 +107,20 @@ describe('SqliteRoomPersistence', () => {
     const stale = db.prepare('SELECT id, status FROM rooms WHERE id LIKE ?').all('r-stale-%') as Array<{ id: string; status: string }>
     expect(stale.every((r) => r.status === 'finished')).toBe(true)
   })
+
+  it('save → load preserves non-empty customCardDbIds', () => {
+    const meta: RoomMeta = { ...META, customCardDbIds: ['card-1', 'card-2'] }
+    p.save('r1', STATE, meta)
+    const snap = p.load('r1') as RoomSnapshot
+    expect(snap.meta.customCardDbIds).toEqual(['card-1', 'card-2'])
+  })
+
+  it('second save bumps version (optimistic concurrency token)', () => {
+    p.save('r1', STATE, META)
+    const v1 = db.prepare('SELECT version FROM rooms WHERE id = ?').get('r1') as { version: number }
+    expect(v1.version).toBe(1)
+    p.save('r1', STATE, META)
+    const v2 = db.prepare('SELECT version FROM rooms WHERE id = ?').get('r1') as { version: number }
+    expect(v2.version).toBe(2)
+  })
 })
