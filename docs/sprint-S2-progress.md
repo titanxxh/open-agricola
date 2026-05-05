@@ -3,7 +3,7 @@
 **生成时间**：2026-05-05  
 **起点 base**：`main` (commit `9725cb0b`)  
 **结束 head**：`sprint-S2-interaction-request` (HEAD = Task 13 摘要 commit)  
-**测试基线**：`pnpm test:fast` 2099 passed / 35 skipped；`pnpm exec tsc -b` 0 error；`pnpm run lint` 0 error / 324 pre-existing warnings
+**测试基线**：`pnpm test:fast` 2098 passed / 35 skipped；`pnpm exec tsc -b` 0 error；`pnpm run lint` 0 error / 323 pre-existing warnings
 
 ## 1. 完成度概览
 
@@ -21,7 +21,7 @@
 | **10** | Round mixin 抽取 | ⚠️ 部分（抽 `nextSeatedPlayerIdx` + `computeStartPlayerIdx`；takeAction / confirm-* 主体留 GameCore） |
 | **11** | Harvest mixin 抽取（含 12 hook handler） | ⚠️ 部分（抽 `getHarvestPlayerIndices`；12 stage-hook + field/feed/breed entry 留 GameCore） |
 | **12** | Draft mixin + card-draft kind 包装 | ⚠️ 部分（抽 `computeCardDraftPending`；submit/advance/finalize 留 GameCore） |
-| **13** | final cleanup（删 PendingAction / 3 confirm shim / EMPTY_CURSOR / 68 测试 codemod / 8 kind 序列化往返） | ⚠️ 部分（step 1 + step 10 完成；step 3/4/5/6/7 延后，cascading codemod 200+ 处） |
+| **13** | final cleanup（删 PendingAction / 3 confirm shim / EMPTY_CURSOR / 68 测试 codemod / 8 kind 序列化往返） | ⚠️ 6/8 完成（13.1 / 13.4 / 13.5 / 13.8 / 13.10 ✅；13.3 deprecation only；13.6 / 13.7 延后） |
 
 ## 2. 实质落地的协议层改造（核心价值）
 
@@ -66,25 +66,30 @@ Plan §3.10 要求把 `Engine.lastEmittedChoice` 缓存换成在 OrNode/XorNode/
 
 每条路径都是一次独立 sprint 量级的工作。本次仅做了"启动 mixin 文件 + 抽 pure helper"的 baseline。
 
-### 3.4 Task 13 cleanup 部分完成
+### 3.4 Task 13 cleanup 完成度
 
 Task 13 各 step 当前状态：
 
 | Step | 内容 | 状态 |
 |---|---|---|
 | 13.1 | 删 EMPTY_ENGINE_STACK_CURSOR + ctx 改必填 | ✅ 完成（commit `f937f9d6`，38 处测试 codemod） |
-| 13.3 | 删 3 个 GameCore confirm shim | ⏳ 延后（162 处 callsite 涉及读 nextPlayerIndex/fromPlayerIndex 私字段，cascading codemod） |
-| 13.4 | 删 ClientCommand 'feed'/'nextPlayer'/'confirmPlayerSwitch' variants | ⏳ 延后（前端 gameTransport.ts + 后端 room-manager.ts 同步迁移到 resolveChoice） |
-| 13.5 | 删 GameSyncPayload.pending | ⏳ 延后（前端 useGameSync hook 仍读，需要前端解耦） |
-| 13.6 | 删 PendingAction union | ⏳ 延后（依赖 13.5 + 13.7） |
-| 13.7 | 68 个 session test confirm shim codemod | ⏳ 延后 |
+| 13.3 | 删 3 个 GameCore confirm shim | ⚠️ 改 deprecation 标记（commit `43693517`）；实质删除延后（162 callsite codemod queue） |
+| 13.4 | 删 ClientCommand 'feed'/'nextPlayer'/'confirmPlayerSwitch' variants | ✅ 完成（commit `27a5a8e9`） |
+| 13.5 | 删 GameSyncPayload.pending | ✅ 完成（commit `d3db5148`） |
+| 13.6 | 删 PendingAction union | ⏳ 延后（PendingAction 退化成 SessionResponse 内部类型，162 处 `resp.pending.type` 测试断言阻塞实质删除） |
+| 13.7 | 68 个 session test confirm shim codemod | ⏳ 延后（依赖 13.3 实质删除） |
+| 13.8 | 重命名 game-core.ts → session-core.ts | ✅ 完成（commit `43693517`） |
 | 13.10 | 添加 farm-select / selection / card-draft cursor round-trip 测试 | ✅ 完成（commit `2477c60c`，4 个新测试） |
 
-step 13.3-13.7 共涉及 200+ 处 callsite cascading codemod，每一组都需要独立 sprint 量级的 refactor。建议作为"S2-followup cleanup" 单独排期。
+完成 6/8 step。step 13.3 实质删除 / 13.6 PendingAction union 删除 / 13.7 162 callsite codemod 三者形成耦合簇——`SessionResponse.pending: PendingAction` 字段是 internal session API，已经从 protocol 层（GameSyncPayload）解耦。删除该 internal 字段需要同步重写 162 个 session test 的 `resp.pending.type === 'X'` 断言，建议作为单独的"S2-followup cleanup" sprint。
 
-## 4. 提交链（Task 1–13 partial）
+## 4. 提交链（Task 1–13）
 
 ```
+43693517 refactor(session): rename game-core.ts → session-core.ts + deprecate confirm shims (Task 13 steps 3+8)
+27a5a8e9 refactor(protocol): drop ws ClientCommand 'feed'/'nextPlayer'/'confirmPlayerSwitch' (Task 13 step 4)
+d3db5148 refactor(protocol): drop GameSyncPayload.pending (Task 13 step 5)
+c43ba30d docs(sprint-s2): update progress for Task 13 step 1 + step 10
 2477c60c test(serialization): add cursor round-trip for new kinds (Task 13 step 10)
 f937f9d6 refactor(serialization): make ctx required, delete EMPTY_ENGINE_STACK_CURSOR (Task 13 step 1)
 16725542 docs(sprint-s2): record final progress report (Task 13 partial)
@@ -101,7 +106,7 @@ f2ce080f feat(types): add PromptKey closed union + PromptParams<K> conditional t
 6c044fc5 docs(sprint-s2): add S2 implementation spec
 ```
 
-加上 S1 的 carry-over commits，共 11 个实质 commits 改动 sprint-S2-interaction-request 分支。
+加上 S1 的 carry-over commits，共 14 个实质 commits 改动 sprint-S2-interaction-request 分支。
 
 ## 5. 后续建议
 
