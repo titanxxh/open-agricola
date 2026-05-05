@@ -108,11 +108,11 @@ export class Engine {
   private registry: ActionRegistry
   private hooks: HookDispatcher
   private log: LogStore
-  // TODO(PR5): Remove these 4 mirror fields. Currently load-bearing for the
+  // TODO(S5): Remove these 4 mirror fields. Currently load-bearing for the
   // `engine.snapshot()` shape consumed by session-core.ts:2258,2599 and the
   // direct mutation hook in stats-gained-pseudo-session.test.ts:35-37.
   // PR3 absorbed the authoritative values onto InteractionNode
-  // (`pendingActionId / ownerNodeId / contextSnapshot`); PR5 work: migrate
+  // (`pendingActionId / ownerNodeId / contextSnapshot`); S5 work: migrate
   // snapshot consumers off top-level pendingInteractionXxx, then these
   // mirrors and the writes in `applyInteractionRequest` / `injectInteraction`
   // can be deleted.
@@ -876,11 +876,12 @@ export class Engine {
         : null
     return {
       nodeStates,
-      // TODO(PR5): These 4 top-level pending* fields mirror the
-      // InteractionNode-owned authoritative state (PR3). When PR5 migrates
+      // TODO(S5): These 4 top-level pending* fields mirror the
+      // InteractionNode-owned authoritative state (PR3). When S5 migrates
       // snapshot consumers to read pending data off the InteractionNode in
       // `choiceData` (or off the composite emit metadata for Or/Xor/Optional),
       // these top-level entries can be removed from the snapshot shape.
+      // (See line 111 — same theme; cross-reference for the four mirror fields.)
       pendingInteractionNodeId: this.pendingInteractionNodeId,
       pendingInteractionActionId: this.pendingInteractionActionId,
       pendingInteractionOwnerNodeId: this.pendingInteractionOwnerNodeId,
