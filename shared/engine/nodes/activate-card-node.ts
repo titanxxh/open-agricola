@@ -26,16 +26,16 @@ export class ActivateCardNode extends BaseNode {
   }
 
   /**
-   * S4b Task 17 — leaf-node medium richness. ActivateCardNode signals
-   * 'continue' when not yet resolved (engine main loop drives
-   * `executeCardListener`, follow-up flow insertion and player-switch
-   * wrapping); 'done' once resolved. Mirrors ActionNode.step intentionally
-   * — both leaves defer execution side-effects to the engine and only
-   * surface lifecycle state via the NodeStepResult signal.
+   * S4b Task 17 / PR5 sub-commit 4 — ActivateCardNode signals
+   * `'activateListener'` (with its `nodeId`) so the engine main loop can
+   * dispatch `executeCardListener`, follow-up flow insertion and
+   * player-switch wrapping without an `instanceof ActivateCardNode` test.
+   * Once resolved → `'done'`. Side-effect implementation stays in the
+   * engine (executeCardListener, tree.insertAfter, log emission).
    */
   step(_ctx: EngineContext): NodeStepResult {
     if (this.getState() === 'resolved') return { kind: 'done' }
-    return { kind: 'continue' }
+    return { kind: 'activateListener', nodeId: this.id }
   }
 
   protected cursorData() {

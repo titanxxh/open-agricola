@@ -25,6 +25,12 @@ export type EngineNode = {
   getArgs(): Record<string, unknown>
   resolve(result?: unknown): void
   isDoable(context: ActionExecutionContext): boolean
+  /**
+   * S4b PR5 sub-commit 4 — every node exposes a step() that returns a
+   * NodeStepResult discriminator the engine main loop dispatches on.
+   * Default (BaseNode) returns `{ kind: 'done' }`; rich nodes override.
+   */
+  step(ctx: EngineContext): NodeStepResult
 }
 
 export type EngineChoice = {
@@ -47,6 +53,19 @@ export type NodeStepResult =
   | { kind: 'choice'; nodeId: string }
   | { kind: 'playerSwitch'; targetPlayerId: string }
   | { kind: 'request'; request: InteractionRequest }
+  /**
+   * S4b PR5 sub-commit 4 — leaf node signals it is ready for the
+   * engine to invoke the action executor (cost / replace / before-phase
+   * / hook / dispatcher) on the node's `actionId`. Returned by
+   * `ActionNode.step()`.
+   */
+  | { kind: 'execute'; nodeId: string; actionId: string }
+  /**
+   * S4b PR5 sub-commit 4 — leaf node signals it is ready for the engine
+   * to fire its registered card listener and apply any returned flow /
+   * follow-up actions. Returned by `ActivateCardNode.step()`.
+   */
+  | { kind: 'activateListener'; nodeId: string }
 
 export type NodeCursor = {
   type: EngineNodeType

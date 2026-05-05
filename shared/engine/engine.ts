@@ -1293,11 +1293,24 @@ export class Engine {
       // here because nextUnresolved() filters resolved nodes.
       return { type: 'blocked', nodeId: node.id }
     }
-    if (node instanceof PlayerSwitchNode) {
-      node.resolve({})
-      return { type: 'playerSwitch', nodeId: node.id, targetPlayerId: node.targetPlayerId }
+    // S4b PR5 sub-commit 4 — leaf-node dispatch routes through `node.step(ctx)`
+    // returning a NodeStepResult discriminator. The engine main loop uses the
+    // `kind` discriminant instead of `instanceof` for behavior dispatch on the
+    // three leaf types (PlayerSwitch / ActivateCard / Action). The
+    // implementation body of each leaf still lives in the engine because it
+    // depends on the engine-private hooks/tree/log machinery.
+    const leafCtx = {
+      resolveSubtree: (n: EngineNode) => this.resolveSubtree(n),
+      emitChoice: () => {},
     }
-    if (node instanceof ActivateCardNode) {
+    const leafStep = node.step(leafCtx)
+    if (leafStep.kind === 'playerSwitch') {
+      // PlayerSwitchNode signals dispatch — engine resolves the node and
+      // surfaces the top-level EngineStepResult.playerSwitch.
+      node.resolve({})
+      return { type: 'playerSwitch', nodeId: node.id, targetPlayerId: leafStep.targetPlayerId }
+    }
+    if (leafStep.kind === 'activateListener' && node instanceof ActivateCardNode) {
       const listener = getListenerById(node.listenerId)
       if (!listener) {
         node.resolve({})
@@ -1362,7 +1375,7 @@ export class Engine {
       node.resolve(result ?? {})
       return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
     }
-    if (node instanceof ActionNode) {
+    if (leafStep.kind === 'execute' && node instanceof ActionNode) {
       const replaceResult = this.hooks.applyComputeReplace({
         ...context,
         params: node.params,

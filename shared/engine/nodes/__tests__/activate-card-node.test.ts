@@ -5,9 +5,13 @@ import type { EngineContext } from '../../types'
 const stubCtx: EngineContext = { resolveSubtree: () => {}, emitChoice: () => {} }
 
 describe('ActivateCardNode.step', () => {
-  it('returns continue when not resolved', () => {
+  it('returns activateListener (with nodeId) when not resolved', () => {
     const node = new ActivateCardNode('ac1', 'L1', 'D123', 'before', 'gain-wood', { foo: 1 })
-    expect(node.step(stubCtx).kind).toBe('continue')
+    const result = node.step(stubCtx)
+    expect(result.kind).toBe('activateListener')
+    if (result.kind === 'activateListener') {
+      expect(result.nodeId).toBe('ac1')
+    }
   })
 
   it('returns done after setState(resolved)', () => {
