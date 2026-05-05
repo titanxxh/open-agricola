@@ -440,6 +440,8 @@ export class GameCore {
     const flow: ActionFlow = { type: 'leaf', actionId, sourceCard }
     return { engine: this.createFlowEngine(flow), source: { kind: 'flow', flow } }
   }
+  /** @internal Round phase — enumerate currently-available anytime entries for the active interaction context. */
+  listAnytimeEntries(): { descriptor: AnytimeAction; flow: ActionFlow }[] { return this.buildAnytimeEntries() }
   /** @internal phase access — build a fresh Engine for a top-level action space. */
   createEngineForSpace(actionId: string): Engine { return this.createEngine(actionId) }
   /** @internal phase access — push a synthetic interaction-only frame. */
@@ -2627,22 +2629,9 @@ export class GameCore {
     return roundPhase.takeAction(this, playerIndex, spaceId)
   }
 
+  /** S2 Task 10 part 4: thin delegator — body lives in `phases/round.ts`. */
   takeAnytimeAction(playerIndex: number, actionId: string): SessionResponse {
-    if (this.state.gameOver) return this.respond(false, 'game is over')
-    if (playerIndex !== this.state.currentPlayerIndex) return this.respond(false, 'not your turn')
-    if (!this.engine || this.activePlayerIndex === null || !this.activeSpaceId) {
-      return this.respond(false, 'no active interaction to interrupt')
-    }
-    const entry = this.buildAnytimeEntries().find(
-      (candidate) => candidate.descriptor.id === actionId,
-    )
-    if (!entry) {
-      return this.respond(false, 'anytime action unavailable')
-    }
-    this.pushHistory()
-    this.engine.prependFlow(entry.flow)
-    this.runEngineSteps()
-    return this.respond()
+    return roundPhase.takeAnytimeAction(this, playerIndex, actionId)
   }
 
   private resolvePendingChoice(

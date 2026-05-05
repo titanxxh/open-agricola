@@ -214,6 +214,34 @@ export const startFeedSubFlow = (
 }
 
 /**
+ * Anytime-action entry: prepend the chosen anytime entry's flow onto the
+ * currently active engine and drive engine steps. Migrated from
+ * GameCore.takeAnytimeAction (S2 Task 10 part 4).
+ */
+export const takeAnytimeAction = (
+  core: GameCore,
+  playerIndex: number,
+  actionId: string,
+): SessionResponse => {
+  if (core.state.gameOver) return core.emitResponse(false, 'game is over')
+  if (playerIndex !== core.state.currentPlayerIndex) return core.emitResponse(false, 'not your turn')
+  const engine = core.peekEngine()
+  if (!engine || core.readActivePlayerIndex() === null || !core.readActiveSpaceId()) {
+    return core.emitResponse(false, 'no active interaction to interrupt')
+  }
+  const entry = core.listAnytimeEntries().find(
+    (candidate) => candidate.descriptor.id === actionId,
+  )
+  if (!entry) {
+    return core.emitResponse(false, 'anytime action unavailable')
+  }
+  core.appendHistory()
+  engine.prependFlow(entry.flow)
+  core.driveEngineSteps()
+  return core.emitResponse()
+}
+
+/**
  * Resolve the synthetic `confirm-player-switch` InteractionNode frame:
  * pop the prompt frame, transfer ownership to `toPlayerIndex` on the
  * parent frame underneath, and resume engine stepping. Migrated from
