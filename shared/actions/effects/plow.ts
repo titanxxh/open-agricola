@@ -124,17 +124,21 @@ export const plowAction: ActionDefinition = {
   canBeExecutedByPlayer: (state, player) =>
     canExecuteWithCostPreview(plowCostPreview, { state, player }),
   costPreview: plowCostPreview,
-  execute: () => ({
-    type: 'request',
-    request: {
-      kind: 'choice',
-      options: [
-        { value: 'confirm', labelKey: 'ui.interactionPlowConfirm' },
-        { value: 'cancel', labelKey: 'ui.interactionPlowCancel' },
-      ],
-    },
-    promptKey: 'ui.interactionPlowSelect',
-  }),
+  execute: ({ player }): ActionExecutionResult => {
+    const selectableTiles = getPlowableTiles(player)
+    return {
+      type: 'request',
+      request: {
+        kind: 'farm-select',
+        farm: { farmType: 'plow', selectableTiles },
+        options: [
+          { value: 'confirm', labelKey: 'ui.interactionPlowConfirm' },
+          { value: 'cancel', labelKey: 'ui.interactionPlowCancel' },
+        ],
+      },
+      promptKey: 'ui.interactionPlowSelect',
+    }
+  },
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
     if (choice === 'cancel') return { type: 'ok' }
 

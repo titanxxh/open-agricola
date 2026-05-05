@@ -3517,10 +3517,16 @@ export class GameCore {
   undoStep(): SessionResponse {
     const interactionNode = this.engineStack.peekInteraction()
     const interactionFrame = this.engineStack.current()
-    const isPlainChoice =
-      interactionNode && (!interactionNode.request || interactionNode.request.kind === 'choice')
-    const farmPrompt = isPlainChoice ? this.isFarmPromptKey(interactionNode.promptKey) : null
-    if (isPlainChoice && farmPrompt && interactionFrame) {
+    // S2 Task 5/6 — farm-select kind also flows through the
+    // farm-prompt undo special-cancel path (it carries the same
+    // promptKey shape as the legacy 'choice' farm-prompts).
+    const isPlainChoiceOrFarmSelect =
+      interactionNode &&
+      (!interactionNode.request ||
+        interactionNode.request.kind === 'choice' ||
+        interactionNode.request.kind === 'farm-select')
+    const farmPrompt = isPlainChoiceOrFarmSelect ? this.isFarmPromptKey(interactionNode.promptKey) : null
+    if (isPlainChoiceOrFarmSelect && farmPrompt && interactionFrame) {
       const currentPromptKey = interactionNode.promptKey
       const currentSpaceId = interactionFrame.spaceId
       const currentPlayerIndex = interactionFrame.ownerPlayerIndex
