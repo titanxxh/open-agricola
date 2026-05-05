@@ -19,6 +19,38 @@ export type InteractionContextSnapshot = Pick<
   'params' | 'costs' | 'sourceCard' | 'actionContext'
 >
 
+/**
+ * Inspect a list of `ActionChoiceOption` and derive a single sourceCard
+ * iff every option declares the same non-empty value. Used as the fallback
+ * for emit/resolveChoiceSourceCard when no explicit sourceCard was passed.
+ * Pure function — no `this` access.
+ */
+export function getOptionsSourceCard(options: ActionChoiceOption[]): string | undefined {
+  if (options.length === 0) return undefined
+  const normalized = options.map((option) =>
+    typeof option.sourceCard === 'string' && option.sourceCard.length > 0
+      ? option.sourceCard
+      : null,
+  )
+  if (normalized.some((sourceCard) => sourceCard === null)) return undefined
+  const sourceCards = [...new Set(normalized)] as string[]
+  return sourceCards.length === 1 ? sourceCards[0] : undefined
+}
+
+/**
+ * Resolve the effective sourceCard for a freshly-emitted choice: explicit
+ * argument wins; otherwise fall back to the single uniform option-derived
+ * sourceCard (if any). Pure function — no `this` access. Shared between
+ * `InteractionNode.emit()` and the fallback (no-targetNode) wiring path
+ * still living on `Engine`.
+ */
+export function resolveChoiceSourceCard(
+  sourceCard: string | undefined,
+  options: ActionChoiceOption[],
+): string | undefined {
+  return sourceCard ?? getOptionsSourceCard(options)
+}
+
 export class InteractionNode extends BaseNode {
   public choices: ActionChoiceOption[]
   public promptKey?: PromptKey
@@ -68,6 +100,60 @@ export class InteractionNode extends BaseNode {
     this.promptParams = promptParams
     this.lastEmittedChoices = choices
     this.nodeState = 'ready'
+  }
+
+  /**
+   * S4b Task 12 — absorbed from `Engine.applyInteractionRequest`. Wires up
+   * this InteractionNode for a freshly-emitted interaction request:
+   *
+   *   - calls `setChoice(promptKey, choiceOptions, promptParams)` so the node
+   *     surfaces the prompt + options
+   *   - sets `this.request` to the InteractionRequest payload
+   *   - records `pendingActionId` (always) and `ownerNodeId` (unless
+   *     `preserveOwner` is true — used by the resolveChoice second-pass that
+   *     keeps the existing XorNode owner pointer)
+   *   - shallow-merges `contextWritePatch` into `actionContext` (mirrors the
+   *     ActionDef-declared `result.extraData.actionContextWrite` patch flow)
+   *   - resolves `sourceCard` via the static `resolveChoiceSourceCard`
+   *     fallback (option-derived single sourceCard if not explicit)
+   *
+   * The engine still owns the top-level `pendingInteractionContext` /
+   * `pendingInteractionNodeId` mirror fields for `snapshot()` /
+   * `getPendingInteractionContext()` back-compat — it copies the returned
+   * `contextSnapshot` into those fields after calling `emit`.
+   */
+  emit(args: {
+    request: InteractionRequest
+    promptKey?: PromptKey
+    promptParams?: Record<string, unknown>
+    choiceOptions: ActionChoiceOption[]
+    actionId: string
+    ownerNodeId: string | null
+    params: ActionExecutionContext['params']
+    costs: ActionExecutionContext['costs']
+    sourceCard: string | undefined
+    actionContext: Record<string, unknown> | undefined
+    contextWritePatch?: Record<string, unknown>
+    preserveOwner?: boolean
+  }): InteractionContextSnapshot {
+    const { request, promptKey, promptParams, choiceOptions, actionId, ownerNodeId } = args
+    this.setChoice(promptKey, choiceOptions, promptParams)
+    this.request = request
+    this.pendingActionId = actionId
+    if (!args.preserveOwner) {
+      this.ownerNodeId = ownerNodeId ?? undefined
+    }
+    const mergedActionContext = args.contextWritePatch
+      ? { ...(args.actionContext ?? {}), ...args.contextWritePatch }
+      : args.actionContext
+    const ctxSnapshot: InteractionContextSnapshot = {
+      params: args.params,
+      costs: args.costs,
+      sourceCard: resolveChoiceSourceCard(args.sourceCard, choiceOptions),
+      actionContext: mergedActionContext,
+    }
+    this.contextSnapshot = ctxSnapshot
+    return ctxSnapshot
   }
 
   resolve(choice: string) {
