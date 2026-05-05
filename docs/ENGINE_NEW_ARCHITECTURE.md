@@ -8,12 +8,14 @@
 
 本架构在**已落地的"shared/server/client 三层 + 后端权威 + WS 全量快照"**之上做四件事：
 
-1. **消除 `PendingAction` 多态 union**，"等什么"只问 Engine（已在 reorganize 子流程上 prototype）
-2. **节点充血 + sub-flow stack**：参照 BGA `AbstractNode`，把 engine.ts 1828 行单体降级
-3. **Session 按游戏阶段拆 traits/mixins**：参照 BGA `States/*Trait.php`
-4. **引入领域聚合层**（`PlayerBoard` 派生视图）：把行动层 ~3300 行差距还回到聚合层
+1. **消除 `PendingAction` 多态 union**，"等什么"只问 Engine ✅ 已落地（S1 / S2）
+2. **节点充血 + sub-flow stack**：参照 BGA `AbstractNode`，把 engine.ts 1828 行单体降级（S4 同期推进）
+3. **Session 按游戏阶段拆 traits/mixins**：参照 BGA `States/*Trait.php` ✅ 已落地（S2 — 4 phase mixin；物理目录留 S6）
+4. **引入领域聚合层**（`PlayerBoard` 派生视图）：把行动层 ~3300 行差距还回到聚合层（S4）
 
 它**不改变**：后端权威 / 全量快照 / WS 协议 / hook 系统 / 卡牌闭环原则 / 三层物理边界。
+
+> **当前 sprint 进度**（详见 §15）：S1 ✅（2026-05-03）/ S2 ✅（2026-05-05）/ S3 ✅（2026-05-04，PaymentSolver 收口）/ S4–S7 待启动。
 
 ---
 
@@ -968,7 +970,19 @@ S6 物理分层完成后专设 S7"卡牌效果测试回归"：
 - 卡牌效果 session 测试可 skip，PR 描述列「新增 skip 数 / 累计 skip 数」
 - skip 必须登记在 `docs/skip-tracker.md`
 
-### Sprint S1：消除 PendingAction 残留 + 引入 InteractionNode 骨架 + 落地 D-a 序列化
+### Sprint S1：消除 PendingAction 残留 + 引入 InteractionNode 骨架 + 落地 D-a 序列化 ✅ 完成（2026-05-03）
+
+> **完成总结**（详见 `docs/sprint-S1-progress.md`）
+>
+> - ✅ Tasks 1–11 全部落地（含 Task 11 reviewer C-1 / I-1 follow-ups）
+> - ✅ R1–R4 残留清掉：`pausedEngine` → `EngineStack`；`subFlowKind` 强类型；`stageResume.extra` 自描述化；`__subflow:reorganize` 命名收口
+> - ✅ `InteractionNode` 骨架引入 + 4 种 kind 起步（`choice` / `animal-reorg` / `confirm-next-player` / `confirm-player-switch`）；`ChoiceNode` 类型不复存在；`ActionExecutionResult.type` 收敛为 `'request'`，`'animalReorg'` result type 删除
+> - ✅ D-a：`Engine.snapshotCursor()` + cursor 进 `SerializedGameState`
+> - ✅ Task 11 reviewer C-1：`resolveChoice` 验证客户端 `value` 命中 `InteractionNode.choices`，恢复 BGA 等价拒绝行为；5 个 sow-fail 测试 un-skip
+> - **基线**：fast 0 fail / 35 skip；slow 0 fail / 13 skip
+>
+> 以下为 sprint 启动时的 spec 内容，作为历史记录保留。
+
 
 - 推广 reorganize 模式到 `confirmNextPlayer` + `confirmPlayerSwitch`
 - 清掉 reorganize prototype 的 R1–R4 残留：
@@ -989,7 +1003,22 @@ S6 物理分层完成后专设 S7"卡牌效果测试回归"：
   - `ChoiceNode` 类型在代码中不复存在（统一 `InteractionNode`）
   - 「强制 green 子集」全绿（含新增的 cursor 序列化 round-trip 测试）
 
-### Sprint S2：InteractionNode 完整推广 + harvestFeed + cardDraft + Session 拆 traits
+### Sprint S2：InteractionNode 完整推广 + harvestFeed + cardDraft + Session 拆 traits ✅ 完成（2026-05-05）
+
+> **完成总结**（详见 `docs/sprint-S2-progress.md`）
+>
+> - ✅ Tasks 1–13 全部落地
+> - ✅ InteractionRequest 推广剩余 kind：`farm-select`（plow/sow/fence/room/stable）/ `selection`（farm-position/occupation-hand）/ `feed`（harvestFeed）/ `card-draft`（cardDraft）；GameCore.build{Plow,Sow,Fence,Selection,Farm}Interaction 全删；`isFarmPromptKey()` / `isSelectionPromptKey()` 字符串嗅探消除
+> - ✅ 协议层 InteractionState 简化：8 stateId → 3（idle / wait / gameover）；`request: InteractionRequest` 单字段
+> - ✅ ClientCommand 收敛：`commitFarm / commitSelection / commitChoice / confirmFeed` 全删 → 全部 `resolveChoice`；`/api/game/draft-submit` HTTP 端点同步删除
+> - ✅ **`PendingAction` union 完全删除**（Task 13.6）：union + `SessionResponse.pending` + `getCurrentPending` / `clonePending` / `computeCardDraftPending` 全部移除；测试侧 ~600 处 `pending.X` + ~330 处 `pending.type` 全部 codemod 到 `interaction.X` / `state.draft`；`HistoryEntry.pending` 收紧为 `hadChoicePending: boolean`
+> - ✅ `confirmNextPlayer / confirmPlayerSwitch / confirmHarvestFeed` shim 全删（Task 13.7）；105 + 24 callsite codemod 完成
+> - ✅ Session 拆 traits：`game-core.ts` → `session-core.ts` + 4 个 phase mixin（`shared/session/phases/{round,harvest,draft,setup}.ts`）；物理迁移留 S6
+> - ✅ `OrNode/XorNode/OptionalNode` emit 元数据下沉到节点自身字段；`Engine.lastEmittedChoice` cache 删除
+> - **基线**：fast 2098 passed / 35 skipped；tsc 0 error；lint 0 error / 323 warnings
+>
+> 以下为 sprint 启动时的 spec 内容，作为历史记录保留。
+
 
 - **InteractionNode 推广剩余 kind**：
   - 实现 `'farm-select'` request kind（含 plow/sow/fence/room/stable 5 种 farmType）
@@ -1075,11 +1104,11 @@ S6 物理分层完成后专设 S7"卡牌效果测试回归"：
 
 | 决策 | ADR | 不重新讨论的原因 |
 |---|---|---|
-| 消除 PendingAction union | `0001-eliminate-pending-action-union.md` | 已在 reorganize 上 prototype 验证，BGA 同模式 |
-| Engine cursor 进 SerializedGameState (D-a) | `0002-engine-cursor-in-serialized-state.md` | D-b 重放历史代价过高，D-c 折衷会长出新胶水 |
-| 节点充血（学 BGA AbstractNode） | `0003-rich-node-vs-anemic-node.md`（待写） | 节点贫血是 engine.ts 1828 行单体的根因 |
-| 引入 `shared/domain/` 聚合层 | `0004-domain-aggregate-layer.md`（待写） | 行动层超 BGA 3300 行的反向来源 |
+| 消除 PendingAction union | `0001-eliminate-pending-action-union.md` | ✅ S1 / S2 已落地：union 完全删除（Task 13.6），8 kind sum type 上线 |
+| Engine cursor 进 SerializedGameState (D-a) | `0002-engine-cursor-in-serialized-state.md` | ✅ S1 已落地：`Engine.snapshotCursor()` + `SerializedGameState.engineStack` |
+| 节点充血（学 BGA AbstractNode） | `0003-rich-node-vs-anemic-node.md`（待写） | 节点贫血是 engine.ts 1828 行单体的根因（S4 同期推进） |
+| 引入 `shared/domain/` 聚合层 | `0004-domain-aggregate-layer.md`（待写） | 行动层超 BGA 3300 行的反向来源（S4 范围） |
 | 不照搬 BGA 充血 Action | `0005-action-as-data-not-class.md`（待写） | 自定义卡 DSL 要求 Action 数据化 |
-| Payment 收口为单深 module | [`0006-payment-solver-deep-module.md`](./adr/0006-payment-solver-deep-module.md)（Accepted 2026-05-04） | 当前 41 export 工具袋接口爆炸 |
+| Payment 收口为单深 module | [`0006-payment-solver-deep-module.md`](./adr/0006-payment-solver-deep-module.md)（Accepted 2026-05-04） | ✅ S3 已落地：`PaymentSolver` namespace 6 成员，`payment/internal/` 深模块 |
 
 ADR 在 sprint 落地时同步建立；本文档在每个 sprint 完成后回流更新。
