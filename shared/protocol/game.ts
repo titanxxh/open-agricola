@@ -1,4 +1,4 @@
-import type { InteractionState, PendingAction, PlayerState, Resource } from '../game/types'
+import type { InteractionState, PlayerState, Resource } from '../game/types'
 import type { SerializedGameState } from '../game/serialization'
 import type { PlayerScoreSummary } from '../logic/scoring'
 import type { CardDefinition } from '../cards/types'
@@ -39,7 +39,6 @@ export type ActionDetailParts = {
 
 export type GameSyncPayload = {
   state: SerializedGameState
-  pending: PendingAction
   interaction: InteractionState
   scores: PlayerScoreSummary[] | null
   pastureCapacities?: Record<string, Record<string, number>>
