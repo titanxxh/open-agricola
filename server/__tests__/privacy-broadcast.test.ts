@@ -1,11 +1,9 @@
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import WebSocket from 'ws'
-import { createWsServer, setPersistence, setRegistry, setLobby } from '../game/room-manager.ts'
+import WebSocket, { WebSocketServer } from 'ws'
+import { createWsServer } from '../connection/ws-server.ts'
 import { InMemoryRoomPersistence } from '../game/persistence/memory-adapter.ts'
-import { RoomRegistry } from '../game/room-registry.ts'
-import { createLobby } from '../game/lobby.ts'
 import type { ServerEvent } from '../../shared/protocol/ws.ts'
 import type { StateUpdateEnvelope } from '../../shared/protocol/game.ts'
 
@@ -58,22 +56,14 @@ const isReconnectState = (event: ServerEvent): event is StateUpdateEnvelope =>
 
 describe('WS broadcast per-viewer filter', () => {
   let server: ReturnType<typeof createServer>
-  let wsServer: ReturnType<typeof createWsServer>
+  let wsServer: WebSocketServer
   let baseUrl: string
   const sockets: TestSocket[] = []
 
   beforeEach(async () => {
     const persistence = new InMemoryRoomPersistence()
-    setPersistence(persistence)
-    const registry = new RoomRegistry()
-    setRegistry(registry)
-    setLobby(createLobby({
-      registry,
-      persistence,
-      broadcaster: { broadcastEvent: () => {} },
-    }))
     server = createServer()
-    wsServer = createWsServer(server)
+    wsServer = createWsServer(server, { persistence }).wss
     await new Promise<void>((resolve) => {
       server.listen(0, '127.0.0.1', () => resolve())
     })
