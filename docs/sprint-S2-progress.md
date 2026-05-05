@@ -14,14 +14,14 @@
 | **3** | promptKey 收紧到 PromptKey closed union (Path C — 56 字面量 + `ui.cards.${string}` 模板) | ✅ 完整 |
 | **4** | InteractionState 8→3 stateId + buildInteraction 重写 | ✅ 完整 |
 | **5** | plow / sow leaf emit farm-select kind | ✅ 完整（commit `8302eee4` — Task 8 落地后解锁；D20 cultivation 测试已重写按实际 hook 排序走） |
-| **6** | fence / room / stable leaf emit farm-select kind | ⚠️ 部分（实质切换尝试引入 farm-expansion multi-step flow 回归 12 处，回滚保留旧 'choice' kind；需后续单独 sprint 重构 multi-step composite flow） |
+| **6** | fence / room / stable leaf emit farm-select kind | ✅ 完整（commit `1308569d` — 找到 engine.ts:1904 单守卫 bug 并修复，实质迁完三个 leaf） |
 | **7** | selection.ts 重写、删 split-comma | ⚠️ 部分（`commitSelectionChoice` 改用 structured payload；selection.resolveChoice 优先 payload + 保留 split fallback；execute 仍 'choice' kind） |
 | **8** | OrNode/XorNode/OptionalNode emit 包成 InteractionNode；删 lastEmittedChoice cache | ✅ 完整（commit `c9f82b06` — 把 emit 元数据存到节点自身的 `emittedChoices/emittedPromptKey/emittedPromptParams/emittedRequest` 字段；删除 `Engine.lastEmittedChoice` cache；snapshot/restore 改写 `compositeEmit` 字段+保留 legacy alias） |
-| **9** | Setup mixin 抽取 | ⚠️ 部分（抽 `getCustomCardDefs` + `updatePlayerName` 到 `phases/setup.ts`；constructor 主体迁移延后） |
-| **10** | Round mixin 抽取 | ⚠️ 部分（抽 `nextSeatedPlayerIdx` + `computeStartPlayerIdx`；takeAction / confirm-* 主体留 GameCore） |
-| **11** | Harvest mixin 抽取（含 12 hook handler） | ⚠️ 部分（抽 `getHarvestPlayerIndices`；12 stage-hook + field/feed/breed entry 留 GameCore） |
-| **12** | Draft mixin + card-draft kind 包装 | ⚠️ 部分（抽 `computeCardDraftPending`；submit/advance/finalize 留 GameCore） |
-| **13** | final cleanup（删 PendingAction / 3 confirm shim / EMPTY_CURSOR / 68 测试 codemod / 8 kind 序列化往返） | ⚠️ 6/8 完成（13.1 / 13.4 / 13.5 / 13.8 / 13.10 ✅；13.3 deprecation only；13.6 / 13.7 延后） |
+| **9** | Setup mixin 抽取 | ⚠️ 部分（抽 `getCustomCardDefs` + `updatePlayerName` 到 `phases/setup.ts`；constructor 主体迁移延后—OOP 限制） |
+| **10** | Round mixin 抽取 | ✅ 主体完整（13 method 迁移到 phases/round.ts：takeAction / startConfirmNextPlayer / startConfirmPlayerSwitch / startFeedSubFlow / handleConfirmNextPlayerResolved / handleConfirmPlayerSwitchResolved / takeAnytimeAction / continueAfterReorganize_returningHome / continueAfterReorganize_roundEnd / finalizeActionLog / finishCompletedActionTurn / performRoundEnd / finalizeRound + helpers；12 stage-hook trampoline chain 按设计保留 GameCore） |
+| **11** | Harvest mixin 抽取（含 12 hook handler） | ✅ 主体完整（startHarvest / startBreedPhase / continueAfterReorganize_harvestBreed / getHarvestPlayerIndices；handleFeedResolved 按设计保留 GameCore） |
+| **12** | Draft mixin + card-draft kind 包装 | ✅ 主体完整（submitDraftPick / computeCardDraftPending；card-draft kind InteractionRequest 包装延后） |
+| **13** | final cleanup（删 PendingAction / 3 confirm shim / EMPTY_CURSOR / 68 测试 codemod / 8 kind 序列化往返） | ⚠️ 7/8 完成（13.1 / 13.4 / 13.5 / 13.8 / 13.10 ✅；13.3 + 13.7 part 1：删 confirmHarvestFeed shim + 24 callsite codemod；confirmNextPlayer/confirmPlayerSwitch shim 保留 deprecated；13.6 PendingAction union 仍延后） |
 
 ## 2. 实质落地的协议层改造（核心价值）
 
