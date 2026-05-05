@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { serializeState } from '../../../shared/game/serialization'
 import { createInitialState } from '../../../shared/logic/state'
 import type { GameSyncPayload, StateUpdateEnvelope } from '../../../shared/protocol/game'
+import { EngineStack } from '../../../shared/engine'
+
+const emptyCtx = () => ({ engineStack: new EngineStack() })
 
 class FakeWebSocket {
   static OPEN = 1
@@ -34,7 +37,7 @@ class FakeWebSocket {
 }
 
 const buildPayload = (historyLength: number): GameSyncPayload => ({
-  state: serializeState(createInitialState(42)),
+  state: serializeState(createInitialState(42), emptyCtx()),
   pending: { type: 'none' },
   interaction: {
     stateId: 'idle',
@@ -196,7 +199,7 @@ describe('WsGameTransport request correlation', () => {
 describe('HttpGameTransport draftSubmit', () => {
   it('POSTs to /api/game/draft-submit with playerId and pick', async () => {
     const fakePayload = {
-      state: serializeState(createInitialState(42)),
+      state: serializeState(createInitialState(42), emptyCtx()),
       pending: { type: 'none' },
       interaction: { stateId: 'idle', allowedCommands: [], anytimeActions: [] },
       scores: null,
@@ -244,7 +247,7 @@ describe('HttpGameTransport draftSubmit', () => {
 describe('HttpGameTransport resolveChoice', () => {
   it('POSTs to /api/game/choice with playerIndex, value and optional payload', async () => {
     const fakePayload = {
-      state: serializeState(createInitialState(42)),
+      state: serializeState(createInitialState(42), emptyCtx()),
       pending: { type: 'none' },
       interaction: { stateId: 'idle', allowedCommands: [], anytimeActions: [] },
       scores: null,

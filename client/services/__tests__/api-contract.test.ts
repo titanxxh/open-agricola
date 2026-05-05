@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState } from '../../../shared/game/types'
 import { serializeState } from '../../../shared/game/serialization'
+import { EngineStack } from '../../../shared/engine'
+
+const emptyCtx = () => ({ engineStack: new EngineStack() })
 
 const createState = (): GameState => ({
   round: 1,
@@ -45,7 +48,7 @@ const createState = (): GameState => ({
 describe('serializeState contract', () => {
   it('strips function fields from action spaces', () => {
     const state = createState()
-    const serialized = serializeState(state)
+    const serialized = serializeState(state, emptyCtx())
 
     const action = serialized.actionSpaces[0] as Record<string, unknown>
     expect(action.canBeExecutedByPlayer).toBeUndefined()
@@ -59,7 +62,7 @@ describe('serializeState contract', () => {
   it('sets roundStartSnapshot to null', () => {
     const state = createState()
     state.roundStartSnapshot = createState()
-    const serialized = serializeState(state)
+    const serialized = serializeState(state, emptyCtx())
     expect(serialized.roundStartSnapshot).toBeNull()
   })
 })

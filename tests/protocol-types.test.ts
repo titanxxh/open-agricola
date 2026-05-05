@@ -4,12 +4,15 @@ import type { ClientCommand, ServerEvent, RoomSummary } from '../shared/protocol
 import type { PendingAction } from '../shared/game/types'
 import { serializeState } from '../shared/game/serialization'
 import { createInitialState } from '../shared/logic/state'
+import { EngineStack } from '../shared/engine'
+
+const emptyCtx = () => ({ engineStack: new EngineStack() })
 
 describe('shared protocol types', () => {
   it('GameSyncPayload can be constructed from SessionResponse', () => {
     const state = createInitialState(42)
     const payload: GameSyncPayload = {
-      state: serializeState(state),
+      state: serializeState(state, emptyCtx()),
       pending: { type: 'none' },
       interaction: {
         stateId: 'idle',
@@ -35,7 +38,7 @@ describe('shared protocol types', () => {
       sync: 'snapshot',
       cause: 'action',
       payload: {
-        state: serializeState(state),
+        state: serializeState(state, emptyCtx()),
         pending: { type: 'none' },
         interaction: {
           stateId: 'idle',

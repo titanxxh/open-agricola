@@ -269,7 +269,7 @@ describe('GameSession — draft persistence (serialize → rehydrate)', () => {
     expect(live.phase).toBe('draft')
     expect(live.draft!.round).toBe(2)
 
-    const serialized = serializeState(live)
+    const serialized = serializeState(live, { engineStack: session.getEngineStack() })
     const json = JSON.parse(JSON.stringify(serialized))
     expect(json.phase).toBe('draft')
     expect(json.draft).toBeTruthy()

@@ -150,10 +150,10 @@ const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
 
 const respondWith = (
   resp: import('./game/authoritative-session.ts').SessionResponse,
-  session?: GameSession,
+  session: GameSession,
   viewerPlayerId: string | null = null,
 ) => {
-  const ctx = session ? { engineStack: session.getEngineStack() } : undefined
+  const ctx = { engineStack: session.getEngineStack() }
   const result: Record<string, unknown> = {
     ...resp,
     state:
@@ -163,10 +163,8 @@ const respondWith = (
   }
   // Include custom card definitions so the frontend can register them
   // in its card registry — custom cards render identically to built-in cards.
-  if (session) {
-    const defs = session.getCustomCardDefs()
-    if (defs.length > 0) result.customCardDefs = defs
-  }
+  const defs = session.getCustomCardDefs()
+  if (defs.length > 0) result.customCardDefs = defs
   return result
 }
 
