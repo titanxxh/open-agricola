@@ -37,7 +37,7 @@ describe('C59_SchnappsDistillery harvest max enforcement (server-side)', () => {
     const session = setup()
     let resp = session.performRoundEnd()
     expect(resp.pending.type).toBe('harvestFeed')
-    if (resp.pending.type !== 'harvestFeed') throw new Error('expected harvestFeed pending')
+    if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) throw new Error('expected harvestFeed pending')
     expect(resp.pending.playerIndex).toBe(0)
     expect(resp.pending.remaining).toBe(2)
 
@@ -65,7 +65,7 @@ describe('C59_SchnappsDistillery harvest max enforcement (server-side)', () => {
   it('allows count=1 (within max)', () => {
     const session = setup()
     let resp = session.performRoundEnd()
-    if (resp.pending.type !== 'harvestFeed') throw new Error('expected harvestFeed pending')
+    if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) throw new Error('expected harvestFeed pending')
 
     resp = session.resolveChoice(0, 'confirm', { selections: [
       {
@@ -87,7 +87,7 @@ describe('C59_SchnappsDistillery harvest max enforcement (server-side)', () => {
   it('selection with unknown sourceId is silently skipped', () => {
     const session = setup()
     let resp = session.performRoundEnd()
-    if (resp.pending.type !== 'harvestFeed') throw new Error('expected harvestFeed pending')
+    if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) throw new Error('expected harvestFeed pending')
 
     // Server cannot resolve the exchange -> selection is dropped; player must
     // beg for the full 2-food deficit, vegetables untouched.

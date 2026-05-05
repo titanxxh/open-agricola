@@ -44,7 +44,7 @@ const drainPending = (session: GameSession, resp: ReturnType<GameSession['getSta
     if (resp.pending.type === 'choice') {
       const playerIdx = resp.pending.playerIndex ?? 0
       resp = session.resolveChoice(playerIdx, resp.pending.options[0]!.value)
-    } else if (resp.pending.type === 'confirmPlayerSwitch') {
+    } else if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     } else {
       break

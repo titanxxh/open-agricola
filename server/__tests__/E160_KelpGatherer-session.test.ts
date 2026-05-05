@@ -41,7 +41,7 @@ describe('E160_KelpGatherer session', () => {
     expect(resp.ok).toBe(true)
 
     // Walk through player switches for card effect
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 

@@ -150,7 +150,7 @@ describe('C1 Overhaul session', () => {
       extraWood: 0,
     })
     expect(resp.ok).toBe(true)
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
     const player = session.getState().state.players[0]!

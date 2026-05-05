@@ -34,7 +34,7 @@ describe('A132_Publican session', () => {
   }
 
   const advancePastPlayerSwitches = (session: GameSession, resp: SessionResponse) => {
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
     return resp

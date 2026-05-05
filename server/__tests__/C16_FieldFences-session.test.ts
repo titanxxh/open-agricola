@@ -166,7 +166,7 @@ describe('C16 FieldFences session', () => {
     expect(resp.state.players[0]!.resources.wood).toBe(2)
 
     // Walk past any switch / done pendings until back to 'none'
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 

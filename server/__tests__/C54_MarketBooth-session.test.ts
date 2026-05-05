@@ -48,7 +48,7 @@ const drainPending = (session: GameSession, accept: boolean) => {
       const target = accept ? nonSkip ?? opts[0] : skipOpt ?? nonSkip ?? opts[0]
       if (!target) break
       resp = session.resolveChoice(resp.pending.playerIndex ?? 0, target.value)
-    } else if (resp.pending.type === 'harvestFeed') {
+    } else if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
     } else {
       break

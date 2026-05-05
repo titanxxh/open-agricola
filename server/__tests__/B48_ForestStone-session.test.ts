@@ -109,7 +109,7 @@ describe('B48_ForestStone session', () => {
     let resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
     expect(readCardExtraData<number>(resp.state.players[0]!, CARD_ID, 'foodCount')).toBe(1)
-    if (resp.pending.type === 'confirmNextPlayer') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player') {
       resp = confirmNextPlayer(session)
       expect(resp.ok).toBe(true)
     }

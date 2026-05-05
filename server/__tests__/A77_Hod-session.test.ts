@@ -71,7 +71,7 @@ describe('A77_Hod session', () => {
     }
 
     // Walk through player switches
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 
@@ -96,7 +96,7 @@ describe('A77_Hod session', () => {
     }
 
     // Walk through player switches for card effect
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 

@@ -188,7 +188,7 @@ const buildMinor = (session: GameSession, actorIdx: number, resp: ReturnType<Gam
 const walkPlayerSwitch = (session: GameSession, resp: ReturnType<GameSession['takeAction']>) => {
   let r = resp
   let safety = 5
-  while (r.pending.type === 'confirmPlayerSwitch' && safety-- > 0) {
+  while (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-player-switch' && safety-- > 0) {
     r = confirmPlayerSwitch(session)
   }
   return r
@@ -356,10 +356,10 @@ describe('D161_CabbageBuyer session', () => {
     // Walk through any intermediate choices / player switches
     let safety = 15
     while (
-      (resp.pending.type === 'choice' || resp.pending.type === 'confirmPlayerSwitch') &&
+      (resp.pending.type === 'choice' || resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') &&
       safety-- > 0
     ) {
-      if (resp.pending.type === 'confirmPlayerSwitch') {
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
         resp = confirmPlayerSwitch(session)
         continue
       }
@@ -390,7 +390,7 @@ describe('D161_CabbageBuyer session', () => {
 
     // Walk any player switches — if D161 fires (it shouldn't), we'd get a choice for p0
     let safety = 5
-    while (resp.pending.type === 'confirmPlayerSwitch' && safety-- > 0) {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch' && safety-- > 0) {
       resp = confirmPlayerSwitch(session)
     }
 
@@ -442,7 +442,7 @@ describe('D161_CabbageBuyer session', () => {
 
     // Walk any player switches
     let safety = 5
-    while (resp.pending.type === 'confirmPlayerSwitch' && safety-- > 0) {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch' && safety-- > 0) {
       resp = confirmPlayerSwitch(session)
     }
 

@@ -30,7 +30,7 @@ describe('D139_Chairman session', () => {
 
     // Before-hooks with opponent scope create a PlayerSwitch to owner context
     // Walk through any pending player switches
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 
@@ -48,7 +48,7 @@ describe('D139_Chairman session', () => {
     expect(resp.ok).toBe(true)
 
     // Walk through any pending player switches
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 

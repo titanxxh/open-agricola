@@ -106,7 +106,7 @@ describe('A106_SlurrySpreader session', () => {
     let safety = 20
 
     while (safety-- > 0 && resp.pending.type !== 'none') {
-      if (resp.pending.type === 'harvestFeed') {
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
         resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
         continue
       }

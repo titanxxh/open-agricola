@@ -35,9 +35,9 @@ describe('C51_FishingNet session', () => {
 
     // Walk through any pending states
     let safety = 20
-    while (resp.pending.type === 'confirmPlayerSwitch' || resp.pending.type === 'confirmNextPlayer') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch' || resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player') {
       if (--safety <= 0) break
-      if (resp.pending.type === 'confirmPlayerSwitch') {
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
         resp = confirmPlayerSwitch(session)
       } else {
         resp = confirmNextPlayer(session)
@@ -57,7 +57,7 @@ describe('C51_FishingNet session', () => {
     expect(resp.ok).toBe(true)
 
     // Walk through pending player switches
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 
@@ -95,9 +95,9 @@ describe('C51_FishingNet session', () => {
 
     // Walk through all pending states until stable
     let safety = 20
-    while (resp.pending.type === 'confirmPlayerSwitch' || resp.pending.type === 'confirmNextPlayer') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch' || resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player') {
       if (--safety <= 0) break
-      if (resp.pending.type === 'confirmPlayerSwitch') {
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
         resp = confirmPlayerSwitch(session)
       } else {
         resp = confirmNextPlayer(session)
@@ -110,9 +110,9 @@ describe('C51_FishingNet session', () => {
 
     // Walk through all pending states (round end should happen automatically)
     safety = 20
-    while (resp.pending.type === 'confirmPlayerSwitch' || resp.pending.type === 'confirmNextPlayer') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch' || resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player') {
       if (--safety <= 0) break
-      if (resp.pending.type === 'confirmPlayerSwitch') {
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
         resp = confirmPlayerSwitch(session)
       } else {
         resp = confirmNextPlayer(session)
@@ -140,7 +140,7 @@ describe('C51_FishingNet session', () => {
     expect(resp.ok).toBe(true)
 
     // Walk through any pending player switches (there should be none for this card)
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 
@@ -163,9 +163,9 @@ describe('C51_FishingNet session', () => {
     expect(resp.ok).toBe(true)
 
     let safety = 20
-    while (resp.pending.type === 'confirmPlayerSwitch' || resp.pending.type === 'confirmNextPlayer') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch' || resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player') {
       if (--safety <= 0) break
-      if (resp.pending.type === 'confirmPlayerSwitch') {
+      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
         resp = confirmPlayerSwitch(session)
       } else {
         resp = confirmNextPlayer(session)

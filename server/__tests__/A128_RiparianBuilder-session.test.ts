@@ -38,7 +38,7 @@ describe('A128_RiparianBuilder session', () => {
     const resp = session.takeAction(1, 'reed-bank')
     expect(resp.ok).toBe(true)
     expect(resp.pending.type).toBe('confirmPlayerSwitch')
-    if (resp.pending.type !== 'confirmPlayerSwitch') return
+    if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch')) return
     expect(resp.pending.fromPlayerIndex).toBe(1)
     expect(resp.pending.toPlayerIndex).toBe(0)
     // The listener fires on `after place-farmer` for the opponent's owner —

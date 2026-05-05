@@ -72,7 +72,7 @@ describe('D72_StableManure session', () => {
     expect(resp.ok).toBe(true)
 
     // Continue through harvest phases
-    while (resp.pending.type === 'harvestFeed') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
     }
     while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
@@ -106,7 +106,7 @@ describe('D72_StableManure session', () => {
     expect(resp.ok).toBe(true)
 
     // Continue through harvest
-    while (resp.pending.type === 'harvestFeed') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
     }
     while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {

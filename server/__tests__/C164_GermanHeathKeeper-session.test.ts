@@ -40,7 +40,7 @@ describe('C164_GermanHeathKeeper session', () => {
     }
 
     // Handle player switch if needed (sheep gain from card)
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 
@@ -71,7 +71,7 @@ describe('C164_GermanHeathKeeper session', () => {
     }
 
     // Handle player switch to owner for sheep gain
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 
@@ -82,7 +82,7 @@ describe('C164_GermanHeathKeeper session', () => {
       ])
     }
 
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 
@@ -97,7 +97,7 @@ describe('C164_GermanHeathKeeper session', () => {
     let resp = session.takeAction(1, 'day-laborer')
     expect(resp.ok).toBe(true)
 
-    while (resp.pending.type === 'confirmPlayerSwitch') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
 
