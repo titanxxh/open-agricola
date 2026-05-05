@@ -74,6 +74,7 @@ import { getActiveCardRegistry, setActiveCardRegistry } from '../cards/active-re
 import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { allOccupationCards, allMinorImprovementCards } from '../cards/catalog.ts'
 import { majorCardDefinitions } from '../cards/major/index.ts'
+import * as setupPhase from './phases/setup.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { getCardEffect } from '../cards/card-effects.ts'
 import { incCardUsed } from '../cards/helpers/card-state.ts'
@@ -498,24 +499,12 @@ export class GameCore {
    * render identically to built-in cards.
    */
   getCustomCardDefs(): import('../protocol/game.ts').CustomCardDef[] {
-    if (!this.sessionCardContext) return []
-    const defs: import('../protocol/game.ts').CustomCardDef[] = []
-    const artUrls = this.sessionCardContext.customArtUrls
-    for (const [id, card] of this.sessionCardContext.customMinors) {
-      defs.push({ cardType: 'minor', cardJson: card.toJSON(), artUrl: artUrls.get(id) ?? null })
-    }
-    for (const [id, card] of this.sessionCardContext.customOccupations) {
-      defs.push({ cardType: 'occupation', cardJson: card.toJSON(), artUrl: artUrls.get(id) ?? null })
-    }
-    return defs
+    return setupPhase.getCustomCardDefs(this.sessionCardContext)
   }
 
   /** Update a player's display name in the game state (called after WS join). */
   updatePlayerName(playerIndex: number, name: string): void {
-    const player = this.state.players[playerIndex]
-    if (player && name.trim()) {
-      player.name = name.trim()
-    }
+    setupPhase.updatePlayerName(this.state.players[playerIndex], name)
   }
 
   private buildEngineNode(flow: ActionFlow, counter: { value: number }): EngineNode {
