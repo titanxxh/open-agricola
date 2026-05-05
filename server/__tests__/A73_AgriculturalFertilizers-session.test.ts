@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 
 import '../../shared/cards/A/A73_AgriculturalFertilizers'
 
@@ -74,7 +75,7 @@ describe('A73_AgriculturalFertilizers session', () => {
     })
     expect(resp.ok).toBe(true)
     // Only 1 tile fenced, no sow offered
-    expect(resp.pending.type).not.toBe('choice')
+    expect(isLegacyChoicePending(resp)).toBe(false)
   })
 
   it('grants optional sow after building 2 stables via farm-expansion', () => {

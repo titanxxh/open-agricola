@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/game/player'
+import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/C/C112_Thresher'
 
 const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`
@@ -172,6 +173,6 @@ describe('C112_Thresher session', () => {
     // undoable. The action resolves immediately without offering a choice,
     // ending in confirmNextPlayer (or none) rather than choice.
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).not.toBe('choice')
+    expect(isLegacyChoicePending(resp)).toBe(false)
   })
 })

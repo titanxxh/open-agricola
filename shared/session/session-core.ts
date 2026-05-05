@@ -3364,11 +3364,10 @@ export class GameCore {
       const cancelResult = this.resolvePendingChoice(currentPlayerIndex, 'cancel', false)
       const stillOnSameFarmPrompt =
         cancelResult.ok &&
-        cancelResult.pending.type === 'choice' &&
-        cancelResult.pending.promptKey === currentPromptKey &&
-        cancelResult.pending.spaceId === currentSpaceId &&
         cancelResult.interaction.stateId === 'wait' &&
-        cancelResult.interaction.farm !== undefined
+        cancelResult.interaction.farm !== undefined &&
+        cancelResult.interaction.promptKey === currentPromptKey &&
+        cancelResult.interaction.spaceId === currentSpaceId
       if (!stillOnSameFarmPrompt) {
         return cancelResult
       }

@@ -3,7 +3,7 @@ import { GameSession } from '../server/game/authoritative-session'
 import { createInitialState } from '../shared/logic/state'
 import { getAllTilePositions } from '../shared/game/farm'
 import type { PendingAction } from '../shared/game/types'
-import { confirmNextPlayer } from '../server/__tests__/_helpers/legacy-confirms'
+import { confirmNextPlayer, isLegacyChoicePending } from '../server/__tests__/_helpers/legacy-confirms'
 
 describe('pending choice types + undo regression', () => {
   let session: GameSession
@@ -221,7 +221,7 @@ describe('pending choice types + undo regression', () => {
 
     it('initial state has pending none', () => {
       const resp = session.getState()
-      expect(resp.interaction.stateId).not.toBe('wait')
+      expect(isLegacyChoicePending(resp)).toBe(false)
       expect(resp.ok).toBe(true)
     })
   })
@@ -239,7 +239,7 @@ describe('pending choice types + undo regression', () => {
       expect(resp.ok).toBe(true)
       expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
       if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player') {
-        expect(resp.pending.nextPlayerIndex).toBe(1)
+        expect(resp.interaction.nextPlayerIndex).toBe(1)
       }
     })
 
@@ -250,7 +250,7 @@ describe('pending choice types + undo regression', () => {
       session.takeAction(0, dayLaborer.spaceId)
       const resp = confirmNextPlayer(session)
       expect(resp.ok).toBe(true)
-      expect(resp.interaction.stateId).not.toBe('wait')
+      expect(isLegacyChoicePending(resp)).toBe(false)
       expect(resp.state.currentPlayerIndex).toBe(1)
     })
   })
@@ -391,7 +391,7 @@ describe('pending choice types + undo regression', () => {
 
       const undone = session.undoStep()
       expect(undone.ok).toBe(true)
-      expect(undone.interaction.stateId).not.toBe('wait')
+      expect(isLegacyChoicePending(undone)).toBe(false)
     })
 
     it('undoAction after multi-step resolves to action start', () => {
@@ -409,7 +409,7 @@ describe('pending choice types + undo regression', () => {
       const undone = session.undoAction()
       expect(undone.ok).toBe(true)
       expect(undone.state.players[0]!.workersAvailable).toBe(beforeWorkers)
-      expect(undone.interaction.stateId).not.toBe('wait')
+      expect(isLegacyChoicePending(undone)).toBe(false)
     })
 
     it('undoStep fails when no history', () => {
@@ -439,7 +439,7 @@ describe('pending choice types + undo regression', () => {
 
       const undo2 = session.undoStep()
       expect(undo2.ok).toBe(true)
-      expect(undo2.interaction.stateId).not.toBe('wait')
+      expect(isLegacyChoicePending(undo2)).toBe(false)
       expect(undo2.state.actionSpaces.find((space) => space.id === farmland.spaceId)?.takenBy).toEqual([])
     })
   })
@@ -460,7 +460,7 @@ describe('pending choice types + undo regression', () => {
 
       session.undoAction()
       const afterUndo = session.getState()
-      expect(afterUndo.interaction.stateId).not.toBe('wait')
+      expect(isLegacyChoicePending(afterUndo)).toBe(false)
 
       const second = actions[1]!
       const retake = session.takeAction(0, second.spaceId)

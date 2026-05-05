@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import type { PlayerState } from '../../shared/game/types.ts'
 
 import { workersAvailable } from '../../shared/game/player'
+import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 const stableTradeModifiers: PlayerState['activeModifiers'] = [
   {
     type: 'trade',
@@ -142,7 +143,7 @@ describe('stable payment session', () => {
 
     const secondUndoStepResp = session.undoStep()
     expect(secondUndoStepResp.ok).toBe(true)
-    expect(secondUndoStepResp.interaction.stateId).not.toBe('wait')
+    expect(isLegacyChoicePending(secondUndoStepResp)).toBe(false)
     expect(workersAvailable(secondUndoStepResp.state, secondUndoStepResp.state.players[0]!)).toBe(2)
     expect(secondUndoStepResp.state.actionSpaces.find((space) => space.id === 'farm-expansion')?.takenBy).toEqual([])
   })
@@ -169,7 +170,7 @@ describe('stable payment session', () => {
 
     const undoResp = session.undoStep()
     expect(undoResp.ok).toBe(true)
-    expect(undoResp.interaction.stateId).not.toBe('wait')
+    expect(isLegacyChoicePending(undoResp)).toBe(false)
     expect(undoResp.interaction.stateId).toBe('idle')
     expect(workersAvailable(undoResp.state, undoResp.state.players[0]!)).toBe(2)
     expect(undoResp.state.actionSpaces.find((space) => space.id === 'farm-expansion')?.takenBy).toEqual([])

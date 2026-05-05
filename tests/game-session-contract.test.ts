@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { GameSession } from '../server/game/authoritative-session'
 import { createInitialState } from '../shared/logic/state'
+import { isLegacyChoicePending } from '../server/__tests__/_helpers/legacy-confirms'
 
 describe('GameSession contract', () => {
   let session: GameSession
@@ -13,7 +14,7 @@ describe('GameSession contract', () => {
     it('returns initial state with pending none', () => {
       const resp = session.getState()
       expect(resp.ok).toBe(true)
-      expect(resp.interaction.stateId).not.toBe('wait')
+      expect(isLegacyChoicePending(resp)).toBe(false)
       expect(resp.historyLength).toBe(0)
       expect(resp.hasActionStartSnapshot).toBe(false)
       expect(resp.state.round).toBe(1)
@@ -123,7 +124,7 @@ describe('GameSession contract', () => {
       const resp = session.loadState(custom)
       expect(resp.ok).toBe(true)
       expect(resp.state.round).toBe(7)
-      expect(resp.interaction.stateId).not.toBe('wait')
+      expect(isLegacyChoicePending(resp)).toBe(false)
     })
   })
 

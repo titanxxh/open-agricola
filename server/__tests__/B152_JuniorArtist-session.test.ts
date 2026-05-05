@@ -4,6 +4,7 @@ import { getRegisteredCardListeners, executeCardListener, type CardListenerConte
 
 import { setWorkersAtHome } from '../../shared/game/player'
 import type { ActionFlow } from '../../shared/game/types'
+import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/B/B152_JuniorArtist'
 
 
@@ -97,14 +98,14 @@ describe('B152_JuniorArtist session', () => {
     const session = setup({ withCard: false, food: 3, travelingPlayersFood: 2 })
     const resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).not.toBe('choice')
+    expect(isLegacyChoicePending(resp)).toBe(false)
   })
 
   it('does not trigger on non-day-laborer spaces', () => {
     const session = setup({ withCard: true, food: 3, travelingPlayersFood: 2 })
     const resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).not.toBe('choice')
+    expect(isLegacyChoicePending(resp)).toBe(false)
   })
 
   it('listener emits seq(pay, jumpLeaf-or-xor) targeting candidate spaces', () => {

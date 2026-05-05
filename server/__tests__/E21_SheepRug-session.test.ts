@@ -4,6 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import { setActiveWorkerCount, setWorkersAtHome, workersAvailable, familySize, newbornCount } from '../../shared/game/player'
 import { E21_SheepRug } from '../../shared/cards/E/E21_SheepRug'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
+import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 
 const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`
 
@@ -40,7 +41,7 @@ describe('E21_SheepRug session', () => {
   it('makes occupied wish-children available only when the card is played', () => {
     const withCard = setup(true).getState()
     expect(withCard.ok).toBe(true)
-    expect(withCard.interaction.stateId).not.toBe('wait')
+    expect(isLegacyChoicePending(withCard)).toBe(false)
     expect(withCard.actionAvailability?.['wish-children']).toBe(true)
 
     const withoutCardSession = setup(false)

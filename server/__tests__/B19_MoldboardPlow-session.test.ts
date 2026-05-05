@@ -4,7 +4,7 @@ import { getCardStack } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/B/B19_MoldboardPlow'
 import type { ActionChoiceOption } from '../../shared/game/types'
-import { confirmNextPlayer } from './_helpers/legacy-confirms'
+import { confirmNextPlayer, isLegacyChoicePending } from './_helpers/legacy-confirms'
 
 describe('B19_MoldboardPlow session', () => {
   const setup = () => {
@@ -110,7 +110,7 @@ describe('B19_MoldboardPlow session', () => {
     expect(resp.ok).toBe(true)
 
     // Should not get optional choice — goes straight to confirmNextPlayer
-    expect(resp.pending.type).not.toBe('choice')
+    expect(isLegacyChoicePending(resp)).toBe(false)
   })
 
   it('stack depletes after using both fields', () => {

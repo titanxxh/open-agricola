@@ -33,8 +33,8 @@ describe('A150_Stagehand session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-player-switch')
     if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch')) return
-    expect(resp.pending.fromPlayerIndex).toBe(1)
-    expect(resp.pending.toPlayerIndex).toBe(0)
+    expect(resp.interaction.fromPlayerIndex).toBe(1)
+    expect(resp.interaction.toPlayerIndex).toBe(0)
     const grantedLog = resp.state.log.find((entry) => entry.key === 'log.cardGrantedAction')
     expect(grantedLog?.params?.player).toBe(resp.state.players[0]!.name)
   })
@@ -108,7 +108,7 @@ describe('A150_Stagehand session', () => {
     const resp = session.takeAction(0, 'traveling-players')
     expect(resp.ok).toBe(true)
     // Owner using the space should NOT trigger stagehand (scope: opponent)
-    expect(resp.pending.type).not.toBe('confirmPlayerSwitch')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).not.toBe('confirm-player-switch')
   })
 
   it('does not trigger for non-matching action spaces', () => {
@@ -116,6 +116,6 @@ describe('A150_Stagehand session', () => {
     const resp = session.takeAction(1, 'day-laborer')
     expect(resp.ok).toBe(true)
     // No player switch should happen for a different space
-    expect(resp.pending.type).not.toBe('confirmPlayerSwitch')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).not.toBe('confirm-player-switch')
   })
 })
