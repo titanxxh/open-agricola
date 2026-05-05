@@ -5,8 +5,10 @@ import { join, extname } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { handleGameRoute } from './game-router.ts'
 import { handleWorkshopRoute } from './workshop.ts'
-import { createWsServer, getRooms, dissolveRoomById } from './game/room-manager.ts'
+import { createWsServer, getRooms, dissolveRoomById, setPersistence } from './game/room-manager.ts'
 import { getDb, cleanExpiredSessions } from './db.ts'
+import { SqliteRoomPersistence } from './game/persistence/sqlite-adapter.ts'
+import { JsonRoomPersistence } from './game/persistence/json-adapter.ts'
 import { register, login, logout, validateSession, extractToken, updateDisplayName, changePassword, isAdmin } from './auth.ts'
 
 const CARD_ART_DIR = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art')
@@ -67,6 +69,15 @@ function getClientIp(req: IncomingMessage): string {
 
 // Initialize database on import
 getDb()
+
+// Wire up room persistence adapter before creating the WS server
+const _PERSIST_ROOMS = (process.env.PERSIST_ROOMS ?? 'sqlite') as 'json' | 'sqlite'
+const _PERSISTED_ROOMS_DIR = process.env.PERSISTED_ROOMS_DIR ?? join(process.cwd(), 'output')
+setPersistence(
+  _PERSIST_ROOMS === 'sqlite'
+    ? new SqliteRoomPersistence(getDb())
+    : new JsonRoomPersistence(_PERSISTED_ROOMS_DIR),
+)
 
 // Periodically clean expired sessions (every hour)
 setInterval(cleanExpiredSessions, 60 * 60 * 1000)
