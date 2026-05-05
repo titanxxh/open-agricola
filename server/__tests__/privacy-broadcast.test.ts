@@ -2,7 +2,8 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
-import { createWsServer } from '../game/room-manager.ts'
+import { createWsServer, setPersistence } from '../game/room-manager.ts'
+import { InMemoryRoomPersistence } from '../game/persistence/memory-adapter.ts'
 import type { ServerEvent } from '../../shared/protocol/ws.ts'
 import type { StateUpdateEnvelope } from '../../shared/protocol/game.ts'
 
@@ -60,6 +61,7 @@ describe('WS broadcast per-viewer filter', () => {
   const sockets: TestSocket[] = []
 
   beforeEach(async () => {
+    setPersistence(new InMemoryRoomPersistence())
     server = createServer()
     wsServer = createWsServer(server)
     await new Promise<void>((resolve) => {
