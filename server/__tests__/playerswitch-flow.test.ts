@@ -91,7 +91,7 @@ describe('ActionFlow playerSwitch', () => {
 
     const resp = session.getState()
     // Should NOT be confirmPlayerSwitch — the gain was auto-applied
-    expect(resp.pending.type).not.toBe('confirmPlayerSwitch')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).not.toBe('confirm-player-switch')
     // p2 should have gained 1 food
     expect(resp.state.players[1]!.resources.food).toBe(p2FoodBefore + 1)
   })

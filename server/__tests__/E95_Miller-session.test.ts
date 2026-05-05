@@ -39,8 +39,8 @@ describe('E95_Miller session', () => {
     // Should trigger a player switch to the Miller owner
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-player-switch')
     if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch')) return
-    expect(resp.pending.fromPlayerIndex).toBe(1)
-    expect(resp.pending.toPlayerIndex).toBe(0)
+    expect(resp.interaction.fromPlayerIndex).toBe(1)
+    expect(resp.interaction.toPlayerIndex).toBe(0)
   })
 
   it('miller can bake bread when opponent uses grain-seeds', () => {
@@ -129,7 +129,7 @@ describe('E95_Miller session', () => {
     const resp = session.takeAction(0, 'grain-seeds')
     expect(resp.ok).toBe(true)
     // Owner using the space should NOT trigger Miller (scope: opponent)
-    expect(resp.pending.type).not.toBe('confirmPlayerSwitch')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).not.toBe('confirm-player-switch')
   })
 
   it('no trigger for non-matching action spaces', () => {
@@ -137,7 +137,7 @@ describe('E95_Miller session', () => {
     const resp = session.takeAction(1, 'day-laborer')
     expect(resp.ok).toBe(true)
     // No player switch should happen for a different space
-    expect(resp.pending.type).not.toBe('confirmPlayerSwitch')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).not.toBe('confirm-player-switch')
   })
 
   it('onBuy offers optional improvement purchase', () => {

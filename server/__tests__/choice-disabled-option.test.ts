@@ -17,6 +17,7 @@ import { occupations } from '../../shared/game/occupations'
 import { setWorkersAtHome } from '../../shared/game/player'
 import type { ActionFlow } from '../../shared/game/types'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
+import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 
 const TEST_CARD_ID = '__TEST_DISABLED_OPTION_CARD__'
 
@@ -124,6 +125,6 @@ describe('disabled option in pending choice', () => {
     // Attempt to resolve with the second (non-disabled) option → should succeed
     resp = session.resolveChoice(0, secondOption.value)
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).not.toBe('choice')
+    expect(isLegacyChoicePending(resp)).toBe(false)
   })
 })

@@ -39,8 +39,8 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-player-switch')
     if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch')) return
-    expect(resp.pending.fromPlayerIndex).toBe(1)
-    expect(resp.pending.toPlayerIndex).toBe(0)
+    expect(resp.interaction.fromPlayerIndex).toBe(1)
+    expect(resp.interaction.toPlayerIndex).toBe(0)
     // The listener fires on `after place-farmer` for the opponent's owner —
     // the owner's per-card stats now record `used` immediately. The acting
     // player (players[1]) is not the listener owner, so their copy stays empty.

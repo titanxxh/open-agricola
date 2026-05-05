@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
+import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 
 import '../../shared/cards/B/B104_SheepWalker'
 
@@ -77,7 +78,7 @@ describe('B104_SheepWalker session — last harvest enforcement', () => {
     }
 
     // No sheep -> no reorg forcing -> game ends normally.
-    expect(resp.interaction.stateId).not.toBe('wait')
+    expect(isLegacyChoicePending(resp)).toBe(false)
     expect(resp.state.gameOver).toBe(true)
   })
 
@@ -114,7 +115,7 @@ describe('B104_SheepWalker session — last harvest enforcement', () => {
       resp = session.resolveChoice(0, 'confirm', { selections: [] })
     }
     // In a normal round, 1 sheep does not trigger reorg.
-    expect(resp.interaction.stateId).not.toBe('wait')
+    expect(isLegacyChoicePending(resp)).toBe(false)
     expect(resp.state.round).toBe(5)
   })
 })

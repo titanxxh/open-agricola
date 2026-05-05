@@ -19,6 +19,7 @@ import { occupations } from '../../shared/game/occupations'
 import { setWorkersAtHome } from '../../shared/game/player'
 import type { ActionFlow } from '../../shared/game/types'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
+import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 
 const TEST_CARD_ID = '__TEST_RC_CARD__'
 
@@ -189,7 +190,7 @@ describe('CardEffect.resolveChoice hook', () => {
     // day-laborer: no pending choice produced (all resources granted immediately)
     const resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).not.toBe('choice')
+    expect(isLegacyChoicePending(resp)).toBe(false)
     expect(handlerCalled).toBe(false)
   })
 })

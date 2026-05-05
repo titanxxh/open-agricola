@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
+import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/A/A106_SlurrySpreader'
 
 const CARD_ID = 'A106_SlurrySpreader'
@@ -126,7 +127,7 @@ describe('A106_SlurrySpreader session', () => {
       throw new Error(`unexpected pending state: ${resp.pending.type}`)
     }
 
-    expect(resp.interaction.stateId).not.toBe('wait')
+    expect(isLegacyChoicePending(resp)).toBe(false)
     const playerAfter = resp.state.players[0]!
     expect(playerAfter.resources.food).toBe(0)
     expect(playerAfter.resources.grain).toBe(1)

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
+import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/D/D60_LargePottery'
 import '../../shared/cards/B/B104_SheepWalker'
 describe('harvest session flow', () => {
@@ -61,7 +62,7 @@ describe('harvest session flow', () => {
       throw new Error('expected harvestFeed pending')
     }
     expect(resp.interaction.playerIndex).toBe(1)
-    expect(resp.pending.remaining).toBe(2)
+    expect(resp.interaction.remaining).toBe(2)
 
     resp = session.resolveChoice(1, 'confirm', { selections: [
       { sourceId: '__basic__', exchangeIndex: 0, count: 1, sourceName: '基础转化' },
@@ -87,7 +88,7 @@ describe('harvest session flow', () => {
       resp = session.resolveChoice(pi, 'confirm', zones as unknown as Record<string, unknown>)
     }
 
-    expect(resp.interaction.stateId).not.toBe('wait')
+    expect(isLegacyChoicePending(resp)).toBe(false)
     expect(resp.state.round).toBe(5)
     expect(resp.state.roundPhase).toBe('work')
 
@@ -194,7 +195,7 @@ describe('harvest session flow', () => {
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('feed')
     if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) throw new Error('expected harvestFeed pending')
     expect(resp.interaction.playerIndex).toBe(0)
-    expect(resp.pending.remaining).toBe(2)
+    expect(resp.interaction.remaining).toBe(2)
 
     resp = session.resolveChoice(0, 'confirm', { selections: [
       { sourceId: '__basic__', exchangeIndex: 0, count: 2, sourceName: 'Basic conversion' },
