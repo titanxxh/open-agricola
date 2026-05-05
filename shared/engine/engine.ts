@@ -1901,26 +1901,34 @@ export class Engine {
         }
         const result = action.execute(executionContext)
         this.hooks.during({ ...executionContext, actionId }, result)
-        if (result.type === 'request' && result.request.kind === 'choice') {
+        if (result.type === 'request' && (result.request.kind === 'choice' || result.request.kind === 'farm-select')) {
           child.resolve(result)
-          // Merge computeArgs extraOptions BEFORE applyInteractionRequest so
-          // both the InteractionNode.choices and the returned result.request
-          // see the same final option list. Build a fresh request rather
-          // than mutating the action's returned object.
-          const argResults = this.hooks.computeArgs(
-            { ...executionContext, actionId },
-            result,
-          )
-          const existingValues = new Set(result.request.options.map((o) => o.value))
+          // S2 Task 6: also accept farm-select kind emitted from an Or/Xor
+          // child leaf. The computeArgs merging path only applies to 'choice'
+          // kind (extraOptions hook); farm-select carries its own structured
+          // payload + optional `options` (confirm/cancel) — we synthesise
+          // a default options surface when absent for the InteractionNode
+          // setChoice call.
+          const argResults = result.request.kind === 'choice'
+            ? this.hooks.computeArgs({ ...executionContext, actionId }, result)
+            : []
+          const baseOptions: ActionChoiceOption[] = result.request.kind === 'choice'
+            ? result.request.options
+            : (result.request.options ?? [
+                { value: 'confirm', labelKey: 'ui.interactionFarmSelectConfirm' },
+                { value: 'cancel', labelKey: 'ui.interactionFarmSelectCancel' },
+              ])
+          const existingValues = new Set(baseOptions.map((o) => o.value))
           const extraOptions = argResults
             .flatMap((entry) => entry.extraOptions ?? [])
             .filter((option) => option && !existingValues.has(option.value))
           const mergedOptions = extraOptions.length > 0
-            ? [...result.request.options, ...extraOptions]
-            : result.request.options
-          const updatedRequest: InteractionRequest = extraOptions.length > 0
-            ? { ...result.request, options: mergedOptions }
-            : result.request
+            ? [...baseOptions, ...extraOptions]
+            : baseOptions
+          const updatedRequest: InteractionRequest =
+            result.request.kind === 'choice' && extraOptions.length > 0
+              ? { ...result.request, options: mergedOptions }
+              : result.request
           // Carry-over (Task 7 reviewer S1): the XorNode follow-up branch
           // previously skipped the actionContextWrite shallow-merge that the
           // L1410 (main 'request') and L1899 (resolveChoice second-pass)

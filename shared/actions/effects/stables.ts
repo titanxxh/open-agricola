@@ -17,6 +17,7 @@ import {
   resolveTypedFlatPaymentSelection,
 } from '../helpers/pay-helpers'
 import { validateStableSelection } from '../../logic/farm/validators'
+import { buildStableFarmInteraction } from '../../logic/farm/farm-interaction'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 
@@ -117,17 +118,26 @@ export const stablesAction: ActionDefinition = {
   canBeExecutedByPlayer: (state, player, opts) =>
     canExecuteWithCostPreview(stablesCostPreview, { state, player }, readCostOverride(opts?.actionContext)),
   costPreview: stablesCostPreview,
-  execute: () => ({
-    type: 'request',
-    request: {
-      kind: 'choice',
-      options: [
-        { value: 'confirm', labelKey: 'ui.interactionStableConfirm' },
-        { value: 'cancel', labelKey: 'ui.interactionStableCancel' },
-      ],
-    },
-    promptKey: 'ui.interactionStableSelect',
-  }),
+  execute: ({ player, costs, actionContext }): ActionExecutionResult => {
+    const zoneFilter = actionContext?.zoneFilter
+    const max = actionContext?.max
+    const farm = buildStableFarmInteraction(player, costs, {
+      zoneFilter: zoneFilter === 'pasture-1' ? 'pasture-1' : undefined,
+      max: typeof max === 'number' ? max : undefined,
+    })
+    return {
+      type: 'request',
+      request: {
+        kind: 'farm-select',
+        farm,
+        options: [
+          { value: 'confirm', labelKey: 'ui.interactionStableConfirm' },
+          { value: 'cancel', labelKey: 'ui.interactionStableCancel' },
+        ],
+      },
+      promptKey: 'ui.interactionStableSelect',
+    }
+  },
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
     if (choice === 'cancel') return { type: 'ok' }
 
