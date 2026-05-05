@@ -1105,7 +1105,7 @@ export class GameCore {
     const farmType = this.isFarmPromptKey(node.promptKey)
     if (!farmType) return null
     const ctx = this.getActionContextFromTopFrame()
-    const costOverride = this.engineStack.current()?.engine.getLastComputedCosts()
+    const costOverride = this.peekHostContextSnapshot()?.costs
     switch (farmType) {
       case 'fence':
         return this.buildFenceInteractionFromNode(node, player)
@@ -1126,9 +1126,44 @@ export class GameCore {
    * Read-through helper for the engine's `pendingInteractionContext.actionContext`
    * on the current engine-stack frame. Replaces the legacy `this.pending.actionContext`
    * accessor (Task 10).
+   *
+   * S4b PR5 — reads the context snapshot directly off the current
+   * pending-interaction host (InteractionNode | OrNode | XorNode |
+   * OptionalNode) via `peekInteractionHost()`. The legacy engine-mirror
+   * `getPendingInteractionContext()` accessor is gone.
    */
   private getActionContextFromTopFrame(): Record<string, unknown> | undefined {
-    return this.engineStack.current()?.engine.getPendingInteractionContext()?.actionContext
+    return this.peekHostContextSnapshot()?.actionContext
+  }
+
+  /**
+   * S4b PR5 — read the pending-interaction context snapshot off whichever
+   * host node is currently active (`InteractionNode.contextSnapshot` or
+   * `Or/Xor/OptionalNode.pendingContextSnapshot`).
+   */
+  private peekHostContextSnapshot() {
+    const host = this.engineStack.current()?.engine.peekInteractionHost()
+    if (!host) return null
+    if (host instanceof InteractionNode) return host.contextSnapshot ?? null
+    if (host instanceof OrNode || host instanceof XorNode || host instanceof OptionalNode) {
+      return host.pendingContextSnapshot ?? null
+    }
+    return null
+  }
+
+  /**
+   * S4b PR5 — read the pending-interaction action id off the current host.
+   * Returns undefined when no pending host or the host did not record an
+   * actionId (composite host emit metadata).
+   */
+  private peekHostPendingActionId(): string | undefined {
+    const host = this.engineStack.current()?.engine.peekInteractionHost()
+    if (!host) return undefined
+    if (host instanceof InteractionNode) return host.pendingActionId
+    if (host instanceof OrNode || host instanceof XorNode || host instanceof OptionalNode) {
+      return host.pendingActionId ?? undefined
+    }
+    return undefined
   }
 
   private buildAnytimeEntries(): { descriptor: AnytimeAction; flow: ActionFlow }[] {
@@ -1260,9 +1295,9 @@ export class GameCore {
     const spaceId = frame.spaceId
     const promptKey = node?.promptKey ?? composite?.promptKey
     const promptParams = node?.promptParams ?? composite?.promptParams
-    const ctx = frame.engine.getPendingInteractionContext()
+    const ctx = this.peekHostContextSnapshot()
     const sourceCard = ctx?.sourceCard
-    const costOverride = frame.engine.getLastComputedCosts()
+    const costOverride = ctx?.costs
 
     // Resolve the InteractionRequest for the wait state. node.request is the
     // primary source; composite-fallback synthesises a `choice` request from
@@ -2279,7 +2314,7 @@ export class GameCore {
           let autoOptions = step.choice.options
           while (autoOptions.length === 1) {
             const auto = autoOptions[0]
-            const resolvedActionId = frame.engine.snapshot().pendingInteractionActionId ?? undefined
+            const resolvedActionId = this.peekHostPendingActionId()
             const result = frame.engine.resolveChoice(auto.value, { state: this.state, player, space })
             this.flushEngineLog()
             if (result.type === 'ok' && resolvedActionId) {
@@ -2562,8 +2597,8 @@ export class GameCore {
     const pendingPlayerIndex = frame?.ownerPlayerIndex ?? -1
     const pendingPromptKey = node?.promptKey ?? composite?.promptKey
     const pendingOptions = node?.choices ?? composite?.options ?? []
-    const pendingActionContext = frame?.engine.getPendingInteractionContext()?.actionContext
-    const pendingSourceCard = frame?.engine.getPendingInteractionContext()?.sourceCard
+    const pendingActionContext = this.peekHostContextSnapshot()?.actionContext
+    const pendingSourceCard = this.peekHostContextSnapshot()?.sourceCard
     // 'choice' (typed), 'animal-reorg' (legacy commit pathway), and any
     // ChoiceNode-emitted untyped request all flow through the engine's
     // resolveChoice path. Composite-node (OrNode/XorNode/OptionalNode)
@@ -2620,7 +2655,7 @@ export class GameCore {
         }
       }
     }
-    const resolvedActionId = this.engine.snapshot().pendingInteractionActionId ?? undefined
+    const resolvedActionId = this.peekHostPendingActionId()
     const result = this.engine.resolveChoice(value, { state: this.state, player, space }, payload)
     this.flushEngineLog()
     if (result.type === 'ok' && resolvedActionId) {
@@ -3112,7 +3147,7 @@ export class GameCore {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
 
-    const interactionContext = frame.engine.getPendingInteractionContext()?.actionContext
+    const interactionContext = this.peekHostContextSnapshot()?.actionContext
     const selectionKind = (interactionContext?.selectionKind as string | undefined) ?? 'farm-position'
     const maxSelections = (interactionContext?.maxSelections as number) ?? 1
 

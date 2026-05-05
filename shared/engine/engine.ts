@@ -193,6 +193,21 @@ export class Engine {
   }
 
   /**
+   * S4b PR5 — return the current pending-interaction host, regardless of
+   * whether it is a leaf-paired `InteractionNode` or one of the composite
+   * nodes (`OrNode` / `XorNode` / `OptionalNode`). All four host types now
+   * carry a uniform `{ pendingActionId, pendingContextSnapshot, choices,
+   * promptKey, request }` shape (composite nodes mirror onto the equivalent
+   * `emittedXxx` fields), so consumers can read pending metadata off this
+   * single accessor instead of going through the engine-level
+   * `pendingInteractionXxx` mirrors.
+   */
+  peekInteractionHost(): EngineNode | null {
+    if (this.pendingInteractionNodeId === null) return null
+    return this.tree.findNodeById(this.pendingInteractionNodeId) ?? null
+  }
+
+  /**
    * Replace this engine's tree with a single synthetic InteractionNode and pin
    * the pending-interaction pointers at it. Used by GameCore.startConfirm*/
   /* startFeedSubFlow when promoting GameCore-driven prompts (confirmNextPlayer,
@@ -1150,12 +1165,13 @@ export class Engine {
       }
       this.pendingInteractionNodeId = node.id
       this.pendingInteractionActionId = null
-      this.pendingInteractionContext = {
+      const compositeCtxSnapshot = {
         params: undefined,
         costs: undefined,
         sourceCard: resolveChoiceSourceCard(getNodeSourceCard(node), options),
         actionContext: undefined,
       }
+      this.pendingInteractionContext = compositeCtxSnapshot
       const compositePromptKey = node.promptKey ?? 'ui.interactionFlowSelect'
       // S2 Task 8: write emit metadata to the OrNode/XorNode itself instead
       // of the engine-level lastEmittedChoice cache.
@@ -1163,6 +1179,11 @@ export class Engine {
       node.emittedPromptKey = compositePromptKey
       node.emittedPromptParams = undefined
       node.emittedRequest = undefined
+      // S4b PR5 — also mirror the pending-interaction context snapshot onto
+      // the composite host so external consumers can read it via
+      // peekInteractionHost() without going through the engine mirror.
+      node.pendingActionId = null
+      node.pendingContextSnapshot = compositeCtxSnapshot
       return {
         type: 'choice',
         nodeId: node.id,
@@ -1220,12 +1241,16 @@ export class Engine {
       }
       this.pendingInteractionNodeId = node.id
       this.pendingInteractionActionId = null
-      this.pendingInteractionContext = {
+      const optionalCtxSnapshot = {
         params: actionNode.params,
         costs: undefined,
         sourceCard: actionNode.sourceCard,
         actionContext: actionNode.actionContext,
       }
+      this.pendingInteractionContext = optionalCtxSnapshot
+      // S4b PR5 — also mirror onto the OptionalNode for peekInteractionHost.
+      node.pendingActionId = null
+      node.pendingContextSnapshot = optionalCtxSnapshot
       const label = getChoiceLabel(node, this.registry) ?? {
         labelKey: actionNode.choiceLabelKey ?? action.nameKey,
         labelParams: actionNode.choiceLabelParams,

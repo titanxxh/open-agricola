@@ -2,6 +2,7 @@ import type { ActionChoiceOption, InteractionRequest } from '../../game/types'
 import type { PromptKey } from '../../game/prompt-keys'
 import type { EngineNode, EngineContext, NodeStepResult } from '../types'
 import { BaseNode } from './base'
+import type { InteractionContextSnapshot } from './interaction-node'
 
 /**
  * S2 Task 8: composite emit nodes (Or/Xor/Optional) carry their own
@@ -19,6 +20,16 @@ export class OrNode extends BaseNode {
   public emittedPromptKey?: PromptKey
   public emittedPromptParams?: Record<string, unknown>
   public emittedRequest?: InteractionRequest
+  /**
+   * S4b PR5 — composite host node carries the pending-interaction context
+   * snapshot when `Engine.proceed` emits a 'choice' for it. Mirrors
+   * InteractionNode.contextSnapshot semantics so external consumers can read
+   * `peekInteractionHost()?.pendingContextSnapshot` uniformly without
+   * dispatching on node type. `pendingActionId` is null for composite-hosted
+   * choices (the actual action runs on the chosen child after resolveChoice).
+   */
+  public pendingActionId?: string | null
+  public pendingContextSnapshot?: InteractionContextSnapshot
 
   constructor(id: string, children: EngineNode[], promptKey?: PromptKey) {
     super(id, 'or')
@@ -41,6 +52,8 @@ export class OrNode extends BaseNode {
       emittedPromptKey: this.emittedPromptKey,
       emittedPromptParams: this.emittedPromptParams,
       emittedRequest: this.emittedRequest,
+      pendingActionId: this.pendingActionId,
+      pendingContextSnapshot: this.pendingContextSnapshot,
     }
   }
 }
