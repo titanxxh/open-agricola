@@ -132,7 +132,7 @@ describe('E110_Dentist session', () => {
 
     // Drain remaining harvest phases
     safety = 30
-    while (safety-- > 0 && resp.pending.type !== 'none') {
+    while (safety-- > 0 && resp.interaction.stateId === 'wait') {
       if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
         resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
       } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {

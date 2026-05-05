@@ -28,7 +28,7 @@ const setupHarvestRound = (round = 4) => {
 
 const drainHarvest = (session: GameSession, feedSelections: Record<number, FeedSelection[]> = {}) => {
   let resp = session.performRoundEnd()
-  while (resp.pending.type !== 'none') {
+  while (resp.interaction.stateId === 'wait') {
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       const idx = resp.pending.playerIndex
       const sel = feedSelections[idx] ?? []

@@ -27,7 +27,7 @@ const setupHarvestRound = (round = 4) => {
 
 const drainHarvest = (session: GameSession) => {
   let resp = session.performRoundEnd()
-  while (resp.pending.type !== 'none') {
+  while (resp.interaction.stateId === 'wait') {
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
     } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {

@@ -78,7 +78,7 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
     // get a harvestFeed prompt. Player can spend 2 more food on reverse trade.
     let safety = 30
     let confirmedReverse = false
-    while (safety-- > 0 && resp.pending.type !== 'none') {
+    while (safety-- > 0 && resp.interaction.stateId === 'wait') {
       if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
         if (resp.pending.playerIndex === 0 && !confirmedReverse) {
           // Submit reverse trade selection: 1 invocation of C105 trade.
@@ -140,7 +140,7 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
 
     let resp = session.performRoundEnd()
     let safety = 30
-    while (safety-- > 0 && resp.pending.type !== 'none') {
+    while (safety-- > 0 && resp.interaction.stateId === 'wait') {
       if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
         resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
       } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
