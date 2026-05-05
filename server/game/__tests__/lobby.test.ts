@@ -40,6 +40,78 @@ describe('lobby.getRooms', () => {
     const summaries = lobby.getRooms()
     expect(summaries.map((s) => s.id).sort()).toEqual(['dev2'])
   })
+
+  it('hides rooms with zero players to keep the lobby free of zombies', () => {
+    const registry = new RoomRegistry()
+    registry.set(fakeRoom({ id: 'alive', players: [{ ws: {} as never, playerIndex: 0, name: 'p1' }] }))
+    registry.set(fakeRoom({ id: 'zombie', players: [] }))
+    registry.set(fakeRoom({
+      id: 'joinable',
+      maxPlayers: 4,
+      players: [{ ws: {} as never, playerIndex: 0, name: 'p1' }],
+    }))
+    const lobby = createLobby({
+      registry,
+      persistence: new InMemoryRoomPersistence(),
+      broadcaster: fakeBroadcaster(),
+    })
+    const summaries = lobby.getRooms()
+    expect(summaries.map((s) => s.id).sort()).toEqual(['alive', 'joinable'])
+  })
+
+  it('keeps fixed dev rooms even when empty', () => {
+    const registry = new RoomRegistry()
+    registry.set(fakeRoom({ id: 'dev2', players: [] }))
+    registry.set(fakeRoom({ id: 'alive', players: [{ ws: {} as never, playerIndex: 0, name: 'p1' }] }))
+    const lobby = createLobby({
+      registry,
+      persistence: new InMemoryRoomPersistence(),
+      broadcaster: fakeBroadcaster(),
+    })
+    const summaries = lobby.getRooms()
+    expect(summaries.map((s) => s.id).sort()).toEqual(['alive', 'dev2'])
+  })
+
+  it('caps the result count when given a positive limit', () => {
+    const registry = new RoomRegistry()
+    registry.set(fakeRoom({ id: 'a', players: [{ ws: {} as never, playerIndex: 0, name: 'p1' }] }))
+    registry.set(fakeRoom({ id: 'b', players: [{ ws: {} as never, playerIndex: 0, name: 'p1' }] }))
+    registry.set(fakeRoom({ id: 'c', players: [{ ws: {} as never, playerIndex: 0, name: 'p1' }] }))
+    const lobby = createLobby({
+      registry,
+      persistence: new InMemoryRoomPersistence(),
+      broadcaster: fakeBroadcaster(),
+    })
+    const summaries = lobby.getRooms(2)
+    expect(summaries.map((s) => s.id)).toEqual(['a', 'b'])
+  })
+
+  it('reports status="playing" only when all seats are filled', () => {
+    const registry = new RoomRegistry()
+    registry.set(fakeRoom({
+      id: 'half',
+      maxPlayers: 4,
+      players: [{ ws: {} as never, playerIndex: 0, name: 'p1' }],
+    }))
+    registry.set(fakeRoom({
+      id: 'full',
+      maxPlayers: 2,
+      players: [
+        { ws: {} as never, playerIndex: 0, name: 'p1' },
+        { ws: {} as never, playerIndex: 1, name: 'p2' },
+      ],
+    }))
+    const lobby = createLobby({
+      registry,
+      persistence: new InMemoryRoomPersistence(),
+      broadcaster: fakeBroadcaster(),
+    })
+    const summaries = lobby.getRooms()
+    expect(summaries.sort((a, b) => a.id.localeCompare(b.id))).toEqual([
+      { id: 'full', playerCount: 2, maxPlayers: 2, createdBy: 'u1', status: 'playing' },
+      { id: 'half', playerCount: 1, maxPlayers: 4, createdBy: 'u1', status: 'waiting' },
+    ])
+  })
 })
 
 describe('lobby.dissolveRoomById', () => {
