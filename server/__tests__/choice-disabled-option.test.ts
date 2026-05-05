@@ -85,13 +85,13 @@ describe('disabled option in pending choice', () => {
     const firstOption = resp.pending.options[0]!
     expect(firstOption).toBeDefined()
 
-    // Task 10: GameState.pending is gone. The engine caches the composite-
-    // node (XorNode here) emitted choice on `lastEmittedChoice` — mutate
-    // that to flip the `disabled` flag for the disabled-guard test.
-    const engine = session.getEngineStack().current()!.engine as unknown as {
-      lastEmittedChoice: { options: { disabled?: boolean }[] }
-    }
-    engine.lastEmittedChoice.options[0].disabled = true
+    // S2 Task 8: composite-node emit metadata now lives on the node itself
+    // (XorNode.emittedChoices). Mutate that to flip the `disabled` flag.
+    const composite = session
+      .getEngineStack()
+      .current()!
+      .engine.peekPendingChoiceFromComposite()!
+    composite.options[0]!.disabled = true
 
     // Attempt to resolve with the disabled option → should be rejected
     resp = session.resolveChoice(0, firstOption.value)
@@ -113,12 +113,13 @@ describe('disabled option in pending choice', () => {
     expect(firstOption).toBeDefined()
     expect(secondOption).toBeDefined()
 
-    // Task 10: GameState.pending is gone. Mutate the engine's cached
-    // composite-node choice to flip the `disabled` flag.
-    const engine = session.getEngineStack().current()!.engine as unknown as {
-      lastEmittedChoice: { options: { disabled?: boolean }[] }
-    }
-    engine.lastEmittedChoice.options[0].disabled = true
+    // S2 Task 8: composite-node emit metadata now lives on the node itself
+    // (XorNode.emittedChoices). Mutate that to flip the `disabled` flag.
+    const composite = session
+      .getEngineStack()
+      .current()!
+      .engine.peekPendingChoiceFromComposite()!
+    composite.options[0]!.disabled = true
 
     // Attempt to resolve with the second (non-disabled) option → should succeed
     resp = session.resolveChoice(0, secondOption.value)

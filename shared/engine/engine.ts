@@ -107,42 +107,35 @@ export class Engine {
   private beforePhaseFlowNodeIds = new Set<string>()
   private lastComputedCosts: Partial<import('../game/types').Resource> | undefined = undefined
   /**
-   * Cache of the most recent {@link proceed} result of `type: 'choice'`. Used
-   * by GameCore (Task 10) to surface a `PendingAction` of `type: 'choice'`
-   * even when the pending choice is hosted on a non-InteractionNode (OrNode,
-   * XorNode, OptionalNode) — those nodes don't carry their own option list,
-   * but the engine has just computed it. Cleared whenever the engine resolves
-   * the pending choice or transitions to a non-choice step.
-   *
-   * Persistence: this field IS persisted in {@link snapshot} / {@link restore}
-   * so OrNode / XorNode / OptionalNode pending choices survive cursor
-   * round-trip and undo restoreHistory. Without persistence,
-   * `getCurrentPending` would return `'none'` after restore even though
-   * `pendingInteractionNodeId` still points at a composite node. GameCore
-   * additionally tolerates a missing cache by falling back to
-   * `peekInteraction()`.
-   */
-  private lastEmittedChoice: {
-    nodeId: string
-    promptKey?: PromptKey
-    promptParams?: Record<string, unknown>
-    options: ActionChoiceOption[]
-  } | null = null
-
   /**
-   * Read-only accessor for the cached pending-choice info. Returns null when
-   * the engine isn't currently waiting on a non-InteractionNode choice.
+   * S2 Task 8: returns the pending-choice metadata regardless of whether the
+   * pending node is an `InteractionNode` (leaf-paired) or one of the composite
+   * nodes (`OrNode` / `XorNode` / `OptionalNode`). Replaces the engine-level
+   * `lastEmittedChoice` cache — composite nodes now carry their own
+   * `emittedChoices` / `emittedPromptKey` / `emittedPromptParams` /
+   * `emittedRequest` fields populated in {@link proceed}.
    */
   peekPendingChoiceFromComposite(): {
     nodeId: string
     promptKey?: PromptKey
     promptParams?: Record<string, unknown>
     options: ActionChoiceOption[]
+    request?: InteractionRequest
   } | null {
     if (this.pendingInteractionNodeId === null) return null
-    if (!this.lastEmittedChoice) return null
-    if (this.lastEmittedChoice.nodeId !== this.pendingInteractionNodeId) return null
-    return this.lastEmittedChoice
+    const node = this.tree.findNodeById(this.pendingInteractionNodeId)
+    if (!node) return null
+    if (node instanceof OrNode || node instanceof XorNode || node instanceof OptionalNode) {
+      if (node.emittedChoices.length === 0 && node.emittedRequest === undefined) return null
+      return {
+        nodeId: node.id,
+        promptKey: node.emittedPromptKey,
+        promptParams: node.emittedPromptParams,
+        options: node.emittedChoices,
+        request: node.emittedRequest,
+      }
+    }
+    return null
   }
 
   getLastComputedCosts() {
@@ -1005,12 +998,35 @@ export class Engine {
       pendingInteractionOwnerNodeId: this.pendingInteractionOwnerNodeId,
       pendingInteractionContext: this.pendingInteractionContext,
       choiceData,
-      // Task 10: persist the composite-node choice cache so OrNode / XorNode /
-      // OptionalNode pending choices survive cursor round-trip and undo
-      // restoreHistory. Without this, getCurrentPending returns 'none' after
-      // restore even though pendingInteractionNodeId points at an OrNode.
-      lastEmittedChoice: this.lastEmittedChoice,
+      // S2 Task 8: composite (Or/Xor/Optional) emit metadata is now stored
+      // on the node itself instead of an engine-level cache. We still need
+      // to persist it so cursor round-trip / undo restoreHistory can rebuild
+      // the pending-choice host on rehydrate.
+      compositeEmit: this.snapshotCompositeEmit(),
     }
+  }
+
+  private snapshotCompositeEmit(): {
+    nodeId: string
+    promptKey?: PromptKey
+    promptParams?: Record<string, unknown>
+    options: ActionChoiceOption[]
+    request?: InteractionRequest
+  } | null {
+    if (this.pendingInteractionNodeId === null) return null
+    const node = this.tree.findNodeById(this.pendingInteractionNodeId)
+    if (!node) return null
+    if (node instanceof OrNode || node instanceof XorNode || node instanceof OptionalNode) {
+      if (node.emittedChoices.length === 0 && node.emittedRequest === undefined) return null
+      return {
+        nodeId: node.id,
+        promptKey: node.emittedPromptKey,
+        promptParams: node.emittedPromptParams,
+        options: node.emittedChoices,
+        request: node.emittedRequest,
+      }
+    }
+    return null
   }
 
   hasPendingChoiceCompositeAncestor() {
@@ -1041,6 +1057,23 @@ export class Engine {
       choices: ActionChoiceOption[]
       request?: InteractionRequest
     } | null
+    /**
+     * S2 Task 8: composite (Or/Xor/Optional) emit metadata. On restore,
+     * apply to the named node's `emittedChoices` / `emittedPromptKey` /
+     * `emittedPromptParams` / `emittedRequest` fields. Older snapshots that
+     * still serialize `lastEmittedChoice` flow through the same restore
+     * path (alias accepted below).
+     */
+    compositeEmit?: {
+      nodeId: string
+      promptKey?: PromptKey
+      promptParams?: Record<string, unknown>
+      options: ActionChoiceOption[]
+      request?: InteractionRequest
+    } | null
+    /** @deprecated S2 Task 8 — accepted on restore for forward-compat with
+     * snapshots produced by pre-Task-8 builds. New snapshots write
+     * `compositeEmit` instead. */
     lastEmittedChoice?: {
       nodeId: string
       promptKey?: PromptKey
@@ -1111,7 +1144,23 @@ export class Engine {
     this.pendingInteractionActionId = snapshot.pendingInteractionActionId
     this.pendingInteractionOwnerNodeId = snapshot.pendingInteractionOwnerNodeId
     this.pendingInteractionContext = snapshot.pendingInteractionContext
-    this.lastEmittedChoice = snapshot.lastEmittedChoice ?? null
+
+    // S2 Task 8: rebuild composite emit metadata onto Or/Xor/Optional nodes.
+    // Accept the legacy `lastEmittedChoice` alias for snapshots produced by
+    // pre-Task-8 builds.
+    const compositeEmit = snapshot.compositeEmit
+      ?? (snapshot.lastEmittedChoice
+        ? { ...snapshot.lastEmittedChoice, request: undefined as InteractionRequest | undefined }
+        : null)
+    if (compositeEmit) {
+      const node = nodeMap.get(compositeEmit.nodeId)
+      if (node instanceof OrNode || node instanceof XorNode || node instanceof OptionalNode) {
+        node.emittedChoices = compositeEmit.options
+        node.emittedPromptKey = compositeEmit.promptKey
+        node.emittedPromptParams = compositeEmit.promptParams
+        node.emittedRequest = compositeEmit.request
+      }
+    }
   }
 
   constructor(params: {
@@ -1210,11 +1259,12 @@ export class Engine {
         actionContext: undefined,
       }
       const compositePromptKey = node.promptKey ?? 'ui.interactionFlowSelect'
-      this.lastEmittedChoice = {
-        nodeId: node.id,
-        promptKey: compositePromptKey,
-        options,
-      }
+      // S2 Task 8: write emit metadata to the OrNode/XorNode itself instead
+      // of the engine-level lastEmittedChoice cache.
+      node.emittedChoices = options
+      node.emittedPromptKey = compositePromptKey
+      node.emittedPromptParams = undefined
+      node.emittedRequest = undefined
       return {
         type: 'choice',
         nodeId: node.id,
@@ -1293,11 +1343,12 @@ export class Engine {
         },
         { value: '__skip__', labelKey: 'ui.interactionOptionalSkip' },
       ]
-      this.lastEmittedChoice = {
-        nodeId: node.id,
-        promptKey: optionalPromptKey,
-        options: optionalOptions,
-      }
+      // S2 Task 8: write emit metadata to the OptionalNode itself instead
+      // of the engine-level lastEmittedChoice cache.
+      node.emittedChoices = optionalOptions
+      node.emittedPromptKey = optionalPromptKey
+      node.emittedPromptParams = undefined
+      node.emittedRequest = undefined
       return {
         type: 'choice',
         nodeId: node.id,
