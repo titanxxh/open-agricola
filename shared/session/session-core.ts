@@ -462,6 +462,10 @@ export class GameCore {
     // sees the post-draft hands rather than the initial empty-handed snapshot.
     this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
   }
+  /** @internal Round phase — read the captured pre-action player snapshot. */
+  getActionStartPlayerSnapshot(): PlayerState | null { return this.actionStartPlayerSnapshot }
+  /** @internal Round phase — emit `log.actionDetail` diff entry. */
+  invokeLogActionDetail(before: PlayerState, after: PlayerState): void { this.logActionDetail(before, after) }
   /** @internal phase access — build a fresh Engine for a top-level action space. */
   createEngineForSpace(actionId: string): Engine { return this.createEngine(actionId) }
   /** @internal phase access — push a synthetic interaction-only frame. */
@@ -830,10 +834,7 @@ export class GameCore {
     return `${prefix}-${this.nextActionToken++}`
   }
 
-  /** S2 Task 10: thin delegators — bodies live in `phases/round.ts`. */
-  private startConfirmNextPlayer(nextPlayerIndex: number): void {
-    roundPhase.startConfirmNextPlayer(this, nextPlayerIndex)
-  }
+  /** S2 Task 10: thin delegator retained because internal handlers still call it. */
   private startConfirmPlayerSwitch(fromPlayerIndex: number, toPlayerIndex: number): void {
     roundPhase.startConfirmPlayerSwitch(this, fromPlayerIndex, toPlayerIndex)
   }
@@ -880,11 +881,6 @@ export class GameCore {
   private hasPendingAnimals(p: PlayerState) {
     return this.getAnimalCount(p) > getAssignedAnimalCount(p)
   }
-
-  private nextPlayerIdx(players: PlayerState[], current: number) {
-    return roundPhase.nextSeatedPlayerIdx(this.state, players, current)
-  }
-
 
   private getHarvestPlayerIndices() {
     return harvestPhase.getHarvestPlayerIndices(this.state)
@@ -1835,14 +1831,8 @@ export class GameCore {
     }
   }
 
-  private finalizeActionLog(player: PlayerState) {
-    const before = this.actionStartPlayerSnapshot
-    if (before) {
-      this.logActionDetail(before, player)
-    }
-    this.actionStartPlayerSnapshot = null
-    delete player._activeActionBonusSources
-  }
+  /** S2 Task 10 part 6: thin delegator — body lives in `phases/round.ts`. */
+  private finalizeActionLog(player: PlayerState) { return roundPhase.finalizeActionLog(this, player) }
 
   private startStageFlow(
     flow: ActionFlow,
@@ -1906,21 +1896,9 @@ export class GameCore {
     return false
   }
 
+  /** S2 Task 10 part 6: thin delegator — body lives in `phases/round.ts`. */
   private finishCompletedActionTurn(playerIndex: number): SessionResponse {
-    const player = this.state.players[playerIndex]
-    if (!player) return this.respond(false, 'invalid player')
-    this.finalizeActionLog(player)
-    this.turnOwnerPlayerIndex = null
-    this.engineStack.clear()
-    const allWorkersUsed = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)
-    if (!allWorkersUsed) {
-      const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
-      this.startConfirmNextPlayer(next)
-    } else {
-      const startIdx = this.state.players.findIndex((p) => p.startPlayer)
-      this.startConfirmNextPlayer(startIdx === -1 ? 0 : startIdx)
-    }
-    return this.respond()
+    return roundPhase.finishCompletedActionTurn(this, playerIndex)
   }
 
   private continueEndTurnHooks(playerIndex: number, cardIndex = 0): SessionResponse {

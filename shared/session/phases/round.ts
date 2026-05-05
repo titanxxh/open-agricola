@@ -263,6 +263,49 @@ export const continueAfterReorganizeRoundEnd = (
 }
 
 /**
+ * Wrap up a single action's per-leaf log: emit the diff entry against
+ * the captured pre-action snapshot, then clear the snapshot + the
+ * player's _activeActionBonusSources field. Migrated from
+ * GameCore.finalizeActionLog (S2 Task 10 part 6).
+ */
+export const finalizeActionLog = (core: GameCore, player: PlayerState): void => {
+  const before = core.getActionStartPlayerSnapshot()
+  if (before) {
+    core.invokeLogActionDetail(before, player)
+  }
+  core.setActionStartPlayerSnapshot(null)
+  delete player._activeActionBonusSources
+}
+
+/**
+ * Wrap up a player's turn after their action and any onEndTurn stage
+ * hook chain finishes: clear engine + turn owner, then enqueue the
+ * confirm-next-player prompt for the next eligible player (or fall
+ * through to the start-player when all workers are spent so the round
+ * advances). Migrated from GameCore.finishCompletedActionTurn
+ * (S2 Task 10 part 6).
+ */
+export const finishCompletedActionTurn = (
+  core: GameCore,
+  playerIndex: number,
+): SessionResponse => {
+  const player = core.state.players[playerIndex]
+  if (!player) return core.emitResponse(false, 'invalid player')
+  finalizeActionLog(core, player)
+  core.setTurnOwner(null)
+  core.clearEngineStack()
+  const allWorkersUsed = core.state.players.every((p) => workersAvailable(core.state, p) <= 0)
+  if (!allWorkersUsed) {
+    const next = nextSeatedPlayerIdx(core.state, core.state.players, core.state.currentPlayerIndex)
+    startConfirmNextPlayer(core, next)
+  } else {
+    const startIdx = computeStartPlayerIdx(core.state)
+    startConfirmNextPlayer(core, startIdx)
+  }
+  return core.emitResponse()
+}
+
+/**
  * Anytime-action entry: prepend the chosen anytime entry's flow onto the
  * currently active engine and drive engine steps. Migrated from
  * GameCore.takeAnytimeAction (S2 Task 10 part 4).
