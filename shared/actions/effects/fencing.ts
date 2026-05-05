@@ -18,10 +18,7 @@ import {
   executeResolvedTypedFlatPayment,
   resolveTypedFlatPaymentSelection,
 } from '../payment/internal'
-// TODO(PR5): inline `normalizePlayerFarm` into a domain helper or
-// drop it once shared/logic/farm/ is removed.
-import { normalizePlayerFarm } from '../../logic/farm/fence-validation'
-import { playerBoard } from '../../domain'
+import { playerBoard, normalizePlayerFarm } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { collectComputeCostsForFarmChoice } from '../../cards/card-listeners'
 import { playerCanBuildPalisades } from '../../cards/helpers/card-type'

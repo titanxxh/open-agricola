@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeAnimalZones, getTotalAnimalCapacity } from '../../actions/helpers/animal-zones'
+import { computeAnimalZones, getTotalAnimalCapacity } from '../../domain/animal-zones'
 import type { PlayerState, Pasture } from '../../game/types'
 
 import '../A/A12_DrinkingTrough'

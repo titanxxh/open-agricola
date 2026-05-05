@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState } from '../../shared/game/types'
-import type { ScoreCategoryResult } from '../../shared/logic/scoring'
+import type { ScoreCategoryResult } from '../../shared/domain/scoring'
 import { D100_LordoftheManor_impl } from '../../shared/cards/D/D100_LordoftheManor'
 
 const makeCategory = (key: ScoreCategoryResult['key'], total: number): ScoreCategoryResult => ({

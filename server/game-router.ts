@@ -1,10 +1,11 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { GameSession } from './game/authoritative-session.ts'
 import { serializeState, serializeStateForPlayer } from '../shared/game/serialization.ts'
-// TODO(PR5): inline `normalizePlayerFarm` into a domain helper or
-// drop it once shared/logic/farm/ is removed.
-import { normalizePlayerFarm } from '../shared/logic/farm/fence-validation.ts'
-import { playerBoard, type SowSelection } from '../shared/domain/index.ts'
+import {
+  playerBoard,
+  type SowSelection,
+  normalizePlayerFarm,
+} from '../shared/domain/index.ts'
 import { playerCanBuildPalisades } from '../shared/cards/helpers/card-type.ts'
 import { collectLockedFarmTileKeys } from '../shared/cards/card-effects.ts'
 import type { FarmTilePosition } from '../shared/game/types.ts'

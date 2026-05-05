@@ -112,10 +112,6 @@ import {
   getFenceCount,
   getPalisadeCount,
 } from '../actions/effects/fencing.ts'
-// TODO(PR5): inline `buildOccupationHandSelectionInteraction` into shared/domain
-// (Farmyard or a dedicated occupation aggregate). It's the last farm-interaction
-// helper not yet on the facade — same pattern as `normalizePlayerFarm` (PR2).
-import { buildOccupationHandSelectionInteraction } from '../logic/farm/occupation-hand-interaction.ts'
 import { rebuildActiveModifiers } from '../game/serialization.ts'
 import { isSpaceOccupied, removeWorkerRef } from '../game/space.ts'
 import { smallestAvailableWorker } from '../game/player.ts'
@@ -266,6 +262,27 @@ export interface GameCoreOptions {
    * custom-code cards at runtime) forward into this session's registry.
    */
   cardRegistry?: CardRegistry
+}
+
+/**
+ * Build the InteractionSelection payload for an "occupation-hand" selection.
+ * Reads actionContext: selectableCards (string[]), minSelections, maxSelections.
+ * Falls back to the player's current occupationHand if selectableCards is absent.
+ *
+ * Inlined in PR5 from a former occupation-hand-interaction helper —
+ * only used here, so kept local rather than surfacing on the domain facade.
+ */
+const buildOccupationHandSelectionInteraction = (
+  player: PlayerState,
+  actionContext?: Record<string, unknown>,
+): InteractionSelection => {
+  const raw = actionContext?.selectableCards
+  const selectableCards = Array.isArray(raw)
+    ? (raw as unknown[]).filter((v): v is string => typeof v === 'string')
+    : player.occupationHand
+  const minSelections = (actionContext?.minSelections as number) ?? 1
+  const maxSelections = (actionContext?.maxSelections as number) ?? minSelections
+  return { kind: 'occupation-hand', selectableCards, minSelections, maxSelections }
 }
 
 export class GameCore {

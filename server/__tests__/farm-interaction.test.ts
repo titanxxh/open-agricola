@@ -6,7 +6,7 @@ import {
   buildRoomFarmInteraction,
   buildSowFarmInteraction,
   buildStableFarmInteraction,
-} from '../../shared/logic/farm/farm-interaction.ts'
+} from '../../shared/domain/farmyard'
 import { A14_CarpentersHammer } from '../../shared/cards/A/A14_CarpentersHammer'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 

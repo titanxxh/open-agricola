@@ -12,7 +12,7 @@
 import type { FenceSegment, GameState, PlayerState, Resource } from '../game/types'
 import type { DraftMode } from '../draft/types'
 import { createRng, shuffleWithRng } from './rng'
-import { tryAddRoomTile } from './farm/build-room-helper'
+import { tryAddRoomTile } from '../domain/farmyard'
 
 export const normalizeFenceSegments = (input: unknown): FenceSegment[] => {
   if (!Array.isArray(input)) return []
