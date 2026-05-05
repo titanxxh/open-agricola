@@ -123,4 +123,12 @@ describe('SqliteRoomPersistence', () => {
     const v2 = db.prepare('SELECT version FROM rooms WHERE id = ?').get('r1') as { version: number }
     expect(v2.version).toBe(2)
   })
+
+  it('save with null serialized creates placeholder row; load returns snap with null serialized but meta present', () => {
+    p.save('r1', null, META)
+    const snap = p.load('r1') as RoomSnapshot
+    expect(snap.serialized).toBeNull()
+    expect(snap.meta.createdBy).toBe('u1')
+    expect(snap.meta.maxPlayers).toBe(2)
+  })
 })

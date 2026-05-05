@@ -6,7 +6,7 @@ import type {
 } from './room-persistence.ts'
 import type { SerializedGameState } from '../../../shared/game/serialization.ts'
 
-type Row = { serialized: SerializedGameState; meta: RoomMeta; updatedAt: number }
+type Row = { serialized: SerializedGameState | null; meta: RoomMeta; updatedAt: number }
 
 export class InMemoryRoomPersistence implements RoomPersistence {
   private rooms = new Map<string, Row>()
@@ -22,7 +22,7 @@ export class InMemoryRoomPersistence implements RoomPersistence {
     }
   }
 
-  save(id: string, serialized: SerializedGameState, meta: RoomMeta): void {
+  save(id: string, serialized: SerializedGameState | null, meta: RoomMeta): void {
     this.rooms.set(id, {
       serialized,
       meta: { ...meta, customCardDbIds: [...meta.customCardDbIds], players: meta.players.map((p) => ({ ...p })) },
