@@ -84,6 +84,8 @@ const shouldPersist: (room: Room) => boolean =
 // Periodically clean expired sessions (every hour)
 setInterval(cleanExpiredSessions, 60 * 60 * 1000)
 
+let wssCtx: ReturnType<typeof createWsServer> | null = null
+
 const server = createServer(async (req, res) => {
   if (!req.url) {
     sendJson(res, 404, { error: 'Not found' })
@@ -186,7 +188,7 @@ const server = createServer(async (req, res) => {
     const limit = Number.isFinite(rawLimit) && rawLimit > 0
       ? Math.min(Math.floor(rawLimit), 200)
       : 50
-    sendJson(res, 200, { ok: true, rooms: lobby.getRooms(limit) })
+    sendJson(res, 200, { ok: true, rooms: wssCtx!.lobby.getRooms(limit) })
     return
   }
 
@@ -196,7 +198,7 @@ const server = createServer(async (req, res) => {
     const user = validateSession(token)
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
     const roomId = req.url.slice('/api/rooms/'.length, req.url.length - '/dissolve'.length)
-    const result = lobby.dissolveRoomById(roomId, user.id)
+    const result = wssCtx!.lobby.dissolveRoomById(roomId, user.id)
     sendJson(res, result.ok ? 200 : 400, result)
     return
   }
@@ -306,8 +308,7 @@ const server = createServer(async (req, res) => {
   sendJson(res, 404, { error: 'Not found' })
 })
 
-const wssCtx = createWsServer(server, { persistence, shouldPersist })
-const { lobby } = wssCtx
+wssCtx = createWsServer(server, { persistence, shouldPersist })
 
 const PORT = Number(process.env.BACKEND_PORT) || 5175
 const HOST = process.env.BACKEND_HOST || undefined
