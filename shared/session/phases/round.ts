@@ -19,7 +19,7 @@ import { incPlacedFarmers } from '../../logic/stats.ts'
 import { recordActionSnapshot } from '../../cards/helpers/action-snapshot.ts'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement.ts'
 import { executeCardListener, getMatchingListeners } from '../../cards/card-listeners.ts'
-import { shouldSkipPlayerTurn } from '../../cards/card-effects.ts'
+import { runRoundEndHooks, shouldSkipPlayerTurn } from '../../cards/card-effects.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
 import { InteractionNode, type EngineNode } from '../../engine/index.ts'
 import type { FeedQueueEntry } from '../../game/types.ts'
@@ -275,6 +275,44 @@ export const finalizeActionLog = (core: GameCore, player: PlayerState): void => 
   }
   core.setActionStartPlayerSnapshot(null)
   delete player._activeActionBonusSources
+}
+
+/**
+ * Round-end entry: validate all-workers-spent + no pending interaction,
+ * pivot into a reorganize sub-flow if any player still owes pending
+ * animal placement, otherwise mark roundPhase='returning-home' and
+ * trampoline into onBeforeReturnHome stage-hook chain. Migrated from
+ * GameCore.performRoundEnd (S2 Task 10 part 7).
+ */
+export const performRoundEnd = (core: GameCore): SessionResponse => {
+  const state = core.state
+  const allUsed = state.players.every((p) => workersAvailable(state, p) <= 0)
+  if (!allUsed) return core.emitResponse(false, 'not all workers used')
+  if (core.peekEngineInteraction()) return core.emitResponse(false, 'pending action exists')
+
+  const pendingAnimal = state.players.findIndex((p) => core.hasPendingAnimalsCheck(p))
+  if (pendingAnimal !== -1) {
+    core.startReorgSubFlow(pendingAnimal, 'round-end',
+      { originPlayerIndex: core.getTurnOwner() ?? undefined })
+    return core.emitResponse()
+  }
+
+  core.appendHistory()
+  state.roundPhase = 'returning-home'
+  return core.invokeBeforeReturnHomeHooks()
+}
+
+/**
+ * Round finalization (after returning-home + post-harvest stage hooks
+ * conclude): mark roundPhase='preparation', dispatch the per-player
+ * onRoundEnd card hooks, then trampoline into onAfterRoundEnd which
+ * eventually advances state.round + flips gameOver at round 15.
+ * Migrated from GameCore.finalizeRound (S2 Task 10 part 7).
+ */
+export const finalizeRound = (core: GameCore): SessionResponse => {
+  core.state.roundPhase = 'preparation'
+  core.state.players.forEach((p) => runRoundEndHooks(core.state, p))
+  return core.invokeAfterRoundEnd()
 }
 
 /**
