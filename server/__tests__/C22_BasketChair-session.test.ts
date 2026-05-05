@@ -221,7 +221,7 @@ describe('C22_BasketChair session', () => {
     let resp = buyC22ViaMeetingPlace(session)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const acceptOption = resp.interaction.options?.find((o) => o.value !== '__skip__')!
+    const acceptOption = (resp.interaction.options ?? []).find((o) => o.value !== '__skip__')!
 
     resp = session.resolveChoice(0, acceptOption.value)
     expect(resp.interaction.stateId).toBe('wait')
@@ -248,7 +248,7 @@ describe('C22_BasketChair session', () => {
     // Golden-path buy + accept + place on clay-pit, matching case 1.
     let resp = buyC22ViaMeetingPlace(session)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected accept/skip choice')
-    const acceptOption = resp.interaction.options?.find((o) => o.value !== '__skip__')!
+    const acceptOption = (resp.interaction.options ?? []).find((o) => o.value !== '__skip__')!
     resp = session.resolveChoice(0, acceptOption.value)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected place-farmer choice')
     resp = session.resolveChoice(0, 'clay-pit')

@@ -39,7 +39,9 @@ const drainPending = (session: GameSession, accept: boolean) => {
   let resp = session.performRoundEnd()
   let safety = 30
   while (safety-- > 0 && resp.interaction.stateId === 'wait') {
-    if (resp.interaction.stateId === 'wait') {
+    if (resp.interaction.request.kind === 'feed') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
+    } else {
       const opts = resp.interaction.options ?? []
       // Optional SEQ surfaces as 2-option choice: [actionNode, __skip__].
       // Accepting picks the non-skip option; declining picks __skip__.
@@ -48,10 +50,6 @@ const drainPending = (session: GameSession, accept: boolean) => {
       const target = accept ? nonSkip ?? opts[0] : skipOpt ?? nonSkip ?? opts[0]
       if (!target) break
       resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, target.value)
-    } else if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
-    } else {
-      break
     }
   }
   return resp
