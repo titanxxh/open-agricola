@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/game/player'
-import type { PendingAction } from '../../shared/game/types'
 import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 import '../../shared/cards/D/D161_CabbageBuyer'
 import '../../shared/cards/A/A55_JunkRoom'
@@ -217,10 +216,8 @@ describe('D161_CabbageBuyer session', () => {
 
     // Now we should see the D161 offer for p0 (cost=3, optional seq)
     expect(resp.interaction.stateId).toBe('wait')
-    expect(resp.interaction.playerIndex).toBe(0)
-    expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).sourceCard).toBe(CARD_ID)
-    expect(resp.interaction.stateId).toBe('wait')
-    expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.playerIndex : -1).toBe(0)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).toBe(CARD_ID)
 
     // Accept the offer (non-skip option)
     const acceptOpt = resp.interaction.options?.find((o) => o.value !== '__skip__')

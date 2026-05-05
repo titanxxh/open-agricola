@@ -113,7 +113,7 @@ describe('E70_CropRotationField session', () => {
       expect(resp.ok).toBe(true)
       expect(resp.ok).toBe(true)
       expect(resp.interaction.stateId).toBe('wait')
-      expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
+      expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined).toBe('ui.interactionSowSelect')
 
       // Sow grain on the virtual tile
       resp = session.resolveChoice(0, 'confirm', {
@@ -363,7 +363,7 @@ describe('E70_CropRotationField session', () => {
       // If sow is available, resolving 'sow' should succeed
       expect(resp.ok).toBe(true)
       expect(resp.interaction.stateId).toBe('wait')
-      expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
+      expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined).toBe('ui.interactionSowSelect')
     })
 
     it('sow is not doable when card already has crop and no regular fields', () => {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/A/A132_Publican'
-import type { ActionChoiceOption, PendingAction } from '../../shared/game/types'
+import type { ActionChoiceOption } from '../../shared/game/types'
 import type { SessionResponse } from '../../shared/session/session-core'
 import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
@@ -68,7 +68,7 @@ describe('stats: gain with recipientPlayerId records resourcesFromCards on targe
     resp = advancePastPlayerSwitches(session, resp)
     expect(resp.interaction.stateId).toBe('wait')
     expect(
-      (resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey,
+      resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined,
     ).toBe('ui.interactionSowSelect')
 
     resp = session.resolveChoice(1, 'confirm', {
