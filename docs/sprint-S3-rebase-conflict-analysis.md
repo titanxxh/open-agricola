@@ -51,6 +51,14 @@ S3 那一边还在用 `{ type: 'choice', promptKey, options }` 旧 shape；S2 �
 
 按时间顺序 S3 的 32 commits 中预计还会撞类似冲突约 6–8 次（每次接到一个改 `pay-helpers.ts` 的新 commit 都会）。
 
+## 3a. 实际 rebase 探测（2026-05-05）
+
+确认 第 1 个冲突点（commit `7c5439ff`）后，继续 `git rebase --continue`，第 2 个冲突点出现在 commit `268b5aa7 refactor(payment): move internals into payment/internal/`。这次冲突更大：S3 把 `pay-helpers.ts` 中 ~20 个 helper 函数（`resolveActionPreviewCost` / `canAffordActionPreviewCost` / `payCardPreviewCost` 等）整体迁出到 `payment/internal/`，但 S2 在原文件中保留并扩展了多个 helper —— 整个文件遍布冲突 marker。
+
+**预估剩余工作量**：单个 `268b5aa7` 冲突约 30–45 分钟（逐 helper 决定保留 S2 / 应用 S3-mv），后续还有 ~4–6 个类似规模冲突（`555207ff split improvement.ts` / `f1dbc007 delete legacy helpers shim` 等）。**总耗时估算 1.5–2 小时 dedicated focus session**，超出本会话剩余预算，rebase 已 abort。
+
+**建议**：单独排期一个 dev-day 专门处理 S3 rebase，按路线 B 的"squash 成 3 个语义节点"执行可大幅压缩冲突点（从 6–8 次降到 3 次）。
+
 ## 4. 解决路线
 
 ### 路线 A：逐 commit rebase（用户原始指示）
