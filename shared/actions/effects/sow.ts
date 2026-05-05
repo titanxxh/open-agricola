@@ -6,7 +6,10 @@ import type {
 } from '../../game/types'
 import { fieldIsEmpty } from '../../game/field'
 import { positionKey } from '../../game/farm'
-import { getPermittedExtraSowableFields } from '../../logic/farm/farm-interaction'
+import {
+  buildSowFarmInteraction,
+  getPermittedExtraSowableFields,
+} from '../../logic/farm/farm-interaction'
 import { handleSowExtraField } from '../../cards/card-effects'
 import { validateSowSelection, type SowSelection } from '../../logic/farm/sow-validation'
 
@@ -91,17 +94,21 @@ export const sowAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (_, player) => canSow(player),
-  execute: () => ({
-    type: 'request',
-    request: {
-      kind: 'choice',
-      options: [
-        { value: 'confirm', labelKey: 'ui.interactionSowConfirm' },
-        { value: 'cancel', labelKey: 'ui.interactionSowCancel' },
-      ],
-    },
-    promptKey: 'ui.interactionSowSelect',
-  }),
+  execute: ({ player, actionContext }): ActionExecutionResult => {
+    const farm = buildSowFarmInteraction(player, actionContext)
+    return {
+      type: 'request',
+      request: {
+        kind: 'farm-select',
+        farm,
+        options: [
+          { value: 'confirm', labelKey: 'ui.interactionSowConfirm' },
+          { value: 'cancel', labelKey: 'ui.interactionSowCancel' },
+        ],
+      },
+      promptKey: 'ui.interactionSowSelect',
+    }
+  },
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
     if (choice === 'cancel') return { type: 'ok' }
     if (choice === 'confirm' && payload) {
