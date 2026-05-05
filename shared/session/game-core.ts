@@ -3401,13 +3401,17 @@ export class GameCore {
         }
       }
       this.pushHistory()
-      const choiceValue = cardIds.length > 0 ? cardIds.join(',') : 'cancel'
+      // S2 Task 7: forward structured payload via engine.resolveChoice's
+      // `payload` arg; selection.resolveChoice now reads `payload.cards` first
+      // and falls back to splitting the legacy `cardIds.join(',')` choice
+      // string only when payload is absent.
+      const choiceValue = cardIds.length > 0 ? 'confirm' : 'cancel'
       const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('selection')
       this.engine?.resolveChoice(choiceValue, {
         state: this.state,
         player: this.state.players[playerIndex]!,
         space,
-      })
+      }, { cards: cardIds })
       this.flushEngineLog()
       this.runEngineSteps()
       return this.continueAfterResolvedFarmChoice(playerIndex)
@@ -3424,14 +3428,14 @@ export class GameCore {
     }
 
     this.pushHistory()
-    const choiceValue =
-      positions.length > 0 ? positions.map((p) => `${p.row}-${p.col}`).join(',') : 'cancel'
+    const positionStrings = positions.map((p) => `${p.row}-${p.col}`)
+    const choiceValue = positions.length > 0 ? 'confirm' : 'cancel'
     const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('selection')
     this.engine?.resolveChoice(choiceValue, {
       state: this.state,
       player: this.state.players[playerIndex]!,
       space,
-    })
+    }, { positions: positionStrings })
     this.flushEngineLog()
     this.runEngineSteps()
     return this.continueAfterResolvedFarmChoice(playerIndex)
