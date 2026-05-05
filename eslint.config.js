@@ -79,6 +79,47 @@ export default defineConfig([
       }],
     },
   },
+  // S4a: shared/domain/** is the new render-agnostic aggregate facade. It
+  // must run in the browser sandbox (no Node API), must not depend on React
+  // (pure domain), and must not import engine / session / actions/effects
+  // to avoid layering cycles.
+  {
+    files: ['shared/domain/**/*.ts'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          {
+            group: ['fs', 'fs/*', 'path', 'os', 'child_process', 'crypto'],
+            message: 'shared/domain/** must run in browser sandbox; no Node API.',
+          },
+          {
+            group: ['react', 'react-dom'],
+            message: 'shared/domain/** is render-agnostic; no React.',
+          },
+          {
+            group: [
+              '../../engine/**',
+              '../../session/**',
+              '../../actions/effects/**',
+              '../engine/**',
+              '../session/**',
+              '../actions/effects/**',
+              // Bare paths so re-exports through e.g.
+              // `../actions/effects/index.ts` (no trailing slash) cannot
+              // slip past the **/* glob.
+              '../../engine',
+              '../../session',
+              '../../actions/effects',
+              '../engine',
+              '../session',
+              '../actions/effects',
+            ],
+            message: 'shared/domain/** must not depend on engine/session/effects (avoid cycles).',
+          },
+        ],
+      }],
+    },
+  },
   {
     files: ['server/**/*.{ts,tsx}'],
     ignores: ['server/**/__tests__/**'],
