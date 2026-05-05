@@ -1,17 +1,26 @@
 /**
- * Round-phase pure helpers extracted from GameCore (S2 Task 10).
+ * Round-phase mixin extracted from GameCore (S2 Task 10).
  *
- * Currently hosts only the seat-walk helpers (nextSeatedPlayerIdx,
- * computeStartPlayerIdx) — the side-effect-heavy paths (takeAction,
- * confirm-* triggers/handlers, round transition, returningHome /
- * roundEnd continuations) remain in GameCore because they read/write
- * engineStack / history / actionStartIndex / state in tightly coupled
- * sequences. Migrating those paths into a RoundPhase mixin requires a
- * dedicated pass (deferred to a follow-up sprint per the S2 plan).
+ * Hosts the side-effect-heavy paths (`takeAction`, confirm-* triggers,
+ * round transitions, returningHome / roundEnd continuations) plus the
+ * pure seat-walk helpers (`nextSeatedPlayerIdx`, `computeStartPlayerIdx`).
+ *
+ * Cross-module GameCore state access goes through the `@internal`
+ * accessor methods on GameCore (e.g. `pushEngineFrame`, `setTurnOwner`,
+ * `appendHistory`); see the accessor block in `session-core.ts` for the
+ * full inventory.
  */
 
 import type { GameState, PlayerState } from '../../game/types.ts'
-import { workersAvailable } from '../../game/player.ts'
+import { smallestAvailableWorker, workersAvailable } from '../../game/player.ts'
+import { addWorkerRef, isSpaceOccupied } from '../../game/space.ts'
+import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability.ts'
+import { incPlacedFarmers } from '../../logic/stats.ts'
+import { recordActionSnapshot } from '../../cards/helpers/action-snapshot.ts'
+import { recordRoundPlacement } from '../../cards/helpers/round-placement.ts'
+import { executeCardListener, getMatchingListeners } from '../../cards/card-listeners.ts'
+import type { GameCore, SessionResponse } from '../session-core.ts'
+import type { EngineNode } from '../../engine/index.ts'
 
 /**
  * Find the next seated player (in turn order) who still has at least one
@@ -39,4 +48,104 @@ export const nextSeatedPlayerIdx = (
 export const computeStartPlayerIdx = (state: GameState): number => {
   const startIdx = state.players.findIndex((player) => player.startPlayer)
   return startIdx === -1 ? 0 : startIdx
+}
+
+/**
+ * Top-level player action entry. Migrated from `GameCore.takeAction`
+ * (S2 Task 10): the per-method body lives here, while GameCore retains
+ * a thin delegator. Cross-module GameCore state mutations go through
+ * the named accessors on `core.*`.
+ */
+export const takeAction = (
+  core: GameCore,
+  playerIndex: number,
+  spaceId: string,
+): SessionResponse => {
+  const state = core.state
+  if (state.gameOver) return core.emitResponse(false, 'game is over')
+  if (state.phase === 'draft') return core.emitResponse(false, 'draft in progress')
+  if (core.peekEngineInteraction()) return core.emitResponse(false, 'interaction in progress')
+  if (playerIndex !== state.currentPlayerIndex) return core.emitResponse(false, 'not your turn')
+  const player = state.players[playerIndex]
+  if (!player || workersAvailable(state, player) <= 0) {
+    return core.emitResponse(false, 'no workers available')
+  }
+  const space = state.actionSpaces.find((s) => s.id === spaceId)
+  if (!space) return core.emitResponse(false, 'space unavailable')
+  if (isSpaceOccupied(space)) {
+    const allowed = computeAllowedPlacementSpaces(state, player)
+    if (!allowed.some(a => a.spaceId === spaceId)) return core.emitResponse(false, 'space unavailable')
+  }
+  // Honor explicit `isDoable` listener vetoes (e.g. C51 FishingNet blocks
+  // opponents with 0 food). We only check listener-driven `doable: false`
+  // here — `space.canBeExecutedByPlayer` (which is conservatively false for
+  // OR-style flows whose every child is currently undoable) is intentionally
+  // skipped, so the existing fall-through-OR semantic in tests is preserved.
+  if (core.listenersVetoIsDoableCheck(player, space)) {
+    return core.emitResponse(false, 'space unavailable')
+  }
+
+  core.appendHistory(true)
+  core.setTurnOwner(playerIndex)
+  player._activeActionBonusSources = []
+  core.setActionStartPlayerSnapshot(core.cloneSessionPlayer(player))
+  core.resetCardEffectDeltas()
+  recordActionSnapshot(player, core.allocActionToken())
+  const worker = smallestAvailableWorker(state, player)
+  if (worker) {
+    addWorkerRef(space, player.id, worker.id)
+  }
+  recordRoundPlacement(player, spaceId, worker?.id ?? '?')
+  incPlacedFarmers(player)
+  state.log.unshift({ key: 'log.placeFarmer', params: { player: player.name, action: space.nameKey } })
+
+  core.pushEngineFrame({
+    engine: core.createEngineForSpace(spaceId),
+    source: { kind: 'action', actionId: spaceId },
+    spaceId,
+    ownerPlayerIndex: playerIndex,
+    stageResume: null,
+    deferredPlayerSwitch: null,
+    // Top-level player action engine (frame is the player's current action
+    // space, not a sub-flow detour).
+    reason: 'top-level',
+  })
+
+  const beforeListenerContext = {
+    state,
+    player,
+    space,
+    actionId: spaceId,
+    phase: 'before' as const,
+  }
+  const matched = getMatchingListeners(beforeListenerContext)
+  const beforeFlowNodes: EngineNode[] = []
+  const frameEngine = () => core.peekEngineFrame()?.engine ?? null
+  for (const entry of matched) {
+    const result = executeCardListener(entry.registration, beforeListenerContext, {
+      ownerPlayerId: entry.ownerPlayerId,
+    })
+    if (result?.flow) {
+      beforeFlowNodes.push(frameEngine()!.buildFlowNodePublic(result.flow))
+    }
+  }
+  if (beforeFlowNodes.length > 0) {
+    const injectedIds = new Set(beforeFlowNodes.map(n => n.id))
+    frameEngine()!.injectBeforeNodes(beforeFlowNodes)
+    let safety = beforeFlowNodes.length * 3
+    while (safety-- > 0) {
+      const eng = frameEngine()
+      if (!eng) break
+      const next = eng.peekNextUnresolved()
+      if (!next || !injectedIds.has(next.id)) break
+      const step = eng.proceed({ state, player, space })
+      core.flushEngineLogPublic()
+      if (step.type !== 'ok') break
+    }
+    player._activeActionBonusSources = []
+    core.setActionStartPlayerSnapshot(core.cloneSessionPlayer(player))
+  }
+
+  core.driveEngineSteps()
+  return core.emitResponse()
 }

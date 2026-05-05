@@ -39,7 +39,8 @@ import {
   XorNode,
   isSyntheticInteractionFrame,
 } from '../engine/index.ts'
-import type { EngineNode, EngineSource, EngineStackCursor, SubFlowReason } from '../engine/index.ts'
+import type { EngineFrame, EngineNode, EngineSource, EngineStackCursor, SubFlowReason } from '../engine/index.ts'
+import type { ReorganizeTrigger } from '../actions/effects/reorganize.ts'
 import {
   createInitialState,
   createRoundOpenById,
@@ -58,7 +59,6 @@ import {
   incFirstPlayer,
   incHarvestedGrain,
   incHarvestedVegetable,
-  incPlacedFarmers,
   incResourceConverted,
   recordDraftPick,
 } from '../logic/stats.ts'
@@ -89,9 +89,8 @@ import { computeScores, type PlayerScoreSummary } from '../logic/scoring.ts'
 import { computeAnimalZones } from '../actions/helpers/animal-zones'
 import { reap } from '../actions/effects/reap.ts'
 import { breedLeaf } from '../actions/effects/breed'
-import { recordActionSnapshot } from '../cards/helpers/action-snapshot.ts'
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
-import { recordRoundPlacement, resetRoundPlacements } from '../cards/helpers/round-placement.ts'
+import { resetRoundPlacements } from '../cards/helpers/round-placement.ts'
 import { familySize, newbornCount, workersAvailable } from '../game/player.ts'
 import { getAssignedAnimalCount } from '../game/animals.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/types.ts'
@@ -126,7 +125,7 @@ import {
 } from '../logic/farm/farm-interaction.ts'
 import { buildOccupationHandSelectionInteraction } from '../logic/farm/occupation-hand-interaction.ts'
 import { rebuildActiveModifiers } from '../game/serialization.ts'
-import { addWorkerRef, isSpaceOccupied, removeWorkerRef } from '../game/space.ts'
+import { isSpaceOccupied, removeWorkerRef } from '../game/space.ts'
 import { smallestAvailableWorker } from '../game/player.ts'
 import { computeAllowedPlacementSpaces } from '../actions/helpers/placement-availability.ts'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../actions/helpers/placement-constants.ts'
@@ -273,7 +272,14 @@ export interface GameCoreOptions {
 }
 
 export class GameCore {
-  private state: GameState
+  /**
+   * @internal phase access — the canonical GameState. Phase mixins read/write
+   * `state.players` / `state.actionSpaces` / `state.log` / `state.round` etc
+   * on every method, so wrapping each field in a getter/setter is impractical.
+   * Keep this field public for `shared/session/phases/*` consumption only;
+   * outside that directory the field is treated as if it were private.
+   */
+  state: GameState
   private engineStack = new EngineStack()
   // Read-only views backed by engineStack.current(). All writes go through
   // engineStack.push/pop or by mutating engineStack.current() fields directly.
@@ -326,6 +332,91 @@ export class GameCore {
    */
   private nextActionToken = 1
   private turnOwnerPlayerIndex: number | null = null
+
+  // ─────────────────────────────────────────────────────────────────────
+  // S2 Tasks 9-12: internal accessor / mutator API for phase mixins.
+  //
+  // Phase classes in `shared/session/phases/` are organisationally split
+  // out from this file but logically still part of the GameCore session
+  // implementation. Rather than promoting each tightly-coupled private
+  // field to public (which would expose the field to all of `shared/`),
+  // each cross-module read/write goes through one of the named methods
+  // below. This keeps a single insertion point for invariants, logs, and
+  // metrics, and makes "who reaches into engineStack/history/turnOwner"
+  // grep-discoverable.
+  //
+  // Accessor naming convention: `<verb><Subject>` (`pushEngineFrame`,
+  // `setTurnOwner`, `allocActionToken`). Direct read of immutable derived
+  // views (`peekEngineFrame`, `engineStackDepth`) skip the verb prefix.
+  // ─────────────────────────────────────────────────────────────────────
+
+  /** @internal phase access — push a new frame onto the engine stack. */
+  pushEngineFrame(frame: EngineFrame): void { this.engineStack.push(frame) }
+  /** @internal phase access — pop the top frame off the engine stack. */
+  popEngineFrame(): EngineFrame | undefined { return this.engineStack.pop() }
+  /** @internal phase access — current top frame (read-only view). */
+  peekEngineFrame(): EngineFrame | undefined { return this.engineStack.current() }
+  /** @internal phase access — current pending InteractionNode if any. */
+  peekEngineInteraction(): InteractionNode | null { return this.engineStack.peekInteraction() }
+  /** @internal phase access — total stack depth. */
+  engineStackDepth(): number { return this.engineStack.depth() }
+  /** @internal phase access — drop all frames (used by confirm-next-player turn switch). */
+  clearEngineStack(): void { this.engineStack.clear() }
+
+  /** @internal phase access — append history entry (Round/Harvest/Draft mixins). */
+  appendHistory(actionStart = false, undoBoundary = false): void { this.pushHistory(actionStart, undoBoundary) }
+  /** @internal phase access — drop all history entries. */
+  clearHistory(): void { this.history = [] }
+
+  /** @internal phase access — set the player index whose turn is currently owned by this session run. */
+  setTurnOwner(idx: number | null): void { this.turnOwnerPlayerIndex = idx }
+  /** @internal phase access — read turnOwnerPlayerIndex. */
+  getTurnOwner(): number | null { return this.turnOwnerPlayerIndex }
+
+  /** @internal phase access — set the action-start index marker (used by undoAction). */
+  setActionStartIndex(idx: number | null): void { this.actionStartIndex = idx }
+  /** @internal phase access — read actionStartIndex. */
+  getActionStartIndex(): number | null { return this.actionStartIndex }
+
+  /** @internal phase access — capture pre-action player snapshot for stats / undo. */
+  setActionStartPlayerSnapshot(snapshot: PlayerState | null): void { this.actionStartPlayerSnapshot = snapshot }
+
+  /** @internal phase access — allocate next monotonic action token. */
+  allocActionToken(): number { return this.nextActionToken++ }
+
+  /** @internal phase access — reset per-leaf card-effect resource deltas. */
+  resetCardEffectDeltas(): void { this.cardEffectDeltasSinceFlush = { gains: {}, costs: {} } }
+
+  /** @internal phase access — emit a SessionResponse with the current state. */
+  emitResponse(ok = true, error?: string): SessionResponse { return this.respond(ok, error) }
+
+  /** @internal phase access — drive the engine's step loop until it blocks. */
+  driveEngineSteps(): void { this.runEngineSteps() }
+
+  /** @internal phase access — flush queued log entries into the canonical log. */
+  flushEngineLogPublic(): void { this.flushEngineLog() }
+
+  /** @internal phase access — deep-clone a player snapshot. */
+  cloneSessionPlayer(p: PlayerState): PlayerState { return this.clonePlayer(p) }
+
+  /** @internal phase access — `place-farmer` after-hook injection chain. */
+  invokePlaceFarmerAfterHooks(player: PlayerState, space: ActionSpace): boolean {
+    return this.runPlaceFarmerAfterHooks(player, space)
+  }
+  /** @internal phase access — animal-reorg pivot detection used by Harvest/Round. */
+  hasPendingAnimalsCheck(player: PlayerState): boolean { return this.hasPendingAnimals(player) }
+  /** @internal phase access — start a reorganize sub-flow frame. */
+  startReorgSubFlow(playerIndex: number, trigger: ReorganizeTrigger, options?: { originPlayerIndex?: number }): void {
+    this.startReorganizeSubFlow(playerIndex, trigger, options)
+  }
+  /** @internal phase access — synthetic InteractionNode id generator. */
+  mintSyntheticNodeId(prefix: string): string { return this.nextSyntheticNodeId(prefix) }
+  /** @internal phase access — Round phase listenersVetoIsDoable check. */
+  listenersVetoIsDoableCheck(player: PlayerState, space: ActionSpace): boolean {
+    return this.listenersVetoIsDoable(player, space)
+  }
+  /** @internal phase access — build a fresh Engine for a top-level action space. */
+  createEngineForSpace(actionId: string): Engine { return this.createEngine(actionId) }
 
   private registry: ActionRegistry
   private hookDispatcher: HookDispatcher
@@ -2548,87 +2639,7 @@ export class GameCore {
   }
 
   takeAction(playerIndex: number, spaceId: string): SessionResponse {
-    if (this.state.gameOver) return this.respond(false, 'game is over')
-    if (this.state.phase === 'draft') return this.respond(false, 'draft in progress')
-    if (this.engineStack.peekInteraction()) return this.respond(false, 'interaction in progress')
-    if (playerIndex !== this.state.currentPlayerIndex) return this.respond(false, 'not your turn')
-    const player = this.state.players[playerIndex]
-    if (!player || workersAvailable(this.state, player) <= 0) return this.respond(false, 'no workers available')
-    const space = this.state.actionSpaces.find((s) => s.id === spaceId)
-    if (!space) return this.respond(false, 'space unavailable')
-    if (isSpaceOccupied(space)) {
-      const allowed = computeAllowedPlacementSpaces(this.state, player)
-      if (!allowed.some(a => a.spaceId === spaceId)) return this.respond(false, 'space unavailable')
-    }
-    // Honor explicit `isDoable` listener vetoes (e.g. C51 FishingNet blocks
-    // opponents with 0 food). We only check listener-driven `doable: false`
-    // here — `space.canBeExecutedByPlayer` (which is conservatively false for
-    // OR-style flows whose every child is currently undoable) is intentionally
-    // skipped, so the existing fall-through-OR semantic in tests is preserved.
-    if (this.listenersVetoIsDoable(player, space)) {
-      return this.respond(false, 'space unavailable')
-    }
-
-    this.pushHistory(true)
-    this.turnOwnerPlayerIndex = playerIndex
-    player._activeActionBonusSources = []
-    this.actionStartPlayerSnapshot = this.clonePlayer(player)
-    this.cardEffectDeltasSinceFlush = { gains: {}, costs: {} }
-    recordActionSnapshot(player, this.nextActionToken++)
-    const worker = smallestAvailableWorker(this.state, player)
-    if (worker) {
-      addWorkerRef(space, player.id, worker.id)
-    }
-    recordRoundPlacement(player, spaceId, worker?.id ?? '?')
-    incPlacedFarmers(player)
-    this.state.log.unshift({ key: 'log.placeFarmer', params: { player: player.name, action: space.nameKey } })
-
-    this.engineStack.push({
-      engine: this.createEngine(spaceId),
-      source: { kind: 'action', actionId: spaceId },
-      spaceId,
-      ownerPlayerIndex: playerIndex,
-      stageResume: null,
-      deferredPlayerSwitch: null,
-      // Top-level player action engine (frame is the player's current action
-      // space, not a sub-flow detour).
-      reason: 'top-level',
-    })
-
-    const beforeListenerContext = {
-      state: this.state,
-      player,
-      space,
-      actionId: spaceId,
-      phase: 'before' as const,
-    }
-    const matched = getMatchingListeners(beforeListenerContext)
-    const beforeFlowNodes: EngineNode[] = []
-    for (const entry of matched) {
-      const result = executeCardListener(entry.registration, beforeListenerContext, {
-        ownerPlayerId: entry.ownerPlayerId,
-      })
-      if (result?.flow) {
-        beforeFlowNodes.push(this.engine!.buildFlowNodePublic(result.flow))
-      }
-    }
-    if (beforeFlowNodes.length > 0) {
-      const injectedIds = new Set(beforeFlowNodes.map(n => n.id))
-      this.engine!.injectBeforeNodes(beforeFlowNodes)
-      let safety = beforeFlowNodes.length * 3
-      while (safety-- > 0 && this.engine) {
-        const next = this.engine.peekNextUnresolved()
-        if (!next || !injectedIds.has(next.id)) break
-        const step = this.engine.proceed({ state: this.state, player, space })
-        this.flushEngineLog()
-        if (step.type !== 'ok') break
-      }
-      player._activeActionBonusSources = []
-      this.actionStartPlayerSnapshot = this.clonePlayer(player)
-    }
-
-    this.runEngineSteps()
-    return this.respond()
+    return roundPhase.takeAction(this, playerIndex, spaceId)
   }
 
   takeAnytimeAction(playerIndex: number, actionId: string): SessionResponse {
