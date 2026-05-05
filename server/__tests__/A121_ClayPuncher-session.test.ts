@@ -71,9 +71,9 @@ describe('A121_ClayPuncher session', () => {
     expect(resp.ok).toBe(true)
 
     // lessons action prompts for occupation choice
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type === 'choice') {
-      const option = resp.pending.options?.find((o: ActionChoiceOption) => o.value === 'A93_BedMaker')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId === 'wait') {
+      const option = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === 'A93_BedMaker')
       expect(option).toBeDefined()
       resp = session.resolveChoice(0, option!.value)
     }

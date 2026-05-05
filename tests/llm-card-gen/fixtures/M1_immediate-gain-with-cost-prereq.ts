@@ -71,7 +71,7 @@ const fixture: CardFixture = {
     steps.push({ label: "takeAction(0,'meeting-place')", resp: r1 })
     if (r1.pending?.type !== 'choice') return { steps }
 
-    const acceptOpt = (r1.pending.options ?? []).find((o) => o.value !== '__skip__')
+    const acceptOpt = (r1.interaction.options ?? []).find((o) => o.value !== '__skip__')
     if (!acceptOpt) return { steps }
     const r2 = session.resolveChoice(0, acceptOpt.value) as {
       ok: boolean

@@ -85,8 +85,8 @@ const driveRenovation = (session: GameSession, actorIdx: number) => {
   // one option is available) or present a choice between 'clay' and 'stone'.
   // Walk through any material choices for the renovation.
   let safety = 5
-  while (resp.pending.type === 'choice' && safety-- > 0) {
-    const opts = resp.pending.options ?? []
+  while (resp.interaction.stateId === 'wait' && safety-- > 0) {
+    const opts = resp.interaction.options ?? []
     // Check if this is the renovation material choice (clay/stone)
     const hasMatChoice = opts.some((o) => o.value === 'clay' || o.value === 'stone')
     if (hasMatChoice) {
@@ -111,8 +111,8 @@ const driveRenovation = (session: GameSession, actorIdx: number) => {
  * Skip the improvement step (pick __skip__).
  */
 const skipImprovement = (session: GameSession, actorIdx: number, resp: ReturnType<GameSession['takeAction']>) => {
-  if (resp.pending.type === 'choice') {
-    const skipOpt = resp.pending.options?.find((o) => o.value === '__skip__')
+  if (resp.interaction.stateId === 'wait') {
+    const skipOpt = resp.interaction.options?.find((o) => o.value === '__skip__')
     if (skipOpt) {
       resp = session.resolveChoice(actorIdx, '__skip__')
     }
@@ -129,8 +129,8 @@ const enterImprovementChoice = (
   actorIdx: number,
   resp: ReturnType<GameSession['takeAction']>,
 ) => {
-  if (resp.pending.type !== 'choice') return resp
-  const enterOpt = resp.pending.options?.find((o) => o.value !== '__skip__')
+  if (resp.interaction.stateId !== 'wait') return resp
+  const enterOpt = resp.interaction.options?.find((o) => o.value !== '__skip__')
   if (!enterOpt) return resp
   return session.resolveChoice(actorIdx, enterOpt.value)
 }
@@ -140,17 +140,17 @@ const enterImprovementChoice = (
  */
 const buildMajor = (session: GameSession, actorIdx: number, resp: ReturnType<GameSession['takeAction']>, majorId: string) => {
   resp = enterImprovementChoice(session, actorIdx, resp)
-  if (resp.pending.type !== 'choice') return resp
-  const opt = resp.pending.options?.find((o) => o.value === `major:${majorId}`)
+  if (resp.interaction.stateId !== 'wait') return resp
+  const opt = resp.interaction.options?.find((o) => o.value === `major:${majorId}`)
   if (!opt) return resp
   resp = session.resolveChoice(actorIdx, opt.value)
   // Drain any sub-choices (e.g. fireplace mode selection)
   let safety = 5
-  while (resp.pending.type === 'choice' && safety-- > 0) {
-    const opts = resp.pending.options ?? []
+  while (resp.interaction.stateId === 'wait' && safety-- > 0) {
+    const opts = resp.interaction.options ?? []
     // Stop if we see the D161 offer (has __skip__ and is for the owner cross-player)
     const hasSkip = opts.some((o) => o.value === '__skip__')
-    if (hasSkip && resp.pending.playerIndex !== actorIdx) break
+    if (hasSkip && resp.interaction.playerIndex !== actorIdx) break
     // If skip is for actor and it's the D161 offer (after improvement), also break
     // but we need to detect we've landed on D161 offer vs a normal improvement choice
     // We'll just break when we've exhausted non-skip choices
@@ -166,15 +166,15 @@ const buildMajor = (session: GameSession, actorIdx: number, resp: ReturnType<Gam
  */
 const buildMinor = (session: GameSession, actorIdx: number, resp: ReturnType<GameSession['takeAction']>, minorId: string) => {
   resp = enterImprovementChoice(session, actorIdx, resp)
-  if (resp.pending.type !== 'choice') return resp
-  const opt = resp.pending.options?.find((o) => o.value === `minor:${minorId}`)
+  if (resp.interaction.stateId !== 'wait') return resp
+  const opt = resp.interaction.options?.find((o) => o.value === `minor:${minorId}`)
   if (!opt) return resp
   resp = session.resolveChoice(actorIdx, opt.value)
   let safety = 5
-  while (resp.pending.type === 'choice' && safety-- > 0) {
-    const opts = resp.pending.options ?? []
+  while (resp.interaction.stateId === 'wait' && safety-- > 0) {
+    const opts = resp.interaction.options ?? []
     const hasSkip = opts.some((o) => o.value === '__skip__')
-    if (hasSkip && resp.pending.playerIndex !== actorIdx) break
+    if (hasSkip && resp.interaction.playerIndex !== actorIdx) break
     const nonSkip = opts.find((o) => o.value !== '__skip__' && o.value !== 'cancel')
     if (!nonSkip) break
     resp = session.resolveChoice(actorIdx, nonSkip.value)
@@ -216,14 +216,14 @@ describe('D161_CabbageBuyer session', () => {
     resp = walkPlayerSwitch(session, resp)
 
     // Now we should see the D161 offer for p0 (cost=3, optional seq)
-    expect(resp.pending.type).toBe('choice')
-    expect(resp.pending.playerIndex).toBe(0)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.playerIndex).toBe(0)
     expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).sourceCard).toBe(CARD_ID)
     expect(resp.interaction.stateId).toBe('wait')
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
 
     // Accept the offer (non-skip option)
-    const acceptOpt = resp.pending.options?.find((o) => o.value !== '__skip__')
+    const acceptOpt = resp.interaction.options?.find((o) => o.value !== '__skip__')
     expect(acceptOpt).toBeDefined()
     expect((acceptOpt as any)?.effectPreview).toEqual({
       kind: 'resourceExchange',
@@ -251,10 +251,10 @@ describe('D161_CabbageBuyer session', () => {
 
     resp = walkPlayerSwitch(session, resp)
 
-    expect(resp.pending.type).toBe('choice')
-    expect(resp.pending.playerIndex).toBe(0)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.playerIndex).toBe(0)
 
-    const acceptOpt = resp.pending.options?.find((o) => o.value !== '__skip__')
+    const acceptOpt = resp.interaction.options?.find((o) => o.value !== '__skip__')
     expect(acceptOpt).toBeDefined()
     resp = session.resolveChoice(0, acceptOpt!.value)
 
@@ -280,10 +280,10 @@ describe('D161_CabbageBuyer session', () => {
     resp = buildMinor(session, 1, resp, 'A55_JunkRoom')
     resp = walkPlayerSwitch(session, resp)
 
-    expect(resp.pending.type).toBe('choice')
-    expect(resp.pending.playerIndex).toBe(0)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.playerIndex).toBe(0)
 
-    const acceptOpt = resp.pending.options?.find((o) => o.value !== '__skip__')
+    const acceptOpt = resp.interaction.options?.find((o) => o.value !== '__skip__')
     expect(acceptOpt).toBeDefined()
     resp = session.resolveChoice(0, acceptOpt!.value)
 
@@ -310,10 +310,10 @@ describe('D161_CabbageBuyer session', () => {
     resp = walkPlayerSwitch(session, resp)
 
     // D161 offer should be presented for p0
-    expect(resp.pending.type).toBe('choice')
-    expect(resp.pending.playerIndex).toBe(0)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.playerIndex).toBe(0)
 
-    const acceptOpt = resp.pending.options?.find((o) => o.value !== '__skip__')
+    const acceptOpt = resp.interaction.options?.find((o) => o.value !== '__skip__')
     expect(acceptOpt).toBeDefined()
     resp = session.resolveChoice(0, acceptOpt!.value)
 
@@ -356,21 +356,21 @@ describe('D161_CabbageBuyer session', () => {
     // Walk through any intermediate choices / player switches
     let safety = 15
     while (
-      (resp.pending.type === 'choice' || resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') &&
+      (resp.interaction.stateId === 'wait' || resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') &&
       safety-- > 0
     ) {
       if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
         resp = confirmPlayerSwitch(session)
         continue
       }
-      const opts = resp.pending.options ?? []
+      const opts = resp.interaction.options ?? []
       const skipOpt = opts.find((o) => o.value === '__skip__')
       if (skipOpt) {
-        resp = session.resolveChoice(resp.pending.playerIndex, '__skip__')
+        resp = session.resolveChoice(resp.interaction.playerIndex, '__skip__')
       } else {
         const first = opts[0]
         if (!first) break
-        resp = session.resolveChoice(resp.pending.playerIndex, first.value)
+        resp = session.resolveChoice(resp.interaction.playerIndex, first.value)
       }
     }
 
@@ -395,11 +395,11 @@ describe('D161_CabbageBuyer session', () => {
     }
 
     // p0 cannot afford cost=3, so no offer should appear
-    if (resp.pending.type === 'choice') {
+    if (resp.interaction.stateId === 'wait') {
       // Ensure it's not the D161 offer for p0 (which would be optional with pay + vegetable)
       // A D161 offer would be for playerIndex=0 with a non-skip option that leads to food payment
       // If playerIndex=1, that would be from something else (shouldn't happen after skip)
-      expect(resp.pending.playerIndex).not.toBe(0)
+      expect(resp.interaction.playerIndex).not.toBe(0)
     }
 
     const after = session.getState().state
@@ -420,8 +420,8 @@ describe('D161_CabbageBuyer session', () => {
     resp = walkPlayerSwitch(session, resp)
 
     // Should be the D161 offer for p0
-    expect(resp.pending.type).toBe('choice')
-    expect(resp.pending.playerIndex).toBe(0)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.playerIndex).toBe(0)
 
     // Decline (pick __skip__)
     resp = session.resolveChoice(0, '__skip__')
@@ -448,9 +448,9 @@ describe('D161_CabbageBuyer session', () => {
 
     // No D161 offer should appear — pending should be 'none' or 'confirmNextPlayer'
     // (end-of-turn transition) but NOT a choice for p0 (D161 offer).
-    if (resp.pending.type === 'choice') {
+    if (resp.interaction.stateId === 'wait') {
       // If there's a choice, it should not be an offer for p0
-      expect(resp.pending.playerIndex).not.toBe(0)
+      expect(resp.interaction.playerIndex).not.toBe(0)
     } else {
       // Either 'none' or 'confirmNextPlayer' — both mean no D161 offer was presented
       expect(['none', 'confirmNextPlayer']).toContain(resp.pending.type)

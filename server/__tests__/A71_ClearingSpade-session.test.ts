@@ -52,16 +52,16 @@ describe('A71_ClearingSpade session', () => {
     // Step 1: take anytime action — first selection choice
     let resp = session.takeAnytimeAction(0, 'A71-clearing-spade-anytime')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') throw new Error('expected choice')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected choice')
 
     // Select the source field (0-2) which has grain remaining=3
     resp = session.resolveChoice(0, '0-2')
     expect(resp.ok).toBe(true)
 
     // Step 2: second selection choice for target
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') throw new Error('expected choice')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected choice')
 
     // Select the target field (0-3) which is empty
     resp = session.resolveChoice(0, '0-3')
@@ -112,12 +112,12 @@ describe('A71_ClearingSpade session', () => {
 
     let resp = session.takeAnytimeAction(0, 'A71-clearing-spade-anytime')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
 
     // Select source
     resp = session.resolveChoice(0, '0-2')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
 
     // Select target
     resp = session.resolveChoice(0, '0-3')

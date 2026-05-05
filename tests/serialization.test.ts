@@ -135,10 +135,10 @@ describe('shared/game/serialization', () => {
 
       let resp = session.takeAction(0, 'farm-expansion')
       expect(resp.ok).toBe(true)
-      expect(resp.pending.type).toBe('choice')
-      if (resp.pending.type !== 'choice') return
+      expect(resp.interaction.stateId).toBe('wait')
+      if (resp.interaction.stateId !== 'wait') return
 
-      const constructOption = resp.pending.options.find(
+      const constructOption = resp.interaction.options?.find(
         (option) => option.labelKey === 'actions.construct.name',
       )
       expect(constructOption).toBeDefined()

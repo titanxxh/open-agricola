@@ -44,7 +44,7 @@ describe('E85_MasterTanner session', () => {
 
     let resp = session.takeAnytimeAction(0, 'exchange')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
 
     // Cook 2 boar (Fireplace trade index 1 = boar->2food)
     resp = session.resolveChoice(0, 'bulk:1=2')

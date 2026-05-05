@@ -48,7 +48,7 @@ describe('B26_AgrarianFences session', () => {
     const resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
     // Normal grain-utilization: or(sow, bake-bread) — presents sow and bake choices
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
   })
 
   it('with the card, grain-utilization offers fence-related alternatives for sow', () => {
@@ -56,10 +56,10 @@ describe('B26_AgrarianFences session', () => {
     const resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
     // The sow action should be replaced with XOR(fence, sow+fence, sow)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     // Should have more options than just normal sow/bake
-    expect(resp.pending.options.length).toBeGreaterThanOrEqual(2)
+    expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)
   })
 
   it('without enough wood for fencing and no seeds, grain-utilization with card still works with bake', () => {
@@ -81,9 +81,9 @@ describe('B26_AgrarianFences session', () => {
 
     const resp = session.takeAction(0, 'cultivation')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type !== 'choice') return
+    if (resp.interaction.stateId !== 'wait') return
     // Cultivation should not have fence options — B26 only affects grain-utilization
-    const optionValues = resp.pending.options.map((o) => o.value)
+    const optionValues = resp.interaction.options?.map((o) => o.value)
     const hasFenceOption = optionValues.some((v) => v.includes('fence'))
     expect(hasFenceOption).toBe(false)
   })

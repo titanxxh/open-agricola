@@ -18,10 +18,10 @@ describe('C60_SmallPottersOven server session', () => {
 
     let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    const c60Option = resp.pending.options.find(
+    const c60Option = resp.interaction.options?.find(
       (option) => option.value === 'minor:C60_SmallPottersOven',
     )
     expect(c60Option).toBeDefined()

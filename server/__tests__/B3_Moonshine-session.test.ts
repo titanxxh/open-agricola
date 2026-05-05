@@ -67,7 +67,7 @@ const playB3 = (session: GameSession) => {
   const mpResp = session.takeAction(0, 'meeting-place')
   expect(mpResp.ok).toBe(true)
   // meeting-place offers a choice of available minor improvements
-  expect(mpResp.pending.type).toBe('choice')
+  expect(mpResp.interaction.stateId).toBe('wait')
   // Choose to play B3_Moonshine
   return session.resolveChoice(0, `minor:${CARD_ID}`)
 }
@@ -83,14 +83,14 @@ describe('B3_Moonshine session', () => {
 
     expect(resp.ok).toBe(true)
     // TARGET: B3 should emit a pending choice, not auto-resolve
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // The choice should be attributed to B3
-    expect(resp.pending.sourceCard).toBe(CARD_ID)
+    expect(resp.interaction.sourceCard).toBe(CARD_ID)
 
     // Options must include exactly 'play' and 'pass'
-    const optionValues = resp.pending.options.map((o) => o.value).sort()
+    const optionValues = resp.interaction.options?.map((o) => o.value).sort()
     expect(optionValues).toEqual(['pass', 'play'])
 
     // The random pick should be cached in cardStates
@@ -114,8 +114,8 @@ describe('B3_Moonshine session', () => {
 
     const b3Resp = playB3(session)
     // TARGET: pending choice should be emitted first
-    expect(b3Resp.pending.type).toBe('choice')
-    if (b3Resp.pending.type !== 'choice') return
+    expect(b3Resp.interaction.stateId).toBe('wait')
+    if (b3Resp.interaction.stateId !== 'wait') return
 
     const pickedOcc = b3Resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.occ as string | undefined
     expect(pickedOcc).toBeDefined()
@@ -139,8 +139,8 @@ describe('B3_Moonshine session', () => {
     const session = makeSession({ food: 3 })
 
     const b3Resp = playB3(session)
-    expect(b3Resp.pending.type).toBe('choice')
-    if (b3Resp.pending.type !== 'choice') return
+    expect(b3Resp.interaction.stateId).toBe('wait')
+    if (b3Resp.interaction.stateId !== 'wait') return
 
     const pickedOcc = b3Resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.occ as string | undefined
     expect(pickedOcc).toBeDefined()
@@ -167,10 +167,10 @@ describe('B3_Moonshine session', () => {
 
     const b3Resp = playB3(session)
     // TARGET: still emits a choice, but 'play' is disabled
-    expect(b3Resp.pending.type).toBe('choice')
-    if (b3Resp.pending.type !== 'choice') return
+    expect(b3Resp.interaction.stateId).toBe('wait')
+    if (b3Resp.interaction.stateId !== 'wait') return
 
-    const playOption = b3Resp.pending.options.find((o) => o.value === 'play')
+    const playOption = b3Resp.interaction.options?.find((o) => o.value === 'play')
     expect(playOption).toBeDefined()
     expect(playOption?.disabled).toBe(true)
 
@@ -215,8 +215,8 @@ describe('B3_Moonshine session', () => {
     session.loadState(state)
 
     const b3Resp = playB3(session)
-    expect(b3Resp.pending.type).toBe('choice')
-    if (b3Resp.pending.type !== 'choice') return
+    expect(b3Resp.interaction.stateId).toBe('wait')
+    if (b3Resp.interaction.stateId !== 'wait') return
 
     const pickedOcc = b3Resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.occ as string | undefined
     expect(pickedOcc).toBeDefined()
@@ -242,9 +242,9 @@ describe('B3_Moonshine session', () => {
     const resp2 = playB3(session2)
 
     // Both must produce a pending choice (target behavior)
-    expect(resp1.pending.type).toBe('choice')
-    expect(resp2.pending.type).toBe('choice')
-    if (resp1.pending.type !== 'choice' || resp2.pending.type !== 'choice') return
+    expect(resp1.interaction.stateId).toBe('wait')
+    expect(resp2.interaction.stateId).toBe('wait')
+    if (resp1.interaction.stateId !== 'wait' || resp2.interaction.stateId !== 'wait') return
 
     const pick1 = resp1.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.occ
     const pick2 = resp2.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.occ
@@ -263,8 +263,8 @@ describe('B3_Moonshine session', () => {
 
     const b3Resp = playB3(session)
     // TARGET: pending choice emitted after roll
-    expect(b3Resp.pending.type).toBe('choice')
-    if (b3Resp.pending.type !== 'choice') return
+    expect(b3Resp.interaction.stateId).toBe('wait')
+    if (b3Resp.interaction.stateId !== 'wait') return
 
     // The cached pick must be set
     const pickBefore = b3Resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.occ
@@ -306,12 +306,12 @@ describe('B3_Moonshine session', () => {
 
     const mpResp = session.takeAction(0, 'meeting-place')
     expect(mpResp.ok).toBe(true)
-    expect(mpResp.pending.type).toBe('choice')
+    expect(mpResp.interaction.stateId).toBe('wait')
 
     const b3Resp = session.resolveChoice(0, `minor:${CARD_ID}`)
     // TARGET: must emit {play, pass} choice
-    expect(b3Resp.pending.type).toBe('choice')
-    if (b3Resp.pending.type !== 'choice') return
+    expect(b3Resp.interaction.stateId).toBe('wait')
+    if (b3Resp.interaction.stateId !== 'wait') return
 
     // The pick must be OCC_B since it's the only occupation in hand
     const pickedOcc = b3Resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.occ

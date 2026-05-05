@@ -36,23 +36,23 @@ describe('A123_FrameBuilder renovation choice repro', () => {
     expect(resp.ok).toBe(true)
 
     // Skip the renovation-target choice if presented (wood→clay only option).
-    if (resp.pending.type === 'choice' && resp.pending.promptKey === 'ui.interactionChooseRenovationTarget') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionChooseRenovationTarget') {
       resp = session.resolveChoice(0, 'clay')
     }
 
     // After renovation target resolution, we expect a payment-choice pending.
     // Currently (bug): this auto-picks direct path and skips the prompt.
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.promptKey).toBe('prompt.selectPayment')
-    expect(resp.pending.options.length).toBeGreaterThanOrEqual(2)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
+    expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)
 
     // Confirm both options are present.
     type PaymentLabel = {
       resourcesPaid?: Record<string, number>
       sourceCards?: string[]
     }
-    const labels = resp.pending.options.map(
+    const labels = resp.interaction.options?.map(
       (opt) => opt.labelParams as PaymentLabel | undefined,
     )
     const direct = labels.find(

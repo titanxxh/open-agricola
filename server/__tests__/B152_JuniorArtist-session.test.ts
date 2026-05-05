@@ -56,9 +56,9 @@ describe('B152_JuniorArtist session', () => {
     const session = setup({ withCard: true, food: 3, travelingPlayersFood: 2 })
     const resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    const hasSkip = resp.pending.options.some((o) => o.value === '__skip__')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const hasSkip = resp.interaction.options?.some((o) => o.value === '__skip__')
     expect(hasSkip).toBe(true)
   })
 
@@ -66,9 +66,9 @@ describe('B152_JuniorArtist session', () => {
     const session = setup({ withCard: true, food: 3, travelingPlayersFood: 2 })
     let resp = session.takeAction(0, 'day-laborer')
     const foodAfterDayLaborer = resp.state.players[0]!.resources.food
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    const accept = resp.pending.options.find((o) => o.value !== '__skip__')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const accept = resp.interaction.options?.find((o) => o.value !== '__skip__')
     expect(accept).toBeDefined()
     resp = session.resolveChoice(0, accept!.value)
     // pay-resources runs as the first step of the optional seq

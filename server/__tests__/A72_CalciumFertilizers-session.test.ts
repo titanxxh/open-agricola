@@ -171,15 +171,15 @@ describe('A72_CalciumFertilizers session', () => {
 
     // A72 fails prerequisite (has field tiles), so no minor improvement is offered.
     // The optional minor-improvement step is auto-skipped, going to confirmNextPlayer.
-    if (resp.pending.type === 'choice') {
+    if (resp.interaction.stateId === 'wait') {
       // If a choice is somehow presented, A72 should NOT be in the options
-      const a72Option = resp.pending.options.find(
+      const a72Option = resp.interaction.options?.find(
         (option) => option.value === CARD_ID,
       )
       expect(a72Option).toBeUndefined()
     } else {
       // Expected: the optional is auto-skipped because A72 is the only card and it fails prerequisite
-      expect(resp.pending.type).toBe('confirmNextPlayer')
+      expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     }
   })
 

@@ -31,7 +31,7 @@ describe('A150_Stagehand session', () => {
     const session = setup()
     const resp = session.takeAction(1, 'traveling-players')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('confirmPlayerSwitch')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-player-switch')
     if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch')) return
     expect(resp.pending.fromPlayerIndex).toBe(1)
     expect(resp.pending.toPlayerIndex).toBe(0)
@@ -50,14 +50,14 @@ describe('A150_Stagehand session', () => {
     })
 
     resp = confirmPlayerSwitch(session)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.playerIndex).toBe(0)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.playerIndex).toBe(0)
 
     // First choice: optional "do or skip" wrapping the XOR
     resp = session.resolveChoice(0, '__skip__')
     // Switch-back happens automatically (no choice follows), so we go straight to confirmNextPlayer
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 
   it('owner can choose Build Rooms (construct) from the XOR choice', () => {
@@ -71,11 +71,11 @@ describe('A150_Stagehand session', () => {
     })
 
     resp = confirmPlayerSwitch(session)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // One-step XOR: fence, stables, construct, skip
-    const xorOptions = resp.pending.options?.filter((o: ActionChoiceOption) => o.value !== '__skip__') ?? []
+    const xorOptions = resp.interaction.options?.filter((o: ActionChoiceOption) => o.value !== '__skip__') ?? []
     expect(xorOptions.length).toBe(3)
 
     // Choose construct (find it by label)
@@ -95,7 +95,7 @@ describe('A150_Stagehand session', () => {
     expect(resp.state.players[0]!.rooms).toBe(3)
 
     // Switch-back happens automatically (no choice follows), so we go straight to confirmNextPlayer
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 
   it('does not trigger when owner uses traveling-players', () => {

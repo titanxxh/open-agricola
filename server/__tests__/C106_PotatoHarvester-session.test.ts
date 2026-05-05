@@ -101,14 +101,14 @@ describe('C106_PotatoHarvester session', () => {
     let resp = session.performRoundEnd()
 
     // Walk through pending states
-    while (resp.pending.type === 'choice') {
-      resp = session.resolveChoice(resp.pending.playerIndex, 'ok')
+    while (resp.interaction.stateId === 'wait') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'ok')
     }
     while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
     }
-    while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones as any)
+    while (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones as any)
     }
 
     const player = resp.state.players[0]!
@@ -129,10 +129,10 @@ describe('C106_PotatoHarvester session', () => {
     let resp = session.performRoundEnd()
 
     while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
     }
-    while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones as any)
+    while (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones as any)
     }
 
     const player = resp.state.players[0]!

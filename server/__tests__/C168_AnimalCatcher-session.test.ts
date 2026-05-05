@@ -47,9 +47,9 @@ const setup = (options?: { round?: number; food?: number }) => {
 const drainPending = (session: GameSession, resp: ReturnType<GameSession['getState']>) => {
   let safety = 30
   while (safety-- > 0) {
-    if (resp.pending.type === 'choice') {
-      const playerIdx = resp.pending.playerIndex ?? 0
-      resp = session.resolveChoice(playerIdx, resp.pending.options[0]!.value)
+    if (resp.interaction.stateId === 'wait') {
+      const playerIdx = resp.interaction.playerIndex ?? 0
+      resp = session.resolveChoice(playerIdx, resp.interaction.options[0]!.value)
     } else if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     } else {
@@ -65,9 +65,9 @@ describe('C168_AnimalCatcher session', () => {
 
     const resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.options.length).toBeGreaterThanOrEqual(2)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)
   })
 
   it('choosing animals gives sheep, boar, cattle and costs food', () => {
@@ -75,11 +75,11 @@ describe('C168_AnimalCatcher session', () => {
 
     let resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // Choose alternative (first option = animal path)
-    resp = session.resolveChoice(0, resp.pending.options[0]!.value)
+    resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
     expect(resp.ok).toBe(true)
 
     resp = drainPending(session, resp)
@@ -95,11 +95,11 @@ describe('C168_AnimalCatcher session', () => {
 
     let resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // Choose original gain (last option)
-    const lastOption = resp.pending.options[resp.pending.options.length - 1]!
+    const lastOption = resp.interaction.options[resp.interaction.options?.length - 1]!
     resp = session.resolveChoice(0, lastOption.value)
     expect(resp.ok).toBe(true)
 
@@ -114,11 +114,11 @@ describe('C168_AnimalCatcher session', () => {
 
     let resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
     // Choose alternative (first option)
-    resp = session.resolveChoice(0, resp.pending.options[0]!.value)
+    resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
     expect(resp.ok).toBe(true)
 
     resp = drainPending(session, resp)

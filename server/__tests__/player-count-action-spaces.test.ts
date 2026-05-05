@@ -108,9 +108,9 @@ describe('3P resource-market XOR choice', () => {
 
     const resp = session.takeAction(0, 'resource-market')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type === 'choice') {
-      expect(resp.pending.options).toHaveLength(2)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId === 'wait') {
+      expect(resp.interaction.options).toHaveLength(2)
     }
   })
 
@@ -124,10 +124,10 @@ describe('3P resource-market XOR choice', () => {
     session.loadState(state)
 
     const resp = session.takeAction(0, 'resource-market')
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     // First option is reed+food (action-gain-0)
-    const resp2 = session.resolveChoice(0, resp.pending.options[0]!.value)
+    const resp2 = session.resolveChoice(0, resp.interaction.options[0]!.value)
     expect(resp2.ok).toBe(true)
     expect(resp2.state.players[0]!.resources.reed).toBe(reedBefore + 1)
     expect(resp2.state.players[0]!.resources.food).toBe(foodBefore + 1)
@@ -143,10 +143,10 @@ describe('3P resource-market XOR choice', () => {
     session.loadState(state)
 
     const resp = session.takeAction(0, 'resource-market')
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     // Second option is stone+food (action-gain-1)
-    const resp2 = session.resolveChoice(0, resp.pending.options[1]!.value)
+    const resp2 = session.resolveChoice(0, resp.interaction.options[1]!.value)
     expect(resp2.ok).toBe(true)
     expect(resp2.state.players[0]!.resources.stone).toBe(stoneBefore + 1)
     expect(resp2.state.players[0]!.resources.food).toBe(foodBefore + 1)
@@ -165,8 +165,8 @@ describe('3P lessons-3 cost', () => {
 
     const resp = session.takeAction(0, 'lessons-3')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type === 'choice') {
-      const occId = resp.pending.options[0]!.value
+    if (resp.interaction.stateId === 'wait') {
+      const occId = resp.interaction.options[0]!.value
       const resp2 = session.resolveChoice(0, occId)
       expect(resp2.ok).toBe(true)
       // Should have paid 2 food (started with 5)

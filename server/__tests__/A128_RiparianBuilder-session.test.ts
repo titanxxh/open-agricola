@@ -37,7 +37,7 @@ describe('A128_RiparianBuilder session', () => {
     const session = setup()
     const resp = session.takeAction(1, 'reed-bank')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('confirmPlayerSwitch')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-player-switch')
     if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch')) return
     expect(resp.pending.fromPlayerIndex).toBe(1)
     expect(resp.pending.toPlayerIndex).toBe(0)
@@ -62,13 +62,13 @@ describe('A128_RiparianBuilder session', () => {
     })
 
     resp = confirmPlayerSwitch(session)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.playerIndex).toBe(0)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.playerIndex).toBe(0)
 
     resp = session.resolveChoice(0, '__skip__')
     // Switch-back happens automatically (no choice follows), so we go straight to confirmNextPlayer
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 
   it('limits the granted construct to one room and switches back after building', () => {
@@ -82,11 +82,11 @@ describe('A128_RiparianBuilder session', () => {
     })
 
     resp = confirmPlayerSwitch(session)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
 
     // Choose to construct
-    const constructOption = resp.pending.type === 'choice'
-      ? resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const constructOption = resp.interaction.stateId === 'wait'
+      ? resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
       : undefined
     expect(constructOption).toBeDefined()
     resp = session.resolveChoice(0, constructOption!.value)
@@ -106,7 +106,7 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.state.players[1]!.rooms).toBe(2)
 
     // Switch-back happens automatically (no choice follows), so we go straight to confirmNextPlayer
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 
   it('marks the gifted construct as non-trueAction for later listeners', () => {
@@ -116,13 +116,13 @@ describe('A128_RiparianBuilder session', () => {
     session.loadState(state)
 
     let resp = session.takeAction(1, 'reed-bank')
-    expect(resp.pending.type).toBe('confirmPlayerSwitch')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-player-switch')
 
     resp = confirmPlayerSwitch(session)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    const constructOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const constructOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(constructOption).toBeDefined()
     resp = session.resolveChoice(0, constructOption!.value)
     expect(resp.interaction.stateId).toBe('wait')
@@ -145,21 +145,21 @@ describe('A128_RiparianBuilder session', () => {
     session.loadState(state)
 
     let resp = session.takeAction(1, 'reed-bank')
-    expect(resp.pending.type).toBe('confirmPlayerSwitch')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-player-switch')
 
     resp = confirmPlayerSwitch(session)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.sourceCard).toBe(CARD_ID)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.sourceCard).toBe(CARD_ID)
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
 
-    const constructOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const constructOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(constructOption).toBeDefined()
     resp = session.resolveChoice(0, constructOption!.value)
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.sourceCard).toBe(CARD_ID)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.sourceCard).toBe(CARD_ID)
     expect(resp.interaction.stateId).toBe('wait')
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
     if (resp.interaction.stateId !== 'wait') return
@@ -170,12 +170,12 @@ describe('A128_RiparianBuilder session', () => {
     const room = resp.interaction.farm.selectableTiles[0]!
     resp = session.resolveChoice(0, 'confirm', { rooms: [room] })
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.promptKey).toBe('prompt.selectPayment')
-    expect(resp.pending.sourceCard).toBe(CARD_ID)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
+    expect(resp.interaction.sourceCard).toBe(CARD_ID)
     expect(resp.interaction.stateId).toBe('wait')
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
-    expect(resp.pending.options).toHaveLength(2)
+    expect(resp.interaction.options).toHaveLength(2)
   })
 })

@@ -187,8 +187,8 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
   ) => {
     let resp = initial
     for (let i = 0; i < 5; i++) {
-      if (resp.pending.type !== 'choice') break
-      const accept = resp.pending.options.find((o) => o.value !== '__skip__')
+      if (resp.interaction.stateId !== 'wait') break
+      const accept = resp.interaction.options?.find((o) => o.value !== '__skip__')
       if (accept?.sourceCard === 'A92_AdoptiveParents') break
       resp = session.resolveChoice(0, '__skip__')
       expect(resp.ok).toBe(true)
@@ -207,11 +207,11 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
 
     // Step 2: drain to A92's offer.
     const a92Resp = advanceToA92Offer(session, fgResp)
-    expect(a92Resp.pending.type).toBe('choice')
-    if (a92Resp.pending.type !== 'choice') return
+    expect(a92Resp.interaction.stateId).toBe('wait')
+    if (a92Resp.interaction.stateId !== 'wait') return
 
     // Step 3: accept the A92 optional offer (pay 1 food to grow child as adult + extra placement).
-    const acceptOption = a92Resp.pending.options.find((o) => o.value !== '__skip__')
+    const acceptOption = a92Resp.interaction.options?.find((o) => o.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     expect(acceptOption!.sourceCard).toBe('A92_AdoptiveParents')
     if (!acceptOption) return
@@ -222,7 +222,7 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
     // The newborn→adult conversion fires in immediatelyAfter gain (after pay-resources runs).
     // At this point worker3 should be adult, FG space should have only 1 ref.
     // The extra place-farmer presents a space-selection choice.
-    expect(afterAcceptResp.pending.type).toBe('choice')
+    expect(afterAcceptResp.interaction.stateId).toBe('wait')
 
     const p1Mid = afterAcceptResp.state.players[0]!
     const worker3Mid = p1Mid.workers.find((w) => w.id === '3')
@@ -241,8 +241,8 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
     expect(p1Mid.resources.food).toBe(4)
 
     // Step 4: resolve the extra place-farmer space selection to complete the action.
-    if (afterAcceptResp.pending.type !== 'choice') return
-    const placeOption = afterAcceptResp.pending.options.find((o) => o.value !== '__skip__')
+    if (afterAcceptResp.interaction.stateId !== 'wait') return
+    const placeOption = afterAcceptResp.interaction.options?.find((o) => o.value !== '__skip__')
     if (placeOption) {
       const finalResp = session.resolveChoice(0, placeOption.value)
       expect(finalResp.ok).toBe(true)
@@ -258,7 +258,7 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
 
     // Step 2: drain to A92's offer, then skip it.
     const a92Resp = advanceToA92Offer(session, fgResp)
-    const skipResp = a92Resp.pending.type === 'choice'
+    const skipResp = a92Resp.interaction.stateId === 'wait'
       ? session.resolveChoice(0, '__skip__')
       : a92Resp
     expect(skipResp.ok).toBe(true)

@@ -56,16 +56,16 @@ describe('D72_StableManure session', () => {
 
     let resp = session.performRoundEnd()
     // First: optional accept/skip
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') throw new Error('expected choice')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected choice')
 
-    const acceptOption = resp.pending.options.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const acceptOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
 
     // Second: selection choice
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') throw new Error('expected selection choice')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
 
     // Select grain at 0-0 and vegetable at 0-1
     resp = session.resolveChoice(0, '0-0,0-1')
@@ -73,10 +73,10 @@ describe('D72_StableManure session', () => {
 
     // Continue through harvest phases
     while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
     }
-    while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones)
+    while (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
     }
 
     const p = resp.state.players[0]!
@@ -91,26 +91,26 @@ describe('D72_StableManure session', () => {
     const { session } = setupHarvest(1)
 
     let resp = session.performRoundEnd()
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') throw new Error('expected choice')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected choice')
 
-    const acceptOption = resp.pending.options.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    const acceptOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     resp = session.resolveChoice(0, acceptOption!.value)
 
     // selection with maxSelections: 1
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') throw new Error('expected selection choice')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
 
     resp = session.resolveChoice(0, '0-0')
     expect(resp.ok).toBe(true)
 
     // Continue through harvest
     while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
     }
-    while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones)
+    while (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
     }
 
     const p = resp.state.players[0]!
@@ -123,10 +123,10 @@ describe('D72_StableManure session', () => {
 
     const resp = session.performRoundEnd()
     // Should not offer Stable Manure optional
-    if (resp.pending.type === 'choice') {
+    if (resp.interaction.stateId === 'wait') {
       // If there's a choice, it shouldn't be the Stable Manure optional
       // (it could be another card's choice)
-      expect(resp.pending.promptKey).not.toBe('ui.interactionOptionalAction')
+      expect(resp.interaction.promptKey).not.toBe('ui.interactionOptionalAction')
     }
   })
 
@@ -149,8 +149,8 @@ describe('D72_StableManure session', () => {
 
     session.loadState(state)
     const resp = session.performRoundEnd()
-    if (resp.pending.type === 'choice') {
-      expect(resp.pending.promptKey).not.toBe('ui.interactionOptionalAction')
+    if (resp.interaction.stateId === 'wait') {
+      expect(resp.interaction.promptKey).not.toBe('ui.interactionOptionalAction')
     }
   })
 })

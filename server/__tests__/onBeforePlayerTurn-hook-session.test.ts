@@ -47,7 +47,7 @@ describe('onBeforePlayerTurn hook (game-core skip-turn dispatch)', () => {
 
     let resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
 
     resp = confirmNextPlayer(session)
     expect(resp.ok).toBe(true)

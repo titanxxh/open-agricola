@@ -173,7 +173,7 @@ describe('A85_Homekeeper session', () => {
 
     const loaded = session.getState()
     expect(loaded.ok).toBe(true)
-    expect(loaded.pending.type).toBe('none')
+    expect(loaded.interaction.stateId).not.toBe('wait')
     expect(loaded.actionAvailability?.['wish-children']).toBe(true)
 
     const resp = session.takeAction(0, 'wish-children')

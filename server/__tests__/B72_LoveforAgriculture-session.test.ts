@@ -80,7 +80,7 @@ describe('B72_LoveforAgriculture session', () => {
       expect(resp.ok).toBe(true)
       // Choose sow
       expect(resp.ok).toBe(true)
-      expect(resp.pending.type).toBe('choice')
+      expect(resp.interaction.stateId).toBe('wait')
       expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
       expect(resp.interaction.stateId).toBe('wait')
 
@@ -226,7 +226,7 @@ describe('B72_LoveforAgriculture session', () => {
       const resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
       expect(resp.ok).toBe(true)
-      expect(resp.pending.type).toBe('choice')
+      expect(resp.interaction.stateId).toBe('wait')
       expect((resp.pending as Extract<PendingAction, { type: 'choice' }>).promptKey).toBe('ui.interactionSowSelect')
 
       // Should only show the pasture tile as sowable

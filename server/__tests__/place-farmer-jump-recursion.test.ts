@@ -29,8 +29,8 @@ describe('A→A self-jump recursion guard', () => {
 
     let resp = session.takeAction(0, 'farm-expansion')
     let safety = 30
-    while (safety-- > 0 && resp.pending.type === 'choice') {
-      const opts = resp.pending.options ?? []
+    while (safety-- > 0 && resp.interaction.stateId === 'wait') {
+      const opts = resp.interaction.options ?? []
       // accept any non-skip option (drives Swagman accept on first prompt; afterwards
       // skips remaining optional follow-ups; mandatory choices fall through to first opt)
       const skip = opts.find(o => o.value === '__skip__')
@@ -75,8 +75,8 @@ describe('A→A self-jump recursion guard', () => {
     const { session } = setup2P('A129_Swagman')
     let resp = session.takeAction(0, 'grain-seeds')
     let safety = 30
-    while (safety-- > 0 && resp.pending.type === 'choice') {
-      const opts = resp.pending.options ?? []
+    while (safety-- > 0 && resp.interaction.stateId === 'wait') {
+      const opts = resp.interaction.options ?? []
       const skip = opts.find(o => o.value === '__skip__')
       const cancel = opts.find(o => o.value === 'cancel')
       const swagmanOpt = opts.find(o => o.sourceCard === 'A129_Swagman')
@@ -113,8 +113,8 @@ describe('place-farmer jump runs full ActionNode path (parity smoke)', () => {
     let resp = session.takeAction(0, 'farm-expansion')
     let safety = 25
     let majorPromptSeen = false
-    while (safety-- > 0 && resp.pending.type === 'choice') {
-      const opts = resp.pending.options ?? []
+    while (safety-- > 0 && resp.interaction.stateId === 'wait') {
+      const opts = resp.interaction.options ?? []
       // Detect the major-improvement buy prompt by looking for option values prefixed with `major:`.
       if (opts.some(o => /^major:/.test(o.value))) {
         majorPromptSeen = true

@@ -37,10 +37,10 @@ describe('B94_StockProtector session', () => {
       extraWood: 0,
     })
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    expect(resp.pending.promptKey).toBe('ui.interactionStockProtectorPlace')
-    expect(resp.pending.sourceCard).toBe(CARD_ID)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('ui.interactionStockProtectorPlace')
+    expect(resp.interaction.sourceCard).toBe(CARD_ID)
     expect(resp.interaction.stateId).toBe('wait')
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
   })

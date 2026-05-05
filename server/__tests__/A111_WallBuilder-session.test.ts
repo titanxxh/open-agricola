@@ -29,8 +29,8 @@ describe('A111_WallBuilder session', () => {
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
     // farm-expansion OR between construct & stables with both resources present.
-    if (resp.pending.type === 'choice') {
-      const constructOption = resp.pending.options.find(
+    if (resp.interaction.stateId === 'wait') {
+      const constructOption = resp.interaction.options?.find(
         (o) => o.labelKey === 'actions.construct.name',
       )
       expect(constructOption).toBeDefined()
@@ -71,8 +71,8 @@ describe('A111_WallBuilder session', () => {
 
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
-    if (resp.pending.type === 'choice') {
-      const constructOption = resp.pending.options.find(
+    if (resp.interaction.stateId === 'wait') {
+      const constructOption = resp.interaction.options?.find(
         (o) => o.labelKey === 'actions.construct.name',
       )
       resp = session.resolveChoice(0, constructOption!.value)

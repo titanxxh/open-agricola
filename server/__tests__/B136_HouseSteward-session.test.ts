@@ -26,8 +26,8 @@ const setupSession = (round: number) => {
 const playOccupation = (session: GameSession) => {
   const resp = session.takeAction(0, 'lessons')
   expect(resp.ok).toBe(true)
-  if (resp.pending.type === 'choice') {
-    const option = resp.pending.options?.find((entry) => entry.value === CARD_ID)
+  if (resp.interaction.stateId === 'wait') {
+    const option = resp.interaction.options?.find((entry) => entry.value === CARD_ID)
     expect(option).toBeDefined()
     return session.resolveChoice(0, option!.value)
   }

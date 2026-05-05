@@ -50,11 +50,11 @@ describe('A126 MasterWorkman integration', () => {
 
     const resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
 
-    expect(resp.pending.promptKey).toBe('ui.interactionPlowSelect')
-    expect(resp.pending.options).toEqual([
+    expect(resp.interaction.promptKey).toBe('ui.interactionPlowSelect')
+    expect(resp.interaction.options).toEqual([
       { value: 'confirm', labelKey: 'ui.interactionPlowConfirm' },
       { value: 'cancel', labelKey: 'ui.interactionPlowCancel' },
     ])

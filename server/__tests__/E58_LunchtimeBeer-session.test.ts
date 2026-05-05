@@ -29,15 +29,15 @@ const drainHarvest = (session: GameSession) => {
   let resp = session.performRoundEnd()
   while (resp.interaction.stateId === 'wait') {
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
-    } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
+    } else if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
       const interaction = resp.interaction.stateId === 'wait' ? resp.interaction : null
-      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', interaction?.zones ?? [])
-    } else if (resp.pending.type === 'choice') {
-      const opts = resp.pending.options ?? []
+      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', interaction?.zones ?? [])
+    } else if (resp.interaction.stateId === 'wait') {
+      const opts = resp.interaction.options ?? []
       const next = opts.find((o) => o.value === '__skip__') ?? opts[0]
       if (!next) break
-      resp = session.resolveChoice(resp.pending.playerIndex ?? 0, next.value)
+      resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, next.value)
     } else {
       break
     }
@@ -122,10 +122,10 @@ describe('E58_LunchtimeBeer harvest-phase skip integration', () => {
 
     let resp = session.performRoundEnd()
     // First we should see an optional SEQ choice from E58 onStartHarvest.
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     // Accept (non-__skip__) — there should be exactly one accept option.
-    const accept = resp.pending.options!.find((o) => o.value !== '__skip__')!
+    const accept = resp.interaction.options!.find((o) => o.value !== '__skip__')!
     resp = session.resolveChoice(0, accept.value)
 
     // Drain remaining feed/reorg prompts to finish the harvest cycle.
@@ -154,9 +154,9 @@ describe('E58_LunchtimeBeer harvest-phase skip integration', () => {
     session.loadState(state)
 
     let resp = session.performRoundEnd()
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    const skip = resp.pending.options!.find((o) => o.value === '__skip__')!
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const skip = resp.interaction.options!.find((o) => o.value === '__skip__')!
     resp = session.resolveChoice(0, skip.value)
 
     resp = drainHarvest(session)
@@ -199,10 +199,10 @@ describe('E58_LunchtimeBeer harvest-phase skip integration', () => {
     session.loadState(state)
 
     let resp = session.performRoundEnd()
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     // Decline — confirm reap still fires (no stale-flag skip).
-    const skip = resp.pending.options!.find((o) => o.value === '__skip__')!
+    const skip = resp.interaction.options!.find((o) => o.value === '__skip__')!
     resp = session.resolveChoice(0, skip.value)
     resp = drainHarvest(session)
 
@@ -222,9 +222,9 @@ describe('E58_LunchtimeBeer harvest-phase skip integration', () => {
 
     let resp = session.performRoundEnd()
     // E58 prompt for P1 first (start player).
-    expect(resp.pending.type).toBe('choice')
-    if (resp.pending.type !== 'choice') return
-    const accept = resp.pending.options!.find((o) => o.value !== '__skip__')!
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const accept = resp.interaction.options!.find((o) => o.value !== '__skip__')!
     resp = session.resolveChoice(0, accept.value)
     resp = drainHarvest(session)
 

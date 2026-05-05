@@ -62,8 +62,8 @@ describe('D160_Midwife session', () => {
     }
 
     // Handle minor improvement choice from wish-children flow (skip it)
-    if (resp.pending.type === 'choice') {
-      const skipOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+    if (resp.interaction.stateId === 'wait') {
+      const skipOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
       if (skipOption) {
         resp = session.resolveChoice(1, '__skip__')
       }
@@ -93,8 +93,8 @@ describe('D160_Midwife session', () => {
     }
 
     // Skip minor improvement
-    if (resp.pending.type === 'choice') {
-      const skipOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+    if (resp.interaction.stateId === 'wait') {
+      const skipOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
       if (skipOption) {
         resp = session.resolveChoice(0, '__skip__')
       }
@@ -123,8 +123,8 @@ describe('D160_Midwife session', () => {
     while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
     }
-    if (resp.pending.type === 'choice') {
-      const skipOption = resp.pending.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+    if (resp.interaction.stateId === 'wait') {
+      const skipOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
       if (skipOption) resp = session.resolveChoice(1, '__skip__')
     }
     while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {

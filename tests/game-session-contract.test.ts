@@ -13,7 +13,7 @@ describe('GameSession contract', () => {
     it('returns initial state with pending none', () => {
       const resp = session.getState()
       expect(resp.ok).toBe(true)
-      expect(resp.pending.type).toBe('none')
+      expect(resp.interaction.stateId).not.toBe('wait')
       expect(resp.historyLength).toBe(0)
       expect(resp.hasActionStartSnapshot).toBe(false)
       expect(resp.state.round).toBe(1)
@@ -123,7 +123,7 @@ describe('GameSession contract', () => {
       const resp = session.loadState(custom)
       expect(resp.ok).toBe(true)
       expect(resp.state.round).toBe(7)
-      expect(resp.pending.type).toBe('none')
+      expect(resp.interaction.stateId).not.toBe('wait')
     })
   })
 

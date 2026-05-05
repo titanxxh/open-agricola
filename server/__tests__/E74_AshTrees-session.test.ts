@@ -45,13 +45,13 @@ describe('E74_AshTrees session flow', () => {
     expect(direct?.doable).toBe(true)
 
     let resp = session.takeAction(0, 'fencing')
-    expect(resp.pending.type).toBe('choice')
-    expect(resp.pending.type === 'choice' ? resp.pending.promptKey : undefined)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionAshTrees')
-    if (resp.pending.type !== 'choice') {
+    if (resp.interaction.stateId !== 'wait') {
       throw new Error('expected Ash Trees choice')
     }
-    const useAll = resp.pending.options.find(
+    const useAll = resp.interaction.options?.find(
       (option) =>
         option.labelKey === 'ui.interactionAshTreesUseCount' &&
         option.labelParams?.count === 4,
@@ -94,11 +94,11 @@ describe('E74_AshTrees session flow', () => {
 
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
 
     // Select "use 3" to reserve freeFences=3
-    if (resp.pending.type !== 'choice') throw new Error('expected choice')
-    const useThree = resp.pending.options.find(
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected choice')
+    const useThree = resp.interaction.options?.find(
       (o) => o.labelParams?.count === 3,
     )
     expect(useThree).toBeDefined()

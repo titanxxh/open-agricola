@@ -76,7 +76,7 @@ describe('D156_RetailDealer session', () => {
     // Advance turn: p1 takes an action, then p0 gets another turn
     resp = confirmNextPlayer(session)
     resp = session.takeAction(1, 'grain-seeds')
-    if (resp.pending.type === 'choice') {
+    if (resp.interaction.stateId === 'wait') {
       resp = session.resolveChoice(1, '__skip__')
     }
     resp = confirmNextPlayer(session)

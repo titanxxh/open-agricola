@@ -119,7 +119,7 @@ describe('E161_ElderBaker session integration', () => {
   const enterMinorChoice = (session: GameSession) => {
     let resp = session.takeAction(0, 'meeting-place')
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     resp = session.resolveChoice(0, 'action-minor-improvement-1')
     return resp
   }
@@ -132,8 +132,8 @@ describe('E161_ElderBaker session integration', () => {
 
     const resp = enterMinorChoice(session)
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
-    const values = (resp.pending.options ?? []).map((o) => o.value)
+    expect(resp.interaction.stateId).toBe('wait')
+    const values = (resp.interaction.options ?? []).map((o) => o.value)
     expect(values).toContain(`major:${STONE_OVEN_ID}`)
   })
 
@@ -145,13 +145,13 @@ describe('E161_ElderBaker session integration', () => {
 
     let resp = enterMinorChoice(session)
     expect(resp.ok).toBe(true)
-    expect(resp.pending.type).toBe('choice')
+    expect(resp.interaction.stateId).toBe('wait')
     resp = session.resolveChoice(0, `major:${STONE_OVEN_ID}`)
 
     let steps = 0
-    while (resp.pending.type === 'choice' && steps < 20) {
+    while (resp.interaction.stateId === 'wait' && steps < 20) {
       steps++
-      const opts = resp.pending.options ?? []
+      const opts = resp.interaction.options ?? []
       const next =
         opts.find((o) => o.value !== '__skip__' && o.value !== 'cancel') ?? opts[0]
       if (!next) break
@@ -168,8 +168,8 @@ describe('E161_ElderBaker session integration', () => {
     session.loadState(state)
 
     const resp = enterMinorChoice(session)
-    if (!resp.ok || resp.pending.type !== 'choice') return
-    const values = (resp.pending.options ?? []).map((o) => o.value)
+    if (!resp.ok || resp.interaction.stateId !== 'wait') return
+    const values = (resp.interaction.options ?? []).map((o) => o.value)
     expect(values).not.toContain(`major:${STONE_OVEN_ID}`)
   })
 })

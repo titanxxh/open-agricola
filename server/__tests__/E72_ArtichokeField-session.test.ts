@@ -79,7 +79,7 @@ describe('E72_ArtichokeField session', () => {
       let resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
       expect(resp.ok).toBe(true)
-      expect(resp.pending.type).toBe('choice')
+      expect(resp.interaction.stateId).toBe('wait')
 
       // Sow grain into virtual card tile
       resp = session.resolveChoice(0, 'confirm', {
@@ -122,7 +122,7 @@ describe('E72_ArtichokeField session', () => {
       const resp = session.takeAction(0, 'grain-utilization')
       expect(resp.ok).toBe(true)
       expect(resp.ok).toBe(true)
-      expect(resp.pending.type).toBe('choice')
+      expect(resp.interaction.stateId).toBe('wait')
     })
   })
 

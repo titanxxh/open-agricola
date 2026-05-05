@@ -107,26 +107,26 @@ describe('A106_SlurrySpreader session', () => {
 
     while (safety-- > 0 && resp.interaction.stateId === 'wait') {
       if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-        resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
+        resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
         continue
       }
 
-      if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
-        resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones)
+      if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+        resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
         continue
       }
 
-      if (resp.pending.type === 'choice') {
-        const skipOption = resp.pending.options.find((option) => option.value === '__skip__')
-        const choiceValue = skipOption?.value ?? resp.pending.options[0]!.value
-        resp = session.resolveChoice(resp.pending.playerIndex, choiceValue)
+      if (resp.interaction.stateId === 'wait') {
+        const skipOption = resp.interaction.options?.find((option) => option.value === '__skip__')
+        const choiceValue = skipOption?.value ?? resp.interaction.options[0]!.value
+        resp = session.resolveChoice(resp.interaction.playerIndex, choiceValue)
         continue
       }
 
       throw new Error(`unexpected pending state: ${resp.pending.type}`)
     }
 
-    expect(resp.pending.type).toBe('none')
+    expect(resp.interaction.stateId).not.toBe('wait')
     const playerAfter = resp.state.players[0]!
     expect(playerAfter.resources.food).toBe(0)
     expect(playerAfter.resources.grain).toBe(1)

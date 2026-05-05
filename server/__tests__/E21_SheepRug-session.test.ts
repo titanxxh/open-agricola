@@ -40,7 +40,7 @@ describe('E21_SheepRug session', () => {
   it('makes occupied wish-children available only when the card is played', () => {
     const withCard = setup(true).getState()
     expect(withCard.ok).toBe(true)
-    expect(withCard.pending.type).toBe('none')
+    expect(withCard.interaction.stateId).not.toBe('wait')
     expect(withCard.actionAvailability?.['wish-children']).toBe(true)
 
     const withoutCardSession = setup(false)
@@ -63,15 +63,15 @@ describe('E21_SheepRug session', () => {
     expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)
     expect(resp.state.actionSpaces.find((space) => space.id === 'wish-children')?.takenBy.some((t) => t.playerId === resp.state.players[1]!.id)).toBe(true)
 
-    if (resp.pending.type === 'choice') {
-      const skipOption = resp.pending.options.find((option) => option.value === '__skip__')
+    if (resp.interaction.stateId === 'wait') {
+      const skipOption = resp.interaction.options?.find((option) => option.value === '__skip__')
       expect(skipOption).toBeDefined()
 
       resp = session.resolveChoice(0, skipOption!.value)
       expect(resp.ok).toBe(true)
     }
 
-    expect(resp.pending.type).toBe('confirmNextPlayer')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 
   describe('prerequisite "4 Sheep"', () => {
