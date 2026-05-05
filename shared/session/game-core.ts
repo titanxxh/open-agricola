@@ -75,6 +75,9 @@ import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { allOccupationCards, allMinorImprovementCards } from '../cards/catalog.ts'
 import { majorCardDefinitions } from '../cards/major/index.ts'
 import * as setupPhase from './phases/setup.ts'
+import * as roundPhase from './phases/round.ts'
+import * as harvestPhase from './phases/harvest.ts'
+import * as draftPhase from './phases/draft.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { getCardEffect } from '../cards/card-effects.ts'
 import { incCardUsed } from '../cards/helpers/card-state.ts'
@@ -781,23 +784,12 @@ export class GameCore {
   }
 
   private nextPlayerIdx(players: PlayerState[], current: number) {
-    for (let off = 1; off <= players.length; off++) {
-      const idx = (current + off) % players.length
-      const candidate = players[idx]
-      if (candidate && workersAvailable(this.state, candidate) > 0) return idx
-    }
-    return current
+    return roundPhase.nextSeatedPlayerIdx(this.state, players, current)
   }
 
-  private getStartPlayerIdx() {
-    const startIdx = this.state.players.findIndex((player) => player.startPlayer)
-    return startIdx === -1 ? 0 : startIdx
-  }
 
   private getHarvestPlayerIndices() {
-    const players = this.state.players
-    const startIdx = this.getStartPlayerIdx()
-    return players.map((_, offset) => (startIdx + offset) % players.length)
+    return harvestPhase.getHarvestPlayerIndices(this.state)
   }
 
   /**
@@ -1311,20 +1303,7 @@ export class GameCore {
   }
 
   private computeCardDraftPending(): Extract<PendingAction, { type: 'cardDraft' }> | null {
-    if (this.state.phase !== 'draft' || !this.state.draft) return null
-    const draft = this.state.draft
-    const allSubmitted = draft.seatOrder.every(
-      (pid) =>
-        draft.pendingPicks[pid] != null &&
-        draft.pendingPicks[pid].occ !== null &&
-        draft.pendingPicks[pid].minor !== null,
-    )
-    return {
-      type: 'cardDraft',
-      round: draft.round,
-      totalRounds: draft.totalRounds,
-      allSubmitted,
-    }
+    return draftPhase.computeCardDraftPending(this.state)
   }
 
   private respond(ok = true, error?: string): SessionResponse {
