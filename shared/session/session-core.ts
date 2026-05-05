@@ -81,7 +81,7 @@ import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { getCardEffect } from '../cards/card-effects.ts'
 import { incCardUsed } from '../cards/helpers/card-state.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
-import { runRoundEndHooks, runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks } from '../cards/card-effects.ts'
+import { runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks } from '../cards/card-effects.ts'
 import { positionKey } from '../game/farm.ts'
 import { getMatchingListeners, executeCardListener, shouldSkipImmediateListenerLog } from '../cards/card-listeners.ts'
 import { computeScores, type PlayerScoreSummary } from '../logic/scoring.ts'
@@ -466,6 +466,10 @@ export class GameCore {
   getActionStartPlayerSnapshot(): PlayerState | null { return this.actionStartPlayerSnapshot }
   /** @internal Round phase — emit `log.actionDetail` diff entry. */
   invokeLogActionDetail(before: PlayerState, after: PlayerState): void { this.logActionDetail(before, after) }
+  /** @internal Round phase — onBeforeReturnHome stage hook chain trampoline. */
+  invokeBeforeReturnHomeHooks(): SessionResponse { return this.continueBeforeReturnHomeHooks() }
+  /** @internal Round phase — onAfterRoundEnd stage hook chain trampoline. */
+  invokeAfterRoundEnd(): SessionResponse { return this.continueAfterRoundEnd() }
   /** @internal phase access — build a fresh Engine for a top-level action space. */
   createEngineForSpace(actionId: string): Engine { return this.createEngine(actionId) }
   /** @internal phase access — push a synthetic interaction-only frame. */
@@ -3031,22 +3035,8 @@ export class GameCore {
     return this.performRoundEnd()
   }
 
-  performRoundEnd(): SessionResponse {
-    const allUsed = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)
-    if (!allUsed) return this.respond(false, 'not all workers used')
-    if (this.engineStack.peekInteraction()) return this.respond(false, 'pending action exists')
-
-    const pendingAnimal = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
-    if (pendingAnimal !== -1) {
-      this.startReorganizeSubFlow(pendingAnimal, 'round-end',
-        { originPlayerIndex: this.turnOwnerPlayerIndex })
-      return this.respond()
-    }
-
-    this.pushHistory()
-    this.state.roundPhase = 'returning-home'
-    return this.continueBeforeReturnHomeHooks()
-  }
+  /** S2 Task 10 part 7: thin delegator — body lives in `phases/round.ts`. */
+  performRoundEnd(): SessionResponse { return roundPhase.performRoundEnd(this) }
 
   private continueBeforeReturnHomeHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
     if (this.continueStageHook('onBeforeReturnHome', playerIndex, cardIndex)) {
@@ -3134,11 +3124,8 @@ export class GameCore {
     return { type: 'seq', children }
   }
 
-  private finalizeRound(): SessionResponse {
-    this.state.roundPhase = 'preparation'
-    this.state.players.forEach((p) => runRoundEndHooks(this.state, p))
-    return this.continueAfterRoundEnd()
-  }
+  /** S2 Task 10 part 7: thin delegator — body lives in `phases/round.ts`. */
+  private finalizeRound(): SessionResponse { return roundPhase.finalizeRound(this) }
 
   private continueAfterRoundEnd(playerIndex = 0, cardIndex = 0): SessionResponse {
     if (this.continueStageHook('onAfterRoundEnd', playerIndex, cardIndex)) {
