@@ -2,7 +2,6 @@ import { describe, expect, it, beforeEach } from 'vitest'
 import { GameSession } from '../server/game/authoritative-session'
 import { createInitialState } from '../shared/logic/state'
 import { getAllTilePositions } from '../shared/game/farm'
-import type { PendingAction } from '../shared/game/types'
 import { confirmNextPlayer, isLegacyChoicePending } from '../server/__tests__/_helpers/legacy-confirms'
 
 describe('pending choice types + undo regression', () => {
@@ -350,7 +349,7 @@ describe('pending choice types + undo regression', () => {
       if (!resp.ok) return
 
       expect(resp.interaction.stateId).toBe('wait')
-      if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+      if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionAnimalReorg') {
         expect(resp.interaction.playerIndex).toBe(0)
       }
     })
@@ -364,7 +363,7 @@ describe('pending choice types + undo regression', () => {
       if (state.round < openRound) return
 
       const takeResp = session.takeAction(0, 'sheep-market')
-      if (!takeResp.ok || (takeResp.interaction.stateId !== 'wait' || (takeResp.pending as any).promptKey !== 'ui.interactionAnimalReorg')) return
+      if (!takeResp.ok || takeResp.interaction.stateId !== 'wait' || takeResp.interaction.promptKey !== 'ui.interactionAnimalReorg') return
 
       const zones = [{ id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 }]
       const resp = session.resolveChoice(0, 'confirm', zones as unknown as Record<string, unknown>)
@@ -455,9 +454,6 @@ describe('pending choice types + undo regression', () => {
 
       const first = actions[0]!
       session.takeAction(0, first.spaceId)
-      const afterFirst = session.getState()
-      const firstPending = afterFirst.pending.type
-
       session.undoAction()
       const afterUndo = session.getState()
       expect(isLegacyChoicePending(afterUndo)).toBe(false)
@@ -529,15 +525,15 @@ describe('pending choice types + undo regression', () => {
       }
     })
 
-    it('pending type is always one of the known variants', () => {
-      const validTypes = ['none', 'choice', 'harvestFeed', 'confirmNextPlayer', 'confirmPlayerSwitch']
+    it('interaction stateId is always one of the known variants', () => {
+      const validStates = ['idle', 'wait', 'gameover']
       const resp = session.getState()
-      expect(validTypes).toContain(resp.pending.type)
+      expect(validStates).toContain(resp.interaction.stateId)
 
       const action = findAvailableAction(session)
       if (action) {
         const actionResp = session.takeAction(0, action.spaceId)
-        expect(validTypes).toContain(actionResp.pending.type)
+        expect(validStates).toContain(actionResp.interaction.stateId)
       }
     })
   })

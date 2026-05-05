@@ -124,7 +124,7 @@ describe('serialization cursor round-trip', () => {
     // session had pre-serialize.
     const restoredResp = restored.getState()
     const beforeResp = session.getState()
-    expect(restoredResp.pending.type).toBe(beforeResp.pending.type)
+    expect(restoredResp.interaction.stateId).toBe(beforeResp.interaction.stateId)
     if (restoredResp.interaction.stateId === 'wait' && beforeResp.interaction.stateId === 'wait') {
       // Same prompt + same set of choice values across the round-trip.
       expect(restoredResp.interaction.promptKey).toBe(beforeResp.interaction.promptKey)

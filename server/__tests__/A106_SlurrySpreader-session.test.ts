@@ -112,19 +112,24 @@ describe('A106_SlurrySpreader session', () => {
         continue
       }
 
-      if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
-        resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
+      if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionAnimalReorg') {
+        resp = session.resolveChoice(
+          resp.interaction.playerIndex,
+          'confirm',
+          { zones: resp.interaction.zones } as unknown as Record<string, unknown>,
+        )
         continue
       }
 
       if (resp.interaction.stateId === 'wait') {
-        const skipOption = resp.interaction.options?.find((option) => option.value === '__skip__')
-        const choiceValue = skipOption?.value ?? resp.interaction.options[0]!.value
+        const options = resp.interaction.options ?? []
+        const skipOption = options.find((option) => option.value === '__skip__')
+        const choiceValue = skipOption?.value ?? options[0]!.value
         resp = session.resolveChoice(resp.interaction.playerIndex, choiceValue)
         continue
       }
 
-      throw new Error(`unexpected pending state: ${resp.pending.type}`)
+      throw new Error('unexpected interaction state')
     }
 
     expect(isLegacyChoicePending(resp)).toBe(false)
