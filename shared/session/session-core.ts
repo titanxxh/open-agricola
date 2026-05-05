@@ -442,6 +442,14 @@ export class GameCore {
   }
   /** @internal Round phase — enumerate currently-available anytime entries for the active interaction context. */
   listAnytimeEntries(): { descriptor: AnytimeAction; flow: ActionFlow }[] { return this.buildAnytimeEntries() }
+  /** @internal Round phase — finalize per-action stats / detail log. */
+  invokeFinalizeActionLog(player: PlayerState): void { this.finalizeActionLog(player) }
+  /** @internal Round phase — `state.round` after-harvest finalization. */
+  invokeFinalizeRound(): void { this.finalizeRound() }
+  /** @internal Round phase — onEndTurn stage hook trampoline. */
+  invokeEndTurnHooks(playerIndex: number): SessionResponse { return this.continueEndTurnHooks(playerIndex) }
+  /** @internal Harvest phase — read the harvestRounds set (for returning-home decision). */
+  isHarvestRound(round: number): boolean { return harvestRounds.includes(round) }
   /** @internal phase access — build a fresh Engine for a top-level action space. */
   createEngineForSpace(actionId: string): Engine { return this.createEngine(actionId) }
   /** @internal phase access — push a synthetic interaction-only frame. */
@@ -2101,17 +2109,9 @@ export class GameCore {
     return this.respond()
   }
 
+  /** S2 Task 10 part 5: thin delegator — body lives in `phases/round.ts`. */
   private continueAfterReorganize_returningHome(_playerIndex: number): void {
-    const nextPending = this.state.players.findIndex((p) => this.hasPendingAnimals(p))
-    if (nextPending !== -1) {
-      this.startReorganizeSubFlow(nextPending, 'returning-home')
-      return
-    }
-    if (harvestRounds.includes(this.state.round)) {
-      this.startHarvest()
-      return
-    }
-    this.finalizeRound()
+    return roundPhase.continueAfterReorganizeReturningHome(this)
   }
 
   private continueAfterReorganize_harvestBreed(playerIndex: number): void {
@@ -2123,20 +2123,12 @@ export class GameCore {
     this.continueEndHarvestEffects()
   }
 
+  /** S2 Task 10 part 5: thin delegator — body lives in `phases/round.ts`. */
   private continueAfterReorganize_roundEnd(
     playerIndex: number,
     originPlayerIndex: number | null,
   ): void {
-    if (originPlayerIndex !== null) {
-      this.continueEndTurnHooks(originPlayerIndex)
-      return
-    }
-    this.finalizeActionLog(this.state.players[playerIndex]!)
-    const allUsed = this.state.players.every((p) => workersAvailable(this.state, p) <= 0)
-    if (!allUsed) {
-      const next = this.nextPlayerIdx(this.state.players, this.state.currentPlayerIndex)
-      this.startConfirmNextPlayer(next)
-    }
+    return roundPhase.continueAfterReorganizeRoundEnd(this, playerIndex, originPlayerIndex)
   }
 
   private resumeStageFlow(stageResume: StageResumeState) {
