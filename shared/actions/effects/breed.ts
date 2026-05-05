@@ -6,7 +6,11 @@ import type {
   HarvestBreedSummary,
   PlayerState,
 } from '../../game/types'
-import { computeAnimalZones, getTotalAnimalCapacity } from '../helpers/animal-zones'
+import { playerBoard } from '../../domain'
+// `getTotalAnimalCapacity(player)` is state-free legacy still imported
+// directly because `breed()` accepts `state: GameState | null`. PR5 will
+// inline / remove this when shared/actions/helpers/animal-zones is deleted.
+import { getTotalAnimalCapacity } from '../helpers/animal-zones'
 import { shouldEnforceReorganizeOnLastHarvest } from '../../cards/card-effects'
 
 export type BreedAnimalType = 'sheep' | 'boar' | 'cattle'
@@ -80,7 +84,8 @@ export const breedAction: ActionDefinition = {
       }
     }
     const buildReorgRequest = (): ActionExecutionResult => {
-      const zones = computeAnimalZones(player).map((zone) => ({
+      const idx = state.players.indexOf(player)
+      const zones = playerBoard(state, idx).animals.zones().map((zone) => ({
         id: zone.id,
         zoneType: zone.zoneType as 'pasture' | 'house' | 'stable',
         animalType: (zone.animalType as 'sheep' | 'boar' | 'cattle' | null) ?? null,

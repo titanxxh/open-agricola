@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
-import { getLooseStableKeys } from '../../actions/helpers/animal-zones'
+import { playerBoard } from '../../domain'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C49_BeerStall'
@@ -18,8 +18,9 @@ export const C49_BeerStall = new MinorImprovement({
 export const C49_BeerStall_impl = {
   effect: {
   id: CARD_ID,
-  onHarvestFeedingPhase: (_state, player) => {
-    const looseKeys = getLooseStableKeys(player)
+  onHarvestFeedingPhase: (state, player) => {
+    const idx = state.players.indexOf(player)
+    const looseKeys = playerBoard(state, idx).animals.looseStableKeys()
     const emptyStables = looseKeys.filter(k => !player.stableAnimals?.[k]).length
     if (emptyStables <= 0 || player.resources.grain < 1) return
     const maxExchanges = Math.min(emptyStables, player.resources.grain)
