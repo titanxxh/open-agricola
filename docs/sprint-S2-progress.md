@@ -13,10 +13,10 @@
 | **2** | InteractionRequest 3 new kinds (farm-select / selection / card-draft) | ✅ 完整 |
 | **3** | promptKey 收紧到 PromptKey closed union (Path C — 56 字面量 + `ui.cards.${string}` 模板) | ✅ 完整 |
 | **4** | InteractionState 8→3 stateId + buildInteraction 重写 | ✅ 完整 |
-| **5** | plow / sow leaf emit farm-select kind | ⚠️ 部分（forward-compat 协议层 + engine 适配；leaf 未实际切 kind 因为 D20_TurnwrestPlow cultivation 流程 hook 排序问题，需等 Task 8 InteractionNode 包装） |
-| **6** | fence / room / stable leaf emit farm-select kind | ⚠️ 部分（同 Task 5 阻塞，未实质切换） |
+| **5** | plow / sow leaf emit farm-select kind | ✅ 完整（commit `8302eee4` — Task 8 落地后解锁；D20 cultivation 测试已重写按实际 hook 排序走） |
+| **6** | fence / room / stable leaf emit farm-select kind | ⚠️ 部分（实质切换尝试引入 farm-expansion multi-step flow 回归 12 处，回滚保留旧 'choice' kind；需后续单独 sprint 重构 multi-step composite flow） |
 | **7** | selection.ts 重写、删 split-comma | ⚠️ 部分（`commitSelectionChoice` 改用 structured payload；selection.resolveChoice 优先 payload + 保留 split fallback；execute 仍 'choice' kind） |
-| **8** | OrNode/XorNode/OptionalNode emit 包成 InteractionNode；删 lastEmittedChoice cache | ⚠️ 标记 — 实际未实施（核心路径改造风险高，cultivation case 在 plow 还原后已通过，功能性收益不再紧迫） |
+| **8** | OrNode/XorNode/OptionalNode emit 包成 InteractionNode；删 lastEmittedChoice cache | ✅ 完整（commit `c9f82b06` — 把 emit 元数据存到节点自身的 `emittedChoices/emittedPromptKey/emittedPromptParams/emittedRequest` 字段；删除 `Engine.lastEmittedChoice` cache；snapshot/restore 改写 `compositeEmit` 字段+保留 legacy alias） |
 | **9** | Setup mixin 抽取 | ⚠️ 部分（抽 `getCustomCardDefs` + `updatePlayerName` 到 `phases/setup.ts`；constructor 主体迁移延后） |
 | **10** | Round mixin 抽取 | ⚠️ 部分（抽 `nextSeatedPlayerIdx` + `computeStartPlayerIdx`；takeAction / confirm-* 主体留 GameCore） |
 | **11** | Harvest mixin 抽取（含 12 hook handler） | ⚠️ 部分（抽 `getHarvestPlayerIndices`；12 stage-hook + field/feed/breed entry 留 GameCore） |
@@ -48,13 +48,17 @@
 
 ## 3. 已知阻塞与延后项
 
-### 3.1 Task 5/6 leaf kind 切换阻塞
+### 3.1 Task 5 完整完成（Task 8 落地后解锁）
 
-把 `plow.execute` 切到 `kind: 'farm-select'` 触发 D20_TurnwrestPlow cultivation 流程的 hook 排序问题：当主 flow 是 `or`，D20 的 'after place-farmer' OptionalNode follow-up 会在 cultivation OrNode 之前 surface 'do/skip' choice。旧 `'choice'` shape 巧妙地通过 `buildFarmInteractionFromNode` 的 promptKey 派生路径绕过；新 `'farm-select'` shape 没有那条派生路径，OptionalNode 'do/skip' 框架上无法 surface farm 数据。Plan 给的方向是 Task 8（composite emit 用 InteractionNode 包装）落地后自然修复 — 但 Task 8 实质改造的代码量大、回归面广，本次未做。fence/room/stable 改造同源阻塞。
+`plow.execute` / `sow.execute` 已切到 `kind: 'farm-select'`。D20_TurnwrestPlow cultivation 测试重写为按实际 hook 排序走（先 D20 'do/skip' OptionalNode → D20 plow farm-select → cultivation 主 OrNode）。`undoStep` 的 farm-prompt special-cancel 路径扩展到接受 `request.kind === 'farm-select'`。
 
-### 3.2 Task 8 未实施
+### 3.1b Task 6 部分（construct/stables/fence 切换阻塞）
 
-Plan §3.10 要求把 `Engine.lastEmittedChoice` 缓存换成在 OrNode/XorNode/OptionalNode emit 时构造真 `InteractionNode`，让 GameCore 不再走 composite-fallback 分支。这是架构 cleanup，不是功能阻塞。当前 cache 路径仍工作 — fast suite 2095 通过、cultivation case 在 plow 还原后通过、所有 cursor round-trip 测试通过。
+把 `construct.execute` / `stables.execute` / `fencing.execute` 切到 `kind: 'farm-select'` 引入 12 处 farm-expansion 流程回归（farm-expansion → OrNode [construct, stables] → 子 leaf farm-select 链路）。这些 multi-step composite flow 路径在 farm-select kind 下出现 `pending.type === 'confirmNextPlayer'` 跳过中间步骤的行为，根因是 OrNode child execute 返回 'farm-select' kind 时 engine 的子节点 resolve 时序与 'choice' kind 不同。需要 multi-step composite flow 的协议重构，回滚保留旧 'choice' kind。
+
+### 3.2 Task 8 完整完成
+
+`OrNode` / `XorNode` / `OptionalNode` 各自携带 `emittedChoices` / `emittedPromptKey` / `emittedPromptParams` / `emittedRequest` 四个字段，`Engine.proceed` emit 时直接写到节点自身。删除 `Engine.lastEmittedChoice` cache 字段。`peekPendingChoiceFromComposite` 改为通过 `tree.findNodeById` 找节点读取。`snapshot()` 改写 `compositeEmit` 字段，`restore()` 接受 legacy `lastEmittedChoice` 别名做 forward-compat。`choice-disabled-option.test.ts` 改用公开 `peekPendingChoiceFromComposite()` accessor mutate `disabled` 标志。
 
 ### 3.3 Task 9–12 主体迁移延后
 
@@ -86,6 +90,9 @@ Task 13 各 step 当前状态：
 ## 4. 提交链（Task 1–13）
 
 ```
+8302eee4 refactor(actions): plow + sow leaves emit farm-select kind directly (Task 5 complete)
+c9f82b06 refactor(engine): move composite emit metadata onto Or/Xor/Optional nodes (Task 8)
+ef41af7b docs(sprint-s2): update progress for Task 13 steps 3+4+5+8
 43693517 refactor(session): rename game-core.ts → session-core.ts + deprecate confirm shims (Task 13 steps 3+8)
 27a5a8e9 refactor(protocol): drop ws ClientCommand 'feed'/'nextPlayer'/'confirmPlayerSwitch' (Task 13 step 4)
 d3db5148 refactor(protocol): drop GameSyncPayload.pending (Task 13 step 5)
@@ -106,7 +113,7 @@ f2ce080f feat(types): add PromptKey closed union + PromptParams<K> conditional t
 6c044fc5 docs(sprint-s2): add S2 implementation spec
 ```
 
-加上 S1 的 carry-over commits，共 14 个实质 commits 改动 sprint-S2-interaction-request 分支。
+加上 S1 的 carry-over commits，共 16 个实质 commits 改动 sprint-S2-interaction-request 分支。
 
 ## 5. 后续建议
 
