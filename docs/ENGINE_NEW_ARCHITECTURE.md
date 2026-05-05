@@ -15,7 +15,7 @@
 
 它**不改变**：后端权威 / 全量快照 / WS 协议 / hook 系统 / 卡牌闭环原则 / 三层物理边界。
 
-> **当前 sprint 进度**（详见 §15）：S1 ✅（2026-05-03）/ S2 ✅（2026-05-05）/ S3 ✅（2026-05-04，PaymentSolver 收口）/ S4–S7 待启动。
+> **当前 sprint 进度**（详见 §15）：S1 ✅（2026-05-03）/ S2 ✅（2026-05-05）/ S3 ✅（2026-05-04，PaymentSolver 收口）/ S4a ✅（2026-05-04）/ S4b ✅（2026-05-05，rich-node + step() dispatch + cursor round-trip 落地）/ S5–S7 待启动。
 
 ---
 
@@ -1049,11 +1049,11 @@ S6 物理分层完成后专设 S7"卡牌效果测试回归"：
 - **完成度量**：21 commits on `sprint-S3-payment-solver` branch；ADR-0006 全部 6 个子决议（D1-D6）落地
 - **依赖关系**：与 S1 / S2 / S4 均无强前置（详见 `docs/superpowers/specs/2026-05-03-engine-redesign-S2-S4-contracts.md` §4.2）。在独立 worktree 推进，effect 改写严格限定在 `improvement.ts` 拆分相关
 
-### Sprint S4：领域聚合层 `shared/domain/` + 节点充血
+### Sprint S4：领域聚合层 `shared/domain/` + 节点充血 ✅ 完成（2026-05-06）
 
 S4 拆分为两条独立轨道并行推进：
 
-#### S4a：领域聚合层 `shared/domain/` ✅ S4a 完成（2026-05-05）
+#### S4a：领域聚合层 `shared/domain/` ✅ 完成（2026-05-05）
 
 > **完成总结**（详见 `docs/sprint-S4a-progress.md`）
 >
@@ -1067,7 +1067,23 @@ S4 拆分为两条独立轨道并行推进：
 >
 > **架构成果**：`shared/domain/` 成为 farm/animal/scoring 的唯一权威；effects/cards/session 不再 reach into `logic/farm/*` / `helpers/animal-zones` / `logic/scoring*`；ESLint guard 保护 domain 不依赖 engine/session/effects。
 
-#### S4b：节点充血 + Engine 公开 API 收敛（并行推进，独立 worktree）
+#### S4b：节点充血 + Engine 公开 API 收敛 ✅ 完成（2026-05-06）
+
+> **完成总结**（详见 `docs/sprint-S4b-progress.md`）
+>
+> 节点充血（学 BGA `AbstractNode`）。`shared/engine/nodes/` 12 文件（每节点一文件，`nodes.ts` 删除）；`InteractionNode` 吸收 4 个 pending state field（`pendingActionId / ownerNodeId / contextSnapshot / promptParams`）+ `emit()` / `validateSelection()` / `step()` / `cursorData()`；leaf 节点（ActionNode/ActivateCardNode/PlayerSwitchNode）通过 `step()` 返回 `NodeStepResult` discriminator 驱动 `engine.proceed` 调度（`'execute'` / `'activateListener'` / `'playerSwitch'`）；composite 节点（OrNode/XorNode/OptionalNode）下沉 emit metadata + `pendingContextSnapshot`；外部 snapshot consumer 全部迁移到 `engine.peekInteractionHost()` 路径。
+>
+> **专项 DoD 兑现情况**：
+>
+> - 🟡 `engine.ts` ≤ 600 行（spec target）：实际 **2135 行**——snapshot/restore mirror 字段（`pendingInteractionNodeId/ActionId/OwnerNodeId/Context`）受 `EngineStackCursor` 持久化 schema 约束未删除；进一步收紧需在 S5 配合 `RoomManager` 拆分时一起重写持久化 schema。
+> - ✅ `shared/engine/nodes/` 12 文件，`nodes.ts` 删除（DoD D11）
+> - 🟡 Engine 公开方法 6 → 实际 **14**（DoD D12）：spec §5.4 目标因 GameCore 与 engine 紧耦合（`prependFlow / injectBeforeNodes / injectInteraction / insertFlowAfterPendingChoice / buildFlowNodePublic / hasPendingChoiceCompositeAncestor / peekPendingChoiceFromComposite` + 新增 `peekInteractionHost`）未达；新增 `engine-public-surface.test.ts` 把 14 个公开方法 + 25 个 private helper 锁定为基线，防止再次扩张；进一步收紧延后到 S5。
+> - ✅ 节点 type discriminator 保字符串供序列化（DoD D13）
+> - ✅ 0 个 `switch (node.type)` 在 engine.ts（DoD D14）
+> - ✅ 9 个节点 cursor round-trip 测试（DoD D15）
+> - ✅ 集成测试零回归（DoD D16，fast 2165 passed / 35 skipped）
+>
+> **架构成果**：节点行为下沉到 class（不再在 engine.ts 主文件 switch type）；engine.proceed 通过 `node.step(ctx)` + `NodeStepResult` 派发 leaf 类型；composite host 字段统一通过 `peekInteractionHost` 暴露；guard test 锁住 public surface 防扩张。剩余收口（mirror 字段删除 + public surface 真正降到 6）下沉到 S5 与 `RoomManager` 拆分一并完成。
 
 - 节点充血（学 BGA `AbstractNode`）—— `shared/engine/nodes/*.ts` 每节点一文件，行为下沉
 - Engine public 收敛到 6 / `flowNodeCounter` 整理 / 序列化测试覆盖
