@@ -61,4 +61,9 @@ describe('JsonRoomPersistence', () => {
     p.save('a/b\\c', STATE, META)
     expect(p.load('a/b\\c')?.serialized).toEqual(STATE)
   })
+
+  it('save with null serialized is a no-op; load returns null (no file written)', () => {
+    p.save('r1', null, META)
+    expect(p.load('r1')).toBeNull()
+  })
 })

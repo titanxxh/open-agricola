@@ -75,4 +75,12 @@ describe('InMemoryRoomPersistence', () => {
     expect(after?.meta.status).toBe('finished')
     expect(after?.updatedAt).toBe(NOW)
   })
+
+  it('save with null serialized creates placeholder row; load returns snap with null serialized but meta present', () => {
+    p.save('r1', null, META)
+    const snap = p.load('r1')
+    expect(snap).not.toBeNull()
+    expect(snap?.serialized).toBeNull()
+    expect(snap?.meta.createdBy).toBe('u')
+  })
 })

@@ -53,8 +53,12 @@ export class JsonRoomPersistence implements RoomPersistence {
    * ignored — the JSON backend is state-only by design (see RoomPersistence
    * interface JSDoc). Callers that need round-tripped meta must use the
    * sqlite or memory adapter.
+   *
+   * When `serialized` is null (placeholder row), this is a no-op — the JSON
+   * adapter does not track placeholder rows.
    */
-  save(id: string, serialized: SerializedGameState, _meta: RoomMeta): void {
+  save(id: string, serialized: SerializedGameState | null, _meta: RoomMeta): void {
+    if (serialized === null) return
     try {
       mkdirSync(this.dir, { recursive: true })
       writeFileSync(this.fileFor(id), JSON.stringify(serialized, null, 0), 'utf-8')

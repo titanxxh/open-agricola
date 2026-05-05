@@ -66,10 +66,10 @@ export class SqliteRoomPersistence implements RoomPersistence {
     }
   }
 
-  save(id: string, serialized: SerializedGameState, meta: RoomMeta): void {
+  save(id: string, serialized: SerializedGameState | null, meta: RoomMeta): void {
     try {
       const now = Date.now()
-      const stateJson = JSON.stringify(serialized)
+      const stateJson = serialized === null ? null : JSON.stringify(serialized)
       const customCardIdsJson = JSON.stringify(meta.customCardDbIds)
       const existing = this.db.prepare('SELECT id FROM rooms WHERE id = ?').get(id)
       if (existing) {

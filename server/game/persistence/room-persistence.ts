@@ -50,12 +50,16 @@ export interface RoomPersistence {
   /**
    * Upsert serialized state + meta. May ignore meta-only fields per adapter.
    *
+   * Pass `serialized = null` to create a placeholder row (sqlite) or skip the
+   * write (json/memory) — used when a room is created before any state has been
+   * emitted.
+   *
    * Adapters that track `updatedAt` MUST set it to `Date.now()` at save time —
    * the interface doesn't externalise the clock since per-broadcast persistence
    * is fire-and-forget. Tests that need deterministic timestamps should use the
    * adapter-specific test helper (e.g., `InMemoryRoomPersistence.__setUpdatedAtForTest`).
    */
-  save(id: string, serialized: SerializedGameState, meta: RoomMeta): void
+  save(id: string, serialized: SerializedGameState | null, meta: RoomMeta): void
   /** Hard-delete the row. Idempotent — silently no-ops if row absent. */
   delete(id: string): void
   /**
