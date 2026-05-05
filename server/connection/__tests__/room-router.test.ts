@@ -91,7 +91,7 @@ describe('seat-binding guards', () => {
 
   it('draftSubmit rejects foreign playerId', () => {
     const ctx = setupTwoSeatRoom()
-    dispatch(ctx, { type: 'draftSubmit', playerId: 'fake-id', pick: { occupation: '', minor: '' } })
+    dispatch(ctx, { type: 'draftSubmit', playerId: 'fake-id', pick: { occCardId: '', minorCardId: '' } })
     const errors = sentMessagesOf(ctx).filter((m) => m.type === 'error')
     expect(errors.some((e) => /seat mismatch/.test(String(e.error)))).toBe(true)
   })
