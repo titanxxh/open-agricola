@@ -11,7 +11,7 @@ const CARD_ID = 'CUSTOM_M3_HarvestHelper'
 // IMPLEMENTATION NOTES (engine quirks discovered while writing this fixture):
 //
 // 1. There is no `harvest-feed` listener action. The feeding phase
-//    (`executeFeedingLogic` in shared/session/game-core.ts) consumes
+//    (`executeFeedingLogic` in shared/session/session-core.ts) consumes
 //    `player.resources.food` directly — it is not dispatched through the
 //    listener pipeline, so a `listeners: [{ actions: ['harvest-feed'], ... }]`
 //    handler can never fire here.

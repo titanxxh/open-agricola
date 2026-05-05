@@ -90,7 +90,7 @@ describe('B14 Hawktower — session', () => {
 
   it('round 12 round-start via real round-advance path: stone-room is built (no execute call)', () => {
     // Real round-start consumption: applyFutureMeeples is called from
-    // shared/session/game-core.ts at every round transition. This test
+    // shared/session/session-core.ts at every round transition. This test
     // simulates that path directly (without invoking futureMeeplesAction.execute),
     // proving the consumption is anchored on the correct entry point.
     const session = setup('stone')

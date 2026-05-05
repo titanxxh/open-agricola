@@ -9,11 +9,11 @@
 import type { GameState } from '../../shared/game/types.ts'
 import type { InitialStateOptions } from '../../shared/logic/state.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
-import { GameCore, type StateWithCursor } from '../../shared/session/game-core.ts'
+import { GameCore, type StateWithCursor } from '../../shared/session/session-core.ts'
 import { registerExecutorBackedCustomCard } from '../custom-code/runtime.ts'
 
-export { type GameCoreOptions, type GameCoreOptions as GameSessionOptions } from '../../shared/session/game-core.ts'
-export type { SessionResponse } from '../../shared/session/game-core.ts'
+export { type GameCoreOptions, type GameCoreOptions as GameSessionOptions } from '../../shared/session/session-core.ts'
+export type { SessionResponse } from '../../shared/session/session-core.ts'
 
 export class GameSession extends GameCore {
   constructor(
