@@ -9,7 +9,7 @@ import type {
 } from '../../game/types'
 import { getAllTilePositions, positionKey } from '../../game/farm'
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'
-import { validatePlowSelection } from '../../logic/farm/plow-validation'
+import { playerBoard } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 // PaymentSolver namespace (S3 Task 7a): core payment APIs migrated to
@@ -99,7 +99,8 @@ const finalizePlow = (
   paymentChoice: string | undefined,
 ): ActionExecutionResult => {
   const lockedKeys = collectLockedFarmTileKeys(ctx.player)
-  const validated = validatePlowSelection(ctx.player, tile, lockedKeys)
+  const idx = ctx.state.players.indexOf(ctx.player)
+  const validated = playerBoard(ctx.state, idx).farmyard.canPlow(tile, lockedKeys)
   if (!validated.ok) return { type: 'fail', logKey: validated.error?.code ?? 'log.action' }
   const plowCost = sanitizePayableCost(ctx.costs)
   const payment = resolveTypedFlatPaymentSelection(
@@ -150,13 +151,14 @@ export const plowAction: ActionDefinition = {
     const lockedKeys = collectLockedFarmTileKeys(ctx.player)
 
     // Second call: payment combo selected after multi-combo prompt.
+    const idx = ctx.state.players.indexOf(ctx.player)
     if (choice.startsWith('pay:plow:')) {
       const farmPayload = ctx.actionContext?.farmPayload as
         | { tile?: FarmTilePosition }
         | undefined
       const tile = farmPayload?.tile
       if (!tile) return { type: 'fail', logKey: 'log.action' }
-      const validated = validatePlowSelection(ctx.player, tile, lockedKeys)
+      const validated = playerBoard(ctx.state, idx).farmyard.canPlow(tile, lockedKeys)
       if (!validated.ok) {
         return { type: 'fail', logKey: validated.error?.code ?? 'log.action' }
       }
@@ -166,7 +168,7 @@ export const plowAction: ActionDefinition = {
     // First call: client submitted tile geometry alongside `confirm`.
     if (payload && choice === 'confirm') {
       const tile = (payload as { tile?: FarmTilePosition }).tile
-      const validated = validatePlowSelection(ctx.player, tile, lockedKeys)
+      const validated = playerBoard(ctx.state, idx).farmyard.canPlow(tile, lockedKeys)
       if (!validated.ok) {
         return { type: 'fail', logKey: validated.error?.code ?? 'log.action' }
       }

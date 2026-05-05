@@ -21,8 +21,7 @@ import {
   executeResolvedTypedFlatPayment,
   resolveTypedFlatPaymentSelection,
 } from '../payment/internal'
-import { validateStableSelection } from '../../logic/farm/validators'
-import { buildStableFarmInteraction } from '../../logic/farm/farm-interaction'
+import { playerBoard } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 
@@ -102,7 +101,8 @@ const finalizeStables = (
   paymentChoice: string | undefined,
 ): ActionExecutionResult => {
   const lockedKeys = collectLockedFarmTileKeys(ctx.player)
-  const validated = validateStableSelection(ctx.player, stables, lockedKeys)
+  const idx = ctx.state.players.indexOf(ctx.player)
+  const validated = playerBoard(ctx.state, idx).farmyard.canBuildStable(stables, lockedKeys)
   if (!validated.ok) return { type: 'fail', logKey: validated.code ?? 'log.buildStableFail' }
   const costOverride = readCostOverride(ctx.actionContext) ?? ctx.costs
   const costPerStable = applyCostOverride({ wood: stableWoodCost }, costOverride)
@@ -135,10 +135,12 @@ export const stablesAction: ActionDefinition = {
   canBeExecutedByPlayer: (state, player, opts) =>
     canExecuteWithCostPreview(stablesCostPreview, { state, player }, readCostOverride(opts?.actionContext)),
   costPreview: stablesCostPreview,
-  execute: ({ player, costs, actionContext }): ActionExecutionResult => {
+  execute: ({ state, player, costs, actionContext }): ActionExecutionResult => {
     const zoneFilter = actionContext?.zoneFilter
     const max = actionContext?.max
-    const farm = buildStableFarmInteraction(player, costs, {
+    const idx = state.players.indexOf(player)
+    const farm = playerBoard(state, idx).farmyard.selectableTiles('stable', {
+      costOverride: costs,
       zoneFilter: zoneFilter === 'pasture-1' ? 'pasture-1' : undefined,
       max: typeof max === 'number' ? max : undefined,
     })
@@ -177,7 +179,8 @@ export const stablesAction: ActionDefinition = {
         return { type: 'fail', logKey: 'NO_SELECTION' }
       }
       const lockedKeys = collectLockedFarmTileKeys(ctx.player)
-      const validated = validateStableSelection(ctx.player, stables, lockedKeys)
+      const idx = ctx.state.players.indexOf(ctx.player)
+      const validated = playerBoard(ctx.state, idx).farmyard.canBuildStable(stables, lockedKeys)
       if (!validated.ok) {
         return { type: 'fail', logKey: validated.code ?? 'log.buildStableFail' }
       }
