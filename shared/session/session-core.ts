@@ -417,6 +417,10 @@ export class GameCore {
   }
   /** @internal phase access — build a fresh Engine for a top-level action space. */
   createEngineForSpace(actionId: string): Engine { return this.createEngine(actionId) }
+  /** @internal phase access — push a synthetic interaction-only frame. */
+  pushSyntheticInteractionFrame(node: InteractionNode, ownerPlayerIndex: number, reason: SubFlowReason): void {
+    this.pushInteractionFrame(node, ownerPlayerIndex, reason)
+  }
 
   private registry: ActionRegistry
   private hookDispatcher: HookDispatcher
@@ -779,64 +783,20 @@ export class GameCore {
     return `${prefix}-${this.nextActionToken++}`
   }
 
-  /**
-   * Promote `confirmNextPlayer` to an InteractionNode hosted by a synthetic
-   * engine-stack frame. The accompanying `handleConfirmNextPlayerResolved`
-   * resolves it via `resolveChoice`. Task 10 dropped the legacy
-   * `this.pending = { type: 'confirmNextPlayer' }` dual-write — the synthetic
-   * InteractionNode on the stack is now the sole source of truth, surfaced
-   * to the client through `getCurrentPending()` / `buildInteraction()`.
-   */
+  /** S2 Task 10: thin delegators — bodies live in `phases/round.ts`. */
   private startConfirmNextPlayer(nextPlayerIndex: number): void {
-    // confirmNextPlayer is only emitted after `engineStack.clear()` in
-    // finishCompletedActionTurn / continueAfterReorganize_roundEnd, so we
-    // always push a fresh synthetic frame.
-    const node = new InteractionNode(
-      this.nextSyntheticNodeId('interaction:confirm-next-player'),
-      [{ value: 'confirm', labelKey: 'ui.interactionConfirm' }],
-      { kind: 'confirm-next-player', nextPlayerIndex },
-    )
-    node.promptKey = 'ui.confirmNextPlayer'
-    this.pushInteractionFrame(node, nextPlayerIndex, 'confirm-next-player')
+    roundPhase.startConfirmNextPlayer(this, nextPlayerIndex)
   }
-
-  /**
-   * Mirror of `startConfirmNextPlayer` for the `playerSwitch` flow node /
-   * deferredPlayerSwitch detour. Leaves the outer engine frame intact
-   * underneath so resolution can pop only the synthetic prompt frame and
-   * resume the parent action.
-   */
-  private startConfirmPlayerSwitch(
-    fromPlayerIndex: number,
-    toPlayerIndex: number,
-  ): void {
-    const node = new InteractionNode(
-      this.nextSyntheticNodeId('interaction:confirm-player-switch'),
-      [{ value: 'confirm', labelKey: 'ui.interactionConfirm' }],
-      { kind: 'confirm-player-switch', fromPlayerIndex, toPlayerIndex },
-    )
-    node.promptKey = 'ui.confirmPlayerSwitch'
-    this.pushInteractionFrame(node, toPlayerIndex, 'confirm-player-switch')
+  private startConfirmPlayerSwitch(fromPlayerIndex: number, toPlayerIndex: number): void {
+    roundPhase.startConfirmPlayerSwitch(this, fromPlayerIndex, toPlayerIndex)
   }
-
-  /**
-   * Promote `harvestFeed` to an InteractionNode-hosted sub-flow. Each player
-   * in the feed queue gets a fresh synthetic frame (recursively pushed by
-   * `handleFeedResolved` once the previous player's selections apply).
-   */
   private startFeedSubFlow(
     playerIndex: number,
     remaining: number,
     foodUsed: number,
     feedQueue?: FeedQueueEntry[],
   ): void {
-    const node = new InteractionNode(
-      this.nextSyntheticNodeId('interaction:feed'),
-      [{ value: 'confirm', labelKey: 'ui.interactionConfirm' }],
-      { kind: 'feed', remaining, foodUsed, feedQueue },
-    )
-    node.promptKey = 'ui.harvestFeed'
-    this.pushInteractionFrame(node, playerIndex, 'feed')
+    roundPhase.startFeedSubFlow(this, playerIndex, remaining, foodUsed, feedQueue)
   }
 
   private createEngine(actionId: string): Engine {
