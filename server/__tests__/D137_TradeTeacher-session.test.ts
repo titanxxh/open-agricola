@@ -229,7 +229,7 @@ describe('D137_TradeTeacher end-to-end via GameSession', () => {
     let r = resp
     let safety = 50
     while (safety-- > 0) {
-      if (r.pending?.type === 'confirmPlayerSwitch') {
+      if (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-player-switch') {
         r = confirmPlayerSwitch(session)
         continue
       }

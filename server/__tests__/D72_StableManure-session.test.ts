@@ -75,7 +75,7 @@ describe('D72_StableManure session', () => {
     while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
     }
-    while (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
     }
 
@@ -109,7 +109,7 @@ describe('D72_StableManure session', () => {
     while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
     }
-    while (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
     }
 

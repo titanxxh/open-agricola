@@ -33,7 +33,7 @@ describe('C164_GermanHeathKeeper session', () => {
     expect(resp.ok).toBe(true)
 
     // Handle animalReorg for boar from pig-market
-    if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
         { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
       ])
@@ -45,7 +45,7 @@ describe('C164_GermanHeathKeeper session', () => {
     }
 
     // Handle animalReorg for sheep from card
-    if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
         { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
         { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
@@ -64,7 +64,7 @@ describe('C164_GermanHeathKeeper session', () => {
     expect(resp.ok).toBe(true)
 
     // Handle animalReorg for opponent's boar
-    if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(1, 'confirm', [
         { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
       ])
@@ -76,7 +76,7 @@ describe('C164_GermanHeathKeeper session', () => {
     }
 
     // Handle animalReorg for owner's sheep
-    if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
         { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
       ])

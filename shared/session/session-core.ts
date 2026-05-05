@@ -10,7 +10,6 @@ import type {
   InteractionRequest,
   InteractionSelection,
   InteractionState,
-  PendingAction,
   PlayerState,
   Resource,
   InteractionAnimalReorgZone,
@@ -209,14 +208,6 @@ type StageResumeState = {
 export type SessionResponse = {
   ok: boolean
   state: GameState
-  /**
-   * @deprecated S2 Task 13.6 — derived view-model. Read `interaction`
-   * (`InteractionState`) instead. This field is `getCurrentPending()`-derived
-   * from `engineStack.peekInteraction()` and the draft-phase shim; it is
-   * retained only for legacy test assertions of the form
-   * `resp.pending.type === 'X'`.
-   */
-  pending: PendingAction
   interaction: InteractionState
   historyLength: number
   hasActionStartSnapshot: boolean
@@ -1272,6 +1263,7 @@ export class GameCore {
           promptParams,
           sourceCard,
           request,
+          options: choiceOptions,
           zones: player ? this.buildAnimalReorgZones(player) : [],
           allowedCommands: ['resolveChoice', 'undoStep', 'undoAction'],
           anytimeActions: [],
@@ -1400,30 +1392,27 @@ export class GameCore {
     return computeScores(this.state).map((s) => ({ playerId: s.playerId, total: s.total }))
   }
 
-  private computeCardDraftPending(): Extract<PendingAction, { type: 'cardDraft' }> | null {
-    return draftPhase.computeCardDraftPending(this.state)
-  }
-
   private respond(ok = true, error?: string): SessionResponse {
-    // While the top-level game phase is 'draft', surface a cardDraft pending
-    // and an idle interaction (the client uses DraftOverlay for picks).
-    const draftPending = this.computeCardDraftPending()
-    const effectivePending: PendingAction = draftPending ?? this.getCurrentPending()
-    const interaction: InteractionState = draftPending
+    // While the top-level game phase is 'draft', the client uses
+    // DraftOverlay (which reads `state.draft` directly), so surface an
+    // idle interaction. Otherwise let `buildInteraction()` derive the
+    // wait/idle/gameover shape from the engine stack.
+    const isDrafting = this.state.phase === 'draft' && this.state.draft != null
+    const interaction: InteractionState = isDrafting
       ? { stateId: 'idle', allowedCommands: [], anytimeActions: [] }
       : this.buildInteraction()
     const resp: SessionResponse = {
       ok,
       state: this.state,
-      pending: effectivePending,
       interaction,
       historyLength: this.history.length,
       hasActionStartSnapshot: this.actionStartIndex !== null,
       scores: computeScores(this.state),
       pastureCapacities: this.getPastureCapacities(),
     }
-    // Include backend-computed availability for current player
-    if (!this.state.gameOver && effectivePending.type === 'none') {
+    // Include backend-computed availability for the current player when
+    // they're free to act (idle interaction, not gameover, not drafting).
+    if (!this.state.gameOver && interaction.stateId === 'idle' && !isDrafting) {
       const actionAvailability = this.getActionAvailability(this.state.currentPlayerIndex)
       resp.actionAvailability = actionAvailability
       resp.cardAvailability = this.getCardAvailability(
@@ -1436,93 +1425,27 @@ export class GameCore {
   }
 
   /**
-   * Derive the legacy `PendingAction` shape from the current engine-stack
-   * state. Replaces the deleted `this.pending` field (Task 10): every read
-   * site that previously consulted `this.pending.<x>` should now go through
-   * either this helper (for full PendingAction values — `respond()` /
-   * `pushHistory()`) or directly through `engineStack.peekInteraction()` /
-   * `engineStack.current()` (for individual fields, faster path).
-   *
-   * Mapping:
-   *   - no InteractionNode on top frame -> `{ type: 'none' }`
-   *   - request.kind === 'choice' / 'animal-reorg' -> `{ type: 'choice', ... }`
-   *     (animal-reorg is surfaced as a `choice` PendingAction by today's
-   *     transitional client contract — Task 11 will codemod the reorg-aware
-   *     test sites; the InteractionState surfaced via `buildInteraction`
-   *     already returns `stateId: 'animalReorg'` to clients.)
-   *   - request.kind === 'confirm-next-player' -> `{ type: 'confirmNextPlayer' }`
-   *   - request.kind === 'confirm-player-switch' -> `{ type: 'confirmPlayerSwitch' }`
-   *   - request.kind === 'feed' -> `{ type: 'harvestFeed', ... }`
-   *
-   * Draft phase short-circuits to `{ type: 'cardDraft' }` regardless of the
-   * stack — `respond()` overlays this value onto the response.
+   * Whether the current engine-stack state is a "legacy choice" — i.e. the
+   * top-of-stack InteractionNode has a `choice` / `animal-reorg` /
+   * `farm-select` / `selection` request, OR a composite-fallback pending
+   * choice from OrNode / XorNode / OptionalNode. Used by `pushHistory()`
+   * to populate `HistoryEntry.hadChoicePending`, which `undoStep()`
+   * consults via the `canRestorePriorChoice` branch.
    */
-  private getCurrentPending(): PendingAction {
+  private currentIsChoicePending(): boolean {
     const frame = this.engineStack.current()
-    if (!frame) {
-      return { type: 'none' }
-    }
+    if (!frame) return false
     const node = this.engineStack.peekInteraction()
-    const ctx = frame.engine.getPendingInteractionContext() ?? null
-    const playerIndex = frame.ownerPlayerIndex
-    const spaceId = frame.spaceId
     if (node) {
-      const request = node.request
-      if (request?.kind === 'confirm-next-player') {
-        return { type: 'confirmNextPlayer', nextPlayerIndex: request.nextPlayerIndex }
-      }
-      if (request?.kind === 'confirm-player-switch') {
-        return {
-          type: 'confirmPlayerSwitch',
-          fromPlayerIndex: request.fromPlayerIndex,
-          toPlayerIndex: request.toPlayerIndex,
-        }
-      }
-      if (request?.kind === 'feed') {
-        return {
-          type: 'harvestFeed',
-          playerIndex,
-          remaining: request.remaining,
-          foodUsed: request.foodUsed,
-          feedQueue: request.feedQueue,
-        }
-      }
-      // 'choice' (typed) and 'animal-reorg' (legacy choice path) and any
-      // ChoiceNode-emitted untyped request all surface as the legacy
-      // `{ type: 'choice', ... }` PendingAction.
-      const options = request?.kind === 'choice' ? request.options : node.choices
-      return {
-        type: 'choice',
-        playerIndex,
-        spaceId,
-        options,
-        promptKey: node.promptKey,
-        promptParams: node.promptParams,
-        costOverride: frame.engine.getLastComputedCosts(),
-        sourceCard: ctx?.sourceCard ?? undefined,
-        actionContext: ctx?.actionContext ?? undefined,
-      }
+      const kind = node.request?.kind
+      return kind === 'choice'
+        || kind === 'animal-reorg'
+        || kind === 'farm-select'
+        || kind === 'selection'
+        || kind == null // ChoiceNode-emitted untyped request
     }
-    // Fallback: the engine may be waiting on a non-InteractionNode pending
-    // choice (OrNode / XorNode / OptionalNode emit `step.type === 'choice'`
-    // directly without wrapping in an InteractionNode). The engine caches
-    // the most recent emitted choice on `lastEmittedChoice`; surface it as
-    // the legacy `{ type: 'choice' }` PendingAction.
-    const composite = frame.engine.peekPendingChoiceFromComposite()
-    if (composite) {
-      return {
-        type: 'choice',
-        playerIndex,
-        spaceId,
-        options: composite.options,
-        promptKey: composite.promptKey,
-        promptParams: composite.promptParams,
-        costOverride: frame.engine.getLastComputedCosts(),
-        sourceCard: ctx?.sourceCard ?? undefined,
-        actionContext: ctx?.actionContext ?? undefined,
-      }
-    }
-    return { type: 'none' }
+    // Composite-fallback (OrNode / XorNode / OptionalNode) pending choice.
+    return frame.engine.peekPendingChoiceFromComposite() != null
   }
 
   private pushHistory(actionStart = false, undoBoundary = false) {
@@ -1539,7 +1462,7 @@ export class GameCore {
       // `engineStack.peekInteraction()`. S2 Task 13.6 contracted the
       // HistoryEntry pending snapshot down to a single boolean — `undoStep()`
       // only consults the 'choice' discriminator (see `canRestorePriorChoice`).
-      hadChoicePending: this.getCurrentPending().type === 'choice',
+      hadChoicePending: this.currentIsChoicePending(),
       activeSpaceId: this.activeSpaceId,
       activePlayerIndex: this.activePlayerIndex,
       engineSnapshot: this.engine?.snapshot() ?? null,

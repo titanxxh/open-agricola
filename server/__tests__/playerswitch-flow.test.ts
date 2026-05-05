@@ -34,7 +34,6 @@ describe('ActionFlow playerSwitch', () => {
           reason: string
         }) => void
       }
-      pending: { type: string }
       createFlowEngine: (flow: ActionFlow) => unknown
       runEngineSteps: () => void
     }
@@ -67,7 +66,6 @@ describe('ActionFlow playerSwitch', () => {
       deferredPlayerSwitch: null,
       reason: 'card-draft',
     })
-    s.pending = { type: 'none' }
     s.runEngineSteps()
   }
 

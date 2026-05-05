@@ -64,7 +64,7 @@ describe('A77_Hod session', () => {
     expect(resp.ok).toBe(true)
 
     // pig-market gives boar -> animalReorg
-    if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
         { id: 'p1', zoneType: 'pasture', animalType: 'boar', animalCount: 1 },
       ])
@@ -89,7 +89,7 @@ describe('A77_Hod session', () => {
     expect(resp.ok).toBe(true)
 
     // pig-market gives boar -> animalReorg for opponent
-    if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(1, 'confirm', [
         { id: 'p2', zoneType: 'pasture', animalType: 'boar', animalCount: 1 },
       ])

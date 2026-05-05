@@ -76,7 +76,7 @@ describe('harvest session flow', () => {
 
     resp = session.resolveChoice(0, 'confirm', { selections: [] })
 
-    while (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       const pi = resp.interaction.playerIndex
       const p = resp.state.players[pi]!
       const zones = p.pastures.map((pasture) => ({

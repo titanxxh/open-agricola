@@ -55,11 +55,12 @@ describe('A128_RiparianBuilder session', () => {
     const session = setup()
 
     let resp = session.takeAction(1, 'reed-bank')
-    expect(resp.pending).toMatchObject({
-      type: 'confirmPlayerSwitch',
-      fromPlayerIndex: 1,
-      toPlayerIndex: 0,
-    })
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId === 'wait') {
+      expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+      expect(resp.interaction.fromPlayerIndex).toBe(1)
+      expect(resp.interaction.toPlayerIndex).toBe(0)
+    }
 
     resp = confirmPlayerSwitch(session)
     expect(resp.interaction.stateId).toBe('wait')
@@ -75,11 +76,12 @@ describe('A128_RiparianBuilder session', () => {
     const session = setup()
 
     let resp = session.takeAction(1, 'reed-bank')
-    expect(resp.pending).toMatchObject({
-      type: 'confirmPlayerSwitch',
-      fromPlayerIndex: 1,
-      toPlayerIndex: 0,
-    })
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId === 'wait') {
+      expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+      expect(resp.interaction.fromPlayerIndex).toBe(1)
+      expect(resp.interaction.toPlayerIndex).toBe(0)
+    }
 
     resp = confirmPlayerSwitch(session)
     expect(resp.interaction.stateId).toBe('wait')

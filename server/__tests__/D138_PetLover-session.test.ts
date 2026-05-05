@@ -82,7 +82,7 @@ describe('D138_PetLover session', () => {
     expect(resp.ok).toBe(true)
 
     // The bonus animal needs to be placed too.
-    if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
         { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
       ])

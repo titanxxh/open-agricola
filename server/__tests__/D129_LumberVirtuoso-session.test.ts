@@ -167,7 +167,7 @@ function drainHarvest(session: GameSession, resp: SessionResponse): SessionRespo
     if (current.interaction.stateId !== 'wait') return current.state
     if (current.interaction.stateId === 'wait' && current.interaction.request.kind === 'feed') {
       current = session.resolveChoice(current.interaction.playerIndex, 'confirm', { selections: [] })
-    } else if (current.interaction.stateId === 'wait' && (current.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    } else if (current.interaction.stateId === 'wait' && current.interaction.stateId === 'wait' ? current.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       current = session.resolveChoice(
         current.interaction.playerIndex, 'confirm',
         current.interaction.zones,

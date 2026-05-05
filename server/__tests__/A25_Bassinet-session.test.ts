@@ -174,9 +174,9 @@ describe('A25_Bassinet session', () => {
 
     // Depending on the dealt hand, wish-children may first offer its own
     // optional minor-improvement tail. If so, skip it to reach the A92 offer.
-    const fgChoice = fgResp.interaction.stateId === 'wait' ? fgResp.pending : null
+    const fgInteraction = fgResp.interaction.stateId === 'wait' ? fgResp.interaction : null
     const showsWishChildrenMinorTail =
-      fgChoice?.options.some((o) => o.labelKey === 'actions.minor-improvement.name') ?? false
+      fgInteraction?.options?.some((o) => o.labelKey === 'actions.minor-improvement.name') ?? false
     const a92Resp = showsWishChildrenMinorTail
       ? session.resolveChoice(0, '__skip__')
       : fgResp

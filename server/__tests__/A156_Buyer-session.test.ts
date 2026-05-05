@@ -117,7 +117,7 @@ describe('A156_Buyer session', () => {
     expect(resp.ok).toBe(true)
 
     // Sheep collection triggers animalReorg for opponent first
-    if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(1, 'confirm', [])
     }
 
@@ -135,7 +135,7 @@ describe('A156_Buyer session', () => {
     }
 
     // Handle animalReorg for buyer if needed (gaining sheep requires placement)
-    if (resp.interaction.stateId === 'wait' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
       expect(resp.interaction.playerIndex).toBe(0)
       resp = session.resolveChoice(0, 'confirm', [
         { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },

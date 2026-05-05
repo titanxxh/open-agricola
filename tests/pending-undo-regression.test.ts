@@ -515,7 +515,6 @@ describe('pending choice types + undo regression', () => {
       for (const resp of responses) {
         expect(resp).toHaveProperty('ok')
         expect(resp).toHaveProperty('state')
-        expect(resp).toHaveProperty('pending')
         expect(resp).toHaveProperty('interaction')
         expect(resp).toHaveProperty('historyLength')
         expect(resp).toHaveProperty('hasActionStartSnapshot')

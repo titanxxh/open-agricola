@@ -55,7 +55,7 @@ describe('B104_SheepWalker session — last harvest enforcement', () => {
     // Without B104, breed phase ends here with no animals (1 sheep < 2). With
     // the fix, B104.enforceReorganizeOnLastHarvest must force animalReorg.
     expect(resp.interaction.stateId).toBe('wait')
-    if ((resp.interaction.stateId !== 'wait' || (resp.pending as any).promptKey !== 'ui.interactionAnimalReorg')) return
+    if ((resp.interaction.stateId !== 'wait' || resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined !== 'ui.interactionAnimalReorg')) return
     expect(resp.interaction.playerIndex).toBe(0)
 
     // Confirm reorg leaving the sheep on its pasture.

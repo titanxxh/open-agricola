@@ -557,51 +557,14 @@ export type ActionSpace = ActionDefinition & {
 /**
  * Single entry in a harvest-feed queue: pinpoints which player still owes
  * food and how much, plus the food already consumed from that player's
- * mandatory pre-deduction (so the UI can display it). Shared between the
- * legacy `PendingAction.harvestFeed` shape, the engine's
- * `InteractionRequest` payload, and `GameCore.startFeedSubFlow` so all
- * three sites refer to the same canonical type.
+ * mandatory pre-deduction (so the UI can display it). Used by the engine's
+ * `InteractionRequest` `feed` payload and `GameCore.startFeedSubFlow`.
  */
 export type FeedQueueEntry = {
   index: number
   remaining: number
   foodUsed: number
 }
-
-/**
- * @deprecated S2 Task 13.6 — `PendingAction` is a transitional view-model
- * that `GameCore.getCurrentPending()` derives from the authoritative
- * `InteractionRequest` (engine-stack `InteractionNode.request`) plus the
- * draft-phase shim. Read `SessionResponse.interaction` (an
- * `InteractionState`) for new code; this type and `SessionResponse.pending`
- * are retained only to support 332 still-extant test assertions of the
- * form `resp.pending.type === 'X'`. Tests scheduled for codemod once
- * `InteractionState`-form helpers stabilize. Do NOT add new internal
- * consumers of this union.
- */
-export type PendingAction =
-  | {
-      type: 'choice'
-      playerIndex: number
-      spaceId: string
-      options: ActionChoiceOption[]
-      promptKey?: PromptKey
-      promptParams?: Record<string, unknown>
-      costOverride?: Partial<Resource>
-      sourceCard?: string
-      actionContext?: Record<string, unknown>
-    }
-  | {
-      type: 'harvestFeed'
-      playerIndex: number
-      remaining: number
-      foodUsed: number
-      feedQueue?: FeedQueueEntry[]
-    }
-  | { type: 'confirmNextPlayer'; nextPlayerIndex: number }
-  | { type: 'confirmPlayerSwitch'; fromPlayerIndex: number; toPlayerIndex: number }
-  | { type: 'cardDraft'; round: number; totalRounds: number; allSubmitted: boolean }
-  | { type: 'none' }
 
 export type SubFlowKind =
   | 'choice'

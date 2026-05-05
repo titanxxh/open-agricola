@@ -46,8 +46,8 @@ describe('B27 Toolbox session', () => {
     let safety = 30
     let reachedBuyMajor = false
     while (resp.interaction.stateId === 'wait' && safety-- > 0) {
-      const opts = resp.interaction.options
-      const promptKey = (resp.pending as { promptKey?: string }).promptKey
+      const opts = resp.interaction.options ?? []
+      const promptKey = (resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       if (promptKey === 'ui.interactionToolboxImprovement') {
         reachedBuyMajor = true
         // 外层 optional 的 sourceCard 应是 B27
@@ -131,8 +131,8 @@ describe('B27 Toolbox session', () => {
 
     let safety = 50
     while (resp.interaction.stateId === 'wait' && safety-- > 0) {
-      const opts = resp.interaction.options
-      const promptKey = (resp.pending as { promptKey?: string }).promptKey
+      const opts = resp.interaction.options ?? []
+      const promptKey = (resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       // Engine farm prompt: confirm with the first selectable room tile so we
       // actually build (test asserts construct → setFlag flow).
       if (promptKey === 'ui.interactionRoomSelect' && resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'room') {

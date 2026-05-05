@@ -1,45 +1,19 @@
 /**
  * Draft-phase mixin extracted from GameCore (S2 Task 12).
  *
- * Hosts the card-draft pending derivation and the per-player draft
- * pick submission entry. Round-advance / finalize internals stay
- * inside `shared/draft/draft-manager.ts`; this module orchestrates
- * those calls from the GameCore side via `@internal` accessors.
- *
- * Wrapping `card-draft` kind into a real InteractionRequest
- * (S2 plan §3.7) is still deferred — current path keeps the
- * PendingAction surface as a transitional shim.
+ * Hosts the per-player draft pick submission entry. Round-advance /
+ * finalize internals stay inside `shared/draft/draft-manager.ts`; this
+ * module orchestrates those calls from the GameCore side via `@internal`
+ * accessors. The S2 Task 13.6 PendingAction-removal pass (2026-05-05)
+ * deleted the legacy `computeCardDraftPending` helper — clients now read
+ * draft state directly off `GameState.draft` (DraftOverlay does this
+ * already).
  */
 
-import type { GameState, PendingAction } from '../../game/types.ts'
 import type { DraftPickPayload } from '../../draft/types.ts'
 import { processSubmit, tryAdvanceRound } from '../../draft/draft-manager.ts'
 import { recordDraftPick } from '../../logic/stats.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
-
-/**
- * Derive the legacy `PendingAction` shape for the draft phase. Returns
- * null when the session isn't currently drafting; otherwise reports the
- * round, totalRounds, and whether every seat has submitted both picks.
- */
-export const computeCardDraftPending = (
-  state: GameState,
-): Extract<PendingAction, { type: 'cardDraft' }> | null => {
-  if (state.phase !== 'draft' || !state.draft) return null
-  const draft = state.draft
-  const allSubmitted = draft.seatOrder.every(
-    (pid) =>
-      draft.pendingPicks[pid] != null &&
-      draft.pendingPicks[pid].occ !== null &&
-      draft.pendingPicks[pid].minor !== null,
-  )
-  return {
-    type: 'cardDraft',
-    round: draft.round,
-    totalRounds: draft.totalRounds,
-    allSubmitted,
-  }
-}
 
 /**
  * Submit a single player's pick for the current draft round. Validates
