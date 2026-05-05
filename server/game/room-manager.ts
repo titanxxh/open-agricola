@@ -603,7 +603,6 @@ const sendTo = (ws: WebSocket, message: ServerEvent) => {
 const toSyncPayload = (resp: SessionResponse, session: GameSession): GameSyncPayload => {
   const payload: GameSyncPayload = {
     state: serializeState(resp.state, { engineStack: session.getEngineStack() }),
-    pending: resp.pending,
     interaction: resp.interaction,
     scores: resp.scores ?? null,
     pastureCapacities: resp.pastureCapacities,

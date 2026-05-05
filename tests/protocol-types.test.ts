@@ -13,7 +13,6 @@ describe('shared protocol types', () => {
     const state = createInitialState(42)
     const payload: GameSyncPayload = {
       state: serializeState(state, emptyCtx()),
-      pending: { type: 'none' },
       interaction: {
         stateId: 'idle',
         allowedCommands: ['takeAction', 'undoStep', 'undoAction'],
@@ -26,7 +25,7 @@ describe('shared protocol types', () => {
     }
     expect(payload.ok).toBe(true)
     expect(payload.state.round).toBe(1)
-    expect(payload.pending.type).toBe('none')
+    expect(payload.interaction.stateId).toBe('idle')
   })
 
   it('StateUpdateEnvelope wraps a GameSyncPayload', () => {
@@ -39,7 +38,6 @@ describe('shared protocol types', () => {
       cause: 'action',
       payload: {
         state: serializeState(state, emptyCtx()),
-        pending: { type: 'none' },
         interaction: {
           stateId: 'idle',
           allowedCommands: ['takeAction', 'undoStep', 'undoAction'],
@@ -92,7 +90,7 @@ describe('shared protocol types', () => {
   it('ServerEvent discriminates on type', () => {
     const events: ServerEvent[] = [
       { type: 'error', error: 'test' },
-      { type: 'roomCreated', roomId: 'abc', playerIndex: 0 },
+      { type: 'roomCreated', roomId: 'abc', playerIndex: 0, maxPlayers: 2 },
       { type: 'roomJoined', roomId: 'abc', playerIndex: 1 },
       { type: 'gameStarted' },
       { type: 'playerDisconnected', playerIndex: 0 },

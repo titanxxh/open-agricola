@@ -38,7 +38,6 @@ class FakeWebSocket {
 
 const buildPayload = (historyLength: number): GameSyncPayload => ({
   state: serializeState(createInitialState(42), emptyCtx()),
-  pending: { type: 'none' },
   interaction: {
     stateId: 'idle',
     allowedCommands: ['takeAction', 'undoStep', 'undoAction'],

@@ -323,7 +323,7 @@ export const GameContainerApi = () => {
   }, [])
   const { user } = useAuth()
   const { transport, wsStatus, isWs, isReady, wsTransport } = useTransportSetup(lockedViewPlayerId, user?.displayName, isWsMode)
-  const { state, pending, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, applySnapshot } =
+  const { state, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, applySnapshot } =
     useGameSync()
   const { locale } = useLocale()
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
@@ -978,9 +978,9 @@ export const GameContainerApi = () => {
   const hasHarvestFeedSummary = Object.values(harvestFeedSummary).some((value) => value > 0)
   const confirmHarvestFeed = useCallback(() => {
     if (!isInteractive) return
-    if (pending.type !== 'harvestFeed') return
-    void transport.confirmFeed(pending.playerIndex, harvestFeedSelections).catch((e) => console.error(e))
-  }, [pending, transport, isInteractive, harvestFeedSelections])
+    if (interaction.stateId !== 'wait' || interaction.request.kind !== 'feed') return
+    void transport.confirmFeed(interaction.playerIndex, harvestFeedSelections).catch((e) => console.error(e))
+  }, [interaction, transport, isInteractive, harvestFeedSelections])
 
   const roomPositions = useMemo(() => new Set((displayPlayer?.roomTiles ?? []).map((pos: FarmTilePosition) => positionKey(pos))), [displayPlayer?.roomTiles])
   const fieldPositions = useMemo(() => new Set((displayPlayer?.fields ?? []).map((f) => positionKey({ row: f.row, col: f.col }))), [displayPlayer?.fields])
