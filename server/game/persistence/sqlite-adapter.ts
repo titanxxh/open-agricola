@@ -73,9 +73,15 @@ export class SqliteRoomPersistence implements RoomPersistence {
       const customCardIdsJson = JSON.stringify(meta.customCardDbIds)
       const existing = this.db.prepare('SELECT id FROM rooms WHERE id = ?').get(id)
       if (existing) {
-        this.db.prepare(
-          'UPDATE rooms SET state_json = ?, status = ?, custom_card_ids = ?, version = version + 1, updated_at = ? WHERE id = ?',
-        ).run(stateJson, meta.status, customCardIdsJson, now, id)
+        if (serialized === null) {
+          this.db.prepare(
+            'UPDATE rooms SET status = ?, custom_card_ids = ?, version = version + 1, updated_at = ? WHERE id = ?',
+          ).run(meta.status, customCardIdsJson, now, id)
+        } else {
+          this.db.prepare(
+            'UPDATE rooms SET state_json = ?, status = ?, custom_card_ids = ?, version = version + 1, updated_at = ? WHERE id = ?',
+          ).run(JSON.stringify(serialized), meta.status, customCardIdsJson, now, id)
+        }
       } else {
         this.db.prepare(
           'INSERT INTO rooms (id, created_by, state_json, max_players, status, version, custom_card_ids, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)',

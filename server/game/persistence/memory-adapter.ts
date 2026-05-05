@@ -23,8 +23,9 @@ export class InMemoryRoomPersistence implements RoomPersistence {
   }
 
   save(id: string, serialized: SerializedGameState | null, meta: RoomMeta): void {
+    const existing = this.rooms.get(id)
     this.rooms.set(id, {
-      serialized,
+      serialized: serialized === null ? (existing?.serialized ?? null) : serialized,
       meta: { ...meta, customCardDbIds: [...meta.customCardDbIds], players: meta.players.map((p) => ({ ...p })) },
       updatedAt: Date.now(),
     })

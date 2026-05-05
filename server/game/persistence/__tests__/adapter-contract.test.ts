@@ -89,5 +89,13 @@ for (const [name, factory] of adapters) {
       const res = p.listRestorable({ now: Date.now(), waitingTtlMs: 60_000, playingTtlMs: 60_000 })
       expect(res.every((s) => s.meta.status !== 'finished')).toBe(true)
     })
+
+    it('save with null serialized on existing row preserves state', () => {
+      const p = factory(register)
+      p.save('r1', STATE, META)
+      p.save('r1', null, { ...META, status: 'playing' })
+      const snap = p.load('r1')
+      expect(snap?.serialized).toEqual(STATE)
+    })
   })
 }
