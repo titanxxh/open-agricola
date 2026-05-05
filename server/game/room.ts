@@ -2,6 +2,7 @@ import type { WebSocket } from 'ws'
 import { GameSession } from './authoritative-session.ts'
 import type { RoomMeta, RoomSnapshot, RoomStatus } from './persistence/room-persistence.ts'
 import { rehydrateState } from '../../shared/game/serialization.ts'
+import type { SerializedGameState } from '../../shared/game/serialization.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import type { RoomSummary } from '../../shared/protocol/ws.ts'
 
@@ -169,3 +170,53 @@ export const snapshotToRoom = (
   createdBy: snapshot.meta.createdBy ?? undefined,
   customCardDbIds: snapshot.meta.customCardDbIds,
 })
+
+export type PersistedRoomRow = {
+  id: string
+  created_by: string | null
+  state_json: string | null
+  max_players: number
+  custom_card_ids: string | null
+  status?: RoomStatus
+  version: number
+  updated_at?: number
+}
+
+const parseCustomCardDbIds = (raw: string | null | undefined): string[] => {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+export function restoreRoomFromSqliteRow(row: PersistedRoomRow): Room | null {
+  const customCardDbIds = parseCustomCardDbIds(row.custom_card_ids)
+  const serialized: SerializedGameState | null = row.state_json
+    ? (() => {
+        try { return JSON.parse(row.state_json) as SerializedGameState }
+        catch { return null }
+      })()
+    : null
+  const snapshot: RoomSnapshot = {
+    id: row.id,
+    serialized,
+    meta: {
+      createdBy: row.created_by,
+      maxPlayers: row.max_players,
+      customCardDbIds,
+      status: row.status ?? (serialized ? 'playing' : 'waiting'),
+      players: [],
+    },
+    updatedAt: row.updated_at ?? 0,
+  }
+  try {
+    const room = snapshotToRoom(snapshot)
+    return { ...room, version: row.version }
+  } catch (err) {
+    console.warn(`[room] failed to restore room ${row.id}:`, err)
+    return null
+  }
+}
