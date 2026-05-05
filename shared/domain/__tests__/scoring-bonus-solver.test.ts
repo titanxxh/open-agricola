@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { solveBonusScoring } from '../scoring-bonus-solver'
+import { solveBonusScoring } from '../scoring'
 import { paretoOptimal } from '../../cards/helpers/pareto-bonus'
 import type { GameState, PlayerState } from '../../game/types'
 import type { BonusScoringContext } from '../../cards/card-effects'

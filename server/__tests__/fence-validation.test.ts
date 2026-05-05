@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { validateFenceSelection } from '../../shared/logic/farm/fence-validation.ts'
-import type { PlayerFarmState } from '../../shared/logic/farm/fence-validation.ts'
+import { validateFenceSelection } from '../../shared/domain/farmyard'
+import type { PlayerFarmState } from '../../shared/domain/farmyard'
 import {
   getFenceCount,
   getPalisadeCount,

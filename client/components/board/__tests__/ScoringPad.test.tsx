@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { fireEvent, render, screen } from '@testing-library/react'
 
-import type { PlayerScoreSummary } from '../../../../shared/logic/scoring'
+import type { PlayerScoreSummary } from '../../../../shared/domain/scoring'
 import type { PlayerState } from '../../../../shared/game/types'
 import { createInitialPlayerStats } from '../../../../shared/logic/stats'
 import { ScoringPad } from '../ScoringPad'

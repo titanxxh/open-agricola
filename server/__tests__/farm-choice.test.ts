@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { constructAction } from '../../shared/actions/effects/construct.ts'
 import type { ActionExecutionContext, ActionSpace, GameState, PlayerState } from '../../shared/game/types.ts'
-import { buildRoomFarmInteraction } from '../../shared/logic/farm/farm-interaction.ts'
+import { buildRoomFarmInteraction } from '../../shared/domain/farmyard'
 import { A14_CarpentersHammer } from '../../shared/cards/A/A14_CarpentersHammer'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 

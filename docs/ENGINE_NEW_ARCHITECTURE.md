@@ -1049,13 +1049,35 @@ S6 物理分层完成后专设 S7"卡牌效果测试回归"：
 - **完成度量**：21 commits on `sprint-S3-payment-solver` branch；ADR-0006 全部 6 个子决议（D1-D6）落地
 - **依赖关系**：与 S1 / S2 / S4 均无强前置（详见 `docs/superpowers/specs/2026-05-03-engine-redesign-S2-S4-contracts.md` §4.2）。在独立 worktree 推进，effect 改写严格限定在 `improvement.ts` 拆分相关
 
-### Sprint S4：领域聚合层 `shared/domain/`
+### Sprint S4：领域聚合层 `shared/domain/` + 节点充血
 
-- 引入 `PlayerBoard / Pasture / Farmyard / AnimalZones` 派生视图（住在新建的 `shared/domain/` 目录）
-- 迁移 `logic/farm/*` + `actions/helpers/animal-zones.ts` 入 `domain/`
-- 行动层 effect 改用 `playerBoard(state, idx).xxx()` 调用
+S4 拆分为两条独立轨道并行推进：
+
+#### S4a：领域聚合层 `shared/domain/` ✅ S4a 完成（2026-05-05）
+
+> **完成总结**（详见 `docs/sprint-S4a-progress.md`）
+>
+> - ✅ PR1：scaffold `shared/domain/{index,player-board,farmyard,pasture,animal-zones,scoring}.ts`，wrap-only
+> - ✅ PR2：farm 类 effects（plow/sow/fence/room/stable）切换到 `playerBoard().farmyard.xxx()`
+> - ✅ PR3：animal-zones 消费方（C11/C12/C148/E33/E11/A86/B11/...）切换到 `playerBoard().animals.xxx()`
+> - ✅ PR4：protocol / session-core / client / cards-effects 类型 import 切换到 `shared/domain`
+> - ✅ PR5：5 处 PR5-deferred external import + 2 处临时 re-export 全部 inline；删除 11 个 legacy 文件（~2189 LoC）—— `shared/logic/farm/` 目录不复存在；`shared/actions/helpers/animal-zones.ts` 不复存在；`shared/logic/scoring*.ts` 不复存在
+> - ✅ DoD D1-D9 全过：D1-D6 ✅；D7 zero regression（slow 33 fail / 1690 pass，比 PR4 baseline 少 1 fail）；D8 effect 行数变化 -0.16%（drop 主体在 PR2/PR3，PR5 仅清 legacy）；D9 强制 green 子集全绿
+> - **基线**：fast 326 passed / 0 fail；tsc 0 error；lint 0 error / 316 warnings；bundle within budget
+>
+> **架构成果**：`shared/domain/` 成为 farm/animal/scoring 的唯一权威；effects/cards/session 不再 reach into `logic/farm/*` / `helpers/animal-zones` / `logic/scoring*`；ESLint guard 保护 domain 不依赖 engine/session/effects。
+
+#### S4b：节点充血 + Engine 公开 API 收敛（并行推进，独立 worktree）
+
 - 节点充血（学 BGA `AbstractNode`）—— `shared/engine/nodes/*.ts` 每节点一文件，行为下沉
-- 专项 DoD：`shared/logic/farm/` 目录不复存在；行动层 effect 平均行数下降 ≥ 30%；engine.ts 主文件 ≤ 600 行
+- Engine public 收敛到 6 / `flowNodeCounter` 整理 / 序列化测试覆盖
+- 专项 DoD：engine.ts 主文件 ≤ 600 行；节点 cursor round-trip 测试覆盖每节点
+
+#### Sprint S4 整体 DoD
+
+- ✅ S4a：`shared/logic/farm/` + `shared/actions/helpers/animal-zones.ts` + `shared/logic/scoring*.ts` 目录/文件不复存在
+- 行动层 effect 平均行数下降 ≥ 30%（注：S4a PR2/PR3 已完成主要 drop；PR5 仅清 legacy；最终对比 pre-S4a `main` 基线衡量）
+- engine.ts 主文件 ≤ 600 行（S4b 负责）
 
 ### Sprint S5：RoomManager 拆 connection/persistence
 

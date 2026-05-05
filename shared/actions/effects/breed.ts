@@ -6,11 +6,7 @@ import type {
   HarvestBreedSummary,
   PlayerState,
 } from '../../game/types'
-import { playerBoard } from '../../domain'
-// `getTotalAnimalCapacity(player)` is state-free legacy still imported
-// directly because `breed()` accepts `state: GameState | null`. PR5 will
-// inline / remove this when shared/actions/helpers/animal-zones is deleted.
-import { getTotalAnimalCapacity } from '../helpers/animal-zones'
+import { playerBoard, getTotalAnimalCapacity } from '../../domain'
 import { shouldEnforceReorganizeOnLastHarvest } from '../../cards/card-effects'
 
 export type BreedAnimalType = 'sheep' | 'boar' | 'cattle'

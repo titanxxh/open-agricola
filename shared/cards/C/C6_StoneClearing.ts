@@ -19,7 +19,7 @@ const CARD_ID = 'C6_StoneClearing'
  *   2. Updating `reap()` to handle stone-yielding fields (touches
  *      shared/actions/effects/reap.ts and HarvestReapSummary).
  *   3. Updating sow / plow / field-display to ignore stone fields where
- *      appropriate (touches shared/logic/farm/sow-validation.ts and UI).
+ *      appropriate (touches shared/domain/farmyard.ts and UI).
  * All main-path changes outside the F1 onBuy SEQ-truncation scope. Tracked
  * in card_progress §刻意不同.
  *

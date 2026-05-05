@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import {
   computeAnimalZones,
   computeInvalidAnimalsForZone,
-} from '../../shared/actions/helpers/animal-zones'
+} from '../../shared/domain/animal-zones'
 
 import '../../shared/cards/C/C12_CattleFarm'
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { validatePlowSelection } from '../../shared/logic/farm/plow-validation.ts'
-import type { PlayerFarmState } from '../../shared/logic/farm/fence-validation.ts'
+import { validatePlowSelection } from '../../shared/domain/farmyard'
+import type { PlayerFarmState } from '../../shared/domain/farmyard'
 
 const createPlayer = (): PlayerFarmState => ({
   id: 'p1',

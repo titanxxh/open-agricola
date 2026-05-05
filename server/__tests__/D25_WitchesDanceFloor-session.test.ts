@@ -22,7 +22,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect, computeExtraSowableFields } from '../../shared/cards/card-effects'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { getPlayerBakeRates } from '../../shared/cards/helpers/exchange-registry'
-import { computeScores } from '../../shared/logic/scoring'
+import { computeScores } from '../../shared/domain/scoring'
 
 import '../../shared/cards/D/D25_WitchesDanceFloor'
 import { D25_WitchesDanceFloor } from '../../shared/cards/D/D25_WitchesDanceFloor'

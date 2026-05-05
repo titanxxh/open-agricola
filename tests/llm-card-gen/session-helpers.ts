@@ -27,7 +27,7 @@ import { createInitialState } from '../../shared/logic/state'
 import type { GameState, PlayerState, Resource } from '../../shared/game/types'
 import { rewriteCardId } from './extract'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import { solveBonusScoring } from '../../shared/logic/scoring-bonus-solver'
+import { solveBonusScoring } from '../../shared/domain/scoring'
 import {
   setWorkersAtHome,
   markAllWorkersUsed,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { tryAddRoomTile } from '../build-room-helper'
-import { getAllTilePositions, positionKey } from '../../../game/farm'
-import type { FarmTilePosition, PlayerState, Resource } from '../../../game/types'
+import { tryAddRoomTile } from '../farmyard'
+import { getAllTilePositions, positionKey } from '../../game/farm'
+import type { FarmTilePosition, PlayerState, Resource } from '../../game/types'
 
 const emptyResources = (): Resource => ({
   wood: 0,

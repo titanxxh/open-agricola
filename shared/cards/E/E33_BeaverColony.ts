@@ -1,13 +1,7 @@
 import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { playerBoard, type AnimalZone } from '../../domain'
-// `getPastureCapacity(pasture)` is state-free legacy still imported
-// directly because it's called from `onComputeAnimalZones`, which is
-// itself the hook that drives `playerBoard().animals.zones()` and
-// therefore cannot recursively call into the facade. PR5 will inline /
-// remove this when shared/actions/helpers/animal-zones is deleted.
-import { getPastureCapacity } from '../../actions/helpers/animal-zones'
+import { playerBoard, type AnimalZone, getPastureCapacity } from '../../domain'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E33_BeaverColony'
