@@ -5,7 +5,7 @@ import type {
   PlayerScoreSummary,
   ScoreCategoryResult,
   ScoreEntry,
-} from '../../../shared/logic/scoring'
+} from '../../../shared/domain'
 import type {
   PlayerState,
   PlayerStats,

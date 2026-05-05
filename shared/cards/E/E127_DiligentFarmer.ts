@@ -1,5 +1,5 @@
 import { Occupation } from '../types'
-import { computeScores } from '../../logic/scoring'
+import { Scoring } from '../../domain'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E127_DiligentFarmer'
@@ -37,7 +37,7 @@ export const E127_DiligentFarmer_impl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
-    const scores = computeScores(state)
+    const scores = Scoring.computeAll(state)
     const playerScore = scores.find((s) => s.playerId === player.id)
     if (!playerScore) return
 

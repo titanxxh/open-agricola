@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { isBorderEdge } from '../../game/farm'
-import { getAllEdgeIds } from '../../logic/farm/fence-validation'
+import { getAllEdgeIds } from '../../domain'
 import type { CardImpl } from '../registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
