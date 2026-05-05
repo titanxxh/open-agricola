@@ -70,7 +70,7 @@ describe('D12_MilkingPlace session', () => {
     // Process harvest feed for all players
     while (resp.pending.type === 'harvestFeed') {
       const pidx = resp.pending.playerIndex
-      resp = session.confirmHarvestFeed(pidx, [])
+      resp = session.resolveChoice(pidx, 'confirm', { selections: [] })
     }
 
     // Handle any animal reorgs
@@ -106,7 +106,7 @@ describe('D12_MilkingPlace session', () => {
 
     while (resp.pending.type === 'harvestFeed') {
       const pidx = resp.pending.playerIndex
-      resp = session.confirmHarvestFeed(pidx, [])
+      resp = session.resolveChoice(pidx, 'confirm', { selections: [] })
     }
 
     while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {

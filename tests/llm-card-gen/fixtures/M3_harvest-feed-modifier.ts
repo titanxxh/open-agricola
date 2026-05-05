@@ -91,7 +91,7 @@ const fixture: CardFixture = {
     let safety = 0
     while (resp.pending?.type === 'harvestFeed' && safety++ < 10) {
       const pi = resp.pending.playerIndex!
-      resp = session.confirmHarvestFeed(pi, []) as typeof resp
+      resp = session.resolveChoice(pi, 'confirm', { selections: [] }) as typeof resp
       steps.push({ label: `confirmHarvestFeed(${pi}, [])`, resp })
     }
     return { steps }

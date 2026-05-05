@@ -134,7 +134,7 @@ describe('A59_PotatoRidger session', () => {
       resp = session.resolveChoice(resp.pending.playerIndex, 'ok')
     }
     while (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
     }
     while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones as any)
@@ -159,7 +159,7 @@ describe('A59_PotatoRidger session', () => {
 
     // Should NOT get a choice for this card since 2 < 3
     while (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
     }
     while (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones as any)

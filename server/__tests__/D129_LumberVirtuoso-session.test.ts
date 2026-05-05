@@ -165,7 +165,7 @@ function drainHarvest(session: GameSession, resp: SessionResponse): SessionRespo
   while (safety-- > 0) {
     if (current.pending.type === 'none') return current.state
     if (current.pending.type === 'harvestFeed') {
-      current = session.confirmHarvestFeed(current.pending.playerIndex, [])
+      current = session.resolveChoice(current.pending.playerIndex, 'confirm', { selections: [] })
     } else if (current.pending.type === 'choice' && (current.pending as any).promptKey === 'ui.interactionAnimalReorg') {
       current = session.resolveChoice(
         current.pending.playerIndex, 'confirm',

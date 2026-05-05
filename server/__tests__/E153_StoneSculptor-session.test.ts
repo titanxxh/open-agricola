@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
+import type { FeedSelection } from '../../shared/session/session-core'
 
 import '../../shared/cards/E/E153_StoneSculptor'
 
@@ -25,13 +26,13 @@ const setupHarvestRound = (round = 4) => {
   return { session, state }
 }
 
-const drainHarvest = (session: GameSession, feedSelections: Record<number, Parameters<GameSession['confirmHarvestFeed']>[1]> = {}) => {
+const drainHarvest = (session: GameSession, feedSelections: Record<number, FeedSelection[]> = {}) => {
   let resp = session.performRoundEnd()
   while (resp.pending.type !== 'none') {
     if (resp.pending.type === 'harvestFeed') {
       const idx = resp.pending.playerIndex
       const sel = feedSelections[idx] ?? []
-      resp = session.confirmHarvestFeed(idx, sel)
+      resp = session.resolveChoice(idx, 'confirm', { selections: sel })
     } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
       const interaction = resp.interaction.stateId === 'wait' ? resp.interaction : null
       resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', interaction?.zones ?? [])

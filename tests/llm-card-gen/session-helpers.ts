@@ -350,7 +350,7 @@ export function autoAdvanceRoundEnd(
   while (iter++ < max) {
     if (resp.pending.type === 'none' && session.getState().state.gameOver) return
     if (resp.pending.type === 'harvestFeed') {
-      resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+      resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
       continue
     }
     if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {

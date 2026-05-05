@@ -40,7 +40,7 @@ describe('E30_ChildsToy session', () => {
     let safety = 30
     while (safety-- > 0 && resp.pending.type !== 'none') {
       if (resp.pending.type === 'harvestFeed') {
-        resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+        resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
       } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
         resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones)
       } else if (resp.pending.type === 'choice') {
@@ -92,7 +92,7 @@ describe('E30_ChildsToy session', () => {
     let safety = 30
     while (safety-- > 0 && resp.pending.type !== 'none') {
       if (resp.pending.type === 'harvestFeed') {
-        resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+        resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
       } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
         resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones)
       } else if (resp.pending.type === 'choice') {
@@ -143,7 +143,7 @@ describe('E30_ChildsToy session', () => {
     let safety = 30
     while (safety-- > 0 && resp.pending.type !== 'none') {
       if (resp.pending.type === 'harvestFeed') {
-        resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+        resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
       } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
         resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones)
       } else if (resp.pending.type === 'choice') {
@@ -188,7 +188,7 @@ describe('E30_ChildsToy session', () => {
     let safety = 30
     while (safety-- > 0 && resp.pending.type !== 'none') {
       if (resp.pending.type === 'harvestFeed') {
-        resp = session.confirmHarvestFeed(resp.pending.playerIndex, [])
+        resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', { selections: [] })
       } else if (resp.pending.type === 'choice' && (resp.pending as any).promptKey === 'ui.interactionAnimalReorg') {
         resp = session.resolveChoice(resp.pending.playerIndex, 'confirm', resp.interaction.zones)
       } else if (resp.pending.type === 'choice') {
