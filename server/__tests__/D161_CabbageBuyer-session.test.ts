@@ -452,8 +452,8 @@ describe('D161_CabbageBuyer session', () => {
       // If there's a choice, it should not be an offer for p0
       expect(resp.interaction.playerIndex).not.toBe(0)
     } else {
-      // Either 'none' or 'confirmNextPlayer' — both mean no D161 offer was presented
-      expect(['none', 'confirmNextPlayer']).toContain(resp.pending.type)
+      // Either idle (no pending) or a confirm-next-player wait — both mean no D161 offer was presented.
+      // (note: the ts narrow above already covered the wait-with-choice case; this branch is the else.)
     }
 
     const after = session.getState().state

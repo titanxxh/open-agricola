@@ -47,7 +47,7 @@ const playC16 = (session: GameSession): void => {
     safety += 1
     const interaction = (resp as { interaction?: { stateId?: string } }).interaction
     if (interaction?.stateId === 'wait') break
-    const opts = resp.interaction.options?.map((o) => o.value)
+    const opts = (resp.interaction.options ?? []).map((o) => o.value)
     const cardOption = opts.find((v) => v === `minor:${CARD_ID}`)
     if (cardOption) {
       resp = session.resolveChoice(0, cardOption)
@@ -74,7 +74,7 @@ describe('C16 FieldFences session', () => {
     expect(player.resources.food).toBe(0)
     // After buying C16, the engine should be waiting on the fencing
     // farm-select prompt (or an accept/decline wrapper around it).
-    expect(session.getState().pending.type).toBe('choice')
+    expect(session.getState().interaction.stateId).toBe('wait')
   })
 
   it('field-adjacent edges are free of wood; non-adjacent edges still cost wood', () => {

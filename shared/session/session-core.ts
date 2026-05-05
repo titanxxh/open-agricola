@@ -157,7 +157,13 @@ export type FeedSelections = FeedSelection[]
 
 type HistoryEntry = {
   state: GameState
-  pending: PendingAction
+  /**
+   * Pending-shape discriminator at the moment of the snapshot. Only the
+   * 'choice' bit is read (by `undoStep()`'s `canRestorePriorChoice`
+   * branch); we don't need the full `PendingAction` value, so keep it
+   * compact instead of cloning the deprecated union.
+   */
+  hadChoicePending: boolean
   activeSpaceId: string | null
   activePlayerIndex: number | null
   engineSnapshot: ReturnType<Engine['snapshot']> | null
@@ -1429,17 +1435,6 @@ export class GameCore {
     return resp
   }
 
-  private clonePending(pending: PendingAction): PendingAction {
-    if (typeof structuredClone === 'function') {
-      try {
-        return structuredClone(pending)
-      } catch {
-        return JSON.parse(JSON.stringify(pending)) as PendingAction
-      }
-    }
-    return JSON.parse(JSON.stringify(pending)) as PendingAction
-  }
-
   /**
    * Derive the legacy `PendingAction` shape from the current engine-stack
    * state. Replaces the deleted `this.pending` field (Task 10): every read
@@ -1541,12 +1536,10 @@ export class GameCore {
     const entry: HistoryEntry = {
       state: cloneState(this.state),
       // Task 10/11: `this.pending` field is gone; derive the snapshot from
-      // `engineStack.peekInteraction()`. The HistoryEntry.pending field
-      // remains live — `undoStep()` reads `entry.pending.type === 'choice'`
-      // to recognise prior-choice farm-prompt restore points (see
-      // `canRestorePriorChoice` branch). Do NOT remove this field without
-      // migrating that read site.
-      pending: this.clonePending(this.getCurrentPending()),
+      // `engineStack.peekInteraction()`. S2 Task 13.6 contracted the
+      // HistoryEntry pending snapshot down to a single boolean — `undoStep()`
+      // only consults the 'choice' discriminator (see `canRestorePriorChoice`).
+      hadChoicePending: this.getCurrentPending().type === 'choice',
       activeSpaceId: this.activeSpaceId,
       activePlayerIndex: this.activePlayerIndex,
       engineSnapshot: this.engine?.snapshot() ?? null,
@@ -1566,11 +1559,11 @@ export class GameCore {
 
   private restoreHistory(entry: HistoryEntry) {
     this.state = cloneState(entry.state)
-    // Task 10/11: `this.pending` field deleted from `GameState`. The
-    // `entry.pending` snapshot persists on HistoryEntry for `undoStep()`'s
-    // `canRestorePriorChoice` discriminator (read-only here). Live pending
-    // shape is rederived from `engineStack.peekInteraction()` after the
-    // stack is restored below.
+    // Task 10/11: `this.pending` field deleted from `GameState`. S2 Task
+    // 13.6 collapsed the HistoryEntry pending snapshot to a single boolean
+    // (`hadChoicePending`) consumed by `undoStep()`'s `canRestorePriorChoice`
+    // branch. Live pending/interaction shape is rederived from
+    // `engineStack.peekInteraction()` after the stack is restored below.
     this.turnOwnerPlayerIndex = entry.turnOwnerPlayerIndex
     this.engineStack.clear()
     const source = entry.engineSource
@@ -3348,7 +3341,7 @@ export class GameCore {
         entry.undoBoundary !== true &&
         entry.activeSpaceId === this.activeSpaceId &&
         entry.activePlayerIndex === this.activePlayerIndex &&
-        entry.pending.type === 'choice'
+        entry.hadChoicePending
       if (canRestorePriorChoice) {
         this.history.pop()
         this.restoreHistory(entry)

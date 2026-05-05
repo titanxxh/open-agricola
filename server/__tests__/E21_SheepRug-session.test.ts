@@ -58,7 +58,7 @@ describe('E21_SheepRug session', () => {
 
     let resp = session.takeAction(0, 'wish-children')
     expect(resp.ok).toBe(true)
-    expect(['choice', 'confirmNextPlayer']).toContain(resp.pending.type)
+    expect(resp.interaction.stateId).toBe('wait')
     expect(familySize(resp.state.players[0]!)).toBe(3)
     expect(newbornCount(resp.state.players[0]!)).toBe(1)
     expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)

@@ -16,7 +16,7 @@ describe('A126 MasterWorkman integration', () => {
     const resp = session.takeAction(0, 'sheep-market')
     const woodAfter = resp.state.players[0].resources.wood
     console.log('Wood before:', woodBefore, 'Wood after:', woodAfter)
-    console.log('Pending:', resp.pending.type)
+    console.log('Interaction:', resp.interaction.stateId)
     console.log('Log:', JSON.stringify(resp.state.log.slice(0, 5), null, 2))
 
     expect(woodAfter).toBeGreaterThan(woodBefore)
