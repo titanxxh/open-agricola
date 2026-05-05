@@ -43,3 +43,22 @@ export const startBreedPhase = (core: GameCore): SessionResponse => {
   core.state.roundPhase = 'breeding'
   return core.invokeAfterFeedingPhase()
 }
+
+/**
+ * Continuation after a player's reorganize sub-flow during the
+ * harvest-breed phase. Walk to the next player still owing a harvest
+ * reorg; if none, trampoline into the onEndHarvest stage-hook chain.
+ * Migrated from GameCore.continueAfterReorganize_harvestBreed
+ * (S2 Task 11 part 3).
+ */
+export const continueAfterReorganizeHarvestBreed = (
+  core: GameCore,
+  playerIndex: number,
+): void => {
+  const nextPending = core.findNextHarvestReorgPlayerIndex(playerIndex)
+  if (nextPending !== -1) {
+    core.startReorgSubFlow(nextPending, 'harvest-breed')
+    return
+  }
+  core.invokeEndHarvestEffects()
+}

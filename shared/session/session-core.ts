@@ -450,6 +450,10 @@ export class GameCore {
   invokeEndTurnHooks(playerIndex: number): SessionResponse { return this.continueEndTurnHooks(playerIndex) }
   /** @internal Harvest phase — read the harvestRounds set (for returning-home decision). */
   isHarvestRound(round: number): boolean { return harvestRounds.includes(round) }
+  /** @internal Harvest phase — find next player still owing a harvest-breed reorg. */
+  findNextHarvestReorgPlayerIndex(playerIndex: number): number { return this.findNextHarvestReorgPlayer(playerIndex) }
+  /** @internal Harvest phase — onEndHarvest stage hook chain trampoline. */
+  invokeEndHarvestEffects(): SessionResponse { return this.continueEndHarvestEffects() }
   /** @internal phase access — build a fresh Engine for a top-level action space. */
   createEngineForSpace(actionId: string): Engine { return this.createEngine(actionId) }
   /** @internal phase access — push a synthetic interaction-only frame. */
@@ -2114,13 +2118,9 @@ export class GameCore {
     return roundPhase.continueAfterReorganizeReturningHome(this)
   }
 
+  /** S2 Task 11 part 3: thin delegator — body lives in `phases/harvest.ts`. */
   private continueAfterReorganize_harvestBreed(playerIndex: number): void {
-    const nextPending = this.findNextHarvestReorgPlayer(playerIndex)
-    if (nextPending !== -1) {
-      this.startReorganizeSubFlow(nextPending, 'harvest-breed')
-      return
-    }
-    this.continueEndHarvestEffects()
+    return harvestPhase.continueAfterReorganizeHarvestBreed(this, playerIndex)
   }
 
   /** S2 Task 10 part 5: thin delegator — body lives in `phases/round.ts`. */
