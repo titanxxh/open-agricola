@@ -1,6 +1,12 @@
-import type { PlayerState, Pasture, GameState } from '../../game/types'
-import { positionKey } from '../../game/farm'
-import { getCardEffect, type Meeple } from '../../cards/card-effects'
+import type { GameState, PlayerState, Pasture } from '../game/types.ts'
+import { positionKey } from '../game/farm.ts'
+import { getCardEffect, type Meeple } from '../cards/card-effects.ts'
+
+// ---------------------------------------------------------------------------
+// AnimalZone type and computation helpers (formerly in
+// `shared/actions/helpers/animal-zones.ts`). Inlined here so the domain
+// layer is self-contained.
+// ---------------------------------------------------------------------------
 
 export type AnimalZone = {
   id: string
@@ -13,9 +19,13 @@ export type AnimalZone = {
   pastureIndex?: number
 }
 
+type AnimalType = 'sheep' | 'boar' | 'cattle'
+
+/** Pasture capacity formula: `size * 2 * 2^stables`. */
 export const getPastureCapacity = (pasture: Pasture) =>
   pasture.size * 2 * Math.pow(2, pasture.stables)
 
+/** Loose-stable tile keys (stables not inside any pasture). */
 export const getLooseStableKeys = (player: PlayerState) => {
   const pastureTiles = new Set(
     player.pastures.flatMap((pasture) =>
@@ -27,6 +37,7 @@ export const getLooseStableKeys = (player: PlayerState) => {
     .filter((key) => !pastureTiles.has(key))
 }
 
+/** Compute the full list of animal zones (pastures + house + loose stables + card zones). */
 export const computeAnimalZones = (player: PlayerState): AnimalZone[] => {
   const zones: AnimalZone[] = [
     ...player.pastures.map((pasture, index) => ({
@@ -74,6 +85,7 @@ export const computeAnimalZones = (player: PlayerState): AnimalZone[] => {
   return zones
 }
 
+/** Total assigned animal count across pastures + house + loose stables. */
 export const getAssignedAnimalCount = (player: PlayerState) => {
   const pastureCount = player.pastures.reduce(
     (sum, pasture) => sum + pasture.animalCount,
@@ -87,14 +99,10 @@ export const getAssignedAnimalCount = (player: PlayerState) => {
   return pastureCount + houseCount + stableCount
 }
 
+/** Total animal capacity across all zones. */
 export const getTotalAnimalCapacity = (player: PlayerState) =>
   computeAnimalZones(player).reduce((sum, zone) => sum + zone.capacity, 0)
 
-/**
- * Expand an `(animalType, animalCount)` zone into a per-meeple list so it can
- * be passed to `CardEffect.getInvalidAnimals`. If the zone has no animal
- * data, returns an empty list.
- */
 const expandZoneToMeeples = (zone: AnimalZone): Meeple[] => {
   const type = zone.animalType
   const count = zone.animalCount ?? 0
@@ -121,13 +129,22 @@ export const computeInvalidAnimalsForZone = (
     return effect.getInvalidAnimals(player, zone, meeples, state)
   } catch (err) {
     if (zone.cardId.startsWith('CUSTOM_')) {
-      console.warn(`[animal-zones] custom card ${zone.cardId} getInvalidAnimals threw, skipping:`, err)
+      console.warn(
+        `[animal-zones] custom card ${zone.cardId} getInvalidAnimals threw, skipping:`,
+        err,
+      )
       return []
     }
     throw err
   }
 }
 
+/**
+ * Imperative: rebalance animals across zones to fit current capacity.
+ *
+ * **MUTATES** `player.pastures`, `player.houseAnimal*`,
+ * `player.stableAnimals`, and the per-type counters in `player.resources`.
+ */
 export const enforceAnimalCapacity = (player: PlayerState) => {
   const zones = computeAnimalZones(player)
   const zoneCapacity = (id: string) => zones.find((z) => z.id === id)?.capacity ?? 0
@@ -138,7 +155,7 @@ export const enforceAnimalCapacity = (player: PlayerState) => {
     cattle: player.resources.cattle,
   }
   const looseStableKeys = getLooseStableKeys(player)
-  const stableAnimals: Record<string, 'sheep' | 'boar' | 'cattle' | null> = {}
+  const stableAnimals: Record<string, AnimalType | null> = {}
   looseStableKeys.forEach((key) => {
     stableAnimals[key] = player.stableAnimals?.[key] ?? null
   })
@@ -177,10 +194,7 @@ export const enforceAnimalCapacity = (player: PlayerState) => {
     totals[type] -= count
     stableAnimals[key] = count > 0 ? type : null
   })
-  const fillPasture = (
-    pasture: Pasture,
-    animalType: 'sheep' | 'boar' | 'cattle',
-  ) => {
+  const fillPasture = (pasture: Pasture, animalType: AnimalType) => {
     const capacity = zoneCapacity(pasture.id)
     const remaining = totals[animalType]
     if (remaining <= 0) return pasture
@@ -273,5 +287,91 @@ export const enforceAnimalCapacity = (player: PlayerState) => {
   for (const zone of zonesForHook) {
     if (zone.zoneType !== 'card') continue
     computeInvalidAnimalsForZone(stateStub, player, zone)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// AnimalZones — domain facade class.
+// ---------------------------------------------------------------------------
+
+/**
+ * View of a player's animal zones (pastures + house + loose stables +
+ * card-typed zones). Owns the computation previously delegated to
+ * `actions/helpers/animal-zones.ts`.
+ *
+ * Mutation contract: query methods do NOT mutate the underlying
+ * `PlayerState`. Only `enforceCapacity()` mutates by design.
+ */
+export class AnimalZones {
+  private readonly player: PlayerState
+  private readonly state: GameState
+
+  constructor(player: PlayerState, state: GameState) {
+    this.player = player
+    this.state = state
+  }
+
+  /** All zones (pastures, house, loose stables, card zones) the player has. */
+  zones(): AnimalZone[] {
+    return computeAnimalZones(this.player)
+  }
+
+  /**
+   * Count of a given animal type, or all assigned animals if no type given.
+   */
+  countAnimals(type?: AnimalType): number {
+    if (type === undefined) {
+      return getAssignedAnimalCount(this.player)
+    }
+    return (this.player.resources[type] as number) ?? 0
+  }
+
+  /** Total capacity across all zones (used for room-for-X questions). */
+  totalCapacity(): number {
+    return getTotalAnimalCapacity(this.player)
+  }
+
+  /**
+   * Per-type remaining capacity (animals that still fit on the board).
+   * NOTE: total capacity is type-agnostic in BGA; we report the same
+   * `free` value for each animal type.
+   */
+  capacityRemaining(): { sheep: number; boar: number; cattle: number } {
+    const total = this.totalCapacity()
+    const assigned = getAssignedAnimalCount(this.player)
+    const free = Math.max(0, total - assigned)
+    return { sheep: free, boar: free, cattle: free }
+  }
+
+  /**
+   * Imperative: rebalance animals across zones to fit current capacity.
+   * **MUTATES** `player.pastures`, `player.houseAnimal*`,
+   * `player.stableAnimals`, and the per-type counters in `player.resources`.
+   */
+  enforceCapacity(): void {
+    enforceAnimalCapacity(this.player)
+  }
+
+  /** Capacity of a specific pasture zone (0 if not a pasture). */
+  pastureCapacity(zoneId: string): number {
+    const pasture = (this.player.pastures ?? []).find((p) => p.id === zoneId)
+    if (!pasture) return 0
+    return getPastureCapacity(pasture)
+  }
+
+  /** Loose-stable tile keys (stables not inside any pasture). */
+  looseStableKeys(): string[] {
+    return getLooseStableKeys(this.player)
+  }
+
+  /**
+   * Per-card invalid-animals hook for a given zone. Returns the list of
+   * meeple records flagged invalid by the card (e.g. C11 WildlifeReserve).
+   * Returns empty list if zone is unknown or not card-typed.
+   */
+  invalidAnimalsForZone(zoneId: string) {
+    const zone = this.zones().find((z) => z.id === zoneId)
+    if (!zone) return []
+    return computeInvalidAnimalsForZone(this.state, this.player, zone)
   }
 }

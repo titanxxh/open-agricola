@@ -5,7 +5,7 @@ import {
   computeAnimalZones,
   getTotalAnimalCapacity,
   enforceAnimalCapacity,
-} from '../../actions/helpers/animal-zones'
+} from '../../domain/animal-zones'
 import type { ActionSpace, GameState, Pasture, PlayerState } from '../../game/types'
 
 import '../E/E33_BeaverColony'

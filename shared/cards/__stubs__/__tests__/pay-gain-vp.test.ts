@@ -10,7 +10,7 @@ import { clearActionHooks } from '../../../actions/hooks'
 import { registerStubCards, clearStubCards } from '../index'
 import { CARD_ID } from '../Stub_PayGainVp'
 import { internalActionDefinitions } from '../../../actions/internal-actions'
-import { computeScores } from '../../../logic/scoring'
+import { computeScores } from '../../../domain/scoring'
 
 const gainAction = internalActionDefinitions.find(a => a.id === 'gain')!
 const payResourcesAction = internalActionDefinitions.find(a => a.id === 'pay')!

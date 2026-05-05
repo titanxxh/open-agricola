@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
-import { computeAnimalZones } from '../../actions/helpers/animal-zones'
-import type { ActionFlow, PlayerState } from '../../game/types'
+import { playerBoard } from '../../domain'
+import type { ActionFlow, GameState, PlayerState } from '../../game/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C9_AutomaticWaterTrough'
@@ -31,8 +31,9 @@ const CARD_ID = 'C9_AutomaticWaterTrough'
  *     undefined so onBuy resolves cleanly.
  */
 
-const canAccommodate = (player: PlayerState, type: 'sheep' | 'boar' | 'cattle'): boolean => {
-  const zones = computeAnimalZones(player)
+const canAccommodate = (state: GameState, player: PlayerState, type: 'sheep' | 'boar' | 'cattle'): boolean => {
+  const idx = state.players.indexOf(player)
+  const zones = playerBoard(state, idx).animals.zones()
   for (const zone of zones) {
     if (zone.blocked) continue
     if ((zone.capacity ?? 0) <= 0) continue
@@ -62,10 +63,10 @@ export const C9_AutomaticWaterTrough = new MinorImprovement({
 export const C9_AutomaticWaterTrough_impl = {
   effect: {
     id: CARD_ID,
-    onBuy: (_state, player): ActionFlow | undefined => {
-      const sheepValid = canAccommodate(player, 'sheep')
-      const boarValid = canAccommodate(player, 'boar')
-      const cattleValid = canAccommodate(player, 'cattle')
+    onBuy: (state, player): ActionFlow | undefined => {
+      const sheepValid = canAccommodate(state, player, 'sheep')
+      const boarValid = canAccommodate(state, player, 'boar')
+      const cattleValid = canAccommodate(state, player, 'cattle')
       const children: ActionFlow[] = []
       if (sheepValid) {
         children.push(gainLeaf(CARD_ID, { sheep: 1 }))

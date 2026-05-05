@@ -18,8 +18,7 @@ import {
   getMaxBuildableRooms,
   resolveRoomPaymentSelection,
 } from '../payment/internal'
-import { validateRoomSelection } from '../../logic/farm/validators'
-import { buildRoomFarmInteraction } from '../../logic/farm/farm-interaction'
+import { playerBoard } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { incRoomsBuilt } from '../../logic/stats'
@@ -45,7 +44,8 @@ const finalizeRoom = (
   paymentChoice: string | undefined,
 ): ActionExecutionResult => {
   const lockedKeys = collectLockedFarmTileKeys(ctx.player)
-  const selection = validateRoomSelection(ctx.player, rooms, lockedKeys)
+  const idx = ctx.state.players.indexOf(ctx.player)
+  const selection = playerBoard(ctx.state, idx).farmyard.canBuildRoom(rooms, lockedKeys)
   if (!selection.ok) return { type: 'fail', logKey: selection.code ?? 'log.action' }
 
   const maxUnits =
@@ -97,8 +97,12 @@ export const constructAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: (_state, player) => getMaxBuildableRooms(player) > 0,
   costPreview: constructCostPreview,
-  execute: ({ player, costs, actionContext }): ActionExecutionResult => {
-    const farm = buildRoomFarmInteraction(player, costs, actionContext)
+  execute: ({ state, player, costs, actionContext }): ActionExecutionResult => {
+    const idx = state.players.indexOf(player)
+    const farm = playerBoard(state, idx).farmyard.selectableTiles('room', {
+      costOverride: costs,
+      actionContext,
+    })
     return {
       type: 'request',
       request: {
@@ -134,7 +138,8 @@ export const constructAction: ActionDefinition = {
         return { type: 'fail', logKey: 'NO_SELECTION' }
       }
       const lockedKeys = collectLockedFarmTileKeys(ctx.player)
-      const selection = validateRoomSelection(ctx.player, rooms, lockedKeys)
+      const idx = ctx.state.players.indexOf(ctx.player)
+      const selection = playerBoard(ctx.state, idx).farmyard.canBuildRoom(rooms, lockedKeys)
       if (!selection.ok) {
         return { type: 'fail', logKey: selection.code ?? 'log.buildRoomFail' }
       }

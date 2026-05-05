@@ -26,6 +26,17 @@ import {
   SequenceNode,
   XorNode,
 } from './nodes'
+import {
+  getOptionsSourceCard,
+  resolveChoiceSourceCard,
+} from './nodes/interaction-node'
+import {
+  attachChoiceLabel,
+  buildReplaceChoiceFlow,
+  getChoiceLabel,
+  getNodeSourceCard,
+  getReplaceAwareChoiceLabel,
+} from './nodes/interaction-helpers'
 import type { EngineNode, EngineStepResult } from './types'
 import { ActionRegistry } from './registry'
 import { HookDispatcher } from './dispatcher'
@@ -97,6 +108,14 @@ export class Engine {
   private registry: ActionRegistry
   private hooks: HookDispatcher
   private log: LogStore
+  // TODO(S5): Remove these 4 mirror fields. Currently load-bearing for the
+  // `engine.snapshot()` shape consumed by session-core.ts:2258,2599 and the
+  // direct mutation hook in stats-gained-pseudo-session.test.ts:35-37.
+  // PR3 absorbed the authoritative values onto InteractionNode
+  // (`pendingActionId / ownerNodeId / contextSnapshot`); S5 work: migrate
+  // snapshot consumers off top-level pendingInteractionXxx, then these
+  // mirrors and the writes in `applyInteractionRequest` / `injectInteraction`
+  // can be deleted.
   private pendingInteractionNodeId: string | null = null
   private pendingInteractionActionId: string | null = null
   private pendingInteractionOwnerNodeId: string | null = null
@@ -105,7 +124,6 @@ export class Engine {
     | null = null
   private flowNodeCounter = 0
   private beforePhaseFlowNodeIds = new Set<string>()
-  private lastComputedCosts: Partial<import('../game/types').Resource> | undefined = undefined
   /**
   /**
    * S2 Task 8: returns the pending-choice metadata regardless of whether the
@@ -138,23 +156,6 @@ export class Engine {
     return null
   }
 
-  getLastComputedCosts() {
-    return this.lastComputedCosts
-  }
-
-  /**
-   * Read-only accessor for the engine's pending-interaction context (sourceCard,
-   * actionContext, params, costs). Used by `GameCore.buildInteraction` /
-   * `GameCore.getCurrentPending` to surface fields previously stored on
-   * `this.pending` (now derived from engineStack — Task 10).
-   */
-  getPendingInteractionContext(): Pick<
-    ActionExecutionContext,
-    'params' | 'costs' | 'sourceCard' | 'actionContext'
-  > | null {
-    return this.pendingInteractionContext
-  }
-
   injectBeforeNodes(nodes: EngineNode[]) {
     if (nodes.length === 0) return
     const first = this.tree.nextUnresolved()
@@ -171,6 +172,21 @@ export class Engine {
     if (this.pendingInteractionNodeId === null) return null
     const node = this.tree.findNodeById(this.pendingInteractionNodeId)
     return node instanceof InteractionNode ? node : null
+  }
+
+  /**
+   * S4b PR5 — return the current pending-interaction host, regardless of
+   * whether it is a leaf-paired `InteractionNode` or one of the composite
+   * nodes (`OrNode` / `XorNode` / `OptionalNode`). All four host types now
+   * carry a uniform `{ pendingActionId, pendingContextSnapshot, choices,
+   * promptKey, request }` shape (composite nodes mirror onto the equivalent
+   * `emittedXxx` fields), so consumers can read pending metadata off this
+   * single accessor instead of going through the engine-level
+   * `pendingInteractionXxx` mirrors.
+   */
+  peekInteractionHost(): EngineNode | null {
+    if (this.pendingInteractionNodeId === null) return null
+    return this.tree.findNodeById(this.pendingInteractionNodeId) ?? null
   }
 
   /**
@@ -194,13 +210,17 @@ export class Engine {
     // tolerate unknown ids gracefully.
     this.pendingInteractionActionId = INTERACTION_ONLY_ACTION_ID
     this.pendingInteractionOwnerNodeId = null
-    this.pendingInteractionContext = {
+    const ctxSnapshot = {
       params: undefined,
       costs: undefined,
       sourceCard: undefined,
       actionContext: undefined,
     }
-    this.lastComputedCosts = undefined
+    this.pendingInteractionContext = ctxSnapshot
+    // S4b Task 11 — mirror onto the injected node (authoritative owner).
+    node.pendingActionId = INTERACTION_ONLY_ACTION_ID
+    node.ownerNodeId = undefined
+    node.contextSnapshot = ctxSnapshot
   }
 
   /**
@@ -243,26 +263,46 @@ export class Engine {
     preserveOwner?: boolean
   }): void {
     const { targetNode, fallbackNodeId, request, promptKey, promptParams, choiceOptions, actionId, ownerNodeId } = args
+    let ctxSnapshot
     if (targetNode) {
-      targetNode.setChoice(promptKey, choiceOptions, promptParams)
-      targetNode.request = request
+      // S4b Task 12 — delegate the heavy lift (setChoice + request + node
+      // pending fields + context snapshot) to InteractionNode.emit().
+      ctxSnapshot = targetNode.emit({
+        request,
+        promptKey,
+        promptParams,
+        choiceOptions,
+        actionId,
+        ownerNodeId,
+        params: args.params,
+        costs: args.costs,
+        sourceCard: args.sourceCard,
+        actionContext: args.actionContext,
+        contextWritePatch: args.contextWritePatch,
+        preserveOwner: args.preserveOwner,
+      })
       this.pendingInteractionNodeId = targetNode.id
     } else {
       this.pendingInteractionNodeId = fallbackNodeId
+      const mergedActionContext = args.contextWritePatch
+        ? { ...(args.actionContext ?? {}), ...args.contextWritePatch }
+        : args.actionContext
+      ctxSnapshot = {
+        params: args.params,
+        costs: args.costs,
+        sourceCard: resolveChoiceSourceCard(args.sourceCard, choiceOptions),
+        actionContext: mergedActionContext,
+      }
     }
     this.pendingInteractionActionId = actionId
     if (!args.preserveOwner) {
       this.pendingInteractionOwnerNodeId = ownerNodeId
     }
-    const mergedActionContext = args.contextWritePatch
-      ? { ...(args.actionContext ?? {}), ...args.contextWritePatch }
-      : args.actionContext
-    this.pendingInteractionContext = {
-      params: args.params,
-      costs: args.costs,
-      sourceCard: this.resolveChoiceSourceCard(args.sourceCard, choiceOptions),
-      actionContext: mergedActionContext,
-    }
+    // Engine top-level fields stay populated to preserve the existing
+    // snapshot()/getPendingInteractionContext() public surface and the
+    // `engine.pendingInteractionContext.sourceCard = ...` mutation hook
+    // used by stats-gained-pseudo-session.test.ts.
+    this.pendingInteractionContext = ctxSnapshot
   }
 
   buildFlowNodePublic(flow: ActionFlow): EngineNode {
@@ -487,98 +527,6 @@ export class Engine {
     node.resolve()
   }
 
-  private attachChoiceLabel(
-    node: EngineNode,
-    choiceLabelKey?: string,
-    choiceLabelParams?: Record<string, unknown>,
-  ) {
-    if (!choiceLabelKey) return node
-    const labeledNode = node as EngineNode & {
-      choiceLabelKey?: string
-      choiceLabelParams?: Record<string, unknown>
-    }
-    labeledNode.choiceLabelKey = choiceLabelKey
-    labeledNode.choiceLabelParams = choiceLabelParams
-    return node
-  }
-
-  private getChoiceLabel(
-    node: EngineNode,
-  ): { labelKey: string; labelParams?: Record<string, unknown> } | null {
-    const labeledNode = node as EngineNode & {
-      choiceLabelKey?: string
-      choiceLabelParams?: Record<string, unknown>
-    }
-    if (labeledNode.choiceLabelKey) {
-      return {
-        labelKey: labeledNode.choiceLabelKey,
-        labelParams: labeledNode.choiceLabelParams,
-      }
-    }
-    if (node instanceof OptionalNode) {
-      return this.getChoiceLabel(node.child)
-    }
-    if (node instanceof ActionNode) {
-      const action = this.registry.get(node.actionId)
-      if (!action) return null
-      return {
-        labelKey: node.choiceLabelKey ?? action.nameKey,
-        labelParams: node.choiceLabelParams,
-      }
-    }
-    if ('children' in node) {
-      const composite = node as { children: EngineNode[] }
-      for (const child of composite.children) {
-        const label = this.getChoiceLabel(child)
-        if (label) return label
-      }
-    }
-    return null
-  }
-
-  private getNodeSourceCard(node: EngineNode): string | undefined {
-    const sourceCards = new Set<string>()
-    const visit = (entry: EngineNode) => {
-      if (entry instanceof ActionNode) {
-        if (entry.sourceCard) sourceCards.add(entry.sourceCard)
-        return
-      }
-      if (entry instanceof OptionalNode) {
-        visit(entry.child)
-        return
-      }
-      if (
-        entry instanceof SequenceNode ||
-        entry instanceof ParallelNode ||
-        entry instanceof OrNode ||
-        entry instanceof XorNode
-      ) {
-        entry.children.forEach(visit)
-      }
-    }
-    visit(node)
-    return sourceCards.size === 1 ? [...sourceCards][0] : undefined
-  }
-
-  private getOptionsSourceCard(options: ActionChoiceOption[]): string | undefined {
-    if (options.length === 0) return undefined
-    const normalized = options.map((option) =>
-      typeof option.sourceCard === 'string' && option.sourceCard.length > 0
-        ? option.sourceCard
-        : null,
-    )
-    if (normalized.some((sourceCard) => sourceCard === null)) return undefined
-    const sourceCards = [...new Set(normalized)] as string[]
-    return sourceCards.length === 1 ? sourceCards[0] : undefined
-  }
-
-  private resolveChoiceSourceCard(
-    sourceCard: string | undefined,
-    options: ActionChoiceOption[],
-  ): string | undefined {
-    return sourceCard ?? this.getOptionsSourceCard(options)
-  }
-
   private sanitizePreviewResources(
     resources?: Partial<Resource>,
   ): Partial<Resource> | undefined {
@@ -693,71 +641,6 @@ export class Engine {
     return undefined
   }
 
-  private getFlowSourceCard(flow: ActionFlow): string | undefined {
-    if (flow.type === 'leaf') return flow.sourceCard
-    if (flow.type === 'playerSwitch') return undefined
-    const sourceCards = [...new Set(
-      flow.children
-        .map((child) => this.getFlowSourceCard(child))
-        .filter((sourceCard): sourceCard is string => typeof sourceCard === 'string' && sourceCard.length > 0),
-    )]
-    return sourceCards.length === 1 ? sourceCards[0] : undefined
-  }
-
-  private markCheckedReplaceAction(actionContext?: Record<string, unknown>) {
-    return {
-      ...(actionContext ?? {}),
-      checkedReplaceAction: true,
-    }
-  }
-
-  private buildReplaceChoiceFlow(
-    actionNode: Pick<ActionNode, 'actionId' | 'params' | 'sourceCard' | 'actionContext' | 'choiceLabelKey' | 'choiceLabelParams'>,
-    alternativeFlow: ActionFlow,
-    replacedActionId: string,
-  ): ActionFlow {
-    return {
-      type: 'xor',
-      children: [
-        alternativeFlow,
-        {
-          type: 'leaf',
-          actionId: replacedActionId,
-          params: actionNode.params,
-          sourceCard: actionNode.sourceCard,
-          actionContext: this.markCheckedReplaceAction(actionNode.actionContext),
-          choiceLabelKey: actionNode.choiceLabelKey,
-          choiceLabelParams: actionNode.choiceLabelParams,
-        },
-      ],
-    }
-  }
-
-  private getReplaceAwareChoiceLabel(
-    actionNode: ActionNode,
-    executionContext: ActionExecutionContext,
-    defaultLabel: { labelKey: string; labelParams?: Record<string, unknown> },
-  ) {
-    const replaceResult = this.hooks.applyComputeReplace({
-      ...executionContext,
-      actionId: actionNode.actionId,
-    })
-    const replaceSourceCard = replaceResult.sourceCard ?? actionNode.sourceCard
-    if (actionNode.choiceLabelKey) return { ...defaultLabel, sourceCard: replaceSourceCard }
-    if (!replaceResult.declined || !replaceResult.alternativeFlow) {
-      return { ...defaultLabel, sourceCard: replaceSourceCard }
-    }
-    const alternativeFlow = this.applyFallbackSourceCardToFlow(
-      replaceResult.alternativeFlow,
-      replaceResult.sourceCard,
-    )
-    return {
-      labelKey: 'ui.interactionActionOrReplace',
-      labelParams: { actionNameKey: defaultLabel.labelKey },
-      sourceCard: this.getFlowSourceCard(alternativeFlow),
-    }
-  }
-
   private buildFlowNode(flow: ActionFlow): EngineNode {
     const nextId = () => `flow-${this.flowNodeCounter++}`
     if (flow.type === 'playerSwitch') {
@@ -797,12 +680,12 @@ export class Engine {
         const node = flow.optional
           ? new OptionalNode(nextId(), sequence, flow.promptKey)
           : sequence
-        return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
+        return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
       }
       const node = flow.optional
         ? new OptionalNode(nextId(), actionNode, flow.promptKey)
         : actionNode
-      return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
+      return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
     }
     const children = flow.children.map((child) => this.buildFlowNode(child))
     if (flow.type === 'seq') {
@@ -810,23 +693,23 @@ export class Engine {
       const node = flow.optional
         ? new OptionalNode(nextId(), sequence, flow.promptKey)
         : sequence
-      return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
+      return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
     }
     if (flow.type === 'parallel') {
       const parallel = new ParallelNode(nextId(), children)
       const node = flow.optional
         ? new OptionalNode(nextId(), parallel, flow.promptKey)
         : parallel
-      return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
+      return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
     }
     if (flow.type === 'xor') {
       const xor = new XorNode(nextId(), children, flow.promptKey)
       const node = flow.optional ? new OptionalNode(nextId(), xor, flow.promptKey) : xor
-      return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
+      return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
     }
     const or = new OrNode(nextId(), children, flow.promptKey)
     const node = flow.optional ? new OptionalNode(nextId(), or, flow.promptKey) : or
-    return this.attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
+    return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
   }
 
   /**
@@ -993,6 +876,12 @@ export class Engine {
         : null
     return {
       nodeStates,
+      // TODO(S5): These 4 top-level pending* fields mirror the
+      // InteractionNode-owned authoritative state (PR3). When S5 migrates
+      // snapshot consumers to read pending data off the InteractionNode in
+      // `choiceData` (or off the composite emit metadata for Or/Xor/Optional),
+      // these top-level entries can be removed from the snapshot shape.
+      // (See line 111 — same theme; cross-reference for the four mirror fields.)
       pendingInteractionNodeId: this.pendingInteractionNodeId,
       pendingInteractionActionId: this.pendingInteractionActionId,
       pendingInteractionOwnerNodeId: this.pendingInteractionOwnerNodeId,
@@ -1215,14 +1104,20 @@ export class Engine {
             ),
           )
           if (!doable) return null
-          const baseLabel = this.getChoiceLabel(entry.node)
+          const baseLabel = getChoiceLabel(entry.node, this.registry)
           if (!baseLabel) return null
-          const label = this.getReplaceAwareChoiceLabel(entry.actionNode, executionContext, baseLabel)
+          const label = getReplaceAwareChoiceLabel(
+            entry.actionNode,
+            executionContext,
+            baseLabel,
+            this.hooks,
+            (flow, sc) => this.applyFallbackSourceCardToFlow(flow, sc),
+          )
           return {
             value: entry.nodeId,
             labelKey: label.labelKey,
             labelParams: label.labelParams,
-            sourceCard: label.sourceCard ?? this.getNodeSourceCard(entry.node),
+            sourceCard: label.sourceCard ?? getNodeSourceCard(entry.node),
             effectPreview: this.getNodeEffectPreview(entry.node),
           }
         })
@@ -1252,12 +1147,13 @@ export class Engine {
       }
       this.pendingInteractionNodeId = node.id
       this.pendingInteractionActionId = null
-      this.pendingInteractionContext = {
+      const compositeCtxSnapshot = {
         params: undefined,
         costs: undefined,
-        sourceCard: this.resolveChoiceSourceCard(this.getNodeSourceCard(node), options),
+        sourceCard: resolveChoiceSourceCard(getNodeSourceCard(node), options),
         actionContext: undefined,
       }
+      this.pendingInteractionContext = compositeCtxSnapshot
       const compositePromptKey = node.promptKey ?? 'ui.interactionFlowSelect'
       // S2 Task 8: write emit metadata to the OrNode/XorNode itself instead
       // of the engine-level lastEmittedChoice cache.
@@ -1265,6 +1161,11 @@ export class Engine {
       node.emittedPromptKey = compositePromptKey
       node.emittedPromptParams = undefined
       node.emittedRequest = undefined
+      // S4b PR5 — also mirror the pending-interaction context snapshot onto
+      // the composite host so external consumers can read it via
+      // peekInteractionHost() without going through the engine mirror.
+      node.pendingActionId = null
+      node.pendingContextSnapshot = compositeCtxSnapshot
       return {
         type: 'choice',
         nodeId: node.id,
@@ -1322,13 +1223,17 @@ export class Engine {
       }
       this.pendingInteractionNodeId = node.id
       this.pendingInteractionActionId = null
-      this.pendingInteractionContext = {
+      const optionalCtxSnapshot = {
         params: actionNode.params,
         costs: undefined,
         sourceCard: actionNode.sourceCard,
         actionContext: actionNode.actionContext,
       }
-      const label = this.getChoiceLabel(node) ?? {
+      this.pendingInteractionContext = optionalCtxSnapshot
+      // S4b PR5 — also mirror onto the OptionalNode for peekInteractionHost.
+      node.pendingActionId = null
+      node.pendingContextSnapshot = optionalCtxSnapshot
+      const label = getChoiceLabel(node, this.registry) ?? {
         labelKey: actionNode.choiceLabelKey ?? action.nameKey,
         labelParams: actionNode.choiceLabelParams,
       }
@@ -1359,12 +1264,22 @@ export class Engine {
       }
     }
     if (node instanceof InteractionNode) {
-      if (node.choices.length > 0) {
+      // S4b Task 14 — InteractionNode owns its lifecycle dispatch via
+      // `node.step(ctx)`. The engine main loop only needs to translate the
+      // node-level NodeStepResult ('choice' / 'blocked' / 'done') into the
+      // top-level EngineStepResult shape and handle the engine-level
+      // pending-context backfill (when no prior emit installed one).
+      const ctx = {
+        resolveSubtree: (n: EngineNode) => this.resolveSubtree(n),
+        emitChoice: () => {},
+      }
+      const stepResult = node.step(ctx)
+      if (stepResult.kind === 'choice') {
         if (!this.pendingInteractionContext) {
           this.pendingInteractionContext = {
             params: undefined,
             costs: undefined,
-            sourceCard: this.getOptionsSourceCard(node.choices),
+            sourceCard: getOptionsSourceCard(node.choices),
             actionContext: undefined,
           }
         }
@@ -1374,13 +1289,29 @@ export class Engine {
           choice: { promptKey: node.promptKey, options: node.choices },
         }
       }
+      // 'blocked' (no choices) or 'done' (already resolved) — both surface
+      // as a blocked step at this level; the resolved case is unreachable
+      // here because nextUnresolved() filters resolved nodes.
       return { type: 'blocked', nodeId: node.id }
     }
-    if (node instanceof PlayerSwitchNode) {
-      node.resolve({})
-      return { type: 'playerSwitch', nodeId: node.id, targetPlayerId: node.targetPlayerId }
+    // S4b PR5 sub-commit 4 — leaf-node dispatch routes through `node.step(ctx)`
+    // returning a NodeStepResult discriminator. The engine main loop uses the
+    // `kind` discriminant instead of `instanceof` for behavior dispatch on the
+    // three leaf types (PlayerSwitch / ActivateCard / Action). The
+    // implementation body of each leaf still lives in the engine because it
+    // depends on the engine-private hooks/tree/log machinery.
+    const leafCtx = {
+      resolveSubtree: (n: EngineNode) => this.resolveSubtree(n),
+      emitChoice: () => {},
     }
-    if (node instanceof ActivateCardNode) {
+    const leafStep = node.step(leafCtx)
+    if (leafStep.kind === 'playerSwitch') {
+      // PlayerSwitchNode signals dispatch — engine resolves the node and
+      // surfaces the top-level EngineStepResult.playerSwitch.
+      node.resolve({})
+      return { type: 'playerSwitch', nodeId: node.id, targetPlayerId: leafStep.targetPlayerId }
+    }
+    if (leafStep.kind === 'activateListener' && node instanceof ActivateCardNode) {
       const listener = getListenerById(node.listenerId)
       if (!listener) {
         node.resolve({})
@@ -1445,7 +1376,7 @@ export class Engine {
       node.resolve(result ?? {})
       return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
     }
-    if (node instanceof ActionNode) {
+    if (leafStep.kind === 'execute' && node instanceof ActionNode) {
       const replaceResult = this.hooks.applyComputeReplace({
         ...context,
         params: node.params,
@@ -1457,7 +1388,7 @@ export class Engine {
       const replaceSourceCard = replaceResult.sourceCard ?? node.sourceCard
       if (replaceResult.declined && replaceResult.alternativeFlow) {
         const flowNode = this.buildFlowNode(
-          this.buildReplaceChoiceFlow(
+          buildReplaceChoiceFlow(
             node,
             this.applyFallbackSourceCardToFlow(
               replaceResult.alternativeFlow,
@@ -1515,7 +1446,6 @@ export class Engine {
       )
       executionContext.costs =
         Object.keys(costOverride).length > 0 ? costOverride : undefined
-      this.lastComputedCosts = executionContext.costs
       if (!this.beforePhaseFlowNodeIds.has(node.id)) {
         const beforePhase = this.hooks.before({ ...executionContext, actionId: replacedActionId })
         const beforeActivateNodes = this.buildActivateCardNodes(
@@ -1833,7 +1763,7 @@ export class Engine {
         executionContext.sourceCard = replaceResult.sourceCard ?? child.sourceCard
         if (replaceResult.declined && replaceResult.alternativeFlow) {
           const flowNode = this.buildFlowNode(
-            this.buildReplaceChoiceFlow(
+            buildReplaceChoiceFlow(
               child,
               this.applyFallbackSourceCardToFlow(
                 replaceResult.alternativeFlow,

@@ -26,16 +26,15 @@ describe('gained.field pseudo-stat', () => {
     const resp = session.takeAction(0, 'farmland')
     expect(resp.ok).toBe(true)
 
-    // Inject sourceCard onto the pending choice for this assertion. The
-    // engine-driven path reads sourceCard from `engine.pendingInteractionContext`
-    // (not the GameSession's `pending` mirror), so we patch both to keep this
-    // test functional without a real plow-card scenario.
-    // The engine reads sourceCard from `engine.pendingInteractionContext`,
-    // which is the actual source of truth — patch it directly.
-    const engineRef = (session as unknown as { engine: { pendingInteractionContext: { sourceCard?: string } | null } }).engine
-    if (engineRef?.pendingInteractionContext) {
-      engineRef.pendingInteractionContext.sourceCard = 'TEST_PlowCard'
-    }
+    // Inject sourceCard onto the pending choice host for this assertion.
+    // S4b PR5: pending-interaction context lives on the InteractionNode (or
+    // composite host) — patch it via `peekInteractionHost()` instead of the
+    // legacy engine-level `pendingInteractionContext` mirror.
+    const host = session.getEngineStack().current()?.engine.peekInteractionHost()
+    const ctx = host && 'contextSnapshot' in host
+      ? (host as unknown as { contextSnapshot?: { sourceCard?: string } }).contextSnapshot
+      : (host as unknown as { pendingContextSnapshot?: { sourceCard?: string } } | undefined)?.pendingContextSnapshot
+    if (ctx) ctx.sourceCard = 'TEST_PlowCard'
 
     const farmResp = session.resolveChoice(0, 'confirm', { tile: { row: 0, col: 0 } })
     expect(farmResp.ok).toBe(true)
@@ -59,14 +58,12 @@ describe('gained.stable pseudo-stat', () => {
     const resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
 
-    // Inject sourceCard onto the pending choice for this assertion. The
-    // engine-driven path reads sourceCard from `engine.pendingInteractionContext`
-    // (not the GameSession's `pending` mirror), so we patch both to keep this
-    // test functional without a real stable-card scenario.
-    const engineRef = (session as unknown as { engine: { pendingInteractionContext: { sourceCard?: string } | null } }).engine
-    if (engineRef?.pendingInteractionContext) {
-      engineRef.pendingInteractionContext.sourceCard = 'TEST_StableCard'
-    }
+    // Inject sourceCard onto the pending choice host (PR5 — see plow case).
+    const host = session.getEngineStack().current()?.engine.peekInteractionHost()
+    const ctx = host && 'contextSnapshot' in host
+      ? (host as unknown as { contextSnapshot?: { sourceCard?: string } }).contextSnapshot
+      : (host as unknown as { pendingContextSnapshot?: { sourceCard?: string } } | undefined)?.pendingContextSnapshot
+    if (ctx) ctx.sourceCard = 'TEST_StableCard'
 
     const farmResp = session.resolveChoice(0, 'confirm', { stables: [{ row: 0, col: 0 }] })
     expect(farmResp.ok).toBe(true)

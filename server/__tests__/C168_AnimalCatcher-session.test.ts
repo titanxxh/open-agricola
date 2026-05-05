@@ -3,7 +3,6 @@ import { GameSession } from '../game/authoritative-session'
 import { setFencesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
 
 import { setWorkersAtHome } from '../../shared/game/player'
-import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 import '../../shared/cards/C/C168_AnimalCatcher'
 
 const CARD_ID = 'C168_AnimalCatcher'
@@ -47,14 +46,11 @@ const setup = (options?: { round?: number; food?: number }) => {
 const drainPending = (session: GameSession, resp: ReturnType<GameSession['getState']>) => {
   let safety = 30
   while (safety-- > 0) {
-    if (resp.interaction.stateId === 'wait') {
-      const playerIdx = resp.interaction.playerIndex ?? 0
-      resp = session.resolveChoice(playerIdx, resp.interaction.options[0]!.value)
-    } else if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
-      resp = confirmPlayerSwitch(session)
-    } else {
+    if (resp.interaction.stateId !== 'wait') {
       break
     }
+    const playerIdx = resp.interaction.playerIndex ?? 0
+    resp = session.resolveChoice(playerIdx, resp.interaction.options![0]!.value)
   }
   return resp
 }

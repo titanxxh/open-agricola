@@ -18,11 +18,7 @@ import {
   executeResolvedTypedFlatPayment,
   resolveTypedFlatPaymentSelection,
 } from '../payment/internal'
-import {
-  normalizePlayerFarm,
-  validateFenceSelection,
-} from '../../logic/farm/fence-validation'
-import { buildFenceFarmInteraction } from '../../logic/farm/farm-interaction'
+import { playerBoard, normalizePlayerFarm } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { collectComputeCostsForFarmChoice } from '../../cards/card-listeners'
 import { playerCanBuildPalisades } from '../../cards/helpers/card-type'
@@ -119,18 +115,18 @@ const finalizeFence = (
     newPalisadeEdgesPreview,
     ctx.space,
   )
-  const validated = validateFenceSelection(
-    normalized,
+  const idx = ctx.state.players.indexOf(ctx.player)
+  const validated = playerBoard(ctx.state, idx).farmyard.canBuildFence({
     edges,
     palisadeEdges,
     extraWood,
     freeFences,
-    {
+    options: {
       skipPayment: true,
       allowPalisades: playerCanBuildPalisades(normalized),
     },
     lockedKeys,
-  )
+  })
   if (!validated.ok) {
     return { type: 'fail', logKey: validated.error?.code ?? 'log.fencingFail' }
   }
@@ -175,8 +171,9 @@ export const fenceAction: ActionDefinition = {
     canExecute: (ctx, costOverride) =>
       canStartFencing(ctx.state, ctx.player, costOverride),
   },
-  execute: ({ player, space }): ActionExecutionResult => {
-    const farm = buildFenceFarmInteraction(player, space.id)
+  execute: ({ state, player, space }): ActionExecutionResult => {
+    const idx = state.players.indexOf(player)
+    const farm = playerBoard(state, idx).farmyard.selectableTiles('fence', { spaceId: space.id })
     return {
       type: 'request',
       request: {
@@ -230,18 +227,18 @@ export const fenceAction: ActionDefinition = {
         newPalisadeEdgesPreview,
         ctx.space,
       )
-      const validated = validateFenceSelection(
-        normalized,
+      const idx = ctx.state.players.indexOf(ctx.player)
+      const validated = playerBoard(ctx.state, idx).farmyard.canBuildFence({
         edges,
         palisadeEdges,
         extraWood,
         freeFences,
-        {
+        options: {
           skipPayment: true,
           allowPalisades: playerCanBuildPalisades(normalized),
         },
         lockedKeys,
-      )
+      })
       if (!validated.ok) {
         return { type: 'fail', logKey: validated.error?.code ?? 'log.fencingFail' }
       }

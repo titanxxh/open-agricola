@@ -1,14 +1,25 @@
-import type { GameState, PlayerState, Resource } from '../game/types'
-import { FARM_COLS, FARM_ROWS, positionKey } from '../game/farm'
-import { fieldHasCrop } from '../game/field'
-import { computeFencedRegions } from './farm'
-import { getMajorCard } from '../cards/major'
-import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/types'
-import { isMajorCardId } from '../cards/helpers/card-type'
-import { getCardEffect } from '../cards/card-effects'
-import { solveBonusScoring } from './scoring-bonus-solver'
-import type { BonusScoringContext } from '../cards/card-effects'
-import { familySize } from '../game/player'
+import type { GameState, PlayerState, Resource } from '../game/types.ts'
+import { FARM_COLS, FARM_ROWS, positionKey } from '../game/farm.ts'
+import { fieldHasCrop } from '../game/field.ts'
+import { getMajorCard } from '../cards/major/index.ts'
+import {
+  getRegisteredMinorImprovement,
+  getRegisteredOccupation,
+} from '../cards/types.ts'
+import { isMajorCardId } from '../cards/helpers/card-type.ts'
+import { getCardEffect } from '../cards/card-effects.ts'
+import type {
+  BonusScoreLevel,
+  BonusScoringContext,
+  BonusScoreHandler,
+  CostedBonusHandler,
+} from '../cards/card-effects.ts'
+import { familySize } from '../game/player.ts'
+import { computeFencedRegions } from './farmyard.ts'
+
+// ---------------------------------------------------------------------------
+// Score types (formerly exported from `shared/logic/scoring.ts`).
+// ---------------------------------------------------------------------------
 
 type ScoreCategoryKey =
   | 'fields'
@@ -30,7 +41,12 @@ type ScoreCategoryKey =
 
 export type ScoreEntry =
   | { type: 'quantity'; quantity: number; score: number }
-  | { type: 'card'; cardId: string; cardType: 'major' | 'minor' | 'occupation'; score: number }
+  | {
+      type: 'card'
+      cardId: string
+      cardType: 'major' | 'minor' | 'occupation'
+      score: number
+    }
   | { type: 'bonus'; score: number }
   | {
       type: 'cardBonus'
@@ -54,6 +70,203 @@ export type PlayerScoreSummary = {
   categories: ScoreCategoryResult[]
   total: number
 }
+
+// ---------------------------------------------------------------------------
+// Bonus solver types + impl (formerly `shared/logic/scoring-bonus-solver.ts`).
+// ---------------------------------------------------------------------------
+
+export type SolverInput = {
+  state: GameState
+  player: PlayerState
+  ctx: BonusScoringContext
+  freeHandlers: { cardId: string; handler: BonusScoreHandler }[]
+  costedHandlers: { cardId: string; handler: CostedBonusHandler }[]
+}
+
+export type SolverEntry = {
+  cardId: string
+  score: number
+  cost: Partial<Resource>
+}
+
+export type SolverResult = {
+  entries: SolverEntry[]
+  totalScore: number
+  totalCost: Partial<Resource>
+}
+
+const RESOURCE_KEYS: (keyof Resource)[] = [
+  'food',
+  'wood',
+  'clay',
+  'stone',
+  'reed',
+  'grain',
+  'vegetable',
+  'sheep',
+  'boar',
+  'cattle',
+  'begging',
+]
+
+function canAffordResources(
+  have: Partial<Resource>,
+  need: Partial<Resource>,
+): boolean {
+  for (const k of RESOURCE_KEYS) {
+    if ((have[k] ?? 0) < (need[k] ?? 0)) return false
+  }
+  return true
+}
+
+function addResources(
+  a: Partial<Resource>,
+  b: Partial<Resource>,
+): Partial<Resource> {
+  const out: Partial<Resource> = { ...a }
+  for (const k of RESOURCE_KEYS) {
+    const v = b[k]
+    if (v !== undefined && v !== 0) out[k] = (out[k] ?? 0) + v
+  }
+  return out
+}
+
+function subtractResources(
+  a: Partial<Resource>,
+  b: Partial<Resource>,
+): Partial<Resource> {
+  const out: Partial<Resource> = { ...a }
+  for (const k of RESOURCE_KEYS) {
+    const v = b[k]
+    if (v !== undefined && v !== 0) out[k] = Math.max(0, (out[k] ?? 0) - v)
+  }
+  return out
+}
+
+export function solveBonusScoring(input: SolverInput): SolverResult {
+  const { state, player, ctx, freeHandlers, costedHandlers } = input
+  const playerResourcesSnapshot: Partial<Resource> = { ...player.resources }
+
+  const allLevels: { cardId: string; levels: BonusScoreLevel[] }[] =
+    costedHandlers.map(({ cardId, handler }) => {
+      let levels: BonusScoreLevel[]
+      try {
+        levels = handler(state, player, ctx)
+      } catch (err) {
+        if (cardId.startsWith('CUSTOM_')) {
+          console.warn(
+            `[scoring-bonus-solver] custom card ${cardId} threw, skipping:`,
+            err,
+          )
+          levels = [{ cost: {}, score: 0 }]
+        } else {
+          throw err
+        }
+      }
+      if (levels.length === 0) levels = [{ cost: {}, score: 0 }]
+      return { cardId, levels }
+    })
+
+  let bestScore = -Infinity
+  let bestCombo: { cardId: string; level: BonusScoreLevel }[] = []
+  let bestCost: Partial<Resource> = {}
+
+  function recurse(
+    idx: number,
+    accCombo: { cardId: string; level: BonusScoreLevel }[],
+    accCost: Partial<Resource>,
+  ) {
+    if (idx === allLevels.length) {
+      if (!canAffordResources(playerResourcesSnapshot, accCost)) return
+      const remaining = subtractResources(playerResourcesSnapshot, accCost)
+      const playerClone = {
+        ...player,
+        resources: { ...player.resources, ...remaining },
+      } as PlayerState
+      const costedScore = accCombo.reduce(
+        (sum, { level }) => sum + level.score,
+        0,
+      )
+      let freeScore = 0
+      for (const { cardId, handler } of freeHandlers) {
+        try {
+          freeScore += handler(state, playerClone, ctx)
+        } catch (err) {
+          if (cardId.startsWith('CUSTOM_')) {
+            console.warn(
+              `[scoring-bonus-solver] custom card ${cardId} threw, skipping:`,
+              err,
+            )
+          } else {
+            throw err
+          }
+        }
+      }
+      const total = costedScore + freeScore
+      if (total > bestScore) {
+        bestScore = total
+        bestCombo = [...accCombo]
+        bestCost = { ...accCost }
+      }
+      return
+    }
+    for (const level of allLevels[idx].levels) {
+      const nextCost = addResources(accCost, level.cost)
+      if (!canAffordResources(playerResourcesSnapshot, nextCost)) continue
+      accCombo.push({ cardId: allLevels[idx].cardId, level })
+      recurse(idx + 1, accCombo, nextCost)
+      accCombo.pop()
+    }
+  }
+  recurse(0, [], {})
+
+  if (bestScore === -Infinity) {
+    bestScore = 0
+    bestCombo = []
+    bestCost = {}
+  }
+
+  for (const k of RESOURCE_KEYS) {
+    const c = bestCost[k] ?? 0
+    if (c > 0) {
+      player.resources[k] = (player.resources[k] ?? 0) - c
+    }
+  }
+
+  const freeEntries: SolverEntry[] = []
+  for (const { cardId, handler } of freeHandlers) {
+    let score = 0
+    try {
+      score = handler(state, player, ctx)
+    } catch (err) {
+      if (cardId.startsWith('CUSTOM_')) {
+        console.warn(
+          `[scoring-bonus-solver] custom card ${cardId} threw, skipping:`,
+          err,
+        )
+        score = 0
+      } else {
+        throw err
+      }
+    }
+    if (score !== 0) freeEntries.push({ cardId, score, cost: {} })
+  }
+  const costedEntries: SolverEntry[] = bestCombo.map(({ cardId, level }) => ({
+    cardId,
+    score: level.score,
+    cost: level.cost,
+  }))
+
+  return {
+    entries: [...freeEntries, ...costedEntries],
+    totalScore: bestScore,
+    totalCost: bestCost,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// computeScores (formerly `shared/logic/scoring.ts`).
+// ---------------------------------------------------------------------------
 
 const parseQuantityRange = (range: string) => {
   if (range.includes('-')) {
@@ -150,7 +363,9 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
       key: 'pastures',
       total: pastureScore,
       quantity: pastureCount,
-      entries: [{ type: 'quantity', quantity: pastureCount, score: pastureScore }],
+      entries: [
+        { type: 'quantity', quantity: pastureCount, score: pastureScore },
+      ],
     })
 
     const grainCount =
@@ -167,7 +382,10 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
     const vegetableCount =
       player.resources.vegetable +
       player.fields.filter((field) => fieldHasCrop(field, 'vegetable')).length
-    const vegetableScore = scoreByRanges(vegetableCount, ['0', '1', '2', '3', '4+'])
+    const vegetableScore = scoreByRanges(
+      vegetableCount,
+      ['0', '1', '2', '3', '4+'],
+    )
     categories.push({
       key: 'vegetables',
       total: vegetableScore,
@@ -267,9 +485,6 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
     // so `computeScores` stays a pure function — repeat invocations (e.g. UI re-render)
     // must not double-deduct. Major scoring + free handlers downstream read the same
     // clone, so they observe the post-solve remaining values.
-    //
-    // Invariant: solver and free/costed handlers MUST treat fields other than
-    // `resources` as read-only (they share references with the original player).
     const bonusCtx: BonusScoringContext = { categories: [...categories] }
     const allCardsForBonus = [
       ...player.improvements,
@@ -278,16 +493,32 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
     ]
     const freeHandlers = allCardsForBonus
       .map((cardId) => ({ cardId, effect: getCardEffect(cardId) }))
-      .filter((x): x is { cardId: string; effect: NonNullable<ReturnType<typeof getCardEffect>> } =>
-        !!x.effect?.computeBonusScore,
+      .filter(
+        (
+          x,
+        ): x is {
+          cardId: string
+          effect: NonNullable<ReturnType<typeof getCardEffect>>
+        } => !!x.effect?.computeBonusScore,
       )
-      .map(({ cardId, effect }) => ({ cardId, handler: effect.computeBonusScore! }))
+      .map(({ cardId, effect }) => ({
+        cardId,
+        handler: effect.computeBonusScore!,
+      }))
     const costedHandlers = allCardsForBonus
       .map((cardId) => ({ cardId, effect: getCardEffect(cardId) }))
-      .filter((x): x is { cardId: string; effect: NonNullable<ReturnType<typeof getCardEffect>> } =>
-        !!x.effect?.computeCostedBonus,
+      .filter(
+        (
+          x,
+        ): x is {
+          cardId: string
+          effect: NonNullable<ReturnType<typeof getCardEffect>>
+        } => !!x.effect?.computeCostedBonus,
       )
-      .map(({ cardId, effect }) => ({ cardId, handler: effect.computeCostedBonus! }))
+      .map(({ cardId, effect }) => ({
+        cardId,
+        handler: effect.computeCostedBonus!,
+      }))
     const playerForBonus = { ...player, resources: { ...player.resources } }
     const bonusScoreResult = solveBonusScoring({
       state,
@@ -300,14 +531,21 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
     const cardEntries: ScoreEntry[] = []
     const cardBonusEntries: ScoreEntry[] = []
     player.improvements.forEach((cardId) => {
-      // player.improvements only contains majors; defend against any
-      // minorImprovement that might have been mis-routed here.
       if (!isMajorCardId(cardId)) return
       const card = getMajorCard(cardId)
       if (!card) return
-      cardEntries.push({ type: 'card', cardId, cardType: 'major', score: card.vp ?? 0 })
+      cardEntries.push({
+        type: 'card',
+        cardId,
+        cardType: 'major',
+        score: card.vp ?? 0,
+      })
       if (card.scoring) {
-        const resourceCount = Math.max(0, playerForBonus.resources[card.scoring.resource] ?? 0)
+        const scoringResource = card.scoring.resource as keyof Resource
+        const resourceCount = Math.max(
+          0,
+          playerForBonus.resources[scoringResource] ?? 0,
+        )
         const bonusScore = scoreByMap(resourceCount, card.scoring.map)
         cardBonusEntries.push({
           type: 'cardBonus',
@@ -315,7 +553,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
           cardType: 'major',
           score: bonusScore,
           quantity: resourceCount,
-          resource: card.scoring.resource,
+          resource: scoringResource,
         })
       }
     })
@@ -325,7 +563,12 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
     })
     player.occupationPlayed.forEach((cardId) => {
       const vp = getRegisteredOccupation(cardId)?.vp ?? 0
-      cardEntries.push({ type: 'card', cardId, cardType: 'occupation', score: vp })
+      cardEntries.push({
+        type: 'card',
+        cardId,
+        cardType: 'occupation',
+        score: vp,
+      })
     })
     const cardsTotal = cardEntries.reduce((sum, entry) => sum + entry.score, 0)
     const cardsBonusTotal = cardBonusEntries.reduce(
@@ -346,15 +589,6 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
     let cardStateBonusVp = 0
     if (player.cardStates) {
       Object.entries(player.cardStates).forEach(([cardId, cardState]) => {
-        // Defensive sentinel filter for any synthetic `__pendingChoice__`
-        // cardStates entry that historical paths used to stash transient
-        // choice-resolution context. The key is no longer written by any
-        // current path (verified by grep), so this branch is effectively
-        // dead — keep it as a guard against accidental reintroduction.
-        // NOTE: a Task 3 sed pass renamed this string to
-        // '__pendingInteraction__'; that rename was a false-positive (the
-        // sed targeted the field rename `pending.type === 'choice'`, not
-        // string sentinels). Restored to the original name here.
         if (cardId === '__pendingChoice__') return
         const vp = cardState.counters?.bonusVp ?? 0
         if (vp > 0) {
@@ -381,7 +615,9 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
       key: 'beggings',
       total: beggingScore,
       quantity: beggingCount,
-      entries: [{ type: 'quantity', quantity: beggingCount, score: beggingScore }],
+      entries: [
+        { type: 'quantity', quantity: beggingCount, score: beggingScore },
+      ],
     })
 
     const total = categories.reduce((sum, category) => sum + category.total, 0)
@@ -398,7 +634,11 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
   )
 
   state.players.forEach((owner) => {
-    const allCards = [...owner.improvements, ...owner.minorPlayed, ...owner.occupationPlayed]
+    const allCards = [
+      ...owner.improvements,
+      ...owner.minorPlayed,
+      ...owner.occupationPlayed,
+    ]
     allCards.forEach((cardId) => {
       const effect = getCardEffect(cardId)
       if (!effect?.computeSharedPostScore) return
@@ -415,3 +655,41 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
 
   return summaries
 }
+
+// ---------------------------------------------------------------------------
+// Scoring namespace — domain facade over scoring queries.
+// ---------------------------------------------------------------------------
+
+/** Compute full per-player score summaries (one entry per player). */
+function computeAll(state: GameState): PlayerScoreSummary[] {
+  return computeScores(state)
+}
+
+/** Solve cross-player bonus scoring (which player wins each comparison). */
+function solveBonus(input: SolverInput): SolverResult {
+  return solveBonusScoring(input)
+}
+
+/** Single player's score breakdown by index. Throws on out-of-range. */
+function breakdown(state: GameState, idx: number): PlayerScoreSummary {
+  const all = computeScores(state)
+  const entry = all[idx]
+  if (!entry) throw new Error(`Scoring.breakdown: no player at index ${idx}`)
+  return entry
+}
+
+/** Convenience: total score for a single player by index. */
+function totalFor(state: GameState, idx: number): number {
+  return breakdown(state, idx).total
+}
+
+/**
+ * Cross-player scoring views. Top-level (NOT under PlayerBoard) because
+ * scoring is inherently a multi-player query.
+ */
+export const Scoring = {
+  computeAll,
+  solveBonus,
+  breakdown,
+  totalFor,
+} as const

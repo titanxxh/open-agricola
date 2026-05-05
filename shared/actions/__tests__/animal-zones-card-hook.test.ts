@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { computeInvalidAnimalsForZone, enforceAnimalCapacity, type AnimalZone } from '../helpers/animal-zones'
+import { computeInvalidAnimalsForZone, enforceAnimalCapacity, type AnimalZone } from '../../domain/animal-zones'
 import { getActiveCardRegistry } from '../../cards/active-registry'
 import type { PlayerState, GameState } from '../../game/types'
 

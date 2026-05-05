@@ -6,7 +6,7 @@ import type {
   HarvestBreedSummary,
   PlayerState,
 } from '../../game/types'
-import { computeAnimalZones, getTotalAnimalCapacity } from '../helpers/animal-zones'
+import { playerBoard, getTotalAnimalCapacity } from '../../domain'
 import { shouldEnforceReorganizeOnLastHarvest } from '../../cards/card-effects'
 
 export type BreedAnimalType = 'sheep' | 'boar' | 'cattle'
@@ -80,7 +80,8 @@ export const breedAction: ActionDefinition = {
       }
     }
     const buildReorgRequest = (): ActionExecutionResult => {
-      const zones = computeAnimalZones(player).map((zone) => ({
+      const idx = state.players.indexOf(player)
+      const zones = playerBoard(state, idx).animals.zones().map((zone) => ({
         id: zone.id,
         zoneType: zone.zoneType as 'pasture' | 'house' | 'stable',
         animalType: (zone.animalType as 'sheep' | 'boar' | 'cattle' | null) ?? null,

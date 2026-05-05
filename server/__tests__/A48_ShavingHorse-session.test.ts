@@ -76,7 +76,7 @@ describe('A48_ShavingHorse session', () => {
     expect(resp.state.players[0]!.resources.food).toBe(0)
 
     // Accept (first option is the action node; '__skip__' is the decline option)
-    const acceptOption = resp.interaction.options?.find((o) => o.value !== '__skip__')!
+    const acceptOption = (resp.interaction.options ?? []).find((o) => o.value !== '__skip__')!
     const resp2 = session.resolveChoice(0, acceptOption.value)
     expect(resp2.ok).toBe(true)
     expect(resp2.state.players[0]!.resources.wood).toBe(4)

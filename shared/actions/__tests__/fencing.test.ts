@@ -4,7 +4,7 @@ import {
   canStartFencing,
   getFenceCount,
 } from '../effects/fencing'
-import { validateFenceSelection } from '../../logic/farm/fence-validation'
+import { validateFenceSelection } from '../../domain/farmyard'
 import type { GameState, PlayerState, TradeModifier } from '../../game/types'
 
 const createPlayer = (): PlayerState => ({

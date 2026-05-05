@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { getLooseStableKeys } from '../../actions/helpers/animal-zones'
+import { playerBoard } from '../../domain'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
-import type { ActionDefinition, ActionFlow, PlayerState } from '../../game/types'
+import type { ActionDefinition, ActionFlow, GameState, PlayerState } from '../../game/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E83_ShepherdsWhistle'
@@ -18,13 +18,16 @@ const POST_REORG_CHECK_ACTION_ID = 'card_E83_ShepherdsWhistle_post-reorg-check'
  *     reorganize, then re-check; if a stable became empty, gain 1 sheep.
  */
 
-const hasEmptyUnfencedStable = (player: PlayerState): boolean => {
-  const looseStableKeys = getLooseStableKeys(player)
+const hasEmptyUnfencedStable = (state: GameState, player: PlayerState): boolean => {
+  const idx = state.players.indexOf(player)
+  const looseStableKeys = playerBoard(state, idx).animals.looseStableKeys()
   return looseStableKeys.some((key) => !player.stableAnimals?.[key])
 }
 
-const hasAnyUnfencedStable = (player: PlayerState): boolean =>
-  getLooseStableKeys(player).length > 0
+const hasAnyUnfencedStable = (state: GameState, player: PlayerState): boolean => {
+  const idx = state.players.indexOf(player)
+  return playerBoard(state, idx).animals.looseStableKeys().length > 0
+}
 
 /**
  * Post-reorganize check leaf: after the optional reorganize, if a
@@ -38,8 +41,8 @@ const postReorgCheckAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ player }) => {
-    if (!hasEmptyUnfencedStable(player)) return { type: 'ok' }
+  execute: ({ state, player }) => {
+    if (!hasEmptyUnfencedStable(state, player)) return { type: 'ok' }
     return { type: 'flow', flow: gainLeaf(CARD_ID, { sheep: 1 }) }
   },
 }
@@ -58,11 +61,11 @@ export const E83_ShepherdsWhistle = new MinorImprovement({
 export const E83_ShepherdsWhistle_impl = {
   effect: {
   id: CARD_ID,
-  onEndHarvestFeedingPhase: (_state, player): ActionFlow | undefined => {
-    if (hasEmptyUnfencedStable(player)) {
+  onEndHarvestFeedingPhase: (state, player): ActionFlow | undefined => {
+    if (hasEmptyUnfencedStable(state, player)) {
       return gainLeaf(CARD_ID, { sheep: 1 })
     }
-    if (hasAnyUnfencedStable(player)) {
+    if (hasAnyUnfencedStable(state, player)) {
       return {
         type: 'seq',
         optional: true,

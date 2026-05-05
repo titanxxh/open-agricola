@@ -104,7 +104,7 @@ describe('B130_FullPeasant session', () => {
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId !== 'wait') return
-    const accept = resp.interaction.options?.find((o) => o.value !== '__skip__')!
+    const accept = (resp.interaction.options ?? []).find((o) => o.value !== '__skip__')!
     resp = session.resolveChoice(0, accept.value)
     expect(resp.state.players[0]!.workers.filter((w) => w.isActive).length).toBe(activeBefore)
   })

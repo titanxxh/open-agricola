@@ -83,8 +83,7 @@ import type { CardEffectHook } from '../cards/card-effects.ts'
 import { runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks } from '../cards/card-effects.ts'
 import { positionKey } from '../game/farm.ts'
 import { getMatchingListeners, executeCardListener, shouldSkipImmediateListenerLog } from '../cards/card-listeners.ts'
-import { computeScores, type PlayerScoreSummary } from '../logic/scoring.ts'
-import { computeAnimalZones } from '../actions/helpers/animal-zones'
+import { Scoring, playerBoard, type PlayerScoreSummary } from '../domain'
 import { reap } from '../actions/effects/reap.ts'
 import { breedLeaf } from '../actions/effects/breed'
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
@@ -113,15 +112,6 @@ import {
   getFenceCount,
   getPalisadeCount,
 } from '../actions/effects/fencing.ts'
-import {
-  buildFarmPositionSelectionInteraction,
-  buildFenceFarmInteraction,
-  buildPlowFarmInteraction,
-  buildRoomFarmInteraction,
-  buildSowFarmInteraction,
-  buildStableFarmInteraction,
-} from '../logic/farm/farm-interaction.ts'
-import { buildOccupationHandSelectionInteraction } from '../logic/farm/occupation-hand-interaction.ts'
 import { rebuildActiveModifiers } from '../game/serialization.ts'
 import { isSpaceOccupied, removeWorkerRef } from '../game/space.ts'
 import { smallestAvailableWorker } from '../game/player.ts'
@@ -272,6 +262,27 @@ export interface GameCoreOptions {
    * custom-code cards at runtime) forward into this session's registry.
    */
   cardRegistry?: CardRegistry
+}
+
+/**
+ * Build the InteractionSelection payload for an "occupation-hand" selection.
+ * Reads actionContext: selectableCards (string[]), minSelections, maxSelections.
+ * Falls back to the player's current occupationHand if selectableCards is absent.
+ *
+ * Inlined in PR5 from a former occupation-hand-interaction helper —
+ * only used here, so kept local rather than surfacing on the domain facade.
+ */
+const buildOccupationHandSelectionInteraction = (
+  player: PlayerState,
+  actionContext?: Record<string, unknown>,
+): InteractionSelection => {
+  const raw = actionContext?.selectableCards
+  const selectableCards = Array.isArray(raw)
+    ? (raw as unknown[]).filter((v): v is string => typeof v === 'string')
+    : player.occupationHand
+  const minSelections = (actionContext?.minSelections as number) ?? 1
+  const maxSelections = (actionContext?.maxSelections as number) ?? minSelections
+  return { kind: 'occupation-hand', selectableCards, minSelections, maxSelections }
 }
 
 export class GameCore {
@@ -1024,7 +1035,11 @@ export class GameCore {
     costOverride?: Partial<Resource>,
     actionContext?: Record<string, unknown>,
   ): InteractionFarmSelection {
-    return buildRoomFarmInteraction(player, costOverride, actionContext)
+    const idx = this.state.players.indexOf(player)
+    return playerBoard(this.state, idx).farmyard.selectableTiles('room', {
+      costOverride,
+      actionContext,
+    })
   }
 
   private buildStableInteraction(
@@ -1034,33 +1049,40 @@ export class GameCore {
   ): InteractionFarmSelection {
     const zoneFilter = actionContext?.zoneFilter
     const max = actionContext?.max
-    return buildStableFarmInteraction(player, costOverride, {
+    const idx = this.state.players.indexOf(player)
+    return playerBoard(this.state, idx).farmyard.selectableTiles('stable', {
+      costOverride,
       zoneFilter: zoneFilter === 'pasture-1' ? 'pasture-1' : undefined,
       max: typeof max === 'number' ? max : undefined,
     })
   }
 
   private buildPlowInteraction(player: PlayerState, costOverride?: Partial<Resource>): InteractionFarmSelection {
-    return buildPlowFarmInteraction(player, costOverride)
+    const idx = this.state.players.indexOf(player)
+    return playerBoard(this.state, idx).farmyard.selectableTiles('plow', { costOverride })
   }
 
   private buildSowInteraction(player: PlayerState): InteractionFarmSelection {
     const actionContext = this.getActionContextFromTopFrame()
-    return buildSowFarmInteraction(player, actionContext)
+    const idx = this.state.players.indexOf(player)
+    return playerBoard(this.state, idx).farmyard.selectableTiles('sow', { actionContext })
   }
 
   /**
    * Refactored from `buildFenceInteraction(pending)` to take the
    * InteractionNode + player directly (Task 10: `this.pending` deleted).
-   * `buildFenceFarmInteraction` only needs the active space id (used to
-   * detect the `farm-redevelopment` `extraWood` adjustment).
+   * `selectableTiles('fence', ...)` only needs the active space id (used
+   * to detect the `farm-redevelopment` `extraWood` adjustment).
    */
   private buildFenceInteractionFromNode(
     _node: InteractionNode,
     player: PlayerState,
   ): InteractionFarmSelection {
     const frame = this.engineStack.current()
-    return buildFenceFarmInteraction(player, frame?.spaceId ?? '')
+    const idx = this.state.players.indexOf(player)
+    return playerBoard(this.state, idx).farmyard.selectableTiles('fence', {
+      spaceId: frame?.spaceId ?? '',
+    })
   }
 
   private buildSelectionInteractionFromNode(
@@ -1072,7 +1094,8 @@ export class GameCore {
     if (kind === 'occupation-hand') {
       return buildOccupationHandSelectionInteraction(player, actionContext)
     }
-    return buildFarmPositionSelectionInteraction(player, actionContext)
+    const idx = this.state.players.indexOf(player)
+    return playerBoard(this.state, idx).farmyard.selectableTiles('farm-position', { actionContext })
   }
 
   private buildFarmInteractionFromNode(
@@ -1082,7 +1105,7 @@ export class GameCore {
     const farmType = this.isFarmPromptKey(node.promptKey)
     if (!farmType) return null
     const ctx = this.getActionContextFromTopFrame()
-    const costOverride = this.engineStack.current()?.engine.getLastComputedCosts()
+    const costOverride = this.peekHostContextSnapshot()?.costs
     switch (farmType) {
       case 'fence':
         return this.buildFenceInteractionFromNode(node, player)
@@ -1103,9 +1126,44 @@ export class GameCore {
    * Read-through helper for the engine's `pendingInteractionContext.actionContext`
    * on the current engine-stack frame. Replaces the legacy `this.pending.actionContext`
    * accessor (Task 10).
+   *
+   * S4b PR5 — reads the context snapshot directly off the current
+   * pending-interaction host (InteractionNode | OrNode | XorNode |
+   * OptionalNode) via `peekInteractionHost()`. The legacy engine-mirror
+   * `getPendingInteractionContext()` accessor is gone.
    */
   private getActionContextFromTopFrame(): Record<string, unknown> | undefined {
-    return this.engineStack.current()?.engine.getPendingInteractionContext()?.actionContext
+    return this.peekHostContextSnapshot()?.actionContext
+  }
+
+  /**
+   * S4b PR5 — read the pending-interaction context snapshot off whichever
+   * host node is currently active (`InteractionNode.contextSnapshot` or
+   * `Or/Xor/OptionalNode.pendingContextSnapshot`).
+   */
+  private peekHostContextSnapshot() {
+    const host = this.engineStack.current()?.engine.peekInteractionHost()
+    if (!host) return null
+    if (host instanceof InteractionNode) return host.contextSnapshot ?? null
+    if (host instanceof OrNode || host instanceof XorNode || host instanceof OptionalNode) {
+      return host.pendingContextSnapshot ?? null
+    }
+    return null
+  }
+
+  /**
+   * S4b PR5 — read the pending-interaction action id off the current host.
+   * Returns undefined when no pending host or the host did not record an
+   * actionId (composite host emit metadata).
+   */
+  private peekHostPendingActionId(): string | undefined {
+    const host = this.engineStack.current()?.engine.peekInteractionHost()
+    if (!host) return undefined
+    if (host instanceof InteractionNode) return host.pendingActionId
+    if (host instanceof OrNode || host instanceof XorNode || host instanceof OptionalNode) {
+      return host.pendingActionId ?? undefined
+    }
+    return undefined
   }
 
   private buildAnytimeEntries(): { descriptor: AnytimeAction; flow: ActionFlow }[] {
@@ -1190,7 +1248,8 @@ export class GameCore {
   private buildAnimalReorgZones(
     player: PlayerState,
   ): InteractionAnimalReorgZone[] {
-    return computeAnimalZones(player).map((zone) => ({
+    const idx = this.state.players.indexOf(player)
+    return playerBoard(this.state, idx).animals.zones().map((zone) => ({
       id: zone.id,
       zoneType: zone.zoneType as 'pasture' | 'house' | 'stable',
       animalType: (zone.animalType as 'sheep' | 'boar' | 'cattle' | null) ?? null,
@@ -1236,9 +1295,9 @@ export class GameCore {
     const spaceId = frame.spaceId
     const promptKey = node?.promptKey ?? composite?.promptKey
     const promptParams = node?.promptParams ?? composite?.promptParams
-    const ctx = frame.engine.getPendingInteractionContext()
+    const ctx = this.peekHostContextSnapshot()
     const sourceCard = ctx?.sourceCard
-    const costOverride = frame.engine.getLastComputedCosts()
+    const costOverride = ctx?.costs
 
     // Resolve the InteractionRequest for the wait state. node.request is the
     // primary source; composite-fallback synthesises a `choice` request from
@@ -1382,14 +1441,14 @@ export class GameCore {
   }
 
   private computeWinnerIds(): string[] {
-    const summary = computeScores(this.state)
+    const summary = Scoring.computeAll(this.state)
     if (summary.length === 0) return []
     const top = summary.reduce((a, b) => (a.total >= b.total ? a : b))
     return summary.filter((s) => s.total === top.total).map((s) => s.playerId)
   }
 
   private computeScoreSummary() {
-    return computeScores(this.state).map((s) => ({ playerId: s.playerId, total: s.total }))
+    return Scoring.computeAll(this.state).map((s) => ({ playerId: s.playerId, total: s.total }))
   }
 
   private respond(ok = true, error?: string): SessionResponse {
@@ -1407,7 +1466,7 @@ export class GameCore {
       interaction,
       historyLength: this.history.length,
       hasActionStartSnapshot: this.actionStartIndex !== null,
-      scores: computeScores(this.state),
+      scores: Scoring.computeAll(this.state),
       pastureCapacities: this.getPastureCapacities(),
     }
     // Include backend-computed availability for the current player when
@@ -2255,7 +2314,7 @@ export class GameCore {
           let autoOptions = step.choice.options
           while (autoOptions.length === 1) {
             const auto = autoOptions[0]
-            const resolvedActionId = frame.engine.snapshot().pendingInteractionActionId ?? undefined
+            const resolvedActionId = this.peekHostPendingActionId()
             const result = frame.engine.resolveChoice(auto.value, { state: this.state, player, space })
             this.flushEngineLog()
             if (result.type === 'ok' && resolvedActionId) {
@@ -2508,8 +2567,8 @@ export class GameCore {
 
   getPastureCapacities(): Record<string, Record<string, number>> {
     const result: Record<string, Record<string, number>> = {}
-    this.state.players.forEach((player) => {
-      const zones = computeAnimalZones(player)
+    this.state.players.forEach((player, idx) => {
+      const zones = playerBoard(this.state, idx).animals.zones()
       result[player.id] = Object.fromEntries(
         zones.filter((z) => z.zoneType === 'pasture').map((z) => [z.id, z.capacity]),
       )
@@ -2538,8 +2597,8 @@ export class GameCore {
     const pendingPlayerIndex = frame?.ownerPlayerIndex ?? -1
     const pendingPromptKey = node?.promptKey ?? composite?.promptKey
     const pendingOptions = node?.choices ?? composite?.options ?? []
-    const pendingActionContext = frame?.engine.getPendingInteractionContext()?.actionContext
-    const pendingSourceCard = frame?.engine.getPendingInteractionContext()?.sourceCard
+    const pendingActionContext = this.peekHostContextSnapshot()?.actionContext
+    const pendingSourceCard = this.peekHostContextSnapshot()?.sourceCard
     // 'choice' (typed), 'animal-reorg' (legacy commit pathway), and any
     // ChoiceNode-emitted untyped request all flow through the engine's
     // resolveChoice path. Composite-node (OrNode/XorNode/OptionalNode)
@@ -2596,7 +2655,7 @@ export class GameCore {
         }
       }
     }
-    const resolvedActionId = this.engine.snapshot().pendingInteractionActionId ?? undefined
+    const resolvedActionId = this.peekHostPendingActionId()
     const result = this.engine.resolveChoice(value, { state: this.state, player, space }, payload)
     this.flushEngineLog()
     if (result.type === 'ok' && resolvedActionId) {
@@ -3088,7 +3147,7 @@ export class GameCore {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
 
-    const interactionContext = frame.engine.getPendingInteractionContext()?.actionContext
+    const interactionContext = this.peekHostContextSnapshot()?.actionContext
     const selectionKind = (interactionContext?.selectionKind as string | undefined) ?? 'farm-position'
     const maxSelections = (interactionContext?.maxSelections as number) ?? 1
 

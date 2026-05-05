@@ -1,6 +1,5 @@
 import type { ActionFlow, FarmTilePosition, GameState, PlayerState, Resource } from '../game/types'
-import type { AnimalZone } from '../actions/helpers/animal-zones'
-import type { PlayerScoreSummary, ScoreCategoryResult } from '../logic/scoring'
+import type { AnimalZone, PlayerScoreSummary, ScoreCategoryResult } from '../domain'
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
 import { positionKey } from '../game/farm'

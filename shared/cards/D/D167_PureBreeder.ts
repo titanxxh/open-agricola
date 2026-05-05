@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getTotalAnimalCapacity } from '../../actions/helpers/animal-zones'
+import { playerBoard } from '../../domain'
 import type { ActionFlow } from '../../game/types'
 import type { CardImpl } from '../registry'
 
@@ -27,7 +27,8 @@ export const D167_PureBreeder_impl = {
   onAfterRoundEnd: (state, player) => {
     if (harvestRounds.includes(state.round)) return // harvest round — skip
     const totalAnimals = BREEDABLE.reduce((sum, t) => sum + player.resources[t], 0)
-    const cap = getTotalAnimalCapacity(player)
+    const idx = state.players.indexOf(player)
+    const cap = playerBoard(state, idx).animals.totalCapacity()
     if (totalAnimals >= cap) return // no capacity for new animal
     const children: ActionFlow[] = BREEDABLE
       .filter((t) => player.resources[t] >= 2)

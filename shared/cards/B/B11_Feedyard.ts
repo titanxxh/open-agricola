@@ -1,5 +1,5 @@
 import { MinorImprovement } from '../types'
-import { computeAnimalZones } from '../../actions/helpers/animal-zones'
+import { playerBoard } from '../../domain'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -44,8 +44,9 @@ export const B11_Feedyard_impl = {
      * (capacity - animalCount). Single-card hook — runs after the breed
      * phase via the existing onEndHarvest dispatch.
      */
-    onEndHarvest: (_state, player) => {
-      const zone = computeAnimalZones(player).find((z) => z.id === `card:${CARD_ID}`)
+    onEndHarvest: (state, player) => {
+      const idx = state.players.indexOf(player)
+      const zone = playerBoard(state, idx).animals.zones().find((z) => z.id === `card:${CARD_ID}`)
       if (!zone) return
       const unused = zone.capacity - (zone.animalCount ?? 0)
       if (unused <= 0) return

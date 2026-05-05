@@ -79,7 +79,7 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
     let safety = 30
     let confirmedReverse = false
     while (safety-- > 0 && resp.interaction.stateId === 'wait') {
-      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
+      if (resp.interaction.request.kind === 'feed') {
         if (resp.interaction.playerIndex === 0 && !confirmedReverse) {
           // Submit reverse trade selection: 1 invocation of C105 trade.
           resp = session.resolveChoice(0, 'confirm', { selections: [
@@ -89,19 +89,17 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
         } else {
           resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
         }
-      } else if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
+      } else if (resp.interaction.request.kind === 'animal-reorg') {
         resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
-      } else if (resp.interaction.stateId === 'wait') {
+      } else if (resp.interaction.request.kind === 'confirm-next-player') {
+        resp = confirmNextPlayer(session)
+      } else {
         const skip = resp.interaction.options?.find((o) => o.value === '__skip__')
         if (skip) {
           resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, '__skip__')
         } else {
-          resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, resp.interaction.options[0]!.value)
+          resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, resp.interaction.options![0]!.value)
         }
-      } else if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player') {
-        resp = confirmNextPlayer(session)
-      } else {
-        break
       }
     }
 
@@ -141,20 +139,18 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
     let resp = session.performRoundEnd()
     let safety = 30
     while (safety-- > 0 && resp.interaction.stateId === 'wait') {
-      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
+      if (resp.interaction.request.kind === 'feed') {
         resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
-      } else if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
+      } else if (resp.interaction.request.kind === 'animal-reorg') {
         resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
-      } else if (resp.interaction.stateId === 'wait') {
+      } else if (resp.interaction.request.kind === 'confirm-next-player') {
+        resp = confirmNextPlayer(session)
+      } else {
         const skip = resp.interaction.options?.find((o) => o.value === '__skip__')
         resp = session.resolveChoice(
           resp.interaction.playerIndex ?? 0,
-          skip ? '__skip__' : resp.interaction.options[0]!.value,
+          skip ? '__skip__' : resp.interaction.options![0]!.value,
         )
-      } else if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player') {
-        resp = confirmNextPlayer(session)
-      } else {
-        break
       }
     }
     const p1 = resp.state.players[0]!

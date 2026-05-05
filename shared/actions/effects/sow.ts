@@ -6,12 +6,8 @@ import type {
 } from '../../game/types'
 import { fieldIsEmpty } from '../../game/field'
 import { positionKey } from '../../game/farm'
-import {
-  buildSowFarmInteraction,
-  getPermittedExtraSowableFields,
-} from '../../logic/farm/farm-interaction'
+import { playerBoard, type SowSelection } from '../../domain'
 import { handleSowExtraField } from '../../cards/card-effects'
-import { validateSowSelection, type SowSelection } from '../../logic/farm/sow-validation'
 
 export const getEmptyFields = (player: PlayerState) =>
   player.fields.filter(fieldIsEmpty)
@@ -61,15 +57,20 @@ const finalizeSow = (
           typeof field.row === 'number' && typeof field.col === 'number',
       )
     : undefined
-  const extraFields = getPermittedExtraSowableFields(player, ctx.actionContext)
+  const idx = ctx.state.players.indexOf(player)
+  const board = playerBoard(ctx.state, idx)
+  const extraFields = board.farmyard.permittedExtraSowableFields(ctx.actionContext)
   const extraAllowedCrops = new Map(
     extraFields.map((field) => [positionKey(field.tile), field.allowedCrops] as const),
   )
-  const validated = validateSowSelection(player, crops, {
-    maxSelections,
-    excludedFields,
-    extraAllowedCrops: extraAllowedCrops.size > 0 ? extraAllowedCrops : undefined,
-  })
+  const validated = board.farmyard.canSow(
+    { fields: crops },
+    {
+      maxSelections,
+      excludedFields,
+      extraAllowedCrops: extraAllowedCrops.size > 0 ? extraAllowedCrops : undefined,
+    },
+  )
   if (!validated.ok) {
     return { type: 'fail', logKey: validated.error?.code ?? 'log.action' }
   }
@@ -94,8 +95,9 @@ export const sowAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (_, player) => canSow(player),
-  execute: ({ player, actionContext }): ActionExecutionResult => {
-    const farm = buildSowFarmInteraction(player, actionContext)
+  execute: ({ state, player, actionContext }): ActionExecutionResult => {
+    const idx = state.players.indexOf(player)
+    const farm = playerBoard(state, idx).farmyard.selectableTiles('sow', { actionContext })
     return {
       type: 'request',
       request: {

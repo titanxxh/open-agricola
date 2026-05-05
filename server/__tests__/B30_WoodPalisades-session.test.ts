@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { computeScores } from '../../shared/logic/scoring'
+import { computeScores } from '../../shared/domain/scoring'
 import { getFenceCount, getPalisadeCount } from '../../shared/actions/effects/fencing'
 
 import '../../shared/cards/B/B30_WoodPalisades'

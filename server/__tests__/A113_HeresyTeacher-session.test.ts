@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { reap } from '../../shared/actions/effects/reap'
-import { computeScores } from '../../shared/logic/scoring'
+import { computeScores } from '../../shared/domain/scoring'
 import type { Field } from '../../shared/game/types'
 
 import '../../shared/cards/A/A113_HeresyTeacher'

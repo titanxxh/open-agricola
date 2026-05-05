@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
-import { computeScores } from '../../shared/logic/scoring'
+import { computeScores } from '../../shared/domain/scoring'
 
 import '../../shared/cards/A/A135_AnimalReeve'
 import '../../shared/cards/C/C136_RanchProvost'

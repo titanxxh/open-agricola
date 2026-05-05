@@ -1310,7 +1310,7 @@ export const GameContainerApi = () => {
 
   // ── Right-column data mappings (Batch 3 Task 7) ───────────────────────────
   //
-  // Map shared/logic/scoring.ts `PlayerScoreSummary` (one entry per player)
+  // Map shared/domain/scoring.ts `PlayerScoreSummary` (one entry per player)
   // into the 5-bucket breakdown that ScorePanel expects. These are *estimates*
   // — spec explicitly says "估算分数" is OK for the live chip — so we collapse
   // related categories pragmatically:

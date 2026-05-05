@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState, Resource } from '../../shared/game/types'
-import { computeScores } from '../../shared/logic/scoring'
+import { computeScores } from '../../shared/domain/scoring'
 
 import '../../shared/cards/D/D132_HideFarmer'
 
