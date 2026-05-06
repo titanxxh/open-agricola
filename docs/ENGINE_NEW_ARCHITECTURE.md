@@ -15,7 +15,7 @@
 
 它**不改变**：后端权威 / 全量快照 / WS 协议 / hook 系统 / 卡牌闭环原则 / 三层物理边界。
 
-> **当前 sprint 进度**（详见 §15）：S1 ✅（2026-05-03）/ S2 ✅（2026-05-05）/ S3 ✅（2026-05-04，PaymentSolver 收口）/ S4a ✅（2026-05-04）/ S4b ✅（2026-05-05，rich-node + step() dispatch + cursor round-trip 落地）/ S5–S7 待启动。
+> **当前 sprint 进度**（详见 §15）：S1 ✅（2026-05-03）/ S2 ✅（2026-05-05）/ S3 ✅（2026-05-04，PaymentSolver 收口）/ S4a ✅（2026-05-04）/ S4b ✅（2026-05-05，rich-node + step() dispatch + cursor round-trip 落地）/ S5 ✅（2026-05-06，RoomManager 拆 connection/persistence 三层）/ S6–S7 待启动。
 
 ---
 
