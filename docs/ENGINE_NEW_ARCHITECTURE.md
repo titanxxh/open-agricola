@@ -15,7 +15,7 @@
 
 它**不改变**：后端权威 / 全量快照 / WS 协议 / hook 系统 / 卡牌闭环原则 / 三层物理边界。
 
-> **当前 sprint 进度**（详见 §15）：S1 ✅（2026-05-03）/ S2 ✅（2026-05-05）/ S3 ✅（2026-05-04，PaymentSolver 收口）/ S4a ✅（2026-05-04）/ S4b ✅（2026-05-05，rich-node + step() dispatch + cursor round-trip 落地）/ S5–S7 待启动。
+> **当前 sprint 进度**（详见 §15）：S1 ✅（2026-05-03）/ S2 ✅（2026-05-05）/ S3 ✅（2026-05-04，PaymentSolver 收口）/ S4a ✅（2026-05-04）/ S4b ✅（2026-05-05，rich-node + step() dispatch + cursor round-trip 落地）/ S5 ✅（2026-05-06，RoomManager 拆 connection/persistence 三层）/ S6–S7 待启动。
 
 ---
 
@@ -950,7 +950,7 @@ S6 物理分层完成后专设 S7"卡牌效果测试回归"：
 | Payment | 3 文件 33 export 工具袋 | `PaymentSolver` 单深 module，3 个 public |
 | 领域聚合 | 散件 helper（`logic/farm/*`、`actions/helpers/*`） | `domain/` 派生视图（`PlayerBoard` 等） |
 | Improvement effect | `improvement.ts` 985 行 5 件事 | ≤ 400 行 + 拆出 options/pool |
-| RoomManager | 1174 行 4 职责 | `connection/` + `game/` + `persistence/` 三层 |
+| RoomManager | 1174 行 4 职责 | ✅ `connection/` + `game/` + `persistence/` 三层 |
 | 协议层 PendingAction | 一等 union | ❌ 删除 |
 | 协议层 InteractionCommand | `confirmReorg/Feed/Next/Switch` 等 | 全合并为 `resolveChoice` |
 | 协议层 InteractionState | 8 个 stateId（idle/choice/farmSelect/selection/animalReorg/harvestFeed/confirmNextPlayer/confirmPlayerSwitch） | 3 个 stateId（idle/wait/gameover）+ `request: InteractionRequest` sum type |
@@ -1095,11 +1095,15 @@ S4 拆分为两条独立轨道并行推进：
 - 行动层 effect 平均行数下降 ≥ 30%（注：S4a PR2/PR3 已完成主要 drop；PR5 仅清 legacy；最终对比 pre-S4a `main` 基线衡量）
 - engine.ts 主文件 ≤ 600 行（S4b 负责）
 
-### Sprint S5：RoomManager 拆 connection/persistence
+### Sprint S5：RoomManager 拆 connection/persistence ✅ 完成（2026-05-05）
 
 - 拆 `server/connection/` + `server/game/persistence/`
 - 引入 in-memory persistence adapter 给测试用
 - 专项 DoD：`room-manager.ts` 不复存在，三个新目录承接职责
+
+**完成态**：`server/game/room-manager.ts` 删除；新增 `server/connection/{ws-server,room-router,envelope-builder,broadcaster,connection-ctx}.ts` + `server/game/{room,room-registry,lobby}.ts` + `server/game/persistence/{room-persistence,sqlite/json/memory-adapter}.ts`。`RoomPersistence` 5 方法接口 + 3 adapter contract test 全绿。
+
+S5 完成（2026-05-05）
 
 ### Sprint S6：物理分层（contract / cards-display / client/sandbox / ESLint 边界）
 
@@ -1214,6 +1218,7 @@ S7 前半段 (shape-mismatch skip codemod) ── S4 完成后即可启动
 
 - 当前若有两个 owner 可分配 → 走双 owner 路径，**先开 S4 ‖ S5**；S5 worktree 已做过 server-only 改动（S2 拆 GameSession 时验证过），并行风险低
 - 若单 owner → 仍按 §15 顺序，**S5 插空策略**保持机会（S4 PR 等 review 时启动）
+- S5 完成（2026-05-05）
 
 ---
 

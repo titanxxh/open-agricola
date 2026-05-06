@@ -25,7 +25,8 @@ const FAST_INCLUDE = [
   'tests/**/*.test.ts',
   'scripts/**/__tests__/*.test.ts',
   'server/__tests__/*.test.ts',
-  'server/game/__tests__/*.test.ts',
+  'server/game/**/__tests__/*.test.ts',
+  'server/connection/**/__tests__/*.test.ts',
   'server/workshop-pr/__tests__/*.test.ts',
 ]
 const BASE_EXCLUDE = [...defaultExclude, '**/.worktree/**']

@@ -5,8 +5,11 @@ import { join, extname } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { handleGameRoute } from './game-router.ts'
 import { handleWorkshopRoute } from './workshop.ts'
-import { createWsServer, getRooms, dissolveRoomById } from './game/room-manager.ts'
+import { createWsServer } from './connection/ws-server.ts'
+import { isFixedDevRoom, type Room } from './game/room.ts'
 import { getDb, cleanExpiredSessions } from './db.ts'
+import { SqliteRoomPersistence } from './game/persistence/sqlite-adapter.ts'
+import { JsonRoomPersistence } from './game/persistence/json-adapter.ts'
 import { register, login, logout, validateSession, extractToken, updateDisplayName, changePassword, isAdmin } from './auth.ts'
 
 const CARD_ART_DIR = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art')
@@ -68,8 +71,20 @@ function getClientIp(req: IncomingMessage): string {
 // Initialize database on import
 getDb()
 
+// Wire up room persistence adapter before creating the WS server
+const PERSIST_ROOMS = (process.env.PERSIST_ROOMS ?? 'sqlite') as 'json' | 'sqlite'
+const PERSISTED_ROOMS_DIR = process.env.PERSISTED_ROOMS_DIR ?? join(process.cwd(), 'output')
+const persistence =
+  PERSIST_ROOMS === 'sqlite'
+    ? new SqliteRoomPersistence(getDb())
+    : new JsonRoomPersistence(PERSISTED_ROOMS_DIR)
+const shouldPersist: (room: Room) => boolean =
+  PERSIST_ROOMS === 'sqlite' ? () => true : (room) => isFixedDevRoom(room.id)
+
 // Periodically clean expired sessions (every hour)
 setInterval(cleanExpiredSessions, 60 * 60 * 1000)
+
+let wssCtx: ReturnType<typeof createWsServer> | null = null
 
 const server = createServer(async (req, res) => {
   if (!req.url) {
@@ -173,7 +188,7 @@ const server = createServer(async (req, res) => {
     const limit = Number.isFinite(rawLimit) && rawLimit > 0
       ? Math.min(Math.floor(rawLimit), 200)
       : 50
-    sendJson(res, 200, { ok: true, rooms: getRooms(limit) })
+    sendJson(res, 200, { ok: true, rooms: wssCtx!.lobby.getRooms(limit) })
     return
   }
 
@@ -183,7 +198,7 @@ const server = createServer(async (req, res) => {
     const user = validateSession(token)
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
     const roomId = req.url.slice('/api/rooms/'.length, req.url.length - '/dissolve'.length)
-    const result = dissolveRoomById(roomId, user.id)
+    const result = wssCtx!.lobby.dissolveRoomById(roomId, user.id)
     sendJson(res, result.ok ? 200 : 400, result)
     return
   }
@@ -293,7 +308,7 @@ const server = createServer(async (req, res) => {
   sendJson(res, 404, { error: 'Not found' })
 })
 
-createWsServer(server)
+wssCtx = createWsServer(server, { persistence, shouldPersist })
 
 const PORT = Number(process.env.BACKEND_PORT) || 5175
 const HOST = process.env.BACKEND_HOST || undefined

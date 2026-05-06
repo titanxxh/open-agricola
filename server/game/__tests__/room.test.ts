@@ -6,8 +6,8 @@ import {
   removePlayerFromRoom,
   resolveJoinRequestPlayerIndex,
   resolveJoinPlayerIndex,
-  restoreRoomFromSqliteRow,
-} from '../game/room-manager.ts'
+  snapshotToRoom,
+} from '../room.ts'
 
 const PRIMARY_DEV_ROOM_ID = FIXED_DEV_ROOMS[0]!.id
 
@@ -103,12 +103,17 @@ describe('room-manager seat assignment', () => {
   })
 
   it('restores waiting rooms without serialized state', () => {
-    const room = restoreRoomFromSqliteRow({
+    const room = snapshotToRoom({
       id: 'waiting1',
-      created_by: null,
-      state_json: null,
-      max_players: 3,
-      custom_card_ids: '[]',
+      serialized: null,
+      meta: {
+        createdBy: null,
+        maxPlayers: 3,
+        customCardDbIds: [],
+        status: 'waiting',
+        players: [],
+      },
+      updatedAt: 0,
     })
 
     expect(room).toMatchObject({
@@ -118,34 +123,6 @@ describe('room-manager seat assignment', () => {
       createdBy: undefined,
       customCardDbIds: [],
     })
-  })
-
-  it('restores waiting room version from sqlite rows', () => {
-    const room = restoreRoomFromSqliteRow({
-      id: 'waiting-version',
-      created_by: null,
-      state_json: null,
-      max_players: 2,
-      custom_card_ids: '[]',
-      version: 7,
-    } as Parameters<typeof restoreRoomFromSqliteRow>[0])
-
-    expect(room?.version).toBe(7)
-  })
-
-  it('restores playing room version from sqlite rows', () => {
-    const room = restoreRoomFromSqliteRow({
-      id: 'playing-version',
-      created_by: null,
-      state_json: JSON.stringify({
-        players: [],
-      }),
-      max_players: 2,
-      custom_card_ids: '[]',
-      version: 11,
-    } as Parameters<typeof restoreRoomFromSqliteRow>[0])
-
-    expect(room?.version).toBe(11)
   })
 
   it('exposes one persistent dev room per supported player count', () => {
@@ -168,7 +145,7 @@ describe('room-manager seat assignment', () => {
     }
     room.players[0]!.ws = ws
 
-    const result = removePlayerFromRoom(room, ws, 1234)
+    const result = removePlayerFromRoom(room, ws)
 
     expect(result).toBe('empty')
     expect(room.players).toEqual([])
