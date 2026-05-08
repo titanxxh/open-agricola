@@ -30,7 +30,7 @@ describe('gained.field pseudo-stat', () => {
     // S4b PR5: pending-interaction context lives on the InteractionNode (or
     // composite host) — patch it via `peekInteractionHost()` instead of the
     // legacy engine-level `pendingInteractionContext` mirror.
-    const host = session.getEngineStack().current()?.engine.peekInteractionHost()
+    const host = session.getEngineStack().peekInteractionHost()
     const ctx = host && 'contextSnapshot' in host
       ? (host as unknown as { contextSnapshot?: { sourceCard?: string } }).contextSnapshot
       : (host as unknown as { pendingContextSnapshot?: { sourceCard?: string } } | undefined)?.pendingContextSnapshot
@@ -59,7 +59,7 @@ describe('gained.stable pseudo-stat', () => {
     expect(resp.ok).toBe(true)
 
     // Inject sourceCard onto the pending choice host (PR5 — see plow case).
-    const host = session.getEngineStack().current()?.engine.peekInteractionHost()
+    const host = session.getEngineStack().peekInteractionHost()
     const ctx = host && 'contextSnapshot' in host
       ? (host as unknown as { contextSnapshot?: { sourceCard?: string } }).contextSnapshot
       : (host as unknown as { pendingContextSnapshot?: { sourceCard?: string } } | undefined)?.pendingContextSnapshot

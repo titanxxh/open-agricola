@@ -39,6 +39,7 @@ describe('Engine surface guard', () => {
     'getNodeEffectPreview',
     'getSequenceEffectPreview',
     'hasPendingChoiceCompositeAncestor',
+    'injectBeforeNodes',
     'insertFlowAfterPendingChoice',
     'maybeBuildChoiceCandidates',
     'mergeContextIntoFlow',
