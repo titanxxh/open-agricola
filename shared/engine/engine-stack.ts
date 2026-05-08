@@ -1,6 +1,6 @@
 import type { Engine } from './engine'
 import type { ActionChoiceOption, ActionFlow, InteractionRequest } from '../contract/types'
-import type { PromptKey } from '../game/prompt-keys'
+import type { PromptKey } from '../contract/prompt-keys'
 import type { EngineNode } from './types'
 
 export type EngineSource =

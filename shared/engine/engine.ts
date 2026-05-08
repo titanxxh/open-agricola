@@ -8,7 +8,7 @@ import type {
   ActionChoiceOption,
   InteractionRequest,
 } from '../contract/types'
-import type { PromptKey } from '../game/prompt-keys'
+import type { PromptKey } from '../contract/prompt-keys'
 import {
   ActionNode,
   InteractionNode,

@@ -9,7 +9,7 @@ import type {
   InteractionRequest,
   Resource,
 } from '../contract/types'
-import type { PromptKey } from '../game/prompt-keys'
+import type { PromptKey } from '../contract/prompt-keys'
 import type { FollowUpAction } from '../actions/hooks'
 import {
   ActionNode,
