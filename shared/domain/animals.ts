@@ -1,6 +1,6 @@
 import type { PlayerState } from '../contract/types'
-
-export type AnimalKey = 'sheep' | 'boar' | 'cattle'
+import type { AnimalKey } from '../contract/animals'
+export type { AnimalKey }
 
 const ZERO: Record<AnimalKey, number> = { sheep: 0, boar: 0, cattle: 0 }
 
