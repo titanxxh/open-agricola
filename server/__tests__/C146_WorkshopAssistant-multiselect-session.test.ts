@@ -117,8 +117,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
     expect(result.resourcesGained).toEqual({ wood: 3, clay: 3, reed: 3, stone: 3 })
   })
 
-  // SKIP[S1]: 'choice'→'request' shape mismatch, see docs/skip-tracker.md
-  it.skip('n=3: emits choice with needed=3, accepts WC,CS,RS → gains wood+2*clay+stone+reed+stone', () => {
+  it('n=3: emits choice with needed=3, accepts WC,CS,RS → gains wood+2*clay+stone+reed+stone', () => {
     const player = createPlayer()
     player.minorPlayed = ['M1', 'M2', 'M3']
     const state = createState([player])
@@ -132,13 +131,15 @@ describe('C146 — multi-select pairs (onBuy)', () => {
     } as unknown as ActionExecutionContext
 
     const initial = def.execute(ctx)
-    expect(initial.type).toBe('choice')
-    if (initial.type !== 'choice') return
+    expect(initial.type).toBe('request')
+    if (initial.type !== 'request') return
+    expect(initial.request.kind).toBe('choice')
+    if (initial.request.kind !== 'choice') return
     expect(initial.promptKey).toBe('ui.interactionWorkshopAssistantSelect')
     expect(initial.promptParams).toEqual({ needed: 3 })
-    expect(initial.options).toHaveLength(6)
-    expect(initial.options.every((o) => o.sourceCard === CARD_ID)).toBe(true)
-    expect(initial.options.map((o) => o.value)).toEqual([
+    expect(initial.request.options).toHaveLength(6)
+    expect(initial.request.options.every((o) => o.sourceCard === CARD_ID)).toBe(true)
+    expect(initial.request.options.map((o) => o.value)).toEqual([
       'WC', 'WR', 'WS', 'CR', 'CS', 'RS',
     ])
 
@@ -153,8 +154,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
     expect(resolved.resourcesGained).toEqual({ wood: 1, clay: 2, reed: 1, stone: 2 })
   })
 
-  // SKIP[S1]: 'choice'→'request' shape mismatch, see docs/skip-tracker.md
-  it.skip('n=3 with insufficient selections (WC only): re-emits same choice', () => {
+  it('n=3 with insufficient selections (WC only): re-emits same choice', () => {
     const player = createPlayer()
     player.minorPlayed = ['M1', 'M2', 'M3']
     const state = createState([player])
@@ -168,18 +168,19 @@ describe('C146 — multi-select pairs (onBuy)', () => {
     } as unknown as ActionExecutionContext
 
     const reEmit = def.resolveChoice!(ctx, 'WC')
-    expect(reEmit.type).toBe('choice')
-    if (reEmit.type !== 'choice') return
+    expect(reEmit.type).toBe('request')
+    if (reEmit.type !== 'request') return
+    expect(reEmit.request.kind).toBe('choice')
+    if (reEmit.request.kind !== 'choice') return
     expect(reEmit.promptKey).toBe('ui.interactionWorkshopAssistantSelect')
     expect(reEmit.promptParams).toEqual({ needed: 3 })
-    expect(reEmit.options).toHaveLength(6)
+    expect(reEmit.request.options).toHaveLength(6)
     // Player resources untouched
     expect(player.resources.wood).toBe(0)
     expect(player.resources.clay).toBe(0)
   })
 
-  // SKIP[S1]: 'choice'→'request' shape mismatch, see docs/skip-tracker.md
-  it.skip('n=3: duplicate selections collapse and re-emit when unique count is short', () => {
+  it('n=3: duplicate selections collapse and re-emit when unique count is short', () => {
     const player = createPlayer()
     player.minorPlayed = ['M1', 'M2', 'M3']
     const state = createState([player])
@@ -193,6 +194,8 @@ describe('C146 — multi-select pairs (onBuy)', () => {
     } as unknown as ActionExecutionContext
 
     const reEmit = def.resolveChoice!(ctx, 'WC,WC,WC')
-    expect(reEmit.type).toBe('choice')
+    expect(reEmit.type).toBe('request')
+    if (reEmit.type !== 'request') return
+    expect(reEmit.request.kind).toBe('choice')
   })
 })
