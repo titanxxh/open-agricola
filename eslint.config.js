@@ -142,4 +142,47 @@ export default defineConfig([
       }],
     },
   },
+  // S6b: cards-display is the bundle-isolated display layer. It must not
+  // import impl layers (actions/engine/session) nor the per-deck card impl
+  // files under shared/cards/[A-E]/**, shared/cards/community/**, or
+  // shared/cards/__stubs__/**. Pure types may come from shared/contract/*.
+  //
+  // Excluded from this rule:
+  //   - shared/cards-display/major/**  — major card data files keep their
+  //     onBuy/onHarvest hooks inline (no separate impl split exists for
+  //     majors); they intentionally reach into actions/effects/internal and
+  //     cards/helpers/stage-effects. Hoisting major hooks is S6c work.
+  //   - shared/cards-display/_lookup.ts — bridges catalog into the display
+  //     facade; needs cards/major + cards/catalog references.
+  //   - shared/cards-display/types.ts — owns the CardBase class hierarchy
+  //     that all card display files extend.
+  {
+    files: ['shared/cards-display/**/*.{ts,tsx}'],
+    ignores: [
+      'shared/cards-display/major/**',
+      'shared/cards-display/_lookup.ts',
+      'shared/cards-display/types.ts',
+    ],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          {
+            group: [
+              '**/shared/actions/**',
+              '**/shared/engine/**',
+              '**/shared/session/**',
+              '**/shared/cards/[A-E]/**',
+              '**/shared/cards/community/**',
+              '**/shared/cards/__stubs__/**',
+              '../actions/**', '../engine/**', '../session/**',
+              '../cards/[A-E]/**', '../cards/community/**', '../cards/__stubs__/**',
+              '../../actions/**', '../../engine/**', '../../session/**',
+              '../../cards/[A-E]/**', '../../cards/community/**', '../../cards/__stubs__/**',
+            ],
+            message: 'shared/cards-display/** must not import impl layers (actions/engine/session) nor per-deck card impl files. Use shared/contract/* for shared types.',
+          },
+        ],
+      }],
+    },
+  },
 ])
