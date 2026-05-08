@@ -13,7 +13,7 @@ import {
   getCustomMinorImprovement,
   getCustomOccupation,
 } from '../../shared/cards/custom-registry'
-import type { CardBase } from '../../shared/cards/types'
+import type { CardBase } from '../../shared/cards-display/types'
 
 export type CardMeta = {
   id: string

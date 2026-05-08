@@ -1,4 +1,4 @@
-import { MajorImprovement } from '../../../../shared/cards/types'
+import { MajorImprovement } from '../../../../shared/cards-display/types'
 
 export const MA_Test = new MajorImprovement({
   id: 'MA_Test',

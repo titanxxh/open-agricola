@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState, Resource } from '../../contract/types'
 import { computeScores } from '../scoring'
-import { Occupation, registerAdHocOccupation } from '../../cards/types'
+import { Occupation } from '../../cards-display/types'
+import { registerAdHocOccupation } from '../../cards/registry-runtime'
 
 // Self-register the minor we use as a fixture
 import '../../cards/B/B68_Beanfield'

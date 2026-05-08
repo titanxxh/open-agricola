@@ -2,7 +2,7 @@ import type {
   MinorImprovement as MinorImprovementCard,
   Occupation as OccupationCard,
   PlayerActionCard,
-} from '../cards/types'
+} from './types'
 import { majorCardDefinitions } from '../cards/major'
 import {
   minorImprovementCards,

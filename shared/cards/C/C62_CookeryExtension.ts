@@ -1,4 +1,4 @@
-import type { CardExchange } from '../types'
+import type { CardExchange } from '../../contract/cards'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardImpl } from '../registry'

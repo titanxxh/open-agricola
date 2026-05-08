@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { PlayerState } from '../../../contract/types'
 import { meetsCardPrerequisites } from '../prerequisites'
-import { MinorImprovement, registerAdHocMinorImprovement } from '../../types'
+import { MinorImprovement } from '../../../cards-display/types'
+import { registerAdHocMinorImprovement } from '../../registry-runtime'
 import { C70_LettucePatch } from '../../C/C70_LettucePatch'
 
 // Register a throwaway field-providing minor for this test file only

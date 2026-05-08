@@ -1,4 +1,4 @@
-import { Occupation } from '../types'
+import { Occupation } from '../../cards-display/types'
 
 export const C178_OnSiteReverend = new Occupation({
   id: 'C178_OnSiteReverend',

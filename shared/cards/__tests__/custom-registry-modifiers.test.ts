@@ -4,7 +4,7 @@ import { CardRegistry } from '../registry'
 import { setActiveCardRegistry, getActiveCardRegistry } from '../active-registry'
 import { registerCustomCard } from '../custom-registry'
 import type { CostModifier } from '../../contract/types'
-import type { CardDefinition } from '../types'
+import type { CardDefinition } from '../../contract/cards'
 
 const baseCardJson = (id: string, extra?: Partial<CardDefinition>): CardDefinition => ({
   id,

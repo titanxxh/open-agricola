@@ -1,4 +1,4 @@
-import { Occupation } from '../../../shared/cards/types'
+import { Occupation } from '../../../shared/cards-display/types'
 export const C1_Missing = new Occupation({ id: 'C1_Missing', name: 'Missing', deck: 'C', number: 1 })
 export const C1_Missing_impl = {
   listeners: [{ id: 'x', cardIds: ['C1_Missing'], handler: () => {

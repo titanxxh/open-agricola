@@ -48,7 +48,7 @@ export type ActionHookResult = {
   actionId?: string
   extraData?: Record<string, unknown>
   extraOptions?: ActionChoiceOption[]
-  extraExchanges?: import('../cards/types').CardExchange[]
+  extraExchanges?: import('../contract/cards').CardExchange[]
   followUpActions?: FollowUpAction[]
   flow?: ActionFlow
   costs?: Partial<Resource>

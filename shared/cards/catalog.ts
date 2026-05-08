@@ -1,11 +1,7 @@
 import { getCustomMinorImprovement, getCustomOccupation } from './custom-registry'
-import {
-  registerCardLookups,
-  MinorImprovement,
-  Occupation,
-  PlayerActionCard,
-} from './types'
-import type { CardDefinition } from './types'
+import { MinorImprovement, Occupation, PlayerActionCard } from '../cards-display/types'
+import { registerCardLookups } from './registry-runtime'
+import type { CardDefinition } from '../contract/cards'
 import { majorCardDefinitions } from './major'
 import { allCommunityCards } from './community/auto-catalog'
 import { A10_WoodenShed } from '../cards-display/A/A10_WoodenShed'

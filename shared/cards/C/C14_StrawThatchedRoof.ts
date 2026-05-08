@@ -1,4 +1,4 @@
-import { MinorImprovement } from '../types'
+import { MinorImprovement } from '../../cards-display/types'
 import type { BonusModifier } from '../../contract/types'
 
 const CARD_ID = 'C14_StrawThatchedRoof'

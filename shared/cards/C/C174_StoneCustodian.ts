@@ -1,4 +1,4 @@
-import { Occupation } from '../types'
+import { Occupation } from '../../cards-display/types'
 
 export const C174_StoneCustodian = new Occupation({
   id: 'C174_StoneCustodian',

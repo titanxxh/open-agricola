@@ -5,13 +5,13 @@ import { performHarvest } from '../../../shared/session/round'
 import {
   getRegisteredMinorImprovement,
   getRegisteredOccupation,
-} from '../../../shared/cards/types'
+} from '../../../shared/cards-display/types'
 import { getMajorCard } from '../../../shared/cards/major'
 import {
   BASIC_CONVERSION_SOURCE_ID,
   basicConversionExchanges,
 } from '../../../shared/cards/basic-conversion'
-import type { CardExchange } from '../../../shared/cards/types'
+import type { CardExchange } from '../../../shared/contract/cards'
 
 export type HarvestFeedPending = {
   playerIndex: number

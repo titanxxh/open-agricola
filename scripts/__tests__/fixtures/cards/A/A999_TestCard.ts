@@ -1,4 +1,4 @@
-import { Occupation } from '../../../../shared/cards/types'
+import { Occupation } from '../../../../shared/cards-display/types'
 
 export const A999_TestCard = new Occupation({
   id: 'A999_TestCard',

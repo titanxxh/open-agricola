@@ -1,4 +1,4 @@
-import { getRegisteredMinorImprovement } from '../types'
+import { getRegisteredMinorImprovement } from '../../cards-display/types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ComplexCost, GameState, PlayerState } from '../../contract/types'

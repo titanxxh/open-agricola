@@ -1,4 +1,4 @@
-import { Occupation } from '../types'
+import { Occupation } from '../../cards-display/types'
 import type { TradeModifier } from '../../contract/types'
 
 /** BGA-style: up to 3× "pay 0 to cover 1 wood" fence units (see `addCost` in bga-agricola A88_HedgeKeeper.php). */

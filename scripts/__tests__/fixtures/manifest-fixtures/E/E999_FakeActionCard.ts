@@ -1,4 +1,4 @@
-import { PlayerActionCard } from '../../../../../shared/cards/types'
+import { PlayerActionCard } from '../../../../../shared/cards-display/types'
 import { registerPlayerActionSpace } from '../../../../../shared/cards/player-action-space'
 
 const CARD_ID = 'E999_FakeActionCard'
