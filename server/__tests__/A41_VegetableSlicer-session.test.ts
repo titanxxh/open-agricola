@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { playImprovement } from '../../shared/actions/effects/improvement'
-import type { ActionSpace, GameState, PlayerState } from '../../shared/game/types'
+import type { ActionSpace, GameState, PlayerState } from '../../shared/contract/types'
 
 import '../../shared/cards/A/A41_VegetableSlicer'
 

@@ -1,4 +1,4 @@
-import type { ActionDefinition, ActionSpace, GameState } from '../../../game/types'
+import type { ActionDefinition, ActionSpace, GameState } from '../../../contract/types'
 import { recordRoundPlacement } from '../../../cards/helpers/round-placement'
 import { smallestAvailableWorker, workersAvailable } from '../../../game/player'
 import { addWorkerRef } from '../../../game/space'

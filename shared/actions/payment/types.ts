@@ -1,4 +1,4 @@
-import type { ComplexCost, CostModifierType, GameState, PaymentSolution, Resource } from '../../game/types'
+import type { ComplexCost, CostModifierType, GameState, PaymentSolution, Resource } from '../../contract/types'
 
 export type Cost = Partial<Resource> | ComplexCost
 

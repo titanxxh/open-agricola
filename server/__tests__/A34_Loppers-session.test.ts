@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
-import type { GameState, PlayerState } from '../../shared/game/types'
+import type { GameState, PlayerState } from '../../shared/contract/types'
 import { setFencesForTest, setPalisadesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
 
 import '../../shared/cards/A/A34_Loppers'

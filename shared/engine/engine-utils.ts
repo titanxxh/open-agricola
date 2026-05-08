@@ -8,7 +8,7 @@ import type {
   ActionChoiceOption,
   InteractionRequest,
   Resource,
-} from '../game/types'
+} from '../contract/types'
 import type { PromptKey } from '../game/prompt-keys'
 import type { FollowUpAction } from '../actions/hooks'
 import {

@@ -1,4 +1,4 @@
-import type { ActionFlow, GameState, PlayerState } from '../../game/types'
+import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 import type { MajorCardData, MajorEffectHook } from './types'
 import { basketmaker } from './basketmaker'
 import { clayOven } from './clay-oven'

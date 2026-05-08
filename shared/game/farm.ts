@@ -1,4 +1,4 @@
-import type { FarmTilePosition, Field, PlayerState } from './types'
+import type { FarmTilePosition, Field, PlayerState } from '../contract/types'
 
 export const FARM_ROWS = 3
 export const FARM_COLS = 5

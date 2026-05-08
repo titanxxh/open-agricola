@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 import '../../shared/cards/D/D70_StrawManure'
-import type { ActionChoiceOption } from '../../shared/game/types'
+import type { ActionChoiceOption } from '../../shared/contract/types'
 
 describe('D70_StrawManure session', () => {
   const setupHarvest = () => {

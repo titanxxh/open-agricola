@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import type { AnytimeAction, ActionFlow } from '../../shared/game/types'
+import type { AnytimeAction, ActionFlow } from '../../shared/contract/types'
 
 import '../../shared/cards/D/D114_SeedTrader'
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
-import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../contract/types'
 
 import '../D/D144_WaterWorker'
 import type { CardListenerContext } from '../card-listeners'

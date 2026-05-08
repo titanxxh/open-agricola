@@ -3,10 +3,10 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
-import type { ActionSpace, GameState, PlayerState, Resource } from '../../shared/game/types'
+import type { ActionSpace, GameState, PlayerState, Resource } from '../../shared/contract/types'
 
 import '../../shared/cards/E/E27_PiggyBank'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'E27_PiggyBank'
 

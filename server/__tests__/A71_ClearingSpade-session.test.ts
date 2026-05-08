@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/A/A71_ClearingSpade'
-import type { AnytimeAction } from '../../shared/game/types';
+import type { AnytimeAction } from '../../shared/contract/types';
 
 describe('A71_ClearingSpade session', () => {
   const setup = (fields?: { row: number; col: number; crop: string | null; remaining: number }[]) => {

@@ -5,7 +5,7 @@ import type {
   ActionSpace,
   GameState,
   PlayerState,
-} from '../../../game/types'
+} from '../../../contract/types'
 
 const dummySpace: ActionSpace = { id: 'sow', type: 'sow' } as unknown as ActionSpace
 

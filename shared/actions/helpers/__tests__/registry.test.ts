@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest'
-import type { ActionDefinition } from '../../../game/types'
+import type { ActionDefinition } from '../../../contract/types'
 import {
   registerAdHocAction,
   getAdHocAction,

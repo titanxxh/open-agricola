@@ -1,4 +1,4 @@
-import type { GameState, PlayerState } from '../../game/types'
+import type { GameState, PlayerState } from '../../contract/types'
 import type { CardDefinition } from '../types'
 import { getRegisteredMinorImprovement } from '../types'
 import { getMajorCard } from '../major'

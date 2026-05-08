@@ -1,4 +1,4 @@
-import type { ActionFlow, FarmTilePosition, GameState, PlayerState, Resource } from '../game/types'
+import type { ActionFlow, FarmTilePosition, GameState, PlayerState, Resource } from '../contract/types'
 import type { AnimalZone, PlayerScoreSummary, ScoreCategoryResult } from '../domain'
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'

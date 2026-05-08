@@ -1,4 +1,4 @@
-import type { ActionDefinition, ActionSpace, GameState, Resource } from '../game/types'
+import type { ActionDefinition, ActionSpace, GameState, Resource } from '../contract/types'
 
 export type PlayerActionSpaceConfig = {
   /** The card ID */

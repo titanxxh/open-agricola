@@ -2,7 +2,7 @@ import { applyMajorEffectsToAllPlayers } from '../cards/major'
 import { breed } from '../actions/effects/breed'
 import { feedFamily } from '../actions/helpers/feed-family'
 import { reap } from '../actions/effects/reap'
-import type { GameState, Resource } from '../game/types'
+import type { GameState, Resource } from '../contract/types'
 
 type HarvestReapEntry = {
   player: string

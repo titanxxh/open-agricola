@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { computeAnimalZones, getTotalAnimalCapacity } from '../../domain/animal-zones'
-import type { PlayerState, Pasture } from '../../game/types'
+import type { PlayerState, Pasture } from '../../contract/types'
 
 import '../A/A12_DrinkingTrough'
 import '../E/E33_BeaverColony'

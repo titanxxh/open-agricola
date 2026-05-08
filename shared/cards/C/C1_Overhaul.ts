@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import { readCardExtraData } from '../helpers/card-state'
 import { getFenceCount } from '../../actions/effects/fencing'
-import type { ActionFlow, PlayerState } from '../../game/types'
+import type { ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'

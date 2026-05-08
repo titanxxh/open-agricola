@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
-import type { ActionFlow, GameState, PlayerState } from '../../shared/game/types'
+import type { ActionFlow, GameState, PlayerState } from '../../shared/contract/types'
 
 import '../../shared/cards/E/E125_DelayedWayfarer'
 

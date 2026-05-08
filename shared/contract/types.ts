@@ -1,4 +1,4 @@
-import type { PromptKey } from './prompt-keys'
+import type { PromptKey } from '../game/prompt-keys'
 
 export type Resource = {
   wood: number

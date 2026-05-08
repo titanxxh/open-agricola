@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/B/B89_Groom'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 describe('B89_Groom session', () => {
   const setup = (options?: { houseType?: 'wood' | 'clay' | 'stone' }) => {

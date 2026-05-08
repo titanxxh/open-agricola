@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { executeCardListener, getRegisteredCardListeners } from '../card-listeners'
 import { getCardEffect } from '../card-effects'
 import { recordActionSnapshot } from '../helpers/action-snapshot'
-import type { ActionSpace, GameState, PlayerState } from '../../game/types'
+import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
 
 import '../A/A29_AleBenches'
 import '../A/A81_InterimStorage'

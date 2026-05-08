@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { PlayerState } from '../../shared/game/types.ts'
+import type { PlayerState } from '../../shared/contract/types.ts'
 import {
   buildFarmPositionSelectionInteraction,
   buildPlowFarmInteraction,

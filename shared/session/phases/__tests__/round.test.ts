@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { GameState, PlayerState } from '../../../game/types.ts'
+import type { GameState, PlayerState } from '../../../contract/types.ts'
 import { nextSeatedPlayerIdx, computeStartPlayerIdx } from '../round.ts'
 
 const makePlayer = (id: string, startPlayer = false, activeWorkers = 1): PlayerState =>

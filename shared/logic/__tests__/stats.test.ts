@@ -17,7 +17,7 @@ import {
   recordDraftPlayed,
   recordDraftDiscarded,
 } from '../stats'
-import type { PlayerState } from '../../game/types'
+import type { PlayerState } from '../../contract/types'
 
 const mockPlayer = (isFirstPlayer = false): PlayerState =>
   ({

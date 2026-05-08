@@ -6,7 +6,7 @@ import type {
   FarmTilePosition,
   PlayerState,
   Resource,
-} from '../../game/types'
+} from '../../contract/types'
 import { getAllTilePositions, positionKey } from '../../game/farm'
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'
 import { playerBoard } from '../../domain'

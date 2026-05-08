@@ -1,4 +1,4 @@
-import type { ActionDefinition, ActionExecutionResult, ActionFlow, GameState, PlayerState, ComplexCost } from '../../game/types'
+import type { ActionDefinition, ActionExecutionResult, ActionFlow, GameState, PlayerState, ComplexCost } from '../../contract/types'
 import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../game/minor-improvements'
 // PaymentSolver namespace (S3 Task 6): core payment APIs migrated to the

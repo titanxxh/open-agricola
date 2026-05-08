@@ -1,6 +1,6 @@
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import type { AnytimeAction } from '../../../shared/game/types'
+import type { AnytimeAction } from '../../../shared/contract/types'
 import { translateCardText } from '../common/cardText'
 
 type Props = {

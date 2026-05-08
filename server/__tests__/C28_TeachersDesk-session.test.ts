@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/C/C28_TeachersDesk'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'C28_TeachersDesk'
 

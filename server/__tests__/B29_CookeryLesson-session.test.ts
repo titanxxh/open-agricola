@@ -11,7 +11,7 @@ import {
   writeCardExtraData,
 } from '../../shared/cards/helpers/card-state'
 import { recordActionSnapshot } from '../../shared/cards/helpers/action-snapshot'
-import type { PlayerState } from '../../shared/game/types'
+import type { PlayerState } from '../../shared/contract/types'
 
 import '../../shared/cards/B/B29_CookeryLesson'
 

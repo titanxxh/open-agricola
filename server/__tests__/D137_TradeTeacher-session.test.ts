@@ -7,7 +7,7 @@ import type {
   ActionSpace,
   GameState,
   PlayerState,
-} from '../../shared/game/types'
+} from '../../shared/contract/types'
 
 import '../../shared/cards/D/D137_TradeTeacher'
 import type { SessionResponse } from '../../shared/session/session-core'

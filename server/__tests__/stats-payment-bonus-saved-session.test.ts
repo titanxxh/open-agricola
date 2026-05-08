@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/game/player'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import { C122_Bricklayer } from '../../shared/cards/C/C122_Bricklayer'
-import type { PlayerState } from '../../shared/game/types'
+import type { PlayerState } from '../../shared/contract/types'
 
 const CARD_ID = 'C122_Bricklayer'
 

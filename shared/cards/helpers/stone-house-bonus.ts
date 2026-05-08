@@ -1,4 +1,4 @@
-import type { PlayerState } from '../../game/types'
+import type { PlayerState } from '../../contract/types'
 import { familySize } from '../../game/player'
 
 /**

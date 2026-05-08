@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { anytimeExchangeAction } from '../exchange'
-import type { GameState, PlayerState, ActionSpace } from '../../../game/types'
-import type { ActionExecutionContext } from '../../../game/types'
+import type { GameState, PlayerState, ActionSpace } from '../../../contract/types'
+import type { ActionExecutionContext } from '../../../contract/types'
 
 const createPlayer = (): PlayerState =>
   ({

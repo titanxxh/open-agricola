@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import { getCardEffect } from '../card-effects'
-import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
 
 import '../D/D50_ForeignAid'
 import { getBlockedSpaceIds } from '../D/D50_ForeignAid'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'D50_ForeignAid'

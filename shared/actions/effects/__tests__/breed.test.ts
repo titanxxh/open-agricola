@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import type { GameState, PlayerState, Pasture } from '../../../game/types'
+import type { GameState, PlayerState, Pasture } from '../../../contract/types'
 import { breed } from '../breed'
 
 const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState =>

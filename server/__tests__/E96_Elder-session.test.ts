@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/E/E96_Elder'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'E96_Elder'
 

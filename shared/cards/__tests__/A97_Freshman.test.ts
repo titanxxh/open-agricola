@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
-import type { ActionSpace, GameState, PlayerState } from '../../game/types'
+import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
 import { playOccupationAction } from '../../actions/effects/occupation'
 import { actionDefinitions } from '../../actions'
 
 import '../A/A97_Freshman'
 import '../A/A123_FrameBuilder'
 import type { CardListenerContext } from '../card-listeners'
-import type { ActionExecutionContext } from '../../game/types'
+import type { ActionExecutionContext } from '../../contract/types'
 
 const createPlayer = (): PlayerState =>
   ({

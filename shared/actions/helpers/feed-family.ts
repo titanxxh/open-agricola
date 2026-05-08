@@ -1,4 +1,4 @@
-import type { ActionExecutionResult, PlayerState } from '../../game/types'
+import type { ActionExecutionResult, PlayerState } from '../../contract/types'
 import { familySize, newbornCount } from '../../game/player'
 
 export const feedFamily = (player: PlayerState): ActionExecutionResult => {

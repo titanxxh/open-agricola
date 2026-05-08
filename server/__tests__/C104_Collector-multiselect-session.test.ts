@@ -10,7 +10,7 @@ import type {
   ActionSpace,
   GameState,
   PlayerState,
-} from '../../shared/game/types'
+} from '../../shared/contract/types'
 
 const CARD_ID = 'C104_Collector'
 

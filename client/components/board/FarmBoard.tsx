@@ -7,7 +7,7 @@ import type {
   FarmTilePosition,
   PlayerState,
   Resource,
-} from '../../../shared/game/types'
+} from '../../../shared/contract/types'
 import { formatAnimalCounts, formatResources } from '../../../shared/logic/format'
 import { emptyResources } from '../../../shared/logic/state-constants'
 import { familySize } from '../../../shared/game/player'

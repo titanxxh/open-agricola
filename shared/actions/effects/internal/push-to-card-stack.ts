@@ -1,4 +1,4 @@
-import type { ActionDefinition } from '../../../game/types'
+import type { ActionDefinition } from '../../../contract/types'
 import { pushToCardStack } from '../../../cards/helpers/card-state'
 
 export const pushCardStackAction: ActionDefinition = {

@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { reap } from '../../shared/actions/effects/reap'
 import { computeScores } from '../../shared/domain/scoring'
-import type { Field } from '../../shared/game/types'
+import type { Field } from '../../shared/contract/types'
 
 import '../../shared/cards/A/A113_HeresyTeacher'
 

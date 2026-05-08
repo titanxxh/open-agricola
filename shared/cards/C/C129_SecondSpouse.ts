@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionChoiceOption, GameState, PlayerState, ActionSpace } from '../../game/types'
+import type { ActionChoiceOption, GameState, PlayerState, ActionSpace } from '../../contract/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import { getRoundPlacementDetails } from '../helpers/round-placement'
 import { spaceOccupantCount } from '../../game/space'

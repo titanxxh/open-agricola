@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createInitialState, normalizeState } from '../state'
-import type { GameState, PlayerState } from '../../game/types'
+import type { GameState, PlayerState } from '../../contract/types'
 
 describe('normalizeState backfills PlayerStats for legacy saves', () => {
   it('creates zero-valued stats when player.stats is missing', () => {

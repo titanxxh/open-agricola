@@ -7,7 +7,7 @@ import type {
   GameState,
   PlayerState,
   Resource,
-} from '../../../game/types'
+} from '../../../contract/types'
 
 const dummySpace: ActionSpace = { id: 'construct', type: 'construct' } as unknown as ActionSpace
 

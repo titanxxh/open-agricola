@@ -2,7 +2,7 @@ import { MinorImprovement } from '../types'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { rollAndCacheCardPick } from '../helpers/card-random'
-import type { ActionFlow, PlayerState } from '../../game/types'
+import type { ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A3_PaperKnife'

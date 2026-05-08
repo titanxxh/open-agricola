@@ -4,8 +4,8 @@ import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effect
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 import '../../shared/cards/B/B58_CrackWeeder'
-import type { ActionChoiceOption } from '../../shared/game/types'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionChoiceOption } from '../../shared/contract/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'B58_CrackWeeder'
 

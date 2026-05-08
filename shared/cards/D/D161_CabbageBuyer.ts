@@ -4,7 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { cardCountsAs } from '../helpers/card-type'
-import type { PlayerState } from '../../game/types'
+import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D161_CabbageBuyer'

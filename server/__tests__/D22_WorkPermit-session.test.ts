@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import type { GameState, PlayerState } from '../../shared/game/types'
+import type { GameState, PlayerState } from '../../shared/contract/types'
 
 import { D22_WorkPermit } from '../../shared/cards/D/D22_WorkPermit'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { GameSession } from '../game/authoritative-session'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'D22_WorkPermit'
 

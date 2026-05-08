@@ -8,7 +8,7 @@ import type {
   Resource,
   Trade,
   ResourceKey,
-} from '../../game/types'
+} from '../../contract/types'
 // PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
 // the new payment module. Other helpers (preview-cost / typed-flat /
 // room-payment / cost-modifier internals) remain on the shim through S3.

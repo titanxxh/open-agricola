@@ -5,7 +5,7 @@ import { readCardExtraData } from '../helpers/card-state'
 import { familySize } from '../../game/player'
 import { getExtraRoomCapacity } from '../card-effects'
 import type { CardImpl } from '../registry'
-import type { PlayerState } from '../../game/types'
+import type { PlayerState } from '../../contract/types'
 
 const CARD_ID = 'D92_ChildOmbudsman'
 

@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { spaceHasPlayer } from '../../game/space'
 import type { CardImpl } from '../registry'

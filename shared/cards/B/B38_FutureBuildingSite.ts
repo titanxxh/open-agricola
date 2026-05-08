@@ -1,5 +1,5 @@
 import { MinorImprovement } from '../types'
-import type { FarmTilePosition } from '../../game/types'
+import type { FarmTilePosition } from '../../contract/types'
 import { getAllTilePositions, getUsedFarmyardTileKeys, positionKey } from '../../game/farm'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'

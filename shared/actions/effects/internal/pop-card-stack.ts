@@ -1,4 +1,4 @@
-import type { ActionDefinition, Resource } from '../../../game/types'
+import type { ActionDefinition, Resource } from '../../../contract/types'
 import { popFromCardStack } from '../../../cards/helpers/card-state'
 import { addCardResourceGained } from '../../../cards/helpers/card-state'
 import { gainResources } from '../gain'

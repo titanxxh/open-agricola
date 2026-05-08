@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DraftPool, DraftState } from '../types'
-import type { GameState, PlayerState } from '../../game/types'
+import type { GameState, PlayerState } from '../../contract/types'
 import {
   finalizeDraft,
   initDraftState,

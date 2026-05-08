@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildStable } from '../effects/stables'
-import type { PlayerState } from '../../game/types'
+import type { PlayerState } from '../../contract/types'
 
 const createPlayer = (wood: number): PlayerState => ({
   id: 'p1',

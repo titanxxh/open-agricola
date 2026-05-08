@@ -1,4 +1,4 @@
-import type { ActionChoiceOption, ActionDefinition } from '../../../game/types'
+import type { ActionChoiceOption, ActionDefinition } from '../../../contract/types'
 import type { PromptKey } from '../../../game/prompt-keys'
 
 /**

@@ -1,4 +1,4 @@
-import type { Resource } from '../../game/types'
+import type { Resource } from '../../contract/types'
 import type { BonusScoreLevel } from '../card-effects'
 
 export function paretoOptimal(levels: BonusScoreLevel[]): BonusScoreLevel[] {

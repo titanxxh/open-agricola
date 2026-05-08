@@ -4,7 +4,7 @@ import type {
   GameState,
   PlayerState,
   Resource,
-} from '../../game/types'
+} from '../../contract/types'
 import type { CardListenerContext } from '../../cards/card-listeners'
 import { isSpaceOccupied } from '../../game/space'
 import { getMatchingListeners, executeCardListener } from '../../cards/card-listeners'

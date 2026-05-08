@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import type { GameState, PlayerState } from '../../shared/game/types'
+import type { GameState, PlayerState } from '../../shared/contract/types'
 import { playMinorImprovement } from '../../shared/actions/effects/improvement'
 import { createInitialPlayerStats } from '../../shared/logic/stats'
 

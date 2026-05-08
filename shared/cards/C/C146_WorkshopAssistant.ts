@@ -5,7 +5,7 @@ import type {
   ActionFlow,
   PlayerState,
   Resource,
-} from '../../game/types'
+} from '../../contract/types'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import { gainResources } from '../../actions/effects/gain'
 import type { CardImpl } from '../registry'

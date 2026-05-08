@@ -4,7 +4,7 @@ import type {
   ActionExecutionResult,
   ImmediateLogEntry,
   PlayerState,
-} from '../../game/types'
+} from '../../contract/types'
 import { getPlayerBakeRates, hasAnyBakingImprovement } from '../../cards/helpers/exchange-registry'
 import { addFoodFromConversion, incResourceConverted } from '../../logic/stats'
 

@@ -7,7 +7,7 @@ import type {
   GameState,
   PlayerState,
   Resource,
-} from '../game/types'
+} from '../contract/types'
 import { applyIsDoableHooks } from './hooks'
 
 const deferredFlowDoableFns = new WeakSet<CanBeExecutedByPlayer>()

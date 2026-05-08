@@ -1,5 +1,5 @@
 import { MinorImprovement } from '../types'
-import type { ActionFlow, Resource } from '../../game/types'
+import type { ActionFlow, Resource } from '../../contract/types'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 

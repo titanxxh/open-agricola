@@ -1,4 +1,4 @@
-import type { ActionDefinition, GameState, PlayerState, Resource } from '../../game/types'
+import type { ActionDefinition, GameState, PlayerState, Resource } from '../../contract/types'
 import {
   setCardFlag,
   writeCardInfobox,

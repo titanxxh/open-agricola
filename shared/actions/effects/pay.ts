@@ -7,7 +7,7 @@ import type {
   PaymentSolution,
   PlayerState,
   Resource,
-} from '../../game/types'
+} from '../../contract/types'
 import { addCardResourcePaid } from '../../cards/helpers/card-state'
 // PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
 // the new payment module. Other helpers (preview-cost / typed-flat /
@@ -111,8 +111,8 @@ const buildSelectedResult = (
   solution: PaymentSolution,
   sourceCard: string | undefined,
   costType: CostModifierType | undefined,
-  player: import('../../game/types').PlayerState,
-  state: import('../../game/types').GameState,
+  player: import('../../contract/types').PlayerState,
+  state: import('../../contract/types').GameState,
   includeReturnedCard?: boolean,
 ): ActionExecutionResult => {
   executePaymentSolution(player, solution, { costType, state })

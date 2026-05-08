@@ -3,7 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getStoredResource } from '../helpers/card-storage'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import type { PlayerState } from '../../game/types'
+import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C81_MaterialHub'
@@ -23,7 +23,7 @@ const THRESHOLDS: Record<string, number> = {
 
 const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
 
-const findOwner = (state: import('../../game/types').GameState): PlayerState | undefined =>
+const findOwner = (state: import('../../contract/types').GameState): PlayerState | undefined =>
   state.players?.find((p) => p.minorPlayed.includes(CARD_ID))
 
 const collectListener: CardListenerRegistration = {
@@ -39,7 +39,7 @@ const collectListener: CardListenerRegistration = {
     const gained = context.result?.type === 'ok' ? context.result.resourcesGained : undefined
     if (!gained) return
 
-    const takeChildren: import('../../game/types').ActionFlow[] = []
+    const takeChildren: import('../../contract/types').ActionFlow[] = []
 
     for (const resource of BUILDING_RESOURCES) {
       const amount = gained[resource] ?? 0

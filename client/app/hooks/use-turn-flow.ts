@@ -1,4 +1,4 @@
-import type { GameState } from '../../../shared/game/types'
+import type { GameState } from '../../../shared/contract/types'
 import { createRoundOpenById } from '../../../shared/logic/state-constants'
 
 export const getNextPlayerIndex = (state: GameState) =>

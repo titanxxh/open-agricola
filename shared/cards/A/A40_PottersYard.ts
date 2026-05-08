@@ -5,7 +5,7 @@ import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { countUnusedFarmyardSpaces } from '../../game/farm'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A40_PottersYard'

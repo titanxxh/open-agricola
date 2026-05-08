@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
-import type { PlayerState } from '../../game/types'
+import type { PlayerState } from '../../contract/types'
 
 const CARD_ID = 'A38_WoolBlankets'
 

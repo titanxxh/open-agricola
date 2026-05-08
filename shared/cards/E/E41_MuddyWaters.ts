@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E41_MuddyWaters'

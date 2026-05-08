@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import type { TradeModifier } from '../../game/types'
+import type { TradeModifier } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D88_Millwright'

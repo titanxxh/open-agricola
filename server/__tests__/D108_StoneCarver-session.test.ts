@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { D108_StoneCarver } from '../../shared/cards/D/D108_StoneCarver'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
-import type { PlayerState, Resource } from '../../shared/game/types'
+import type { PlayerState, Resource } from '../../shared/contract/types'
 
 const CARD_ID = 'D108_StoneCarver'
 

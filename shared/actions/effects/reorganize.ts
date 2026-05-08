@@ -3,7 +3,7 @@ import type {
   ActionExecutionResult,
   GameState,
   PlayerState,
-} from '../../game/types'
+} from '../../contract/types'
 import { playerBoard } from '../../domain'
 
 export type ReorganizeTrigger =

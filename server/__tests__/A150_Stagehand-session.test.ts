@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A150_Stagehand'
-import type { ActionChoiceOption } from '../../shared/game/types'
+import type { ActionChoiceOption } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 describe('A150_Stagehand session', () => {

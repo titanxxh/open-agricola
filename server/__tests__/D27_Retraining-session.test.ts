@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { setCardFlag, isCardFlagged, readCardExtraData } from '../../shared/cards/helpers/card-state'
-import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
+import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
 
 import '../../shared/cards/D/D27_Retraining'
 

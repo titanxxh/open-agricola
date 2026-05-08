@@ -1,4 +1,4 @@
-import type { ActionDefinition } from '../../game/types'
+import type { ActionDefinition } from '../../contract/types'
 import { incCounter } from '../../cards/__stubs__/helpers'
 
 export const bonusVpAction: ActionDefinition = {

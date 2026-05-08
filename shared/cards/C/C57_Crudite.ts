@@ -2,7 +2,7 @@ import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainFlow, gainLeaf } from '../helpers/pay-gain-node'
-import type { Field } from '../../game/types'
+import type { Field } from '../../contract/types'
 import { fieldFindStackOfKind, fieldHasCrop, fieldPopIfDepleted } from '../../game/field'
 import type { CardImpl } from '../registry'
 

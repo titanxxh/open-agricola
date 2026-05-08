@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { GameState, PlayerState } from '../../../game/types'
+import type { GameState, PlayerState } from '../../../contract/types'
 import { playMinorImprovement } from '../improvement'
 
 // Ensure D25 card definition is registered before tests run

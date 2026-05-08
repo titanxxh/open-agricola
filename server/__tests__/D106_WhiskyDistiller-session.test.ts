@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import type { AnytimeAction } from '../../shared/game/types'
+import type { AnytimeAction } from '../../shared/contract/types'
 
 import '../../shared/cards/D/D106_WhiskyDistiller'
 

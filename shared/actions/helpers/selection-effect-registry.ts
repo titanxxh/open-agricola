@@ -1,4 +1,4 @@
-import type { ActionFlow, GameState, PlayerState } from '../../game/types'
+import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 
 export type SelectionEffectContext = {
   player: PlayerState

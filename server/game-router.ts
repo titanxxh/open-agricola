@@ -8,7 +8,7 @@ import {
 } from '../shared/domain/index.ts'
 import { playerCanBuildPalisades } from '../shared/cards/helpers/card-type.ts'
 import { collectLockedFarmTileKeys } from '../shared/cards/card-effects.ts'
-import type { FarmTilePosition } from '../shared/game/types.ts'
+import type { FarmTilePosition } from '../shared/contract/types.ts'
 import { getDb } from './db.ts'
 import { validateSession, extractToken } from './auth.ts'
 import type { CustomCardData } from '../shared/cards/session-card-context.ts'

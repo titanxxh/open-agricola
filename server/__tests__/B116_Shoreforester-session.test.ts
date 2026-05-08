@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/B/B116_Shoreforester'
-import type { ActionFlow, ActionSpace, Resource } from '../../shared/game/types'
+import type { ActionFlow, ActionSpace, Resource } from '../../shared/contract/types'
 
 const CARD_ID = 'B116_Shoreforester'
 

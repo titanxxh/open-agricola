@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import type { PlayerState } from '../../shared/game/types.ts'
+import type { PlayerState } from '../../shared/contract/types.ts'
 
 import { workersAvailable } from '../../shared/game/player'
 import { isLegacyChoicePending } from './_helpers/legacy-confirms'

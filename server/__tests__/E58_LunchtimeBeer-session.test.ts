@@ -4,7 +4,7 @@ import { getCardEffect } from '../../shared/cards/card-effects'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 
 import '../../shared/cards/E/E58_LunchtimeBeer'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'E58_LunchtimeBeer'
 

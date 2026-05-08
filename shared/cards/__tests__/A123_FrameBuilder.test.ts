@@ -7,7 +7,7 @@ import type {
   ComplexCost,
   PlayerState,
   Resource,
-} from '../../game/types'
+} from '../../contract/types'
 
 const CARD_ID = 'A123_FrameBuilder'
 

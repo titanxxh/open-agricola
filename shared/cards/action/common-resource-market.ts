@@ -1,4 +1,4 @@
-import type { ActionDefinition } from '../../game/types'
+import type { ActionDefinition } from '../../contract/types'
 
 export const resourceMarket: ActionDefinition = {
   id: 'resource-market',

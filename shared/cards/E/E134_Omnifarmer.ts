@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
-import type { ActionChoiceOption, ActionFlow, PlayerState } from '../../game/types'
+import type { ActionChoiceOption, ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E134_Omnifarmer'

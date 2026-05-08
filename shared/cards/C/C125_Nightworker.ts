@@ -1,5 +1,5 @@
 import { Occupation } from '../types'
-import type { ActionFlow, Resource } from '../../game/types'
+import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { workersAvailable } from '../../game/player'
 

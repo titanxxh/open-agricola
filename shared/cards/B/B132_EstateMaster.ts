@@ -4,7 +4,7 @@ import {
   readCardExtraData,
   writeCardExtraData,
 } from '../helpers/card-state'
-import type { PlayerState } from '../../game/types'
+import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'

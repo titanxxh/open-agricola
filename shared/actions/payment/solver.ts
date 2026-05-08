@@ -1,4 +1,4 @@
-import type { GameState } from '../../game/types'
+import type { GameState } from '../../contract/types'
 import type {
   Cost,
   Option,

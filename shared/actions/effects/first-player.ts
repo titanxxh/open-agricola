@@ -1,4 +1,4 @@
-import type { ActionDefinition, GameState, PlayerState } from '../../game/types'
+import type { ActionDefinition, GameState, PlayerState } from '../../contract/types'
 
 export const setStartPlayer = (state: GameState, player: PlayerState) => {
   state.players.forEach((item) => {

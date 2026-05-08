@@ -2,7 +2,7 @@ import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { setStoredResource, takeStoredResource } from '../helpers/card-storage'
-import type { Resource } from '../../game/types'
+import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A144_Sequestrator'

@@ -1,5 +1,5 @@
 import { Occupation } from '../types'
-import type { BonusModifier } from '../../game/types'
+import type { BonusModifier } from '../../contract/types'
 
 const CARD_ID = 'A123_FrameBuilder'
 

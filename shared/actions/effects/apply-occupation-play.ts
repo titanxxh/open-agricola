@@ -5,7 +5,7 @@ import type {
   GameState,
   PlayerState,
   Resource,
-} from '../../game/types'
+} from '../../contract/types'
 import { getOccupation } from '../../game/occupations'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { activateCard } from './activate-card'

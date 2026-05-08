@@ -1,4 +1,4 @@
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardListenerContext } from '../card-listeners'
 
 export interface JumpLeafParams {

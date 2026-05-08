@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import type { ChangeEvent } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import type { PlayerState, Resource } from '../../../shared/game/types'
+import type { PlayerState, Resource } from '../../../shared/contract/types'
 
 type Props = {
   locale: Locale

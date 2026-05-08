@@ -1,4 +1,4 @@
-import type { BonusModifier } from '../../game/types'
+import type { BonusModifier } from '../../contract/types'
 
 const STUB_BONUS_CHOICE_MODIFIER_CARD = 'Stub_BonusChoiceModifier'
 

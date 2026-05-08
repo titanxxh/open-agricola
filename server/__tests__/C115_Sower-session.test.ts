@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/C/C115_Sower'
-import type { AnytimeAction } from '../../shared/game/types';
+import type { AnytimeAction } from '../../shared/contract/types';
 
 describe('C115_Sower session', () => {
   const setup = () => {

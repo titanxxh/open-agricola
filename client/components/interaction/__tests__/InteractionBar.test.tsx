@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-import type { AnytimeAction } from '../../../../shared/game/types'
+import type { AnytimeAction } from '../../../../shared/contract/types'
 import type { PendingChoice } from '../../../types/ui'
 import { InteractionBar } from '../InteractionBar'
 

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners } from '../card-listeners'
 import { getCardEffect } from '../card-effects'
-import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
 
 // Import card to register its effects/listeners
 import '../C/C75_Firewood'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'C75_Firewood'

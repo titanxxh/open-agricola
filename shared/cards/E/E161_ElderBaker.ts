@@ -2,7 +2,7 @@ import { PlayerActionCard } from '../types'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
-import type { ActionChoiceOption } from '../../game/types'
+import type { ActionChoiceOption } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E161_ElderBaker'

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { E16_BriarHedge_impl } from '../E16_BriarHedge'
 import type { CardListenerContext } from '../../card-listeners'
-import type { ActionSpace, GameState, PlayerState } from '../../../game/types'
+import type { ActionSpace, GameState, PlayerState } from '../../../contract/types'
 
 const dummySpace = { id: 'fence', type: 'fence', position: 0, players: [], available: true } as unknown as ActionSpace
 

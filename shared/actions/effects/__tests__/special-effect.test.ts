@@ -5,7 +5,7 @@ import {
   readCardInfobox,
   isCardFlagged,
 } from '../../../cards/helpers/card-state'
-import type { ActionExecutionContext, PlayerState, Resource, GameState, ActionSpace } from '../../../game/types'
+import type { ActionExecutionContext, PlayerState, Resource, GameState, ActionSpace } from '../../../contract/types'
 
 const makePlayer = (): PlayerState => ({
   id: 'p1', name: 'P1', color: 'red',

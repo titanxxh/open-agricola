@@ -2,7 +2,7 @@ import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
-import type { ActionChoiceOption } from '../../game/types'
+import type { ActionChoiceOption } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D131_CraftsmanshipPromoter'

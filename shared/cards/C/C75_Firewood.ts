@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { GameState, PlayerState } from '../../game/types'
+import type { GameState, PlayerState } from '../../contract/types'
 import { initCardState } from '../__stubs__/helpers'
 import type { CardImpl } from '../registry'
 

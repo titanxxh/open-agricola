@@ -29,7 +29,7 @@ export const A35_SwimmingClass_impl = {
     const newborns = newbornCount(player)
     if (newborns <= 0) return
     // 2 bonus VP per newborn
-    const vpChildren: import('../../game/types').ActionFlow[] = Array.from(
+    const vpChildren: import('../../contract/types').ActionFlow[] = Array.from(
       { length: newborns * 2 },
       () => ({ type: 'leaf' as const, actionId: 'bonus-vp', sourceCard: CARD_ID }),
     )

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { enforceAnimalCapacity } from '../../domain/animal-zones'
-import type { PlayerState } from '../../game/types'
+import type { PlayerState } from '../../contract/types'
 
 const createPlayer = (): PlayerState => ({
   id: 'p1',

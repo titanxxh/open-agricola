@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { pairedSpaceIdFor } from '../space-pairing'
-import type { GameState } from '../../../game/types'
+import type { GameState } from '../../../contract/types'
 
 const makeState = (spaceIds: string[]): GameState =>
   ({

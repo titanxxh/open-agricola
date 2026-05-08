@@ -1,4 +1,4 @@
-import type { ActionDefinition, ActionSpace, PlayerState, Resource } from '../../game/types'
+import type { ActionDefinition, ActionSpace, PlayerState, Resource } from '../../contract/types'
 import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
 import { addResourcesFromBoard } from '../../logic/stats'
 

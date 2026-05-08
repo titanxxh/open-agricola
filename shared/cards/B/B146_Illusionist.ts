@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionChoiceOption, ActionDefinition, ActionFlow } from '../../game/types'
+import type { ActionChoiceOption, ActionDefinition, ActionFlow } from '../../contract/types'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
 

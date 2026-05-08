@@ -1,4 +1,4 @@
-import type { LogEntry } from '../game/types'
+import type { LogEntry } from '../contract/types'
 
 export class LogStore {
   private entries: LogEntry[] = []

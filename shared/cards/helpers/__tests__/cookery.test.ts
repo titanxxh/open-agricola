@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { getPlayerCookeryCards } from '../cookery'
-import type { PlayerState } from '../../../game/types'
+import type { PlayerState } from '../../../contract/types'
 
 const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
   improvements: [],

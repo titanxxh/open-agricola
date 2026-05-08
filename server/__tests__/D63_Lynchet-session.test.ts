@@ -4,7 +4,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { reap } from '../../shared/actions/effects/reap'
 
 import '../../shared/cards/D/D63_Lynchet'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'D63_Lynchet'
 

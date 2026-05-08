@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E139_BunnyBreeder'

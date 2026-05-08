@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { GameState, PlayerState, Resource } from '../../shared/game/types'
+import type { GameState, PlayerState, Resource } from '../../shared/contract/types'
 import { computeScores } from '../../shared/domain/scoring'
 
 import '../../shared/cards/D/D132_HideFarmer'

@@ -1,4 +1,4 @@
-import type { GameState, PlayerState } from '../../game/types'
+import type { GameState, PlayerState } from '../../contract/types'
 import { removeWorkerRef } from '../../game/space'
 import { holdWorkerOnCard } from './card-held-workers'
 

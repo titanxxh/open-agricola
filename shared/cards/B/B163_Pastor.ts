@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionFlow, GameState, PlayerState } from '../../game/types'
+import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 import { isCardFlagged } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'

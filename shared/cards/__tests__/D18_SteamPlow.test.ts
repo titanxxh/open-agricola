@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect, runCardEffectHook } from '../card-effects'
-import type { GameState, PlayerState , ActionFlow } from '../../game/types'
+import type { GameState, PlayerState , ActionFlow } from '../../contract/types'
 
 import '../D/D18_SteamPlow'
 import { D18_SteamPlow as D18Card } from '../D/D18_SteamPlow'

@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import type { ComplexCost, Resource } from '../../../shared/game/types'
+import type { ComplexCost, Resource } from '../../../shared/contract/types'
 import { emptyResources } from '../../../shared/logic/state-constants'
 import { getCustomCardArtUrl, getCustomCardNumbering } from '../../../shared/cards/custom-registry'
 import { getCardMeta } from '../../services/card-meta'

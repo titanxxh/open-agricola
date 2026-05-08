@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/B/B19_MoldboardPlow'
-import type { ActionChoiceOption } from '../../shared/game/types'
+import type { ActionChoiceOption } from '../../shared/contract/types'
 import { confirmNextPlayer, isLegacyChoicePending } from './_helpers/legacy-confirms'
 
 describe('B19_MoldboardPlow session', () => {

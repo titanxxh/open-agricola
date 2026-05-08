@@ -3,9 +3,9 @@ import { GameSession } from '../game/authoritative-session'
 
 import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/D/D129_LumberVirtuoso'
-import type { ActionChoiceOption } from '../../shared/game/types'
+import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { SessionResponse } from '../../shared/session/session-core'
-import type { GameState } from '../../shared/game/types'
+import type { GameState } from '../../shared/contract/types'
 import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 
 describe('D129_LumberVirtuoso session', () => {

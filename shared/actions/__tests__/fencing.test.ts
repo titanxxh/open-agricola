@@ -5,7 +5,7 @@ import {
   getFenceCount,
 } from '../effects/fencing'
 import { validateFenceSelection } from '../../domain/farmyard'
-import type { GameState, PlayerState, TradeModifier } from '../../game/types'
+import type { GameState, PlayerState, TradeModifier } from '../../contract/types'
 
 const createPlayer = (): PlayerState => ({
   id: 'p1',

@@ -4,7 +4,7 @@ import {
   removeFutureMeeples,
   buildFutureEntries,
 } from '../effects/internal/future-meeples'
-import type { GameState } from '../../game/types'
+import type { GameState } from '../../contract/types'
 
 const createMinimalState = (overrides: Partial<GameState> = {}): GameState =>
   ({

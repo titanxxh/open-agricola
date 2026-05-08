@@ -1,4 +1,4 @@
-import type { ActionDefinition } from '../../../game/types'
+import type { ActionDefinition } from '../../../contract/types'
 import { incRoomsBuilt } from '../../../logic/stats'
 
 /**

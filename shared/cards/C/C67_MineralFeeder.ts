@@ -15,7 +15,7 @@ const harvestRounds = [4, 7, 9, 11, 13, 14]
  * The BGA version also offers reorganize; we skip that complexity.
  */
 
-const hasSheepInPasture = (player: import('../../game/types').PlayerState): boolean =>
+const hasSheepInPasture = (player: import('../../contract/types').PlayerState): boolean =>
   player.pastures.some(
     (pasture) => pasture.animalType === 'sheep' && pasture.animalCount > 0,
   )

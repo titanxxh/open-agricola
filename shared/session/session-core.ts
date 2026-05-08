@@ -13,7 +13,7 @@ import type {
   PlayerState,
   Resource,
   InteractionAnimalReorgZone,
-} from '../game/types.ts'
+} from '../contract/types.ts'
 import type { ActionDetailParts } from '../contract/protocol/game.ts'
 import { actionDefinitions, getActionDefinition } from '../actions/index.ts'
 import { internalActionDefinitions } from '../actions/internal-actions.ts'

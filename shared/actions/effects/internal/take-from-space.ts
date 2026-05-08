@@ -1,4 +1,4 @@
-import type { ActionDefinition, ActionExecutionResult, Resource } from '../../../game/types'
+import type { ActionDefinition, ActionExecutionResult, Resource } from '../../../contract/types'
 
 export const takeFromSpaceAction: ActionDefinition = {
   id: 'take-from-space',

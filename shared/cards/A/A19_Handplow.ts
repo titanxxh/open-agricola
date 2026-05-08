@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A19_Handplow'

@@ -1,4 +1,4 @@
-import type { GameState, PlayerState, Resource } from '../game/types.ts'
+import type { GameState, PlayerState, Resource } from '../contract/types.ts'
 import { FARM_COLS, FARM_ROWS, positionKey } from '../game/farm.ts'
 import { fieldHasCrop } from '../game/field.ts'
 import { getMajorCard } from '../cards/major/index.ts'

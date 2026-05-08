@@ -1,4 +1,4 @@
-import type { FarmTilePosition, PlayerState } from '../../game/types'
+import type { FarmTilePosition, PlayerState } from '../../contract/types'
 import { positionKey } from '../../game/farm'
 
 /**

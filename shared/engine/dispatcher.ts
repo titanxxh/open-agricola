@@ -3,7 +3,7 @@ import type {
   ActionExecutionContext,
   ActionExecutionResult,
   ActionFlow,
-} from '../game/types'
+} from '../contract/types'
 import type { ActionHookResult } from '../actions/hooks'
 import {
   applyComputeReplaceHooks,

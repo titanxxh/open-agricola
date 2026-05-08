@@ -4,7 +4,7 @@ import {
   executeCardListener,
   type CardListenerContext,
 } from '../../shared/cards/card-listeners'
-import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
+import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C39_StudioBoat'
 

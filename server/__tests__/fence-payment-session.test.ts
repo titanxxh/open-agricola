@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { storePendingFenceBonus } from '../../shared/cards/helpers/pending-fence-bonus'
-import type { PlayerState } from '../../shared/game/types.ts'
+import type { PlayerState } from '../../shared/contract/types.ts'
 
 const fenceTradeModifiers: PlayerState['activeModifiers'] = [
   {

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { solveBonusScoring } from '../scoring'
 import { paretoOptimal } from '../../cards/helpers/pareto-bonus'
-import type { GameState, PlayerState } from '../../game/types'
+import type { GameState, PlayerState } from '../../contract/types'
 import type { BonusScoringContext } from '../../cards/card-effects'
 
 const makePlayer = (resources: Partial<PlayerState['resources']> = {}): PlayerState => ({

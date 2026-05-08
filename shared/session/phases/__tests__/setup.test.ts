@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { PlayerState } from '../../../game/types.ts'
+import type { PlayerState } from '../../../contract/types.ts'
 import { getCustomCardDefs, updatePlayerName } from '../setup.ts'
 
 describe('setup phase helpers', () => {

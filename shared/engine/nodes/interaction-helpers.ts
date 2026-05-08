@@ -14,7 +14,7 @@ import type {
   ActionExecutionContext,
   ActionFlow,
   ActionChoiceOption,
-} from '../../game/types'
+} from '../../contract/types'
 import type { ActionRegistry } from '../registry'
 import type { HookDispatcher } from '../dispatcher'
 import type { EngineNode } from '../types'

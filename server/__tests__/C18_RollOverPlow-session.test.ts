@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/C/C18_RollOverPlow'
-import type { AnytimeAction } from '../../shared/game/types';
+import type { AnytimeAction } from '../../shared/contract/types';
 
 const CARD_ID = 'C18_RollOverPlow'
 

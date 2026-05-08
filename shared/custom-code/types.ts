@@ -1,5 +1,5 @@
 import type { ActionHookPhase, ActionHookResult } from '../actions/hooks'
-import type { ActionFlow, GameState, PlayerState } from '../game/types'
+import type { ActionFlow, GameState, PlayerState } from '../contract/types'
 import type { CardListenerContext, CardListenerScope } from '../cards/card-listeners'
 import type { CardEffectField, PaymentInfo } from '../cards/card-effects'
 

@@ -2,7 +2,7 @@ import type {
   PaymentSolution,
   PlayerState,
   Resource,
-} from '../../game/types'
+} from '../../contract/types'
 import {
   addCardResourcePaid,
   addCardResourceSaved,

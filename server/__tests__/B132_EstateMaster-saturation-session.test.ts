@@ -6,7 +6,7 @@ import {
   type CardListenerContext,
 } from '../../shared/cards/card-listeners'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
-import type { PlayerState, ActionSpace } from '../../shared/game/types'
+import type { PlayerState, ActionSpace } from '../../shared/contract/types'
 
 import '../../shared/cards/B/B132_EstateMaster'
 

@@ -1,4 +1,4 @@
-import type { Resource } from './types'
+import type { Resource } from '../contract/types'
 
 // Real resources actually held in player.resources / space.resources.
 // `begging` is included as a real key because it tracks begging-card count.

@@ -1,4 +1,4 @@
-import type { ActionSpace, GameState } from './types'
+import type { ActionSpace, GameState } from '../contract/types'
 import type { EngineStack, EngineStackCursor } from '../engine'
 import { createActionSpaces } from '../actions'
 import { normalizeState } from '../logic/state'

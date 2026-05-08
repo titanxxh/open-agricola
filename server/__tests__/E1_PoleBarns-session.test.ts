@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { E1_PoleBarns } from '../../shared/cards/E/E1_PoleBarns'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
-import type { FenceSegment } from '../../shared/game/types'
+import type { FenceSegment } from '../../shared/contract/types'
 
 describe('E1_PoleBarns prerequisite', () => {
   it('blocks when player has fewer than 15 fence segments on board', () => {

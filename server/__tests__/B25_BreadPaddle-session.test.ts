@@ -4,8 +4,8 @@ import { getCardEffect } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B25_BreadPaddle'
-import type { ActionChoiceOption } from '../../shared/game/types'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionChoiceOption } from '../../shared/contract/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'B25_BreadPaddle'
 

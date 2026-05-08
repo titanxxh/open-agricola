@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionFlow, Pasture, PlayerState } from '../../game/types'
+import type { ActionFlow, Pasture, PlayerState } from '../../contract/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import {
   isCardFlagged,

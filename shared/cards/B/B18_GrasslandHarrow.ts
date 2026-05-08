@@ -3,7 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
-import type { ActionFlow, Resource } from '../../game/types'
+import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B18_GrasslandHarrow'

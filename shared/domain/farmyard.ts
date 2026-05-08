@@ -7,7 +7,7 @@ import type {
   InteractionFarmSelection,
   InteractionSelection,
   Resource,
-} from '../game/types.ts'
+} from '../contract/types.ts'
 import { isBorderEdge, getAllTilePositions, positionKey } from '../game/farm.ts'
 import {
   applyCostOverride,

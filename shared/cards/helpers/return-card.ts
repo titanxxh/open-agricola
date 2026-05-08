@@ -10,7 +10,7 @@
  * the payment domain. May relocate again to `shared/domain/` aggregates in S4.
  */
 
-import type { GameState, PlayerState } from '../../game/types'
+import type { GameState, PlayerState } from '../../contract/types'
 
 export const returnCardToBoard = (
   player: PlayerState,

@@ -1,5 +1,5 @@
 import { MinorImprovement } from '../types'
-import type { ActionDefinition, ActionFlow, Resource } from '../../game/types'
+import type { ActionDefinition, ActionFlow, Resource } from '../../contract/types'
 import { fieldTopStack, fieldTotalRemaining } from '../../game/field'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'

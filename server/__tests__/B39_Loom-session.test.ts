@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook, getCardEffect } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/B/B39_Loom'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 describe('B39_Loom — onHarvestFieldPhase uses on-board sheep (not reserve)', () => {
   const setup = () => {

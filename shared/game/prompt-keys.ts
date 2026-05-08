@@ -1,5 +1,5 @@
 import type { ReorganizeTrigger } from '../actions/effects/reorganize'
-import type { CropStack } from './types'
+import type { CropStack } from '../contract/types'
 
 type CropType = CropStack['kind']
 

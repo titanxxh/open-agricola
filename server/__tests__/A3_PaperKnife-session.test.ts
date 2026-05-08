@@ -33,7 +33,7 @@ import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { checkCustomPrerequisite } from '../../shared/cards/helpers/prerequisite-registry'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
-import type { GameState, PlayerState } from '../../shared/game/types'
+import type { GameState, PlayerState } from '../../shared/contract/types'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome, setActiveWorkerCount } from '../../shared/game/player'
 
@@ -43,7 +43,7 @@ import '../../shared/cards/A/A116_WoodCutter'
 import '../../shared/cards/A/A117_WoodCarrier'
 import '../../shared/cards/A/A118_Treegardener'
 import '../../shared/cards/A/A119_FirewoodCollector'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'A3_PaperKnife'
 

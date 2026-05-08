@@ -4,7 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount, setNewbornCount, newbornCount } from '../../shared/game/player'
 import { E30_ChildsToy } from '../../shared/cards/E/E30_ChildsToy'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
-import type { ActionChoiceOption } from '../../shared/game/types'
+import type { ActionChoiceOption } from '../../shared/contract/types'
 
 const CARD_ID = 'E30_ChildsToy'
 

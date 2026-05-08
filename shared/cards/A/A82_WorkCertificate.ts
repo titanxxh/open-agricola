@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionFlow, Resource } from '../../game/types'
+import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A82_WorkCertificate'

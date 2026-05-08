@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { checkCustomPrerequisite } from '../helpers/prerequisite-registry'
 import { getCardEffect } from '../card-effects'
-import type { GameState, PlayerState, Pasture } from '../../game/types'
+import type { GameState, PlayerState, Pasture } from '../../contract/types'
 
 import '../A/A38_WoolBlankets'
 

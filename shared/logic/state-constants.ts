@@ -9,7 +9,7 @@
 // `../cards/register-all`, `../actions/index`, or anything that transitively
 // reaches card implementations. Type-only imports from pure modules are fine.
 
-import type { FenceSegment, GameState, PlayerState, Resource } from '../game/types'
+import type { FenceSegment, GameState, PlayerState, Resource } from '../contract/types'
 import type { DraftMode } from '../draft/types'
 import { createRng, shuffleWithRng } from './rng'
 import { tryAddRoomTile } from '../domain/farmyard'

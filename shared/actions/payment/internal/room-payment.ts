@@ -17,7 +17,7 @@ import type {
   PaymentSolution,
   PlayerState,
   Resource,
-} from '../../../game/types'
+} from '../../../contract/types'
 import { getAllTilePositions, positionKey } from '../../../game/farm'
 import { resolveCostPaymentSelection } from './payment-choice-result'
 import { executeResolvedTypedFlatPayment } from './typed-flat'

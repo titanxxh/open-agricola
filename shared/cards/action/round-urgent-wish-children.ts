@@ -1,4 +1,4 @@
-import type { ActionDefinition } from '../../game/types'
+import type { ActionDefinition } from '../../contract/types'
 import { deriveCanBeExecutedByFlow } from '../../actions/flow'
 
 export const urgentWishChildren: ActionDefinition = {

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { readCardExtraData } from '../../../cards/helpers/card-state'
 import { registerSelectionEffect } from '../../helpers/selection-effect-registry'
 import { selectionAction } from '../internal/selection'
-import type { PlayerState } from '../../../game/types'
+import type { PlayerState } from '../../../contract/types'
 
 const createMockPlayer = (): PlayerState => ({
   id: 'p1',

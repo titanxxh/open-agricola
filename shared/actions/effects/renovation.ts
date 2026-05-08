@@ -6,7 +6,7 @@ import type {
   ActionFlow,
   PlayerState,
   Resource,
-} from '../../game/types'
+} from '../../contract/types'
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'
 // PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
 // the new payment module. Other helpers (preview-cost / typed-flat /

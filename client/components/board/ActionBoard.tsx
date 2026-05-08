@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../shared/game/types'
+import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../shared/contract/types'
 import { getRoundPlacementOrder } from '../../../shared/cards/helpers/round-placement'
 import { RESERVED_ACTION_SPACES_KEY } from '../../../shared/cards/helpers/card-state'
 import { PlayerCard } from '../common/PlayerCard'

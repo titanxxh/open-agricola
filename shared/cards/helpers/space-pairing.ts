@@ -1,4 +1,4 @@
-import type { GameState } from '../../game/types'
+import type { GameState } from '../../contract/types'
 
 const BASE_TO_VARIANTS: Record<string, string[]> = {
   hollow: ['hollow-4'],

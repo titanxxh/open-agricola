@@ -3,7 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getStableTilesBuiltThisAction } from '../helpers/action-snapshot'
-import type { TradeModifier } from '../../game/types'
+import type { TradeModifier } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C56_FeedFence'

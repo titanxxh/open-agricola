@@ -4,8 +4,8 @@ import { setCardFlag, isCardFlagged } from '../../shared/cards/helpers/card-stat
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/D/D122_ClayCarrier'
-import type { AnytimeAction } from '../../shared/game/types';
-import type { ActionFlow } from '../../shared/game/types'
+import type { AnytimeAction } from '../../shared/contract/types';
+import type { ActionFlow } from '../../shared/contract/types'
 
 describe('D122_ClayCarrier session', () => {
   const setup = () => {
