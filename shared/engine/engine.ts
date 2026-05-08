@@ -124,8 +124,13 @@ export class Engine {
    * `lastEmittedChoice` cache — composite nodes now carry their own
    * `emittedChoices` / `emittedPromptKey` / `emittedPromptParams` /
    * `emittedRequest` fields populated in {@link proceed}.
+   *
+   * @internal Package-internal coordination surface for EngineStack.
+   * Do not call from outside shared/engine/. Listed in
+   * `engine-public-surface.test.ts:PRIVATE_HELPERS` so the surface guard
+   * stays green.
    */
-  private peekPendingChoiceFromComposite(): {
+  peekPendingChoiceFromComposite(): {
     nodeId: string
     promptKey?: PromptKey
     promptParams?: Record<string, unknown>
@@ -148,19 +153,13 @@ export class Engine {
     return null
   }
 
-  private injectBeforeNodes(nodes: EngineNode[]) {
-    if (nodes.length === 0) return
-    const first = this.tree.nextUnresolved()
-    if (first) {
-      this.tree.insertBefore(first.id, nodes)
-    }
-  }
-
-  private peekNextUnresolved(): EngineNode | null {
-    return this.tree.nextUnresolved()
-  }
-
-  private peekInteraction(): InteractionNode | null {
+  /**
+   * @internal Package-internal coordination surface for EngineStack.
+   * Do not call from outside shared/engine/. Listed in
+   * `engine-public-surface.test.ts:PRIVATE_HELPERS` so the surface guard
+   * stays green.
+   */
+  peekInteraction(): InteractionNode | null {
     if (this.pendingInteractionNodeId === null) return null
     const node = this.tree.findNodeById(this.pendingInteractionNodeId)
     return node instanceof InteractionNode ? node : null
@@ -175,8 +174,13 @@ export class Engine {
    * `emittedXxx` fields), so consumers can read pending metadata off this
    * single accessor instead of going through the engine-level
    * `pendingInteractionXxx` mirrors.
+   *
+   * @internal Package-internal coordination surface for EngineStack.
+   * Do not call from outside shared/engine/. Listed in
+   * `engine-public-surface.test.ts:PRIVATE_HELPERS` so the surface guard
+   * stays green.
    */
-  private peekInteractionHost(): EngineNode | null {
+  peekInteractionHost(): EngineNode | null {
     if (this.pendingInteractionNodeId === null) return null
     return this.tree.findNodeById(this.pendingInteractionNodeId) ?? null
   }
@@ -278,19 +282,6 @@ export class Engine {
     }
   }
 
-  private prependFlow(flow: ActionFlow) {
-    const first = this.tree.nextUnresolved()
-    const flowNode = this.buildFlowNode(flow)
-    if (first) {
-      this.tree.insertBefore(first.id, [flowNode])
-      return
-    }
-    this.tree.root = new SequenceNode(`prepend-root-${this.flowNodeCounter++}`, [
-      flowNode,
-      this.tree.root,
-    ])
-  }
-
   /**
    * Build flow nodes from the given ActionFlow list, inject them before the
    * next unresolved node (or prepend before root when nothing is pending), then
@@ -298,11 +289,11 @@ export class Engine {
    * longer the next unresolved.
    *
    * Without ctx (`injectBeforeFlows([flow])`), only injection happens. This is
-   * the replacement for `prependFlow()` in anytime-action plumbing where the
-   * caller drives the engine separately afterwards.
+   * the anytime-action plumbing path where the caller drives the engine
+   * separately afterwards.
    *
-   * With ctx (`injectBeforeFlows(flows, ctx)`), this is the replacement for the
-   * before-phase inject pattern: build → injectBeforeNodes → proceed-loop.
+   * With ctx (`injectBeforeFlows(flows, ctx)`), this is the before-phase inject
+   * pattern: build → inject → proceed-loop.
    */
   injectBeforeFlows(flows: ActionFlow[], ctx?: EngineContext): void {
     if (flows.length === 0) return
@@ -311,8 +302,8 @@ export class Engine {
     if (nextUnresolved) {
       this.tree.insertBefore(nextUnresolved.id, flowNodes)
     } else {
-      // Equivalent of prependFlow when there is no pending unresolved node.
-      // Wrap root in a SequenceNode so the injected flows execute first.
+      // No pending unresolved node — wrap root in a SequenceNode so the
+      // injected flows execute first.
       this.tree.root = new SequenceNode(
         `prepend-root-${this.flowNodeCounter++}`,
         [...flowNodes, this.tree.root],
@@ -922,7 +913,13 @@ export class Engine {
     return null
   }
 
-  private hasPendingChoiceCompositeAncestor() {
+  /**
+   * @internal Package-internal coordination surface for EngineStack.
+   * Do not call from outside shared/engine/. Listed in
+   * `engine-public-surface.test.ts:PRIVATE_HELPERS` so the surface guard
+   * stays green.
+   */
+  hasPendingChoiceCompositeAncestor() {
     if (!this.pendingInteractionNodeId) return false
     let parent = this.tree.findParent(this.pendingInteractionNodeId)
     while (parent) {
@@ -2122,10 +2119,18 @@ export class Engine {
     return result
   }
 
-  /** Insert an ActionFlow to run after the pending choice is resolved. Precondition: a
-   *  pending choice is currently active (pendingInteractionNodeId is set). No-op otherwise.
-   *  Mirrors the `{ type: 'flow' }` branch of resolveChoice. */
-  private insertFlowAfterPendingChoice(flow: ActionFlow): void {
+  /**
+   * Insert an ActionFlow to run after the pending choice is resolved.
+   * Precondition: a pending choice is currently active
+   * (pendingInteractionNodeId is set). No-op otherwise. Mirrors the
+   * `{ type: 'flow' }` branch of resolveChoice.
+   *
+   * @internal Package-internal coordination surface for EngineStack.
+   * Do not call from outside shared/engine/. Listed in
+   * `engine-public-surface.test.ts:PRIVATE_HELPERS` so the surface guard
+   * stays green.
+   */
+  insertFlowAfterPendingChoice(flow: ActionFlow): void {
     // S4c PR2 — read owner from the InteractionNode (was: pendingInteractionOwnerNodeId mirror).
     const interactionNode = this.peekInteraction()
     const insertionTargetId = interactionNode?.ownerNodeId ?? this.pendingInteractionNodeId
