@@ -278,8 +278,7 @@ describe('B146_Illusionist listener handler', () => {
 
 // Direct tests of the discard-from-hand action registration (leaf payload).
 describe('discard-from-hand action', () => {
-  // SKIP[S1]: 'choice'→'request' shape mismatch, see docs/skip-tracker.md
-  it.skip('is registered via internalActionDefinitions and exposes choice', () => {
+  it('is registered via internalActionDefinitions and exposes choice', () => {
     const def = getActionDefinition(DISCARD_ACTION_ID)
     expect(def).toBeDefined()
 
@@ -290,15 +289,16 @@ describe('discard-from-hand action', () => {
     const forest = createSpace('forest', { wood: 3 })
     const state = createState([player], [forest])
     const result = def!.execute({ state, player, space: forest, params: {} } as unknown as ActionExecutionContext)
-    expect(result.type).toBe('choice')
-    if (result.type === 'choice') {
-      expect(result.options).toHaveLength(3)
-      expect(result.options.map((o) => o.value)).toEqual([
-        'occ:A9_SheepFarmer',
-        'occ:A124_Knapper',
-        'min:A1_AnimalPen',
-      ])
-    }
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') return
+    expect(result.request.kind).toBe('choice')
+    if (result.request.kind !== 'choice') return
+    expect(result.request.options).toHaveLength(3)
+    expect(result.request.options.map((o) => o.value)).toEqual([
+      'occ:A9_SheepFarmer',
+      'occ:A124_Knapper',
+      'min:A1_AnimalPen',
+    ])
   })
 
   it('resolveChoice removes the chosen occupation from hand', () => {
