@@ -185,4 +185,28 @@ export default defineConfig([
       }],
     },
   },
+  // S6c: shared/contract/** is type-only; runtime imports forbidden.
+  // Type-only imports (`import type { ... }`) are allowed since they erase at
+  // build time and don't produce runtime dependencies.
+  {
+    files: ['shared/contract/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', {
+        patterns: [
+          {
+            group: [
+              '../actions/**', '../engine/**', '../session/**',
+              '../cards/**', '../cards-display/**', '../domain/**',
+              '../utils/**',
+              '../../actions/**', '../../engine/**', '../../session/**',
+              '../../cards/**', '../../cards-display/**', '../../domain/**',
+              '../../utils/**',
+            ],
+            message: 'shared/contract/** is type-only; do not import runtime modules.',
+            allowTypeImports: true,
+          },
+        ],
+      }],
+    },
+  },
 ])
