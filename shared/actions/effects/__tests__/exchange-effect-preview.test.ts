@@ -95,8 +95,7 @@ const createSpace = (): ActionSpace =>
   }) as ActionSpace
 
 describe('anytimeExchangeAction effectPreview', () => {
-  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
-  it.skip('builds scaled resource-exchange previews from affordable cookery trades', () => {
+  it('builds scaled resource-exchange previews from affordable cookery trades', () => {
     const player = createPlayer()
     player.resources.sheep = 2
     const state = createState(player)
@@ -107,9 +106,11 @@ describe('anytimeExchangeAction effectPreview', () => {
       space: createSpace(),
     } as unknown as ActionExecutionContext)
 
-    expect(result.type).toBe('choice')
-    if (result.type !== 'choice') return
-    expect(result.options[0]).toMatchObject({
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') return
+    expect(result.request.kind).toBe('choice')
+    if (result.request.kind !== 'choice') return
+    expect(result.request.options[0]).toMatchObject({
       value: 'trade:0:2',
       sourceCard: 'Major_Fireplace1',
       effectPreview: {
