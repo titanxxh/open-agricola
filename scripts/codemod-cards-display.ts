@@ -5,6 +5,9 @@
 //         shared/cards/<deck>/<file>.ts (overwritten — _impl + back-import display + only impl imports)
 
 import * as ts from 'typescript'
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'fs'
+import { dirname, join, resolve, relative } from 'path'
+import { fileURLToPath } from 'url'
 
 export type SplitResult =
   | { kind: 'split'; displayText: string; implText: string }
@@ -269,4 +272,81 @@ export function splitCardFile(input: SplitInput): SplitResult {
   const implText = implLines.join('\n').replace(/\n+$/, '') + '\n'
 
   return { kind: 'split', displayText, implText }
+}
+
+interface RunOptions { dryRun: boolean; rootDir: string }
+interface RunReport {
+  totalCardFiles: number
+  splitCount: number
+  displayOnlyCount: number
+  skipCount: number
+  errors: { path: string; reason: string }[]
+}
+
+const DECKS = ['A', 'B', 'C', 'D', 'E', 'major', 'community', '__stubs__']
+
+export function runCodemod(opts: RunOptions): RunReport {
+  const cardsRoot = resolve(opts.rootDir, 'shared/cards')
+  const displayRoot = resolve(opts.rootDir, 'shared/cards-display')
+  const report: RunReport = {
+    totalCardFiles: 0, splitCount: 0, displayOnlyCount: 0, skipCount: 0, errors: [],
+  }
+  for (const deck of DECKS) {
+    const deckPath = join(cardsRoot, deck)
+    let files: string[]
+    try { files = readdirSync(deckPath) } catch { continue }
+    for (const file of files) {
+      if (!file.endsWith('.ts') || file.endsWith('.test.ts')) continue
+      const fullPath = join(deckPath, file)
+      if (!statSync(fullPath).isFile()) continue
+      report.totalCardFiles++
+      const sourceText = readFileSync(fullPath, 'utf8')
+      const sourcePath = relative(opts.rootDir, fullPath).replace(/\\/g, '/')
+      try {
+        const result = splitCardFile({ sourcePath, sourceText })
+        if (result.kind === 'skip') {
+          report.skipCount++
+          report.errors.push({ path: sourcePath, reason: result.reason })
+          continue
+        }
+        if (result.kind === 'display-only') {
+          report.displayOnlyCount++
+          if (!opts.dryRun) {
+            const target = join(displayRoot, deck, file)
+            mkdirSync(dirname(target), { recursive: true })
+            writeFileSync(target, result.displayText)
+          }
+          continue
+        }
+        report.splitCount++
+        if (!opts.dryRun) {
+          const target = join(displayRoot, deck, file)
+          mkdirSync(dirname(target), { recursive: true })
+          writeFileSync(target, result.displayText)
+          writeFileSync(fullPath, result.implText)
+        }
+      } catch (e) {
+        report.errors.push({ path: sourcePath, reason: (e as Error).message })
+      }
+    }
+  }
+  return report
+}
+
+const __filename_local = fileURLToPath(import.meta.url)
+const __dirname_local = dirname(__filename_local)
+
+if (process.argv[1] && resolve(process.argv[1]) === resolve(__filename_local)) {
+  const dryRun = !process.argv.includes('--write')
+  const report = runCodemod({ dryRun, rootDir: resolve(__dirname_local, '..') })
+  console.log(`Codemod ${dryRun ? '(dry-run)' : '(WET)'}:`)
+  console.log(`  Total card files: ${report.totalCardFiles}`)
+  console.log(`  Split:            ${report.splitCount}`)
+  console.log(`  Display-only:     ${report.displayOnlyCount}`)
+  console.log(`  Skip + errors:    ${report.skipCount + report.errors.length}`)
+  if (report.errors.length > 0) {
+    console.log('\nErrors:')
+    for (const e of report.errors) console.log(`  ${e.path}: ${e.reason}`)
+  }
+  process.exit(report.errors.length > 0 ? 1 : 0)
 }
