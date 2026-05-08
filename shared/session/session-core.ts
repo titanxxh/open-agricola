@@ -1142,7 +1142,7 @@ export class GameCore {
    * `Or/Xor/OptionalNode.pendingContextSnapshot`).
    */
   private peekHostContextSnapshot() {
-    const host = this.engineStack.current()?.engine.peekInteractionHost()
+    const host = this.engineStack.peekInteractionHost()
     if (!host) return null
     if (host instanceof InteractionNode) return host.contextSnapshot ?? null
     if (host instanceof OrNode || host instanceof XorNode || host instanceof OptionalNode) {
@@ -1157,7 +1157,7 @@ export class GameCore {
    * actionId (composite host emit metadata).
    */
   private peekHostPendingActionId(): string | undefined {
-    const host = this.engineStack.current()?.engine.peekInteractionHost()
+    const host = this.engineStack.peekInteractionHost()
     if (!host) return undefined
     if (host instanceof InteractionNode) return host.pendingActionId
     if (host instanceof OrNode || host instanceof XorNode || host instanceof OptionalNode) {
@@ -1280,7 +1280,7 @@ export class GameCore {
     // Fallback for composite-node pending choices (OrNode / XorNode /
     // OptionalNode): the engine has a pending choice but no InteractionNode
     // wraps it. Surface the cached options so the wait+choice shape works.
-    const composite = !node ? frame?.engine.peekPendingChoiceFromComposite() ?? null : null
+    const composite = !node ? this.engineStack.peekPendingChoiceFromComposite() : null
 
     if (!frame || (!node && !composite)) {
       const anytimeActions = this.buildAnytimeEntries().map((entry) => entry.descriptor)
@@ -1504,7 +1504,7 @@ export class GameCore {
         || kind == null // ChoiceNode-emitted untyped request
     }
     // Composite-fallback (OrNode / XorNode / OptionalNode) pending choice.
-    return frame.engine.peekPendingChoiceFromComposite() != null
+    return this.engineStack.peekPendingChoiceFromComposite() != null
   }
 
   private pushHistory(actionStart = false, undoBoundary = false) {
@@ -2593,7 +2593,7 @@ export class GameCore {
   ): SessionResponse {
     const node = this.engineStack.peekInteraction()
     const frame = this.engineStack.current()
-    const composite = frame?.engine.peekPendingChoiceFromComposite() ?? null
+    const composite = this.engineStack.peekPendingChoiceFromComposite()
     const pendingPlayerIndex = frame?.ownerPlayerIndex ?? -1
     const pendingPromptKey = node?.promptKey ?? composite?.promptKey
     const pendingOptions = node?.choices ?? composite?.options ?? []
@@ -2651,7 +2651,7 @@ export class GameCore {
         if (cardFlow && this.engine) {
           // Insert the follow-up so it runs after the engine finishes resolving the choice.
           // Mirrors the `{ type: 'flow' }` branch of the engine's own resolveChoice.
-          this.engine.insertFlowAfterPendingChoice(cardFlow)
+          this.engineStack.insertFlowAfterPendingChoice(cardFlow)
         }
       }
     }
@@ -3330,7 +3330,7 @@ export class GameCore {
         this.recomputeActionStartIndex()
         return this.respond()
       }
-      if (entry && this.engine?.hasPendingChoiceCompositeAncestor()) {
+      if (entry && this.engineStack.hasPendingChoiceCompositeAncestor()) {
         this.history.pop()
         this.restoreHistory(entry)
         this.recomputeActionStartIndex()

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { EngineStack, type EngineFrame } from '../engine-stack'
 import { Engine } from '../engine'
 import { EngineTree } from '../tree'
@@ -76,5 +76,71 @@ describe('EngineStack', () => {
     expect(rebuilt.depth()).toBe(1)
     expect(rebuilt.current()!.ownerPlayerIndex).toBe(1)
     expect(rebuilt.current()!.reason).toBe('reorganize')
+  })
+})
+
+describe('EngineStack query/write delegation', () => {
+  const pushStubFrame = (stack: EngineStack, engine: Engine) => {
+    stack.push({
+      engine,
+      source: { kind: 'flow', flow: { type: 'leaf', actionId: 'noop' } },
+      ownerPlayerIndex: 0,
+      spaceId: '__subflow:test',
+      stageResume: null,
+      deferredPlayerSwitch: null,
+      reason: 'reorganize',
+    })
+  }
+
+  it('peekInteractionHost delegates to top frame engine; returns null when empty', () => {
+    const stack = new EngineStack()
+    expect(stack.peekInteractionHost()).toBeNull()
+    const engine = makeEngine()
+    const fakeHost = { id: 'n1' } as unknown as ReturnType<Engine['peekInteractionHost']>
+    const spy = vi.spyOn(engine, 'peekInteractionHost').mockReturnValue(fakeHost)
+    pushStubFrame(stack, engine)
+    expect(stack.peekInteractionHost()).toBe(fakeHost)
+    expect(spy).toHaveBeenCalledTimes(1)
+  })
+
+  it('peekPendingChoiceFromComposite delegates to top frame engine', () => {
+    const stack = new EngineStack()
+    const engine = makeEngine()
+    const result = {
+      nodeId: 'n1',
+      options: [],
+      promptKey: undefined,
+      promptParams: undefined,
+      request: undefined,
+    }
+    const spy = vi.spyOn(engine, 'peekPendingChoiceFromComposite').mockReturnValue(result)
+    pushStubFrame(stack, engine)
+    expect(stack.peekPendingChoiceFromComposite()).toBe(result)
+    expect(spy).toHaveBeenCalledTimes(1)
+  })
+
+  it('hasPendingChoiceCompositeAncestor delegates to top frame engine', () => {
+    const stack = new EngineStack()
+    expect(stack.hasPendingChoiceCompositeAncestor()).toBe(false)
+    const engine = makeEngine()
+    const spy = vi.spyOn(engine, 'hasPendingChoiceCompositeAncestor').mockReturnValue(true)
+    pushStubFrame(stack, engine)
+    expect(stack.hasPendingChoiceCompositeAncestor()).toBe(true)
+    expect(spy).toHaveBeenCalledTimes(1)
+  })
+
+  it('insertFlowAfterPendingChoice delegates to top frame engine', () => {
+    const stack = new EngineStack()
+    const engine = makeEngine()
+    const spy = vi.spyOn(engine, 'insertFlowAfterPendingChoice').mockImplementation(() => {})
+    pushStubFrame(stack, engine)
+    const flow = { type: 'leaf' as const, actionId: 'test' }
+    stack.insertFlowAfterPendingChoice(flow)
+    expect(spy).toHaveBeenCalledWith(flow)
+  })
+
+  it('insertFlowAfterPendingChoice on empty stack is a no-op', () => {
+    const stack = new EngineStack()
+    expect(() => stack.insertFlowAfterPendingChoice({ type: 'leaf', actionId: 'noop' })).not.toThrow()
   })
 })
