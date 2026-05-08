@@ -125,7 +125,7 @@ export class Engine {
    * `emittedChoices` / `emittedPromptKey` / `emittedPromptParams` /
    * `emittedRequest` fields populated in {@link proceed}.
    */
-  peekPendingChoiceFromComposite(): {
+  private peekPendingChoiceFromComposite(): {
     nodeId: string
     promptKey?: PromptKey
     promptParams?: Record<string, unknown>
@@ -148,7 +148,7 @@ export class Engine {
     return null
   }
 
-  injectBeforeNodes(nodes: EngineNode[]) {
+  private injectBeforeNodes(nodes: EngineNode[]) {
     if (nodes.length === 0) return
     const first = this.tree.nextUnresolved()
     if (first) {
@@ -156,11 +156,11 @@ export class Engine {
     }
   }
 
-  peekNextUnresolved(): EngineNode | null {
+  private peekNextUnresolved(): EngineNode | null {
     return this.tree.nextUnresolved()
   }
 
-  peekInteraction(): InteractionNode | null {
+  private peekInteraction(): InteractionNode | null {
     if (this.pendingInteractionNodeId === null) return null
     const node = this.tree.findNodeById(this.pendingInteractionNodeId)
     return node instanceof InteractionNode ? node : null
@@ -176,7 +176,7 @@ export class Engine {
    * single accessor instead of going through the engine-level
    * `pendingInteractionXxx` mirrors.
    */
-  peekInteractionHost(): EngineNode | null {
+  private peekInteractionHost(): EngineNode | null {
     if (this.pendingInteractionNodeId === null) return null
     return this.tree.findNodeById(this.pendingInteractionNodeId) ?? null
   }
@@ -278,11 +278,7 @@ export class Engine {
     }
   }
 
-  buildFlowNodePublic(flow: ActionFlow): EngineNode {
-    return this.buildFlowNode(flow)
-  }
-
-  prependFlow(flow: ActionFlow) {
+  private prependFlow(flow: ActionFlow) {
     const first = this.tree.nextUnresolved()
     const flowNode = this.buildFlowNode(flow)
     if (first) {
@@ -293,6 +289,44 @@ export class Engine {
       flowNode,
       this.tree.root,
     ])
+  }
+
+  /**
+   * Build flow nodes from the given ActionFlow list, inject them before the
+   * next unresolved node (or prepend before root when nothing is pending), then
+   * — when ctx is supplied — drive proceed() until the injected nodes are no
+   * longer the next unresolved.
+   *
+   * Without ctx (`injectBeforeFlows([flow])`), only injection happens. This is
+   * the replacement for `prependFlow()` in anytime-action plumbing where the
+   * caller drives the engine separately afterwards.
+   *
+   * With ctx (`injectBeforeFlows(flows, ctx)`), this is the replacement for the
+   * before-phase inject pattern: build → injectBeforeNodes → proceed-loop.
+   */
+  injectBeforeFlows(flows: ActionFlow[], ctx?: EngineContext): void {
+    if (flows.length === 0) return
+    const flowNodes = flows.map((flow) => this.buildFlowNode(flow))
+    const nextUnresolved = this.tree.nextUnresolved()
+    if (nextUnresolved) {
+      this.tree.insertBefore(nextUnresolved.id, flowNodes)
+    } else {
+      // Equivalent of prependFlow when there is no pending unresolved node.
+      // Wrap root in a SequenceNode so the injected flows execute first.
+      this.tree.root = new SequenceNode(
+        `prepend-root-${this.flowNodeCounter++}`,
+        [...flowNodes, this.tree.root],
+      )
+    }
+    if (!ctx) return
+    const injectedIds = new Set(flowNodes.map((n) => n.id))
+    let safety = flowNodes.length * 3
+    while (safety-- > 0) {
+      const next = this.tree.nextUnresolved()
+      if (!next || !injectedIds.has(next.id)) break
+      const step = this.proceed(ctx)
+      if (step.type !== 'ok') break
+    }
   }
 
   private parseFollowUpAction(followUp: FollowUpAction): { actionId: string; sourceCard?: string } {
@@ -888,7 +922,7 @@ export class Engine {
     return null
   }
 
-  hasPendingChoiceCompositeAncestor() {
+  private hasPendingChoiceCompositeAncestor() {
     if (!this.pendingInteractionNodeId) return false
     let parent = this.tree.findParent(this.pendingInteractionNodeId)
     while (parent) {
@@ -2091,7 +2125,7 @@ export class Engine {
   /** Insert an ActionFlow to run after the pending choice is resolved. Precondition: a
    *  pending choice is currently active (pendingInteractionNodeId is set). No-op otherwise.
    *  Mirrors the `{ type: 'flow' }` branch of resolveChoice. */
-  insertFlowAfterPendingChoice(flow: ActionFlow): void {
+  private insertFlowAfterPendingChoice(flow: ActionFlow): void {
     // S4c PR2 — read owner from the InteractionNode (was: pendingInteractionOwnerNodeId mirror).
     const interactionNode = this.peekInteraction()
     const insertionTargetId = interactionNode?.ownerNodeId ?? this.pendingInteractionNodeId

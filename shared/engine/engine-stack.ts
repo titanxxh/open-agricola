@@ -73,6 +73,15 @@ export function isSyntheticInteractionFrame(frame: EngineFrame): boolean {
   )
 }
 
+/**
+ * EngineStack — delegates several Engine internals (peekInteraction*,
+ * peekPendingChoiceFromComposite, hasPendingChoiceCompositeAncestor,
+ * insertFlowAfterPendingChoice) via `(engine as any)` casts. This is an
+ * intentional package-internal convention: those methods are `private` on
+ * Engine (TS compile-time only) so external callers cannot reach them, but
+ * EngineStack lives in the same shared/engine/ folder and is part of the
+ * package's internal coordination surface.
+ */
 export class EngineStack {
   private frames: EngineFrame[] = []
 
@@ -97,11 +106,17 @@ export class EngineStack {
   }
 
   peekInteraction(): import('./nodes').InteractionNode | null {
-    return this.current()?.engine.peekInteraction() ?? null
+    const engine = this.current()?.engine
+    if (!engine) return null
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (engine as any).peekInteraction() ?? null
   }
 
   peekInteractionHost(): EngineNode | null {
-    return this.current()?.engine.peekInteractionHost() ?? null
+    const engine = this.current()?.engine
+    if (!engine) return null
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (engine as any).peekInteractionHost() ?? null
   }
 
   peekPendingChoiceFromComposite(): {
@@ -111,15 +126,24 @@ export class EngineStack {
     options: ActionChoiceOption[]
     request?: InteractionRequest
   } | null {
-    return this.current()?.engine.peekPendingChoiceFromComposite() ?? null
+    const engine = this.current()?.engine
+    if (!engine) return null
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (engine as any).peekPendingChoiceFromComposite() ?? null
   }
 
   hasPendingChoiceCompositeAncestor(): boolean {
-    return this.current()?.engine.hasPendingChoiceCompositeAncestor() ?? false
+    const engine = this.current()?.engine
+    if (!engine) return false
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (engine as any).hasPendingChoiceCompositeAncestor()
   }
 
   insertFlowAfterPendingChoice(flow: ActionFlow): void {
-    this.current()?.engine.insertFlowAfterPendingChoice(flow)
+    const engine = this.current()?.engine
+    if (!engine) return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(engine as any).insertFlowAfterPendingChoice(flow)
   }
 
   toCursor(): EngineStackCursor {
