@@ -1,6 +1,6 @@
 import type { Locale } from '../../../shared/i18n'
 import type { Resource } from '../../../shared/contract/types'
-import { resourceKeyList } from '../../../shared/session/state-constants'
+import { resourceKeyList } from '../../../shared/contract/state-constants'
 
 type Props = {
   locale: Locale

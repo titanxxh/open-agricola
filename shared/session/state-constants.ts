@@ -1,9 +1,12 @@
-// Client-safe slice of `shared/logic/state`: pure data constants and helpers
-// that do NOT import `../cards/catalog` or any card implementation module.
+// Session-only slice of state-constants. Pure literal/zero-dep helpers
+// (`emptyResources`, `resourceKeyList`, `harvestRounds`, `createRoundOpenById`)
+// have been hoisted to `shared/contract/state-constants.ts` so the main
+// client (which is barred from importing `shared/session/**` per S6c Rule 7)
+// can keep using them without crossing the layer.
 //
-// Client code should import from this module. The full `./state` module
-// re-exports everything from here in addition to catalog-dependent helpers
-// (createInitialState, dealHands, normalizeState, cloneState, ...).
+// What remains here is server/session-side logic that legitimately reaches
+// into `shared/utils/rng` and `shared/domain/farmyard`. Server code, tests,
+// and `shared/session/state-bootstrap.ts` continue to import from this file.
 //
 // Keep this file free of imports from `../cards/catalog`, `../cards/major`,
 // `../cards/register-all`, `../actions/index`, or anything that transitively
@@ -13,6 +16,14 @@ import type { FenceSegment, GameState, PlayerState, Resource } from '../contract
 import type { DraftMode } from '../draft/types'
 import { createRng, shuffleWithRng } from '../utils/rng'
 import { tryAddRoomTile } from '../domain/farmyard'
+import {
+  emptyResources,
+  resourceKeyList,
+  harvestRounds,
+  createRoundOpenById,
+} from '../contract/state-constants'
+
+export { emptyResources, resourceKeyList, harvestRounds, createRoundOpenById }
 
 export const normalizeFenceSegments = (input: unknown): FenceSegment[] => {
   if (!Array.isArray(input)) return []
@@ -29,34 +40,6 @@ export const normalizeFenceSegments = (input: unknown): FenceSegment[] => {
     })
     .filter((s): s is FenceSegment => s !== null)
 }
-
-export const emptyResources: Resource = {
-  wood: 0,
-  clay: 0,
-  reed: 0,
-  stone: 0,
-  food: 0,
-  grain: 0,
-  vegetable: 0,
-  sheep: 0,
-  boar: 0,
-  cattle: 0,
-  begging: 0,
-}
-
-export const resourceKeyList: (keyof Resource)[] = [
-  'wood',
-  'clay',
-  'reed',
-  'stone',
-  'food',
-  'grain',
-  'vegetable',
-  'sheep',
-  'boar',
-  'cattle',
-  'begging',
-]
 
 const roundStageSlots = [
   { stage: 1, count: 4 },
@@ -112,21 +95,12 @@ export const generateRoundActionOrder = (seed: number) => {
   return order
 }
 
-export const createRoundOpenById = (order: (string | null)[]) =>
-  new Map(
-    order
-      .map((id, index) => (id ? [id, index + 1] : null))
-      .filter((item): item is [string, number] => item !== null),
-  )
-
 export const defaultPlayerColors: PlayerState['color'][] = [
   'red',
   'yellow',
   'blue',
   'black',
 ]
-
-export const harvestRounds = [4, 7, 9, 11, 13, 14]
 
 export const applyRoundGrowth = (state: GameState) => {
   const roundOpenById = createRoundOpenById(state.roundActionOrder)
