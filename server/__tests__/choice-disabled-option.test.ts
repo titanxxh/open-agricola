@@ -88,10 +88,7 @@ describe('disabled option in pending choice', () => {
 
     // S2 Task 8: composite-node emit metadata now lives on the node itself
     // (XorNode.emittedChoices). Mutate that to flip the `disabled` flag.
-    const composite = session
-      .getEngineStack()
-      .current()!
-      .engine.peekPendingChoiceFromComposite()!
+    const composite = session.getEngineStack().peekPendingChoiceFromComposite()!
     composite.options[0]!.disabled = true
 
     // Attempt to resolve with the disabled option → should be rejected
@@ -116,10 +113,7 @@ describe('disabled option in pending choice', () => {
 
     // S2 Task 8: composite-node emit metadata now lives on the node itself
     // (XorNode.emittedChoices). Mutate that to flip the `disabled` flag.
-    const composite = session
-      .getEngineStack()
-      .current()!
-      .engine.peekPendingChoiceFromComposite()!
+    const composite = session.getEngineStack().peekPendingChoiceFromComposite()!
     composite.options[0]!.disabled = true
 
     // Attempt to resolve with the second (non-disabled) option → should succeed

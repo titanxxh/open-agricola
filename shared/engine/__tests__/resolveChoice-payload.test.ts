@@ -178,6 +178,7 @@ describe('engine resolveChoice payload', () => {
     engine.proceed({ state, player, space })
     engine.resolveChoice('commit', { state, player, space })
     // S4b PR5: read pending interaction context off the InteractionNode (host) directly.
+    // S4c PR4: peekInteractionHost is `@internal` on Engine — package-internal test access.
     const host = engine.peekInteractionHost()
     const ctx = host instanceof InteractionNode ? host.contextSnapshot : undefined
     expect(ctx?.actionContext).toEqual({ stashed: { foo: 42 } })
@@ -225,6 +226,7 @@ describe('engine resolveChoice payload', () => {
     engine.resolveChoice('a', { state, player, space })
     engine.resolveChoice('b', { state, player, space })
     // S4b PR5: read pending interaction context off the InteractionNode (host) directly.
+    // S4c PR4: peekInteractionHost is `@internal` on Engine — package-internal test access.
     const host = engine.peekInteractionHost()
     const ctx = host instanceof InteractionNode ? host.contextSnapshot : undefined
     expect(ctx?.actionContext).toEqual({ x: 1, y: 99, z: 3 })

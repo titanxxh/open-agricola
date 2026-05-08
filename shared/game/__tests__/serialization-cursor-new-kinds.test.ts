@@ -49,7 +49,9 @@ const pushSyntheticInteraction = (
   const frame = engineStack.current()
   expect(frame).toBeDefined()
   if (!frame) return
-  const interactionNode = frame.engine.peekInteraction()
+  // S4c PR4: peekInteraction is private on Engine; cast for package-internal test access.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const interactionNode = (frame.engine as any).peekInteraction()
   expect(interactionNode).toBeDefined()
   if (!interactionNode) return
   // Repurpose the existing InteractionNode: rewrite its request + promptKey

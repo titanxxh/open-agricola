@@ -11,7 +11,7 @@
  * full inventory.
  */
 
-import type { GameState, PlayerState } from '../../game/types.ts'
+import type { ActionFlow, GameState, PlayerState } from '../../game/types.ts'
 import { smallestAvailableWorker, workersAvailable } from '../../game/player.ts'
 import { addWorkerRef, isSpaceOccupied } from '../../game/space.ts'
 import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability.ts'
@@ -21,7 +21,7 @@ import { recordRoundPlacement } from '../../cards/helpers/round-placement.ts'
 import { executeCardListener, getMatchingListeners } from '../../cards/card-listeners.ts'
 import { runRoundEndHooks, shouldSkipPlayerTurn } from '../../cards/card-effects.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
-import { InteractionNode, type EngineNode } from '../../engine/index.ts'
+import { InteractionNode } from '../../engine/index.ts'
 import type { FeedQueueEntry } from '../../game/types.ts'
 
 /**
@@ -121,29 +121,16 @@ export const takeAction = (
     phase: 'before' as const,
   }
   const matched = getMatchingListeners(beforeListenerContext)
-  const beforeFlowNodes: EngineNode[] = []
-  const frameEngine = () => core.peekEngineFrame()?.engine ?? null
+  const beforeFlows: ActionFlow[] = []
   for (const entry of matched) {
     const result = executeCardListener(entry.registration, beforeListenerContext, {
       ownerPlayerId: entry.ownerPlayerId,
     })
-    if (result?.flow) {
-      beforeFlowNodes.push(frameEngine()!.buildFlowNodePublic(result.flow))
-    }
+    if (result?.flow) beforeFlows.push(result.flow)
   }
-  if (beforeFlowNodes.length > 0) {
-    const injectedIds = new Set(beforeFlowNodes.map(n => n.id))
-    frameEngine()!.injectBeforeNodes(beforeFlowNodes)
-    let safety = beforeFlowNodes.length * 3
-    while (safety-- > 0) {
-      const eng = frameEngine()
-      if (!eng) break
-      const next = eng.peekNextUnresolved()
-      if (!next || !injectedIds.has(next.id)) break
-      const step = eng.proceed({ state, player, space })
-      core.flushEngineLogPublic()
-      if (step.type !== 'ok') break
-    }
+  if (beforeFlows.length > 0) {
+    core.peekEngineFrame()?.engine.injectBeforeFlows(beforeFlows, { state, player, space })
+    core.flushEngineLogPublic()
     player._activeActionBonusSources = []
     core.setActionStartPlayerSnapshot(core.cloneSessionPlayer(player))
   }
@@ -366,7 +353,7 @@ export const takeAnytimeAction = (
     return core.emitResponse(false, 'anytime action unavailable')
   }
   core.appendHistory()
-  engine.prependFlow(entry.flow)
+  engine.injectBeforeFlows([entry.flow])
   core.driveEngineSteps()
   return core.emitResponse()
 }
