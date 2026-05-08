@@ -209,4 +209,20 @@ export default defineConfig([
       }],
     },
   },
+  // S6c: main client may not import session/engine. Use client/sandbox/ for hot-seat.
+  {
+    files: ['client/**/*.{ts,tsx}'],
+    ignores: ['client/sandbox/**', 'client/**/__tests__/**'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', {
+        patterns: [
+          {
+            group: ['**/shared/session/**', '**/shared/engine/**'],
+            message: 'Main client cannot import shared/session/** or shared/engine/**. Use client/sandbox/ for workshop hot-seat.',
+            allowTypeImports: true,
+          },
+        ],
+      }],
+    },
+  },
 ])

@@ -9,7 +9,7 @@ import type {
   Resource,
 } from '../../../shared/contract/types'
 import { formatAnimalCounts, formatResources } from '../../utils/format'
-import { emptyResources } from '../../../shared/session/state-constants'
+import { emptyResources } from '../../../shared/contract/state-constants'
 import { familySize } from '../../../shared/domain/player'
 import { readCardResourceStats } from '../../../shared/cards/helpers/card-state'
 import { getWorkerHeldOnCard } from '../../../shared/cards/helpers/card-held-workers'

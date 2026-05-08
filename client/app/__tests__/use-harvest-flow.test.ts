@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState, Resource } from '../../../shared/contract/types'
-import { canFinalizeHarvest, runHarvestFlow } from '../hooks/use-harvest-flow'
+import { performHarvest } from '../../../shared/session/round'
+import { canFinalizeHarvest } from '../hooks/use-harvest-flow'
+
+const runHarvestFlow = (state: GameState) => performHarvest(state)
 
 const resources = (): Resource => ({
   wood: 0,
