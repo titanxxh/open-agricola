@@ -1,4 +1,4 @@
-import type { ActionDefinition } from '../game/types'
+import type { ActionDefinition } from '../contract/types'
 
 export class ActionRegistry {
   private actions = new Map<string, ActionDefinition>()

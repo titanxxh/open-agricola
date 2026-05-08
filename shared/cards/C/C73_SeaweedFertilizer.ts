@@ -1,10 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { C73_SeaweedFertilizer } from '../../cards-display/C/C73_SeaweedFertilizer'
+export { C73_SeaweedFertilizer }
 
-const CARD_ID = 'C73_SeaweedFertilizer'
+const CARD_ID = C73_SeaweedFertilizer.id
 
 const isUnconditionalSow = (context: CardListenerContext): boolean => {
   const actionContext = context.actionContext ?? {}
@@ -12,8 +13,6 @@ const isUnconditionalSow = (context: CardListenerContext): boolean => {
   return actionContext.maxSelections === undefined && actionContext.cropType === undefined
 }
 
-// C73 Seaweed Fertilizer: Each time after you take an unconditional Sow action,
-// you get 1 GRAIN from the general supply. From round 11 on, you can get 1 VEGETABLE instead.
 const listener: CardListenerRegistration = {
   id: 'C73-seaweed-fertilizer-after-sow',
   cardIds: [CARD_ID],
@@ -37,19 +36,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const C73_SeaweedFertilizer = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Seaweed Fertilizer',
-  deck: 'C',
-  number: 73,
-  category: 'CROP_PROVIDER',
-  desc: [
-    'Each time after you take an unconditional __Sow__ action, you get 1 <GRAIN> from the general supply. From round 11 on, you can get 1 <VEGETABLE> instead.',
-  ],
-  cost: { food: 2 },
-  newSet: true,
-})
 
 export const C73_SeaweedFertilizer_impl = {
   listeners: [listener],

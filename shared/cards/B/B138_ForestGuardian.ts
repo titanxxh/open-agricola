@@ -1,10 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B138_ForestGuardian } from '../../cards-display/B/B138_ForestGuardian'
+export { B138_ForestGuardian }
 
-const CARD_ID = 'B138_ForestGuardian'
+const CARD_ID = B138_ForestGuardian.id
 
 /**
  * B138 Forest Guardian:
@@ -67,19 +68,6 @@ const collectListener: CardListenerRegistration = {
     }
   },
 }
-
-export const B138_ForestGuardian = new Occupation({
-  id: CARD_ID,
-  name: 'Forest Guardian',
-  deck: 'B',
-  number: 138,
-  category: 'GOODS_PROVIDER',
-  desc: [
-    'When you play this card, you immediately get 2 <WOOD>. Each time before another player takes at least 5 <WOOD> from an accumulation space, they must first pay you 1 <FOOD>.',
-  ],
-  cost: {},
-  players: '3+',
-})
 
 export const B138_ForestGuardian_impl = {
   listeners: [onBuyListener, collectListener],

@@ -1,12 +1,13 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { AnimalZone } from '../../domain'
-import type { PlayerState } from '../../game/types'
-import { fieldTopStack } from '../../game/field'
+import type { PlayerState } from '../../contract/types'
+import { fieldTopStack } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { B115_TinsmithMaster } from '../../cards-display/B/B115_TinsmithMaster'
+export { B115_TinsmithMaster }
 
-const CARD_ID = 'B115_TinsmithMaster'
+const CARD_ID = B115_TinsmithMaster.id
 
 /**
  * B115 Tinsmith Master (Occupation):
@@ -30,7 +31,6 @@ const getFreshlySownFields = (context: CardListenerContext) =>
     return !!top && top.remaining === INITIAL_REMAINING[top.kind]
   })
 
-// --- After sow: every freshly sown field gets +1 crop directly ---
 const afterSowListener: CardListenerRegistration = {
   id: 'B115-tinsmith-master-after-sow',
   cardIds: [CARD_ID],
@@ -45,18 +45,6 @@ const afterSowListener: CardListenerRegistration = {
     }
   },
 }
-
-export const B115_TinsmithMaster = new Occupation({
-  id: CARD_ID,
-  name: 'Tinsmith Master',
-  deck: 'B',
-  number: 115,
-  category: 'CROP_PROVIDER',
-  desc: ['You can hold 1 additional animal in each pasture without a stable. Each time you sow in a field, you can place 1 additional crop of the respective type in that field.'],
-  cost: {},
-  players: '1+',
-  implemented: true,
-})
 
 export const B115_TinsmithMaster_impl = {
   listeners: [afterSowListener],

@@ -1,13 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E163_Patroness } from '../../cards-display/E/E163_Patroness'
+export { E163_Patroness }
 
-const CARD_ID = 'E163_Patroness'
+const CARD_ID = E163_Patroness.id
 
-// E163 Patroness: Each time after you play an occupation after this one,
-// you get 1 building resource of your choice.
 const listener: CardListenerRegistration = {
   id: 'E163-patroness-after-occupation',
   cardIds: [CARD_ID],
@@ -30,19 +29,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const E163_Patroness = new Occupation({
-  id: CARD_ID,
-  name: 'Patroness',
-  deck: 'E',
-  number: 163,
-  category: 'BUILDING_RESOURCES',
-  desc: [
-    'Each time after you play an occupation after this one, you get 1 building resource of your choice.',
-  ],
-  cost: {},
-  players: '4+',
-})
 
 export const E163_Patroness_impl = {
   listeners: [listener],

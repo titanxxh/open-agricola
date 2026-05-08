@@ -1,12 +1,10 @@
-import { PlayerActionCard } from '../types'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import type { CardImpl } from '../registry'
+import { D23_PioneeringSpirit } from '../../cards-display/D/D23_PioneeringSpirit'
+export { D23_PioneeringSpirit }
 
-const CARD_ID = 'D23_PioneeringSpirit'
+const CARD_ID = D23_PioneeringSpirit.id
 
-// Owner-only action space.
-// Rounds 3-5: provides a Renovation action.
-// Rounds 6-8: choice of 1 vegetable, 1 pig, or 1 cattle.
 registerPlayerActionSpace({
   cardId: CARD_ID,
   access: 'owner',
@@ -49,17 +47,6 @@ registerPlayerActionSpace({
       return { type: 'ok' }
     },
   }),
-})
-
-export const D23_PioneeringSpirit = new PlayerActionCard({
-  id: CARD_ID,
-  name: "Pioneering Spirit",
-  deck: "D",
-  number: 23,
-  category: "ACTIONS_BOOSTER",
-  desc: ["This card is an action space for you only. In rounds 3-5, it provides a __Renovation__ action. In rounds 6-8, it provides your choice of 1 <VEGETABLE>, <PIG>, or <CATTLE>."],
-  cost: {},
-  newSet: true,
 })
 
 export const D23_PioneeringSpirit_impl = {

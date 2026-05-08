@@ -1,28 +1,16 @@
-import { MinorImprovement } from '../types'
 import { recallWorkerById } from '../helpers/recall-worker'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
+import { E3_TeaTime } from '../../cards-display/E/E3_TeaTime'
+export { E3_TeaTime }
 
-const CARD_ID = 'E3_TeaTime'
+const CARD_ID = E3_TeaTime.id
 
-// BGA isBuyable: Farmers::getOnCard('ActionGrainUtilization', $pid)->empty() → false
 registerPrerequisite('Own Person on Grain Utilization', (player, state) => {
   if (!state) return true
   const space = state.actionSpaces.find((s) => s.id === 'grain-utilization')
   if (!space) return false
   return space.takenBy.some((t) => t.playerId === player.id)
-})
-
-export const E3_TeaTime = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Tea Time',
-  deck: 'E',
-  number: 3,
-  category: 'PASSING_-_ACTION_-_FARMYARD',
-  desc: ['Immediately return your person on the __Grain Utilization__ action space home; you can place it again later this round.'],
-  cost: { food: 1 },
-  passing: true,
-  prerequisite: 'Own Person on Grain Utilization',
 })
 
 export const E3_TeaTime_impl = {

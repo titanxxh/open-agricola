@@ -1,12 +1,13 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionChoiceOption } from '../../game/types'
+import type { ActionChoiceOption } from '../../contract/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
-import { isSpaceOccupied, spaceHasPlayer } from '../../game/space'
+import { isSpaceOccupied, spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
+import { E129_Imitator } from '../../cards-display/E/E129_Imitator'
+export { E129_Imitator }
 
-const CARD_ID = 'E129_Imitator'
+const CARD_ID = E129_Imitator.id
 
 /**
  * E129 Imitator — If you have a person on the __Day Laborer__ action space,
@@ -54,17 +55,6 @@ const computeArgsListener: CardListenerRegistration = {
     return { extraOptions, sourceCard: CARD_ID }
   },
 }
-
-export const E129_Imitator = new Occupation({
-  id: CARD_ID,
-  name: 'Imitator',
-  deck: 'E',
-  number: 129,
-  category: 'ACTION',
-  desc: ['If you have a person on the __Day Laborer__ action space, you can use non-accumulating round 1-9 action spaces even if they are occupied.'],
-  cost: {},
-  players: '3+',
-})
 
 export const E129_Imitator_impl = {
   listeners: [computeArgsListener],

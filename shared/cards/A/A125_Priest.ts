@@ -1,18 +1,8 @@
-import { Occupation } from '../types'
 import type { CardImpl } from '../registry'
+import { A125_Priest } from '../../cards-display/A/A125_Priest'
+export { A125_Priest }
 
-const CARD_ID = 'A125_Priest'
-
-export const A125_Priest = new Occupation({
-  id: CARD_ID,
-  name: 'Priest',
-  deck: 'A',
-  number: 125,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['When you play this card, if you live in a clay house with exactly 2 rooms, you immediately get 3 <CLAY>, 2 <REED> and 2 <STONE>.'],
-  cost: {},
-  players: '1+',
-})
+const CARD_ID = A125_Priest.id
 
 export const A125_Priest_impl = {
   effect: {

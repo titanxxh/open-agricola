@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { clearCustomCards, registerCustomCard, type CustomCardData } from '../../shared/cards/custom-registry.ts'
 import { executeCardListener, getMatchingListeners } from '../../shared/cards/card-listeners.ts'
 import { runCardEffectHook } from '../../shared/cards/card-effects.ts'
-import { createInitialState } from '../../shared/logic/state.ts'
+import { createInitialState } from '../../shared/session/state-bootstrap.ts'
 import { validateAndCompileCustomCode, invokeCustomCodeEffect } from '../custom-code/engine.ts'
 import { registerExecutorBackedCustomCard } from '../custom-code/runtime.ts'
 

@@ -1,10 +1,12 @@
-import { MinorImprovement } from '../types'
-import type { ActionDefinition, ActionFlow, Resource } from '../../game/types'
-import { fieldTopStack, fieldTotalRemaining } from '../../game/field'
+import type { ActionDefinition, ActionFlow, Resource } from '../../contract/types'
+import { fieldTopStack, fieldTotalRemaining } from '../../domain/field'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
+import { E73_Scythe } from '../../cards-display/E/E73_Scythe'
+export { E73_Scythe }
 
 const CARD_ID = 'E73_Scythe'
+
 const HARVEST_ACTION_ID = 'card_E73_Scythe_harvest-field'
 
 /**
@@ -51,16 +53,8 @@ const scytheHarvestFieldAction: ActionDefinition = {
     }
   },
 }
-registerAdHocAction(scytheHarvestFieldAction)
 
-export const E73_Scythe = new MinorImprovement({
-  id: "E73_Scythe",
-  name: "Scythe",
-  deck: "E",
-  number: 73,
-  desc: ["During the field phase of each harvest, you can select exactly one of your fields and harvest all the crops planted in it."],
-  cost: {"wood":1},
-})
+registerAdHocAction(scytheHarvestFieldAction)
 
 export const E73_Scythe_impl = {
   effect: {

@@ -2,8 +2,8 @@ import type {
   ActionChoiceOption,
   ActionExecutionContext,
   InteractionRequest,
-} from '../../game/types'
-import type { PromptKey } from '../../game/prompt-keys'
+} from '../../contract/types'
+import type { PromptKey } from '../../contract/prompt-keys'
 import type { EngineContext, NodeStepResult } from '../types'
 import { BaseNode } from './base'
 

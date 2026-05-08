@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { PlayerState } from '../../../game/types'
+import type { PlayerState } from '../../../contract/types'
 import {
   buildRenovationPlan,
   canRenovate,

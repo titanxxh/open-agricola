@@ -13,8 +13,8 @@ import type {
   PlayerState,
   Resource,
   InteractionAnimalReorgZone,
-} from '../game/types.ts'
-import type { ActionDetailParts } from '../protocol/game.ts'
+} from '../contract/types.ts'
+import type { ActionDetailParts } from '../contract/protocol/game.ts'
 import { actionDefinitions, getActionDefinition } from '../actions/index.ts'
 import { internalActionDefinitions } from '../actions/internal-actions.ts'
 import { clearActionHooks } from '../actions/hooks.ts'
@@ -51,16 +51,16 @@ import {
   resourceKeyList,
   applyRoundGrowth,
   applyFutureMeeples,
-} from '../logic/state.ts'
-import { clearWorkPhaseBuildingResources } from '../logic/work-phase-resources.ts'
+} from './state-bootstrap.ts'
+import { clearWorkPhaseBuildingResources } from '../session/work-phase-resources.ts'
 import {
   addFoodFromConversion,
   incFirstPlayer,
   incHarvestedGrain,
   incHarvestedVegetable,
   incResourceConverted,
-} from '../logic/stats.ts'
-import { getMinorImprovement } from '../game/minor-improvements.ts'
+} from '../session/stats.ts'
+import { getMinorImprovement } from '../cards/registry-display.ts'
 import {
   registerCustomCard,
   getCustomMinorImprovementIds,
@@ -81,16 +81,16 @@ import { getCardEffect } from '../cards/card-effects.ts'
 import { incCardUsed } from '../cards/helpers/card-state.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
 import { runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks } from '../cards/card-effects.ts'
-import { positionKey } from '../game/farm.ts'
+import { positionKey } from '../domain/farm.ts'
 import { getMatchingListeners, executeCardListener, shouldSkipImmediateListenerLog } from '../cards/card-listeners.ts'
 import { Scoring, playerBoard, type PlayerScoreSummary } from '../domain'
 import { reap } from '../actions/effects/reap.ts'
 import { breedLeaf } from '../actions/effects/breed'
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { resetRoundPlacements } from '../cards/helpers/round-placement.ts'
-import { familySize, newbornCount, workersAvailable } from '../game/player.ts'
-import { getAssignedAnimalCount } from '../game/animals.ts'
-import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/types.ts'
+import { familySize, newbornCount, workersAvailable } from '../domain/player.ts'
+import { getAssignedAnimalCount } from '../domain/animals.ts'
+import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/registry-display'
 import { getExchangesInWindow } from '../actions/effects/exchange.ts'
 import { getMajorCard } from '../cards/major/index.ts'
 import {
@@ -112,9 +112,9 @@ import {
   getFenceCount,
   getPalisadeCount,
 } from '../actions/effects/fencing.ts'
-import { rebuildActiveModifiers } from '../game/serialization.ts'
-import { isSpaceOccupied, removeWorkerRef } from '../game/space.ts'
-import { smallestAvailableWorker } from '../game/player.ts'
+import { rebuildActiveModifiers } from '../session/serialization.ts'
+import { isSpaceOccupied, removeWorkerRef } from '../domain/space.ts'
+import { smallestAvailableWorker } from '../domain/player.ts'
 import { computeAllowedPlacementSpaces } from '../actions/helpers/placement-availability.ts'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../actions/helpers/placement-constants.ts'
 
@@ -666,7 +666,7 @@ export class GameCore {
    * Frontend uses this to register custom cards into its card registry so they
    * render identically to built-in cards.
    */
-  getCustomCardDefs(): import('../protocol/game.ts').CustomCardDef[] {
+  getCustomCardDefs(): import('../contract/protocol/game.ts').CustomCardDef[] {
     return setupPhase.getCustomCardDefs(this.sessionCardContext)
   }
 
@@ -2807,12 +2807,12 @@ export class GameCore {
     const lookupExchange = (
       sourceId: string,
       idx: number,
-    ): import('../cards/types').CardExchange | undefined => {
+    ): import('../contract/cards').CardExchange | undefined => {
       if (sourceId === BASIC_CONVERSION_SOURCE_ID) {
         return getBasicConversionExchange(idx)
       }
       let card:
-        | { exchanges?: readonly import('../cards/types').CardExchange[] }
+        | { exchanges?: readonly import('../contract/cards').CardExchange[] }
         | undefined
       if (player.improvements.includes(sourceId)) card = getMajorCard(sourceId)
       else if (player.minorPlayed.includes(sourceId)) card = getRegisteredMinorImprovement(sourceId)
@@ -2824,7 +2824,7 @@ export class GameCore {
     // multi-tier cards like D62 BeerTap collapse to one tier per harvest).
     const perSourceUsed = new Map<string, number>()
     type ResolvedSel = (typeof selections)[number] & {
-      _exchange?: import('../cards/types').CardExchange
+      _exchange?: import('../contract/cards').CardExchange
     }
     const cappedSelections: ResolvedSel[] = selections.map((sel) => {
       if (!sel.sourceId || sel.count <= 0) return sel

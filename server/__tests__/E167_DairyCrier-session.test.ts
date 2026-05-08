@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setFencesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
 
-import { setWorkersAtHome } from '../../shared/game/player'
+import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/E/E167_DairyCrier'
 
 const CARD_ID = 'E167_DairyCrier'

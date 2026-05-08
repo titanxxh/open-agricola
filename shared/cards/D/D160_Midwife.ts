@@ -1,11 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
+import { D160_Midwife } from '../../cards-display/D/D160_Midwife'
+export { D160_Midwife }
 
-const CARD_ID = 'D160_Midwife'
+const CARD_ID = D160_Midwife.id
 
 /**
  * D160 Midwife (Occupation, D, 160)
@@ -37,20 +38,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { grain: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const D160_Midwife = new Occupation({
-  id: CARD_ID,
-  name: 'Midwife',
-  deck: 'D',
-  number: 160,
-  category: 'CROP_PROVIDER',
-  desc: [
-    'Each time another player uses the first person they place in a round to take a __Family Growth__ action, you get 1 <GRAIN> from the general supply.',
-  ],
-  cost: {},
-  players: '4+',
-  newSet: true,
-})
 
 export const D160_Midwife_impl = {
   listeners: [listener],

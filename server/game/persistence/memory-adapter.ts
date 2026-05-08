@@ -4,7 +4,7 @@ import type {
   RoomSnapshot,
   RestoreOptions,
 } from './room-persistence.ts'
-import type { SerializedGameState } from '../../../shared/game/serialization.ts'
+import type { SerializedGameState } from '../../../shared/session/serialization.ts'
 
 type Row = { serialized: SerializedGameState | null; meta: RoomMeta; updatedAt: number }
 

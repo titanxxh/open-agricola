@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/game/player'
+import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type {
   ActionFlow,
   ActionSpace,
   GameState,
   PlayerState,
-} from '../../shared/game/types'
+} from '../../shared/contract/types'
 
 import '../../shared/cards/D/D137_TradeTeacher'
 import type { SessionResponse } from '../../shared/session/session-core'

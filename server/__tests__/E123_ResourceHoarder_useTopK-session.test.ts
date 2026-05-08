@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
-import type { ActionSpace, GameState, PlayerState, Resource } from '../../shared/game/types'
+import type { ActionSpace, GameState, PlayerState, Resource } from '../../shared/contract/types'
 
 import '../../shared/cards/E/E123_ResourceHoarder'
 

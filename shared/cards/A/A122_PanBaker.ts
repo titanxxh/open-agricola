@@ -1,13 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { A122_PanBaker } from '../../cards-display/A/A122_PanBaker'
+export { A122_PanBaker }
 
-const CARD_ID = 'A122_PanBaker'
+const CARD_ID = A122_PanBaker.id
 
-// A122 Pan Baker: Each time you use the Grain Utilization action space,
-// you also get 2 CLAY and 1 WOOD.
 const listener: CardListenerRegistration = {
   id: 'A122-pan-baker-after-place-farmer',
   cardIds: [CARD_ID],
@@ -18,18 +17,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { clay: 2, wood: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const A122_PanBaker = new Occupation({
-  id: CARD_ID,
-  name: 'Pan Baker',
-  deck: 'A',
-  number: 122,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['Each time you use the __Grain Utilization__ action space, you also get 2 <CLAY> and 1 <WOOD>.'],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
 
 export const A122_PanBaker_impl = {
   listeners: [listener],

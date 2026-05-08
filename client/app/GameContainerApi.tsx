@@ -2,15 +2,15 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
-import type { ActionSpace, CropStack, FarmTilePosition, PlayerState, Resource } from '../../shared/game/types'
-import { getPlayedCardKeys } from '../../shared/game/player'
+import type { ActionSpace, CropStack, FarmTilePosition, PlayerState, Resource } from '../../shared/contract/types'
+import { getPlayedCardKeys } from '../../shared/domain/player'
 import { t } from '../../shared/i18n'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../types/ui'
-import { parsePositionKey, positionKey } from '../../shared/game/farm'
-import { emptyResources, resourceKeyList } from '../../shared/logic/state-constants'
+import { parsePositionKey, positionKey } from '../../shared/domain/farm'
+import { emptyResources, resourceKeyList } from '../../shared/contract/state-constants'
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, parseDraftParamsFromQuery, type GameTransport } from '../services/gameTransport'
-import type { GameSyncPayload } from '../../shared/protocol/game'
+import type { GameSyncPayload } from '../../shared/contract/protocol/game'
 import { playerCanBuildPalisades } from '../../shared/cards/helpers/card-type'
 import { useFarmSelection } from '../hooks/useFarmSelection'
 import { buildHarvestFeedOptions } from './hooks/use-harvest-flow'
@@ -1416,7 +1416,7 @@ export const GameContainerApi = () => {
     const playerIndex = state.currentPlayerIndex
     const current = state.players[playerIndex]
     if (!current || current.id !== devPlayerId) return
-    const clone = JSON.parse(JSON.stringify(state)) as import('../../shared/game/types').GameState
+    const clone = JSON.parse(JSON.stringify(state)) as import('../../shared/contract/types').GameState
     const cp = clone.players.find((p) => p.id === devPlayerId)
     if (!cp) return
     cp.resources.wood = Math.max(0, 6)
@@ -1441,7 +1441,7 @@ export const GameContainerApi = () => {
     reader.onload = () => {
       const result = reader.result
       if (!result) return
-      const raw = JSON.parse(String(result)) as import('../../shared/game/types').GameState
+      const raw = JSON.parse(String(result)) as import('../../shared/contract/types').GameState
       void transport.loadGame(raw).catch((e) => console.error('loadDevState error', e))
     }
     reader.readAsText(file)

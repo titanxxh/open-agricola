@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { resolveFutureMeepleRequests } from '../../shared/actions/effects/internal/future-meeples'
-import { applyFutureMeeples } from '../../shared/logic/state'
+import { applyFutureMeeples } from '../../shared/session/state-bootstrap'
 
 import '../../shared/cards/B/B107_Manservant'
 

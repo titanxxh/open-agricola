@@ -1,17 +1,8 @@
-import { MinorImprovement } from '../types'
 import type { CardImpl } from '../registry'
+import { C12_CattleFarm } from '../../cards-display/C/C12_CattleFarm'
+export { C12_CattleFarm }
 
-const CARD_ID = 'C12_CattleFarm'
-
-export const C12_CattleFarm = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Cattle Farm',
-  deck: 'C',
-  number: 12,
-  category: 'FARM_PLANNER',
-  desc: ['For each pasture you have, you can keep 1 <CATTLE> on this card.'],
-  cost: { wood: 1 },
-})
+const CARD_ID = C12_CattleFarm.id
 
 export const C12_CattleFarm_impl = {
   effect: {

@@ -1,13 +1,13 @@
-import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { B140_FarmyardWorker } from '../../cards-display/B/B140_FarmyardWorker'
+export { B140_FarmyardWorker }
 
-const CARD_ID = 'B140_FarmyardWorker'
+const CARD_ID = B140_FarmyardWorker.id
 
-// Listen for stables, fencing, construct (rooms) — any action that places goods on farmyard
 const farmyardListener: CardListenerRegistration = {
   id: 'B140-farmyard-worker-after-farmyard',
   cardIds: [CARD_ID],
@@ -21,18 +21,6 @@ const farmyardListener: CardListenerRegistration = {
     }
   },
 }
-
-export const B140_FarmyardWorker = new Occupation({
-  id: CARD_ID,
-  name: 'Farmyard Worker',
-  deck: 'B',
-  number: 140,
-  category: 'FOOD_PROVIDER',
-  desc: ['At the end of each work phase in which you placed at least 1 good on 1 of your farmyard spaces, you get 2 <FOOD>.'],
-  cost: {},
-  players: '3+',
-  newSet: true,
-})
 
 export const B140_FarmyardWorker_impl = {
   listeners: [farmyardListener],

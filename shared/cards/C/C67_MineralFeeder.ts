@@ -1,8 +1,9 @@
-import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { C67_MineralFeeder } from '../../cards-display/C/C67_MineralFeeder'
+export { C67_MineralFeeder }
 
-const CARD_ID = 'C67_MineralFeeder'
+const CARD_ID = C67_MineralFeeder.id
 
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 
@@ -15,22 +16,10 @@ const harvestRounds = [4, 7, 9, 11, 13, 14]
  * The BGA version also offers reorganize; we skip that complexity.
  */
 
-const hasSheepInPasture = (player: import('../../game/types').PlayerState): boolean =>
+const hasSheepInPasture = (player: import('../../contract/types').PlayerState): boolean =>
   player.pastures.some(
     (pasture) => pasture.animalType === 'sheep' && pasture.animalCount > 0,
   )
-
-export const C67_MineralFeeder = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Mineral Feeder',
-  deck: 'C',
-  number: 67,
-  category: 'CROP_PROVIDER',
-  desc: ['At the start of each round that does not end with a harvest, if you have at least 1 <SHEEP> in a pasture, you get 1 <GRAIN>.'],
-  cost: { reed: 1 },
-  vp: 1,
-  newSet: true,
-})
 
 export const C67_MineralFeeder_impl = {
   effect: {

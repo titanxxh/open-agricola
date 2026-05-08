@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { passOccupationToNextPlayer } from '../pass-occupation'
-import type { GameState, PlayerState } from '../../../game/types'
+import type { GameState, PlayerState } from '../../../contract/types'
 
 const mkPlayer = (id: string, hand: string[]): PlayerState => ({
   id, name: id,

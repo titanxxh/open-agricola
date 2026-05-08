@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { JsonRoomPersistence } from '../json-adapter.ts'
 import type { RoomMeta } from '../room-persistence.ts'
-import type { SerializedGameState } from '../../../../shared/game/serialization.ts'
+import type { SerializedGameState } from '../../../../shared/session/serialization.ts'
 
 const META: RoomMeta = {
   createdBy: null,

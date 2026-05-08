@@ -1,10 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B120_Sweep } from '../../cards-display/B/B120_Sweep'
+export { B120_Sweep }
 
-const CARD_ID = 'B120_Sweep'
+const CARD_ID = B120_Sweep.id
 
 /**
  * B120 Sweep — Each time before you use the action space above the most recent
@@ -37,6 +38,7 @@ const ABOVE_TURN_BY_ROUND: Record<number, number> = {
   11: 9,
   14: 11,
 }
+
 const ABOVE_FIXED_BY_ROUND: Record<number, string> = {
   12: 'day-laborer',
   13: 'fishing',
@@ -52,10 +54,6 @@ const getAboveSpaceId = (
   return roundActionOrder[turn - 1] ?? null
 }
 
-// The session-level "before" phase dispatches with actionId = <spaceId>.
-// The engine also dispatches per-node "before" phases with inner actionIds
-// ('gain', 'collect', ...). To fire only at the space-level entry, we compare
-// actionId to the space's id.
 const listener: CardListenerRegistration = {
   id: 'B120-sweep-before-place-farmer',
   cardIds: [CARD_ID],
@@ -70,20 +68,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { clay: 2 }), sourceCard: CARD_ID }
   },
 }
-
-export const B120_Sweep = new Occupation({
-  id: CARD_ID,
-  name: 'Sweep',
-  deck: 'B',
-  number: 120,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: [
-    'Each time before you use the action space above the most recent round 1-14 action space, you get 2 <CLAY>.',
-  ],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
 
 export const B120_Sweep_impl = {
   listeners: [listener],

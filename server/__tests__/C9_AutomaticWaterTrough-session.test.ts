@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import type { ActionFlow } from '../../shared/game/types'
-import { getRegisteredMinorImprovement } from '../../shared/cards/types'
+import type { ActionFlow } from '../../shared/contract/types'
+import { getRegisteredMinorImprovement } from '../../shared/cards-display/types'
 
 import {
   C9_AutomaticWaterTrough,

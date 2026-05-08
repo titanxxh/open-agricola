@@ -7,7 +7,7 @@ import type {
   GameState,
   PlayerState,
   Resource,
-} from '../../../game/types'
+} from '../../../contract/types'
 
 const dummySpace: ActionSpace = { id: 'fencing', type: 'fencing' } as unknown as ActionSpace
 
@@ -87,8 +87,7 @@ describe('fenceAction.resolveChoice', () => {
     expect(ctx.player.pastures).toHaveLength(1)
   })
 
-  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
-  it.skip('first call with multi-combo payment returns choice + actionContextWrite', () => {
+  it('first call with multi-combo payment returns choice + actionContextWrite', () => {
     // 1 wood + clay/stone trade modifiers force the payment-combo prompt for
     // a 4-fence enclosure that costs 4 wood total.
     const ctx = makeCtx({
@@ -130,9 +129,11 @@ describe('fenceAction.resolveChoice', () => {
       palisadeEdges: [],
       extraWood: 0,
     })
-    expect(result.type).toBe('choice')
-    if (result.type !== 'choice') return
-    expect(result.options.length).toBeGreaterThan(1)
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') return
+    expect(result.request.kind).toBe('choice')
+    if (result.request.kind !== 'choice') return
+    expect(result.request.options.length).toBeGreaterThan(1)
     const write = result.extraData?.actionContextWrite as
       | { farmPayload?: { edges?: string[]; palisadeEdges?: string[]; extraWood?: number } }
       | undefined

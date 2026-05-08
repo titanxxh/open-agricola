@@ -1,19 +1,9 @@
-import { Occupation } from '../types'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
+import { D120_ClayDeliveryman } from '../../cards-display/D/D120_ClayDeliveryman'
+export { D120_ClayDeliveryman }
 
-const CARD_ID = 'D120_ClayDeliveryman'
-
-export const D120_ClayDeliveryman = new Occupation({
-  id: CARD_ID,
-  name: 'Clay Deliveryman',
-  deck: 'D',
-  number: 120,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['Place 1 <CLAY> on each remaining space for rounds 6 to 14. At the start of these rounds, you get the <CLAY>.'],
-  cost: {},
-  players: '1+',
-})
+const CARD_ID = D120_ClayDeliveryman.id
 
 export const D120_ClayDeliveryman_impl = {
   effect: {

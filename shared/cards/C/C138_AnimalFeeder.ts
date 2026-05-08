@@ -1,10 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { C138_AnimalFeeder } from '../../cards-display/C/C138_AnimalFeeder'
+export { C138_AnimalFeeder }
 
-const CARD_ID = 'C138_AnimalFeeder'
+const CARD_ID = C138_AnimalFeeder.id
 
 const listener: CardListenerRegistration = {
   id: 'C138-animal-feeder-after-place-farmer',
@@ -39,18 +40,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const C138_AnimalFeeder = new Occupation({
-  id: CARD_ID,
-  name: 'Animal Feeder',
-  deck: 'C',
-  number: 138,
-  category: 'GOODS_PROVIDER',
-  desc: ['On the __Day Laborer__ action space, you also get your choice of 1 <SHEEP> or 1 <GRAIN>. Instead of that good, you can buy 1 <PIG> for 1 <FOOD> or 1 <CATTLE> for 2 <FOOD>.'],
-  cost: {},
-  players: '3+',
-  newSet: true,
-})
 
 export const C138_AnimalFeeder_impl = {
   listeners: [listener],

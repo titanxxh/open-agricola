@@ -7,7 +7,7 @@ import {
 } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/C/C94_StableCleaner'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'C94_StableCleaner'
 const LISTENER_ID = 'C94-stable-cleaner-anytime'

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
-import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
+import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C148_MudWallower'
 

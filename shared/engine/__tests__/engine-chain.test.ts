@@ -9,7 +9,7 @@ import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { actionDefinitions } from '../../actions'
 import { internalActionDefinitions } from '../../actions/internal-actions'
-import type { ActionSpace, GameState, PlayerState } from '../../game/types'
+import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
 
 const createPlayer = (): PlayerState => ({

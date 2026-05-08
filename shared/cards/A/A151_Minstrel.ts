@@ -1,9 +1,10 @@
-import { Occupation } from '../types'
-import { isSpaceOccupied } from '../../game/space'
+import { isSpaceOccupied } from '../../domain/space'
 import { jumpLeaf } from '../helpers/jump-leaf'
 import type { CardImpl } from '../registry'
+import { A151_Minstrel } from '../../cards-display/A/A151_Minstrel'
+export { A151_Minstrel }
 
-const CARD_ID = 'A151_Minstrel'
+const CARD_ID = A151_Minstrel.id
 
 /**
  * A151 Minstrel:
@@ -25,18 +26,6 @@ const STAGE_1_ACTIONS = [
   'fencing',
   'major-improvement',
 ] as const
-
-export const A151_Minstrel = new Occupation({
-  id: CARD_ID,
-  name: 'Minstrel',
-  deck: 'A',
-  number: 151,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['At the start of each returning home phase, if only one action space card on round space 1 to 4 is unoccupied, you can use that action space.'],
-  cost: {},
-  players: '4+',
-  newSet: true,
-})
 
 export const A151_Minstrel_impl = {
   effect: {

@@ -1,5 +1,5 @@
 import { deriveCanBeExecutedByFlow } from '../../actions/flow'
-import type { ActionDefinition } from '../../game/types'
+import type { ActionDefinition } from '../../contract/types'
 
 export const farmExpansion: ActionDefinition = {
   id: 'farm-expansion',

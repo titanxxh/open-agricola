@@ -1,17 +1,17 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import type { Resource } from '../../game/types'
+import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { D140_Loudmouth } from '../../cards-display/D/D140_Loudmouth'
+export { D140_Loudmouth }
 
-const CARD_ID = 'D140_Loudmouth'
+const CARD_ID = D140_Loudmouth.id
 
 const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'stone', 'reed']
+
 const ANIMAL_RESOURCES: (keyof Resource)[] = ['sheep', 'boar', 'cattle']
 
-// D140 Loudmouth: Each time you take at least 4 building resources or 4 animals from an
-// accumulation space, you also get 1 FOOD.
 const listener: CardListenerRegistration = {
   id: 'D140-loudmouth-after-collect',
   cardIds: [CARD_ID],
@@ -25,20 +25,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const D140_Loudmouth = new Occupation({
-  id: CARD_ID,
-  name: 'Loudmouth',
-  deck: 'D',
-  number: 140,
-  category: 'FOOD_PROVIDER',
-  desc: [
-    'Each time you take at least 4 building resources or 4 animals from an accumulation space, you also get 1 <FOOD>.',
-  ],
-  cost: {},
-  players: '3+',
-  newSet: true,
-})
 
 export const D140_Loudmouth_impl = {
   listeners: [listener],

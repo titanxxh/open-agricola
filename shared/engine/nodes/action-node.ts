@@ -3,7 +3,7 @@ import type {
   ActionExecutionContext,
   ActionExecutionResult,
   Resource,
-} from '../../game/types'
+} from '../../contract/types'
 import type { EngineContext, NodeStepResult } from '../types'
 import { BaseNode } from './base'
 

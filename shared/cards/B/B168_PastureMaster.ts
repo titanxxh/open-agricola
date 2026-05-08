@@ -1,11 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import type { Resource } from '../../game/types'
+import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { B168_PastureMaster } from '../../cards-display/B/B168_PastureMaster'
+export { B168_PastureMaster }
 
-const CARD_ID = 'B168_PastureMaster'
+const CARD_ID = B168_PastureMaster.id
 
 /**
  * B168 Pasture Master:
@@ -36,20 +37,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, gain), sourceCard: CARD_ID }
   },
 }
-
-export const B168_PastureMaster = new Occupation({
-  id: CARD_ID,
-  name: 'Pasture Master',
-  deck: 'B',
-  number: 168,
-  category: 'LIVESTOCK_PROVIDER',
-  desc: [
-    'Each time you renovate, you get 2 <FOOD> and 1 additional animal of the respective type in each of your pastures with stable.',
-  ],
-  cost: {},
-  players: '4+',
-  newSet: true,
-})
 
 export const B168_PastureMaster_impl = {
   listeners: [listener],

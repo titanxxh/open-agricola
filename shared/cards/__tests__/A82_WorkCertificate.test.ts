@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../card-listeners'
-import type { GameState, PlayerState, ActionSpace, ActionFlow } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace, ActionFlow } from '../../contract/types'
 
 import '../A/A82_WorkCertificate'
 

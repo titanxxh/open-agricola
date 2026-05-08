@@ -1,12 +1,12 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { A78_Canoe } from '../../cards-display/A/A78_Canoe'
+export { A78_Canoe }
 
-const CARD_ID = 'A78_Canoe'
+const CARD_ID = A78_Canoe.id
 
-// A78 Canoe: Each time you use the Fishing accumulation space, you get an additional 1 FOOD and 1 REED.
 const listener: CardListenerRegistration = {
   id: 'A78-canoe-after-place-farmer',
   cardIds: [CARD_ID],
@@ -17,19 +17,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { reed: 1, food: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const A78_Canoe = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Canoe',
-  deck: 'A',
-  number: 78,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['Each time you use the __Fishing__ accumulation space, you get an additional 1 <FOOD> and 1 <REED>.'],
-  cost: { wood: 2 },
-  vp: 1,
-  prerequisite: '1 Occupation',
-  occupationPrerequisites: { min: 1 },
-})
 
 export const A78_Canoe_impl = {
   listeners: [listener],

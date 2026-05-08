@@ -4,7 +4,7 @@ import type {
   ActionExecutionResult,
   ActionFlow,
   Resource,
-} from '../game/types'
+} from '../contract/types'
 
 export type ActionHookPhase =
   | 'before'
@@ -48,16 +48,16 @@ export type ActionHookResult = {
   actionId?: string
   extraData?: Record<string, unknown>
   extraOptions?: ActionChoiceOption[]
-  extraExchanges?: import('../cards/types').CardExchange[]
+  extraExchanges?: import('../contract/cards').CardExchange[]
   followUpActions?: FollowUpAction[]
   flow?: ActionFlow
   costs?: Partial<Resource>
-  trades?: import('../game/types').Trade[]
-  bonuses?: import('../game/types').Bonus[]
+  trades?: import('../contract/types').Trade[]
+  bonuses?: import('../contract/types').Bonus[]
   sourceCard?: string
   logKey?: string
   logParams?: Record<string, unknown>
-  immediateLogs?: import('../game/types').ImmediateLogEntry[]
+  immediateLogs?: import('../contract/types').ImmediateLogEntry[]
   labelKey?: string
   labelParams?: Record<string, unknown>
   decline?: boolean

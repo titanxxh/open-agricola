@@ -4,7 +4,7 @@ import type {
   ActionSpace,
   GameState,
   PlayerState,
-} from '../../game/types'
+} from '../../contract/types'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
 import { CardRegistry } from '../../cards/registry'
 import { setActiveCardRegistry } from '../../cards/active-registry'

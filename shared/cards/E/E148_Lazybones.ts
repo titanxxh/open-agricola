@@ -1,22 +1,25 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import {
   getReservedActionSpaces,
   setReservedActionSpaces,
 } from '../helpers/card-state'
-import { getNextEmptyTileForPlayer } from '../../game/farm'
+import { getNextEmptyTileForPlayer } from '../../domain/farm'
 import type { CardImpl } from '../registry'
+import { E148_Lazybones } from '../../cards-display/E/E148_Lazybones'
+export { E148_Lazybones }
 
-const CARD_ID = 'E148_Lazybones'
+const CARD_ID = E148_Lazybones.id
+
 const MAX_STABLES = 4
+
 const TRIGGER_SPACES = ['grain-seeds', 'farmland', 'day-laborer', 'farm-expansion']
 
 /**
  * Count stables in reserve: total supply (4) minus those on farm and those
  * already placed on action spaces via this card.
  */
-const countStablesInReserve = (player: import('../../game/types').PlayerState): number => {
+const countStablesInReserve = (player: import('../../contract/types').PlayerState): number => {
   const onFarm = player.stableTiles.length
   const onSpaces = getReservedActionSpaces(player, CARD_ID).length
   return Math.max(0, MAX_STABLES - onFarm - onSpaces)
@@ -61,16 +64,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const E148_Lazybones = new Occupation({
-  id: CARD_ID,
-  name: 'Lazybones',
-  deck: 'E',
-  number: 148,
-  desc: ['Place (up to) 1 <STABLE> each on __Grain Seeds__, __Farmland__, __Day Laborer__, and __Farm Expansion__. Build the <STABLE> at no cost when another player uses that action space.'],
-  cost: {},
-  players: '4+',
-})
 
 export const E148_Lazybones_impl = {
   listeners: [listener],

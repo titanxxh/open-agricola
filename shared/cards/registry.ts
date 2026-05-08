@@ -13,8 +13,8 @@
  */
 import type { CardListenerRegistration } from './card-listeners'
 import type { CardEffect } from './card-effects'
-import type { CardDefinition } from './types'
-import type { CostModifier } from '../game/types'
+import type { CardDefinition } from '../contract/cards'
+import type { CostModifier } from '../contract/types'
 
 export type CardImpl = {
   listeners?: CardListenerRegistration[]

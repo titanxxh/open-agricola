@@ -13,8 +13,9 @@
  */
 import type { CardEffect } from './card-effects.ts'
 import type { CardListenerRegistration } from './card-listeners.ts'
-import type { CardBase, CardDefinition } from './types.ts'
-import { MinorImprovement, Occupation } from './types.ts'
+import type { CardBase } from '../cards-display/types'
+import type { CardDefinition } from '../contract/cards'
+import { MinorImprovement, Occupation } from '../cards-display/types'
 import type { CustomCodeManifest } from '../custom-code/types.ts'
 
 // ── Custom card data type (moved from custom-registry.ts) ───────────────────

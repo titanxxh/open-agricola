@@ -1,7 +1,6 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { GameState, PlayerState } from '../../game/types'
+import type { GameState, PlayerState } from '../../contract/types'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import {
   getRoomsBuiltThisAction,
@@ -9,12 +8,12 @@ import {
 } from '../helpers/action-snapshot'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import { A111_WallBuilder } from '../../cards-display/A/A111_WallBuilder'
+export { A111_WallBuilder }
 
-const CARD_ID = 'A111_WallBuilder'
+const CARD_ID = A111_WallBuilder.id
+
 const USED_ACTION_TOKEN_KEY = 'usedActionToken'
-
-// A111 Wall Builder: Each time you build at least 1 room, place 1 FOOD on
-// each of the next 4 round spaces. At the start of these rounds, you get the FOOD.
 
 const queueFoodNextFour = (state: GameState, player: PlayerState) => {
   const actionToken = readActionSnapshotToken(player)
@@ -43,19 +42,6 @@ const listener: CardListenerRegistration = {
     return { flow, sourceCard: CARD_ID }
   },
 }
-
-export const A111_WallBuilder = new Occupation({
-  id: CARD_ID,
-  name: 'Wall Builder',
-  deck: 'A',
-  number: 111,
-  category: 'FOOD_PROVIDER',
-  desc: [
-    'Each time you build at least 1 room, you can place 1 <FOOD> on each of the next 4 round spaces. At the start of these rounds, you get the <FOOD>.',
-  ],
-  cost: {},
-  players: '1+',
-})
 
 export const A111_WallBuilder_impl = {
   listeners: [listener],

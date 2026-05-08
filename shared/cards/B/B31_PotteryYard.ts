@@ -1,28 +1,15 @@
-import { MinorImprovement } from '../types'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
+import { B31_PotteryYard } from '../../cards-display/B/B31_PotteryYard'
+export { B31_PotteryYard }
 
-const CARD_ID = 'B31_PotteryYard'
+const CARD_ID = B31_PotteryYard.id
 
-// BGA isBuyable: requires Major_Pottery or D60_LargePottery.
 const POTTERY_IDS = ['Major_Pottery', 'D60_LargePottery']
+
 registerPrerequisite('Pottery (or an Upgrade Thereof)', (player) => {
   const owned = new Set<string>([...player.improvements, ...player.minorPlayed])
   return POTTERY_IDS.some((id) => owned.has(id))
-})
-
-export const B31_PotteryYard = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Pottery Yard',
-  deck: 'B',
-  number: 31,
-  category: 'POINTS_PROVIDER',
-  desc: [
-    'During the scoring, if there are at least 2 orthogonally adjacent unused spaces in your farm, you get 2 bonus <SCORE>. (You still get the negative points for those unused spaces.',
-  ],
-  cost: {},
-  vp: 1,
-  prerequisite: 'Pottery (or an Upgrade Thereof)',
 })
 
 export const B31_PotteryYard_impl = {

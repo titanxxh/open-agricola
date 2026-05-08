@@ -1,23 +1,11 @@
-import { MinorImprovement } from '../types'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
+import { E2_RenovationMaterials } from '../../cards-display/E/E2_RenovationMaterials'
+export { E2_RenovationMaterials }
 
-const CARD_ID = 'E2_RenovationMaterials'
+const CARD_ID = E2_RenovationMaterials.id
 
-// BGA isBuyable: getRoomType() != 'roomWood' → false
 registerPrerequisite('Wooden House', (player) => player.houseType === 'wood')
-
-export const E2_RenovationMaterials = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Renovation Materials',
-  deck: 'E',
-  number: 2,
-  category: 'PASSING_-_ACTION_-_FARMYARD',
-  desc: ['Immediately renovate to clay at no cost. (You must pay the cost of this card though.)'],
-  cost: { clay: 3, reed: 1 },
-  passing: true,
-  prerequisite: 'Wooden House',
-})
 
 export const E2_RenovationMaterials_impl = {
   effect: {

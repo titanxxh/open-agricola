@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 
-import { markAllWorkersUsed } from '../../shared/game/player'
+import { markAllWorkersUsed } from '../../shared/domain/player'
 import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/B/B70_NewPurchase'
 import '../../shared/cards/A/A166_Haydryer'

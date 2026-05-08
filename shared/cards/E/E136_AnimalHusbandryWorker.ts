@@ -1,8 +1,9 @@
-import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E136_AnimalHusbandryWorker } from '../../cards-display/E/E136_AnimalHusbandryWorker'
+export { E136_AnimalHusbandryWorker }
 
-const CARD_ID = 'E136_AnimalHusbandryWorker'
+const CARD_ID = E136_AnimalHusbandryWorker.id
 
 const roundsLeftWoodBonus = (state: { round: number }): number => {
   const remaining = 14 - state.round
@@ -11,17 +12,6 @@ const roundsLeftWoodBonus = (state: { round: number }): number => {
   if (remaining >= 3) return 2
   return 0
 }
-
-export const E136_AnimalHusbandryWorker = new Occupation({
-  id: CARD_ID,
-  name: "Animal Husbandry Worker",
-  deck: "E",
-  number: 136,
-  category: "BONUS_POINTS_-_4_WOOD_CARD_COMPETITION",
-  desc: ['If there are still 3/6/9 complete rounds left to play, you immediately get 2/3/4 <WOOD> and a __Build Fences__ action. During scoring, each player with the most pastures gets 2 <SCORE>.'],
-  cost: {},
-  players: "3+",
-})
 
 export const E136_AnimalHusbandryWorker_impl = {
   effect: {

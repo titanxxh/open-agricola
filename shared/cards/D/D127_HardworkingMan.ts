@@ -1,11 +1,10 @@
-import { PlayerActionCard } from '../types'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import type { CardImpl } from '../registry'
+import { D127_HardworkingMan } from '../../cards-display/D/D127_HardworkingMan'
+export { D127_HardworkingMan }
 
-const CARD_ID = 'D127_HardworkingMan'
+const CARD_ID = D127_HardworkingMan.id
 
-// Owner-only action space. Available only when every other player has more rooms.
-// Provides Day Laborer, Building Rooms (construct), and Major Improvement actions (all three via xor).
 registerPlayerActionSpace({
   cardId: CARD_ID,
   access: 'owner',
@@ -33,17 +32,6 @@ registerPlayerActionSpace({
       }
     },
   }),
-})
-
-export const D127_HardworkingMan = new PlayerActionCard({
-  id: CARD_ID,
-  name: "Hardworking Man",
-  deck: "D",
-  number: 127,
-  category: "FARM_PLANNER",
-  desc: ["This card is an action space for you only. If each other player has more rooms than you, it provides the __Day Laborer__, __Building Rooms__, and __Major Improvement__ actions (all three)."],
-  cost: {},
-  players: "3+",
 })
 
 export const D127_HardworkingMan_impl = {

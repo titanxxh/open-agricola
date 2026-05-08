@@ -25,7 +25,7 @@ import type {
   PaymentSolution,
   Trade,
   TradeModifier,
-} from '../../../game/types'
+} from '../../../contract/types'
 import { A88_HedgeKeeper } from '../../../cards/A/A88_HedgeKeeper'
 
 const hedgeKeeperModifier = A88_HedgeKeeper.modifier as TradeModifier
@@ -541,40 +541,42 @@ describe('executePaymentSolution', () => {
 })
 
 describe('payment choice ordering', () => {
-  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
-  it.skip('uses stable resource display order in payment labels', () => {
+  it('uses stable resource display order in payment labels', () => {
     const result = buildPaymentChoiceResult([
       { resourcesPaid: { stone: 1, wood: 2, reed: 1 }, tradesUsed: [] },
     ], 'pay:test')
 
-    expect(result.type).toBe('choice')
-    if (result.type !== 'choice') return
-    expect(result.options[0]?.labelKey).toBe('prompt.selectPaymentOption')
-    expect(result.options[0]?.labelParams).toEqual({
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') return
+    expect(result.request.kind).toBe('choice')
+    if (result.request.kind !== 'choice') return
+    expect(result.request.options[0]?.labelKey).toBe('prompt.selectPaymentOption')
+    expect(result.request.options[0]?.labelParams).toEqual({
       resourcesPaid: { stone: 1, wood: 2, reed: 1 },
       cardUsed: undefined,
     })
-    expect((result.options[0] as any)?.effectPreview).toEqual({
+    expect((result.request.options[0] as any)?.effectPreview).toEqual({
       kind: 'payment',
       resourcesPaid: { stone: 1, wood: 2, reed: 1 },
       cardUsed: undefined,
     })
   })
 
-  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
-  it.skip('sorts same-cost returned-card solutions deterministically', () => {
+  it('sorts same-cost returned-card solutions deterministically', () => {
     const result = buildPaymentChoiceResult([
       { resourcesPaid: { clay: 2 }, tradesUsed: [], cardUsed: 'Major_StoneOven' },
       { resourcesPaid: { clay: 2 }, tradesUsed: [], cardUsed: 'Major_ClayOven' },
     ], 'pay:test', true)
 
-    expect(result.type).toBe('choice')
-    if (result.type !== 'choice') return
-    expect(result.options.map((option) => option.labelParams)).toMatchObject([
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') return
+    expect(result.request.kind).toBe('choice')
+    if (result.request.kind !== 'choice') return
+    expect(result.request.options.map((option) => option.labelParams)).toMatchObject([
       { resourcesPaid: { clay: 2 }, cardUsed: 'Major_ClayOven' },
       { resourcesPaid: { clay: 2 }, cardUsed: 'Major_StoneOven' },
     ])
-    expect(result.options.map((option) => (option as any).effectPreview)).toEqual([
+    expect(result.request.options.map((option) => (option as any).effectPreview)).toEqual([
       {
         kind: 'payment',
         resourcesPaid: { clay: 2 },
@@ -875,7 +877,7 @@ const callPay = (
   payAction.execute({
     state: {} as GameState,
     player,
-    space: { id: 'test', name: '', actionId: 'pay', round: 0 } as unknown as import('../../../game/types').ActionSpace,
+    space: { id: 'test', name: '', actionId: 'pay', round: 0 } as unknown as import('../../../contract/types').ActionSpace,
     params,
     sourceCard: extra.sourceCard,
     actionContext: extra.actionContext,
@@ -930,25 +932,25 @@ describe('payAction: ComplexCost typed-flat single solution', () => {
 })
 
 describe('payAction: ComplexCost multi-solution choice', () => {
-  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
-  it.skip('emits choice when multiple solutions exist', () => {
+  it('emits choice when multiple solutions exist', () => {
     const player = createMockPlayer({ food: 2, grain: 1 })
     const cost: ComplexCost = { fees: [{ food: 2 }, { grain: 1 }] }
     const result = callPay(player, { cost, optionPrefix: 'pay:test' })
-    expect(result.type).toBe('choice')
-    if (result.type === 'choice') {
-      expect(result.options.length).toBe(2)
-      expect(result.options.every((o) => o.value.startsWith('pay:test:'))).toBe(true)
-    }
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') return
+    expect(result.request.kind).toBe('choice')
+    if (result.request.kind !== 'choice') return
+    expect(result.request.options.length).toBe(2)
+    expect(result.request.options.every((o) => o.value.startsWith('pay:test:'))).toBe(true)
   })
 
-  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
-  it.skip('resolveChoice / paymentChoice param applies selected solution', () => {
+  it('resolveChoice / paymentChoice param applies selected solution', () => {
     const player = createMockPlayer({ food: 2, grain: 1 })
     const cost: ComplexCost = { fees: [{ food: 2 }, { grain: 1 }] }
     const initial = callPay(player, { cost, optionPrefix: 'pay:test' })
-    if (initial.type !== 'choice') throw new Error('expected choice')
-    const grainOption = initial.options.find(
+    if (initial.type !== 'request') throw new Error('expected request')
+    if (initial.request.kind !== 'choice') throw new Error('expected choice kind')
+    const grainOption = initial.request.options.find(
       (o) =>
         ((o.labelParams as { resourcesPaid?: Record<string, number> } | undefined)
           ?.resourcesPaid?.grain ?? 0) === 1,
@@ -964,8 +966,7 @@ describe('payAction: ComplexCost multi-solution choice', () => {
     expect(player.resources.food).toBe(2)
   })
 
-  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
-  it.skip('multi-choice bonus: extraData.bonusChoiceIndex carries chosen index', () => {
+  it('multi-choice bonus: extraData.bonusChoiceIndex carries chosen index', () => {
     const player = createMockPlayer({ wood: 3, clay: 3 })
     const cost: ComplexCost = {
       fee: { wood: 2, clay: 2 },
@@ -982,10 +983,11 @@ describe('payAction: ComplexCost multi-solution choice', () => {
       ],
     }
     const initial = callPay(player, { cost, optionPrefix: 'pay:bonus' })
-    expect(initial.type).toBe('choice')
-    if (initial.type !== 'choice') throw new Error('expected choice')
+    expect(initial.type).toBe('request')
+    if (initial.type !== 'request') throw new Error('expected request')
+    if (initial.request.kind !== 'choice') throw new Error('expected choice kind')
     // pick the option that saves wood (paid 1 wood + 2 clay)
-    const woodSaveOption = initial.options.find((o) => {
+    const woodSaveOption = initial.request.options.find((o) => {
       const paid = (
         (o.labelParams as { resourcesPaid?: Record<string, number> } | undefined)
           ?.resourcesPaid ?? {}

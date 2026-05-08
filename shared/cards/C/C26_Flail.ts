@@ -1,10 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { C26_Flail } from '../../cards-display/C/C26_Flail'
+export { C26_Flail }
 
-const CARD_ID = 'C26_Flail'
+const CARD_ID = C26_Flail.id
 
 /**
  * C26 Flail (Minor Improvement)
@@ -42,18 +43,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const C26_Flail = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Flail',
-  deck: 'C',
-  number: 26,
-  category: 'ACTIONS_BOOSTER',
-  desc: [
-    'When you play this card, you immediately get 2 <FOOD>. Each time you use the __Farmland__ or __Cultivation__ action space, you can also take a __Bake Bread__ action.',
-  ],
-  cost: { wood: 1 },
-})
 
 export const C26_Flail_impl = {
   listeners: [listener],

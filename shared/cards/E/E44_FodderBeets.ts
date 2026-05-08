@@ -1,19 +1,9 @@
-import { MinorImprovement } from '../types'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
+import { E44_FodderBeets } from '../../cards-display/E/E44_FodderBeets'
+export { E44_FodderBeets }
 
-const CARD_ID = 'E44_FodderBeets'
-
-export const E44_FodderBeets = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Fodder Beets',
-  deck: 'E',
-  number: 44,
-  category: 'FOOD_-_FUTURE_ROUND_SPACES',
-  desc: ['Place 1 <FOOD> on each remaining odd-numbered round space. At the start of these rounds, you get the <FOOD>.'],
-  vp: 1,
-  prerequisite: '3 Field Tiles',
-})
+const CARD_ID = E44_FodderBeets.id
 
 export const E44_FodderBeets_impl = {
   effect: {

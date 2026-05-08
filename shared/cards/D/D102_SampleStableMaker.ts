@@ -1,15 +1,17 @@
-import { Occupation } from '../types'
 import { addCardResourceGained } from '../helpers/card-state'
-import { addResourcesFromCards } from '../../logic/stats'
+import { addResourcesFromCards } from '../../session/stats'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import {
   listReturnableStableTiles,
   removeStableOrFarmHandAtTile,
 } from '../helpers/stable-removal'
-import type { ActionFlow, FarmTilePosition } from '../../game/types'
+import type { ActionFlow, FarmTilePosition } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { D102_SampleStableMaker } from '../../cards-display/D/D102_SampleStableMaker'
+export { D102_SampleStableMaker }
 
-const CARD_ID = 'D102_SampleStableMaker'
+const CARD_ID = D102_SampleStableMaker.id
+
 const FIELD_EFFECT = 'sample-stable-maker-return'
 
 /**
@@ -45,19 +47,6 @@ registerSelectionEffect(FIELD_EFFECT, ({ player, positions, sourceCard }) => {
     addCardResourceGained(player, sourceCard, gain)
   }
   addResourcesFromCards(player, gain)
-})
-
-export const D102_SampleStableMaker = new Occupation({
-  id: CARD_ID,
-  name: 'Sample Stable Maker',
-  deck: 'D',
-  number: 102,
-  category: 'GOODS_PROVIDER',
-  desc: [
-    'At the start of each returning home phase, you can return a built stable to your supply to get 1 <WOOD>, 1 <GRAIN>, 1 <FOOD>, and a __Minor Improvement__ action.',
-  ],
-  cost: {},
-  players: '1+',
 })
 
 export const D102_SampleStableMaker_impl = {

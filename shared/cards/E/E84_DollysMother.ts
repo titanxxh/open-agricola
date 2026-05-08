@@ -1,20 +1,10 @@
-import { MinorImprovement } from '../types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { playerBoard } from '../../domain'
 import type { CardImpl } from '../registry'
+import { E84_DollysMother } from '../../cards-display/E/E84_DollysMother'
+export { E84_DollysMother }
 
-const CARD_ID = 'E84_DollysMother'
-
-export const E84_DollysMother = new MinorImprovement({
-  id: CARD_ID,
-  name: "Dolly's Mother",
-  deck: "E",
-  number: 84,
-  desc: ["You only require 1 <SHEEP> to breed sheep during the breeding phase of a harvest. This card can hold 1 <SHEEP>."],
-  cost: {},
-  vp: 1,
-  prerequisite: "1 Sheep",
-})
+const CARD_ID = E84_DollysMother.id
 
 export const E84_DollysMother_impl = {
   effect: {

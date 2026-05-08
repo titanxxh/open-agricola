@@ -1,5 +1,5 @@
-import type { PlayerState } from '../../game/types'
-import { familySize } from '../../game/player'
+import type { PlayerState } from '../../contract/types'
+import { familySize } from '../../domain/player'
 
 /**
  * BGA's bonusStoneRoom exclusivity: when a player plays multiple cards that

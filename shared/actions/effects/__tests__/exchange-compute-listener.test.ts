@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { collectComputeExchanges } from '../../../cards/card-listeners'
 import { getExchangesInWindow } from '../exchange'
-import type { GameState, PlayerState } from '../../../game/types'
-import type { CardExchange } from '../../../cards/types'
+import type { GameState, PlayerState } from '../../../contract/types'
+import type { CardExchange } from '../../../contract/cards'
 import type { CardListenerRegistration } from '../../../cards/card-listeners'
 import { CardRegistry } from '../../../cards/registry'
 import {

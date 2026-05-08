@@ -1,18 +1,8 @@
-import { Occupation } from '../types'
 import type { CardImpl } from '../registry'
+import { C89_StableMaster } from '../../cards-display/C/C89_StableMaster'
+export { C89_StableMaster }
 
-const CARD_ID = 'C89_StableMaster'
-
-export const C89_StableMaster = new Occupation({
-  id: CARD_ID,
-  name: 'Stable Master',
-  deck: 'C',
-  number: 89,
-  category: 'FARM_PLANNER',
-  desc: ['When you play this card, you can immediately build exactly 1 stable for 1 <WOOD>. Exactly one of your unfenced stables can hold up to 3 animals of one type.'],
-  cost: {},
-  players: '1+',
-})
+const CARD_ID = C89_StableMaster.id
 
 export const C89_StableMaster_impl = {
   effect: {

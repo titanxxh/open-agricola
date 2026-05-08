@@ -1,12 +1,13 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
-import { familySize } from '../../game/player'
-import { fieldIsEmpty } from '../../game/field'
+import { familySize } from '../../domain/player'
+import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { E92_FieldDoctor } from '../../cards-display/E/E92_FieldDoctor'
+export { E92_FieldDoctor }
 
-const CARD_ID = 'E92_FieldDoctor'
+const CARD_ID = E92_FieldDoctor.id
 
 /**
  * E92 Field Doctor — Once this game, if you live in a house with exactly 2 rooms
@@ -63,16 +64,6 @@ const computeReplaceListener: CardListenerRegistration = {
     }
   },
 }
-
-export const E92_FieldDoctor = new Occupation({
-  id: CARD_ID,
-  name: 'Field Doctor',
-  deck: 'E',
-  number: 92,
-  desc: ['Once this game, if you live in a house with exactly 2 rooms surrounded by 4 field tiles, you can use any __Wish for Children__ action space even without room.'],
-  cost: {},
-  players: '1+',
-})
 
 export const E92_FieldDoctor_impl = {
   listeners: [computeReplaceListener],

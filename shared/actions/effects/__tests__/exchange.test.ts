@@ -8,7 +8,7 @@ import {
   getPossibleTradeTimes,
   reverseTrade,
 } from '../exchange'
-import type { PlayerState, Resource, Trade } from '../../../game/types'
+import type { PlayerState, Resource, Trade } from '../../../contract/types'
 
 const createMockPlayer = (resources: Partial<Resource>): PlayerState => ({
   id: 'p1',

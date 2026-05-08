@@ -15,7 +15,7 @@
 import { describe, expect, it } from 'vitest'
 import { parseDraftOptions } from '../room-router.ts'
 import { GameSession } from '../../game/authoritative-session.ts'
-import { rehydrateState, serializeState } from '../../../shared/game/serialization.ts'
+import { rehydrateState, serializeState } from '../../../shared/session/serialization.ts'
 
 describe('parseDraftOptions', () => {
   it('returns value=null when draftMode is absent', () => {

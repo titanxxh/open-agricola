@@ -1,23 +1,10 @@
-import { Occupation } from '../types'
-import type { ActionFlow } from '../../game/types'
-import { familySize } from '../../game/player'
+import type { ActionFlow } from '../../contract/types'
+import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { E106_EmergencySeller } from '../../cards-display/E/E106_EmergencySeller'
+export { E106_EmergencySeller }
 
-const CARD_ID = 'E106_EmergencySeller'
-
-export const E106_EmergencySeller = new Occupation({
-  id: CARD_ID,
-  name: 'Emergency Seller',
-  deck: 'E',
-  number: 106,
-  category: 'FOOD',
-  desc: [
-    'When you play this card, you can immediately turn as many building resources into food as you have people:',
-    '<WOOD>/<CLAY> <ARROW> 2 <FOOD>',
-    '<REED>/<STONE> <ARROW> 3 <FOOD>',
-  ],
-  players: '1+',
-})
+const CARD_ID = E106_EmergencySeller.id
 
 export const E106_EmergencySeller_impl = {
   effect: {

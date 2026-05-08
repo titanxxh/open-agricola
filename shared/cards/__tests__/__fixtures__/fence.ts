@@ -1,4 +1,4 @@
-import type { PlayerState } from '../../../game/types'
+import type { PlayerState } from '../../../contract/types'
 
 export const setFencesForTest = (p: PlayerState, n: number): void => {
   for (let i = 0; i < n; i += 1) {

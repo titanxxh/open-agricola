@@ -1,19 +1,9 @@
-import { MinorImprovement } from '../types'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { E39_Paintbrush } from '../../cards-display/E/E39_Paintbrush'
+export { E39_Paintbrush }
 
-const CARD_ID = 'E39_Paintbrush'
-
-export const E39_Paintbrush = new MinorImprovement({
-  id: CARD_ID,
-  name: "Paintbrush",
-  deck: "E",
-  number: 39,
-  category: "BONUS_POINTS_-_GET",
-  desc: ["Each harvest, you can exchange exactly 1 <CLAY> for your choice of 2 <FOOD> or 1 bonus <SCORE>."],
-  cost: { wood: 1 },
-  prerequisite: "1 Pig",
-})
+const CARD_ID = E39_Paintbrush.id
 
 export const E39_Paintbrush_impl = {
   effect: {

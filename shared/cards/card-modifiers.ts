@@ -1,4 +1,4 @@
-import type { CostModifier } from '../game/types'
+import type { CostModifier } from '../contract/types'
 import { getActiveCardRegistry } from './active-registry'
 
 /**

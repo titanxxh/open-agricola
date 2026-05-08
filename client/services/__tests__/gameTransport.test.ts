@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { serializeState } from '../../../shared/game/serialization'
-import { createInitialState } from '../../../shared/logic/state'
-import type { GameSyncPayload, StateUpdateEnvelope } from '../../../shared/protocol/game'
+import { serializeState } from '../../../shared/session/serialization'
+import { createInitialState } from '../../../shared/session/state-bootstrap'
+import type { GameSyncPayload, StateUpdateEnvelope } from '../../../shared/contract/protocol/game'
 import { EngineStack } from '../../../shared/engine'
 
 const emptyCtx = () => ({ engineStack: new EngineStack() })

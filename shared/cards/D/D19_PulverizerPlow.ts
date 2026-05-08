@@ -1,11 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-const CARD_ID = 'D19_PulverizerPlow'
+import { D19_PulverizerPlow } from '../../cards-display/D/D19_PulverizerPlow'
+export { D19_PulverizerPlow }
 
-// D19 Pulverizer Plow: Immediately after each time you use a clay accumulation space,
-// you can pay 1 CLAY to plow 1 field. If you do, place that 1 CLAY on the accumulation space.
+const CARD_ID = D19_PulverizerPlow.id
+
 const listener: CardListenerRegistration = {
   id: 'D19-pulverizer-plow-after-collect',
   cardIds: [CARD_ID],
@@ -36,20 +36,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const D19_PulverizerPlow = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Pulverizer Plow',
-  deck: 'D',
-  number: 19,
-  category: 'FARM_PLANNER',
-  desc: [
-    'Immediately after each time you use a clay accumulation space, you can pay 1 <CLAY> to plow 1 field. If you do, place that 1 <CLAY> on the accumulation space.',
-  ],
-  cost: { wood: 2 },
-  prerequisite: '1 Occupation',
-  occupationPrerequisites: { min: 1 },
-})
 
 export const D19_PulverizerPlow_impl = {
   listeners: [listener],

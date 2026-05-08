@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
-import type { ActionFlow, ActionSpace } from '../../shared/game/types'
+import type { ActionFlow, ActionSpace } from '../../shared/contract/types'
 import '../../shared/cards/C/C154_TwinResearcher'
 
 

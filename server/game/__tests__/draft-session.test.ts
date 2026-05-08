@@ -16,7 +16,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../authoritative-session'
-import { rehydrateState, serializeState } from '../../../shared/game/serialization'
+import { rehydrateState, serializeState } from '../../../shared/session/serialization'
 
 const makeDraftSession = (
   playerCount = 2,

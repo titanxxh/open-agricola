@@ -1,10 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import { C19_SwingPlow } from '../../cards-display/C/C19_SwingPlow'
+export { C19_SwingPlow }
 
-const CARD_ID = 'C19_SwingPlow'
+const CARD_ID = C19_SwingPlow.id
 
 const listener: CardListenerRegistration = {
   id: 'C19-swing-plow-after-place-farmer',
@@ -53,18 +54,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const C19_SwingPlow = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Swing Plow',
-  deck: 'C',
-  number: 19,
-  category: 'FARM_PLANNER',
-  desc: ['Place 4 field tiles on this card. Each time you use the __Farmland__ action space, you can also plow up to 2 fields from this card.'],
-  cost: { wood: 3 },
-  prerequisite: '3 Occupations',
-  occupationPrerequisites: { min: 3 },
-})
 
 export const C19_SwingPlow_impl = {
   listeners: [listener],

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { setWorkersAtHome } from '../../shared/game/player'
+import { setWorkersAtHome } from '../../shared/domain/player'
 import { getFenceCount } from '../../shared/actions/effects/fencing'
 import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 

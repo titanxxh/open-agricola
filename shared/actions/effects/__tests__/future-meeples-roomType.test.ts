@@ -3,8 +3,8 @@ import {
   queueFutureMeeples,
   resolveFutureMeepleRequests,
 } from '../internal/future-meeples'
-import { applyFutureMeeples } from '../../../logic/state-constants'
-import type { FarmTilePosition, GameState, PlayerState, Resource } from '../../../game/types'
+import { applyFutureMeeples } from '../../../session/state-constants'
+import type { FarmTilePosition, GameState, PlayerState, Resource } from '../../../contract/types'
 
 const emptyResources = (): Resource => ({
   wood: 0,

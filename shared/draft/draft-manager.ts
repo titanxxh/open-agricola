@@ -12,7 +12,7 @@
  */
 
 import type { DraftPickPayload, DraftPool, DraftState } from './types'
-import type { GameState } from '../game/types'
+import type { GameState } from '../contract/types'
 
 export function initDraftState(
   seatOrder: string[],

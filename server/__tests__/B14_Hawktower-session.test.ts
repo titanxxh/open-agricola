@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { resolveFutureMeepleRequests } from '../../shared/actions/effects/internal/future-meeples'
-import { applyFutureMeeples } from '../../shared/logic/state'
+import { applyFutureMeeples } from '../../shared/session/state-bootstrap'
 import { B14_Hawktower } from '../../shared/cards/B/B14_Hawktower'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 

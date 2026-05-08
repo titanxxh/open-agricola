@@ -1,5 +1,5 @@
-import type { GameState, PlayerState, Pasture } from '../game/types.ts'
-import { positionKey } from '../game/farm.ts'
+import type { GameState, PlayerState, Pasture } from '../contract/types.ts'
+import { positionKey } from '../domain/farm.ts'
 import { getCardEffect, type Meeple } from '../cards/card-effects.ts'
 
 // ---------------------------------------------------------------------------

@@ -1,9 +1,10 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { D15_ClaySupports } from '../../cards-display/D/D15_ClaySupports'
+export { D15_ClaySupports }
 
-const CARD_ID = 'D15_ClaySupports'
+const CARD_ID = D15_ClaySupports.id
 
 /**
  * D15 Clay Supports — Each time you build a clay room, you can pay
@@ -28,16 +29,6 @@ const constructCostListener: CardListenerRegistration = {
     return { costs: { clay: -3, reed: -1, wood: 1 } }
   },
 }
-
-export const D15_ClaySupports = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Clay Supports',
-  deck: 'D',
-  number: 15,
-  category: 'FARM_PLANNER',
-  desc: ['Each time you build a clay room, you can pay 2 <CLAY>, 1 <WOOD>, and 1 <REED> instead of 5 <CLAY> and 2 <REED>.'],
-  cost: { wood: 2 },
-})
 
 export const D15_ClaySupports_impl = {
   listeners: [constructCostListener],

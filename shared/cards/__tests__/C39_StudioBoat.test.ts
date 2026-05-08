@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../card-effects'
 import { getPlayerActionSpaceConfig } from '../player-action-space'
-import type { GameState, PlayerState, ActionSpace, Resource } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace, Resource } from '../../contract/types'
 
 import '../C/C39_StudioBoat'
-import type { ActionExecutionContext } from '../../game/types'
+import type { ActionExecutionContext } from '../../contract/types'
 
 const CARD_ID = 'C39_StudioBoat'
 

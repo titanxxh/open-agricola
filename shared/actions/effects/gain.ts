@@ -1,11 +1,11 @@
-import type { ActionDefinition, PlayerState, Resource } from '../../game/types'
+import type { ActionDefinition, PlayerState, Resource } from '../../contract/types'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { gainConfigByActionId } from '../factories/gain'
-import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
+import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resources'
 import {
   addResourcesFromBoard,
   addResourcesFromCards,
-} from '../../logic/stats'
+} from '../../session/stats'
 
 export const gainResources = (
   player: PlayerState,

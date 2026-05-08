@@ -1,13 +1,14 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { cardCountsAs } from '../helpers/card-type'
-import type { PlayerState } from '../../game/types'
+import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { D161_CabbageBuyer } from '../../cards-display/D/D161_CabbageBuyer'
+export { D161_CabbageBuyer }
 
-const CARD_ID = 'D161_CabbageBuyer'
+const CARD_ID = D161_CabbageBuyer.id
 
 /**
  * D161 Cabbage Buyer — Each time any player (including you) takes a
@@ -40,8 +41,6 @@ const getBuiltCardId = (choice: string | undefined): string | undefined => {
   return choice.replace(/^major:/, '').replace(/^minor:/, '')
 }
 
-// ── Listener (a): after:renovate-house — open tracker ───────────
-
 const openTrackerListener: CardListenerRegistration = {
   id: 'D161-cabbage-buyer-open-tracker',
   cardIds: [CARD_ID],
@@ -62,8 +61,6 @@ const openTrackerListener: CardListenerRegistration = {
     })
   },
 }
-
-// ── Listener (b): after:improvement — tag kind ──────────────────
 
 const tagImprovementListener: CardListenerRegistration = {
   id: 'D161-cabbage-buyer-tag-improvement',
@@ -90,8 +87,6 @@ const tagImprovementListener: CardListenerRegistration = {
     setInFlight(owner, inFlight)
   },
 }
-
-// ── Listener (c): after:place-farmer — drain & offer ────────────
 
 const drainTrackerListener: CardListenerRegistration = {
   id: 'D161-cabbage-buyer-drain-offer',
@@ -127,20 +122,6 @@ const drainTrackerListener: CardListenerRegistration = {
     }
   },
 }
-
-export const D161_CabbageBuyer = new Occupation({
-  id: CARD_ID,
-  name: 'Cabbage Buyer',
-  deck: 'D',
-  number: 161,
-  category: 'CROP_PROVIDER',
-  desc: [
-    'Each time any player (including you) renovates and then builds no/1 minor/1 major improvement, you can buy 1 <VEGETABLE> for 3/2/1 <FOOD>.',
-  ],
-  cost: {},
-  players: '4+',
-  newSet: true,
-})
 
 export const D161_CabbageBuyer_impl = {
   listeners: [openTrackerListener, tagImprovementListener, drainTrackerListener],

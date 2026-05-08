@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { serializeState, rehydrateState } from '../shared/game/serialization'
-import { createInitialState } from '../shared/logic/state'
+import { serializeState, rehydrateState } from '../shared/session/serialization'
+import { createInitialState } from '../shared/session/state-bootstrap'
 import { getCardModifiers } from '../shared/cards/card-modifiers'
 import { GameSession } from '../server/game/authoritative-session'
 import { EngineStack } from '../shared/engine'
 
 const emptyCtx = () => ({ engineStack: new EngineStack() })
 
-describe('shared/game/serialization', () => {
+describe('shared/session/serialization', () => {
   const state = createInitialState(42)
 
   describe('serializeState', () => {

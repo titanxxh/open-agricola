@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/D/D20_TurnwrestPlow'
-import type { ActionChoiceOption } from '../../shared/game/types'
+import type { ActionChoiceOption } from '../../shared/contract/types'
 
 describe('D20_TurnwrestPlow session', () => {
   const setup = (round = 1) => {

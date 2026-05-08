@@ -1,29 +1,18 @@
-import { MinorImprovement } from '../types'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { E41_MuddyWaters } from '../../cards-display/E/E41_MuddyWaters'
+export { E41_MuddyWaters }
 
-const CARD_ID = 'E41_MuddyWaters'
+const CARD_ID = E41_MuddyWaters.id
 
-// BGA isBuyable: getPlayedCards()->count() < 5 → false
 registerPrerequisite('5 Cards in Play', (player) => {
   const total =
     player.occupationPlayed.length
     + player.minorPlayed.length
     + player.improvements.length
   return total >= 5
-})
-
-export const E41_MuddyWaters = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Muddy Waters',
-  deck: 'E',
-  number: 41,
-  category: 'GOODS_-_GET',
-  desc: ['Alternate placing 1 <FOOD> and 1 <CLAY> on each remaining even-numbered round space, starting with <FOOD>. At the start of these rounds, you get the respective good.'],
-  vp: 1,
-  prerequisite: '5 Cards in Play',
 })
 
 export const E41_MuddyWaters_impl = {

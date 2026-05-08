@@ -1,11 +1,13 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionChoiceOption, ActionDefinition, ActionFlow } from '../../game/types'
+import type { ActionChoiceOption, ActionDefinition, ActionFlow } from '../../contract/types'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
+import { B146_Illusionist } from '../../cards-display/B/B146_Illusionist'
+export { B146_Illusionist }
 
-const CARD_ID = 'B146_Illusionist'
+const CARD_ID = B146_Illusionist.id
+
 const DISCARD_ACTION_ID = 'card_B146_Illusionist_discard-from-hand'
 
 const discardFromHandAction: ActionDefinition = {
@@ -53,6 +55,7 @@ const discardFromHandAction: ActionDefinition = {
     return { type: 'fail', logKey: 'log.actionFail' }
   },
 }
+
 registerAdHocAction(discardFromHandAction)
 
 /**
@@ -81,6 +84,7 @@ registerAdHocAction(discardFromHandAction)
  */
 
 const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
+
 type BuildingResource = (typeof BUILDING_RESOURCES)[number]
 
 const pickAccumulatingResource = (
@@ -136,20 +140,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const B146_Illusionist = new Occupation({
-  id: CARD_ID,
-  name: 'Illusionist',
-  deck: 'B',
-  number: 146,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: [
-    'Each time you use a building resource accumulation space, you can discard exactly 1 card from your hand to get 1 additional building resource of the accumulating type.',
-  ],
-  cost: {},
-  players: '3+',
-  evenMoreSet: true,
-})
 
 export const B146_Illusionist_impl = {
   listeners: [listener],

@@ -1,10 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { B87_Cottager } from '../../cards-display/B/B87_Cottager'
+export { B87_Cottager }
 
-const CARD_ID = 'B87_Cottager'
+const CARD_ID = B87_Cottager.id
 
 const listener: CardListenerRegistration = {
   id: 'B87-cottager-after-place-farmer',
@@ -27,17 +28,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const B87_Cottager = new Occupation({
-  id: CARD_ID,
-  name: 'Cottager',
-  deck: 'B',
-  number: 87,
-  category: 'FARM_PLANNER',
-  desc: ['Each time you use the __Day Laborer__ action space, you can also either build exactly 1 room or renovate your house. Either way, you have to pay the cost.'],
-  cost: {},
-  players: '1+',
-})
 
 export const B87_Cottager_impl = {
   listeners: [listener],

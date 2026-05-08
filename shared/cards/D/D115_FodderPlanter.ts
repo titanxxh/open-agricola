@@ -1,19 +1,9 @@
-import { Occupation } from '../types'
 import { canSow } from '../../actions/effects/sow'
 import type { CardImpl } from '../registry'
+import { D115_FodderPlanter } from '../../cards-display/D/D115_FodderPlanter'
+export { D115_FodderPlanter }
 
-const CARD_ID = 'D115_FodderPlanter'
-
-export const D115_FodderPlanter = new Occupation({
-  id: CARD_ID,
-  name: "Fodder Planter",
-  deck: "D",
-  number: 115,
-  category: "CROP_PROVIDER",
-  desc: ["In the breeding phase of each harvest, for each newborn animal you get, you can sow crops in exactly 1 field."],
-  cost: {},
-  players: "1+",
-})
+const CARD_ID = D115_FodderPlanter.id
 
 export const D115_FodderPlanter_impl = {
   effect: {

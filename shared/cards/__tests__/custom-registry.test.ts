@@ -7,7 +7,7 @@ import {
   getCustomOccupationIds,
   clearCustomCards,
 } from '../custom-registry'
-import type { CardDefinition } from '../types'
+import type { CardDefinition } from '../../contract/cards'
 import type { CustomCardData } from '../session-card-context'
 import { CardRegistry } from '../registry'
 import { setActiveCardRegistry } from '../active-registry'

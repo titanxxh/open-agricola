@@ -1,17 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E166_Roastmaster } from '../../cards-display/E/E166_Roastmaster'
+export { E166_Roastmaster }
 
-const CARD_ID = 'E166_Roastmaster'
+const CARD_ID = E166_Roastmaster.id
 
-// E166 Roastmaster: Each time you use Traveling Players or Fishing,
-// optionally move 1 food from that space to the other to get 1 cattle.
-//
-// BGA actually moves the food meeple between the two action cards before
-// gaining the cattle. We implement the same shape via the
-// `move-resource-between-spaces` SE kind (special-effect.ts).
 const PAIR: Record<string, string> = {
   fishing: 'traveling-players',
   'traveling-players': 'fishing',
@@ -55,17 +50,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const E166_Roastmaster = new Occupation({
-  id: CARD_ID,
-  name: 'Roastmaster',
-  deck: 'E',
-  number: 166,
-  category: 'ANIMALS_-_CATTLE',
-  desc: ['Each time you use the __Traveling Players__ or __Fishing__ accumulation spaces, you can move exactly 1 <FOOD> from that space to the other to get 1 <CATTLE>.'],
-  cost: {},
-  players: '4+',
-})
 
 export const E166_Roastmaster_impl = {
   listeners: [listener],

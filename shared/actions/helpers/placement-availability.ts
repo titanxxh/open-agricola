@@ -4,9 +4,9 @@ import type {
   GameState,
   PlayerState,
   Resource,
-} from '../../game/types'
+} from '../../contract/types'
 import type { CardListenerContext } from '../../cards/card-listeners'
-import { isSpaceOccupied } from '../../game/space'
+import { isSpaceOccupied } from '../../domain/space'
 import { getMatchingListeners, executeCardListener } from '../../cards/card-listeners'
 import { runActionHooks } from '../hooks'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'

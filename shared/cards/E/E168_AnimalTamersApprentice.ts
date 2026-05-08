@@ -1,20 +1,10 @@
-import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { familySize } from '../../game/player'
+import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { E168_AnimalTamersApprentice } from '../../cards-display/E/E168_AnimalTamersApprentice'
+export { E168_AnimalTamersApprentice }
 
-const CARD_ID = 'E168_AnimalTamersApprentice'
-
-export const E168_AnimalTamersApprentice = new Occupation({
-  id: CARD_ID,
-  name: "Animal Tamer's Apprentice",
-  deck: 'E',
-  number: 168,
-  category: 'ANIMALS_-_ALL',
-  desc: ['At the start of each round, you get 1 <SHEEP>/<PIG>/<CATTLE> for each unoccupied wood/clay/stone room in your house.'],
-  cost: {},
-  players: '4+',
-})
+const CARD_ID = E168_AnimalTamersApprentice.id
 
 export const E168_AnimalTamersApprentice_impl = {
   effect: {

@@ -1,11 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { Bonus } from '../../game/types'
+import type { Bonus } from '../../contract/types'
 import { writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import { E123_ResourceHoarder } from '../../cards-display/E/E123_ResourceHoarder'
+export { E123_ResourceHoarder }
 
-const CARD_ID = 'E123_ResourceHoarder'
+const CARD_ID = E123_ResourceHoarder.id
 
 /**
  * E123 Resource Hoarder (Occupation, E, 123)
@@ -61,7 +62,7 @@ const computeCostsListener: CardListenerRegistration = {
         const res = stack[stack.length - 1 - i]!
         discount[res] = (discount[res] ?? 0) + 1
       }
-      choices.push({ discount: discount as import('../../game/types').BonusChoice['discount'] })
+      choices.push({ discount: discount as import('../../contract/types').BonusChoice['discount'] })
     }
     const bonus: Bonus = {
       choices,
@@ -126,16 +127,6 @@ const afterPayListener: CardListenerRegistration = {
     updateInfobox(context.player)
   },
 }
-
-export const E123_ResourceHoarder = new Occupation({
-  id: CARD_ID,
-  name: 'Resource Hoarder',
-  deck: 'E',
-  number: 123,
-  desc: ['Pile resources as depicted on this card. You can use the top item(s) when building a room, playing/building an improvement, or renovating. (From bottom to top: <STONE>, <CLAY>, <STONE>, <REED>, <WOOD>, <CLAY>)'],
-  cost: {},
-  players: '1+',
-})
 
 export const E123_ResourceHoarder_impl = {
   listeners: [computeCostsListener, afterPayListener],

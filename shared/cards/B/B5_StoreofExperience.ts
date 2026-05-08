@@ -1,23 +1,12 @@
-import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import type { Resource } from '../../game/types'
+import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { B5_StoreofExperience } from '../../cards-display/B/B5_StoreofExperience'
+export { B5_StoreofExperience }
 
-const CARD_ID = 'B5_StoreofExperience'
+const CARD_ID = B5_StoreofExperience.id
 
-// rewards[0..4] => stone, [5] => reed, [6] => clay, [7] => wood
 const REWARDS: (keyof Resource)[] = ['stone', 'stone', 'stone', 'stone', 'stone', 'reed', 'clay', 'wood']
-
-export const B5_StoreofExperience = new MinorImprovement({
-  id: CARD_ID,
-  name: "Store of Experience",
-  deck: "B",
-  number: 5,
-  category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["If you have 0-4/5/6/7 occupations left in hand, you immediately get 1 <STONE>/<REED>/<CLAY>/<WOOD>."],
-  cost: { food: 1 },
-  passing: true,
-})
 
 export const B5_StoreofExperience_impl = {
   effect: {

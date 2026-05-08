@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { C16_FieldFences_impl } from '../C16_FieldFences'
 import type { CardListenerContext } from '../../card-listeners'
-import type { ActionSpace, GameState, PlayerState } from '../../../game/types'
+import type { ActionSpace, GameState, PlayerState } from '../../../contract/types'
 
 const dummySpace = { id: 'fence', type: 'fence', position: 0, players: [], available: true } as unknown as ActionSpace
 

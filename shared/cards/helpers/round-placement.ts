@@ -1,4 +1,4 @@
-import type { PlayerState } from '../../game/types'
+import type { PlayerState } from '../../contract/types'
 import { ensureCardState } from './card-state'
 
 const ROUND_PLACEMENT_CARD_ID = '__roundPlacement__'

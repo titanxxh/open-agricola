@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { computeScores , ScoreEntry } from '../../shared/domain/scoring'
-import type { ActionChoiceOption,  FarmTilePosition } from '../../shared/game/types'
-import { positionKey } from '../../shared/game/farm'
+import type { ActionChoiceOption,  FarmTilePosition } from '../../shared/contract/types'
+import { positionKey } from '../../shared/domain/farm'
 
 import { B38_FutureBuildingSite } from '../../shared/cards/B/B38_FutureBuildingSite'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'

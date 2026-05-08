@@ -1,11 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import type { ActionFlow, Resource } from '../../game/types'
+import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { E144_WaresSalesman } from '../../cards-display/E/E144_WaresSalesman'
+export { E144_WaresSalesman }
 
-const CARD_ID = 'E144_WaresSalesman'
+const CARD_ID = E144_WaresSalesman.id
 
 /**
  * E144 Wares Salesman:
@@ -21,8 +22,11 @@ const CARD_ID = 'E144_WaresSalesman'
 type ResourceGain = Partial<Resource>
 
 const WOOD_REED: ResourceGain = { wood: 1, reed: 1 }
+
 const CLAY_REED: ResourceGain = { clay: 1, reed: 1 }
+
 const REED_2: ResourceGain = { reed: 2 }
+
 const STONE_REED: ResourceGain = { stone: 1, reed: 1 }
 
 const WOOD_REED_CARDS = new Set([
@@ -110,19 +114,6 @@ const makeListener = (
     if (!flow) return
     return { flow, sourceCard: CARD_ID }
   },
-})
-
-export const E144_WaresSalesman = new Occupation({
-  id: CARD_ID,
-  name: 'Wares Salesman',
-  deck: 'E',
-  number: 144,
-  category: 'BUILDING_RESOURCES_-_REED',
-  desc: [
-    'Each time any player (including you) plays or builds a card that lets them turn building resources into <FOOD>, you get exactly 1 corresponding building resource and 1 <REED>.',
-  ],
-  cost: {},
-  players: '3+',
 })
 
 export const E144_WaresSalesman_impl = {

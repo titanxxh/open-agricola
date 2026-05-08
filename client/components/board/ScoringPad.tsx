@@ -10,7 +10,7 @@ import type {
   PlayerState,
   PlayerStats,
   Resource,
-} from '../../../shared/game/types'
+} from '../../../shared/contract/types'
 import { getAnyCardDisplayName, getCardDisplayName } from '../common/cardText'
 import { ResourceLine } from '../common/ResourceLine'
 

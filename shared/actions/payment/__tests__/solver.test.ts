@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { PaymentSolver } from '../index'
 import type { PaymentCtx } from '../index'
-import type { GameState, PlayerState } from '../../../game/types'
+import type { GameState, PlayerState } from '../../../contract/types'
 
 const makePlayerWithResources = (res: Partial<Record<string, number>>): PlayerState => {
   return {

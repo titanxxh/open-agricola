@@ -1,20 +1,9 @@
-import { Occupation } from '../types'
 import type { CardImpl } from '../registry'
 import type { BonusScoreLevel } from '../card-effects'
+import { C133_Soldier } from '../../cards-display/C/C133_Soldier'
+export { C133_Soldier }
 
-const CARD_ID = 'C133_Soldier'
-
-export const C133_Soldier = new Occupation({
-  id: CARD_ID,
-  name: "Soldier",
-  deck: "C",
-  number: 133,
-  category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 1 bonus <SCORE> for each <STONE> + <WOOD> pair in your supply. You cannot score additional points for the resources scored with this card."],
-  cost: {},
-  players: "3+",
-  newSet: true,
-})
+const CARD_ID = C133_Soldier.id
 
 export const C133_Soldier_impl = {
   effect: {

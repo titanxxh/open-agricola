@@ -1,20 +1,9 @@
-import { Occupation } from '../types'
-import { familySize } from '../../game/player'
+import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { C100_Butler } from '../../cards-display/C/C100_Butler'
+export { C100_Butler }
 
-const CARD_ID = 'C100_Butler'
-
-export const C100_Butler = new Occupation({
-  id: CARD_ID,
-  name: "Butler",
-  deck: "C",
-  number: 100,
-  category: "POINTS_PROVIDER",
-  desc: ["If you play this card in round 11 or before, during scoring, you get 4 bonus <SCORE> if you then have more rooms than people."],
-  cost: {},
-  players: "1+",
-  maxRound: 11,
-})
+const CARD_ID = C100_Butler.id
 
 export const C100_Butler_impl = {
   effect: {

@@ -1,4 +1,3 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
@@ -6,8 +5,10 @@ import { getMinorImprovementCard } from '../catalog'
 import { getMajorCard } from '../major'
 import { isMajorCardId } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
+import { D117_WoodExpert } from '../../cards-display/D/D117_WoodExpert'
+export { D117_WoodExpert }
 
-const CARD_ID = 'D117_WoodExpert'
+const CARD_ID = D117_WoodExpert.id
 
 /**
  * D117 Wood Expert — Occupation.
@@ -64,19 +65,6 @@ const computeCostsListener: CardListenerRegistration = {
     }
   },
 }
-
-export const D117_WoodExpert = new Occupation({
-  id: CARD_ID,
-  name: 'Wood Expert',
-  deck: 'D',
-  number: 117,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: [
-    'When you play this card, you immediately get 2 <WOOD>. Each improvement costs you up to 2 <WOOD> less, if you pay 1 <FOOD> instead.',
-  ],
-  cost: {},
-  players: '1+',
-})
 
 export const D117_WoodExpert_impl = {
   listeners: [computeCostsListener],

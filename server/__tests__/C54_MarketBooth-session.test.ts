@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getFenceCount } from '../../shared/actions/effects/fencing'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
-import { getRegisteredMinorImprovement } from '../../shared/cards/types'
-import { markAllWorkersUsed } from '../../shared/game/player'
-import type { ActionChoiceOption } from '../../shared/game/types'
+import { getRegisteredMinorImprovement } from '../../shared/cards-display/types'
+import { markAllWorkersUsed } from '../../shared/domain/player'
+import type { ActionChoiceOption } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C54_MarketBooth'
 

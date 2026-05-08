@@ -1,21 +1,11 @@
-import { Occupation } from '../types'
-import { fieldIsEmpty } from '../../game/field'
+import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import type { BonusScoreLevel } from '../card-effects'
 import { paretoOptimal } from '../helpers/pareto-bonus'
+import { C99_GardenDesigner } from '../../cards-display/C/C99_GardenDesigner'
+export { C99_GardenDesigner }
 
 const CARD_ID = 'C99_GardenDesigner'
-
-export const C99_GardenDesigner = new Occupation({
-  id: "C99_GardenDesigner",
-  name: "Garden Designer",
-  deck: "C",
-  number: 99,
-  category: "POINTS_PROVIDER",
-  desc: ["At the start of scoring, you can place <FOOD> in empty fields. You get 1/2/3 bonus <SCORE> for each field in which you place 1/4/7 <FOOD>."],
-  cost: {},
-  players: "1+",
-})
 
 export const C99_GardenDesigner_impl = {
   effect: {

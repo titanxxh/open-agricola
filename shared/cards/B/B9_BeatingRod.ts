@@ -1,19 +1,9 @@
-import { MinorImprovement } from '../types'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B9_BeatingRod } from '../../cards-display/B/B9_BeatingRod'
+export { B9_BeatingRod }
 
-const CARD_ID = 'B9_BeatingRod'
-
-export const B9_BeatingRod = new MinorImprovement({
-  id: CARD_ID,
-  name: "Beating Rod",
-  deck: "B",
-  number: 9,
-  category: "GOODS_PROVIDER",
-  desc: ["You can immediately choose to either get 1 <REED> or exchange 1 <REED> for 1 <CATTLE>."],
-  cost: { wood: 1 },
-  passing: true,
-})
+const CARD_ID = B9_BeatingRod.id
 
 export const B9_BeatingRod_impl = {
   effect: {

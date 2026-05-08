@@ -1611,7 +1611,7 @@ export function WorkshopPage() {
   }
 
   return (
-    <div className="ws-page">
+    <div className="ws-page" data-testid="workshop-root">
       <WorkshopNav
         view={view}
         onOpenHome={() => navigateView('home')}

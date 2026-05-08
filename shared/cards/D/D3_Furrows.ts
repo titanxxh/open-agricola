@@ -1,19 +1,8 @@
-import { MinorImprovement } from '../types'
 import type { CardImpl } from '../registry'
+import { D3_Furrows } from '../../cards-display/D/D3_Furrows'
+export { D3_Furrows }
 
-const CARD_ID = 'D3_Furrows'
-
-export const D3_Furrows = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Furrows',
-  deck: 'D',
-  number: 3,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['You can immediately sow in exactly 1 field.'],
-  cost: {},
-  passing: true,
-  newSet: true,
-})
+const CARD_ID = D3_Furrows.id
 
 export const D3_Furrows_impl = {
   effect: {

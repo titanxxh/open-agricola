@@ -1,12 +1,13 @@
-import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { familySize } from '../../game/player'
+import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { D157_PartyOrganizer } from '../../cards-display/D/D157_PartyOrganizer'
+export { D157_PartyOrganizer }
 
-const CARD_ID = 'D157_PartyOrganizer'
+const CARD_ID = D157_PartyOrganizer.id
 
 /**
  * D157 Party Organizer — When an opponent reaches their 5th family member
@@ -36,17 +37,6 @@ const opponentGrowsToFiveListener: CardListenerRegistration = {
     }
   },
 }
-
-export const D157_PartyOrganizer = new Occupation({
-  id: CARD_ID,
-  name: 'Party Organizer',
-  deck: 'D',
-  number: 157,
-  category: 'FOOD_PROVIDER',
-  desc: ["As soon as the next player but you gains their 5th person, you immediately get 8 <FOOD> (not retroactively). During scoring, if only you have 5 people, you get 3 bonus <SCORE>."],
-  players: '4+',
-  newSet: true,
-})
 
 export const D157_PartyOrganizer_impl = {
   listeners: [opponentGrowsToFiveListener],

@@ -1,23 +1,13 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { Resource } from '../../game/types'
+import type { Resource } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { C116_FurnitureMaker } from '../../cards-display/C/C116_FurnitureMaker'
+export { C116_FurnitureMaker }
 
-const CARD_ID = 'C116_FurnitureMaker'
+const CARD_ID = C116_FurnitureMaker.id
 
-// 7b1 migration: listens on `actions: ['pay']` with `costType === 'occupation'`
-// instead of the legacy `actions: ['play-occupation']` after-listener that
-// reconstructed the lessons cost from spaceId + occupation count. The new
-// listener reads the real `extraData.resourcesPaid.food` written by the pay
-// leaf, so:
-//   - lessons-4 + B109 PaperMaker trade (player swaps wood→food and the
-//     actual resourcesPaid is { wood: 1 }, food: 0) correctly emits 0 wood.
-//   - cost-discount modifiers reduce food paid; C116's wood gain shrinks in
-//     lockstep without any special-case logic here.
-//   - listener never fires for C116's own play (sourceCard === CARD_ID),
-//     mirroring the legacy `choice === CARD_ID` guard.
 const afterPayListener: CardListenerRegistration = {
   id: 'C116-furniture-maker-after-pay',
   cardIds: [CARD_ID],
@@ -36,19 +26,6 @@ const afterPayListener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { wood: foodPaid }), sourceCard: CARD_ID }
   },
 }
-
-export const C116_FurnitureMaker = new Occupation({
-  id: CARD_ID,
-  name: 'Furniture Maker',
-  deck: 'C',
-  number: 116,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: [
-    'When you play this card, you immediately get 1 <WOOD>. Each time you play an occupation after this one, you get 1 <WOOD> for each <FOOD> paid as occupation cost.',
-  ],
-  cost: {},
-  players: '1+',
-})
 
 export const C116_FurnitureMaker_impl = {
   listeners: [afterPayListener],

@@ -1,12 +1,15 @@
-import { Occupation } from '../types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
-import type { ActionDefinition, ActionFlow } from '../../game/types'
-import { fieldHasCrop, fieldFindStackOfKind, fieldTopStack } from '../../game/field'
+import type { ActionDefinition, ActionFlow } from '../../contract/types'
+import { fieldHasCrop, fieldFindStackOfKind, fieldTopStack } from '../../domain/field'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
+import { E112_GrainThief } from '../../cards-display/E/E112_GrainThief'
+export { E112_GrainThief }
 
 const CARD_ID = 'E112_GrainThief'
+
 const PROTECTED_KEY = 'protectedFields'
+
 const PROTECT_ACTION_ID = 'card_E112_GrainThief_protect'
 
 const grainThiefProtectAction: ActionDefinition = {
@@ -38,17 +41,8 @@ const grainThiefProtectAction: ActionDefinition = {
     }
   },
 }
-registerAdHocAction(grainThiefProtectAction)
 
-export const E112_GrainThief = new Occupation({
-  id: "E112_GrainThief",
-  name: "Grain Thief",
-  deck: "E",
-  number: 112,
-  desc: ["Each time you would harvest a grain field, you can leave the grain on the field and take 1 <GRAIN> from the general supply instead."],
-  cost: {},
-  players: "1+",
-})
+registerAdHocAction(grainThiefProtectAction)
 
 export const E112_GrainThief_impl = {
   effect: {

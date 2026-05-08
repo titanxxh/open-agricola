@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { getRegisteredCardListeners, type CardListenerRegistration } from '../../../cards/card-listeners'
 import { resolveCardCostWithModifiers } from '../../payment/internal'
-import type { GameState, PlayerState, ComplexCost } from '../../../game/types'
+import type { GameState, PlayerState, ComplexCost } from '../../../contract/types'
 import { CardRegistry } from '../../../../shared/cards/registry'
 import { setActiveCardRegistry, requireActiveCardRegistry } from '../../../../shared/cards/active-registry'
 

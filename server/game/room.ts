@@ -1,9 +1,9 @@
 import type { WebSocket } from 'ws'
 import { GameSession } from './authoritative-session.ts'
 import type { RoomMeta, RoomSnapshot, RoomStatus } from './persistence/room-persistence.ts'
-import { rehydrateState } from '../../shared/game/serialization.ts'
+import { rehydrateState } from '../../shared/session/serialization.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
-import type { RoomSummary } from '../../shared/protocol/ws.ts'
+import type { RoomSummary } from '../../shared/contract/protocol/ws.ts'
 
 export type RoomPlayer = {
   ws: WebSocket

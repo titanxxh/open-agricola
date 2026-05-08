@@ -1,15 +1,14 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { A15_CarpentersAxe } from '../../cards-display/A/A15_CarpentersAxe'
+export { A15_CarpentersAxe }
 
-const CARD_ID = 'A15_CarpentersAxe'
+const CARD_ID = A15_CarpentersAxe.id
 
 const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =>
   (space?.gainPerRound?.wood ?? 0) > 0
 
-// A15 Carpenter's Axe: After using a wood accumulation space, if you then have at least 7 wood,
-// you can build exactly 1 stable for 1 wood.
 const listener: CardListenerRegistration = {
   id: 'A15-carpenters-axe-after-collect',
   cardIds: [CARD_ID],
@@ -30,17 +29,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const A15_CarpentersAxe = new MinorImprovement({
-  id: CARD_ID,
-  name: "Carpenter's Axe",
-  deck: 'A',
-  number: 15,
-  category: 'FARM_PLANNER',
-  desc: ["Each time after you use a wood accumulation space, if you then have at least 7 <WOOD> in your supply, you can build exactly 1 stable for 1 <WOOD>."],
-  cost: { wood: 1 },
-  newSet: true,
-})
 
 export const A15_CarpentersAxe_impl = {
   listeners: [listener],

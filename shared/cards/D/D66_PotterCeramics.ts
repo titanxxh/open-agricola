@@ -1,10 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { D66_PotterCeramics } from '../../cards-display/D/D66_PotterCeramics'
+export { D66_PotterCeramics }
 
-const CARD_ID = 'D66_PotterCeramics'
+const CARD_ID = D66_PotterCeramics.id
 
 /**
  * Before bake-bread: optionally exchange 1 clay for 1 grain.
@@ -64,16 +65,6 @@ const isDoableListener: CardListenerRegistration = {
     }
   },
 }
-
-export const D66_PotterCeramics = new MinorImprovement({
-  id: CARD_ID,
-  name: "Potter Ceramics",
-  deck: "D",
-  number: 66,
-  category: "CROP_PROVIDER",
-  desc: ["Each time before you take a __Bake Bread__ action, you can exchange 1 <CLAY> for 1 <GRAIN>."],
-  cost: {},
-})
 
 export const D66_PotterCeramics_impl = {
   listeners: [beforeBakeListener, isDoableListener],

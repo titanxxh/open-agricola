@@ -3,7 +3,7 @@ import type {
   ActionExecutionContext,
   ActionExecutionResult,
   InteractionRequest,
-} from '../game/types'
+} from '../contract/types'
 
 export type NodeState = 'ready' | 'resolved' | 'blocked'
 

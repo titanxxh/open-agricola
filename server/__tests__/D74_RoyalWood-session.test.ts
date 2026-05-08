@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { setWorkersAtHome } from '../../shared/game/player'
+import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/D/D74_RoyalWood'
 import '../../shared/cards/B/B81_Handcart'
 import '../../shared/cards/E/E14_WoodSaw'

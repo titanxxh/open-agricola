@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { ServerEvent } from '../../../shared/protocol/ws.ts'
+import type { ServerEvent } from '../../../shared/contract/protocol/ws.ts'
 import { createLobby, type RoomBroadcaster } from '../lobby.ts'
 import { RoomRegistry } from '../room-registry.ts'
 import { InMemoryRoomPersistence } from '../persistence/memory-adapter.ts'

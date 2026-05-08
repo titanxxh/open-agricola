@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../card-effects'
-import type { GameState, PlayerState } from '../../game/types'
+import type { GameState, PlayerState } from '../../contract/types'
 
 import '../B/B30_WoodPalisades'
 import { B30_WoodPalisades } from '../B/B30_WoodPalisades'

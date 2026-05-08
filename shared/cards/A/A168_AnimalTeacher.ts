@@ -1,15 +1,14 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { A168_AnimalTeacher } from '../../cards-display/A/A168_AnimalTeacher'
+export { A168_AnimalTeacher }
 
-const CARD_ID = 'A168_AnimalTeacher'
+const CARD_ID = A168_AnimalTeacher.id
 
 const LESSONS_SPACES = new Set(['lessons', 'lessons-4'])
 
-// A168 Animal Teacher: Immediately after each time you use a Lessons action space,
-// you can also buy 1 SHEEP/PIG/CATTLE for 0/1/2 FOOD.
 const listener: CardListenerRegistration = {
   id: 'A168-animal-teacher-after-place-farmer',
   cardIds: [CARD_ID],
@@ -43,18 +42,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const A168_AnimalTeacher = new Occupation({
-  id: CARD_ID,
-  name: 'Animal Teacher',
-  deck: 'A',
-  number: 168,
-  category: 'LIVESTOCK_PROVIDER',
-  desc: ['Immediately after each time you use a __Lessons__ action space, you can also buy 1 <SHEEP>/<PIG>/<CATTLE> for 0/1/2 <FOOD>.'],
-  cost: {},
-  players: '4+',
-  newSet: true,
-})
 
 export const A168_AnimalTeacher_impl = {
   listeners: [listener],

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { setWorkersAtHome, workersAvailable } from '../../shared/game/player'
+import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import '../../shared/cards/B/B151_LittlePeasant'
 
 const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`

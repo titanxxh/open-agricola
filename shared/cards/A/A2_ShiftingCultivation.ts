@@ -1,18 +1,8 @@
-import { MinorImprovement } from '../types'
 import type { CardImpl } from '../registry'
+import { A2_ShiftingCultivation } from '../../cards-display/A/A2_ShiftingCultivation'
+export { A2_ShiftingCultivation }
 
-const CARD_ID = 'A2_ShiftingCultivation'
-
-export const A2_ShiftingCultivation = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Shifting Cultivation',
-  deck: 'A',
-  number: 2,
-  category: 'FARM_PLANNER',
-  desc: ['Immediately plow 1 field.'],
-  cost: { food: 2 },
-  passing: true,
-})
+const CARD_ID = A2_ShiftingCultivation.id
 
 export const A2_ShiftingCultivation_impl = {
   effect: {

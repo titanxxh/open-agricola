@@ -5,11 +5,11 @@ import type {
   GameState,
   PlayerState,
   Resource,
-} from '../../game/types'
-import { getOccupation } from '../../game/occupations'
+} from '../../contract/types'
+import { getOccupation } from '../../cards/registry-display'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { activateCard } from './activate-card'
-import { incOccupationBuilt, recordDraftPlayed } from '../../logic/stats'
+import { incOccupationBuilt, recordDraftPlayed } from '../../session/stats'
 import {
   getRegisteredCardListeners,
   type CardListenerContext,

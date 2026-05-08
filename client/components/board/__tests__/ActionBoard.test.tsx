@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../../shared/game/types'
+import type { ActionSpace, FutureMeeple, PlayerState, Resource } from '../../../../shared/contract/types'
 import { ActionBoard } from '../ActionBoard'
 
 const resources = (): Resource => ({

@@ -7,7 +7,7 @@ import { SqliteRoomPersistence } from '../sqlite-adapter.ts'
 import { JsonRoomPersistence } from '../json-adapter.ts'
 import { InMemoryRoomPersistence } from '../memory-adapter.ts'
 import type { RoomMeta, RoomPersistence } from '../room-persistence.ts'
-import type { SerializedGameState } from '../../../../shared/game/serialization.ts'
+import type { SerializedGameState } from '../../../../shared/session/serialization.ts'
 
 const META: RoomMeta = {
   createdBy: 'u',

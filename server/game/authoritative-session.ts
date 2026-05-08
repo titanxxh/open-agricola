@@ -6,8 +6,8 @@
  * `(stateOrSeed?, customCards?, initialStateOptions?)` API; pure shared-side
  * code uses `GameCore` directly.
  */
-import type { GameState } from '../../shared/game/types.ts'
-import type { InitialStateOptions } from '../../shared/logic/state.ts'
+import type { GameState } from '../../shared/contract/types.ts'
+import type { InitialStateOptions } from '../../shared/session/state-bootstrap.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import { GameCore, type StateWithCursor } from '../../shared/session/session-core.ts'
 import { registerExecutorBackedCustomCard } from '../custom-code/runtime.ts'

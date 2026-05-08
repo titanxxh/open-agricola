@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 import '../../shared/cards/C/C46_Mandoline'
-import type { AnytimeAction } from '../../shared/game/types';
-import type { FutureMeeple } from '../../shared/game/types'
+import type { AnytimeAction } from '../../shared/contract/types';
+import type { FutureMeeple } from '../../shared/contract/types'
 
 describe('C46_Mandoline session', () => {
   const setup = () => {

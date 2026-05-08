@@ -1,8 +1,9 @@
-import { PlayerActionCard } from '../types'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import { readCardExtraData } from '../helpers/card-state'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { C104_Collector } from '../../cards-display/C/C104_Collector'
+export { C104_Collector }
 
 const CARD_ID = 'C104_Collector'
 
@@ -77,17 +78,6 @@ registerPlayerActionSpace({
       return { type: 'flow', flow }
     },
   }),
-})
-
-export const C104_Collector = new PlayerActionCard({
-  id: "C104_Collector",
-  name: "Collector",
-  deck: "C",
-  number: 104,
-  category: "GOODS_PROVIDER",
-  desc: ["This card is an action space for you only. When you use it for the 1st/2nd/3rd/4th time, you get 1 <BEGGING> marker and 6/7/8/9 different goods of your choice."],
-  cost: {},
-  players: "1+",
 })
 
 export const C104_Collector_impl = {

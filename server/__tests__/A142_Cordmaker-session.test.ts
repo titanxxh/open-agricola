@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
-import type { ActionFlow, ActionSpace, GameState, PlayerState } from '../../shared/game/types'
+import type { ActionFlow, ActionSpace, GameState, PlayerState } from '../../shared/contract/types'
 
 import '../../shared/cards/A/A142_Cordmaker'
 

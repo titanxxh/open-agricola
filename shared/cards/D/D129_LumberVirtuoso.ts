@@ -1,21 +1,9 @@
-import { Occupation } from '../types'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { D129_LumberVirtuoso } from '../../cards-display/D/D129_LumberVirtuoso'
+export { D129_LumberVirtuoso }
 
-const CARD_ID = 'D129_LumberVirtuoso'
-
-export const D129_LumberVirtuoso = new Occupation({
-  id: CARD_ID,
-  name: 'Lumber Virtuoso',
-  deck: 'D',
-  number: 129,
-  category: 'ACTIONS_BOOSTER',
-  desc: [
-    'Each harvest in which you have at least 5 <WOOD> in your supply, you can discard down to 5 <WOOD> to take a __Build Stables__ or __Build Wood Rooms__ action by paying the usual costs.',
-  ],
-  cost: {},
-  players: '3+',
-})
+const CARD_ID = D129_LumberVirtuoso.id
 
 export const D129_LumberVirtuoso_impl = {
   effect: {

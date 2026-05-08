@@ -1,12 +1,13 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionFlow } from '../../game/types'
-import { workersAvailable } from '../../game/player'
+import type { ActionFlow } from '../../contract/types'
+import { workersAvailable } from '../../domain/player'
 import { pairedSpaceIdFor } from '../helpers/space-pairing'
 import type { CardImpl } from '../registry'
+import { C130_OutskirtsDirector } from '../../cards-display/C/C130_OutskirtsDirector'
+export { C130_OutskirtsDirector }
 
-const CARD_ID = 'C130_OutskirtsDirector'
+const CARD_ID = C130_OutskirtsDirector.id
 
 /**
  * C130 Outskirts Director:
@@ -68,20 +69,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const C130_OutskirtsDirector = new Occupation({
-  id: CARD_ID,
-  name: 'Outskirts Director',
-  deck: 'C',
-  number: 130,
-  category: 'ACTIONS_BOOSTER',
-  desc: [
-    'Each time you use the __Grove__ or __Hollow__ accumulation space, you can place 2 <REED> from the general supply on the other space. If you do, you can immediately place another person.',
-  ],
-  cost: {},
-  players: '3+',
-  newSet: true,
-})
 
 export const C130_OutskirtsDirector_impl = {
   listeners: [listener],

@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import type { PlayerState, Resource } from '../../../shared/game/types'
-import { formatResources } from '../../../shared/logic/format'
-import { emptyResources } from '../../../shared/logic/state-constants'
+import type { PlayerState, Resource } from '../../../shared/contract/types'
+import { formatResources } from '../../utils/format'
+import { emptyResources } from '../../../shared/contract/state-constants'
 import { ResourceLine } from '../common/ResourceLine'
 import { PlayerCard } from '../common/PlayerCard'
 

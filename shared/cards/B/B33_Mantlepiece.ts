@@ -1,23 +1,11 @@
-import { MinorImprovement } from '../types'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
+import { B33_Mantlepiece } from '../../cards-display/B/B33_Mantlepiece'
+export { B33_Mantlepiece }
 
-const CARD_ID = 'B33_Mantlepiece'
+const CARD_ID = B33_Mantlepiece.id
 
-// BGA isBuyable: getRoomType() == 'roomWood' → false (require clay or stone house)
 registerPrerequisite('Clay or Stone House', (player) => player.houseType !== 'wood')
-
-export const B33_Mantlepiece = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Mantlepiece',
-  deck: 'B',
-  number: 33,
-  category: 'POINTS_PROVIDER',
-  desc: ['When you play this card, you immediately get 1 bonus <SCORE> for each complete round left to play. You may no longer renovate your house.'],
-  cost: { stone: 1 },
-  vp: -3,
-  prerequisite: 'Clay or Stone House',
-})
 
 export const B33_Mantlepiece_impl = {
   effect: {

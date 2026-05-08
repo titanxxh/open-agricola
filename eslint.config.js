@@ -142,4 +142,131 @@ export default defineConfig([
       }],
     },
   },
+  // S6b: cards-display is the bundle-isolated display layer. It must not
+  // import impl layers (actions/engine/session) nor the per-deck card impl
+  // files under shared/cards/[A-E]/**, shared/cards/community/**, or
+  // shared/cards/__stubs__/**. Pure types may come from shared/contract/*.
+  //
+  // Excluded from this rule:
+  //   - shared/cards-display/major/**  — major card data files keep their
+  //     onBuy/onHarvest hooks inline (no separate impl split exists for
+  //     majors); they intentionally reach into actions/effects/internal and
+  //     cards/helpers/stage-effects. Hoisting major hooks is S6c work.
+  //   - shared/cards-display/_lookup.ts — bridges catalog into the display
+  //     facade; needs cards/major + cards/catalog references.
+  //   - shared/cards-display/types.ts — owns the CardBase class hierarchy
+  //     that all card display files extend.
+  {
+    files: ['shared/cards-display/**/*.{ts,tsx}'],
+    ignores: [
+      'shared/cards-display/major/**',
+      'shared/cards-display/_lookup.ts',
+      'shared/cards-display/types.ts',
+    ],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          {
+            group: [
+              '**/shared/actions/**',
+              '**/shared/engine/**',
+              '**/shared/session/**',
+              '**/shared/cards/[A-E]/**',
+              '**/shared/cards/community/**',
+              '**/shared/cards/__stubs__/**',
+              '../actions/**', '../engine/**', '../session/**',
+              '../cards/[A-E]/**', '../cards/community/**', '../cards/__stubs__/**',
+              '../../actions/**', '../../engine/**', '../../session/**',
+              '../../cards/[A-E]/**', '../../cards/community/**', '../../cards/__stubs__/**',
+            ],
+            message: 'shared/cards-display/** must not import impl layers (actions/engine/session) nor per-deck card impl files. Use shared/contract/* for shared types.',
+          },
+        ],
+      }],
+    },
+  },
+  // S6c: shared/contract/** is type-only; runtime imports forbidden.
+  // Type-only imports (`import type { ... }`) are allowed since they erase at
+  // build time and don't produce runtime dependencies.
+  {
+    files: ['shared/contract/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', {
+        patterns: [
+          {
+            group: [
+              '../actions/**', '../engine/**', '../session/**',
+              '../cards/**', '../cards-display/**', '../domain/**',
+              '../utils/**',
+              '../../actions/**', '../../engine/**', '../../session/**',
+              '../../cards/**', '../../cards-display/**', '../../domain/**',
+              '../../utils/**',
+            ],
+            message: 'shared/contract/** is type-only; do not import runtime modules.',
+            allowTypeImports: true,
+          },
+        ],
+      }],
+    },
+  },
+  // S6c: main client may not import session/engine. Use client/sandbox/ for hot-seat.
+  {
+    files: ['client/**/*.{ts,tsx}'],
+    ignores: ['client/sandbox/**', 'client/**/__tests__/**'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', {
+        patterns: [
+          {
+            group: ['**/shared/session/**', '**/shared/engine/**'],
+            message: 'Main client cannot import shared/session/** or shared/engine/**. Use client/sandbox/ for workshop hot-seat.',
+            allowTypeImports: true,
+          },
+        ],
+      }],
+    },
+  },
+  // S6c: impl layers should consume card metadata via getCardDefinition/registry-runtime,
+  // not reach into cards-display directly (would couple impl to display chunk).
+  {
+    files: [
+      'shared/actions/**/*.ts',
+      'shared/engine/**/*.ts',
+      'shared/session/**/*.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', {
+        patterns: [
+          {
+            group: ['**/cards-display/**', '../cards-display/**', '../../cards-display/**'],
+            message: 'session/engine/actions should consume metadata via shared/cards/registry-runtime (getCardDefinition / getCardEffect), not import cards-display directly.',
+            allowTypeImports: true,
+          },
+        ],
+      }],
+    },
+  },
+  // S6c: shared/utils/** is pure helper. No game/session/engine/cards/domain imports.
+  {
+    files: ['shared/utils/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', {
+        patterns: [
+          {
+            group: [
+              '**/shared/cards/**',
+              '**/shared/cards-display/**',
+              '**/shared/session/**',
+              '**/shared/engine/**',
+              '**/shared/actions/**',
+              '**/shared/domain/**',
+              '**/server/**',
+              '**/client/**',
+            ],
+            message: 'shared/utils/** is pure helper; no domain/runtime/UI imports.',
+            allowTypeImports: true,
+          },
+        ],
+      }],
+    },
+  },
 ])

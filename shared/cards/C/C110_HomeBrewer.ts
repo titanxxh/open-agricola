@@ -1,19 +1,9 @@
-import { Occupation } from '../types'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { C110_HomeBrewer } from '../../cards-display/C/C110_HomeBrewer'
+export { C110_HomeBrewer }
 
-const CARD_ID = 'C110_HomeBrewer'
-
-export const C110_HomeBrewer = new Occupation({
-  id: CARD_ID,
-  name: "Home Brewer",
-  deck: "C",
-  number: 110,
-  category: "FOOD_PROVIDER",
-  desc: ["After the field phase of each harvest, you can use this card to turn exactly 1 <GRAIN> into your choice of 3 <FOOD> or 1 bonus <SCORE>."],
-  cost: {},
-  players: "1+",
-})
+const CARD_ID = C110_HomeBrewer.id
 
 export const C110_HomeBrewer_impl = {
   effect: {

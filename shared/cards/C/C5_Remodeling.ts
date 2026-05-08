@@ -1,20 +1,9 @@
-import { MinorImprovement } from '../types'
 import { collectCardsAs } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
+import { C5_Remodeling } from '../../cards-display/C/C5_Remodeling'
+export { C5_Remodeling }
 
-const CARD_ID = 'C5_Remodeling'
-
-export const C5_Remodeling = new MinorImprovement({
-  id: CARD_ID,
-  name: "Remodeling",
-  deck: "C",
-  number: 5,
-  category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["You immediately get 1 <CLAY> for each clay room and for each major improvement you have."],
-  cost: { food: 1 },
-  passing: true,
-  newSet: true,
-})
+const CARD_ID = C5_Remodeling.id
 
 export const C5_Remodeling_impl = {
   effect: {

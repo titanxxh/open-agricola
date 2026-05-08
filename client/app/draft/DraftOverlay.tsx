@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { GameState } from '../../../shared/game/types'
+import type { GameState } from '../../../shared/contract/types'
 import type { DraftPickPayload, DraftState } from '../../../shared/draft/types'
 import type { Locale } from '../../../shared/i18n'
 import { DraftPoolRow } from './DraftPoolRow'

@@ -1,10 +1,11 @@
-import { MinorImprovement } from '../types'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import { playerBoard } from '../../domain'
-import type { ActionFlow, GameState, PlayerState } from '../../game/types'
+import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { C9_AutomaticWaterTrough } from '../../cards-display/C/C9_AutomaticWaterTrough'
+export { C9_AutomaticWaterTrough }
 
-const CARD_ID = 'C9_AutomaticWaterTrough'
+const CARD_ID = C9_AutomaticWaterTrough.id
 
 /**
  * C9 Automatic Water Trough — Minor Improvement
@@ -48,17 +49,6 @@ const canAccommodate = (state: GameState, player: PlayerState, type: 'sheep' | '
   }
   return false
 }
-
-export const C9_AutomaticWaterTrough = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Automatic Water Trough',
-  deck: 'C',
-  number: 9,
-  category: 'LIVESTOCK_PROVIDER',
-  desc: ['If you can accommodate the animal, you can immediately buy 1 <SHEEP>/<PIG>/<CATTLE> for 0/1/2 <FOOD>.'],
-  cost: { wood: 1 },
-  newSet: true,
-})
 
 export const C9_AutomaticWaterTrough_impl = {
   effect: {

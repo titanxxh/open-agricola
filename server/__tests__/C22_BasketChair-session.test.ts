@@ -12,8 +12,8 @@ import {
   setActiveWorkerCount,
   setWorkersAtHome,
   workersAvailable,
-} from '../../shared/game/player'
-import { addWorkerRef } from '../../shared/game/space'
+} from '../../shared/domain/player'
+import { addWorkerRef } from '../../shared/domain/space'
 
 import '../../shared/cards/C/C22_BasketChair'
 // Import a second, cheap minor so the minor-selection choice never has exactly

@@ -1,14 +1,15 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionChoiceOption } from '../../game/types'
+import type { ActionChoiceOption } from '../../contract/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
-import { isSpaceOccupied } from '../../game/space'
-import { familySize, workersAvailable } from '../../game/player'
+import { isSpaceOccupied } from '../../domain/space'
+import { familySize, workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { D24_BrotherlyLove } from '../../cards-display/D/D24_BrotherlyLove'
+export { D24_BrotherlyLove }
 
-const CARD_ID = 'D24_BrotherlyLove'
+const CARD_ID = D24_BrotherlyLove.id
 
 /**
  * D24 Brotherly Love — Minor Improvement
@@ -65,18 +66,6 @@ const computeArgsListener: CardListenerRegistration = {
     return { extraOptions, sourceCard: CARD_ID }
   },
 }
-
-export const D24_BrotherlyLove = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Brotherly Love',
-  deck: 'D',
-  number: 24,
-  category: 'ACTIONS_BOOSTER',
-  desc: [
-    'As long as you have exactly 4 people, in the work phase of each round, you can place your third and fourth person immediately after one another, even on the same action space.',
-  ],
-  cost: { food: 1 },
-})
 
 export const D24_BrotherlyLove_impl = {
   listeners: [computeArgsListener],

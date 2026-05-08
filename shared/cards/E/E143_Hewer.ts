@@ -1,22 +1,10 @@
-import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { isSpaceOccupied } from '../../game/space'
+import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
+import { E143_Hewer } from '../../cards-display/E/E143_Hewer'
+export { E143_Hewer }
 
-const CARD_ID = 'E143_Hewer'
-
-export const E143_Hewer = new Occupation({
-  id: CARD_ID,
-  name: 'Hewer',
-  deck: 'E',
-  number: 143,
-  category: 'BUILDING_RESOURCES_-_CLAY_OR_STONE',
-  desc: [
-    'From round 3 on, at the end of each work phase in which all clay accumulation spaces are unoccupied, you get 1 <STONE> and 1 <FOOD>.',
-  ],
-  cost: {},
-  players: '3+',
-})
+const CARD_ID = E143_Hewer.id
 
 export const E143_Hewer_impl = {
   effect: {

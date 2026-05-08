@@ -1,10 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionFlow, Resource } from '../../game/types'
+import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { A82_WorkCertificate } from '../../cards-display/A/A82_WorkCertificate'
+export { A82_WorkCertificate }
 
-const CARD_ID = 'A82_WorkCertificate'
+const CARD_ID = A82_WorkCertificate.id
 
 const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 
@@ -65,19 +66,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const A82_WorkCertificate = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Work Certificate',
-  deck: 'A',
-  number: 82,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['Each time after you use an action space, you can take 1 building resource from a building resource accumulation space with at least 4 building resources on it.'],
-  cost: { food: 1 },
-  prerequisite: '3 Occupations',
-  occupationPrerequisites: { min: 3 },
-  newSet: true,
-})
 
 export const A82_WorkCertificate_impl = {
   listeners: [listener],

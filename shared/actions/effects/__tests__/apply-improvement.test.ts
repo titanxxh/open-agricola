@@ -6,7 +6,7 @@ import type {
   GameState,
   PlayerState,
   Resource,
-} from '../../../game/types'
+} from '../../../contract/types'
 
 const emptyResources = (): Resource => ({
   wood: 0,

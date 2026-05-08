@@ -134,10 +134,10 @@ function generateCardFile(meta: CardMeta, dsl: CardDslEffects | null): string {
   const lines: string[] = []
   const classType = meta.cardType === 'minor' ? 'MinorImprovement' : 'Occupation'
 
-  lines.push(`import { ${classType} } from '../../shared/cards/types'`)
+  lines.push(`import { ${classType} } from '../../shared/cards-display/types'`)
   if (dsl && Object.keys(dsl).length > 0) {
     lines.push(`import { requireActiveCardRegistry } from '../../shared/cards/active-registry'`)
-    lines.push(`import { familySize } from '../../shared/game/player'`)
+    lines.push(`import { familySize } from '../../shared/domain/player'`)
   }
   lines.push('')
 

@@ -1,11 +1,12 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import { collectComputeCostsForFarmChoice } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { canStartFencing } from '../../actions/effects/fencing'
 import type { CardImpl } from '../registry'
+import { B26_AgrarianFences } from '../../cards-display/B/B26_AgrarianFences'
+export { B26_AgrarianFences }
 
-const CARD_ID = 'B26_AgrarianFences'
+const CARD_ID = B26_AgrarianFences.id
 
 /**
  * B26 Agrarian Fences — Minor Improvement
@@ -63,10 +64,6 @@ const computeReplaceListener: CardListenerRegistration = {
   },
 }
 
-// BGA parity: agrarian fences also lets the player swap the BAKE half of
-// grain-utilization for a Build Fences action (or combine fence + bake).
-// See bga-agricola/modules/php/Cards/B/B26_AgrarianFences.php
-// onPlayerComputePlaceFarmerFlow — builds XOR(original, or(fence, sow), or(fence, bake)).
 const computeReplaceBakeListener: CardListenerRegistration = {
   id: 'B26-agrarian-fences-replace-bake-on-grain-utilization',
   cardIds: [CARD_ID],
@@ -103,22 +100,9 @@ const computeReplaceBakeListener: CardListenerRegistration = {
   },
 }
 
-// Aggregate fence-action computeCosts listeners (e.g. E16 BriarHedge,
-// C16 FieldFences) so the wood-affordability check inside canStartFencing
-// sees the same discount that the dispatcher will apply at execution time.
-// `params: {}` (no `newFenceEdges`) makes E16 return its Pass #1 potential
-// max — matching the "is fencing at all reachable?" gating semantics.
-// B26 itself does not register a fence-targeting computeCosts listener,
-// so this cannot recurse.
 const previewFenceCostOverride = (context: CardListenerContext) =>
   collectComputeCostsForFarmChoice(context.state, context.player, 'fence', {})
 
-// Also make the sow action doable within grain-utilization when the player
-// can build fences (since the card adds fencing as an alternative).
-// We preserve the existing semantics of B26 (wood/discount must also allow
-// fencing, not just structural caps), so we feed canStartFencing a cost
-// override aggregated from active computeCosts listeners. This keeps the
-// listener correct after Task 7/8 removes the legacy effect-field path.
 const isDoableListener: CardListenerRegistration = {
   id: 'B26-agrarian-fences-isdoable-sow',
   cardIds: [CARD_ID],
@@ -134,8 +118,6 @@ const isDoableListener: CardListenerRegistration = {
   },
 }
 
-// Make bake-bread doable within grain-utilization when the player can fence,
-// mirroring the sow-side availability override.
 const isDoableBakeListener: CardListenerRegistration = {
   id: 'B26-agrarian-fences-isdoable-bake',
   cardIds: [CARD_ID],
@@ -149,18 +131,6 @@ const isDoableBakeListener: CardListenerRegistration = {
     }
   },
 }
-
-export const B26_AgrarianFences = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Agrarian Fences',
-  deck: 'B',
-  number: 26,
-  category: 'ACTIONS_BOOSTER',
-  desc: [
-    'Each time you use the __Grain Utilization__ action space, you can take a __Build Fences__ action instead of one of the two actions provide by the action space.',
-  ],
-  cost: { wood: 1 },
-})
 
 export const B26_AgrarianFences_impl = {
   listeners: [computeReplaceListener, computeReplaceBakeListener, isDoableListener, isDoableBakeListener],

@@ -2,12 +2,12 @@ import type { GameSession, SessionResponse } from '../game/authoritative-session
 import {
   serializeState,
   serializeStateForPlayer,
-} from '../../shared/game/serialization.ts'
+} from '../../shared/session/serialization.ts'
 import type {
   GameSyncPayload,
   StateUpdateCause,
   StateUpdateEnvelope,
-} from '../../shared/protocol/game.ts'
+} from '../../shared/contract/protocol/game.ts'
 
 type Args = {
   room: { id: string; session: GameSession }

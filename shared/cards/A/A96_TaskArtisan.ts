@@ -1,10 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { A96_TaskArtisan } from '../../cards-display/A/A96_TaskArtisan'
+export { A96_TaskArtisan }
 
-const CARD_ID = 'A96_TaskArtisan'
+const CARD_ID = A96_TaskArtisan.id
 
 /**
  * A96 Task Artisan:
@@ -31,7 +32,6 @@ const buildTaskArtisanFlow = () => ({
   ],
 })
 
-// onBuy is triggered via the play-occupation after-listener pattern
 const onBuyListener: CardListenerRegistration = {
   id: 'A96-task-artisan-onbuy',
   cardIds: [CARD_ID],
@@ -42,20 +42,6 @@ const onBuyListener: CardListenerRegistration = {
     return { flow: buildTaskArtisanFlow(), sourceCard: CARD_ID }
   },
 }
-
-export const A96_TaskArtisan = new Occupation({
-  id: CARD_ID,
-  name: 'Task Artisan',
-  deck: 'A',
-  number: 96,
-  category: 'ACTIONS_BOOSTER',
-  desc: [
-    'When you play this card and each time a stone accumulation space appears on a round space in the preparation phase, you get 1 <WOOD> and a __Minor Improvement__ action.',
-  ],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
 
 export const A96_TaskArtisan_impl = {
   listeners: [onBuyListener],

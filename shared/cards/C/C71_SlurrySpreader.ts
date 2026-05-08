@@ -1,18 +1,9 @@
-import { MinorImprovement } from '../types'
 import { canSow } from '../../actions/effects/sow'
 import type { CardImpl } from '../registry'
+import { C71_SlurrySpreader } from '../../cards-display/C/C71_SlurrySpreader'
+export { C71_SlurrySpreader }
 
-const CARD_ID = 'C71_SlurrySpreader'
-
-export const C71_SlurrySpreader = new MinorImprovement({
-  id: CARD_ID,
-  name: "Slurry Spreader",
-  deck: "C",
-  number: 71,
-  category: "CROP_PROVIDER",
-  desc: ["In the breeding phase of each harvest, if you get newborn animals of at least two types, you also get a __Sow__ action."],
-  cost: {},
-})
+const CARD_ID = C71_SlurrySpreader.id
 
 export const C71_SlurrySpreader_impl = {
   effect: {

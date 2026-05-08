@@ -8,21 +8,20 @@ import type {
   Resource,
   Trade,
   ResourceKey,
-} from '../../game/types'
+} from '../../contract/types'
 // PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
 // the new payment module. Other helpers (preview-cost / typed-flat /
 // room-payment / cost-modifier internals) remain on the shim through S3.
 // exchange.ts only uses applyTradeSideEffect (shim scope), so no PaymentSolver
 // call sites exist here yet.
 import { applyTradeSideEffect } from '../payment/internal'
-import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
-import { addFoodFromConversion, incResourceConverted } from '../../logic/stats'
+import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resources'
+import { addFoodFromConversion, incResourceConverted } from '../../session/stats'
 import {
   getRegisteredMinorImprovement,
   getRegisteredOccupation,
-  type CardExchange,
-  type ExchangeWindow,
-} from '../../cards/types'
+} from '../../cards/registry-display'
+import type { CardExchange, ExchangeWindow } from '../../contract/cards'
 import { getMajorCard } from '../../cards/major'
 import { collectComputeExchanges, runCardListeners } from '../../cards/card-listeners'
 import { isMajorCardId } from '../../cards/helpers/card-type'

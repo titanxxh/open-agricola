@@ -1,4 +1,3 @@
-import { MinorImprovement } from '../types'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import {
   isCardFlagged,
@@ -8,14 +7,16 @@ import {
   writeCardInfobox,
 } from '../helpers/card-state'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import { workersAvailable } from '../../game/player'
-import type { ActionFlow } from '../../game/types'
+import { workersAvailable } from '../../domain/player'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { D22_WorkPermit } from '../../cards-display/D/D22_WorkPermit'
+export { D22_WorkPermit }
 
-const CARD_ID = 'D22_WorkPermit'
+const CARD_ID = D22_WorkPermit.id
+
 const TARGET_ROUND_KEY = 'targetRound'
 
-// BGA isBuyable: (wood+stone+clay+reed) == 0 || !hasFarmerInReserve() → false
 registerPrerequisite('At Least 1 Building Resource', (player, state) => {
   const totalBuildRes =
     (player.resources.wood ?? 0)
@@ -25,20 +26,6 @@ registerPrerequisite('At Least 1 Building Resource', (player, state) => {
   if (totalBuildRes === 0) return false
   if (!state) return true
   return workersAvailable(state, player) > 0
-})
-
-export const D22_WorkPermit = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Work Permit',
-  deck: 'D',
-  number: 22,
-  category: 'ACTIONS_BOOSTER',
-  desc: [
-    'Add 1 to the current round for each building resource you have and place 1 person from your supply on the corresponding round space. In that round, you can use the person.',
-  ],
-  cost: { food: 1 },
-  prerequisite: 'At Least 1 Building Resource',
-  evenMoreSet: true,
 })
 
 export const D22_WorkPermit_impl = {

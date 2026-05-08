@@ -1,13 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { E31_Upholstery } from '../../cards-display/E/E31_Upholstery'
+export { E31_Upholstery }
 
-const CARD_ID = 'E31_Upholstery'
+const CARD_ID = E31_Upholstery.id
 
-// E31 Upholstery: Each time you build or play an improvement after this one, you can place
-// 1 REED on this card, irretrievably, to get 1 bonus SCORE, up to the number of rooms in your house.
-// Uses return-to-space (card storage) to track reed on card and bonus-vp for score.
 const listener: CardListenerRegistration = {
   id: 'E31-upholstery-after-improvement',
   cardIds: [CARD_ID],
@@ -42,18 +40,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const E31_Upholstery = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Upholstery',
-  deck: 'E',
-  number: 31,
-  category: 'BONUS_POINTS_-_GET',
-  desc: [
-    'Each time you build or play an improvement after this one, you can place 1 <REED> on this card, irretrievably, to get 1 bonus <SCORE>, up to the number of rooms in your house.',
-  ],
-  cost: {},
-})
 
 export const E31_Upholstery_impl = {
   listeners: [listener],

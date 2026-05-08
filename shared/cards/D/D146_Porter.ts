@@ -1,13 +1,13 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import type { Resource } from '../../game/types'
+import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { D146_Porter } from '../../cards-display/D/D146_Porter'
+export { D146_Porter }
 
-const CARD_ID = 'D146_Porter'
+const CARD_ID = D146_Porter.id
 
-// Building resources that can trigger the bonus
 const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 
 const listener: CardListenerRegistration = {
@@ -33,20 +33,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, gain), sourceCard: CARD_ID }
   },
 }
-
-export const D146_Porter = new Occupation({
-  id: CARD_ID,
-  name: 'Porter',
-  deck: 'D',
-  number: 146,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: [
-    'Each time you take at least 4 of the same building resource from an accumulation space, you get 1 additional building resource of the accumulating type and 1 <FOOD>',
-  ],
-  cost: {},
-  players: '3+',
-  implemented: true,
-})
 
 export const D146_Porter_impl = {
   listeners: [listener],

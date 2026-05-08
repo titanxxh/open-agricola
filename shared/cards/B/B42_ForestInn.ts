@@ -1,12 +1,10 @@
-import { PlayerActionCard } from '../types'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import type { CardImpl } from '../registry'
+import { B42_ForestInn } from '../../cards-display/B/B42_ForestInn'
+export { B42_ForestInn }
 
-const CARD_ID = 'B42_ForestInn'
+const CARD_ID = B42_ForestInn.id
 
-// All players can use it. Exchange wood for wood+food.
-// Non-owners must pay 1 food to the owner first.
-// Choices: 5W→8W+2F / 7W→8W+4F / 9W→8W+7F
 registerPlayerActionSpace({
   cardId: CARD_ID,
   access: 'all',
@@ -56,20 +54,6 @@ registerPlayerActionSpace({
       }
     },
   }),
-})
-
-export const B42_ForestInn = new PlayerActionCard({
-  id: CARD_ID,
-  name: "Forest Inn",
-  deck: "B",
-  number: 42,
-  category: "GOODS_PROVIDER",
-  desc: ["This is an action space for all. A player who uses it can exchange 5/7/9 <WOOD> for 8 <WOOD> and 2/4/7 <FOOD>. When another player uses it, they must first pay you 1 <FOOD>."],
-  cost: {"clay":1,"reed":1},
-  vp: 1,
-  prerequisite: "Play in Round 6 or Before",
-  maxRound: 6,
-  newSet: true,
 })
 
 export const B42_ForestInn_impl = {

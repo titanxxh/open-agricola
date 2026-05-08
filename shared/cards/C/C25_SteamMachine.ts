@@ -1,9 +1,10 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { Resource } from '../../game/types'
-import { workersAvailable } from '../../game/player'
+import type { Resource } from '../../contract/types'
+import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { C25_SteamMachine } from '../../cards-display/C/C25_SteamMachine'
+export { C25_SteamMachine }
 
 const hasAccumulation = (space: { gainPerRound: Partial<Resource> }): boolean => {
   return Object.keys(space.gainPerRound).length > 0
@@ -33,17 +34,6 @@ const steamMachineListener: CardListenerRegistration = {
     }
   },
 }
-
-export const C25_SteamMachine = new MinorImprovement({
-  id: "C25_SteamMachine",
-  name: "Steam Machine",
-  deck: "C",
-  number: 25,
-  category: "ACTIONS_BOOSTER",
-  desc: ["Each work phase, if the last action space you use is an accumulation space, you can immediately afterward take a __Bake Bread__ action."],
-  vp: 1,
-  cost: {"wood":2},
-})
 
 export const C25_SteamMachine_impl = {
   listeners: [steamMachineListener],

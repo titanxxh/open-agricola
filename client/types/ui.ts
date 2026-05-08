@@ -1,5 +1,5 @@
-import type { ActionChoiceOption } from '../../shared/game/types'
-import type { FarmTilePosition, GameState, InteractionAnimalReorgZone } from '../../shared/game/types'
+import type { ActionChoiceOption } from '../../shared/contract/types'
+import type { FarmTilePosition, GameState, InteractionAnimalReorgZone } from '../../shared/contract/types'
 
 export type PendingChoice = {
   promptKey?: string

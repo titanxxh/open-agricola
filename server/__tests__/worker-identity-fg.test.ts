@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getRoundPlacementOrder } from '../../shared/cards/helpers/round-placement'
 
-import { setActiveWorkerCount, setWorkersAtHome, familySize, newbornCount } from '../../shared/game/player'
+import { setActiveWorkerCount, setWorkersAtHome, familySize, newbornCount } from '../../shared/domain/player'
 import '../../shared/cards/A/A92_AdoptiveParents'
 
 describe('worker-identity: family growth pushes newborn to FG space takenBy', () => {

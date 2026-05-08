@@ -1,10 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { A147_AnimalDealer } from '../../cards-display/A/A147_AnimalDealer'
+export { A147_AnimalDealer }
 
-const CARD_ID = 'A147_AnimalDealer'
+const CARD_ID = A147_AnimalDealer.id
 
 type AnimalKey = 'sheep' | 'boar' | 'cattle'
 
@@ -14,8 +15,6 @@ const SPACE_TO_ANIMAL: Record<string, AnimalKey> = {
   'cattle-market': 'cattle',
 }
 
-// A147 Animal Dealer: Each time you use the Sheep Market, Pig Market, or Cattle Market
-// accumulation space, you can buy 1 additional animal of the respective type for 1 FOOD.
 const listener: CardListenerRegistration = {
   id: 'A147-animal-dealer-after-place-farmer',
   cardIds: [CARD_ID],
@@ -38,17 +37,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const A147_AnimalDealer = new Occupation({
-  id: CARD_ID,
-  name: 'Animal Dealer',
-  deck: 'A',
-  number: 147,
-  category: 'LIVESTOCK_PROVIDER',
-  desc: ['Each time you use the __Sheep Market__, __Pig Market__, or __Cattle Market__ accumulation space, you can buy 1 additional animal of the respective type for 1 <FOOD>.'],
-  cost: {},
-  players: '3+',
-})
 
 export const A147_AnimalDealer_impl = {
   listeners: [listener],

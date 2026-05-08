@@ -1,13 +1,12 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E18_SeedAlmanac } from '../../cards-display/E/E18_SeedAlmanac'
+export { E18_SeedAlmanac }
 
-const CARD_ID = 'E18_SeedAlmanac'
+const CARD_ID = E18_SeedAlmanac.id
 
-// E18 Seed Almanac: Each time after you play a minor improvement after this one,
-// you can pay 1 FOOD to plow 1 field.
 const listener: CardListenerRegistration = {
   id: 'E18-seed-almanac-after-improvement',
   cardIds: [CARD_ID],
@@ -32,20 +31,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const E18_SeedAlmanac = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Seed Almanac',
-  deck: 'E',
-  number: 18,
-  category: 'FARMYARD_-_PLOWING',
-  desc: [
-    'Each time after you play a minor improvement after this one, you can pay 1 <FOOD> to plow 1 field.',
-  ],
-  cost: { reed: 1 },
-  prerequisite: '4 Occupations',
-  occupationPrerequisites: { min: 4 },
-})
 
 export const E18_SeedAlmanac_impl = {
   listeners: [listener],

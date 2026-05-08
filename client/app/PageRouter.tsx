@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState, type ReactElement } from 'react'
+import { Suspense, useEffect, useState, type ReactElement } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { LoginPage } from './LoginPage'
@@ -6,8 +6,7 @@ import { LobbyPage } from './LobbyPage'
 import { SettingsPage } from './SettingsPage'
 import { GameContainerApi } from './GameContainerApi'
 import { MobileTabBar } from '../components/common/MobileTabBar'
-
-const WorkshopPage = lazy(() => import('./WorkshopPage').then(m => ({ default: m.WorkshopPage })))
+import { SandboxAppLazy } from '../sandbox'
 
 type Page = 'login' | 'lobby' | 'workshop' | 'game' | 'settings'
 
@@ -85,7 +84,7 @@ export function PageRouter() {
     case 'workshop':
       pageNode = (
         <Suspense fallback={<div className="loading-screen">{t('platform.loading')}</div>}>
-          <WorkshopPage />
+          <SandboxAppLazy />
         </Suspense>
       )
       break

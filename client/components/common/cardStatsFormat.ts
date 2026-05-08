@@ -1,6 +1,6 @@
 import type { Locale } from '../../../shared/i18n'
-import type { CardResourceStats, Resource } from '../../../shared/game/types'
-import { isPseudoResourceKey } from '../../../shared/game/resource-keys'
+import type { CardResourceStats, Resource } from '../../../shared/contract/types'
+import { isPseudoResourceKey } from '../../../shared/contract/resource-keys'
 
 export type CardStatLine = {
   key: string

@@ -6,8 +6,8 @@ import type {
   FarmTilePosition,
   PlayerState,
   Resource,
-} from '../../game/types'
-import { getAllTilePositions, positionKey } from '../../game/farm'
+} from '../../contract/types'
+import { getAllTilePositions, positionKey } from '../../domain/farm'
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'
 import { playerBoard } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'

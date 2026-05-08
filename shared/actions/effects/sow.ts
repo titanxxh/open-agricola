@@ -3,9 +3,9 @@ import type {
   ActionExecutionContext,
   ActionExecutionResult,
   PlayerState,
-} from '../../game/types'
-import { fieldIsEmpty } from '../../game/field'
-import { positionKey } from '../../game/farm'
+} from '../../contract/types'
+import { fieldIsEmpty } from '../../domain/field'
+import { positionKey } from '../../domain/farm'
 import { playerBoard, type SowSelection } from '../../domain'
 import { handleSowExtraField } from '../../cards/card-effects'
 

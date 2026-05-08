@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { GameSession } from '../../../../server/game/authoritative-session'
 import { placeFarmerAction } from '../place-farmer'
-import { setWorkersAtHome } from '../../../game/player'
-import { addWorkerRef } from '../../../game/space'
-import { createInitialPlayerStats } from '../../../logic/stats'
+import { setWorkersAtHome } from '../../../domain/player'
+import { addWorkerRef } from '../../../domain/space'
+import { createInitialPlayerStats } from '../../../session/stats'
 
 const buildState = () => {
   const session = new GameSession(undefined, undefined, { playerCount: 2 })

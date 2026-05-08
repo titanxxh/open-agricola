@@ -1,4 +1,3 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import {
@@ -7,10 +6,13 @@ import {
 } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getMajorCard } from '../major'
-import { getRegisteredMinorImprovement } from '../types'
+import { getRegisteredMinorImprovement } from '../../cards-display/types'
 import type { CardImpl } from '../registry'
+import { C53_GypsysCrock } from '../../cards-display/C/C53_GypsysCrock'
+export { C53_GypsysCrock }
 
-const CARD_ID = 'C53_GypsysCrock'
+const CARD_ID = C53_GypsysCrock.id
+
 const COUNTER_KEY = 'cookedCount'
 
 /**
@@ -68,17 +70,6 @@ const afterExchangeListener: CardListenerRegistration = {
     }
   },
 }
-
-export const C53_GypsysCrock = new MinorImprovement({
-  id: CARD_ID,
-  name: "Gypsy's Crock",
-  deck: 'C',
-  number: 53,
-  category: 'FOOD_PROVIDER',
-  desc: ["Each time you use a cooking improvement to turn 2 goods into <FOOD> at the same time, you get 1 additional <FOOD>."],
-  cost: { clay: 2 },
-  vp: 1,
-})
 
 export const C53_GypsysCrock_impl = {
   listeners: [tradeAppliedListener, afterExchangeListener],

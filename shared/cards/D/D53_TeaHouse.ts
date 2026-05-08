@@ -1,14 +1,15 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import { workersAvailable } from '../../game/player'
+import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { D53_TeaHouse } from '../../cards-display/D/D53_TeaHouse'
+export { D53_TeaHouse }
 
-const CARD_ID = 'D53_TeaHouse'
+const CARD_ID = D53_TeaHouse.id
 
 registerPrerequisite('Play in Round 6 or Later', (_player, state) => {
   if (!state) return true
@@ -39,18 +40,6 @@ const anytimeListener: CardListenerRegistration = {
     }
   },
 }
-
-export const D53_TeaHouse = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Tea House',
-  deck: 'D',
-  number: 53,
-  category: 'FOOD_PROVIDER',
-  desc: ['Once per round, you can skip placing your second person and get 1 <FOOD> instead. (You can place the person later that round.)'],
-  cost: { wood: 1, stone: 1 },
-  vp: 2,
-  prerequisite: 'Play in Round 6 or Later',
-})
 
 export const D53_TeaHouse_impl = {
   listeners: [anytimeListener],

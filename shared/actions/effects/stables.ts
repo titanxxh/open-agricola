@@ -7,8 +7,8 @@ import type {
   GameState,
   PlayerState,
   Resource,
-} from '../../game/types'
-import { getNextEmptyTileForPlayer } from '../../game/farm'
+} from '../../contract/types'
+import { getNextEmptyTileForPlayer } from '../../domain/farm'
 import { payResources, applyCostOverride } from '../payment/internal'
 import { stableWoodCost } from './fencing'
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'

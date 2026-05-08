@@ -1,9 +1,10 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { A75_LumberMill } from '../../cards-display/A/A75_LumberMill'
+export { A75_LumberMill }
 
-const CARD_ID = 'A75_LumberMill'
+const CARD_ID = A75_LumberMill.id
 
 /**
  * A75 Lumber Mill — Every improvement costs you 1 wood less.
@@ -18,19 +19,6 @@ const computeCostsListener: CardListenerRegistration = {
     return { costs: { wood: -1 } }
   },
 }
-
-export const A75_LumberMill = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Lumber Mill',
-  deck: 'A',
-  number: 75,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['Every improvement costs you 1 <WOOD> less.'],
-  cost: { stone: 2 },
-  vp: 2,
-  prerequisite: 'At most 3 Occupations',
-  occupationPrerequisites: { max: 3 },
-})
 
 export const A75_LumberMill_impl = {
   listeners: [computeCostsListener],

@@ -1,22 +1,11 @@
-import { Occupation } from '../types'
-import { isSpaceOccupied } from '../../game/space'
+import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
+import { A152_NightSchoolStudent } from '../../cards-display/A/A152_NightSchoolStudent'
+export { A152_NightSchoolStudent }
 
-const CARD_ID = 'A152_NightSchoolStudent'
+const CARD_ID = A152_NightSchoolStudent.id
 
 const LESSONS_SPACES = ['lessons', 'lessons-4']
-
-export const A152_NightSchoolStudent = new Occupation({
-  id: CARD_ID,
-  name: 'Night-School Student',
-  deck: 'A',
-  number: 152,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['Each returning home phase in which no player returns a person from a __Lessons__ action space, you can play an occupation for an occupation cost of 1 <FOOD>.'],
-  cost: {},
-  players: '4+',
-  newSet: true,
-})
 
 export const A152_NightSchoolStudent_impl = {
   effect: {

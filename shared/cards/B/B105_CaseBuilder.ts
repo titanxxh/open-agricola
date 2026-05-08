@@ -1,20 +1,10 @@
-import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import type { Resource } from '../../game/types'
+import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { B105_CaseBuilder } from '../../cards-display/B/B105_CaseBuilder'
+export { B105_CaseBuilder }
 
-const CARD_ID = 'B105_CaseBuilder'
-
-export const B105_CaseBuilder = new Occupation({
-  id: CARD_ID,
-  name: 'Case Builder',
-  deck: 'B',
-  number: 105,
-  category: 'GOODS_PROVIDER',
-  desc: ['When you play this card, you immediately get 1 good of each of the following types, if you have at least 2 of that good in your supply already: <FOOD>, <GRAIN>, <VEGETABLE>, <REED>, <WOOD>.'],
-  cost: {},
-  players: '1+',
-})
+const CARD_ID = B105_CaseBuilder.id
 
 export const B105_CaseBuilder_impl = {
   effect: {

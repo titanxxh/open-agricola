@@ -1,13 +1,13 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
 import type { CardImpl } from '../registry'
+import { D96_Furnisher } from '../../cards-display/D/D96_Furnisher'
+export { D96_Furnisher }
 
-const CARD_ID = 'D96_Furnisher'
+const CARD_ID = D96_Furnisher.id
 
-// After construct → optional improvement per room built
 const afterConstructListener: CardListenerRegistration = {
   id: 'D96-furnisher-after-construct',
   cardIds: [CARD_ID],
@@ -43,7 +43,6 @@ const afterConstructListener: CardListenerRegistration = {
   },
 }
 
-// computeCosts: reduce wood cost by 1 when improvement is played via Furnisher
 const computeCostsListener: CardListenerRegistration = {
   id: 'D96-furnisher-compute-costs-improvement',
   cardIds: [CARD_ID],
@@ -55,19 +54,6 @@ const computeCostsListener: CardListenerRegistration = {
     return { costs: { wood: -1 } }
   },
 }
-
-export const D96_Furnisher = new Occupation({
-  id: CARD_ID,
-  name: 'Furnisher',
-  deck: 'D',
-  number: 96,
-  category: 'ACTIONS_BOOSTER',
-  desc: [
-    'When you play this card, you immediately get 2 <WOOD>. Each time after you build at least one new room, you can build or play a number of improvements equal to the number of new rooms you built, paying up to 1 <WOOD> less for each such improvement.',
-  ],
-  cost: {},
-  players: '1+',
-})
 
 export const D96_Furnisher_impl = {
   listeners: [afterConstructListener, computeCostsListener],

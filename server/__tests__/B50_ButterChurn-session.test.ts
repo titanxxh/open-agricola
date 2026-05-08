@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/B/B50_ButterChurn'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 describe('B50_ButterChurn — onHarvestFieldPhase uses on-board sheep+cattle (not reserve)', () => {
   const setup = () => {

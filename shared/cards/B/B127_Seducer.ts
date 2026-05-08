@@ -1,19 +1,9 @@
-import { Occupation } from '../types'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B127_Seducer } from '../../cards-display/B/B127_Seducer'
+export { B127_Seducer }
 
-const CARD_ID = 'B127_Seducer'
-
-export const B127_Seducer = new Occupation({
-  id: CARD_ID,
-  name: 'Seducer',
-  deck: 'B',
-  number: 127,
-  category: 'FARM_PLANNER',
-  desc: ['When you play this card in round 5 or later, you can immediately pay 1 <STONE>, 1 <GRAIN>, 1 <VEGETABLE>, and 1 <SHEEP> to take a __Family Growth Even without Room__ action.'],
-  cost: {},
-  players: '3+',
-})
+const CARD_ID = B127_Seducer.id
 
 export const B127_Seducer_impl = {
   effect: {

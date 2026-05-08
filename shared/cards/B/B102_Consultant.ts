@@ -1,28 +1,17 @@
-import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import type { Resource } from '../../game/types'
+import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { B102_Consultant } from '../../cards-display/B/B102_Consultant'
+export { B102_Consultant }
 
-const CARD_ID = 'B102_Consultant'
+const CARD_ID = B102_Consultant.id
 
-// BGA: 1p→2 grain, 2p→3 clay, 3p→2 reed, 4p→2 sheep.
 const REWARD_BY_PLAYER_COUNT: Record<number, Partial<Resource>> = {
   1: { grain: 2 },
   2: { clay: 3 },
   3: { reed: 2 },
   4: { sheep: 2 },
 }
-
-export const B102_Consultant = new Occupation({
-  id: CARD_ID,
-  name: 'Consultant',
-  deck: 'B',
-  number: 102,
-  category: 'GOODS_PROVIDER',
-  desc: ['When you play this card in a 1-/2-/3-/4- player game, you immediately get 2 <GRAIN>/3 <CLAY>/2 <REED>/2 <SHEEP>.'],
-  cost: {},
-  players: '1+',
-})
 
 export const B102_Consultant_impl = {
   effect: {

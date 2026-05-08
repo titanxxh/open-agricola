@@ -1,19 +1,9 @@
-import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E147_AnimalDriver } from '../../cards-display/E/E147_AnimalDriver'
+export { E147_AnimalDriver }
 
-const CARD_ID = 'E147_AnimalDriver'
-
-export const E147_AnimalDriver = new Occupation({
-  id: CARD_ID,
-  name: "Animal Driver",
-  deck: "E",
-  number: 147,
-  category: "ANIMALS_-_ALL",
-  desc: ["At the start of each harvest, if you have 1/2/3+ fenced stables, you get 1 <SHEEP>/<PIG>/<CATTLE>."],
-  cost: {},
-  players: "3+",
-})
+const CARD_ID = E147_AnimalDriver.id
 
 export const E147_AnimalDriver_impl = {
   effect: {

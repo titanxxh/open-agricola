@@ -5,7 +5,7 @@
  * (here: CUSTOM_FixtureHarvester) appear in player hands after initial deal.
  */
 import { describe, it, expect } from 'vitest'
-import { dealHands } from '../../shared/logic/state'
+import { dealHands } from '../../shared/session/state-bootstrap'
 import { allCommunityCards } from '../../shared/cards/community/auto-catalog'
 
 // Ensure the community fixture card is registered before any state is created.

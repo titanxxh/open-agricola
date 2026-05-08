@@ -1,9 +1,10 @@
-import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldHasCrop, fieldFindStackOfKind } from '../../game/field'
+import { fieldHasCrop, fieldFindStackOfKind } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { D135_GardeningHeadOfficial } from '../../cards-display/D/D135_GardeningHeadOfficial'
+export { D135_GardeningHeadOfficial }
 
-const CARD_ID = 'D135_GardeningHeadOfficial'
+const CARD_ID = D135_GardeningHeadOfficial.id
 
 const roundsLeftWoodBonus = (state: { round: number }): number => {
   const remaining = 14 - state.round
@@ -12,19 +13,6 @@ const roundsLeftWoodBonus = (state: { round: number }): number => {
   if (remaining >= 3) return 2
   return 0
 }
-
-export const D135_GardeningHeadOfficial = new Occupation({
-  id: CARD_ID,
-  name: "Gardening Head Official",
-  deck: "D",
-  number: 135,
-  category: "POINTS_PROVIDER",
-  desc: [
-    'If there are still 3/6/9 complete rounds left to play, you immediately get 2/3/4 <WOOD>. During scoring, each player with the most vegetables in their fields gets 2 bonus <SCORE>.',
-  ],
-  cost: {},
-  players: "3+",
-})
 
 export const D135_GardeningHeadOfficial_impl = {
   effect: {

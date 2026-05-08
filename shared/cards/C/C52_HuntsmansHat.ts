@@ -1,10 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { C52_HuntsmansHat } from '../../cards-display/C/C52_HuntsmansHat'
+export { C52_HuntsmansHat }
 
-const CARD_ID = 'C52_HuntsmansHat'
+const CARD_ID = C52_HuntsmansHat.id
 
 /**
  * C52 Huntsman's Hat — For each new pig you get from the effect of an action
@@ -38,19 +39,6 @@ const huntsmansHatListener: CardListenerRegistration = {
     }
   },
 }
-
-export const C52_HuntsmansHat = new MinorImprovement({
-  id: CARD_ID,
-  name: "Huntsman's Hat",
-  deck: "C",
-  number: 52,
-  category: "FOOD_PROVIDER",
-  desc: ["For each new <PIG> you get from the effect of an action space, you also get 1 <FOOD>."],
-  vp: 1,
-  cost: { reed: 1 },
-  prerequisite: "Cooking Improvement",
-  newSet: true,
-})
 
 export const C52_HuntsmansHat_impl = {
   listeners: [huntsmansHatListener],

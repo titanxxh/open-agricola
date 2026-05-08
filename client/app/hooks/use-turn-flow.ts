@@ -1,5 +1,5 @@
-import type { GameState } from '../../../shared/game/types'
-import { createRoundOpenById } from '../../../shared/logic/state-constants'
+import type { GameState } from '../../../shared/contract/types'
+import { createRoundOpenById } from '../../../shared/contract/state-constants'
 
 export const getNextPlayerIndex = (state: GameState) =>
   (state.currentPlayerIndex + 1) % state.players.length

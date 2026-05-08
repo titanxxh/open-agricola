@@ -1,18 +1,10 @@
-import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldIsEmpty } from '../../game/field'
+import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { A11_MudPatch } from '../../cards-display/A/A11_MudPatch'
+export { A11_MudPatch }
 
-const CARD_ID = 'A11_MudPatch'
-
-export const A11_MudPatch = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Mud Patch',
-  deck: 'A',
-  number: 11,
-  category: 'FARM_PLANNER',
-  desc: ['When you play this card, you immediately get 1 <PIG>. You can hold 1 <PIG> on each of your unplanted field tiles.'],
-})
+const CARD_ID = A11_MudPatch.id
 
 export const A11_MudPatch_impl = {
   effect: {

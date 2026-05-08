@@ -1,11 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
-import { familySize } from '../../game/player'
+import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { E151_DeliveryNurse } from '../../cards-display/E/E151_DeliveryNurse'
+export { E151_DeliveryNurse }
 
-const CARD_ID = 'E151_DeliveryNurse'
+const CARD_ID = E151_DeliveryNurse.id
 
 /**
  * E151 Delivery Nurse — Once this game, if you have all types of animals,
@@ -48,16 +49,6 @@ const computeReplaceListener: CardListenerRegistration = {
     }
   },
 }
-
-export const E151_DeliveryNurse = new Occupation({
-  id: CARD_ID,
-  name: 'Delivery Nurse',
-  deck: 'E',
-  number: 151,
-  desc: ['Once this game, if you have all types of animals, you can use any __Wish for Children__ action space even without room.'],
-  cost: {},
-  players: '4+',
-})
 
 export const E151_DeliveryNurse_impl = {
   listeners: [computeReplaceListener],

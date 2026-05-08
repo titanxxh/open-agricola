@@ -1,19 +1,9 @@
-import { Occupation } from '../types'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E88_MasterFencer } from '../../cards-display/E/E88_MasterFencer'
+export { E88_MasterFencer }
 
-const CARD_ID = 'E88_MasterFencer'
-
-export const E88_MasterFencer = new Occupation({
-  id: CARD_ID,
-  name: 'Master Fencer',
-  deck: 'E',
-  number: 88,
-  category: 'FARMYARD_-_FENCING',
-  desc: ['Once you live in a stone house, at the start of each round, you can pay 2 or 3 <WOOD> to build up to 3 or 4 fences, respectively.'],
-  cost: {},
-  players: '1+',
-})
+const CARD_ID = E88_MasterFencer.id
 
 export const E88_MasterFencer_impl = {
   effect: {

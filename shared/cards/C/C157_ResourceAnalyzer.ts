@@ -1,22 +1,11 @@
-import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { C157_ResourceAnalyzer } from '../../cards-display/C/C157_ResourceAnalyzer'
+export { C157_ResourceAnalyzer }
 
-const CARD_ID = 'C157_ResourceAnalyzer'
+const CARD_ID = C157_ResourceAnalyzer.id
 
 const BUILD_RESOURCES = ['stone', 'clay', 'reed', 'wood'] as const
-
-export const C157_ResourceAnalyzer = new Occupation({
-  id: CARD_ID,
-  name: 'Resource Analyzer',
-  deck: 'C',
-  number: 157,
-  category: 'FOOD_PROVIDER',
-  desc: ['Before the start of each round, if you have more building resources than all other players of at least two types, you get 1 <FOOD>.'],
-  cost: {},
-  players: '4+',
-  evenMoreSet: true,
-})
 
 export const C157_ResourceAnalyzer_impl = {
   effect: {

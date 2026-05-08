@@ -1,10 +1,10 @@
-import type { GameState, PlayerState } from '../../game/types'
-import type { CardDefinition } from '../types'
-import { getRegisteredMinorImprovement } from '../types'
+import type { GameState, PlayerState } from '../../contract/types'
+import type { CardDefinition } from '../../contract/cards'
+import { getRegisteredMinorImprovement } from '../../cards-display/types'
 import { getMajorCard } from '../major'
 import { collectCardsAs } from './card-type'
 import { checkCustomPrerequisite } from './prerequisite-registry'
-import { fieldHasCrop } from '../../game/field'
+import { fieldHasCrop } from '../../domain/field'
 
 type CardPrerequisiteSource = Pick<
   CardDefinition,

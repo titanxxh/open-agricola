@@ -1,19 +1,9 @@
-import { Occupation } from '../types'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
+import { B96_TreeFarmJoiner } from '../../cards-display/B/B96_TreeFarmJoiner'
+export { B96_TreeFarmJoiner }
 
-const CARD_ID = 'B96_TreeFarmJoiner'
-
-export const B96_TreeFarmJoiner = new Occupation({
-  id: CARD_ID,
-  name: 'Tree Farm Joiner',
-  deck: 'B',
-  number: 96,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['Place 1 <WOOD> on each of the next 2 odd-numbered round spaces. At the start of these rounds, you get the <WOOD> and, immediately afterward, a __Minor Improvement__ action.'],
-  cost: {},
-  players: '1+',
-})
+const CARD_ID = B96_TreeFarmJoiner.id
 
 export const B96_TreeFarmJoiner_impl = {
   effect: {

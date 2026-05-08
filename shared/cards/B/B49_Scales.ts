@@ -1,10 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B49_Scales } from '../../cards-display/B/B49_Scales'
+export { B49_Scales }
 
-const CARD_ID = 'B49_Scales'
+const CARD_ID = B49_Scales.id
 
 /**
  * B49 Scales
@@ -47,21 +48,6 @@ const improvementListener: CardListenerRegistration = {
     return checkBalance(context)
   },
 }
-
-export const B49_Scales = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Scales',
-  deck: 'B',
-  number: 49,
-  category: 'FOOD_PROVIDER',
-  desc: [
-    'Each time after you place an improvement or occupation in front of you, if you then have the same number of improvements and occupations in play, you get 2 <FOOD>.',
-  ],
-  cost: { wood: 1 },
-  prerequisite: 'No Occupation',
-  occupationPrerequisites: { max: 0 },
-  newSet: true,
-})
 
 export const B49_Scales_impl = {
   listeners: [occupationListener, improvementListener],

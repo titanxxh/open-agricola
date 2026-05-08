@@ -1,10 +1,12 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getStoredResource } from '../helpers/card-storage'
 import type { CardImpl } from '../registry'
+import { A81_InterimStorage } from '../../cards-display/A/A81_InterimStorage'
+export { A81_InterimStorage }
 
-const CARD_ID = 'A81_InterimStorage'
+const CARD_ID = A81_InterimStorage.id
+
 const PAYOUT_ROUNDS = new Set([7, 11, 14])
 
 const COLLECT_MAP = {
@@ -37,17 +39,6 @@ const collectListener: CardListenerRegistration = {
     }
   },
 }
-
-export const A81_InterimStorage = new MinorImprovement({
-  id: CARD_ID,
-  name: "Interim Storage",
-  deck: "A",
-  number: 81,
-  category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["Each time you use a clay/reed/stone accumulation space, place 1 <WOOD>/<CLAY>/<REED> on this card. At the start of rounds 7, 11, and 14, move all the goods on this card to your supply."],
-  cost: {"food":2},
-  newSet: true,
-})
 
 export const A81_InterimStorage_impl = {
   listeners: [collectListener],

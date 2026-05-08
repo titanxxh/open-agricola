@@ -1,19 +1,9 @@
-import { MinorImprovement } from '../types'
-import { familySize } from '../../game/player'
+import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { E35_Misanthropy } from '../../cards-display/E/E35_Misanthropy'
+export { E35_Misanthropy }
 
-const CARD_ID = 'E35_Misanthropy'
-
-export const E35_Misanthropy = new MinorImprovement({
-  id: CARD_ID,
-  name: "Misanthropy",
-  deck: "E",
-  number: 35,
-  category: "BONUS_POINTS_-_GET",
-  desc: ['During scoring, if you have exactly 4/3/2 people, you get 2/3/5 bonus <SCORE>.'],
-  cost: {},
-  vp: 0,
-})
+const CARD_ID = E35_Misanthropy.id
 
 export const E35_Misanthropy_impl = {
   effect: {

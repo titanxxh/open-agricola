@@ -18,7 +18,7 @@ import type {
   PaymentSolution,
   PlayerState,
   Resource,
-} from '../../../game/types'
+} from '../../../contract/types'
 import { canPayResources, payResources } from './affordability'
 import { computeAllBuyableCombinations } from './enumerate'
 import { executePaymentSolution } from './execute'

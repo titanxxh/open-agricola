@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
-import type { ActionSpace, GameState, PlayerState } from '../../game/types'
+import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
 import { playOccupationAction } from '../../actions/effects/occupation'
 import { actionDefinitions } from '../../actions'
 
 import '../A/A97_Freshman'
 import '../A/A123_FrameBuilder'
 import type { CardListenerContext } from '../card-listeners'
-import type { ActionExecutionContext } from '../../game/types'
+import type { ActionExecutionContext } from '../../contract/types'
 
 const createPlayer = (): PlayerState =>
   ({
@@ -135,8 +135,7 @@ describe('A97_Freshman', () => {
     })
   })
 
-  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
-  it.skip('lets play-occupation ignore normal lessons cost when Freshman provides free play', () => {
+  it('lets play-occupation ignore normal lessons cost when Freshman provides free play', () => {
     const player = createPlayer()
     player.occupationPlayed.push('A55_JunkRoom')
     player.occupationHand = ['A123_FrameBuilder']
@@ -148,8 +147,10 @@ describe('A97_Freshman', () => {
       params: { costOverride: {} } as unknown as ActionExecutionContext,
     })
 
-    expect(result.type).toBe('choice')
-    if (result.type !== 'choice') return
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') return
+    expect(result.request.kind).toBe('choice')
+    if (result.request.kind !== 'choice') return
 
     const resolved = playOccupationAction.resolveChoice!(
       {

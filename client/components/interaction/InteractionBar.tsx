@@ -8,7 +8,7 @@ import type {
   AnytimeAction,
   ChoiceEffectPreview,
   Resource,
-} from '../../../shared/game/types'
+} from '../../../shared/contract/types'
 import { AnytimeBar } from './AnytimeBar'
 import { getAnyCardDisplayName, translateCardText } from '../common/cardText'
 

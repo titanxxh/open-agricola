@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
-import { setWorkersAtHome } from '../../shared/game/player'
+import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A121_ClayPuncher'
-import type { ActionChoiceOption } from '../../shared/game/types'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionChoiceOption } from '../../shared/contract/types'
+import type { ActionFlow } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 describe('A121_ClayPuncher session', () => {

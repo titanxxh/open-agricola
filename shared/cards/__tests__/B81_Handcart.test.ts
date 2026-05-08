@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { runCardEffectHook } from '../card-effects'
-import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../contract/types'
 
 import '../B/B81_Handcart'
 

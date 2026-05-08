@@ -1,13 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E157_Usufructuary } from '../../cards-display/E/E157_Usufructuary'
+export { E157_Usufructuary }
 
-const CARD_ID = 'E157_Usufructuary'
+const CARD_ID = E157_Usufructuary.id
 
-// E157 Usufructuary: When you play this card as your first occupation, you immediately get
-// 1 FOOD for every other occupation in play (by any player), up to a maximum of 7 FOOD.
 const listener: CardListenerRegistration = {
   id: 'E157-usufructuary-after-occupation',
   cardIds: [CARD_ID],
@@ -24,19 +23,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { food }), sourceCard: CARD_ID }
   },
 }
-
-export const E157_Usufructuary = new Occupation({
-  id: CARD_ID,
-  name: 'Usufructuary',
-  deck: 'E',
-  number: 157,
-  category: 'FOOD',
-  desc: [
-    'When you play this card as your first occupation, you immediately get 1 <FOOD> for every other occupation in play (by any player), up to a maximum of 7 <FOOD>.',
-  ],
-  cost: {},
-  players: '4+',
-})
 
 export const E157_Usufructuary_impl = {
   listeners: [listener],

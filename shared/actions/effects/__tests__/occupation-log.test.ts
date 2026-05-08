@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { GameState, PlayerState } from '../../../game/types'
+import type { GameState, PlayerState } from '../../../contract/types'
 import { playOccupation } from '../occupation'
 import '../../../cards/A/A85_Homekeeper'
 import '../../../cards/C/C107_Baker'

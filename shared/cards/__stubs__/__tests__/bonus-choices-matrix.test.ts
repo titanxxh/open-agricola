@@ -10,7 +10,7 @@ import {
 import { resolveCardCostWithModifiers } from '../../../actions/payment/internal'
 import { PaymentSolver } from '../../../actions/payment'
 import { computeAllBuyableCombinations } from '../../../actions/payment/internal'
-import type { GameState, PlayerState, ComplexCost } from '../../../game/types'
+import type { GameState, PlayerState, ComplexCost } from '../../../contract/types'
 import { CardRegistry } from '../../registry'
 import { setActiveCardRegistry, requireActiveCardRegistry } from '../../active-registry'
 

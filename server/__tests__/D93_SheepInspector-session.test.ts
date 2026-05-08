@@ -3,15 +3,15 @@ import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { setCardFlag, isCardFlagged } from '../../shared/cards/helpers/card-state'
-import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/game/player'
+import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import type {
   ActionSpace,
   GameState,
   PlayerState,
-} from '../../shared/game/types'
+} from '../../shared/contract/types'
 
 import '../../shared/cards/D/D93_SheepInspector'
-import type { ActionChoiceOption , ActionFlow } from '../../shared/game/types'
+import type { ActionChoiceOption , ActionFlow } from '../../shared/contract/types'
 import type { SessionResponse } from '../../shared/session/session-core'
 import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 

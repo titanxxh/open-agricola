@@ -1,13 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
+import { D111_InteriorDecorator } from '../../cards-display/D/D111_InteriorDecorator'
+export { D111_InteriorDecorator }
 
-const CARD_ID = 'D111_InteriorDecorator'
+const CARD_ID = D111_InteriorDecorator.id
 
-// D111 Interior Decorator: Each time you renovate, place 1 FOOD on each of the next 6 round
-// spaces. At the start of these rounds, you get the FOOD.
 const listener: CardListenerRegistration = {
   id: 'D111-interior-decorator-after-renovation',
   cardIds: [CARD_ID],
@@ -27,19 +26,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const D111_InteriorDecorator = new Occupation({
-  id: CARD_ID,
-  name: 'Interior Decorator',
-  deck: 'D',
-  number: 111,
-  category: 'FOOD_PROVIDER',
-  desc: [
-    'Each time you renovate, place 1 <FOOD> on each of the next 6 round spaces. At the start of these rounds, you get the <FOOD>.',
-  ],
-  cost: {},
-  players: '1+',
-})
 
 export const D111_InteriorDecorator_impl = {
   listeners: [listener],

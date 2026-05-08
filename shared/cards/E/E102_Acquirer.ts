@@ -1,20 +1,10 @@
-import { Occupation } from '../types'
 import { payLeaf } from '../helpers/pay-gain-node'
-import { familySize } from '../../game/player'
+import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { E102_Acquirer } from '../../cards-display/E/E102_Acquirer'
+export { E102_Acquirer }
 
-const CARD_ID = 'E102_Acquirer'
-
-export const E102_Acquirer = new Occupation({
-  id: CARD_ID,
-  name: 'Acquirer',
-  deck: 'E',
-  number: 102,
-  category: 'GOODS_-_GET',
-  desc: ['At the start of each round, you can pay <FOOD> equal to the number of people you have to buy 1 good of your choice from the general supply.'],
-  cost: {},
-  players: '1+',
-})
+const CARD_ID = E102_Acquirer.id
 
 export const E102_Acquirer_impl = {
   effect: {

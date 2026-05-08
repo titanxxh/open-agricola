@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { executeCardListener, getRegisteredCardListeners } from '../card-listeners'
 import { runCardEffectHook } from '../card-effects'
 import { getPlayerActionSpaceConfig } from '../player-action-space'
-import type { ActionSpace, GameState, PlayerState } from '../../game/types'
+import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
 import { clayOven } from '../major/clay-oven'
 import { stoneOven } from '../major/stone-oven'
 
@@ -13,7 +13,7 @@ import '../E/E53_BoarSpear'
 import '../E/E73_Scythe'
 import '../E/E74_AshTrees'
 import type { CardListenerContext } from '../card-listeners'
-import type { ActionExecutionContext } from '../../game/types'
+import type { ActionExecutionContext } from '../../contract/types'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -194,8 +194,7 @@ describe('sourceCard card production contract', () => {
     })
   })
 
-  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
-  it.skip('D23 Pioneering Spirit card-owned choice options carry sourceCard', () => {
+  it('D23 Pioneering Spirit card-owned choice options carry sourceCard', () => {
     const config = getPlayerActionSpaceConfig('D23_PioneeringSpirit')
     expect(config).toBeDefined()
     const player = createPlayer()
@@ -208,17 +207,18 @@ describe('sourceCard card production contract', () => {
       space: createSpace('D23_PioneeringSpirit'),
     } as unknown as ActionExecutionContext)
 
-    expect(result.type).toBe('choice')
-    if (result.type !== 'choice') return
-    expect(result.options.map((option) => option.sourceCard)).toEqual([
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') return
+    expect(result.request.kind).toBe('choice')
+    if (result.request.kind !== 'choice') return
+    expect(result.request.options.map((option) => option.sourceCard)).toEqual([
       'D23_PioneeringSpirit',
       'D23_PioneeringSpirit',
       'D23_PioneeringSpirit',
     ])
   })
 
-  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
-  it.skip('C104 Collector preserves sourceCard on both initial and repeated direct choices', () => {
+  it('C104 Collector preserves sourceCard on both initial and repeated direct choices', () => {
     const config = getPlayerActionSpaceConfig('C104_Collector')
     expect(config).toBeDefined()
     const player = createPlayer()
@@ -232,22 +232,25 @@ describe('sourceCard card production contract', () => {
       space: createSpace('C104_Collector'),
     } as unknown as ActionExecutionContext)
 
-    expect(first.type).toBe('choice')
-    if (first.type !== 'choice') return
-    expect(first.options.every((option) => option.sourceCard === 'C104_Collector')).toBe(true)
+    expect(first.type).toBe('request')
+    if (first.type !== 'request') return
+    expect(first.request.kind).toBe('choice')
+    if (first.request.kind !== 'choice') return
+    expect(first.request.options.every((option) => option.sourceCard === 'C104_Collector')).toBe(true)
 
     const retry = definition.resolveChoice?.({
       state,
       player,
       space: createSpace('C104_Collector'),
     } as any, 'wood,clay')
-    expect(retry?.type).toBe('choice')
-    if (retry?.type !== 'choice') return
-    expect(retry.options.every((option) => option.sourceCard === 'C104_Collector')).toBe(true)
+    expect(retry?.type).toBe('request')
+    if (retry?.type !== 'request') return
+    expect(retry.request.kind).toBe('choice')
+    if (retry.request.kind !== 'choice') return
+    expect(retry.request.options.every((option) => option.sourceCard === 'C104_Collector')).toBe(true)
   })
 
-  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
-  it.skip('B42 Forest Inn tags its direct exchange choices with sourceCard', () => {
+  it('B42 Forest Inn tags its direct exchange choices with sourceCard', () => {
     const config = getPlayerActionSpaceConfig('B42_ForestInn')
     expect(config).toBeDefined()
     const player = createPlayer()
@@ -261,9 +264,11 @@ describe('sourceCard card production contract', () => {
       space: createSpace('B42_ForestInn'),
     } as unknown as ActionExecutionContext)
 
-    expect(result.type).toBe('choice')
-    if (result.type !== 'choice') return
-    expect(result.options.map((option) => option.sourceCard)).toEqual([
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') return
+    expect(result.request.kind).toBe('choice')
+    if (result.request.kind !== 'choice') return
+    expect(result.request.options.map((option) => option.sourceCard)).toEqual([
       'B42_ForestInn',
       'B42_ForestInn',
       'B42_ForestInn',

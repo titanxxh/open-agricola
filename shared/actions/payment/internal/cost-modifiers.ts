@@ -18,7 +18,7 @@ import type {
   PlayerState,
   Trade,
   TradeModifier,
-} from '../../../game/types'
+} from '../../../contract/types'
 
 export const evaluateConditions = (
   player: PlayerState,

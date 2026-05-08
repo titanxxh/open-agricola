@@ -1,10 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import { B19_MoldboardPlow } from '../../cards-display/B/B19_MoldboardPlow'
+export { B19_MoldboardPlow }
 
-const CARD_ID = 'B19_MoldboardPlow'
+const CARD_ID = B19_MoldboardPlow.id
 
 const listener: CardListenerRegistration = {
   id: 'B19-moldboard-plow-after-place-farmer',
@@ -28,18 +29,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const B19_MoldboardPlow = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Moldboard Plow',
-  deck: 'B',
-  number: 19,
-  category: 'FARM_PLANNER',
-  desc: ['Place 2 field tiles on this card. Twice this game, when you use the __Farmland__ action space, you can also plow 1 field from this card.'],
-  cost: { wood: 2 },
-  prerequisite: '1 Occupation',
-  occupationPrerequisites: { min: 1 },
-})
 
 export const B19_MoldboardPlow_impl = {
   listeners: [listener],

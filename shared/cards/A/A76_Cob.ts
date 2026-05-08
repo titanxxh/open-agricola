@@ -1,19 +1,9 @@
-import { MinorImprovement } from '../types'
 import { payGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { A76_Cob } from '../../cards-display/A/A76_Cob'
+export { A76_Cob }
 
-const CARD_ID = 'A76_Cob'
-
-export const A76_Cob = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Cob',
-  deck: 'A',
-  number: 76,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['At the start of each work phase, if you have at least 1 <CLAY> in your supply, you can exchange exactly 1 <GRAIN> for 2 <CLAY> and 1 <FOOD>.'],
-  cost: { food: 1 },
-  newSet: true,
-})
+const CARD_ID = A76_Cob.id
 
 export const A76_Cob_impl = {
   effect: {

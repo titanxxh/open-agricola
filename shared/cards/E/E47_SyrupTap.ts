@@ -1,11 +1,12 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
-import type { FutureMeepleRequest } from '../../game/types'
+import type { FutureMeepleRequest } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { E47_SyrupTap } from '../../cards-display/E/E47_SyrupTap'
+export { E47_SyrupTap }
 
-const CARD_ID = 'E47_SyrupTap'
+const CARD_ID = E47_SyrupTap.id
 
 /**
  * E47 Syrup Tap: Each time you get at least 1 wood from an action space,
@@ -39,16 +40,6 @@ const afterCollectListener: CardListenerRegistration = {
     }
   },
 }
-
-export const E47_SyrupTap = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Syrup Tap',
-  deck: 'E',
-  number: 47,
-  desc: ['Each time you get at least 1 <WOOD> from an action space, place 1 <FOOD> on the next round space. At the start of that round, you get the <FOOD>.'],
-  cost: { wood: 1, stone: 1 },
-  vp: 1,
-})
 
 export const E47_SyrupTap_impl = {
   listeners: [afterCollectListener],

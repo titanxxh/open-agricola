@@ -1,5 +1,5 @@
-import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ComplexCost, GameState, ImmediateLogEntry, PlayerState, Resource } from '../../game/types'
-import { getOccupation } from '../../game/occupations'
+import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ComplexCost, GameState, ImmediateLogEntry, PlayerState, Resource } from '../../contract/types'
+import { getOccupation } from '../../cards/registry-display'
 import {
   canAffordCardPreviewCostByProvider,
   payCardPreviewCostByProvider,
@@ -13,7 +13,7 @@ import { PaymentSolver } from '../payment'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { activateCard } from './activate-card'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
-import { incOccupationBuilt, recordDraftPlayed } from '../../logic/stats'
+import { incOccupationBuilt, recordDraftPlayed } from '../../session/stats'
 
 const getPositiveResourceLog = (
   resources?: Partial<Resource> | null,

@@ -1,19 +1,9 @@
-import { Occupation } from '../types'
 import type { CardImpl } from '../registry'
 import type { BonusScoreLevel } from '../card-effects'
+import { D132_HideFarmer } from '../../cards-display/D/D132_HideFarmer'
+export { D132_HideFarmer }
 
-const CARD_ID = 'D132_HideFarmer'
-
-export const D132_HideFarmer = new Occupation({
-  id: CARD_ID,
-  name: "Hide Farmer",
-  deck: "D",
-  number: 132,
-  category: "POINTS_PROVIDER",
-  desc: ['During scoring, you can pay 1 <FOOD> each for any number of unused farmyard spaces. You do not lose points for these spaces.'],
-  cost: {},
-  players: "3+",
-})
+const CARD_ID = D132_HideFarmer.id
 
 export const D132_HideFarmer_impl = {
   effect: {

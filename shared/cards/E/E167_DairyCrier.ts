@@ -1,21 +1,10 @@
-import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { E167_DairyCrier } from '../../cards-display/E/E167_DairyCrier'
+export { E167_DairyCrier }
 
-const CARD_ID = 'E167_DairyCrier'
-
-export const E167_DairyCrier = new Occupation({
-  id: CARD_ID,
-  name: 'Dairy Crier',
-  deck: 'E',
-  number: 167,
-  desc: [
-    'When you play this card, each player (including you) can choose to get 2 <SHEEP> or 2 <FOOD>; you also get 1 <CATTLE>.',
-  ],
-  cost: {},
-  players: '4+',
-})
+const CARD_ID = E167_DairyCrier.id
 
 export const E167_DairyCrier_impl = {
   effect: {

@@ -1,7 +1,8 @@
-import { Occupation } from '../types'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
-import { fieldTopStack, fieldDecrementTop } from '../../game/field'
+import { fieldTopStack, fieldDecrementTop } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { B165_GameProvider } from '../../cards-display/B/B165_GameProvider'
+export { B165_GameProvider }
 
 const CARD_ID = 'B165_GameProvider'
 
@@ -19,17 +20,6 @@ registerSelectionEffect('discard-grain-for-pigs', ({ player, positions }) => {
   }
   const pigs = grainsRemoved >= 4 ? 3 : grainsRemoved >= 3 ? 2 : grainsRemoved >= 1 ? 1 : 0
   player.resources.boar = (player.resources.boar ?? 0) + pigs
-})
-
-export const B165_GameProvider = new Occupation({
-  id: "B165_GameProvider",
-  name: "Game Provider",
-  deck: "B",
-  number: 165,
-  category: "LIVESTOCK_PROVIDER",
-  desc: ["Immediately before each harvest, you can discard 1/3/4 <GRAIN> from different fields to get 1/2/3 <PIG>."],
-  cost: {},
-  players: "4+",
 })
 
 export const B165_GameProvider_impl = {

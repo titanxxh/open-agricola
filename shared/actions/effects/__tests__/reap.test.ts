@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { reap } from '../reap'
-import type { GameState, PlayerState, Field } from '../../../game/types'
+import type { GameState, PlayerState, Field } from '../../../contract/types'
 import * as cardListeners from '../../../cards/card-listeners'
 
 const mkState = (): Pick<GameState, 'players'> => ({ players: [] as PlayerState[] })

@@ -1,6 +1,6 @@
-import type { Pasture, PlayerState } from '../../../shared/game/types'
-import type { ActionChoiceOption } from '../../../shared/game/types'
-import type { GameState } from '../../../shared/game/types'
+import type { Pasture, PlayerState } from '../../../shared/contract/types'
+import type { ActionChoiceOption } from '../../../shared/contract/types'
+import type { GameState } from '../../../shared/contract/types'
 import type { AnimalReorgState, PendingAnimalReorg, PendingChoice } from '../../types/ui'
 import type { EngineProgress } from './use-engine-flow'
 

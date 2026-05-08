@@ -9,7 +9,7 @@ import { CARD_ID as HARVEST_FIELD_ID } from '../Stub_HarvestFieldPhase'
 import { CARD_ID as HARVEST_FEEDING_ID } from '../Stub_HarvestFeedingPhase'
 import { CARD_ID as END_HARVEST_ID } from '../Stub_EndHarvest'
 import { clearActionHooks } from '../../../actions/hooks'
-import { markAllWorkersUsed } from '../../../game/player'
+import { markAllWorkersUsed } from '../../../domain/player'
 
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 

@@ -1,15 +1,17 @@
-import { MinorImprovement } from '../types'
 import { addCardResourceGained } from '../helpers/card-state'
-import { addResourcesFromCards } from '../../logic/stats'
+import { addResourcesFromCards } from '../../session/stats'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import {
   listReturnableStableTiles,
   removeStableOrFarmHandAtTile,
 } from '../helpers/stable-removal'
-import type { ActionFlow, FarmTilePosition } from '../../game/types'
+import type { ActionFlow, FarmTilePosition } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { E76_LumberPile } from '../../cards-display/E/E76_LumberPile'
+export { E76_LumberPile }
 
-const CARD_ID = 'E76_LumberPile'
+const CARD_ID = E76_LumberPile.id
+
 const FIELD_EFFECT = 'lumber-pile-return-stables'
 
 /**
@@ -43,17 +45,6 @@ registerSelectionEffect(FIELD_EFFECT, ({ player, positions, sourceCard }) => {
     }
     addResourcesFromCards(player, { wood })
   }
-})
-
-export const E76_LumberPile = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Lumber Pile',
-  deck: 'E',
-  number: 76,
-  category: 'BUILDING_RESOURCES_-_WOOD_OR_CLAY',
-  desc: [
-    'When you play this card, you can immediately return up to 3 <STABLE> from your farmyard board to your supply and get 3 <WOOD> for each.',
-  ],
 })
 
 export const E76_LumberPile_impl = {

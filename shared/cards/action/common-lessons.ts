@@ -3,9 +3,9 @@ import type {
   ActionDefinition,
   PlayerState,
   Resource,
-} from '../../game/types'
+} from '../../contract/types'
 import { canAffordOccupationActionCost } from '../../actions/effects/occupation'
-import { getOccupation } from '../../game/occupations'
+import { getOccupation } from '../../cards-display/_lookup'
 
 const getLessonsCost = (player: PlayerState): Partial<Resource> => {
   const base = player.occupationPlayed.length === 0 ? 0 : 1

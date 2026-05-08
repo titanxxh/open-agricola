@@ -1,12 +1,13 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
-import type { PlayerState } from '../../game/types'
+import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { C48_Farmstead } from '../../cards-display/C/C48_Farmstead'
+export { C48_Farmstead }
 
-const CARD_ID = 'C48_Farmstead'
+const CARD_ID = C48_Farmstead.id
 
 const countUsedTiles = (player: PlayerState): number => {
   const used = new Set<string>()
@@ -43,20 +44,6 @@ const afterListener: CardListenerRegistration = {
     }
   },
 }
-
-export const C48_Farmstead = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Farmstead',
-  deck: 'C',
-  number: 48,
-  category: 'FOOD_PROVIDER',
-  desc: [
-    'After each turn in which you make at least one unused farmyard space used, you get 1 <FOOD>.',
-  ],
-  cost: {},
-  prerequisite: '1 Occupation',
-  occupationPrerequisites: { min: 1 },
-})
 
 export const C48_Farmstead_impl = {
   listeners: [beforeListener, afterListener],

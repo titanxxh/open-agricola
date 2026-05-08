@@ -12,7 +12,7 @@
 
 import type { DraftPickPayload } from '../../draft/types.ts'
 import { processSubmit, tryAdvanceRound } from '../../draft/draft-manager.ts'
-import { recordDraftPick } from '../../logic/stats.ts'
+import { recordDraftPick } from '../../session/stats.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
 
 /**

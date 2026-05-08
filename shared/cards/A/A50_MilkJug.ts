@@ -1,10 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { A50_MilkJug } from '../../cards-display/A/A50_MilkJug'
+export { A50_MilkJug }
 
-const CARD_ID = 'A50_MilkJug'
+const CARD_ID = A50_MilkJug.id
 
 /**
  * A50 Milk Jug — Each time any player (including you) uses the Cattle Market
@@ -40,18 +41,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const A50_MilkJug = new MinorImprovement({
-  id: CARD_ID,
-  name: "Milk Jug",
-  deck: "A",
-  number: 50,
-  category: "FOOD_PROVIDER",
-  desc: [
-    "Each time any player (including you) uses the __Cattle Market__ accumulation space, you get 3 <FOOD>, and each other player gets 1 <FOOD>.",
-  ],
-  cost: { clay: 1 },
-})
 
 export const A50_MilkJug_impl = {
   listeners: [listener],

@@ -4,7 +4,7 @@ import { D92_ChildOmbudsman_impl } from '../../shared/cards/D/D92_ChildOmbudsman
 import {
   setActiveWorkerCount,
   setNewbornCount,
-} from '../../shared/game/player'
+} from '../../shared/domain/player'
 import {
   readCardExtraData,
   writeCardExtraData,

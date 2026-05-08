@@ -4,9 +4,9 @@ import type {
   ActionExecutionResult,
   ImmediateLogEntry,
   PlayerState,
-} from '../../game/types'
+} from '../../contract/types'
 import { getPlayerBakeRates, hasAnyBakingImprovement } from '../../cards/helpers/exchange-registry'
-import { addFoodFromConversion, incResourceConverted } from '../../logic/stats'
+import { addFoodFromConversion, incResourceConverted } from '../../session/stats'
 
 export const canBakeBread = (player: PlayerState, cardId: string): boolean => {
   const rates = getPlayerBakeRates(player)

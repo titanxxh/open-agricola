@@ -1,18 +1,9 @@
-import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E58_LunchtimeBeer } from '../../cards-display/E/E58_LunchtimeBeer'
+export { E58_LunchtimeBeer }
 
-const CARD_ID = 'E58_LunchtimeBeer'
-
-export const E58_LunchtimeBeer = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Lunchtime Beer',
-  deck: 'E',
-  number: 58,
-  category: 'FOOD',
-  desc: ['At the start of each harvest, you can choose to skip the field and breeding phase of that harvest and get exactly 1 <FOOD> instead.'],
-  cost: {},
-})
+const CARD_ID = E58_LunchtimeBeer.id
 
 export const E58_LunchtimeBeer_impl = {
   effect: {

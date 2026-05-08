@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from 'vitest'
-import type { GameState, PlayerState } from '../../../game/types'
+import type { GameState, PlayerState } from '../../../contract/types'
 import { reap, dispatchReapListener } from '../reap'
 import * as cardListeners from '../../../cards/card-listeners'
 

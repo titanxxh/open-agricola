@@ -1,10 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B143_ClayWarden } from '../../cards-display/B/B143_ClayWarden'
+export { B143_ClayWarden }
 
-const CARD_ID = 'B143_ClayWarden'
+const CARD_ID = B143_ClayWarden.id
 
 /**
  * B143 Clay Warden (Occupation, B, 143)
@@ -29,20 +30,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, gain), sourceCard: CARD_ID }
   },
 }
-
-export const B143_ClayWarden = new Occupation({
-  id: CARD_ID,
-  name: 'Clay Warden',
-  deck: 'B',
-  number: 143,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: [
-    'Each time another player uses the __Hollow__ accumulation space, you get 1 <CLAY>. In a 3-/4-player game, you also get 1 additional <CLAY>/<FOOD>.',
-  ],
-  cost: {},
-  players: '3+',
-  newSet: true,
-})
 
 export const B143_ClayWarden_impl = {
   listeners: [listener],

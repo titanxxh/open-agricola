@@ -7,7 +7,7 @@ import {
 } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/C/C52_HuntsmansHat'
-import type { ActionExecutionResult, ActionFlow } from '../../shared/game/types'
+import type { ActionExecutionResult, ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'C52_HuntsmansHat'
 const LISTENER_ID = 'C52-huntsmans-hat-after-boar-gain'

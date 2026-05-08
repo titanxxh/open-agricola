@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { collectComputeCostsForFarmChoice } from '../card-listeners'
-import type { GameState, PlayerState } from '../../game/types'
+import type { GameState, PlayerState } from '../../contract/types'
 
 const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
   id: 'p1',

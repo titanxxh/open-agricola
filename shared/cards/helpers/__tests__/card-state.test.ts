@@ -8,7 +8,7 @@ import {
   addCardResourceReceivedPayment,
   addCardResourcePaidToOthers,
 } from '../card-state'
-import type { PlayerState } from '../../../game/types'
+import type { PlayerState } from '../../../contract/types'
 
 const mockPlayer = (): PlayerState =>
   ({ id: 'p1', cardStates: {} } as unknown as PlayerState)

@@ -7,15 +7,15 @@ import type {
   FarmTilePosition,
   PlayerState,
   Resource,
-} from '../../../shared/game/types'
-import { formatAnimalCounts, formatResources } from '../../../shared/logic/format'
-import { emptyResources } from '../../../shared/logic/state-constants'
-import { familySize } from '../../../shared/game/player'
+} from '../../../shared/contract/types'
+import { formatAnimalCounts, formatResources } from '../../utils/format'
+import { emptyResources } from '../../../shared/contract/state-constants'
+import { familySize } from '../../../shared/domain/player'
 import { readCardResourceStats } from '../../../shared/cards/helpers/card-state'
 import { getWorkerHeldOnCard } from '../../../shared/cards/helpers/card-held-workers'
 import { getFenceCount } from '../../../shared/actions/effects/fencing'
 import { collectLockedFarmTileKeys } from '../../../shared/cards/card-effects'
-import { isBorderEdge } from '../../../shared/game/farm'
+import { isBorderEdge } from '../../../shared/domain/farm'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
 import { formatCardStatsLines } from '../common/cardStatsFormat'

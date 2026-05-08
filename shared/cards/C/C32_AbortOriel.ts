@@ -1,4 +1,4 @@
-import { MinorImprovement } from '../types'
+import { MinorImprovement } from '../../cards-display/types'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 
 const CARD_ID = 'C32_AbortOriel'

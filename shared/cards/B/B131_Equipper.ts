@@ -1,16 +1,14 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { B131_Equipper } from '../../cards-display/B/B131_Equipper'
+export { B131_Equipper }
 
-const CARD_ID = 'B131_Equipper'
+const CARD_ID = B131_Equipper.id
 
 const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =>
   (space?.gainPerRound?.wood ?? 0) > 0
 
-// B131 Equipper: Immediately after each time you use a wood accumulation space, you can
-// play a minor improvement.
-// BGA: wrapOptional([IMPROVEMENT, types => [MINOR], trueAction => false])
 const listener: CardListenerRegistration = {
   id: 'B131-equipper-after-collect',
   cardIds: [CARD_ID],
@@ -30,18 +28,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const B131_Equipper = new Occupation({
-  id: CARD_ID,
-  name: 'Equipper',
-  deck: 'B',
-  number: 131,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['Immediately after each time you use a wood accumulation space, you can play a minor improvement.'],
-  cost: {},
-  players: '3+',
-  newSet: true,
-})
 
 export const B131_Equipper_impl = {
   listeners: [listener],

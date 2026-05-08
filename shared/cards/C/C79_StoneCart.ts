@@ -1,20 +1,9 @@
-import { MinorImprovement } from '../types'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
+import { C79_StoneCart } from '../../cards-display/C/C79_StoneCart'
+export { C79_StoneCart }
 
-const CARD_ID = 'C79_StoneCart'
-
-export const C79_StoneCart = new MinorImprovement({
-  id: CARD_ID,
-  name: "Stone Cart",
-  deck: "C",
-  number: 79,
-  category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["Place 1 <STONE> on each remaining even-numbered round space. At the start of these rounds, you get the <STONE>."],
-  cost: { wood: 2 },
-  prerequisite: "2 Occupations",
-  occupationPrerequisites: { min: 2 },
-})
+const CARD_ID = C79_StoneCart.id
 
 export const C79_StoneCart_impl = {
   effect: {

@@ -1,21 +1,10 @@
-import { MinorImprovement } from '../types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
-import { familySize } from '../../game/player'
+import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { C24_BedintheGrainField } from '../../cards-display/C/C24_BedintheGrainField'
+export { C24_BedintheGrainField }
 
 const CARD_ID = 'C24_BedintheGrainField'
-
-export const C24_BedintheGrainField = new MinorImprovement({
-  id: "C24_BedintheGrainField",
-  name: "Bed in the Grain Field",
-  deck: "C",
-  number: 24,
-  category: "ACTIONS_BOOSTER",
-  desc: ["At the start of the next harvest, you get a __Family Growth__ action if you have room for the newborn."],
-  cost: {},
-  prerequisite: "1 Grain Field",
-  newSet: true,
-})
 
 export const C24_BedintheGrainField_impl = {
   effect: {

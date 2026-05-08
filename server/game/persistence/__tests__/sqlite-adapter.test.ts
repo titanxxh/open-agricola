@@ -2,7 +2,7 @@ import Database from 'better-sqlite3'
 import { describe, expect, it, beforeEach } from 'vitest'
 import { SqliteRoomPersistence } from '../sqlite-adapter.ts'
 import type { RoomMeta, RoomSnapshot } from '../room-persistence.ts'
-import type { SerializedGameState } from '../../../../shared/game/serialization.ts'
+import type { SerializedGameState } from '../../../../shared/session/serialization.ts'
 
 const WAITING_TTL = 30 * 60 * 1000
 const PLAYING_TTL = 24 * 60 * 60 * 1000

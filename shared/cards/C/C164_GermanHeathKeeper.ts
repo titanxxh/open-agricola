@@ -1,10 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { C164_GermanHeathKeeper } from '../../cards-display/C/C164_GermanHeathKeeper'
+export { C164_GermanHeathKeeper }
 
-const CARD_ID = 'C164_GermanHeathKeeper'
+const CARD_ID = C164_GermanHeathKeeper.id
 
 const listener: CardListenerRegistration = {
   id: 'C164-german-heath-keeper-any-pig-market',
@@ -17,21 +18,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { sheep: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const C164_GermanHeathKeeper = new Occupation({
-  id: CARD_ID,
-  name: 'German Heath Keeper',
-  deck: 'C',
-  number: 164,
-  category: 'LIVESTOCK_PROVIDER',
-  desc: [
-    'Each time any player (including you) uses the __Pig Market__ accumulation space, you get 1 <SHEEP> from the general supply.',
-  ],
-  cost: {},
-  players: '4+',
-  newSet: true,
-  implemented: true,
-})
 
 export const C164_GermanHeathKeeper_impl = {
   listeners: [listener],

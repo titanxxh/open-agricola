@@ -19,7 +19,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { setWorkersAtHome, setActiveWorkerCount } from '../../shared/game/player'
+import { setWorkersAtHome, setActiveWorkerCount } from '../../shared/domain/player'
 
 // Force card modules to register their effects.
 import '../../shared/cards/B/B3_Moonshine'

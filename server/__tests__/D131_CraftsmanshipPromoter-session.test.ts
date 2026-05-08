@@ -185,8 +185,7 @@ describe('D131_CraftsmanshipPromoter session integration', () => {
     }
   })
 
-  // SKIP[S1]: 'choice'→'request' shape mismatch, see docs/skip-tracker.md
-  it.skip('cost-unaffordable: bottom-row majors filtered out', () => {
+  it('cost-unaffordable: bottom-row majors filtered out', () => {
     const session = setup({
       minorHand: [],
       resources: { food: 0, wood: 0, clay: 0, stone: 0, reed: 0 },

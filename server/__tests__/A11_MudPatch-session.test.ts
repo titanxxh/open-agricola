@@ -4,7 +4,7 @@ import { computeAnimalZones } from '../../shared/domain/animal-zones'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/A/A11_MudPatch'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 describe('A11_MudPatch session', () => {
   const setup = (options?: {

@@ -1,11 +1,13 @@
-import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { PlayerState, Resource } from '../../game/types'
+import type { PlayerState, Resource } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { A126_MasterWorkman } from '../../cards-display/A/A126_MasterWorkman'
+export { A126_MasterWorkman }
 
 const CARD_ID = 'A126_MasterWorkman'
+
 const RESOURCE_MAP: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 
 const getRoundResource = (context: CardListenerContext): keyof Resource | undefined => {
@@ -46,18 +48,6 @@ const masterWorkmanIsDoableListener: CardListenerRegistration = {
     }
   },
 }
-
-export const A126_MasterWorkman = new Occupation({
-  id: "A126_MasterWorkman",
-  name: "Master Workman",
-  deck: "A",
-  number: 126,
-  category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["Each time before you use an action space card on round spaces 1/2/3/4, you get 1 <WOOD>/<CLAY>/<REED>/<STONE>."],
-  cost: {},
-  players: "1+",
-  newSet: true,
-})
 
 export const A126_MasterWorkman_impl = {
   listeners: [masterWorkmanBeforeListener, masterWorkmanIsDoableListener],

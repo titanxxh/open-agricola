@@ -1,9 +1,10 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { C152_Puppeteer } from '../../cards-display/C/C152_Puppeteer'
+export { C152_Puppeteer }
 
-const CARD_ID = 'C152_Puppeteer'
+const CARD_ID = C152_Puppeteer.id
 
 /**
  * C152 Puppeteer:
@@ -49,20 +50,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const C152_Puppeteer = new Occupation({
-  id: CARD_ID,
-  name: 'Puppeteer',
-  deck: 'C',
-  number: 152,
-  category: 'ACTIONS_BOOSTER',
-  desc: [
-    'Each time another player uses the __Traveling Players__ accumulation space, you can pay them 1 <FOOD> to immediately play an occupation without paying an occupation cost.',
-  ],
-  cost: {},
-  players: '4+',
-  evenMoreSet: true,
-})
 
 export const C152_Puppeteer_impl = {
   listeners: [listener],

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { setWorkersAtHome } from '../../shared/game/player'
+import { setWorkersAtHome } from '../../shared/domain/player'
 
 describe('PlayerStats resource origin tracking', () => {
   it('card-effect gains route to resourcesFromCards via applyCardGain helper', async () => {
     const { applyCardGain } = await import('../../shared/cards/helpers/card-gain')
-    const { createInitialPlayerStats } = await import('../../shared/logic/stats')
+    const { createInitialPlayerStats } = await import('../../shared/session/stats')
     const player = {
       id: 'p',
       resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },

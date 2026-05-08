@@ -1,11 +1,12 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B83_MuddyPuddles } from '../../cards-display/B/B83_MuddyPuddles'
+export { B83_MuddyPuddles }
 
-const CARD_ID = 'B83_MuddyPuddles'
+const CARD_ID = B83_MuddyPuddles.id
 
 /**
  * Stack order (bottom to top): boar, food, cattle, food, sheep.
@@ -34,17 +35,6 @@ const anytimeListener: CardListenerRegistration = {
     }
   },
 }
-
-export const B83_MuddyPuddles = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Muddy Puddles',
-  deck: 'B',
-  number: 83,
-  category: 'LIVESTOCK_PROVIDER',
-  desc: ['Pile (from bottom to top) 1 <PIG>, 1 <FOOD>, 1 <CATTLE>, 1 <FOOD>, and 1 <SHEEP> on this card. At any time, you can pay 1 <CLAY> to take the top good.'],
-  cost: { clay: 2 },
-  players: '1+',
-})
 
 export const B83_MuddyPuddles_impl = {
   listeners: [anytimeListener],

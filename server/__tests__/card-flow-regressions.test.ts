@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 
-import { setWorkersAtHome, workersAvailable, familySize } from '../../shared/game/player'
+import { setWorkersAtHome, workersAvailable, familySize } from '../../shared/domain/player'
 import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/A/A17_ReclamationPlow'
 import '../../shared/cards/D/D150_GodlySpouse'

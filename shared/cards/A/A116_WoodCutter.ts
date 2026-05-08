@@ -1,10 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { A116_WoodCutter } from '../../cards-display/A/A116_WoodCutter'
+export { A116_WoodCutter }
 
-const CARD_ID = 'A116_WoodCutter'
+const CARD_ID = A116_WoodCutter.id
 
 /**
  * A116 Wood Cutter — Each time you use a wood accumulation space
@@ -24,19 +25,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const A116_WoodCutter = new Occupation({
-  id: CARD_ID,
-  name: "Wood Cutter",
-  deck: "A",
-  number: 116,
-  category: "BUILDING_RESOURCE_PROVIDER",
-  desc: [
-    "Each time you use a wood accumulation space, you get 1 additional <WOOD>.",
-  ],
-  cost: {},
-  players: "1+",
-})
 
 export const A116_WoodCutter_impl = {
   listeners: [listener],

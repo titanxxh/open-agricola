@@ -1,7 +1,8 @@
-import { PlayerActionCard } from '../types'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import { incCounter } from '../__stubs__/helpers'
 import type { CardImpl } from '../registry'
+import { A39_Chapel } from '../../cards-display/A/A39_Chapel'
+export { A39_Chapel }
 
 const CARD_ID = 'A39_Chapel'
 
@@ -29,19 +30,6 @@ registerPlayerActionSpace({
       return { type: 'ok' }
     },
   }),
-})
-
-export const A39_Chapel = new PlayerActionCard({
-  id: "A39_Chapel",
-  name: "Chapel",
-  deck: "A",
-  number: 39,
-  category: "POINTS_PROVIDER",
-  desc: ["This is an action space for all. A player who uses it gets 3 bonus <SCORE>. If another player uses it, they must first pay you 1 <GRAIN>."],
-  cost: {"wood":3,"clay":2},
-  prerequisite: "2 Occupations",
-  occupationPrerequisites: {"min":2},
-  extraVp: true,
 })
 
 export const A39_Chapel_impl = {

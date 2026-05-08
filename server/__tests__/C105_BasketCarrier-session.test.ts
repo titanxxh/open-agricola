@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { markAllWorkersUsed, setActiveWorkerCount, setNewbornCount } from '../../shared/game/player'
+import { markAllWorkersUsed, setActiveWorkerCount, setNewbornCount } from '../../shared/domain/player'
 import { C105_BasketCarrier } from '../../shared/cards/C/C105_BasketCarrier'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
-import type { PlayerState, Resource } from '../../shared/game/types'
+import type { PlayerState, Resource } from '../../shared/contract/types'
 import { confirmNextPlayer } from './_helpers/legacy-confirms'
 
 const CARD_ID = 'C105_BasketCarrier'

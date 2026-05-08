@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import '../../shared/cards/register-all'
-import type { ActionFlow, GameState, PlayerState, Resource } from '../../shared/game/types'
+import type { ActionFlow, GameState, PlayerState, Resource } from '../../shared/contract/types'
 
 const CARD_ID = 'E149_MidnightFencer'
 

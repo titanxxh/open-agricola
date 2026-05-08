@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { D62_BeerTap, D62_BeerTap_impl } from '../../shared/cards/D/D62_BeerTap'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
-import type { PlayerState, Resource } from '../../shared/game/types'
+import type { PlayerState, Resource } from '../../shared/contract/types'
 
 const CARD_ID = 'D62_BeerTap'
 

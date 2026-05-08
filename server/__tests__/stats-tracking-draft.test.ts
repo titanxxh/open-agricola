@@ -38,7 +38,7 @@ describe('PlayerStats draft tracking', () => {
   })
 
   it('recordDraftPlayed sets playedTurn on the original draft entry when occupation is played', async () => {
-    const { recordDraftPick, recordDraftPlayed, createInitialPlayerStats } = await import('../../shared/logic/stats')
+    const { recordDraftPick, recordDraftPlayed, createInitialPlayerStats } = await import('../../shared/session/stats')
     const player = {
       id: 'p1',
       stats: createInitialPlayerStats({ isFirstPlayer: false }),

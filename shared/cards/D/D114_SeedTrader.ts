@@ -1,11 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { D114_SeedTrader } from '../../cards-display/D/D114_SeedTrader'
+export { D114_SeedTrader }
 
-const CARD_ID = 'D114_SeedTrader'
+const CARD_ID = D114_SeedTrader.id
 
 /**
  * D114 Seed Trader (Sprint 7a F5+F6).
@@ -72,19 +73,6 @@ const anytimeListener: CardListenerRegistration = {
     }
   },
 }
-
-export const D114_SeedTrader = new Occupation({
-  id: CARD_ID,
-  name: 'Seed Trader',
-  deck: 'D',
-  number: 114,
-  category: 'CROP_PROVIDER',
-  desc: [
-    'Place 2 <GRAIN> and 2 <VEGETABLE> on this card. You can buy them at any time. Each <GRAIN> costs 2 <FOOD>; each <VEGETABLE> costs 3 <FOOD>.',
-  ],
-  cost: {},
-  players: '1+',
-})
 
 export const D114_SeedTrader_impl = {
   listeners: [anytimeListener],

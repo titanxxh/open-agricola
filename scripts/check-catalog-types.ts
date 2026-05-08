@@ -11,7 +11,7 @@ import {
   MinorImprovement,
   Occupation,
   PlayerActionCard,
-} from '../shared/cards/types'
+} from '../shared/cards-display/types'
 
 const misInOcc = occupationCards.filter(
   (c) => c instanceof MinorImprovement || c instanceof PlayerActionCard,

@@ -1,14 +1,16 @@
-import { Occupation } from '../types'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
-import type { ActionChoiceOption, ActionFlow, PlayerState } from '../../game/types'
+import type { ActionChoiceOption, ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { E134_Omnifarmer } from '../../cards-display/E/E134_Omnifarmer'
+export { E134_Omnifarmer }
 
-const CARD_ID = 'E134_Omnifarmer'
+const CARD_ID = E134_Omnifarmer.id
 
 type Storable = 'grain' | 'vegetable' | 'sheep' | 'boar' | 'cattle'
 
 const KEY_STORED = 'storedGoods'
+
 const KEY_USED = 'usedThisHarvest'
 
 const readStored = (player: PlayerState): Storable[] =>
@@ -37,17 +39,6 @@ const buildChoiceFlow = (types: Storable[]): ActionFlow | undefined => {
     },
   }
 }
-
-export const E134_Omnifarmer = new Occupation({
-  id: CARD_ID,
-  name: 'Omnifarmer',
-  deck: 'E',
-  number: 134,
-  category: 'BONUS_POINTS',
-  desc: ['Each harvest, you can place 1 harvested crop or 1 newborn animal on this card, irretrievably. Once this game, if there are 2/3/4/5 different goods on this, you get 3/5/7/9 bonus <SCORE>.'],
-  cost: {},
-  players: '3+',
-})
 
 export const E134_Omnifarmer_impl = {
   effect: {

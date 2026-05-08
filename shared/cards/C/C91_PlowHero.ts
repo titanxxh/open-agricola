@@ -1,11 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
+import { C91_PlowHero } from '../../cards-display/C/C91_PlowHero'
+export { C91_PlowHero }
 
-const CARD_ID = 'C91_PlowHero'
+const CARD_ID = C91_PlowHero.id
 
 const listener: CardListenerRegistration = {
   id: 'C91-plow-hero-after-place-farmer',
@@ -31,18 +32,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const C91_PlowHero = new Occupation({
-  id: CARD_ID,
-  name: 'Plow Hero',
-  deck: 'C',
-  number: 91,
-  category: 'FARM_PLANNER',
-  desc: ['Each time you use the __Farmland__ or __Cultivation__ action space with the first person you place in a round, you can plow 1 additional field for 1 <FOOD>.'],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
 
 export const C91_PlowHero_impl = {
   listeners: [listener],

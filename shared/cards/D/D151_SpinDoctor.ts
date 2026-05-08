@@ -1,13 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { workersAvailable } from '../../game/player'
+import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { D151_SpinDoctor } from '../../cards-display/D/D151_SpinDoctor'
+export { D151_SpinDoctor }
 
-const CARD_ID = 'D151_SpinDoctor'
+const CARD_ID = D151_SpinDoctor.id
 
-// Immediately after using Traveling Players, can place another person on any action space
-// (even occupied), excluding Meeting Place.
 const listener: CardListenerRegistration = {
   id: 'D151-spin-doctor-after-place-farmer',
   cardIds: [CARD_ID],
@@ -38,17 +37,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const D151_SpinDoctor = new Occupation({
-  id: CARD_ID,
-  name: 'Spin Doctor',
-  deck: 'D',
-  number: 151,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['Immediately after each time you use the __Traveling Players__ accumulation space, you can place another person on an action space of your choice, regardless whether or not the action space is occupied.'],
-  cost: {},
-  players: '4+',
-})
 
 export const D151_SpinDoctor_impl = {
   listeners: [listener],

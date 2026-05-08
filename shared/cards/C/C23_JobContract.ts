@@ -1,12 +1,14 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionFlow, GameState, PlayerState } from '../../game/types'
-import { addWorkerRef, isSpaceOccupied } from '../../game/space'
-import { smallestAvailableWorker } from '../../game/player'
+import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
+import { addWorkerRef, isSpaceOccupied } from '../../domain/space'
+import { smallestAvailableWorker } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { C23_JobContract } from '../../cards-display/C/C23_JobContract'
+export { C23_JobContract }
 
-const CARD_ID = 'C23_JobContract'
+const CARD_ID = C23_JobContract.id
+
 const LESSONS_SPACE_IDS = ['lessons', 'lessons-4'] as const
 
 /**
@@ -92,20 +94,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const C23_JobContract = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Job Contract',
-  deck: 'C',
-  number: 23,
-  category: 'ACTIONS_BOOSTER',
-  desc: [
-    'If both are unoccupied, you can use the __Day Laborer__ and the adjacent __Lessons__ action space with a single person (in that order). Afterward, both spaces are considered occupied.',
-  ],
-  cost: {},
-  prerequisite: 'No Occupations',
-  occupationPrerequisites: { max: 0 },
-})
 
 export const C23_JobContract_impl = {
   listeners: [listener],

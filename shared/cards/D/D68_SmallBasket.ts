@@ -1,13 +1,12 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { D68_SmallBasket } from '../../cards-display/D/D68_SmallBasket'
+export { D68_SmallBasket }
 
-const CARD_ID = 'D68_SmallBasket'
+const CARD_ID = D68_SmallBasket.id
 
-// After Reed Bank: optional pay 1 reed → get 1 vegetable.
-// In 4+ player games, the reed goes back on the accumulation space.
 const listener: CardListenerRegistration = {
   id: 'D68-small-basket-after-place-farmer',
   cardIds: [CARD_ID],
@@ -48,19 +47,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const D68_SmallBasket = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Small Basket',
-  deck: 'D',
-  number: 68,
-  category: 'CROP_PROVIDER',
-  desc: ['Each time after you use the __Reed Bank__ accumulation space, you can pay 1 <REED> to get 1 <VEGETABLE>. If you do in a game with 4+ players, place that 1 <REED> on the accumulation space.'],
-  cost: {},
-  prerequisite: '2 Occupations',
-  occupationPrerequisites: { min: 2 },
-  newSet: true,
-})
 
 export const D68_SmallBasket_impl = {
   listeners: [listener],

@@ -25,7 +25,7 @@
  * explicit VP hooks).
  */
 import { describe, expect, it } from 'vitest'
-import type { GameState, PlayerState, Resource } from '../../game/types'
+import type { GameState, PlayerState, Resource } from '../../contract/types'
 import { computeScores } from '../scoring'
 import '../../cards/D/D25_WitchesDanceFloor'
 

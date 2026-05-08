@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import { getCardEffect } from '../card-effects'
-import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
 
 import '../D/D50_ForeignAid'
 import { getBlockedSpaceIds } from '../D/D50_ForeignAid'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'D50_ForeignAid'
@@ -103,21 +103,23 @@ describe('D50_ForeignAid', () => {
   })
 
   describe('computeArgs place-farmer', () => {
-    // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
-    it.skip('filters out rounds 12-14 spaces from options', () => {
+    it('filters out rounds 12-14 spaces from options', () => {
       const listener = findListener('D50-foreign-aid-compute-args-place-farmer')!
       expect(listener).toBeDefined()
       const player = createPlayer()
       const state = createState(player)
       const result = {
-        type: 'choice' as const,
-        options: [
-          { value: 'forest', labelKey: 'actions.forest.name' },
-          { value: 'farmland', labelKey: 'actions.farmland.name' },
-          { value: 'cultivation', labelKey: 'actions.cultivation.name' },
-          { value: 'urgent-wish-children', labelKey: 'actions.urgent-wish-children.name' },
-          { value: 'farm-redevelopment', labelKey: 'actions.farm-redevelopment.name' },
-        ],
+        type: 'request' as const,
+        request: {
+          kind: 'choice' as const,
+          options: [
+            { value: 'forest', labelKey: 'actions.forest.name' },
+            { value: 'farmland', labelKey: 'actions.farmland.name' },
+            { value: 'cultivation', labelKey: 'actions.cultivation.name' },
+            { value: 'urgent-wish-children', labelKey: 'actions.urgent-wish-children.name' },
+            { value: 'farm-redevelopment', labelKey: 'actions.farm-redevelopment.name' },
+          ],
+        },
       }
       executeCardListener(listener, {
         state, player,
@@ -125,8 +127,8 @@ describe('D50_ForeignAid', () => {
         result,
       } as unknown as CardListenerContext)
       // Only non-blocked spaces remain
-      expect(result.options).toHaveLength(2)
-      expect(result.options.map(o => o.value)).toEqual(['forest', 'farmland'])
+      expect(result.request.options).toHaveLength(2)
+      expect(result.request.options.map(o => o.value)).toEqual(['forest', 'farmland'])
     })
 
 

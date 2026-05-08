@@ -1,4 +1,4 @@
-import type { ActionExecutionContext, ActionExecutionResult, ActionSpace, GameState, PlayerState, Resource, Trade } from '../game/types'
+import type { ActionExecutionContext, ActionExecutionResult, ActionSpace, GameState, PlayerState, Resource, Trade } from '../contract/types'
 import { runActionHooks, type ActionHookContext, type ActionHookPhase, type ActionHookResult } from '../actions/hooks'
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
@@ -256,14 +256,14 @@ export const collectComputeChoiceCandidates = (
   state: GameState,
   player: PlayerState,
   actionId: string,
-): import('../game/types').ActionChoiceOption[] => {
+): import('../contract/types').ActionChoiceOption[] => {
   const baseCtx: CardListenerContext = {
     state,
     player,
     actionId,
     phase: 'computeChoiceCandidates' as ActionHookPhase,
   } as CardListenerContext
-  const out: import('../game/types').ActionChoiceOption[] = []
+  const out: import('../contract/types').ActionChoiceOption[] = []
   for (const matched of getMatchingListeners(baseCtx)) {
     const result = executeCardListener(matched.registration, baseCtx, {
       ownerPlayerId: matched.ownerPlayerId,

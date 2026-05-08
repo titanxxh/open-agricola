@@ -1,20 +1,8 @@
-import { MinorImprovement } from '../types'
 import type { CardImpl } from '../registry'
+import { E23_Apiary } from '../../cards-display/E/E23_Apiary'
+export { E23_Apiary }
 
-const CARD_ID = 'E23_Apiary'
-
-export const E23_Apiary = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Apiary',
-  deck: 'E',
-  number: 23,
-  category: 'ACTION',
-  desc: ['At the end of each work phase, you can sow exactly 1 crop on 1 field.'],
-  cost: {},
-  prerequisite: '4 Occupations',
-  occupationPrerequisites: { min: 4 },
-  evenMoreSet: true,
-})
+const CARD_ID = E23_Apiary.id
 
 export const E23_Apiary_impl = {
   effect: {

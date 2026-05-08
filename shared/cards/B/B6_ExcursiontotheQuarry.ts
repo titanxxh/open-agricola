@@ -1,22 +1,10 @@
-import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { familySize } from '../../game/player'
+import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { B6_ExcursiontotheQuarry } from '../../cards-display/B/B6_ExcursiontotheQuarry'
+export { B6_ExcursiontotheQuarry }
 
-const CARD_ID = 'B6_ExcursiontotheQuarry'
-
-export const B6_ExcursiontotheQuarry = new MinorImprovement({
-  id: CARD_ID,
-  name: "Excursion to the Quarry",
-  deck: "B",
-  number: 6,
-  category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["You immediately get a number of <STONE> equal to the number of people you have."],
-  cost: { food: 2 },
-  passing: true,
-  prerequisite: "1 Occupation",
-  occupationPrerequisites: { min: 1 },
-})
+const CARD_ID = B6_ExcursiontotheQuarry.id
 
 export const B6_ExcursiontotheQuarry_impl = {
   effect: {

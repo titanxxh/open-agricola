@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/B/B154_SheepKeeper'
-import type { AnytimeAction } from '../../shared/game/types';
+import type { AnytimeAction } from '../../shared/contract/types';
 
 const CARD_ID = 'B154_SheepKeeper'
 

@@ -1,10 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E165_MasterHuntsman } from '../../cards-display/E/E165_MasterHuntsman'
+export { E165_MasterHuntsman }
 
-const CARD_ID = 'E165_MasterHuntsman'
+const CARD_ID = E165_MasterHuntsman.id
 
 /**
  * E165 Master Huntsman:
@@ -39,19 +40,6 @@ const majorImprovementListener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { boar: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const E165_MasterHuntsman = new Occupation({
-  id: CARD_ID,
-  name: 'Master Huntsman',
-  deck: 'E',
-  number: 165,
-  category: 'ANIMALS_-_WILD_BOAR',
-  desc: [
-    'When you play this card and each time you build a major improvement, you get 1 <PIG>.',
-  ],
-  cost: {},
-  players: '4+',
-})
 
 export const E165_MasterHuntsman_impl = {
   listeners: [onBuyListener, majorImprovementListener],

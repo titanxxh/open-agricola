@@ -1,8 +1,9 @@
-import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { D136_AnimalActivist } from '../../cards-display/D/D136_AnimalActivist'
+export { D136_AnimalActivist }
 
-const CARD_ID = 'D136_AnimalActivist'
+const CARD_ID = D136_AnimalActivist.id
 
 const roundsLeftWoodBonus = (state: { round: number }): number => {
   const remaining = 14 - state.round
@@ -11,19 +12,6 @@ const roundsLeftWoodBonus = (state: { round: number }): number => {
   if (remaining >= 3) return 2
   return 0
 }
-
-export const D136_AnimalActivist = new Occupation({
-  id: CARD_ID,
-  name: "Animal Activist",
-  deck: "D",
-  number: 136,
-  category: "POINTS_PROVIDER",
-  desc: [
-    'If there are still 3/6/9 complete rounds left to play, you immediately get 2/3/4 <WOOD>. During scoring, each player with the most fenced stables gets 2 bonus <SCORE>.',
-  ],
-  cost: {},
-  players: "3+",
-})
 
 export const D136_AnimalActivist_impl = {
   effect: {

@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { GameSession } from './game/authoritative-session.ts'
-import { serializeState, serializeStateForPlayer } from '../shared/game/serialization.ts'
+import { serializeState, serializeStateForPlayer } from '../shared/session/serialization.ts'
 import {
   playerBoard,
   type SowSelection,
@@ -8,12 +8,12 @@ import {
 } from '../shared/domain/index.ts'
 import { playerCanBuildPalisades } from '../shared/cards/helpers/card-type.ts'
 import { collectLockedFarmTileKeys } from '../shared/cards/card-effects.ts'
-import type { FarmTilePosition } from '../shared/game/types.ts'
+import type { FarmTilePosition } from '../shared/contract/types.ts'
 import { getDb } from './db.ts'
 import { validateSession, extractToken } from './auth.ts'
 import type { CustomCardData } from '../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../shared/custom-code/types.ts'
-import { defaultSandboxDeckIds, defaultSandboxPlayerNames } from '../shared/logic/state.ts'
+import { defaultSandboxDeckIds, defaultSandboxPlayerNames } from '../shared/session/state-bootstrap.ts'
 
 /**
  * Per-user HTTP game sessions, keyed by user ID.

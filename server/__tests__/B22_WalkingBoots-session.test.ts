@@ -5,8 +5,8 @@ import {
   readCardExtraData,
   writeCardExtraData,
 } from '../../shared/cards/helpers/card-state'
-import { setWorkersAtHome } from '../../shared/game/player'
-import type { ActionFlow } from '../../shared/game/types'
+import { setWorkersAtHome } from '../../shared/domain/player'
+import type { ActionFlow } from '../../shared/contract/types'
 
 import { B22_WalkingBoots } from '../../shared/cards/B/B22_WalkingBoots'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'

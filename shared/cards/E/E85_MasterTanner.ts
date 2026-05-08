@@ -1,14 +1,13 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData, getCardStack } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { E85_MasterTanner } from '../../cards-display/E/E85_MasterTanner'
+export { E85_MasterTanner }
 
-const CARD_ID = 'E85_MasterTanner'
-
-// ── Part 1: Exchange monitoring (before/after) ──
+const CARD_ID = E85_MasterTanner.id
 
 const beforeExchangeListener: CardListenerRegistration = {
   id: 'E85-master-tanner-before-exchange',
@@ -51,16 +50,6 @@ const afterExchangeListener: CardListenerRegistration = {
     }
   },
 }
-
-export const E85_MasterTanner = new Occupation({
-  id: CARD_ID,
-  name: 'Master Tanner',
-  deck: 'E',
-  number: 85,
-  desc: ['For each <PIG> or <CATTLE> you turn into <FOOD>, you can place 1 of that <FOOD> on this card. While its <FOOD> equals your number of rooms, this card provides room for 1 person.'],
-  cost: {},
-  players: '1+',
-})
 
 export const E85_MasterTanner_impl = {
   listeners: [beforeExchangeListener, afterExchangeListener],

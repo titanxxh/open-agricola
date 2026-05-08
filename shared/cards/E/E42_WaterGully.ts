@@ -1,23 +1,12 @@
-import { MinorImprovement } from '../types'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
+import { E42_WaterGully } from '../../cards-display/E/E42_WaterGully'
+export { E42_WaterGully }
 
-const CARD_ID = 'E42_WaterGully'
+const CARD_ID = E42_WaterGully.id
 
-// BGA isBuyable: !hasPlayedCard('Major_Well') → false
 registerPrerequisite('Major Well', (player) => player.improvements.includes('Major_Well'))
-
-export const E42_WaterGully = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Water Gully',
-  deck: 'E',
-  number: 42,
-  category: 'GOODS_-_GET',
-  desc: ['Place 1 <CATTLE>, 1 <GRAIN>, and 1 <CATTLE> on the next 3 round spaces (in that order). At the start of these rounds, you get the respective good.'],
-  cost: { stone: 1 },
-  prerequisite: 'Major Well',
-})
 
 export const E42_WaterGully_impl = {
   effect: {

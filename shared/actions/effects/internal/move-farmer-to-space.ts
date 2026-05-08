@@ -1,6 +1,6 @@
-import type { ActionDefinition, ActionSpace } from '../../../game/types'
-import { addWorkerRef, spaceHasPlayer } from '../../../game/space'
-import { smallestAvailableWorker } from '../../../game/player'
+import type { ActionDefinition, ActionSpace } from '../../../contract/types'
+import { addWorkerRef, spaceHasPlayer } from '../../../domain/space'
+import { smallestAvailableWorker } from '../../../domain/player'
 import { computeAllowedPlacementSpaces, type AllowedPlacement } from '../../helpers/placement-availability'
 
 /**

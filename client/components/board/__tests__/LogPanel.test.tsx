@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-import type { GameState } from '../../../../shared/game/types'
+import type { GameState } from '../../../../shared/contract/types'
 import { LogPanel } from '../LogPanel'
 
 const stripHtml = (html: string) =>

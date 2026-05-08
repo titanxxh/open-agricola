@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
-import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
 
 import '../B/B36_Bottles'
 import { B36_Bottles as B36Card } from '../B/B36_Bottles'
 
-import { setActiveWorkerCount } from '../../game/player'
+import { setActiveWorkerCount } from '../../domain/player'
 import type { CardListenerContext } from '../card-listeners'
 const CARD_ID = 'B36_Bottles'
 

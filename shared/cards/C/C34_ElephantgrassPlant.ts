@@ -1,20 +1,9 @@
-import { MinorImprovement } from '../types'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { C34_ElephantgrassPlant } from '../../cards-display/C/C34_ElephantgrassPlant'
+export { C34_ElephantgrassPlant }
 
-const CARD_ID = 'C34_ElephantgrassPlant'
-
-export const C34_ElephantgrassPlant = new MinorImprovement({
-  id: CARD_ID,
-  name: "Elephantgrass Plant",
-  deck: "C",
-  number: 34,
-  category: "POINTS_PROVIDER",
-  desc: ["Immediately after each harvest, you can use this card to exchange exactly 1 <REED> for 1 bonus <SCORE>."],
-  cost: { clay: 2, stone: 1 },
-  prerequisite: "2 Occupations",
-  occupationPrerequisites: { min: 2 },
-})
+const CARD_ID = C34_ElephantgrassPlant.id
 
 export const C34_ElephantgrassPlant_impl = {
   effect: {

@@ -1,4 +1,3 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { returnCardToBoard } from '../helpers/return-card'
@@ -9,11 +8,15 @@ import {
   writeCardExtraData,
   readCardExtraData,
 } from '../helpers/card-state'
-import type { ActionFlow, GameState, PlayerState } from '../../game/types'
+import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { D27_Retraining } from '../../cards-display/D/D27_Retraining'
+export { D27_Retraining }
 
-const CARD_ID = 'D27_Retraining'
+const CARD_ID = D27_Retraining.id
+
 const SWAP_KEY = 'pendingSwap'
+
 const FIELD_EFFECT = 'D27-retraining-swap'
 
 /**
@@ -51,9 +54,6 @@ const determineSwap = (
   return null
 }
 
-// Selection-effect: perform the swap. We do not care about the selected positions.
-// The swap target was stashed on the card's extraData immediately before the
-// engine executed this leaf; we read it here and mutate.
 registerSelectionEffect(FIELD_EFFECT, ({ player }) => {
   const swap = readCardExtraData<{ from: string; to: string }>(
     player,
@@ -80,7 +80,6 @@ registerSelectionEffect(FIELD_EFFECT, ({ player }) => {
   player.improvements.push(swap.to)
 })
 
-// Phase 1: after renovation → flag the card.
 const renovationListener: CardListenerRegistration = {
   id: 'D27-retraining-after-renovation',
   cardIds: [CARD_ID],
@@ -93,7 +92,6 @@ const renovationListener: CardListenerRegistration = {
   },
 }
 
-// Phase 2: after any place-farmer, if flagged, offer the swap and unflag.
 const placeFarmerListener: CardListenerRegistration = {
   id: 'D27-retraining-after-place-farmer',
   cardIds: [CARD_ID],
@@ -161,22 +159,6 @@ const placeFarmerListener: CardListenerRegistration = {
     }
   },
 }
-
-export const D27_Retraining = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Retraining',
-  deck: 'D',
-  number: 27,
-  category: 'ACTIONS_BOOSTER',
-  desc: [
-    "At the end of each turn in which you renovate, you can exchange your __Joinery__ for the __Pottery__ or your __Pottery__ for the __Basketmaker's Workshop__.",
-  ],
-  vp: 1,
-  cost: { food: 1 },
-  prerequisite: '1 Occupation',
-  occupationPrerequisites: { min: 1 },
-  evenMoreSet: true,
-})
 
 export const D27_Retraining_impl = {
   listeners: [renovationListener, placeFarmerListener],

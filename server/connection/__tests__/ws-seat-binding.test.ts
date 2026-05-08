@@ -20,8 +20,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
 import { createWsServer } from '../ws-server.ts'
 import { InMemoryRoomPersistence } from '../../game/persistence/memory-adapter.ts'
-import type { ServerEvent } from '../../../shared/protocol/ws.ts'
-import type { StateUpdateEnvelope } from '../../../shared/protocol/game.ts'
+import type { ServerEvent } from '../../../shared/contract/protocol/ws.ts'
+import type { StateUpdateEnvelope } from '../../../shared/contract/protocol/game.ts'
 
 type TestSocket = WebSocket & {
   received: ServerEvent[]

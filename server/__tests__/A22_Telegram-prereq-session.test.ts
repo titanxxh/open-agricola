@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { A22_Telegram } from '../../shared/cards/A/A22_Telegram'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { maxFences } from '../../shared/actions/effects/fencing'
-import type { FenceSegment } from '../../shared/game/types'
+import type { FenceSegment } from '../../shared/contract/types'
 
 describe('A22_Telegram prerequisite', () => {
   it('blocks when player has placed all fences (no fences in supply)', () => {

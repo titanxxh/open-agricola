@@ -1,11 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { canStartFencing, getFenceCount } from '../../actions/effects/fencing'
 import { clearPendingFenceBonus } from '../helpers/pending-fence-bonus'
 import type { CardImpl } from '../registry'
+import { C88_CarpentersApprentice } from '../../cards-display/C/C88_CarpentersApprentice'
+export { C88_CarpentersApprentice }
 
-const CARD_ID = 'C88_CarpentersApprentice'
+const CARD_ID = C88_CarpentersApprentice.id
 
 const constructCostListener: CardListenerRegistration = {
   id: 'C88-carpenters-apprentice-costs-construct',
@@ -84,17 +85,6 @@ const fenceAfterListener: CardListenerRegistration = {
     clearPendingFenceBonus(context.player)
   },
 }
-
-export const C88_CarpentersApprentice = new Occupation({
-  id: CARD_ID,
-  name: "Carpenter's Apprentice",
-  deck: "C",
-  number: 88,
-  category: "FARM_PLANNER",
-  desc: ["Wood rooms cost you 2 <WOOD> less. Your 3rd and 4th stable each cost you 1 <WOOD> less. Your 13th to 15th fence each cost you nothing."],
-  cost: {},
-  players: "1+",
-})
 
 export const C88_CarpentersApprentice_impl = {
   listeners: [constructCostListener, stablesCostListener, fenceIsDoableListener, fenceBeforeListener, fenceAfterListener],

@@ -1,10 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { C153_PatternMaker } from '../../cards-display/C/C153_PatternMaker'
+export { C153_PatternMaker }
 
-const CARD_ID = 'C153_PatternMaker'
+const CARD_ID = C153_PatternMaker.id
 
 /**
  * C153 Pattern Maker:
@@ -45,19 +46,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const C153_PatternMaker = new Occupation({
-  id: CARD_ID,
-  name: 'Pattern Maker',
-  deck: 'C',
-  number: 153,
-  category: 'POINTS_PROVIDER',
-  desc: [
-    'Each time another player renovates, you can exchange exactly 2 <WOOD> for 1 <GRAIN>, 1 <FOOD>, and 1 bonus <SCORE>.',
-  ],
-  cost: {},
-  players: '4+',
-})
 
 export const C153_PatternMaker_impl = {
   listeners: [listener],

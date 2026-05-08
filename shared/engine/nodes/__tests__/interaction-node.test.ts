@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { InteractionNode, getOptionsSourceCard, resolveChoiceSourceCard } from '../interaction-node'
 import type { EngineContext } from '../../types'
-import type { ActionChoiceOption } from '../../../game/types'
+import type { ActionChoiceOption } from '../../../contract/types'
 
 const stubCtx: EngineContext = { resolveSubtree: () => {}, emitChoice: () => {} }
 

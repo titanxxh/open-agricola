@@ -1,24 +1,12 @@
-import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
+import { D48_CivicFacade } from '../../cards-display/D/D48_CivicFacade'
+export { D48_CivicFacade }
 
-const CARD_ID = 'D48_CivicFacade'
+const CARD_ID = D48_CivicFacade.id
 
-// BGA isBuyable: countRooms() < 3 → false
 registerPrerequisite('3 Rooms', (player) => player.rooms >= 3)
-
-export const D48_CivicFacade = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Civic Facade',
-  deck: 'D',
-  number: 48,
-  category: 'FOOD_PROVIDER',
-  desc: ['Before the start of each round, if you have more occupations than improvements in your hand, you get 1 <FOOD>.'],
-  cost: { clay: 1 },
-  prerequisite: '3 Rooms',
-  newSet: true,
-})
 
 export const D48_CivicFacade_impl = {
   effect: {

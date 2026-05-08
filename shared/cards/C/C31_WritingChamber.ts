@@ -1,17 +1,8 @@
-import { MinorImprovement } from '../types'
 import type { CardImpl } from '../registry'
+import { C31_WritingChamber } from '../../cards-display/C/C31_WritingChamber'
+export { C31_WritingChamber }
 
-const CARD_ID = 'C31_WritingChamber'
-
-export const C31_WritingChamber = new MinorImprovement({
-  id: CARD_ID,
-  name: "Writing Chamber",
-  deck: "C",
-  number: 31,
-  category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get a number of bonus <SCORE> equal to the total of negative points you have, to a maximum of 7 <SCORE>."],
-  cost: {"wood":2},
-})
+const CARD_ID = C31_WritingChamber.id
 
 export const C31_WritingChamber_impl = {
   effect: {

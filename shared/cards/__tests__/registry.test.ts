@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { CardRegistry, type CardImpl } from '../registry'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { CardEffect } from '../card-effects'
-import type { CostModifier } from '../../game/types'
+import type { CostModifier } from '../../contract/types'
 
 describe('CardRegistry', () => {
   it('stores listeners by cardId after loadImpl', () => {

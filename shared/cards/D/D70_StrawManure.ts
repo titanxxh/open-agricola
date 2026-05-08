@@ -1,10 +1,11 @@
-import { MinorImprovement } from '../types'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
-import { fieldFindStackOfKind, fieldHasCrop } from '../../game/field'
+import { fieldFindStackOfKind, fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { D70_StrawManure } from '../../cards-display/D/D70_StrawManure'
+export { D70_StrawManure }
 
-const CARD_ID = 'D70_StrawManure'
+const CARD_ID = D70_StrawManure.id
 
 registerSelectionEffect('add-vegetable', ({ player, positions }) => {
   for (const key of positions) {
@@ -15,17 +16,6 @@ registerSelectionEffect('add-vegetable', ({ player, positions }) => {
       if (vegStack) vegStack.remaining += 1
     }
   }
-})
-
-export const D70_StrawManure = new MinorImprovement({
-  id: CARD_ID,
-  name: "Straw Manure",
-  deck: "D",
-  number: 70,
-  category: "CROP_PROVIDER",
-  desc: ["Before the field phase of each harvest, you can pay 1 <GRAIN> from your supply to add 1 <VEGETABLE> to each of up to 2 vegetable fields."],
-  cost: {},
-  prerequisite: "2 Fields",
 })
 
 export const D70_StrawManure_impl = {

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { GameState, PlayerState, ActionSpace, ActionDefinition } from '../../../game/types'
+import type { GameState, PlayerState, ActionSpace, ActionDefinition } from '../../../contract/types'
 import { ActionRegistry } from '../../../engine/registry'
 import { Engine } from '../../../engine/engine'
 import { EngineTree } from '../../../engine/tree'

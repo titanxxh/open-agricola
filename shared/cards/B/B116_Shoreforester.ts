@@ -1,22 +1,9 @@
-import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B116_Shoreforester } from '../../cards-display/B/B116_Shoreforester'
+export { B116_Shoreforester }
 
-const CARD_ID = 'B116_Shoreforester'
-
-export const B116_Shoreforester = new Occupation({
-  id: CARD_ID,
-  name: 'Shoreforester',
-  deck: 'B',
-  number: 116,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: [
-    'When you play this card and each time 1 <REED> is placed on an empty __Reed Bank__ accumulation space in the preparation phase, you get 1 <WOOD>.',
-  ],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
+const CARD_ID = B116_Shoreforester.id
 
 export const B116_Shoreforester_impl = {
   effect: {

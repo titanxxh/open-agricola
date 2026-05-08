@@ -1,10 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B159_LieutenantGeneral } from '../../cards-display/B/B159_LieutenantGeneral'
+export { B159_LieutenantGeneral }
 
-const CARD_ID = 'B159_LieutenantGeneral'
+const CARD_ID = B159_LieutenantGeneral.id
 
 /**
  * B159 Lieutenant General (Occupation, B, 159)
@@ -35,20 +36,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, reward), sourceCard: CARD_ID }
   },
 }
-
-export const B159_LieutenantGeneral = new Occupation({
-  id: CARD_ID,
-  name: 'Lieutenant General',
-  deck: 'B',
-  number: 159,
-  category: 'FOOD_PROVIDER',
-  desc: [
-    'For each field tile that another player places next to an existing field tile, you get 1 <FOOD> from the general supply. In round 14, you get 1 <GRAIN> instead.',
-  ],
-  cost: {},
-  players: '4+',
-  newSet: true,
-})
 
 export const B159_LieutenantGeneral_impl = {
   listeners: [listener],

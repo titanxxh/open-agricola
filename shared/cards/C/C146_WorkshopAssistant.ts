@@ -1,16 +1,18 @@
-import { Occupation } from '../types'
 import type {
   ActionChoiceOption,
   ActionDefinition,
   ActionFlow,
   PlayerState,
   Resource,
-} from '../../game/types'
+} from '../../contract/types'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import { gainResources } from '../../actions/effects/gain'
 import type { CardImpl } from '../registry'
+import { C146_WorkshopAssistant } from '../../cards-display/C/C146_WorkshopAssistant'
+export { C146_WorkshopAssistant }
 
-const CARD_ID = 'C146_WorkshopAssistant'
+const CARD_ID = C146_WorkshopAssistant.id
+
 const CHOOSE_PAIRS_ACTION_ID = 'card_C146_WorkshopAssistant_choosePairs'
 
 /**
@@ -125,20 +127,6 @@ const choosePairsAction: ActionDefinition = {
 }
 
 registerAdHocAction(choosePairsAction)
-
-export const C146_WorkshopAssistant = new Occupation({
-  id: CARD_ID,
-  name: "Workshop Assistant",
-  deck: "C",
-  number: 146,
-  category: "GOODS_PROVIDER",
-  desc: [
-    'Place unique pairs of different building resources on this card, one for each improvement you have built. Each time another player renovates, you may move one such pair to your supply.',
-  ],
-  cost: {},
-  players: "3+",
-  newSet: true,
-})
 
 export const C146_WorkshopAssistant_impl = {
   effect: {

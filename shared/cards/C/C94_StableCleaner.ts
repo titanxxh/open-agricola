@@ -1,10 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import { C94_StableCleaner } from '../../cards-display/C/C94_StableCleaner'
+export { C94_StableCleaner }
 
-const CARD_ID = 'C94_StableCleaner'
+const CARD_ID = C94_StableCleaner.id
 
 /**
  * C94 Stable Cleaner — At any time, you can take the __Build Stables__ action
@@ -47,18 +48,6 @@ const anytimeListener: CardListenerRegistration = {
     }
   },
 }
-
-export const C94_StableCleaner = new Occupation({
-  id: CARD_ID,
-  name: 'Stable Cleaner',
-  deck: 'C',
-  number: 94,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['At any time, you can take the __Build Stables__ action without placing a person. If you do, each stable costs you 1 <WOOD> and 1 <FOOD>.'],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
 
 export const C94_StableCleaner_impl = {
   listeners: [anytimeListener],

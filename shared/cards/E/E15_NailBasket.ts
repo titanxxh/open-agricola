@@ -1,12 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { E15_NailBasket } from '../../cards-display/E/E15_NailBasket'
+export { E15_NailBasket }
 
-const CARD_ID = 'E15_NailBasket'
+const CARD_ID = E15_NailBasket.id
 
-// E15 Nail Basket: Each time after you use a wood accumulation space, you can place 1 STONE
-// from your supply on that space (for the next visitor) to take a Build Fences action.
 const listener: CardListenerRegistration = {
   id: 'E15-nail-basket-after-collect',
   cardIds: [CARD_ID],
@@ -38,19 +37,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const E15_NailBasket = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Nail Basket',
-  deck: 'E',
-  number: 15,
-  category: 'FARMYARD_-__FENCING_OR_STABLE_BUILDING',
-  desc: [
-    'Each time after you use a wood accumulation space, you can place 1\u00a0<STONE> from your supply on that space (for the next visitor) to take a __Build Fences__ action.',
-  ],
-  cost: { reed: 1 },
-  vp: 1,
-})
 
 export const E15_NailBasket_impl = {
   listeners: [listener],

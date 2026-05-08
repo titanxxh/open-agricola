@@ -1,7 +1,6 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { GameState, PlayerState } from '../../game/types'
+import type { GameState, PlayerState } from '../../contract/types'
 import {
   queueFutureMeeplesFlow,
 } from '../../actions/effects/internal/future-meeples'
@@ -12,15 +11,12 @@ import {
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
+import { A43_FarmyardManure } from '../../cards-display/A/A43_FarmyardManure'
+export { A43_FarmyardManure }
 
-const CARD_ID = 'A43_FarmyardManure'
+const CARD_ID = A43_FarmyardManure.id
+
 const USED_ACTION_TOKEN_KEY = 'usedActionToken'
-
-// A43 Farmyard Manure: Each time you build 1 or more stables in one turn,
-// place 1 FOOD on each of the next 3 round spaces.
-// Ruling: OFFTURN_STABLES_DONT_TRIGGER — stables built off-turn (e.g., from
-// opponent trigger) do not fire. We enforce this by checking trueAction.
-// Prerequisite: 1 Animal.
 
 const queueFoodNextThree = (state: GameState, player: PlayerState) => {
   const actionToken = readActionSnapshotToken(player)
@@ -51,7 +47,6 @@ const listener: CardListenerRegistration = {
   },
 }
 
-// Prerequisite: the player must have at least 1 animal on their farm.
 registerPrerequisite('1 Animal', (player) => {
   const inStables = Object.values(player.stableAnimals ?? {}).filter(
     (animal) => animal !== null,
@@ -62,20 +57,6 @@ registerPrerequisite('1 Animal', (player) => {
     0,
   )
   return inStables + inHouse + inPastures >= 1
-})
-
-export const A43_FarmyardManure = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Farmyard Manure',
-  deck: 'A',
-  number: 43,
-  category: 'FOOD_PROVIDER',
-  desc: [
-    'Each time you build 1 or more stables in one turn, you place 1 <FOOD> on each of the next 3 round spaces. At the start of these rounds, you get the <FOOD>.',
-  ],
-  cost: {},
-  prerequisite: '1 Animal',
-  evenMoreSet: true,
 })
 
 export const A43_FarmyardManure_impl = {

@@ -1,19 +1,9 @@
-import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B118_SmallscaleFarmer } from '../../cards-display/B/B118_SmallscaleFarmer'
+export { B118_SmallscaleFarmer }
 
-const CARD_ID = 'B118_SmallscaleFarmer'
-
-export const B118_SmallscaleFarmer = new Occupation({
-  id: CARD_ID,
-  name: 'Small-scale Farmer',
-  deck: 'B',
-  number: 118,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['As long as you live in a house with exactly 2 rooms, at the start of each round, you get 1 <WOOD>.'],
-  cost: {},
-  players: '1+',
-})
+const CARD_ID = B118_SmallscaleFarmer.id
 
 export const B118_SmallscaleFarmer_impl = {
   effect: {

@@ -1,23 +1,11 @@
-import { Occupation } from '../types'
 import { markCardCounterIfBoughtByRound, hasCardCounter } from '../helpers/stage-effects'
 import { payGainFlow } from '../helpers/pay-gain-node'
-import { familySize } from '../../game/player'
+import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { D99_EarthenwarePotter } from '../../cards-display/D/D99_EarthenwarePotter'
+export { D99_EarthenwarePotter }
 
-const CARD_ID = 'D99_EarthenwarePotter'
-
-export const D99_EarthenwarePotter = new Occupation({
-  id: CARD_ID,
-  name: "Earthenware Potter",
-  deck: "D",
-  number: 99,
-  category: "POINTS_PROVIDER",
-  desc: [
-    'If you play this card in round 4 or before, after the final harvest, you get 1 bonus <SCORE> for each person for which you then pay 1 <CLAY>.',
-  ],
-  cost: {},
-  players: "1+",
-})
+const CARD_ID = D99_EarthenwarePotter.id
 
 export const D99_EarthenwarePotter_impl = {
   effect: {

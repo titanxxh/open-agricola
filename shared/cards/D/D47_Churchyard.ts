@@ -1,31 +1,17 @@
-import { MinorImprovement } from '../types'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
+import { D47_Churchyard } from '../../cards-display/D/D47_Churchyard'
+export { D47_Churchyard }
 
-const CARD_ID = 'D47_Churchyard'
+const CARD_ID = D47_Churchyard.id
 
-// BGA isBuyable: getPlayedCards()->count() < 10 → false. Played cards == all
-// occupations + minor improvements + (major) improvements played in front.
 registerPrerequisite('10 Cards* in Front of You', (player) => {
   const total =
     player.occupationPlayed.length
     + player.minorPlayed.length
     + player.improvements.length
   return total >= 10
-})
-
-export const D47_Churchyard = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Churchyard',
-  deck: 'D',
-  number: 47,
-  category: 'FOOD_PROVIDER',
-  desc: ['Place 2 <FOOD> on each remaining round space. At the start of these rounds, you get the <FOOD>. (*Occupations and Improvements)'],
-  cost: { stone: 1, reed: 1 },
-  vp: 1,
-  prerequisite: '10 Cards* in Front of You',
-  newSet: true,
 })
 
 export const D47_Churchyard_impl = {

@@ -1,19 +1,9 @@
-import { MinorImprovement } from '../types'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { C55_Studio } from '../../cards-display/C/C55_Studio'
+export { C55_Studio }
 
-const CARD_ID = 'C55_Studio'
-
-export const C55_Studio = new MinorImprovement({
-  id: CARD_ID,
-  name: "Studio",
-  deck: "C",
-  number: 55,
-  category: "FOOD_PROVIDER",
-  desc: ["In the feeding phase of each harvest, you can use this card to turn exactly 1 <WOOD>/<CLAY>/<STONE> into 2/2/3 <FOOD>."],
-  vp: 1,
-  cost: { clay: 1, reed: 1 },
-})
+const CARD_ID = C55_Studio.id
 
 export const C55_Studio_impl = {
   effect: {

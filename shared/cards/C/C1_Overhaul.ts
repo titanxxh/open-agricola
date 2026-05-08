@@ -1,13 +1,16 @@
-import { MinorImprovement } from '../types'
 import { readCardExtraData } from '../helpers/card-state'
 import { getFenceCount } from '../../actions/effects/fencing'
-import type { ActionFlow, PlayerState } from '../../game/types'
+import type { ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { C1_Overhaul } from '../../cards-display/C/C1_Overhaul'
+export { C1_Overhaul }
 
-const CARD_ID = 'C1_Overhaul'
+const CARD_ID = C1_Overhaul.id
+
 const FLAG_KEY = 'c1Active'
+
 const MAX_REBUILD_KEY = 'c1MaxRebuild'
 
 /**
@@ -44,19 +47,6 @@ const isC1Active = (player: PlayerState): boolean =>
 
 const getC1MaxRebuild = (player: PlayerState): number =>
   readCardExtraData<number>(player, CARD_ID, MAX_REBUILD_KEY) ?? 0
-
-export const C1_Overhaul = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Overhaul',
-  deck: 'C',
-  number: 1,
-  category: 'FARM_PLANNER',
-  desc: ['Immediately raze all of your fences, add up to 3 fences from your supply, and rebuild them. (You do not lose any animals during this.)'],
-  cost: { wood: 1 },
-  prerequisite: '2 Occupations',
-  occupationPrerequisites: { min: 2 },
-  newSet: true,
-})
 
 const setExtraDataFlow = (key: string, value: unknown): ActionFlow => ({
   type: 'leaf',

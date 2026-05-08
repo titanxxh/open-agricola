@@ -1,16 +1,15 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { returnToSpaceThenGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { A164_WoodWorker } from '../../cards-display/A/A164_WoodWorker'
+export { A164_WoodWorker }
 
-const CARD_ID = 'A164_WoodWorker'
+const CARD_ID = A164_WoodWorker.id
 
 const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =>
   (space?.gainPerRound?.wood ?? 0) > 0
 
-// A164 Wood Worker: Each time you take wood from an accumulation space, you can exchange
-// 1 wood for 1 sheep. Place the wood back on the accumulation space.
 const listener: CardListenerRegistration = {
   id: 'A164-wood-worker-after-collect',
   cardIds: [CARD_ID],
@@ -26,18 +25,6 @@ const listener: CardListenerRegistration = {
     })
   },
 }
-
-export const A164_WoodWorker = new Occupation({
-  id: CARD_ID,
-  name: 'Wood Worker',
-  deck: 'A',
-  number: 164,
-  category: 'LIVESTOCK_PROVIDER',
-  desc: ['Each time you take <WOOD> from an accumulation space, you can exchange 1 <WOOD> for 1 <SHEEP>. Place the <WOOD> on the accumulation space.'],
-  cost: {},
-  players: '4+',
-  newSet: true,
-})
 
 export const A164_WoodWorker_impl = {
   listeners: [listener],

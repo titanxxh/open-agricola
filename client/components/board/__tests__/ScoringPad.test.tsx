@@ -4,8 +4,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { fireEvent, render, screen } from '@testing-library/react'
 
 import type { PlayerScoreSummary } from '../../../../shared/domain/scoring'
-import type { PlayerState } from '../../../../shared/game/types'
-import { createInitialPlayerStats } from '../../../../shared/logic/stats'
+import type { PlayerState } from '../../../../shared/contract/types'
+import { createInitialPlayerStats } from '../../../../shared/session/stats'
 import { ScoringPad } from '../ScoringPad'
 
 const mockScores: PlayerScoreSummary[] = [

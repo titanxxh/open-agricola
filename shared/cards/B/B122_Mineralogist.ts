@@ -1,10 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B122_Mineralogist } from '../../cards-display/B/B122_Mineralogist'
+export { B122_Mineralogist }
 
-const CARD_ID = 'B122_Mineralogist'
+const CARD_ID = B122_Mineralogist.id
 
 /**
  * B122 Mineralogist — Each time you use a clay/stone accumulation space,
@@ -27,20 +28,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, gain), sourceCard: CARD_ID }
   },
 }
-
-export const B122_Mineralogist = new Occupation({
-  id: CARD_ID,
-  name: 'Mineralogist',
-  deck: 'B',
-  number: 122,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: [
-    'Each time you use a clay/stone accumulation space, you also get 1 of the other good, <STONE>/<CLAY>.',
-  ],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
 
 export const B122_Mineralogist_impl = {
   listeners: [listener],

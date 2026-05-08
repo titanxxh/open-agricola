@@ -1,21 +1,10 @@
-import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { spaceHasPlayer } from '../../game/space'
+import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
+import { B158_DistrictManager } from '../../cards-display/B/B158_DistrictManager'
+export { B158_DistrictManager }
 
-const CARD_ID = 'B158_DistrictManager'
-
-export const B158_DistrictManager = new Occupation({
-  id: CARD_ID,
-  name: 'District Manager',
-  deck: 'B',
-  number: 158,
-  category: 'FOOD_PROVIDER',
-  desc: ['At the end of each work phase, if you used both the __Forest__ and __Grove__ accumulation spaces, you get 5 <FOOD>.'],
-  cost: {},
-  players: '4+',
-  newSet: true,
-})
+const CARD_ID = B158_DistrictManager.id
 
 export const B158_DistrictManager_impl = {
   effect: {

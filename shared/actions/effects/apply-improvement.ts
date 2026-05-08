@@ -1,6 +1,6 @@
-import type { ActionDefinition, ActionExecutionResult, GameState, PlayerState, Resource } from '../../game/types'
-import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../logic/stats'
-import { getMinorImprovement } from '../../game/minor-improvements'
+import type { ActionDefinition, ActionExecutionResult, GameState, PlayerState, Resource } from '../../contract/types'
+import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../session/stats'
+import { getMinorImprovement } from '../../cards/registry-display'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { activateCard } from './activate-card'
 

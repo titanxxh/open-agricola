@@ -1,11 +1,13 @@
-import { MinorImprovement } from '../types'
 import { readCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionFlow, FarmTilePosition, PlayerState } from '../../game/types'
+import type { ActionFlow, FarmTilePosition, PlayerState } from '../../contract/types'
+import { C16_FieldFences } from '../../cards-display/C/C16_FieldFences'
+export { C16_FieldFences }
 
-const CARD_ID = 'C16_FieldFences'
+const CARD_ID = C16_FieldFences.id
+
 const FLAG_KEY = 'c16Active'
 
 /**
@@ -38,16 +40,6 @@ const fieldEdgeIds = (fields: FarmTilePosition[]): Set<string> => {
 
 const isC16Active = (player: PlayerState): boolean =>
   readCardExtraData<boolean>(player, CARD_ID, FLAG_KEY) === true
-
-export const C16_FieldFences = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Field Fences',
-  deck: 'C',
-  number: 16,
-  category: 'FARM_PLANNER',
-  desc: ['You can immediately take a __Build Fences__ action, during which you do not have to pay <WOOD> for fences that you build next to field tiles.'],
-  cost: { food: 2 },
-})
 
 const setFlagFlow = (value: boolean): ActionFlow => ({
   type: 'leaf',

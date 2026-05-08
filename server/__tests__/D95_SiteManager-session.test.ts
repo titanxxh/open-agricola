@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { D95_SiteManager } from '../../shared/cards/D/D95_SiteManager'
-import { occupations } from '../../shared/game/occupations'
+import { occupations } from '../../shared/cards-display/_lookup'
 
-import { setWorkersAtHome } from '../../shared/game/player'
+import { setWorkersAtHome } from '../../shared/domain/player'
 const CARD_ID = 'D95_SiteManager'
 
 // Catalog registration is handled by the parent agent; for local testing we

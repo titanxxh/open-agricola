@@ -1,10 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
+import { B43_Chophouse } from '../../cards-display/B/B43_Chophouse'
+export { B43_Chophouse }
 
-const CARD_ID = 'B43_Chophouse'
+const CARD_ID = B43_Chophouse.id
 
 const listener: CardListenerRegistration = {
   id: 'B43-chophouse-after-place-farmer',
@@ -25,18 +26,6 @@ const listener: CardListenerRegistration = {
     return { flow: futureMeeplesNode(), sourceCard: CARD_ID }
   },
 }
-
-export const B43_Chophouse = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Chophouse',
-  deck: 'B',
-  number: 43,
-  category: 'FOOD_PROVIDER',
-  desc: ['Each time you use the __Grain/Vegetable Seeds__ action space, place 1 <FOOD> on each of the next 3/2 round spaces. At the start of these rounds, you get the <FOOD>.'],
-  vp: 1,
-  altCosts: [{ wood: 2 }, { clay: 2 }],
-  newSet: true,
-})
 
 export const B43_Chophouse_impl = {
   listeners: [listener],

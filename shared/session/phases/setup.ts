@@ -12,8 +12,8 @@
  * read/write hooks for those fields.
  */
 
-import type { PlayerState } from '../../game/types.ts'
-import type { CustomCardDef } from '../../protocol/game.ts'
+import type { PlayerState } from '../../contract/types.ts'
+import type { CustomCardDef } from '../../contract/protocol/game.ts'
 import type { SessionCardContext } from '../../cards/session-card-context.ts'
 
 /**

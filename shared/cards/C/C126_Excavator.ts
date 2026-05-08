@@ -1,13 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { C126_Excavator } from '../../cards-display/C/C126_Excavator'
+export { C126_Excavator }
 
-const CARD_ID = 'C126_Excavator'
+const CARD_ID = C126_Excavator.id
 
-// C126 Excavator: After Day Laborer, gain 1 wood + 1 clay, and optionally pay 1 food for 1 stone.
-// Uses after phase (onPlayerAfterPlaceFarmer in BGA = HAPPENS_AFTER_COTTAGER).
 const listener: CardListenerRegistration = {
   id: 'C126-excavator-after-place-farmer',
   cardIds: [CARD_ID],
@@ -35,17 +34,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const C126_Excavator = new Occupation({
-  id: CARD_ID,
-  name: 'Excavator',
-  deck: 'C',
-  number: 126,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['Each time after you use the __Day Laborer__ action space, you get 1 additional <WOOD> and <CLAY>, and you can buy 1 <STONE> for 1 <FOOD>.'],
-  cost: {},
-  players: '1+',
-})
 
 export const C126_Excavator_impl = {
   listeners: [listener],

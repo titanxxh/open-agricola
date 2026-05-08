@@ -1,12 +1,14 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
-import type { ActionFlow, Resource } from '../../game/types'
+import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { B18_GrasslandHarrow } from '../../cards-display/B/B18_GrasslandHarrow'
+export { B18_GrasslandHarrow }
 
-const CARD_ID = 'B18_GrasslandHarrow'
+const CARD_ID = B18_GrasslandHarrow.id
+
 const TARGET_ROUND_KEY = 'targetRound'
 
 /**
@@ -45,21 +47,6 @@ const afterPayListener: CardListenerRegistration = {
     }
   },
 }
-
-export const B18_GrasslandHarrow = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Grassland Harrow',
-  deck: 'B',
-  number: 18,
-  category: 'FARM_PLANNER',
-  desc: [
-    'Add 1 to the current round for each building resource in your supply and place 1 field on the corresponding round space. At the start of the round, you can plow the field.',
-  ],
-  cost: { wood: 2 },
-  prerequisite: '2 Occupations',
-  occupationPrerequisites: { min: 2 },
-  evenMoreSet: true,
-})
 
 export const B18_GrasslandHarrow_impl = {
   listeners: [afterPayListener],

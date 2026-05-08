@@ -8,8 +8,8 @@ import type {
   ActionChoiceOption,
   InteractionRequest,
   Resource,
-} from '../game/types'
-import type { PromptKey } from '../game/prompt-keys'
+} from '../contract/types'
+import type { PromptKey } from '../contract/prompt-keys'
 import type { FollowUpAction } from '../actions/hooks'
 import {
   ActionNode,

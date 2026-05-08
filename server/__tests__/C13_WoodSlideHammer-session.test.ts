@@ -6,7 +6,7 @@ import {
   computeAllBuyableCombinations,
   getModifiersForCostType,
 } from '../../shared/actions/payment/internal'
-import type { BonusModifier } from '../../shared/game/types'
+import type { BonusModifier } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C13_WoodSlideHammer'
 

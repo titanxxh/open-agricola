@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { rollAndCacheCardPick } from '../card-random'
-import type { GameState, PlayerState } from '../../../game/types'
+import type { GameState, PlayerState } from '../../../contract/types'
 
 const mkPlayer = (): PlayerState => ({
   id: 'p1', name: 'P1',

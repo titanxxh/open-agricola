@@ -1,20 +1,9 @@
-import { MinorImprovement } from '../types'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
+import { B66_SackCart } from '../../cards-display/B/B66_SackCart'
+export { B66_SackCart }
 
-const CARD_ID = 'B66_SackCart'
-
-export const B66_SackCart = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Sack Cart',
-  deck: 'B',
-  number: 66,
-  category: 'CROP_PROVIDER',
-  desc: ['Place 1 <GRAIN> each on the remaining spaces for rounds 5, 8, 11, and 14. At the start of these rounds, you get the <GRAIN>.'],
-  cost: { wood: 2 },
-  prerequisite: '2 Occupations',
-  occupationPrerequisites: { min: 2 },
-})
+const CARD_ID = B66_SackCart.id
 
 export const B66_SackCart_impl = {
   effect: {

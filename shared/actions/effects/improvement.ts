@@ -1,6 +1,6 @@
-import type { ActionDefinition, ActionExecutionResult, ActionFlow, GameState, PlayerState, ComplexCost } from '../../game/types'
+import type { ActionDefinition, ActionExecutionResult, ActionFlow, GameState, PlayerState, ComplexCost } from '../../contract/types'
 import type { PaymentInfo } from '../../cards/card-effects'
-import { getMinorImprovement } from '../../game/minor-improvements'
+import { getMinorImprovement } from '../../cards/registry-display'
 // PaymentSolver namespace (S3 Task 6): core payment APIs migrated to the
 // new payment module. Legacy helpers (payResources / executePaymentSolution
 // / resolvePaymentSolutionSelection) remain on the shim through S3 and
@@ -9,7 +9,7 @@ import { PaymentSolver } from '../payment'
 import type { PaymentCtx } from '../payment'
 import { payResources, executePaymentSolution } from '../payment/internal'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
-import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../logic/stats'
+import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../session/stats'
 import { getMajorCard } from '../../cards/major'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'

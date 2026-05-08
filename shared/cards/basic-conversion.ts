@@ -1,4 +1,4 @@
-import type { CardExchange } from './types'
+import type { CardExchange } from '../contract/cards'
 
 export const BASIC_CONVERSION_SOURCE_ID = '__basic__'
 

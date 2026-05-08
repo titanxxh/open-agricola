@@ -1,19 +1,9 @@
-import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B8_MarketStall } from '../../cards-display/B/B8_MarketStall'
+export { B8_MarketStall }
 
-const CARD_ID = 'B8_MarketStall'
-
-export const B8_MarketStall = new MinorImprovement({
-  id: CARD_ID,
-  name: "Market Stall",
-  deck: "B",
-  number: 8,
-  category: "CROP_PROVIDER",
-  desc: ["You immediately get 1 <VEGETABLE>. (Effectively, you are exchanging 1 <GRAIN> for 1 <VEGETABLE>)."],
-  cost: { grain: 1 },
-  passing: true,
-})
+const CARD_ID = B8_MarketStall.id
 
 export const B8_MarketStall_impl = {
   effect: {

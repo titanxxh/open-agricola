@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { getCardEffect } from '../card-effects'
-import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
 import {
   getPlayerActionSpaceConfig,
   createPlayerActionSpaces,
@@ -11,8 +11,8 @@ import { moveFarmerToSpaceAction } from '../../actions/effects/internal/move-far
 import '../A/A28_ForestSchool'
 import '../D/D51_Archway'
 import '../E/E10_StrawHat'
-import type { ActionFlow } from '../../game/types'
-import type { ActionExecutionContext } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
+import type { ActionExecutionContext } from '../../contract/types'
 
 const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
   ({
@@ -261,8 +261,7 @@ describe('E10_StrawHat', () => {
 })
 
 describe('move-farmer-to-space action', () => {
-  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
-  it.skip('execute lists unoccupied spaces excluding source', () => {
+  it('execute lists unoccupied spaces excluding source', () => {
     const player = createPlayer()
     const source = createSpace('D51_Archway', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
     const available = createSpace('day-laborer')
@@ -272,10 +271,10 @@ describe('move-farmer-to-space action', () => {
       state, player, space: source,
       params: { excludeSpaceId: 'D51_Archway' },
     } as unknown as ActionExecutionContext)
-    expect(result.type).toBe('choice')
-    if (result.type === 'choice') {
-      expect(result.options!.length).toBe(1)
-      expect(result.options![0].value).toBe('day-laborer')
+    expect(result.type).toBe('request')
+    if (result.type === 'request' && result.request.kind === 'choice') {
+      expect(result.request.options.length).toBe(1)
+      expect(result.request.options[0].value).toBe('day-laborer')
     }
   })
 
@@ -291,8 +290,7 @@ describe('move-farmer-to-space action', () => {
     expect(result.type).toBe('fail')
   })
 
-  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
-  it.skip('execute includes occupied Lessons with A28_ForestSchool', () => {
+  it('execute includes occupied Lessons with A28_ForestSchool', () => {
     const player = createPlayer()
     player.minorPlayed = ['A28_ForestSchool']
     const source = createSpace('D51_Archway', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
@@ -302,9 +300,9 @@ describe('move-farmer-to-space action', () => {
       state, player, space: source,
       params: { excludeSpaceId: 'D51_Archway' },
     } as unknown as ActionExecutionContext)
-    expect(result.type).toBe('choice')
-    if (result.type === 'choice') {
-      expect(result.options!.some((o) => o.value === 'lessons')).toBe(true)
+    expect(result.type).toBe('request')
+    if (result.type === 'request' && result.request.kind === 'choice') {
+      expect(result.request.options.some((o) => o.value === 'lessons')).toBe(true)
     }
   })
 

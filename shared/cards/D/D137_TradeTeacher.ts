@@ -1,10 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionFlow, Resource } from '../../game/types'
+import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { D137_TradeTeacher } from '../../cards-display/D/D137_TradeTeacher'
+export { D137_TradeTeacher }
 
-const CARD_ID = 'D137_TradeTeacher'
+const CARD_ID = D137_TradeTeacher.id
+
 const LESSONS_SPACE_IDS = new Set(['lessons', 'lessons-4'])
 
 /**
@@ -104,18 +106,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const D137_TradeTeacher = new Occupation({
-  id: CARD_ID,
-  name: "Trade Teacher",
-  deck: "D",
-  number: 137,
-  category: "GOODS_PROVIDER",
-  desc: ["Each time after you use a __Lesson__ action space, you can buy up to 2 different goods: <GRAIN>, <STONE>, <SHEEP>, and <PIG> for 1 <FOOD> each; <CATTLE> and <VEGETABLE> for 2 food each."],
-  cost: {},
-  players: "3+",
-  newSet: true,
-})
 
 export const D137_TradeTeacher_impl = {
   listeners: [listener],

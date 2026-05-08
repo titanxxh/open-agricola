@@ -1,26 +1,14 @@
-import { MinorImprovement } from '../types'
-import type { CardExchange } from '../types'
+import type { CardExchange } from '../../contract/cards'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { getPlayerCookeryCards } from '../helpers/cookery'
+import { C62_CookeryExtension } from '../../cards-display/C/C62_CookeryExtension'
+export { C62_CookeryExtension }
 
-const CARD_ID = 'C62_CookeryExtension'
+const CARD_ID = C62_CookeryExtension.id
 
 const VALID_FROM_RESOURCES: readonly string[] = ['vegetable', 'sheep', 'boar', 'cattle']
-
-export const C62_CookeryExtension = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Cookery Extension',
-  deck: 'C',
-  number: 62,
-  category: 'FOOD_PROVIDER',
-  desc: [
-    'Each harvest, you can use each of your cooking improvements once to get double the amount of <FOOD> for 1 animal or <VEGETABLE>.',
-  ],
-  cost: { clay: 2 },
-  implemented: true,
-})
 
 const computeExchangesListener: CardListenerRegistration = {
   id: 'C62-cookery-extension-compute-exchanges',

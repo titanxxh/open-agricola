@@ -5,7 +5,7 @@ import type {
   GameState,
   HarvestBreedSummary,
   PlayerState,
-} from '../../game/types'
+} from '../../contract/types'
 import { playerBoard, getTotalAnimalCapacity } from '../../domain'
 import { shouldEnforceReorganizeOnLastHarvest } from '../../cards/card-effects'
 

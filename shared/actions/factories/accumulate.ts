@@ -1,5 +1,5 @@
 import { collectAccumulatedResources } from '../effects/collect'
-import type { ActionDefinition, Resource } from '../../game/types'
+import type { ActionDefinition, Resource } from '../../contract/types'
 
 type AccumulatingActionConfig = {
   id: string

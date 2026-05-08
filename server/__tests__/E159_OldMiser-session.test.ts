@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { computeScores } from '../../shared/domain/scoring'
-import type { ActionChoiceOption,  GameState, PlayerState, Resource } from '../../shared/game/types'
+import type { ActionChoiceOption,  GameState, PlayerState, Resource } from '../../shared/contract/types'
 
-import { markAllWorkersUsed, setActiveWorkerCount, setNewbornCount } from '../../shared/game/player'
+import { markAllWorkersUsed, setActiveWorkerCount, setNewbornCount } from '../../shared/domain/player'
 import '../../shared/cards/E/E159_OldMiser'
 
 const CARD_ID = 'E159_OldMiser'

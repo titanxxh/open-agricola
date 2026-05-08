@@ -1,10 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { C112_Thresher } from '../../cards-display/C/C112_Thresher'
+export { C112_Thresher }
 
-const CARD_ID = 'C112_Thresher'
+const CARD_ID = C112_Thresher.id
 
 /**
  * C112 Thresher — Occupation
@@ -59,19 +60,6 @@ const isDoableListener: CardListenerRegistration = {
     return { doable: true }
   },
 }
-
-export const C112_Thresher = new Occupation({
-  id: CARD_ID,
-  name: 'Thresher',
-  deck: 'C',
-  number: 112,
-  category: 'CROP_PROVIDER',
-  desc: [
-    'Immediately before each time you use the __Grain Utilization__, __Farmland__, or __Cultivation__ action space, you can buy 1 <GRAIN> for 1 <FOOD>.',
-  ],
-  cost: {},
-  players: '1+',
-})
 
 export const C112_Thresher_impl = {
   listeners: [beforeListener, isDoableListener],

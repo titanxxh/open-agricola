@@ -1,5 +1,5 @@
-import type { SerializedGameState } from '../../shared/game/serialization'
-import type { GameState } from '../../shared/game/types'
+import type { SerializedGameState } from '../../shared/session/serialization'
+import type { GameState } from '../../shared/contract/types'
 
 /**
  * Lightweight client-side state rehydrator.

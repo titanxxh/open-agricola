@@ -1,9 +1,10 @@
-import { MinorImprovement } from '../types'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
-import type { PlayerState } from '../../game/types'
+import type { PlayerState } from '../../contract/types'
+import { A38_WoolBlankets } from '../../cards-display/A/A38_WoolBlankets'
+export { A38_WoolBlankets }
 
-const CARD_ID = 'A38_WoolBlankets'
+const CARD_ID = A38_WoolBlankets.id
 
 const countSheepOnBoard = (player: PlayerState): number => {
   let total = 0
@@ -18,18 +19,6 @@ const countSheepOnBoard = (player: PlayerState): number => {
 }
 
 registerPrerequisite('5 Sheep', (player) => countSheepOnBoard(player) >= 5)
-
-export const A38_WoolBlankets = new MinorImprovement({
-  id: CARD_ID,
-  name: "Wool Blankets",
-  deck: "A",
-  number: 38,
-  category: "POINTS_PROVIDER",
-  desc: ["During scoring, if you live in a wooden/clay/stone house by then, you get 3/2/0 bonus <SCORE>."],
-  cost: {},
-  prerequisite: "5 Sheep",
-  extraVp: true,
-})
 
 export const A38_WoolBlankets_impl = {
   effect: {

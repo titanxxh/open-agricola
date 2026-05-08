@@ -1,21 +1,10 @@
-import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldHasCrop, fieldIsEmpty } from '../../game/field'
+import { fieldHasCrop, fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { B61_ThreeFieldRotation } from '../../cards-display/B/B61_ThreeFieldRotation'
+export { B61_ThreeFieldRotation }
 
-const CARD_ID = 'B61_ThreeFieldRotation'
-
-export const B61_ThreeFieldRotation = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Three-Field Rotation',
-  deck: 'B',
-  number: 61,
-  category: 'FOOD_PROVIDER',
-  desc: ['At the start of the field phase of each harvest, if you have at least 1 <GRAIN> field, 1 <VEGETABLE> field, and 1 empty field, you get 3 <FOOD>.'],
-  cost: {},
-  prerequisite: '3 Occupations',
-  occupationPrerequisites: { min: 3 },
-})
+const CARD_ID = B61_ThreeFieldRotation.id
 
 export const B61_ThreeFieldRotation_impl = {
   effect: {

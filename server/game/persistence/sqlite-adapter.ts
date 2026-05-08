@@ -6,7 +6,7 @@ import type {
   RoomStatus,
   RestoreOptions,
 } from './room-persistence.ts'
-import type { SerializedGameState } from '../../../shared/game/serialization.ts'
+import type { SerializedGameState } from '../../../shared/session/serialization.ts'
 
 type RoomRow = {
   id: string

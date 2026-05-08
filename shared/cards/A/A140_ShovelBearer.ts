@@ -1,14 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { A140_ShovelBearer } from '../../cards-display/A/A140_ShovelBearer'
+export { A140_ShovelBearer }
 
-const CARD_ID = 'A140_ShovelBearer'
+const CARD_ID = A140_ShovelBearer.id
 
-// A140 Shovel Bearer: Each time you use the Clay Pit or Hollow accumulation space,
-// you also get a number of FOOD equal to the amount of CLAY on the respective OTHER
-// accumulation space.
 const listener: CardListenerRegistration = {
   id: 'A140-shovel-bearer-after-place-farmer',
   cardIds: [CARD_ID],
@@ -26,18 +24,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { food: clay }), sourceCard: CARD_ID }
   },
 }
-
-export const A140_ShovelBearer = new Occupation({
-  id: CARD_ID,
-  name: 'Shovel Bearer',
-  deck: 'A',
-  number: 140,
-  category: 'FOOD_PROVIDER',
-  desc: ['Each time you use the __Clay Pit__ or __Hollow__ accumulation space, you also get a number of <FOOD> equal to the amount of <CLAY> on the respective other accumulation space.'],
-  cost: {},
-  players: '3+',
-  newSet: true,
-})
 
 export const A140_ShovelBearer_impl = {
   listeners: [listener],

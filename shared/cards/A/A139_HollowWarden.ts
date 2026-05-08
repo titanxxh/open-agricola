@@ -1,10 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { A139_HollowWarden } from '../../cards-display/A/A139_HollowWarden'
+export { A139_HollowWarden }
 
-const CARD_ID = 'A139_HollowWarden'
+const CARD_ID = A139_HollowWarden.id
 
 /**
  * A139 Hollow Warden:
@@ -55,20 +56,6 @@ const hollowListener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const A139_HollowWarden = new Occupation({
-  id: CARD_ID,
-  name: 'Hollow Warden',
-  deck: 'A',
-  number: 139,
-  category: 'FOOD_PROVIDER',
-  desc: [
-    'When you play this card, you immediately get a __Major Improvement__ action to build a Fireplace. Each time you use the __Hollow__ accumulation space, you also get 1 <FOOD>.',
-  ],
-  cost: {},
-  players: '3+',
-  newSet: true,
-})
 
 export const A139_HollowWarden_impl = {
   listeners: [onBuyListener, hollowListener],

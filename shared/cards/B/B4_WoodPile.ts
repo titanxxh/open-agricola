@@ -1,22 +1,10 @@
-import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B4_WoodPile } from '../../cards-display/B/B4_WoodPile'
+export { B4_WoodPile }
 
-const CARD_ID = 'B4_WoodPile'
+const CARD_ID = B4_WoodPile.id
 
-export const B4_WoodPile = new MinorImprovement({
-  id: CARD_ID,
-  name: "Wood Pile",
-  deck: "B",
-  number: 4,
-  category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["You immediately get a number of <WOOD> equal to the number of people you have on accumulation spaces."],
-  cost: {},
-  passing: true,
-})
-
-// BGA: $n = number of accumulation spaces with at least one farmer of mine.
-// Counts SPACES (not farmers) — `Farmers::getOnCard($spaceId, $pId)->empty()`.
 export const B4_WoodPile_impl = {
   effect: {
     id: CARD_ID,

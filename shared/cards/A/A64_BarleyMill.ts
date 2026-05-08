@@ -1,21 +1,10 @@
-import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldHasCrop, fieldTotalRemaining } from '../../game/field'
+import { fieldHasCrop, fieldTotalRemaining } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { A64_BarleyMill } from '../../cards-display/A/A64_BarleyMill'
+export { A64_BarleyMill }
 
-const CARD_ID = 'A64_BarleyMill'
-
-export const A64_BarleyMill = new MinorImprovement({
-  id: CARD_ID,
-  name: "Barley Mill",
-  deck: "A",
-  number: 64,
-  category: "FOOD_PROVIDER",
-  desc: ["In the field phase of each harvest, you get 1 <FOOD> for each grain field that you harvest."],
-  vp: 1,
-  cost: { wood: 1 },
-  altCosts: [{ clay: 4 }, { stone: 2 }],
-})
+const CARD_ID = A64_BarleyMill.id
 
 export const A64_BarleyMill_impl = {
   effect: {

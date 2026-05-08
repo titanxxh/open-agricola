@@ -1,14 +1,15 @@
-import { MinorImprovement } from '../types'
 import type { ExtraSowableField } from '../card-effects'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { FarmTilePosition, PlayerState } from '../../game/types'
+import type { FarmTilePosition, PlayerState } from '../../contract/types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { canSow } from '../../actions/effects/sow'
 import { dispatchReapListener } from '../../actions/effects/reap'
 import type { CardImpl } from '../registry'
+import { E72_ArtichokeField } from '../../cards-display/E/E72_ArtichokeField'
+export { E72_ArtichokeField }
 
-const CARD_ID = 'E72_ArtichokeField'
+const CARD_ID = E72_ArtichokeField.id
 
 type CardCrop = { crop: 'grain' | 'vegetable'; remaining: number }
 
@@ -23,8 +24,6 @@ const VIRTUAL_TILE: FarmTilePosition = { row: -1, col: 72 }
 
 const tileMatches = (tile: FarmTilePosition) =>
   tile.row === VIRTUAL_TILE.row && tile.col === VIRTUAL_TILE.col
-
-// --- isDoable listener: make sow doable when card field is available + player has seeds ---
 
 const isDoableListener: CardListenerRegistration = {
   id: 'E72-artichoke-field-isdoable-sow',
@@ -43,22 +42,6 @@ const isDoableListener: CardListenerRegistration = {
     return { doable: true }
   },
 }
-
-export const E72_ArtichokeField = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Artichoke Field',
-  deck: 'E',
-  number: 72,
-  category: 'CROPS_-_GRAIN_AND_VEGETABLE',
-  desc: [
-    'This card is a field. During the field phase of each harvest, if you harvest at least 1\u00a0good from this card, you also get 1 <FOOD>.',
-  ],
-  cost: { wood: 1 },
-  vp: 1,
-  prerequisite: '2 Occupations',
-  occupationPrerequisites: { min: 2 },
-  isField: true,
-})
 
 export const E72_ArtichokeField_impl = {
   listeners: [isDoableListener],

@@ -7,7 +7,7 @@
  * the public API instead.
  */
 
-import type { ActionSpace, GameState, PlayerState, Resource } from '../../../game/types'
+import type { ActionSpace, GameState, PlayerState, Resource } from '../../../contract/types'
 import type { CardListenerContext } from '../../../cards/card-listeners'
 
 export const buildCardCostListenerContext = (

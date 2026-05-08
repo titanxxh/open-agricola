@@ -1,11 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { GameState } from '../../game/types'
+import type { GameState } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { C158_ForestCampaigner } from '../../cards-display/C/C158_ForestCampaigner'
+export { C158_ForestCampaigner }
 
-const CARD_ID = 'C158_ForestCampaigner'
+const CARD_ID = C158_ForestCampaigner.id
 
 /**
  * C158 Forest Campaigner (Occupation):
@@ -37,7 +38,6 @@ export const countWoodOnAccumulationSpaces = (state: GameState): number => {
 
 const WOOD_THRESHOLD = 8
 
-// Before place-farmer: if 8+ wood on accumulation spaces, gain 1 food
 const beforePlaceFarmerListener: CardListenerRegistration = {
   id: 'C158-forest-campaigner-before-place-farmer',
   cardIds: [CARD_ID],
@@ -52,19 +52,6 @@ const beforePlaceFarmerListener: CardListenerRegistration = {
     }
   },
 }
-
-export const C158_ForestCampaigner = new Occupation({
-  id: CARD_ID,
-  name: 'Forest Campaigner',
-  deck: 'C',
-  number: 158,
-  category: 'FOOD_PROVIDER',
-  desc: [
-    'Each time before you place a person, if there are at least 8 <WOOD> total on accumulation spaces, you get 1 <FOOD>.',
-  ],
-  cost: {},
-  players: '4+',
-})
 
 export const C158_ForestCampaigner_impl = {
   listeners: [beforePlaceFarmerListener],

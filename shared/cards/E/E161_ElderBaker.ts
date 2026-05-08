@@ -1,9 +1,10 @@
-import { PlayerActionCard } from '../types'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
-import type { ActionChoiceOption } from '../../game/types'
+import type { ActionChoiceOption } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { E161_ElderBaker } from '../../cards-display/E/E161_ElderBaker'
+export { E161_ElderBaker }
 
 const CARD_ID = 'E161_ElderBaker'
 
@@ -48,16 +49,6 @@ registerPlayerActionSpace({
       return { type: 'ok', resourcesGained: { grain: 3 } }
     },
   }),
-})
-
-export const E161_ElderBaker = new PlayerActionCard({
-  id: "E161_ElderBaker",
-  name: "Elder Baker",
-  deck: "E",
-  number: 161,
-  desc: ["This card is an action space for you only. When you use it, you get 3 <GRAIN>. You can build the __Stone Oven__ major improvement even when taking a __Minor Improvement__ action."],
-  cost: {},
-  players: "4+",
 })
 
 export const E161_ElderBaker_impl = {

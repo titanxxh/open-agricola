@@ -1,20 +1,9 @@
-import { MinorImprovement } from '../types'
-import { fieldHasCrop } from '../../game/field'
+import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { A7_GardenersKnife } from '../../cards-display/A/A7_GardenersKnife'
+export { A7_GardenersKnife }
 
-const CARD_ID = 'A7_GardenersKnife'
-
-export const A7_GardenersKnife = new MinorImprovement({
-  id: CARD_ID,
-  name: "Gardener's Knife",
-  deck: 'A',
-  number: 7,
-  category: 'FOOD_PROVIDER',
-  desc: ['You immediately get 1 <FOOD> for each grain field you have and 1 <GRAIN> for each vegetable field you have.'],
-  cost: { wood: 1 },
-  passing: true,
-  newSet: true,
-})
+const CARD_ID = A7_GardenersKnife.id
 
 export const A7_GardenersKnife_impl = {
   effect: {

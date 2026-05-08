@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { sowCrop, getEmptyFields, canSow } from '../sow'
-import type { Field, PlayerState } from '../../../game/types'
+import type { Field, PlayerState } from '../../../contract/types'
 
 const mkPlayer = (fields: Field[], grain = 0, veg = 0): Partial<PlayerState> => ({
   fields,

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import { getCardEffect } from '../card-effects'
 import { readPendingFenceBonus, storePendingFenceBonus } from '../helpers/pending-fence-bonus'
-import type { ActionSpace, GameState, PlayerState } from '../../game/types'
+import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
 import { setFencesForTest } from './__fixtures__/fence'
 
 import '../E/E74_AshTrees'

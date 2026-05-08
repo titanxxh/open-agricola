@@ -1,4 +1,4 @@
-import type { GameState, PlayerState, Resource } from '../../game/types'
+import type { GameState, PlayerState, Resource } from '../../contract/types'
 import { initCardState } from '../__stubs__/helpers'
 import { applyCardGain, type CardGain } from './card-gain'
 import { dispatchTradeAppliedListener } from '../../actions/effects/exchange'

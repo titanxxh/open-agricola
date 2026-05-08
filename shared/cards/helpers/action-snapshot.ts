@@ -1,4 +1,4 @@
-import type { PlayerState } from '../../game/types'
+import type { PlayerState } from '../../contract/types'
 import { ensureCardState } from './card-state'
 
 const ACTION_SNAPSHOT_CARD_ID = '__actionSnapshot__'

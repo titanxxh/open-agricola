@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 
 import '../../shared/cards/B/B104_SheepWalker'
@@ -28,7 +28,14 @@ describe('B104_SheepWalker session — last harvest enforcement', () => {
     return { session, state, playerA, playerB }
   }
 
-  // SKIP[S1]: 'choice'→'request' shape mismatch, see docs/skip-tracker.md
+  // SKIP[behavior-regression]: shape codemod applied (S7 Batch 3), but
+  // B104.enforceReorganizeOnLastHarvest no longer surfaces an animal-reorg
+  // request after feed-phase confirm in round 14. Stage-flow's breed leaf
+  // does emit `{ type: 'request', request: { kind: 'animal-reorg' } }`
+  // (verified with engine.proceed instrumentation), but the engineStack /
+  // runEngineSteps choice-path does not pivot into the reorganize sub-flow,
+  // ending the harvest with `stateId: 'idle'` instead. Out of scope for the
+  // shape codemod; track separately as a behavior regression.
   it.skip('forces animalReorg in last harvest even when no breeding occurs (single sheep)', () => {
     const { session, state, playerA } = setupRound14Harvest()
     playerA.occupationPlayed.push(CARD_ID)
@@ -55,7 +62,8 @@ describe('B104_SheepWalker session — last harvest enforcement', () => {
     // Without B104, breed phase ends here with no animals (1 sheep < 2). With
     // the fix, B104.enforceReorganizeOnLastHarvest must force animalReorg.
     expect(resp.interaction.stateId).toBe('wait')
-    if ((resp.interaction.stateId !== 'wait' || resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined !== 'ui.interactionAnimalReorg')) return
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
+    expect(resp.interaction.request.kind).toBe('animal-reorg')
     expect(resp.interaction.playerIndex).toBe(0)
 
     // Confirm reorg leaving the sheep on its pasture.

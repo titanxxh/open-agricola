@@ -1,20 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E118_KindlingGatherer } from '../../cards-display/E/E118_KindlingGatherer'
+export { E118_KindlingGatherer }
 
-const CARD_ID = 'E118_KindlingGatherer'
+const CARD_ID = E118_KindlingGatherer.id
 
-// BGA: Each time you get food from an action space, you get 1 additional wood.
-// Triggers on place-farmer for: Fishing, TravelingPlayers, ResourceMarket, ResourceMarketAdd,
-//   ForestInn (B42), Archway (D51), StudioBoat (C39), MeetingPlace beginner variants
-// Triggers on gain for: DayLaborer, AnimalMarketAdd, Collector (C104)
-
-// Fishing is an accumulation space → triggers via collect.
-// TravelingPlayers is an accumulation space → triggers via collect (food accumulation).
-// ResourceMarket (4p) is a gain action → triggers via place-farmer.
-// DayLaborer triggers via gain action.
 const PLACE_FARMER_FOOD_SPACES = new Set([
   'resource-market-4',
 ])
@@ -67,17 +59,6 @@ const gainListener: CardListenerRegistration = {
     }
   },
 }
-
-export const E118_KindlingGatherer = new Occupation({
-  id: CARD_ID,
-  name: 'Kindling Gatherer',
-  deck: 'E',
-  number: 118,
-  category: 'BUILDING_RESOURCES_-_WOOD',
-  desc: ['Each time you get <FOOD> from an action space, you get 1 additional <WOOD>.'],
-  cost: {},
-  players: '1+',
-})
 
 export const E118_KindlingGatherer_impl = {
   listeners: [placeFarmerListener, collectListener, gainListener],

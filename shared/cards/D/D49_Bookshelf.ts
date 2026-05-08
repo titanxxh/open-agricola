@@ -1,10 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { D49_Bookshelf } from '../../cards-display/D/D49_Bookshelf'
+export { D49_Bookshelf }
 
-const CARD_ID = 'D49_Bookshelf'
+const CARD_ID = D49_Bookshelf.id
 
 const beforeListener: CardListenerRegistration = {
   id: 'D49-bookshelf-before-occupation',
@@ -25,20 +26,6 @@ const isDoableListener: CardListenerRegistration = {
     return { doable: true }
   },
 }
-
-export const D49_Bookshelf = new MinorImprovement({
-  id: CARD_ID,
-  name: "Bookshelf",
-  deck: "D",
-  number: 49,
-  category: "FOOD_PROVIDER",
-  desc: ['Immediately before each time you play an occupation (even before paying the occupation cost), you get 3 <FOOD>.'],
-  cost: { wood: 1 },
-  vp: 1,
-  prerequisite: "3 Occupations",
-  occupationPrerequisites: { min: 3 },
-  players: "1+",
-})
 
 export const D49_Bookshelf_impl = {
   listeners: [beforeListener, isDoableListener],

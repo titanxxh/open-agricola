@@ -1,13 +1,9 @@
-import { MinorImprovement } from '../types'
-import type { ActionFlow, Resource } from '../../game/types'
+import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { B81_Handcart } from '../../cards-display/B/B81_Handcart'
+export { B81_Handcart }
 
-const CARD_ID = 'B81_Handcart'
-
-// B81 Handcart: Before each work phase, you can take 1 building resource from at most
-// one accumulation space containing at least 6 wood / 5 clay / 4 reed / 4 stone.
-// BGA: startOfWork -> we use onRoundStart.
-// Like A82_WorkCertificate, we gain from general supply.
+const CARD_ID = B81_Handcart.id
 
 const THRESHOLDS: Record<string, number> = {
   wood: 6,
@@ -17,17 +13,6 @@ const THRESHOLDS: Record<string, number> = {
 }
 
 const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
-
-export const B81_Handcart = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Handcart',
-  deck: 'B',
-  number: 81,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['Before each work phase, you can take 1 building resource from at most one <WOOD>/<CLAY>/<REED>/<STONE> accumulation space containing at least 6/5/4/4 building resources of the same type.'],
-  cost: { wood: 1 },
-  evenMoreSet: true,
-})
 
 export const B81_Handcart_impl = {
   effect: {

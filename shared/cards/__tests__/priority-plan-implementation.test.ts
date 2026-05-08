@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { executeCardListener, getRegisteredCardListeners } from '../card-listeners'
 import { getCardEffect } from '../card-effects'
 import { recordActionSnapshot } from '../helpers/action-snapshot'
-import type { ActionSpace, GameState, PlayerState } from '../../game/types'
+import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
 
 import '../A/A29_AleBenches'
 import '../A/A81_InterimStorage'
@@ -354,8 +354,7 @@ describe('priority plan implementations', () => {
     expect(player.resources.clay).toBe(0)
   })
 
-  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
-  it.skip('C60 Small Potter\'s Oven asks which oven to return when both match', () => {
+  it('C60 Small Potter\'s Oven asks which oven to return when both match', () => {
     const player = createPlayer()
     player.minorHand = ['C60_SmallPottersOven']
     player.improvements = ['Major_ClayOven', 'Major_StoneOven']
@@ -364,15 +363,17 @@ describe('priority plan implementations', () => {
 
     const result = playImprovement(state, player, 'C60_SmallPottersOven', 'minor')
 
-    expect(result.type).toBe('choice')
-    if (result.type !== 'choice') return
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') return
+    expect(result.request.kind).toBe('choice')
+    if (result.request.kind !== 'choice') return
     expect(result.promptKey).toBe('prompt.selectPayment')
-    expect(result.options).toHaveLength(2)
-    expect(result.options.map((option) => option.value)).toEqual([
+    expect(result.request.options).toHaveLength(2)
+    expect(result.request.options.map((option) => option.value)).toEqual([
       'pay:minor:C60_SmallPottersOven:0',
       'pay:minor:C60_SmallPottersOven:1',
     ])
-    expect(result.options.map((option) => option.labelParams)).toMatchObject([
+    expect(result.request.options.map((option) => option.labelParams)).toMatchObject([
       { resourcesPaid: { clay: 2 }, cardUsed: 'Major_ClayOven' },
       { resourcesPaid: { clay: 2 }, cardUsed: 'Major_StoneOven' },
     ])

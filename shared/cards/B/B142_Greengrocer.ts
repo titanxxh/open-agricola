@@ -1,10 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B142_Greengrocer } from '../../cards-display/B/B142_Greengrocer'
+export { B142_Greengrocer }
 
-const CARD_ID = 'B142_Greengrocer'
+const CARD_ID = B142_Greengrocer.id
 
 const listener: CardListenerRegistration = {
   id: 'B142-greengrocer-after-place-farmer',
@@ -16,17 +17,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { vegetable: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const B142_Greengrocer = new Occupation({
-  id: CARD_ID,
-  name: 'Greengrocer',
-  deck: 'B',
-  number: 142,
-  category: 'CROP_PROVIDER',
-  desc: ['Each time you use the __Grain Seeds__ action space, you also get 1 <VEGETABLE>.'],
-  cost: {},
-  players: '3+',
-})
 
 export const B142_Greengrocer_impl = {
   listeners: [listener],

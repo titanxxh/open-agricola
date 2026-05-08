@@ -1,9 +1,10 @@
-import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { C151_SowingDirector } from '../../cards-display/C/C151_SowingDirector'
+export { C151_SowingDirector }
 
-const CARD_ID = 'C151_SowingDirector'
+const CARD_ID = C151_SowingDirector.id
 
 /**
  * C151 Sowing Director:
@@ -36,19 +37,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const C151_SowingDirector = new Occupation({
-  id: CARD_ID,
-  name: 'Sowing Director',
-  deck: 'C',
-  number: 151,
-  category: 'ACTIONS_BOOSTER',
-  desc: [
-    'Each time after another player uses the __Grain Utilization__ action space, you get a __Sow__ action.',
-  ],
-  cost: {},
-  players: '4+',
-})
 
 export const C151_SowingDirector_impl = {
   listeners: [listener],

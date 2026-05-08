@@ -23,8 +23,8 @@ import {
   type CustomCardData,
 } from '../../shared/cards/custom-registry'
 import { registerExecutorBackedCustomCard } from '../../server/custom-code/runtime'
-import { createInitialState } from '../../shared/logic/state'
-import type { GameState, PlayerState, Resource } from '../../shared/game/types'
+import { createInitialState } from '../../shared/session/state-bootstrap'
+import type { GameState, PlayerState, Resource } from '../../shared/contract/types'
 import { rewriteCardId } from './extract'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { solveBonusScoring } from '../../shared/domain/scoring'
@@ -33,7 +33,7 @@ import {
   markAllWorkersUsed,
   setActiveWorkerCount,
   workersAvailable,
-} from '../../shared/game/player'
+} from '../../shared/domain/player'
 import { GameSession } from '../../server/game/authoritative-session'
 import { confirmNextPlayer, confirmPlayerSwitch } from '../../server/__tests__/_helpers/legacy-confirms'
 

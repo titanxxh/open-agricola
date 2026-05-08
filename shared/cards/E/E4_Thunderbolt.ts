@@ -1,7 +1,8 @@
-import { MinorImprovement } from '../types'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
-import { fieldTopStack } from '../../game/field'
+import { fieldTopStack } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { E4_Thunderbolt } from '../../cards-display/E/E4_Thunderbolt'
+export { E4_Thunderbolt }
 
 const CARD_ID = 'E4_Thunderbolt'
 
@@ -17,17 +18,6 @@ registerSelectionEffect('remove-all-grain-for-wood', ({ player, positions }) => 
       player.resources.wood = (player.resources.wood ?? 0) + grainCount * 2
     }
   }
-})
-
-export const E4_Thunderbolt = new MinorImprovement({
-  id: "E4_Thunderbolt",
-  name: "Thunderbolt",
-  deck: "E",
-  number: 4,
-  desc: ["Immediately remove all <GRAIN> from one of your fields to the general supply. Gain 2 <WOOD> for each <GRAIN> you just removed."],
-  cost: {},
-  prerequisite: "1 Grain Field",
-  passing: true,
 })
 
 export const E4_Thunderbolt_impl = {

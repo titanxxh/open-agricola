@@ -1,12 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { B28_ForestryStudies } from '../../cards-display/B/B28_ForestryStudies'
+export { B28_ForestryStudies }
 
-const CARD_ID = 'B28_ForestryStudies'
+const CARD_ID = B28_ForestryStudies.id
 
-// B28 Forestry Studies: After using Forest, can return 2 wood to the space
-// then play 1 occupation for free (no occupation cost).
 const listener: CardListenerRegistration = {
   id: 'B28-forestry-studies-after-place-farmer',
   cardIds: [CARD_ID],
@@ -37,17 +36,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const B28_ForestryStudies = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Forestry Studies',
-  deck: 'B',
-  number: 28,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['Each time after you use the __Forest__ accumulation space, you can return 2 <WOOD> to that space to play 1 occupation without paying an occupation costs.'],
-  cost: { food: 2 },
-  newSet: true,
-})
 
 export const B28_ForestryStudies_impl = {
   listeners: [listener],

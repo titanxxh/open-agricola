@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../card-effects'
 import { runCardEffectHook } from '../card-effects'
-import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
 
 import '../E/E143_Hewer'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 
 const CARD_ID = 'E143_Hewer'
 

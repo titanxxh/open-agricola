@@ -1,28 +1,14 @@
-import { MinorImprovement } from '../types'
 import { writeCardExtraData, readCardExtraData, writeCardInfobox, setCardFlag, isCardFlagged } from '../helpers/card-state'
 import { getFenceCount, maxFences } from '../../actions/effects/fencing'
-import { workersAvailable } from '../../game/player'
+import { workersAvailable } from '../../domain/player'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
+import { A22_Telegram } from '../../cards-display/A/A22_Telegram'
+export { A22_Telegram }
 
-const CARD_ID = 'A22_Telegram'
+const CARD_ID = A22_Telegram.id
 
-// BGA isBuyable: Fences::countAvailable($player->getId()) == 0 → false
-// "Fence in Supply" = unplaced fence reserve = max - already-placed
 registerPrerequisite('At Least 1 Fence in Supply', (player) => maxFences - getFenceCount(player) >= 1)
-
-export const A22_Telegram = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Telegram',
-  deck: 'A',
-  number: 22,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['Add 1 to the current round for each fence in your supply and mark the corresponding round space. In that round only, you can place a person from your supply.'],
-  cost: { food: 2 },
-  prerequisite: 'At Least 1 Fence in Supply',
-  vp: 1,
-  evenMoreSet: true,
-})
 
 export const A22_Telegram_impl = {
   effect: {

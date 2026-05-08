@@ -11,7 +11,7 @@
  * the public API instead.
  */
 
-import type { Resource, Trade } from '../../../game/types'
+import type { Resource, Trade } from '../../../contract/types'
 
 export type InternalSolution = {
   resourcesRemaining: Partial<Resource>

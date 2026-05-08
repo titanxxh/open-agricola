@@ -1,15 +1,15 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
+import { A163_BuildingExpert } from '../../cards-display/A/A163_BuildingExpert'
+export { A163_BuildingExpert }
 
-const CARD_ID = 'A163_BuildingExpert'
+const CARD_ID = A163_BuildingExpert.id
 
 type ResourceKey = 'wood' | 'clay' | 'reed' | 'stone'
 
-// 1st→wood, 2nd→clay, 3rd→reed, 4th→stone, 5th→stone (1-indexed)
 const PLACEMENT_TO_RESOURCE: Record<number, ResourceKey> = {
   1: 'wood',
   2: 'clay',
@@ -18,8 +18,6 @@ const PLACEMENT_TO_RESOURCE: Record<number, ResourceKey> = {
   5: 'stone',
 }
 
-// A163 Building Expert: Each time you use the Resource Market action space with the
-// 1st/2nd/3rd/4th/5th person you place, you also get 1 WOOD/CLAY/REED/STONE/STONE.
 const listener: CardListenerRegistration = {
   id: 'A163-building-expert-after-place-farmer',
   cardIds: [CARD_ID],
@@ -33,18 +31,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { [resource]: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const A163_BuildingExpert = new Occupation({
-  id: CARD_ID,
-  name: 'Building Expert',
-  deck: 'A',
-  number: 163,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['Each time you use the __Resource Market__ action space with the 1st/2nd/3rd/4th/5th person you place, you also get 1 <WOOD>/<CLAY>/<REED>/<STONE>/<STONE>.'],
-  cost: {},
-  players: '4+',
-  newSet: true,
-})
 
 export const A163_BuildingExpert_impl = {
   listeners: [listener],

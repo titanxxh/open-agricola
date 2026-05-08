@@ -1,6 +1,6 @@
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import type { GameState } from '../../../shared/game/types'
+import type { GameState } from '../../../shared/contract/types'
 import { LogParts, prepareLogEntry } from './log-rendering'
 
 type Props = {

@@ -1,10 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import { E40_BeeStatue } from '../../cards-display/E/E40_BeeStatue'
+export { E40_BeeStatue }
 
-const CARD_ID = 'E40_BeeStatue'
+const CARD_ID = E40_BeeStatue.id
 
 /**
  * Stack order (bottom to top): vegetable, stone, grain, stone, grain.
@@ -27,17 +28,6 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
     }
   },
 }
-
-export const E40_BeeStatue = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Bee Statue',
-  deck: 'E',
-  number: 40,
-  category: 'GOODS_-_GET',
-  desc: ['Pile (from bottom to top) 1 <VEGETABLE>, 1 <STONE>, 1 <GRAIN>, 1 <STONE>, 1 <GRAIN> on this card. Each time you use the __Day Laborer__ action space, you get the top good.'],
-  cost: { clay: 2 },
-  players: '1+',
-})
 
 export const E40_BeeStatue_impl = {
   listeners: [afterPlaceFarmerListener],

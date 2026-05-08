@@ -1,14 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B112_Silokeeper } from '../../cards-display/B/B112_Silokeeper'
+export { B112_Silokeeper }
 
-const CARD_ID = 'B112_Silokeeper'
+const CARD_ID = B112_Silokeeper.id
 
-// Maps current round to the round in which the trigger space was revealed.
-// -1 means no trigger. This is the space revealed just before the most recent harvest.
-// Harvests: 4, 7, 9, 11, 13, 14. Trigger round = round before last harvest.
 const TRIGGER_ROUND_MAP: Record<number, number> = {
   1: -1, 2: -1, 3: -1, 4: -1,
   5: 4, 6: 4, 7: 4,
@@ -34,18 +32,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { grain: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const B112_Silokeeper = new Occupation({
-  id: CARD_ID,
-  name: 'Silokeeper',
-  deck: 'B',
-  number: 112,
-  category: 'CROP_PROVIDER',
-  desc: ['Each time you use the action space card that has been revealed right before the most recent harvest, you also get 1 <GRAIN>.'],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
 
 export const B112_Silokeeper_impl = {
   listeners: [listener],

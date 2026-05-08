@@ -1,11 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
+import { C119_SkillfulRenovator } from '../../cards-display/C/C119_SkillfulRenovator'
+export { C119_SkillfulRenovator }
 
-const CARD_ID = 'C119_SkillfulRenovator'
+const CARD_ID = C119_SkillfulRenovator.id
 
 const afterRenovateListener: CardListenerRegistration = {
   id: 'C119-skillful-renovator-after-renovate',
@@ -18,19 +19,6 @@ const afterRenovateListener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { wood: placed }), sourceCard: CARD_ID }
   },
 }
-
-export const C119_SkillfulRenovator = new Occupation({
-  id: CARD_ID,
-  name: 'Skillful Renovator',
-  deck: 'C',
-  number: 119,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: [
-    'When you play this card, you immediately get 1 <WOOD> and 1 <CLAY>. Each time after you renovate, you get a number of <WOOD> equal to the number of people you placed that round.',
-  ],
-  cost: {},
-  players: '1+',
-})
 
 export const C119_SkillfulRenovator_impl = {
   listeners: [afterRenovateListener],

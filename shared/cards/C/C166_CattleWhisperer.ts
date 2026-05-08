@@ -1,18 +1,9 @@
-import { Occupation } from '../types'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
+import { C166_CattleWhisperer } from '../../cards-display/C/C166_CattleWhisperer'
+export { C166_CattleWhisperer }
 
-const CARD_ID = 'C166_CattleWhisperer'
-
-export const C166_CattleWhisperer = new Occupation({
-  id: CARD_ID,
-  name: "Cattle Whisperer",
-  deck: "C",
-  number: 166,
-  category: "LIVESTOCK_PROVIDER",
-  desc: ["Add 5 and 8 to the current round and place 1 <CATTLE> on each corresponding round space. At the start of these rounds, you get the <CATTLE>."],
-  players: "4+",
-})
+const CARD_ID = C166_CattleWhisperer.id
 
 export const C166_CattleWhisperer_impl = {
   effect: {

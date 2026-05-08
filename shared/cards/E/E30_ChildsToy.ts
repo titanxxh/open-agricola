@@ -1,27 +1,13 @@
-import { MinorImprovement } from '../types'
 import { ensureCardState } from '../helpers/card-state'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import { familySize, newbornCount } from '../../game/player'
+import { familySize, newbornCount } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { E30_ChildsToy } from '../../cards-display/E/E30_ChildsToy'
+export { E30_ChildsToy }
 
-const CARD_ID = 'E30_ChildsToy'
+const CARD_ID = E30_ChildsToy.id
 
-// BGA isBuyable: countFarmers(ADULT) != 2 → false. Adults = active workers that
-// are not newborns.
 registerPrerequisite('Exactly 2 Adults', (player) => familySize(player) - newbornCount(player) === 2)
-
-export const E30_ChildsToy = new MinorImprovement({
-  id: CARD_ID,
-  name: "Child's Toy",
-  deck: 'E',
-  number: 30,
-  category: 'BONUS_POINTS_-_GET',
-  desc: ['During the feeding phase of each harvest, your newborns require 2 <FOOD> (instead of 1).'],
-  cost: { wood: 1 },
-  altCosts: [{ clay: 1 }],
-  vp: 2,
-  prerequisite: 'Exactly 2 Adults',
-})
 
 export const E30_ChildsToy_impl = {
   effect: {

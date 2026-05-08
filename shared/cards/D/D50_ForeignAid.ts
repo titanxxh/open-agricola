@@ -1,10 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { D50_ForeignAid } from '../../cards-display/D/D50_ForeignAid'
+export { D50_ForeignAid }
 
-const CARD_ID = 'D50_ForeignAid'
+const CARD_ID = D50_ForeignAid.id
 
 /**
  * D50 Foreign Aid (Minor Improvement):
@@ -28,7 +29,6 @@ const getBlockedSpaceIds = (state: { roundActionOrder: (string | null)[] }): Set
   return blocked
 }
 
-// computeArgs: filter out rounds 12-14 action spaces from place-farmer choices
 const computeArgsListener: CardListenerRegistration = {
   id: 'D50-foreign-aid-compute-args-place-farmer',
   cardIds: [CARD_ID],
@@ -53,18 +53,6 @@ const computeArgsListener: CardListenerRegistration = {
 }
 
 export { getBlockedSpaceIds }
-
-export const D50_ForeignAid = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Foreign Aid',
-  deck: 'D',
-  number: 50,
-  category: 'FOOD_PROVIDER',
-  desc: ['When you play this card, you immediately get 6 <FOOD>. You may no longer use the action spaces of rounds 12 to 14.'],
-  cost: {},
-  maxRound: 11,
-  players: '1+',
-})
 
 export const D50_ForeignAid_impl = {
   listeners: [computeArgsListener],

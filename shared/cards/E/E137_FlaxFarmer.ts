@@ -1,13 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E137_FlaxFarmer } from '../../cards-display/E/E137_FlaxFarmer'
+export { E137_FlaxFarmer }
 
-const CARD_ID = 'E137_FlaxFarmer'
+const CARD_ID = E137_FlaxFarmer.id
 
-// Each time you use Reed Bank, also get 1 grain.
-// Each time you use Grain Seeds, also get 1 reed.
 const listener: CardListenerRegistration = {
   id: 'E137-flax-farmer-before-place-farmer',
   cardIds: [CARD_ID],
@@ -23,17 +22,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const E137_FlaxFarmer = new Occupation({
-  id: CARD_ID,
-  name: 'Flax Farmer',
-  deck: 'E',
-  number: 137,
-  category: 'GOODS_-_GET',
-  desc: ['Each time you use the __Reed Bank__ accumulation space, you also get 1\u00a0<GRAIN>. Each time you use the __Grain Seeds__ action space, you also get 1 <REED>.'],
-  cost: {},
-  players: '3+',
-})
 
 export const E137_FlaxFarmer_impl = {
   listeners: [listener],

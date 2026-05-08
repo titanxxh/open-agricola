@@ -1,11 +1,12 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack, isCardFlagged, setCardFlag, writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
-import type { PlayerState } from '../../game/types'
+import type { PlayerState } from '../../contract/types'
+import { E22_GuestRoom } from '../../cards-display/E/E22_GuestRoom'
+export { E22_GuestRoom }
 
-const CARD_ID = 'E22_GuestRoom'
+const CARD_ID = E22_GuestRoom.id
 
 const updateInfobox = (player: PlayerState) => {
   const stack = getCardStack(player, CARD_ID)
@@ -45,15 +46,6 @@ const anytimeListener: CardListenerRegistration = {
     }
   },
 }
-
-export const E22_GuestRoom = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Guest Room',
-  deck: 'E',
-  number: 22,
-  desc: ['Immediately place any amount of <FOOD> from your supply on this card. Once per round, you can discard 1 <FOOD> from this card to place a person from your supply in that round.'],
-  cost: { wood: 4, reed: 1 },
-})
 
 export const E22_GuestRoom_impl = {
   listeners: [anytimeListener],

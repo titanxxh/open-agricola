@@ -1,11 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { C143_StoneBuyer } from '../../cards-display/C/C143_StoneBuyer'
+export { C143_StoneBuyer }
 
-const CARD_ID = 'C143_StoneBuyer'
+const CARD_ID = C143_StoneBuyer.id
 
 const anytimeListener: CardListenerRegistration = {
   id: 'C143-stone-buyer-anytime',
@@ -28,17 +29,6 @@ const anytimeListener: CardListenerRegistration = {
     }
   },
 }
-
-export const C143_StoneBuyer = new Occupation({
-  id: CARD_ID,
-  name: 'Stone Buyer',
-  deck: 'C',
-  number: 143,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['When you play this card, you can immediately buy exactly 2 <STONE> for 1 <FOOD>. From the next round on, once per round, you can buy 1 <STONE> for 2 <FOOD>.'],
-  cost: {},
-  players: '3+',
-})
 
 export const C143_StoneBuyer_impl = {
   listeners: [anytimeListener],

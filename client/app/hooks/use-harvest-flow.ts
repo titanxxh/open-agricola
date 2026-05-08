@@ -1,17 +1,16 @@
-import type { GameState, PlayerState, Resource } from '../../../shared/game/types'
+import type { PlayerState, Resource } from '../../../shared/contract/types'
 import type { Locale } from '../../../shared/i18n'
-import type { HarvestSummary } from '../../../shared/logic/round'
-import { performHarvest } from '../../../shared/logic/round'
+import type { HarvestSummary } from '../../../shared/session/round'
 import {
   getRegisteredMinorImprovement,
   getRegisteredOccupation,
-} from '../../../shared/cards/types'
+} from '../../../shared/cards-display/types'
 import { getMajorCard } from '../../../shared/cards/major'
 import {
   BASIC_CONVERSION_SOURCE_ID,
   basicConversionExchanges,
 } from '../../../shared/cards/basic-conversion'
-import type { CardExchange } from '../../../shared/cards/types'
+import type { CardExchange } from '../../../shared/contract/cards'
 
 export type HarvestFeedPending = {
   playerIndex: number
@@ -39,8 +38,6 @@ export type HarvestContext = {
 
 export const canFinalizeHarvest = (pendingFeedByPlayerId: Record<string, number>) =>
   Object.values(pendingFeedByPlayerId).every((value) => value <= 0)
-
-export const runHarvestFlow = (state: GameState) => performHarvest(state)
 
 const isHarvestFeedTrigger = (ex: CardExchange) => {
   const triggers = ex.triggers ?? []

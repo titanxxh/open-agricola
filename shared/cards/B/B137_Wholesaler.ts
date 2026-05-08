@@ -1,11 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B137_Wholesaler } from '../../cards-display/B/B137_Wholesaler'
+export { B137_Wholesaler }
 
-const CARD_ID = 'B137_Wholesaler'
+const CARD_ID = B137_Wholesaler.id
 
 type WholesalerData = {
   vegetableTaken: boolean
@@ -107,17 +108,6 @@ const afterCattleMarketListener: CardListenerRegistration = {
     }
   },
 }
-
-export const B137_Wholesaler = new Occupation({
-  id: CARD_ID,
-  name: 'Wholesaler',
-  deck: 'B',
-  number: 137,
-  category: 'GOODS_PROVIDER',
-  desc: ['Place 1 <VEGETABLE>, 1 <PIG>, 1 <STONE>, and 1 <CATTLE> on this card. Each time you use an action space card on round spaces 8 to 11, you get the corresponding good from this card.'],
-  cost: {},
-  players: '3+',
-})
 
 export const B137_Wholesaler_impl = {
   listeners: [afterVegetableSeedsListener, afterPigMarketListener, afterEasternQuarryListener, afterCattleMarketListener],

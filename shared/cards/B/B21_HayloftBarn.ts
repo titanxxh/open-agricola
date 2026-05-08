@@ -1,13 +1,14 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionFlow, PlayerState } from '../../game/types'
+import type { ActionFlow, PlayerState } from '../../contract/types'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldHasCrop } from '../../game/field'
+import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { B21_HayloftBarn } from '../../cards-display/B/B21_HayloftBarn'
+export { B21_HayloftBarn }
 
-const CARD_ID = 'B21_HayloftBarn'
+const CARD_ID = B21_HayloftBarn.id
 
 const updateInfobox = (player: Parameters<typeof writeCardInfobox>[0], count: number) => {
   writeCardInfobox(player, CARD_ID, count > 0 ? `${count} Food` : 'Empty')
@@ -59,19 +60,6 @@ const grainGainListener: CardListenerRegistration = {
     return { flow: buildFlow(newCount, context.player), sourceCard: CARD_ID }
   },
 }
-
-export const B21_HayloftBarn = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Hayloft Barn',
-  deck: 'B',
-  number: 21,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['Place 4 <FOOD> on this card. Each time you obtain at least 1 <GRAIN>, you also get 1 <FOOD> from this card. Once it is empty, you get a __Family Growth Even without Room__ action.'],
-  cost: { wood: 3 },
-  prerequisite: '1 Occupation',
-  occupationPrerequisites: { min: 1 },
-  newSet: true,
-})
 
 export const B21_HayloftBarn_impl = {
   listeners: [grainGainListener],

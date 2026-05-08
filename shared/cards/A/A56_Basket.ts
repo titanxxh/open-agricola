@@ -1,16 +1,15 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { returnToSpaceThenGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { A56_Basket } from '../../cards-display/A/A56_Basket'
+export { A56_Basket }
 
-const CARD_ID = 'A56_Basket'
+const CARD_ID = A56_Basket.id
 
 const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =>
   (space?.gainPerRound?.wood ?? 0) > 0
 
-// A56 Basket: Immediately after each time you use a wood accumulation space, you can
-// exchange 2 wood for 3 food. Place those 2 wood back on the accumulation space.
 const listener: CardListenerRegistration = {
   id: 'A56-basket-immediately-after-collect',
   cardIds: [CARD_ID],
@@ -26,16 +25,6 @@ const listener: CardListenerRegistration = {
     })
   },
 }
-
-export const A56_Basket = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Basket',
-  deck: 'A',
-  number: 56,
-  category: 'FOOD_PROVIDER',
-  desc: ['Immediately after each time you use a wood accumulation space, you can exchange 2 <WOOD> for 3 <FOOD>. If you do, place those 2 <WOOD> on the accumulation space.'],
-  cost: { reed: 1 },
-})
 
 export const A56_Basket_impl = {
   listeners: [listener],

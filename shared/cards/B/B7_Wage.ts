@@ -1,22 +1,11 @@
-import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B7_Wage } from '../../cards-display/B/B7_Wage'
+export { B7_Wage }
 
-const CARD_ID = 'B7_Wage'
+const CARD_ID = B7_Wage.id
 
-// BGA: 2 food + 1 food per bottom-row major improvement (ClayOven, StoneOven, Joinery, Pottery, Basket)
 const BOTTOM_ROW_MAJORS = ['Major_ClayOven', 'Major_StoneOven', 'Major_Joinery', 'Major_Pottery', 'Major_Basket']
-
-export const B7_Wage = new MinorImprovement({
-  id: CARD_ID,
-  name: "Wage",
-  deck: "B",
-  number: 7,
-  category: "FOOD_PROVIDER",
-  desc: ["You immediately get 2 <FOOD> and 1 additional <FOOD> for each major improvement you have from the bottom row of the supply board."],
-  cost: { food: 1 },
-  passing: true,
-})
 
 export const B7_Wage_impl = {
   effect: {

@@ -1,4 +1,4 @@
-import type { GameState, PlayerState } from '../game/types.ts'
+import type { GameState, PlayerState } from '../contract/types.ts'
 import { Farmyard } from './farmyard.ts'
 import { AnimalZones } from './animal-zones.ts'
 

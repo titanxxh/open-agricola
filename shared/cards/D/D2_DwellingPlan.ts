@@ -1,19 +1,8 @@
-import { MinorImprovement } from '../types'
 import type { CardImpl } from '../registry'
+import { D2_DwellingPlan } from '../../cards-display/D/D2_DwellingPlan'
+export { D2_DwellingPlan }
 
-const CARD_ID = 'D2_DwellingPlan'
-
-export const D2_DwellingPlan = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Dwelling Plan',
-  deck: 'D',
-  number: 2,
-  category: 'FARM_PLANNER',
-  desc: ['You can immediately take a __Renovation__ action.'],
-  cost: { food: 1 },
-  passing: true,
-  newSet: true,
-})
+const CARD_ID = D2_DwellingPlan.id
 
 export const D2_DwellingPlan_impl = {
   effect: {

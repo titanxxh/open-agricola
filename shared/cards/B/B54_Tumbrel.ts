@@ -1,10 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B54_Tumbrel } from '../../cards-display/B/B54_Tumbrel'
+export { B54_Tumbrel }
 
-const CARD_ID = 'B54_Tumbrel'
+const CARD_ID = B54_Tumbrel.id
 
 /**
  * B54 Tumbrel (Minor Improvement):
@@ -31,19 +32,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { food: stableCount }), sourceCard: CARD_ID }
   },
 }
-
-export const B54_Tumbrel = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Tumbrel',
-  deck: 'B',
-  number: 54,
-  category: 'FOOD_PROVIDER',
-  desc: [
-    'When you play this card, you immediately get 2 <FOOD>. Each time after you take an unconditional __Sow__ action, you get 1 <FOOD> for each stable you have.',
-  ],
-  cost: { wood: 1 },
-  newSet: true,
-})
 
 export const B54_Tumbrel_impl = {
   listeners: [listener],

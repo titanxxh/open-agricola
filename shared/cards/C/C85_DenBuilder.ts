@@ -1,11 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { C85_DenBuilder } from '../../cards-display/C/C85_DenBuilder'
+export { C85_DenBuilder }
 
-const CARD_ID = 'C85_DenBuilder'
+const CARD_ID = C85_DenBuilder.id
 
 const anytimeListener: CardListenerRegistration = {
   id: 'C85-den-builder-anytime',
@@ -29,18 +30,6 @@ const anytimeListener: CardListenerRegistration = {
     }
   },
 }
-
-export const C85_DenBuilder = new Occupation({
-  id: CARD_ID,
-  name: 'Den Builder',
-  deck: 'C',
-  number: 85,
-  category: 'FARM_PLANNER',
-  desc: ['When you live in a clay or stone house, you can pay 1 <GRAIN> and 2 <FOOD>. If you do, for the rest of the game, this card provides room for exactly one person.'],
-  cost: {},
-  players: '1+',
-  implemented: true,
-})
 
 export const C85_DenBuilder_impl = {
   listeners: [anytimeListener],

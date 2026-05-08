@@ -1,8 +1,9 @@
-import { Occupation } from '../types'
-import { fieldHasCrop } from '../../game/field'
+import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { D153_WealthyMan } from '../../cards-display/D/D153_WealthyMan'
+export { D153_WealthyMan }
 
-const CARD_ID = 'D153_WealthyMan'
+const CARD_ID = D153_WealthyMan.id
 
 const harvestGrainFieldThreshold: Record<number, number> = {
   4: 1,
@@ -12,17 +13,6 @@ const harvestGrainFieldThreshold: Record<number, number> = {
   13: 5,
   14: 6,
 }
-
-export const D153_WealthyMan = new Occupation({
-  id: CARD_ID,
-  name: "Wealthy Man",
-  deck: "D",
-  number: 153,
-  category: "POINTS_PROVIDER",
-  desc: ["At the start of each of the 1st/2nd/3rd/4th/5th/6th harvest, if you have at least 1/2/3/4/5/6 grain fields, you get 1 bonus <SCORE>."],
-  cost: {},
-  players: "4+",
-})
 
 export const D153_WealthyMan_impl = {
   effect: {

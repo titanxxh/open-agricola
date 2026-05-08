@@ -1,15 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { D125_ForestTrader } from '../../cards-display/D/D125_ForestTrader'
+export { D125_ForestTrader }
 
-const CARD_ID = 'D125_ForestTrader'
+const CARD_ID = D125_ForestTrader.id
 
-// Each time you use a wood or clay accumulation space,
-// optionally buy exactly 1 building resource:
-// Wood/Clay/Reed = 1 food; Stone = 2 food.
-// Triggers before collect (isBeforeCollectEvent in BGA).
 const listener: CardListenerRegistration = {
   id: 'D125-forest-trader-before-collect',
   cardIds: [CARD_ID],
@@ -35,18 +32,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const D125_ForestTrader = new Occupation({
-  id: CARD_ID,
-  name: 'Forest Trader',
-  deck: 'D',
-  number: 125,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['Each time you use a wood or clay accumulation space, you can also buy exactly 1 building resource. <WOOD>, <CLAY>, and <REED> cost 1 <FOOD> each; <STONE> costs 2 food.'],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
 
 export const D125_ForestTrader_impl = {
   listeners: [listener],

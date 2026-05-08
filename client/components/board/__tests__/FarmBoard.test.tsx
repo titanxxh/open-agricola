@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-import type { PlayerState, Resource } from '../../../../shared/game/types'
+import type { PlayerState, Resource } from '../../../../shared/contract/types'
 import { FarmBoard } from '../FarmBoard'
 
 const resources = (): Resource => ({

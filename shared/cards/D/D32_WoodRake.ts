@@ -1,18 +1,9 @@
-import { MinorImprovement } from '../types'
-import { fieldTotalRemaining } from '../../game/field'
+import { fieldTotalRemaining } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { D32_WoodRake } from '../../cards-display/D/D32_WoodRake'
+export { D32_WoodRake }
 
-const CARD_ID = 'D32_WoodRake'
-
-export const D32_WoodRake = new MinorImprovement({
-  id: CARD_ID,
-  name: "Wood Rake",
-  deck: "D",
-  number: 32,
-  category: "POINTS_PROVIDER",
-  desc: ["During scoring, if you had at least 7 goods in your fields before the final harvest, you get 2 bonus <SCORE>."],
-  cost: { wood: 1 },
-})
+const CARD_ID = D32_WoodRake.id
 
 export const D32_WoodRake_impl = {
   effect: {

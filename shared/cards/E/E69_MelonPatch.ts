@@ -1,14 +1,15 @@
-import { MinorImprovement } from '../types'
 import type { ExtraSowableField } from '../card-effects'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { FarmTilePosition, PlayerState } from '../../game/types'
+import type { FarmTilePosition, PlayerState } from '../../contract/types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { canSow } from '../../actions/effects/sow'
 import { dispatchReapListener } from '../../actions/effects/reap'
 import type { CardImpl } from '../registry'
+import { E69_MelonPatch } from '../../cards-display/E/E69_MelonPatch'
+export { E69_MelonPatch }
 
-const CARD_ID = 'E69_MelonPatch'
+const CARD_ID = E69_MelonPatch.id
 
 type CardCrop = { crop: 'grain' | 'vegetable'; remaining: number }
 
@@ -24,8 +25,6 @@ const VIRTUAL_TILE: FarmTilePosition = { row: -1, col: 69 }
 const tileMatches = (tile: FarmTilePosition) =>
   tile.row === VIRTUAL_TILE.row && tile.col === VIRTUAL_TILE.col
 
-// --- isDoable listener: make sow doable when card is empty + player has vegetable ---
-
 const isDoableListener: CardListenerRegistration = {
   id: 'E69-melon-patch-isdoable-sow',
   cardIds: [CARD_ID],
@@ -39,20 +38,6 @@ const isDoableListener: CardListenerRegistration = {
     return { doable: true }
   },
 }
-
-export const E69_MelonPatch = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Melon Patch',
-  deck: 'E',
-  number: 69,
-  category: 'CROPS_-_VEGETABLE',
-  desc: [
-    'This card is a field that can only grow vegetables. Each time you harvest the last <VEGETABLE> from this card, you can plow 1 field.',
-  ],
-  prerequisite: '2 Occupations',
-  occupationPrerequisites: { min: 2 },
-  isField: true,
-})
 
 export const E69_MelonPatch_impl = {
   listeners: [isDoableListener],

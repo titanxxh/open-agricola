@@ -1,5 +1,5 @@
-import type { ActionChoiceOption, ActionDefinition } from '../../../game/types'
-import type { PromptKey } from '../../../game/prompt-keys'
+import type { ActionChoiceOption, ActionDefinition } from '../../../contract/types'
+import type { PromptKey } from '../../../contract/prompt-keys'
 
 /**
  * `emit-choice` — a dedicated leaf action for cards that need to surface a

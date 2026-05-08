@@ -1,18 +1,9 @@
-import { MinorImprovement } from '../types'
-import { spaceHasPlayer } from '../../game/space'
+import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
+import { E20_IronHoe } from '../../cards-display/E/E20_IronHoe'
+export { E20_IronHoe }
 
-const CARD_ID = 'E20_IronHoe'
-
-export const E20_IronHoe = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Iron Hoe',
-  deck: 'E',
-  number: 20,
-  category: 'FARMYARD_-_PLOWING',
-  desc: ['At the end of each work phase, if you occupy both the __Grain Seeds__ and __Vegetable Seeds__ action spaces, you can plow 1 field.'],
-  cost: { wood: 1 },
-})
+const CARD_ID = E20_IronHoe.id
 
 export const E20_IronHoe_impl = {
   effect: {

@@ -1,17 +1,8 @@
-import { Occupation } from '../types'
 import type { CardImpl } from '../registry'
+import { E98_Prodigy } from '../../cards-display/E/E98_Prodigy'
+export { E98_Prodigy }
 
-const CARD_ID = 'E98_Prodigy'
-
-export const E98_Prodigy = new Occupation({
-  id: CARD_ID,
-  name: 'Prodigy',
-  deck: 'E',
-  number: 98,
-  category: 'BONUS_POINTS_-_GET',
-  desc: ['If this is your 1st occupation, you immediately get 1 <SCORE> for each improvement you have. (This will not apply to improvements played after this card.)'],
-  players: '1+',
-})
+const CARD_ID = E98_Prodigy.id
 
 export const E98_Prodigy_impl = {
   effect: {

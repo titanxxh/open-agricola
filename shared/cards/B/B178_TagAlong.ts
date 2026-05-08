@@ -1,4 +1,4 @@
-import { Occupation } from '../types'
+import { Occupation } from '../../cards-display/types'
 
 export const B178_TagAlong = new Occupation({
   id: 'B178_TagAlong',

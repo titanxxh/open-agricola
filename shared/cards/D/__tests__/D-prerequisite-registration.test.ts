@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { meetsCardPrerequisites } from '../../helpers/prerequisites'
-import type { GameState, PlayerState, Field } from '../../../game/types'
+import type { GameState, PlayerState, Field } from '../../../contract/types'
 
 import '../D7_Trident'
 import '../D8_FernSeeds'

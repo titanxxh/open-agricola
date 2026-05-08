@@ -1,12 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { C15_Trellis } from '../../cards-display/C/C15_Trellis'
+export { C15_Trellis }
 
-const CARD_ID = 'C15_Trellis'
+const CARD_ID = C15_Trellis.id
 
-// C15 Trellis: Before using Pig Market, can take a fencing action (pay wood as usual).
-// BGA `onPlayerPlaceFarmer` is the before-event; ours runs on `before` phase to match.
 const listener: CardListenerRegistration = {
   id: 'C15-trellis-before-place-farmer',
   cardIds: [CARD_ID],
@@ -30,19 +29,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const C15_Trellis = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Trellis',
-  deck: 'C',
-  number: 15,
-  category: 'FARM_PLANNER',
-  desc: ['Each time before you use the __Pig Market__ accumulation space, you can take a __Build Fences__ action. (You must pay <WOOD> for the fences as usual.)'],
-  cost: {},
-  prerequisite: '2 Occupations',
-  occupationPrerequisites: { min: 2 },
-  newSet: true,
-})
 
 export const C15_Trellis_impl = {
   listeners: [listener],

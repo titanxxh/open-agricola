@@ -1,22 +1,19 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { getFenceCount } from '../../actions/effects/fencing'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import { fieldIsEmpty } from '../../game/field'
+import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { A68_AsparagusGift } from '../../cards-display/A/A68_AsparagusGift'
+export { A68_AsparagusGift }
 
-const CARD_ID = 'A68_AsparagusGift'
+const CARD_ID = A68_AsparagusGift.id
 
-// BGA isBuyable: countEmptyLogicalFields() == 0 → false (require >= 1 empty field)
 registerPrerequisite('1 Unplanted Field', (player) => player.fields.some(fieldIsEmpty))
-const FENCES_BEFORE_KEY = 'fencesBefore'
 
-// A68 Asparagus Gift: Each time you build a number of fences equal to or greater than
-// the current round, you immediately get 1 vegetable.
-// BGA checks: count($event['fences']) >= Globals::getTurn()
+const FENCES_BEFORE_KEY = 'fencesBefore'
 
 const beforeListener: CardListenerRegistration = {
   id: 'A68-asparagus-gift-before-fencing',
@@ -40,18 +37,6 @@ const afterListener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { vegetable: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const A68_AsparagusGift = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Asparagus Gift',
-  deck: 'A',
-  number: 68,
-  category: 'CROP_PROVIDER',
-  desc: ['Each time you build a number of fences equal to or greater than the current round, you immediately get 1 <VEGETABLE>.'],
-  cost: {},
-  prerequisite: '1 Unplanted Field',
-  newSet: true,
-})
 
 export const A68_AsparagusGift_impl = {
   listeners: [beforeListener, afterListener],

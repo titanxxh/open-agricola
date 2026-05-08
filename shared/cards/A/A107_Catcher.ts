@@ -1,11 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
+import { A107_Catcher } from '../../cards-display/A/A107_Catcher'
+export { A107_Catcher }
 
-const CARD_ID = 'A107_Catcher'
+const CARD_ID = A107_Catcher.id
 
 const isBuildingResourceSpace = (space: CardListenerContext['space']): boolean =>
   (space.gainPerRound?.wood ?? 0) > 0 ||
@@ -19,9 +20,6 @@ const countBuildingResources = (space: CardListenerContext['space']): number =>
   (space.resources?.reed ?? 0) +
   (space.resources?.stone ?? 0)
 
-// A107 Catcher: Each time you place your 1st/2nd/3rd person in a round on a building resource
-// accumulation space with exactly 5/4/3 building resources, you get 1 FOOD.
-// This uses before-collect phase so the space resources are still there for counting.
 const listener: CardListenerRegistration = {
   id: 'A107-catcher-before-collect',
   cardIds: [CARD_ID],
@@ -41,18 +39,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const A107_Catcher = new Occupation({
-  id: CARD_ID,
-  name: 'Catcher',
-  deck: 'A',
-  number: 107,
-  category: 'FOOD_PROVIDER',
-  desc: ['Each time you place your 1st/2nd/3rd person in a round on a building resource accumulation space with exactly 5/4/3 building resources, you get 1 <FOOD>.'],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
 
 export const A107_Catcher_impl = {
   listeners: [listener],
