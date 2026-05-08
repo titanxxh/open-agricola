@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { computeHarvestFeedCounterMax } from '../use-harvest-feed-counter'
-import { emptyResources } from '../../../../shared/logic/state-constants'
+import { emptyResources } from '../../../../shared/session/state-constants'
 import type { HarvestFeedOption } from '../use-harvest-flow'
 import type { Resource } from '../../../../shared/contract/types'
 

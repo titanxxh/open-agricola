@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState } from '../../contract/types'
 import type { DraftState } from '../../draft/types'
-import { createInitialState } from '../../logic/state'
+import { createInitialState } from '../../session/state-bootstrap'
 import { serializeState, serializeStateForPlayer } from '../../session/serialization'
 import { EngineStack } from '../../engine'
 

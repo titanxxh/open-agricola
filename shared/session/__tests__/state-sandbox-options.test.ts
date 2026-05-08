@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getMinorImprovementCard, getOccupationCard } from '../../cards/catalog'
-import { createInitialState, defaultSandboxPlayerNames } from '../state'
+import { createInitialState, defaultSandboxPlayerNames } from '../state-bootstrap'
 
 describe('sandbox initial state options', () => {
   it('supports configurable player count and sandbox player names', () => {

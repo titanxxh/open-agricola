@@ -3,7 +3,7 @@ import type { GameSyncPayload, StateUpdateCause, StateUpdateEnvelope } from '../
 import type { ClientCommand, ServerEvent, RoomSummary } from '../shared/protocol/ws'
 import type { InteractionRequest } from '../shared/game/types'
 import { serializeState } from '../shared/session/serialization'
-import { createInitialState } from '../shared/logic/state'
+import { createInitialState } from '../shared/session/state-bootstrap'
 import { EngineStack } from '../shared/engine'
 
 const emptyCtx = () => ({ engineStack: new EngineStack() })

@@ -9,7 +9,7 @@ import type {
 import { recordRoundPlacement } from '../../cards/helpers/round-placement'
 import { addWorkerRef, removeWorkerRef } from '../../domain/space'
 import { smallestAvailableWorker } from '../../domain/player'
-import { incPlacedFarmers } from '../../logic/stats'
+import { incPlacedFarmers } from '../../session/stats'
 import { computeAllowedPlacementSpaces } from '../helpers/placement-availability'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
 import { executeCardListener, getMatchingListeners } from '../../cards/card-listeners'

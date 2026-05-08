@@ -1,6 +1,6 @@
-import { t, type Locale } from '../i18n'
-import type { Resource } from '../contract/types'
-import { resourceKeyList } from './state'
+import { t, type Locale } from '../../shared/i18n'
+import type { Resource } from '../../shared/contract/types'
+import { resourceKeyList } from '../../shared/session/state-constants'
 
 export const formatResources = (
   locale: Locale,

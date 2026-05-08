@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { createInitialState, normalizeState } from '../../shared/logic/state'
+import { createInitialState, normalizeState } from '../../shared/session/state-bootstrap'
 import { createActionSpaces } from '../../shared/actions'
 
 // ---- Helpers ----

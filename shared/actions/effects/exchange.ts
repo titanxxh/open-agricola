@@ -15,8 +15,8 @@ import type {
 // exchange.ts only uses applyTradeSideEffect (shim scope), so no PaymentSolver
 // call sites exist here yet.
 import { applyTradeSideEffect } from '../payment/internal'
-import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
-import { addFoodFromConversion, incResourceConverted } from '../../logic/stats'
+import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resources'
+import { addFoodFromConversion, incResourceConverted } from '../../session/stats'
 import {
   getRegisteredMinorImprovement,
   getRegisteredOccupation,

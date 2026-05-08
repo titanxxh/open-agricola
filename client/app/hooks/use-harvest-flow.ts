@@ -1,7 +1,7 @@
 import type { GameState, PlayerState, Resource } from '../../../shared/contract/types'
 import type { Locale } from '../../../shared/i18n'
-import type { HarvestSummary } from '../../../shared/logic/round'
-import { performHarvest } from '../../../shared/logic/round'
+import type { HarvestSummary } from '../../../shared/session/round'
+import { performHarvest } from '../../../shared/session/round'
 import {
   getRegisteredMinorImprovement,
   getRegisteredOccupation,

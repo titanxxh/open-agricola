@@ -1,5 +1,5 @@
 import type { ActionDefinition, ActionExecutionResult, GameState, PlayerState, Resource } from '../../contract/types'
-import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../logic/stats'
+import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../session/stats'
 import { getMinorImprovement } from '../../cards-display/_lookup'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { activateCard } from './activate-card'

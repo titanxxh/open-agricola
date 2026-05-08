@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cloneState, createInitialState } from '../state'
+import { cloneState, createInitialState } from '../state-bootstrap'
 import { getPlayedCardKeys } from '../../domain/player'
 
 describe('cloneState', () => {

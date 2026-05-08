@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createInitialState, normalizeState } from '../state'
+import { createInitialState, normalizeState } from '../state-bootstrap'
 import type { GameState, PlayerState } from '../../contract/types'
 
 describe('normalizeState backfills PlayerStats for legacy saves', () => {

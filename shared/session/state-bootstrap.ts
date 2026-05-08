@@ -11,7 +11,7 @@ import {
   getAllTilePositions,
   positionKey,
 } from '../domain/farm'
-import { createRng, createSeed, shuffleWithRng } from './rng'
+import { createRng, createSeed, shuffleWithRng } from '../utils/rng'
 import { createActionSpaces } from '../actions'
 import { majorImprovementIds } from '../cards-display/_lookup'
 import {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { serializeState } from '../../../shared/session/serialization'
-import { createInitialState } from '../../../shared/logic/state'
+import { createInitialState } from '../../../shared/session/state-bootstrap'
 import type { GameSyncPayload, StateUpdateEnvelope } from '../../../shared/contract/protocol/game'
 import { EngineStack } from '../../../shared/engine'
 

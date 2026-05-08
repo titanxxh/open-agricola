@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createInitialState, normalizeState } from '../state'
+import { createInitialState, normalizeState } from '../state-bootstrap'
 
 describe('legacy fenceSegments coercion', () => {
   it('coerces old string[] shape into FenceSegment[] with type "fence"', () => {

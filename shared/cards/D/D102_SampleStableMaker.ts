@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import { addCardResourceGained } from '../helpers/card-state'
-import { addResourcesFromCards } from '../../logic/stats'
+import { addResourcesFromCards } from '../../session/stats'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import {
   listReturnableStableTiles,
