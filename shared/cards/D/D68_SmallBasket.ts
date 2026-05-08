@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D68_SmallBasket } from '../../cards-display/D/D68_SmallBasket'
+export { D68_SmallBasket }
 
 const CARD_ID = D68_SmallBasket.id
 

@@ -1,6 +1,7 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A49_NestSite } from '../../cards-display/A/A49_NestSite'
+export { A49_NestSite }
 
 const CARD_ID = A49_NestSite.id
 

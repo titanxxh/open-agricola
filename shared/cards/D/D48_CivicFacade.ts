@@ -2,6 +2,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { D48_CivicFacade } from '../../cards-display/D/D48_CivicFacade'
+export { D48_CivicFacade }
 
 const CARD_ID = D48_CivicFacade.id
 

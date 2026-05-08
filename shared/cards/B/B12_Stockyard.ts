@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { B12_Stockyard } from '../../cards-display/B/B12_Stockyard'
+export { B12_Stockyard }
 
 const CARD_ID = B12_Stockyard.id
 

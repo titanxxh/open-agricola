@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A41_VegetableSlicer } from '../../cards-display/A/A41_VegetableSlicer'
+export { A41_VegetableSlicer }
 
 const CARD_ID = A41_VegetableSlicer.id
 

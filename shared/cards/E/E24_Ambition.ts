@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { E24_Ambition } from '../../cards-display/E/E24_Ambition'
+export { E24_Ambition }
 
 const CARD_ID = E24_Ambition.id
 

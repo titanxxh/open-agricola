@@ -3,6 +3,7 @@ import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { ActionChoiceOption, ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E134_Omnifarmer } from '../../cards-display/E/E134_Omnifarmer'
+export { E134_Omnifarmer }
 
 const CARD_ID = E134_Omnifarmer.id
 

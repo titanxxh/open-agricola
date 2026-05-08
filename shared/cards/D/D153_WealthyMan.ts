@@ -1,6 +1,7 @@
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { D153_WealthyMan } from '../../cards-display/D/D153_WealthyMan'
+export { D153_WealthyMan }
 
 const CARD_ID = D153_WealthyMan.id
 

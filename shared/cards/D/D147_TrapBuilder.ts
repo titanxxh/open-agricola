@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 import { D147_TrapBuilder } from '../../cards-display/D/D147_TrapBuilder'
+export { D147_TrapBuilder }
 
 const CARD_ID = D147_TrapBuilder.id
 

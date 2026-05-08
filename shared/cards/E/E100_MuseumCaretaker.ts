@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { E100_MuseumCaretaker } from '../../cards-display/E/E100_MuseumCaretaker'
+export { E100_MuseumCaretaker }
 
 const CARD_ID = E100_MuseumCaretaker.id
 

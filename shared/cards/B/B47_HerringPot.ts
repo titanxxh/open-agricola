@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 import { B47_HerringPot } from '../../cards-display/B/B47_HerringPot'
+export { B47_HerringPot }
 
 const CARD_ID = B47_HerringPot.id
 

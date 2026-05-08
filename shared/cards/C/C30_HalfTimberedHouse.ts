@@ -1,6 +1,7 @@
 import { getStoneHouseBonusScore } from '../helpers/stone-house-bonus'
 import type { CardImpl } from '../registry'
 import { C30_HalfTimberedHouse } from '../../cards-display/C/C30_HalfTimberedHouse'
+export { C30_HalfTimberedHouse }
 
 const CARD_ID = C30_HalfTimberedHouse.id
 

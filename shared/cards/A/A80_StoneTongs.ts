@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A80_StoneTongs } from '../../cards-display/A/A80_StoneTongs'
+export { A80_StoneTongs }
 
 const CARD_ID = A80_StoneTongs.id
 

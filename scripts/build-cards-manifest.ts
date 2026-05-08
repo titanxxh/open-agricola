@@ -296,7 +296,7 @@ export function buildCardsManifest(cardsRoot: string): CardsManifest {
 }
 
 export function writeCardsManifest(repoRoot: string): string {
-  const cardsRoot = path.join(repoRoot, 'shared', 'cards')
+  const cardsRoot = path.join(repoRoot, 'shared', 'cards-display')
   const outputPath = path.join(repoRoot, 'public', 'cards-manifest.json')
   const manifest = buildCardsManifest(cardsRoot)
   fs.mkdirSync(path.dirname(outputPath), { recursive: true })

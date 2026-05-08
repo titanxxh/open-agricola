@@ -3,6 +3,7 @@ import { fieldTopStack, fieldTotalRemaining } from '../../domain/field'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
 import { E73_Scythe } from '../../cards-display/E/E73_Scythe'
+export { E73_Scythe }
 
 const CARD_ID = 'E73_Scythe'
 

@@ -3,6 +3,7 @@ import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-me
 import { getFenceCount } from '../../actions/effects/fencing'
 import type { CardImpl } from '../registry'
 import { B119_Lumberjack } from '../../cards-display/B/B119_Lumberjack'
+export { B119_Lumberjack }
 
 const CARD_ID = B119_Lumberjack.id
 

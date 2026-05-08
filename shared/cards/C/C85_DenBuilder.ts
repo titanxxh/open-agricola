@@ -4,6 +4,7 @@ import { isCardFlagged } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C85_DenBuilder } from '../../cards-display/C/C85_DenBuilder'
+export { C85_DenBuilder }
 
 const CARD_ID = C85_DenBuilder.id
 

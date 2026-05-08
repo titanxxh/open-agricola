@@ -5,6 +5,7 @@ import { isCardFlagged } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B163_Pastor } from '../../cards-display/B/B163_Pastor'
+export { B163_Pastor }
 
 const CARD_ID = B163_Pastor.id
 

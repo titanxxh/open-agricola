@@ -2,6 +2,7 @@ import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/int
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E120_ScrapCollector } from '../../cards-display/E/E120_ScrapCollector'
+export { E120_ScrapCollector }
 
 const CARD_ID = E120_ScrapCollector.id
 

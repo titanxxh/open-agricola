@@ -2,6 +2,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { D7_Trident } from '../../cards-display/D/D7_Trident'
+export { D7_Trident }
 
 const CARD_ID = D7_Trident.id
 

@@ -1,6 +1,7 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A16_RammedClay } from '../../cards-display/A/A16_RammedClay'
+export { A16_RammedClay }
 
 const CARD_ID = A16_RammedClay.id
 

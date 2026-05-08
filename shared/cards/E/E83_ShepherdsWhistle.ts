@@ -4,6 +4,7 @@ import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registr
 import type { ActionDefinition, ActionFlow, GameState, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E83_ShepherdsWhistle } from '../../cards-display/E/E83_ShepherdsWhistle'
+export { E83_ShepherdsWhistle }
 
 const CARD_ID = E83_ShepherdsWhistle.id
 

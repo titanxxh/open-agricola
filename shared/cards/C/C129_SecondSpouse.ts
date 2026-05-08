@@ -6,6 +6,7 @@ import { getRoundPlacementDetails } from '../helpers/round-placement'
 import { spaceOccupantCount } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { C129_SecondSpouse } from '../../cards-display/C/C129_SecondSpouse'
+export { C129_SecondSpouse }
 
 const CARD_ID = C129_SecondSpouse.id
 

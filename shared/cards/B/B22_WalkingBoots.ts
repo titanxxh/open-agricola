@@ -8,6 +8,7 @@ import { familySize } from '../../domain/player'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { B22_WalkingBoots } from '../../cards-display/B/B22_WalkingBoots'
+export { B22_WalkingBoots }
 
 const CARD_ID = B22_WalkingBoots.id
 

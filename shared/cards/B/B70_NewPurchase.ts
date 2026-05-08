@@ -1,6 +1,7 @@
 import { payGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B70_NewPurchase } from '../../cards-display/B/B70_NewPurchase'
+export { B70_NewPurchase }
 
 const CARD_ID = B70_NewPurchase.id
 

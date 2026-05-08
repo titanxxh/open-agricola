@@ -5,6 +5,7 @@ import { payLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { C115_Sower } from '../../cards-display/C/C115_Sower'
+export { C115_Sower }
 
 const CARD_ID = C115_Sower.id
 

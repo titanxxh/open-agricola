@@ -3,6 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { B100_Clutterer } from '../../cards-display/B/B100_Clutterer'
+export { B100_Clutterer }
 
 const CARD_ID = B100_Clutterer.id
 

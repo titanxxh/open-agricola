@@ -1,4 +1,4 @@
-import type { MajorCardData } from './types'
+import type { MajorCardData } from '../../cards/major/types'
 
 export const stoneOven: MajorCardData = {
   id: 'Major_StoneOven',

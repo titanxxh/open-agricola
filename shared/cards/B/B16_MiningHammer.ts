@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B16_MiningHammer } from '../../cards-display/B/B16_MiningHammer'
+export { B16_MiningHammer }
 
 const CARD_ID = B16_MiningHammer.id
 

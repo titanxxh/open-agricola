@@ -2,6 +2,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { B6_ExcursiontotheQuarry } from '../../cards-display/B/B6_ExcursiontotheQuarry'
+export { B6_ExcursiontotheQuarry }
 
 const CARD_ID = B6_ExcursiontotheQuarry.id
 

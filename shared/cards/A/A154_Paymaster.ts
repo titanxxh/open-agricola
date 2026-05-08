@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A154_Paymaster } from '../../cards-display/A/A154_Paymaster'
+export { A154_Paymaster }
 
 const CARD_ID = A154_Paymaster.id
 

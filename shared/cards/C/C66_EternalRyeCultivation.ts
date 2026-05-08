@@ -1,6 +1,7 @@
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { C66_EternalRyeCultivation } from '../../cards-display/C/C66_EternalRyeCultivation'
+export { C66_EternalRyeCultivation }
 
 const CARD_ID = C66_EternalRyeCultivation.id
 

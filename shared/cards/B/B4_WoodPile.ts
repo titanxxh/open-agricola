@@ -1,6 +1,7 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B4_WoodPile } from '../../cards-display/B/B4_WoodPile'
+export { B4_WoodPile }
 
 const CARD_ID = B4_WoodPile.id
 

@@ -1,6 +1,7 @@
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { B114_Childless } from '../../cards-display/B/B114_Childless'
+export { B114_Childless }
 
 const CARD_ID = B114_Childless.id
 

@@ -4,6 +4,7 @@ import type { GameState, PlayerState } from '../../contract/types'
 import { initCardState } from '../__stubs__/helpers'
 import type { CardImpl } from '../registry'
 import { C75_Firewood } from '../../cards-display/C/C75_Firewood'
+export { C75_Firewood }
 
 const CARD_ID = C75_Firewood.id
 

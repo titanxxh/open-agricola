@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A159_JoineroftheSea } from '../../cards-display/A/A159_JoineroftheSea'
+export { A159_JoineroftheSea }
 
 const CARD_ID = A159_JoineroftheSea.id
 

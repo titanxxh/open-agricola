@@ -4,6 +4,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { B67_HandTruck } from '../../cards-display/B/B67_HandTruck'
+export { B67_HandTruck }
 
 const CARD_ID = B67_HandTruck.id
 

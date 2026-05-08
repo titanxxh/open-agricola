@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D42_EducationBonus } from '../../cards-display/D/D42_EducationBonus'
+export { D42_EducationBonus }
 
 const CARD_ID = D42_EducationBonus.id
 

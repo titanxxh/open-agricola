@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C61_BeerStein } from '../../cards-display/C/C61_BeerStein'
+export { C61_BeerStein }
 
 const CARD_ID = C61_BeerStein.id
 

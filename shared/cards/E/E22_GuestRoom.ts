@@ -4,6 +4,7 @@ import { getCardStack, pushToCardStack, isCardFlagged, setCardFlag, writeCardInf
 import type { CardImpl } from '../registry'
 import type { PlayerState } from '../../contract/types'
 import { E22_GuestRoom } from '../../cards-display/E/E22_GuestRoom'
+export { E22_GuestRoom }
 
 const CARD_ID = E22_GuestRoom.id
 

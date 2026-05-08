@@ -6,6 +6,7 @@ import { getMajorCard } from '../major'
 import { isMajorCardId } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
 import { C137_CharcoalBurner } from '../../cards-display/C/C137_CharcoalBurner'
+export { C137_CharcoalBurner }
 
 const CARD_ID = C137_CharcoalBurner.id
 

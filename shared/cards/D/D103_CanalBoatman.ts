@@ -4,6 +4,7 @@ import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { D103_CanalBoatman } from '../../cards-display/D/D103_CanalBoatman'
+export { D103_CanalBoatman }
 
 const CARD_ID = D103_CanalBoatman.id
 

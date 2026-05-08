@@ -1,6 +1,7 @@
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 import { C77_ClaySupply } from '../../cards-display/C/C77_ClaySupply'
+export { C77_ClaySupply }
 
 const CARD_ID = C77_ClaySupply.id
 

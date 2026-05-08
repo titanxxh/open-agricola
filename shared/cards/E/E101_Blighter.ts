@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { E101_Blighter } from '../../cards-display/E/E101_Blighter'
+export { E101_Blighter }
 
 const CARD_ID = E101_Blighter.id
 

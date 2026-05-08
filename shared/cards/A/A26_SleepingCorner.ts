@@ -5,6 +5,7 @@ import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer
 import { isSpaceOccupied, spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { A26_SleepingCorner } from '../../cards-display/A/A26_SleepingCorner'
+export { A26_SleepingCorner }
 
 const CARD_ID = A26_SleepingCorner.id
 

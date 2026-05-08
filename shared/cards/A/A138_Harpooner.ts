@@ -4,6 +4,7 @@ import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { A138_Harpooner } from '../../cards-display/A/A138_Harpooner'
+export { A138_Harpooner }
 
 const CARD_ID = A138_Harpooner.id
 

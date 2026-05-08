@@ -1,6 +1,7 @@
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { E159_OldMiser } from '../../cards-display/E/E159_OldMiser'
+export { E159_OldMiser }
 
 const CARD_ID = E159_OldMiser.id
 

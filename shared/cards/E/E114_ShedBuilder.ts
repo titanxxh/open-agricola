@@ -5,6 +5,7 @@ import { getStableTilesBuiltThisAction } from '../helpers/action-snapshot'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E114_ShedBuilder } from '../../cards-display/E/E114_ShedBuilder'
+export { E114_ShedBuilder }
 
 const CARD_ID = E114_ShedBuilder.id
 

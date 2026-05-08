@@ -4,6 +4,7 @@ import { isCardFlagged, setCardFlag, readCardExtraData, writeCardExtraData } fro
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E91_PlowBuilder } from '../../cards-display/E/E91_PlowBuilder'
+export { E91_PlowBuilder }
 
 const CARD_ID = E91_PlowBuilder.id
 

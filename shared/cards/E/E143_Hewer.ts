@@ -2,6 +2,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { E143_Hewer } from '../../cards-display/E/E143_Hewer'
+export { E143_Hewer }
 
 const CARD_ID = E143_Hewer.id
 

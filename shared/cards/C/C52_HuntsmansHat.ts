@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C52_HuntsmansHat } from '../../cards-display/C/C52_HuntsmansHat'
+export { C52_HuntsmansHat }
 
 const CARD_ID = C52_HuntsmansHat.id
 

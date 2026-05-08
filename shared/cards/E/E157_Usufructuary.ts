@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E157_Usufructuary } from '../../cards-display/E/E157_Usufructuary'
+export { E157_Usufructuary }
 
 const CARD_ID = E157_Usufructuary.id
 

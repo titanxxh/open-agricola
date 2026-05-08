@@ -1,6 +1,7 @@
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E142_Smuggler } from '../../cards-display/E/E142_Smuggler'
+export { E142_Smuggler }
 
 const CARD_ID = E142_Smuggler.id
 

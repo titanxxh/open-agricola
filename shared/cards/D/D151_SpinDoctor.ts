@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { D151_SpinDoctor } from '../../cards-display/D/D151_SpinDoctor'
+export { D151_SpinDoctor }
 
 const CARD_ID = D151_SpinDoctor.id
 

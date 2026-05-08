@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { E97_Beneficiary } from '../../cards-display/E/E97_Beneficiary'
+export { E97_Beneficiary }
 
 const CARD_ID = E97_Beneficiary.id
 

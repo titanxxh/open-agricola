@@ -1,6 +1,7 @@
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { E35_Misanthropy } from '../../cards-display/E/E35_Misanthropy'
+export { E35_Misanthropy }
 
 const CARD_ID = E35_Misanthropy.id
 

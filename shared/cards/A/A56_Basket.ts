@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { returnToSpaceThenGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A56_Basket } from '../../cards-display/A/A56_Basket'
+export { A56_Basket }
 
 const CARD_ID = A56_Basket.id
 

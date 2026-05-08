@@ -1,6 +1,7 @@
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 import { E46_WaterlilyPond } from '../../cards-display/E/E46_WaterlilyPond'
+export { E46_WaterlilyPond }
 
 const CARD_ID = E46_WaterlilyPond.id
 

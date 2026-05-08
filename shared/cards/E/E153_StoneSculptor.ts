@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { E153_StoneSculptor } from '../../cards-display/E/E153_StoneSculptor'
+export { E153_StoneSculptor }
 
 const CARD_ID = E153_StoneSculptor.id
 

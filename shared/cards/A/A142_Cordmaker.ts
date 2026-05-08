@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A142_Cordmaker } from '../../cards-display/A/A142_Cordmaker'
+export { A142_Cordmaker }
 
 const CARD_ID = A142_Cordmaker.id
 

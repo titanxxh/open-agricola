@@ -1,6 +1,7 @@
 import { canSow } from '../../actions/effects/sow'
 import type { CardImpl } from '../registry'
 import { C71_SlurrySpreader } from '../../cards-display/C/C71_SlurrySpreader'
+export { C71_SlurrySpreader }
 
 const CARD_ID = C71_SlurrySpreader.id
 

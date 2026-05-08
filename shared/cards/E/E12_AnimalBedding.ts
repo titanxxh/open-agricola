@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { E12_AnimalBedding } from '../../cards-display/E/E12_AnimalBedding'
+export { E12_AnimalBedding }
 
 const CARD_ID = E12_AnimalBedding.id
 

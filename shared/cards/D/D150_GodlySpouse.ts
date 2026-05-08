@@ -4,6 +4,7 @@ import { isCardFlagged } from '../helpers/card-state'
 import { getRoundPlacementDetails } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 import { D150_GodlySpouse } from '../../cards-display/D/D150_GodlySpouse'
+export { D150_GodlySpouse }
 
 const CARD_ID = D150_GodlySpouse.id
 

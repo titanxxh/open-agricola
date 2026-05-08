@@ -1,6 +1,7 @@
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import type { CardImpl } from '../registry'
 import { D23_PioneeringSpirit } from '../../cards-display/D/D23_PioneeringSpirit'
+export { D23_PioneeringSpirit }
 
 const CARD_ID = D23_PioneeringSpirit.id
 

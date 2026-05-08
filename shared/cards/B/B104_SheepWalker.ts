@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { B104_SheepWalker } from '../../cards-display/B/B104_SheepWalker'
+export { B104_SheepWalker }
 
 const CARD_ID = B104_SheepWalker.id
 

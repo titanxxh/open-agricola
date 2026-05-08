@@ -5,6 +5,7 @@ import { readActionSnapshotToken } from '../helpers/action-snapshot'
 import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { B29_CookeryLesson } from '../../cards-display/B/B29_CookeryLesson'
+export { B29_CookeryLesson }
 
 const CARD_ID = B29_CookeryLesson.id
 

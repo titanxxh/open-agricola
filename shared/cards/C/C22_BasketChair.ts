@@ -2,6 +2,7 @@ import { getRoundPlacementDetails } from '../helpers/round-placement'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { C22_BasketChair } from '../../cards-display/C/C22_BasketChair'
+export { C22_BasketChair }
 
 const CARD_ID = C22_BasketChair.id
 

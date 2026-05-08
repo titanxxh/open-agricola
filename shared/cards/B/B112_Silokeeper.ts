@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B112_Silokeeper } from '../../cards-display/B/B112_Silokeeper'
+export { B112_Silokeeper }
 
 const CARD_ID = B112_Silokeeper.id
 

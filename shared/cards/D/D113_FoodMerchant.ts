@@ -2,6 +2,7 @@ import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { D113_FoodMerchant } from '../../cards-display/D/D113_FoodMerchant'
+export { D113_FoodMerchant }
 
 const CARD_ID = D113_FoodMerchant.id
 

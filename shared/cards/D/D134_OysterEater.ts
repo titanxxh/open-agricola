@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import type { CardEffect } from '../card-effects'
 import { D134_OysterEater } from '../../cards-display/D/D134_OysterEater'
+export { D134_OysterEater }
 
 const CARD_ID = D134_OysterEater.id
 

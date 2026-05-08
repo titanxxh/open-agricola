@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { returnToSpaceThenGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C102_TreeGuard } from '../../cards-display/C/C102_TreeGuard'
+export { C102_TreeGuard }
 
 const CARD_ID = C102_TreeGuard.id
 

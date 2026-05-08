@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { A128_RiparianBuilder } from '../../cards-display/A/A128_RiparianBuilder'
+export { A128_RiparianBuilder }
 
 const CARD_ID = A128_RiparianBuilder.id
 

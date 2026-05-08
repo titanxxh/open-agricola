@@ -2,6 +2,7 @@ import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-me
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { B14_Hawktower } from '../../cards-display/B/B14_Hawktower'
+export { B14_Hawktower }
 
 const CARD_ID = B14_Hawktower.id
 

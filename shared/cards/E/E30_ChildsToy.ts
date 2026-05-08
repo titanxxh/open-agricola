@@ -3,6 +3,7 @@ import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { familySize, newbornCount } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { E30_ChildsToy } from '../../cards-display/E/E30_ChildsToy'
+export { E30_ChildsToy }
 
 const CARD_ID = E30_ChildsToy.id
 

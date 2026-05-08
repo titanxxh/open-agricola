@@ -4,6 +4,7 @@ import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { getPlayerCookeryCards } from '../helpers/cookery'
 import { C62_CookeryExtension } from '../../cards-display/C/C62_CookeryExtension'
+export { C62_CookeryExtension }
 
 const CARD_ID = C62_CookeryExtension.id
 

@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E18_SeedAlmanac } from '../../cards-display/E/E18_SeedAlmanac'
+export { E18_SeedAlmanac }
 
 const CARD_ID = E18_SeedAlmanac.id
 

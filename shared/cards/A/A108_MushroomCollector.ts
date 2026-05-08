@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { returnToSpaceThenGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A108_MushroomCollector } from '../../cards-display/A/A108_MushroomCollector'
+export { A108_MushroomCollector }
 
 const CARD_ID = A108_MushroomCollector.id
 

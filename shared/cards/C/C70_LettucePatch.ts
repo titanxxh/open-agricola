@@ -8,6 +8,7 @@ import { dispatchReapListener } from '../../actions/effects/reap'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C70_LettucePatch } from '../../cards-display/C/C70_LettucePatch'
+export { C70_LettucePatch }
 
 const CARD_ID = C70_LettucePatch.id
 

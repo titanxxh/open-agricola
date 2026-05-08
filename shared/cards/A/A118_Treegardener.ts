@@ -1,6 +1,7 @@
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { A118_Treegardener } from '../../cards-display/A/A118_Treegardener'
+export { A118_Treegardener }
 
 const CARD_ID = A118_Treegardener.id
 

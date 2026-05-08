@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { fieldTopStack, fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { A72_CalciumFertilizers } from '../../cards-display/A/A72_CalciumFertilizers'
+export { A72_CalciumFertilizers }
 
 const CARD_ID = A72_CalciumFertilizers.id
 

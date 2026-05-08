@@ -1,6 +1,7 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B148_PetBroker } from '../../cards-display/B/B148_PetBroker'
+export { B148_PetBroker }
 
 const CARD_ID = B148_PetBroker.id
 

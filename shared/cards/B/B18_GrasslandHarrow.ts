@@ -5,6 +5,7 @@ import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { B18_GrasslandHarrow } from '../../cards-display/B/B18_GrasslandHarrow'
+export { B18_GrasslandHarrow }
 
 const CARD_ID = B18_GrasslandHarrow.id
 

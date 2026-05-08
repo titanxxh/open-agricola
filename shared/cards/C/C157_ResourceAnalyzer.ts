@@ -1,6 +1,7 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C157_ResourceAnalyzer } from '../../cards-display/C/C157_ResourceAnalyzer'
+export { C157_ResourceAnalyzer }
 
 const CARD_ID = C157_ResourceAnalyzer.id
 

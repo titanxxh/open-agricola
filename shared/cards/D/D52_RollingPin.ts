@@ -1,6 +1,7 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D52_RollingPin } from '../../cards-display/D/D52_RollingPin'
+export { D52_RollingPin }
 
 const CARD_ID = D52_RollingPin.id
 

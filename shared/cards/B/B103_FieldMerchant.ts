@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B103_FieldMerchant } from '../../cards-display/B/B103_FieldMerchant'
+export { B103_FieldMerchant }
 
 const CARD_ID = B103_FieldMerchant.id
 

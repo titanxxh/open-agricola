@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { E38_RodCollection } from '../../cards-display/E/E38_RodCollection'
+export { E38_RodCollection }
 
 const CARD_ID = E38_RodCollection.id
 

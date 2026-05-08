@@ -1,5 +1,5 @@
-import type { MajorCardData } from './types'
-import { createSingleHarvestExchange } from '../helpers/stage-effects'
+import type { MajorCardData } from '../../cards/major/types'
+import { createSingleHarvestExchange } from '../../cards/helpers/stage-effects'
 
 export const basketmaker: MajorCardData = {
   id: 'Major_Basket',

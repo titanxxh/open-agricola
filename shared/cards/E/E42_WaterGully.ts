@@ -2,6 +2,7 @@ import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/int
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { E42_WaterGully } from '../../cards-display/E/E42_WaterGully'
+export { E42_WaterGully }
 
 const CARD_ID = E42_WaterGully.id
 

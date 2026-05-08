@@ -2,6 +2,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { B5_StoreofExperience } from '../../cards-display/B/B5_StoreofExperience'
+export { B5_StoreofExperience }
 
 const CARD_ID = B5_StoreofExperience.id
 

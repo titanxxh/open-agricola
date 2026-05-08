@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { D29_MuckRake } from '../../cards-display/D/D29_MuckRake'
+export { D29_MuckRake }
 
 const CARD_ID = D29_MuckRake.id
 

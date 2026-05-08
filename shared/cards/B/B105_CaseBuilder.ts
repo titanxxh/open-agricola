@@ -2,6 +2,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { B105_CaseBuilder } from '../../cards-display/B/B105_CaseBuilder'
+export { B105_CaseBuilder }
 
 const CARD_ID = B105_CaseBuilder.id
 

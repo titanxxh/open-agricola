@@ -5,6 +5,7 @@ import { registerSelectionEffect } from '../../actions/helpers/selection-effect-
 import { fieldTopStack, fieldIsEmpty, fieldDecrementTop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { A71_ClearingSpade } from '../../cards-display/A/A71_ClearingSpade'
+export { A71_ClearingSpade }
 
 const CARD_ID = A71_ClearingSpade.id
 

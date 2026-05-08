@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { A8_FoodBasket } from '../../cards-display/A/A8_FoodBasket'
+export { A8_FoodBasket }
 
 const CARD_ID = A8_FoodBasket.id
 

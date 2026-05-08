@@ -50,18 +50,35 @@ for (const deck of decks) {
       entries.push(`  '${cardId}': ${cardId}_impl,`)
     }
 
-    // For community deck, also find card definition exports.
-    if (deck === 'community') {
-      // Match `export const <ID> = CARD_DEF` or `export const <ID> = new (MinorImprovement|Occupation)`
-      const defMatch = source.match(
-        /^export const (\w+)\s*=\s*(?:CARD_DEF|new\s+(?:MinorImprovement|Occupation))/m,
-      )
-      if (defMatch) {
-        const defId = defMatch[1]
-        const moduleRel = `./${path.basename(file, '.ts')}`
-        communityDefImports.push(`import { ${defId} } from '${moduleRel}'`)
-        communityDefEntries.push(`  ${defId},`)
-      }
+  }
+}
+
+// Scan cards-display/community/ for community card definition exports
+// (display consts live in cards-display after S6b split).
+const cardsDisplayRoot = path.resolve(process.cwd(), 'shared', 'cards-display')
+const communityDisplayDir = path.join(cardsDisplayRoot, 'community')
+if (fs.existsSync(communityDisplayDir)) {
+  const files = fs
+    .readdirSync(communityDisplayDir)
+    .filter(
+      (f) =>
+        f.endsWith('.ts') &&
+        !f.endsWith('.test.ts') &&
+        f !== 'auto-catalog.ts',
+    )
+    .sort()
+  for (const file of files) {
+    const filePath = path.join(communityDisplayDir, file)
+    const source = fs.readFileSync(filePath, 'utf8')
+    // Match `export const <ID> = CARD_DEF` or `export const <ID> = new (MinorImprovement|Occupation)`
+    const defMatch = source.match(
+      /^export const (\w+)\s*=\s*(?:CARD_DEF|new\s+(?:MinorImprovement|Occupation))/m,
+    )
+    if (defMatch) {
+      const defId = defMatch[1]
+      const moduleRel = `../../cards-display/community/${path.basename(file, '.ts')}`
+      communityDefImports.push(`import { ${defId} } from '${moduleRel}'`)
+      communityDefEntries.push(`  ${defId},`)
     }
   }
 }

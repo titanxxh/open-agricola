@@ -1,6 +1,7 @@
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { D129_LumberVirtuoso } from '../../cards-display/D/D129_LumberVirtuoso'
+export { D129_LumberVirtuoso }
 
 const CARD_ID = D129_LumberVirtuoso.id
 

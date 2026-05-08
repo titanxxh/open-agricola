@@ -4,6 +4,7 @@ import type { GameState, PlayerState } from '../../contract/types'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 import { B107_Manservant } from '../../cards-display/B/B107_Manservant'
+export { B107_Manservant }
 
 const CARD_ID = B107_Manservant.id
 

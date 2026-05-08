@@ -6,6 +6,7 @@ import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { canSow } from '../../actions/effects/sow'
 import type { CardImpl } from '../registry'
 import { B68_Beanfield } from '../../cards-display/B/B68_Beanfield'
+export { B68_Beanfield }
 
 const CARD_ID = B68_Beanfield.id
 

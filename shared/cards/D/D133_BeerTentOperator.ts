@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { D133_BeerTentOperator } from '../../cards-display/D/D133_BeerTentOperator'
+export { D133_BeerTentOperator }
 
 const CARD_ID = D133_BeerTentOperator.id
 

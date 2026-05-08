@@ -1,6 +1,7 @@
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { A4_Baseboards } from '../../cards-display/A/A4_Baseboards'
+export { A4_Baseboards }
 
 const CARD_ID = A4_Baseboards.id
 

@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C82_HardwareStore } from '../../cards-display/C/C82_HardwareStore'
+export { C82_HardwareStore }
 
 const CARD_ID = C82_HardwareStore.id
 

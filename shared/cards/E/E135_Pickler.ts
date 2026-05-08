@@ -2,6 +2,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop, fieldFindStackOfKind } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { E135_Pickler } from '../../cards-display/E/E135_Pickler'
+export { E135_Pickler }
 
 const CARD_ID = E135_Pickler.id
 

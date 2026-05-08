@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E164_MountainPlowman } from '../../cards-display/E/E164_MountainPlowman'
+export { E164_MountainPlowman }
 
 const CARD_ID = E164_MountainPlowman.id
 

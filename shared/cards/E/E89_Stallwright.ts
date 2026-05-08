@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { E89_Stallwright } from '../../cards-display/E/E89_Stallwright'
+export { E89_Stallwright }
 
 const CARD_ID = E89_Stallwright.id
 

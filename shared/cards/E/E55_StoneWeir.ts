@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E55_StoneWeir } from '../../cards-display/E/E55_StoneWeir'
+export { E55_StoneWeir }
 
 const CARD_ID = E55_StoneWeir.id
 

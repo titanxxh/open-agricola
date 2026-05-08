@@ -1,6 +1,7 @@
 import { getStoneHouseBonusScore } from '../helpers/stone-house-bonus'
 import type { CardImpl } from '../registry'
 import { D34_LuxuriousHostel } from '../../cards-display/D/D34_LuxuriousHostel'
+export { D34_LuxuriousHostel }
 
 const CARD_ID = D34_LuxuriousHostel.id
 

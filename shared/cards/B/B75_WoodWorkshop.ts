@@ -13,6 +13,7 @@ import type { PaymentCtx } from '../../actions/payment'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B75_WoodWorkshop } from '../../cards-display/B/B75_WoodWorkshop'
+export { B75_WoodWorkshop }
 
 const CARD_ID = B75_WoodWorkshop.id
 

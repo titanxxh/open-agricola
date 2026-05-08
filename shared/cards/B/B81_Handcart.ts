@@ -1,6 +1,7 @@
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { B81_Handcart } from '../../cards-display/B/B81_Handcart'
+export { B81_Handcart }
 
 const CARD_ID = B81_Handcart.id
 

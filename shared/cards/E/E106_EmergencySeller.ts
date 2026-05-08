@@ -2,6 +2,7 @@ import type { ActionFlow } from '../../contract/types'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { E106_EmergencySeller } from '../../cards-display/E/E106_EmergencySeller'
+export { E106_EmergencySeller }
 
 const CARD_ID = E106_EmergencySeller.id
 

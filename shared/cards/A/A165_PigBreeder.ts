@@ -3,6 +3,7 @@ import { breedLeaf } from '../../actions/effects/breed'
 import { playerBoard } from '../../domain'
 import type { CardImpl } from '../registry'
 import { A165_PigBreeder } from '../../cards-display/A/A165_PigBreeder'
+export { A165_PigBreeder }
 
 const CARD_ID = A165_PigBreeder.id
 

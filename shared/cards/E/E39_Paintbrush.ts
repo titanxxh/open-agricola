@@ -1,6 +1,7 @@
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E39_Paintbrush } from '../../cards-display/E/E39_Paintbrush'
+export { E39_Paintbrush }
 
 const CARD_ID = E39_Paintbrush.id
 

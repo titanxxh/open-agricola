@@ -1,6 +1,7 @@
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C40_CanvasSack } from '../../cards-display/C/C40_CanvasSack'
+export { C40_CanvasSack }
 
 const CARD_ID = C40_CanvasSack.id
 

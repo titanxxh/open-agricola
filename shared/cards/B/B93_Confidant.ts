@@ -2,6 +2,7 @@ import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-me
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B93_Confidant } from '../../cards-display/B/B93_Confidant'
+export { B93_Confidant }
 
 const CARD_ID = B93_Confidant.id
 

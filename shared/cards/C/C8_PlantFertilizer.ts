@@ -1,6 +1,7 @@
 import { fieldHasCrop, fieldIsEmpty, fieldTotalRemaining } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { C8_PlantFertilizer } from '../../cards-display/C/C8_PlantFertilizer'
+export { C8_PlantFertilizer }
 
 const CARD_ID = C8_PlantFertilizer.id
 

@@ -4,6 +4,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
 import type { CardImpl } from '../registry'
 import { E49_Twibil } from '../../cards-display/E/E49_Twibil'
+export { E49_Twibil }
 
 const CARD_ID = E49_Twibil.id
 

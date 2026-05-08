@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { A150_Stagehand } from '../../cards-display/A/A150_Stagehand'
+export { A150_Stagehand }
 
 const CARD_ID = A150_Stagehand.id
 

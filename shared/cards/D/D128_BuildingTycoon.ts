@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
 import type { CardImpl } from '../registry'
 import { D128_BuildingTycoon } from '../../cards-display/D/D128_BuildingTycoon'
+export { D128_BuildingTycoon }
 
 const CARD_ID = D128_BuildingTycoon.id
 

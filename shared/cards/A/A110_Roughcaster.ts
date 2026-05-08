@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A110_Roughcaster } from '../../cards-display/A/A110_Roughcaster'
+export { A110_Roughcaster }
 
 const CARD_ID = A110_Roughcaster.id
 

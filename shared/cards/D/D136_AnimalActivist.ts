@@ -1,6 +1,7 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D136_AnimalActivist } from '../../cards-display/D/D136_AnimalActivist'
+export { D136_AnimalActivist }
 
 const CARD_ID = D136_AnimalActivist.id
 

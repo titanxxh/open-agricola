@@ -7,6 +7,7 @@ import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { A68_AsparagusGift } from '../../cards-display/A/A68_AsparagusGift'
+export { A68_AsparagusGift }
 
 const CARD_ID = A68_AsparagusGift.id
 

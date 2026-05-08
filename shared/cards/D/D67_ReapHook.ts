@@ -1,6 +1,7 @@
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 import { D67_ReapHook } from '../../cards-display/D/D67_ReapHook'
+export { D67_ReapHook }
 
 const CARD_ID = D67_ReapHook.id
 

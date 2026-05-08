@@ -1,6 +1,7 @@
 import { payGainActionFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C103_GreenGrocer } from '../../cards-display/C/C103_GreenGrocer'
+export { C103_GreenGrocer }
 
 const CARD_ID = C103_GreenGrocer.id
 

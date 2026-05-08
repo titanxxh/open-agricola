@@ -1,6 +1,7 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A145_Ropemaker } from '../../cards-display/A/A145_Ropemaker'
+export { A145_Ropemaker }
 
 const CARD_ID = A145_Ropemaker.id
 

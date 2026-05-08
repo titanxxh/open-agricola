@@ -2,6 +2,7 @@ import { registerSelectionEffect } from '../../actions/helpers/selection-effect-
 import { fieldTopStack, fieldDecrementTop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { A70_LiftingMachine } from '../../cards-display/A/A70_LiftingMachine'
+export { A70_LiftingMachine }
 
 const CARD_ID = 'A70_LiftingMachine'
 

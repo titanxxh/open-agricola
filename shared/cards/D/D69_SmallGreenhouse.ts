@@ -3,6 +3,7 @@ import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { payGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D69_SmallGreenhouse } from '../../cards-display/D/D69_SmallGreenhouse'
+export { D69_SmallGreenhouse }
 
 const CARD_ID = D69_SmallGreenhouse.id
 

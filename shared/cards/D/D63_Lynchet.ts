@@ -1,6 +1,7 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D63_Lynchet } from '../../cards-display/D/D63_Lynchet'
+export { D63_Lynchet }
 
 const CARD_ID = D63_Lynchet.id
 

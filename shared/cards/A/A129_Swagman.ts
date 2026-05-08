@@ -4,6 +4,7 @@ import { jumpLeaf, isJumpChainContains } from '../helpers/jump-leaf'
 import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability'
 import type { CardImpl } from '../registry'
 import { A129_Swagman } from '../../cards-display/A/A129_Swagman'
+export { A129_Swagman }
 
 const CARD_ID = A129_Swagman.id
 

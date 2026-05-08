@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C153_PatternMaker } from '../../cards-display/C/C153_PatternMaker'
+export { C153_PatternMaker }
 
 const CARD_ID = C153_PatternMaker.id
 

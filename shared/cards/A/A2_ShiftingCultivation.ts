@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { A2_ShiftingCultivation } from '../../cards-display/A/A2_ShiftingCultivation'
+export { A2_ShiftingCultivation }
 
 const CARD_ID = A2_ShiftingCultivation.id
 

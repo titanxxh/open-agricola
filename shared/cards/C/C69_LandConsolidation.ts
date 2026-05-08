@@ -5,6 +5,7 @@ import { fieldTopStack, fieldTotalRemaining } from '../../domain/field'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
 import { C69_LandConsolidation } from '../../cards-display/C/C69_LandConsolidation'
+export { C69_LandConsolidation }
 
 const CARD_ID = C69_LandConsolidation.id
 

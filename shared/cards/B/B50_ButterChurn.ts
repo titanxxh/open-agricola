@@ -2,6 +2,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { getAssignedAnimalsByType } from '../../domain/animals'
 import type { CardImpl } from '../registry'
 import { B50_ButterChurn } from '../../cards-display/B/B50_ButterChurn'
+export { B50_ButterChurn }
 
 const CARD_ID = B50_ButterChurn.id
 

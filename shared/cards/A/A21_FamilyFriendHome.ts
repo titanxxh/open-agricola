@@ -5,6 +5,7 @@ import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
 import { familySize as getFamilySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { A21_FamilyFriendHome } from '../../cards-display/A/A21_FamilyFriendHome'
+export { A21_FamilyFriendHome }
 
 const CARD_ID = A21_FamilyFriendHome.id
 

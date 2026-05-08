@@ -5,6 +5,7 @@ import { jumpLeaf, isJumpChainContains } from '../helpers/jump-leaf'
 import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability'
 import type { CardImpl } from '../registry'
 import { B150_LargeScaleFarmer } from '../../cards-display/B/B150_LargeScaleFarmer'
+export { B150_LargeScaleFarmer }
 
 const CARD_ID = B150_LargeScaleFarmer.id
 

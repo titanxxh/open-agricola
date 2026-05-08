@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E166_Roastmaster } from '../../cards-display/E/E166_Roastmaster'
+export { E166_Roastmaster }
 
 const CARD_ID = E166_Roastmaster.id
 

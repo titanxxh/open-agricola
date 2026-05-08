@@ -1,6 +1,7 @@
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { C161_PotatoDigger } from '../../cards-display/C/C161_PotatoDigger'
+export { C161_PotatoDigger }
 
 const CARD_ID = C161_PotatoDigger.id
 

@@ -5,6 +5,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { D157_PartyOrganizer } from '../../cards-display/D/D157_PartyOrganizer'
+export { D157_PartyOrganizer }
 
 const CARD_ID = D157_PartyOrganizer.id
 

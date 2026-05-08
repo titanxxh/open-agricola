@@ -4,6 +4,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { getPlayerBakeRates } from '../helpers/exchange-registry'
 import type { CardImpl } from '../registry'
 import { E67_GrainBag } from '../../cards-display/E/E67_GrainBag'
+export { E67_GrainBag }
 
 const CARD_ID = E67_GrainBag.id
 

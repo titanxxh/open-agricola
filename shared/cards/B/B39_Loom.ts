@@ -2,6 +2,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { getAssignedAnimalsByType } from '../../domain/animals'
 import type { CardImpl } from '../registry'
 import { B39_Loom } from '../../cards-display/B/B39_Loom'
+export { B39_Loom }
 
 const CARD_ID = B39_Loom.id
 

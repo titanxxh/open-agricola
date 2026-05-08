@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { B108_OvenFiringBoy } from '../../cards-display/B/B108_OvenFiringBoy'
+export { B108_OvenFiringBoy }
 
 const CARD_ID = B108_OvenFiringBoy.id
 

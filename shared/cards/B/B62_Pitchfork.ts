@@ -4,6 +4,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { B62_Pitchfork } from '../../cards-display/B/B62_Pitchfork'
+export { B62_Pitchfork }
 
 const CARD_ID = B62_Pitchfork.id
 

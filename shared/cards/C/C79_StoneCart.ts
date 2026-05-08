@@ -1,6 +1,7 @@
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 import { C79_StoneCart } from '../../cards-display/C/C79_StoneCart'
+export { C79_StoneCart }
 
 const CARD_ID = C79_StoneCart.id
 

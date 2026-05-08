@@ -3,6 +3,7 @@ import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { fieldIsEmpty, fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { D8_FernSeeds } from '../../cards-display/D/D8_FernSeeds'
+export { D8_FernSeeds }
 
 const CARD_ID = D8_FernSeeds.id
 

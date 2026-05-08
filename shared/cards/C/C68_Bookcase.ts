@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C68_Bookcase } from '../../cards-display/C/C68_Bookcase'
+export { C68_Bookcase }
 
 const CARD_ID = C68_Bookcase.id
 

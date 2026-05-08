@@ -1,6 +1,7 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C67_MineralFeeder } from '../../cards-display/C/C67_MineralFeeder'
+export { C67_MineralFeeder }
 
 const CARD_ID = C67_MineralFeeder.id
 

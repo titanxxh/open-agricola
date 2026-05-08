@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { B136_HouseSteward } from '../../cards-display/B/B136_HouseSteward'
+export { B136_HouseSteward }
 
 const CARD_ID = B136_HouseSteward.id
 

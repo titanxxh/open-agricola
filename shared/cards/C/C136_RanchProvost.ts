@@ -1,6 +1,7 @@
 import type { CardImpl } from '../registry'
 import { playerBoard } from '../../domain'
 import { C136_RanchProvost } from '../../cards-display/C/C136_RanchProvost'
+export { C136_RanchProvost }
 
 const CARD_ID = C136_RanchProvost.id
 

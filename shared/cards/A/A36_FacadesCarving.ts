@@ -1,6 +1,7 @@
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { A36_FacadesCarving } from '../../cards-display/A/A36_FacadesCarving'
+export { A36_FacadesCarving }
 
 const CARD_ID = A36_FacadesCarving.id
 

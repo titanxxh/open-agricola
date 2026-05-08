@@ -91,7 +91,7 @@ describe('buildCardsManifest — extended patterns', () => {
 describe('writeCardsManifest', () => {
   it('writes public/cards-manifest.json when the repo root is missing it', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cards-manifest-test-'))
-    const cardsRoot = path.join(tmp, 'shared', 'cards')
+    const cardsRoot = path.join(tmp, 'shared', 'cards-display')
     const deckDir = path.join(cardsRoot, 'A')
     fs.mkdirSync(deckDir, { recursive: true })
     fs.writeFileSync(

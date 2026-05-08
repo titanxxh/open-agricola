@@ -1,6 +1,7 @@
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A59_PotatoRidger } from '../../cards-display/A/A59_PotatoRidger'
+export { A59_PotatoRidger }
 
 const CARD_ID = A59_PotatoRidger.id
 

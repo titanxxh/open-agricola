@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { D100_LordoftheManor } from '../../cards-display/D/D100_LordoftheManor'
+export { D100_LordoftheManor }
 
 const CARD_ID = D100_LordoftheManor.id
 

@@ -6,6 +6,7 @@ import { countPeopleOnSpace } from '../helpers/space-occupancy'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import type { CardImpl } from '../registry'
 import { A25_Bassinet } from '../../cards-display/A/A25_Bassinet'
+export { A25_Bassinet }
 
 const CARD_ID = A25_Bassinet.id
 

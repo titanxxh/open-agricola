@@ -3,6 +3,7 @@ import { registerSelectionEffect } from '../../actions/helpers/selection-effect-
 import { fieldFindStackOfKind, fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { D70_StrawManure } from '../../cards-display/D/D70_StrawManure'
+export { D70_StrawManure }
 
 const CARD_ID = D70_StrawManure.id
 

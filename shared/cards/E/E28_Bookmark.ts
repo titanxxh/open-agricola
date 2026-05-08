@@ -1,6 +1,7 @@
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { E28_Bookmark } from '../../cards-display/E/E28_Bookmark'
+export { E28_Bookmark }
 
 const CARD_ID = E28_Bookmark.id
 

@@ -4,6 +4,7 @@ import { registerSelectionEffect } from '../../actions/helpers/selection-effect-
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { C18_RollOverPlow } from '../../cards-display/C/C18_RollOverPlow'
+export { C18_RollOverPlow }
 
 const CARD_ID = C18_RollOverPlow.id
 

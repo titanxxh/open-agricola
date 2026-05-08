@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C164_GermanHeathKeeper } from '../../cards-display/C/C164_GermanHeathKeeper'
+export { C164_GermanHeathKeeper }
 
 const CARD_ID = C164_GermanHeathKeeper.id
 

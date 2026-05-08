@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { C31_WritingChamber } from '../../cards-display/C/C31_WritingChamber'
+export { C31_WritingChamber }
 
 const CARD_ID = C31_WritingChamber.id
 

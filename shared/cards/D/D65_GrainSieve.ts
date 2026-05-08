@@ -1,6 +1,7 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D65_GrainSieve } from '../../cards-display/D/D65_GrainSieve'
+export { D65_GrainSieve }
 
 const CARD_ID = D65_GrainSieve.id
 

@@ -1,6 +1,7 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D62_BeerTap } from '../../cards-display/D/D62_BeerTap'
+export { D62_BeerTap }
 
 const CARD_ID = D62_BeerTap.id
 

@@ -7,6 +7,7 @@ import type { PaymentCtx } from '../../actions/payment'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C60_SmallPottersOven } from '../../cards-display/C/C60_SmallPottersOven'
+export { C60_SmallPottersOven }
 
 const CARD_ID = C60_SmallPottersOven.id
 

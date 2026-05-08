@@ -4,6 +4,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, FarmTilePosition, PlayerState } from '../../contract/types'
 import { C16_FieldFences } from '../../cards-display/C/C16_FieldFences'
+export { C16_FieldFences }
 
 const CARD_ID = C16_FieldFences.id
 

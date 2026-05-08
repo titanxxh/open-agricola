@@ -4,6 +4,7 @@ import type { Bonus } from '../../contract/types'
 import { writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { E123_ResourceHoarder } from '../../cards-display/E/E123_ResourceHoarder'
+export { E123_ResourceHoarder }
 
 const CARD_ID = E123_ResourceHoarder.id
 

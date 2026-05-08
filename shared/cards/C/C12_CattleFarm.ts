@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { C12_CattleFarm } from '../../cards-display/C/C12_CattleFarm'
+export { C12_CattleFarm }
 
 const CARD_ID = C12_CattleFarm.id
 

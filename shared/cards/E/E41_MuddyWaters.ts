@@ -3,6 +3,7 @@ import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E41_MuddyWaters } from '../../cards-display/E/E41_MuddyWaters'
+export { E41_MuddyWaters }
 
 const CARD_ID = E41_MuddyWaters.id
 

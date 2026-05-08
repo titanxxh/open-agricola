@@ -2,6 +2,7 @@ import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-a
 import { getStoredResource, setStoredResource } from '../helpers/card-storage'
 import type { CardImpl } from '../registry'
 import { D116_TreeInspector } from '../../cards-display/D/D116_TreeInspector'
+export { D116_TreeInspector }
 
 const CARD_ID = 'D116_TreeInspector'
 

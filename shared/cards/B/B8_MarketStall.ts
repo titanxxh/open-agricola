@@ -1,6 +1,7 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B8_MarketStall } from '../../cards-display/B/B8_MarketStall'
+export { B8_MarketStall }
 
 const CARD_ID = B8_MarketStall.id
 

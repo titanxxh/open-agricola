@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B63_Tasting } from '../../cards-display/B/B63_Tasting'
+export { B63_Tasting }
 
 const CARD_ID = B63_Tasting.id
 
