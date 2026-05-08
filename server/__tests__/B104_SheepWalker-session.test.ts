@@ -28,15 +28,7 @@ describe('B104_SheepWalker session — last harvest enforcement', () => {
     return { session, state, playerA, playerB }
   }
 
-  // SKIP[behavior-regression]: shape codemod applied (S7 Batch 3), but
-  // B104.enforceReorganizeOnLastHarvest no longer surfaces an animal-reorg
-  // request after feed-phase confirm in round 14. Stage-flow's breed leaf
-  // does emit `{ type: 'request', request: { kind: 'animal-reorg' } }`
-  // (verified with engine.proceed instrumentation), but the engineStack /
-  // runEngineSteps choice-path does not pivot into the reorganize sub-flow,
-  // ending the harvest with `stateId: 'idle'` instead. Out of scope for the
-  // shape codemod; track separately as a behavior regression.
-  it.skip('forces animalReorg in last harvest even when no breeding occurs (single sheep)', () => {
+  it('forces animalReorg in last harvest even when no breeding occurs (single sheep)', () => {
     const { session, state, playerA } = setupRound14Harvest()
     playerA.occupationPlayed.push(CARD_ID)
     // 1 sheep on a pasture — not enough to breed (<2), but B104 must force reorg.

@@ -634,6 +634,16 @@ export function engineProceed(
         actionContext: executionContext.actionContext,
         contextWritePatch,
       })
+      // S7 Batch 1: when no InteractionNode is paired with this ActionNode
+      // (no resolveChoice on the ActionDef → buildFlowNode emitted a bare
+      // ActionNode), `applyInteractionRequest` only sets
+      // `pendingNodeIdRef = node.id` and the request payload would otherwise
+      // be lost. Mirror the request onto the ActionNode itself so
+      // `peekInteractionHost()` callers (e.g. session-core's choice-step
+      // animal-reorg pivot) can read the kind regardless of host node type.
+      if (!choiceNode && node instanceof ActionNode) {
+        node.emittedRequest = updatedRequest
+      }
       if (duringActivateNodes.length > 0) {
         int.tree.insertAfter(node.id, [...duringActivateNodes])
       }

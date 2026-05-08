@@ -2,6 +2,7 @@ import type {
   ChoiceEffectPreview,
   ActionExecutionContext,
   ActionExecutionResult,
+  InteractionRequest,
   Resource,
 } from '../../contract/types'
 import type { EngineContext, NodeStepResult } from '../types'
@@ -16,6 +17,23 @@ export class ActionNode extends BaseNode {
   public choiceLabelKey?: string
   public choiceLabelParams?: Record<string, unknown>
   public beforePhaseResolved = false
+  /**
+   * S7 Batch 1 (Sprint S7) — when a leaf ActionNode is built from an
+   * ActionDef without `resolveChoice` (no paired InteractionNode wrap), its
+   * `execute()` may still return `{ type: 'request', request: {...} }`
+   * (e.g. `breedAction` emitting `kind: 'animal-reorg'` for B104
+   * SheepWalker's last-harvest enforcement). In that case engine-proceed
+   * routes the emit via `applyInteractionRequest` with `targetNode === null`
+   * and falls back to `pendingNodeIdRef = ActionNode.id`. Without this
+   * field the request payload would be lost (no InteractionNode hosts it
+   * and `peekInteraction()` returns null), so session-core could not pivot
+   * into `startReorganizeSubFlow`. Mirrors `OrNode.emittedRequest` /
+   * `XorNode.emittedRequest` / `OptionalNode.emittedRequest` so
+   * `peekInteractionHost()` callers can read the kind off the host node
+   * uniformly regardless of whether the pending node is leaf-paired or
+   * leaf-only.
+   */
+  public emittedRequest?: InteractionRequest
 
   constructor(
     id: string,
@@ -72,6 +90,7 @@ export class ActionNode extends BaseNode {
       choiceLabelKey: this.choiceLabelKey,
       choiceLabelParams: this.choiceLabelParams,
       beforePhaseResolved: this.beforePhaseResolved,
+      emittedRequest: this.emittedRequest,
     }
   }
 }
