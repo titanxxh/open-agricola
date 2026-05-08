@@ -76,29 +76,27 @@ describe('selectionAction', () => {
 })
 
 describe('selection action with occupation-hand kind', () => {
-  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
-  it.skip("execute() emits promptKey 'ui.interactionOccupationHand' when selectionKind is occupation-hand", () => {
+  it("execute() emits promptKey 'ui.interactionOccupationHand' when selectionKind is occupation-hand", () => {
     const result = selectionAction.execute({
       actionContext: { selectionKind: 'occupation-hand', maxSelections: 3 },
     } as never)
 
-    expect(result.type).toBe('choice')
-    if (result.type === 'choice') {
-      expect(result.promptKey).toBe('ui.interactionOccupationHand')
-      expect(result.promptParams).toEqual({ maxSelections: 3 })
-    }
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') return
+    expect(result.request.kind).toBe('choice')
+    expect(result.promptKey).toBe('ui.interactionOccupationHand')
+    expect(result.promptParams).toEqual({ maxSelections: 3 })
   })
 
-  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
-  it.skip("execute() keeps farm-position promptKey when selectionKind is absent", () => {
+  it("execute() keeps farm-position promptKey when selectionKind is absent", () => {
     const result = selectionAction.execute({
       actionContext: {},
     } as never)
 
-    expect(result.type).toBe('choice')
-    if (result.type === 'choice') {
-      expect(result.promptKey).toBe('ui.interactionSelection')
-    }
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') return
+    expect(result.request.kind).toBe('choice')
+    expect(result.promptKey).toBe('ui.interactionSelection')
   })
 
   it('resolveChoice propagates a flow returned by the effect handler', () => {
