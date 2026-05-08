@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { GameSyncPayload, StateUpdateCause, StateUpdateEnvelope } from '../shared/protocol/game'
 import type { ClientCommand, ServerEvent, RoomSummary } from '../shared/protocol/ws'
 import type { InteractionRequest } from '../shared/game/types'
-import { serializeState } from '../shared/game/serialization'
+import { serializeState } from '../shared/session/serialization'
 import { createInitialState } from '../shared/logic/state'
 import { EngineStack } from '../shared/engine'
 

@@ -6,7 +6,7 @@ import {
   toRoomMeta,
   type Room,
 } from '../game/room.ts'
-import { serializeState } from '../../shared/game/serialization.ts'
+import { serializeState } from '../../shared/session/serialization.ts'
 import { validateSession } from '../auth.ts'
 import { getDb } from '../db.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'

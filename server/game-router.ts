@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { GameSession } from './game/authoritative-session.ts'
-import { serializeState, serializeStateForPlayer } from '../shared/game/serialization.ts'
+import { serializeState, serializeStateForPlayer } from '../shared/session/serialization.ts'
 import {
   playerBoard,
   type SowSelection,

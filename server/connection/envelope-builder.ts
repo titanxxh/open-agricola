@@ -2,7 +2,7 @@ import type { GameSession, SessionResponse } from '../game/authoritative-session
 import {
   serializeState,
   serializeStateForPlayer,
-} from '../../shared/game/serialization.ts'
+} from '../../shared/session/serialization.ts'
 import type {
   GameSyncPayload,
   StateUpdateCause,

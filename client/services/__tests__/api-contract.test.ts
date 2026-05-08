@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState } from '../../../shared/contract/types'
-import { serializeState } from '../../../shared/game/serialization'
+import { serializeState } from '../../../shared/session/serialization'
 import { EngineStack } from '../../../shared/engine'
 
 const emptyCtx = () => ({ engineStack: new EngineStack() })
