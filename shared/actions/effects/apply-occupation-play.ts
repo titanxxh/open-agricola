@@ -6,7 +6,7 @@ import type {
   PlayerState,
   Resource,
 } from '../../contract/types'
-import { getOccupation } from '../../cards-display/_lookup'
+import { getOccupation } from '../../cards/registry-display'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { activateCard } from './activate-card'
 import { incOccupationBuilt, recordDraftPlayed } from '../../session/stats'

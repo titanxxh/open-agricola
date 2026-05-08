@@ -60,7 +60,7 @@ import {
   incHarvestedVegetable,
   incResourceConverted,
 } from '../session/stats.ts'
-import { getMinorImprovement } from '../cards-display/_lookup.ts'
+import { getMinorImprovement } from '../cards/registry-display.ts'
 import {
   registerCustomCard,
   getCustomMinorImprovementIds,
@@ -90,7 +90,7 @@ import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { resetRoundPlacements } from '../cards/helpers/round-placement.ts'
 import { familySize, newbornCount, workersAvailable } from '../domain/player.ts'
 import { getAssignedAnimalCount } from '../domain/animals.ts'
-import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards-display/types'
+import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/registry-display'
 import { getExchangesInWindow } from '../actions/effects/exchange.ts'
 import { getMajorCard } from '../cards/major/index.ts'
 import {
