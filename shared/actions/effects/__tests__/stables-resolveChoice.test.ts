@@ -77,8 +77,7 @@ describe('stablesAction.resolveChoice', () => {
     expect(ctx.player.resources.wood).toBe(2)
   })
 
-  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
-  it.skip('first call with multi-combo trade modifier returns choice + actionContextWrite', () => {
+  it('first call with multi-combo trade modifier returns choice + actionContextWrite', () => {
     const tile: FarmTilePosition = { row: 0, col: 0 }
     const ctx = makeCtx({
       player: {
@@ -115,8 +114,9 @@ describe('stablesAction.resolveChoice', () => {
       } as Partial<PlayerState>,
     })
     const result = stablesAction.resolveChoice!(ctx, 'confirm', { stables: [tile] })
-    expect(result.type).toBe('choice')
-    if (result.type !== 'choice') return
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') return
+    expect(result.request.kind).toBe('choice')
     expect(result.extraData?.actionContextWrite).toEqual({ farmPayload: { stables: [tile] } })
   })
 
