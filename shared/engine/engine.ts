@@ -108,20 +108,12 @@ export class Engine {
   private registry: ActionRegistry
   private hooks: HookDispatcher
   private log: LogStore
-  // TODO(S5): Remove these 4 mirror fields. Currently load-bearing for the
-  // `engine.snapshot()` shape consumed by session-core.ts:2258,2599 and the
-  // direct mutation hook in stats-gained-pseudo-session.test.ts:35-37.
-  // PR3 absorbed the authoritative values onto InteractionNode
-  // (`pendingActionId / ownerNodeId / contextSnapshot`); S5 work: migrate
-  // snapshot consumers off top-level pendingInteractionXxx, then these
-  // mirrors and the writes in `applyInteractionRequest` / `injectInteraction`
-  // can be deleted.
+  // S4c PR2 — the engine's own runtime pointer to the currently presented
+  // InteractionNode (or composite host: Or/Xor/Optional). NOT a mirror — the
+  // 3 mirror fields (pendingInteractionActionId / OwnerNodeId / Context) were
+  // deleted in S4c PR2 once snapshot consumers migrated to read pending data
+  // off the InteractionNode in `choiceData` (and composite emit metadata).
   private pendingInteractionNodeId: string | null = null
-  private pendingInteractionActionId: string | null = null
-  private pendingInteractionOwnerNodeId: string | null = null
-  private pendingInteractionContext:
-    | Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'>
-    | null = null
   private flowNodeCounter = 0
   private beforePhaseFlowNodeIds = new Set<string>()
   /**
@@ -206,21 +198,17 @@ export class Engine {
     this.tree.root = node
     this.pendingInteractionNodeId = node.id
     // Synthetic action id — never resolves through the registry. Engine paths
-    // that look up `pendingInteractionActionId` (e.g. flushLeafActionDetail)
-    // tolerate unknown ids gracefully.
-    this.pendingInteractionActionId = INTERACTION_ONLY_ACTION_ID
-    this.pendingInteractionOwnerNodeId = null
-    const ctxSnapshot = {
+    // that look up `node.pendingActionId` (e.g. flushLeafActionDetail) tolerate
+    // unknown ids gracefully. Authoritative owner is the InteractionNode
+    // itself (S4b Task 11; S4c PR2 deleted the engine-level mirrors).
+    node.pendingActionId = INTERACTION_ONLY_ACTION_ID
+    node.ownerNodeId = undefined
+    node.contextSnapshot = {
       params: undefined,
       costs: undefined,
       sourceCard: undefined,
       actionContext: undefined,
     }
-    this.pendingInteractionContext = ctxSnapshot
-    // S4b Task 11 — mirror onto the injected node (authoritative owner).
-    node.pendingActionId = INTERACTION_ONLY_ACTION_ID
-    node.ownerNodeId = undefined
-    node.contextSnapshot = ctxSnapshot
   }
 
   /**
@@ -257,17 +245,16 @@ export class Engine {
      *  performs the shallow merge so all three call sites can stop repeating
      *  the same boilerplate inline. */
     contextWritePatch?: Record<string, unknown>
-    /** When true, leave `pendingInteractionOwnerNodeId` untouched (used by
-     *  the resolveChoice second-pass that wants to preserve the existing
-     *  owner pointer). */
+    /** When true, leave the InteractionNode's existing `ownerNodeId` untouched
+     *  (used by the resolveChoice second-pass that wants to preserve the
+     *  existing owner pointer). Forwarded to `InteractionNode.emit()`. */
     preserveOwner?: boolean
   }): void {
     const { targetNode, fallbackNodeId, request, promptKey, promptParams, choiceOptions, actionId, ownerNodeId } = args
-    let ctxSnapshot
     if (targetNode) {
       // S4b Task 12 — delegate the heavy lift (setChoice + request + node
       // pending fields + context snapshot) to InteractionNode.emit().
-      ctxSnapshot = targetNode.emit({
+      targetNode.emit({
         request,
         promptKey,
         promptParams,
@@ -284,25 +271,7 @@ export class Engine {
       this.pendingInteractionNodeId = targetNode.id
     } else {
       this.pendingInteractionNodeId = fallbackNodeId
-      const mergedActionContext = args.contextWritePatch
-        ? { ...(args.actionContext ?? {}), ...args.contextWritePatch }
-        : args.actionContext
-      ctxSnapshot = {
-        params: args.params,
-        costs: args.costs,
-        sourceCard: resolveChoiceSourceCard(args.sourceCard, choiceOptions),
-        actionContext: mergedActionContext,
-      }
     }
-    this.pendingInteractionActionId = actionId
-    if (!args.preserveOwner) {
-      this.pendingInteractionOwnerNodeId = ownerNodeId
-    }
-    // Engine top-level fields stay populated to preserve the existing
-    // snapshot()/getPendingInteractionContext() public surface and the
-    // `engine.pendingInteractionContext.sourceCard = ...` mutation hook
-    // used by stats-gained-pseudo-session.test.ts.
-    this.pendingInteractionContext = ctxSnapshot
   }
 
   buildFlowNodePublic(flow: ActionFlow): EngineNode {
@@ -865,6 +834,10 @@ export class Engine {
       this.pendingInteractionNodeId !== null
         ? this.tree.findNodeById(this.pendingInteractionNodeId)
         : null
+    // S4c PR2 — the engine no longer keeps top-level pendingInteractionXxx
+    // mirror fields. choiceData carries the InteractionNode-authoritative
+    // pending state (pendingActionId / ownerNodeId / contextSnapshot) so
+    // restore() can rebuild without consulting deleted engine fields.
     const choiceData =
       choiceNode instanceof InteractionNode
         ? {
@@ -872,20 +845,13 @@ export class Engine {
             promptKey: choiceNode.promptKey,
             choices: choiceNode.choices,
             request: choiceNode.request,
+            pendingActionId: choiceNode.pendingActionId,
+            ownerNodeId: choiceNode.ownerNodeId,
+            contextSnapshot: choiceNode.contextSnapshot,
           }
         : null
     return {
       nodeStates,
-      // TODO(S5): These 4 top-level pending* fields mirror the
-      // InteractionNode-owned authoritative state (PR3). When S5 migrates
-      // snapshot consumers to read pending data off the InteractionNode in
-      // `choiceData` (or off the composite emit metadata for Or/Xor/Optional),
-      // these top-level entries can be removed from the snapshot shape.
-      // (See line 111 — same theme; cross-reference for the four mirror fields.)
-      pendingInteractionNodeId: this.pendingInteractionNodeId,
-      pendingInteractionActionId: this.pendingInteractionActionId,
-      pendingInteractionOwnerNodeId: this.pendingInteractionOwnerNodeId,
-      pendingInteractionContext: this.pendingInteractionContext,
       choiceData,
       // S2 Task 8: composite (Or/Xor/Optional) emit metadata is now stored
       // on the node itself instead of an engine-level cache. We still need
@@ -936,15 +902,14 @@ export class Engine {
       state: 'ready' | 'resolved' | 'blocked'
       active?: boolean
     }[]
-    pendingInteractionNodeId: string | null
-    pendingInteractionActionId: string | null
-    pendingInteractionOwnerNodeId: string | null
-    pendingInteractionContext: Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'> | null
     choiceData: {
       id: string
       promptKey?: PromptKey
       choices: ActionChoiceOption[]
       request?: InteractionRequest
+      pendingActionId?: string
+      ownerNodeId?: string
+      contextSnapshot?: Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'>
     } | null
     /**
      * S2 Task 8: composite (Or/Xor/Optional) emit metadata. On restore,
@@ -972,12 +937,13 @@ export class Engine {
   }) {
     // Synthetic interaction-only frames (pushed by GameCore.startConfirm*/
     // startFeedSubFlow) have a single InteractionNode at root. The cursor
-    // serializes them with `pendingInteractionActionId === '__interaction_only__'`
-    // and the InteractionNode's request in `choiceData`. Re-inject before the
-    // normal nodeStates pass so subsequent `nextUnresolved()` finds the same
-    // InteractionNode the original session held.
+    // serializes them with `pendingActionId === '__interaction_only__'`
+    // on the InteractionNode itself (S4c PR2 — the previous engine-level
+    // mirror was deleted; choiceData now carries the marker). Re-inject
+    // before the normal nodeStates pass so subsequent `nextUnresolved()`
+    // finds the same InteractionNode the original session held.
     if (
-      snapshot.pendingInteractionActionId === INTERACTION_ONLY_ACTION_ID &&
+      snapshot.choiceData?.pendingActionId === INTERACTION_ONLY_ACTION_ID &&
       snapshot.choiceData
     ) {
       const restored = new InteractionNode(
@@ -986,8 +952,10 @@ export class Engine {
         snapshot.choiceData.request,
       )
       restored.promptKey = snapshot.choiceData.promptKey
+      restored.pendingActionId = snapshot.choiceData.pendingActionId
+      restored.ownerNodeId = snapshot.choiceData.ownerNodeId
+      restored.contextSnapshot = snapshot.choiceData.contextSnapshot ?? undefined
       this.injectInteraction(restored)
-      this.pendingInteractionContext = snapshot.pendingInteractionContext
       // Replay the node state in case the interaction was already
       // partially resolved before serialization.
       const nodeStateEntry = snapshot.nodeStates.find(
@@ -1027,12 +995,23 @@ export class Engine {
         if (snapshot.choiceData.request) {
           node.request = snapshot.choiceData.request
         }
+        if (snapshot.choiceData.pendingActionId !== undefined) {
+          node.pendingActionId = snapshot.choiceData.pendingActionId
+        }
+        if (snapshot.choiceData.ownerNodeId !== undefined) {
+          node.ownerNodeId = snapshot.choiceData.ownerNodeId
+        }
+        if (snapshot.choiceData.contextSnapshot !== undefined) {
+          node.contextSnapshot = snapshot.choiceData.contextSnapshot
+        }
       }
     }
-    this.pendingInteractionNodeId = snapshot.pendingInteractionNodeId
-    this.pendingInteractionActionId = snapshot.pendingInteractionActionId
-    this.pendingInteractionOwnerNodeId = snapshot.pendingInteractionOwnerNodeId
-    this.pendingInteractionContext = snapshot.pendingInteractionContext
+    // S4c PR2 — rebuild the engine's runtime pointer from choiceData.id
+    // (InteractionNode host) or compositeEmit.nodeId (Or/Xor/Optional host).
+    // Replaces the deleted top-level pendingInteractionNodeId/ActionId/
+    // OwnerNodeId/Context mirror fields.
+    this.pendingInteractionNodeId =
+      snapshot.choiceData?.id ?? snapshot.compositeEmit?.nodeId ?? null
 
     // S2 Task 8: rebuild composite emit metadata onto Or/Xor/Optional nodes.
     // Accept the legacy `lastEmittedChoice` alias for snapshots produced by
@@ -1146,14 +1125,12 @@ export class Engine {
         return { type: 'blocked', nodeId: node.id }
       }
       this.pendingInteractionNodeId = node.id
-      this.pendingInteractionActionId = null
       const compositeCtxSnapshot = {
         params: undefined,
         costs: undefined,
         sourceCard: resolveChoiceSourceCard(getNodeSourceCard(node), options),
         actionContext: undefined,
       }
-      this.pendingInteractionContext = compositeCtxSnapshot
       const compositePromptKey = node.promptKey ?? 'ui.interactionFlowSelect'
       // S2 Task 8: write emit metadata to the OrNode/XorNode itself instead
       // of the engine-level lastEmittedChoice cache.
@@ -1161,9 +1138,8 @@ export class Engine {
       node.emittedPromptKey = compositePromptKey
       node.emittedPromptParams = undefined
       node.emittedRequest = undefined
-      // S4b PR5 — also mirror the pending-interaction context snapshot onto
-      // the composite host so external consumers can read it via
-      // peekInteractionHost() without going through the engine mirror.
+      // S4b PR5 / S4c PR2 — composite host owns pending-interaction context
+      // snapshot. peekInteractionHost() reads it off the node directly.
       node.pendingActionId = null
       node.pendingContextSnapshot = compositeCtxSnapshot
       return {
@@ -1222,15 +1198,14 @@ export class Engine {
         return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
       }
       this.pendingInteractionNodeId = node.id
-      this.pendingInteractionActionId = null
       const optionalCtxSnapshot = {
         params: actionNode.params,
         costs: undefined,
         sourceCard: actionNode.sourceCard,
         actionContext: actionNode.actionContext,
       }
-      this.pendingInteractionContext = optionalCtxSnapshot
-      // S4b PR5 — also mirror onto the OptionalNode for peekInteractionHost.
+      // S4b PR5 / S4c PR2 — OptionalNode owns pending-interaction context.
+      // peekInteractionHost() reads it off the node directly.
       node.pendingActionId = null
       node.pendingContextSnapshot = optionalCtxSnapshot
       const label = getChoiceLabel(node, this.registry) ?? {
@@ -1275,8 +1250,14 @@ export class Engine {
       }
       const stepResult = node.step(ctx)
       if (stepResult.kind === 'choice') {
-        if (!this.pendingInteractionContext) {
-          this.pendingInteractionContext = {
+        // S4c PR2 — backfill the InteractionNode's authoritative
+        // contextSnapshot when no prior emit installed one (e.g. an
+        // InteractionNode that was injected without going through
+        // applyInteractionRequest). Pre-PR2 this wrote to the engine-level
+        // pendingInteractionContext mirror; the InteractionNode is now the
+        // canonical owner.
+        if (!node.contextSnapshot) {
+          node.contextSnapshot = {
             params: undefined,
             costs: undefined,
             sourceCard: getOptionsSourceCard(node.choices),
@@ -1707,24 +1688,16 @@ export class Engine {
         if (choice === '__skip__') {
           node.resolve()
           this.pendingInteractionNodeId = null
-          this.pendingInteractionActionId = null
-          this.pendingInteractionOwnerNodeId = null
-          this.pendingInteractionContext = null
           return { type: 'ok' }
         }
         node.active = true
         this.pendingInteractionNodeId = null
-        this.pendingInteractionActionId = null
-        this.pendingInteractionOwnerNodeId = null
-        this.pendingInteractionContext = null
         return { type: 'ok' }
       }
       if (node instanceof OrNode || node instanceof XorNode) {
         if (choice === '__done__' && node instanceof OrNode) {
           node.resolve(choice)
           this.pendingInteractionNodeId = null
-          this.pendingInteractionOwnerNodeId = null
-          this.pendingInteractionContext = null
           return { type: 'ok' }
         }
         if (choice === '__skip__') {
@@ -1733,9 +1706,6 @@ export class Engine {
             this.resolveSubtree(node)
             parent.resolve()
             this.pendingInteractionNodeId = null
-            this.pendingInteractionActionId = null
-            this.pendingInteractionOwnerNodeId = null
-            this.pendingInteractionContext = null
             return { type: 'ok' }
           }
         }
@@ -1743,8 +1713,6 @@ export class Engine {
         const child = targetNode ? this.findActionNode(targetNode) : null
         if (!child) {
           this.pendingInteractionNodeId = null
-          this.pendingInteractionOwnerNodeId = null
-          this.pendingInteractionContext = null
           return { type: 'ok' }
         }
         const executionContext: ActionExecutionContext = {
@@ -1776,16 +1744,11 @@ export class Engine {
           targetNode!.resolve(choice)
           node.resolve(choice)
           this.pendingInteractionNodeId = null
-          this.pendingInteractionActionId = null
-          this.pendingInteractionOwnerNodeId = null
-          this.pendingInteractionContext = null
           return { type: 'ok' }
         }
         const action = this.registry.get(actionId)
         if (!action) {
           this.pendingInteractionNodeId = null
-          this.pendingInteractionOwnerNodeId = null
-          this.pendingInteractionContext = null
           return { type: 'fail', logKey: 'log.buildRoomFail' }
         }
         const costResults = this.hooks.computeCosts({
@@ -1824,9 +1787,6 @@ export class Engine {
           }
           this.tree.insertBefore(node.id, [...beforeActivateNodes, deferredTarget])
           this.pendingInteractionNodeId = null
-          this.pendingInteractionActionId = null
-          this.pendingInteractionOwnerNodeId = null
-          this.pendingInteractionContext = null
           return { type: 'ok' }
         }
         const result = action.execute(executionContext)
@@ -1966,22 +1926,27 @@ export class Engine {
           node.resolve(choice)
         }
         this.pendingInteractionNodeId = null
-        this.pendingInteractionOwnerNodeId = null
-        this.pendingInteractionContext = null
         return result
       }
     }
-    const actionId = this.pendingInteractionActionId
+    // S4c PR2 — second-pass dispatch (after Or/Xor/Optional handling above).
+    // The pending host MUST be an InteractionNode here (composite hosts are
+    // already drained by the early-return branches above). Read actionId,
+    // ownerNodeId and contextSnapshot off the InteractionNode itself —
+    // the engine no longer keeps those as top-level mirrors.
+    const interactionHost = this.peekInteraction()
+    const actionId = interactionHost?.pendingActionId ?? null
     if (!actionId) {
-      this.pendingInteractionContext = null
       return { type: 'ok' }
     }
     const action = this.registry.get(actionId)
     if (!action) {
-      this.pendingInteractionContext = null
       return { type: 'ok' }
     }
-    const executionContext = this.buildChoiceExecutionContext(context, this.pendingInteractionContext)
+    const executionContext = this.buildChoiceExecutionContext(
+      context,
+      interactionHost?.contextSnapshot ?? null,
+    )
     executionContext.params = {
       ...(executionContext.params ?? {}),
       selectedOption: choice,
@@ -2017,8 +1982,9 @@ export class Engine {
         actionId,
         // resolveChoice second-pass keeps the existing owner pointer (e.g.
         // XorNode owner when the second prompt is still nested under the
-        // same parent). Don't clobber it.
-        ownerNodeId: this.pendingInteractionOwnerNodeId,
+        // same parent). `preserveOwner: true` makes InteractionNode.emit()
+        // ignore this value, so passing a stale read is safe.
+        ownerNodeId: interactionHost?.ownerNodeId ?? null,
         preserveOwner: true,
         params: executionContext.params,
         costs: executionContext.costs,
@@ -2034,7 +2000,8 @@ export class Engine {
         this.log.append(entry)
       })
     }
-    const insertionTargetId = this.pendingInteractionOwnerNodeId ?? this.pendingInteractionNodeId
+    // S4c PR2 — read owner from the InteractionNode (was: pendingInteractionOwnerNodeId mirror).
+    const insertionTargetId = interactionHost?.ownerNodeId ?? this.pendingInteractionNodeId
     const immediatePhase = this.hooks.immediatelyAfter({ ...executionContext, actionId, choice }, result, choice)
     const afterPhase = this.hooks.after({ ...executionContext, actionId, choice }, result, choice)
 
@@ -2111,16 +2078,15 @@ export class Engine {
         }
       }
     }
-    if (this.pendingInteractionOwnerNodeId) {
-      const ownerNode = this.tree.findNodeById(this.pendingInteractionOwnerNodeId)
+    // S4c PR2 — read owner from the InteractionNode (was: pendingInteractionOwnerNodeId mirror).
+    const ownerNodeIdToResolve = interactionHost?.ownerNodeId ?? null
+    if (ownerNodeIdToResolve) {
+      const ownerNode = this.tree.findNodeById(ownerNodeIdToResolve)
       if (ownerNode instanceof XorNode) {
         ownerNode.resolve()
       }
     }
     this.pendingInteractionNodeId = null
-    this.pendingInteractionActionId = null
-    this.pendingInteractionOwnerNodeId = null
-    this.pendingInteractionContext = null
     return result
   }
 
@@ -2128,7 +2094,9 @@ export class Engine {
    *  pending choice is currently active (pendingInteractionNodeId is set). No-op otherwise.
    *  Mirrors the `{ type: 'flow' }` branch of resolveChoice. */
   insertFlowAfterPendingChoice(flow: ActionFlow): void {
-    const insertionTargetId = this.pendingInteractionOwnerNodeId ?? this.pendingInteractionNodeId
+    // S4c PR2 — read owner from the InteractionNode (was: pendingInteractionOwnerNodeId mirror).
+    const interactionNode = this.peekInteraction()
+    const insertionTargetId = interactionNode?.ownerNodeId ?? this.pendingInteractionNodeId
     if (!insertionTargetId) return
     const flowNode = this.buildFlowNode(flow)
     this.tree.insertAfter(insertionTargetId, [flowNode])
