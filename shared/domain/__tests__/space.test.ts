@@ -6,7 +6,7 @@ import {
   removeWorkerRef,
   spaceHasPlayer,
   spaceOccupantCount,
-} from '../../domain/space'
+} from '../space'
 import { mkActionSpace } from '../../cards/__tests__/fixtures'
 
 const mkSpace = (takenBy: WorkerRef[] = []): ActionSpace => mkActionSpace({ id: 'x', takenBy })

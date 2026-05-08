@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState } from '../../contract/types'
 import type { DraftState } from '../../draft/types'
-import { createInitialState } from '../../session/state-bootstrap'
-import { serializeState, serializeStateForPlayer } from '../../session/serialization'
+import { createInitialState } from '../state-bootstrap'
+import { serializeState, serializeStateForPlayer } from '../serialization'
 import { EngineStack } from '../../engine'
 
 const emptyCtx = () => ({ engineStack: new EngineStack() })

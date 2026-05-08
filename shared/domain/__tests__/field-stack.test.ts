@@ -11,7 +11,7 @@ import {
   fieldFindStackOfKind,
   countFieldsWithCrop,
   countEmptyFields,
-} from '../../domain/field'
+} from '../field'
 describe('Field stack type', () => {
   it('accepts a field with empty stacks', () => {
     const f: Field = { stacks: [], row: 0, col: 0 }

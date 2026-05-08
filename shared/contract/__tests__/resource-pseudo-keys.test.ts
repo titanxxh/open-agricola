@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { REAL_RESOURCE_KEYS, PSEUDO_RESOURCE_KEYS, isPseudoResourceKey } from '../../contract/resource-keys'
+import { REAL_RESOURCE_KEYS, PSEUDO_RESOURCE_KEYS, isPseudoResourceKey } from '../resource-keys'
 
 describe('Resource pseudo keys', () => {
   it('exposes the BGA pseudo set', () => {
