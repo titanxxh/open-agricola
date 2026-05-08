@@ -24,7 +24,7 @@ import {
 } from '../../shared/cards/custom-registry'
 import { registerExecutorBackedCustomCard } from '../../server/custom-code/runtime'
 import { createInitialState } from '../../shared/session/state-bootstrap'
-import type { GameState, PlayerState, Resource } from '../../shared/game/types'
+import type { GameState, PlayerState, Resource } from '../../shared/contract/types'
 import { rewriteCardId } from './extract'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { solveBonusScoring } from '../../shared/domain/scoring'
