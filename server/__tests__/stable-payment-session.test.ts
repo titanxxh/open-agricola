@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import type { PlayerState } from '../../shared/contract/types.ts'
 
-import { workersAvailable } from '../../shared/game/player'
+import { workersAvailable } from '../../shared/domain/player'
 import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 const stableTradeModifiers: PlayerState['activeModifiers'] = [
   {

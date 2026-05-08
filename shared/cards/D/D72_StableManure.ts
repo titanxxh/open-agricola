@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
-import { positionKey } from '../../game/farm'
+import { positionKey } from '../../domain/farm'
 import type { PlayerState } from '../../contract/types'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
-import { fieldTopStack, fieldIsEmpty } from '../../game/field'
+import { fieldTopStack, fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D72_StableManure'

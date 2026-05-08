@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldHasCrop } from '../../game/field'
+import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E117_PipeSmoker'

@@ -1,5 +1,5 @@
 import { Occupation } from '../types'
-import { isSpaceOccupied } from '../../game/space'
+import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A152_NightSchoolStudent'

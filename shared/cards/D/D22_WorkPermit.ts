@@ -8,7 +8,7 @@ import {
   writeCardInfobox,
 } from '../helpers/card-state'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import { workersAvailable } from '../../game/player'
+import { workersAvailable } from '../../domain/player'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 

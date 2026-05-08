@@ -5,7 +5,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { getFenceCount } from '../../actions/effects/fencing'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import { fieldIsEmpty } from '../../game/field'
+import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A68_AsparagusGift'

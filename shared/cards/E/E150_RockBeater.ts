@@ -3,7 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../contract/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
-import { isSpaceOccupied } from '../../game/space'
+import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E150_RockBeater'

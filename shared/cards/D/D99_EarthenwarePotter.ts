@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
 import { markCardCounterIfBoughtByRound, hasCardCounter } from '../helpers/stage-effects'
 import { payGainFlow } from '../helpers/pay-gain-node'
-import { familySize } from '../../game/player'
+import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D99_EarthenwarePotter'

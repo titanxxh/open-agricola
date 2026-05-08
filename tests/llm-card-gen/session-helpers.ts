@@ -33,7 +33,7 @@ import {
   markAllWorkersUsed,
   setActiveWorkerCount,
   workersAvailable,
-} from '../../shared/game/player'
+} from '../../shared/domain/player'
 import { GameSession } from '../../server/game/authoritative-session'
 import { confirmNextPlayer, confirmPlayerSwitch } from '../../server/__tests__/_helpers/legacy-confirms'
 

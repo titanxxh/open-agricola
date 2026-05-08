@@ -5,7 +5,7 @@ import { computeExtraSowableFields } from '../../shared/cards/card-effects'
 import { readCardExtraData, writeCardExtraData } from '../../shared/cards/helpers/card-state'
 import { buildSowFarmInteraction } from '../../shared/domain/farmyard'
 
-import { markAllWorkersUsed } from '../../shared/game/player'
+import { markAllWorkersUsed } from '../../shared/domain/player'
 import '../../shared/cards/E/E70_CropRotationField'
 import '../../shared/cards/E/E69_MelonPatch'
 

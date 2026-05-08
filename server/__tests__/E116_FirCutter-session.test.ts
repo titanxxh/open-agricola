@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 
-import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/game/player'
+import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/E/E116_FirCutter'
 import { mkActionSpace } from '../../shared/cards/__tests__/fixtures'
 

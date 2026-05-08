@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { ActionDefinition, ActionFlow } from '../../contract/types'
-import { fieldHasCrop, fieldFindStackOfKind, fieldTopStack } from '../../game/field'
+import { fieldHasCrop, fieldFindStackOfKind, fieldTopStack } from '../../domain/field'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
 

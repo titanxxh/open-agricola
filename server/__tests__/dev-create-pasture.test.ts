@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { workersAvailable } from '../../shared/game/player'
+import { workersAvailable } from '../../shared/domain/player'
 describe('dev create pasture', () => {
   it('does not consume worker and enters fence select pending', () => {
     const session = new GameSession()

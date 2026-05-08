@@ -12,8 +12,8 @@
  */
 
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types.ts'
-import { smallestAvailableWorker, workersAvailable } from '../../game/player.ts'
-import { addWorkerRef, isSpaceOccupied } from '../../game/space.ts'
+import { smallestAvailableWorker, workersAvailable } from '../../domain/player.ts'
+import { addWorkerRef, isSpaceOccupied } from '../../domain/space.ts'
 import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability.ts'
 import { incPlacedFarmers } from '../../logic/stats.ts'
 import { recordActionSnapshot } from '../../cards/helpers/action-snapshot.ts'

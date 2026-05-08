@@ -58,8 +58,8 @@ export function scanUsedHelpers(source: string): Set<string> {
 const HELPER_IMPORTS: Record<string, string> = {
   gainLeaf: `import { gainLeaf } from '../helpers/pay-gain-node'`,
   payLeaf: `import { payLeaf } from '../helpers/pay-gain-node'`,
-  spaceHasPlayer: `import { spaceHasPlayer } from '../../game/space'`,
-  positionKey: `import { positionKey } from '../../game/farm'`,
+  spaceHasPlayer: `import { spaceHasPlayer } from '../../domain/space'`,
+  positionKey: `import { positionKey } from '../../domain/farm'`,
   getCardDefinition: `import { getCardDefinition } from '../catalog'`,
   getCardStack: `import { getCardStack } from '../helpers/card-state'`,
   readCardExtraData: `import { readCardExtraData } from '../helpers/card-state'`,

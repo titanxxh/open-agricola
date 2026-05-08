@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldHasCrop, fieldTotalRemaining } from '../../game/field'
+import { fieldHasCrop, fieldTotalRemaining } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A64_BarleyMill'

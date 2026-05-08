@@ -6,7 +6,7 @@ import {
   setActiveWorkerCount,
   setNewbornCount,
   familySize,
-} from '../../shared/game/player'
+} from '../../shared/domain/player'
 import type { ActionHookPhase, ActionHookResult } from '../../shared/actions/hooks'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 

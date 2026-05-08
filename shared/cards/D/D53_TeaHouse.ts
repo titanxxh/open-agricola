@@ -5,7 +5,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import { workersAvailable } from '../../game/player'
+import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D53_TeaHouse'

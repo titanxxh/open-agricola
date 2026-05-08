@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { fieldHasCrop, fieldFindStackOfKind } from '../../game/field'
+import { fieldHasCrop, fieldFindStackOfKind } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A113_HeresyTeacher'

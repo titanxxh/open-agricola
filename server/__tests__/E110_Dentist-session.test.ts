@@ -4,7 +4,7 @@ import { getCardStack } from '../../shared/cards/helpers/card-state'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
-import { markAllWorkersUsed } from '../../shared/game/player'
+import { markAllWorkersUsed } from '../../shared/domain/player'
 import '../../shared/cards/E/E110_Dentist'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { ActionFlow } from '../../shared/contract/types'

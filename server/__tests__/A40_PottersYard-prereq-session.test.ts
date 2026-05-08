@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { A40_PottersYard } from '../../shared/cards/A/A40_PottersYard'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
-import { getAllTilePositions } from '../../shared/game/farm'
+import { getAllTilePositions } from '../../shared/domain/farm'
 
 describe('A40_PottersYard prerequisite', () => {
   it('blocks when player has more than 7 free farmyard spaces', () => {

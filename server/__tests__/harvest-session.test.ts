@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/D/D60_LargePottery'
 import '../../shared/cards/B/B104_SheepWalker'

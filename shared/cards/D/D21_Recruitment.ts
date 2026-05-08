@@ -2,7 +2,7 @@ import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getExtraRoomCapacity } from '../card-effects'
-import { familySize } from '../../game/player'
+import { familySize } from '../../domain/player'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 

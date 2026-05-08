@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import type { ActionFlow } from '../../contract/types'
-import { familySize } from '../../game/player'
+import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E106_EmergencySeller'

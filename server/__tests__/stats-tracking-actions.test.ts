@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { setWorkersAtHome } from '../../shared/game/player'
+import { setWorkersAtHome } from '../../shared/domain/player'
 import { setStartPlayer } from '../../shared/actions/effects/first-player'
 
 describe('PlayerStats action tracking', () => {

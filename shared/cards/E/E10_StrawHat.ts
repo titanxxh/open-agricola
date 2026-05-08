@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
-import { isSpaceOccupied, spaceHasPlayer } from '../../game/space'
+import { isSpaceOccupied, spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E10_StrawHat'

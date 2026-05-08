@@ -2,7 +2,7 @@ import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
-import { fieldIsEmpty } from '../../game/field'
+import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C18_RollOverPlow'

@@ -4,7 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import { E109_BraidMaker } from '../../shared/cards/E/E109_BraidMaker'
 import { A143_Stonecutter } from '../../shared/cards/A/A143_Stonecutter'
 
-import { setWorkersAtHome } from '../../shared/game/player'
+import { setWorkersAtHome } from '../../shared/domain/player'
 const CARD_ID = 'E109_BraidMaker'
 
 // Keep side-effect imports referenced.

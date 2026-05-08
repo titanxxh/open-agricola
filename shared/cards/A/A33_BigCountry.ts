@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import { hasNoUnusedFarmyardSpaces } from '../../game/farm'
+import { hasNoUnusedFarmyardSpaces } from '../../domain/farm'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A33_BigCountry'

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { setWorkersAtHome } from '../../shared/game/player'
+import { setWorkersAtHome } from '../../shared/domain/player'
 import { isCardFlagged, setCardFlag } from '../../shared/cards/helpers/card-state'
 import { recordActionSnapshot } from '../../shared/cards/helpers/action-snapshot'
 import '../../shared/cards/B/B27_Toolbox'

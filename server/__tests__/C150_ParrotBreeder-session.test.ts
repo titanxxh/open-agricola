@@ -7,7 +7,7 @@ import {
   writeCardExtraData,
 } from '../../shared/cards/helpers/card-state'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import { setWorkersAtHome } from '../../shared/game/player'
+import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/C/C150_ParrotBreeder'
 import type { AnytimeAction } from '../../shared/contract/types'

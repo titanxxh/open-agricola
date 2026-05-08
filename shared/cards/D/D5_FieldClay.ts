@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldIsEmpty } from '../../game/field'
+import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D5_FieldClay'

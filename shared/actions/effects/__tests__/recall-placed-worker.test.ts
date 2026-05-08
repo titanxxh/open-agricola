@@ -3,7 +3,7 @@ import type { ActionSpace, GameState, PlayerState } from '../../../contract/type
 import { recallPlacedWorkerAction } from '../internal/recall-placed-worker'
 import { recordRoundPlacement } from '../../../cards/helpers/round-placement'
 import { getWorkerHeldOnCard } from '../../../cards/helpers/card-held-workers'
-import { workersAvailable } from '../../../game/player'
+import { workersAvailable } from '../../../domain/player'
 import type { ActionExecutionContext } from '../../../contract/types'
 
 const mkSpace = (id: string, takenBy: { playerId: string; workerId: string }[] = []): ActionSpace =>

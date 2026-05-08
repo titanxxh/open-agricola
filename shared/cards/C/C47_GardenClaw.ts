@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
-import { fieldIsEmpty } from '../../game/field'
+import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C47_GardenClaw'

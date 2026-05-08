@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
-import { markAllWorkersUsed } from '../../shared/game/player'
+import { markAllWorkersUsed } from '../../shared/domain/player'
 import '../../shared/cards/C/C70_LettucePatch'
 import type { ActionFlow } from '../../shared/contract/types'
 

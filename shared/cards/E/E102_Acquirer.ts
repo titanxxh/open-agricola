@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import { payLeaf } from '../helpers/pay-gain-node'
-import { familySize } from '../../game/player'
+import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E102_Acquirer'

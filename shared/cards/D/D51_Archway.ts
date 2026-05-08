@@ -1,6 +1,6 @@
 import { PlayerActionCard } from '../types'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
-import { isSpaceOccupied, spaceHasPlayer } from '../../game/space'
+import { isSpaceOccupied, spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D51_Archway'

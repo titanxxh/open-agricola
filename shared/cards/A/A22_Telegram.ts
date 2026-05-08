@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import { writeCardExtraData, readCardExtraData, writeCardInfobox, setCardFlag, isCardFlagged } from '../helpers/card-state'
 import { getFenceCount, maxFences } from '../../actions/effects/fencing'
-import { workersAvailable } from '../../game/player'
+import { workersAvailable } from '../../domain/player'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 

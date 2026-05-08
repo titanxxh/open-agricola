@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import type { Field, CropStack } from '../types'
+import type { Field, CropStack } from '../../contract/types'
 import {
   fieldIsEmpty,
   fieldTopStack,
@@ -11,7 +11,7 @@ import {
   fieldFindStackOfKind,
   countFieldsWithCrop,
   countEmptyFields,
-} from '../field'
+} from '../../domain/field'
 describe('Field stack type', () => {
   it('accepts a field with empty stacks', () => {
     const f: Field = { stacks: [], row: 0, col: 0 }

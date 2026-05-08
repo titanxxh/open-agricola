@@ -4,7 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, ActionSpace, GameState, PlayerState } from '../../contract/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { isSpaceOccupied } from '../../game/space'
+import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B151_LittlePeasant'

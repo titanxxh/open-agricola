@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { isSpaceOccupied } from '../../game/space'
+import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A141_TurnipFarmer'

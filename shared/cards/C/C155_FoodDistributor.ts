@@ -2,7 +2,7 @@ import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
-import { isSpaceOccupied } from '../../game/space'
+import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C155_FoodDistributor'

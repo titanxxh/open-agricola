@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { setWorkersAtHome } from '../../shared/game/player'
+import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/B/B150_LargeScaleFarmer'
 import type { ActionFlow } from '../../shared/contract/types'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'

@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
-import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import '../../shared/cards/D/D126_FieldCultivator'
 
 const CARD_ID = 'D126_FieldCultivator'

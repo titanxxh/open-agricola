@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { GameSession } from '../server/game/authoritative-session'
 import { createInitialState } from '../shared/logic/state'
-import { getAllTilePositions } from '../shared/game/farm'
+import { getAllTilePositions } from '../shared/domain/farm'
 import { confirmNextPlayer, isLegacyChoicePending } from '../server/__tests__/_helpers/legacy-confirms'
 
 describe('pending choice types + undo regression', () => {

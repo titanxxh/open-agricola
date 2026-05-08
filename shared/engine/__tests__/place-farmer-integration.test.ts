@@ -8,7 +8,7 @@ import type { CardListenerContext } from '../../cards/card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { Resource } from '../../contract/types'
 
-import { markAllWorkersUsed, setWorkersAtHome, workersAvailable } from '../../game/player'
+import { markAllWorkersUsed, setWorkersAtHome, workersAvailable } from '../../domain/player'
 import { CardRegistry } from '../../../shared/cards/registry'
 import { setActiveCardRegistry, requireActiveCardRegistry } from '../../../shared/cards/active-registry'
 import type { CardListenerContext } from '../../cards/card-listeners'

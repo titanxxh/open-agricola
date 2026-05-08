@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { setWorkersAtHome } from '../../shared/game/player'
+import { setWorkersAtHome } from '../../shared/domain/player'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import { C122_Bricklayer } from '../../shared/cards/C/C122_Bricklayer'
 import type { PlayerState } from '../../shared/contract/types'

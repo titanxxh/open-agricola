@@ -3,7 +3,7 @@ import { getRegisteredCardListeners, type CardListenerRegistration, type CardLis
 import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 
-import { markAllWorkersUsed } from '../../game/player'
+import { markAllWorkersUsed } from '../../domain/player'
 import { CardRegistry } from '../registry'
 import { setActiveCardRegistry, requireActiveCardRegistry } from '../active-registry'
 describe('PlaceFarmer card listeners', () => {

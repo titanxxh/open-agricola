@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect, computeExtraSowableFields } from '../../shared/cards/card-effects'
 
-import { markAllWorkersUsed } from '../../shared/game/player'
+import { markAllWorkersUsed } from '../../shared/domain/player'
 import '../../shared/cards/E/E72_ArtichokeField'
 
 const CARD_ID = 'E72_ArtichokeField'

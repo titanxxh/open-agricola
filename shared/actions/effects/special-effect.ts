@@ -10,7 +10,7 @@ import {
   fieldFindStackOfKind,
   fieldHasCrop,
   fieldPopIfDepleted,
-} from '../../game/field'
+} from '../../domain/field'
 
 export type SpecialEffectParams =
   | { kind: 'increment-extra-data'; key: string; amount: number }

@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
-import { hasNoUnusedFarmyardSpaces } from '../../game/farm'
-import { workersAvailable } from '../../game/player'
+import { hasNoUnusedFarmyardSpaces } from '../../domain/farm'
+import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E93_Motivator'

@@ -1,5 +1,5 @@
 import type { FarmTilePosition, PlayerState } from '../../contract/types'
-import { positionKey } from '../../game/farm'
+import { positionKey } from '../../domain/farm'
 
 /**
  * Stable-tile return helpers — the single abstraction layer for "put a

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { setWorkersAtHome } from '../../shared/game/player'
+import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/E/E24_Ambition'
 import '../../shared/cards/A/A55_JunkRoom'

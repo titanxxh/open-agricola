@@ -7,8 +7,8 @@ import type {
   PlayerState,
 } from '../../contract/types'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement'
-import { addWorkerRef, removeWorkerRef } from '../../game/space'
-import { smallestAvailableWorker } from '../../game/player'
+import { addWorkerRef, removeWorkerRef } from '../../domain/space'
+import { smallestAvailableWorker } from '../../domain/player'
 import { incPlacedFarmers } from '../../logic/stats'
 import { computeAllowedPlacementSpaces } from '../helpers/placement-availability'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'

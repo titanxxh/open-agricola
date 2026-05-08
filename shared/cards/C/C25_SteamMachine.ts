@@ -2,7 +2,7 @@ import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { Resource } from '../../contract/types'
-import { workersAvailable } from '../../game/player'
+import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
 const hasAccumulation = (space: { gainPerRound: Partial<Resource> }): boolean => {

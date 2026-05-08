@@ -2,7 +2,7 @@ import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
-import { fieldTotalRemaining } from '../../game/field'
+import { fieldTotalRemaining } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D71_Changeover'

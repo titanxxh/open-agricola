@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
-import { spaceHasPlayer } from '../../game/space'
-import { newbornCount } from '../../game/player'
+import { spaceHasPlayer } from '../../domain/space'
+import { newbornCount } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A35_SwimmingClass'

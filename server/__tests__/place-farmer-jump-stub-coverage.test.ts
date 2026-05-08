@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { setWorkersAtHome } from '../../shared/game/player'
+import { setWorkersAtHome } from '../../shared/domain/player'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import { registerActionHook, unregisterActionHook } from '../../shared/actions/hooks'
 import { jumpLeaf } from '../../shared/cards/helpers/jump-leaf'

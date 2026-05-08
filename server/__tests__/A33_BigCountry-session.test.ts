@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { A33_BigCountry } from '../../shared/cards/A/A33_BigCountry'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
-import { getAllTilePositions } from '../../shared/game/farm'
+import { getAllTilePositions } from '../../shared/domain/farm'
 
 describe('A33_BigCountry prerequisite', () => {
   it('blocks when there is at least one free farmyard space', () => {

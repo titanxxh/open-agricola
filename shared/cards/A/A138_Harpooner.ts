@@ -2,7 +2,7 @@ import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
-import { familySize } from '../../game/player'
+import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A138_Harpooner'

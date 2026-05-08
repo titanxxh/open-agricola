@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
-import { setWorkersAtHome } from '../../shared/game/player'
+import { setWorkersAtHome } from '../../shared/domain/player'
 import { confirmNextPlayer } from './_helpers/legacy-confirms'
 
 import '../../shared/cards/D/D156_RetailDealer'

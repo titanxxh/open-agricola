@@ -4,7 +4,7 @@ import { computeExtraSowableFields } from '../../shared/cards/card-effects'
 import { readCardExtraData, writeCardExtraData } from '../../shared/cards/helpers/card-state'
 import { validateSowSelection } from '../../shared/domain/farmyard'
 
-import { markAllWorkersUsed } from '../../shared/game/player'
+import { markAllWorkersUsed } from '../../shared/domain/player'
 const CARD_ID = 'E68_CherryOrchard'
 const VIRTUAL_TILE = { row: -1, col: 68 }
 const harvestRounds = [4, 7, 9, 11, 13, 14]

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { playImprovement } from '../../shared/actions/effects/improvement'
 
-import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { confirmNextPlayer, isLegacyChoicePending } from './_helpers/legacy-confirms'
 describe('A53_Claypipe session flow', () => {
   it('triggers Claypipe at round 7 round-end after being played mid-work phase', () => {

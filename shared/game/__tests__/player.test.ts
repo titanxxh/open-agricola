@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { GameState, PlayerState, Worker } from '../types'
-import { markAllWorkersUsed } from '../../game/player'
-import { familySize, workersAvailable, newbornCount } from '../../game/player'
+import type { GameState, PlayerState, Worker } from '../../contract/types'
+import { markAllWorkersUsed } from '../../domain/player'
+import { familySize, workersAvailable, newbornCount } from '../../domain/player'
 import { holdWorkerOnCard, releaseWorkerFromCard } from '../../cards/helpers/card-held-workers'
 import {
   activateSmallestInactive,
@@ -13,7 +13,7 @@ import {
   smallestAvailableWorker,
   workersAtHome,
   workersAvailable,
-} from '../player'
+} from '../../domain/player'
 import { mkActionSpace } from '../../cards/__tests__/fixtures'
 
 const makeWorker = (id: string, isActive = true, isNewborn = false): Worker => ({ id, isActive, isNewborn })

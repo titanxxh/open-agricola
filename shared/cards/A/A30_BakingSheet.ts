@@ -3,7 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import { fieldHasCrop } from '../../game/field'
+import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A30_BakingSheet'

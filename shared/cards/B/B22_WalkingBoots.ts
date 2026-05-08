@@ -5,7 +5,7 @@ import {
   writeCardExtraData,
 } from '../helpers/card-state'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import { familySize } from '../../game/player'
+import { familySize } from '../../domain/player'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 

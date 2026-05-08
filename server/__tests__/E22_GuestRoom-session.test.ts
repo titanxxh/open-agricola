@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 
-import { familySize } from '../../shared/game/player'
+import { familySize } from '../../shared/domain/player'
 import '../../shared/cards/E/E22_GuestRoom'
 
 const CARD_ID = 'E22_GuestRoom'

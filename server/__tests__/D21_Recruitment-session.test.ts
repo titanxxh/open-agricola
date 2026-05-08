@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { D21_Recruitment } from '../../shared/cards/D/D21_Recruitment'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
-import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 
 const CARD_ID = 'D21_Recruitment'
 

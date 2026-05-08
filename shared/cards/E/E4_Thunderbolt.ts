@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
-import { fieldTopStack } from '../../game/field'
+import { fieldTopStack } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E4_Thunderbolt'

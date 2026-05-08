@@ -3,7 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainFlow, gainLeaf } from '../helpers/pay-gain-node'
 import type { Field } from '../../contract/types'
-import { fieldFindStackOfKind, fieldHasCrop, fieldPopIfDepleted } from '../../game/field'
+import { fieldFindStackOfKind, fieldHasCrop, fieldPopIfDepleted } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C57_Crudite'

@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldHasCrop, fieldFindStackOfKind } from '../../game/field'
+import { fieldHasCrop, fieldFindStackOfKind } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D135_GardeningHeadOfficial'

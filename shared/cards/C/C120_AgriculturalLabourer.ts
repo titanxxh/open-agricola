@@ -2,7 +2,7 @@ import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getStoredResource } from '../helpers/card-storage'
-import { fieldHasCrop } from '../../game/field'
+import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C120_AgriculturalLabourer'

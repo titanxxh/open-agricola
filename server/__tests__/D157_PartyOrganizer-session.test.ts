@@ -6,7 +6,7 @@ import {
   setNewbornCount,
   setWorkersAtHome,
   familySize,
-} from '../../shared/game/player'
+} from '../../shared/domain/player'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 import type {
   ActionHookPhase,
