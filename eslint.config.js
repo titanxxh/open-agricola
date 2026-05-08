@@ -245,4 +245,28 @@ export default defineConfig([
       }],
     },
   },
+  // S6c: shared/utils/** is pure helper. No game/session/engine/cards/domain imports.
+  {
+    files: ['shared/utils/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', {
+        patterns: [
+          {
+            group: [
+              '**/shared/cards/**',
+              '**/shared/cards-display/**',
+              '**/shared/session/**',
+              '**/shared/engine/**',
+              '**/shared/actions/**',
+              '**/shared/domain/**',
+              '**/server/**',
+              '**/client/**',
+            ],
+            message: 'shared/utils/** is pure helper; no domain/runtime/UI imports.',
+            allowTypeImports: true,
+          },
+        ],
+      }],
+    },
+  },
 ])
