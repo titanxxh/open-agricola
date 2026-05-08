@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import type { PlayerState, GameState } from '../../shared/game/types'
+import type { PlayerState, GameState } from '../../shared/contract/types'
 
 import '../../shared/cards/B/B32_Kettle'
 

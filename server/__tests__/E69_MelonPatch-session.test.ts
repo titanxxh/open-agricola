@@ -4,7 +4,7 @@ import { getCardEffect, computeExtraSowableFields } from '../../shared/cards/car
 
 import { markAllWorkersUsed } from '../../shared/game/player'
 import '../../shared/cards/E/E69_MelonPatch'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'E69_MelonPatch'
 const harvestRounds = [4, 7, 9, 11, 13, 14]

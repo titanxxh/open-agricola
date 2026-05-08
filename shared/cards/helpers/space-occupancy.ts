@@ -1,4 +1,4 @@
-import type { GameState } from '../../game/types'
+import type { GameState } from '../../contract/types'
 
 /**
  * 某行动格上当前物理存在的"人"数量（含新生儿）。

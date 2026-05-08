@@ -8,7 +8,7 @@ import type {
   GameState,
   PlayerState,
   Resource,
-} from '../../../game/types'
+} from '../../../contract/types'
 
 const dummySpace: ActionSpace = { id: 'farm-expansion', type: 'farm-expansion' } as unknown as ActionSpace
 

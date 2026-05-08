@@ -1,4 +1,4 @@
-import type { ActionChoiceOption, InteractionRequest } from '../../game/types'
+import type { ActionChoiceOption, InteractionRequest } from '../../contract/types'
 import type { PromptKey } from '../../game/prompt-keys'
 import type { EngineNode, EngineContext, NodeStepResult } from '../types'
 import { BaseNode } from './base'

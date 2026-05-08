@@ -1,5 +1,5 @@
 import { t, type Locale } from '../i18n'
-import type { Resource } from '../game/types'
+import type { Resource } from '../contract/types'
 import { resourceKeyList } from './state'
 
 export const formatResources = (

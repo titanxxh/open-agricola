@@ -1,8 +1,8 @@
 import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionSpace, PlayerState, Pasture } from '../../game/types'
+import type { ActionSpace, PlayerState, Pasture } from '../../contract/types'
 import { isCardFlagged, setCardFlag, writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 

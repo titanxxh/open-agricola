@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { canStartFencing, maxFences } from '../fencing'
-import type { GameState, PlayerState } from '../../../game/types'
+import type { GameState, PlayerState } from '../../../contract/types'
 
 import '../../../cards/E/E16_BriarHedge'
 

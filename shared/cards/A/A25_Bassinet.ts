@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionChoiceOption, GameState } from '../../game/types'
+import type { ActionChoiceOption, GameState } from '../../contract/types'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import { countPeopleOnSpace } from '../helpers/space-occupancy'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'

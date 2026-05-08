@@ -1,4 +1,4 @@
-import type { ActionDefinition } from '../game/types'
+import type { ActionDefinition } from '../contract/types'
 import { actionHookPhases } from './hooks'
 import type { ActionHookPhase, ActionHookRegistration } from './hooks'
 import type { CardListenerRegistration } from '../cards/card-listeners'

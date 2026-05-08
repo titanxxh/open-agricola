@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
-import type { GameState, PlayerState, ActionSpace } from '../../shared/game/types'
+import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 
 import '../../shared/cards/C/C119_SkillfulRenovator'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'C119_SkillfulRenovator'
 

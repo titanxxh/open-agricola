@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { getExchangesInWindow, getExchangesByTradeIds } from '../exchange'
-import type { PlayerState, Resource } from '../../../game/types'
+import type { PlayerState, Resource } from '../../../contract/types'
 
 const createMockPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
   id: 'p1',

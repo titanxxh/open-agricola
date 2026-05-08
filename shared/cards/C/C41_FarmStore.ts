@@ -1,5 +1,5 @@
 import { MinorImprovement } from '../types'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C41_FarmStore'

@@ -21,7 +21,7 @@ import type {
   Resource,
   ResourceKey,
   Trade,
-} from '../../../game/types'
+} from '../../../contract/types'
 import {
   convertResources,
   hasValidResources,

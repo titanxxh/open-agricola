@@ -1,4 +1,4 @@
-import type { GameState, PlayerState, Worker } from './types'
+import type { GameState, PlayerState, Worker } from '../contract/types'
 import { getCardHeldWorkerIds } from '../cards/helpers/card-held-workers'
 
 export const getPlayedCardKeys = (
@@ -59,7 +59,7 @@ export const activateSmallestInactive = (p: PlayerState): Worker | null => {
 
 const TEST_SINK_SPACE_ID = '__test-worker-sink__'
 
-const ensureTestSink = (state: GameState): import('./types').ActionSpace => {
+const ensureTestSink = (state: GameState): import('../contract/types').ActionSpace => {
   let sink = state.actionSpaces.find(s => s.id === TEST_SINK_SPACE_ID)
   if (sink) return sink
   sink = {
@@ -75,7 +75,7 @@ const ensureTestSink = (state: GameState): import('./types').ActionSpace => {
       grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     },
     takenBy: [],
-  } as import('./types').ActionSpace
+  } as import('../contract/types').ActionSpace
   state.actionSpaces.push(sink)
   return sink
 }

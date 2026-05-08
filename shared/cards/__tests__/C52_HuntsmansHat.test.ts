@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ActionExecutionResult, ActionSpace, GameState, PlayerState } from '../../game/types'
+import type { ActionExecutionResult, ActionSpace, GameState, PlayerState } from '../../contract/types'
 import { CardRegistry } from '../registry'
 import { setActiveCardRegistry, requireActiveCardRegistry } from '../active-registry'
 

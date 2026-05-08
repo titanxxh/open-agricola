@@ -1,4 +1,4 @@
-import type { ActionDefinition, PlayerState, Resource } from '../../game/types'
+import type { ActionDefinition, PlayerState, Resource } from '../../contract/types'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { gainConfigByActionId } from '../factories/gain'
 import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'

@@ -21,7 +21,7 @@ import type {
   PlayerState,
   Resource,
   Trade,
-} from '../../../game/types'
+} from '../../../contract/types'
 import { executeCardListener, getMatchingListeners } from '../../../cards/card-listeners'
 import { applyCostOverride, isComplexCost } from './affordability'
 import { canPayCost, computeAllBuyableCombinations } from './enumerate'

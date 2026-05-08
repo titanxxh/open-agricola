@@ -1,5 +1,5 @@
-import type { ChoiceEffectPreview, Resource } from '../../game/types'
-import type { ActionFlow } from '../../game/types'
+import type { ChoiceEffectPreview, Resource } from '../../contract/types'
+import type { ActionFlow } from '../../contract/types'
 import type { PromptKey } from '../../game/prompt-keys'
 import type { ActionHookResult } from '../../actions/hooks'
 import { splitCardGain, type CardGain } from './card-gain'

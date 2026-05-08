@@ -4,7 +4,7 @@ import { validateCardCode } from '../../shared/custom-code/ast-validator.ts'
 import { compileCardCode } from './compiler.ts'
 import { cardEffectHooks, type CardEffectField } from '../../shared/cards/card-effects.ts'
 import type { CardListenerScope } from '../../shared/cards/card-listeners.ts'
-import type { ActionFlow } from '../../shared/game/types.ts'
+import type { ActionFlow } from '../../shared/contract/types.ts'
 import type { ActionHookResult } from '../../shared/actions/hooks.ts'
 import type {
   CustomCodeEffectInvocation,

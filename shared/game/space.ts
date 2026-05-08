@@ -1,4 +1,4 @@
-import type { ActionSpace, WorkerRef } from './types'
+import type { ActionSpace, WorkerRef } from '../contract/types'
 
 /**
  * Coerce a deserialized or test-fixture `takenBy` into a `WorkerRef[]`.

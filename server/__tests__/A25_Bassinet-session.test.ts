@@ -7,7 +7,7 @@ import {
   newbornCount,
 } from '../../shared/game/player'
 import { addWorkerRef } from '../../shared/game/space'
-import type { GameState, PlayerState } from '../../shared/game/types'
+import type { GameState, PlayerState } from '../../shared/contract/types'
 
 import '../../shared/cards/A/A25_Bassinet'
 import '../../shared/cards/A/A92_AdoptiveParents'

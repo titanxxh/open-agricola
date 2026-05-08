@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { playerBoard } from '../../domain'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D167_PureBreeder'

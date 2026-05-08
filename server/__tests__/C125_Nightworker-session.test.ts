@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import type { ActionSpace } from '../../shared/game/types'
+import type { ActionSpace } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C125_Nightworker'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'C125_Nightworker'
 

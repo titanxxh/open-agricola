@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionChoiceOption, ActionSpace, GameState } from '../../game/types'
+import type { ActionChoiceOption, ActionSpace, GameState } from '../../contract/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import { canSow } from '../../actions/effects/sow'
 import { isSpaceOccupied } from '../../game/space'

@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { BonusModifier } from '../../game/types'
+import type { BonusModifier } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A143_Stonecutter'

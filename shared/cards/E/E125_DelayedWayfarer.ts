@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 

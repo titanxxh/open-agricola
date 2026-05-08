@@ -3,7 +3,7 @@ import type {
   ActionDefinition,
   PlayerState,
   Resource,
-} from '../../game/types'
+} from '../../contract/types'
 import { canAffordOccupationActionCost } from '../../actions/effects/occupation'
 import { getOccupation } from '../../game/occupations'
 

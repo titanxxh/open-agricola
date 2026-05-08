@@ -1,4 +1,4 @@
-import type { ActionExecutionResult, GameState, PlayerState } from '../../game/types'
+import type { ActionExecutionResult, GameState, PlayerState } from '../../contract/types'
 import { runCardEffectHook } from '../../cards/card-effects'
 import type { CardEffectHook, PaymentInfo } from '../../cards/card-effects'
 

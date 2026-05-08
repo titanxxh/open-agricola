@@ -22,7 +22,7 @@ import {
 } from '../cards/catalog'
 import { initDraftState } from '../draft/draft-manager'
 import type { DraftPool } from '../draft/types'
-import type { ActionSpace, Field, GameState, PlayerState } from '../game/types'
+import type { ActionSpace, Field, GameState, PlayerState } from '../contract/types'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
 import { normalizeTakenBy } from '../game/space'
 import { createInitialPlayerStats } from './stats'

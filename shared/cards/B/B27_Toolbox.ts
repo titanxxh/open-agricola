@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionFlow, PlayerState } from '../../game/types'
+import type { ActionFlow, PlayerState } from '../../contract/types'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import {
   getRoomsBuiltThisAction,

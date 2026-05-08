@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
 import { getPlayerBakeRates } from '../helpers/exchange-registry'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A61_WinnowingFan'

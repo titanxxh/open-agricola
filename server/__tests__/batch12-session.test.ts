@@ -7,7 +7,7 @@ import '../../shared/cards/A/A129_Swagman'
 import '../../shared/cards/B/B16_MiningHammer'
 import '../../shared/cards/B/B124_Trimmer'
 import '../../shared/cards/A/A82_WorkCertificate'
-import type { ActionChoiceOption } from '../../shared/game/types'
+import type { ActionChoiceOption } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 // ===== A54 Credit session tests =====

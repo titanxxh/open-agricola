@@ -13,7 +13,7 @@ import {
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/E/E91_PlowBuilder'
-import type { AnytimeAction } from '../../shared/game/types'
+import type { AnytimeAction } from '../../shared/contract/types'
 
 const CARD_ID = 'E91_PlowBuilder'
 

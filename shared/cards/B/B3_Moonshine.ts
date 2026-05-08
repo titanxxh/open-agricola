@@ -2,7 +2,7 @@ import { MinorImprovement } from '../types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { rollAndCacheCardPick } from '../helpers/card-random'
 import { passOccupationToNextPlayer } from '../helpers/pass-occupation'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B3_Moonshine'

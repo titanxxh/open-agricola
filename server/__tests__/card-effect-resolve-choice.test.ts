@@ -17,7 +17,7 @@ import type { ResolveChoiceHandler } from '../../shared/cards/card-effects'
 import { Occupation } from '../../shared/cards/types'
 import { occupations } from '../../shared/game/occupations'
 import { setWorkersAtHome } from '../../shared/game/player'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 

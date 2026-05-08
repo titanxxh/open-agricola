@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import { playerBoard } from '../../domain'
-import type { ActionFlow, GameState, PlayerState } from '../../game/types'
+import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C9_AutomaticWaterTrough'

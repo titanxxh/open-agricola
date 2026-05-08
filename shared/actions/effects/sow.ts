@@ -3,7 +3,7 @@ import type {
   ActionExecutionContext,
   ActionExecutionResult,
   PlayerState,
-} from '../../game/types'
+} from '../../contract/types'
 import { fieldIsEmpty } from '../../game/field'
 import { positionKey } from '../../game/farm'
 import { playerBoard, type SowSelection } from '../../domain'

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 import '../../shared/cards/B/B11_Feedyard'
 

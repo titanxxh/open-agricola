@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import { pushToCardStack, getCardStack, writeCardInfobox } from '../helpers/card-state'
-import type { ActionFlow, PlayerState } from '../../game/types'
+import type { ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D126_FieldCultivator'

@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook, getCardEffect } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/C/C135_Constable'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 // BGA C135_Constable.php map (key = 14 - turn = remaining complete rounds left after this one):
 //   0→0, 1→1, 2→1, 3→2, 4→2, 5→2, 6→3, 7→3, 8→3,

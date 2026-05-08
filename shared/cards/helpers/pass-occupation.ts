@@ -1,4 +1,4 @@
-import type { GameState, PlayerState } from '../../game/types'
+import type { GameState, PlayerState } from '../../contract/types'
 
 export type PassResult =
   | { target: 'next'; playerId: string }

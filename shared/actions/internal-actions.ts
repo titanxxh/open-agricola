@@ -1,4 +1,4 @@
-import type { ActionDefinition } from '../game/types'
+import type { ActionDefinition } from '../contract/types'
 import { futureMeeplesAction } from './effects/internal/future-meeples'
 import { collectAction } from './effects/collect'
 import { gainAction, bonusWoodAction, bonusFoodAction, bonusGrainAction } from './effects/gain'

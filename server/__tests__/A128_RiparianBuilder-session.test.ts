@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
-import type { ActionChoiceOption,  PlayerState } from '../../shared/game/types.ts'
+import type { ActionChoiceOption,  PlayerState } from '../../shared/contract/types.ts'
 
 import { setWorkersAtHome } from '../../shared/game/player'
 import { confirmPlayerSwitch } from './_helpers/legacy-confirms'

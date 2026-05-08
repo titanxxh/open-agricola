@@ -1,4 +1,4 @@
-import type { PlayerState, FarmTilePosition } from '../game/types.ts'
+import type { PlayerState, FarmTilePosition } from '../contract/types.ts'
 
 /**
  * Readonly view of a fenced pasture region. Projects the persisted

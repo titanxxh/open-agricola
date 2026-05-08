@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { GameState, WorkerRef } from '../../../game/types'
+import type { GameState, WorkerRef } from '../../../contract/types'
 import { countPeopleOnSpace } from '../space-occupancy'
 import { mkActionSpace } from '../../__tests__/fixtures'
 

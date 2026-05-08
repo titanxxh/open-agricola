@@ -4,7 +4,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { getCardStack, pushToCardStack } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/E/E162_Entrepreneur'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'E162_Entrepreneur'
 

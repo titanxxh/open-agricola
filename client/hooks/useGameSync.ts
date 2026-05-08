@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { GameState, InteractionState } from '../../shared/game/types'
+import type { GameState, InteractionState } from '../../shared/contract/types'
 import type { PlayerScoreSummary } from '../../shared/domain'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
 import { rehydrateStateForClient } from '../services/rehydrate'

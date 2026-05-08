@@ -4,7 +4,7 @@ import type {
   ActionSpace,
   GameState,
   PlayerState,
-} from '../../../game/types'
+} from '../../../contract/types'
 import { ActionRegistry } from '../../../engine/registry'
 import { Engine } from '../../../engine/engine'
 import { EngineTree } from '../../../engine/tree'

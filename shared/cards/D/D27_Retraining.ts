@@ -9,7 +9,7 @@ import {
   writeCardExtraData,
   readCardExtraData,
 } from '../helpers/card-state'
-import type { ActionFlow, GameState, PlayerState } from '../../game/types'
+import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D27_Retraining'

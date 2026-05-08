@@ -4,7 +4,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/E/E28_Bookmark'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'E28_Bookmark'
 

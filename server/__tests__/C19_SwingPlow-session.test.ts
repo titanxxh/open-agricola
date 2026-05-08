@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/C/C19_SwingPlow'
-import type { ActionChoiceOption } from '../../shared/game/types'
+import type { ActionChoiceOption } from '../../shared/contract/types'
 import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 
 describe('C19_SwingPlow session', () => {

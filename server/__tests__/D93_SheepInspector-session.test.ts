@@ -8,10 +8,10 @@ import type {
   ActionSpace,
   GameState,
   PlayerState,
-} from '../../shared/game/types'
+} from '../../shared/contract/types'
 
 import '../../shared/cards/D/D93_SheepInspector'
-import type { ActionChoiceOption , ActionFlow } from '../../shared/game/types'
+import type { ActionChoiceOption , ActionFlow } from '../../shared/contract/types'
 import type { SessionResponse } from '../../shared/session/session-core'
 import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 

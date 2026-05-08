@@ -2,7 +2,7 @@ import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
-import type { FutureMeepleRequest } from '../../game/types'
+import type { FutureMeepleRequest } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E47_SyrupTap'

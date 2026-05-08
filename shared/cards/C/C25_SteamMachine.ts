@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { Resource } from '../../game/types'
+import type { Resource } from '../../contract/types'
 import { workersAvailable } from '../../game/player'
 import type { CardImpl } from '../registry'
 

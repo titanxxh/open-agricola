@@ -1,5 +1,5 @@
 import { Occupation } from '../types'
-import type { ActionSpace, Resource } from '../../game/types'
+import type { ActionSpace, Resource } from '../../contract/types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'

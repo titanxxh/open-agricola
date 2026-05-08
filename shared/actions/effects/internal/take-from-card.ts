@@ -1,4 +1,4 @@
-import type { ActionDefinition, Resource } from '../../../game/types'
+import type { ActionDefinition, Resource } from '../../../contract/types'
 import { initCardState } from '../../../cards/__stubs__/helpers'
 import { addCardResourceGained } from '../../../cards/helpers/card-state'
 import { gainResources } from '../gain'

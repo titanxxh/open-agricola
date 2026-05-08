@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners } from '../../shared/cards/card-listeners'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
-import type { PlayerState, GameState } from '../../shared/game/types'
+import type { PlayerState, GameState } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C88_CarpentersApprentice'
 import '../../shared/cards/B/B30_WoodPalisades'

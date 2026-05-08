@@ -8,7 +8,7 @@
  * the public API instead.
  */
 
-import type { ComplexCost, PlayerState, Resource } from '../../../game/types'
+import type { ComplexCost, PlayerState, Resource } from '../../../contract/types'
 
 export const payResources = (
   player: PlayerState,

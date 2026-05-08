@@ -5,7 +5,7 @@ import type {
   ActionSpace,
   GameState,
   PlayerState,
-} from '../../game/types'
+} from '../../contract/types'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement'
 import { addWorkerRef, removeWorkerRef } from '../../game/space'
 import { smallestAvailableWorker } from '../../game/player'

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import { getCardEffect, runCardEffectHook } from '../card-effects'
-import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
 import { recordActionSnapshot } from '../helpers/action-snapshot'
 
 import '../D/D96_Furnisher'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'D96_Furnisher'

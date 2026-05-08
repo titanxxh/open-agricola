@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { takeFromSpaceAction } from '../take-from-space'
-import type { GameState, PlayerState, ActionSpace } from '../../../../game/types'
+import type { GameState, PlayerState, ActionSpace } from '../../../../contract/types'
 
 const makeContext = (
   spaceId: string,

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 import '../../shared/cards/C/C64_CornSchnappsDistillery'
-import type { FutureMeeple } from '../../shared/game/types'
+import type { FutureMeeple } from '../../shared/contract/types'
 
 describe('C64_CornSchnappsDistillery session', () => {
   const setup = () => {

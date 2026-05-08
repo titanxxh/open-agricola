@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
 import '../../shared/cards/D/D72_StableManure'
-import type { ActionChoiceOption } from '../../shared/game/types'
+import type { ActionChoiceOption } from '../../shared/contract/types'
 
 describe('D72_StableManure session', () => {
   const setupHarvest = (unfencedStableCount: number) => {

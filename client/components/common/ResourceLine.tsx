@@ -1,5 +1,5 @@
 import type { Locale } from '../../../shared/i18n'
-import type { Resource } from '../../../shared/game/types'
+import type { Resource } from '../../../shared/contract/types'
 import { resourceKeyList } from '../../../shared/logic/state-constants'
 
 type Props = {

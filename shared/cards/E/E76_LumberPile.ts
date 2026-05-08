@@ -6,7 +6,7 @@ import {
   listReturnableStableTiles,
   removeStableOrFarmHandAtTile,
 } from '../helpers/stable-removal'
-import type { ActionFlow, FarmTilePosition } from '../../game/types'
+import type { ActionFlow, FarmTilePosition } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E76_LumberPile'

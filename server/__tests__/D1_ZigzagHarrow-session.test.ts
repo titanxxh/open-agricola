@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 import { D1_ZigzagHarrow } from '../../shared/cards/D/D1_ZigzagHarrow'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'

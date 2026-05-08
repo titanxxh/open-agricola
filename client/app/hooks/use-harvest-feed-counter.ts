@@ -1,4 +1,4 @@
-import type { Resource } from '../../../shared/game/types'
+import type { Resource } from '../../../shared/contract/types'
 import type { HarvestFeedOption } from './use-harvest-flow'
 
 /**

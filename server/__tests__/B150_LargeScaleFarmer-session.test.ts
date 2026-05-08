@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/B/B150_LargeScaleFarmer'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 

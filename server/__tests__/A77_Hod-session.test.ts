@@ -4,7 +4,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { setWorkersAtHome } from '../../shared/game/player'
 import '../../shared/cards/A/A77_Hod'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 describe('A77_Hod session', () => {

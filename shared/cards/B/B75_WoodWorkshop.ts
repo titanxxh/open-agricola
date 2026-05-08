@@ -1,7 +1,7 @@
 import { MinorImprovement, getRegisteredMinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ComplexCost, GameState, PlayerState } from '../../game/types'
+import type { ComplexCost, GameState, PlayerState } from '../../contract/types'
 import { getMajorCard } from '../major'
 import { meetsCardPrerequisites } from '../helpers/prerequisites'
 import {

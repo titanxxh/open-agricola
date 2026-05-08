@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
-import type { ActionSpace, GameState, PlayerState } from '../../shared/game/types'
+import type { ActionSpace, GameState, PlayerState } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C145_ForestReviewer'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 import { mkActionSpace } from '../../shared/cards/__tests__/fixtures'
 
 const CARD_ID = 'C145_ForestReviewer'

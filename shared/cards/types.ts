@@ -1,4 +1,4 @@
-import type { Resource, CostModifier, TradeSideEffect, ComplexCost } from '../game/types'
+import type { Resource, CostModifier, TradeSideEffect, ComplexCost } from '../contract/types'
 
 export type CardType = 'major' | 'minor' | 'occupation'
 

@@ -1,4 +1,4 @@
-import type { ComplexCost, GameState, PlayerState, Resource } from '../../game/types'
+import type { ComplexCost, GameState, PlayerState, Resource } from '../../contract/types'
 import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../game/minor-improvements'
 import { PaymentSolver } from '../payment'

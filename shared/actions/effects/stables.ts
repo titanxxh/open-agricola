@@ -7,7 +7,7 @@ import type {
   GameState,
   PlayerState,
   Resource,
-} from '../../game/types'
+} from '../../contract/types'
 import { getNextEmptyTileForPlayer } from '../../game/farm'
 import { payResources, applyCostOverride } from '../payment/internal'
 import { stableWoodCost } from './fencing'

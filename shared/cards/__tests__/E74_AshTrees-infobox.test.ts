@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import { readCardInfobox } from '../helpers/card-state'
-import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
 import type { CardListenerContext } from '../card-listeners'
 
 import '../E/E74_AshTrees'

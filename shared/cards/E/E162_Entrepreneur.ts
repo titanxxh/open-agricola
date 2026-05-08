@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
 import { getCardStack } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import type { ActionFlow, Resource } from '../../game/types'
+import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E162_Entrepreneur'

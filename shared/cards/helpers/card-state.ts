@@ -4,7 +4,7 @@ import type {
   CardState,
   PlayerState,
   Resource,
-} from '../../game/types'
+} from '../../contract/types'
 
 const CARD_RESOURCE_STATS_KEY = 'resourceStats'
 

@@ -16,7 +16,7 @@ import { getExtraRoomCapacity } from '../../shared/cards/card-effects'
 import { getFarmHandCandidates } from '../../shared/cards/B/B85_FarmHand'
 
 import '../../shared/cards/B/B85_FarmHand'
-import type { ActionSpace, FarmTilePosition, GameState, PlayerState } from '../../shared/game/types'
+import type { ActionSpace, FarmTilePosition, GameState, PlayerState } from '../../shared/contract/types'
 
 const CARD_ID = 'B85_FarmHand'
 const LISTENER_ID = 'B85-farm-hand-anytime'

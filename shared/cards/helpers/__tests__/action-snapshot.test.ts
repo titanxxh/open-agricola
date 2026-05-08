@@ -6,7 +6,7 @@ import {
   getStableTilesBuiltThisAction,
   getFencesBuiltThisAction,
 } from '../action-snapshot'
-import type { PlayerState } from '../../../game/types'
+import type { PlayerState } from '../../../contract/types'
 
 const makePlayer = (): PlayerState => ({
   id: 'p1',

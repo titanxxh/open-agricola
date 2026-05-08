@@ -9,7 +9,7 @@ import {
 } from '../helpers/card-state'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { workersAvailable } from '../../game/player'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D22_WorkPermit'

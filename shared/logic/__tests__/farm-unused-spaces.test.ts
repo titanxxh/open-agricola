@@ -7,7 +7,7 @@ import {
   parsePositionKey,
   positionKey,
 } from '../../game/farm'
-import type { FarmTilePosition, PlayerState, Resource } from '../../game/types'
+import type { FarmTilePosition, PlayerState, Resource } from '../../contract/types'
 
 const emptyResources = (): Resource => ({
   wood: 0,

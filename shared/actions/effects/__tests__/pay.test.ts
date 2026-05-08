@@ -25,7 +25,7 @@ import type {
   PaymentSolution,
   Trade,
   TradeModifier,
-} from '../../../game/types'
+} from '../../../contract/types'
 import { A88_HedgeKeeper } from '../../../cards/A/A88_HedgeKeeper'
 
 const hedgeKeeperModifier = A88_HedgeKeeper.modifier as TradeModifier
@@ -877,7 +877,7 @@ const callPay = (
   payAction.execute({
     state: {} as GameState,
     player,
-    space: { id: 'test', name: '', actionId: 'pay', round: 0 } as unknown as import('../../../game/types').ActionSpace,
+    space: { id: 'test', name: '', actionId: 'pay', round: 0 } as unknown as import('../../../contract/types').ActionSpace,
     params,
     sourceCard: extra.sourceCard,
     actionContext: extra.actionContext,

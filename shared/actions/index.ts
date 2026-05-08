@@ -1,4 +1,4 @@
-import type { ActionDefinition, ActionSpace, Resource } from '../game/types'
+import type { ActionDefinition, ActionSpace, Resource } from '../contract/types'
 import { initializeFlowDerivedCanBeExecutedByPlayer } from './flow'
 import { internalActionDefinitions } from './internal-actions'
 import { getAdHocAction } from './helpers/ad-hoc-action-registry'

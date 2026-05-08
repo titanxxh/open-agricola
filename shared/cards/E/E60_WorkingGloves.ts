@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import type { TradeModifier } from '../../game/types'
+import type { TradeModifier } from '../../contract/types'
 
 const CARD_ID = 'E60_WorkingGloves'
 

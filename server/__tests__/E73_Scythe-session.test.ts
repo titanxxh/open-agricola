@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/E/E73_Scythe'
-import type { ActionFlow, Field } from '../../shared/game/types'
+import type { ActionFlow, Field } from '../../shared/contract/types'
 import { getAdHocAction } from '../../shared/actions/helpers/ad-hoc-action-registry'
 import { reap } from '../../shared/actions/effects/reap'
 

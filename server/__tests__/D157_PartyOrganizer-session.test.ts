@@ -13,7 +13,7 @@ import type {
   ActionHookResult,
 } from '../../shared/actions/hooks'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
-import type { GameState, PlayerState } from '../../shared/game/types'
+import type { GameState, PlayerState } from '../../shared/contract/types'
 
 const CARD_ID = 'D157_PartyOrganizer'
 

@@ -2,7 +2,7 @@ import type {
   PlayerState,
   PlayerStats,
   Resource,
-} from '../game/types'
+} from '../contract/types'
 
 export const createInitialPlayerStats = (
   options: { isFirstPlayer: boolean },

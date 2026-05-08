@@ -4,7 +4,7 @@ import { executeCardListener, getRegisteredCardListeners, type CardListenerConte
 
 import '../../shared/cards/C/C117_Legworker'
 import { hasAdjacentWorker } from '../../shared/cards/C/C117_Legworker'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 
 const CARD_ID = 'C117_Legworker'

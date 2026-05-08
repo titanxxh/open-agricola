@@ -1,4 +1,4 @@
-import type { PlayerState } from './types'
+import type { PlayerState } from '../contract/types'
 
 export type AnimalKey = 'sheep' | 'boar' | 'cattle'
 

@@ -2,7 +2,7 @@ import type {
   ActionDefinition,
   ActionExecutionResult,
   PlayerState,
-} from '../../game/types'
+} from '../../contract/types'
 
 export type ApplyRenovationParams = {
   nextType: Exclude<PlayerState['houseType'], 'wood'>

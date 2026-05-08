@@ -1,4 +1,4 @@
-import type { PlayerState, Resource } from '../../game/types'
+import type { PlayerState, Resource } from '../../contract/types'
 import { gainResources } from '../../actions/effects/gain'
 import { incCounter } from '../__stubs__/helpers'
 import { addCardResourceGained } from './card-state'

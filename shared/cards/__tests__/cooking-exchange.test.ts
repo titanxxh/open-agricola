@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getPlayerBakeRates, hasAnyBakingImprovement } from '../helpers/exchange-registry'
 import { canBakeBread, bakeBread } from '../../actions/effects/bake-bread'
-import type { PlayerState } from '../../game/types'
+import type { PlayerState } from '../../contract/types'
 
 import '../E/E63_IronOven'
 import '../E/E64_SimpleOven'

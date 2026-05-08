@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
-import type { ActionExecutionContext, ActionSpace, GameState, PlayerState } from '../../shared/game/types'
+import type { ActionExecutionContext, ActionSpace, GameState, PlayerState } from '../../shared/contract/types'
 
 import '../../shared/cards/B/B146_Illusionist'
 import { getActionDefinition } from '../../shared/actions/index'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 const DISCARD_ACTION_ID = 'card_B146_Illusionist_discard-from-hand'
 

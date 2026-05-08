@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import { getCardEffect } from '../card-effects'
-import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../contract/types'
 
 import '../E/E105_Pioneer'
 import { getMostRecentlyRevealedSpaceId } from '../E/E105_Pioneer'

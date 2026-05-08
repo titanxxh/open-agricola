@@ -1,4 +1,4 @@
-import type { ActionDefinition, ActionSpace } from '../../../game/types'
+import type { ActionDefinition, ActionSpace } from '../../../contract/types'
 import { addWorkerRef, spaceHasPlayer } from '../../../game/space'
 import { smallestAvailableWorker } from '../../../game/player'
 import { computeAllowedPlacementSpaces, type AllowedPlacement } from '../../helpers/placement-availability'

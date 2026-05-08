@@ -1,4 +1,4 @@
-import type { ActionDefinition } from '../../../game/types'
+import type { ActionDefinition } from '../../../contract/types'
 import { writeCardExtraData } from '../../../cards/helpers/card-state'
 import { runSelectionEffect } from '../../helpers/selection-effect-registry'
 

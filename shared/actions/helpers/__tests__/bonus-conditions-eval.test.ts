@@ -4,7 +4,7 @@ import type {
   ComplexCost,
   PlayerState,
   Resource,
-} from '../../../game/types'
+} from '../../../contract/types'
 import {
   applyCostModifiers,
   computeAllBuyableCombinations,

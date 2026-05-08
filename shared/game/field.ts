@@ -1,4 +1,4 @@
-import type { CropStack, Field } from './types'
+import type { CropStack, Field } from '../contract/types'
 
 export const fieldIsEmpty = (f: Field): boolean => f.stacks.length === 0
 

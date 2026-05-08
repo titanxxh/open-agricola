@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { PlayerState } from '../../../game/types'
+import type { PlayerState } from '../../../contract/types'
 import { meetsCardPrerequisites } from '../prerequisites'
 import { MinorImprovement, registerAdHocMinorImprovement } from '../../types'
 import { C70_LettucePatch } from '../../C/C70_LettucePatch'

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { recordPaymentStats } from '../payment-stats'
 import { readCardResourceStats } from '../card-state'
-import type { PlayerState, PaymentSolution, Trade } from '../../../game/types'
+import type { PlayerState, PaymentSolution, Trade } from '../../../contract/types'
 
 const mockPlayer = (): PlayerState =>
   ({ id: 'p1', cardStates: {} } as unknown as PlayerState)

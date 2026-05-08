@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { A14_CarpentersHammer } from '../../shared/cards/A/A14_CarpentersHammer'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
-import type { PlayerState } from '../../shared/game/types.ts'
+import type { PlayerState } from '../../shared/contract/types.ts'
 
 import { workersAvailable } from '../../shared/game/player'
 import { isLegacyChoicePending } from './_helpers/legacy-confirms'

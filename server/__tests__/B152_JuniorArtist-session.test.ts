@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 import { setWorkersAtHome } from '../../shared/game/player'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/B/B152_JuniorArtist'
 

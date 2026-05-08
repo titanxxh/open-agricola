@@ -1,7 +1,7 @@
 import type {
   ActionAvailabilityContext,
   ActionCostPreview,
-} from '../../game/types'
+} from '../../contract/types'
 import {
   canAffordActionPreviewCost,
   resolveActionPreviewCost as resolveActionPreviewCostFromPay,

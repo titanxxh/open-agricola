@@ -4,7 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { positionKey } from '../../game/farm'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import type { ActionFlow, PlayerState } from '../../game/types'
+import type { ActionFlow, PlayerState } from '../../contract/types'
 import { fieldTopStack } from '../../game/field'
 import type { CardImpl } from '../registry'
 

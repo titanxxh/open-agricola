@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { GameState, PlayerState, Resource } from '../../../shared/game/types'
+import type { GameState, PlayerState, Resource } from '../../../shared/contract/types'
 import type { AnimalReorgState, PendingAnimalReorg } from '../../types/ui'
 import {
   applyAnimalReorgToPlayer,

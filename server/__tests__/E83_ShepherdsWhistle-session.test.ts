@@ -4,7 +4,7 @@ import { getCardEffect } from '../../shared/cards/card-effects'
 import { getAdHocAction } from '../../shared/actions/helpers/ad-hoc-action-registry'
 
 import '../../shared/cards/E/E83_ShepherdsWhistle'
-import type { ActionFlow } from '../../shared/game/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'E83_ShepherdsWhistle'
 

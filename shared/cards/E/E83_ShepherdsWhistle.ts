@@ -2,7 +2,7 @@ import { MinorImprovement } from '../types'
 import { playerBoard } from '../../domain'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
-import type { ActionDefinition, ActionFlow, GameState, PlayerState } from '../../game/types'
+import type { ActionDefinition, ActionFlow, GameState, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E83_ShepherdsWhistle'

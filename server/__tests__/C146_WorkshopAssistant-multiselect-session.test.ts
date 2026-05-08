@@ -10,7 +10,7 @@ import type {
   ActionSpace,
   GameState,
   PlayerState,
-} from '../../shared/game/types'
+} from '../../shared/contract/types'
 
 const CARD_ID = 'C146_WorkshopAssistant'
 const CHOOSE_PAIRS_ACTION_ID = 'card_C146_WorkshopAssistant_choosePairs'

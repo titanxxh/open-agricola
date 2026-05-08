@@ -11,7 +11,7 @@
  * full inventory.
  */
 
-import type { ActionFlow, GameState, PlayerState } from '../../game/types.ts'
+import type { ActionFlow, GameState, PlayerState } from '../../contract/types.ts'
 import { smallestAvailableWorker, workersAvailable } from '../../game/player.ts'
 import { addWorkerRef, isSpaceOccupied } from '../../game/space.ts'
 import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability.ts'
@@ -22,7 +22,7 @@ import { executeCardListener, getMatchingListeners } from '../../cards/card-list
 import { runRoundEndHooks, shouldSkipPlayerTurn } from '../../cards/card-effects.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
 import { InteractionNode } from '../../engine/index.ts'
-import type { FeedQueueEntry } from '../../game/types.ts'
+import type { FeedQueueEntry } from '../../contract/types.ts'
 
 /**
  * Find the next seated player (in turn order) who still has at least one

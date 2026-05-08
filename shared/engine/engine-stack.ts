@@ -1,5 +1,5 @@
 import type { Engine } from './engine'
-import type { ActionChoiceOption, ActionFlow, InteractionRequest } from '../game/types'
+import type { ActionChoiceOption, ActionFlow, InteractionRequest } from '../contract/types'
 import type { PromptKey } from '../game/prompt-keys'
 import type { EngineNode } from './types'
 

@@ -3,7 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack, isCardFlagged, setCardFlag, writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
-import type { PlayerState } from '../../game/types'
+import type { PlayerState } from '../../contract/types'
 
 const CARD_ID = 'E22_GuestRoom'
 

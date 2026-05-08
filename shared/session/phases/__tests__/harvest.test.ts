@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { GameState, PlayerState } from '../../../game/types.ts'
+import type { GameState, PlayerState } from '../../../contract/types.ts'
 import { getHarvestPlayerIndices } from '../harvest.ts'
 
 const makeState = (players: PlayerState[]): GameState =>

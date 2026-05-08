@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { executeCardListener, getRegisteredCardListeners } from '../card-listeners'
 import { runCardEffectHook } from '../card-effects'
 import { getPlayerActionSpaceConfig } from '../player-action-space'
-import type { ActionSpace, GameState, PlayerState } from '../../game/types'
+import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
 import { clayOven } from '../major/clay-oven'
 import { stoneOven } from '../major/stone-oven'
 
@@ -13,7 +13,7 @@ import '../E/E53_BoarSpear'
 import '../E/E73_Scythe'
 import '../E/E74_AshTrees'
 import type { CardListenerContext } from '../card-listeners'
-import type { ActionExecutionContext } from '../../game/types'
+import type { ActionExecutionContext } from '../../contract/types'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({

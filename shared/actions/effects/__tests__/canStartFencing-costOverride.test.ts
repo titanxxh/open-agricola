@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { canStartFencing } from '../fencing'
-import type { GameState, PlayerState } from '../../../game/types'
+import type { GameState, PlayerState } from '../../../contract/types'
 
 const fakeState = { actionSpaces: [], players: [] } as unknown as GameState
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { formatCardStatsLines } from '../cardStatsFormat'
 import { t } from '../../../../shared/i18n'
-import type { CardResourceStats } from '../../../../shared/game/types'
+import type { CardResourceStats } from '../../../../shared/contract/types'
 
 const empty: CardResourceStats = {
   used: 0,

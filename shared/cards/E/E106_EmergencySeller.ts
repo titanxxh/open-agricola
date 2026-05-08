@@ -1,5 +1,5 @@
 import { Occupation } from '../types'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import { familySize } from '../../game/player'
 import type { CardImpl } from '../registry'
 

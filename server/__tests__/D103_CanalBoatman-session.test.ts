@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { internalActionDefinitions } from '../../shared/actions/internal-actions'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { getRoundPlacementOrder } from '../../shared/cards/helpers/round-placement'
-import type { ActionSpace, GameState, PlayerState , ActionFlow } from '../../shared/game/types'
+import type { ActionSpace, GameState, PlayerState , ActionFlow } from '../../shared/contract/types'
 
 import { setActiveWorkerCount, setWorkersAtHome, workersAvailable } from '../../shared/game/player'
 import '../../shared/cards/D/D103_CanalBoatman'

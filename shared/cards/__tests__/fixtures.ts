@@ -5,7 +5,7 @@
  * have to specify what they actually care about. Using these removes the
  * `{ id: 'foo' } as any` / `{} as any` pattern that litters test files.
  */
-import type { ActionSpace } from '../../game/types'
+import type { ActionSpace } from '../../contract/types'
 
 /**
  * Minimal `ActionSpace` stub keyed by id — nameKey/descriptionKey mirror the

@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { Resource } from '../../game/types'
+import type { Resource } from '../../contract/types'
 import { getMajorCard } from '../major'
 import { PaymentSolver } from '../../actions/payment'
 import type { PaymentCtx } from '../../actions/payment'

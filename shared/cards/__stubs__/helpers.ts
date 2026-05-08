@@ -1,4 +1,4 @@
-import type { PlayerState } from '../../game/types'
+import type { PlayerState } from '../../contract/types'
 
 export const initCardState = (player: PlayerState, cardId: string) => {
   if (!player.cardStates) player.cardStates = {}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { GameState } from '../../../shared/game/types'
+import type { GameState } from '../../../shared/contract/types'
 import { serializeState } from '../../../shared/game/serialization'
 import { EngineStack } from '../../../shared/engine'
 

@@ -1,4 +1,4 @@
-import type { ActionChoiceOption } from '../../../shared/game/types'
+import type { ActionChoiceOption } from '../../../shared/contract/types'
 
 export type EngineProgress =
   | { type: 'choice'; choice: ActionChoiceOption[]; promptKey?: string }

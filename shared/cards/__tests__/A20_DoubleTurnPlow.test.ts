@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import { getCardEffect, runCardEffectHook } from '../card-effects'
-import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../contract/types'
 
 import '../A/A20_DoubleTurnPlow'
 import { A20_DoubleTurnPlow as A20Card } from '../A/A20_DoubleTurnPlow'

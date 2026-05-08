@@ -16,7 +16,7 @@ const TRIGGER_SPACES = ['grain-seeds', 'farmland', 'day-laborer', 'farm-expansio
  * Count stables in reserve: total supply (4) minus those on farm and those
  * already placed on action spaces via this card.
  */
-const countStablesInReserve = (player: import('../../game/types').PlayerState): number => {
+const countStablesInReserve = (player: import('../../contract/types').PlayerState): number => {
   const onFarm = player.stableTiles.length
   const onSpaces = getReservedActionSpaces(player, CARD_ID).length
   return Math.max(0, MAX_STABLES - onFarm - onSpaces)

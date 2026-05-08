@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { getCardEffect } from '../card-effects'
-import type { GameState, PlayerState, ActionSpace } from '../../game/types'
+import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
 import {
   getPlayerActionSpaceConfig,
   createPlayerActionSpaces,
@@ -11,8 +11,8 @@ import { moveFarmerToSpaceAction } from '../../actions/effects/internal/move-far
 import '../A/A28_ForestSchool'
 import '../D/D51_Archway'
 import '../E/E10_StrawHat'
-import type { ActionFlow } from '../../game/types'
-import type { ActionExecutionContext } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
+import type { ActionExecutionContext } from '../../contract/types'
 
 const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
   ({

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import type { ActionSpace, GameState, PlayerState } from '../../game/types'
+import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
 import { gainAction } from '../../actions/effects/gain'
 import { playImprovement } from '../../actions/effects/improvement'
 import { getCardEffect } from '../card-effects'
 import { getWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
 
 import '../A/A53_Claypipe'
-import type { ActionExecutionContext } from '../../game/types'
+import type { ActionExecutionContext } from '../../contract/types'
 
 const createPlayer = (): PlayerState => ({
   id: 'p1',

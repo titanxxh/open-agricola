@@ -4,7 +4,7 @@ import {
   getPlayerActionSpaceConfig,
   registerPlayerActionSpace,
 } from '../player-action-space'
-import type { GameState, PlayerState, Resource } from '../../game/types'
+import type { GameState, PlayerState, Resource } from '../../contract/types'
 
 const TEST_CARD = '__TEST_PA_GATED__'
 

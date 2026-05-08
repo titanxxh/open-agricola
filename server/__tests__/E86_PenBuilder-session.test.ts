@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 
 import '../../shared/cards/E/E86_PenBuilder'
-import type { AnytimeAction } from '../../shared/game/types';
+import type { AnytimeAction } from '../../shared/contract/types';
 import type { AnimalZone } from '../../shared/domain/animal-zones'
 
 describe('E86_PenBuilder session', () => {

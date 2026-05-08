@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect, runCardEffectHook } from '../card-effects'
-import type { GameState, PlayerState } from '../../game/types'
+import type { GameState, PlayerState } from '../../contract/types'
 
 import { setActiveWorkerCount, setWorkersAtHome, workersAvailable, familySize } from '../../game/player'
 import '../A/A127_Lodger'

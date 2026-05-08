@@ -3,7 +3,7 @@ import { readCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionFlow, FarmTilePosition, PlayerState } from '../../game/types'
+import type { ActionFlow, FarmTilePosition, PlayerState } from '../../contract/types'
 
 const CARD_ID = 'C16_FieldFences'
 const FLAG_KEY = 'c16Active'

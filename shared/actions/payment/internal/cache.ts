@@ -11,7 +11,7 @@
  * the public API instead.
  */
 
-import type { ComplexCost, CostModifierType, PaymentSolution, PlayerState } from '../../../game/types'
+import type { ComplexCost, CostModifierType, PaymentSolution, PlayerState } from '../../../contract/types'
 
 class LRUCache<K, V> {
   private cache = new Map<K, V>()

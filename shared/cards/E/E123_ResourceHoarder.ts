@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { Bonus } from '../../game/types'
+import type { Bonus } from '../../contract/types'
 import { writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 
@@ -61,7 +61,7 @@ const computeCostsListener: CardListenerRegistration = {
         const res = stack[stack.length - 1 - i]!
         discount[res] = (discount[res] ?? 0) + 1
       }
-      choices.push({ discount: discount as import('../../game/types').BonusChoice['discount'] })
+      choices.push({ discount: discount as import('../../contract/types').BonusChoice['discount'] })
     }
     const bonus: Bonus = {
       choices,

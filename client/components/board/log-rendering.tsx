@@ -1,7 +1,7 @@
 import { Fragment, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import type { GameState, PlayerState, Resource } from '../../../shared/game/types'
+import type { GameState, PlayerState, Resource } from '../../../shared/contract/types'
 import type { ActionDetailParts } from '../../../shared/contract/protocol/game'
 import { getCardMeta } from '../../services/card-meta'
 import { PlayerCard, type CardType } from '../common/PlayerCard'

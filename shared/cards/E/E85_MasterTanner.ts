@@ -3,7 +3,7 @@ import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData, getCardStack } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
-import type { ActionFlow } from '../../game/types'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E85_MasterTanner'

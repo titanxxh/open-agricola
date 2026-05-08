@@ -9,7 +9,7 @@
  * on GameCore for cross-module phase calls.
  */
 
-import type { GameState } from '../../game/types.ts'
+import type { GameState } from '../../contract/types.ts'
 import { computeStartPlayerIdx } from './round.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
 

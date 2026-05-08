@@ -3,7 +3,7 @@ import type {
   ActionExecutionResult,
   GameState,
   PlayerState,
-} from '../../game/types'
+} from '../../contract/types'
 import { getExtraRoomCapacity } from '../../cards/card-effects'
 import { activateSmallestInactive, familySize } from '../../game/player'
 import { addWorkerRef } from '../../game/space'

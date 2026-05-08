@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { runSelectionEffect } from '../../shared/actions/helpers/selection-effect-registry'
-import type { GameState, PlayerState , ActionFlow } from '../../shared/game/types'
+import type { GameState, PlayerState , ActionFlow } from '../../shared/contract/types'
 
 import '../../shared/cards/D/D102_SampleStableMaker'
 

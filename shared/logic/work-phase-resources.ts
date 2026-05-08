@@ -1,4 +1,4 @@
-import type { GameState, Resource } from '../game/types'
+import type { GameState, Resource } from '../contract/types'
 
 const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 

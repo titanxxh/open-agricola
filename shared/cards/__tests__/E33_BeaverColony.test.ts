@@ -6,7 +6,7 @@ import {
   getTotalAnimalCapacity,
   enforceAnimalCapacity,
 } from '../../domain/animal-zones'
-import type { ActionSpace, GameState, Pasture, PlayerState } from '../../game/types'
+import type { ActionSpace, GameState, Pasture, PlayerState } from '../../contract/types'
 
 import '../E/E33_BeaverColony'
 import type { CardListenerContext } from '../card-listeners'

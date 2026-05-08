@@ -18,7 +18,7 @@ import type {
   Resource,
   ResourceKey,
   TradeSideEffect,
-} from '../../../game/types'
+} from '../../../contract/types'
 import { recordPaymentStats } from '../../../cards/helpers/payment-stats'
 
 const buildBonusReductions = (

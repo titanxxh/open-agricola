@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/D/D71_Changeover'
-import type { ActionChoiceOption,  AnytimeAction } from '../../shared/game/types';
+import type { ActionChoiceOption,  AnytimeAction } from '../../shared/contract/types';
 
 describe('D71_Changeover session', () => {
   const setup = () => {

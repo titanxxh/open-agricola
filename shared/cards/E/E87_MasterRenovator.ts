@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { BonusModifier } from '../../game/types'
+import type { BonusModifier } from '../../contract/types'
 import { getRenovation } from '../../actions/effects/renovation'
 import type { CardImpl } from '../registry'
 

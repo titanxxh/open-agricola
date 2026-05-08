@@ -1,5 +1,5 @@
 import { gainResources } from '../effects/gain'
-import type { ActionDefinition, Resource } from '../../game/types'
+import type { ActionDefinition, Resource } from '../../contract/types'
 
 type GainActionConfig = {
   id: string

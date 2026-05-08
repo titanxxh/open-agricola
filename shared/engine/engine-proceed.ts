@@ -6,7 +6,7 @@ import type {
   ImmediateLogEntry,
   InteractionRequest,
   LogEntry,
-} from '../game/types'
+} from '../contract/types'
 import {
   ActionNode,
   ActivateCardNode,
