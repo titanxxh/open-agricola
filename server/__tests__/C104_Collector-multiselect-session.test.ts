@@ -67,8 +67,7 @@ const buildSpaceForPlayer = (state: GameState, ownerId: string): ActionSpace => 
 }
 
 describe('C104 — multi-select session (player action space)', () => {
-  // SKIP[S1]: 'choice'→'request' shape mismatch, see docs/skip-tracker.md
-  it.skip('1st use: emits choice with needed=6 and resolves to begging+6 distinct goods', () => {
+  it('1st use: emits choice with needed=6 and resolves to begging+6 distinct goods', () => {
     const player = createPlayer()
     const state = createState([player])
     const space = buildSpaceForPlayer(state, player.id)
@@ -80,12 +79,14 @@ describe('C104 — multi-select session (player action space)', () => {
     } as unknown as ActionExecutionContext
 
     const initial = space.execute(ctx)
-    expect(initial.type).toBe('choice')
-    if (initial.type !== 'choice') return
+    expect(initial.type).toBe('request')
+    if (initial.type !== 'request') return
+    expect(initial.request.kind).toBe('choice')
+    if (initial.request.kind !== 'choice') return
     expect(initial.promptKey).toBe('ui.interactionCollectorSelect')
     expect(initial.promptParams).toEqual({ needed: 6 })
-    expect(initial.options).toHaveLength(10)
-    expect(initial.options.every((o) => o.sourceCard === CARD_ID)).toBe(true)
+    expect(initial.request.options).toHaveLength(10)
+    expect(initial.request.options.every((o) => o.sourceCard === CARD_ID)).toBe(true)
 
     const resolved = space.resolveChoice!(ctx, 'wood,clay,reed,stone,food,grain')
     expect(resolved.type).toBe('flow')
@@ -105,8 +106,7 @@ describe('C104 — multi-select session (player action space)', () => {
     })
   })
 
-  // SKIP[S1]: 'choice'→'request' shape mismatch, see docs/skip-tracker.md
-  it.skip('2nd use: needed=7 (after first use bumps the counter)', () => {
+  it('2nd use: needed=7 (after first use bumps the counter)', () => {
     const player = createPlayer()
     writeCardExtraData(player, CARD_ID, 'used', 1)
     const state = createState([player])
@@ -119,8 +119,9 @@ describe('C104 — multi-select session (player action space)', () => {
     } as unknown as ActionExecutionContext
 
     const initial = space.execute(ctx)
-    expect(initial.type).toBe('choice')
-    if (initial.type !== 'choice') return
+    expect(initial.type).toBe('request')
+    if (initial.type !== 'request') return
+    expect(initial.request.kind).toBe('choice')
     expect(initial.promptParams).toEqual({ needed: 7 })
 
     const resolved = space.resolveChoice!(
@@ -137,8 +138,7 @@ describe('C104 — multi-select session (player action space)', () => {
     })
   })
 
-  // SKIP[S1]: 'choice'→'request' shape mismatch, see docs/skip-tracker.md
-  it.skip('insufficient selections: re-emits same choice (needed unchanged, no flow)', () => {
+  it('insufficient selections: re-emits same choice (needed unchanged, no flow)', () => {
     const player = createPlayer()
     const state = createState([player])
     const space = buildSpaceForPlayer(state, player.id)
@@ -151,11 +151,13 @@ describe('C104 — multi-select session (player action space)', () => {
 
     // 1st use needs 6, but submit only 5 distinct
     const reEmit = space.resolveChoice!(ctx, 'wood,clay,reed,stone,food')
-    expect(reEmit.type).toBe('choice')
-    if (reEmit.type !== 'choice') return
+    expect(reEmit.type).toBe('request')
+    if (reEmit.type !== 'request') return
+    expect(reEmit.request.kind).toBe('choice')
+    if (reEmit.request.kind !== 'choice') return
     expect(reEmit.promptKey).toBe('ui.interactionCollectorSelect')
     expect(reEmit.promptParams).toEqual({ needed: 6 })
-    expect(reEmit.options).toHaveLength(10)
+    expect(reEmit.request.options).toHaveLength(10)
     // Player resources untouched (mutation deferred to engine via flow)
     expect(player.resources.wood).toBe(0)
     expect(player.resources.begging).toBe(0)
