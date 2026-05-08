@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isBorderEdge } from '../../domain/farm'
+import { isBorderEdge } from '../farm'
 
 describe('isBorderEdge', () => {
   it('treats top/bottom rows as horizontal border', () => {

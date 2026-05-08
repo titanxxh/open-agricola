@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session'
-import { rehydrateState, serializeState } from '../../session/serialization'
+import { rehydrateState, serializeState } from '../serialization'
 import { InteractionNode, INTERACTION_ONLY_ACTION_ID } from '../../engine'
 import type { ActionFlow, InteractionRequest } from '../../contract/types'
 

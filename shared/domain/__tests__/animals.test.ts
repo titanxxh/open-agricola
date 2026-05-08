@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getAssignedAnimalsByType, getAssignedAnimalCount } from '../../domain/animals'
+import { getAssignedAnimalsByType, getAssignedAnimalCount } from '../animals'
 import type { PlayerState } from '../../contract/types'
 
 const mkPlayer = (overrides: Partial<PlayerState>): PlayerState =>
