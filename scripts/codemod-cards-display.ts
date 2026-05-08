@@ -280,25 +280,52 @@ interface RunReport {
   splitCount: number
   displayOnlyCount: number
   skipCount: number
+  filteredOut: number
   errors: { path: string; reason: string }[]
 }
 
-const DECKS = ['A', 'B', 'C', 'D', 'E', 'major', 'community', '__stubs__']
+// Decks under shared/cards/ that contain real card files.
+// `__stubs__/` is excluded — it holds test-only listener/effect fixtures
+// (not real cards) and is referenced by neither catalog nor register-all.
+const DECKS = ['A', 'B', 'C', 'D', 'E', 'major', 'community']
+
+// Filenames we silently skip — barrels, type-only files, generated catalogs.
+// These are NOT card files and should not count as errors.
+const NON_CARD_FILES = new Set([
+  'index.ts',
+  'types.ts',
+  'auto-catalog.ts',
+])
+
+// Per-deck filename pattern — files matching the deck's card pattern are processed.
+// Files not matching are silently filtered out (counted in filteredOut, not errors).
+const CARD_FILE_PATTERNS: Record<string, RegExp> = {
+  A: /^A\d+_/,
+  B: /^B\d+_/,
+  C: /^C\d+_/,
+  D: /^D\d+_/,
+  E: /^E\d+_/,
+  major: /.+\.ts$/,
+  community: /^CUSTOM_/,
+}
 
 export function runCodemod(opts: RunOptions): RunReport {
   const cardsRoot = resolve(opts.rootDir, 'shared/cards')
   const displayRoot = resolve(opts.rootDir, 'shared/cards-display')
   const report: RunReport = {
-    totalCardFiles: 0, splitCount: 0, displayOnlyCount: 0, skipCount: 0, errors: [],
+    totalCardFiles: 0, splitCount: 0, displayOnlyCount: 0, skipCount: 0, filteredOut: 0, errors: [],
   }
   for (const deck of DECKS) {
     const deckPath = join(cardsRoot, deck)
     let files: string[]
     try { files = readdirSync(deckPath) } catch { continue }
+    const pattern = CARD_FILE_PATTERNS[deck]
     for (const file of files) {
       if (!file.endsWith('.ts') || file.endsWith('.test.ts')) continue
+      if (NON_CARD_FILES.has(file)) { report.filteredOut++; continue }
       const fullPath = join(deckPath, file)
       if (!statSync(fullPath).isFile()) continue
+      if (pattern && !pattern.test(file)) { report.filteredOut++; continue }
       report.totalCardFiles++
       const sourceText = readFileSync(fullPath, 'utf8')
       const sourcePath = relative(opts.rootDir, fullPath).replace(/\\/g, '/')
@@ -343,7 +370,9 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(__filename_local)) {
   console.log(`  Total card files: ${report.totalCardFiles}`)
   console.log(`  Split:            ${report.splitCount}`)
   console.log(`  Display-only:     ${report.displayOnlyCount}`)
-  console.log(`  Skip + errors:    ${report.skipCount + report.errors.length}`)
+  console.log(`  Skip:             ${report.skipCount}`)
+  console.log(`  Filtered out:     ${report.filteredOut}`)
+  console.log(`  Errors:           ${report.errors.length}`)
   if (report.errors.length > 0) {
     console.log('\nErrors:')
     for (const e of report.errors) console.log(`  ${e.path}: ${e.reason}`)
