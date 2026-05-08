@@ -1157,6 +1157,16 @@ S5 完成（2026-05-05）
 3. **codemod 一次性脚本**：`scripts/codemod-cards-display.ts` 完成施工后留作文档；新卡靠 ESLint 规则自然守门。
 4. **registry-display.ts seam**：S6c rule 8（impl 不 import cards-display）发现 7 effect + 3 session 文件确实 import cards-display 取 metadata，建立 `shared/cards/registry-display.ts` 作为前向 seam，避免 cycle 同时合规化。
 
+#### 已知遗留（S7 之前需要决定）
+
+S6 落地过程中出现 3 处 spec/plan 未预见的偏差，S6 closeout 时被 implementer 报告但未单独登记。回流如下：
+
+1. **cards-impl 文件 re-export 桥** — `scripts/codemod-cards-display.ts` wet-run 后，`shared/cards/<deck>/<file>.ts` 的 `import { <Display> } from '../../cards-display/...'` 一行被 `perl -i` 跨 825 文件改成 `import { X } / export { X }` 对。原因：(a) 解 codemod 残留的 TS6133 unused import；(b) 让约 200+ 个 server tests + 散落 client/test 调用 `import { A1_Shelter } from '../../shared/cards/A/A1_Shelter'` 仍能 resolve 到 display const（透过 cards-impl 文件再 re-export）。**清理路径**：S7（或独立 codemod）把 server tests 的 `from '.../shared/cards/<deck>/<file>'` 重定向到 `from '.../shared/cards-display/<deck>/<file>'`，bridge 即可删除（grep `grep -rln "from '.*/shared/cards/[A-E]/[A-Z]" server/__tests__/` 列表约 100+ 文件）。
+
+2. **`shared/cards-display/major/**` 被 ESLint excluded** — major 卡（well.ts、fireplace.ts、joinery.ts 等 8 张）的 `onBuy` / `onPlay` hooks 是**内联实现**，违反 cards-display 纯 display 假设。S6c rule 7 给 `shared/cards-display/major/**` + `shared/cards-display/_lookup.ts` + `shared/cards-display/types.ts` 三个路径加了 `ignores` 豁免。**长期决策**：(a) 把 major hooks 抽到 `shared/cards/major/` impl 侧（需要新机制承载 hooks 数据）—— BGA 风格更纯；(b) 承认 major 卡是合法例外，将豁免登记为 ADR——更轻量但需写明。
+
+3. **e2e workshop-smoke spec 仅 TS 编译验证** — `e2e-tests/workshop-smoke.spec.ts` 已写但 S6c 未实跑（需要 dev server 启动）。当前 CI workflow（`.github/workflows/ci.yml`）不含 e2e job。**清理路径**：手动 `pnpm exec playwright test e2e-tests/workshop-smoke.spec.ts` 验证一次；如要纳入 CI 需新建 e2e workflow + dev server 启动逻辑。
+
 ### Sprint S7：卡牌效果测试回归
 
 解除整个重构期间累积的 skip：
