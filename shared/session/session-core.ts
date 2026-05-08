@@ -112,7 +112,7 @@ import {
   getFenceCount,
   getPalisadeCount,
 } from '../actions/effects/fencing.ts'
-import { rebuildActiveModifiers } from '../game/serialization.ts'
+import { rebuildActiveModifiers } from '../session/serialization.ts'
 import { isSpaceOccupied, removeWorkerRef } from '../domain/space.ts'
 import { smallestAvailableWorker } from '../domain/player.ts'
 import { computeAllowedPlacementSpaces } from '../actions/helpers/placement-availability.ts'

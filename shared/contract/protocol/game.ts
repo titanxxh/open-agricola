@@ -1,5 +1,5 @@
 import type { InteractionState, PlayerState, Resource } from '../../contract/types'
-import type { SerializedGameState } from '../../game/serialization'
+import type { SerializedGameState } from '../../session/serialization'
 import type { PlayerScoreSummary } from '../../domain'
 import type { CardDefinition } from '../../cards/types'
 

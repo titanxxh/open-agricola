@@ -1,4 +1,4 @@
-import type { SerializedGameState } from '../../../shared/game/serialization.ts'
+import type { SerializedGameState } from '../../../shared/session/serialization.ts'
 
 export type RoomStatus = 'waiting' | 'playing' | 'finished'
 

@@ -5,7 +5,7 @@ import type { SessionResponse } from '../game/authoritative-session.ts'
 import type { RoomPersistence } from '../game/persistence/room-persistence.ts'
 import type { ServerEvent } from '../../shared/contract/protocol/ws.ts'
 import type { StateUpdateCause } from '../../shared/contract/protocol/game.ts'
-import { serializeState } from '../../shared/game/serialization.ts'
+import { serializeState } from '../../shared/session/serialization.ts'
 import { buildEnvelope } from './envelope-builder.ts'
 
 const viewerIdForSeat = (resp: SessionResponse, seatIndex: number | undefined): string | null => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { serializeState, rehydrateState } from '../shared/game/serialization'
+import { serializeState, rehydrateState } from '../shared/session/serialization'
 import type { GameSyncPayload } from '../shared/protocol/game'
 import { createInitialState } from '../shared/logic/state'
 import { EngineStack } from '../shared/engine'

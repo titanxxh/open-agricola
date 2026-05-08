@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { InMemoryRoomPersistence } from '../memory-adapter.ts'
 import type { RoomMeta } from '../room-persistence.ts'
-import type { SerializedGameState } from '../../../../shared/game/serialization.ts'
+import type { SerializedGameState } from '../../../../shared/session/serialization.ts'
 
 const META: RoomMeta = {
   createdBy: 'u',

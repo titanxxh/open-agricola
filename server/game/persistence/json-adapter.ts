@@ -6,7 +6,7 @@ import type {
   RoomSnapshot,
   RestoreOptions,
 } from './room-persistence.ts'
-import type { SerializedGameState } from '../../../shared/game/serialization.ts'
+import type { SerializedGameState } from '../../../shared/session/serialization.ts'
 
 const sanitise = (id: string) => id.replace(/[^a-zA-Z0-9._-]/g, '_')
 
