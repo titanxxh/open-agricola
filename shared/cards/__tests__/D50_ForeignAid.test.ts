@@ -103,21 +103,23 @@ describe('D50_ForeignAid', () => {
   })
 
   describe('computeArgs place-farmer', () => {
-    // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
-    it.skip('filters out rounds 12-14 spaces from options', () => {
+    it('filters out rounds 12-14 spaces from options', () => {
       const listener = findListener('D50-foreign-aid-compute-args-place-farmer')!
       expect(listener).toBeDefined()
       const player = createPlayer()
       const state = createState(player)
       const result = {
-        type: 'choice' as const,
-        options: [
-          { value: 'forest', labelKey: 'actions.forest.name' },
-          { value: 'farmland', labelKey: 'actions.farmland.name' },
-          { value: 'cultivation', labelKey: 'actions.cultivation.name' },
-          { value: 'urgent-wish-children', labelKey: 'actions.urgent-wish-children.name' },
-          { value: 'farm-redevelopment', labelKey: 'actions.farm-redevelopment.name' },
-        ],
+        type: 'request' as const,
+        request: {
+          kind: 'choice' as const,
+          options: [
+            { value: 'forest', labelKey: 'actions.forest.name' },
+            { value: 'farmland', labelKey: 'actions.farmland.name' },
+            { value: 'cultivation', labelKey: 'actions.cultivation.name' },
+            { value: 'urgent-wish-children', labelKey: 'actions.urgent-wish-children.name' },
+            { value: 'farm-redevelopment', labelKey: 'actions.farm-redevelopment.name' },
+          ],
+        },
       }
       executeCardListener(listener, {
         state, player,
@@ -125,8 +127,8 @@ describe('D50_ForeignAid', () => {
         result,
       } as unknown as CardListenerContext)
       // Only non-blocked spaces remain
-      expect(result.options).toHaveLength(2)
-      expect(result.options.map(o => o.value)).toEqual(['forest', 'farmland'])
+      expect(result.request.options).toHaveLength(2)
+      expect(result.request.options.map(o => o.value)).toEqual(['forest', 'farmland'])
     })
 
 
