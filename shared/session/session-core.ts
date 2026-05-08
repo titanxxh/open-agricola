@@ -130,6 +130,26 @@ const subflowSpaceId = (reason: SubFlowReason): string =>
   `${SUBFLOW_SPACE_PREFIX}${reason}`
 
 /**
+ * S7 Batch 1 — uniform discriminator for the InteractionRequest carried by
+ * the current pending host node. InteractionNode exposes `request`; the
+ * composite hosts (OrNode / XorNode / OptionalNode) and the bare leaf
+ * ActionNode (S7) expose `emittedRequest`. Returns the request `kind` or
+ * null when no request payload is attached. Used by runEngineSteps' choice
+ * branch to decide whether to pivot into `startReorganizeSubFlow` for
+ * `kind: 'animal-reorg'` regardless of which host node type currently
+ * carries the pending interaction.
+ */
+const getHostRequestKind = (host: EngineNode | null): string | null => {
+  if (!host) return null
+  if (host instanceof InteractionNode) return host.request?.kind ?? null
+  if (host instanceof OrNode || host instanceof XorNode || host instanceof OptionalNode) {
+    return host.emittedRequest?.kind ?? null
+  }
+  if (host instanceof ActionNode) return host.emittedRequest?.kind ?? null
+  return null
+}
+
+/**
  * Selection payload sent by the client to resolve a pending `harvestFeed`
  * interaction. Each entry references one row of `card.exchanges[]` via
  * `(sourceId, exchangeIndex)`; `count` is the requested number of times to
@@ -2271,18 +2291,22 @@ export class GameCore {
         // emits ActionExecutionResult { type: 'request', request: { kind:
         // 'animal-reorg' } } — the engine wraps it in the new 'request'
         // branch and surfaces it as step.type === 'choice', losing the
-        // direct kind discriminator. Detect it via the InteractionNode's
-        // request field and pivot to the same anytime sub-flow path the
-        // legacy 'animalReorg' result took. After Task 6 we leave the parent
+        // direct kind discriminator. Detect it via the host node's request
+        // field and pivot to the same anytime sub-flow path the legacy
+        // 'animalReorg' result took. After Task 6 we leave the parent
         // frame on the stack and push a reorganize sub-flow frame.
-        const interaction = this.engineStack.peekInteraction()
+        // S7 Batch 1: read the request via `peekInteractionHost()` (returns
+        // the host node, which can be InteractionNode for resolveChoice-wrapped
+        // actions OR ActionNode for bare leaves like `breedAction`). Both
+        // host types now expose a `request`/`emittedRequest` field carrying
+        // the InteractionRequest payload — uniform discrimination via
+        // `getHostRequestKind()`.
+        const host = this.engineStack.peekInteractionHost()
+        const hostRequestKind = getHostRequestKind(host)
         const isReorgSubFlow =
           frame.source.kind === 'flow'
           && (frame.source.flow as { actionId?: string }).actionId === 'reorganize'
-        if (
-          interaction?.request?.kind === 'animal-reorg'
-          && !isReorgSubFlow
-        ) {
+        if (hostRequestKind === 'animal-reorg' && !isReorgSubFlow) {
           const pIdx = frame.ownerPlayerIndex
           this.startReorganizeSubFlow(pIdx, 'anytime')
           return
