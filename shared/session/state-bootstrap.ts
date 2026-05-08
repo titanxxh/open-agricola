@@ -34,7 +34,7 @@ import {
 import {
   getRegisteredMinorImprovement,
   getRegisteredOccupation,
-} from '../cards/types'
+} from '../cards-display/types'
 import {
   applyRoundGrowth,
   defaultPlayerColors,

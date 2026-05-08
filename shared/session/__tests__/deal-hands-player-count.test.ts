@@ -2,10 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { cardAllowedForPlayerCount } from '../../cards/player-count-filter'
 import { getMinorImprovementCard, getOccupationCard } from '../../cards/catalog'
 import { createInitialState, dealHands } from '../state-bootstrap'
-import {
-  registerAdHocMinorImprovement,
-  MinorImprovement,
-} from '../../cards/types'
+import { MinorImprovement } from '../../cards-display/types'
+import { registerAdHocMinorImprovement } from '../../cards/registry-runtime'
 
 const FOUR_PLUS_ID = '__TEST_DEAL_FOURPLUS__'
 const NO_RESTRICTION_ID = '__TEST_DEAL_NORESTRICT__'

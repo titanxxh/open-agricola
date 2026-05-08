@@ -1,4 +1,4 @@
-import { Occupation } from '../types'
+import { Occupation } from '../../cards-display/types'
 
 const CARD_ID = 'C109_SchnappsDistiller'
 

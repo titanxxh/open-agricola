@@ -90,7 +90,7 @@ import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { resetRoundPlacements } from '../cards/helpers/round-placement.ts'
 import { familySize, newbornCount, workersAvailable } from '../domain/player.ts'
 import { getAssignedAnimalCount } from '../domain/animals.ts'
-import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/types.ts'
+import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards-display/types'
 import { getExchangesInWindow } from '../actions/effects/exchange.ts'
 import { getMajorCard } from '../cards/major/index.ts'
 import {
@@ -2807,12 +2807,12 @@ export class GameCore {
     const lookupExchange = (
       sourceId: string,
       idx: number,
-    ): import('../cards/types').CardExchange | undefined => {
+    ): import('../contract/cards').CardExchange | undefined => {
       if (sourceId === BASIC_CONVERSION_SOURCE_ID) {
         return getBasicConversionExchange(idx)
       }
       let card:
-        | { exchanges?: readonly import('../cards/types').CardExchange[] }
+        | { exchanges?: readonly import('../contract/cards').CardExchange[] }
         | undefined
       if (player.improvements.includes(sourceId)) card = getMajorCard(sourceId)
       else if (player.minorPlayed.includes(sourceId)) card = getRegisteredMinorImprovement(sourceId)
@@ -2824,7 +2824,7 @@ export class GameCore {
     // multi-tier cards like D62 BeerTap collapse to one tier per harvest).
     const perSourceUsed = new Map<string, number>()
     type ResolvedSel = (typeof selections)[number] & {
-      _exchange?: import('../cards/types').CardExchange
+      _exchange?: import('../contract/cards').CardExchange
     }
     const cappedSelections: ResolvedSel[] = selections.map((sel) => {
       if (!sel.sourceId || sel.count <= 0) return sel

@@ -1,4 +1,4 @@
-import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../types'
+import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../../cards-display/types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'

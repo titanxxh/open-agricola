@@ -11,7 +11,7 @@
  * catalog.ts lookup functions fall back to this registry when
  * the id starts with "CUSTOM_".
  */
-import { MinorImprovement, Occupation, type CardBase } from './types.ts'
+import { MinorImprovement, Occupation, type CardBase } from '../cards-display/types'
 import { getActiveCardRegistry } from './active-registry.ts'
 import { getCurrentSessionContext, type CustomCardData } from './session-card-context.ts'
 

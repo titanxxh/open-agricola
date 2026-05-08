@@ -1,4 +1,4 @@
-import { Occupation } from '../types'
+import { Occupation } from '../../cards-display/types'
 import type { TradeModifier } from '../../contract/types'
 
 const CARD_ID = 'B145_BrushwoodCollector'

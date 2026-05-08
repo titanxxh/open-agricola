@@ -1,6 +1,6 @@
 import type { Resource, ComplexCost } from '../../contract/types'
 import type { CardEffect, CardEffectHook } from '../card-effects'
-import type { CardDefinition } from '../types'
+import type { CardDefinition } from '../../contract/cards'
 
 /**
  * Hooks majors are allowed to register. Excludes `onBeforePlayerTurn`

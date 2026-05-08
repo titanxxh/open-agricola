@@ -1,4 +1,4 @@
-import { MinorImprovement } from '../types'
+import { MinorImprovement } from '../../cards-display/types'
 
 const CARD_ID = 'A60_OrientalFireplace'
 
