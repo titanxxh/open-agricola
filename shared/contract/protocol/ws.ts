@@ -1,5 +1,5 @@
 import type { StateUpdateEnvelope } from './game'
-import type { DraftMode, DraftPickPayload } from '../draft/types'
+import type { DraftMode, DraftPickPayload } from '../../draft/types'
 
 type ClientCommandBody =
   | { type: 'auth'; token: string }

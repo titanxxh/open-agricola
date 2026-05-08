@@ -1,7 +1,7 @@
-import type { InteractionState, PlayerState, Resource } from '../game/types'
-import type { SerializedGameState } from '../game/serialization'
-import type { PlayerScoreSummary } from '../domain'
-import type { CardDefinition } from '../cards/types'
+import type { InteractionState, PlayerState, Resource } from '../../game/types'
+import type { SerializedGameState } from '../../game/serialization'
+import type { PlayerScoreSummary } from '../../domain'
+import type { CardDefinition } from '../../cards/types'
 
 export type CustomCardDef = {
   cardType: 'minor' | 'occupation'

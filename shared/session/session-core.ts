@@ -14,7 +14,7 @@ import type {
   Resource,
   InteractionAnimalReorgZone,
 } from '../game/types.ts'
-import type { ActionDetailParts } from '../protocol/game.ts'
+import type { ActionDetailParts } from '../contract/protocol/game.ts'
 import { actionDefinitions, getActionDefinition } from '../actions/index.ts'
 import { internalActionDefinitions } from '../actions/internal-actions.ts'
 import { clearActionHooks } from '../actions/hooks.ts'
@@ -666,7 +666,7 @@ export class GameCore {
    * Frontend uses this to register custom cards into its card registry so they
    * render identically to built-in cards.
    */
-  getCustomCardDefs(): import('../protocol/game.ts').CustomCardDef[] {
+  getCustomCardDefs(): import('../contract/protocol/game.ts').CustomCardDef[] {
     return setupPhase.getCustomCardDefs(this.sessionCardContext)
   }
 

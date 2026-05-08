@@ -1,4 +1,4 @@
-import type { RoomSummary, ServerEvent } from '../../shared/protocol/ws.ts'
+import type { RoomSummary, ServerEvent } from '../../shared/contract/protocol/ws.ts'
 import type { RoomPersistence } from './persistence/room-persistence.ts'
 import { RoomRegistry } from './room-registry.ts'
 import {

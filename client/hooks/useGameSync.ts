@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GameState, InteractionState } from '../../shared/game/types'
 import type { PlayerScoreSummary } from '../../shared/domain'
-import type { GameSyncPayload } from '../../shared/protocol/game'
+import type { GameSyncPayload } from '../../shared/contract/protocol/game'
 import { rehydrateStateForClient } from '../services/rehydrate'
 import { registerCustomCard } from '../../shared/cards/custom-registry'
 
