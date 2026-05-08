@@ -132,9 +132,12 @@ const makeImprovementAnyAction = (): ActionDefinition => ({
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
   execute: () => ({
-    type: 'choice',
+    type: 'request',
+    request: {
+      kind: 'choice',
+      options: [{ value: 'major-a', labelKey: 'Major A' }],
+    },
     promptKey: 'ui.selectImprovement',
-    options: [{ value: 'major-a', labelKey: 'Major A' }],
   }),
   resolveChoice: () => ({ type: 'ok' }),
 })
@@ -312,8 +315,7 @@ describe('Stub card: Stub_ComputeArgs_ExtraOption', () => {
     registerStubCards()
   })
 
-  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
-  it.skip('adds extra option to improvement-any choice', () => {
+  it('adds extra option to improvement-any choice', () => {
     const player = createPlayer()
     player.minorPlayed = [COMPUTE_ARGS_ID]
     const action = makeImprovementAnyAction()
