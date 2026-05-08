@@ -1,5 +1,7 @@
 import type { Engine } from './engine'
-import type { ActionFlow } from '../game/types'
+import type { ActionChoiceOption, ActionFlow, InteractionRequest } from '../game/types'
+import type { PromptKey } from '../game/prompt-keys'
+import type { EngineNode } from './types'
 
 export type EngineSource =
   | { kind: 'action'; actionId: string }
@@ -96,6 +98,28 @@ export class EngineStack {
 
   peekInteraction(): import('./nodes').InteractionNode | null {
     return this.current()?.engine.peekInteraction() ?? null
+  }
+
+  peekInteractionHost(): EngineNode | null {
+    return this.current()?.engine.peekInteractionHost() ?? null
+  }
+
+  peekPendingChoiceFromComposite(): {
+    nodeId: string
+    promptKey?: PromptKey
+    promptParams?: Record<string, unknown>
+    options: ActionChoiceOption[]
+    request?: InteractionRequest
+  } | null {
+    return this.current()?.engine.peekPendingChoiceFromComposite() ?? null
+  }
+
+  hasPendingChoiceCompositeAncestor(): boolean {
+    return this.current()?.engine.hasPendingChoiceCompositeAncestor() ?? false
+  }
+
+  insertFlowAfterPendingChoice(flow: ActionFlow): void {
+    this.current()?.engine.insertFlowAfterPendingChoice(flow)
   }
 
   toCursor(): EngineStackCursor {
