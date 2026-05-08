@@ -85,8 +85,7 @@ describe('farm choice', () => {
     expect(player.rooms).toBe(3)
   })
 
-  // SKIP[S1]: 'choice'→'request' codemod pending, see docs/skip-tracker.md
-  it.skip('requires an explicit payment choice when multiple room payments are legal', () => {
+  it('requires an explicit payment choice when multiple room payments are legal', () => {
     const player = createPlayer()
     player.houseType = 'stone'
     player.resources.wood = 1
@@ -102,9 +101,11 @@ describe('farm choice', () => {
       rooms: [interaction.selectableTiles[0]!],
     })
 
-    // Multi-combo: returns `choice` (engine forwards it as a payment-select
-    // pending) rather than a fail.
-    expect(result.type).toBe('choice')
+    // Multi-combo: returns `request` with payment `choice` kind (engine forwards
+    // it as a payment-select pending) rather than a fail.
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') return
+    expect(result.request.kind).toBe('choice')
   })
 
   it('rejects room selections above the true max buildable room count', () => {
