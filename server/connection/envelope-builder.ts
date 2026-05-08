@@ -7,7 +7,7 @@ import type {
   GameSyncPayload,
   StateUpdateCause,
   StateUpdateEnvelope,
-} from '../../shared/protocol/game.ts'
+} from '../../shared/contract/protocol/game.ts'
 
 type Args = {
   room: { id: string; session: GameSession }

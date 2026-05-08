@@ -13,7 +13,7 @@
  */
 
 import type { PlayerState } from '../../game/types.ts'
-import type { CustomCardDef } from '../../protocol/game.ts'
+import type { CustomCardDef } from '../../contract/protocol/game.ts'
 import type { SessionCardContext } from '../../cards/session-card-context.ts'
 
 /**

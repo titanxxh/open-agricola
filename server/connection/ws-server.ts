@@ -17,7 +17,7 @@ import type { RoomPersistence } from '../game/persistence/room-persistence.ts'
 import { Broadcaster } from './broadcaster.ts'
 import { createConnectionCtx } from './connection-ctx.ts'
 import { dispatch } from './room-router.ts'
-import type { ClientCommand } from '../../shared/protocol/ws.ts'
+import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
 
 const WS_AUTH_TIMEOUT_MS = 5000
 const ROOM_CLEANUP_INTERVAL_MS = 5 * 60 * 1000

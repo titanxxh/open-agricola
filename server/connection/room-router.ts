@@ -11,7 +11,7 @@ import { validateSession } from '../auth.ts'
 import { getDb } from '../db.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../../shared/custom-code/types.ts'
-import type { ClientCommand } from '../../shared/protocol/ws.ts'
+import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
 import type { ConnectionCtx } from './connection-ctx.ts'
 
 const DRAFT_POOL_SIZE_DEFAULT = 7

@@ -1,5 +1,5 @@
-import type { GameSyncPayload, StateUpdateEnvelope } from '../../shared/protocol/game'
-import type { ClientCommand, ServerEvent } from '../../shared/protocol/ws'
+import type { GameSyncPayload, StateUpdateEnvelope } from '../../shared/contract/protocol/game'
+import type { ClientCommand, ServerEvent } from '../../shared/contract/protocol/ws'
 import type { DraftPickPayload } from '../../shared/draft/types'
 
 export type ValidateResult = {
