@@ -1,18 +1,8 @@
-import { Occupation } from '../types'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { E159_OldMiser } from '../../cards-display/E/E159_OldMiser'
 
-const CARD_ID = 'E159_OldMiser'
-
-export const E159_OldMiser = new Occupation({
-  id: CARD_ID,
-  name: 'Old Miser',
-  deck: 'E',
-  number: 159,
-  category: 'FOOD',
-  desc: ['In the feeding phase of each harvest, each of your people requires 1\u00a0less <FOOD>. During scoring, your people are worth 2 points each instead of 3.'],
-  players: '4+',
-})
+const CARD_ID = E159_OldMiser.id
 
 export const E159_OldMiser_impl = {
   effect: {

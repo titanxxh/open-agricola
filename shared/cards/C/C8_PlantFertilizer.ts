@@ -1,20 +1,8 @@
-import { MinorImprovement } from '../types'
 import { fieldHasCrop, fieldIsEmpty, fieldTotalRemaining } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { C8_PlantFertilizer } from '../../cards-display/C/C8_PlantFertilizer'
 
-const CARD_ID = 'C8_PlantFertilizer'
-
-export const C8_PlantFertilizer = new MinorImprovement({
-  id: CARD_ID,
-  name: "Plant Fertilizer",
-  deck: "C",
-  number: 8,
-  category: "CROP_PROVIDER",
-  desc: ["In each field with exactly 1 good, you can immediately place 1 additional good of the same type."],
-  cost: {},
-  passing: true,
-  newSet: true,
-})
+const CARD_ID = C8_PlantFertilizer.id
 
 export const C8_PlantFertilizer_impl = {
   effect: {

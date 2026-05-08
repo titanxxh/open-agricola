@@ -1,4 +1,4 @@
-import { MinorImprovement, getRegisteredMinorImprovement } from '../types'
+import { getRegisteredMinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ComplexCost, GameState, PlayerState } from '../../contract/types'
@@ -12,8 +12,9 @@ import { PaymentSolver } from '../../actions/payment'
 import type { PaymentCtx } from '../../actions/payment'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B75_WoodWorkshop } from '../../cards-display/B/B75_WoodWorkshop'
 
-const CARD_ID = 'B75_WoodWorkshop'
+const CARD_ID = B75_WoodWorkshop.id
 
 const createPreviewPlayer = (player: PlayerState): PlayerState => ({
   ...player,
@@ -122,18 +123,6 @@ const isDoableListener: CardListenerRegistration = {
     }
   },
 }
-
-export const B75_WoodWorkshop = new MinorImprovement({
-  id: CARD_ID,
-  name: "Wood Workshop",
-  deck: "B",
-  number: 75,
-  category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["Each time before you play or build an improvement, you get 1 <WOOD>."],
-  cost: {"clay":1},
-  prerequisite: "1 Occupation",
-  occupationPrerequisites: {"min":1},
-})
 
 export const B75_WoodWorkshop_impl = {
   listeners: [beforeListener, isDoableListener],

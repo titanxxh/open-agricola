@@ -1,9 +1,9 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { B13_CarpentersParlor } from '../../cards-display/B/B13_CarpentersParlor'
 
-const CARD_ID = 'B13_CarpentersParlor'
+const CARD_ID = B13_CarpentersParlor.id
 
 /**
  * B13 Carpenter's Parlor — Wooden rooms only cost you 2 wood and 2 reed each
@@ -23,16 +23,6 @@ const constructCostListener: CardListenerRegistration = {
     return { costs: { wood: -3 } }
   },
 }
-
-export const B13_CarpentersParlor = new MinorImprovement({
-  id: CARD_ID,
-  name: "Carpenter's Parlor",
-  deck: 'B',
-  number: 13,
-  category: 'FARM_PLANNER',
-  desc: ['Wooden rooms only cost you 2 <WOOD> and 2 <REED> each.'],
-  cost: { wood: 1, stone: 1 },
-})
 
 export const B13_CarpentersParlor_impl = {
   listeners: [constructCostListener],

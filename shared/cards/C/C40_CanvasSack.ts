@@ -1,20 +1,8 @@
-import { MinorImprovement } from '../types'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { C40_CanvasSack } from '../../cards-display/C/C40_CanvasSack'
 
-const CARD_ID = 'C40_CanvasSack'
-
-export const C40_CanvasSack = new MinorImprovement({
-  id: CARD_ID,
-  name: "Canvas Sack",
-  deck: "C",
-  number: 40,
-  category: "GOODS_PROVIDER",
-  desc: ["When you play this card paying <GRAIN>/<REED> for it, you immediately get 1 <VEGETABLE>/4 <WOOD>."],
-  vp: 1,
-  prerequisite: "No Occupations",
-  occupationPrerequisites: { max: 0 },
-})
+const CARD_ID = C40_CanvasSack.id
 
 export const C40_CanvasSack_impl = {
   effect: {

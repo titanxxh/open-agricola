@@ -1,17 +1,8 @@
-import { MinorImprovement } from '../types'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import { E28_Bookmark } from '../../cards-display/E/E28_Bookmark'
 
-const CARD_ID = 'E28_Bookmark'
-
-export const E28_Bookmark = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Bookmark',
-  deck: 'E',
-  number: 28,
-  desc: ['Add 3 to the current round and mark the corresponding round space. At the start of that round, you can play 1 occupation without paying an occupation cost.'],
-  cost: { wood: 1 },
-})
+const CARD_ID = E28_Bookmark.id
 
 export const E28_Bookmark_impl = {
   effect: {

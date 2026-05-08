@@ -1,14 +1,12 @@
-import { MinorImprovement } from '../types'
 import type { FarmTilePosition } from '../../contract/types'
 import { getAllTilePositions, getUsedFarmyardTileKeys, positionKey } from '../../domain/farm'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
+import { B38_FutureBuildingSite } from '../../cards-display/B/B38_FutureBuildingSite'
 
-const CARD_ID = 'B38_FutureBuildingSite'
+const CARD_ID = B38_FutureBuildingSite.id
 
-// BGA isBuyable: turn > 4 → false. Already redundantly enforced by maxRound,
-// but register the explicit handler so the prereq label is not silently passed.
 registerPrerequisite('Play in Round 4 or Before', (_player, state) => {
   if (!state) return true
   return state.round <= 4
@@ -20,22 +18,6 @@ const DELTAS = [
   { dr: 0, dc: -1 },
   { dr: 0, dc: 1 },
 ]
-
-export const B38_FutureBuildingSite = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Future Building Site',
-  deck: 'B',
-  number: 38,
-  category: 'POINTS_PROVIDER',
-  desc: [
-    'Up until all other farmyard spaces are used, you cannot use the unused spaces that are orthogonally adjacent to your house (not even to build rooms).',
-  ],
-  cost: {},
-  vp: 3,
-  maxRound: 4,
-  prerequisite: 'Play in Round 4 or Before',
-  implemented: true,
-})
 
 export const B38_FutureBuildingSite_impl = {
   effect: {

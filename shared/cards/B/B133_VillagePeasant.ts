@@ -1,20 +1,8 @@
-import { Occupation } from '../types'
 import { collectCardsAs } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
+import { B133_VillagePeasant } from '../../cards-display/B/B133_VillagePeasant'
 
-const CARD_ID = 'B133_VillagePeasant'
-
-export const B133_VillagePeasant = new Occupation({
-  id: CARD_ID,
-  name: 'Village Peasant',
-  deck: 'B',
-  number: 133,
-  category: 'POINTS_PROVIDER',
-  desc: ['At the start of scoring, you get a number of <VEGETABLE> equal to the smallest of the numbers of major improvements, minor improvements, and occupations you have.'],
-  cost: {},
-  players: '3+',
-  newSet: true,
-})
+const CARD_ID = B133_VillagePeasant.id
 
 export const B133_VillagePeasant_impl = {
   effect: {

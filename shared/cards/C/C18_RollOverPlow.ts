@@ -1,11 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { C18_RollOverPlow } from '../../cards-display/C/C18_RollOverPlow'
 
-const CARD_ID = 'C18_RollOverPlow'
+const CARD_ID = C18_RollOverPlow.id
 
 registerSelectionEffect('discard-all-crops', ({ player, positions }) => {
   for (const key of positions) {
@@ -51,16 +51,6 @@ const anytimeListener: CardListenerRegistration = {
     }
   },
 }
-
-export const C18_RollOverPlow = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Roll-Over Plow',
-  deck: 'C',
-  number: 18,
-  category: 'FARM_PLANNER',
-  desc: ['At any time, if you have at least 3 planted fields, you can discard all goods from one of those fields to plow 1 field.'],
-  cost: { wood: 2 },
-})
 
 export const C18_RollOverPlow_impl = {
   listeners: [anytimeListener],

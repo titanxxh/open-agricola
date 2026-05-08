@@ -1,20 +1,8 @@
-import { MinorImprovement } from '../types'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { C3_CarriageTrip } from '../../cards-display/C/C3_CarriageTrip'
 
-const CARD_ID = 'C3_CarriageTrip'
-
-export const C3_CarriageTrip = new MinorImprovement({
-  id: CARD_ID,
-  name: "Carriage Trip",
-  deck: "C",
-  number: 3,
-  category: "ACTIONS_BOOSTER",
-  desc: ["If you play this card in the work phase, you can immediately place another person."],
-  cost: {},
-  passing: true,
-  prerequisite: "1 Person yet to Place",
-})
+const CARD_ID = C3_CarriageTrip.id
 
 export const C3_CarriageTrip_impl = {
   effect: {

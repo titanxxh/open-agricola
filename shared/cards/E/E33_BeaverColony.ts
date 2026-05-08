@@ -1,13 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { playerBoard, type AnimalZone, getPastureCapacity } from '../../domain'
 import type { CardImpl } from '../registry'
+import { E33_BeaverColony } from '../../cards-display/E/E33_BeaverColony'
 
-const CARD_ID = 'E33_BeaverColony'
+const CARD_ID = E33_BeaverColony.id
 
-// Reed-producing action spaces (accumulation + gain-type).
-// BGA also checks ActionResourceMarket and specific cards (C104_Collector, E81_AlchemistsLab).
 const REED_ACTION_SPACES = new Set(['reed-bank', 'resource-market-4'])
 
 const afterCollectListener: CardListenerRegistration = {
@@ -40,18 +38,6 @@ const afterGainListener: CardListenerRegistration = {
     }
   },
 }
-
-export const E33_BeaverColony = new MinorImprovement({
-  id: CARD_ID,
-  name: "Beaver Colony",
-  deck: "E",
-  number: 33,
-  category: "BONUS_POINTS_-_GET",
-  desc: ['From now on, one of your pastures with stable cannot hold animals. Each time you get <REED> from an action space, you get 1\u00a0bonus <SCORE>.'],
-  vp: 1,
-  cost: {},
-  prerequisite: "1 Fenced Stable",
-})
 
 export const E33_BeaverColony_impl = {
   listeners: [afterCollectListener, afterGainListener],

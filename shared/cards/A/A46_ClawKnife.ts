@@ -1,17 +1,14 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
+import { A46_ClawKnife } from '../../cards-display/A/A46_ClawKnife'
 
-const CARD_ID = 'A46_ClawKnife'
+const CARD_ID = A46_ClawKnife.id
 
-// BGA isBuyable: count(getPastures(true)) != 1 → false
 registerPrerequisite('Exactly 1 Pasture', (player) => player.pastures.length === 1)
 
-// A46 Claw Knife: Each time you use the Sheep Market accumulation space, place 1 FOOD on each
-// of the next 2 round spaces. At the start of these rounds, you get the FOOD.
 const listener: CardListenerRegistration = {
   id: 'A46-claw-knife-after-place-farmer',
   cardIds: [CARD_ID],
@@ -29,19 +26,6 @@ const listener: CardListenerRegistration = {
     return { flow: futureMeeplesNode(), sourceCard: CARD_ID }
   },
 }
-
-export const A46_ClawKnife = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Claw Knife',
-  deck: 'A',
-  number: 46,
-  category: 'FOOD_PROVIDER',
-  desc: ['Each time you use the __Sheep Market__ accumulation space, place 1 <FOOD> on each of the next 2 round spaces. At the start of these rounds, you get the <FOOD>.'],
-  cost: { wood: 1 },
-  vp: 1,
-  prerequisite: 'Exactly 1 Pasture',
-  newSet: true,
-})
 
 export const A46_ClawKnife_impl = {
   listeners: [listener],

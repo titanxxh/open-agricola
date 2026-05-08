@@ -1,18 +1,7 @@
-import { Occupation } from '../types'
 import type { CardImpl } from '../registry'
+import { A104_WoodHarvester } from '../../cards-display/A/A104_WoodHarvester'
 
-const CARD_ID = 'A104_WoodHarvester'
-
-export const A104_WoodHarvester = new Occupation({
-  id: CARD_ID,
-  name: "Wood Harvester",
-  deck: "A",
-  number: 104,
-  category: "GOODS_PROVIDER",
-  desc: ["In the field phase of each harvest, you get 1 <WOOD>/1 <FOOD> for each wood accumulation space with exactly 2 <WOOD>/at least 3 <WOOD>."],
-  cost: {},
-  players: "1+",
-})
+const CARD_ID = A104_WoodHarvester.id
 
 export const A104_WoodHarvester_impl = {
   effect: {

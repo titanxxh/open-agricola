@@ -1,14 +1,12 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
+import { A52_ThrowingAxe } from '../../cards-display/A/A52_ThrowingAxe'
 
-const CARD_ID = 'A52_ThrowingAxe'
+const CARD_ID = A52_ThrowingAxe.id
 
-// BGA isBuyable: turn < 7 → false. Same label is also used by B51_DiggingSpade;
-// both register the equivalent predicate (last-write-wins, identical handler).
 registerPrerequisite('Play in Round 7 or Later', (_player, state) => {
   if (!state) return true
   return state.round >= 7
@@ -17,9 +15,6 @@ registerPrerequisite('Play in Round 7 or Later', (_player, state) => {
 const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =>
   (space.gainPerRound?.wood ?? 0) > 0
 
-// A52 Throwing Axe: Each time you use a wood accumulation space while there is at least
-// 1 PIG on the Pig Market accumulation space, you also get 2 FOOD.
-// This triggers before the space is collected (before phase of collect action).
 const listener: CardListenerRegistration = {
   id: 'A52-throwing-axe-before-collect',
   cardIds: [CARD_ID],
@@ -34,18 +29,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { food: 2 }), sourceCard: CARD_ID }
   },
 }
-
-export const A52_ThrowingAxe = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Throwing Axe',
-  deck: 'A',
-  number: 52,
-  category: 'FOOD_PROVIDER',
-  desc: ['Each time you use a wood accumulation space while there is at least 1 <PIG> on the __Pig Market__ accumulation space, you also get 2 <FOOD>.'],
-  cost: { wood: 1 },
-  prerequisite: 'Play in Round 7 or Later',
-  newSet: true,
-})
 
 export const A52_ThrowingAxe_impl = {
   listeners: [listener],

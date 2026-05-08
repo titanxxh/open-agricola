@@ -1,14 +1,12 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { A24_ThreshingBoard } from '../../cards-display/A/A24_ThreshingBoard'
 
-const CARD_ID = 'A24_ThreshingBoard'
+const CARD_ID = A24_ThreshingBoard.id
 
 const TRIGGER_SPACES = new Set(['farmland', 'cultivation'])
 
-// A24 Threshing Board: Each time you use the Farmland or Cultivation action space,
-// you get an additional Bake Bread action.
 const listener: CardListenerRegistration = {
   id: 'A24-threshing-board-after-place-farmer',
   cardIds: [CARD_ID],
@@ -22,19 +20,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const A24_ThreshingBoard = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Threshing Board',
-  deck: 'A',
-  number: 24,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['Each time you use the __Farmland__ or __Cultivation__ action space, you get an additional __Bake Bread__ action.'],
-  cost: { wood: 1 },
-  vp: 1,
-  prerequisite: '2 Occupations',
-  occupationPrerequisites: { min: 2 },
-})
 
 export const A24_ThreshingBoard_impl = {
   listeners: [listener],

@@ -1,13 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E59_CombandCutter } from '../../cards-display/E/E59_CombandCutter'
 
-const CARD_ID = 'E59_CombandCutter'
+const CARD_ID = E59_CombandCutter.id
 
-// Each time you use Day Laborer, get 1 additional food for each sheep on the
-// Sheep Market accumulation space, up to a maximum of 4 additional food.
 const listener: CardListenerRegistration = {
   id: 'E59-comb-and-cutter-before-place-farmer',
   cardIds: [CARD_ID],
@@ -22,16 +20,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { food: foodBonus }), sourceCard: CARD_ID }
   },
 }
-
-export const E59_CombandCutter = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Comb and Cutter',
-  deck: 'E',
-  number: 59,
-  category: 'FOOD',
-  desc: ['Each time you use the __Day Laborer__ action space, you get 1 additional <FOOD> for each <SHEEP> on the __Sheep Market__ accumulation space, up to a maximum of 4 additional <FOOD>.'],
-  cost: { wood: 1 },
-})
 
 export const E59_CombandCutter_impl = {
   listeners: [listener],

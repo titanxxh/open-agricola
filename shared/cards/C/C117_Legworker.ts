@@ -1,12 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { GameState } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
+import { C117_Legworker } from '../../cards-display/C/C117_Legworker'
 
-const CARD_ID = 'C117_Legworker'
+const CARD_ID = C117_Legworker.id
 
 /**
  * C117 Legworker (Occupation)
@@ -45,8 +45,6 @@ const COMMON_ADJACENCY: Record<string, (string | number)[]> = {
   'traveling-players': ['lessons-4', 'day-laborer'],
 }
 
-// Neighbours for round positions 1..14 (1-indexed).
-// Values are either another round position (number) or a space id (string).
 const ROUND_ADJACENCY: Record<number, (string | number)[]> = {
   1: [2, 'farm-expansion', 'forest'],
   2: [1, 3, 5],
@@ -119,19 +117,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const C117_Legworker = new Occupation({
-  id: CARD_ID,
-  name: 'Legworker',
-  deck: 'C',
-  number: 117,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: [
-    'Each time you use an action space that is orthogonally adjacent to another action space occupied by one of your people, you get 1 <WOOD>.',
-  ],
-  cost: {},
-  players: '1+',
-})
 
 export const C117_Legworker_impl = {
   listeners: [listener],

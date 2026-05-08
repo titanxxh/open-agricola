@@ -1,20 +1,8 @@
-import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B106_MoralCrusader } from '../../cards-display/B/B106_MoralCrusader'
 
-const CARD_ID = 'B106_MoralCrusader'
-
-export const B106_MoralCrusader = new Occupation({
-  id: CARD_ID,
-  name: 'Moral Crusader',
-  deck: 'B',
-  number: 106,
-  category: 'FOOD_PROVIDER',
-  desc: ['Immediately before the start of each round, if there are goods on the remaining round spaces that are promised to you, you get 1 <FOOD>.'],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
+const CARD_ID = B106_MoralCrusader.id
 
 export const B106_MoralCrusader_impl = {
   effect: {

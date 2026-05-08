@@ -1,4 +1,3 @@
-import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
@@ -6,8 +5,9 @@ import { getMinorImprovementCard } from '../catalog'
 import { getMajorCard } from '../major'
 import { isMajorCardId } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
+import { C137_CharcoalBurner } from '../../cards-display/C/C137_CharcoalBurner'
 
-const CARD_ID = 'C137_CharcoalBurner'
+const CARD_ID = C137_CharcoalBurner.id
 
 /**
  * C137 Charcoal Burner (Occupation, C, 137)
@@ -44,20 +44,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { wood: 1, food: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const C137_CharcoalBurner = new Occupation({
-  id: CARD_ID,
-  name: 'Charcoal Burner',
-  deck: 'C',
-  number: 137,
-  category: 'GOODS_PROVIDER',
-  desc: [
-    'Each time any player (including you) plays or builds a <BAKE>-improvement, you get 1 <WOOD> and 1 <FOOD>.',
-  ],
-  cost: {},
-  players: '3+',
-  newSet: true,
-})
 
 export const C137_CharcoalBurner_impl = {
   listeners: [listener],

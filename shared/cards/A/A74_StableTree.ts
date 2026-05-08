@@ -1,4 +1,3 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
@@ -8,8 +7,10 @@ import {
 } from '../helpers/action-snapshot'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import { A74_StableTree } from '../../cards-display/A/A74_StableTree'
 
-const CARD_ID = 'A74_StableTree'
+const CARD_ID = A74_StableTree.id
+
 const USED_ACTION_TOKEN_KEY = 'usedActionToken'
 
 const queueStableTreeWood = (
@@ -42,16 +43,6 @@ const listener: CardListenerRegistration = {
     return { flow, sourceCard: CARD_ID }
   },
 }
-
-export const A74_StableTree = new MinorImprovement({
-  id: CARD_ID,
-  name: "Stable Tree",
-  deck: "A",
-  number: 74,
-  category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["Each time you build 1 or more stables on your turn, place 1 <WOOD> on each of the next 3 round spaces. At the start of these rounds, you get the <WOOD>."],
-  cost: {"wood":1},
-})
 
 export const A74_StableTree_impl = {
   listeners: [listener],

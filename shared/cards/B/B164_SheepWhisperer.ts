@@ -1,19 +1,8 @@
-import { Occupation } from '../types'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
+import { B164_SheepWhisperer } from '../../cards-display/B/B164_SheepWhisperer'
 
-const CARD_ID = 'B164_SheepWhisperer'
-
-export const B164_SheepWhisperer = new Occupation({
-  id: CARD_ID,
-  name: 'Sheep Whisperer',
-  deck: 'B',
-  number: 164,
-  category: 'LIVESTOCK_PROVIDER',
-  desc: ['Add 2, 5, 8, and 10 to the current round and place 1 <SHEEP> on each corresponding round space. At the start of these rounds, you get the <SHEEP>.'],
-  cost: {},
-  players: '4+',
-})
+const CARD_ID = B164_SheepWhisperer.id
 
 export const B164_SheepWhisperer_impl = {
   effect: {

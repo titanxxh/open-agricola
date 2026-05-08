@@ -1,13 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E55_StoneWeir } from '../../cards-display/E/E55_StoneWeir'
 
-const CARD_ID = 'E55_StoneWeir'
+const CARD_ID = E55_StoneWeir.id
 
-// Each time you use Fishing, if there are 0/1/2/3 food on the space,
-// get an additional 4/3/2/1 food from the general supply.
 const listener: CardListenerRegistration = {
   id: 'E55-stone-weir-before-place-farmer',
   cardIds: [CARD_ID],
@@ -21,19 +19,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { food: bonus }), sourceCard: CARD_ID }
   },
 }
-
-export const E55_StoneWeir = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Stone Weir',
-  deck: 'E',
-  number: 55,
-  category: 'FOOD',
-  desc: ['Each time you use the __Fishing__ accumulation space, if there are 0/1/2/3 <FOOD> on the space, you get an additional 4/3/2/1 <FOOD> from the general supply.'],
-  cost: { stone: 1 },
-  vp: 1,
-  prerequisite: '2 Occupations',
-  occupationPrerequisites: { min: 2 },
-})
 
 export const E55_StoneWeir_impl = {
   listeners: [listener],

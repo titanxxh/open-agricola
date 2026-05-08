@@ -1,11 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
+import { B67_HandTruck } from '../../cards-display/B/B67_HandTruck'
 
-const CARD_ID = 'B67_HandTruck'
+const CARD_ID = B67_HandTruck.id
 
 const listener: CardListenerRegistration = {
   id: 'B67-hand-truck-before-bake',
@@ -44,17 +44,6 @@ const isDoableListener: CardListenerRegistration = {
     return { doable: true }
   },
 }
-
-export const B67_HandTruck = new MinorImprovement({
-  id: CARD_ID,
-  name: "Hand Truck",
-  deck: "B",
-  number: 67,
-  category: "CROP_PROVIDER",
-  desc: ["Each time before you take a __Bake Bread__ action, you also get 1 <GRAIN> for each of your people occupying an accumulation space."],
-  cost: {"wood":1},
-  newSet: true,
-})
 
 export const B67_HandTruck_impl = {
   listeners: [listener, isDoableListener],

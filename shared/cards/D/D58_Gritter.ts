@@ -1,21 +1,18 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { fieldHasCrop, fieldFindStackOfKind } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { D58_Gritter } from '../../cards-display/D/D58_Gritter'
 
-const CARD_ID = 'D58_Gritter'
+const CARD_ID = D58_Gritter.id
 
 registerPrerequisite('Play in Round 5 or Later', (_player, state) => {
   if (!state) return true
   return state.round >= 5
 })
 
-// D58 Gritter: At the end of each action in which you sow vegetables in a field,
-// you get 1 FOOD for each vegetable field you have (including the new ones).
-// We trigger after sow, check if any vegetable was sown, count all vegetable fields.
 const listener: CardListenerRegistration = {
   id: 'D58-gritter-after-sow',
   cardIds: [CARD_ID],
@@ -38,20 +35,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { food: n }), sourceCard: CARD_ID }
   },
 }
-
-export const D58_Gritter = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Gritter',
-  deck: 'D',
-  number: 58,
-  category: 'FOOD_PROVIDER',
-  desc: [
-    'At the end of each action in which you sow vegetables in a field, you get 1 <FOOD> for each vegetable field you have (including the new ones).',
-  ],
-  cost: { wood: 1 },
-  prerequisite: 'Play in Round 5 or Later',
-  newSet: true,
-})
 
 export const D58_Gritter_impl = {
   listeners: [listener],

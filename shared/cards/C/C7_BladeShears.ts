@@ -1,20 +1,7 @@
-import { MinorImprovement } from '../types'
 import type { CardImpl } from '../registry'
+import { C7_BladeShears } from '../../cards-display/C/C7_BladeShears'
 
-const CARD_ID = 'C7_BladeShears'
-
-export const C7_BladeShears = new MinorImprovement({
-  id: CARD_ID,
-  name: "Blade Shears",
-  deck: "C",
-  number: 7,
-  category: "FOOD_PROVIDER",
-  desc: ["You immediately get your choice of 3 <FOOD>, or 1 <FOOD> for each sheep you have. (Keep the sheep.)"],
-  cost: { wood: 1 },
-  passing: true,
-  prerequisite: "1 Pasture",
-  newSet: true,
-})
+const CARD_ID = C7_BladeShears.id
 
 export const C7_BladeShears_impl = {
   effect: {

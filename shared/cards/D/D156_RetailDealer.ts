@@ -1,11 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { D156_RetailDealer } from '../../cards-display/D/D156_RetailDealer'
 
-const CARD_ID = 'D156_RetailDealer'
+const CARD_ID = D156_RetailDealer.id
 
 const listener: CardListenerRegistration = {
   id: 'D156-retail-dealer-after-place-farmer',
@@ -23,17 +23,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const D156_RetailDealer = new Occupation({
-  id: CARD_ID,
-  name: 'Retail Dealer',
-  deck: 'D',
-  number: 156,
-  category: 'GOODS_PROVIDER',
-  desc: ['Place 3 <GRAIN> and 3 <FOOD> on this card. Each time you use the __Resource Market__ action space, you also get 1 <GRAIN> and 1 <FOOD> from this card.'],
-  cost: {},
-  players: '4+',
-})
 
 export const D156_RetailDealer_impl = {
   listeners: [listener],

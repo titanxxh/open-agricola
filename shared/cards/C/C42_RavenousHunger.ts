@@ -1,4 +1,3 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
@@ -6,8 +5,9 @@ import { isCardFlagged } from '../helpers/card-state'
 import type { ActionFlow, Resource } from '../../contract/types'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { C42_RavenousHunger } from '../../cards-display/C/C42_RavenousHunger'
 
-const CARD_ID = 'C42_RavenousHunger'
+const CARD_ID = C42_RavenousHunger.id
 
 /**
  * C42 Ravenous Hunger:
@@ -74,19 +74,6 @@ const afterCollectListener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, gain), sourceCard: CARD_ID }
   },
 }
-
-export const C42_RavenousHunger = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Ravenous Hunger',
-  deck: 'C',
-  number: 42,
-  category: 'GOODS_PROVIDER',
-  desc: [
-    'Immediately after each time you use the __Vegetable Seeds__ action space, you can place another person on an accumulation space and get 1 additional good of the accumulating type.',
-  ],
-  cost: { grain: 1 },
-  players: '1+',
-})
 
 export const C42_RavenousHunger_impl = {
   listeners: [afterPlaceFarmerListener, afterCollectListener],

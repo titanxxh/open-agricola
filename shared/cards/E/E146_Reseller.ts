@@ -1,15 +1,13 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import { getMinorImprovementCard } from '../catalog'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E146_Reseller } from '../../cards-display/E/E146_Reseller'
 
-const CARD_ID = 'E146_Reseller'
+const CARD_ID = E146_Reseller.id
 
-// E146 Reseller: Once this game, immediately after playing or building an improvement,
-// you can choose to get its printed cost from the general supply.
 const listener: CardListenerRegistration = {
   id: 'E146-reseller-immediately-after-improvement',
   cardIds: [CARD_ID],
@@ -45,19 +43,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const E146_Reseller = new Occupation({
-  id: CARD_ID,
-  name: 'Reseller',
-  deck: 'E',
-  number: 146,
-  category: 'BUILDING_RESOURCES_-_ALL',
-  desc: [
-    'Once this game, immediately after playing or building an improvement, you can choose to get its printed cost from the general supply.',
-  ],
-  cost: {},
-  players: '3+',
-})
 
 export const E146_Reseller_impl = {
   listeners: [listener],

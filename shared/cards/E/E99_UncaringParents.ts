@@ -1,18 +1,7 @@
-import { Occupation } from '../types'
 import type { CardImpl } from '../registry'
+import { E99_UncaringParents } from '../../cards-display/E/E99_UncaringParents'
 
-const CARD_ID = 'E99_UncaringParents'
-
-export const E99_UncaringParents = new Occupation({
-  id: CARD_ID,
-  name: "Uncaring Parents",
-  deck: "E",
-  number: 99,
-  category: "BONUS_POINTS_-_GET",
-  desc: ["At the end of each harvest, if you live in a stone house, you get 1 bonus <SCORE>."],
-  cost: {},
-  players: "1+",
-})
+const CARD_ID = E99_UncaringParents.id
 
 export const E99_UncaringParents_impl = {
   effect: {

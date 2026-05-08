@@ -1,10 +1,10 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { C27_Blueprint } from '../../cards-display/C/C27_Blueprint'
 
-const CARD_ID = 'C27_Blueprint'
+const CARD_ID = C27_Blueprint.id
 
 const ALLOWED_MAJORS = ['Major_Joinery', 'Major_Pottery', 'Major_Basket'] as const
 
@@ -57,16 +57,6 @@ const choiceCandidateListener: CardListenerRegistration = {
     return { extraOptions, sourceCard: CARD_ID }
   },
 }
-
-export const C27_Blueprint = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Blueprint',
-  deck: 'C',
-  number: 27,
-  category: 'ACTIONS_BOOSTER',
-  desc: ["You can build the major improvements __Joinery__, __Pottery__, and __Basketmaker's Workshop__ even when taking a __Minor Improvement__ action. They each cost you 1 <STONE> less."],
-  cost: { food: 1 },
-})
 
 export const C27_Blueprint_impl = {
   listeners: [computeCostsListener, choiceCandidateListener],

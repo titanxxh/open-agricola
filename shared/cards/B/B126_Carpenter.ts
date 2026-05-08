@@ -1,9 +1,9 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { B126_Carpenter } from '../../cards-display/B/B126_Carpenter'
 
-const CARD_ID = 'B126_Carpenter'
+const CARD_ID = B126_Carpenter.id
 
 /**
  * B126 Carpenter — Every new room only costs 3 of the appropriate building resource
@@ -25,17 +25,6 @@ const constructCostListener: CardListenerRegistration = {
     return { costs: { wood: -2 } }
   },
 }
-
-export const B126_Carpenter = new Occupation({
-  id: CARD_ID,
-  name: 'Carpenter',
-  deck: 'B',
-  number: 126,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['Every new room only costs you 3 of the appropriate building resource and 2 <REED> (e.g. if you live in a wooden house, 3 <WOOD> and 2 <REED>).'],
-  cost: {},
-  players: '1+',
-})
 
 export const B126_Carpenter_impl = {
   listeners: [constructCostListener],

@@ -1,12 +1,12 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { positionKey } from '../../domain/farm'
 import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { A73_AgriculturalFertilizers } from '../../cards-display/A/A73_AgriculturalFertilizers'
 
-const CARD_ID = 'A73_AgriculturalFertilizers'
+const CARD_ID = A73_AgriculturalFertilizers.id
 
 const countUsedSpaces = (player: PlayerState): number => {
   const occupied = new Set<string>()
@@ -42,19 +42,6 @@ const afterListener: CardListenerRegistration = {
     }
   },
 }
-
-export const A73_AgriculturalFertilizers = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Agricultural Fertilizers',
-  deck: 'A',
-  number: 73,
-  category: 'CROP_PROVIDER',
-  desc: [
-    'Each time after you turn at least 2 unused spaces into used spaces in one action, you get an additional __Sow__ action.',
-  ],
-  cost: {},
-  prerequisite: '1 Pasture',
-})
 
 export const A73_AgriculturalFertilizers_impl = {
   listeners: [beforeListener, afterListener],

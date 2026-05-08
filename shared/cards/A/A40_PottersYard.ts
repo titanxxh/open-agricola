@@ -1,4 +1,3 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
@@ -7,10 +6,10 @@ import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { countUnusedFarmyardSpaces } from '../../domain/farm'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { A40_PottersYard } from '../../cards-display/A/A40_PottersYard'
 
-const CARD_ID = 'A40_PottersYard'
+const CARD_ID = A40_PottersYard.id
 
-// BGA isBuyable: count(getFreeZones()) > 7 → false (at most 7 unused spaces)
 registerPrerequisite('At Most 7 Unused Farmyard Spaces', (player) =>
   countUnusedFarmyardSpaces(player) <= 7,
 )
@@ -31,6 +30,7 @@ registerPrerequisite('At Most 7 Unused Farmyard Spaces', (player) =>
  */
 
 const FARM_ROWS = 3
+
 const FARM_COLS = 5
 
 const getUsedTiles = (player: CardListenerContext['player']): Set<string> => {
@@ -96,7 +96,6 @@ const buildClayCollectFlow = (clayCollected: number): ActionHookResult | void =>
   }
 }
 
-// Before hooks: snapshot current used count
 const beforePlowListener: CardListenerRegistration = {
   id: 'A40-potters-yard-before-plow',
   cardIds: [CARD_ID],
@@ -141,7 +140,6 @@ const beforeStablesListener: CardListenerRegistration = {
   },
 }
 
-// After hooks: calculate newly used tiles, collect clay
 const createAfterHandler = (actionName: string): CardListenerRegistration => ({
   id: `A40-potters-yard-after-${actionName}`,
   cardIds: [CARD_ID],
@@ -158,18 +156,6 @@ const createAfterHandler = (actionName: string): CardListenerRegistration => ({
     setClayRemaining(context.player, clayRemaining - clayCollected)
     return buildClayCollectFlow(clayCollected)
   },
-})
-
-export const A40_PottersYard = new MinorImprovement({
-  id: CARD_ID,
-  name: "Potter's Yard",
-  deck: 'A',
-  number: 40,
-  category: 'GOODS_PROVIDER',
-  desc: ["Immediately place 1 <CLAY> on each unused space in your farmyard. Each time you turn a space into a used space, you get the clay and you can immediately exchange it for 2 <FOOD>."],
-  cost: { wood: 1, reed: 1 },
-  prerequisite: 'At Most 7 Unused Farmyard Spaces',
-  evenMoreSet: true,
 })
 
 export const A40_PottersYard_impl = {

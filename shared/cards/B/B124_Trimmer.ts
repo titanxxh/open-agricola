@@ -1,11 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag, writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import { B124_Trimmer } from '../../cards-display/B/B124_Trimmer'
 
-const CARD_ID = 'B124_Trimmer'
+const CARD_ID = B124_Trimmer.id
 
 /**
  * B124 Trimmer:
@@ -35,7 +35,6 @@ const getStoredArea = (player: CardListenerContext['player']): number =>
 const setStoredArea = (player: CardListenerContext['player'], area: number) =>
   writeCardExtraData(player, CARD_ID, 'pastureArea', area)
 
-// After fencing: check if pasture area increased
 const afterFencingListener: CardListenerRegistration = {
   id: 'B124-trimmer-after-fencing',
   cardIds: [CARD_ID],
@@ -54,18 +53,6 @@ const afterFencingListener: CardListenerRegistration = {
     }
   },
 }
-
-export const B124_Trimmer = new Occupation({
-  id: CARD_ID,
-  name: 'Trimmer',
-  deck: 'B',
-  number: 124,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['In each work phase, after you enclose at least one farmyard space, you get 2 <STONE>. (Subdividing an existing pasture does not count.)'],
-  cost: {},
-  players: '1+',
-  evenMoreSet: true,
-})
 
 export const B124_Trimmer_impl = {
   listeners: [afterFencingListener],

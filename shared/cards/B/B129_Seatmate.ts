@@ -1,12 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../contract/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import { isSpaceOccupied, spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
+import { B129_Seatmate } from '../../cards-display/B/B129_Seatmate'
 
-const CARD_ID = 'B129_Seatmate'
+const CARD_ID = B129_Seatmate.id
 
 /**
  * B129 Seatmate — You can use the action space on round space 13 even if it
@@ -42,17 +42,6 @@ const computeArgsListener: CardListenerRegistration = {
     return { extraOptions, sourceCard: CARD_ID }
   },
 }
-
-export const B129_Seatmate = new Occupation({
-  id: CARD_ID,
-  name: 'Seatmate',
-  deck: 'B',
-  number: 129,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['You can use the action space on round space 13 even if it is occupied by one or more people of the players to your immediate left and right.'],
-  cost: {},
-  players: '3+',
-})
 
 export const B129_Seatmate_impl = {
   listeners: [computeArgsListener],

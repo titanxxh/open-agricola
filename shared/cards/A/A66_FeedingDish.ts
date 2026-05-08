@@ -1,11 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { PlayerState, Pasture } from '../../contract/types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { A66_FeedingDish } from '../../cards-display/A/A66_FeedingDish'
 
-const CARD_ID = 'A66_FeedingDish'
+const CARD_ID = A66_FeedingDish.id
 
 type AnimalKey = 'sheep' | 'boar' | 'cattle'
 
@@ -25,8 +25,6 @@ const countAnimalOfType = (player: PlayerState, animal: AnimalKey): number => {
   return inHouse + inStables + inPastures
 }
 
-// A66 Feeding Dish: Each time you use an animal accumulation space while already having
-// an animal of that type, you get 1 GRAIN.
 const listener: CardListenerRegistration = {
   id: 'A66-feeding-dish-after-place-farmer',
   cardIds: [CARD_ID],
@@ -40,17 +38,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { grain: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const A66_FeedingDish = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Feeding Dish',
-  deck: 'A',
-  number: 66,
-  category: 'CROP_PROVIDER',
-  desc: ['Each time you use an animal accumulation space while already having an animal of that type, you get 1 <GRAIN>.'],
-  cost: { wood: 1 },
-  newSet: true,
-})
 
 export const A66_FeedingDish_impl = {
   listeners: [listener],

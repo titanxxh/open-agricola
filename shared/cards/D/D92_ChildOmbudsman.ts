@@ -1,4 +1,3 @@
-import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData } from '../helpers/card-state'
@@ -6,8 +5,9 @@ import { familySize } from '../../domain/player'
 import { getExtraRoomCapacity } from '../card-effects'
 import type { CardImpl } from '../registry'
 import type { PlayerState } from '../../contract/types'
+import { D92_ChildOmbudsman } from '../../cards-display/D/D92_ChildOmbudsman'
 
-const CARD_ID = 'D92_ChildOmbudsman'
+const CARD_ID = D92_ChildOmbudsman.id
 
 const effectiveRooms = (player: PlayerState) =>
   player.rooms + getExtraRoomCapacity(player)
@@ -59,17 +59,6 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
     }
   },
 }
-
-export const D92_ChildOmbudsman = new Occupation({
-  id: CARD_ID,
-  name: 'Child Ombudsman',
-  deck: 'D',
-  number: 92,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['From round 5 on, if you have room in your house, at the end of each person action, you can take a __Family Growth__ action with that person. If you do, you get 2 negative <SCORE>.'],
-  cost: {},
-  players: '1+',
-})
 
 export const D92_ChildOmbudsman_impl = {
   listeners: [afterPlaceFarmerListener],

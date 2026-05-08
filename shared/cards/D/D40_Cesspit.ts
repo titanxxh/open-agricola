@@ -1,22 +1,8 @@
-import { MinorImprovement } from '../types'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
+import { D40_Cesspit } from '../../cards-display/D/D40_Cesspit'
 
-const CARD_ID = 'D40_Cesspit'
-
-export const D40_Cesspit = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Cesspit',
-  deck: 'D',
-  number: 40,
-  category: 'GOODS_PROVIDER',
-  desc: ['Alternate placing 1 <CLAY> and 1 <PIG> on each remaining round space, starting with <CLAY>. At the start of these rounds, you get the respective good.'],
-  cost: {},
-  vp: -1,
-  prerequisite: '2 Fields and 1 Occupation',
-  occupationPrerequisites: { min: 1 },
-  newSet: true,
-})
+const CARD_ID = D40_Cesspit.id
 
 export const D40_Cesspit_impl = {
   effect: {

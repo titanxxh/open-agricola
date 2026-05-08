@@ -1,11 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { B162_ForestClearer } from '../../cards-display/B/B162_ForestClearer'
 
-const CARD_ID = 'B162_ForestClearer'
+const CARD_ID = B162_ForestClearer.id
 
 /**
  * B162 Forest Clearer:
@@ -37,20 +37,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, gain), sourceCard: CARD_ID }
   },
 }
-
-export const B162_ForestClearer = new Occupation({
-  id: CARD_ID,
-  name: 'Forest Clearer',
-  deck: 'B',
-  number: 162,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: [
-    'Each time you obtain exactly 2/3/4 <WOOD> from a wood accumulation space, you get 1 additional <WOOD> and 1/0/1 <FOOD>.',
-  ],
-  cost: {},
-  players: '4+',
-  evenMoreSet: true,
-})
 
 export const B162_ForestClearer_impl = {
   listeners: [listener],

@@ -1,10 +1,10 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getRenovation } from '../../actions/effects/renovation'
 import type { CardImpl } from '../registry'
+import { D13_Trowel } from '../../cards-display/D/D13_Trowel'
 
-const CARD_ID = 'D13_Trowel'
+const CARD_ID = D13_Trowel.id
 
 /**
  * D13 Trowel — MinorImprovement (cost: 1 wood).
@@ -54,7 +54,6 @@ const anytimeListener: CardListenerRegistration = {
   },
 }
 
-// computeCosts: apply custom costs when triggered by this card
 const computeCostsListener: CardListenerRegistration = {
   id: 'D13-trowel-compute-costs-renovation',
   cardIds: [CARD_ID],
@@ -86,19 +85,6 @@ const computeCostsListener: CardListenerRegistration = {
     }
   },
 }
-
-export const D13_Trowel = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Trowel',
-  deck: 'D',
-  number: 13,
-  category: 'FARM_PLANNER',
-  desc: [
-    'At any time, you can renovate your house to stone. From a wooden house, this costs 1 <STONE>, 1 <REED>, and 1 <FOOD> per room. From a clay house, this costs 1 <STONE> per room.',
-  ],
-  cost: { wood: 1 },
-  newSet: true,
-})
 
 export const D13_Trowel_impl = {
   listeners: [anytimeListener, computeCostsListener],

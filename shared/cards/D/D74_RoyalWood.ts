@@ -1,11 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { D74_RoyalWood } from '../../cards-display/D/D74_RoyalWood'
 
-const CARD_ID = 'D74_RoyalWood'
+const CARD_ID = D74_RoyalWood.id
 
 /**
  * Track wood spent during construct, stables, and pay actions. The latter
@@ -69,18 +69,6 @@ const afterPayListener: CardListenerRegistration = {
     writeCardExtraData(context.player, CARD_ID, 'woodSpent', total)
   },
 }
-
-export const D74_RoyalWood = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Royal Wood',
-  deck: 'D',
-  number: 74,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: [
-    'At the end of each turn in which you use the __Farm Expansion__ action space or build an improvement, you get 1 <WOOD> back for every 2 <WOOD> paid during those actions (rounded down).',
-  ],
-  cost: { food: 1 },
-})
 
 export const D74_RoyalWood_impl = {
   listeners: [beforeListener, afterListener, afterPayListener],

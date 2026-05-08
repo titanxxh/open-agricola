@@ -1,9 +1,9 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { E95_Miller } from '../../cards-display/E/E95_Miller'
 
-const CARD_ID = 'E95_Miller'
+const CARD_ID = E95_Miller.id
 
 /**
  * List of baking-related improvements that the Miller can purchase onBuy.
@@ -81,19 +81,6 @@ const opponentGrainSeedsListener: CardListenerRegistration = {
     }
   },
 }
-
-export const E95_Miller = new Occupation({
-  id: CARD_ID,
-  name: 'Miller',
-  deck: 'E',
-  number: 95,
-  category: 'ACTION_-_MAJOR_IMPROVEMENT',
-  desc: [
-    'You can immediately build a <BAKE>-improvement by paying its cost. Each time another player uses the __Grain Seeds__ action space, you can take a __Bake Bread__ action.',
-  ],
-  cost: {},
-  players: '1+',
-})
 
 export const E95_Miller_impl = {
   listeners: [onBuyListener, opponentGrainSeedsListener],

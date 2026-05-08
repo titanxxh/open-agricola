@@ -1,12 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { A67_CornScoop } from '../../cards-display/A/A67_CornScoop'
 
-const CARD_ID = 'A67_CornScoop'
+const CARD_ID = A67_CornScoop.id
 
-// A67 Corn Scoop: Each time you use the Grain Seeds action space, you get 1 additional GRAIN.
 const listener: CardListenerRegistration = {
   id: 'A67-corn-scoop-after-place-farmer',
   cardIds: [CARD_ID],
@@ -17,16 +16,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { grain: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const A67_CornScoop = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Corn Scoop',
-  deck: 'A',
-  number: 67,
-  category: 'CROP_PROVIDER',
-  desc: ['Each time you use the __Grain Seeds__ action space, you get 1 additional <GRAIN>.'],
-  cost: { wood: 1 },
-})
 
 export const A67_CornScoop_impl = {
   listeners: [listener],

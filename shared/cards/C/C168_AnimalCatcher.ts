@@ -1,10 +1,10 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { C168_AnimalCatcher } from '../../cards-display/C/C168_AnimalCatcher'
 
-const CARD_ID = 'C168_AnimalCatcher'
+const CARD_ID = C168_AnimalCatcher.id
 
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 
@@ -36,20 +36,6 @@ const computeReplaceListener: CardListenerRegistration = {
     }
   },
 }
-
-export const C168_AnimalCatcher = new Occupation({
-  id: CARD_ID,
-  name: 'Animal Catcher',
-  deck: 'C',
-  number: 168,
-  category: 'LIVESTOCK_PROVIDER',
-  desc: [
-    'Each time you use the __Day Laborer__ action space, instead of 2 <FOOD>, you can get 3 different animals from the general supply. If you do, you must pay 1 <FOOD> each harvest left to play.',
-  ],
-  cost: {},
-  players: '4+',
-  newSet: true,
-})
 
 export const C168_AnimalCatcher_impl = {
   listeners: [computeReplaceListener],

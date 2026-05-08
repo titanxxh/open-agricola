@@ -1,8 +1,8 @@
-import { Occupation } from '../types'
 import { Scoring } from '../../domain'
 import type { CardImpl } from '../registry'
+import { E127_DiligentFarmer } from '../../cards-display/E/E127_DiligentFarmer'
 
-const CARD_ID = 'E127_DiligentFarmer'
+const CARD_ID = E127_DiligentFarmer.id
 
 /**
  * E127 Diligent Farmer (Occupation, E, 127)
@@ -22,16 +22,6 @@ const MAX_SCORE_CATEGORIES = [
   'fields', 'pastures', 'grains', 'vegetables',
   'sheeps', 'boars', 'cattles', 'stables',
 ]
-
-export const E127_DiligentFarmer = new Occupation({
-  id: CARD_ID,
-  name: 'Diligent Farmer',
-  deck: 'E',
-  number: 127,
-  category: 'FARMYARD_-_PLACE_FOR_PERSON',
-  desc: ['When you play this card, if you would score the maximum 4 points in 3 scoring categories (including fenced stables), you can extend your house by 1 room at no cost.'],
-  players: '3+',
-})
 
 export const E127_DiligentFarmer_impl = {
   effect: {

@@ -1,17 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
+import { D165_PigStalker } from '../../cards-display/D/D165_PigStalker'
 
-const CARD_ID = 'D165_PigStalker'
-
-// D165 Pig Stalker: Each time you use an animal accumulation space, get 1 pig if you
-// occupy a round space immediately adjacent (left or right) to that animal market.
-//
-// BGA adjacency map (by round-space position, 1-indexed):
-//   1->[2], 2->[1,3], 3->[2,4], 4->[3], 8->[9], 9->[8], 10->[11], 11->[10]
+const CARD_ID = D165_PigStalker.id
 
 const ANIMAL_MARKETS = ['sheep-market', 'pig-market', 'cattle-market']
 
@@ -57,18 +51,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { boar: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const D165_PigStalker = new Occupation({
-  id: CARD_ID,
-  name: 'Pig Stalker',
-  deck: 'D',
-  number: 165,
-  category: 'LIVESTOCK_PROVIDER',
-  desc: ['Each time you use an animal accumulation space, you get an additional 1 <PIG> if you occupy a Round 1-14 action space which is immediately to the left or right of that accumulation space.'],
-  cost: {},
-  players: '4+',
-  evenMoreSet: true,
-})
 
 export const D165_PigStalker_impl = {
   listeners: [listener],

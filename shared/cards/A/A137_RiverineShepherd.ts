@@ -1,11 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { A137_RiverineShepherd } from '../../cards-display/A/A137_RiverineShepherd'
 
-const CARD_ID = 'A137_RiverineShepherd'
+const CARD_ID = A137_RiverineShepherd.id
 
 /**
  * A137 Riverine Shepherd:
@@ -59,18 +59,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const A137_RiverineShepherd = new Occupation({
-  id: CARD_ID,
-  name: "Riverine Shepherd",
-  deck: "A",
-  number: 137,
-  category: "GOODS_PROVIDER",
-  desc: ["Each time you use the __Sheep Market__ or __Reed Bank__ accumulation space, you can also take 1 good from the respective other accumulation space, if possible."],
-  cost: {},
-  players: "3+",
-  newSet: true,
-})
 
 export const A137_RiverineShepherd_impl = {
   listeners: [listener],

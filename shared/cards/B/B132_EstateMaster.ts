@@ -1,4 +1,3 @@
-import { Occupation } from '../types'
 import { incCounter } from '../__stubs__/helpers'
 import {
   readCardExtraData,
@@ -8,8 +7,9 @@ import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
+import { B132_EstateMaster } from '../../cards-display/B/B132_EstateMaster'
 
-const CARD_ID = 'B132_EstateMaster'
+const CARD_ID = B132_EstateMaster.id
 
 const FARM_TOTAL = 15
 
@@ -63,17 +63,6 @@ const reapListener: CardListenerRegistration = {
     incCounter(player, CARD_ID, 'bonusVp', amount)
   },
 }
-
-export const B132_EstateMaster = new Occupation({
-  id: CARD_ID,
-  name: 'Estate Master',
-  deck: 'B',
-  number: 132,
-  category: 'POINTS_PROVIDER',
-  desc: ['Once you have no unused farmyard spaces left, you get 1 bonus <SCORE> for each <VEGETABLE> that you harvest.'],
-  cost: {},
-  players: '1+',
-})
 
 export const B132_EstateMaster_impl = {
   listeners: [

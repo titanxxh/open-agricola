@@ -1,10 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B155_ArtTeacher } from '../../cards-display/B/B155_ArtTeacher'
 
-const CARD_ID = 'B155_ArtTeacher'
+const CARD_ID = B155_ArtTeacher.id
+
 const TRAVELING_PLAYERS = 'traveling-players'
 
 /**
@@ -66,20 +67,6 @@ const computeCostsListener: CardListenerRegistration = {
     }
   },
 }
-
-export const B155_ArtTeacher = new Occupation({
-  id: CARD_ID,
-  name: 'Art Teacher',
-  deck: 'B',
-  number: 155,
-  category: 'GOODS_PROVIDER',
-  desc: [
-    'When you play this card, you immediately get 1 <WOOD> and 1 <REED>. Each time you pay an occupation cost, you can use <FOOD> from the __Traveling Players__ accumulation space.',
-  ],
-  cost: {},
-  players: '4+',
-  evenMoreSet: true,
-})
 
 export const B155_ArtTeacher_impl = {
   listeners: [onBuyListener, computeCostsListener],

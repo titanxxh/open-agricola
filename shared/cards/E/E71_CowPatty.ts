@@ -1,4 +1,3 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { positionKey } from '../../domain/farm'
@@ -7,6 +6,7 @@ import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { ActionFlow, PlayerState } from '../../contract/types'
 import { fieldTopStack } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { E71_CowPatty } from '../../cards-display/E/E71_CowPatty'
 
 const CARD_ID = 'E71_CowPatty'
 
@@ -22,7 +22,6 @@ const countCattleOnBoard = (player: PlayerState): number => {
   return total
 }
 
-// BGA isBuyable: countAnimalsOnBoard()[CATTLE] == 0 → false
 registerPrerequisite('1 Cattle', (player) => countCattleOnBoard(player) >= 1)
 
 /**
@@ -40,7 +39,6 @@ registerPrerequisite('1 Cattle', (player) => countCattleOnBoard(player) >= 1)
 /** Initial remaining values for each crop type when freshly sown. */
 const INITIAL_REMAINING: Record<string, number> = { grain: 3, vegetable: 2 }
 
-// Field effect: add 1 crop to the selected field (matching its crop type)
 registerSelectionEffect('cow-patty-bonus-crop', ({ player, positions }) => {
   for (const key of positions) {
     const [r, c] = key.split('-').map(Number)
@@ -77,7 +75,6 @@ const isAdjacentToPasture = (
   return neighbors.some((n) => pastureTileKeys.has(positionKey(n)))
 }
 
-// --- After sow: find freshly sown fields adjacent to pastures, add bonus crop ---
 const afterSowListener: CardListenerRegistration = {
   id: 'E71-cow-patty-after-sow',
   cardIds: [CARD_ID],
@@ -119,18 +116,6 @@ const afterSowListener: CardListenerRegistration = {
     }
   },
 }
-
-export const E71_CowPatty = new MinorImprovement({
-  id: 'E71_CowPatty',
-  name: 'Cow Patty',
-  deck: 'E',
-  number: 71,
-  desc: ['Each time you sow in a field that is orthogonally adjacent to a pasture, you can place 1 additional good of the planted type in it.'],
-  cost: {},
-  vp: 1,
-  prerequisite: '1 Cattle',
-  implemented: true,
-})
 
 export const E71_CowPatty_impl = {
   listeners: [afterSowListener],

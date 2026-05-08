@@ -1,12 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import { playerBoard } from '../../domain'
 import type { CardImpl } from '../registry'
+import { C101_StallHolder } from '../../cards-display/C/C101_StallHolder'
 
-const CARD_ID = 'C101_StallHolder'
+const CARD_ID = C101_StallHolder.id
 
 const anytimeListener: CardListenerRegistration = {
   id: 'C101-stall-holder-anytime',
@@ -33,17 +33,6 @@ const anytimeListener: CardListenerRegistration = {
     }
   },
 }
-
-export const C101_StallHolder = new Occupation({
-  id: CARD_ID,
-  name: 'Stall Holder',
-  deck: 'C',
-  number: 101,
-  category: 'POINTS_PROVIDER',
-  desc: ['Once per round, if you have 0/1/2/3/4 unfenced stables on your farm, you can exchange 2 <GRAIN> for 1 bonus <SCORE> and 1/2/3/4/5 <FOOD>.'],
-  cost: {},
-  players: '1+',
-})
 
 export const C101_StallHolder_impl = {
   listeners: [anytimeListener],

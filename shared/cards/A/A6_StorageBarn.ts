@@ -1,19 +1,7 @@
-import { MinorImprovement } from '../types'
 import type { CardImpl } from '../registry'
+import { A6_StorageBarn } from '../../cards-display/A/A6_StorageBarn'
 
-const CARD_ID = 'A6_StorageBarn'
-
-export const A6_StorageBarn = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Storage Barn',
-  deck: 'A',
-  number: 6,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ["If you have the Well, Joinery, Pottery, and/or Basketmaker's Workshop, you immediately get 1 <STONE>, 1 <WOOD>, 1 <CLAY>, and/or 1 <REED>, respectively."],
-  cost: {},
-  passing: true,
-  newSet: true,
-})
+const CARD_ID = A6_StorageBarn.id
 
 export const A6_StorageBarn_impl = {
   effect: {

@@ -1,31 +1,7 @@
-import { Occupation } from '../types'
 import type { CardImpl } from '../registry'
+import { B104_SheepWalker } from '../../cards-display/B/B104_SheepWalker'
 
-const CARD_ID = 'B104_SheepWalker'
-
-// Reorg-pending exchange suppression note:
-//   BGA `getExchanges` returns [] while animals sit in the "reserve" (pending
-//   reorg). Our `buildAnytimeEntries` already returns [] when the engine's
-//   pending interaction has `request.kind === 'animal-reorg'`, so anytime
-//   exchanges are naturally suppressed during reorg — no extra filter needed.
-
-export const B104_SheepWalker = new Occupation({
-  id: CARD_ID,
-  name: 'Sheep Walker',
-  deck: 'B',
-  number: 104,
-  category: 'GOODS_PROVIDER',
-  desc: [
-    'At any time, you can exchange 1 <SHEEP> on your farmyard for either 1 <PIG>, 1 <VEGETABLE>, or 1 <STONE>.',
-  ],
-  cost: {},
-  players: '1+',
-  exchanges: [
-    { from: { sheep: 1 }, to: { boar: 1 }, triggers: ['anytime'] },
-    { from: { sheep: 1 }, to: { vegetable: 1 }, triggers: ['anytime'] },
-    { from: { sheep: 1 }, to: { stone: 1 }, triggers: ['anytime'] },
-  ],
-})
+const CARD_ID = B104_SheepWalker.id
 
 export const B104_SheepWalker_impl = {
   effect: {

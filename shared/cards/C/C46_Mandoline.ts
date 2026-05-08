@@ -1,12 +1,12 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
+import { C46_Mandoline } from '../../cards-display/C/C46_Mandoline'
 
-const CARD_ID = 'C46_Mandoline'
+const CARD_ID = C46_Mandoline.id
 
 const anytimeListener: CardListenerRegistration = {
   id: 'C46-mandoline-anytime',
@@ -37,16 +37,6 @@ const anytimeListener: CardListenerRegistration = {
     }
   },
 }
-
-export const C46_Mandoline = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Mandoline',
-  deck: 'C',
-  number: 46,
-  category: 'FOOD_PROVIDER',
-  desc: ['Once per round, you can pay 1 <VEGETABLE> to get 1 bonus <SCORE>. If you do, place 1 <FOOD> on each of the next 2 round spaces. At the start of these rounds, you get the <FOOD>.'],
-  cost: { wood: 1 },
-})
 
 export const C46_Mandoline_impl = {
   listeners: [anytimeListener],

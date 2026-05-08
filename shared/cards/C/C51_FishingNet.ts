@@ -1,10 +1,10 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import { C51_FishingNet } from '../../cards-display/C/C51_FishingNet'
 
-const CARD_ID = 'C51_FishingNet'
+const CARD_ID = C51_FishingNet.id
 
 /**
  * Part 1: When an opponent uses the Fishing accumulation space,
@@ -69,17 +69,6 @@ const isDoableListener: CardListenerRegistration = {
     return { doable: false }
   },
 }
-
-export const C51_FishingNet = new MinorImprovement({
-  id: CARD_ID,
-  name: "Fishing Net",
-  deck: "C",
-  number: 51,
-  category: "FOOD_PROVIDER",
-  desc: ["Each time another player uses the __Fishing__ accumulation space, they must first pay you 1 <FOOD>. Then, in the returning home phase of that round, place 2 <FOOD> on __Fishing__."],
-  cost: {"reed":1},
-  vp: 1,
-})
 
 export const C51_FishingNet_impl = {
   listeners: [listener, isDoableListener],

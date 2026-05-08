@@ -1,14 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { D105_Sculptor } from '../../cards-display/D/D105_Sculptor'
 
-const CARD_ID = 'D105_Sculptor'
+const CARD_ID = D105_Sculptor.id
 
-// Each time you use a clay accumulation space, also get 1 food.
-// Each time you use a stone accumulation space, also get 1 grain.
-// Triggers before collect (isBeforeCollectEvent in BGA).
 const listener: CardListenerRegistration = {
   id: 'D105-sculptor-before-collect',
   cardIds: [CARD_ID],
@@ -22,18 +19,6 @@ const listener: CardListenerRegistration = {
     if (isStone) return { flow: gainLeaf(CARD_ID, { grain: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const D105_Sculptor = new Occupation({
-  id: CARD_ID,
-  name: 'Sculptor',
-  deck: 'D',
-  number: 105,
-  category: 'GOODS_PROVIDER',
-  desc: ['Each time you use a clay accumulation space, you also get 1 <FOOD>. Each time you use a stone accumulation space, you also get 1 <GRAIN>.'],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
 
 export const D105_Sculptor_impl = {
   listeners: [listener],

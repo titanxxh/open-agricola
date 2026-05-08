@@ -1,20 +1,8 @@
-import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { C111_SmallAnimalBreeder } from '../../cards-display/C/C111_SmallAnimalBreeder'
 
-const CARD_ID = 'C111_SmallAnimalBreeder'
-
-export const C111_SmallAnimalBreeder = new Occupation({
-  id: CARD_ID,
-  name: 'Small Animal Breeder',
-  deck: 'C',
-  number: 111,
-  category: 'FOOD_PROVIDER',
-  desc: ['Before the start of each round, if you have <FOOD> equal to or higher than the upcoming round number (e.g., 8+ <FOOD> before round 8), you get 1 <FOOD>.'],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
+const CARD_ID = C111_SmallAnimalBreeder.id
 
 export const C111_SmallAnimalBreeder_impl = {
   effect: {

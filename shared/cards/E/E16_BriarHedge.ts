@@ -1,12 +1,13 @@
-import { MinorImprovement } from '../types'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { isBorderEdge } from '../../domain/farm'
 import { getAllEdgeIds } from '../../domain'
 import type { CardImpl } from '../registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { E16_BriarHedge } from '../../cards-display/E/E16_BriarHedge'
 
-const CARD_ID = 'E16_BriarHedge'
+const CARD_ID = E16_BriarHedge.id
+
 const countAllAnimalsOfType = (player: { resources: { sheep: number; boar: number; cattle: number }; pastures: Array<{ animalType: string | null; animalCount: number }>; houseAnimalType: string | null; houseAnimalCount: number; stableAnimals?: Record<string, string | null> }) => {
   const totals = { sheep: 0, boar: 0, cattle: 0 } as Record<string, number>
   for (const pasture of player.pastures) {
@@ -26,16 +27,6 @@ const countAllAnimalsOfType = (player: { resources: { sheep: number; boar: numbe
 registerPrerequisite('1 Animal of Each Type', (player) => {
   const totals = countAllAnimalsOfType(player)
   return (totals.sheep ?? 0) >= 1 && (totals.boar ?? 0) >= 1 && (totals.cattle ?? 0) >= 1
-})
-
-export const E16_BriarHedge = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Briar Hedge',
-  deck: 'E',
-  number: 16,
-  desc: ['You do not need to pay wood for fences that you build on the edge of your farmyard board.'],
-  cost: {},
-  prerequisite: '1 Animal of Each Type',
 })
 
 const countAvailableBorderEdges = (player: { fenceSegments?: { edge: string }[] }): number => {

@@ -1,19 +1,8 @@
-import { Occupation } from '../types'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { A118_Treegardener } from '../../cards-display/A/A118_Treegardener'
 
-const CARD_ID = 'A118_Treegardener'
-
-export const A118_Treegardener = new Occupation({
-  id: CARD_ID,
-  name: "Treegardener",
-  deck: "A",
-  number: 118,
-  category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["In the field phase of each harvest, you get 1 <WOOD> and you can buy up to 2 additional <WOOD> for 1 <FOOD> each."],
-  cost: {},
-  players: "1+",
-})
+const CARD_ID = A118_Treegardener.id
 
 export const A118_Treegardener_impl = {
   effect: {

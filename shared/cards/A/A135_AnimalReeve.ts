@@ -1,29 +1,13 @@
-import { Occupation } from '../types'
 import type { CardImpl } from '../registry'
+import { A135_AnimalReeve } from '../../cards-display/A/A135_AnimalReeve'
 
-const CARD_ID = 'A135_AnimalReeve'
+const CARD_ID = A135_AnimalReeve.id
 
-// BGA: If there are still 1/3/6/9 complete rounds left, get 1/2/3/4 WOOD.
-// woodMap[remainingTurns] → wood to gain (indices 0..9+)
 const WOOD_MAP: Record<number, number> = {
   0: 0, 1: 1, 2: 1, 3: 2, 4: 2, 5: 2, 6: 3, 7: 3, 8: 3, 9: 4,
 }
 
-// BGA computeBonusScore: sets = min(sheep, pig, cattle, 4); map → bonus VP.
 const SETS_VP_MAP = [0, 0, 1, 3, 5] as const
-
-export const A135_AnimalReeve = new Occupation({
-  id: CARD_ID,
-  name: 'Animal Reeve',
-  deck: 'A',
-  number: 135,
-  category: 'POINTS_PROVIDER',
-  desc: ['If there are still 1/3/6/9 complete rounds left to play, you immediately get 1/2/3/4 <WOOD>. During scoring, each player with 2/3/4+ animals of each type gets 1/3/5 bonus <SCORE>.'],
-  cost: {},
-  players: '3+',
-  extraVp: true,
-  newSet: true,
-})
 
 export const A135_AnimalReeve_impl = {
   effect: {

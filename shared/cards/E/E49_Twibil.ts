@@ -1,11 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
 import type { CardImpl } from '../registry'
+import { E49_Twibil } from '../../cards-display/E/E49_Twibil'
 
-const CARD_ID = 'E49_Twibil'
+const CARD_ID = E49_Twibil.id
 
 /**
  * E49 Twibil (MinorImprovement, E, 49)
@@ -32,19 +32,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const E49_Twibil = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Twibil',
-  deck: 'E',
-  number: 49,
-  category: 'FOOD',
-  desc: [
-    'Each time after any player (including you) builds at least 1 wood room, you get 1 <FOOD>.',
-  ],
-  cost: { stone: 1 },
-  vp: 1,
-})
 
 export const E49_Twibil_impl = {
   listeners: [listener],

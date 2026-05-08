@@ -1,11 +1,12 @@
-import { Occupation } from '../types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { E125_DelayedWayfarer } from '../../cards-display/E/E125_DelayedWayfarer'
 
-const CARD_ID = 'E125_DelayedWayfarer'
+const CARD_ID = E125_DelayedWayfarer.id
+
 const PLAYED_ROUND_KEY = 'playedRound'
 
 /**
@@ -33,19 +34,6 @@ const buildingChoiceFlow = (): ActionFlow => ({
     gainLeaf(CARD_ID, { reed: 1 }),
     gainLeaf(CARD_ID, { stone: 1 }),
   ],
-})
-
-export const E125_DelayedWayfarer = new Occupation({
-  id: CARD_ID,
-  name: 'Delayed Wayfarer',
-  deck: 'E',
-  number: 125,
-  category: 'BUILDING_RESOURCES_-_ALL',
-  desc: [
-    'When you play this card, you immediately get 1 building resource of your choice and, once all people have been placed this round, you can place a person from your supply.',
-  ],
-  cost: {},
-  players: '1+',
 })
 
 export const E125_DelayedWayfarer_impl = {

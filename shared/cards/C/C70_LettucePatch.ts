@@ -1,4 +1,3 @@
-import { MinorImprovement } from '../types'
 import type { ExtraSowableField } from '../card-effects'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
@@ -8,8 +7,9 @@ import { canSow } from '../../actions/effects/sow'
 import { dispatchReapListener } from '../../actions/effects/reap'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { C70_LettucePatch } from '../../cards-display/C/C70_LettucePatch'
 
-const CARD_ID = 'C70_LettucePatch'
+const CARD_ID = C70_LettucePatch.id
 
 type CardCrop = { crop: 'vegetable'; remaining: number }
 
@@ -19,10 +19,7 @@ const getCardCrop = (player: PlayerState): CardCrop | null =>
 const setCardCrop = (player: PlayerState, crop: CardCrop | null) =>
   writeCardExtraData(player, CARD_ID, 'cardCrop', crop)
 
-// Virtual tile for this card's extra field
 const VIRTUAL_TILE = { row: -1, col: 70 }
-
-// --- isDoable listener: make sow doable when card field can be sown ---
 
 const isDoableListener: CardListenerRegistration = {
   id: 'C70-lettuce-patch-isdoable-sow',
@@ -39,23 +36,6 @@ const isDoableListener: CardListenerRegistration = {
     return { doable: true }
   },
 }
-
-export const C70_LettucePatch = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Lettuce Patch',
-  deck: 'C',
-  number: 70,
-  category: 'CROP_PROVIDER',
-  providesField: true,
-  vp: 1,
-  cost: {},
-  prerequisite: '3 Occupations',
-  occupationPrerequisites: { min: 3 },
-  isField: true,
-  desc: [
-    'This card is a field that can only grow vegetables. You can immediately turn each <VEGETABLE> you harvested from this card into 4 <FOOD>.',
-  ],
-})
 
 export const C70_LettucePatch_impl = {
   listeners: [isDoableListener],

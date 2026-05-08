@@ -1,12 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import { C87_Mason } from '../../cards-display/C/C87_Mason'
 
-const CARD_ID = 'C87_Mason'
+const CARD_ID = C87_Mason.id
 
 const anytimeListener: CardListenerRegistration = {
   id: 'C87-mason-anytime',
@@ -31,18 +31,6 @@ const anytimeListener: CardListenerRegistration = {
     }
   },
 }
-
-export const C87_Mason = new Occupation({
-  id: CARD_ID,
-  name: 'Mason',
-  deck: 'C',
-  number: 87,
-  category: 'FARM_PLANNER',
-  desc: ['Place a stone room on this card. Once you have a stone house with at least 4 rooms, at any time, you can add that room without paying any building resources.'],
-  cost: {},
-  players: '1+',
-  implemented: true,
-})
 
 export const C87_Mason_impl = {
   listeners: [anytimeListener],

@@ -1,11 +1,11 @@
-import { Occupation } from '../types'
 import type { ActionSpace, Resource } from '../../contract/types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B161_Weakling } from '../../cards-display/B/B161_Weakling'
 
-const CARD_ID = 'B161_Weakling'
+const CARD_ID = B161_Weakling.id
 
 /**
  * B161 Weakling — Each time it is your turn in the work phase, if there are
@@ -60,20 +60,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { vegetable: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const B161_Weakling = new Occupation({
-  id: CARD_ID,
-  name: 'Weakling',
-  deck: 'B',
-  number: 161,
-  category: 'CROP_PROVIDER',
-  desc: [
-    'Each time it is your turn in the work phase, if there are one or more accumulation spaces with 5+ goods on them and you do not use any of them, you get 1 <VEGETABLE>.',
-  ],
-  cost: {},
-  players: '4+',
-  evenMoreSet: true,
-})
 
 export const B161_Weakling_impl = {
   listeners: [listener],

@@ -1,20 +1,8 @@
-import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E61_RaisedBed } from '../../cards-display/E/E61_RaisedBed'
 
-const CARD_ID = 'E61_RaisedBed'
-
-export const E61_RaisedBed = new MinorImprovement({
-  id: CARD_ID,
-  name: "Raised Bed",
-  deck: "E",
-  number: 61,
-  category: "FOOD_-_GRAIN",
-  desc: ["At the start of each harvest, you get 4 <FOOD>."],
-  vp: 1,
-  cost: { clay: 2, stone: 2 },
-  prerequisite: "2 Grain Fields",
-})
+const CARD_ID = E61_RaisedBed.id
 
 export const E61_RaisedBed_impl = {
   effect: {

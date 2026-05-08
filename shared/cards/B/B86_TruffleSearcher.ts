@@ -1,20 +1,8 @@
-import { Occupation } from '../types'
 import { initCardState } from '../__stubs__/helpers'
 import type { CardImpl } from '../registry'
+import { B86_TruffleSearcher } from '../../cards-display/B/B86_TruffleSearcher'
 
-const CARD_ID = 'B86_TruffleSearcher'
-
-export const B86_TruffleSearcher = new Occupation({
-  id: CARD_ID,
-  name: 'Truffle Searcher',
-  deck: 'B',
-  number: 86,
-  category: 'FARM_PLANNER',
-  desc: ['This card can hold a number of <PIG> equal to the number of completed feeding phases.'],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
+const CARD_ID = B86_TruffleSearcher.id
 
 export const B86_TruffleSearcher_impl = {
   effect: {

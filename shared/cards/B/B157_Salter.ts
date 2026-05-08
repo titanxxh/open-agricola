@@ -1,11 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import { initCardState } from '../__stubs__/helpers'
 import type { CardImpl } from '../registry'
+import { B157_Salter } from '../../cards-display/B/B157_Salter'
 
-const CARD_ID = 'B157_Salter'
+const CARD_ID = B157_Salter.id
 
 const anytimeListener: CardListenerRegistration = {
   id: 'B157-salter-anytime',
@@ -60,18 +60,6 @@ const anytimeListener: CardListenerRegistration = {
     }
   },
 }
-
-export const B157_Salter = new Occupation({
-  id: CARD_ID,
-  name: 'Salter',
-  deck: 'B',
-  number: 157,
-  category: 'FOOD_PROVIDER',
-  desc: ['At any time, you can pay 1 <SHEEP>/<PIG>/<CATTLE> from your farm. If you do, place 1 <FOOD> on each of the next 3/5/7 round spaces. At the start of these rounds, you get the <FOOD>.'],
-  cost: {},
-  players: '4+',
-  newSet: true,
-})
 
 export const B157_Salter_impl = {
   listeners: [anytimeListener],

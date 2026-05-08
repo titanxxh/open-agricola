@@ -1,4 +1,3 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionFlow, Pasture, PlayerState } from '../../contract/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
@@ -8,10 +7,12 @@ import {
   writeCardExtraData,
 } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import { B34_SpecialFood } from '../../cards-display/B/B34_SpecialFood'
+
+const CARD_ID = B34_SpecialFood.id
 
 type AnimalType = 'sheep' | 'boar' | 'cattle'
 
-const CARD_ID = 'B34_SpecialFood'
 const ANIMALS_BEFORE_KEY = 'animalsBeforeCollecting'
 
 const isAnimalAccumulationSpace = (context: CardListenerContext) => {
@@ -128,17 +129,6 @@ const afterListener: CardListenerRegistration = {
     return { flow: buildSpecialFoodFlow(totalObtained, ambiguous) }
   },
 }
-
-export const B34_SpecialFood = new MinorImprovement({
-  id: CARD_ID,
-  name: "Special Food",
-  deck: "B",
-  number: 34,
-  category: "POINTS_PROVIDER",
-  desc: ["The next time you take animals from an accumulation space and accommodate all of them on your farm, you get 1 bonus <SCORE> for each of these animals."],
-  cost: {},
-  prerequisite: "No Animal",
-})
 
 export const B34_SpecialFood_impl = {
   listeners: [beforeListener, afterListener],

@@ -1,20 +1,8 @@
-import { Occupation } from '../types'
 import { initCardState } from '../__stubs__/helpers'
 import type { CardImpl } from '../registry'
+import { A148_Woolgrower } from '../../cards-display/A/A148_Woolgrower'
 
-const CARD_ID = 'A148_Woolgrower'
-
-export const A148_Woolgrower = new Occupation({
-  id: CARD_ID,
-  name: 'Woolgrower',
-  deck: 'A',
-  number: 148,
-  category: 'FARM_PLANNER',
-  desc: ['This card can hold a number of <SHEEP> equal to the number of completed feeding phases.'],
-  cost: {},
-  players: '4+',
-  newSet: true,
-})
+const CARD_ID = A148_Woolgrower.id
 
 export const A148_Woolgrower_impl = {
   effect: {

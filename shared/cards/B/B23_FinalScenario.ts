@@ -1,26 +1,13 @@
-import { MinorImprovement } from '../types'
 import { writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
+import { B23_FinalScenario } from '../../cards-display/B/B23_FinalScenario'
 
-const CARD_ID = 'B23_FinalScenario'
+const CARD_ID = B23_FinalScenario.id
 
-// BGA isBuyable: turn == 14 → false
 registerPrerequisite('Round 13 or Before', (_player, state) => {
   if (!state) return true
   return state.round <= 13
-})
-
-export const B23_FinalScenario = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Final Scenario',
-  deck: 'B',
-  number: 23,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['Reveal the action space card for round 14. Only you can use it until round 14 starts.'],
-  cost: {},
-  prerequisite: 'Round 13 or Before',
-  evenMoreSet: true,
 })
 
 export const B23_FinalScenario_impl = {

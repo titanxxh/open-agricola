@@ -1,20 +1,8 @@
-import { MinorImprovement } from '../types'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
+import { D57_WholesaleMarket } from '../../cards-display/D/D57_WholesaleMarket'
 
-const CARD_ID = 'D57_WholesaleMarket'
-
-export const D57_WholesaleMarket = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Wholesale Market',
-  deck: 'D',
-  number: 57,
-  category: 'FOOD_PROVIDER',
-  desc: ['Place 1 <FOOD> on each remaining round space. At the start of these rounds, you get the <FOOD>.'],
-  cost: { wood: 2, vegetable: 2 },
-  vp: 3,
-  newSet: true,
-})
+const CARD_ID = D57_WholesaleMarket.id
 
 export const D57_WholesaleMarket_impl = {
   effect: {

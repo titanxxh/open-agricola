@@ -1,11 +1,11 @@
-import { MinorImprovement } from '../types'
 import { positionKey } from '../../domain/farm'
 import type { PlayerState } from '../../contract/types'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { fieldTopStack, fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { D72_StableManure } from '../../cards-display/D/D72_StableManure'
 
-const CARD_ID = 'D72_StableManure'
+const CARD_ID = D72_StableManure.id
 
 registerSelectionEffect('harvest-extra', ({ player, positions }) => {
   for (const key of positions) {
@@ -31,18 +31,6 @@ const countUnfencedStables = (player: PlayerState): number => {
   }
   return player.stableTiles.filter(s => !pastureTileKeys.has(positionKey(s))).length
 }
-
-export const D72_StableManure = new MinorImprovement({
-  id: CARD_ID,
-  name: "Stable Manure",
-  deck: "D",
-  number: 72,
-  category: "CROP_PROVIDER",
-  desc: ["In the field phase of each harvest, you can harvest 1 additional good from a number of fields equal to the number of unfenced stables you have."],
-  cost: {},
-  prerequisite: "At Most 1 Occupation",
-  occupationPrerequisites: {"max":1},
-})
 
 export const D72_StableManure_impl = {
   effect: {

@@ -1,8 +1,8 @@
-import { MinorImprovement } from '../types'
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { E5_NightLoot } from '../../cards-display/E/E5_NightLoot'
 
-const CARD_ID = 'E5_NightLoot'
+const CARD_ID = E5_NightLoot.id
 
 /**
  * E5 Night Loot — Minor Improvement
@@ -56,16 +56,6 @@ const takeFromSpaceLeaf = (
   actionId: 'take-from-space',
   sourceCard: CARD_ID,
   actionContext: { spaceId, resource, amount: 1 },
-})
-
-export const E5_NightLoot = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Night Loot',
-  deck: 'E',
-  number: 5,
-  category: 'PASSING_-_BUILDING_RESOURCES_',
-  desc: ['Immediately remove 2 different building resources total from accumulation spaces and place them in your supply.'],
-  cost: { food: 2 },
 })
 
 export const E5_NightLoot_impl = {

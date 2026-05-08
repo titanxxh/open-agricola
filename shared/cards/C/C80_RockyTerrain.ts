@@ -1,11 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
 import { isFieldCard } from '../catalog'
 import type { CardImpl } from '../registry'
+import { C80_RockyTerrain } from '../../cards-display/C/C80_RockyTerrain'
 
-const CARD_ID = 'C80_RockyTerrain'
+const CARD_ID = C80_RockyTerrain.id
 
 /**
  * C80 Rocky Terrain (BGA `Cards/C/C80_RockyTerrain.php`):
@@ -38,7 +38,6 @@ const plowListener: CardListenerRegistration = {
     buyStoneForFood(context.player),
 }
 
-// improvement-any: context.choice is "minor:<id>" or "major:<id>"
 const improvementFieldListener: CardListenerRegistration = {
   id: 'C80-rocky-terrain-after-improvement-field',
   cardIds: [CARD_ID],
@@ -52,7 +51,6 @@ const improvementFieldListener: CardListenerRegistration = {
   },
 }
 
-// play-occupation: context.choice is the occupation id (no prefix)
 const occupationFieldListener: CardListenerRegistration = {
   id: 'C80-rocky-terrain-after-occupation-field',
   cardIds: [CARD_ID],
@@ -64,18 +62,6 @@ const occupationFieldListener: CardListenerRegistration = {
     return buyStoneForFood(context.player)
   },
 }
-
-export const C80_RockyTerrain = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Rocky Terrain',
-  deck: 'C',
-  number: 80,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['Each time you plow a field (tile or card), you can also buy 1 <STONE> for 1 <FOOD>.'],
-  cost: { food: 1 },
-  players: '1+',
-  newSet: true,
-})
 
 export const C80_RockyTerrain_impl = {
   listeners: [plowListener, improvementFieldListener, occupationFieldListener],

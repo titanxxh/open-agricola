@@ -1,10 +1,10 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { A142_Cordmaker } from '../../cards-display/A/A142_Cordmaker'
 
-const CARD_ID = 'A142_Cordmaker'
+const CARD_ID = A142_Cordmaker.id
 
 /**
  * A142 Cordmaker:
@@ -41,19 +41,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const A142_Cordmaker = new Occupation({
-  id: CARD_ID,
-  name: 'Cordmaker',
-  deck: 'A',
-  number: 142,
-  category: 'CROP_PROVIDER',
-  desc: [
-    'Each time any player (including you) takes at least 2 <REED> from the __Reed Bank__ accumulation space, you can choose to take 1 <GRAIN> or buy 1 <VEGETABLE> for 2 <FOOD>.',
-  ],
-  cost: {},
-  players: '3+',
-})
 
 export const A142_Cordmaker_impl = {
   listeners: [listener],

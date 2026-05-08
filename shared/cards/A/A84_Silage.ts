@@ -1,11 +1,13 @@
-import { MinorImprovement } from '../types'
 import type { ActionDefinition, ActionFlow } from '../../contract/types'
 import { fieldHasCrop, fieldTopStack, fieldPopIfDepleted } from '../../domain/field'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
+import { A84_Silage } from '../../cards-display/A/A84_Silage'
 
-const CARD_ID = 'A84_Silage'
+const CARD_ID = A84_Silage.id
+
 const PAY_GRAIN_ACTION_ID = 'card_A84_Silage_pay-grain-any'
+
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 
 const BREEDABLE_TYPES = ['cattle', 'boar', 'sheep'] as const
@@ -37,18 +39,8 @@ const payGrainAnyAction: ActionDefinition = {
     return { type: 'fail', logKey: 'log.exchangeFail' }
   },
 }
-registerAdHocAction(payGrainAnyAction)
 
-export const A84_Silage = new MinorImprovement({
-  id: CARD_ID,
-  name: "Silage",
-  deck: "A",
-  number: 84,
-  category: "LIVESTOCK_PROVIDER",
-  desc: ["In each returning home phase after which there is no harvest, you can pay exactly 1 <GRAIN> - even from a field - to breed exactly one type of animal."],
-  cost: {},
-  prerequisite: "2 Fields",
-})
+registerAdHocAction(payGrainAnyAction)
 
 export const A84_Silage_impl = {
   effect: {

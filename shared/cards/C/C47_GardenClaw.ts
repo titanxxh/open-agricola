@@ -1,20 +1,9 @@
-import { MinorImprovement } from '../types'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { C47_GardenClaw } from '../../cards-display/C/C47_GardenClaw'
 
-const CARD_ID = 'C47_GardenClaw'
-
-export const C47_GardenClaw = new MinorImprovement({
-  id: CARD_ID,
-  name: "Garden Claw",
-  deck: "C",
-  number: 47,
-  category: "FOOD_PROVIDER",
-  desc: ["Place 1 <FOOD> on each remaining round space, up to three times the number of planted fields you have. At the start of these rounds, you get the <FOOD>."],
-  cost: { wood: 1 },
-  newSet: true,
-})
+const CARD_ID = C47_GardenClaw.id
 
 export const C47_GardenClaw_impl = {
   effect: {

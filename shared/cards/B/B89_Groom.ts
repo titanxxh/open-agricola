@@ -1,21 +1,8 @@
-import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B89_Groom } from '../../cards-display/B/B89_Groom'
 
-const CARD_ID = 'B89_Groom'
-
-export const B89_Groom = new Occupation({
-  id: CARD_ID,
-  name: 'Groom',
-  deck: 'B',
-  number: 89,
-  category: 'FARM_PLANNER',
-  desc: [
-    'When you play this card, immediately get 1 <WOOD>. Once you live in a stone house, at the start of each round, you can build exactly 1 stable for 1 <WOOD>.',
-  ],
-  cost: {},
-  players: '1+',
-})
+const CARD_ID = B89_Groom.id
 
 export const B89_Groom_impl = {
   effect: {

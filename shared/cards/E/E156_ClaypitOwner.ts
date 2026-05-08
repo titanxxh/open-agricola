@@ -1,4 +1,4 @@
-import { Occupation, getRegisteredMinorImprovement } from '../types'
+import { getRegisteredMinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
@@ -6,8 +6,9 @@ import { getMajorCard } from '../major'
 import { isMajorCardId } from '../helpers/card-type'
 import { PaymentSolver } from '../../actions/payment'
 import type { CardImpl } from '../registry'
+import { E156_ClaypitOwner } from '../../cards-display/E/E156_ClaypitOwner'
 
-const CARD_ID = 'E156_ClaypitOwner'
+const CARD_ID = E156_ClaypitOwner.id
 
 /**
  * E156 Claypit Owner (Occupation, E, 156)
@@ -63,20 +64,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { food: 1, clay: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const E156_ClaypitOwner = new Occupation({
-  id: CARD_ID,
-  name: 'Claypit Owner',
-  deck: 'E',
-  number: 156,
-  category: 'GOODS_-_GET',
-  desc: [
-    'Each time another player plays or builds an improvement with a printed <CLAY> cost, you get 1 <FOOD> and 1 <CLAY>.',
-  ],
-  cost: {},
-  players: '4+',
-  newSet: true,
-})
 
 export const E156_ClaypitOwner_impl = {
   listeners: [listener],

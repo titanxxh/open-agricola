@@ -1,13 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { D73_SupplyBoat } from '../../cards-display/D/D73_SupplyBoat'
 
-const CARD_ID = 'D73_SupplyBoat'
+const CARD_ID = D73_SupplyBoat.id
 
-// D73 Supply Boat: Each time after you use the Fishing accumulation space,
-// you can choose to buy 1 GRAIN for 1 FOOD, or 1 VEGETABLE for 3 FOOD.
 const listener: CardListenerRegistration = {
   id: 'D73-supply-boat-after-collect',
   cardIds: [CARD_ID],
@@ -28,21 +26,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const D73_SupplyBoat = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Supply Boat',
-  deck: 'D',
-  number: 73,
-  category: 'CROP_PROVIDER',
-  desc: [
-    'Each time after you use the __Fishing__ accumulation space, you can choose to buy 1 <GRAIN> for 1 <FOOD>, or 1 <VEGETABLE> for 3 <FOOD>.',
-  ],
-  cost: { wood: 1 },
-  vp: 1,
-  prerequisite: '1 Occupation',
-  occupationPrerequisites: { min: 1 },
-})
 
 export const D73_SupplyBoat_impl = {
   listeners: [listener],

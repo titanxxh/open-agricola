@@ -1,10 +1,10 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B63_Tasting } from '../../cards-display/B/B63_Tasting'
 
-const CARD_ID = 'B63_Tasting'
+const CARD_ID = B63_Tasting.id
 
 const LESSONS_SPACES = new Set(['lessons', 'lessons-2', 'lessons-4'])
 
@@ -38,20 +38,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const B63_Tasting = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Tasting',
-  deck: 'B',
-  number: 63,
-  category: 'FOOD_PROVIDER',
-  desc: [
-    'Each time you use a __Lessons__ action space, before paying the occupation cost, you can exchange 1 <GRAIN> for 4 <FOOD>.',
-  ],
-  cost: { wood: 2 },
-  vp: 1,
-  newSet: true,
-})
 
 export const B63_Tasting_impl = {
   listeners: [listener],

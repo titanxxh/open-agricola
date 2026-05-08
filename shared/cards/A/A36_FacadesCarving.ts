@@ -1,16 +1,14 @@
-import { MinorImprovement } from '../types'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
+import { A36_FacadesCarving } from '../../cards-display/A/A36_FacadesCarving'
 
-const CARD_ID = 'A36_FacadesCarving'
+const CARD_ID = A36_FacadesCarving.id
 
-// BGA isBuyable: countReserveResource(WOOD) < Globals::getTurn() → false
 registerPrerequisite('Wood in Your Supply >= Current Round', (player, state) => {
   if (!state) return true
   return (player.resources.wood ?? 0) >= state.round
 })
 
-// Maps current round to number of completed harvests
 const HARVEST_MAP: Record<number, number> = {
   1: 0, 2: 0, 3: 0, 4: 0,
   5: 1, 6: 1, 7: 1,
@@ -19,19 +17,6 @@ const HARVEST_MAP: Record<number, number> = {
   12: 4, 13: 4,
   14: 5,
 }
-
-export const A36_FacadesCarving = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Facades Carving',
-  deck: 'A',
-  number: 36,
-  category: 'POINTS_PROVIDER',
-  desc: ['When you play this card, you can exchange any number of <FOOD> for 1 bonus <SCORE> each, up to the number of completed harvests.'],
-  cost: { clay: 2 },
-  prerequisite: 'Wood in Your Supply >= Current Round',
-  extraVp: true,
-  newSet: true,
-})
 
 export const A36_FacadesCarving_impl = {
   effect: {

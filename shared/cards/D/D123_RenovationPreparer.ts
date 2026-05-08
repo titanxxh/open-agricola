@@ -1,13 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
 import type { CardImpl } from '../registry'
+import { D123_RenovationPreparer } from '../../cards-display/D/D123_RenovationPreparer'
 
-const CARD_ID = 'D123_RenovationPreparer'
+const CARD_ID = D123_RenovationPreparer.id
 
-// D123 Renovation Preparer: For each new wood/clay room you build, you get 2 CLAY/2 STONE.
 const listener: CardListenerRegistration = {
   id: 'D123-renovation-preparer-after-construct',
   cardIds: [CARD_ID],
@@ -24,18 +23,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const D123_RenovationPreparer = new Occupation({
-  id: CARD_ID,
-  name: 'Renovation Preparer',
-  deck: 'D',
-  number: 123,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['For each new wood/clay room you build, you get 2 <CLAY>/2 <STONE>.'],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
 
 export const D123_RenovationPreparer_impl = {
   listeners: [listener],

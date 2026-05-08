@@ -1,9 +1,9 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { B109_PaperMaker } from '../../cards-display/B/B109_PaperMaker'
 
-const CARD_ID = 'B109_PaperMaker'
+const CARD_ID = B109_PaperMaker.id
 
 const computeCostsListener: CardListenerRegistration = {
   id: 'B109-paper-maker-compute-costs-occupation',
@@ -25,17 +25,6 @@ const computeCostsListener: CardListenerRegistration = {
     }
   },
 }
-
-export const B109_PaperMaker = new Occupation({
-  id: CARD_ID,
-  name: "Paper Maker",
-  deck: "B",
-  number: 109,
-  category: "FOOD_PROVIDER",
-  desc: ["Immediately before playing each occupation after this one, you can pay 1 <WOOD> total to get 1 <FOOD> for each occupation you have in front of you."],
-  cost: {},
-  players: "1+",
-})
 
 export const B109_PaperMaker_impl = {
   listeners: [computeCostsListener],
