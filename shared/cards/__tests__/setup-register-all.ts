@@ -5,7 +5,7 @@
  *
  * 1. **Module load order**: there is a pre-existing TDZ cycle between
  *    `shared/cards/catalog.ts` and `shared/cards/D/D95_SiteManager.ts` (via
- *    `shared/game/minor-improvements.ts`). The cycle resolves correctly only
+ *    `shared/cards-display/_lookup.ts`). The cycle resolves correctly only
  *    when `minor-improvements.ts` is loaded before `catalog.ts` reaches its
  *    first card import. Importing `GameSession` here forces the same load
  *    order the server uses at runtime.

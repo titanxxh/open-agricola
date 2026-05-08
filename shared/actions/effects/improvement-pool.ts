@@ -1,5 +1,5 @@
 import type { GameState, PlayerState } from '../../contract/types'
-import { getMinorImprovement } from '../../game/minor-improvements'
+import { getMinorImprovement } from '../../cards-display/_lookup'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
 
 type ResolvedMinorImprovement = NonNullable<ReturnType<typeof getMinorImprovement>>
