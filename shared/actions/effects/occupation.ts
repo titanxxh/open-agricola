@@ -1,5 +1,5 @@
 import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ComplexCost, GameState, ImmediateLogEntry, PlayerState, Resource } from '../../contract/types'
-import { getOccupation } from '../../cards-display/_lookup'
+import { getOccupation } from '../../cards/registry-display'
 import {
   canAffordCardPreviewCostByProvider,
   payCardPreviewCostByProvider,

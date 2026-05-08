@@ -20,7 +20,7 @@ import { addFoodFromConversion, incResourceConverted } from '../../session/stats
 import {
   getRegisteredMinorImprovement,
   getRegisteredOccupation,
-} from '../../cards-display/types'
+} from '../../cards/registry-display'
 import type { CardExchange, ExchangeWindow } from '../../contract/cards'
 import { getMajorCard } from '../../cards/major'
 import { collectComputeExchanges, runCardListeners } from '../../cards/card-listeners'

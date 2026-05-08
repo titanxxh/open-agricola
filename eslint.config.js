@@ -225,4 +225,24 @@ export default defineConfig([
       }],
     },
   },
+  // S6c: impl layers should consume card metadata via getCardDefinition/registry-runtime,
+  // not reach into cards-display directly (would couple impl to display chunk).
+  {
+    files: [
+      'shared/actions/**/*.ts',
+      'shared/engine/**/*.ts',
+      'shared/session/**/*.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', {
+        patterns: [
+          {
+            group: ['**/cards-display/**', '../cards-display/**', '../../cards-display/**'],
+            message: 'session/engine/actions should consume metadata via shared/cards/registry-runtime (getCardDefinition / getCardEffect), not import cards-display directly.',
+            allowTypeImports: true,
+          },
+        ],
+      }],
+    },
+  },
 ])

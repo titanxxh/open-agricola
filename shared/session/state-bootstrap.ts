@@ -13,7 +13,7 @@ import {
 } from '../domain/farm'
 import { createRng, createSeed, shuffleWithRng } from '../utils/rng'
 import { createActionSpaces } from '../actions'
-import { majorImprovementIds } from '../cards-display/_lookup'
+import { majorImprovementIds } from '../cards/registry-display'
 import {
   implementedMinorImprovementCards,
   implementedOccupationCards,
@@ -34,7 +34,7 @@ import {
 import {
   getRegisteredMinorImprovement,
   getRegisteredOccupation,
-} from '../cards-display/types'
+} from '../cards/registry-display'
 import {
   applyRoundGrowth,
   defaultPlayerColors,
