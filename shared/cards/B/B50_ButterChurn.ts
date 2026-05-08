@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getAssignedAnimalsByType } from '../../game/animals'
+import { getAssignedAnimalsByType } from '../../domain/animals'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B50_ButterChurn'
