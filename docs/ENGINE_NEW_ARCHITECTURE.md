@@ -15,7 +15,7 @@
 
 它**不改变**：后端权威 / 全量快照 / WS 协议 / hook 系统 / 卡牌闭环原则 / 三层物理边界。
 
-> **当前 sprint 进度**（详见 §15）：S1 ✅（2026-05-03）/ S2 ✅（2026-05-05）/ S3 ✅（2026-05-04，PaymentSolver 收口）/ S4a ✅（2026-05-04）/ S4b ✅（2026-05-05，rich-node + step() dispatch + cursor round-trip 落地）/ S4c ✅（2026-05-08，Engine API 收敛 14 → 6 + mirror 字段删除 + engine.ts 447 行）/ S5 ✅（2026-05-06，RoomManager 拆 connection/persistence 三层）/ S6–S7 待启动。
+> **当前 sprint 进度**（详见 §15）：S1 ✅（2026-05-03）/ S2 ✅（2026-05-05）/ S3 ✅（2026-05-04，PaymentSolver 收口）/ S4a ✅（2026-05-04）/ S4b ✅（2026-05-05，rich-node + step() dispatch + cursor round-trip 落地）/ S4c ✅（2026-05-08，Engine API 收敛 14 → 6 + mirror 字段删除 + engine.ts 447 行）/ S5 ✅（2026-05-06，RoomManager 拆 connection/persistence 三层）/ S6 ✅（2026-05-08，物理分层 + cards-display split + sandbox lazy + 5 ESLint error 级规则）/ S7 待启动。
 
 ---
 
@@ -1131,20 +1131,31 @@ S4 拆分为两条独立轨道并行推进：
 
 S5 完成（2026-05-05）
 
-### Sprint S6：物理分层（contract / cards-display / client/sandbox / ESLint 边界）
+### Sprint S6：物理分层 ✅ 完成（2026-05-08）
 
-纯搬迁，零行为变化：
+> **完成总结**：
+> - ✅ S6a: `shared/contract/`、`shared/utils/`、`client/utils/` 三个新目录创建；`shared/game/`、`shared/logic/`、`shared/protocol/` 物理删除；`shared/cards/types.ts` 拆三份（contract/cards.ts + cards-display/types.ts + cards/registry-runtime.ts）
+> - ✅ S6b: `scripts/codemod-cards-display.ts` 写好并跑过；900 张卡 split 成 cards-display + cards-impl 两份；catalog 改 import cards-display；ESLint cards-display 隔离规则落地；`shared/cards/types.ts` shim 删除
+> - ✅ S6c: `client/sandbox/{index,SandboxApp}.tsx` 入口创建；workshop 路由改用 SandboxAppLazy；4 套新 ESLint error 级规则（contract / main-client / impl-no-cards-display / utils）；Playwright workshop smoke 验证 lazy-loading；bundle 限额 re-baseline（main 529 KB raw / 161 KB gz 维持现状——一直未发生 impl 泄漏）
 
-- 创建 `shared/contract/`：迁入当前 `shared/game/types.ts` + `shared/protocol/*` + 部分 `shared/game/` record
-- 拆 `shared/cards/*.ts` → `shared/cards-display/*.ts`（display 字段）+ `shared/cards/*.ts`（impl 部分保留）
-- 创建 `client/sandbox/` 目录骨架，把工坊 hot-seat 改成走这个入口（动态 import `shared/session/...`）
-- 配 ESLint：主路径白名单 [A] only，sandbox 子目录全开
-- 验证 `pnpm run build` 产出两个 chunk：`client-app.bundle` + `client-sandbox.bundle`
-- 专项 DoD：
-  - `shared/game/` `shared/logic/` 目录不复存在
-  - 主路径 ESLint violation 为 0
-  - 主 bundle 不含 `shared/session/` `shared/engine/` `shared/actions/` `shared/cards/` impl
-  - 「强制 green 子集」零回归（行为零变化）
+#### Sprint S6 整体 DoD
+
+- ✅ D1: 4 个新目录 + 3 个旧目录消失
+- ✅ D2: 900 张卡 split 完成
+- ✅ D3: 5 套新 ESLint error 级规则（cards-display 在 S6b、其他 4 套在 S6c）
+- ✅ D4: bundle 隔离已稳定 — main 一直 ≈541 KB（未发生 impl 泄漏，ESLint 边界硬阻断未来扩张）
+- ✅ D5: `dist/assets/SandboxApp-*.js` + `WorkshopPage-*.js` 独立 chunks 含 session/engine/cards-impl
+- ✅ D6: `pnpm test:fast` 2277 pass / 0 fail（行为零变化）
+- ✅ D7: tsc app+server / lint / build / check:bundle-size 全绿
+- ✅ D8: Playwright workshop smoke pass
+- ✅ D9: GitHub Actions 全绿
+
+#### 关键演进
+
+1. **物理边界 vs 逻辑边界**：S6 之前 ESLint 多为 warn 级、有 5 套规则；S6 后 error 级硬阻断 + 物理目录隔离 — 无法误导入。共 5 套新 error 级规则（cards-display + contract + main-client + impl-no-cards-display + utils）。
+2. **Main bundle 一直未泄漏**：S6b 期间确认 main client 从未通过 catalog 直接 import cards/<deck>/<file> 的 impl —— 这条路径靠 `client/services/card-meta.ts` + `cards-manifest.json` 的异步 metadata 查询绕开。S6 真正的价值在**未来防御**——ESLint 硬阻断未来 PR 误把 impl 拉入 client 主路径。
+3. **codemod 一次性脚本**：`scripts/codemod-cards-display.ts` 完成施工后留作文档；新卡靠 ESLint 规则自然守门。
+4. **registry-display.ts seam**：S6c rule 8（impl 不 import cards-display）发现 7 effect + 3 session 文件确实 import cards-display 取 metadata，建立 `shared/cards/registry-display.ts` 作为前向 seam，避免 cycle 同时合规化。
 
 ### Sprint S7：卡牌效果测试回归
 
