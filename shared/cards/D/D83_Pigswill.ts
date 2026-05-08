@@ -1,12 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { D83_Pigswill } from '../../cards-display/D/D83_Pigswill'
 
-const CARD_ID = 'D83_Pigswill'
+const CARD_ID = D83_Pigswill.id
 
-// Each time you use Fencing, you also get 1 pig (before building fences).
 const listener: CardListenerRegistration = {
   id: 'D83-pigswill-before-place-farmer',
   cardIds: [CARD_ID],
@@ -17,17 +16,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { boar: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const D83_Pigswill = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Pigswill',
-  deck: 'D',
-  number: 83,
-  category: 'LIVESTOCK_PROVIDER',
-  desc: ['Each time you use the __Fencing__ action space, you also get 1 <PIG>.'],
-  altCosts: [{ food: 2 }, { grain: 1 }],
-  newSet: true,
-})
 
 export const D83_Pigswill_impl = {
   listeners: [listener],

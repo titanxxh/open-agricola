@@ -1,15 +1,14 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { C84_PerennialRye } from '../../cards-display/C/C84_PerennialRye'
 
-// Inline harvest rounds to avoid circular dependency with logic/state
+const CARD_ID = C84_PerennialRye.id
+
 const HARVEST_ROUNDS = [4, 7, 9, 11, 13, 14]
-
-const CARD_ID = 'C84_PerennialRye'
 
 const ANIMAL_TYPES = ['sheep', 'boar', 'cattle'] as const
 
@@ -41,19 +40,6 @@ const anytimeListener: CardListenerRegistration = {
     }
   },
 }
-
-export const C84_PerennialRye = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Perennial Rye',
-  deck: 'C',
-  number: 84,
-  category: 'LIVESTOCK_PROVIDER',
-  desc: ['Each round that does not end with a harvest, you can pay 1 <GRAIN> to breed exactly 1 type of animal. (This is not considered a breeding phase.)'],
-  cost: { food: 1 },
-  prerequisite: '2 Occupations',
-  occupationPrerequisites: { min: 2 },
-  newSet: true,
-})
 
 export const C84_PerennialRye_impl = {
   listeners: [anytimeListener],

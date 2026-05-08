@@ -1,10 +1,10 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { D109_SowingMaster } from '../../cards-display/D/D109_SowingMaster'
 
-const CARD_ID = 'D109_SowingMaster'
+const CARD_ID = D109_SowingMaster.id
 
 const listener: CardListenerRegistration = {
   id: 'D109-sowing-master-after-place-farmer',
@@ -16,21 +16,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { food: 2 }), sourceCard: CARD_ID }
   },
 }
-
-export const D109_SowingMaster = new Occupation({
-  id: CARD_ID,
-  name: 'Sowing Master',
-  deck: 'D',
-  number: 109,
-  category: 'FOOD_PROVIDER',
-  desc: [
-    'When you play this card, you immediately get 1 <WOOD>. Each time after you use the __Grain Utilization__ or __Cultivation__ action space, you get 2 <FOOD>.',
-  ],
-  cost: {},
-  players: '1+',
-  evenMoreSet: true,
-  implemented: true,
-})
 
 export const D109_SowingMaster_impl = {
   listeners: [listener],

@@ -1,11 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getStoredResource } from '../helpers/card-storage'
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { C120_AgriculturalLabourer } from '../../cards-display/C/C120_AgriculturalLabourer'
 
-const CARD_ID = 'C120_AgriculturalLabourer'
+const CARD_ID = C120_AgriculturalLabourer.id
 
 const grainRewardFlow = (
   context: CardListenerContext,
@@ -58,17 +58,6 @@ const gainListener: CardListenerRegistration = {
     return grainRewardFlow(context, grainCount)
   },
 }
-
-export const C120_AgriculturalLabourer = new Occupation({
-  id: CARD_ID,
-  name: "Agricultural Labourer",
-  deck: "C",
-  number: 120,
-  category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["Place 8 <CLAY> on this card. For each <GRAIN> you obtain, you also get 1 <CLAY> from this card."],
-  cost: {},
-  players: "1+",
-})
 
 export const C120_AgriculturalLabourer_impl = {
   listeners: [onPlayListener, gainListener],

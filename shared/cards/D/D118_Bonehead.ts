@@ -1,10 +1,10 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import { D118_Bonehead } from '../../cards-display/D/D118_Bonehead'
 
-const CARD_ID = 'D118_Bonehead'
+const CARD_ID = D118_Bonehead.id
 
 /**
  * After playing an occupation (play-occupation action), give 1 wood from stack.
@@ -41,17 +41,6 @@ const afterImprovementListener: CardListenerRegistration = {
     }
   },
 }
-
-export const D118_Bonehead = new Occupation({
-  id: CARD_ID,
-  name: 'Bonehead',
-  deck: 'D',
-  number: 118,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['When you play this card, immediately place 6 <WOOD> on it. Immediately after each time you play a card from your hand, including this one, you get 1 <WOOD> from this card.'],
-  cost: {},
-  players: '1+',
-})
 
 export const D118_Bonehead_impl = {
   listeners: [afterOccupationListener, afterImprovementListener],

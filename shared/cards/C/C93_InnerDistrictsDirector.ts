@@ -1,11 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { C93_InnerDistrictsDirector } from '../../cards-display/C/C93_InnerDistrictsDirector'
 
-const CARD_ID = 'C93_InnerDistrictsDirector'
+const CARD_ID = C93_InnerDistrictsDirector.id
 
 /**
  * C93 Inner Districts Director:
@@ -62,20 +62,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const C93_InnerDistrictsDirector = new Occupation({
-  id: CARD_ID,
-  name: 'Inner Districts Director',
-  deck: 'C',
-  number: 93,
-  category: 'ACTIONS_BOOSTER',
-  desc: [
-    'Each time you use the __Forest__ or __Clay Pit__ accumulation space, you can place 1 <STONE> from the general supply on the other space. If you do, you can immediately place another person.',
-  ],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
 
 export const C93_InnerDistrictsDirector_impl = {
   listeners: [listener],

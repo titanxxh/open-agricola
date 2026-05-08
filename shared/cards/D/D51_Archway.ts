@@ -1,11 +1,10 @@
-import { PlayerActionCard } from '../types'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import { isSpaceOccupied, spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
+import { D51_Archway } from '../../cards-display/D/D51_Archway'
 
-const CARD_ID = 'D51_Archway'
+const CARD_ID = D51_Archway.id
 
-// Register D51 as a dynamic action space: any player can use it, gives 1 FOOD
 registerPlayerActionSpace({
   cardId: CARD_ID,
   access: 'all',
@@ -22,19 +21,6 @@ registerPlayerActionSpace({
       }
     },
   }),
-})
-
-export const D51_Archway = new PlayerActionCard({
-  id: CARD_ID,
-  name: "Archway",
-  deck: "D",
-  number: 51,
-  category: "FOOD_PROVIDER",
-  desc: ["This card is an action space for all. A player who uses it immediately gets 1 <FOOD>. Immediately before the returning home phase, they can use an unoccupied action space with the person from this card."],
-  cost: {"clay":2},
-  vp: 4,
-  prerequisite: "No Occupations",
-  occupationPrerequisites: {"max":0},
 })
 
 export const D51_Archway_impl = {

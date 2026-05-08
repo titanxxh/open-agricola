@@ -1,18 +1,7 @@
-import { Occupation } from '../types'
 import type { CardImpl } from '../registry'
+import { C134_CowPrince } from '../../cards-display/C/C134_CowPrince'
 
-const CARD_ID = 'C134_CowPrince'
-
-export const C134_CowPrince = new Occupation({
-  id: CARD_ID,
-  name: "Cow Prince",
-  deck: "C",
-  number: 134,
-  category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 1 bonus <SCORE> for each space in your farmyard (including rooms) holding at least 1 <CATTLE>."],
-  cost: {},
-  players: "3+",
-})
+const CARD_ID = C134_CowPrince.id
 
 export const C134_CowPrince_impl = {
   effect: {

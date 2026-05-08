@@ -1,10 +1,10 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B16_MiningHammer } from '../../cards-display/B/B16_MiningHammer'
 
-const CARD_ID = 'B16_MiningHammer'
+const CARD_ID = B16_MiningHammer.id
 
 /**
  * B16 Mining Hammer:
@@ -44,18 +44,6 @@ const afterRenovateListener: CardListenerRegistration = {
     }
   },
 }
-
-export const B16_MiningHammer = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Mining Hammer',
-  deck: 'B',
-  number: 16,
-  category: 'FARM_PLANNER',
-  desc: [
-    'When you play this card, you immediately get 1 <FOOD>. Each time you renovate, you can also build a stable without paying <WOOD>.',
-  ],
-  cost: { wood: 1 },
-})
 
 export const B16_MiningHammer_impl = {
   listeners: [onBuyListener, afterRenovateListener],

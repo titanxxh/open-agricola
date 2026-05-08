@@ -1,15 +1,13 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getStoredResource } from '../helpers/card-storage'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { C81_MaterialHub } from '../../cards-display/C/C81_MaterialHub'
 
-const CARD_ID = 'C81_MaterialHub'
+const CARD_ID = C81_MaterialHub.id
 
-// BGA isBuyable: countReserveResource(REED) == 0 || countReserveResource(STONE) == 0 → false
-// Whole-string handler so the registry takes priority over the " and " split parser.
 registerPrerequisite('1 reed and 1 stone in your supply', (player) =>
   (player.resources.reed ?? 0) >= 1 && (player.resources.stone ?? 0) >= 1,
 )
@@ -70,20 +68,6 @@ const collectListener: CardListenerRegistration = {
     }
   },
 }
-
-export const C81_MaterialHub = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Material Hub',
-  deck: 'C',
-  number: 81,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: [
-    'Immediately place 2 of each building resource on this card. Each time any player (including you) takes at least 5 <WOOD>, 4 <CLAY>, 3 <REED>, or 3 <STONE>, you get 1 of that building resource from this card.',
-  ],
-  cost: { wood: 1, clay: 1 },
-  prerequisite: '1 reed and 1 stone in your supply',
-  newSet: true,
-})
 
 export const C81_MaterialHub_impl = {
   listeners: [collectListener],

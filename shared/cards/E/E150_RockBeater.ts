@@ -1,12 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../contract/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
+import { E150_RockBeater } from '../../cards-display/E/E150_RockBeater'
 
-const CARD_ID = 'E150_RockBeater'
+const CARD_ID = E150_RockBeater.id
 
 /**
  * E150 Rock Beater — Occupation (players: 4+).
@@ -41,7 +41,6 @@ const computeArgsListener: CardListenerRegistration = {
   },
 }
 
-// 2. Stone rooms cost 2 stone less
 const constructCostListener: CardListenerRegistration = {
   id: 'E150-rock-beater-compute-costs-construct',
   cardIds: [CARD_ID],
@@ -52,19 +51,6 @@ const constructCostListener: CardListenerRegistration = {
     return { costs: { stone: -2 } }
   },
 }
-
-export const E150_RockBeater = new Occupation({
-  id: CARD_ID,
-  name: 'Rock Beater',
-  deck: 'E',
-  number: 150,
-  category: 'ACTION',
-  desc: [
-    'You can use an action space providing both stone and a different building resource even if it is occupied by another player. Stone rooms cost you 2 <STONE> less each.',
-  ],
-  cost: {},
-  players: '4+',
-})
 
 export const E150_RockBeater_impl = {
   listeners: [computeArgsListener, constructCostListener],

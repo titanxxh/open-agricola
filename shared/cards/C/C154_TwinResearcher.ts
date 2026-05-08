@@ -1,11 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { GameState } from '../../contract/types'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { C154_TwinResearcher } from '../../cards-display/C/C154_TwinResearcher'
 
-const CARD_ID = 'C154_TwinResearcher'
+const CARD_ID = C154_TwinResearcher.id
 
 /**
  * C154 Twin Researcher (Occupation, 4+ players)
@@ -88,20 +88,6 @@ const listener: CardListenerRegistration = {
     })
   },
 }
-
-export const C154_TwinResearcher = new Occupation({
-  id: CARD_ID,
-  name: 'Twin Researcher',
-  deck: 'C',
-  number: 154,
-  category: 'POINTS_PROVIDER',
-  desc: [
-    'Each time you use one of the two accumulation spaces for the same type of good containing exactly the same number of goods, you can also buy 1 bonus <SCORE> for 1 <FOOD>.',
-  ],
-  cost: {},
-  players: '4+',
-  evenMoreSet: true,
-})
 
 export const C154_TwinResearcher_impl = {
   listeners: [listener],

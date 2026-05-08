@@ -1,7 +1,7 @@
-import { Occupation } from '../types'
 import type { CardImpl } from '../registry'
+import { D86_SheepAgent } from '../../cards-display/D/D86_SheepAgent'
 
-const CARD_ID = 'D86_SheepAgent'
+const CARD_ID = D86_SheepAgent.id
 
 /**
  * D86 Sheep Agent — You can keep 1 <SHEEP> on this card for each occupation
@@ -16,17 +16,6 @@ const OTHER_ANIMAL_HOLDER_OCCUPATIONS = [
   'B148_PetBroker',
   'C86_LivestockFeeder',
 ]
-
-export const D86_SheepAgent = new Occupation({
-  id: CARD_ID,
-  name: 'Sheep Agent',
-  deck: 'D',
-  number: 86,
-  category: 'FARM_PLANNER',
-  desc: ['You can keep 1 <SHEEP> on this card for each occupation card in front of you (including this one), unless it is already able to hold animals.'],
-  cost: {},
-  players: '1+',
-})
 
 export const D86_SheepAgent_impl = {
   effect: {

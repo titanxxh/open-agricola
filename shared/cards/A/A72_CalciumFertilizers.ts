@@ -1,10 +1,10 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { fieldTopStack, fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { A72_CalciumFertilizers } from '../../cards-display/A/A72_CalciumFertilizers'
 
-const CARD_ID = 'A72_CalciumFertilizers'
+const CARD_ID = A72_CalciumFertilizers.id
 
 /**
  * A72 Calcium Fertilizers:
@@ -46,18 +46,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const A72_CalciumFertilizers = new MinorImprovement({
-  id: CARD_ID,
-  name: "Calcium Fertilizers",
-  deck: "A",
-  number: 72,
-  category: "CROP_PROVIDER",
-  desc: ["Each time you use a __Quarry__ accumulation space, add 1 additional good of the respective type to each of your planted fields growing a single type of crop."],
-  cost: {},
-  prerequisite: "No Field Tiles",
-  newSet: true,
-})
 
 export const A72_CalciumFertilizers_impl = {
   listeners: [listener],

@@ -1,10 +1,10 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { A37_Bucksaw } from '../../cards-display/A/A37_Bucksaw'
 
-const CARD_ID = 'A37_Bucksaw'
+const CARD_ID = A37_Bucksaw.id
 
 const afterRenovateListener: CardListenerRegistration = {
   id: 'A37-bucksaw-after-renovate',
@@ -20,18 +20,6 @@ const afterRenovateListener: CardListenerRegistration = {
     })
   },
 }
-
-export const A37_Bucksaw = new MinorImprovement({
-  id: CARD_ID,
-  name: "Bucksaw",
-  deck: "A",
-  number: 37,
-  category: "POINTS_PROVIDER",
-  desc: ["Each time you renovate, you can also pay 1 <WOOD> to get 1 bonus <SCORE> and 1 <GRAIN>."],
-  cost: {"wood":1},
-  newSet: true,
-  extraVp: true,
-})
 
 export const A37_Bucksaw_impl = {
   listeners: [afterRenovateListener],

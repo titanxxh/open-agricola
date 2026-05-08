@@ -1,4 +1,3 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { PlayerState } from '../../contract/types'
@@ -6,8 +5,9 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { initCardState } from '../__stubs__/helpers'
 import { writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import { C148_MudWallower } from '../../cards-display/C/C148_MudWallower'
 
-const CARD_ID = 'C148_MudWallower'
+const CARD_ID = C148_MudWallower.id
 
 /**
  * C148 Mud Wallower:
@@ -111,19 +111,6 @@ const afterPaySyncListener: CardListenerRegistration = {
     syncHeldDownward(context.player)
   },
 }
-
-export const C148_MudWallower = new Occupation({
-  id: CARD_ID,
-  name: 'Mud Wallower',
-  deck: 'C',
-  number: 148,
-  category: 'FARM_PLANNER',
-  desc: ['Every fourth time you use an accumulation space, you get 1 <PIG>, held by this card.'],
-  cost: {},
-  players: '4+',
-  evenMoreSet: true,
-  extraVp: true,
-})
 
 export const C148_MudWallower_impl = {
   listeners: [afterPlaceFarmerListener, afterExchangeSyncListener, syncHeldAfterPlaceFarmerListener, afterPaySyncListener],

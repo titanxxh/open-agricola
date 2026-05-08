@@ -1,22 +1,20 @@
-import { Occupation } from '../types'
 import type { ActionSpace } from '../../contract/types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
+import { A161_PatchCaretaker } from '../../cards-display/A/A161_PatchCaretaker'
 
-const CARD_ID = 'A161_PatchCaretaker'
+const CARD_ID = A161_PatchCaretaker.id
 
 type ResourceType = 'wood' | 'clay' | 'stone' | 'food' | 'sheep' | 'boar' | 'cattle'
+
 const RESOURCE_TYPES: ResourceType[] = ['wood', 'clay', 'stone', 'food', 'sheep', 'boar', 'cattle']
 
 const getAccumulatedTypes = (space: ActionSpace): ResourceType[] =>
   RESOURCE_TYPES.filter((r) => (space.gainPerRound?.[r] ?? 0) > 0)
 
-// A161 Patch Caretaker: Each time you use an accumulation space while already having
-// used another accumulation space for the same type of good that work phase,
-// you also get 1 VEGETABLE.
 const listener: CardListenerRegistration = {
   id: 'A161-patch-caretaker-after-place-farmer',
   cardIds: [CARD_ID],
@@ -41,18 +39,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const A161_PatchCaretaker = new Occupation({
-  id: CARD_ID,
-  name: 'Patch Caretaker',
-  deck: 'A',
-  number: 161,
-  category: 'CROP_PROVIDER',
-  desc: ['Each time you use an accumulation space while already having used another accumulation space for the same type of good that work phase, you also get 1 <VEGETABLE>.'],
-  cost: {},
-  players: '4+',
-  newSet: true,
-})
 
 export const A161_PatchCaretaker_impl = {
   listeners: [listener],

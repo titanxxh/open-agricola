@@ -1,16 +1,12 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
+import { A45_FireProtectionPond } from '../../cards-display/A/A45_FireProtectionPond'
 
-const CARD_ID = 'A45_FireProtectionPond'
+const CARD_ID = A45_FireProtectionPond.id
 
-// A45 Fire Protection Pond: Once you no longer live in a wooden house, place 1 food on each
-// of the next 6 round spaces. At the start of these rounds, you get the food.
-// BGA checks: isActionEvent($event, 'Renovation') && !$this->isFlagged()
-// Only triggers once (flagged after use).
 const listener: CardListenerRegistration = {
   id: 'A45-fire-protection-pond-after-renovation',
   cardIds: [CARD_ID],
@@ -37,18 +33,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const A45_FireProtectionPond = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Fire Protection Pond',
-  deck: 'A',
-  number: 45,
-  category: 'FOOD_PROVIDER',
-  desc: ['Once you no longer live in a wooden house, place 1 <FOOD> on each of the next 6 round spaces. At the start of these rounds, you get the <FOOD>.'],
-  cost: { food: 1 },
-  prerequisite: 'Still in Wooden House',
-  newSet: true,
-})
 
 export const A45_FireProtectionPond_impl = {
   listeners: [listener],

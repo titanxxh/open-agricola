@@ -1,10 +1,10 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E57_CheeseFondue } from '../../cards-display/E/E57_CheeseFondue'
 
-const CARD_ID = 'E57_CheeseFondue'
+const CARD_ID = E57_CheeseFondue.id
 
 const listener: CardListenerRegistration = {
   id: 'E57-cheese-fondue-after-exchange',
@@ -19,17 +19,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { food: bonus }), sourceCard: CARD_ID }
   },
 }
-
-export const E57_CheeseFondue = new MinorImprovement({
-  id: CARD_ID,
-  name: "Cheese Fondue",
-  deck: "E",
-  number: 57,
-  category: "FOOD",
-  desc: ['Each time you bake at least 1 <GRAIN> into bread, you get 1 additional <FOOD> if you have at least 1\u00a0<SHEEP> and (another) 1 additional <FOOD> if you have at least 1 <CATTLE>.'],
-  cost: { clay: 1 },
-  vp: 1,
-})
 
 export const E57_CheeseFondue_impl = {
   listeners: [listener],

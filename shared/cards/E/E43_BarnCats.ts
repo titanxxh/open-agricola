@@ -1,23 +1,11 @@
-import { MinorImprovement } from '../types'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
+import { E43_BarnCats } from '../../cards-display/E/E43_BarnCats'
 
-const CARD_ID = 'E43_BarnCats'
+const CARD_ID = E43_BarnCats.id
 
-// BGA isBuyable: countStablesForCards() == 0 → false (require >= 1 stable)
 registerPrerequisite('1 Stable', (player) => player.stableTiles.length >= 1)
-
-export const E43_BarnCats = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Barn Cats',
-  deck: 'E',
-  number: 43,
-  category: 'FOOD_-_FUTURE_ROUND_SPACES',
-  desc: ['If you have 1/2/3/4 stables, place 1 <FOOD> on each of the next 2/3/4/5 round spaces. At the start of these rounds, you get the <FOOD>.'],
-  vp: 1,
-  prerequisite: '1 Stable',
-})
 
 export const E43_BarnCats_impl = {
   effect: {

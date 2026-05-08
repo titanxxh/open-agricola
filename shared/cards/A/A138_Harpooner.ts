@@ -1,14 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { A138_Harpooner } from '../../cards-display/A/A138_Harpooner'
 
-const CARD_ID = 'A138_Harpooner'
+const CARD_ID = A138_Harpooner.id
 
-// A138 Harpooner: Each time you use the Fishing space you can also pay 1 WOOD to get
-// 1 FOOD for each person you have, and 1 REED.
 const listener: CardListenerRegistration = {
   id: 'A138-harpooner-after-place-farmer',
   cardIds: [CARD_ID],
@@ -30,17 +28,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const A138_Harpooner = new Occupation({
-  id: CARD_ID,
-  name: 'Harpooner',
-  deck: 'A',
-  number: 138,
-  category: 'GOODS_PROVIDER',
-  desc: ['Each time you use the __Fishing__ space you can also pay 1 <WOOD> to get 1 <FOOD> for each person you have, and 1 <REED>'],
-  cost: {},
-  players: '3+',
-})
 
 export const A138_Harpooner_impl = {
   listeners: [listener],

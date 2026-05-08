@@ -1,4 +1,3 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../contract/types'
@@ -8,8 +7,9 @@ import { getRoundPlacementOrder } from '../helpers/round-placement'
 import { isSpaceOccupied } from '../../domain/space'
 import { familySize, workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { A130_MummysBoy } from '../../cards-display/A/A130_MummysBoy'
 
-const CARD_ID = 'A130_MummysBoy'
+const CARD_ID = A130_MummysBoy.id
 
 /**
  * A130 Mummy's Boy:
@@ -30,7 +30,6 @@ const getSecondFarmerSpaceId = (context: CardListenerContext): string | null => 
 
 const MEETING_PLACE_IDS = new Set(['meeting-place', 'meeting-place-solo'])
 
-// computeArgs: add 2nd farmer's space as available choice for 3rd+ placement
 const computeArgsListener: CardListenerRegistration = {
   id: 'A130-mummys-boy-compute-args-place-farmer',
   cardIds: [CARD_ID],
@@ -59,7 +58,6 @@ const computeArgsListener: CardListenerRegistration = {
   },
 }
 
-// After place-farmer: if 3rd+ placement on 2nd farmer's space, flag the card
 const afterPlaceFarmerListener: CardListenerRegistration = {
   id: 'A130-mummys-boy-after-place-farmer',
   cardIds: [CARD_ID],
@@ -77,20 +75,6 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
     }
   },
 }
-
-export const A130_MummysBoy = new Occupation({
-  id: CARD_ID,
-  name: "Mummy's Boy",
-  deck: 'A',
-  number: 130,
-  category: 'ACTIONS_BOOSTER',
-  desc: [
-    "Once per round, when placing a person after your first two, you can place it on the action space with your 2nd person and use that space again, unless it is on the __Meeting Place__ action space.",
-  ],
-  cost: {},
-  players: '3+',
-  evenMoreSet: true,
-})
 
 export const A130_MummysBoy_impl = {
   listeners: [computeArgsListener, afterPlaceFarmerListener],

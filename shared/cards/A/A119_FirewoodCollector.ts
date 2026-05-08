@@ -1,8 +1,8 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { A119_FirewoodCollector } from '../../cards-display/A/A119_FirewoodCollector'
 
 const CARD_ID = 'A119_FirewoodCollector'
 
@@ -18,17 +18,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const A119_FirewoodCollector = new Occupation({
-  id: "A119_FirewoodCollector",
-  name: "Firewood Collector",
-  deck: "A",
-  number: 119,
-  category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["Each time you use the __Farmland__, __Grain Seeds__, __Grain Utilization__, or __Cultivation__ action space, at the end of that turn, you get 1 <WOOD>."],
-  cost: {},
-  players: "1+",
-})
 
 export const A119_FirewoodCollector_impl = {
   listeners: [listener],

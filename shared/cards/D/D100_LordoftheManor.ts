@@ -1,19 +1,7 @@
-import { Occupation } from '../types'
 import type { CardImpl } from '../registry'
+import { D100_LordoftheManor } from '../../cards-display/D/D100_LordoftheManor'
 
-const CARD_ID = 'D100_LordoftheManor'
-
-export const D100_LordoftheManor = new Occupation({
-  id: CARD_ID,
-  name: "Lord of the Manor",
-  deck: "D",
-  number: 100,
-  category: "POINTS_PROVIDER",
-  desc: ["During scoring, you get 1 bonus <SCORE> for each scoring category in which you score the maximum 4 points. (The bonus point is also awarded for 4 fenced stables.)"],
-  cost: {},
-  players: "1+",
-  newSet: true,
-})
+const CARD_ID = D100_LordoftheManor.id
 
 export const D100_LordoftheManor_impl = {
   effect: {

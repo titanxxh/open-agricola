@@ -1,4 +1,3 @@
-import { MinorImprovement } from '../types'
 import type { ExtraSowableField } from '../card-effects'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
@@ -7,8 +6,10 @@ import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { canSow } from '../../actions/effects/sow'
 import { dispatchReapListener } from '../../actions/effects/reap'
 import type { CardImpl } from '../registry'
+import { E68_CherryOrchard } from '../../cards-display/E/E68_CherryOrchard'
 
-const CARD_ID = 'E68_CherryOrchard'
+const CARD_ID = E68_CherryOrchard.id
+
 const VIRTUAL_TILE: FarmTilePosition = { row: -1, col: 68 }
 
 type CardCrop = { crop: 'wood'; remaining: number }
@@ -34,18 +35,6 @@ const isDoableListener: CardListenerRegistration = {
     return { doable: true }
   },
 }
-
-export const E68_CherryOrchard = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Cherry Orchard',
-  deck: 'E',
-  number: 68,
-  category: 'CROPS_-_VEGETABLE',
-  desc: [
-    'This card is a field that can only grow <WOOD>. During each harvest, you receive 1 <WOOD> from this card. When you harvest the last <WOOD>, you also receive 1 <VEGETABLE>.',
-  ],
-  isField: true,
-})
 
 export const E68_CherryOrchard_impl = {
   listeners: [isDoableListener],

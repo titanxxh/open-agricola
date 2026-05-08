@@ -1,10 +1,10 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E86_PenBuilder } from '../../cards-display/E/E86_PenBuilder'
 
-const CARD_ID = 'E86_PenBuilder'
+const CARD_ID = E86_PenBuilder.id
 
 const anytimeListener: CardListenerRegistration = {
   id: 'E86-pen-builder-anytime',
@@ -30,17 +30,6 @@ const anytimeListener: CardListenerRegistration = {
     }
   },
 }
-
-export const E86_PenBuilder = new Occupation({
-  id: CARD_ID,
-  name: 'Pen Builder',
-  deck: 'E',
-  number: 86,
-  category: 'FARMYARD_-_PLACE_FOR_ANIMALS',
-  desc: ['At any time, you can discard 1 <WOOD> from your supply. This card can hold two animals of any type for each <WOOD> discarded this way.'],
-  cost: {},
-  players: '1+',
-})
 
 export const E86_PenBuilder_impl = {
   listeners: [anytimeListener],

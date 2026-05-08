@@ -1,12 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E79_FieldSpade } from '../../cards-display/E/E79_FieldSpade'
 
-const CARD_ID = 'E79_FieldSpade'
+const CARD_ID = E79_FieldSpade.id
 
-// E79 Field Spade: Each time after you sow in at least 1 field, you get 1 STONE.
 const listener: CardListenerRegistration = {
   id: 'E79-field-spade-after-sow',
   cardIds: [CARD_ID],
@@ -16,16 +15,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { stone: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const E79_FieldSpade = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Field Spade',
-  deck: 'E',
-  number: 79,
-  category: 'BUILDING_RESOURCES_-_STONE',
-  desc: ['Each time after you sow in at least 1 field, you get 1 <STONE>.'],
-  cost: { wood: 1 },
-})
 
 export const E79_FieldSpade_impl = {
   listeners: [listener],

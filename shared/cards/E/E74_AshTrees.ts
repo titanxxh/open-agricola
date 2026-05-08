@@ -1,4 +1,3 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { initCardState } from '../__stubs__/helpers'
@@ -8,8 +7,10 @@ import {
 } from '../helpers/pending-fence-bonus'
 import { getFenceCount, getTotalPastureCells, maxFences, maxPastureCells, minimumFenceSegments } from '../../actions/effects/fencing'
 import type { CardImpl } from '../registry'
+import { E74_AshTrees } from '../../cards-display/E/E74_AshTrees'
 
-const CARD_ID = 'E74_AshTrees'
+const CARD_ID = E74_AshTrees.id
+
 const MAX_FREE_FENCES = 5
 
 const isDoableListener: CardListenerRegistration = {
@@ -75,16 +76,6 @@ const afterFenceListener: CardListenerRegistration = {
     writeCardInfobox(context.player, CARD_ID, `${remaining} / ${MAX_FREE_FENCES}`)
   },
 }
-
-export const E74_AshTrees = new MinorImprovement({
-  id: CARD_ID,
-  name: "Ash Trees",
-  deck: "E",
-  number: 74,
-  desc: ["When you play this card, immediately place (up to) 5 fences from your supply on it. When you build fences, fences taken from this card cost you nothing."],
-  cost: {},
-  prerequisite: "2 Planted Fields",
-})
 
 export const E74_AshTrees_impl = {
   listeners: [isDoableListener, beforeFenceListener, afterFenceListener],

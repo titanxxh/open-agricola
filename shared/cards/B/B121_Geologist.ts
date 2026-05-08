@@ -1,10 +1,10 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B121_Geologist } from '../../cards-display/B/B121_Geologist'
 
-const CARD_ID = 'B121_Geologist'
+const CARD_ID = B121_Geologist.id
 
 /**
  * B121 Geologist — Each time you use the Forest or Reed Bank accumulation space,
@@ -30,19 +30,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { clay: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const B121_Geologist = new Occupation({
-  id: CARD_ID,
-  name: 'Geologist',
-  deck: 'B',
-  number: 121,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: [
-    'Each time you use the __Forest__ or __Reed Bank__ accumulation space, you also get 1 <CLAY>. In games with 3 or more players, this also applies to the __Clay Pit__.',
-  ],
-  cost: {},
-  players: '1+',
-})
 
 export const B121_Geologist_impl = {
   listeners: [listener],

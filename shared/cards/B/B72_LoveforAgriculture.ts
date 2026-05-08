@@ -1,4 +1,3 @@
-import { MinorImprovement } from '../types'
 import type { ExtraSowableField } from '../card-effects'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
@@ -6,8 +5,9 @@ import type { FarmTilePosition, PlayerState } from '../../contract/types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { canSow } from '../../actions/effects/sow'
 import type { CardImpl } from '../registry'
+import { B72_LoveforAgriculture } from '../../cards-display/B/B72_LoveforAgriculture'
 
-const CARD_ID = 'B72_LoveforAgriculture'
+const CARD_ID = B72_LoveforAgriculture.id
 
 type PastureCrop = {
   pastureId: string
@@ -77,8 +77,6 @@ const findPastureByTile = (
   return null
 }
 
-// --- isDoable listener: make sow doable when pastures can be sown ---
-
 const isDoableListener: CardListenerRegistration = {
   id: 'B72-love-agriculture-isdoable-sow',
   cardIds: [CARD_ID],
@@ -96,18 +94,6 @@ const isDoableListener: CardListenerRegistration = {
     return { doable: true }
   },
 }
-
-export const B72_LoveforAgriculture = new MinorImprovement({
-  id: CARD_ID,
-  name: "Love for Agriculture",
-  deck: "B",
-  number: 72,
-  category: "CROP_PROVIDER",
-  desc: [
-    "You can sow crops in pastures covering 1 or 2 farmyard spaces. If you do, these pastures are also considered fields and hold 1 and 2 animals less, respectively.",
-  ],
-  cost: {},
-})
 
 export const B72_LoveforAgriculture_impl = {
   listeners: [isDoableListener],

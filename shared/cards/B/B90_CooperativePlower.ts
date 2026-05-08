@@ -1,10 +1,10 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
+import { B90_CooperativePlower } from '../../cards-display/B/B90_CooperativePlower'
 
-const CARD_ID = 'B90_CooperativePlower'
+const CARD_ID = B90_CooperativePlower.id
 
 const listener: CardListenerRegistration = {
   id: 'B90-cooperative-plower-after-place-farmer',
@@ -26,18 +26,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const B90_CooperativePlower = new Occupation({
-  id: CARD_ID,
-  name: 'Cooperative Plower',
-  deck: 'B',
-  number: 90,
-  category: 'FARM_PLANNER',
-  desc: ['Each time you use the __Farmland__ action space while the __Grain Seeds__ action space is occupied, you can plow 1 additional field.'],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
 
 export const B90_CooperativePlower_impl = {
   listeners: [listener],

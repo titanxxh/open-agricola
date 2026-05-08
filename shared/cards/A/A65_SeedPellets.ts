@@ -1,12 +1,12 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { canSow } from '../../actions/effects/sow'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { A65_SeedPellets } from '../../cards-display/A/A65_SeedPellets'
 
-const CARD_ID = 'A65_SeedPellets'
+const CARD_ID = A65_SeedPellets.id
 
 const isUnconditionalSow = (context: CardListenerContext) => {
   const actionContext = context.actionContext ?? {}
@@ -37,17 +37,6 @@ const isDoableListener: CardListenerRegistration = {
     return { doable: true }
   },
 }
-
-export const A65_SeedPellets = new MinorImprovement({
-  id: CARD_ID,
-  name: "Seed Pellets",
-  deck: "A",
-  number: 65,
-  category: "CROP_PROVIDER",
-  desc: ["Each time before you take an unconditional __Sow__ action, you get 1 <GRAIN>."],
-  cost: {},
-  prerequisite: "3 Fields",
-})
 
 export const A65_SeedPellets_impl = {
   listeners: [beforeSowListener, isDoableListener],

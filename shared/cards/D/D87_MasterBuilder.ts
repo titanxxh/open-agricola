@@ -1,10 +1,10 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import { D87_MasterBuilder } from '../../cards-display/D/D87_MasterBuilder'
 
-const CARD_ID = 'D87_MasterBuilder'
+const CARD_ID = D87_MasterBuilder.id
 
 const anytimeListener: CardListenerRegistration = {
   id: 'D87-master-builder-anytime',
@@ -26,18 +26,6 @@ const anytimeListener: CardListenerRegistration = {
     }
   },
 }
-
-export const D87_MasterBuilder = new Occupation({
-  id: CARD_ID,
-  name: 'Master Builder',
-  deck: 'D',
-  number: 87,
-  category: 'FARM_PLANNER',
-  desc: ['Once your house has at least 5 rooms, at any time, but only once this game, you can add another room at no cost.'],
-  cost: {},
-  players: '1+',
-  implemented: true,
-})
 
 export const D87_MasterBuilder_impl = {
   listeners: [anytimeListener],

@@ -1,20 +1,14 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, setCardFlag, readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E91_PlowBuilder } from '../../cards-display/E/E91_PlowBuilder'
 
-const CARD_ID = 'E91_PlowBuilder'
+const CARD_ID = E91_PlowBuilder.id
 
-// BGA isListeningTo gates `usedJoinery` on Exchange-event sourceId starting
-// with "Major_Joinery", catching base Major_Joinery and any future upgrades
-// produced by the same family. This codebase has no Joinery upgrade today
-// (verified: only `Major_Joinery` is referenced), so the prefix match remains
-// equivalent to a literal match while staying upgrade-safe.
 const JOINERY_SOURCE_PREFIX = 'Major_Joinery'
 
-// Inline harvest rounds to avoid circular dependency with logic/state
 const HARVEST_ROUNDS = [4, 7, 9, 11, 13, 14]
 
 /**
@@ -63,16 +57,6 @@ const anytimeListener: CardListenerRegistration = {
     }
   },
 }
-
-export const E91_PlowBuilder = new Occupation({
-  id: CARD_ID,
-  name: 'Plow Builder',
-  deck: 'E',
-  number: 91,
-  desc: ['You can build the Joinery when taking a __Minor Improvement__ action. If you use the Joinery (or an upgrade thereof) during the harvest, you can pay 1 <FOOD> to plow 1 field.'],
-  cost: {},
-  players: '1+',
-})
 
 export const E91_PlowBuilder_impl = {
   listeners: [tradeAppliedListener, anytimeListener],

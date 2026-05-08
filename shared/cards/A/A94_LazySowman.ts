@@ -1,4 +1,3 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, ActionSpace, GameState } from '../../contract/types'
@@ -7,8 +6,9 @@ import { canSow } from '../../actions/effects/sow'
 import { isSpaceOccupied } from '../../domain/space'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { A94_LazySowman } from '../../cards-display/A/A94_LazySowman'
 
-const CARD_ID = 'A94_LazySowman'
+const CARD_ID = A94_LazySowman.id
 
 const isMeetingPlace = (space: ActionSpace) => space.id === 'meeting-place'
 
@@ -93,17 +93,6 @@ const computeArgsListener: CardListenerRegistration = {
     return { extraOptions, sourceCard: CARD_ID }
   },
 }
-
-export const A94_LazySowman = new Occupation({
-  id: CARD_ID,
-  name: "Lazy Sowman",
-  deck: "A",
-  number: 94,
-  category: "ACTIONS_BOOSTER",
-  desc: ["Each time you decline an unconditional __Sow__ action on your turn, you can immediately place another person on an action space of your choice (even if it is occupied)."],
-  cost: {},
-  players: "1+",
-})
 
 export const A94_LazySowman_impl = {
   listeners: [computeReplaceListener, isDoableListener, computeArgsListener],

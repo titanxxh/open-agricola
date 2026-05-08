@@ -1,15 +1,10 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { D81_RoofLadder } from '../../cards-display/D/D81_RoofLadder'
 
-const CARD_ID = 'D81_RoofLadder'
-
-// D81 Roof Ladder: Each time you renovate, you pay 1 fewer reed and, at the end of the
-// action, you get 1 stone.
-// BGA: onPlayerComputeCostsRenovation (Utils::addBonus reed -1) +
-//      onPlayerAfterRenovation (gain 1 stone)
+const CARD_ID = D81_RoofLadder.id
 
 const costListener: CardListenerRegistration = {
   id: 'D81-roof-ladder-compute-costs-renovation',
@@ -30,19 +25,6 @@ const afterListener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { stone: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const D81_RoofLadder = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Roof Ladder',
-  deck: 'D',
-  number: 81,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: [
-    'Each time you renovate, you pay 1 fewer <REED> and, at the end of the action, you get 1 <STONE>.',
-  ],
-  cost: { wood: 1 },
-  newSet: true,
-})
 
 export const D81_RoofLadder_impl = {
   listeners: [costListener, afterListener],

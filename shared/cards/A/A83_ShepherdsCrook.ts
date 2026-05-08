@@ -1,10 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { A83_ShepherdsCrook } from '../../cards-display/A/A83_ShepherdsCrook'
 
-const CARD_ID = 'A83_ShepherdsCrook'
+const CARD_ID = A83_ShepherdsCrook.id
+
 const MIN_PASTURE_SIZE = 4
 
 const listener: CardListenerRegistration = {
@@ -25,16 +26,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { sheep: sheepGain }), sourceCard: CARD_ID }
   },
 }
-
-export const A83_ShepherdsCrook = new MinorImprovement({
-  id: CARD_ID,
-  name: "Shepherd's Crook",
-  deck: "A",
-  number: 83,
-  category: "LIVESTOCK_PROVIDER",
-  desc: ["Each time you fence a new pasture covering at least 4 farmyard spaces, you immediately get 2 sheep on this pasture."],
-  cost: {"wood":1},
-})
 
 export const A83_ShepherdsCrook_impl = {
   listeners: [listener],

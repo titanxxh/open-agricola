@@ -1,9 +1,9 @@
 import { returnCardToBoard } from '../helpers/return-card'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import { MinorImprovement } from '../types'
 import type { CardImpl } from '../registry'
+import { D60_LargePottery } from '../../cards-display/D/D60_LargePottery'
 
-const CARD_ID = 'D60_LargePottery'
+const CARD_ID = D60_LargePottery.id
 
 /**
  * D60 Large Pottery — dual-type minor that also counts as a major (BGA
@@ -18,29 +18,6 @@ const CARD_ID = 'D60_LargePottery'
 
 registerPrerequisite('Return the Pottery', (player) =>
   player.improvements.includes('Major_Pottery'))
-
-export const D60_LargePottery = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Large Pottery',
-  deck: 'D',
-  number: 60,
-  category: 'FOOD_PROVIDER',
-  desc: [
-    '[Anytime]',
-    '<CLAY> <ARROW> 2<FOOD>',
-    '[Scoring]',
-    '3/5/6/7<CLAY> <ARROW-1X> 1/2/3/4<SCORE>',
-  ],
-  cost: { clay: 1, stone: 1 },
-  vp: 3,
-  extraVp: true,
-  prerequisite: 'Return the Pottery',
-  alsoCountsAs: ['major'],
-  evenMoreSet: true,
-  exchanges: [
-    { from: { clay: 1 }, to: { food: 2 }, triggers: ['anytime'] },
-  ],
-})
 
 export const D60_LargePottery_impl = {
   effect: {

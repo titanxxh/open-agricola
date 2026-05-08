@@ -1,10 +1,10 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B79_Corf } from '../../cards-display/B/B79_Corf'
 
-const CARD_ID = 'B79_Corf'
+const CARD_ID = B79_Corf.id
 
 /**
  * B79 Corf (Minor Improvement):
@@ -26,19 +26,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { stone: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const B79_Corf = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Corf',
-  deck: 'B',
-  number: 79,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: [
-    'Each time any player (including you) takes at least 3 <STONE> from an accumulation space, you get 1 <STONE> from the general supply.',
-  ],
-  cost: { reed: 1 },
-  newSet: true,
-})
 
 export const B79_Corf_impl = {
   listeners: [listener],

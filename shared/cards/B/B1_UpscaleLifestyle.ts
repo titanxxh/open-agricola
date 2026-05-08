@@ -1,19 +1,8 @@
-import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B1_UpscaleLifestyle } from '../../cards-display/B/B1_UpscaleLifestyle'
 
-const CARD_ID = 'B1_UpscaleLifestyle'
-
-export const B1_UpscaleLifestyle = new MinorImprovement({
-  id: CARD_ID,
-  name: "Upscale Lifestyle",
-  deck: "B",
-  number: 1,
-  category: "FARM_PLANNER",
-  desc: ["You immediately get 5 <CLAY> and a __Renovation__ action. If you take the action, you must pay the renovation cost."],
-  cost: { wood: 3 },
-  passing: true,
-})
+const CARD_ID = B1_UpscaleLifestyle.id
 
 export const B1_UpscaleLifestyle_impl = {
   effect: {

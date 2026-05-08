@@ -1,11 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop, fieldTotalRemaining } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { A79_GardenHoe } from '../../cards-display/A/A79_GardenHoe'
 
-const CARD_ID = 'A79_GardenHoe'
+const CARD_ID = A79_GardenHoe.id
 
 const listener: CardListenerRegistration = {
   id: 'A79-garden-hoe-after-sow',
@@ -23,17 +23,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { clay: 1, stone: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const A79_GardenHoe = new MinorImprovement({
-  id: CARD_ID,
-  name: "Garden Hoe",
-  deck: "A",
-  number: 79,
-  category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["Each time you take an unconditional __Sow__ action planting <VEGETABLE> in at least 1 field, you get 1 <CLAY> and 1 <STONE>."],
-  cost: {"wood":1},
-  newSet: true,
-})
 
 export const A79_GardenHoe_impl = {
   listeners: [listener],

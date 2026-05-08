@@ -1,11 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeples, futureMeeplesNode, removeFutureMeeples } from '../../actions/effects/internal/future-meeples'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import { B76_Ceilings } from '../../cards-display/B/B76_Ceilings'
 
-const CARD_ID = 'B76_Ceilings'
+const CARD_ID = B76_Ceilings.id
 
 const listener: CardListenerRegistration = {
   id: 'B76-ceilings-after-renovation',
@@ -21,19 +21,6 @@ const listener: CardListenerRegistration = {
     setCardFlag(context.player, CARD_ID, true)
   },
 }
-
-export const B76_Ceilings = new MinorImprovement({
-  id: CARD_ID,
-  name: "Ceilings",
-  deck: "B",
-  number: 76,
-  category: "BUILDING_RESOURCE_PROVIDER",
-  desc: ["Place 1 <WOOD> on the next 5 round spaces. At the start of these rounds, you get the <WOOD>. Remove the <WOOD> promised by this card from future round spaces the next time you renovate."],
-  cost: {"clay": 1},
-  prerequisite: "1 Occupation",
-  occupationPrerequisites: {"min": 1},
-  implemented: true,
-})
 
 export const B76_Ceilings_impl = {
   listeners: [listener],

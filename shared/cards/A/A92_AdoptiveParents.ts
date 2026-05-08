@@ -1,4 +1,3 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
@@ -6,8 +5,9 @@ import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { findFirstNewborn, newbornCount } from '../../domain/player'
 import { removeWorkerRef } from '../../domain/space'
 import type { CardImpl } from '../registry'
+import { A92_AdoptiveParents } from '../../cards-display/A/A92_AdoptiveParents'
 
-const CARD_ID = 'A92_AdoptiveParents'
+const CARD_ID = A92_AdoptiveParents.id
 
 /**
  * A92 Adoptive Parents:
@@ -55,7 +55,6 @@ const beforePlaceFarmerListener: CardListenerRegistration = {
   },
 }
 
-// After place-farmer: offer the adoptive parents choice
 const afterPlaceFarmerListener: CardListenerRegistration = {
   id: 'A92-adoptive-parents-after-place-farmer',
   cardIds: [CARD_ID],
@@ -93,10 +92,6 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   },
 }
 
-// immediatelyAfter gain sourced by A92: do the newborn→adult conversion.
-// NOTE: 'before' ActivateCardNode events don't carry actionContext; 'immediatelyAfter' events
-// do (engine spreads actionContext + sourceCard into the event via buildListenerEvent).
-// We identify this specific gain by checking sourceCard === CARD_ID.
 const immediatelyAfterGainActivation: CardListenerRegistration = {
   id: 'A92-adoptive-parents-before-gain-activation',
   cardIds: [CARD_ID],
@@ -117,17 +112,6 @@ const immediatelyAfterGainActivation: CardListenerRegistration = {
     setCardFlag(context.player, CARD_ID, true)
   },
 }
-
-export const A92_AdoptiveParents = new Occupation({
-  id: CARD_ID,
-  name: 'Adoptive Parents',
-  deck: 'A',
-  number: 92,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['For 1 <FOOD>, you can take an action with offspring in the same round you get it. If you do, the offspring does not count as "newborn".'],
-  cost: {},
-  players: '1+',
-})
 
 export const A92_AdoptiveParents_impl = {
   listeners: [afterPlaceFarmerListener, immediatelyAfterGainActivation, beforePlaceFarmerListener],

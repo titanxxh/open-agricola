@@ -1,11 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E105_Pioneer } from '../../cards-display/E/E105_Pioneer'
 
-const CARD_ID = 'E105_Pioneer'
+const CARD_ID = E105_Pioneer.id
 
 /**
  * E105 Pioneer (Occupation):
@@ -32,7 +32,6 @@ const getMostRecentlyRevealedSpaceId = (state: { round: number; roundActionOrder
   return state.roundActionOrder[state.round - 1] ?? null
 }
 
-// After place-farmer on the most recently revealed space: XOR choice
 const afterPlaceFarmerListener: CardListenerRegistration = {
   id: 'E105-pioneer-after-place-farmer',
   cardIds: [CARD_ID],
@@ -50,19 +49,6 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
 }
 
 export { getMostRecentlyRevealedSpaceId }
-
-export const E105_Pioneer = new Occupation({
-  id: CARD_ID,
-  name: 'Pioneer',
-  deck: 'E',
-  number: 105,
-  category: 'GOODS_-_GET',
-  desc: [
-    'When you play this card and each time before you use the most recent action space card, you get 1 building resource of your choice and 1 <FOOD>.',
-  ],
-  cost: {},
-  players: '1+',
-})
 
 export const E105_Pioneer_impl = {
   listeners: [afterPlaceFarmerListener],

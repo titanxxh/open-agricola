@@ -1,20 +1,14 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getMinorImprovementCard } from '../catalog'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E54_Contraband } from '../../cards-display/E/E54_Contraband'
 
-const CARD_ID = 'E54_Contraband'
+const CARD_ID = E54_Contraband.id
 
 const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
 
-// E54 Contraband: Each time you play or build an improvement after this, you can pay 1 additional
-// building resource of a type in the printed cost to get 3 FOOD.
-//
-// 7b1 migration: listens on `actions: ['pay']` with costType=major/minor-improvement.
-// `context.sourceCard` carries the improvement id (set by improvement-any flow's
-// pay leaf to `parsed.id`). Old `actions: ['improvement-any']` path is retired.
 const listener: CardListenerRegistration = {
   id: 'E54-contraband-after-pay',
   cardIds: [CARD_ID],
@@ -52,18 +46,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const E54_Contraband = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Contraband',
-  deck: 'E',
-  number: 54,
-  category: 'FOOD',
-  desc: [
-    'Each time you play or build an improvement after this, you can pay 1 additional building resource of a type in the printed cost to get 3 <FOOD>.',
-  ],
-  cost: { food: 1 },
-})
 
 export const E54_Contraband_impl = {
   listeners: [listener],

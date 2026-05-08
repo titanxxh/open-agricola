@@ -1,18 +1,13 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
 import { familySize as getFamilySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { A21_FamilyFriendHome } from '../../cards-display/A/A21_FamilyFriendHome'
 
-const CARD_ID = 'A21_FamilyFriendHome'
+const CARD_ID = A21_FamilyFriendHome.id
 
-// A21 Family Friendly Home: Each time you take a Build Rooms action while having more rooms
-// than people already, you also get a Family Growth action and 1 food.
-// BGA checks: isActionEvent($event, 'Construct', 'player')
-// and then: $oldRoomCount > $farmers && $farmers < 5 && $event['trueAction']
-// $oldRoomCount = rooms before action, $farmers = current family size
 const listener: CardListenerRegistration = {
   id: 'A21-family-friendly-home-after-construct',
   cardIds: [CARD_ID],
@@ -45,19 +40,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const A21_FamilyFriendHome = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Family Friendly Home',
-  deck: 'A',
-  number: 21,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['Each time you take a __Build Rooms__ action while having more rooms than people already, you also get a __Family Growth__ action and 1 <FOOD>.'],
-  cost: {},
-  prerequisite: '1 Occupation',
-  occupationPrerequisites: { min: 1 },
-  newSet: true,
-})
 
 export const A21_FamilyFriendHome_impl = {
   listeners: [listener],

@@ -1,17 +1,14 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { A146_StorehouseSteward } from '../../cards-display/A/A146_StorehouseSteward'
 
-const CARD_ID = 'A146_StorehouseSteward'
+const CARD_ID = A146_StorehouseSteward.id
 
 const isFoodAccumulationSpace = (space: CardListenerContext['space']): boolean =>
   (space?.gainPerRound?.food ?? 0) > 0
 
-// A146 Storehouse Steward: Each time you take exactly 2/3/4/5 food from a food accumulation space,
-// you also get 1 stone/reed/clay/wood. (6+ gives no bonus)
-// BGA checks count($event['meeples']) which maps to food gained
 const listener: CardListenerRegistration = {
   id: 'A146-storehouse-steward-after-collect',
   cardIds: [CARD_ID],
@@ -36,18 +33,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, gain), sourceCard: CARD_ID }
   },
 }
-
-export const A146_StorehouseSteward = new Occupation({
-  id: CARD_ID,
-  name: 'Storehouse Steward',
-  deck: 'A',
-  number: 146,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['Each time you take exactly 2/3/4/5 <FOOD> from a food accumulation space, you also get 1 <STONE>/<REED>/<CLAY>/<WOOD>. (If you take 6 or more <FOOD>, you do not get a bonus good).'],
-  cost: {},
-  players: '3+',
-  newSet: true,
-})
 
 export const A146_StorehouseSteward_impl = {
   listeners: [listener],

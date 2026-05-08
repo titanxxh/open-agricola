@@ -1,12 +1,12 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getExtraRoomCapacity } from '../card-effects'
 import { familySize } from '../../domain/player'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
+import { D21_Recruitment } from '../../cards-display/D/D21_Recruitment'
 
-const CARD_ID = 'D21_Recruitment'
+const CARD_ID = D21_Recruitment.id
 
 /**
  * D21 Recruitment (Minor Improvement, D, 21)
@@ -100,17 +100,6 @@ const isDoableListener: CardListenerRegistration = {
     return { doable: true }
   },
 }
-
-export const D21_Recruitment = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Recruitment',
-  deck: 'D',
-  number: 21,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['From round 5 on, provided you have room in your house, each time you get a __Minor Improvement__ action, you can take a __Family Growth__ action instead.'],
-  cost: { food: 1 },
-  prerequisite: 'No People Left in the House',
-})
 
 export const D21_Recruitment_impl = {
   listeners: [computeReplaceListener, isDoableListener],

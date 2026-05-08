@@ -1,22 +1,17 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { A30_BakingSheet } from '../../cards-display/A/A30_BakingSheet'
 
-const CARD_ID = 'A30_BakingSheet'
+const CARD_ID = A30_BakingSheet.id
 
-// BGA isBuyable: count(getGrainFields()) > 0 → false
 registerPrerequisite('No Grain Field', (player) =>
   player.fields.every((f) => !fieldHasCrop(f, 'grain')),
 )
 
-// A30 Baking Sheet: Each time you take a Bake Bread action, you can use this card to
-// exchange exactly 1 grain for 2 food and 1 bonus score.
-// BGA checks: isActionEvent($event, 'Exchange') && $event['trigger'] == BREAD
-// In our system: actions: ['bake-bread']
 const listener: CardListenerRegistration = {
   id: 'A30-baking-sheet-after-bake',
   cardIds: [CARD_ID],
@@ -30,19 +25,6 @@ const listener: CardListenerRegistration = {
     })
   },
 }
-
-export const A30_BakingSheet = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Baking Sheet',
-  deck: 'A',
-  number: 30,
-  category: 'POINTS_PROVIDER',
-  desc: ['Each time you take a __Bake Bread__ action, you can use this card to exchange exactly 1 <GRAIN> for 2 <FOOD> and 1 bonus <SCORE>.'],
-  cost: {},
-  prerequisite: 'No Grain Field',
-  newSet: true,
-  extraVp: true,
-})
 
 export const A30_BakingSheet_impl = {
   listeners: [listener],

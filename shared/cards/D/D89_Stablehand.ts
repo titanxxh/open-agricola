@@ -1,12 +1,10 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { D89_Stablehand } from '../../cards-display/D/D89_Stablehand'
 
-const CARD_ID = 'D89_Stablehand'
+const CARD_ID = D89_Stablehand.id
 
-// D89 Stablehand: Each time you build at least 1 fence, you can also build a stable
-// without paying WOOD for the stable.
 const listener: CardListenerRegistration = {
   id: 'D89-stablehand-after-fencing',
   cardIds: [CARD_ID],
@@ -31,17 +29,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const D89_Stablehand = new Occupation({
-  id: CARD_ID,
-  name: 'Stablehand',
-  deck: 'D',
-  number: 89,
-  category: 'FARM_PLANNER',
-  desc: ['Each time you build at least 1 fence, you can also build a stable without paying <WOOD> for the stable.'],
-  cost: {},
-  players: '1+',
-})
 
 export const D89_Stablehand_impl = {
   listeners: [listener],

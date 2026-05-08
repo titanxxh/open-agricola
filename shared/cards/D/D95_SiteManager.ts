@@ -1,9 +1,9 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { D95_SiteManager } from '../../cards-display/D/D95_SiteManager'
 
-const CARD_ID = 'D95_SiteManager'
+const CARD_ID = D95_SiteManager.id
 
 /**
  * D95 Site Manager (Occupation, 1+ players).
@@ -67,20 +67,6 @@ const computeCostsListener: CardListenerRegistration = {
     }
   },
 }
-
-export const D95_SiteManager = new Occupation({
-  id: CARD_ID,
-  name: 'Site Manager',
-  deck: 'D',
-  number: 95,
-  category: 'ACTIONS_BOOSTER',
-  desc: [
-    'When you play this card, immediately build a major improvement. When paying its cost, you can replace up to 1 building resource of each type with 1 <FOOD> each.',
-  ],
-  cost: {},
-  players: '1+',
-  evenMoreSet: true,
-})
 
 export const D95_SiteManager_impl = {
   listeners: [onBuyListener, computeCostsListener],

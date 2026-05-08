@@ -1,12 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import { D36_BreedRegistry } from '../../cards-display/D/D36_BreedRegistry'
 
-const CARD_ID = 'D36_BreedRegistry'
+const CARD_ID = D36_BreedRegistry.id
 
-// Track sheep gained from non-breeding sources (collect action on sheep spaces)
 const afterCollectListener: CardListenerRegistration = {
   id: 'D36-breed-registry-after-collect',
   cardIds: [CARD_ID],
@@ -24,7 +23,6 @@ const afterCollectListener: CardListenerRegistration = {
   },
 }
 
-// Track sheep-to-food conversion: snapshot sheep before exchange
 const beforeExchangeListener: CardListenerRegistration = {
   id: 'D36-breed-registry-before-exchange',
   cardIds: [CARD_ID],
@@ -35,7 +33,6 @@ const beforeExchangeListener: CardListenerRegistration = {
   },
 }
 
-// After exchange: if sheep count decreased, mark as converted
 const afterExchangeListener: CardListenerRegistration = {
   id: 'D36-breed-registry-after-exchange',
   cardIds: [CARD_ID],
@@ -48,17 +45,6 @@ const afterExchangeListener: CardListenerRegistration = {
     }
   },
 }
-
-export const D36_BreedRegistry = new MinorImprovement({
-  id: CARD_ID,
-  name: "Breed Registry",
-  deck: "D",
-  number: 36,
-  category: "POINTS_PROVIDER",
-  desc: ["During scoring, if you gained at most 2 <SHEEP> from sources other than breeding during the game and have not turned any sheep into food, you get 3 bonus <SCORE>."],
-  cost: {},
-  prerequisite: "No Sheep",
-})
 
 export const D36_BreedRegistry_impl = {
   listeners: [afterCollectListener, beforeExchangeListener, afterExchangeListener],

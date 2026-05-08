@@ -1,11 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { familySize, workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { E116_FirCutter } from '../../cards-display/E/E116_FirCutter'
 
-const CARD_ID = 'E116_FirCutter'
+const CARD_ID = E116_FirCutter.id
 
 /**
  * E116 Fir Cutter:
@@ -23,6 +23,7 @@ const CARD_ID = 'E116_FirCutter'
  * Occupation onBuy flows must use a play-occupation listener.
  */
 const ANIMAL_MARKET_SPACES = new Set(['sheep-market', 'pig-market', 'cattle-market'])
+
 const WOOD_BY_PLACEMENT = [0, 1, 1, 2, 2, 3]
 
 const onBuyListener: CardListenerRegistration = {
@@ -53,20 +54,6 @@ const animalMarketListener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { wood: woodAmount }), sourceCard: CARD_ID }
   },
 }
-
-export const E116_FirCutter = new Occupation({
-  id: CARD_ID,
-  name: 'Fir Cutter',
-  deck: 'E',
-  number: 116,
-  category: 'BUILDING_RESOURCES_-_WOOD',
-  desc: [
-    'When you play this card, you immediately get 1 <FOOD>. Each time after you use an animal accumulation space with your 1st/2nd/3rd/4th/5th person, you get 1/1/2/2/3 <WOOD>.',
-  ],
-  cost: {},
-  players: '1+',
-  evenMoreSet: true,
-})
 
 export const E116_FirCutter_impl = {
   listeners: [onBuyListener, animalMarketListener],

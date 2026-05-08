@@ -1,19 +1,7 @@
-import { MinorImprovement } from '../types'
 import type { CardImpl } from '../registry'
+import { B12_Stockyard } from '../../cards-display/B/B12_Stockyard'
 
-const CARD_ID = 'B12_Stockyard'
-
-export const B12_Stockyard = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Stockyard',
-  deck: 'B',
-  number: 12,
-  category: 'FARM_PLANNER',
-  desc: ['This card can hold up to 3 animals of the same type. (It is not considered a pasture).'],
-  cost: { wood: 1, stone: 1 },
-  vp: 1,
-  newSet: true,
-})
+const CARD_ID = B12_Stockyard.id
 
 export const B12_Stockyard_impl = {
   effect: {

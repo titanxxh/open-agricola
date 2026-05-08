@@ -1,4 +1,3 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, PlayerState } from '../../contract/types'
@@ -6,8 +5,9 @@ import { isSpaceOccupied } from '../../domain/space'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
+import { E21_SheepRug } from '../../cards-display/E/E21_SheepRug'
 
-const CARD_ID = 'E21_SheepRug'
+const CARD_ID = E21_SheepRug.id
 
 const countSheepOnBoard = (player: PlayerState): number => {
   let total = 0
@@ -21,8 +21,8 @@ const countSheepOnBoard = (player: PlayerState): number => {
   return total
 }
 
-// BGA isBuyable: countAnimalsOnBoard()[SHEEP] < 4 → false
 registerPrerequisite('4 Sheep', (player) => countSheepOnBoard(player) >= 4)
+
 const WISH_SPACE_IDS = ['wish-children', 'urgent-wish-children']
 
 const computeArgsListener: CardListenerRegistration = {
@@ -46,18 +46,6 @@ const computeArgsListener: CardListenerRegistration = {
     return { extraOptions, sourceCard: CARD_ID }
   },
 }
-
-export const E21_SheepRug = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Sheep Rug',
-  deck: 'E',
-  number: 21,
-  category: 'ACTION_-_FAMILY_GROWTH',
-  desc: ["You can use any __Wish for Children__ action space, even if it is occupied by another player's person."],
-  vp: 1,
-  cost: { sheep: 1 },
-  prerequisite: '4 Sheep',
-})
 
 export const E21_SheepRug_impl = {
   listeners: [computeArgsListener],

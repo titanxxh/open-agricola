@@ -1,18 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getStableTilesBuiltThisAction } from '../helpers/action-snapshot'
-import type { TradeModifier } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { C56_FeedFence } from '../../cards-display/C/C56_FeedFence'
 
-const CARD_ID = 'C56_FeedFence'
-
-// C56 Feed Fence: For each new stable you build, you get 1 food — for your last one
-// (the 4th), get 3 food instead of 1.
-// Each time you build stables, you can build exactly 1 stable for 1 clay instead of 2 wood.
-// BGA: onPlayerAfterStables (gain food based on stables built, +2 bonus for 4th stable)
-//      onPlayerComputeCostsStables (addCost: clay 1, max 1, when base cost has wood 2)
+const CARD_ID = C56_FeedFence.id
 
 const afterListener: CardListenerRegistration = {
   id: 'C56-feed-fence-after-stables',
@@ -28,28 +21,6 @@ const afterListener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { food: totalFood }), sourceCard: CARD_ID }
   },
 }
-
-export const C56_FeedFence = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Feed Fence',
-  deck: 'C',
-  number: 56,
-  category: 'FOOD_PROVIDER',
-  desc: [
-    'For each new stable you build, you get 1 <FOOD> —for your last one, get 3 <FOOD>. Each time you build stables, you can build exactly 1 stable for 1 <CLAY> instead of 2 <WOOD>.',
-  ],
-  cost: { wood: 1 },
-  // Trade modifier: 1 clay substitutes for 2 wood, max 1 per stables action
-  // BGA: Utils::addCost($args['costs'], [CLAY => 1, 'max' => 1], $this->id)
-  modifier: {
-    type: 'trade',
-    cardId: CARD_ID,
-    appliesTo: ['stables'],
-    from: { clay: 1 },
-    to: { wood: 2 },
-    max: 1,
-  } as TradeModifier,
-})
 
 export const C56_FeedFence_impl = {
   listeners: [afterListener],

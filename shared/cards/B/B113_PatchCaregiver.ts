@@ -1,20 +1,8 @@
-import { Occupation } from '../types'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B113_PatchCaregiver } from '../../cards-display/B/B113_PatchCaregiver'
 
-const CARD_ID = 'B113_PatchCaregiver'
-
-export const B113_PatchCaregiver = new Occupation({
-  id: CARD_ID,
-  name: 'Patch Caregiver',
-  deck: 'B',
-  number: 113,
-  category: 'CROP_PROVIDER',
-  desc: ['When you play this card, you can choose to buy 1 <GRAIN> for 1 <FOOD>, or 1 <VEGETABLE> for 3 <FOOD>. This card is a field.'],
-  cost: {},
-  players: '1+',
-  isField: true,
-})
+const CARD_ID = B113_PatchCaregiver.id
 
 export const B113_PatchCaregiver_impl = {
   effect: {

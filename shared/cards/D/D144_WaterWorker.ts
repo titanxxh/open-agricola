@@ -1,13 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { D144_WaterWorker } from '../../cards-display/D/D144_WaterWorker'
 
-const CARD_ID = 'D144_WaterWorker'
+const CARD_ID = D144_WaterWorker.id
 
-// BGA: After Fishing (collect), DayLaborer, ReedBank, or the round 4 action space → gain 1 reed.
-// Fishing triggers on collect (food accumulation), others on place-farmer.
 const TRIGGER_SPACE_IDS = new Set(['day-laborer', 'reed-bank'])
 
 const isRound4ActionSpace = (context: CardListenerContext): boolean => {
@@ -41,19 +39,6 @@ const placeFarmerListener: CardListenerRegistration = {
     }
   },
 }
-
-export const D144_WaterWorker = new Occupation({
-  id: CARD_ID,
-  name: 'Water Worker',
-  deck: 'D',
-  number: 144,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: [
-    'Each time after you use any of the __Fishing__, __Reed Bank__, __Day Laborer__ spaces or the action space of round 4, you get 1 additional <REED>.',
-  ],
-  cost: {},
-  players: '3+',
-})
 
 export const D144_WaterWorker_impl = {
   listeners: [collectListener, placeFarmerListener],

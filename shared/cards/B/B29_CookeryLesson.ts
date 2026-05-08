@@ -1,14 +1,17 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { readActionSnapshotToken } from '../helpers/action-snapshot'
 import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { B29_CookeryLesson } from '../../cards-display/B/B29_CookeryLesson'
 
-const CARD_ID = 'B29_CookeryLesson'
+const CARD_ID = B29_CookeryLesson.id
+
 const USED_ACTION_TOKEN_KEY = 'usedActionToken'
+
 const COOKED_TOKEN_KEY = 'cookedActionToken'
+
 const LESSONS_TOKEN_KEY = 'lessonsActionToken'
 
 /**
@@ -67,8 +70,6 @@ const awardBonusVp = (context: CardListenerContext): ActionHookResult | void => 
   }
 }
 
-// After exchange: stamp cookedActionToken with current action token,
-// then award VP if lessons was already stamped this same action.
 const afterExchangeListener: CardListenerRegistration = {
   id: 'B29-cookery-lesson-after-exchange',
   cardIds: [CARD_ID],
@@ -82,8 +83,6 @@ const afterExchangeListener: CardListenerRegistration = {
   },
 }
 
-// After place-farmer on Lessons: stamp lessonsActionToken with current action
-// token, then award VP if cooked was already stamped this same action.
 const afterPlaceFarmerListener: CardListenerRegistration = {
   id: 'B29-cookery-lesson-after-place-farmer',
   cardIds: [CARD_ID],
@@ -97,21 +96,6 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
     }
   },
 }
-
-export const B29_CookeryLesson = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Cookery Lesson',
-  deck: 'B',
-  number: 29,
-  category: 'POINTS_PROVIDER',
-  desc: [
-    'Each time you use a __Lessons__ action space and a cooking improvement on the same turn, you get 1 bonus <SCORE>.',
-  ],
-  cost: { food: 2 },
-  extraVp: true,
-  evenMoreSet: true,
-  implemented: true,
-})
 
 export const B29_CookeryLesson_impl = {
   listeners: [afterExchangeListener, afterPlaceFarmerListener],

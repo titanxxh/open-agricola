@@ -1,20 +1,9 @@
-import { Occupation } from '../types'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { A127_Lodger } from '../../cards-display/A/A127_Lodger'
 
-const CARD_ID = 'A127_Lodger'
-
-export const A127_Lodger = new Occupation({
-  id: CARD_ID,
-  name: 'Lodger',
-  deck: 'A',
-  number: 127,
-  category: 'FARM_PLANNER',
-  desc: ['This card provides room for one person, but only until the returning home phase of round 9. If, by then, there is no room elsewhere for that person, remove it from play.'],
-  cost: {},
-  players: '3+',
-})
+const CARD_ID = A127_Lodger.id
 
 export const A127_Lodger_impl = {
   effect: {

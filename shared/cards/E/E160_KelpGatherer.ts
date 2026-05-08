@@ -1,10 +1,10 @@
-import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E160_KelpGatherer } from '../../cards-display/E/E160_KelpGatherer'
 
-const CARD_ID = 'E160_KelpGatherer'
+const CARD_ID = E160_KelpGatherer.id
 
 /**
  * E160 Kelp Gatherer (Occupation, E, 160)
@@ -44,20 +44,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const E160_KelpGatherer = new Occupation({
-  id: CARD_ID,
-  name: 'Kelp Gatherer',
-  deck: 'E',
-  number: 160,
-  category: 'CROPS',
-  desc: [
-    'Each time another player uses the __Fishing__ accumulation space, they get 1 additional <FOOD> and you get 1 <VEGETABLE>.',
-  ],
-  cost: {},
-  players: '4+',
-  newSet: true,
-})
 
 export const E160_KelpGatherer_impl = {
   listeners: [listener],

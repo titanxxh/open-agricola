@@ -1,21 +1,12 @@
-import { MinorImprovement } from '../types'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { A19_Handplow } from '../../cards-display/A/A19_Handplow'
 
-const CARD_ID = 'A19_Handplow'
+const CARD_ID = A19_Handplow.id
+
 const TARGET_ROUND_KEY = 'targetRound'
-
-export const A19_Handplow = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Handplow',
-  deck: 'A',
-  number: 19,
-  category: 'FARM_PLANNER',
-  desc: ['Add 5 to the current round and place 1 field tile on the corresponding round space. At the start of that round, you can plow the field.'],
-  cost: { wood: 1 },
-})
 
 export const A19_Handplow_impl = {
   effect: {

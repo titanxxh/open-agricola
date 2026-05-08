@@ -1,11 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { D103_CanalBoatman } from '../../cards-display/D/D103_CanalBoatman'
 
-const CARD_ID = 'D103_CanalBoatman'
+const CARD_ID = D103_CanalBoatman.id
+
 const TRIGGER_SPACE_IDS = new Set(['fishing', 'reed-bank'])
 
 const listener: CardListenerRegistration = {
@@ -48,20 +49,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const D103_CanalBoatman = new Occupation({
-  id: CARD_ID,
-  name: 'Canal Boatman',
-  deck: 'D',
-  number: 103,
-  category: 'GOODS_PROVIDER',
-  desc: [
-    'Each time you use __Fishing__ or __Reed Bank__, you can pay 1 <FOOD> to immediately place another person on this card. If you do, you get your choice of 3 <STONE> or 1 <GRAIN> plus 1 <VEGETABLE>.',
-  ],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
 
 export const D103_CanalBoatman_impl = {
   listeners: [listener],

@@ -1,19 +1,9 @@
-import { MinorImprovement } from '../types'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import { playerBoard } from '../../domain'
 import type { CardImpl } from '../registry'
+import { C49_BeerStall } from '../../cards-display/C/C49_BeerStall'
 
-const CARD_ID = 'C49_BeerStall'
-
-export const C49_BeerStall = new MinorImprovement({
-  id: CARD_ID,
-  name: "Beer Stall",
-  deck: "C",
-  number: 49,
-  category: "FOOD_PROVIDER",
-  desc: ['In the feeding phase of each harvest, for each empty unfenced stable you have, you can exchange 1 <GRAIN> for 5 <FOOD>.'],
-  cost: { wood: 1 },
-})
+const CARD_ID = C49_BeerStall.id
 
 export const C49_BeerStall_impl = {
   effect: {

@@ -1,9 +1,9 @@
-import { MinorImprovement } from '../types'
 import type { ActionFlow, Resource } from '../../contract/types'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E78_SleightofHand } from '../../cards-display/E/E78_SleightofHand'
 
-const CARD_ID = 'E78_SleightofHand'
+const CARD_ID = E78_SleightofHand.id
 
 /**
  * E78 Sleight of Hand (Minor Improvement, E, 78)
@@ -34,17 +34,6 @@ const buildSingleExchange = (): ActionFlow => ({
         ],
       })),
   ),
-})
-
-export const E78_SleightofHand = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Sleight of Hand',
-  deck: 'E',
-  number: 78,
-  category: 'BUILDING_RESOURCES_-_REED',
-  desc: ['When you play this card, you can immediately exchange up to 4 building resources for an equal number of other building resources.'],
-  prerequisite: '3 Occupations',
-  occupationPrerequisites: { min: 3 },
 })
 
 export const E78_SleightofHand_impl = {

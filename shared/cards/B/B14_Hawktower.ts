@@ -1,25 +1,13 @@
-import { MinorImprovement } from '../types'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
+import { B14_Hawktower } from '../../cards-display/B/B14_Hawktower'
 
-const CARD_ID = 'B14_Hawktower'
+const CARD_ID = B14_Hawktower.id
 
-// BGA isBuyable: turn > 7 → false
 registerPrerequisite('Play in Round 7 or Before', (_player, state) => {
   if (!state) return true
   return state.round <= 7
-})
-
-export const B14_Hawktower = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Hawktower',
-  deck: 'B',
-  number: 14,
-  category: 'FARM_PLANNER',
-  desc: ['Place a stone room on round space 12. If you live in a stone house at the start of the round, you can build the stone room at no cost. Otherwise, discard the stone room.'],
-  cost: { clay: 2 },
-  prerequisite: 'Play in Round 7 or Before',
 })
 
 export const B14_Hawktower_impl = {

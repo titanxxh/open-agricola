@@ -1,11 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { B48_ForestStone } from '../../cards-display/B/B48_ForestStone'
 
-const CARD_ID = 'B48_ForestStone'
+const CARD_ID = B48_ForestStone.id
 
 const updateInfobox = (player: Parameters<typeof writeCardInfobox>[0], count: number) => {
   writeCardInfobox(player, CARD_ID, `${count} Food`)
@@ -17,7 +17,6 @@ const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =
 const isStoneAccumulationSpace = (space: CardListenerContext['space']): boolean =>
   (space?.gainPerRound?.stone ?? 0) > 0
 
-// After using a wood accumulation space: move 1 food from card to supply
 const woodCollectListener: CardListenerRegistration = {
   id: 'B48-forest-stone-after-collect-wood',
   cardIds: [CARD_ID],
@@ -34,7 +33,6 @@ const woodCollectListener: CardListenerRegistration = {
   },
 }
 
-// After using a stone accumulation space: add 2 food to card
 const stoneCollectListener: CardListenerRegistration = {
   id: 'B48-forest-stone-after-collect-stone',
   cardIds: [CARD_ID],
@@ -48,20 +46,6 @@ const stoneCollectListener: CardListenerRegistration = {
     updateInfobox(context.player, newCount)
   },
 }
-
-export const B48_ForestStone = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Forest Stone',
-  deck: 'B',
-  number: 48,
-  category: 'FOOD_PROVIDER',
-  desc: ['Place 2 <FOOD> on this card. Each time you use a wood accumulation space, move 1 of these <FOOD> to your supply. Each time you use a stone accumulation space, add 2 <FOOD> to this card.'],
-  cost: { wood: 2, stone: 1 },
-  vp: 1,
-  prerequisite: '1 Occupation',
-  occupationPrerequisites: { min: 1 },
-  newSet: true,
-})
 
 export const B48_ForestStone_impl = {
   listeners: [woodCollectListener, stoneCollectListener],

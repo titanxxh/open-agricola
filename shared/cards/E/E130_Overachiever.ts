@@ -1,9 +1,9 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { E130_Overachiever } from '../../cards-display/E/E130_Overachiever'
 
-const CARD_ID = 'E130_Overachiever'
+const CARD_ID = E130_Overachiever.id
 
 const DISCOUNT_RESOURCES = [
   'wood', 'clay', 'stone', 'reed', 'food', 'grain', 'vegetable',
@@ -41,17 +41,6 @@ const computeCostsListener: CardListenerRegistration = {
     }
   },
 }
-
-export const E130_Overachiever = new Occupation({
-  id: CARD_ID,
-  name: "Overachiever",
-  deck: "E",
-  number: 130,
-  category: "ACTION_-_IMPROVEMENTS_OR_OCCUPATIONS",
-  desc: ['Each time you use a __Wish for Children__ action space, you can play 1 additional improvement by paying its cost minus 1 resource of your choice.'],
-  cost: {},
-  players: "3+",
-})
 
 export const E130_Overachiever_impl = {
   listeners: [beforeWishChildrenListener, computeCostsListener],

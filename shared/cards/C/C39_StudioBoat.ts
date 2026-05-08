@@ -1,18 +1,12 @@
-import { PlayerActionCard } from '../types'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import { collectAccumulatedResources } from '../../actions/effects/collect'
 import { incCounter } from '../__stubs__/helpers'
 import type { CardImpl } from '../registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { C39_StudioBoat } from '../../cards-display/C/C39_StudioBoat'
 
-const CARD_ID = 'C39_StudioBoat'
-
-// In games with 1-3 players, C39 acts as the Traveling Players accumulation
-// space (which is only added by the action board itself in 4-player games).
-// In games with 4 players, the global Traveling Players action space exists,
-// so C39 contributes only the +1 bonus VP each time *its owner* places a
-// farmer there. See BGA: modules/php/Cards/C/C39_StudioBoat.php.
+const CARD_ID = C39_StudioBoat.id
 
 registerPlayerActionSpace({
   cardId: CARD_ID,
@@ -67,20 +61,6 @@ const travelingPlayersOwnerVp: CardListenerRegistration = {
     }
   },
 }
-
-export const C39_StudioBoat = new PlayerActionCard({
-  id: CARD_ID,
-  name: 'Studio Boat',
-  deck: 'C',
-  number: 39,
-  category: 'POINTS_PROVIDER',
-  desc: [
-    'Each time you use the __Traveling Players__ accumulation space, you also get 1 bonus <SCORE>. In games with 1-3 players, this card is considered __Traveling Players__ (same effect as __Fishing__).',
-  ],
-  cost: { wood: 1 },
-  prerequisite: '1 Occupation',
-  occupationPrerequisites: { min: 1 },
-})
 
 export const C39_StudioBoat_impl = {
   effect: {

@@ -1,12 +1,12 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack, popFromCardStack } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { E103_Wolf } from '../../cards-display/E/E103_Wolf'
 
-const CARD_ID = 'E103_Wolf'
+const CARD_ID = E103_Wolf.id
 
 /**
  * After gain/collect: if the gained resources include the top-of-stack resource,
@@ -33,18 +33,6 @@ const afterGainCollectListener: CardListenerRegistration = {
     }
   },
 }
-
-export const E103_Wolf = new Occupation({
-  id: CARD_ID,
-  name: 'Wolf',
-  deck: 'E',
-  number: 103,
-  desc: [
-    'Pile (from bottom to top) 1 <CLAY>, 1 <WOOD>, and 1 <GRAIN> on this card. Each time you get a good matching the top item, you can move that item to your supply and get 1 <PIG>.',
-  ],
-  cost: {},
-  players: '1+',
-})
 
 export const E103_Wolf_impl = {
   listeners: [afterGainCollectListener],

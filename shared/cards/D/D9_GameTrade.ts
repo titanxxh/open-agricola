@@ -1,19 +1,8 @@
-import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { D9_GameTrade } from '../../cards-display/D/D9_GameTrade'
 
-const CARD_ID = 'D9_GameTrade'
-
-export const D9_GameTrade = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Game Trade',
-  deck: 'D',
-  number: 9,
-  category: 'LIVESTOCK_PROVIDER',
-  desc: ['You immediately get 1 <PIG> and 1 <CATTLE>. (effectively, you are exchanging 2 <SHEEP> for 1 <PIG> and 1 <CATTLE>.)'],
-  cost: { sheep: 2 },
-  passing: true,
-})
+const CARD_ID = D9_GameTrade.id
 
 export const D9_GameTrade_impl = {
   effect: {

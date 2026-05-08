@@ -1,21 +1,9 @@
-import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied, spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
+import { D142_PotatoPlanter } from '../../cards-display/D/D142_PotatoPlanter'
 
-const CARD_ID = 'D142_PotatoPlanter'
-
-export const D142_PotatoPlanter = new Occupation({
-  id: CARD_ID,
-  name: 'Potato Planter',
-  deck: 'D',
-  number: 142,
-  category: 'CROP_PROVIDER',
-  desc: ['At the end of each work phase in which you occupy the __Clay Pit__ or __Reed Bank__ accumulation space while the respective other is unoccupied, you get 1 <VEGETABLE>.'],
-  cost: {},
-  players: '3+',
-  newSet: true,
-})
+const CARD_ID = D142_PotatoPlanter.id
 
 export const D142_PotatoPlanter_impl = {
   effect: {

@@ -1,10 +1,10 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { C149_ResourceRecycler } from '../../cards-display/C/C149_ResourceRecycler'
 
-const CARD_ID = 'C149_ResourceRecycler'
+const CARD_ID = C149_ResourceRecycler.id
 
 /**
  * C149 Resource Recycler:
@@ -47,20 +47,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const C149_ResourceRecycler = new Occupation({
-  id: CARD_ID,
-  name: 'Resource Recycler',
-  deck: 'C',
-  number: 149,
-  category: 'FARM_PLANNER',
-  desc: [
-    'Each time another player renovates to stone, if you live in a clay house, you can pay 2 <FOOD> to build a clay room at no additional cost.',
-  ],
-  cost: {},
-  players: '4+',
-  evenMoreSet: true,
-})
 
 export const C149_ResourceRecycler_impl = {
   listeners: [listener],

@@ -1,11 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { GameState, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { D77_RecycledBrick } from '../../cards-display/D/D77_RecycledBrick'
 
-const CARD_ID = 'D77_RecycledBrick'
+const CARD_ID = D77_RecycledBrick.id
 
 /**
  * D77 Recycled Brick (MinorImprovement, D, 77)
@@ -43,18 +43,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { clay: rooms }), sourceCard: CARD_ID }
   },
 }
-
-export const D77_RecycledBrick = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Recycled Brick',
-  deck: 'D',
-  number: 77,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: ['Each time any player (including you) renovates to stone, you get 1 <CLAY> for each newly renovated room.'],
-  cost: { food: 1 },
-  prerequisite: '3 Occupations',
-  occupationPrerequisites: { min: 3 },
-})
 
 export const D77_RecycledBrick_impl = {
   listeners: [listener],

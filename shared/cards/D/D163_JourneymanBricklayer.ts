@@ -1,10 +1,10 @@
-import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { D163_JourneymanBricklayer } from '../../cards-display/D/D163_JourneymanBricklayer'
 
-const CARD_ID = 'D163_JourneymanBricklayer'
+const CARD_ID = D163_JourneymanBricklayer.id
 
 /**
  * D163 Journeyman Bricklayer:
@@ -51,19 +51,6 @@ const constructListener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { stone: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const D163_JourneymanBricklayer = new Occupation({
-  id: CARD_ID,
-  name: 'Journeyman Bricklayer',
-  deck: 'D',
-  number: 163,
-  category: 'BUILDING_RESOURCE_PROVIDER',
-  desc: [
-    'When you play this card, you immediately get 2 <STONE>. Each time another player renovates to stone or builds a stone room, you get 1 <STONE>.',
-  ],
-  cost: {},
-  players: '4+',
-})
 
 export const D163_JourneymanBricklayer_impl = {
   listeners: [onBuyListener, renovateListener, constructListener],

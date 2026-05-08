@@ -1,9 +1,9 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { E24_Ambition } from '../../cards-display/E/E24_Ambition'
 
-const CARD_ID = 'E24_Ambition'
+const CARD_ID = E24_Ambition.id
 
 /**
  * E24 Ambition — Each time you get a __Minor Improvement__ action on an action
@@ -34,18 +34,6 @@ const computeReplaceListener: CardListenerRegistration = {
     }
   },
 }
-
-export const E24_Ambition = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Ambition',
-  deck: 'E',
-  number: 24,
-  category: 'ACTION',
-  desc: ['Each time you get a __Minor Improvement__ action on an action space, you can build a major improvement instead of playing a minor one.'],
-  cost: {},
-  prerequisite: '2 Occupations',
-  occupationPrerequisites: { min: 2 },
-})
 
 export const E24_Ambition_impl = {
   listeners: [computeReplaceListener],

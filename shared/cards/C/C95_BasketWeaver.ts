@@ -1,9 +1,10 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { C95_BasketWeaver } from '../../cards-display/C/C95_BasketWeaver'
 
-const CARD_ID = 'C95_BasketWeaver'
+const CARD_ID = C95_BasketWeaver.id
+
 const TARGET_MAJOR = 'Major_Basket'
 
 /**
@@ -66,20 +67,6 @@ const computeCostsListener: CardListenerRegistration = {
     return { costs: { stone: -1, reed: -1 } }
   },
 }
-
-export const C95_BasketWeaver = new Occupation({
-  id: CARD_ID,
-  name: 'Basket Weaver',
-  deck: 'C',
-  number: 95,
-  category: 'ACTIONS_BOOSTER',
-  desc: [
-    "When you play this card, immediately build the __Basketmaker's Workshop__ major improvement for 1 <STONE> and 1 <REED>.",
-  ],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
 
 export const C95_BasketWeaver_impl = {
   listeners: [onBuyListener, computeCostsListener],

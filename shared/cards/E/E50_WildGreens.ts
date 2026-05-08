@@ -1,14 +1,11 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { E50_WildGreens } from '../../cards-display/E/E50_WildGreens'
 
-const CARD_ID = 'E50_WildGreens'
+const CARD_ID = E50_WildGreens.id
 
-// E50 Wild Greens: Each time you sow, you get 1 FOOD for every different type of good that you sow.
-// BGA counts grain, vegetable, wood, stone sowed in the action.
-// Our sow action fires once per field sow. Each sow is one type, so we give 1 food per sow.
 const listener: CardListenerRegistration = {
   id: 'E50-wild-greens-after-sow',
   cardIds: [CARD_ID],
@@ -19,16 +16,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const E50_WildGreens = new MinorImprovement({
-  id: CARD_ID,
-  name: 'Wild Greens',
-  deck: 'E',
-  number: 50,
-  category: 'FOOD',
-  desc: ['Each time you sow, you get 1 <FOOD> for every different type of good that you sow.'],
-  cost: {},
-})
 
 export const E50_WildGreens_impl = {
   listeners: [listener],

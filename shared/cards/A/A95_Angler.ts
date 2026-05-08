@@ -1,13 +1,10 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { A95_Angler } from '../../cards-display/A/A95_Angler'
 
-const CARD_ID = 'A95_Angler'
+const CARD_ID = A95_Angler.id
 
-// A95 Angler: After using the Fishing accumulation space while there are at most 2 food on
-// that space (before collecting), get a Major or Minor Improvement action.
-// BGA checks count($event['meeples']) <= 2 which maps to food on the space before collection.
 const listener: CardListenerRegistration = {
   id: 'A95-angler-after-collect',
   cardIds: [CARD_ID],
@@ -32,18 +29,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const A95_Angler = new Occupation({
-  id: CARD_ID,
-  name: 'Angler',
-  deck: 'A',
-  number: 95,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['Each time after you use the __Fishing__ Accumulation space while there are at most 2 <FOOD> on that space, you get a __Major or Minor Improvement__ action.'],
-  cost: {},
-  players: '1+',
-  newSet: true,
-})
 
 export const A95_Angler_impl = {
   listeners: [listener],

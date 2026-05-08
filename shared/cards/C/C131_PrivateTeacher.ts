@@ -1,10 +1,10 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
+import { C131_PrivateTeacher } from '../../cards-display/C/C131_PrivateTeacher'
 
-const CARD_ID = 'C131_PrivateTeacher'
+const CARD_ID = C131_PrivateTeacher.id
 
 const LESSONS_SPACES = ['lessons', 'lessons-2', 'lessons-4']
 
@@ -32,18 +32,6 @@ const listener: CardListenerRegistration = {
     }
   },
 }
-
-export const C131_PrivateTeacher = new Occupation({
-  id: CARD_ID,
-  name: 'Private Teacher',
-  deck: 'C',
-  number: 131,
-  category: 'ACTIONS_BOOSTER',
-  desc: ['Each time you use the __Grain Seeds__ action space when any __Lessons__ action space is occupied, you can also play an occupation for an occupation cost of 1 <FOOD>.'],
-  cost: {},
-  players: '3+',
-  newSet: true,
-})
 
 export const C131_PrivateTeacher_impl = {
   listeners: [listener],

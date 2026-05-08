@@ -1,7 +1,7 @@
-import { Occupation } from '../types'
 import type { CardImpl } from '../registry'
+import { D148_DomesticianExpert } from '../../cards-display/D/D148_DomesticianExpert'
 
-const CARD_ID = 'D148_DomesticianExpert'
+const CARD_ID = D148_DomesticianExpert.id
 
 const countAdjacentRoomPairs = (roomTiles: Array<{row: number, col: number}>): number => {
   let pairs = 0
@@ -13,16 +13,6 @@ const countAdjacentRoomPairs = (roomTiles: Array<{row: number, col: number}>): n
   }
   return pairs
 }
-
-export const D148_DomesticianExpert = new Occupation({
-  id: CARD_ID,
-  name: 'Domestician Expert',
-  deck: 'D',
-  number: 148,
-  desc: ['You can keep 2 sheep on the border between each pair of orthogonally adjacent rooms.'],
-  cost: {},
-  players: '4+',
-})
 
 export const D148_DomesticianExpert_impl = {
   effect: {

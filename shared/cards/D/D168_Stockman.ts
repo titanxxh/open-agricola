@@ -1,15 +1,13 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getStableTilesBuiltThisAction } from '../helpers/action-snapshot'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { D168_Stockman } from '../../cards-display/D/D168_Stockman'
 
-const CARD_ID = 'D168_Stockman'
+const CARD_ID = D168_Stockman.id
 
-// D168 Stockman: When you build your 2nd/3rd/4th stable, you immediately get
-// 1 CATTLE/PIG/SHEEP, even if built on the same turn (but not retroactively).
 const listener: CardListenerRegistration = {
   id: 'D168-stockman-after-stables',
   cardIds: [CARD_ID],
@@ -30,19 +28,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, gains), sourceCard: CARD_ID }
   },
 }
-
-export const D168_Stockman = new Occupation({
-  id: CARD_ID,
-  name: 'Stockman',
-  deck: 'D',
-  number: 168,
-  category: 'LIVESTOCK_PROVIDER',
-  desc: [
-    'When you build your 2nd/3rd/4th stable, you immediately get 1 <CATTLE>/<PIG>/<SHEEP>, even if built on the same turn (but not retroactively).',
-  ],
-  cost: {},
-  players: '4+',
-})
 
 export const D168_Stockman_impl = {
   listeners: [listener],

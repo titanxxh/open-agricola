@@ -1,13 +1,15 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionFlow } from '../../contract/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionSpace, PlayerState, Pasture } from '../../contract/types'
 import { isCardFlagged, setCardFlag, writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import { A17_ReclamationPlow } from '../../cards-display/A/A17_ReclamationPlow'
+
+const CARD_ID = A17_ReclamationPlow.id
 
 type AnimalType = 'sheep' | 'boar' | 'cattle'
-const CARD_ID = 'A17_ReclamationPlow'
+
 const USED_INFOBOX = '✓'
 
 const isAnimalAccumulationSpace = (space: ActionSpace): boolean => {
@@ -79,16 +81,6 @@ const reclamationPlowAfterPlowListener: CardListenerRegistration = {
     writeCardInfobox(context.player, CARD_ID, USED_INFOBOX)
   },
 }
-
-export const A17_ReclamationPlow = new MinorImprovement({
-  id: CARD_ID,
-  name: "Reclamation Plow",
-  deck: "A",
-  number: 17,
-  category: "FARM_PLANNER",
-  desc: ["After the next time you take animals from an accumulation space and accommodate all of them on your farm, you can plow 1 field."],
-  cost: {"wood":1},
-})
 
 export const A17_ReclamationPlow_impl = {
   listeners: [reclamationPlowAfterCollectListener, reclamationPlowAfterPlowListener],

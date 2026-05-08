@@ -1,13 +1,11 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { A155_Conjurer } from '../../cards-display/A/A155_Conjurer'
 
-const CARD_ID = 'A155_Conjurer'
+const CARD_ID = A155_Conjurer.id
 
-// A155 Conjurer: Each time you use the Traveling Players accumulation space,
-// you get an additional 1 WOOD and 1 GRAIN.
 const listener: CardListenerRegistration = {
   id: 'A155-conjurer-after-place-farmer',
   cardIds: [CARD_ID],
@@ -18,17 +16,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { wood: 1, grain: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const A155_Conjurer = new Occupation({
-  id: CARD_ID,
-  name: 'Conjurer',
-  deck: 'A',
-  number: 155,
-  category: 'GOODS_PROVIDER',
-  desc: ['Each time you use the __Traveling Players__ accumulation space, you get an additional 1 <WOOD> and 1 <GRAIN>.'],
-  cost: {},
-  players: '4+',
-})
 
 export const A155_Conjurer_impl = {
   listeners: [listener],

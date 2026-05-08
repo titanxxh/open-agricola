@@ -1,14 +1,9 @@
-import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { A149_HouseArtist } from '../../cards-display/A/A149_HouseArtist'
 
-const CARD_ID = 'A149_HouseArtist'
-
-// A149 House Artist: Each time you use the Traveling Players accumulation space, you also
-// get a Build Rooms action. Each room you build during the action costs you 1 reed less.
-// BGA: onPlayerPlaceFarmer (on TravelingPlayers) → optional CONSTRUCT with actionCardId=A149
-//      onPlayerComputeCostsConstruct: if actionCardId === this card, reduce reed by 1 per room trade
+const CARD_ID = A149_HouseArtist.id
 
 const triggerListener: CardListenerRegistration = {
   id: 'A149-house-artist-after-traveling-players',
@@ -29,9 +24,6 @@ const triggerListener: CardListenerRegistration = {
   },
 }
 
-// Discount: -1 reed per room when triggered by this card.
-// BGA: iterates over trades with REED key and decrements by 1 per trade entry.
-// In our system, the reed cost per room is a flat cost; -1 reed discount applies.
 const costListener: CardListenerRegistration = {
   id: 'A149-house-artist-compute-costs-construct',
   cardIds: [CARD_ID],
@@ -42,20 +34,6 @@ const costListener: CardListenerRegistration = {
     return { costs: { reed: -1 } }
   },
 }
-
-export const A149_HouseArtist = new Occupation({
-  id: CARD_ID,
-  name: 'House Artist',
-  deck: 'A',
-  number: 149,
-  category: 'FARM_PLANNER',
-  desc: [
-    'Each time you use the __Traveling Players__ accumulation space, you also get a __Build Rooms__ action. Each room you build during the action costs you 1 <REED> less.',
-  ],
-  cost: {},
-  players: '4+',
-  newSet: true,
-})
 
 export const A149_HouseArtist_impl = {
   listeners: [triggerListener, costListener],

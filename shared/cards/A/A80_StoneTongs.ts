@@ -1,10 +1,10 @@
-import { MinorImprovement } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { A80_StoneTongs } from '../../cards-display/A/A80_StoneTongs'
 
-const CARD_ID = 'A80_StoneTongs'
+const CARD_ID = A80_StoneTongs.id
 
 /**
  * A80 Stone Tongs — Each time you use a stone accumulation space
@@ -24,18 +24,6 @@ const listener: CardListenerRegistration = {
     return { flow: gainLeaf(CARD_ID, { stone: 1 }), sourceCard: CARD_ID }
   },
 }
-
-export const A80_StoneTongs = new MinorImprovement({
-  id: CARD_ID,
-  name: "Stone Tongs",
-  deck: "A",
-  number: 80,
-  category: "BUILDING_RESOURCE_PROVIDER",
-  desc: [
-    "Each time you use a stone accumulation space, you get 1 additional <STONE>.",
-  ],
-  cost: { wood: 1 },
-})
 
 export const A80_StoneTongs_impl = {
   listeners: [listener],
