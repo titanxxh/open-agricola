@@ -51,15 +51,15 @@ import {
   resourceKeyList,
   applyRoundGrowth,
   applyFutureMeeples,
-} from '../logic/state.ts'
-import { clearWorkPhaseBuildingResources } from '../logic/work-phase-resources.ts'
+} from './state-bootstrap.ts'
+import { clearWorkPhaseBuildingResources } from '../session/work-phase-resources.ts'
 import {
   addFoodFromConversion,
   incFirstPlayer,
   incHarvestedGrain,
   incHarvestedVegetable,
   incResourceConverted,
-} from '../logic/stats.ts'
+} from '../session/stats.ts'
 import { getMinorImprovement } from '../cards-display/_lookup.ts'
 import {
   registerCustomCard,

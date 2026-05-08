@@ -8,8 +8,8 @@ import type {
   PlayerState,
   Resource,
 } from '../../../shared/contract/types'
-import { formatAnimalCounts, formatResources } from '../../../shared/logic/format'
-import { emptyResources } from '../../../shared/logic/state-constants'
+import { formatAnimalCounts, formatResources } from '../../utils/format'
+import { emptyResources } from '../../../shared/session/state-constants'
 import { familySize } from '../../../shared/domain/player'
 import { readCardResourceStats } from '../../../shared/cards/helpers/card-state'
 import { getWorkerHeldOnCard } from '../../../shared/cards/helpers/card-held-workers'

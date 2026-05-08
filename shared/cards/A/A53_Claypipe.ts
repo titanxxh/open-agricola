@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import {
   getWorkPhaseBuildingResources,
-} from '../../logic/work-phase-resources'
+} from '../../session/work-phase-resources'
 import { writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { cardAllowedForPlayerCount } from '../../cards/player-count-filter'
 import { getMinorImprovementCard, getOccupationCard } from '../../cards/catalog'
-import { createInitialState, dealHands } from '../state'
+import { createInitialState, dealHands } from '../state-bootstrap'
 import {
   registerAdHocMinorImprovement,
   MinorImprovement,

@@ -1,7 +1,7 @@
 import type { ActionSpace, GameState } from '../contract/types'
 import type { EngineStack, EngineStackCursor } from '../engine'
 import { createActionSpaces } from '../actions'
-import { normalizeState } from '../logic/state'
+import { normalizeState } from '../session/state-bootstrap'
 import { getCardModifiers } from '../cards/card-modifiers'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
 import { normalizeTakenBy } from '../domain/space'

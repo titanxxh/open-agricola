@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../server/game/authoritative-session'
-import { createInitialState } from '../shared/logic/state'
+import { createInitialState } from '../shared/session/state-bootstrap'
 import type { LogEntry } from '../shared/game/types'
 
 describe('A126 MasterWorkman integration', () => {

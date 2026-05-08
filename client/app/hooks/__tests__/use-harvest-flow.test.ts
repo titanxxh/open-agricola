@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildHarvestFeedOptions } from '../use-harvest-flow'
-import { emptyResources } from '../../../../shared/logic/state-constants'
+import { emptyResources } from '../../../../shared/session/state-constants'
 import type { PlayerState } from '../../../../shared/contract/types'
 import '../../../../shared/cards/C/C59_SchnappsDistillery'
 import '../../../../shared/cards/B/B104_SheepWalker'

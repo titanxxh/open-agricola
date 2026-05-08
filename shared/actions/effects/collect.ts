@@ -1,6 +1,6 @@
 import type { ActionDefinition, ActionSpace, PlayerState, Resource } from '../../contract/types'
-import { trackWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
-import { addResourcesFromBoard } from '../../logic/stats'
+import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resources'
+import { addResourcesFromBoard } from '../../session/stats'
 
 export const collectAccumulatedResources = (
   player: PlayerState,

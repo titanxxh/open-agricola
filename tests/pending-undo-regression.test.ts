@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { GameSession } from '../server/game/authoritative-session'
-import { createInitialState } from '../shared/logic/state'
+import { createInitialState } from '../shared/session/state-bootstrap'
 import { getAllTilePositions } from '../shared/domain/farm'
 import { confirmNextPlayer, isLegacyChoicePending } from '../server/__tests__/_helpers/legacy-confirms'
 

@@ -11,7 +11,7 @@
 
 import type { FenceSegment, GameState, PlayerState, Resource } from '../contract/types'
 import type { DraftMode } from '../draft/types'
-import { createRng, shuffleWithRng } from './rng'
+import { createRng, shuffleWithRng } from '../utils/rng'
 import { tryAddRoomTile } from '../domain/farmyard'
 
 export const normalizeFenceSegments = (input: unknown): FenceSegment[] => {

@@ -5,7 +5,7 @@ import { addCardResourceGained } from './card-state'
 import {
   addResourcesFromBoard,
   addResourcesFromCards,
-} from '../../logic/stats'
+} from '../../session/stats'
 
 export type CardGain = Partial<Resource> & { score?: number }
 

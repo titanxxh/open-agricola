@@ -3,7 +3,7 @@ import { GameSession } from '../../../../server/game/authoritative-session'
 import { placeFarmerAction } from '../place-farmer'
 import { setWorkersAtHome } from '../../../domain/player'
 import { addWorkerRef } from '../../../domain/space'
-import { createInitialPlayerStats } from '../../../logic/stats'
+import { createInitialPlayerStats } from '../../../session/stats'
 
 const buildState = () => {
   const session = new GameSession(undefined, undefined, { playerCount: 2 })

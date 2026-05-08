@@ -1,4 +1,4 @@
-import { createRng } from '../../logic/rng'
+import { createRng } from '../../utils/rng'
 import type { GameState, PlayerState } from '../../contract/types'
 import { readCardExtraData, writeCardExtraData } from './card-state'
 

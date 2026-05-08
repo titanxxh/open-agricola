@@ -13,7 +13,7 @@ import { getDb } from './db.ts'
 import { validateSession, extractToken } from './auth.ts'
 import type { CustomCardData } from '../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../shared/custom-code/types.ts'
-import { defaultSandboxDeckIds, defaultSandboxPlayerNames } from '../shared/logic/state.ts'
+import { defaultSandboxDeckIds, defaultSandboxPlayerNames } from '../shared/session/state-bootstrap.ts'
 
 /**
  * Per-user HTTP game sessions, keyed by user ID.

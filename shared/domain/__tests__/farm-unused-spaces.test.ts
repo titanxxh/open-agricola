@@ -6,7 +6,7 @@ import {
   hasNoUnusedFarmyardSpaces,
   parsePositionKey,
   positionKey,
-} from '../../domain/farm'
+} from '../farm'
 import type { FarmTilePosition, PlayerState, Resource } from '../../contract/types'
 
 const emptyResources = (): Resource => ({

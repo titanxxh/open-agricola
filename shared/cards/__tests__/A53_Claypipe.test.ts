@@ -4,7 +4,7 @@ import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
 import { gainAction } from '../../actions/effects/gain'
 import { playImprovement } from '../../actions/effects/improvement'
 import { getCardEffect } from '../card-effects'
-import { getWorkPhaseBuildingResources } from '../../logic/work-phase-resources'
+import { getWorkPhaseBuildingResources } from '../../session/work-phase-resources'
 
 import '../A/A53_Claypipe'
 import type { ActionExecutionContext } from '../../contract/types'

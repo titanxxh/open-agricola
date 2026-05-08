@@ -21,7 +21,7 @@ import {
 import { playerBoard } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
-import { incRoomsBuilt } from '../../logic/stats'
+import { incRoomsBuilt } from '../../session/stats'
 
 const constructCostPreview: ActionCostPreview = {
   getBaseCost: ({ player }) => getBuildRoomCost(player.houseType),

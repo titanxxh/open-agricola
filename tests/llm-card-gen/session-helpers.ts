@@ -23,7 +23,7 @@ import {
   type CustomCardData,
 } from '../../shared/cards/custom-registry'
 import { registerExecutorBackedCustomCard } from '../../server/custom-code/runtime'
-import { createInitialState } from '../../shared/logic/state'
+import { createInitialState } from '../../shared/session/state-bootstrap'
 import type { GameState, PlayerState, Resource } from '../../shared/game/types'
 import { rewriteCardId } from './extract'
 import { getCardEffect } from '../../shared/cards/card-effects'

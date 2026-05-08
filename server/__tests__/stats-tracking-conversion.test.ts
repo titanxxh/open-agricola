@@ -4,7 +4,7 @@ import {
   bakeBreadAction as _bakeBreadAction,
 } from '../../shared/actions/effects/bake-bread'
 import { applyTrade } from '../../shared/actions/effects/exchange'
-import { createInitialPlayerStats } from '../../shared/logic/stats'
+import { createInitialPlayerStats } from '../../shared/session/stats'
 import type { PlayerState, Trade } from '../../shared/contract/types'
 import { GameSession } from '../game/authoritative-session'
 
