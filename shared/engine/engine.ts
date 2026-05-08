@@ -46,6 +46,7 @@ import { EngineTree } from './tree'
 import { LogStore } from './log-store'
 import { INTERACTION_ONLY_ACTION_ID } from './engine-stack'
 import type { ReorganizeTrigger } from '../actions/effects/reorganize'
+import type { EngineInternals } from './engine-internals'
 
 type EngineContext = {
   state: GameState
@@ -113,9 +114,36 @@ export class Engine {
   // 3 mirror fields (pendingInteractionActionId / OwnerNodeId / Context) were
   // deleted in S4c PR2 once snapshot consumers migrated to read pending data
   // off the InteractionNode in `choiceData` (and composite emit metadata).
-  private pendingInteractionNodeId: string | null = null
-  private flowNodeCounter = 0
+  //
+  // S4c PR5 — boxed as `{ value }` ref objects so module-private functions
+  // in engine-utils / engine-proceed / engine-resolve (extracted in
+  // subsequent steps) can mutate them via the `EngineInternals` snapshot.
+  // Module functions cannot mutate primitives on `this` by reference.
+  private _pendingNodeIdRef: { value: string | null } = { value: null }
+  private _counterRef: { value: number } = { value: 0 }
   private beforePhaseFlowNodeIds = new Set<string>()
+
+  /**
+   * S4c PR5 — return a boxed snapshot of the engine's core mutable fields,
+   * for use by module-private functions in `engine-utils.ts` /
+   * `engine-proceed.ts` / `engine-resolve.ts` (extracted in subsequent
+   * sub-commits). Not part of the public API; listed in the surface guard's
+   * `PRIVATE_HELPERS`.
+   *
+   * @internal Package-internal coordination surface only. Do not call from
+   * outside shared/engine/.
+   */
+  _internals(): EngineInternals {
+    return {
+      tree: this.tree,
+      registry: this.registry,
+      hooks: this.hooks,
+      log: this.log,
+      counterRef: this._counterRef,
+      beforePhaseFlowNodeIds: this.beforePhaseFlowNodeIds,
+      pendingNodeIdRef: this._pendingNodeIdRef,
+    }
+  }
   /**
   /**
    * S2 Task 8: returns the pending-choice metadata regardless of whether the
@@ -137,8 +165,8 @@ export class Engine {
     options: ActionChoiceOption[]
     request?: InteractionRequest
   } | null {
-    if (this.pendingInteractionNodeId === null) return null
-    const node = this.tree.findNodeById(this.pendingInteractionNodeId)
+    if (this._pendingNodeIdRef.value === null) return null
+    const node = this.tree.findNodeById(this._pendingNodeIdRef.value)
     if (!node) return null
     if (node instanceof OrNode || node instanceof XorNode || node instanceof OptionalNode) {
       if (node.emittedChoices.length === 0 && node.emittedRequest === undefined) return null
@@ -160,8 +188,8 @@ export class Engine {
    * stays green.
    */
   peekInteraction(): InteractionNode | null {
-    if (this.pendingInteractionNodeId === null) return null
-    const node = this.tree.findNodeById(this.pendingInteractionNodeId)
+    if (this._pendingNodeIdRef.value === null) return null
+    const node = this.tree.findNodeById(this._pendingNodeIdRef.value)
     return node instanceof InteractionNode ? node : null
   }
 
@@ -181,8 +209,8 @@ export class Engine {
    * stays green.
    */
   peekInteractionHost(): EngineNode | null {
-    if (this.pendingInteractionNodeId === null) return null
-    return this.tree.findNodeById(this.pendingInteractionNodeId) ?? null
+    if (this._pendingNodeIdRef.value === null) return null
+    return this.tree.findNodeById(this._pendingNodeIdRef.value) ?? null
   }
 
   /**
@@ -200,7 +228,7 @@ export class Engine {
    */
   injectInteraction(node: InteractionNode): void {
     this.tree.root = node
-    this.pendingInteractionNodeId = node.id
+    this._pendingNodeIdRef.value = node.id
     // Synthetic action id — never resolves through the registry. Engine paths
     // that look up `node.pendingActionId` (e.g. flushLeafActionDetail) tolerate
     // unknown ids gracefully. Authoritative owner is the InteractionNode
@@ -272,13 +300,13 @@ export class Engine {
         contextWritePatch: args.contextWritePatch,
         preserveOwner: args.preserveOwner,
       })
-      this.pendingInteractionNodeId = targetNode.id
+      this._pendingNodeIdRef.value = targetNode.id
     } else {
       // No-targetNode path: pending context (params/costs/sourceCard/actionContext)
       // will be installed when the eventual InteractionNode emits — engine carries
       // no fallback snapshot post-PR2 (the deleted `pendingInteractionContext` mirror
       // used to live here).
-      this.pendingInteractionNodeId = fallbackNodeId
+      this._pendingNodeIdRef.value = fallbackNodeId
     }
   }
 
@@ -305,7 +333,7 @@ export class Engine {
       // No pending unresolved node — wrap root in a SequenceNode so the
       // injected flows execute first.
       this.tree.root = new SequenceNode(
-        `prepend-root-${this.flowNodeCounter++}`,
+        `prepend-root-${this._counterRef.value++}`,
         [...flowNodes, this.tree.root],
       )
     }
@@ -403,7 +431,7 @@ export class Engine {
     event: Record<string, unknown> = {},
   ): EngineNode[] {
     return matched.map((entry, index) => {
-      const nodeId = `activate-${phase}-${actionId}-${index}-${this.flowNodeCounter++}`
+      const nodeId = `activate-${phase}-${actionId}-${index}-${this._counterRef.value++}`
       return new ActivateCardNode(
         nodeId,
         entry.registration.id,
@@ -426,7 +454,7 @@ export class Engine {
   private cloneNode(node: EngineNode): EngineNode {
     if (node instanceof ActionNode) {
       const clone = new ActionNode(
-        `${node.id}-clone-${this.flowNodeCounter++}`,
+        `${node.id}-clone-${this._counterRef.value++}`,
         node.actionId,
         node.sourceCard,
         node.params,
@@ -440,7 +468,7 @@ export class Engine {
     }
     if (node instanceof InteractionNode) {
       const clone = new InteractionNode(
-        `${node.id}-clone-${this.flowNodeCounter++}`,
+        `${node.id}-clone-${this._counterRef.value++}`,
         [...node.choices],
       )
       if (node.promptKey) {
@@ -450,33 +478,33 @@ export class Engine {
     }
     if (node instanceof SequenceNode) {
       return new SequenceNode(
-        `${node.id}-clone-${this.flowNodeCounter++}`,
+        `${node.id}-clone-${this._counterRef.value++}`,
         node.children.map((child) => this.cloneNode(child)),
       )
     }
     if (node instanceof ParallelNode) {
       return new ParallelNode(
-        `${node.id}-clone-${this.flowNodeCounter++}`,
+        `${node.id}-clone-${this._counterRef.value++}`,
         node.children.map((child) => this.cloneNode(child)),
       )
     }
     if (node instanceof OrNode) {
       return new OrNode(
-        `${node.id}-clone-${this.flowNodeCounter++}`,
+        `${node.id}-clone-${this._counterRef.value++}`,
         node.children.map((child) => this.cloneNode(child)),
         node.promptKey,
       )
     }
     if (node instanceof XorNode) {
       return new XorNode(
-        `${node.id}-clone-${this.flowNodeCounter++}`,
+        `${node.id}-clone-${this._counterRef.value++}`,
         node.children.map((child) => this.cloneNode(child)),
         node.promptKey,
       )
     }
     if (node instanceof OptionalNode) {
       const clone = new OptionalNode(
-        `${node.id}-clone-${this.flowNodeCounter++}`,
+        `${node.id}-clone-${this._counterRef.value++}`,
         this.cloneNode(node.child),
         node.promptKey,
       )
@@ -485,7 +513,7 @@ export class Engine {
     }
     if (node instanceof ActivateCardNode) {
       return new ActivateCardNode(
-        `${node.id}-clone-${this.flowNodeCounter++}`,
+        `${node.id}-clone-${this._counterRef.value++}`,
         node.listenerId,
         node.cardId,
         node.phase,
@@ -495,7 +523,7 @@ export class Engine {
     }
     if (node instanceof PlayerSwitchNode) {
       return new PlayerSwitchNode(
-        `${node.id}-clone-${this.flowNodeCounter++}`,
+        `${node.id}-clone-${this._counterRef.value++}`,
         node.targetPlayerId,
       )
     }
@@ -640,9 +668,9 @@ export class Engine {
   }
 
   private buildFlowNode(flow: ActionFlow): EngineNode {
-    const nextId = () => `flow-${this.flowNodeCounter++}`
+    const nextId = () => `flow-${this._counterRef.value++}`
     if (flow.type === 'playerSwitch') {
-      return new PlayerSwitchNode(`ps-flow-${this.flowNodeCounter++}`, flow.targetPlayerId)
+      return new PlayerSwitchNode(`ps-flow-${this._counterRef.value++}`, flow.targetPlayerId)
     }
     if (flow.type === 'leaf') {
       if (flow.expandFlow) {
@@ -860,8 +888,8 @@ export class Engine {
       active: node instanceof OptionalNode ? node.active : undefined,
     }))
     const choiceNode =
-      this.pendingInteractionNodeId !== null
-        ? this.tree.findNodeById(this.pendingInteractionNodeId)
+      this._pendingNodeIdRef.value !== null
+        ? this.tree.findNodeById(this._pendingNodeIdRef.value)
         : null
     // S4c PR2 — the engine no longer keeps top-level pendingInteractionXxx
     // mirror fields. choiceData carries the InteractionNode-authoritative
@@ -897,8 +925,8 @@ export class Engine {
     options: ActionChoiceOption[]
     request?: InteractionRequest
   } | null {
-    if (this.pendingInteractionNodeId === null) return null
-    const node = this.tree.findNodeById(this.pendingInteractionNodeId)
+    if (this._pendingNodeIdRef.value === null) return null
+    const node = this.tree.findNodeById(this._pendingNodeIdRef.value)
     if (!node) return null
     if (node instanceof OrNode || node instanceof XorNode || node instanceof OptionalNode) {
       if (node.emittedChoices.length === 0 && node.emittedRequest === undefined) return null
@@ -920,8 +948,8 @@ export class Engine {
    * stays green.
    */
   hasPendingChoiceCompositeAncestor() {
-    if (!this.pendingInteractionNodeId) return false
-    let parent = this.tree.findParent(this.pendingInteractionNodeId)
+    if (!this._pendingNodeIdRef.value) return false
+    let parent = this.tree.findParent(this._pendingNodeIdRef.value)
     while (parent) {
       if (parent instanceof OrNode || parent instanceof XorNode) {
         return true
@@ -1037,7 +1065,7 @@ export class Engine {
     // (InteractionNode host) or compositeEmit.nodeId (Or/Xor/Optional host).
     // Replaces the deleted top-level pendingInteractionNodeId/ActionId/
     // OwnerNodeId/Context mirror fields.
-    this.pendingInteractionNodeId =
+    this._pendingNodeIdRef.value =
       snapshot.choiceData?.id ?? snapshot.compositeEmit?.nodeId ?? null
 
     // S2 Task 8: rebuild composite emit metadata onto Or/Xor/Optional nodes.
@@ -1151,7 +1179,7 @@ export class Engine {
         }
         return { type: 'blocked', nodeId: node.id }
       }
-      this.pendingInteractionNodeId = node.id
+      this._pendingNodeIdRef.value = node.id
       const compositeCtxSnapshot = {
         params: undefined,
         costs: undefined,
@@ -1224,7 +1252,7 @@ export class Engine {
         node.resolve()
         return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
       }
-      this.pendingInteractionNodeId = node.id
+      this._pendingNodeIdRef.value = node.id
       const optionalCtxSnapshot = {
         params: actionNode.params,
         costs: undefined,
@@ -1597,7 +1625,7 @@ export class Engine {
         }
         return {
           type: 'choice',
-          nodeId: this.pendingInteractionNodeId ?? node.id,
+          nodeId: this._pendingNodeIdRef.value ?? node.id,
           choice: {
             promptKey: result.promptKey,
             promptParams: result.promptParams,
@@ -1709,22 +1737,22 @@ export class Engine {
     context: EngineContext,
     payload?: Record<string, unknown>,
   ): ActionExecutionResult {
-    if (this.pendingInteractionNodeId) {
-      const node = this.tree.findNodeById(this.pendingInteractionNodeId)
+    if (this._pendingNodeIdRef.value) {
+      const node = this.tree.findNodeById(this._pendingNodeIdRef.value)
       if (node instanceof OptionalNode) {
         if (choice === '__skip__') {
           node.resolve()
-          this.pendingInteractionNodeId = null
+          this._pendingNodeIdRef.value = null
           return { type: 'ok' }
         }
         node.active = true
-        this.pendingInteractionNodeId = null
+        this._pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
       if (node instanceof OrNode || node instanceof XorNode) {
         if (choice === '__done__' && node instanceof OrNode) {
           node.resolve(choice)
-          this.pendingInteractionNodeId = null
+          this._pendingNodeIdRef.value = null
           return { type: 'ok' }
         }
         if (choice === '__skip__') {
@@ -1732,14 +1760,14 @@ export class Engine {
           if (parent instanceof OptionalNode) {
             this.resolveSubtree(node)
             parent.resolve()
-            this.pendingInteractionNodeId = null
+            this._pendingNodeIdRef.value = null
             return { type: 'ok' }
           }
         }
         const targetNode = node.children.find((item) => item.id === choice)
         const child = targetNode ? this.findActionNode(targetNode) : null
         if (!child) {
-          this.pendingInteractionNodeId = null
+          this._pendingNodeIdRef.value = null
           return { type: 'ok' }
         }
         const executionContext: ActionExecutionContext = {
@@ -1770,12 +1798,12 @@ export class Engine {
           this.tree.insertAfter(node.id, [flowNode])
           targetNode!.resolve(choice)
           node.resolve(choice)
-          this.pendingInteractionNodeId = null
+          this._pendingNodeIdRef.value = null
           return { type: 'ok' }
         }
         const action = this.registry.get(actionId)
         if (!action) {
-          this.pendingInteractionNodeId = null
+          this._pendingNodeIdRef.value = null
           return { type: 'fail', logKey: 'log.buildRoomFail' }
         }
         const costResults = this.hooks.computeCosts({
@@ -1813,7 +1841,7 @@ export class Engine {
             node.resolve(choice)
           }
           this.tree.insertBefore(node.id, [...beforeActivateNodes, deferredTarget])
-          this.pendingInteractionNodeId = null
+          this._pendingNodeIdRef.value = null
           return { type: 'ok' }
         }
         const result = action.execute(executionContext)
@@ -1952,7 +1980,7 @@ export class Engine {
         if (node instanceof XorNode) {
           node.resolve(choice)
         }
-        this.pendingInteractionNodeId = null
+        this._pendingNodeIdRef.value = null
         return result
       }
     }
@@ -1996,8 +2024,8 @@ export class Engine {
           ? (result.extraData.actionContextWrite as Record<string, unknown> | undefined)
           : undefined
       const requestOptions = result.request.options
-      const existingNode = this.pendingInteractionNodeId
-        ? this.tree.findNodeById(this.pendingInteractionNodeId)
+      const existingNode = this._pendingNodeIdRef.value
+        ? this.tree.findNodeById(this._pendingNodeIdRef.value)
         : null
       const interactionTarget = existingNode instanceof InteractionNode ? existingNode : null
       this.applyInteractionRequest({
@@ -2030,7 +2058,7 @@ export class Engine {
       })
     }
     // S4c PR2 — read owner from the InteractionNode (was: pendingInteractionOwnerNodeId mirror).
-    const insertionTargetId = interactionHost?.ownerNodeId ?? this.pendingInteractionNodeId
+    const insertionTargetId = interactionHost?.ownerNodeId ?? this._pendingNodeIdRef.value
     const immediatePhase = this.hooks.immediatelyAfter({ ...executionContext, actionId, choice }, result, choice)
     const afterPhase = this.hooks.after({ ...executionContext, actionId, choice }, result, choice)
 
@@ -2094,8 +2122,8 @@ export class Engine {
         }
       }
     }
-    if (this.pendingInteractionNodeId) {
-      const node = this.tree.findNodeById(this.pendingInteractionNodeId)
+    if (this._pendingNodeIdRef.value) {
+      const node = this.tree.findNodeById(this._pendingNodeIdRef.value)
       if (node instanceof InteractionNode) {
         if (
           node.promptKey === 'ui.interactionBakeBreadChoice' &&
@@ -2115,7 +2143,7 @@ export class Engine {
         ownerNode.resolve()
       }
     }
-    this.pendingInteractionNodeId = null
+    this._pendingNodeIdRef.value = null
     return result
   }
 
@@ -2133,7 +2161,7 @@ export class Engine {
   insertFlowAfterPendingChoice(flow: ActionFlow): void {
     // S4c PR2 — read owner from the InteractionNode (was: pendingInteractionOwnerNodeId mirror).
     const interactionNode = this.peekInteraction()
-    const insertionTargetId = interactionNode?.ownerNodeId ?? this.pendingInteractionNodeId
+    const insertionTargetId = interactionNode?.ownerNodeId ?? this._pendingNodeIdRef.value
     if (!insertionTargetId) return
     const flowNode = this.buildFlowNode(flow)
     this.tree.insertAfter(insertionTargetId, [flowNode])

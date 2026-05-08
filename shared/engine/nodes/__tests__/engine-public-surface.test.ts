@@ -22,6 +22,7 @@ describe('Engine surface guard', () => {
   // is compile-time only. Listed here so the guard fails loudly on accidental rename
   // or new private addition. Does NOT count toward public-API surface.
   const PRIVATE_HELPERS = [
+    '_internals',
     'applyFallbackSourceCardToFlow',
     'applyInteractionRequest',
     'buildActivateCardNodes',
