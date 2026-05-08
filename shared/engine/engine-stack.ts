@@ -74,13 +74,13 @@ export function isSyntheticInteractionFrame(frame: EngineFrame): boolean {
 }
 
 /**
- * EngineStack — delegates several Engine internals (peekInteraction*,
- * peekPendingChoiceFromComposite, hasPendingChoiceCompositeAncestor,
- * insertFlowAfterPendingChoice) via `(engine as any)` casts. This is an
- * intentional package-internal convention: those methods are `private` on
- * Engine (TS compile-time only) so external callers cannot reach them, but
- * EngineStack lives in the same shared/engine/ folder and is part of the
- * package's internal coordination surface.
+ * EngineStack — delegates to a small set of `@internal`-marked methods on
+ * Engine (peekInteraction*, peekPendingChoiceFromComposite,
+ * hasPendingChoiceCompositeAncestor, insertFlowAfterPendingChoice). These
+ * methods are implementation details of the shared/engine/ package; the
+ * `engine-public-surface.test.ts` guard enumerates them in PRIVATE_HELPERS
+ * to lock the surface, and external callers (session-core, round.ts) go
+ * through this stack instead of touching them directly.
  */
 export class EngineStack {
   private frames: EngineFrame[] = []
@@ -106,17 +106,11 @@ export class EngineStack {
   }
 
   peekInteraction(): import('./nodes').InteractionNode | null {
-    const engine = this.current()?.engine
-    if (!engine) return null
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (engine as any).peekInteraction() ?? null
+    return this.current()?.engine.peekInteraction() ?? null
   }
 
   peekInteractionHost(): EngineNode | null {
-    const engine = this.current()?.engine
-    if (!engine) return null
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (engine as any).peekInteractionHost() ?? null
+    return this.current()?.engine.peekInteractionHost() ?? null
   }
 
   peekPendingChoiceFromComposite(): {
@@ -126,24 +120,15 @@ export class EngineStack {
     options: ActionChoiceOption[]
     request?: InteractionRequest
   } | null {
-    const engine = this.current()?.engine
-    if (!engine) return null
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (engine as any).peekPendingChoiceFromComposite() ?? null
+    return this.current()?.engine.peekPendingChoiceFromComposite() ?? null
   }
 
   hasPendingChoiceCompositeAncestor(): boolean {
-    const engine = this.current()?.engine
-    if (!engine) return false
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (engine as any).hasPendingChoiceCompositeAncestor()
+    return this.current()?.engine.hasPendingChoiceCompositeAncestor() ?? false
   }
 
   insertFlowAfterPendingChoice(flow: ActionFlow): void {
-    const engine = this.current()?.engine
-    if (!engine) return
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(engine as any).insertFlowAfterPendingChoice(flow)
+    this.current()?.engine.insertFlowAfterPendingChoice(flow)
   }
 
   toCursor(): EngineStackCursor {
