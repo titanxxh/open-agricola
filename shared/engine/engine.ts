@@ -270,6 +270,10 @@ export class Engine {
       })
       this.pendingInteractionNodeId = targetNode.id
     } else {
+      // No-targetNode path: pending context (params/costs/sourceCard/actionContext)
+      // will be installed when the eventual InteractionNode emits — engine carries
+      // no fallback snapshot post-PR2 (the deleted `pendingInteractionContext` mirror
+      // used to live here).
       this.pendingInteractionNodeId = fallbackNodeId
     }
   }
@@ -942,25 +946,17 @@ export class Engine {
     // mirror was deleted; choiceData now carries the marker). Re-inject
     // before the normal nodeStates pass so subsequent `nextUnresolved()`
     // finds the same InteractionNode the original session held.
-    if (
-      snapshot.choiceData?.pendingActionId === INTERACTION_ONLY_ACTION_ID &&
-      snapshot.choiceData
-    ) {
-      const restored = new InteractionNode(
-        snapshot.choiceData.id,
-        snapshot.choiceData.choices,
-        snapshot.choiceData.request,
-      )
-      restored.promptKey = snapshot.choiceData.promptKey
-      restored.pendingActionId = snapshot.choiceData.pendingActionId
-      restored.ownerNodeId = snapshot.choiceData.ownerNodeId
-      restored.contextSnapshot = snapshot.choiceData.contextSnapshot ?? undefined
+    if (snapshot.choiceData?.pendingActionId === INTERACTION_ONLY_ACTION_ID) {
+      const data = snapshot.choiceData
+      const restored = new InteractionNode(data.id, data.choices, data.request)
+      restored.promptKey = data.promptKey
+      restored.pendingActionId = data.pendingActionId
+      restored.ownerNodeId = data.ownerNodeId
+      restored.contextSnapshot = data.contextSnapshot ?? undefined
       this.injectInteraction(restored)
       // Replay the node state in case the interaction was already
       // partially resolved before serialization.
-      const nodeStateEntry = snapshot.nodeStates.find(
-        (entry) => entry.id === snapshot.choiceData!.id,
-      )
+      const nodeStateEntry = snapshot.nodeStates.find((entry) => entry.id === data.id)
       if (nodeStateEntry) {
         restored.setState(nodeStateEntry.state)
       }
@@ -1959,10 +1955,11 @@ export class Engine {
     }
     this.hooks.during({ ...executionContext, actionId }, result)
     if (result.type === 'request' && result.request.kind === 'choice') {
-      // Merge ActionDef-declared actionContext patches into pendingInteractionContext.actionContext.
-      // Used by farm ActionDefs to persist payload (e.g. fence geometry) across payment-combo
-      // second prompts. The shallow merge itself happens inside
-      // `applyInteractionRequest` so all three sites share one implementation.
+      // Merge ActionDef-declared actionContext patches into the InteractionNode's
+      // `contextSnapshot.actionContext`. Used by farm ActionDefs to persist payload
+      // (e.g. fence geometry) across payment-combo second prompts. The shallow merge
+      // itself happens inside `applyInteractionRequest` so all three sites share one
+      // implementation.
       const contextWritePatch =
         result.extraData && typeof result.extraData === 'object'
           ? (result.extraData.actionContextWrite as Record<string, unknown> | undefined)
@@ -1992,7 +1989,8 @@ export class Engine {
         actionContext: executionContext.actionContext,
         contextWritePatch,
       })
-      // Don't clear pendingInteractionActionId — the action still needs to resolve its choice.
+      // Don't clear the InteractionNode's pendingActionId — the action still needs
+      // to resolve its choice (the next prompt is queued on the same node).
       return result
     }
     if (result.type === 'ok' || result.type === 'flow') {
