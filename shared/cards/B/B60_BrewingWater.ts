@@ -4,6 +4,7 @@ import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/int
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B60_BrewingWater } from '../../cards-display/B/B60_BrewingWater'
+export { B60_BrewingWater }
 
 const CARD_ID = B60_BrewingWater.id
 

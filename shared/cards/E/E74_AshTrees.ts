@@ -8,6 +8,7 @@ import {
 import { getFenceCount, getTotalPastureCells, maxFences, maxPastureCells, minimumFenceSegments } from '../../actions/effects/fencing'
 import type { CardImpl } from '../registry'
 import { E74_AshTrees } from '../../cards-display/E/E74_AshTrees'
+export { E74_AshTrees }
 
 const CARD_ID = E74_AshTrees.id
 

@@ -5,6 +5,7 @@ import type { PlayerState } from '../../contract/types'
 import { fieldTopStack } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { B115_TinsmithMaster } from '../../cards-display/B/B115_TinsmithMaster'
+export { B115_TinsmithMaster }
 
 const CARD_ID = B115_TinsmithMaster.id
 

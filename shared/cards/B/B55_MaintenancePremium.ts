@@ -4,6 +4,7 @@ import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../help
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B55_MaintenancePremium } from '../../cards-display/B/B55_MaintenancePremium'
+export { B55_MaintenancePremium }
 
 const CARD_ID = B55_MaintenancePremium.id
 

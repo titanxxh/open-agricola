@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E50_WildGreens } from '../../cards-display/E/E50_WildGreens'
+export { E50_WildGreens }
 
 const CARD_ID = E50_WildGreens.id
 

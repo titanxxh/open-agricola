@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D141_SeedSeller } from '../../cards-display/D/D141_SeedSeller'
+export { D141_SeedSeller }
 
 const CARD_ID = D141_SeedSeller.id
 

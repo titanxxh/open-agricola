@@ -2,6 +2,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { A157_Bohemian } from '../../cards-display/A/A157_Bohemian'
+export { A157_Bohemian }
 
 const CARD_ID = A157_Bohemian.id
 

@@ -2,6 +2,7 @@ import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { playerBoard } from '../../domain'
 import type { CardImpl } from '../registry'
 import { E84_DollysMother } from '../../cards-display/E/E84_DollysMother'
+export { E84_DollysMother }
 
 const CARD_ID = E84_DollysMother.id
 

@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { D121_ClayPlasterer } from '../../cards-display/D/D121_ClayPlasterer'
+export { D121_ClayPlasterer }
 
 const CARD_ID = D121_ClayPlasterer.id
 

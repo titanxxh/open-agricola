@@ -4,6 +4,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
 import type { CardImpl } from '../registry'
 import { D123_RenovationPreparer } from '../../cards-display/D/D123_RenovationPreparer'
+export { D123_RenovationPreparer }
 
 const CARD_ID = D123_RenovationPreparer.id
 

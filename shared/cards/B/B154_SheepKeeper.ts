@@ -5,6 +5,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { B154_SheepKeeper } from '../../cards-display/B/B154_SheepKeeper'
+export { B154_SheepKeeper }
 
 const CARD_ID = B154_SheepKeeper.id
 

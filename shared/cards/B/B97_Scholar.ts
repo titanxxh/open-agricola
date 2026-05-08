@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { B97_Scholar } from '../../cards-display/B/B97_Scholar'
+export { B97_Scholar }
 
 const CARD_ID = B97_Scholar.id
 

@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C147_Cowherd } from '../../cards-display/C/C147_Cowherd'
+export { C147_Cowherd }
 
 const CARD_ID = C147_Cowherd.id
 

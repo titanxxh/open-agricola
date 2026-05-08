@@ -11,6 +11,7 @@ import {
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import type { CardImpl } from '../registry'
 import { B85_FarmHand } from '../../cards-display/B/B85_FarmHand'
+export { B85_FarmHand }
 
 const CARD_ID = B85_FarmHand.id
 

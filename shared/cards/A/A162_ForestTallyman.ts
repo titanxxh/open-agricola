@@ -2,6 +2,7 @@ import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-a
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { A162_ForestTallyman } from '../../cards-display/A/A162_ForestTallyman'
+export { A162_ForestTallyman }
 
 const CARD_ID = 'A162_ForestTallyman'
 

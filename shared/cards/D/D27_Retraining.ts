@@ -11,6 +11,7 @@ import {
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { D27_Retraining } from '../../cards-display/D/D27_Retraining'
+export { D27_Retraining }
 
 const CARD_ID = D27_Retraining.id
 

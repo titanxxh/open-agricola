@@ -2,6 +2,7 @@ import { recallWorkerById } from '../helpers/recall-worker'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { E3_TeaTime } from '../../cards-display/E/E3_TeaTime'
+export { E3_TeaTime }
 
 const CARD_ID = E3_TeaTime.id
 

@@ -2,6 +2,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { playerBoard } from '../../domain'
 import type { CardImpl } from '../registry'
 import { A134_FullFarmer } from '../../cards-display/A/A134_FullFarmer'
+export { A134_FullFarmer }
 
 const CARD_ID = A134_FullFarmer.id
 

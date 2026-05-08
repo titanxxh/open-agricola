@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { C72_FestivalPlanning } from '../../cards-display/C/C72_FestivalPlanning'
+export { C72_FestivalPlanning }
 
 const CARD_ID = C72_FestivalPlanning.id
 

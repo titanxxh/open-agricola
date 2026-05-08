@@ -2,6 +2,7 @@ import { getPlayerBakeRates } from '../helpers/exchange-registry'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { A61_WinnowingFan } from '../../cards-display/A/A61_WinnowingFan'
+export { A61_WinnowingFan }
 
 const CARD_ID = A61_WinnowingFan.id
 

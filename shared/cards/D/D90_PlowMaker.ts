@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D90_PlowMaker } from '../../cards-display/D/D90_PlowMaker'
+export { D90_PlowMaker }
 
 const CARD_ID = D90_PlowMaker.id
 

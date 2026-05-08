@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { B17_ForestPlow } from '../../cards-display/B/B17_ForestPlow'
+export { B17_ForestPlow }
 
 const CARD_ID = B17_ForestPlow.id
 

@@ -1,6 +1,7 @@
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C127_Lover } from '../../cards-display/C/C127_Lover'
+export { C127_Lover }
 
 const CARD_ID = C127_Lover.id
 

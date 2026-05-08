@@ -3,6 +3,7 @@ import type { ActionFlow } from '../../contract/types'
 import { isSpaceOccupied, spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { E10_StrawHat } from '../../cards-display/E/E10_StrawHat'
+export { E10_StrawHat }
 
 const CARD_ID = 'E10_StrawHat'
 

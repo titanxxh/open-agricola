@@ -1,6 +1,7 @@
 import { getPalisadeCount } from '../../actions/effects/fencing'
 import type { CardImpl } from '../registry'
 import { B30_WoodPalisades } from '../../cards-display/B/B30_WoodPalisades'
+export { B30_WoodPalisades }
 
 const CARD_ID = B30_WoodPalisades.id
 

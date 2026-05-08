@@ -4,6 +4,7 @@ import { getMinorImprovementCard } from '../catalog'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E54_Contraband } from '../../cards-display/E/E54_Contraband'
+export { E54_Contraband }
 
 const CARD_ID = E54_Contraband.id
 

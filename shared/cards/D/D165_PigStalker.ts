@@ -4,6 +4,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { D165_PigStalker } from '../../cards-display/D/D165_PigStalker'
+export { D165_PigStalker }
 
 const CARD_ID = D165_PigStalker.id
 

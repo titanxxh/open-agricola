@@ -1,6 +1,7 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E58_LunchtimeBeer } from '../../cards-display/E/E58_LunchtimeBeer'
+export { E58_LunchtimeBeer }
 
 const CARD_ID = E58_LunchtimeBeer.id
 

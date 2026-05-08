@@ -1,6 +1,7 @@
 import { writeCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { C108_Layabout } from '../../cards-display/C/C108_Layabout'
+export { C108_Layabout }
 
 const CARD_ID = C108_Layabout.id
 

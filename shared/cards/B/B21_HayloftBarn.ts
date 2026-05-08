@@ -6,6 +6,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { B21_HayloftBarn } from '../../cards-display/B/B21_HayloftBarn'
+export { B21_HayloftBarn }
 
 const CARD_ID = B21_HayloftBarn.id
 

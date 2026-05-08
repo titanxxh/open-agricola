@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { E27_PiggyBank } from '../../cards-display/E/E27_PiggyBank'
+export { E27_PiggyBank }
 
 const CARD_ID = E27_PiggyBank.id
 

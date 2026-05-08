@@ -5,6 +5,7 @@ import { payLeaf } from '../helpers/pay-gain-node'
 import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 import { C64_CornSchnappsDistillery } from '../../cards-display/C/C64_CornSchnappsDistillery'
+export { C64_CornSchnappsDistillery }
 
 const CARD_ID = C64_CornSchnappsDistillery.id
 

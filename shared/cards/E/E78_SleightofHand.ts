@@ -2,6 +2,7 @@ import type { ActionFlow, Resource } from '../../contract/types'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E78_SleightofHand } from '../../cards-display/E/E78_SleightofHand'
+export { E78_SleightofHand }
 
 const CARD_ID = E78_SleightofHand.id
 

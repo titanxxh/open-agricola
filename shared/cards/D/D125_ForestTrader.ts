@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D125_ForestTrader } from '../../cards-display/D/D125_ForestTrader'
+export { D125_ForestTrader }
 
 const CARD_ID = D125_ForestTrader.id
 

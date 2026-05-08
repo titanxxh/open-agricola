@@ -7,6 +7,7 @@ import { canSow } from '../../actions/effects/sow'
 import { dispatchReapListener } from '../../actions/effects/reap'
 import type { CardImpl } from '../registry'
 import { D25_WitchesDanceFloor } from '../../cards-display/D/D25_WitchesDanceFloor'
+export { D25_WitchesDanceFloor }
 
 const CARD_ID = D25_WitchesDanceFloor.id
 

@@ -4,6 +4,7 @@ import type { GameState } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C158_ForestCampaigner } from '../../cards-display/C/C158_ForestCampaigner'
+export { C158_ForestCampaigner }
 
 const CARD_ID = C158_ForestCampaigner.id
 

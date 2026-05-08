@@ -5,6 +5,7 @@ import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { B111_Rustic } from '../../cards-display/B/B111_Rustic'
+export { B111_Rustic }
 
 const CARD_ID = B111_Rustic.id
 

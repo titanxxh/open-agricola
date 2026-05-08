@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A119_FirewoodCollector } from '../../cards-display/A/A119_FirewoodCollector'
+export { A119_FirewoodCollector }
 
 const CARD_ID = 'A119_FirewoodCollector'
 

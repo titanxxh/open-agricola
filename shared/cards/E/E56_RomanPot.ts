@@ -2,6 +2,7 @@ import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../help
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E56_RomanPot } from '../../cards-display/E/E56_RomanPot'
+export { E56_RomanPot }
 
 const CARD_ID = E56_RomanPot.id
 

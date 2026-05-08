@@ -1,6 +1,7 @@
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { C21_HeartofStone } from '../../cards-display/C/C21_HeartofStone'
+export { C21_HeartofStone }
 
 const CARD_ID = C21_HeartofStone.id
 

@@ -4,6 +4,7 @@ import { getCardStack } from '../helpers/card-state'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D124_Emissary } from '../../cards-display/D/D124_Emissary'
+export { D124_Emissary }
 
 const CARD_ID = D124_Emissary.id
 

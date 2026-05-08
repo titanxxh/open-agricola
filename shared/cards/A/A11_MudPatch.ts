@@ -2,6 +2,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { A11_MudPatch } from '../../cards-display/A/A11_MudPatch'
+export { A11_MudPatch }
 
 const CARD_ID = A11_MudPatch.id
 

@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { C131_PrivateTeacher } from '../../cards-display/C/C131_PrivateTeacher'
+export { C131_PrivateTeacher }
 
 const CARD_ID = C131_PrivateTeacher.id
 

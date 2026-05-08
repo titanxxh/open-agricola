@@ -4,6 +4,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { D143_TreeCutter } from '../../cards-display/D/D143_TreeCutter'
+export { D143_TreeCutter }
 
 const CARD_ID = D143_TreeCutter.id
 

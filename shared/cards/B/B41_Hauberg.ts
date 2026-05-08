@@ -1,6 +1,7 @@
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 import { B41_Hauberg } from '../../cards-display/B/B41_Hauberg'
+export { B41_Hauberg }
 
 const CARD_ID = B41_Hauberg.id
 

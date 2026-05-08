@@ -8,6 +8,7 @@ import {
 import type { ActionFlow, FarmTilePosition } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E76_LumberPile } from '../../cards-display/E/E76_LumberPile'
+export { E76_LumberPile }
 
 const CARD_ID = E76_LumberPile.id
 

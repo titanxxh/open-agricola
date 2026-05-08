@@ -3,6 +3,7 @@ import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { A19_Handplow } from '../../cards-display/A/A19_Handplow'
+export { A19_Handplow }
 
 const CARD_ID = A19_Handplow.id
 

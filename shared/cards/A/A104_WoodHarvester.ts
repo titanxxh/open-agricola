@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { A104_WoodHarvester } from '../../cards-display/A/A104_WoodHarvester'
+export { A104_WoodHarvester }
 
 const CARD_ID = A104_WoodHarvester.id
 

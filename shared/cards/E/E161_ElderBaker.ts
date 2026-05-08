@@ -4,6 +4,7 @@ import type { ActionHookPhase } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E161_ElderBaker } from '../../cards-display/E/E161_ElderBaker'
+export { E161_ElderBaker }
 
 const CARD_ID = 'E161_ElderBaker'
 

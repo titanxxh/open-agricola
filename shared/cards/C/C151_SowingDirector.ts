@@ -2,6 +2,7 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { C151_SowingDirector } from '../../cards-display/C/C151_SowingDirector'
+export { C151_SowingDirector }
 
 const CARD_ID = C151_SowingDirector.id
 

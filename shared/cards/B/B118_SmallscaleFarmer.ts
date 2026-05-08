@@ -1,6 +1,7 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B118_SmallscaleFarmer } from '../../cards-display/B/B118_SmallscaleFarmer'
+export { B118_SmallscaleFarmer }
 
 const CARD_ID = B118_SmallscaleFarmer.id
 

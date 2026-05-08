@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C142_MarketCrier } from '../../cards-display/C/C142_MarketCrier'
+export { C142_MarketCrier }
 
 const CARD_ID = C142_MarketCrier.id
 

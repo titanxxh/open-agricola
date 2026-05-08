@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { A24_ThreshingBoard } from '../../cards-display/A/A24_ThreshingBoard'
+export { A24_ThreshingBoard }
 
 const CARD_ID = A24_ThreshingBoard.id
 

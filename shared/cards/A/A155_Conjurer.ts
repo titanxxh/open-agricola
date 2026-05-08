@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A155_Conjurer } from '../../cards-display/A/A155_Conjurer'
+export { A155_Conjurer }
 
 const CARD_ID = A155_Conjurer.id
 

@@ -1,6 +1,7 @@
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E88_MasterFencer } from '../../cards-display/E/E88_MasterFencer'
+export { E88_MasterFencer }
 
 const CARD_ID = E88_MasterFencer.id
 

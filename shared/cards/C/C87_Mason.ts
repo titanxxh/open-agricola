@@ -5,6 +5,7 @@ import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { C87_Mason } from '../../cards-display/C/C87_Mason'
+export { C87_Mason }
 
 const CARD_ID = C87_Mason.id
 

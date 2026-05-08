@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getStoredResource } from '../helpers/card-storage'
 import type { CardImpl } from '../registry'
 import { A81_InterimStorage } from '../../cards-display/A/A81_InterimStorage'
+export { A81_InterimStorage }
 
 const CARD_ID = A81_InterimStorage.id
 

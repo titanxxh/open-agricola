@@ -1,6 +1,7 @@
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { C55_Studio } from '../../cards-display/C/C55_Studio'
+export { C55_Studio }
 
 const CARD_ID = C55_Studio.id
 

@@ -4,6 +4,7 @@ import { isCardFlagged } from '../helpers/card-state'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 import { A18_WheelPlow } from '../../cards-display/A/A18_WheelPlow'
+export { A18_WheelPlow }
 
 const CARD_ID = A18_WheelPlow.id
 

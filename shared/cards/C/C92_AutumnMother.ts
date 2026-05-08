@@ -1,6 +1,7 @@
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { C92_AutumnMother } from '../../cards-display/C/C92_AutumnMother'
+export { C92_AutumnMother }
 
 const CARD_ID = C92_AutumnMother.id
 

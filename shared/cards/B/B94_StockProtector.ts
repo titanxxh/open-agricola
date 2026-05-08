@@ -5,6 +5,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { B94_StockProtector } from '../../cards-display/B/B94_StockProtector'
+export { B94_StockProtector }
 
 const CARD_ID = B94_StockProtector.id
 

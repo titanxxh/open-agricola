@@ -4,6 +4,7 @@ import { canStartFencing, getFenceCount } from '../../actions/effects/fencing'
 import { clearPendingFenceBonus } from '../helpers/pending-fence-bonus'
 import type { CardImpl } from '../registry'
 import { C88_CarpentersApprentice } from '../../cards-display/C/C88_CarpentersApprentice'
+export { C88_CarpentersApprentice }
 
 const CARD_ID = C88_CarpentersApprentice.id
 

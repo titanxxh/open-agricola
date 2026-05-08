@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { E14_WoodSaw } from '../../cards-display/E/E14_WoodSaw'
+export { E14_WoodSaw }
 
 const CARD_ID = E14_WoodSaw.id
 

@@ -3,6 +3,7 @@ import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D91_Plowman } from '../../cards-display/D/D91_Plowman'
+export { D91_Plowman }
 
 const CARD_ID = D91_Plowman.id
 

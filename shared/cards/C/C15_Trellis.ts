@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { C15_Trellis } from '../../cards-display/C/C15_Trellis'
+export { C15_Trellis }
 
 const CARD_ID = C15_Trellis.id
 

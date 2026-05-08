@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A121_ClayPuncher } from '../../cards-display/A/A121_ClayPuncher'
+export { A121_ClayPuncher }
 
 const CARD_ID = A121_ClayPuncher.id
 

@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { B36_Bottles } from '../../cards-display/B/B36_Bottles'
+export { B36_Bottles }
 
 const CARD_ID = B36_Bottles.id
 

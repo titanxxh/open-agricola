@@ -3,6 +3,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E162_Entrepreneur } from '../../cards-display/E/E162_Entrepreneur'
+export { E162_Entrepreneur }
 
 const CARD_ID = E162_Entrepreneur.id
 

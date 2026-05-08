@@ -1,4 +1,4 @@
-import type { MajorCardData } from './types'
+import type { MajorCardData } from '../../cards/major/types'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 
 export const well: MajorCardData = {

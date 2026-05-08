@@ -1,6 +1,7 @@
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { D1_ZigzagHarrow } from '../../cards-display/D/D1_ZigzagHarrow'
+export { D1_ZigzagHarrow }
 
 const CARD_ID = D1_ZigzagHarrow.id
 

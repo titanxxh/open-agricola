@@ -4,6 +4,7 @@ import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../help
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B48_ForestStone } from '../../cards-display/B/B48_ForestStone'
+export { B48_ForestStone }
 
 const CARD_ID = B48_ForestStone.id
 

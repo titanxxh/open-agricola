@@ -1,6 +1,7 @@
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import type { CardImpl } from '../registry'
 import { E81_AlchemistsLab } from '../../cards-display/E/E81_AlchemistsLab'
+export { E81_AlchemistsLab }
 
 const CARD_ID = E81_AlchemistsLab.id
 

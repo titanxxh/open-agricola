@@ -4,6 +4,7 @@ import { registerSelectionEffect } from '../../actions/helpers/selection-effect-
 import { fieldTopStack, fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { D72_StableManure } from '../../cards-display/D/D72_StableManure'
+export { D72_StableManure }
 
 const CARD_ID = D72_StableManure.id
 

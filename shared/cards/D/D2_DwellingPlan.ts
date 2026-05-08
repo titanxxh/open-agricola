@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { D2_DwellingPlan } from '../../cards-display/D/D2_DwellingPlan'
+export { D2_DwellingPlan }
 
 const CARD_ID = D2_DwellingPlan.id
 

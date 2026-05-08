@@ -4,6 +4,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { B64_MillWheel } from '../../cards-display/B/B64_MillWheel'
+export { B64_MillWheel }
 
 const CARD_ID = B64_MillWheel.id
 

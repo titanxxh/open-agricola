@@ -3,6 +3,7 @@ import type { ActionHookPhase } from '../../actions/hooks'
 import { buildRenovationPlan, canRenovate } from '../../actions/effects/renovation'
 import type { CardImpl } from '../registry'
 import { A87_Conservator } from '../../cards-display/A/A87_Conservator'
+export { A87_Conservator }
 
 const CARD_ID = A87_Conservator.id
 

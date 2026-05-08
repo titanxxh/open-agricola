@@ -2,6 +2,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E167_DairyCrier } from '../../cards-display/E/E167_DairyCrier'
+export { E167_DairyCrier }
 
 const CARD_ID = E167_DairyCrier.id
 

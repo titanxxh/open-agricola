@@ -2,6 +2,7 @@ import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-me
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { B74_ThickForest } from '../../cards-display/B/B74_ThickForest'
+export { B74_ThickForest }
 
 const CARD_ID = B74_ThickForest.id
 

@@ -1,6 +1,7 @@
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 import { D57_WholesaleMarket } from '../../cards-display/D/D57_WholesaleMarket'
+export { D57_WholesaleMarket }
 
 const CARD_ID = D57_WholesaleMarket.id
 

@@ -4,6 +4,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 import { D160_Midwife } from '../../cards-display/D/D160_Midwife'
+export { D160_Midwife }
 
 const CARD_ID = D160_Midwife.id
 

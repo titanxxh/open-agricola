@@ -2,6 +2,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { E168_AnimalTamersApprentice } from '../../cards-display/E/E168_AnimalTamersApprentice'
+export { E168_AnimalTamersApprentice }
 
 const CARD_ID = E168_AnimalTamersApprentice.id
 

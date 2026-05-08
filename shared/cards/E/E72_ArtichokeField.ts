@@ -7,6 +7,7 @@ import { canSow } from '../../actions/effects/sow'
 import { dispatchReapListener } from '../../actions/effects/reap'
 import type { CardImpl } from '../registry'
 import { E72_ArtichokeField } from '../../cards-display/E/E72_ArtichokeField'
+export { E72_ArtichokeField }
 
 const CARD_ID = E72_ArtichokeField.id
 

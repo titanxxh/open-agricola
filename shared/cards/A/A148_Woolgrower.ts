@@ -1,6 +1,7 @@
 import { initCardState } from '../__stubs__/helpers'
 import type { CardImpl } from '../registry'
 import { A148_Woolgrower } from '../../cards-display/A/A148_Woolgrower'
+export { A148_Woolgrower }
 
 const CARD_ID = A148_Woolgrower.id
 

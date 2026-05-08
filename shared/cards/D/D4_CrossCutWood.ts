@@ -1,6 +1,7 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D4_CrossCutWood } from '../../cards-display/D/D4_CrossCutWood'
+export { D4_CrossCutWood }
 
 const CARD_ID = D4_CrossCutWood.id
 

@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { E17_SkimmerPlow } from '../../cards-display/E/E17_SkimmerPlow'
+export { E17_SkimmerPlow }
 
 const CARD_ID = E17_SkimmerPlow.id
 

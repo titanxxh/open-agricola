@@ -4,6 +4,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { A52_ThrowingAxe } from '../../cards-display/A/A52_ThrowingAxe'
+export { A52_ThrowingAxe }
 
 const CARD_ID = A52_ThrowingAxe.id
 

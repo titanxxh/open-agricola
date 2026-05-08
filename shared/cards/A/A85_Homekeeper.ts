@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { A85_Homekeeper } from '../../cards-display/A/A85_Homekeeper'
+export { A85_Homekeeper }
 
 const CARD_ID = A85_Homekeeper.id
 

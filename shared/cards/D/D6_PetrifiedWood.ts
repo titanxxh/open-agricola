@@ -1,6 +1,7 @@
 import { payThenGainActionFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D6_PetrifiedWood } from '../../cards-display/D/D6_PetrifiedWood'
+export { D6_PetrifiedWood }
 
 const CARD_ID = D6_PetrifiedWood.id
 

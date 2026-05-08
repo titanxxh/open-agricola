@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { B109_PaperMaker } from '../../cards-display/B/B109_PaperMaker'
+export { B109_PaperMaker }
 
 const CARD_ID = B109_PaperMaker.id
 

@@ -1,6 +1,7 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E107_LandSurveyor } from '../../cards-display/E/E107_LandSurveyor'
+export { E107_LandSurveyor }
 
 const CARD_ID = E107_LandSurveyor.id
 

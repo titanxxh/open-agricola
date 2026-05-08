@@ -2,6 +2,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { B73_GiftBasket } from '../../cards-display/B/B73_GiftBasket'
+export { B73_GiftBasket }
 
 const CARD_ID = B73_GiftBasket.id
 

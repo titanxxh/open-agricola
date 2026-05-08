@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { B91_AssistantTiller } from '../../cards-display/B/B91_AssistantTiller'
+export { B91_AssistantTiller }
 
 const CARD_ID = B91_AssistantTiller.id
 

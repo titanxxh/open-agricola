@@ -4,6 +4,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { D146_Porter } from '../../cards-display/D/D146_Porter'
+export { D146_Porter }
 
 const CARD_ID = D146_Porter.id
 

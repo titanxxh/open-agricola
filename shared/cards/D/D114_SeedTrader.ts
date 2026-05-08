@@ -4,6 +4,7 @@ import type { ActionFlow } from '../../contract/types'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D114_SeedTrader } from '../../cards-display/D/D114_SeedTrader'
+export { D114_SeedTrader }
 
 const CARD_ID = D114_SeedTrader.id
 

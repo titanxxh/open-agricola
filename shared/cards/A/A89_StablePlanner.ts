@@ -3,6 +3,7 @@ import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { A89_StablePlanner } from '../../cards-display/A/A89_StablePlanner'
+export { A89_StablePlanner }
 
 const CARD_ID = A89_StablePlanner.id
 

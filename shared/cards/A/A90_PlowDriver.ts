@@ -1,6 +1,7 @@
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A90_PlowDriver } from '../../cards-display/A/A90_PlowDriver'
+export { A90_PlowDriver }
 
 const CARD_ID = A90_PlowDriver.id
 

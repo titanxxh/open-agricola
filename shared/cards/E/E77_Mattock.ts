@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E77_Mattock } from '../../cards-display/E/E77_Mattock'
+export { E77_Mattock }
 
 const CARD_ID = E77_Mattock.id
 

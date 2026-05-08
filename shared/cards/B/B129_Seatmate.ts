@@ -5,6 +5,7 @@ import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-co
 import { isSpaceOccupied, spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { B129_Seatmate } from '../../cards-display/B/B129_Seatmate'
+export { B129_Seatmate }
 
 const CARD_ID = B129_Seatmate.id
 

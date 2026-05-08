@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { E37_OxSkull } from '../../cards-display/E/E37_OxSkull'
+export { E37_OxSkull }
 
 const CARD_ID = E37_OxSkull.id
 

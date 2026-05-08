@@ -5,6 +5,7 @@ import { positionKey } from '../../domain/farm'
 import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { A73_AgriculturalFertilizers } from '../../cards-display/A/A73_AgriculturalFertilizers'
+export { A73_AgriculturalFertilizers }
 
 const CARD_ID = A73_AgriculturalFertilizers.id
 

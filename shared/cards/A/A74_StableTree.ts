@@ -8,6 +8,7 @@ import {
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { A74_StableTree } from '../../cards-display/A/A74_StableTree'
+export { A74_StableTree }
 
 const CARD_ID = A74_StableTree.id
 

@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B121_Geologist } from '../../cards-display/B/B121_Geologist'
+export { B121_Geologist }
 
 const CARD_ID = B121_Geologist.id
 

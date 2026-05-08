@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A42_ForestLakeHut } from '../../cards-display/A/A42_ForestLakeHut'
+export { A42_ForestLakeHut }
 
 const CARD_ID = A42_ForestLakeHut.id
 

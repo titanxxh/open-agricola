@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isMajorCardId } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
 import { B95_MasterBricklayer } from '../../cards-display/B/B95_MasterBricklayer'
+export { B95_MasterBricklayer }
 
 const CARD_ID = B95_MasterBricklayer.id
 

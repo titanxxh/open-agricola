@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { D95_SiteManager } from '../../cards-display/D/D95_SiteManager'
+export { D95_SiteManager }
 
 const CARD_ID = D95_SiteManager.id
 

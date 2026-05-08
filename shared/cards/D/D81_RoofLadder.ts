@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D81_RoofLadder } from '../../cards-display/D/D81_RoofLadder'
+export { D81_RoofLadder }
 
 const CARD_ID = D81_RoofLadder.id
 

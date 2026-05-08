@@ -1,6 +1,7 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D54_TroutPool } from '../../cards-display/D/D54_TroutPool'
+export { D54_TroutPool }
 
 const CARD_ID = D54_TroutPool.id
 

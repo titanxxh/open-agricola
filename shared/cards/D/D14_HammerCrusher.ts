@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D14_HammerCrusher } from '../../cards-display/D/D14_HammerCrusher'
+export { D14_HammerCrusher }
 
 const CARD_ID = D14_HammerCrusher.id
 

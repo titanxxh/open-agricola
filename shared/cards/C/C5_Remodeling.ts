@@ -1,6 +1,7 @@
 import { collectCardsAs } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
 import { C5_Remodeling } from '../../cards-display/C/C5_Remodeling'
+export { C5_Remodeling }
 
 const CARD_ID = C5_Remodeling.id
 

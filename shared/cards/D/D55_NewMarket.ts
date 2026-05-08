@@ -4,6 +4,7 @@ import type { GameState } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D55_NewMarket } from '../../cards-display/D/D55_NewMarket'
+export { D55_NewMarket }
 
 const CARD_ID = D55_NewMarket.id
 

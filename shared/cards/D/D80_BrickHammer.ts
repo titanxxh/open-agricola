@@ -6,6 +6,7 @@ import { getMajorCard } from '../major'
 import { isMajorCardId } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
 import { D80_BrickHammer } from '../../cards-display/D/D80_BrickHammer'
+export { D80_BrickHammer }
 
 const CARD_ID = D80_BrickHammer.id
 

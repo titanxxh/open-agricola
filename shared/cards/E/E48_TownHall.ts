@@ -1,6 +1,7 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E48_TownHall } from '../../cards-display/E/E48_TownHall'
+export { E48_TownHall }
 
 const CARD_ID = E48_TownHall.id
 

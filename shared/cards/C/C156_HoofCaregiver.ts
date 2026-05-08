@@ -2,6 +2,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { C156_HoofCaregiver } from '../../cards-display/C/C156_HoofCaregiver'
+export { C156_HoofCaregiver }
 
 const CARD_ID = C156_HoofCaregiver.id
 

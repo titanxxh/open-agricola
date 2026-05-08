@@ -1,6 +1,7 @@
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { C3_CarriageTrip } from '../../cards-display/C/C3_CarriageTrip'
+export { C3_CarriageTrip }
 
 const CARD_ID = C3_CarriageTrip.id
 

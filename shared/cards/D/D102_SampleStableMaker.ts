@@ -8,6 +8,7 @@ import {
 import type { ActionFlow, FarmTilePosition } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { D102_SampleStableMaker } from '../../cards-display/D/D102_SampleStableMaker'
+export { D102_SampleStableMaker }
 
 const CARD_ID = D102_SampleStableMaker.id
 

@@ -1,6 +1,7 @@
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B123_RoofBallaster } from '../../cards-display/B/B123_RoofBallaster'
+export { B123_RoofBallaster }
 
 const CARD_ID = B123_RoofBallaster.id
 

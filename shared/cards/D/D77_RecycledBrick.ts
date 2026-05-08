@@ -4,6 +4,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { GameState, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { D77_RecycledBrick } from '../../cards-display/D/D77_RecycledBrick'
+export { D77_RecycledBrick }
 
 const CARD_ID = D77_RecycledBrick.id
 

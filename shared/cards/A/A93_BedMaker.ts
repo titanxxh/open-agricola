@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
 import type { CardImpl } from '../registry'
 import { A93_BedMaker } from '../../cards-display/A/A93_BedMaker'
+export { A93_BedMaker }
 
 const CARD_ID = A93_BedMaker.id
 

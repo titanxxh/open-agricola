@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E86_PenBuilder } from '../../cards-display/E/E86_PenBuilder'
+export { E86_PenBuilder }
 
 const CARD_ID = E86_PenBuilder.id
 

@@ -2,6 +2,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop, fieldTotalRemaining } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { A64_BarleyMill } from '../../cards-display/A/A64_BarleyMill'
+export { A64_BarleyMill }
 
 const CARD_ID = A64_BarleyMill.id
 

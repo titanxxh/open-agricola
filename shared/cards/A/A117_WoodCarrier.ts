@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { A117_WoodCarrier } from '../../cards-display/A/A117_WoodCarrier'
+export { A117_WoodCarrier }
 
 const CARD_ID = A117_WoodCarrier.id
 

@@ -1,6 +1,7 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E60_WorkingGloves } from '../../cards-display/E/E60_WorkingGloves'
+export { E60_WorkingGloves }
 
 const CARD_ID = E60_WorkingGloves.id
 

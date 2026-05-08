@@ -6,6 +6,7 @@ import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-co
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { E21_SheepRug } from '../../cards-display/E/E21_SheepRug'
+export { E21_SheepRug }
 
 const CARD_ID = E21_SheepRug.id
 

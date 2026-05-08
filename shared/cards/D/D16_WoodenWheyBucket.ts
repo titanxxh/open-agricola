@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { D16_WoodenWheyBucket } from '../../cards-display/D/D16_WoodenWheyBucket'
+export { D16_WoodenWheyBucket }
 
 const CARD_ID = D16_WoodenWheyBucket.id
 

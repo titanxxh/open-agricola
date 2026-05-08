@@ -4,6 +4,7 @@ import { payLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { C132_TimberShingleMaker } from '../../cards-display/C/C132_TimberShingleMaker'
+export { C132_TimberShingleMaker }
 
 const CARD_ID = C132_TimberShingleMaker.id
 

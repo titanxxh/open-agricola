@@ -4,6 +4,7 @@ import type { ActionHookPhase } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { D131_CraftsmanshipPromoter } from '../../cards-display/D/D131_CraftsmanshipPromoter'
+export { D131_CraftsmanshipPromoter }
 
 const CARD_ID = D131_CraftsmanshipPromoter.id
 

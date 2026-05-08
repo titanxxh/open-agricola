@@ -4,6 +4,7 @@ import { getCardStack, pushToCardStack } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A102_Grocer } from '../../cards-display/A/A102_Grocer'
+export { A102_Grocer }
 
 const CARD_ID = A102_Grocer.id
 

@@ -1,6 +1,7 @@
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 import { B96_TreeFarmJoiner } from '../../cards-display/B/B96_TreeFarmJoiner'
+export { B96_TreeFarmJoiner }
 
 const CARD_ID = B96_TreeFarmJoiner.id
 

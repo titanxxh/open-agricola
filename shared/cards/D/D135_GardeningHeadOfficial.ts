@@ -2,6 +2,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop, fieldFindStackOfKind } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { D135_GardeningHeadOfficial } from '../../cards-display/D/D135_GardeningHeadOfficial'
+export { D135_GardeningHeadOfficial }
 
 const CARD_ID = D135_GardeningHeadOfficial.id
 

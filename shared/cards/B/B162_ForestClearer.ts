@@ -4,6 +4,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { B162_ForestClearer } from '../../cards-display/B/B162_ForestClearer'
+export { B162_ForestClearer }
 
 const CARD_ID = B162_ForestClearer.id
 

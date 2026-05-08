@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { CUSTOM_FixtureHarvester } from '../../cards-display/community/CUSTOM_FixtureHarvester'
+export { CUSTOM_FixtureHarvester }
 
 const CARD_ID = CUSTOM_FixtureHarvester.id
 

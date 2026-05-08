@@ -5,6 +5,7 @@ import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { C84_PerennialRye } from '../../cards-display/C/C84_PerennialRye'
+export { C84_PerennialRye }
 
 const CARD_ID = C84_PerennialRye.id
 

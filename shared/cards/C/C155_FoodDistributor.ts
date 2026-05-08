@@ -4,6 +4,7 @@ import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { C155_FoodDistributor } from '../../cards-display/C/C155_FoodDistributor'
+export { C155_FoodDistributor }
 
 const CARD_ID = C155_FoodDistributor.id
 

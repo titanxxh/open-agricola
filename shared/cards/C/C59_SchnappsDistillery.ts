@@ -1,6 +1,7 @@
 import { fieldHasCrop, fieldFindStackOfKind } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { C59_SchnappsDistillery } from '../../cards-display/C/C59_SchnappsDistillery'
+export { C59_SchnappsDistillery }
 
 const CARD_ID = C59_SchnappsDistillery.id
 

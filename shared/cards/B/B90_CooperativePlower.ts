@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { B90_CooperativePlower } from '../../cards-display/B/B90_CooperativePlower'
+export { B90_CooperativePlower }
 
 const CARD_ID = B90_CooperativePlower.id
 

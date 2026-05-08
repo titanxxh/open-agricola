@@ -1,6 +1,7 @@
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { B53_SculptureCourse } from '../../cards-display/B/B53_SculptureCourse'
+export { B53_SculptureCourse }
 
 const CARD_ID = B53_SculptureCourse.id
 

@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { E64_SimpleOven } from '../../cards-display/E/E64_SimpleOven'
+export { E64_SimpleOven }
 
 const CARD_ID = E64_SimpleOven.id
 

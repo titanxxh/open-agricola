@@ -5,6 +5,7 @@ import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-co
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { E150_RockBeater } from '../../cards-display/E/E150_RockBeater'
+export { E150_RockBeater }
 
 const CARD_ID = E150_RockBeater.id
 

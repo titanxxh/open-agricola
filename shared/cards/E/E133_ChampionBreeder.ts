@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { E133_ChampionBreeder } from '../../cards-display/E/E133_ChampionBreeder'
+export { E133_ChampionBreeder }
 
 const CARD_ID = E133_ChampionBreeder.id
 

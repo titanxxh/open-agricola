@@ -4,6 +4,7 @@ import { registerSelectionEffect } from '../../actions/helpers/selection-effect-
 import { fieldTopStack, fieldDecrementTop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { A58_AsparagusKnife } from '../../cards-display/A/A58_AsparagusKnife'
+export { A58_AsparagusKnife }
 
 const CARD_ID = 'A58_AsparagusKnife'
 

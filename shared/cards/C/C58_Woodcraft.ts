@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C58_Woodcraft } from '../../cards-display/C/C58_Woodcraft'
+export { C58_Woodcraft }
 
 const CARD_ID = C58_Woodcraft.id
 

@@ -1,6 +1,7 @@
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 import { B20_ChainFloat } from '../../cards-display/B/B20_ChainFloat'
+export { B20_ChainFloat }
 
 const CARD_ID = B20_ChainFloat.id
 

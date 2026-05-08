@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E121_HillCultivator } from '../../cards-display/E/E121_HillCultivator'
+export { E121_HillCultivator }
 
 const CARD_ID = E121_HillCultivator.id
 

@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { returnToSpaceThenGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C36_ClayDeposit } from '../../cards-display/C/C36_ClayDeposit'
+export { C36_ClayDeposit }
 
 const CARD_ID = C36_ClayDeposit.id
 

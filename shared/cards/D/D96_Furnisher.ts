@@ -4,6 +4,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
 import type { CardImpl } from '../registry'
 import { D96_Furnisher } from '../../cards-display/D/D96_Furnisher'
+export { D96_Furnisher }
 
 const CARD_ID = D96_Furnisher.id
 

@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { E109_BraidMaker } from '../../cards-display/E/E109_BraidMaker'
+export { E109_BraidMaker }
 
 const CARD_ID = E109_BraidMaker.id
 

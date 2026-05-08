@@ -1,6 +1,7 @@
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { B82_ValueAssets } from '../../cards-display/B/B82_ValueAssets'
+export { B82_ValueAssets }
 
 const CARD_ID = B82_ValueAssets.id
 

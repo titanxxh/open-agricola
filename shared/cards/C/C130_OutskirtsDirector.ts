@@ -5,6 +5,7 @@ import { workersAvailable } from '../../domain/player'
 import { pairedSpaceIdFor } from '../helpers/space-pairing'
 import type { CardImpl } from '../registry'
 import { C130_OutskirtsDirector } from '../../cards-display/C/C130_OutskirtsDirector'
+export { C130_OutskirtsDirector }
 
 const CARD_ID = C130_OutskirtsDirector.id
 

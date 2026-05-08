@@ -1,6 +1,7 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B1_UpscaleLifestyle } from '../../cards-display/B/B1_UpscaleLifestyle'
+export { B1_UpscaleLifestyle }
 
 const CARD_ID = B1_UpscaleLifestyle.id
 

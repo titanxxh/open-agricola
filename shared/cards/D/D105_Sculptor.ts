@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D105_Sculptor } from '../../cards-display/D/D105_Sculptor'
+export { D105_Sculptor }
 
 const CARD_ID = D105_Sculptor.id
 

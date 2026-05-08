@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { A97_Freshman } from '../../cards-display/A/A97_Freshman'
+export { A97_Freshman }
 
 const CARD_ID = A97_Freshman.id
 

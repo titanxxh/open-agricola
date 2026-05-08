@@ -5,6 +5,7 @@ import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { D93_SheepInspector } from '../../cards-display/D/D93_SheepInspector'
+export { D93_SheepInspector }
 
 const CARD_ID = D93_SheepInspector.id
 

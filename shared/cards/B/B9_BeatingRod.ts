@@ -1,6 +1,7 @@
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B9_BeatingRod } from '../../cards-display/B/B9_BeatingRod'
+export { B9_BeatingRod }
 
 const CARD_ID = B9_BeatingRod.id
 

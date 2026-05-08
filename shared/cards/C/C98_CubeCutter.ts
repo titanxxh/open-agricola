@@ -1,6 +1,7 @@
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C98_CubeCutter } from '../../cards-display/C/C98_CubeCutter'
+export { C98_CubeCutter }
 
 const CARD_ID = C98_CubeCutter.id
 

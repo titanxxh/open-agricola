@@ -4,6 +4,7 @@ import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D74_RoyalWood } from '../../cards-display/D/D74_RoyalWood'
+export { D74_RoyalWood }
 
 const CARD_ID = D74_RoyalWood.id
 

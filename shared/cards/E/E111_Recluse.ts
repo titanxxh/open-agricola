@@ -1,6 +1,7 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E111_Recluse } from '../../cards-display/E/E111_Recluse'
+export { E111_Recluse }
 
 const CARD_ID = E111_Recluse.id
 

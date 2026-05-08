@@ -5,6 +5,7 @@ import type { CardImpl } from '../registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { C1_Overhaul } from '../../cards-display/C/C1_Overhaul'
+export { C1_Overhaul }
 
 const CARD_ID = C1_Overhaul.id
 

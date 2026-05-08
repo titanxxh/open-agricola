@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { D11_LawnFertilizer } from '../../cards-display/D/D11_LawnFertilizer'
+export { D11_LawnFertilizer }
 
 const CARD_ID = D11_LawnFertilizer.id
 

@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B144_Collier } from '../../cards-display/B/B144_Collier'
+export { B144_Collier }
 
 const CARD_ID = B144_Collier.id
 

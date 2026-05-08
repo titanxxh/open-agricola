@@ -1,6 +1,7 @@
 import { payGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A29_AleBenches } from '../../cards-display/A/A29_AleBenches'
+export { A29_AleBenches }
 
 const CARD_ID = A29_AleBenches.id
 

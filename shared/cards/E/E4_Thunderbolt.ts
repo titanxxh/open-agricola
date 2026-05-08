@@ -2,6 +2,7 @@ import { registerSelectionEffect } from '../../actions/helpers/selection-effect-
 import { fieldTopStack } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { E4_Thunderbolt } from '../../cards-display/E/E4_Thunderbolt'
+export { E4_Thunderbolt }
 
 const CARD_ID = 'E4_Thunderbolt'
 

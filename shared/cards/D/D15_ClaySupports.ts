@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { D15_ClaySupports } from '../../cards-display/D/D15_ClaySupports'
+export { D15_ClaySupports }
 
 const CARD_ID = D15_ClaySupports.id
 

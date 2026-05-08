@@ -2,6 +2,7 @@ import { pushToCardStack, getCardStack, writeCardInfobox } from '../helpers/card
 import type { ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { D126_FieldCultivator } from '../../cards-display/D/D126_FieldCultivator'
+export { D126_FieldCultivator }
 
 const CARD_ID = D126_FieldCultivator.id
 

@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { returnToSpaceThenGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C114_SoilScientist } from '../../cards-display/C/C114_SoilScientist'
+export { C114_SoilScientist }
 
 const CARD_ID = C114_SoilScientist.id
 

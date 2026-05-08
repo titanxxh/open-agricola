@@ -2,6 +2,7 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { C28_TeachersDesk } from '../../cards-display/C/C28_TeachersDesk'
+export { C28_TeachersDesk }
 
 const CARD_ID = C28_TeachersDesk.id
 

@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { A82_WorkCertificate } from '../../cards-display/A/A82_WorkCertificate'
+export { A82_WorkCertificate }
 
 const CARD_ID = A82_WorkCertificate.id
 

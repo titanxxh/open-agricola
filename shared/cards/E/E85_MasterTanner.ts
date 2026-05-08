@@ -5,6 +5,7 @@ import { payLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E85_MasterTanner } from '../../cards-display/E/E85_MasterTanner'
+export { E85_MasterTanner }
 
 const CARD_ID = E85_MasterTanner.id
 

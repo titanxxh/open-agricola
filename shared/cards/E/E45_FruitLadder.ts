@@ -1,6 +1,7 @@
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 import { E45_FruitLadder } from '../../cards-display/E/E45_FruitLadder'
+export { E45_FruitLadder }
 
 const CARD_ID = E45_FruitLadder.id
 

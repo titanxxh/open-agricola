@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { B24_Lasso } from '../../cards-display/B/B24_Lasso'
+export { B24_Lasso }
 
 const CARD_ID = B24_Lasso.id
 

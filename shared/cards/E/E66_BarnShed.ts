@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E66_BarnShed } from '../../cards-display/E/E66_BarnShed'
+export { E66_BarnShed }
 
 const CARD_ID = E66_BarnShed.id
 

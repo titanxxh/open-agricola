@@ -4,6 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { canStartFencing } from '../../actions/effects/fencing'
 import type { CardImpl } from '../registry'
 import { B26_AgrarianFences } from '../../cards-display/B/B26_AgrarianFences'
+export { B26_AgrarianFences }
 
 const CARD_ID = B26_AgrarianFences.id
 

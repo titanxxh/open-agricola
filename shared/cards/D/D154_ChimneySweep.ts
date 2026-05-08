@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { D154_ChimneySweep } from '../../cards-display/D/D154_ChimneySweep'
+export { D154_ChimneySweep }
 
 const CARD_ID = D154_ChimneySweep.id
 

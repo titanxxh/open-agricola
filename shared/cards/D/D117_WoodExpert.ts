@@ -6,6 +6,7 @@ import { getMajorCard } from '../major'
 import { isMajorCardId } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
 import { D117_WoodExpert } from '../../cards-display/D/D117_WoodExpert'
+export { D117_WoodExpert }
 
 const CARD_ID = D117_WoodExpert.id
 

@@ -4,6 +4,7 @@ import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { readActionSnapshotToken } from '../helpers/action-snapshot'
 import type { CardImpl } from '../registry'
 import { E53_BoarSpear } from '../../cards-display/E/E53_BoarSpear'
+export { E53_BoarSpear }
 
 const CARD_ID = E53_BoarSpear.id
 

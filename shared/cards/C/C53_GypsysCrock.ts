@@ -9,6 +9,7 @@ import { getMajorCard } from '../major'
 import { getRegisteredMinorImprovement } from '../types'
 import type { CardImpl } from '../registry'
 import { C53_GypsysCrock } from '../../cards-display/C/C53_GypsysCrock'
+export { C53_GypsysCrock }
 
 const CARD_ID = C53_GypsysCrock.id
 

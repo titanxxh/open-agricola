@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E160_KelpGatherer } from '../../cards-display/E/E160_KelpGatherer'
+export { E160_KelpGatherer }
 
 const CARD_ID = E160_KelpGatherer.id
 

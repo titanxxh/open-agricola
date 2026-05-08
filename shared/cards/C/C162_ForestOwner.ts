@@ -1,6 +1,7 @@
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import type { CardImpl } from '../registry'
 import { C162_ForestOwner } from '../../cards-display/C/C162_ForestOwner'
+export { C162_ForestOwner }
 
 const CARD_ID = 'C162_ForestOwner'
 

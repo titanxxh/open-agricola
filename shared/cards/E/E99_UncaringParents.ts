@@ -1,5 +1,6 @@
 import type { CardImpl } from '../registry'
 import { E99_UncaringParents } from '../../cards-display/E/E99_UncaringParents'
+export { E99_UncaringParents }
 
 const CARD_ID = E99_UncaringParents.id
 

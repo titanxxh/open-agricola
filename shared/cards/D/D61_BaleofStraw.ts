@@ -2,6 +2,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { D61_BaleofStraw } from '../../cards-display/D/D61_BaleofStraw'
+export { D61_BaleofStraw }
 
 const CARD_ID = D61_BaleofStraw.id
 

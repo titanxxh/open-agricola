@@ -4,6 +4,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 import { A107_Catcher } from '../../cards-display/A/A107_Catcher'
+export { A107_Catcher }
 
 const CARD_ID = A107_Catcher.id
 

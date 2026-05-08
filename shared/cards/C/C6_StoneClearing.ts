@@ -1,6 +1,7 @@
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { C6_StoneClearing } from '../../cards-display/C/C6_StoneClearing'
+export { C6_StoneClearing }
 
 const CARD_ID = C6_StoneClearing.id
 

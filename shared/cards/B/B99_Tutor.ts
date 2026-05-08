@@ -1,6 +1,7 @@
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { B99_Tutor } from '../../cards-display/B/B99_Tutor'
+export { B99_Tutor }
 
 const CARD_ID = B99_Tutor.id
 

@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B166_CattleFeeder } from '../../cards-display/B/B166_CattleFeeder'
+export { B166_CattleFeeder }
 
 const CARD_ID = B166_CattleFeeder.id
 
