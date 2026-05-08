@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import { ensureCardState } from '../helpers/card-state'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import { familySize, newbornCount } from '../../game/player'
+import { familySize, newbornCount } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E30_ChildsToy'

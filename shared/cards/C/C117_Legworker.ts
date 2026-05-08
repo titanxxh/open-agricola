@@ -3,7 +3,7 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { GameState } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { spaceHasPlayer } from '../../game/space'
+import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C117_Legworker'

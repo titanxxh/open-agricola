@@ -3,7 +3,7 @@ import { GameSession } from '../../../../server/game/authoritative-session'
 import { registerStubCards, clearStubCards } from '../index'
 import { CARD_ID as ON_ROUND_END_ID } from '../Stub_OnRoundEnd'
 import { clearActionHooks } from '../../../actions/hooks'
-import { markAllWorkersUsed } from '../../../game/player'
+import { markAllWorkersUsed } from '../../../domain/player'
 
 describe('Stub_OnRoundEnd mechanism', () => {
   beforeEach(() => {

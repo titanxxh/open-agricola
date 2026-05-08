@@ -8,7 +8,7 @@ import type {
   InteractionSelection,
   Resource,
 } from '../contract/types.ts'
-import { isBorderEdge, getAllTilePositions, positionKey } from '../game/farm.ts'
+import { isBorderEdge, getAllTilePositions, positionKey } from '../domain/farm.ts'
 import {
   applyCostOverride,
   canAffordTypedFlatCost,

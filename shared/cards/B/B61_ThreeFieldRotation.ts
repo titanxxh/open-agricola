@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldHasCrop, fieldIsEmpty } from '../../game/field'
+import { fieldHasCrop, fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B61_ThreeFieldRotation'

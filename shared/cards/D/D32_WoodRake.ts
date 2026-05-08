@@ -1,5 +1,5 @@
 import { MinorImprovement } from '../types'
-import { fieldTotalRemaining } from '../../game/field'
+import { fieldTotalRemaining } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D32_WoodRake'

@@ -1,7 +1,7 @@
 import { Occupation } from '../types'
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { workersAvailable } from '../../game/player'
+import { workersAvailable } from '../../domain/player'
 
 const CARD_ID = 'C125_Nightworker'
 

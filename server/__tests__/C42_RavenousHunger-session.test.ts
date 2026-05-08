@@ -3,7 +3,7 @@ import { getRegisteredCardListeners, executeCardListener, type CardListenerConte
 import { setCardFlag, isCardFlagged } from '../../shared/cards/helpers/card-state'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
 
-import { markAllWorkersUsed } from '../../shared/game/player'
+import { markAllWorkersUsed } from '../../shared/domain/player'
 import '../../shared/cards/C/C42_RavenousHunger'
 import type { ActionFlow } from '../../shared/contract/types'
 

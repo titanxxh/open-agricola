@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getCardEffect, runCardEffectHook } from '../card-effects'
 import type { GameState, PlayerState } from '../../contract/types'
 
-import { setActiveWorkerCount, setWorkersAtHome, workersAvailable, familySize } from '../../game/player'
+import { setActiveWorkerCount, setWorkersAtHome, workersAvailable, familySize } from '../../domain/player'
 import '../A/A127_Lodger'
 
 const CARD_ID = 'A127_Lodger'

@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { spaceHasPlayer } from '../../game/space'
+import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B158_DistrictManager'

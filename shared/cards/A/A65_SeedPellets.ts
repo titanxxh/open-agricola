@@ -3,7 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { canSow } from '../../actions/effects/sow'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldIsEmpty } from '../../game/field'
+import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A65_SeedPellets'

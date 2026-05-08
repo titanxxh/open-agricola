@@ -1,6 +1,6 @@
 import type { GameState, PlayerState, Resource } from '../contract/types.ts'
-import { FARM_COLS, FARM_ROWS, positionKey } from '../game/farm.ts'
-import { fieldHasCrop } from '../game/field.ts'
+import { FARM_COLS, FARM_ROWS, positionKey } from '../domain/farm.ts'
+import { fieldHasCrop } from '../domain/field.ts'
 import { getMajorCard } from '../cards/major/index.ts'
 import {
   getRegisteredMinorImprovement,
@@ -14,7 +14,7 @@ import type {
   BonusScoreHandler,
   CostedBonusHandler,
 } from '../cards/card-effects.ts'
-import { familySize } from '../game/player.ts'
+import { familySize } from '../domain/player.ts'
 import { computeFencedRegions } from './farmyard.ts'
 
 // ---------------------------------------------------------------------------

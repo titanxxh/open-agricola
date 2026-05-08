@@ -2,7 +2,7 @@ import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
-import { positionKey } from '../../game/farm'
+import { positionKey } from '../../domain/farm'
 import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 

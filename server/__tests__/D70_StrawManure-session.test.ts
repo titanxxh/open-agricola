@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/game/player'
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import '../../shared/cards/D/D70_StrawManure'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 

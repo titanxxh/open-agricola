@@ -1,5 +1,5 @@
 import { Occupation } from '../types'
-import { spaceHasPlayer } from '../../game/space'
+import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D130_RecreationalCarpenter'

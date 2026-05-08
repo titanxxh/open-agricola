@@ -1,11 +1,11 @@
 import { MinorImprovement } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { positionKey } from '../../game/farm'
+import { positionKey } from '../../domain/farm'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { ActionFlow, PlayerState } from '../../contract/types'
-import { fieldTopStack } from '../../game/field'
+import { fieldTopStack } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E71_CowPatty'

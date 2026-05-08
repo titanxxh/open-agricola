@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
-import { fieldTopStack, fieldDecrementTop } from '../../game/field'
+import { fieldTopStack, fieldDecrementTop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B165_GameProvider'

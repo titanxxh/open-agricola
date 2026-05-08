@@ -5,7 +5,7 @@ import { executeCardListener, getRegisteredCardListeners, type CardListenerConte
 import { getRoundPlacementOrder } from '../../shared/cards/helpers/round-placement'
 import type { ActionSpace, GameState, PlayerState , ActionFlow } from '../../shared/contract/types'
 
-import { setActiveWorkerCount, setWorkersAtHome, workersAvailable } from '../../shared/game/player'
+import { setActiveWorkerCount, setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import '../../shared/cards/D/D103_CanalBoatman'
 import '../../shared/cards/D/D150_GodlySpouse'
 

@@ -4,7 +4,7 @@ import { A14_CarpentersHammer } from '../../shared/cards/A/A14_CarpentersHammer'
 import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
 import type { PlayerState } from '../../shared/contract/types.ts'
 
-import { workersAvailable } from '../../shared/game/player'
+import { workersAvailable } from '../../shared/domain/player'
 import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 describe('construct room payment session', () => {
   const setup = () => {

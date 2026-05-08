@@ -1,5 +1,5 @@
 import type { ActionExecutionResult, PlayerState } from '../../contract/types'
-import { familySize, newbornCount } from '../../game/player'
+import { familySize, newbornCount } from '../../domain/player'
 
 export const feedFamily = (player: PlayerState): ActionExecutionResult => {
   const size = familySize(player)

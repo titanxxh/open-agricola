@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { tryAddRoomTile } from '../farmyard'
-import { getAllTilePositions, positionKey } from '../../game/farm'
+import { getAllTilePositions, positionKey } from '../../domain/farm'
 import type { FarmTilePosition, PlayerState, Resource } from '../../contract/types'
 
 const emptyResources = (): Resource => ({

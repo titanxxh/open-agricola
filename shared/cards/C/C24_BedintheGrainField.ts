@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
-import { familySize } from '../../game/player'
+import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C24_BedintheGrainField'

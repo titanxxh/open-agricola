@@ -4,7 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, GameState, PlayerState, ActionSpace } from '../../contract/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import { getRoundPlacementDetails } from '../helpers/round-placement'
-import { spaceOccupantCount } from '../../game/space'
+import { spaceOccupantCount } from '../../domain/space'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C129_SecondSpouse'

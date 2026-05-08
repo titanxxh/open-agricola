@@ -2,7 +2,7 @@ import type { ActionFlow, FarmTilePosition, GameState, PlayerState, Resource } f
 import type { AnimalZone, PlayerScoreSummary, ScoreCategoryResult } from '../domain'
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
-import { positionKey } from '../game/farm'
+import { positionKey } from '../domain/farm'
 
 /**
  * Extra sowable field contributed by a card (e.g. B72 allows sowing in pastures).

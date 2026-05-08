@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 
-import { workersAvailable, setActiveWorkerCount, setWorkersAtHome } from '../../shared/game/player'
+import { workersAvailable, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/D/D24_BrotherlyLove'
 
 const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`

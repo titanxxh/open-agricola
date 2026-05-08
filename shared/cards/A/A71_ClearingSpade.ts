@@ -3,7 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
-import { fieldTopStack, fieldIsEmpty, fieldDecrementTop } from '../../game/field'
+import { fieldTopStack, fieldIsEmpty, fieldDecrementTop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A71_ClearingSpade'

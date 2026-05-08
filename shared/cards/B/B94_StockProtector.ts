@@ -3,7 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { canStartFencing } from '../../actions/effects/fencing'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { workersAvailable } from '../../game/player'
+import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B94_StockProtector'

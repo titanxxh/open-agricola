@@ -1,5 +1,5 @@
 import { Occupation } from '../types'
-import { fieldIsEmpty } from '../../game/field'
+import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C161_PotatoDigger'

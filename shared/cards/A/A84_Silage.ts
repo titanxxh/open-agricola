@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
 import type { ActionDefinition, ActionFlow } from '../../contract/types'
-import { fieldHasCrop, fieldTopStack, fieldPopIfDepleted } from '../../game/field'
+import { fieldHasCrop, fieldTopStack, fieldPopIfDepleted } from '../../domain/field'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
 

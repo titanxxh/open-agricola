@@ -1,5 +1,5 @@
 import { MinorImprovement } from '../types'
-import { fieldHasCrop, fieldIsEmpty, fieldTotalRemaining } from '../../game/field'
+import { fieldHasCrop, fieldIsEmpty, fieldTotalRemaining } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C8_PlantFertilizer'

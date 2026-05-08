@@ -2,7 +2,7 @@ import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
-import { fieldTopStack, fieldDecrementTop } from '../../game/field'
+import { fieldTopStack, fieldDecrementTop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A58_AsparagusKnife'

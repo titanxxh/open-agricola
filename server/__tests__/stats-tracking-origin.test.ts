@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { setWorkersAtHome } from '../../shared/game/player'
+import { setWorkersAtHome } from '../../shared/domain/player'
 
 describe('PlayerStats resource origin tracking', () => {
   it('card-effect gains route to resourcesFromCards via applyCardGain helper', async () => {

@@ -3,7 +3,7 @@ import * as React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import { useFarmSelection } from '../useFarmSelection'
-import { isBorderEdge } from '../../../shared/game/farm'
+import { isBorderEdge } from '../../../shared/domain/farm'
 
 type Captured = ReturnType<typeof useFarmSelection>
 

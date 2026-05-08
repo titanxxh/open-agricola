@@ -2,7 +2,7 @@ import { Occupation } from '../types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
-import { workersAvailable } from '../../game/player'
+import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D103_CanalBoatman'

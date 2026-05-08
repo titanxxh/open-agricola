@@ -4,7 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import { countUnusedFarmyardSpaces } from '../../game/farm'
+import { countUnusedFarmyardSpaces } from '../../domain/farm'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 

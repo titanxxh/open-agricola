@@ -2,7 +2,7 @@ import { Occupation } from '../types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { FarmTilePosition, PlayerState } from '../../contract/types'
-import { FARM_ROWS, FARM_COLS, positionKey } from '../../game/farm'
+import { FARM_ROWS, FARM_COLS, positionKey } from '../../domain/farm'
 import { payLeaf } from '../helpers/pay-gain-node'
 import {
   isCardFlagged,

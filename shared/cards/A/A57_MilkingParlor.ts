@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import { countUnusedFarmyardSpaces } from '../../game/farm'
+import { countUnusedFarmyardSpaces } from '../../domain/farm'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A57_MilkingParlor'

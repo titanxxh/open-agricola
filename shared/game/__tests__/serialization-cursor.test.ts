@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session'
-import { setWorkersAtHome } from '../player'
+import { setWorkersAtHome } from '../../domain/player'
 import { rehydrateState, serializeState } from '../serialization'
 import { isLegacyChoicePending } from '../../../server/__tests__/_helpers/legacy-confirms'
 

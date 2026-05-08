@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { A57_MilkingParlor } from '../../shared/cards/A/A57_MilkingParlor'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
-import { getAllTilePositions } from '../../shared/game/farm'
+import { getAllTilePositions } from '../../shared/domain/farm'
 
 describe('A57_MilkingParlor prerequisite', () => {
   it('blocks when fewer than 4 free farmyard spaces remain', () => {

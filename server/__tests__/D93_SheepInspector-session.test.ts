@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { setCardFlag, isCardFlagged } from '../../shared/cards/helpers/card-state'
-import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/game/player'
+import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import type {
   ActionSpace,
   GameState,

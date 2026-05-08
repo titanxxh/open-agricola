@@ -5,8 +5,8 @@ import {
   setActiveWorkerCount,
   setWorkersAtHome,
   newbornCount,
-} from '../../shared/game/player'
-import { addWorkerRef } from '../../shared/game/space'
+} from '../../shared/domain/player'
+import { addWorkerRef } from '../../shared/domain/space'
 import type { GameState, PlayerState } from '../../shared/contract/types'
 
 import '../../shared/cards/A/A25_Bassinet'

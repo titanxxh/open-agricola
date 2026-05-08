@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import { fieldHasCrop } from '../../game/field'
+import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B45_StrawberryPatch'

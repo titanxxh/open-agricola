@@ -1,5 +1,5 @@
 import { MinorImprovement } from '../types'
-import { familySize } from '../../game/player'
+import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A4_Baseboards'

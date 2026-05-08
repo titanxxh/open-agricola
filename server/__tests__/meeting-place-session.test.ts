@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/game/player'
+import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { confirmNextPlayer } from './_helpers/legacy-confirms'
 
 describe('meeting-place session', () => {

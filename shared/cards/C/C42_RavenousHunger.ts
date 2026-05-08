@@ -4,7 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged } from '../helpers/card-state'
 import type { ActionFlow, Resource } from '../../contract/types'
-import { workersAvailable } from '../../game/player'
+import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C42_RavenousHunger'

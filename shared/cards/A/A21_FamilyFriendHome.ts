@@ -3,7 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
-import { familySize as getFamilySize } from '../../game/player'
+import { familySize as getFamilySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A21_FamilyFriendHome'

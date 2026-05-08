@@ -1,6 +1,6 @@
 import { MinorImprovement } from '../types'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import { FARM_COLS, FARM_ROWS, positionKey } from '../../game/farm'
+import { FARM_COLS, FARM_ROWS, positionKey } from '../../domain/farm'
 
 const CARD_ID = 'D37_Sculpture'
 

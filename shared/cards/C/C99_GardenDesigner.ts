@@ -1,5 +1,5 @@
 import { Occupation } from '../types'
-import { fieldIsEmpty } from '../../game/field'
+import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import type { BonusScoreLevel } from '../card-effects'
 import { paretoOptimal } from '../helpers/pareto-bonus'

@@ -35,7 +35,7 @@ import { checkCustomPrerequisite } from '../../shared/cards/helpers/prerequisite
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import type { GameState, PlayerState } from '../../shared/contract/types'
 import { GameSession } from '../game/authoritative-session'
-import { setWorkersAtHome, setActiveWorkerCount } from '../../shared/game/player'
+import { setWorkersAtHome, setActiveWorkerCount } from '../../shared/domain/player'
 
 import '../../shared/cards/A/A3_PaperKnife'
 import { A3_PaperKnife } from '../../shared/cards/A/A3_PaperKnife'

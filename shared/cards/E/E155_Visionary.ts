@@ -2,7 +2,7 @@ import { Occupation } from '../types'
 import type { CardImpl } from '../registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { familySize } from '../../game/player'
+import { familySize } from '../../domain/player'
 
 const CARD_ID = 'E155_Visionary'
 

@@ -1,6 +1,6 @@
 import { Occupation } from '../types'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
-import { fieldHasCrop } from '../../game/field'
+import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D113_FoodMerchant'

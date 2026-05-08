@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import type { ActionFlow } from '../../contract/types'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
-import { fieldFindStackOfKind, fieldHasCrop } from '../../game/field'
+import { fieldFindStackOfKind, fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D70_StrawManure'

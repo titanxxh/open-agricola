@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { workersAvailable } from '../../shared/game/player'
+import { workersAvailable } from '../../shared/domain/player'
 import { E3_TeaTime } from '../../shared/cards/E/E3_TeaTime'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 

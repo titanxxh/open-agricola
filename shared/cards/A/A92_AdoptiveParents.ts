@@ -3,8 +3,8 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
-import { findFirstNewborn, newbornCount } from '../../game/player'
-import { removeWorkerRef } from '../../game/space'
+import { findFirstNewborn, newbornCount } from '../../domain/player'
+import { removeWorkerRef } from '../../domain/space'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A92_AdoptiveParents'

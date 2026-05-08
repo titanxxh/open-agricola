@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import type { ActionSpace, WorkerRef } from '../types'
+import type { ActionSpace, WorkerRef } from '../../contract/types'
 import {
   addWorkerRef,
   isSpaceOccupied,
   removeWorkerRef,
   spaceHasPlayer,
   spaceOccupantCount,
-} from '../space'
+} from '../../domain/space'
 import { mkActionSpace } from '../../cards/__tests__/fixtures'
 
 const mkSpace = (takenBy: WorkerRef[] = []): ActionSpace => mkActionSpace({ id: 'x', takenBy })

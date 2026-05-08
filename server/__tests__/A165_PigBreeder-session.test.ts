@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import '../../shared/cards/register-all'
 import { clearActionHooks, registerActionHook } from '../../shared/actions/hooks'
-import { markAllWorkersUsed } from '../../shared/game/player'
+import { markAllWorkersUsed } from '../../shared/domain/player'
 
 import '../../shared/cards/A/A165_PigBreeder'
 

@@ -137,7 +137,7 @@ function generateCardFile(meta: CardMeta, dsl: CardDslEffects | null): string {
   lines.push(`import { ${classType} } from '../../shared/cards/types'`)
   if (dsl && Object.keys(dsl).length > 0) {
     lines.push(`import { requireActiveCardRegistry } from '../../shared/cards/active-registry'`)
-    lines.push(`import { familySize } from '../../shared/game/player'`)
+    lines.push(`import { familySize } from '../../shared/domain/player'`)
   }
   lines.push('')
 

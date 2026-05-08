@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { cloneState, createInitialState } from '../state'
-import { getPlayedCardKeys } from '../../game/player'
+import { getPlayedCardKeys } from '../../domain/player'
 
 describe('cloneState', () => {
   it('preserves round and derives played cards from canonical arrays', () => {

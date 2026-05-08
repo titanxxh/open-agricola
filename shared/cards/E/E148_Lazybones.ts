@@ -5,7 +5,7 @@ import {
   getReservedActionSpaces,
   setReservedActionSpaces,
 } from '../helpers/card-state'
-import { getNextEmptyTileForPlayer } from '../../game/farm'
+import { getNextEmptyTileForPlayer } from '../../domain/farm'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E148_Lazybones'

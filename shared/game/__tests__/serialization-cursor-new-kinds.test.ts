@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session'
 import { rehydrateState, serializeState } from '../serialization'
 import { InteractionNode, INTERACTION_ONLY_ACTION_ID } from '../../engine'
-import type { ActionFlow, InteractionRequest } from '../types'
+import type { ActionFlow, InteractionRequest } from '../../contract/types'
 
 /**
  * S2 Task 13 step 10 — verify the three S2-new InteractionRequest kinds

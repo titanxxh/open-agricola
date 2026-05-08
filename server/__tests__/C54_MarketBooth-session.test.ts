@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getFenceCount } from '../../shared/actions/effects/fencing'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { getRegisteredMinorImprovement } from '../../shared/cards/types'
-import { markAllWorkersUsed } from '../../shared/game/player'
+import { markAllWorkersUsed } from '../../shared/domain/player'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C54_MarketBooth'

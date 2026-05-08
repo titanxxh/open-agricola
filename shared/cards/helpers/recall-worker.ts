@@ -1,5 +1,5 @@
 import type { GameState, PlayerState } from '../../contract/types'
-import { removeWorkerRef } from '../../game/space'
+import { removeWorkerRef } from '../../domain/space'
 import { holdWorkerOnCard } from './card-held-workers'
 
 type RecallOptions = {

@@ -1,5 +1,5 @@
 import { Occupation } from '../types'
-import { isSpaceOccupied } from '../../game/space'
+import { isSpaceOccupied } from '../../domain/space'
 import { jumpLeaf } from '../helpers/jump-leaf'
 import type { CardImpl } from '../registry'
 

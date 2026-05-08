@@ -4,7 +4,7 @@ import { getRegisteredMinorImprovement } from '../types'
 import { getMajorCard } from '../major'
 import { collectCardsAs } from './card-type'
 import { checkCustomPrerequisite } from './prerequisite-registry'
-import { fieldHasCrop } from '../../game/field'
+import { fieldHasCrop } from '../../domain/field'
 
 type CardPrerequisiteSource = Pick<
   CardDefinition,

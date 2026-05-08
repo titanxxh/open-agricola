@@ -4,7 +4,7 @@ import { createActionSpaces } from '../actions'
 import { normalizeState } from '../logic/state'
 import { getCardModifiers } from '../cards/card-modifiers'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
-import { normalizeTakenBy } from './space'
+import { normalizeTakenBy } from '../domain/space'
 
 export type SerializedActionSpace = Omit<
   ActionSpace,

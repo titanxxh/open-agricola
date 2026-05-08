@@ -1,7 +1,7 @@
 import { MinorImprovement } from '../types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
-import { fieldIsEmpty, fieldHasCrop } from '../../game/field'
+import { fieldIsEmpty, fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D8_FernSeeds'

@@ -1,5 +1,5 @@
 import { MinorImprovement } from '../types'
-import { fieldFindStackOfKind, fieldHasCrop } from '../../game/field'
+import { fieldFindStackOfKind, fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D31_Storeroom'

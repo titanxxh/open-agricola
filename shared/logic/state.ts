@@ -10,7 +10,7 @@ import {
   FARM_ROWS,
   getAllTilePositions,
   positionKey,
-} from '../game/farm'
+} from '../domain/farm'
 import { createRng, createSeed, shuffleWithRng } from './rng'
 import { createActionSpaces } from '../actions'
 import { majorImprovementIds } from '../game/major-improvements'
@@ -24,7 +24,7 @@ import { initDraftState } from '../draft/draft-manager'
 import type { DraftPool } from '../draft/types'
 import type { ActionSpace, Field, GameState, PlayerState } from '../contract/types'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
-import { normalizeTakenBy } from '../game/space'
+import { normalizeTakenBy } from '../domain/space'
 import { createInitialPlayerStats } from './stats'
 import { cardAllowedForPlayerCount } from '../cards/player-count-filter'
 import {

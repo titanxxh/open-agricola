@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 
-import { setWorkersAtHome } from '../../shared/game/player'
+import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/B/B115_TinsmithMaster'
 
 const CARD_ID = 'B115_TinsmithMaster'
