@@ -3,7 +3,7 @@ import type {
   ActionExecutionContext,
   InteractionRequest,
 } from '../../contract/types'
-import type { PromptKey } from '../../game/prompt-keys'
+import type { PromptKey } from '../../contract/prompt-keys'
 import type { EngineContext, NodeStepResult } from '../types'
 import { BaseNode } from './base'
 

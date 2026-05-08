@@ -1,5 +1,5 @@
 import { describe, it, expectTypeOf } from 'vitest'
-import type { PromptKey, PromptParams } from '../prompt-keys'
+import type { PromptKey, PromptParams } from '../../contract/prompt-keys'
 
 describe('PromptKey + PromptParams', () => {
   it('PromptKey is a closed union covering all emit literals', () => {

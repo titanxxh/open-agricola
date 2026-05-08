@@ -1,4 +1,4 @@
-import type { PromptKey } from '../game/prompt-keys'
+import type { PromptKey } from './prompt-keys'
 
 export type Resource = {
   wood: number
@@ -18,7 +18,7 @@ export type Resource = {
 // BGA-style "Plows: N / Built: N rooms / Occupations played: N" lines via
 // the same Partial<Resource>-shaped storage slot. These keys are NEVER
 // stored in player.resources or space.resources. See
-// shared/game/resource-keys.ts for the runtime list / discriminator.
+// shared/contract/resource-keys.ts for the runtime list / discriminator.
 export type PseudoResourceMap = {
   occupation?: number
   field?: number
