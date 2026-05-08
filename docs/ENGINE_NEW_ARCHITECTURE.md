@@ -15,7 +15,7 @@
 
 它**不改变**：后端权威 / 全量快照 / WS 协议 / hook 系统 / 卡牌闭环原则 / 三层物理边界。
 
-> **当前 sprint 进度**（详见 §15）：S1 ✅（2026-05-03）/ S2 ✅（2026-05-05）/ S3 ✅（2026-05-04，PaymentSolver 收口）/ S4a ✅（2026-05-04）/ S4b ✅（2026-05-05，rich-node + step() dispatch + cursor round-trip 落地）/ S5 ✅（2026-05-06，RoomManager 拆 connection/persistence 三层）/ S6–S7 待启动。
+> **当前 sprint 进度**（详见 §15）：S1 ✅（2026-05-03）/ S2 ✅（2026-05-05）/ S3 ✅（2026-05-04，PaymentSolver 收口）/ S4a ✅（2026-05-04）/ S4b ✅（2026-05-05，rich-node + step() dispatch + cursor round-trip 落地）/ S4c ✅（2026-05-08，Engine API 收敛 14 → 6 + mirror 字段删除 + engine.ts 447 行）/ S5 ✅（2026-05-06，RoomManager 拆 connection/persistence 三层）/ S6–S7 待启动。
 
 ---
 
@@ -1093,7 +1093,33 @@ S4 拆分为两条独立轨道并行推进：
 
 - ✅ S4a：`shared/logic/farm/` + `shared/actions/helpers/animal-zones.ts` + `shared/logic/scoring*.ts` 目录/文件不复存在
 - 行动层 effect 平均行数下降 ≥ 30%（注：S4a PR2/PR3 已完成主要 drop；PR5 仅清 legacy；最终对比 pre-S4a `main` 基线衡量）
-- engine.ts 主文件 ≤ 600 行（S4b 负责）
+- engine.ts 主文件 ≤ 600 行（S4b 留作 S4c follow-up；S4c 已达成 447 行）
+
+### Sprint S4c：Engine API 收敛 ✅ 完成（2026-05-08）
+
+> **完成总结**：
+> - ✅ Engine 公开方法 14 → **6**（`proceed / resolveChoice / snapshot / restore / injectBeforeFlows / injectInteraction`）；`engine-public-surface.test.ts` guard pass
+> - ✅ 3 个 mirror 字段（`pendingInteractionActionId / OwnerNodeId / Context`）从 engine.ts 删除；`EngineSnapshot` 顶层不含 `pendingInteractionXxx` 字段，`choiceData` 扩展承载 `pendingActionId / ownerNodeId / contextSnapshot`
+> - ✅ `EngineStack` 新增 4 个 query + 1 个写操作方法（`peekInteractionHost / peekPendingChoiceFromComposite / hasPendingChoiceCompositeAncestor / insertFlowAfterPendingChoice` + 既有 `peekInteraction`）；session-core / round.ts 调用点全部迁移
+> - ✅ engine.ts **447 行**（目标 ≤600）；`proceed` / `resolveChoice` 提取到 `engine-proceed.ts` / `engine-resolve.ts`；私有工具函数集中在 `engine-utils.ts`；`EngineInternals` interface (`engine-internals.ts`) 承载跨函数 mutation
+
+#### Sprint S4c 整体 DoD
+
+- ✅ D1: Engine 公开方法恰好 6 个，guard pass
+- ✅ D2: 3 个 mirror 私有字段（`pendingInteractionActionId / OwnerNodeId / Context`）删除
+- ✅ D3: EngineSnapshot 顶层不含 `pendingInteractionXxx` 字段
+- ✅ D4: EngineStack 新增 4 query + 1 write，各有 unit test
+- ✅ D5: session-core.ts 不直接调用已内部化的 8 个 Engine 方法
+- ✅ D6: round.ts before-phase inject 改为 `engine.injectBeforeFlows()`
+- ✅ D7: engine.ts 447 行（≤600 ✓）
+- ✅ D8: pnpm test:fast 2251 pass / 0 fail
+- ✅ D9: ENGINE_NEW_ARCHITECTURE.md §15 S4c 收口记录回流
+
+#### 关键演进
+
+1. `@internal` JSDoc + PRIVATE_HELPERS guard 取代 TS `private` 关键字 — 避免 TS6133 死循环（私有方法只被 EngineStack 反射调用，TS 看不见）。surface guard 是真正的封装契约。
+2. `EngineInternals` interface + ref-boxed primitives (`counterRef`, `pendingNodeIdRef`) 让 ~30 个私有工具函数从 method 提取为模块级函数，无需丢弃可变性。
+3. PR2 删除 mirror 字段时，新增的 `proceed()` 内 OrNode/XorNode/OptionalNode/InteractionNode-leaf composite-emit cleanup 是必要的连锁——pending state 的 single-source-of-truth 契约现在贯穿整条链路。
 
 ### Sprint S5：RoomManager 拆 connection/persistence ✅ 完成（2026-05-05）
 
