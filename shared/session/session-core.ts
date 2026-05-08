@@ -60,7 +60,7 @@ import {
   incHarvestedVegetable,
   incResourceConverted,
 } from '../logic/stats.ts'
-import { getMinorImprovement } from '../game/minor-improvements.ts'
+import { getMinorImprovement } from '../cards-display/_lookup.ts'
 import {
   registerCustomCard,
   getCustomMinorImprovementIds,

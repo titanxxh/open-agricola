@@ -13,7 +13,7 @@ import {
 } from '../domain/farm'
 import { createRng, createSeed, shuffleWithRng } from './rng'
 import { createActionSpaces } from '../actions'
-import { majorImprovementIds } from '../game/major-improvements'
+import { majorImprovementIds } from '../cards-display/_lookup'
 import {
   implementedMinorImprovementCards,
   implementedOccupationCards,

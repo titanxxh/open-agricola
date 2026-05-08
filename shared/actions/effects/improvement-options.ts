@@ -1,6 +1,6 @@
 import type { ComplexCost, GameState, PlayerState, Resource } from '../../contract/types'
 import type { PaymentInfo } from '../../cards/card-effects'
-import { getMinorImprovement } from '../../game/minor-improvements'
+import { getMinorImprovement } from '../../cards-display/_lookup'
 import { PaymentSolver } from '../payment'
 import type { PaymentCtx } from '../payment'
 import { majorCardDefinitions, getMajorCard } from '../../cards/major'
