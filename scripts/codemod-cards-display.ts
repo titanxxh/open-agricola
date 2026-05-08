@@ -21,6 +21,13 @@ export interface SplitInput {
 
 const DISPLAY_CTORS = new Set(['MinorImprovement', 'Occupation', 'PlayerActionCard'])
 
+// Type annotations whose variable declarations are treated as display data.
+// Major improvements use a `MajorCardData` object literal (no class wrapper)
+// that bundles display fields (id/name/desc/cost/vp) and effect hooks
+// (onBuy/onHarvest/...) — the entire object is the canonical card definition,
+// so the whole file is emitted to cards-display unchanged (display-only).
+const DISPLAY_TYPE_ANNOTATIONS = new Set(['MajorCardData'])
+
 interface ImportInfo {
   node: ts.ImportDeclaration
   moduleSpec: string
@@ -94,6 +101,23 @@ export function splitCardFile(input: SplitInput): SplitResult {
     true,
     ts.ScriptKind.TS,
   )
+
+  // Majors and similar declarative-data card files (typed as `MajorCardData`,
+  // etc.) are treated as display-only — the entire file is the canonical card
+  // definition. Detect by scanning for any exported variable whose type
+  // annotation matches DISPLAY_TYPE_ANNOTATIONS.
+  for (const stmt of sf.statements) {
+    if (!ts.isVariableStatement(stmt)) continue
+    if (!stmt.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) continue
+    for (const decl of stmt.declarationList.declarations) {
+      const typeNode = decl.type
+      if (typeNode && ts.isTypeReferenceNode(typeNode) &&
+          ts.isIdentifier(typeNode.typeName) &&
+          DISPLAY_TYPE_ANNOTATIONS.has(typeNode.typeName.text)) {
+        return { kind: 'display-only', displayText: input.sourceText }
+      }
+    }
+  }
 
   const imports: ImportInfo[] = []
   type Entry = { node: ts.Statement; kind: 'display' | 'impl' | 'shared' }

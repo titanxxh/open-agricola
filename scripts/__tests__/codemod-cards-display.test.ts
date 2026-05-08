@@ -40,4 +40,16 @@ describe('codemod-cards-display: splitCardFile', () => {
     })
     expect(result.kind).toBe('display-only')
   })
+
+  it('major/joinery — display-only (MajorCardData type annotation)', () => {
+    const input = readFixture('major/joinery.ts')
+    const result = splitCardFile({
+      sourcePath: 'shared/cards/major/joinery.ts',
+      sourceText: input,
+    })
+    expect(result.kind).toBe('display-only')
+    if (result.kind !== 'display-only') return
+    // Major files are emitted verbatim — display-only path returns sourceText unchanged.
+    expect(result.displayText).toBe(input)
+  })
 })
