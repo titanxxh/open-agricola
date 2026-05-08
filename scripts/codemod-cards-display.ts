@@ -24,6 +24,7 @@ interface ImportInfo {
   isTypeOnly: boolean
   defaultName: string | null
   named: { name: string; isTypeOnly: boolean; raw: string }[]
+  originalText: string
 }
 
 const collectIdentifiers = (node: ts.Node): Set<string> => {
@@ -57,6 +58,7 @@ const parseImport = (imp: ts.ImportDeclaration, sf: ts.SourceFile): ImportInfo |
     isTypeOnly: clause.isTypeOnly,
     defaultName,
     named,
+    originalText: imp.getText(sf),
   }
 }
 
@@ -64,6 +66,14 @@ const renderImport = (info: ImportInfo, refs: Set<string>): string | null => {
   const defaultName = info.defaultName && refs.has(info.defaultName) ? info.defaultName : null
   const namedKept = info.named.filter((n) => refs.has(n.name))
   if (!defaultName && namedKept.length === 0) return null
+
+  // If everything is kept, preserve original formatting (incl. multi-line layout).
+  const allDefaultKept = info.defaultName === null || defaultName !== null
+  const allNamedKept = namedKept.length === info.named.length
+  if (allDefaultKept && allNamedKept) {
+    return info.originalText.replace(/;$/, '')
+  }
+
   const typeMarker = info.isTypeOnly ? 'type ' : ''
   const parts: string[] = []
   if (defaultName) parts.push(defaultName)
@@ -119,20 +129,91 @@ export function splitCardFile(input: SplitInput): SplitResult {
 
   if (!displayName) return { kind: 'skip', reason: 'no display export found' }
 
-  const stmtText = (stmt: ts.Statement): string => stmt.getText(sf)
+  const fullText = sf.getFullText()
+  const stmtText = (stmt: ts.Statement): string => {
+    const ranges = ts.getLeadingCommentRanges(fullText, stmt.getFullStart()) ?? []
+    // Only attach JSDoc-style block comments (/** ... */) — line comments are
+    // typically attached to imports above and would be duplicated.
+    const jsDocRanges = ranges.filter((r) => {
+      const t = fullText.slice(r.pos, r.end)
+      return t.startsWith('/**')
+    })
+    if (jsDocRanges.length === 0) return stmt.getText(sf)
+    const first = jsDocRanges[0]
+    const prefix = fullText.slice(first.pos, stmt.getStart(sf))
+    return prefix + stmt.getText(sf)
+  }
 
+  // First pass: collect what display + impl statements reference.
+  const displayOwnStmts: ts.Statement[] = []
+  const implOwnStmts: ts.Statement[] = []
+  const sharedStmts: ts.Statement[] = []
+  for (const entry of otherStatements) {
+    if (entry.kind === 'display') displayOwnStmts.push(entry.node)
+    else if (entry.kind === 'impl') implOwnStmts.push(entry.node)
+    else sharedStmts.push(entry.node)
+  }
+
+  const namesDeclaredBy = (stmt: ts.Statement): string[] => {
+    const names: string[] = []
+    if (ts.isVariableStatement(stmt)) {
+      for (const decl of stmt.declarationList.declarations) {
+        if (ts.isIdentifier(decl.name)) names.push(decl.name.text)
+      }
+    } else if (ts.isFunctionDeclaration(stmt) && stmt.name) {
+      names.push(stmt.name.text)
+    }
+    return names
+  }
+
+  // Iteratively classify shared stmts by what side references them (transitively).
+  const displayRefs = new Set<string>()
+  for (const s of displayOwnStmts) for (const id of collectIdentifiers(s)) displayRefs.add(id)
+  const implRefs = new Set<string>()
+  for (const s of implOwnStmts) for (const id of collectIdentifiers(s)) implRefs.add(id)
+
+  type Classification = 'display' | 'impl' | 'orphan'
+  const sharedClass = new Map<ts.Statement, Classification>()
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const s of sharedStmts) {
+      if (sharedClass.has(s)) continue
+      const names = namesDeclaredBy(s)
+      const wantedByDisplay = names.some((n) => displayRefs.has(n))
+      const wantedByImpl = names.some((n) => implRefs.has(n))
+      if (wantedByDisplay) {
+        sharedClass.set(s, 'display')
+        for (const id of collectIdentifiers(s)) displayRefs.add(id)
+        changed = true
+      } else if (wantedByImpl) {
+        sharedClass.set(s, 'impl')
+        for (const id of collectIdentifiers(s)) implRefs.add(id)
+        changed = true
+      }
+    }
+  }
+  // Statements not referenced by either side (e.g. top-level expression statements
+  // like `registerAdHocAction(...)`) — default to impl.
+  for (const s of sharedStmts) {
+    if (!sharedClass.has(s)) {
+      sharedClass.set(s, 'impl')
+      for (const id of collectIdentifiers(s)) implRefs.add(id)
+    }
+  }
+
+  // Walk original statement order, splitting into display/impl streams.
   const displayStmts: ts.Statement[] = []
   const implStmts: ts.Statement[] = []
   for (const entry of otherStatements) {
     if (entry.kind === 'display') displayStmts.push(entry.node)
     else if (entry.kind === 'impl') implStmts.push(entry.node)
-    else displayStmts.push(entry.node)
+    else {
+      const cls = sharedClass.get(entry.node)
+      if (cls === 'display') displayStmts.push(entry.node)
+      else implStmts.push(entry.node)
+    }
   }
-
-  const displayRefs = new Set<string>()
-  for (const s of displayStmts) for (const id of collectIdentifiers(s)) displayRefs.add(id)
-  const implRefs = new Set<string>()
-  for (const s of implStmts) for (const id of collectIdentifiers(s)) implRefs.add(id)
 
   const renderImports = (refs: Set<string>): string[] => {
     const out: string[] = []
