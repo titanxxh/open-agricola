@@ -175,20 +175,36 @@ describe('E70_CropRotationField session', () => {
       ])
     })
 
-    // SKIP[S1]: 'choice'→'request' shape mismatch, see docs/skip-tracker.md
-    it.skip('fromSelectedFields rejects committing a different extra sow field', () => {
-      const session = setup({ vegetable: 1 })
+    it('fromSelectedFields rejects committing a different extra sow field', () => {
+      // Drive the harvest-emitted optional sow leaf rather than mutating
+      // private session fields: round-4 harvest with cardCrop={grain,1} +
+      // vegetable=1 triggers E70's onHarvestFieldPhase to reap the last
+      // grain (cardCrop -> null, selectedPositions = ['-1-70']) and emit
+      // an optional sow leaf with actionContext
+      // { allowedFields: 'fromSelectedFields', sourceCard: E70 }. The
+      // commit-time selectableFields filter then narrows allowed extras
+      // to just -1/70, so submitting the cross-card -1/69 (E69 MelonPatch)
+      // must be rejected.
+      const session = setup({
+        round: 4,
+        grain: 0,
+        vegetable: 1,
+        cardCrop: { crop: 'grain', remaining: 1 },
+      })
       addMinorCard(session, OTHER_EXTRA_CARD_ID)
 
-      const player = session.getState().state.players[0]!
-      writeCardExtraData(player, CARD_ID, 'selectedPositions', ['-1-70'])
+      let resp = session.performRoundEnd()
+      expect(resp.ok).toBe(true)
+      expect(resp.interaction.stateId).toBe('wait')
+      expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
+        .toBe('ui.interactionOptionalAction')
 
-      // Pre-S2 hack: this test directly mutated `session.pending` to seed a
-      // synthetic choice. Since S2 Task 13.6 deleted the pending field, this
-      // path is non-functional and only kept here as it.skip placeholder.
-      ;(session as unknown as { activeSpaceId: string | null }).activeSpaceId = 'grain-utilization'
+      resp = session.resolveChoice(0, 'confirm', 'sow')
+      expect(resp.ok).toBe(true)
+      expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
+        .toBe('ui.interactionSowSelect')
 
-      const resp = session.resolveChoice(0, 'confirm', {
+      resp = session.resolveChoice(0, 'confirm', {
         crops: [{ row: -1, col: 69, crop: 'vegetable' }],
       })
 
