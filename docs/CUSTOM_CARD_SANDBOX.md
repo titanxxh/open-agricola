@@ -65,7 +65,8 @@
 
 生成器还会同步输出：
 
-- `shared/cards/community/{CUSTOM_ID}.ts`
+- `shared/cards-display/community/{CUSTOM_ID}.ts` — display 数据层（仅 `CARD_DEF` + i18n locales）
+- `shared/cards/community/{CUSTOM_ID}.ts` — impl 层（仅 `CARD_IMPL`，re-export display）
 - `shared/cards/community/__tests__/{CUSTOM_ID}.test.ts`
 - `shared/cards/register-all.ts`
 - `shared/cards/community/auto-catalog.ts`
@@ -81,6 +82,31 @@ pnpm run build
 ```
 
 如果某张工坊卡在沙盒中通过、但 PR CI 因 TypeScript 类型失败，优先修生成器规范化，而不是只手改生成出来的单张社区牌；否则下一次用户提 PR 还会复现。
+
+### 1.1.1 提交后的物理分层（display + impl 双文件）
+
+提交到 GitHub PR 时，server `code-gen.ts` 会把沙盒里的单文件
+`CARD_DEF + CARD_IMPL` **透明拆分**到两个物理文件：
+
+- `shared/cards-display/community/{CARD_ID}.ts` — 仅 `CARD_DEF`
+  + i18n locales（display 数据层）
+  - `import { MinorImprovement } from '../types'`（或 `Occupation`）
+  - `export const {CARD_ID} = CARD_DEF`
+- `shared/cards/community/{CARD_ID}.ts` — 仅 `CARD_IMPL`（impl 层）
+  - `import { {CARD_ID} } from '../../cards-display/community/{CARD_ID}'`
+  - `export { {CARD_ID} }` （re-export display）
+  - `export const {CARD_ID}_impl = CARD_IMPL satisfies CardImpl`
+
+外加 4 个补丁文件：
+- `shared/cards/community/__tests__/{CARD_ID}.test.ts` — smoke test
+- `shared/cards/register-all.ts` — patched 加 impl 注册
+- `shared/cards/community/auto-catalog.ts` — patched 加 display 引用
+- `docs/community_cards.md` — patched 加目录行
+
+**用户在沙盒里不需要关心物理分层** —— 继续按 `CARD_DEF + CARD_IMPL`
+两个常量写就行。后端 `code-gen.ts` 自动拆分；这两个常量从沙盒内
+（同一文件 closure）变成跨两个 module（display 和 impl 之间通过
+`import { {CARD_ID} }` 跨过）。
 
 ---
 
