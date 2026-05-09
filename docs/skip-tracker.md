@@ -26,7 +26,8 @@ Tracks tests skipped during architecture refactor sprints. Each skip must list:
 
 | Test | Skipped in | Category | Reason | Resolve in |
 |---|---|---|---|---|
-| server/__tests__/E70_CropRotationField-session.test.ts > E70_CropRotationField session > sowing on card field > "fromSelectedFields rejects committing a different extra sow field" | S1 | private-field-access | test mutates private `session.pending` / `activeSpaceId` which are now getter-only after Task 10 | S2 |
+
+(empty — all sprint-introduced skips resolved as of S7 Batch 2, 2026-05-09)
 
 ## Resolved skips
 
@@ -66,3 +67,4 @@ Tracks tests skipped during architecture refactor sprints. Each skip must list:
 | server/__tests__/C146_WorkshopAssistant-multiselect-session.test.ts > "n=3: duplicate selections collapse and re-emit when unique count is short" | S1 | S7-shape-codemod 2026-05-08 | same |
 | server/__tests__/D131_CraftsmanshipPromoter-session.test.ts > "cost-unaffordable: bottom-row majors filtered out" | S1 | S7-shape-codemod 2026-05-08 | same |
 | server/__tests__/B104_SheepWalker-session.test.ts > "forces animalReorg in last harvest even when no breeding occurs (single sheep)" | S1 → S7-shape (2026-05-08) | S7 Batch 1 (2026-05-08) | Engine pivot path fix (方案 X): leaf `ActionNode` now carries `emittedRequest` (mirrors `OrNode/XorNode/OptionalNode`) so `peekInteractionHost()` callers read `kind: 'animal-reorg'` regardless of host node type. Session-core's choice-branch animal-reorg pivot now uses uniform `getHostRequestKind(host)` discriminator. Root cause: `breedAction.execute` returns `{type:'request', request:{kind:'animal-reorg'}}` in round-14 enforce path, but bare `breed` leaf has no paired `InteractionNode` (no `resolveChoice` on the ActionDef → `buildFlowNode` skipped the wrap), so `applyInteractionRequest` fell back to `pendingNodeIdRef = ActionNode.id` and the request payload was lost. |
+| server/__tests__/E70_CropRotationField-session.test.ts > "fromSelectedFields rejects committing a different extra sow field" | S1 | S7 Batch 2 (2026-05-09) | Rewrite via public API: drive harvest path (round 4 + last grain → E70 onHarvestFieldPhase emits optional sow leaf with actionContext fromSelectedFields), confirm optional, then submit cross-card -1/69 — selectableFields filter rejects (resp.ok=false). No longer mutates session.pending / activeSpaceId. |
