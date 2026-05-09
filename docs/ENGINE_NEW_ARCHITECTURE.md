@@ -15,7 +15,7 @@
 
 它**不改变**：后端权威 / 全量快照 / WS 协议 / hook 系统 / 卡牌闭环原则 / 三层物理边界。
 
-> **当前 sprint 进度**（详见 §15）：S1 ✅（2026-05-03）/ S2 ✅（2026-05-05）/ S3 ✅（2026-05-04，PaymentSolver 收口）/ S4a ✅（2026-05-04）/ S4b ✅（2026-05-05，rich-node + step() dispatch + cursor round-trip 落地）/ S4c ✅（2026-05-08，Engine API 收敛 14 → 6 + mirror 字段删除 + engine.ts 447 行）/ S5 ✅（2026-05-06，RoomManager 拆 connection/persistence 三层）/ S6 ✅（2026-05-08，物理分层 + cards-display split + sandbox lazy + 5 ESLint error 级规则）/ S7 待启动。
+> **当前 sprint 进度**（详见 §15）：S1 ✅（2026-05-03）/ S2 ✅（2026-05-05）/ S3 ✅（2026-05-04，PaymentSolver 收口）/ S4a ✅（2026-05-04）/ S4b ✅（2026-05-05，rich-node + step() dispatch + cursor round-trip 落地）/ S4c ✅（2026-05-08，Engine API 收敛 14 → 6 + mirror 字段删除 + engine.ts 447 行）/ S5 ✅（2026-05-06，RoomManager 拆 connection/persistence 三层）/ S6 ✅（2026-05-08，物理分层 + cards-display split + sandbox lazy + 5 ESLint error 级规则）/ S7 ✅（2026-05-09，B104 引擎修复 + E70 public API rewrite + 825 cards-impl 桥清理；e2e smoke 暴露 S6c 残留 TDZ — 见 §15 deferred）。
 
 ---
 
@@ -1157,24 +1157,32 @@ S5 完成（2026-05-05）
 3. **codemod 一次性脚本**：`scripts/codemod-cards-display.ts` 完成施工后留作文档；新卡靠 ESLint 规则自然守门。
 4. **registry-display.ts seam**：S6c rule 8（impl 不 import cards-display）发现 7 effect + 3 session 文件确实 import cards-display 取 metadata，建立 `shared/cards/registry-display.ts` 作为前向 seam，避免 cycle 同时合规化。
 
-#### 已知遗留（S7 之前需要决定）
+#### 已知遗留（S6 closeout 时回流）
 
-S6 落地过程中出现 3 处 spec/plan 未预见的偏差，S6 closeout 时被 implementer 报告但未单独登记。回流如下：
+1. **cards-impl 文件 re-export 桥** — ✅ **已闭环（S7 Batch 3, 2026-05-09）**：`scripts/codemod-cards-display-redirect.ts` 重定向 ~85 caller 文件直接 import cards-display；`perl -i` 删除 825 cards-impl 文件的 `export { X }` 桥。callers grep 清干净，build/lint/test 全绿。
 
-1. **cards-impl 文件 re-export 桥** — `scripts/codemod-cards-display.ts` wet-run 后，`shared/cards/<deck>/<file>.ts` 的 `import { <Display> } from '../../cards-display/...'` 一行被 `perl -i` 跨 825 文件改成 `import { X } / export { X }` 对。原因：(a) 解 codemod 残留的 TS6133 unused import；(b) 让约 200+ 个 server tests + 散落 client/test 调用 `import { A1_Shelter } from '../../shared/cards/A/A1_Shelter'` 仍能 resolve 到 display const（透过 cards-impl 文件再 re-export）。**清理路径**：S7（或独立 codemod）把 server tests 的 `from '.../shared/cards/<deck>/<file>'` 重定向到 `from '.../shared/cards-display/<deck>/<file>'`，bridge 即可删除（grep `grep -rln "from '.*/shared/cards/[A-E]/[A-Z]" server/__tests__/` 列表约 100+ 文件）。
+2. **`shared/cards-display/major/**` 被 ESLint excluded** — major 卡（well.ts、fireplace.ts、joinery.ts 等 8 张）的 `onBuy` / `onPlay` hooks 是**内联实现**，违反 cards-display 纯 display 假设。S6c rule 7 给 `shared/cards-display/major/**` + `shared/cards-display/_lookup.ts` + `shared/cards-display/types.ts` 三个路径加了 `ignores` 豁免。**长期决策**：(a) 把 major hooks 抽到 `shared/cards/major/` impl 侧（需要新机制承载 hooks 数据）—— BGA 风格更纯；(b) 承认 major 卡是合法例外，将豁免登记为 ADR——更轻量但需写明。**S7 状态**：未变更（spec §0 已声明走 ADR，不进 sprint）。
 
-2. **`shared/cards-display/major/**` 被 ESLint excluded** — major 卡（well.ts、fireplace.ts、joinery.ts 等 8 张）的 `onBuy` / `onPlay` hooks 是**内联实现**，违反 cards-display 纯 display 假设。S6c rule 7 给 `shared/cards-display/major/**` + `shared/cards-display/_lookup.ts` + `shared/cards-display/types.ts` 三个路径加了 `ignores` 豁免。**长期决策**：(a) 把 major hooks 抽到 `shared/cards/major/` impl 侧（需要新机制承载 hooks 数据）—— BGA 风格更纯；(b) 承认 major 卡是合法例外，将豁免登记为 ADR——更轻量但需写明。
+3. **e2e workshop-smoke spec — Deferred（S7 Batch 4 实跑暴露 pre-existing TDZ bug）**：`e2e-tests/workshop-smoke.spec.ts` 在 sprint-S7 worktree 实跑（dev server BACKEND_PORT=5275 + vite --port 5273）发现页面无法渲染，浏览器控制台 3 次报 `ReferenceError: Cannot access 'majorCardDefinitions' before initialization`，stack 指向 `shared/cards-display/_lookup.ts:12`。**根因**：vite dev mode ESM 加载链中 `cards-display/_lookup.ts` (L6 import majorCardDefinitions, L7-12 import cards/catalog) 与 `cards/catalog.ts` (L5 import majorCardDefinitions from cards/major) 形成 TDZ — `_lookup` 在 `cards/major/index.ts` 完成 export 之前就尝试读 `majorCardDefinitions.map`。在回退到 commit `6b99c4fa`（仅含 Batch 1+2，无 Batch 3 改动）上同样复现，确认是 **S6c 残留**而非 S7 引入；S6c 未实跑掩盖了 bug。**清理路径**（独立任务）：消除 `cards-display/_lookup.ts` ↔ `cards/catalog.ts` ↔ `cards/major` 的循环；候选方案：(a) 把 majorCardDefinitions 移到 cards-display 侧（majors 已经"display 内联 hooks"，本就不该住 cards/）；(b) 抽出 `cards/major/_data.ts` 仅含数据数组，cards-display 和 cards/major 共同读它；(c) 拆分 _lookup 为 `_lookup-minor.ts` + `_lookup-major.ts`，让 minor lookup 与 major lookup 独立加载。需独立 brainstorm；不在 S7 范围。
 
-3. **e2e workshop-smoke spec 仅 TS 编译验证** — `e2e-tests/workshop-smoke.spec.ts` 已写但 S6c 未实跑（需要 dev server 启动）。当前 CI workflow（`.github/workflows/ci.yml`）不含 e2e job。**清理路径**：手动 `pnpm exec playwright test e2e-tests/workshop-smoke.spec.ts` 验证一次；如要纳入 CI 需新建 e2e workflow + dev server 启动逻辑。
+### Sprint S7（测试回归 + S6 已知遗留清理） ✅ 完成（2026-05-09）
 
-### Sprint S7：卡牌效果测试回归
+> **DoD 达成**：
+> - ✅ Batch 1: B104 SheepWalker last-harvest reorg 测试 unskip，方案 X（引擎路径修复 — `ActionNode.emittedRequest` 字段 + `getHostRequestKind(host)` helper，session-core choice 分支统一读 request kind）；commit `68e174de`
+> - ✅ Batch 2: E70 CropRotationField "rejects different extra sow field" 改写为 public API 驱动（harvest path → optional sow → 跨卡 -1/69 commit reject）；commit `6b99c4fa`
+> - ✅ Batch 3: cards re-export 桥清理 — `scripts/codemod-cards-display-redirect.ts` 重定向 ~85 callers + `perl -i` 删 825 cards-impl `export { X }` bridges；commits `0e9cd1fa` + `04f72fe8`
+> - ⚠️ Batch 4: e2e workshop-smoke 实跑**未通过** — 暴露 S6c pre-existing TDZ 循环依赖（已知遗留 #3 升级为 deferred bug，记入上文）
 
-解除整个重构期间累积的 skip：
+#### Sprint S7 关键演进
 
-- 走完 `docs/skip-tracker.md` 列出的所有 skip 卡牌
-- 每张卡按现行规则 codemod 调用方式（`confirmXxx` → `resolveChoice + payload`）
-- 卡牌实际行为退化（不是测试 codemod 出问题，是真规则坏了）记录到 `docs/card_progress.md` §5（刻意不同）或修复
-- 专项 DoD：`skip-tracker.md` 清空；254 个卡牌效果 session 测试全绿；fast + slow project 都全绿
+- 引擎层新字段 `ActionNode.emittedRequest`（mirror `OrNode/XorNode/OptionalNode`），让 leaf ActionNode 在没有 paired InteractionNode 时也能 surface request kind。session-core 的 animal-reorg pivot 现在用 uniform `getHostRequestKind(host)` 读取，不再依赖 `peekInteraction()` 是否返回 host frame。
+- skip-tracker.md Active 表清空（B104 + E70 都 Resolved，2 → 0）。
+- 新增 codemod `scripts/codemod-cards-display-redirect.ts`（TS Compiler API），可处理 display-only / impl-only / mixed binding 三种 import 形态，作为 cards-display 边界的稳定工具（TDD 保护 + dry-run/wet-run 双模式）。
+- 实测 e2e 暴露 vite dev TDZ —— 反向证明物理分层是必要的（_lookup 反向 import cards/catalog 是核心 anti-pattern）。
+
+#### Sprint S7 已知遗留
+
+- **e2e workshop-smoke vite dev 循环依赖**（已知遗留 #3 升级版）—— 见上文。需独立 brainstorm 修 `cards-display/_lookup.ts` 反向 import。在该 bug 修复之前，e2e workshop-smoke 不能加入 CI。
 
 ---
 
