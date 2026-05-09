@@ -579,13 +579,13 @@ WorkshopPage
 - 添加 `better-sqlite3`，创建 `server/db.ts` (schema 初始化)
 - 创建 `server/auth.ts` (register/login/session)
 - 添加认证中间件到 `server/index.ts`
-- 创建 `src/app/LoginPage.tsx` + `AuthContext`
+- 创建 `client/app/LoginPage.tsx` + `AuthContext`
 - 迁移房间持久化：JSON 文件 → SQLite
 - WebSocket 认证握手
 
 ### Phase 2: 大厅
 
-- 创建 `src/app/LobbyPage.tsx`
+- 创建 `client/app/LobbyPage.tsx`
 - 添加大厅 API 路由
 - 创建 `PageRouter` 替代 App.tsx 中的直接渲染
 - 房间列表/创建/加入 UI
@@ -594,12 +594,12 @@ WorkshopPage
 
 - 工坊 API 路由
 - `CustomCardRegistry` + DSL 运行器
-- `src/app/WorkshopPage.tsx` (浏览/编辑/沙盒)
+- `client/app/WorkshopPage.tsx` (浏览/编辑/沙盒)
 - 社交功能（点赞/评论）
 
 ### Phase 4: LLM 卡牌设计师
 
-- `src/services/llmService.ts` (浏览器端 LLM 调用)
+- `client/services/llmService.ts` (浏览器端 LLM 调用)
 - 系统提示词模板
 - AI 对话式设计 UI
 - 卡牌美术生成
@@ -620,8 +620,8 @@ WorkshopPage
 - `server/room-manager.ts` — JSON 持久化 → SQLite、认证集成
 - `shared/cards/card-effects.ts` — 自定义卡牌 try/catch 包裹
 - `shared/cards/catalog.ts` — fallback 到 custom registry
-- `src/App.tsx` — 包裹 AuthProvider + PageRouter
-- `src/app/GameContainerApi.tsx` — transport 添加 auth token
+- `client/App.tsx` — 包裹 AuthProvider + PageRouter
+- `client/app/GameContainerApi.tsx` — transport 添加 auth token
 
 **需新建：**
 
@@ -631,12 +631,12 @@ WorkshopPage
 - `server/lobby.ts` — 大厅 API
 - `shared/cards/custom-registry.ts` — 自定义卡牌注册
 - `shared/cards/custom-dsl-runner.ts` — DSL → ActionFlow 转换
-- `src/app/LoginPage.tsx` — 登录/注册页
-- `src/app/LobbyPage.tsx` — 大厅页
-- `src/app/WorkshopPage.tsx` — 工坊页
-- `src/app/PageRouter.tsx` — 页面路由
-- `src/contexts/AuthContext.tsx` — 认证 Context
-- `src/services/llmService.ts` — 浏览器端 LLM 调用
+- `client/app/LoginPage.tsx` — 登录/注册页
+- `client/app/LobbyPage.tsx` — 大厅页
+- `client/app/WorkshopPage.tsx` — 工坊页
+- `client/app/PageRouter.tsx` — 页面路由
+- `client/contexts/AuthContext.tsx` — 认证 Context
+- `client/services/llmService.ts` — 浏览器端 LLM 调用
 
 ---
 
@@ -661,7 +661,7 @@ WorkshopPage
 
 | 功能                             | 文件                                                                                                                           |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| 注册/登录/登出/会话验证                  | `server/auth.ts`, `src/app/LoginPage.tsx`, `src/contexts/AuthContext.tsx`                                                    |
+| 注册/登录/登出/会话验证                  | `server/auth.ts`, `client/app/LoginPage.tsx`, `client/contexts/AuthContext.tsx`                                                    |
 | SQLite 数据库 + migration (v1-v3) | `server/db.ts`                                                                                                               |
 | WebSocket 认证握手                 | `server/room-manager.ts`, `shared/protocol/ws.ts`                                                                            |
 | WS 房间 → SQLite 写入              | `server/room-manager.ts` (ensureRoomRowSqlite, upsertRoomPlayer)                                                             |
@@ -669,14 +669,14 @@ WorkshopPage
 | 游戏状态持久化（JSON/SQLite）           | `server/room-manager.ts` (PERSIST_ROOMS 环境变量)                                                                                |
 | 游戏结束更新房间状态                     | `server/room-manager.ts` (broadcastState → rooms.status=finished)                                                            |
 | 房间 TTL 清理                      | `server/room-manager.ts` (startRoomCleanup, 30min TTL)                                                                       |
-| 大厅页面                           | `src/app/LobbyPage.tsx`, `/api/lobby/my-rooms`                                                                               |
-| 页面路由 (?page=)                  | `src/app/PageRouter.tsx`                                                                                                     |
-| URL params 实时读取                | `src/app/GameContainerApi.tsx` (移出模块级)                                                                                       |
-| 返回大厅按钮                         | `src/components/header/GameHeader.tsx`                                                                                       |
-| Dev 模式默认关闭                     | `src/app/GameContainerApi.tsx` (?devMode=1)                                                                                  |
-| Auth 401 自动登出                  | `src/contexts/AuthContext.tsx` (apiFetch)                                                                                    |
+| 大厅页面                           | `client/app/LobbyPage.tsx`, `/api/lobby/my-rooms`                                                                               |
+| 页面路由 (?page=)                  | `client/app/PageRouter.tsx`                                                                                                     |
+| URL params 实时读取                | `client/app/GameContainerApi.tsx` (移出模块级)                                                                                       |
+| 返回大厅按钮                         | `client/components/header/GameHeader.tsx`                                                                                       |
+| Dev 模式默认关闭                     | `client/app/GameContainerApi.tsx` (?devMode=1)                                                                                  |
+| Auth 401 自动登出                  | `client/contexts/AuthContext.tsx` (apiFetch)                                                                                    |
 | 游戏中玩家名与登录用户同步                  | `server/game-session.ts` (updatePlayerName), `server/room-manager.ts`, `server/game-router.ts`                               |
-| 工坊卡牌 CRUD                      | `server/workshop.ts`, `src/app/WorkshopPage.tsx`                                                                             |
+| 工坊卡牌 CRUD                      | `server/workshop.ts`, `client/app/WorkshopPage.tsx`                                                                             |
 | 工坊社交（点赞/评论）                    | `server/workshop.ts`                                                                                                         |
 | 工坊沙盒                           | `server/workshop.ts`, WorkshopPage SandboxView                                                                               |
 | 自定义 DSL 效果系统                   | `shared/cards/custom-dsl-runner.ts`                                                                                          |
@@ -689,12 +689,12 @@ WorkshopPage
 | 多 LLM Provider 支持              | Gemini / OpenRouter / DeepSeek / AiHubMix；完整模型表见 §C1.1                                                                       |
 | API Key 浏览器隔离                  | localStorage 存储，绝不发往服务器                                                                                                      |
 | 卡牌美术生成 + 上传                    | Gemini / OpenRouter / AiHubMix 图片模型 + `POST /api/workshop/art` + `/card-art/` 静态服务                                           |
-| 资源图标解析                         | `src/components/common/ResourceText.tsx`                                                                                     |
+| 资源图标解析                         | `client/components/common/ResourceText.tsx`                                                                                     |
 | auth/workshop 单元测试             | `server/__tests__/auth.test.ts`, `workshop-api.test.ts`                                                                      |
 | TypeScript AST 验证 + VM 沙盒      | `server/ast-validator.ts`, `server/card-compiler.ts`, WorkshopPage 代码模式                                                      |
 | 卡牌版本历史                         | `workshop_card_versions` 表, versions/revert API, WorkshopPage 版本面板                                                           |
 | 工坊精选页面                         | `workshop_cards.featured` 列, admin 精选切换, Featured 标签页                                                                        |
-| 生产部署 (Docker + GitHub Pages)   | `Dockerfile`, `docker-compose.yml`, `.github/workflows/deploy-pages.yml`, `src/config.ts`                                    |
+| 生产部署 (Docker + GitHub Pages)   | `Dockerfile`, `docker-compose.yml`, `.github/workflows/deploy-pages.yml`, `client/config.ts`                                    |
 | 管理员角色                          | `server/auth.ts` isAdmin(), `ADMIN_USERS` 环境变量                                                                               |
 | 管理员 API                        | `GET/DELETE /api/admin/cards`, `GET /api/admin/cards/:id/export`, `POST /api/admin/cards/:id/status`, `GET /api/admin/users` |
 | 卡牌发布/取消发布                      | `server/workshop.ts` draft→published 状态切换, 详情页发布按钮, 非作者只能看到已发布卡牌                                                             |

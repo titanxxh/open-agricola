@@ -21,7 +21,7 @@ Open Agricola——React + TypeScript + Vite 前端 + Node.js WebSocket/HTTP 后
 ```
 shared/    纯领域逻辑（无 React、无 Node API），前后端共用
 server/    后端：HTTP + WebSocket 服务，权威状态
-src/       前端：React UI、transport 抽象、hooks
+client/    前端：React UI、transport 抽象、hooks
 ```
 
 ## 架构详解
@@ -58,7 +58,7 @@ src/       前端：React UI、transport 抽象、hooks
 - `computeCosts`、`computeArgs`、`computeReplace`——行动定制
 - `isDoable`——可用性覆盖
 
-### Transport 抽象（`src/services/`）
+### Transport 抽象（`client/services/`）
 
 `GameTransport` 接口统一 HTTP 和 WebSocket。两种实现：
 
@@ -97,7 +97,7 @@ effect禁止膨胀！
 
 - `shared/cards/custom-registry.ts`——运行时自定义卡牌注册
 - `shared/cards/custom-dsl-runner.ts`——DSL → ActionFlow（仅白名单行动）
-- 工坊 UI 在 `src/app/WorkshopPage.tsx`，含 LLM 辅助卡牌设计（`src/app/workshop/AiCardDesigner.tsx`）
+- 工坊 UI 在 `client/app/WorkshopPage.tsx`，含 LLM 辅助卡牌设计（`client/app/workshop/AiCardDesigner.tsx`）
 - 卡牌美术上传到 `/api/workshop/art`，从 `/card-art/` 提供
 - LLM API key **仅**存在浏览器 `localStorage`——服务端不见
 
@@ -303,7 +303,7 @@ gh run view <RUN_ID> --log-failed
 ### 前端：GitHub Pages（自动）
 
 - Workflow：`.github/workflows/deploy-pages.yml`，触发分支 `main` / `ui`。
-- 触发路径：`src/**`、`shared/**`、`public/**`、`index.html`、`vite.config.ts`、`package.json`、workflow 本身。只改文档不会触发。
+- 触发路径：`client/**`、`shared/**`、`public/**`、`index.html`、`vite.config.ts`、`package.json`、workflow 本身。只改文档不会触发。
 - 必要时用 workflow_dispatch 手动重跑：
   ```bash
   curl -X POST -H "Authorization: Bearer $GH_TOKEN" \
