@@ -22,6 +22,7 @@
 
 `server/custom-code/engine.ts` 往 isolate 注入以下全局：
 
+<!-- prompt-sync:begin id=sandbox-injections -->
 
 | 全局                                       | 形态      | 备注                                                                                 |
 | ---------------------------------------- | ------- | ---------------------------------------------------------------------------------- |
@@ -35,6 +36,8 @@
 | `getCardDefinition(cardId)`              | 函数 stub | 沙盒里始终返回 `null`（无法访问卡牌注册表）                                                          |
 | `getCardStack(player, cardId)`           | 函数      | 读取 `player.cardStates[cardId].stack` 的浅拷贝                                          |
 | `readCardExtraData(player, cardId)`      | 函数      | 读取 `player.cardStates[cardId].extraData` 的浅拷贝                                      |
+
+<!-- prompt-sync:end id=sandbox-injections -->
 
 
 **不再注入** `registerCardEffect` / `registerCardListener`。新契约通过 `CARD_DEF` + `CARD_IMPL` 双常量导出（见 §7）。
