@@ -24,6 +24,10 @@ const REPO_ROOT = resolve(__dirname, '../../..')
 // This catches drift between the inline patcher (`patchRegisterAll` /
 // `patchCommunityAutoCatalog`) and the canonical scanner in
 // `generate-register-all.ts`.
+//
+// Note: docs/community_cards.md is patched by patchCommunityCardsMarkdown but
+// has no scanner equivalent in generate-register-all.ts, so it's not asserted
+// here — diff would be vacuous.
 describe('PR files self-consistency (S9-B2)', () => {
   it(
     'generated 6 files compile under tsc + auto-catalog matches generate-register-all rerun',
@@ -100,6 +104,11 @@ const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { 
           /"tsBuildInfoFile"\s*:\s*"[^"]*"/,
           '"tsBuildInfoFile": "./tsbuildinfo.app"',
         )
+        if (tscfgPatched === tscfgRaw) {
+          throw new Error(
+            'tsconfig.app.json missing tsBuildInfoFile field — symlink to node_modules would be polluted',
+          )
+        }
         writeFileSync(join(tmp, 'tsconfig.app.json'), tscfgPatched, 'utf-8')
 
         // Apply generated files
