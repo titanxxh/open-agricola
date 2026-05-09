@@ -56,12 +56,10 @@ function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): Cus
   const result: CustomCardData[] = []
   for (const dbId of cardDbIds) {
     const row = db.prepare(
-      'SELECT card_type, card_json, effect_code, compiled_code, code_manifest, art_url, status, author_id FROM workshop_cards WHERE id = ?',
+      'SELECT card_type, card_json, code_manifest, art_url, status, author_id FROM workshop_cards WHERE id = ?',
     ).get(dbId) as {
       card_type: string
       card_json: string
-      effect_code: string | null
-      compiled_code: string | null
       code_manifest: string | null
       art_url: string | null
       status: string
@@ -71,11 +69,14 @@ function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): Cus
     const allowed = row.status === 'published' || (row.status === 'draft' && requestUserId === row.author_id)
     if (!allowed) continue
     try {
+      const parsed = JSON.parse(row.card_json) as Record<string, unknown>
+      const effectCode = typeof parsed._code === 'string' ? parsed._code : null
+      const compiledCode = typeof parsed._compiled === 'string' ? parsed._compiled : null
       result.push({
         cardType: row.card_type as 'minor' | 'occupation',
-        cardJson: JSON.parse(row.card_json),
-        effectCode: row.effect_code ?? null,
-        compiledCode: row.compiled_code ?? null,
+        cardJson: parsed as unknown as CustomCardData['cardJson'],
+        effectCode,
+        compiledCode,
         codeManifest: row.code_manifest ? JSON.parse(row.code_manifest) as CustomCodeManifest : null,
         artUrl: row.art_url ?? null,
       })
