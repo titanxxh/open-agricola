@@ -294,7 +294,7 @@ for n in 2 3 4; do
   fi
   echo "  ${n}-player room (room=dev${n})${marker}"
   for ((i = 1; i <= n; i += 1)); do
-    echo "    P${i}: http://${LAN_IP}:5173/?player=p${i}&transport=ws&room=dev${n}"
+    echo "    P${i}: http://${LAN_IP}:5173/?player=p${i}&transport=ws&room=dev${n}&devMode=1"
   done
 done
 echo ""
