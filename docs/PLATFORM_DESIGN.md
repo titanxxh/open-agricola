@@ -363,7 +363,7 @@ LLM 输出 **TypeScript 源码**（包含 `CARD_DEF` 定义、`CARD_IMPL.effect`
 
 **2. 编译** — `server/custom-code/compiler.ts`
 
-AST 验证通过后，`ts.transpileModule()` 将 TypeScript 编译为 CommonJS JS。数据库中 `card_json` 列只存储 `CARD_DEF` 的 JSON 序列化（卡牌元数据），TypeScript 源码存入 `effect_code` 列，编译后的 JS 存入 `compiled_code` 列，三者分列存储。
+AST 验证通过后，`ts.transpileModule()` 将 TypeScript 编译为 CommonJS JS。数据库 `card_json` 列存所有自定义代码相关数据（CARD_DEF 元数据 + TypeScript 源码 + 编译后 JS + manifest）。早期 v1-v3 schema 有独立的 `effect_dsl` / `effect_code` / `compiled_code` 列（V1 DSL 设计遗留），migration v7 已全部 DROP，统一聚合到 `card_json`。
 
 **3. 沙盒执行** — `server/custom-code/{engine, executor-worker, isolate-runner, runtime}.ts`
 
@@ -409,7 +409,7 @@ export function getMinorImprovementCard(id: string) {
 1. 创建房间时可选 "启用工坊卡牌"（WS `createRoom.customCardIds` / HTTP `/api/game/new-sandbox`）
 2. `GameSession` 构造时从数据库加载房间关联的自定义卡牌
 3. 从 `card_json` 反序列化为 `MinorImprovement`/`Occupation` 实例，调用 `registerCustomCard()`
-4. `server/custom-code/runtime.ts` 的 `registerExecutorBackedCustomCard()` 从 `compiled_code`（编译后 JS）+ `code_manifest` 注入 effect hook 和 listener，通过 `invokeCustomCodeEffectSync` / `invokeCustomCodeListenerSync` 委托给 Worker Thread + isolated-vm 执行
+4. `server/custom-code/runtime.ts` 的 `registerExecutorBackedCustomCard()` 从 `card_json` 中的编译产物 + manifest 注入 effect hook 和 listener，通过 `invokeCustomCodeEffectSync` / `invokeCustomCodeListenerSync` 委托给 Worker Thread + isolated-vm 执行
 5. 将自定义卡牌 ID 加入发牌池
 
 ### D3. 沙盒隔离与容错
