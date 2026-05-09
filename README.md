@@ -1,124 +1,97 @@
 # Open Agricola
 
-基于 React + TypeScript + Vite 的 Agricola 桌游在线实现。后端权威状态 + WebSocket 实时同步，支持多人对局。
+后端权威 + WebSocket 实时多人同步的 Agricola 桌游在线复刻。
 
-## 快速开始
+[![CI](https://github.com/titanxxh/open-agricola/actions/workflows/ci.yml/badge.svg)](https://github.com/titanxxh/open-agricola/actions)
+[![Pages Deploy](https://github.com/titanxxh/open-agricola/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/titanxxh/open-agricola/actions/workflows/deploy-pages.yml)
+[![License: Apache 2.0](https://img.shields.io/github/license/titanxxh/open-agricola)](LICENSE)
+[![Live Demo](https://img.shields.io/badge/demo-live-success)](https://titanxxh.github.io/open-agricola/)
 
-本地开发请使用 Node.js 22。仓库里的原生依赖（例如 `better-sqlite3`）会按当前 Node ABI 编译；如果依赖用 Node 22 安装，却用 Node 20 启动后端，会出现 `NODE_MODULE_VERSION` 不匹配。
+> **Disclaimer**: Open Agricola is a fan-made implementation. Agricola is © Uwe Rosenberg / Lookout Spiele / Z-Man Games. This project is not affiliated with or endorsed by the rights holders.
+
+## Features
+
+- **LLM-Assisted Card Design** — 浏览器内调用 LLM 设计自定义卡牌，自动生成卡牌艺术，PR 一键提交到工坊
+- 后端权威 + WebSocket 实时多人同步
+- 248+ 张原版 Agricola 卡（接近 BGA 完整集）
+- 一键 Docker 自部署（自建 VPS + GitHub Pages 双部署）
+- 自定义代码沙盒（TypeScript AST 校验 + VM 隔离执行）
+
+## Live Demo
+
+https://titanxxh.github.io/open-agricola/
+
+<!-- TODO: 截图占位（后续 PR 补） -->
+
+## Quick Start
+
+前置：Node.js 22 + pnpm（项目 `package.json` 的 `packageManager` 字段已锁定 pnpm 版本）。`better-sqlite3` 等原生依赖按 Node ABI 编译，Node 20 启动会出现 `NODE_MODULE_VERSION` 不匹配。
 
 ```bash
 pnpm install
+./restart-intranet.sh    # 同时启动后端 (5175) + 前端 (5173)
 ```
 
-### 启动后端 + 前端
+或分开启动：
 
 ```bash
-./restart-intranet.sh
+pnpm run server          # 后端 5175
+pnpm run dev             # 前端 5173
 ```
 
-如果当前 shell 默认不是 Node 22，请先用本机的版本管理工具切到 Node 22（例如 `asdf local nodejs 22.x`、`nvm use 22` 或 Volta 配置），再启动：
-
-```bash
-node --version  # 应为 v22.x
-./restart-intranet.sh
-```
-
-或分别启动：
-
-```bash
-# 后端（端口 5175）
-pnpm run server
-
-# 前端（端口 5173）
-pnpm run dev
-```
-
-### 打开游戏
-
-启动后，在浏览器中打开多个窗口进行对局：
-
-**WS 多人模式**（推荐）：
+WS 多人模式（推荐）——浏览器开两个窗口：
 
 ```
 玩家 1：http://<host>:5173/?player=p1&transport=ws
 玩家 2：http://<host>:5173/?player=p2&transport=ws
 ```
 
-P1 自动创建房间并等待，P2 自动发现房间并加入。双方就绪后游戏开始，操作实时同步。
+P1 自动创建房间，P2 自动加入，操作实时同步。
 
-- 在同一台机器本地调试时，`<host>` 通常就是 `localhost`。
-- 在局域网 / WSL intranet 场景下，优先使用 `./restart-intranet.sh` 输出的地址。
+## URL Parameters
 
-**HTTP 单机模式**（调试用）：
+| 参数 | 说明 |
+|---|---|
+| `player=p1` / `player=p2` | 锁定玩家视角 |
+| `transport=ws` | 启用 WebSocket 实时同步 |
+| `room=<id>` | 加入指定房间 |
+| `devMode=1` | 启用开发者面板（资源编辑、回合跳转、卡牌工具） |
+| `customCards=id1,id2` | 创建 WS 房间时加载工坊卡 ID |
+| `page=workshop` | 打开工坊页面 |
 
-```
-http://<host>:5173/?player=p1
-```
-
-HTTP 模式使用单例 GameSession，适合单人调试。
-
-### URL 参数
-
-
-| 参数                        | 说明                |
-| ------------------------- | ----------------- |
-| `player=p1` / `player=p2` | 锁定玩家视角            |
-| `transport=ws`            | 启用 WebSocket 实时同步 |
-| `room=<id>`               | 加入指定房间（P2 用）      |
-| `devMode=1`               | 启用开发者面板           |
-
-
-## 项目结构
+## Project Structure
 
 ```
-shared/           前后端共用
-  engine/         Flow 节点树引擎
-  actions/        行动定义与效果
-  cards/          卡牌定义（248 张）
-  game/           领域模型、状态、序列化
-  logic/          状态初始化、计分、格式化
-  protocol/       WS/HTTP 共享协议类型
-  i18n/           多语言文案
-
-server/           后端
-  index.ts        HTTP + WS 服务入口
-  game-session.ts 权威状态（唯一写入入口）
-  room-manager.ts WS 房间管理与广播
-  game-router.ts  HTTP REST API
-
-client/              前端 (React)
-  app/            主容器 GameContainerApi
-  components/     UI 组件
-  hooks/          状态管理 hooks
-  services/       GameTransport (HTTP/WS)
+shared/    前后端共用：领域模型、引擎、卡牌、行动、协议
+server/    后端：HTTP + WebSocket，权威状态
+client/    前端：React UI、transport 抽象、hooks
+docs/      架构、部署、平台设计、卡牌进度
 ```
 
-## 命令
+## Tech Stack
 
-```bash
-pnpm test            # 单元测试（vitest）
-pnpm run test:e2e    # E2E 测试（Playwright）
-pnpm run lint        # ESLint
-pnpm run build       # TypeScript + Vite 构建
-```
+![Node](https://img.shields.io/badge/node-22-brightgreen)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
+![React](https://img.shields.io/badge/React-19-61dafb)
+![Vite](https://img.shields.io/badge/Vite-7-646cff)
+![pnpm](https://img.shields.io/badge/pnpm-10-f69220)
 
-## 架构
+后端 Node.js + WebSocket + SQLite（better-sqlite3）；前端 React 19 + Vite 7 + TypeScript。
 
-详见 `docs/ENGINE_ARCHITECTURE.md`。
+## Documentation
 
-核心设计：
+| Topic | Doc |
+|---|---|
+| Architecture | [docs/ENGINE_ARCHITECTURE.md](docs/ENGINE_ARCHITECTURE.md) |
+| Deployment | [docs/HOW_TO_DEPLOY.md](docs/HOW_TO_DEPLOY.md) |
+| Platform & Workshop | [docs/PLATFORM_DESIGN.md](docs/PLATFORM_DESIGN.md) |
+| Card Test Template | [docs/CARD_TEST_TEMPLATE.md](docs/CARD_TEST_TEMPLATE.md) |
+| Card Implementation Progress | [docs/card_progress.md](docs/card_progress.md) |
 
-- **后端权威**：`GameSession` 是唯一可写入 `GameState` 的入口
-- **命令驱动**：前端发送 `ClientCommand`，后端执行后广播 `StateUpdateEnvelope`
-- **全量快照同步**：每次状态变更广播完整序列化状态给所有客户端
-- **Transport 抽象**：`GameTransport` 接口统一 HTTP/WS，前端代码无需感知传输层
+## Contributing
 
-## 开发者模式
+PRs welcome. Commit 标题规范：`feat: ...` / `fix: ...` / `refactor: ...` / `docs: ...`，message 用英文。AI 协作约束（卡牌实现规范、文档同步硬规则、测试边界）见 [AGENTS.md](AGENTS.md)。
 
-URL 加 `?devMode=1` 或在界面中开启，可使用：
+## License
 
-- 资源编辑、回合跳转、卡牌发放/打出
-- 围栏快速创建
-- 状态导出/导入
-- 种子指定重开（Reset）
-
+[Apache 2.0](LICENSE)。fan project disclaimer + BGA studio attribution 见 [NOTICE](NOTICE)。
