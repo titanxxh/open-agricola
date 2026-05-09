@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { D75_WoodField } from '../../shared/cards/D/D75_WoodField'
+import { D75_WoodField } from '../../shared/cards-display/D/D75_WoodField'
 import { getMinorImprovementCard, isFieldCard, implementedMinorImprovementCards } from '../../shared/cards/catalog'
 
 describe('D75_WoodField (Sprint 7d isField stub)', () => {

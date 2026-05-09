@@ -5,7 +5,7 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/D/D154_ChimneySweep'
 import '../../shared/cards/A/A87_Conservator'
-import { D154_ChimneySweep } from '../../shared/cards/D/D154_ChimneySweep'
+import { D154_ChimneySweep } from '../../shared/cards-display/D/D154_ChimneySweep'
 
 const CARD_ID = 'D154_ChimneySweep'
 

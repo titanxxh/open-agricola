@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
+import { A123_FrameBuilder } from '../../shared/cards-display/A/A123_FrameBuilder'
 import type { ActionChoiceOption,  PlayerState } from '../../shared/contract/types.ts'
 
 import { setWorkersAtHome } from '../../shared/domain/player'

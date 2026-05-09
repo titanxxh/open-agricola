@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { B52_GrowingFarm } from '../../shared/cards/B/B52_GrowingFarm'
+import { B52_GrowingFarm } from '../../shared/cards-display/B/B52_GrowingFarm'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 describe('B52_GrowingFarm prerequisite', () => {

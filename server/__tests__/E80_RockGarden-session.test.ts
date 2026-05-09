@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { E80_RockGarden } from '../../shared/cards/E/E80_RockGarden'
+import { E80_RockGarden } from '../../shared/cards-display/E/E80_RockGarden'
 import { getMinorImprovementCard, isFieldCard, implementedMinorImprovementCards } from '../../shared/cards/catalog'
 
 describe('E80_RockGarden (Sprint 7d isField stub)', () => {

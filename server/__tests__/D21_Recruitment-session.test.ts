@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
-import { D21_Recruitment } from '../../shared/cards/D/D21_Recruitment'
+import { D21_Recruitment } from '../../shared/cards-display/D/D21_Recruitment'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 

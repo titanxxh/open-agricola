@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { A22_Telegram } from '../../shared/cards/A/A22_Telegram'
+import { A22_Telegram } from '../../shared/cards-display/A/A22_Telegram'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { maxFences } from '../../shared/actions/effects/fencing'
 import type { FenceSegment } from '../../shared/contract/types'

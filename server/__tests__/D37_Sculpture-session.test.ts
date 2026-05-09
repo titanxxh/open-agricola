@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 import '../../shared/cards/D/D37_Sculpture'
-import { D37_Sculpture } from '../../shared/cards/D/D37_Sculpture'
+import { D37_Sculpture } from '../../shared/cards-display/D/D37_Sculpture'
 
 describe('D37_Sculpture session', () => {
   const setup = () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { D155_Ebonist } from '../../shared/cards/D/D155_Ebonist'
+import { D155_Ebonist } from '../../shared/cards-display/D/D155_Ebonist'
 
 const CARD_ID = 'D155_Ebonist'
 
