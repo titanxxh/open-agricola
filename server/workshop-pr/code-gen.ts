@@ -417,6 +417,69 @@ function normalizeWorkshopEffectCode(
   }
 }
 
+/**
+ * Extract a top-level const VariableStatement by name from sandbox source.
+ */
+function findTopLevelConst(
+  sf: ts.SourceFile,
+  name: string,
+): ts.VariableStatement | null {
+  for (const stmt of sf.statements) {
+    if (!ts.isVariableStatement(stmt)) continue
+    const decl = stmt.declarationList.declarations[0]
+    if (!decl || !ts.isIdentifier(decl.name)) continue
+    if (decl.name.text === name) return stmt
+  }
+  return null
+}
+
+function printStatements(sf: ts.SourceFile, stmts: ts.Statement[]): string {
+  if (stmts.length === 0) return ''
+  const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
+  return stmts
+    .map((s) => printer.printNode(ts.EmitHint.Unspecified, s, sf))
+    .join('\n')
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) =>
+      String.fromCodePoint(parseInt(hex, 16)),
+    )
+}
+
+export function extractCardDefSource(source: string): string {
+  const sf = ts.createSourceFile(
+    'in.ts',
+    source,
+    ts.ScriptTarget.ES2022,
+    true,
+    ts.ScriptKind.TS,
+  )
+  const cardId = findTopLevelConst(sf, 'CARD_ID')
+  const cardDef = findTopLevelConst(sf, 'CARD_DEF')
+  if (!cardDef) {
+    throw new Error('CARD_DEF top-level const not found in workshop code')
+  }
+  const stmts: ts.Statement[] = []
+  if (cardId) stmts.push(cardId)
+  stmts.push(cardDef)
+  return printStatements(sf, stmts)
+}
+
+export function extractCardImplSource(source: string): string {
+  const sf = ts.createSourceFile(
+    'in.ts',
+    source,
+    ts.ScriptTarget.ES2022,
+    true,
+    ts.ScriptKind.TS,
+  )
+  const cardId = findTopLevelConst(sf, 'CARD_ID')
+  const cardImpl = findTopLevelConst(sf, 'CARD_IMPL')
+  if (!cardImpl) return 'const CARD_IMPL = {}'
+  const stmts: ts.Statement[] = []
+  if (cardId) stmts.push(cardId)
+  stmts.push(cardImpl)
+  return printStatements(sf, stmts)
+}
+
 export function generateMainCardFile(
   wcard: WorkshopCardForGen & { card_json?: string },
   ctx: { githubLogin: string; iso: string },
