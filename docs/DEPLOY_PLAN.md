@@ -125,14 +125,14 @@ docs
 ### 1. 前端：API 地址可配置
 
 **涉及文件：**
-- `src/contexts/AuthContext.tsx` — `apiFetch()` 需要用 `import.meta.env.VITE_API_BASE` 作为 base URL
-- `src/services/gameTransport.ts` — HTTP/WS 连接地址需要可配置
-- `src/app/WorkshopPage.tsx` — workshop API 调用
-- `src/app/LobbyPage.tsx` — lobby API 调用
-- `src/app/SettingsPage.tsx` — settings API 调用
-- `src/app/GameContainerApi.tsx` — game API 调用
+- `client/contexts/AuthContext.tsx` — `apiFetch()` 需要用 `import.meta.env.VITE_API_BASE` 作为 base URL
+- `client/services/gameTransport.ts` — HTTP/WS 连接地址需要可配置
+- `client/app/WorkshopPage.tsx` — workshop API 调用
+- `client/app/LobbyPage.tsx` — lobby API 调用
+- `client/app/SettingsPage.tsx` — settings API 调用
+- `client/app/GameContainerApi.tsx` — game API 调用
 
-**方案：** 创建一个 `src/config.ts` 导出 `API_BASE` 和 `WS_BASE`：
+**方案：** 创建一个 `client/config.ts` 导出 `API_BASE` 和 `WS_BASE`：
 
 ```typescript
 export const API_BASE = import.meta.env.VITE_API_BASE || ''  // 开发时空字符串=同源
@@ -202,7 +202,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [platform]
-    paths: ['src/**', 'shared/**', 'index.html', 'vite.config.ts']
+    paths: ['client/**', 'shared/**', 'index.html', 'vite.config.ts']
 
 jobs:
   deploy:
@@ -293,10 +293,10 @@ api.your-domain.com {
 | `docker-compose.yml` | 新建 | 单服务 + volume |
 | `.dockerignore` | 新建 | 排除不需要的文件 |
 | `.env.example` | 新建 | 环境变量模板 |
-| `src/config.ts` | 新建 | API_BASE / WS_BASE 配置 |
-| `src/contexts/AuthContext.tsx` | 修改 | 使用 API_BASE |
-| `src/services/gameTransport.ts` | 修改 | 使用 API_BASE / WS_BASE |
-| `src/app/*.tsx` | 修改 | API 调用使用 API_BASE |
+| `client/config.ts` | 新建 | API_BASE / WS_BASE 配置 |
+| `client/contexts/AuthContext.tsx` | 修改 | 使用 API_BASE |
+| `client/services/gameTransport.ts` | 修改 | 使用 API_BASE / WS_BASE |
+| `client/app/*.tsx` | 修改 | API 调用使用 API_BASE |
 | `server/index.ts` | 修改 | CORS origin 可配置 |
 | `vite.config.ts` | 修改 | BGA 图片构建时复制 |
 | `.github/workflows/deploy-pages.yml` | 新建（可选） | GitHub Actions 自动部署 |
