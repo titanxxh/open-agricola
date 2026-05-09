@@ -439,6 +439,7 @@ function printStatements(sf: ts.SourceFile, stmts: ts.Statement[]): string {
   return stmts
     .map((s) => printer.printNode(ts.EmitHint.Unspecified, s, sf))
     .join('\n')
+    .replace(/;$/gm, '')
     .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) =>
       String.fromCodePoint(parseInt(hex, 16)),
     )
