@@ -1,7 +1,6 @@
 import { collectCardsAs } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
 import { A31_DebtSecurity } from '../../cards-display/A/A31_DebtSecurity'
-export { A31_DebtSecurity }
 
 const CARD_ID = A31_DebtSecurity.id
 

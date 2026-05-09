@@ -201,8 +201,7 @@ export function engineProceed(
       actionContext: undefined,
     }
     const compositePromptKey = node.promptKey ?? 'ui.interactionFlowSelect'
-    // S2 Task 8: write emit metadata to the OrNode/XorNode itself instead
-    // of the engine-level lastEmittedChoice cache.
+    // S2 Task 8: write emit metadata to the OrNode/XorNode itself.
     node.emittedChoices = options
     node.emittedPromptKey = compositePromptKey
     node.emittedPromptParams = undefined
@@ -292,8 +291,7 @@ export function engineProceed(
       },
       { value: '__skip__', labelKey: 'ui.interactionOptionalSkip' },
     ]
-    // S2 Task 8: write emit metadata to the OptionalNode itself instead
-    // of the engine-level lastEmittedChoice cache.
+    // S2 Task 8: write emit metadata to the OptionalNode itself.
     node.emittedChoices = optionalOptions
     node.emittedPromptKey = optionalPromptKey
     node.emittedPromptParams = undefined
@@ -634,6 +632,16 @@ export function engineProceed(
         actionContext: executionContext.actionContext,
         contextWritePatch,
       })
+      // S7 Batch 1: when no InteractionNode is paired with this ActionNode
+      // (no resolveChoice on the ActionDef → buildFlowNode emitted a bare
+      // ActionNode), `applyInteractionRequest` only sets
+      // `pendingNodeIdRef = node.id` and the request payload would otherwise
+      // be lost. Mirror the request onto the ActionNode itself so
+      // `peekInteractionHost()` callers (e.g. session-core's choice-step
+      // animal-reorg pivot) can read the kind regardless of host node type.
+      if (!choiceNode && node instanceof ActionNode) {
+        node.emittedRequest = updatedRequest
+      }
       if (duringActivateNodes.length > 0) {
         int.tree.insertAfter(node.id, [...duringActivateNodes])
       }

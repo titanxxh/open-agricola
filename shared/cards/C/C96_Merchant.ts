@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payThenActionFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C96_Merchant } from '../../cards-display/C/C96_Merchant'
-export { C96_Merchant }
 
 const CARD_ID = C96_Merchant.id
 

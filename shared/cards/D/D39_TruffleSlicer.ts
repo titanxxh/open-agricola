@@ -4,7 +4,6 @@ import { payLeaf } from '../helpers/pay-gain-node'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { D39_TruffleSlicer } from '../../cards-display/D/D39_TruffleSlicer'
-export { D39_TruffleSlicer }
 
 const CARD_ID = D39_TruffleSlicer.id
 

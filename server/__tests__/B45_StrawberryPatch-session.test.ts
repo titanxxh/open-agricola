@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { B45_StrawberryPatch } from '../../shared/cards/B/B45_StrawberryPatch'
+import { B45_StrawberryPatch } from '../../shared/cards-display/B/B45_StrawberryPatch'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 describe('B45_StrawberryPatch prerequisite', () => {

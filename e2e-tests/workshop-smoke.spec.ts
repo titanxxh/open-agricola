@@ -17,7 +17,10 @@ test('workshop opens with lazy-loaded sandbox bundle', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
 
-  await page.goto('/?page=workshop')
+  // `?player=p1&devMode=1` triggers AuthContext's dev shortcut so PageRouter
+  // routes to workshop instead of forcing LoginPage. The sandbox lazy chunk
+  // is still fetched on first navigation, not at app boot.
+  await page.goto('/?page=workshop&player=p1&devMode=1')
 
   // The sandbox-loading fallback may or may not be observable depending on how
   // fast the lazy chunk resolves. We only require the workshop root to land.

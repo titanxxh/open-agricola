@@ -2,7 +2,6 @@ import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-me
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { D47_Churchyard } from '../../cards-display/D/D47_Churchyard'
-export { D47_Churchyard }
 
 const CARD_ID = D47_Churchyard.id
 

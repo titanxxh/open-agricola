@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B40_BreweryPond } from '../../cards-display/B/B40_BreweryPond'
-export { B40_BreweryPond }
 
 const CARD_ID = B40_BreweryPond.id
 

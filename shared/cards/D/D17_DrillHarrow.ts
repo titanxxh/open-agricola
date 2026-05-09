@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D17_DrillHarrow } from '../../cards-display/D/D17_DrillHarrow'
-export { D17_DrillHarrow }
 
 const CARD_ID = D17_DrillHarrow.id
 

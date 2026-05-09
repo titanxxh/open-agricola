@@ -1,7 +1,6 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C135_Constable } from '../../cards-display/C/C135_Constable'
-export { C135_Constable }
 
 const CARD_ID = C135_Constable.id
 

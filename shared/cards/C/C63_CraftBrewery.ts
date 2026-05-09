@@ -1,7 +1,6 @@
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { C63_CraftBrewery } from '../../cards-display/C/C63_CraftBrewery'
-export { C63_CraftBrewery }
 
 const CARD_ID = C63_CraftBrewery.id
 

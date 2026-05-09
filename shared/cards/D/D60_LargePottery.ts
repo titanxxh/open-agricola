@@ -2,7 +2,6 @@ import { returnCardToBoard } from '../helpers/return-card'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { D60_LargePottery } from '../../cards-display/D/D60_LargePottery'
-export { D60_LargePottery }
 
 const CARD_ID = D60_LargePottery.id
 

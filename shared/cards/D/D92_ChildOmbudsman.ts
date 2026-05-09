@@ -6,7 +6,6 @@ import { getExtraRoomCapacity } from '../card-effects'
 import type { CardImpl } from '../registry'
 import type { PlayerState } from '../../contract/types'
 import { D92_ChildOmbudsman } from '../../cards-display/D/D92_ChildOmbudsman'
-export { D92_ChildOmbudsman }
 
 const CARD_ID = D92_ChildOmbudsman.id
 

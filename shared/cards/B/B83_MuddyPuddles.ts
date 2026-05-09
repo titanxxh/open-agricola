@@ -4,7 +4,6 @@ import { getCardStack, pushToCardStack } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B83_MuddyPuddles } from '../../cards-display/B/B83_MuddyPuddles'
-export { B83_MuddyPuddles }
 
 const CARD_ID = B83_MuddyPuddles.id
 

@@ -1,7 +1,6 @@
-import type { MajorCardData } from '../../cards/major/types'
-import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
+import type { MajorCardDisplay } from '../../cards/major/types'
 
-export const well: MajorCardData = {
+export const well: MajorCardDisplay = {
   id: 'Major_Well',
   name: 'Well',
   deck: 'major',
@@ -10,13 +9,4 @@ export const well: MajorCardData = {
   vp: 4,
   extraVp: false,
   desc: ['[Put 1 <FOOD> on the 5 next turns. At the start of each turn, collect the <FOOD>]'],
-  onBuy: (state, player) => {
-    return queueFutureMeeplesFlow(state, {
-      cardId: 'Major_Well',
-      playerId: player.id,
-      startRound: state.round + 1,
-      count: 5,
-      resources: { food: 1 },
-    })
-  },
 }

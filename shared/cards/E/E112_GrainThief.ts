@@ -3,8 +3,6 @@ import type { ActionDefinition, ActionFlow } from '../../contract/types'
 import { fieldHasCrop, fieldFindStackOfKind, fieldTopStack } from '../../domain/field'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
-import { E112_GrainThief } from '../../cards-display/E/E112_GrainThief'
-export { E112_GrainThief }
 
 const CARD_ID = 'E112_GrainThief'
 

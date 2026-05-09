@@ -22,6 +22,7 @@
 
 `server/custom-code/engine.ts` 往 isolate 注入以下全局：
 
+<!-- prompt-sync:begin id=sandbox-injections -->
 
 | 全局                                       | 形态      | 备注                                                                                 |
 | ---------------------------------------- | ------- | ---------------------------------------------------------------------------------- |
@@ -29,12 +30,14 @@
 | `Occupation(def)`                        | 函数 stub | 同上                                                                                 |
 | `console.log(...)` / `console.warn(...)` | 函数      | 转发到宿主 `console`，参数会被 `JSON.stringify`（非字符串时）                                       |
 | `gainLeaf(cardId, resources)`            | 函数      | 返回 `{ type: 'leaf', actionId: 'gain', params: resources, sourceCard: cardId }`     |
-| `payLeaf({ cardId, cost })`              | 函数      | 返回 `{ type: 'leaf', actionId: 'pay-resources', params: cost, sourceCard: cardId }` |
+| `payLeaf({ cardId, cost })`              | 函数      | 返回 `{ type: 'leaf', actionId: 'pay', params: cost, sourceCard: cardId }`           |
 | `spaceHasPlayer(space, playerId)`        | 函数      | 判断某个行动位是否已被指定玩家占据                                                                  |
 | `positionKey(pos)`                       | 函数      | 将 `{ x, y }` 转为确定性字符串 `"x,y"`                                                      |
-| `getMajorCardEffect(cardId)`             | 函数 stub | 沙盒里始终返回 `null`（无法访问主改良注册表）                                                         |
+| `getCardDefinition(cardId)`              | 函数 stub | 沙盒里始终返回 `null`（无法访问卡牌注册表）                                                          |
 | `getCardStack(player, cardId)`           | 函数      | 读取 `player.cardStates[cardId].stack` 的浅拷贝                                          |
 | `readCardExtraData(player, cardId)`      | 函数      | 读取 `player.cardStates[cardId].extraData` 的浅拷贝                                      |
+
+<!-- prompt-sync:end id=sandbox-injections -->
 
 
 **不再注入** `registerCardEffect` / `registerCardListener`。新契约通过 `CARD_DEF` + `CARD_IMPL` 双常量导出（见 §7）。
@@ -62,7 +65,8 @@
 
 生成器还会同步输出：
 
-- `shared/cards/community/{CUSTOM_ID}.ts`
+- `shared/cards-display/community/{CUSTOM_ID}.ts` — display 数据层（仅 `CARD_DEF` + i18n locales）
+- `shared/cards/community/{CUSTOM_ID}.ts` — impl 层（仅 `CARD_IMPL`，re-export display）
 - `shared/cards/community/__tests__/{CUSTOM_ID}.test.ts`
 - `shared/cards/register-all.ts`
 - `shared/cards/community/auto-catalog.ts`
@@ -78,6 +82,31 @@ pnpm run build
 ```
 
 如果某张工坊卡在沙盒中通过、但 PR CI 因 TypeScript 类型失败，优先修生成器规范化，而不是只手改生成出来的单张社区牌；否则下一次用户提 PR 还会复现。
+
+### 1.1.1 提交后的物理分层（display + impl 双文件）
+
+提交到 GitHub PR 时，server `code-gen.ts` 会把沙盒里的单文件
+`CARD_DEF + CARD_IMPL` **透明拆分**到两个物理文件：
+
+- `shared/cards-display/community/{CARD_ID}.ts` — 仅 `CARD_DEF`
+  + i18n locales（display 数据层）
+  - `import { MinorImprovement } from '../types'`（或 `Occupation`）
+  - `export const {CARD_ID} = CARD_DEF`
+- `shared/cards/community/{CARD_ID}.ts` — 仅 `CARD_IMPL`（impl 层）
+  - `import { {CARD_ID} } from '../../cards-display/community/{CARD_ID}'`
+  - `export { {CARD_ID} }` （re-export display）
+  - `export const {CARD_ID}_impl = CARD_IMPL satisfies CardImpl`
+
+外加 4 个补丁文件：
+- `shared/cards/community/__tests__/{CARD_ID}.test.ts` — smoke test
+- `shared/cards/register-all.ts` — patched 加 impl 注册
+- `shared/cards/community/auto-catalog.ts` — patched 加 display 引用
+- `docs/community_cards.md` — patched 加目录行
+
+**用户在沙盒里不需要关心物理分层** —— 继续按 `CARD_DEF + CARD_IMPL`
+两个常量写就行。后端 `code-gen.ts` 自动拆分；这两个常量从沙盒内
+（同一文件 closure）变成跨两个 module（display 和 impl 之间通过
+`import { {CARD_ID} }` 跨过）。
 
 ---
 
@@ -462,7 +491,7 @@ return {
 | `store-on-card`            | params 形如 `{ wood: 1, clay: 2 }`，写入 `player.cardStates[CARD_ID].counters`         |
 | `take-from-card`           | params 形如 `{ grain: 1 }`，从 `player.cardStates[CARD_ID].counters` 扣，扣完 leaf 就 fail |
 | `gain`                     | params 形如 `{ food: 2, wood: 1 }`                                                  |
-| `pay-resources`            | 同上，扣资源                                                                            |
+| `pay`                      | 同上，扣资源                                                                            |
 | `bake-bread`               | 启动一段烤面包子流程                                                                        |
 | `push-card-stack`          | 向 `player.cardStates[CARD_ID].stack` 推入一项                                         |
 | `special-effect`           | **唯一的 cardStates mutation 入口**（Sprint 6a/6b）。`params: { kind: 'set-flag' \| 'set-infobox' \| 'set-extra-data' \| 'increment-extra-data', ... }`。取代旧的 `flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data` 5 个 leaf。详见 §6.1。 |
@@ -586,7 +615,7 @@ CI 会拦下漏改的情况。
 
 | 日期         | 变更                                                                                                                                                                                                                                                                                                                               |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-04-30 | 双轨 scoring hook 重构：删除 `computePostScore` / `scoringPriority` / `ctx.reserved`；新增 `computeCostedBonus` 走 Pareto 求解器。详见 `docs/superpowers/specs/2026-04-30-bonus-score-merge-design.md`。|
+| 2026-04-30 | 双轨 scoring hook 重构：删除 `computePostScore` / `scoringPriority` / `ctx.reserved`；新增 `computeCostedBonus` 走 Pareto 求解器。详见 `(spec/plan 已归档，见 git history)`。|
 | 2026-04-24 | 修正 `computeBonusScore` / `computePostScore` / `computeSharedPostScore` 签名（实为 `=> number` / `=> Array<{playerId,score}>`，非 `{score,label}`）；新增 §5.5 listener `actions:` 高频踩坑（不含空间 ID、`harvest-feed` 不可监听）、§5.6 anytime 写法、§5.7 `futureMeeplesNode` 不在沙箱；登记 `flag-card` / `future-meeples` actionId。来源：LLM card-gen session 测试套件实测 |
 | 2026-04-22 | 全面重写：`registerCardEffect`/`registerCardListener` → `CARD_DEF`/`CARD_IMPL` 双常量；注入 helper 函数；扩展 hook 白名单至全部 CardEffectField；扩展 phase 白名单增加 `anytime`/`computeChoiceCandidates`；AST validator hard-fail；4 个新 actionId                                                                                                               |
-| 2026-04-19 | 抽出本文件作为唯一真源；从 `docs/CARD_DESIGN_PROMPT.md` / `docs/superpowers/specs/2026-04-19-architecture-three-layer-split-design.md` §16 内联描述迁出                                                                                                                                                                                             |
+| 2026-04-19 | 抽出本文件作为唯一真源；从 `docs/CARD_DESIGN_PROMPT.md` / `(spec/plan 已归档，见 git history)` §16 内联描述迁出                                                                                                                                                                                             |

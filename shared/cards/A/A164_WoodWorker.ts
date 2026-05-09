@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { returnToSpaceThenGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A164_WoodWorker } from '../../cards-display/A/A164_WoodWorker'
-export { A164_WoodWorker }
 
 const CARD_ID = A164_WoodWorker.id
 

@@ -1,7 +1,6 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D9_GameTrade } from '../../cards-display/D/D9_GameTrade'
-export { D9_GameTrade }
 
 const CARD_ID = D9_GameTrade.id
 

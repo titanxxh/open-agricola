@@ -9,7 +9,6 @@ import {
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { A111_WallBuilder } from '../../cards-display/A/A111_WallBuilder'
-export { A111_WallBuilder }
 
 const CARD_ID = A111_WallBuilder.id
 

@@ -1,7 +1,6 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C123_Freemason } from '../../cards-display/C/C123_Freemason'
-export { C123_Freemason }
 
 const CARD_ID = C123_Freemason.id
 

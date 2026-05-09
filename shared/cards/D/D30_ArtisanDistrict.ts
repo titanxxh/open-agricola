@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { D30_ArtisanDistrict } from '../../cards-display/D/D30_ArtisanDistrict'
-export { D30_ArtisanDistrict }
 
 const CARD_ID = D30_ArtisanDistrict.id
 

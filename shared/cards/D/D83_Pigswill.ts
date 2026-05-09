@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D83_Pigswill } from '../../cards-display/D/D83_Pigswill'
-export { D83_Pigswill }
 
 const CARD_ID = D83_Pigswill.id
 

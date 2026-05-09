@@ -4,7 +4,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 import { C119_SkillfulRenovator } from '../../cards-display/C/C119_SkillfulRenovator'
-export { C119_SkillfulRenovator }
 
 const CARD_ID = C119_SkillfulRenovator.id
 

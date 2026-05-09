@@ -5,7 +5,6 @@ import type { CardImpl } from '../registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { C39_StudioBoat } from '../../cards-display/C/C39_StudioBoat'
-export { C39_StudioBoat }
 
 const CARD_ID = C39_StudioBoat.id
 

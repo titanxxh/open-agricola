@@ -2,7 +2,6 @@ import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E139_BunnyBreeder } from '../../cards-display/E/E139_BunnyBreeder'
-export { E139_BunnyBreeder }
 
 const CARD_ID = E139_BunnyBreeder.id
 

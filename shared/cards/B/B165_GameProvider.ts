@@ -1,8 +1,6 @@
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { fieldTopStack, fieldDecrementTop } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { B165_GameProvider } from '../../cards-display/B/B165_GameProvider'
-export { B165_GameProvider }
 
 const CARD_ID = 'B165_GameProvider'
 

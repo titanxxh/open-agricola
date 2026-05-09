@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { E6_Recount } from '../../cards-display/E/E6_Recount'
-export { E6_Recount }
 
 const CARD_ID = E6_Recount.id
 

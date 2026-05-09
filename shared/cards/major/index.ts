@@ -1,26 +1,13 @@
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
+import { majorCardDisplayData } from '../../cards-display/major'
 import type { MajorCardData, MajorEffectHook } from './types'
-import { basketmaker } from './basketmaker'
-import { clayOven } from './clay-oven'
-import { cookingHearth1, cookingHearth2 } from './cooking-hearth'
-import { fireplace1, fireplace2 } from './fireplace'
-import { joinery } from './joinery'
-import { pottery } from './pottery'
-import { stoneOven } from './stone-oven'
-import { well } from './well'
+import { majorEffects } from './effects'
 
-export const majorCardDefinitions: MajorCardData[] = [
-  fireplace1,
-  fireplace2,
-  cookingHearth1,
-  cookingHearth2,
-  clayOven,
-  stoneOven,
-  well,
-  joinery,
-  pottery,
-  basketmaker,
-]
+export const majorCardDefinitions: readonly MajorCardData[] =
+  majorCardDisplayData.map((display) => ({
+    ...display,
+    ...(majorEffects[display.id] ?? {}),
+  }))
 
 const majorDefinitionMap = new Map<string, MajorCardData>(
   majorCardDefinitions.map((effect) => [effect.id, effect]),

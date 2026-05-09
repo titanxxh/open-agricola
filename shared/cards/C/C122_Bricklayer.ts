@@ -2,7 +2,6 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { C122_Bricklayer } from '../../cards-display/C/C122_Bricklayer'
-export { C122_Bricklayer }
 
 const CARD_ID = C122_Bricklayer.id
 

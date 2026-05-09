@@ -2,7 +2,6 @@ import { isSpaceOccupied } from '../../domain/space'
 import { jumpLeaf } from '../helpers/jump-leaf'
 import type { CardImpl } from '../registry'
 import { A151_Minstrel } from '../../cards-display/A/A151_Minstrel'
-export { A151_Minstrel }
 
 const CARD_ID = A151_Minstrel.id
 

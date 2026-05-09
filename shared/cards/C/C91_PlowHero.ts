@@ -4,7 +4,6 @@ import { payLeaf } from '../helpers/pay-gain-node'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 import { C91_PlowHero } from '../../cards-display/C/C91_PlowHero'
-export { C91_PlowHero }
 
 const CARD_ID = C91_PlowHero.id
 

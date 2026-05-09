@@ -5,7 +5,7 @@ import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites
 import { isMinorImprovementPlayable, playMinorImprovement } from '../../shared/actions/effects/improvement'
 
 import '../../shared/cards/A/A10_WoodenShed'
-import { A10_WoodenShed } from '../../shared/cards/A/A10_WoodenShed'
+import { A10_WoodenShed } from '../../shared/cards-display/A/A10_WoodenShed'
 
 const CARD_ID = 'A10_WoodenShed'
 

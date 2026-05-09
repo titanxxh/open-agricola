@@ -6,7 +6,6 @@ import { cardCountsAs } from '../helpers/card-type'
 import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { D161_CabbageBuyer } from '../../cards-display/D/D161_CabbageBuyer'
-export { D161_CabbageBuyer }
 
 const CARD_ID = D161_CabbageBuyer.id
 

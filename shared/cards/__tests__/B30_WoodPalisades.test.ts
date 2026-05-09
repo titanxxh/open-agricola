@@ -3,7 +3,7 @@ import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState } from '../../contract/types'
 
 import '../B/B30_WoodPalisades'
-import { B30_WoodPalisades } from '../B/B30_WoodPalisades'
+import { B30_WoodPalisades } from '../../cards-display/B/B30_WoodPalisades'
 
 const CARD_ID = 'B30_WoodPalisades'
 

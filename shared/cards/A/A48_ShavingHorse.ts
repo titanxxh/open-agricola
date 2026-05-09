@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A48_ShavingHorse } from '../../cards-display/A/A48_ShavingHorse'
-export { A48_ShavingHorse }
 
 const CARD_ID = A48_ShavingHorse.id
 

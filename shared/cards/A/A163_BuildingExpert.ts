@@ -4,7 +4,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 import { A163_BuildingExpert } from '../../cards-display/A/A163_BuildingExpert'
-export { A163_BuildingExpert }
 
 const CARD_ID = A163_BuildingExpert.id
 

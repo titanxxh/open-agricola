@@ -1,7 +1,6 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C106_PotatoHarvester } from '../../cards-display/C/C106_PotatoHarvester'
-export { C106_PotatoHarvester }
 
 const CARD_ID = C106_PotatoHarvester.id
 

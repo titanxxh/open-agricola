@@ -4,7 +4,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { getStableTilesBuiltThisAction } from '../helpers/action-snapshot'
 import type { CardImpl } from '../registry'
 import { C56_FeedFence } from '../../cards-display/C/C56_FeedFence'
-export { C56_FeedFence }
 
 const CARD_ID = C56_FeedFence.id
 

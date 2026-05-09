@@ -1,7 +1,6 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D12_MilkingPlace } from '../../cards-display/D/D12_MilkingPlace'
-export { D12_MilkingPlace }
 
 const CARD_ID = D12_MilkingPlace.id
 

@@ -4,9 +4,7 @@ import { getCardEffect } from '../../shared/cards/card-effects'
 import type { ActionFlow } from '../../shared/contract/types'
 import { getRegisteredMinorImprovement } from '../../shared/cards-display/types'
 
-import {
-  C9_AutomaticWaterTrough,
-} from '../../shared/cards/C/C9_AutomaticWaterTrough'
+import { C9_AutomaticWaterTrough } from '../../shared/cards-display/C/C9_AutomaticWaterTrough'
 
 const CARD_ID = 'C9_AutomaticWaterTrough'
 

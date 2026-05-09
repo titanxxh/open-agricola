@@ -1,7 +1,6 @@
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { D98_Transactor } from '../../cards-display/D/D98_Transactor'
-export { D98_Transactor }
 
 const CARD_ID = D98_Transactor.id
 

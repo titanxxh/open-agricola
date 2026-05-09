@@ -1,7 +1,6 @@
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A54_Credit } from '../../cards-display/A/A54_Credit'
-export { A54_Credit }
 
 const CARD_ID = A54_Credit.id
 

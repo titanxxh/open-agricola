@@ -1,7 +1,6 @@
 import { Scoring } from '../../domain'
 import type { CardImpl } from '../registry'
 import { E127_DiligentFarmer } from '../../cards-display/E/E127_DiligentFarmer'
-export { E127_DiligentFarmer }
 
 const CARD_ID = E127_DiligentFarmer.id
 

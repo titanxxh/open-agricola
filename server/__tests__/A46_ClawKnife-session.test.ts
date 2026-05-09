@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { A46_ClawKnife } from '../../shared/cards/A/A46_ClawKnife'
+import { A46_ClawKnife } from '../../shared/cards-display/A/A46_ClawKnife'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 describe('A46_ClawKnife prerequisite', () => {

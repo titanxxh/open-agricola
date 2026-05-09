@@ -1,6 +1,12 @@
 /**
  * System prompt for LLM-powered card design.
  *
+ * **沙盒约束 vs 物理分层**：本 prompt 仅描述沙盒约束（LLM 输出格式：
+ * 单文件含 `CARD_DEF + CARD_IMPL` 两个常量）。提交到主仓库 PR 时由
+ * `server/workshop-pr/code-gen.ts` 把这两个常量**透明拆分**到
+ * `shared/cards-display/community/X.ts` + `shared/cards/community/X.ts`
+ * 两个物理文件，与 prompt 内容无关。详见 docs/CUSTOM_CARD_SANDBOX.md §1.1。
+ *
  * **Single source of truth for sandbox constraints**: docs/CUSTOM_CARD_SANDBOX.md
  *
  * Whenever you add / remove a hook, phase, scope, denied identifier or actionId
@@ -10,6 +16,7 @@
  *   - shared/cards/card-effects.ts        (cardEffectHooks)
  *   - server/custom-code/engine.ts (isActionHookPhase, isCardListenerScope)
  *   - shared/custom-code/ast-validator.ts (DENIED_IDENTIFIERS, DENIED_PROPERTY_ACCESS)
+ *   - server/custom-code/injected-helpers.ts (sandbox injections; S9)
  */
 
 import communityExamples from '../../docs/community-card-examples.md?raw'
@@ -231,7 +238,7 @@ return {
 | actionId | 说明 | params |
 |----------|------|--------|
 | gain | 获得资源 | { food: 2, wood: 1 } |
-| pay-resources | 支付资源 | { grain: 1 } |
+| pay | 支付资源 | { grain: 1 } |
 | bonus-vp | +1 VP（固定，不接受 amount） | {} |
 | gain-other-players | 其他每位玩家各获得 | { food: 1 } |
 | bake-bread | 烤面包 | {} |
@@ -251,7 +258,7 @@ return {
 | helper | 用法 |
 |--------|------|
 | \`gainLeaf(cardId, { food: 2 })\` | 创建 gain leaf 节点 |
-| \`payLeaf({ cardId, cost: { wood: 1 } })\` | 创建 pay-resources leaf 节点 |
+| \`payLeaf({ cardId, cost: { wood: 1 } })\` | 创建 pay leaf 节点 |
 | \`spaceHasPlayer(space, playerId)\` | 判断行动位是否被指定玩家占据 |
 | \`positionKey({ x, y })\` | 将位置转为字符串 \`"x,y"\` |
 | \`getCardStack(player, cardId)\` | 读取 \`cardStates[cardId].stack\` |

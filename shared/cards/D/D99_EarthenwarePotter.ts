@@ -3,7 +3,6 @@ import { payGainFlow } from '../helpers/pay-gain-node'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { D99_EarthenwarePotter } from '../../cards-display/D/D99_EarthenwarePotter'
-export { D99_EarthenwarePotter }
 
 const CARD_ID = D99_EarthenwarePotter.id
 

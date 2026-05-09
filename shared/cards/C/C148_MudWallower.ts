@@ -6,7 +6,6 @@ import { initCardState } from '../__stubs__/helpers'
 import { writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { C148_MudWallower } from '../../cards-display/C/C148_MudWallower'
-export { C148_MudWallower }
 
 const CARD_ID = C148_MudWallower.id
 

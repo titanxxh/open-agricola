@@ -4,7 +4,6 @@ import type { GameState } from '../../contract/types'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C154_TwinResearcher } from '../../cards-display/C/C154_TwinResearcher'
-export { C154_TwinResearcher }
 
 const CARD_ID = C154_TwinResearcher.id
 

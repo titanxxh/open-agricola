@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { A13_RenovationCompany } from '../../shared/cards/A/A13_RenovationCompany'
+import { A13_RenovationCompany } from '../../shared/cards-display/A/A13_RenovationCompany'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 describe('A13_RenovationCompany prerequisite', () => {

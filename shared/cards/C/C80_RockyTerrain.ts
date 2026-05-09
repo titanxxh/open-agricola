@@ -4,7 +4,6 @@ import { payGainNode } from '../helpers/pay-gain-node'
 import { isFieldCard } from '../catalog'
 import type { CardImpl } from '../registry'
 import { C80_RockyTerrain } from '../../cards-display/C/C80_RockyTerrain'
-export { C80_RockyTerrain }
 
 const CARD_ID = C80_RockyTerrain.id
 

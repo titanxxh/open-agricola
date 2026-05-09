@@ -1,7 +1,6 @@
 import { getMajorCard } from '../major'
 import type { CardImpl } from '../registry'
 import { B153_Housemaster } from '../../cards-display/B/B153_Housemaster'
-export { B153_Housemaster }
 
 const CARD_ID = B153_Housemaster.id
 

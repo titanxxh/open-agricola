@@ -1,7 +1,6 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C159_FishermansFriend } from '../../cards-display/C/C159_FishermansFriend'
-export { C159_FishermansFriend }
 
 const CARD_ID = C159_FishermansFriend.id
 

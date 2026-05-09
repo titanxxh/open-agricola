@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { B35_HookKnife } from '../../cards-display/B/B35_HookKnife'
-export { B35_HookKnife }
 
 const CARD_ID = B35_HookKnife.id
 

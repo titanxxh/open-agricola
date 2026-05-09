@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { C35_LanternHouse } from '../../cards-display/C/C35_LanternHouse'
-export { C35_LanternHouse }
 
 const CARD_ID = C35_LanternHouse.id
 

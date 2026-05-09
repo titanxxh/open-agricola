@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C126_Excavator } from '../../cards-display/C/C126_Excavator'
-export { C126_Excavator }
 
 const CARD_ID = C126_Excavator.id
 

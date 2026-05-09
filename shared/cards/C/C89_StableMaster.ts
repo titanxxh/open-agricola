@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { C89_StableMaster } from '../../cards-display/C/C89_StableMaster'
-export { C89_StableMaster }
 
 const CARD_ID = C89_StableMaster.id
 

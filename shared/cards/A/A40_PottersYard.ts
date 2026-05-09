@@ -7,7 +7,6 @@ import { countUnusedFarmyardSpaces } from '../../domain/farm'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { A40_PottersYard } from '../../cards-display/A/A40_PottersYard'
-export { A40_PottersYard }
 
 const CARD_ID = A40_PottersYard.id
 

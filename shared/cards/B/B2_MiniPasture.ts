@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { B2_MiniPasture } from '../../cards-display/B/B2_MiniPasture'
-export { B2_MiniPasture }
 
 const CARD_ID = B2_MiniPasture.id
 

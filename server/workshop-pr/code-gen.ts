@@ -417,7 +417,80 @@ function normalizeWorkshopEffectCode(
   }
 }
 
-export function generateMainCardFile(
+/**
+ * Extract a top-level const VariableStatement by name from sandbox source.
+ */
+function findTopLevelConst(
+  sf: ts.SourceFile,
+  name: string,
+): ts.VariableStatement | null {
+  for (const stmt of sf.statements) {
+    if (!ts.isVariableStatement(stmt)) continue
+    const decl = stmt.declarationList.declarations[0]
+    if (!decl || !ts.isIdentifier(decl.name)) continue
+    if (decl.name.text === name) return stmt
+  }
+  return null
+}
+
+/**
+ * Print top-level statements with two normalizations:
+ * - Strip TS printer's trailing semicolons (line-end `;`) so the output style
+ *   matches `normalizeWorkshopEffectCode`'s `printer.printFile()` path which
+ *   omits them. Without this, hand-written fixtures and generator output drift.
+ * - Reverse `\\uXXXX` escapes back to their UTF-8 codepoints (TS printer
+ *   defaults to escaping every non-ASCII character) so generated files
+ *   match repo convention of verbatim CJK literals.
+ */
+function printStatements(sf: ts.SourceFile, stmts: ts.Statement[]): string {
+  if (stmts.length === 0) return ''
+  const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
+  return stmts
+    .map((s) => printer.printNode(ts.EmitHint.Unspecified, s, sf))
+    .join('\n')
+    .replace(/;$/gm, '')
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) =>
+      String.fromCodePoint(parseInt(hex, 16)),
+    )
+}
+
+export function extractCardDefSource(source: string): string {
+  const sf = ts.createSourceFile(
+    'in.ts',
+    source,
+    ts.ScriptTarget.ES2022,
+    true,
+    ts.ScriptKind.TS,
+  )
+  const cardId = findTopLevelConst(sf, 'CARD_ID')
+  const cardDef = findTopLevelConst(sf, 'CARD_DEF')
+  if (!cardDef) {
+    throw new Error('CARD_DEF top-level const not found in workshop code')
+  }
+  const stmts: ts.Statement[] = []
+  if (cardId) stmts.push(cardId)
+  stmts.push(cardDef)
+  return printStatements(sf, stmts)
+}
+
+export function extractCardImplSource(source: string): string {
+  const sf = ts.createSourceFile(
+    'in.ts',
+    source,
+    ts.ScriptTarget.ES2022,
+    true,
+    ts.ScriptKind.TS,
+  )
+  const cardId = findTopLevelConst(sf, 'CARD_ID')
+  const cardImpl = findTopLevelConst(sf, 'CARD_IMPL')
+  if (!cardImpl) return 'const CARD_IMPL = {}'
+  const stmts: ts.Statement[] = []
+  if (cardId) stmts.push(cardId)
+  stmts.push(cardImpl)
+  return printStatements(sf, stmts)
+}
+
+export function generateDisplayFile(
   wcard: WorkshopCardForGen & { card_json?: string },
   ctx: { githubLogin: string; iso: string },
 ): string {
@@ -425,6 +498,28 @@ export function generateMainCardFile(
     wcard.card_type === 'occupation'
       ? `import { Occupation } from '../types'`
       : `import { MinorImprovement } from '../types'`
+
+  const locales = readLocalesFromCardJson(wcard.card_json)
+  const normalised = normalizeWorkshopEffectCode(wcard.effect_code, wcard.card_id, { locales })
+  const cardDefSource = extractCardDefSource(normalised)
+
+  return `// Generated from Open Agricola workshop. Do not hand-edit.
+// Workshop card: ${wcard.card_id}
+// Author: ${wcard.author_name ?? 'unknown'} (github: @${ctx.githubLogin})
+// Submitted: ${ctx.iso}
+
+${classImport}
+
+${cardDefSource}
+
+export const ${wcard.card_id} = CARD_DEF
+`
+}
+
+export function generateImplFile(
+  wcard: WorkshopCardForGen & { card_json?: string },
+  ctx: { githubLogin: string; iso: string },
+): string {
   const used = scanUsedHelpers(wcard.effect_code)
   const helperImports = Array.from(used)
     .map((h) => HELPER_IMPORTS[h])
@@ -433,21 +528,21 @@ export function generateMainCardFile(
     .join('\n')
 
   const locales = readLocalesFromCardJson(wcard.card_json)
-  const effectCode = normalizeWorkshopEffectCode(wcard.effect_code, wcard.card_id, { locales })
+  const normalised = normalizeWorkshopEffectCode(wcard.effect_code, wcard.card_id, { locales })
+  const cardImplSource = extractCardImplSource(normalised)
 
   return `// Generated from Open Agricola workshop. Do not hand-edit.
 // Workshop card: ${wcard.card_id}
 // Author: ${wcard.author_name ?? 'unknown'} (github: @${ctx.githubLogin})
 // Submitted: ${ctx.iso}
 
-${classImport}
 import type { CardImpl } from '../registry'
-${helperImports ? helperImports + '\n' : ''}
-// --- BEGIN WORKSHOP CODE (validated in sandbox) ---
-${effectCode}
-// --- END WORKSHOP CODE ---
+import { ${wcard.card_id} } from '../../cards-display/community/${wcard.card_id}'
+export { ${wcard.card_id} }
+${helperImports ? '\n' + helperImports : ''}
 
-export const ${wcard.card_id} = CARD_DEF
+${cardImplSource}
+
 export const ${wcard.card_id}_impl = CARD_IMPL satisfies CardImpl
 `
 }
@@ -628,16 +723,17 @@ export function patchCommunityCardsMarkdown(
   return source.slice(0, idx) + row + '\n' + source.slice(idx)
 }
 
-function patchCommunityAutoCatalog(
+export function patchCommunityAutoCatalog(
   source: string,
   args: { card_id: string },
 ): string {
   const id = args.card_id
-  const newImport = `import { ${id} } from './${id}'`
+  const newImport = `import { ${id} } from '../../cards-display/community/${id}'`
   const newEntry = `  ${id},`
   if (source.includes(newImport)) return source
 
-  const customImportRe = /^(import \{ (CUSTOM_\w+) \} from '\.\/CUSTOM_\w+')\n/gm
+  const customImportRe =
+    /^(import \{ (CUSTOM_\w+) \} from '\.\.\/\.\.\/cards-display\/community\/CUSTOM_\w+')\n/gm
   const customImports: Array<{ id: string; start: number; end: number }> = []
   let m: RegExpExecArray | null
   while ((m = customImportRe.exec(source)) !== null) {
@@ -714,7 +810,11 @@ export async function generatePrFiles(args: GenArgs): Promise<PrFile[]> {
   } = args
   const iso = new Date().toISOString()
 
-  const mainContent = generateMainCardFile(wcard, {
+  const displayContent = generateDisplayFile(wcard, {
+    githubLogin: github_login,
+    iso,
+  })
+  const implContent = generateImplFile(wcard, {
     githubLogin: github_login,
     iso,
   })
@@ -746,8 +846,13 @@ export async function generatePrFiles(args: GenArgs): Promise<PrFile[]> {
 
   const files: PrFile[] = [
     {
+      path: `shared/cards-display/community/${wcard.card_id}.ts`,
+      content: displayContent,
+      encoding: 'utf-8',
+    },
+    {
       path: `shared/cards/community/${wcard.card_id}.ts`,
-      content: mainContent,
+      content: implContent,
       encoding: 'utf-8',
     },
     {

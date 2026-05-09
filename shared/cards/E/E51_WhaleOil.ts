@@ -4,7 +4,6 @@ import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../help
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E51_WhaleOil } from '../../cards-display/E/E51_WhaleOil'
-export { E51_WhaleOil }
 
 const CARD_ID = E51_WhaleOil.id
 

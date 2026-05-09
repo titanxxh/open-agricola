@@ -3,7 +3,6 @@ import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { B45_StrawberryPatch } from '../../cards-display/B/B45_StrawberryPatch'
-export { B45_StrawberryPatch }
 
 const CARD_ID = B45_StrawberryPatch.id
 

@@ -1,8 +1,6 @@
 import { payLeaf } from '../helpers/pay-gain-node'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { D10_StorksNest } from '../../cards-display/D/D10_StorksNest'
-export { D10_StorksNest }
 
 const CARD_ID = 'D10_StorksNest'
 

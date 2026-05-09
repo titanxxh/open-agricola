@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { D36_BreedRegistry } from '../../cards-display/D/D36_BreedRegistry'
-export { D36_BreedRegistry }
 
 const CARD_ID = D36_BreedRegistry.id
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { E41_MuddyWaters } from '../../shared/cards/E/E41_MuddyWaters'
+import { E41_MuddyWaters } from '../../shared/cards-display/E/E41_MuddyWaters'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 describe('E41_MuddyWaters prerequisite', () => {

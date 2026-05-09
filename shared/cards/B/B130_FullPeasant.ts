@@ -5,7 +5,6 @@ import { jumpLeaf, isJumpChainContains } from '../helpers/jump-leaf'
 import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability'
 import type { CardImpl } from '../registry'
 import { B130_FullPeasant } from '../../cards-display/B/B130_FullPeasant'
-export { B130_FullPeasant }
 
 const CARD_ID = B130_FullPeasant.id
 

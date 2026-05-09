@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { E36_HerbalGarden } from '../../cards-display/E/E36_HerbalGarden'
-export { E36_HerbalGarden }
 
 const CARD_ID = E36_HerbalGarden.id
 

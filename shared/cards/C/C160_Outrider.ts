@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C160_Outrider } from '../../cards-display/C/C160_Outrider'
-export { C160_Outrider }
 
 const CARD_ID = C160_Outrider.id
 

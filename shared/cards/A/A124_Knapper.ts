@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A124_Knapper } from '../../cards-display/A/A124_Knapper'
-export { A124_Knapper }
 
 const CARD_ID = A124_Knapper.id
 

@@ -1,7 +1,6 @@
 import type { CardImpl } from '../registry'
 import type { BonusScoreLevel } from '../card-effects'
 import { C133_Soldier } from '../../cards-display/C/C133_Soldier'
-export { C133_Soldier }
 
 const CARD_ID = C133_Soldier.id
 

@@ -4,7 +4,6 @@ import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
 import { getStoredResource } from '../helpers/card-storage'
 import type { CardImpl } from '../registry'
 import { E52_Cubbyhole } from '../../cards-display/E/E52_Cubbyhole'
-export { E52_Cubbyhole }
 
 const CARD_ID = E52_Cubbyhole.id
 

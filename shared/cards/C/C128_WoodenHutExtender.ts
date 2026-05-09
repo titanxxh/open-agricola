@@ -2,7 +2,6 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { C128_WoodenHutExtender } from '../../cards-display/C/C128_WoodenHutExtender'
-export { C128_WoodenHutExtender }
 
 const CARD_ID = C128_WoodenHutExtender.id
 

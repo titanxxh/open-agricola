@@ -1,8 +1,6 @@
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { C24_BedintheGrainField } from '../../cards-display/C/C24_BedintheGrainField'
-export { C24_BedintheGrainField }
 
 const CARD_ID = 'C24_BedintheGrainField'
 

@@ -1,7 +1,6 @@
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B113_PatchCaregiver } from '../../cards-display/B/B113_PatchCaregiver'
-export { B113_PatchCaregiver }
 
 const CARD_ID = B113_PatchCaregiver.id
 

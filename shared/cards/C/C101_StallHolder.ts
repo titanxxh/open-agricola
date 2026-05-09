@@ -5,7 +5,6 @@ import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import { playerBoard } from '../../domain'
 import type { CardImpl } from '../registry'
 import { C101_StallHolder } from '../../cards-display/C/C101_StallHolder'
-export { C101_StallHolder }
 
 const CARD_ID = C101_StallHolder.id
 

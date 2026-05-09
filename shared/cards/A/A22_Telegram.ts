@@ -4,7 +4,6 @@ import { workersAvailable } from '../../domain/player'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { A22_Telegram } from '../../cards-display/A/A22_Telegram'
-export { A22_Telegram }
 
 const CARD_ID = A22_Telegram.id
 

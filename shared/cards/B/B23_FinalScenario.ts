@@ -2,7 +2,6 @@ import { writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { B23_FinalScenario } from '../../cards-display/B/B23_FinalScenario'
-export { B23_FinalScenario }
 
 const CARD_ID = B23_FinalScenario.id
 

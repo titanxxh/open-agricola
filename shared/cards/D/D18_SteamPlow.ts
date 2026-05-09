@@ -1,7 +1,6 @@
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D18_SteamPlow } from '../../cards-display/D/D18_SteamPlow'
-export { D18_SteamPlow }
 
 const CARD_ID = D18_SteamPlow.id
 

@@ -1,13 +1,13 @@
 # Bad Smell 清单：主路径中的单卡特殊逻辑
 
-> 调查日期：2026-05-02
-> 最近更新：2026-05-02（A 级全部 + B 级 + card-type 工具统一已完成）
+> 调查日期：2026-05-09（重新扫描）
+> 上一次重写：2026-05-02
 > 范围：`shared/`（不含 `cards/`、`i18n/`）、`server/`、`client/`
-> 目的：枚举主路径里"含特定卡牌字面量 / 为单卡而生"的所有点，作为后续 sprint 清理依据
+> 目的：枚举主路径里"含特定卡牌字面量 / 为单卡而生 / 用字符串前缀做 type 判定"的所有点，作为后续 sprint 清理依据
 >
-> 背景：CLAUDE.md 明确要求「不要为单卡改动主路径」「不要在核心文件添加针对某张卡的 if-else」。本清单按违反程度分级 A→E。
+> 背景：CLAUDE.md 明确要求「不要为单卡改动主路径」「不要在核心文件添加针对某张卡的 if-else」。
 
-## 状态总览
+## 状态总览（2026-05-09 复查）
 
 | 级别 | 状态 | 备注 |
 | --- | --- | --- |
@@ -17,208 +17,253 @@
 | B 级 主路径 `Major_` 前缀 | ✅ 已解决（`74ff5231`） | 引入 `isMajorCardId` + 修 `parseImprovementChoice` bare 推断 |
 | 卡内 `Major_` 前缀残留 | ✅ 已解决（`35ed327e`） | B95/C137/D80/D117/E156 五处 |
 | `isMajorImprovement` / `alsoCountsAs` 双字段 | ✅ 已解决（`74656dd6`） | 字段合并到 `alsoCountsAs`，删除 `isEffectivelyMajor` 工具 |
-| C 级 `CUSTOM_` 前缀分支 | ⏳ 待办 | 5 处复制，结构合理但缺统一工具 |
-| D 级 internal/ 单卡 leaf | ⏳ 待办 | 注释提及 B85/D51/E10/D93 |
-| E 级 注释里的举例卡名 | ⏳ 待办 | 仅文档影响 |
-| 边界 `breed.ts:70` 魔法字符串 | ⏳ 待办 | `'harvest'` 区分调用来源 |
+| **C 级 `CUSTOM_` 前缀分支** | ⚠️ 复查反而扩散（11 处主路径 + 5 处 UI） | 仍未抽 `isCustomCardId` 工具；建议优先做 |
+| **D 级 `internal/` 单卡 leaf** | ⏳ 仅 1 张真单卡（B85） | `build-farmhand-room.ts` 21 行；`recall-placed-worker.ts` / `move-farmer-to-space.ts` 已通用化或多卡共用 |
+| **E 级 注释举例** | ⏳ 残存 2 处 | 大部分已在 5/6/7/S1-S8 sprint 顺手清掉 |
+| **边界 `breed.ts` `'harvest'` 魔法字符串** | ⏳ 仍待办 | sourceCard 用 `'harvest'` 当哨兵，未换枚举 |
+| **新发现：`ad-hoc-action-registry.ts` `card_` 前缀强约束** | ⏳ 待评估 | 用字符串前缀做 invariant assert，与 `Major_` / `CUSTOM_` 同类问题 |
+| **F 级 `legacy` 标记残留**（2026-05-09 新扫） | ⚠️ 主路径 79 处 + 测试 131 处 = 221 处 | 4 类：真 fallback / 兼容字段 / 迁移留痕注释 / 测试 baseline 命名；详见下文 |
+| **F5 `@deprecated` 标记**（2026-05-09 补扫 + 同日清理） | ✅ 已收口 | 3 个真 `@deprecated` 字段（engine snapshot + SQL 双列）已删；DSL 一次性迁移脚本同步退役 |
 
 ---
 
-## A 级：主路径出现具体卡牌 ID 字面量
+## A / B 级：已解决（详情参见 git log `efeca3b0` / `09edf30d` / `04945238` / `74ff5231` / `35ed327e` / `74656dd6`）
 
-### A1. `B30_WoodPalisades`（Wood Palisades 准入） ✅ 已解决
+A 级 / B 级清理已完整落地，本节只保留摘要。当前主路径**没有任何**针对具体卡 ID 的字面量分支或 `Major_*` 字符串前缀判定，相关查询统一走 `shared/cards/helpers/card-type.ts` 工具链（详见本文末"卡类型工具链"小节）。
 
-> 解决于 commit `efeca3b0`。
+---
 
-### 原问题
+## C 级：`CUSTOM_` 前缀分支（自定义卡专用代码路径）⚠️
 
-字面量被三处独立 `includes(...)` 复制：
+**复查发现：扩散反而比上次记录更严重。** 上次列 5 处，这次主路径 11 处 + UI 5 处，分布 9 个文件。
 
-| 位置 | 代码 |
+### 主路径复制（**11 处**，急需抽 helper）
+
+| 文件 | 行 | 用途 |
+| --- | --- | --- |
+| `shared/domain/scoring.ts` | 156, 195, 242 | scoring 时区分自定义卡 → 走 custom-registry 取属性 |
+| `shared/domain/animal-zones.ts` | 131 | zone owner 解析时 fall back 到 custom-registry |
+| `shared/cards/custom-registry.ts` | 138, 139 | active card pool 切换时按前缀过滤要清理的 effect / listener |
+| `shared/cards/card-effects.ts` | 239（封了局部 `isCustomCard`）, 428, 454, 483, 511 | listener 注册扫描时按前缀分流；本文件已抽 `isCustomCard` 但**仅本文件用** |
+| `client/services/card-meta.ts` | 111 | 前端取卡 meta 时 fall back |
+| `client/components/common/PlayerCard.tsx` | 57 | 前端展示卡编号时 fall back |
+
+### UI 校验（5 处，结构合理但仍是字面量）
+
+| 文件 | 行 |
 | --- | --- |
-| `shared/logic/farm/farm-choice.ts:145` | `allowPalisades: (normalized.minorPlayed ?? []).includes('B30_WoodPalisades')` |
-| `shared/session/game-core.ts:2795` | 同上字面量（围栏分支） |
-| `client/app/GameContainerApi.tsx:1865` | `hasWoodPalisadesCard={!!currentPlayer?.minorPlayed?.includes('B30_WoodPalisades')}` |
-| `client/components/interaction/InteractionBar.tsx:318/361/488` | 接收 `hasWoodPalisadesCard` prop 并按此切换 UI |
+| `client/app/workshop/AiCardDesigner.tsx` | 43, 1124, 1148, 1174, 1176 |
 
-主路径泄漏了"哪张卡能开 palisade"，前后端各一份字面量。
+UI 校验"自定义卡 ID 必须以 CUSTOM_ 开头"是 BGA 对齐的命名 invariant，本质上是字符串前缀的**用户协议**而非内部分流，可以保留前缀字面量但应共用一个常量。
 
-### 解决方案
+### 建议修法（按 CLAUDE.md 优先级最高）
 
-- `shared/cards/types.ts`：CardDefinition / CardBase / toJSON 增加 `enablesPalisades?: boolean`
-- `shared/cards/B/B30_WoodPalisades.ts`：声明 marker
-- `shared/cards/helpers/card-type.ts`：新增 `playerCanBuildPalisades(player)`，遍历 minor/occupation/major 找 marker
-- 三处主路径全部替换；前端 prop 顺手 rename `hasWoodPalisadesCard` → `canBuildPalisades`
+```ts
+// shared/cards/helpers/card-type.ts
+export const CUSTOM_CARD_ID_PREFIX = 'CUSTOM_'
+export const isCustomCardId = (id: string): boolean =>
+  id.startsWith(CUSTOM_CARD_ID_PREFIX)
+```
 
----
+把 11 处主路径全部 replace 成 `isCustomCardId(id)`；UI 5 处也改用同一 helper（保留 prefix 校验语义）。`card-effects.ts` 已封的局部 `isCustomCard` 删掉（顶替为公共 helper）。`custom-registry.ts` 那 2 处用同一 helper 替 callback。
 
-### A2. `E148_Lazybones`（Lazybones 预占 stable 显示） ✅ 已解决
-
-> 解决于 commit `09edf30d`。
-
-### 原问题
-
-| 位置 | 代码 |
-| --- | --- |
-| `client/components/board/ActionBoard.tsx:457` | `(player.cardStates?.['E148_Lazybones']?.extraData as { spaces?: string[] }).spaces` |
-
-前端直接按卡名读 `cardStates`，单卡耦合到渲染层。
-
-### 解决方案
-
-- `shared/cards/helpers/card-state.ts`：新增 `RESERVED_ACTION_SPACES_KEY = 'reservedActionSpaces'` 常量 + `getReservedActionSpaces` / `setReservedActionSpaces` helpers（值为 `string[]` 行动位 ID）
-- `shared/cards/E/E148_Lazybones.ts`：改用工具读写（extraData key 由 `'spaces'` 改名为 `'reservedActionSpaces'`）
-- `client/components/board/ActionBoard.tsx`：改成遍历每个 player 的所有 `cardStates`，找带 `RESERVED_ACTION_SPACES_KEY` 的 entry —— 后续新增"预占 stable"卡牌无需改渲染层
-
----
-
-### A3. `Major_Fireplace1` / `Major_Fireplace2`（壁炉返还兼容池） ✅ 已解决
-
-> 解决于 commit `04945238`。
-
-### 原问题
-
-| 位置 | 代码 |
-| --- | --- |
-| `shared/actions/helpers/payment.ts:23` | `const FIREPLACE_COST_IDS = ['Major_Fireplace1', 'Major_Fireplace2'] as const` |
-| 同上 `:35-40` | `cardMatchesCostList` 里据此识别"该 cost 是否要求返还壁炉" |
-| `shared/actions/effects/improvement.ts:20` | `const FIREPLACE_MAJOR_IDS = ['Major_Fireplace1', 'Major_Fireplace2'] as const` |
-| 同上 `:27-55` | `getFireplaceReturnPool` / `getPlayedCardsForCost` 用此过滤 |
-
-`fireplaceIdentity` marker 当时只对 minor 生效（D25_WitchesDanceFloor），major 自己的 ID 仍硬编码——机制半成品。
-
-### 解决方案
-
-- `shared/cards/major/fireplace.ts`：fireplace1 加 `fireplaceIdentity: true`（fireplace2 通过 spread 继承）
-- `shared/cards/helpers/card-type.ts` 新增 `isFireplaceIdentityCard(id)` 工具，聚合 majors + minors 查询
-- `shared/actions/effects/improvement.ts`：删 `FIREPLACE_MAJOR_IDS`，`getFireplaceReturnPool` / `getPlayedCardsForCost` 改用工具
-- `shared/actions/helpers/payment.ts`：删 `FIREPLACE_COST_IDS`，`cardMatchesCostList` 改用工具
-
-主路径再无 `Major_Fireplace*` 字面量；行为保持不变。
-
----
-
-## B 级：基于 `Major_` 前缀的字符串分支 ✅ 已解决
-
-> 解决于 commit `74ff5231`（主路径 7 处）+ `35ed327e`（单卡 5 处残留）。
-
-### 原问题
-
-`shared/actions/effects/improvement.ts` 同一文件出现 4 次：
-
-| 行 | 代码 |
-| --- | --- |
-| `:552` | `if (!improvement \|\| !improvementId.startsWith('Major_'))` |
-| `:685` | `if (parsed.kind === 'major' \|\| parsed.id.startsWith('Major_'))` |
-| `:730` | `const majorImprovement = allowMajor && parsed.id.startsWith('Major_') ? getMajorCard(parsed.id) : undefined` |
-| `:817` | `if (parsed.id.startsWith('Major_'))` |
-
-跨文件还有：`exchange.ts:240`、`scoring.ts:304`、`InteractionBar.tsx:30`，以及单卡内 5 处（B95/C137/D80/D117/E156）。
-
-### 解决方案
-
-- `shared/cards/helpers/card-type.ts`：新增 `getCardPrimaryType(id)` / `isMajorCardId(id)` / `isMinorCardId(id)` / `isOccupationCardId(id)`，内部基于 `getMajorCard(id)` lookup（不再字符串前缀）
-- `parseImprovementChoice` (`improvement.ts`) 在 bare 形式下用 `isMajorCardId` 推断 kind，原本的 `|| parsed.id.startsWith('Major_')` fallback 全部消掉
-- B1 `improvement.ts:552` 的双保险防御直接删（`getMajorCard` 返 undefined 已挡）
-- B5 `exchange.ts:240` / B6 `scoring.ts:304` 改用 `isMajorCardId`
-- B7 `InteractionBar.tsx:30` 直接复用同文件已有的 `getAnyCardDisplayName`（i18n 三 pool fallback），删除 `renderReturnedCardName` + `resolveAnyCardName`
-- 主路径所有 `startsWith('Major_')` 字面量清零；剩 1 处在 `card-type.ts` 注释里作为反例提示
-
-### 附带成果：字段统一
-
-发现两套并存且**语义不一致**的"判定 effectively-major"机制：`isMajorImprovement: boolean`（`isEffectivelyMajor()` 用）vs `alsoCountsAs: CardType[]`（`cardCountsAs()` 用）。覆盖矩阵：
-
-| 卡 | `isMajorImprovement` | `alsoCountsAs:['major']` |
-| --- | :---: | :---: |
-| A60 / D59 | ✅ | ✅ |
-| D60 | — | ✅ |
-| D25 / C60 | ✅ | — |
-
-导致两个**实际 bug**：
-- D60_LargePottery 触发 D161_CabbageBuyer 时算成 minor → cost 2 food（应为 1）
-- D25_WitchesDanceFloor / C60_SmallPottersOven 不计入 cookery prereq
-
-修复（commit `74656dd6`）：
-- 给 D25 / C60 补 `alsoCountsAs: ['major']`（修两个 bug）
-- 删 `isMajorImprovement` 字段 + `isEffectivelyMajor()` 工具 + `card-identity.ts`
-- D161 改用 `cardCountsAs(id, 'major')`
-
-`alsoCountsAs` 是 BGA 对齐的字段（mirror `getOtherCardTypes()`）。
-
----
-
-## C 级：`CUSTOM_` 前缀分支（自定义卡专用代码路径）
-
-| 位置 |
-| --- |
-| `shared/logic/scoring-bonus-solver.ts:73, 100, 147` |
-| `shared/actions/helpers/animal-zones.ts:123` |
-| `shared/actions/effects/fencing.ts:34` |
-| `client/components/common/PlayerCard.tsx:57` |
-| `client/services/card-meta.ts:111` |
-
-**问题**：判断"是不是工坊自定义卡，走 custom-registry"的分流，结构上合理，但和 B 级一样靠字符串前缀。
-
-**建议修法**：统一一个 `isCustomCardId()` / `getCardSource(id)` 工具函数，消除 `startsWith('CUSTOM_')` 复制。
+工作量估算：~15 min。无行为改动，纯重构。建议下次任意 sprint 顺手做。
 
 ---
 
 ## D 级：`actions/effects/internal/` 中"为单卡设立的 leaf 文件"
 
-文件名/接口本身泛化，但顶部注释明说是为某张卡而生：
+`internal/` 总共 13 个 leaf 文件。重新审视后真正算"为单卡而生"的只剩 1 个：
 
-| 文件 | 注释中点名的卡 |
-| --- | --- |
-| `shared/actions/effects/internal/build-farmhand-room.ts:5` | B85_FarmHand |
-| `shared/actions/effects/internal/move-farmer-to-space.ts:8` | D51_Archway、E10_StrawHat |
-| `shared/actions/effects/internal/recall-placed-worker.ts:16` | D93_SheepInspector |
+| 文件 | 行数 | 状态 |
+| --- | --- | --- |
+| `build-farmhand-room.ts` | 21 | ⚠️ **真单卡**——注释明指 B85_FarmHand，全仓 caller 仅 B85 |
+| `move-farmer-to-space.ts` | 57 | ✅ 已 D51_Archway + E10_StrawHat 双卡共用 |
+| `recall-placed-worker.ts` | 146 | ✅ 真泛化——名字描述行为而非卡牌；direct mode + choice mode 双接口适配多卡 |
+| `take-from-space.ts` / `take-from-card.ts` / `store-on-card.ts` / `push-to-card-stack.ts` / `pop-card-stack.ts` / `reserve-fence-bonus.ts` / `return-to-space.ts` / `spend-worker.ts` / `future-meeples.ts` / `emit-choice.ts` / `selection.ts` | 22-50 | ✅ 已注册到通用 action registry，多卡复用或主路径共用 |
 
-**问题**：文件没硬编码卡牌字面量，但"主路径里为单卡新建 leaf"是 CLAUDE.md 反对的扩散方向。
+### `build-farmhand-room.ts` 处理建议
 
-**建议处理**：review 这些 leaf —— 是该挪到 cards/ 目录附近，还是该参数化进通用 leaf。move-farmer-to-space 已经被两张卡共用，相对健康。
+文件本身只是把 `player.familySize += 1`（增加 housing capacity 但不放物理 tile）封成一个 leaf，没共用价值。两条路径选一：
+
+- **选项 A**：把这 21 行内联到 `shared/cards/B/B85_FarmHand.ts`，从 `internal/` 删除该文件 — 卡内闭环
+- **选项 B**：参数化为 `set-virtual-room-count` leaf（接受 delta + which counter），保留在 `internal/` 但等第二张卡出现再考虑
+
+**推荐 A**：YAGNI；如果未来真有第二张 virtual-room 卡，再走"两个 caller 才抽公共"原则提到 `internal/`。
 
 ---
 
 ## E 级：注释里的卡名"举例"（不影响行为）
 
-仅文档/注释，无执行影响。如果后续清理，建议改成"举例 X 类卡"的描述而不是点名具体卡。
+仅文档/注释，无执行影响。复查后只剩 2 处（其余在 5/6/7/S1-S8 sprint 中顺手清掉了）：
 
 | 位置 | 提到的卡 |
 | --- | --- |
-| `shared/actions/effects/improvement.ts:461` | E95_Miller |
-| 同上 `:770/:778` | D131（bottom-row majors） |
-| 同上 `:800` | E78_Y（路径示例） |
-| `shared/actions/helpers/payment.ts:678/679/686` | A14、A143、D82、A123、C122 |
-| `shared/actions/helpers/pay-helpers.ts:169` | A88_HedgeKeeper |
-| `shared/actions/effects/breed.ts:29` | A165_PigBreeder |
-| `shared/game/types.ts:333` | D95_SiteManager |
-| `shared/protocol/game.ts:33` | A123_FrameBuilder |
-| `shared/session/game-core.ts:2499` | C22_BasketChair |
+| `shared/actions/effects/breed.ts:30` | A165_PigBreeder（"such as A165 PigBreeder (sourceCard='A165_PigBreeder')"）|
+| `shared/contract/types.ts:358` | D95_SiteManager（"e.g. D95 Site Manager treats `actionCardId === 'D95_SiteManager'`"）|
+
+两处都是 doc comment，描述某种**调用模式的代表卡**，不是字面量分支。可以保留；如果清理建议改成"举例 X 类卡（如 ChildToys-style trigger）"。
 
 ---
 
 ## 边界 case：魔法字符串而非卡 ID
 
-`shared/actions/effects/breed.ts:70` —— `if (sourceCard === 'harvest')`
+### `shared/actions/effects/breed.ts:71` / `:111` —— `sourceCard === 'harvest'`
 
-不是卡牌 ID，但是"主路径用魔法字符串 `'harvest'` 区分调用来源"。建议换枚举或显式的 `harvestSummary?: boolean` 选项。
+```ts
+if (sourceCard === 'harvest') {
+  state.harvestBreedSummary ??= {}
+  state.harvestBreedSummary[player.id] = breedSummary
+  ...
+}
+```
+
+`sourceCard` 字段类型是 string（卡 ID），但主路径传 `'harvest'` 当哨兵区分"这次 breed 是收获相位触发的 vs 卡触发的"。两个用途共享同一字段：
+
+1. **卡触发** (line 30 注释)：`sourceCard='A165_PigBreeder'` 等真卡 ID，决定动物归属 / 计分 source
+2. **收获触发** (line 71)：`sourceCard='harvest'` 哨兵，启用 `harvestBreedSummary` 累计 + 多 round 14 listener 加挂
+
+### 建议修法
+
+把 `sourceCard?: string` 改成 `breedTrigger: { kind: 'harvest' } | { kind: 'card', cardId: string }`，调用点显式传 discriminated union。两处 `=== 'harvest'` 改成 `breedTrigger.kind === 'harvest'`。
+
+工作量：~30 min（含 caller 修 + 测试）。
+
+---
+
+## 新发现（2026-05-09）
+
+### `shared/actions/helpers/ad-hoc-action-registry.ts:6` —— `id.startsWith('card_')` invariant
+
+```ts
+if (!def.id.startsWith('card_')) {
+  // throw / warn
+}
+```
+
+ad-hoc action ID 必须以 `card_` 开头是个 namespace invariant（防止 ad-hoc action 与内置 action 命名冲突），但 enforced via 字符串字面量 startsWith 检查。**与 `Major_` / `CUSTOM_` 是同类问题**——namespace 协议靠字符串前缀维护。
+
+### 建议修法
+
+抽常量 + helper（与 C 级修法同模式）：
+
+```ts
+export const AD_HOC_ACTION_ID_PREFIX = 'card_'
+export const isAdHocActionId = (id: string): boolean =>
+  id.startsWith(AD_HOC_ACTION_ID_PREFIX)
+```
+
+工作量：~5 min。可以与 C 级合并为一个"前缀 namespace helper"sprint。
+
+### 4 张 deferred 卡的"为单卡新基建"暗示（不属本表）
+
+S7 spec §0 列出 C6 / C146 / E123 / C148 各需独立基建（CropStack stone kind / cross-player listener / pay leaf 主路径迁移 / reorg dispatcher hook）。这些是**还没写**的扩展点，不是"已写 + 单卡污染"，已登记到 `docs/card_progress.md` §2.5 末"deferred 基建依赖"表，**不属本文件追踪范围**。
+
+---
+
+## F 级：`legacy` 标记残留（2026-05-09 全仓扫描）
+
+**全仓总量 221 处**：主路径 79 + 测试 131 + 文档 11（`ENGINE_NEW_ARCHITECTURE.md` 自身的迁移留痕）。
+
+按"性质"分 4 类，按修复优先级排：
+
+### F1. 真 fallback 路径（带 if/else 双轨）—— P1，等主路径迁移
+
+| 文件 | 行 | Legacy 路径用途 | 触发条件 / 删除条件 |
+| --- | --- | --- | --- |
+| `shared/cards/E/E123_ResourceHoarder.ts` | 83-128 | `actions: ['construct', 'renovate-house']` 旧 listener path（fallback to k=1） | 等 construct/renovate-house 主路径迁到 pay leaf；与 S3 PaymentSolver 收口的尾部清理同步进展 |
+| `shared/cards/custom-registry.ts` | 67-71 | per-session registry 找不到 → fall back to global maps | 等所有调用方走 session context（含前端）后删 global map |
+| `shared/actions/effects/internal/selection.ts` | 35, 45 | "Prefer structured payload (S2 Task 7); fall back to legacy split-comma" / `'r-c'` 字符串格式兼容 | 所有 caller 改传 structured payload + position 用对象格式 |
+| `shared/actions/effects/pay.ts` | 244, 321, 324 | "silent cost-replacement treatment they had in the legacy" / "legacy mutate-in-place path" / "legacy D83-style upper-flow tests compatible" | pay leaf 完全替代 `executePaymentSolution` 直调路径后删 |
+| `shared/session/session-core.ts` | 2222, 2295, 2324, 2355, 2367, 2401, 2626, 2709, 2711, 2746, 2756, 3192, 3333 | animal-reorg / next-player switch / choice 等多个 confirmXxx 仍 fall back to legacy `state.pending`-driven path | 全部 pending 改成 typed `InteractionRequest` 后删（S1/S2 主体已完，confirmXxx legacy 路径是收尾） |
+| `shared/engine/engine-proceed.ts`, `engine-resolve.ts` | `includeLegacyLogKey` 选项 + `legacyEntry` 注入 | 默认 `true`，把 result.logKey 转成 immediate log entry 与新 entries 合并 | 所有 listener 直接产 immediate logs（不再用顶层 `logKey`）后删 |
+| `shared/actions/effects/pay.ts` | 59-61 | `_activeActionBonusSources` 字段是 legacy 字段（仍在维护） | 所有 source-tracking 改走 result.extraData.bonusUsed（pay leaf 路径已用）后删字段 |
+
+### F2. 历史迁移留痕注释（已删 legacy 代码后留的说明）—— P3
+
+注释只描述"现在的实现替代了 legacy XYZ"，本身无 fallback 代码，不影响行为：
+
+| 文件 | 行 | 性质 |
+| --- | --- | --- |
+| `shared/cards/registry.ts` | 6, 130 | "PR-3 deletes the legacy global layer" / "after the legacy `getMajorCardEffect` fallback is removed" |
+| `shared/session/session-core.ts` | 280, 559, 566, 632, 1147, 1152, 1283, 1507 | "Replaces the legacy ..." / "the legacy `this.pending` is gone (Task 10)" 等 8 处 S1/S2 迁移说明 |
+| `shared/engine/nodes/interaction-node.ts` | 11, 59, 69 | "mirrors the legacy engine-private `pending` field" |
+| `shared/contract/types.ts` | 190, 730 | "receiving the same `PaymentInfo` it did under the legacy ..." / "the legacy stateId switches" |
+| `shared/domain/farmyard.ts` | 25, 156, 1395 | "Legacy types preserved for the inlined validators" / "previously private in legacy modules" / "mirror legacy `validatePlowSelection` behavior" —— S4a 把 `shared/logic/farm/` 拆完留的 |
+| `shared/actions/effects/breed.ts` | 22, 74, 100 | "replays the legacy `breedAnimals` semantics" / "Match legacy applyBreedPhase log entry" / "preserves the legacy `'animalReorg'`" |
+
+**处理建议**：S1/S2/S3/S4 已完，迁移留痕注释完成它的引导作用——**可以一次性 grep 删**（保留代码不动）。预估 ~30 行注释清理，10 min。
+
+### F3. 测试里的 `legacy` 命名（baseline / mock 标识）—— P3 / 不动
+
+131 处分布在 ~20 个测试文件，多数是：
+- "legacy baseline" 测试名（对照新实现）
+- mock cardStates / mock pending 取名为 legacyXxx
+- 注释 "this asserts legacy shape pre-Sx codemod"
+
+**性质**：测试自身命名约定，不是代码坏味道。**建议不动**——除非测试本身已弃用。
+
+### F4. 文档里的 `legacy`（`ENGINE_NEW_ARCHITECTURE.md` 等）—— P3
+
+11 处自描述，sprint 完成总结里说"以前的 legacy 设计是 X，现在是 Y"。属合理历史叙述，不动。
+
+### F5. `@deprecated` / `deprecated` 标记（2026-05-09 补扫 + 同日清理）—— 已收口
+
+#### F5.1 真 `@deprecated` 字段 —— ✅ 2026-05-09 已清理
+
+| 位置 | 字段 | 清理动作 |
+| --- | --- | --- |
+| `shared/engine/engine.ts:301-309`（已删） | `lastEmittedChoice` snapshot alias | 扫 prod DB 2262 个 rooms.state_json 全 0 含此字段 → 删字段定义 + 删 restore alias 接受逻辑 + 清相关注释 |
+| `server/db.ts` `effect_dsl` 双列 | SQL 列 | v7 migration 早已 `ALTER TABLE DROP COLUMN`（本地 schema_version v8 验证 effect_dsl/effect_code/compiled_code 三列均不在）；删 `@deprecated` 注释（misleading），保留 v2/v3/v7 migration 历史本身（不可变） |
+| `scripts/migrate-dsl-to-code.ts` + `__tests__/` + `package.json` `migrate:dsl-to-code` | 一次性迁移脚本 | 与 effect_dsl 列同时退役（DB 中已无该列，脚本无法运行）→ 整套删除 |
+| `scripts/check-no-dsl.ts` allowlist | DSL 关键字守卫的豁免列表 | 移除已删除的 `migrate-dsl-to-code` + `docs/superpowers` 引用 |
+
+**验证**：fast 测试 2283 全过 / lint 0 error / build OK。
+
+#### F5.2 注释自描述（无残留代码）—— 不动
+
+- `server/__tests__/_helpers/legacy-confirms.ts:8, 23, 36` —— 3 处 test helper 注释，描述自己**替代**已删除的 `confirmNextPlayer()` / `confirmPlayerSwitch()` shim + `'choice' PendingAction` predicate（S2 Task 13.7 已删）
+- `shared/session/session-core.ts:173` —— 注释提 "the deprecated union"（PendingAction union 已删 S1 Task 13.6）
+
+**不动**——历史叙述，删了反而丢失迁移上下文。
+
+#### F5.3 测试拒收 deprecated 字段（回归保护）—— 保留
+
+- `shared/custom-code/__tests__/ast-validator.test.ts:83` —— `it('rejects scoringPriority as a deprecated meta field')`
+- 主路径已 0 处 `scoringPriority`（2026-04-30 Bonus scoring hook 双轨合并时删干净）
+- ast-validator 黑名单防止 LLM 生成的自定义卡复活此字段
+
+**保留**——回归保护必要。
+
+### F 级处理优先级
+
+1. **F1 真 fallback**：等对应主路径 sprint 推进（不要单独清理——清掉会破坏兼容期）
+2. **F2 注释清理**：可立即批量做（~10 min），但收益小
+3. **F3 测试命名**：不动
+4. **F4 文档**：不动
+5. **F5.1 真 `@deprecated` 字段**：需 owner 决定 + 生产数据迁移；engine `lastEmittedChoice` 扫 DB 后可决；SQL `effect_dsl` 双列需备份 → DROP COLUMN
+6. **F5.2 / F5.3**：不动
 
 ---
 
 ## 后续优先级
 
-A 级 + B 级全部清理完成。剩余项：
+1. **C 级 `CUSTOM_` 前缀**（最严重 / 最易做）：抽 `isCustomCardId()` helper，11 处主路径 + 5 处 UI 共用。~15 min。
+2. **新发现 `card_` ad-hoc action 前缀**：抽 `isAdHocActionId()` helper。~5 min。**建议与 1 合并 commit**。
+3. **D 级 `build-farmhand-room.ts`**：内联到 B85_FarmHand 卡内，删 `internal/` 文件。~10 min。
+4. **边界 case `breed.ts 'harvest'`**：换 discriminated union `breedTrigger`。~30 min（含测试）。
+5. **E 级 注释举例**：可选，捎带清理。~5 min。
+6. **F2 legacy 注释清理**（可选）：批量删除"Replaces the legacy XYZ" 等迁移留痕注释。~10 min。
+7. **F1 真 fallback**：跟随对应主路径 sprint 自然清理，不单独立项。
+8. ~~F5.1 真 `@deprecated` 字段~~ ✅ 已于 2026-05-09 同日清理。
 
-1. **C 级（`CUSTOM_` 前缀分支）**：5 处复制，结构合理但缺统一工具 — 抽 `isCustomCardId()` 即可。
-2. **D 级（`actions/effects/internal/` 单卡 leaf）**：review 是否参数化或挪到 cards/ 附近。
-3. **E 级（注释里的举例卡名）**：仅文档影响，捎带清理。
-4. **边界 case `breed.ts:70`** `'harvest'` 魔法字符串：换枚举 / 显式 flag。
+合计 ~1h（不含 F1）即可清完所有可立即处理的 P3 坏味道。
 
 ---
 
 ## 卡类型工具链（清理后的现状参考）
 
-未来涉及"卡类型"的检查统一走以下工具，**不要**再用 `id.startsWith('Major_')` / `id.startsWith('Minor_')` 等前缀字面量：
+未来涉及"卡类型 / namespace"的检查统一走以下工具，**不要**再用 `id.startsWith('Major_')` / `id.startsWith('Minor_')` / `id.startsWith('CUSTOM_')` / `id.startsWith('card_')` 等前缀字面量：
 
 | 用途 | 工具 | 位置 |
 | --- | --- | --- |
@@ -230,6 +275,8 @@ A 级 + B 级全部清理完成。剩余项：
 | Fireplace 兼容卡（满足返还需求） | `isFireplaceIdentityCard(id)` | `shared/cards/helpers/card-type.ts` |
 | 玩家是否能建 palisade（B30 同款能力） | `playerCanBuildPalisades(player)` | 同上 |
 | 卡在某些 action space 上预占 marker（E148 同款能力） | `RESERVED_ACTION_SPACES_KEY` + `getReservedActionSpaces` / `setReservedActionSpaces` | `shared/cards/helpers/card-state.ts` |
+| **是不是自定义卡 ID（待添加）** | `isCustomCardId(id)` | `shared/cards/helpers/card-type.ts`（C 级清理后） |
+| **是不是 ad-hoc action ID（待添加）** | `isAdHocActionId(id)` | `shared/actions/helpers/ad-hoc-action-registry.ts`（C 级清理后） |
 
 声明字段：
 - `alsoCountsAs?: CardType[]` —— minor/occupation 也算作其它类型（dual-type）

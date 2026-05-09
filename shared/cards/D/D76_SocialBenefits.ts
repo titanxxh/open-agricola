@@ -1,7 +1,6 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D76_SocialBenefits } from '../../cards-display/D/D76_SocialBenefits'
-export { D76_SocialBenefits }
 
 const CARD_ID = D76_SocialBenefits.id
 

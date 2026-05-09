@@ -1,7 +1,6 @@
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import type { CardImpl } from '../registry'
 import { B42_ForestInn } from '../../cards-display/B/B42_ForestInn'
-export { B42_ForestInn }
 
 const CARD_ID = B42_ForestInn.id
 

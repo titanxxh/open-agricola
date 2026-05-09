@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { D62_BeerTap, D62_BeerTap_impl } from '../../shared/cards/D/D62_BeerTap'
+import { D62_BeerTap } from '../../shared/cards-display/D/D62_BeerTap'
+import { D62_BeerTap_impl } from '../../shared/cards/D/D62_BeerTap'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
 import type { PlayerState, Resource } from '../../shared/contract/types'
 

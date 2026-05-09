@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { A57_MilkingParlor } from '../../shared/cards/A/A57_MilkingParlor'
+import { A57_MilkingParlor } from '../../shared/cards-display/A/A57_MilkingParlor'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { getAllTilePositions } from '../../shared/domain/farm'
 

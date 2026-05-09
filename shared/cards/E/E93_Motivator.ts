@@ -3,7 +3,6 @@ import { hasNoUnusedFarmyardSpaces } from '../../domain/farm'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { E93_Motivator } from '../../cards-display/E/E93_Motivator'
-export { E93_Motivator }
 
 const CARD_ID = E93_Motivator.id
 

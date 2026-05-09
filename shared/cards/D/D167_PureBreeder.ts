@@ -2,8 +2,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { playerBoard } from '../../domain'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { D167_PureBreeder } from '../../cards-display/D/D167_PureBreeder'
-export { D167_PureBreeder }
 
 const CARD_ID = 'D167_PureBreeder'
 

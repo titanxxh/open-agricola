@@ -2,7 +2,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { A106_SlurrySpreader } from '../../cards-display/A/A106_SlurrySpreader'
-export { A106_SlurrySpreader }
 
 const CARD_ID = A106_SlurrySpreader.id
 

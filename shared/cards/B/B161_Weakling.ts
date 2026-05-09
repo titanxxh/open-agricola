@@ -4,7 +4,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B161_Weakling } from '../../cards-display/B/B161_Weakling'
-export { B161_Weakling }
 
 const CARD_ID = B161_Weakling.id
 

@@ -1,7 +1,6 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B71_HarvestHouse } from '../../cards-display/B/B71_HarvestHouse'
-export { B71_HarvestHouse }
 
 const CARD_ID = B71_HarvestHouse.id
 

@@ -2,7 +2,6 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { C95_BasketWeaver } from '../../cards-display/C/C95_BasketWeaver'
-export { C95_BasketWeaver }
 
 const CARD_ID = C95_BasketWeaver.id
 

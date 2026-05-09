@@ -1,7 +1,6 @@
 import { initCardState } from '../__stubs__/helpers'
 import type { CardImpl } from '../registry'
 import { B86_TruffleSearcher } from '../../cards-display/B/B86_TruffleSearcher'
-export { B86_TruffleSearcher }
 
 const CARD_ID = B86_TruffleSearcher.id
 

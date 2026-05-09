@@ -1,7 +1,6 @@
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 import { A69_LargeGreenhouse } from '../../cards-display/A/A69_LargeGreenhouse'
-export { A69_LargeGreenhouse }
 
 const CARD_ID = A69_LargeGreenhouse.id
 

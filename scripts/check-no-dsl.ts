@@ -27,19 +27,12 @@ const DSL_KEYWORDS = [
 
 const ALLOW_LIST_PATTERNS = [
   /^CHANGELOG\.md$/,
-  /^docs\/superpowers\/specs\/.*\.md$/,
-  /^docs\/superpowers\/plans\/.*\.md$/,
   /^scripts\/check-no-dsl\.ts$/,
   /^scripts\/__tests__\/check-no-dsl\.test\.ts$/,
   /^scripts\/__tests__\/fixtures\/dsl-samples\//,
-  // PR-2: one-shot migration script (keeps legacy DSL types/column names so it
-  // can read old `effect_dsl` rows and convert them to TS code). The script is
-  // kept for historical data recovery but no new code should reference DSL.
-  /^scripts\/migrate-dsl-to-code\.ts$/,
-  /^scripts\/__tests__\/migrate-dsl-to-code\.test\.ts$/,
-  // PR-2: db.ts keeps the `effect_dsl` column in migration SQL so existing
-  // SQLite files still match the schema. Column is @deprecated and never
-  // written to. The workshop-api test recreates the same legacy schema.
+  // db.ts keeps the legacy `effect_dsl` column in v2/v3 migration SQL +
+  // drops it in v7 — the literal name still appears in the migration history
+  // even though new DBs end up with the column dropped.
   /^server\/db\.ts$/,
   /^server\/__tests__\/workshop-api\.test\.ts$/,
 ]

@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { A6_StorageBarn } from '../../cards-display/A/A6_StorageBarn'
-export { A6_StorageBarn }
 
 const CARD_ID = A6_StorageBarn.id
 

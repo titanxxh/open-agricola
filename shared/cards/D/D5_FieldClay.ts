@@ -2,7 +2,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { D5_FieldClay } from '../../cards-display/D/D5_FieldClay'
-export { D5_FieldClay }
 
 const CARD_ID = D5_FieldClay.id
 

@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { E124_MayorCandidate } from '../../cards-display/E/E124_MayorCandidate'
-export { E124_MayorCandidate }
 
 const CARD_ID = E124_MayorCandidate.id
 

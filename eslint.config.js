@@ -147,20 +147,18 @@ export default defineConfig([
   // files under shared/cards/[A-E]/**, shared/cards/community/**, or
   // shared/cards/__stubs__/**. Pure types may come from shared/contract/*.
   //
-  // Excluded from this rule:
-  //   - shared/cards-display/major/**  — major card data files keep their
-  //     onBuy/onHarvest hooks inline (no separate impl split exists for
-  //     majors); they intentionally reach into actions/effects/internal and
-  //     cards/helpers/stage-effects. Hoisting major hooks is S6c work.
-  //   - shared/cards-display/_lookup.ts — bridges catalog into the display
-  //     facade; needs cards/major + cards/catalog references.
+  // Excluded from this rule (Sprint S8 collapsed prior 3 exemptions):
+  //   - shared/cards-display/_lookup-data.ts — single forwarding seam for
+  //     `cards/custom-registry` (runtime overlay registry). custom-registry
+  //     has no transitive imports to cards/major or cards/catalog, so this
+  //     reverse edge is safe under vite dev ESM cycle resolution.
   //   - shared/cards-display/types.ts — owns the CardBase class hierarchy
-  //     that all card display files extend.
+  //     that all card display files extend (kept defensively; verify by
+  //     `grep '^import' shared/cards-display/types.ts`).
   {
     files: ['shared/cards-display/**/*.{ts,tsx}'],
     ignores: [
-      'shared/cards-display/major/**',
-      'shared/cards-display/_lookup.ts',
+      'shared/cards-display/_lookup-data.ts',
       'shared/cards-display/types.ts',
     ],
     rules: {
@@ -227,11 +225,18 @@ export default defineConfig([
   },
   // S6c: impl layers should consume card metadata via getCardDefinition/registry-runtime,
   // not reach into cards-display directly (would couple impl to display chunk).
+  // Tests under __tests__/ are dev-only and may import cards-display directly
+  // for assertion fixtures (e.g. asserting a card's modifier shape).
   {
     files: [
       'shared/actions/**/*.ts',
       'shared/engine/**/*.ts',
       'shared/session/**/*.ts',
+    ],
+    ignores: [
+      'shared/actions/**/__tests__/**',
+      'shared/engine/**/__tests__/**',
+      'shared/session/**/__tests__/**',
     ],
     rules: {
       '@typescript-eslint/no-restricted-imports': ['error', {

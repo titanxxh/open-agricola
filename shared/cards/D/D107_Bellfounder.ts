@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { D107_Bellfounder } from '../../cards-display/D/D107_Bellfounder'
-export { D107_Bellfounder }
 
 const CARD_ID = D107_Bellfounder.id
 

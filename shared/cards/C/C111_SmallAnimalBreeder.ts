@@ -1,7 +1,6 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C111_SmallAnimalBreeder } from '../../cards-display/C/C111_SmallAnimalBreeder'
-export { C111_SmallAnimalBreeder }
 
 const CARD_ID = C111_SmallAnimalBreeder.id
 

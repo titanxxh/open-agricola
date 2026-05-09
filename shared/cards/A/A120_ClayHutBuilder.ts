@@ -5,7 +5,6 @@ import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/int
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { A120_ClayHutBuilder } from '../../cards-display/A/A120_ClayHutBuilder'
-export { A120_ClayHutBuilder }
 
 const CARD_ID = A120_ClayHutBuilder.id
 

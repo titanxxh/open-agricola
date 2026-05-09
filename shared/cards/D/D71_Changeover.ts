@@ -4,7 +4,6 @@ import { registerSelectionEffect } from '../../actions/helpers/selection-effect-
 import { fieldTotalRemaining } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { D71_Changeover } from '../../cards-display/D/D71_Changeover'
-export { D71_Changeover }
 
 const CARD_ID = D71_Changeover.id
 

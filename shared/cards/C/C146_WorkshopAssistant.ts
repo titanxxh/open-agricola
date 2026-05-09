@@ -9,7 +9,6 @@ import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registr
 import { gainResources } from '../../actions/effects/gain'
 import type { CardImpl } from '../registry'
 import { C146_WorkshopAssistant } from '../../cards-display/C/C146_WorkshopAssistant'
-export { C146_WorkshopAssistant }
 
 const CARD_ID = C146_WorkshopAssistant.id
 

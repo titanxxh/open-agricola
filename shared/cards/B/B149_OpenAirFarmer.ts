@@ -1,7 +1,6 @@
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B149_OpenAirFarmer } from '../../cards-display/B/B149_OpenAirFarmer'
-export { B149_OpenAirFarmer }
 
 const CARD_ID = B149_OpenAirFarmer.id
 

@@ -4,7 +4,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { B134_HousebookMaster } from '../../cards-display/B/B134_HousebookMaster'
-export { B134_HousebookMaster }
 
 const CARD_ID = B134_HousebookMaster.id
 

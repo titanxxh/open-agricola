@@ -5,7 +5,6 @@ import { payLeaf } from '../helpers/pay-gain-node'
 import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 import { D46_PelletPress } from '../../cards-display/D/D46_PelletPress'
-export { D46_PelletPress }
 
 const CARD_ID = D46_PelletPress.id
 

@@ -6,7 +6,6 @@ import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-co
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { D112_YoungFarmer } from '../../cards-display/D/D112_YoungFarmer'
-export { D112_YoungFarmer }
 
 const CARD_ID = D112_YoungFarmer.id
 

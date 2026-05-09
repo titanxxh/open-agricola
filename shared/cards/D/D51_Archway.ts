@@ -2,7 +2,6 @@ import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-a
 import { isSpaceOccupied, spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { D51_Archway } from '../../cards-display/D/D51_Archway'
-export { D51_Archway }
 
 const CARD_ID = D51_Archway.id
 

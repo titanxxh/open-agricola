@@ -1,7 +1,6 @@
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { C100_Butler } from '../../cards-display/C/C100_Butler'
-export { C100_Butler }
 
 const CARD_ID = C100_Butler.id
 

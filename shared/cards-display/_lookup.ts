@@ -3,27 +3,23 @@ import type {
   Occupation as OccupationCard,
   PlayerActionCard,
 } from './types'
-import { majorCardDefinitions } from '../cards/major'
+import { majorImprovementIdsList } from './major'
 import {
-  minorImprovementCards,
-  minorImprovementIds,
-  occupationCards,
-  occupationIds,
-} from '../cards/catalog'
-import {
+  minorImprovementCardsList,
+  minorImprovementIdsList,
+  occupationCardsList,
+  occupationIdsList,
   getCustomMinorImprovement,
   getCustomOccupation,
-} from '../cards/custom-registry'
+} from './_lookup-data'
 
-export const majorImprovementIds = majorCardDefinitions.map(
-  (improvement) => improvement.id,
-)
+export const majorImprovementIds = majorImprovementIdsList
 
 export type MinorImprovement = MinorImprovementCard | PlayerActionCard
 
-export const minorImprovements: MinorImprovement[] = minorImprovementCards
+export const minorImprovements: MinorImprovement[] = [...minorImprovementCardsList]
 
-export { minorImprovementIds }
+export const minorImprovementIds = minorImprovementIdsList
 
 export const getMinorImprovement = (id: string) =>
   minorImprovements.find((improvement) => improvement.id === id)
@@ -31,9 +27,9 @@ export const getMinorImprovement = (id: string) =>
 
 export type Occupation = OccupationCard | PlayerActionCard
 
-export const occupations: Occupation[] = occupationCards
+export const occupations: Occupation[] = [...occupationCardsList]
 
-export { occupationIds }
+export const occupationIds = occupationIdsList
 
 export const getOccupation = (id: string) =>
   occupations.find((occupation) => occupation.id === id)

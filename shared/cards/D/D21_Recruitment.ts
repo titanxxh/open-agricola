@@ -5,7 +5,6 @@ import { familySize } from '../../domain/player'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { D21_Recruitment } from '../../cards-display/D/D21_Recruitment'
-export { D21_Recruitment }
 
 const CARD_ID = D21_Recruitment.id
 

@@ -2,7 +2,6 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { E130_Overachiever } from '../../cards-display/E/E130_Overachiever'
-export { E130_Overachiever }
 
 const CARD_ID = E130_Overachiever.id
 

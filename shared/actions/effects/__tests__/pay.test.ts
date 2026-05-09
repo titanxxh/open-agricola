@@ -26,7 +26,7 @@ import type {
   Trade,
   TradeModifier,
 } from '../../../contract/types'
-import { A88_HedgeKeeper } from '../../../cards/A/A88_HedgeKeeper'
+import { A88_HedgeKeeper } from '../../../cards-display/A/A88_HedgeKeeper'
 
 const hedgeKeeperModifier = A88_HedgeKeeper.modifier as TradeModifier
 

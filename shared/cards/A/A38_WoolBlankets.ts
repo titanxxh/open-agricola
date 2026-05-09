@@ -2,7 +2,6 @@ import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import type { PlayerState } from '../../contract/types'
 import { A38_WoolBlankets } from '../../cards-display/A/A38_WoolBlankets'
-export { A38_WoolBlankets }
 
 const CARD_ID = A38_WoolBlankets.id
 

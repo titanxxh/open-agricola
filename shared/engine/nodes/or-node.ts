@@ -8,9 +8,8 @@ import type { InteractionContextSnapshot } from './interaction-node'
  * S2 Task 8: composite emit nodes (Or/Xor/Optional) carry their own
  * pending-choice metadata (`emittedChoices`, `emittedPromptKey`,
  * `emittedRequest`) when `Engine.proceed` has emitted a `'choice'` step
- * for them. This replaces the engine-level `lastEmittedChoice` cache and
- * makes `Engine.peekInteractionHost` able to surface the same shape
- * regardless of whether the pending node is a leaf-paired
+ * for them. This makes `Engine.peekInteractionHost` able to surface the
+ * same shape regardless of whether the pending node is a leaf-paired
  * `InteractionNode` or one of the composite nodes below.
  */
 export class OrNode extends BaseNode {

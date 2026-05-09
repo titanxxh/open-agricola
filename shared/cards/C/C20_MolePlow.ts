@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { C20_MolePlow } from '../../cards-display/C/C20_MolePlow'
-export { C20_MolePlow }
 
 const CARD_ID = C20_MolePlow.id
 

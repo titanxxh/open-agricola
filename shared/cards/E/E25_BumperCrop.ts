@@ -1,7 +1,6 @@
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { E25_BumperCrop } from '../../cards-display/E/E25_BumperCrop'
-export { E25_BumperCrop }
 
 const CARD_ID = E25_BumperCrop.id
 

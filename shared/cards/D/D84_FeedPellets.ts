@@ -2,7 +2,6 @@ import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { D84_FeedPellets } from '../../cards-display/D/D84_FeedPellets'
-export { D84_FeedPellets }
 
 const CARD_ID = D84_FeedPellets.id
 

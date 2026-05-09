@@ -1,7 +1,6 @@
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E5_NightLoot } from '../../cards-display/E/E5_NightLoot'
-export { E5_NightLoot }
 
 const CARD_ID = E5_NightLoot.id
 

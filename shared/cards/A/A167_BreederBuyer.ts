@@ -9,7 +9,6 @@ import {
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { A167_BreederBuyer } from '../../cards-display/A/A167_BreederBuyer'
-export { A167_BreederBuyer }
 
 const CARD_ID = A167_BreederBuyer.id
 
