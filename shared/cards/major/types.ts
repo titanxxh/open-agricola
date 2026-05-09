@@ -11,19 +11,23 @@ import type { CardDefinition } from '../../contract/cards'
 export type MajorEffectHook = Exclude<CardEffectHook, 'onBeforePlayerTurn'>
 
 /**
- * Major improvement card metadata. Majors carry both CardDefinition fields
- * (id / name / deck / number / desc / vp / cost / exchanges / scoring / ...)
- * and CardEffect hooks (onBuy / onHarvest / ...). Built as an intersection
- * with CardDefinition so getCardDefinition can return majors via the unified
- * catalog entry.
- *
- * `cost`, `vp`, `extraVp`, `desc` are required for majors (CardDefinition
- * has them as optional / generic).
+ * Display-only major card metadata (no hooks). Used by cards-display/major
+ * and consumed via `getMajorCardDisplay` from client tree-shake-friendly paths.
  */
-export type MajorCardData = CardDefinition &
-  CardEffect & {
-    cost: Partial<Resource> | ComplexCost
-    vp: number
-    extraVp: boolean
-    desc: string[]
-  }
+export type MajorCardDisplay = CardDefinition & {
+  cost: Partial<Resource> | ComplexCost
+  vp: number
+  extraVp: boolean
+  desc: string[]
+}
+
+/**
+ * Major hooks layer. Map-keyed by major id in `cards/major/effects.ts`.
+ */
+export type MajorHooks = Pick<CardEffect, MajorEffectHook>
+
+/**
+ * Composite type used by callers (improvement / exchange / round / catalog).
+ * `cards/major/index.ts` builds these by merging display data with effects.
+ */
+export type MajorCardData = MajorCardDisplay & MajorHooks

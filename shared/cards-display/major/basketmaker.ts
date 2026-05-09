@@ -1,7 +1,6 @@
-import type { MajorCardData } from '../../cards/major/types'
-import { createSingleHarvestExchange } from '../../cards/helpers/stage-effects'
+import type { MajorCardDisplay } from '../../cards/major/types'
 
-export const basketmaker: MajorCardData = {
+export const basketmaker: MajorCardDisplay = {
   id: 'Major_Basket',
   name: 'Basketmaker',
   deck: 'major',
@@ -23,5 +22,4 @@ export const basketmaker: MajorCardData = {
       '5+': 3,
     },
   },
-  onHarvest: createSingleHarvestExchange('reed', { food: 3 }),
 }

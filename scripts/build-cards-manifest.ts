@@ -124,7 +124,10 @@ function parseMajorCardDataVars(
       if (!ts.isIdentifier(decl.name)) continue
       if (!decl.type) continue
       const typeText = decl.type.getText()
-      if (typeText !== 'MajorCardData') continue
+      // Accept both legacy `MajorCardData` (display + hooks) and the
+      // S8 split `MajorCardDisplay` (display-only). cards-display/major
+      // files now use the display-only type after Sprint S8 B1.
+      if (typeText !== 'MajorCardData' && typeText !== 'MajorCardDisplay') continue
       if (!decl.initializer || !ts.isObjectLiteralExpression(decl.initializer)) continue
 
       const obj: Record<string, unknown> = {}

@@ -1,7 +1,6 @@
-import type { MajorCardData } from '../../cards/major/types'
-import { createSingleHarvestExchange } from '../../cards/helpers/stage-effects'
+import type { MajorCardDisplay } from '../../cards/major/types'
 
-export const pottery: MajorCardData = {
+export const pottery: MajorCardDisplay = {
   id: 'Major_Pottery',
   name: 'Pottery',
   deck: 'major',
@@ -23,5 +22,4 @@ export const pottery: MajorCardData = {
       '7+': 3,
     },
   },
-  onHarvest: createSingleHarvestExchange('clay', { food: 2 }),
 }

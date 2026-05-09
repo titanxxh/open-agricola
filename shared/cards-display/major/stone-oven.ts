@@ -1,6 +1,6 @@
-import type { MajorCardData } from '../../cards/major/types'
+import type { MajorCardDisplay } from '../../cards/major/types'
 
-export const stoneOven: MajorCardData = {
+export const stoneOven: MajorCardDisplay = {
   id: 'Major_StoneOven',
   name: 'Stone Oven',
   deck: 'major',
@@ -14,10 +14,4 @@ export const stoneOven: MajorCardData = {
     '<GRAIN> <ARROW-2X> 4<FOOD>',
     '[When you build it, you can Bake immediately]',
   ],
-  onBuy: () => ({
-    type: 'leaf',
-    actionId: 'bake-bread',
-    optional: true,
-    sourceCard: 'Major_StoneOven',
-  }),
 }
