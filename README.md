@@ -58,6 +58,7 @@ P1 自动创建房间，P2 自动加入，操作实时同步。
 | `devMode=1` | 启用开发者面板（资源编辑、回合跳转、卡牌工具） |
 | `customCards=id1,id2` | 创建 WS 房间时加载工坊卡 ID |
 | `page=workshop` | 打开工坊页面 |
+| `page=login` | 强制跳登录页（认证后默认跳大厅）|
 
 ## Project Structure
 
