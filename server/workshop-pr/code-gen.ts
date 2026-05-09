@@ -748,16 +748,17 @@ export function patchCommunityCardsMarkdown(
   return source.slice(0, idx) + row + '\n' + source.slice(idx)
 }
 
-function patchCommunityAutoCatalog(
+export function patchCommunityAutoCatalog(
   source: string,
   args: { card_id: string },
 ): string {
   const id = args.card_id
-  const newImport = `import { ${id} } from './${id}'`
+  const newImport = `import { ${id} } from '../../cards-display/community/${id}'`
   const newEntry = `  ${id},`
   if (source.includes(newImport)) return source
 
-  const customImportRe = /^(import \{ (CUSTOM_\w+) \} from '\.\/CUSTOM_\w+')\n/gm
+  const customImportRe =
+    /^(import \{ (CUSTOM_\w+) \} from '\.\.\/\.\.\/cards-display\/community\/CUSTOM_\w+')\n/gm
   const customImports: Array<{ id: string; start: number; end: number }> = []
   let m: RegExpExecArray | null
   while ((m = customImportRe.exec(source)) !== null) {
