@@ -1,7 +1,6 @@
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C165_GameCatcher } from '../../cards-display/C/C165_GameCatcher'
-export { C165_GameCatcher }
 
 const CARD_ID = C165_GameCatcher.id
 

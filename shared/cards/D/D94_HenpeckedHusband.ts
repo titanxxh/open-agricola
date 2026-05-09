@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { getRoundPlacementDetails } from '../helpers/round-placement'
 import { D94_HenpeckedHusband } from '../../cards-display/D/D94_HenpeckedHusband'
-export { D94_HenpeckedHusband }
 
 const CARD_ID = D94_HenpeckedHusband.id
 

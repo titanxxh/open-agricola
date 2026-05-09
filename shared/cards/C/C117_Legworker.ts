@@ -5,7 +5,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { C117_Legworker } from '../../cards-display/C/C117_Legworker'
-export { C117_Legworker }
 
 const CARD_ID = C117_Legworker.id
 

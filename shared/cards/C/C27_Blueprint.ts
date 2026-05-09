@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { C27_Blueprint } from '../../cards-display/C/C27_Blueprint'
-export { C27_Blueprint }
 
 const CARD_ID = C27_Blueprint.id
 

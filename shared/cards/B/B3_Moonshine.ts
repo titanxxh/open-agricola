@@ -4,7 +4,6 @@ import { passOccupationToNextPlayer } from '../helpers/pass-occupation'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { B3_Moonshine } from '../../cards-display/B/B3_Moonshine'
-export { B3_Moonshine }
 
 const CARD_ID = B3_Moonshine.id
 

@@ -1,7 +1,6 @@
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { A152_NightSchoolStudent } from '../../cards-display/A/A152_NightSchoolStudent'
-export { A152_NightSchoolStudent }
 
 const CARD_ID = A152_NightSchoolStudent.id
 

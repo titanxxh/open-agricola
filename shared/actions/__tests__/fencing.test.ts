@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { A88_HedgeKeeper } from '../../cards/A/A88_HedgeKeeper'
+import { A88_HedgeKeeper } from '../../cards-display/A/A88_HedgeKeeper'
 import {
   canStartFencing,
   getFenceCount,

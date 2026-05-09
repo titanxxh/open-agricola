@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { fieldHasCrop, fieldFindStackOfKind } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { A113_HeresyTeacher } from '../../cards-display/A/A113_HeresyTeacher'
-export { A113_HeresyTeacher }
 
 const CARD_ID = A113_HeresyTeacher.id
 

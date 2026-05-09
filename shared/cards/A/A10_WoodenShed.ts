@@ -1,7 +1,6 @@
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { A10_WoodenShed } from '../../cards-display/A/A10_WoodenShed'
-export { A10_WoodenShed }
 
 const CARD_ID = A10_WoodenShed.id
 

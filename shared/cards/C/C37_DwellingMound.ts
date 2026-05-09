@@ -2,7 +2,6 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { C37_DwellingMound } from '../../cards-display/C/C37_DwellingMound'
-export { C37_DwellingMound }
 
 const CARD_ID = C37_DwellingMound.id
 

@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { C94_StableCleaner } from '../../cards-display/C/C94_StableCleaner'
-export { C94_StableCleaner }
 
 const CARD_ID = C94_StableCleaner.id
 

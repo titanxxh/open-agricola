@@ -6,7 +6,6 @@ import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { canSow } from '../../actions/effects/sow'
 import type { CardImpl } from '../registry'
 import { B72_LoveforAgriculture } from '../../cards-display/B/B72_LoveforAgriculture'
-export { B72_LoveforAgriculture }
 
 const CARD_ID = B72_LoveforAgriculture.id
 

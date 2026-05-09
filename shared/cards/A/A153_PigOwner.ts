@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { A153_PigOwner } from '../../cards-display/A/A153_PigOwner'
-export { A153_PigOwner }
 
 const CARD_ID = A153_PigOwner.id
 

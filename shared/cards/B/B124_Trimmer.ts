@@ -4,7 +4,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag, writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { B124_Trimmer } from '../../cards-display/B/B124_Trimmer'
-export { B124_Trimmer }
 
 const CARD_ID = B124_Trimmer.id
 

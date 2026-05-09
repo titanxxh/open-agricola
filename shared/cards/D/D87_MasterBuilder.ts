@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { D87_MasterBuilder } from '../../cards-display/D/D87_MasterBuilder'
-export { D87_MasterBuilder }
 
 const CARD_ID = D87_MasterBuilder.id
 

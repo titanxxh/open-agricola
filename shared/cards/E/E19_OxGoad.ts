@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E19_OxGoad } from '../../cards-display/E/E19_OxGoad'
-export { E19_OxGoad }
 
 const CARD_ID = E19_OxGoad.id
 

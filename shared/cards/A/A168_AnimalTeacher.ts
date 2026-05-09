@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A168_AnimalTeacher } from '../../cards-display/A/A168_AnimalTeacher'
-export { A168_AnimalTeacher }
 
 const CARD_ID = A168_AnimalTeacher.id
 

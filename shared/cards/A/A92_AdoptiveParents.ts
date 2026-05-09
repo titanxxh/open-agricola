@@ -6,7 +6,6 @@ import { findFirstNewborn, newbornCount } from '../../domain/player'
 import { removeWorkerRef } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { A92_AdoptiveParents } from '../../cards-display/A/A92_AdoptiveParents'
-export { A92_AdoptiveParents }
 
 const CARD_ID = A92_AdoptiveParents.id
 

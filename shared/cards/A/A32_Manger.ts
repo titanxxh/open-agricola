@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { A32_Manger } from '../../cards-display/A/A32_Manger'
-export { A32_Manger }
 
 const CARD_ID = A32_Manger.id
 

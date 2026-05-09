@@ -4,7 +4,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { C145_ForestReviewer } from '../../cards-display/C/C145_ForestReviewer'
-export { C145_ForestReviewer }
 
 const CARD_ID = C145_ForestReviewer.id
 

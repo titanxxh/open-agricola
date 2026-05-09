@@ -3,8 +3,6 @@ import {
 } from '../../session/work-phase-resources'
 import { writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
-import { A53_Claypipe } from '../../cards-display/A/A53_Claypipe'
-export { A53_Claypipe }
 
 const CARD_ID = 'A53_Claypipe'
 

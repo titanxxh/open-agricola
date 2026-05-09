@@ -227,11 +227,18 @@ export default defineConfig([
   },
   // S6c: impl layers should consume card metadata via getCardDefinition/registry-runtime,
   // not reach into cards-display directly (would couple impl to display chunk).
+  // Tests under __tests__/ are dev-only and may import cards-display directly
+  // for assertion fixtures (e.g. asserting a card's modifier shape).
   {
     files: [
       'shared/actions/**/*.ts',
       'shared/engine/**/*.ts',
       'shared/session/**/*.ts',
+    ],
+    ignores: [
+      'shared/actions/**/__tests__/**',
+      'shared/engine/**/__tests__/**',
+      'shared/session/**/__tests__/**',
     ],
     rules: {
       '@typescript-eslint/no-restricted-imports': ['error', {

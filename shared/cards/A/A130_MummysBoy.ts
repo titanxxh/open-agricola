@@ -8,7 +8,6 @@ import { isSpaceOccupied } from '../../domain/space'
 import { familySize, workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { A130_MummysBoy } from '../../cards-display/A/A130_MummysBoy'
-export { A130_MummysBoy }
 
 const CARD_ID = A130_MummysBoy.id
 

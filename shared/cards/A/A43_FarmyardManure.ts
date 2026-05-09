@@ -12,7 +12,6 @@ import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { A43_FarmyardManure } from '../../cards-display/A/A43_FarmyardManure'
-export { A43_FarmyardManure }
 
 const CARD_ID = A43_FarmyardManure.id
 

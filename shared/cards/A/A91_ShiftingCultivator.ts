@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A91_ShiftingCultivator } from '../../cards-display/A/A91_ShiftingCultivator'
-export { A91_ShiftingCultivator }
 
 const CARD_ID = A91_ShiftingCultivator.id
 

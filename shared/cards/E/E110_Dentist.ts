@@ -2,7 +2,6 @@ import { getCardStack } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E110_Dentist } from '../../cards-display/E/E110_Dentist'
-export { E110_Dentist }
 
 const CARD_ID = E110_Dentist.id
 

@@ -8,7 +8,6 @@ import {
 } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { B34_SpecialFood } from '../../cards-display/B/B34_SpecialFood'
-export { B34_SpecialFood }
 
 const CARD_ID = B34_SpecialFood.id
 

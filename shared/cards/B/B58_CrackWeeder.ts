@@ -1,7 +1,6 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B58_CrackWeeder } from '../../cards-display/B/B58_CrackWeeder'
-export { B58_CrackWeeder }
 
 const CARD_ID = B58_CrackWeeder.id
 

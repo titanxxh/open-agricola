@@ -2,7 +2,6 @@ import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { countUnusedFarmyardSpaces } from '../../domain/farm'
 import type { CardImpl } from '../registry'
 import { A57_MilkingParlor } from '../../cards-display/A/A57_MilkingParlor'
-export { A57_MilkingParlor }
 
 const CARD_ID = A57_MilkingParlor.id
 

@@ -8,11 +8,11 @@ import '../D39_TruffleSlicer'
 import '../D53_TeaHouse'
 import '../D58_Gritter'
 
-import { D7_Trident } from '../D7_Trident'
-import { D8_FernSeeds } from '../D8_FernSeeds'
-import { D39_TruffleSlicer } from '../D39_TruffleSlicer'
-import { D53_TeaHouse } from '../D53_TeaHouse'
-import { D58_Gritter } from '../D58_Gritter'
+import { D7_Trident } from '../../../cards-display/D/D7_Trident'
+import { D8_FernSeeds } from '../../../cards-display/D/D8_FernSeeds'
+import { D39_TruffleSlicer } from '../../../cards-display/D/D39_TruffleSlicer'
+import { D53_TeaHouse } from '../../../cards-display/D/D53_TeaHouse'
+import { D58_Gritter } from '../../../cards-display/D/D58_Gritter'
 
 const emptyResources = {
   wood: 0, clay: 0, reed: 0, stone: 0, food: 0,

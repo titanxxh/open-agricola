@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E163_Patroness } from '../../cards-display/E/E163_Patroness'
-export { E163_Patroness }
 
 const CARD_ID = E163_Patroness.id
 

@@ -7,7 +7,6 @@ import { canSow } from '../../actions/effects/sow'
 import { dispatchReapListener } from '../../actions/effects/reap'
 import type { CardImpl } from '../registry'
 import { E69_MelonPatch } from '../../cards-display/E/E69_MelonPatch'
-export { E69_MelonPatch }
 
 const CARD_ID = E69_MelonPatch.id
 

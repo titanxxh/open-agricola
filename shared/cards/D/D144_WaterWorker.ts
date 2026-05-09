@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D144_WaterWorker } from '../../cards-display/D/D144_WaterWorker'
-export { D144_WaterWorker }
 
 const CARD_ID = D144_WaterWorker.id
 

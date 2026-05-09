@@ -2,7 +2,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { C97_SeedResearcher } from '../../cards-display/C/C97_SeedResearcher'
-export { C97_SeedResearcher }
 
 const CARD_ID = C97_SeedResearcher.id
 

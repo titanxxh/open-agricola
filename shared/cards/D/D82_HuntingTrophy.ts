@@ -4,7 +4,6 @@ import type { Bonus, CostModifier } from '../../contract/types'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { D82_HuntingTrophy } from '../../cards-display/D/D82_HuntingTrophy'
-export { D82_HuntingTrophy }
 
 const CARD_ID = D82_HuntingTrophy.id
 

@@ -5,7 +5,6 @@ import type { CardImpl } from '../registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { E16_BriarHedge } from '../../cards-display/E/E16_BriarHedge'
-export { E16_BriarHedge }
 
 const CARD_ID = E16_BriarHedge.id
 

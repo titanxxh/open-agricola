@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C26_Flail } from '../../cards-display/C/C26_Flail'
-export { C26_Flail }
 
 const CARD_ID = C26_Flail.id
 

@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A37_Bucksaw } from '../../cards-display/A/A37_Bucksaw'
-export { A37_Bucksaw }
 
 const CARD_ID = A37_Bucksaw.id
 

@@ -2,7 +2,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { E117_PipeSmoker } from '../../cards-display/E/E117_PipeSmoker'
-export { E117_PipeSmoker }
 
 const CARD_ID = E117_PipeSmoker.id
 

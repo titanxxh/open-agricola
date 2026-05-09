@@ -2,7 +2,6 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { B92_LittleStickKnitter } from '../../cards-display/B/B92_LittleStickKnitter'
-export { B92_LittleStickKnitter }
 
 const CARD_ID = B92_LittleStickKnitter.id
 

@@ -7,7 +7,7 @@ import { cardCountsAs, collectCardsAs } from '../helpers/card-type'
 import { meetsCardPrerequisites } from '../helpers/prerequisites'
 
 import '../D/D60_LargePottery'
-import { D60_LargePottery as D60Card } from '../D/D60_LargePottery'
+import { D60_LargePottery as D60Card } from '../../cards-display/D/D60_LargePottery'
 
 const CARD_ID = 'D60_LargePottery'
 

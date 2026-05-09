@@ -1,6 +1,4 @@
 import type { CardImpl } from '../registry'
-import { C17_NewlyPlowedField } from '../../cards-display/C/C17_NewlyPlowedField'
-export { C17_NewlyPlowedField }
 
 const CARD_ID = 'C17_NewlyPlowedField'
 

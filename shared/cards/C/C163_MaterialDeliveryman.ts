@@ -4,7 +4,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { C163_MaterialDeliveryman } from '../../cards-display/C/C163_MaterialDeliveryman'
-export { C163_MaterialDeliveryman }
 
 const CARD_ID = C163_MaterialDeliveryman.id
 

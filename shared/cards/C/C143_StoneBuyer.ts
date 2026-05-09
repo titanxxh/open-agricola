@@ -4,7 +4,6 @@ import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C143_StoneBuyer } from '../../cards-display/C/C143_StoneBuyer'
-export { C143_StoneBuyer }
 
 const CARD_ID = C143_StoneBuyer.id
 

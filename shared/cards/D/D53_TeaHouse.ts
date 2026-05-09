@@ -7,7 +7,6 @@ import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { D53_TeaHouse } from '../../cards-display/D/D53_TeaHouse'
-export { D53_TeaHouse }
 
 const CARD_ID = D53_TeaHouse.id
 

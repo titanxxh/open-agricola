@@ -2,7 +2,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { A141_TurnipFarmer } from '../../cards-display/A/A141_TurnipFarmer'
-export { A141_TurnipFarmer }
 
 const CARD_ID = A141_TurnipFarmer.id
 

@@ -11,7 +11,6 @@ import { payLeaf } from '../helpers/pay-gain-node'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import type { CardImpl } from '../registry'
 import { C150_ParrotBreeder } from '../../cards-display/C/C150_ParrotBreeder'
-export { C150_ParrotBreeder }
 
 const CARD_ID = C150_ParrotBreeder.id
 

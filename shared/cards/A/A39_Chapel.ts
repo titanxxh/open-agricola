@@ -1,8 +1,6 @@
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import { incCounter } from '../__stubs__/helpers'
 import type { CardImpl } from '../registry'
-import { A39_Chapel } from '../../cards-display/A/A39_Chapel'
-export { A39_Chapel }
 
 const CARD_ID = 'A39_Chapel'
 

@@ -5,7 +5,6 @@ import { familySize } from '../../domain/player'
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { E92_FieldDoctor } from '../../cards-display/E/E92_FieldDoctor'
-export { E92_FieldDoctor }
 
 const CARD_ID = E92_FieldDoctor.id
 

@@ -3,8 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { ensureCardState } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
-import { D158_BeanCounter } from '../../cards-display/D/D158_BeanCounter'
-export { D158_BeanCounter }
 
 const CARD_ID = 'D158_BeanCounter'
 

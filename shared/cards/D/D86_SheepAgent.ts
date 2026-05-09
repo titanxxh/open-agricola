@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { D86_SheepAgent } from '../../cards-display/D/D86_SheepAgent'
-export { D86_SheepAgent }
 
 const CARD_ID = D86_SheepAgent.id
 

@@ -1,7 +1,6 @@
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E9_BarteringHut } from '../../cards-display/E/E9_BarteringHut'
-export { E9_BarteringHut }
 
 const CARD_ID = E9_BarteringHut.id
 

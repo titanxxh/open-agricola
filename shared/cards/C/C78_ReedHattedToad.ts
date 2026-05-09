@@ -1,7 +1,6 @@
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 import { C78_ReedHattedToad } from '../../cards-display/C/C78_ReedHattedToad'
-export { C78_ReedHattedToad }
 
 const CARD_ID = C78_ReedHattedToad.id
 

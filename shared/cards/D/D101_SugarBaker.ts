@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D101_SugarBaker } from '../../cards-display/D/D101_SugarBaker'
-export { D101_SugarBaker }
 
 const CARD_ID = D101_SugarBaker.id
 

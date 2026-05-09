@@ -7,7 +7,6 @@ import { isSpaceOccupied } from '../../domain/space'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { A94_LazySowman } from '../../cards-display/A/A94_LazySowman'
-export { A94_LazySowman }
 
 const CARD_ID = A94_LazySowman.id
 

@@ -1,7 +1,6 @@
 import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { D130_RecreationalCarpenter } from '../../cards-display/D/D130_RecreationalCarpenter'
-export { D130_RecreationalCarpenter }
 
 const CARD_ID = D130_RecreationalCarpenter.id
 

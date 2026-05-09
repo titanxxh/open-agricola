@@ -3,7 +3,6 @@ import { playerBoard } from '../../domain'
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { C9_AutomaticWaterTrough } from '../../cards-display/C/C9_AutomaticWaterTrough'
-export { C9_AutomaticWaterTrough }
 
 const CARD_ID = C9_AutomaticWaterTrough.id
 

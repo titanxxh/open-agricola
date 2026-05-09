@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { C11_WildlifeReserve } from '../../cards-display/C/C11_WildlifeReserve'
-export { C11_WildlifeReserve }
 
 const CARD_ID = C11_WildlifeReserve.id
 

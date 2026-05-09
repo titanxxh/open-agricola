@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { E40_BeeStatue } from '../../cards-display/E/E40_BeeStatue'
-export { E40_BeeStatue }
 
 const CARD_ID = E40_BeeStatue.id
 

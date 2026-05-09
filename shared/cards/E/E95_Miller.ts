@@ -2,7 +2,6 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { E95_Miller } from '../../cards-display/E/E95_Miller'
-export { E95_Miller }
 
 const CARD_ID = E95_Miller.id
 

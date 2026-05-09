@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { E34_LandRegister } from '../../cards-display/E/E34_LandRegister'
-export { E34_LandRegister }
 
 const CARD_ID = E34_LandRegister.id
 

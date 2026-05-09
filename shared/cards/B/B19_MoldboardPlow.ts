@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { B19_MoldboardPlow } from '../../cards-display/B/B19_MoldboardPlow'
-export { B19_MoldboardPlow }
 
 const CARD_ID = B19_MoldboardPlow.id
 

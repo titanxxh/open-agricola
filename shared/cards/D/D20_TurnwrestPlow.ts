@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { D20_TurnwrestPlow } from '../../cards-display/D/D20_TurnwrestPlow'
-export { D20_TurnwrestPlow }
 
 const CARD_ID = D20_TurnwrestPlow.id
 

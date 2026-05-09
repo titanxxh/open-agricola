@@ -4,7 +4,6 @@ import { isCardFlagged } from '../helpers/card-state'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { E151_DeliveryNurse } from '../../cards-display/E/E151_DeliveryNurse'
-export { E151_DeliveryNurse }
 
 const CARD_ID = E151_DeliveryNurse.id
 

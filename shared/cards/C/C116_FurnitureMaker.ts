@@ -4,7 +4,6 @@ import type { Resource } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C116_FurnitureMaker } from '../../cards-display/C/C116_FurnitureMaker'
-export { C116_FurnitureMaker }
 
 const CARD_ID = C116_FurnitureMaker.id
 

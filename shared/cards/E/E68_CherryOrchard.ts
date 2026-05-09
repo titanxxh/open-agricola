@@ -7,7 +7,6 @@ import { canSow } from '../../actions/effects/sow'
 import { dispatchReapListener } from '../../actions/effects/reap'
 import type { CardImpl } from '../registry'
 import { E68_CherryOrchard } from '../../cards-display/E/E68_CherryOrchard'
-export { E68_CherryOrchard }
 
 const CARD_ID = E68_CherryOrchard.id
 

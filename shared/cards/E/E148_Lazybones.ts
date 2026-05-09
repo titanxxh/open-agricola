@@ -7,7 +7,6 @@ import {
 import { getNextEmptyTileForPlayer } from '../../domain/farm'
 import type { CardImpl } from '../registry'
 import { E148_Lazybones } from '../../cards-display/E/E148_Lazybones'
-export { E148_Lazybones }
 
 const CARD_ID = E148_Lazybones.id
 

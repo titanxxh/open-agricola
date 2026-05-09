@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A140_ShovelBearer } from '../../cards-display/A/A140_ShovelBearer'
-export { A140_ShovelBearer }
 
 const CARD_ID = A140_ShovelBearer.id
 

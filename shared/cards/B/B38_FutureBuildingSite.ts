@@ -4,7 +4,6 @@ import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { B38_FutureBuildingSite } from '../../cards-display/B/B38_FutureBuildingSite'
-export { B38_FutureBuildingSite }
 
 const CARD_ID = B38_FutureBuildingSite.id
 

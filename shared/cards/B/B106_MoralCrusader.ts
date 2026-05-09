@@ -1,7 +1,6 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B106_MoralCrusader } from '../../cards-display/B/B106_MoralCrusader'
-export { B106_MoralCrusader }
 
 const CARD_ID = B106_MoralCrusader.id
 

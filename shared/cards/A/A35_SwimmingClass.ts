@@ -2,7 +2,6 @@ import { spaceHasPlayer } from '../../domain/space'
 import { newbornCount } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { A35_SwimmingClass } from '../../cards-display/A/A35_SwimmingClass'
-export { A35_SwimmingClass }
 
 const CARD_ID = A35_SwimmingClass.id
 

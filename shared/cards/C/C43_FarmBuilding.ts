@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 import { C43_FarmBuilding } from '../../cards-display/C/C43_FarmBuilding'
-export { C43_FarmBuilding }
 
 const CARD_ID = C43_FarmBuilding.id
 

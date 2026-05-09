@@ -5,7 +5,6 @@ import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { C81_MaterialHub } from '../../cards-display/C/C81_MaterialHub'
-export { C81_MaterialHub }
 
 const CARD_ID = C81_MaterialHub.id
 

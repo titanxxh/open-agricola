@@ -1,7 +1,6 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B59_FoodChest } from '../../cards-display/B/B59_FoodChest'
-export { B59_FoodChest }
 
 const CARD_ID = B59_FoodChest.id
 

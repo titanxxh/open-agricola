@@ -6,7 +6,6 @@ import type { ActionFlow, Resource } from '../../contract/types'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { C42_RavenousHunger } from '../../cards-display/C/C42_RavenousHunger'
-export { C42_RavenousHunger }
 
 const CARD_ID = C42_RavenousHunger.id
 

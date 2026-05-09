@@ -3,7 +3,6 @@ import { fieldHasCrop, fieldTopStack, fieldPopIfDepleted } from '../../domain/fi
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
 import { A84_Silage } from '../../cards-display/A/A84_Silage'
-export { A84_Silage }
 
 const CARD_ID = A84_Silage.id
 

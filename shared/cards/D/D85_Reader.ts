@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { D85_Reader } from '../../cards-display/D/D85_Reader'
-export { D85_Reader }
 
 const CARD_ID = D85_Reader.id
 

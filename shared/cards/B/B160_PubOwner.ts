@@ -2,7 +2,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { B160_PubOwner } from '../../cards-display/B/B160_PubOwner'
-export { B160_PubOwner }
 
 const CARD_ID = B160_PubOwner.id
 

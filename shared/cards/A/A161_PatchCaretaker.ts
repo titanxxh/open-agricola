@@ -5,7 +5,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 import { A161_PatchCaretaker } from '../../cards-display/A/A161_PatchCaretaker'
-export { A161_PatchCaretaker }
 
 const CARD_ID = A161_PatchCaretaker.id
 

@@ -2,7 +2,6 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { C152_Puppeteer } from '../../cards-display/C/C152_Puppeteer'
-export { C152_Puppeteer }
 
 const CARD_ID = C152_Puppeteer.id
 

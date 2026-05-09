@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { B87_Cottager } from '../../cards-display/B/B87_Cottager'
-export { B87_Cottager }
 
 const CARD_ID = B87_Cottager.id
 

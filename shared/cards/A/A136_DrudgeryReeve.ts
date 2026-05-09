@@ -2,7 +2,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import type { BonusScoreLevel } from '../card-effects'
 import { A136_DrudgeryReeve } from '../../cards-display/A/A136_DrudgeryReeve'
-export { A136_DrudgeryReeve }
 
 const CARD_ID = A136_DrudgeryReeve.id
 

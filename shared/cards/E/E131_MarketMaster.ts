@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { E131_MarketMaster } from '../../cards-display/E/E131_MarketMaster'
-export { E131_MarketMaster }
 
 const CARD_ID = E131_MarketMaster.id
 

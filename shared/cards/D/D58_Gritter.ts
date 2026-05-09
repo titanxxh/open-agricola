@@ -5,7 +5,6 @@ import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { fieldHasCrop, fieldFindStackOfKind } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { D58_Gritter } from '../../cards-display/D/D58_Gritter'
-export { D58_Gritter }
 
 const CARD_ID = D58_Gritter.id
 

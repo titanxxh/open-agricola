@@ -5,7 +5,6 @@ import { payLeaf } from '../helpers/pay-gain-node'
 import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 import { C46_Mandoline } from '../../cards-display/C/C46_Mandoline'
-export { C46_Mandoline }
 
 const CARD_ID = C46_Mandoline.id
 

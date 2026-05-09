@@ -4,7 +4,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { A27_OvenSite } from '../../cards-display/A/A27_OvenSite'
-export { A27_OvenSite }
 
 const CARD_ID = A27_OvenSite.id
 

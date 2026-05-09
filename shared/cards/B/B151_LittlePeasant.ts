@@ -6,7 +6,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { B151_LittlePeasant } from '../../cards-display/B/B151_LittlePeasant'
-export { B151_LittlePeasant }
 
 const CARD_ID = B151_LittlePeasant.id
 

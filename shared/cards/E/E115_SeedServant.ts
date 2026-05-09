@@ -2,7 +2,6 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { E115_SeedServant } from '../../cards-display/E/E115_SeedServant'
-export { E115_SeedServant }
 
 const CARD_ID = E115_SeedServant.id
 

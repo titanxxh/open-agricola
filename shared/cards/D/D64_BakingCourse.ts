@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { D64_BakingCourse } from '../../cards-display/D/D64_BakingCourse'
-export { D64_BakingCourse }
 
 const CARD_ID = D64_BakingCourse.id
 

@@ -4,7 +4,6 @@ import { rollAndCacheCardPick } from '../helpers/card-random'
 import type { ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { A3_PaperKnife } from '../../cards-display/A/A3_PaperKnife'
-export { A3_PaperKnife }
 
 const CARD_ID = A3_PaperKnife.id
 

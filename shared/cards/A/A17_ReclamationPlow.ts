@@ -5,7 +5,6 @@ import type { ActionSpace, PlayerState, Pasture } from '../../contract/types'
 import { isCardFlagged, setCardFlag, writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { A17_ReclamationPlow } from '../../cards-display/A/A17_ReclamationPlow'
-export { A17_ReclamationPlow }
 
 const CARD_ID = A17_ReclamationPlow.id
 

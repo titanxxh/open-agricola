@@ -2,7 +2,6 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { D28_WritingDesk } from '../../cards-display/D/D28_WritingDesk'
-export { D28_WritingDesk }
 
 const CARD_ID = D28_WritingDesk.id
 

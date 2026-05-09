@@ -4,7 +4,6 @@ import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D56_FatstockStretcher } from '../../cards-display/D/D56_FatstockStretcher'
-export { D56_FatstockStretcher }
 
 const CARD_ID = D56_FatstockStretcher.id
 

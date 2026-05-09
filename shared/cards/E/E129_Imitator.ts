@@ -5,7 +5,6 @@ import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-co
 import { isSpaceOccupied, spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { E129_Imitator } from '../../cards-display/E/E129_Imitator'
-export { E129_Imitator }
 
 const CARD_ID = E129_Imitator.id
 

@@ -2,7 +2,6 @@ import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/int
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { C47_GardenClaw } from '../../cards-display/C/C47_GardenClaw'
-export { C47_GardenClaw }
 
 const CARD_ID = C47_GardenClaw.id
 

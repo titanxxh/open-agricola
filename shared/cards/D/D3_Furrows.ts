@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { D3_Furrows } from '../../cards-display/D/D3_Furrows'
-export { D3_Furrows }
 
 const CARD_ID = D3_Furrows.id
 

@@ -1,7 +1,6 @@
 import { playerBoard } from '../../domain'
 import type { CardImpl } from '../registry'
 import { B98_OrganicFarmer } from '../../cards-display/B/B98_OrganicFarmer'
-export { B98_OrganicFarmer }
 
 const CARD_ID = B98_OrganicFarmer.id
 

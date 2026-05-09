@@ -4,7 +4,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E144_WaresSalesman } from '../../cards-display/E/E144_WaresSalesman'
-export { E144_WaresSalesman }
 
 const CARD_ID = E144_WaresSalesman.id
 

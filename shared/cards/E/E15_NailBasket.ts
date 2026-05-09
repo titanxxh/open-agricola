@@ -2,7 +2,6 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { E15_NailBasket } from '../../cards-display/E/E15_NailBasket'
-export { E15_NailBasket }
 
 const CARD_ID = E15_NailBasket.id
 

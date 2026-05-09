@@ -2,7 +2,6 @@ import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/int
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { E43_BarnCats } from '../../cards-display/E/E43_BarnCats'
-export { E43_BarnCats }
 
 const CARD_ID = E43_BarnCats.id
 

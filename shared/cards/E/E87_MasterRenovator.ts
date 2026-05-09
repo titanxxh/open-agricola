@@ -4,7 +4,6 @@ import type { BonusModifier } from '../../contract/types'
 import { getRenovation } from '../../actions/effects/renovation'
 import type { CardImpl } from '../registry'
 import { E87_MasterRenovator } from '../../cards-display/E/E87_MasterRenovator'
-export { E87_MasterRenovator }
 
 const CARD_ID = E87_MasterRenovator.id
 

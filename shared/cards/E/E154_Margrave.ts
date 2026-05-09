@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E154_Margrave } from '../../cards-display/E/E154_Margrave'
-export { E154_Margrave }
 
 const CARD_ID = E154_Margrave.id
 

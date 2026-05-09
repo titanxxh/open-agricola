@@ -5,7 +5,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { B51_DiggingSpade } from '../../cards-display/B/B51_DiggingSpade'
-export { B51_DiggingSpade }
 
 const CARD_ID = B51_DiggingSpade.id
 

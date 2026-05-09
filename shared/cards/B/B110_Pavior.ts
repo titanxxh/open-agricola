@@ -1,7 +1,6 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B110_Pavior } from '../../cards-display/B/B110_Pavior'
-export { B110_Pavior }
 
 const CARD_ID = B110_Pavior.id
 

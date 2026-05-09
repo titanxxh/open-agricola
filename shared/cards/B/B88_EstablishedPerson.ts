@@ -1,7 +1,6 @@
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B88_EstablishedPerson } from '../../cards-display/B/B88_EstablishedPerson'
-export { B88_EstablishedPerson }
 
 const CARD_ID = B88_EstablishedPerson.id
 

@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { B32_Kettle } from '../../cards-display/B/B32_Kettle'
-export { B32_Kettle }
 
 const CARD_ID = B32_Kettle.id
 

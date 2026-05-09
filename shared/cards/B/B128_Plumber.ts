@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getRenovation } from '../../actions/effects/renovation'
 import type { CardImpl } from '../registry'
 import { B128_Plumber } from '../../cards-display/B/B128_Plumber'
-export { B128_Plumber }
 
 const CARD_ID = B128_Plumber.id
 

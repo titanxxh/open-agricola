@@ -11,7 +11,6 @@ import { workersAvailable } from '../../domain/player'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { D22_WorkPermit } from '../../cards-display/D/D22_WorkPermit'
-export { D22_WorkPermit }
 
 const CARD_ID = D22_WorkPermit.id
 

@@ -1,7 +1,6 @@
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { C110_HomeBrewer } from '../../cards-display/C/C110_HomeBrewer'
-export { C110_HomeBrewer }
 
 const CARD_ID = C110_HomeBrewer.id
 

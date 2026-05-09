@@ -2,7 +2,6 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { A23_StoneCompany } from '../../cards-display/A/A23_StoneCompany'
-export { A23_StoneCompany }
 
 const CARD_ID = A23_StoneCompany.id
 

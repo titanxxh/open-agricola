@@ -2,7 +2,6 @@ import { payLeaf } from '../helpers/pay-gain-node'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { E102_Acquirer } from '../../cards-display/E/E102_Acquirer'
-export { E102_Acquirer }
 
 const CARD_ID = E102_Acquirer.id
 

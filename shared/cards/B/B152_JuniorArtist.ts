@@ -6,7 +6,6 @@ import { jumpLeaf, isJumpChainContains } from '../helpers/jump-leaf'
 import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability'
 import type { CardImpl } from '../registry'
 import { B152_JuniorArtist } from '../../cards-display/B/B152_JuniorArtist'
-export { B152_JuniorArtist }
 
 const CARD_ID = B152_JuniorArtist.id
 

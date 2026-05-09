@@ -2,7 +2,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop, fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { B61_ThreeFieldRotation } from '../../cards-display/B/B61_ThreeFieldRotation'
-export { B61_ThreeFieldRotation }
 
 const CARD_ID = B61_ThreeFieldRotation.id
 
