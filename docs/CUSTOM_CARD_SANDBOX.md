@@ -29,10 +29,10 @@
 | `Occupation(def)`                        | 函数 stub | 同上                                                                                 |
 | `console.log(...)` / `console.warn(...)` | 函数      | 转发到宿主 `console`，参数会被 `JSON.stringify`（非字符串时）                                       |
 | `gainLeaf(cardId, resources)`            | 函数      | 返回 `{ type: 'leaf', actionId: 'gain', params: resources, sourceCard: cardId }`     |
-| `payLeaf({ cardId, cost })`              | 函数      | 返回 `{ type: 'leaf', actionId: 'pay-resources', params: cost, sourceCard: cardId }` |
+| `payLeaf({ cardId, cost })`              | 函数      | 返回 `{ type: 'leaf', actionId: 'pay', params: cost, sourceCard: cardId }`           |
 | `spaceHasPlayer(space, playerId)`        | 函数      | 判断某个行动位是否已被指定玩家占据                                                                  |
 | `positionKey(pos)`                       | 函数      | 将 `{ x, y }` 转为确定性字符串 `"x,y"`                                                      |
-| `getMajorCardEffect(cardId)`             | 函数 stub | 沙盒里始终返回 `null`（无法访问主改良注册表）                                                         |
+| `getCardDefinition(cardId)`              | 函数 stub | 沙盒里始终返回 `null`（无法访问卡牌注册表）                                                          |
 | `getCardStack(player, cardId)`           | 函数      | 读取 `player.cardStates[cardId].stack` 的浅拷贝                                          |
 | `readCardExtraData(player, cardId)`      | 函数      | 读取 `player.cardStates[cardId].extraData` 的浅拷贝                                      |
 
