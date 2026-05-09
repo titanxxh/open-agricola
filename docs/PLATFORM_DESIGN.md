@@ -70,10 +70,8 @@ CREATE TABLE workshop_cards (
   card_type TEXT NOT NULL,        -- 'minor' | 'occupation'
   name TEXT NOT NULL,
   description TEXT NOT NULL,
-  card_json TEXT NOT NULL,        -- CardDefinition JSON
-  effect_dsl TEXT,                -- v1: 声明式 DSL JSON
-  effect_code TEXT,               -- v2: TypeScript 源码
-  compiled_code TEXT,             -- v2: 验证后的 JS
+  card_json TEXT NOT NULL,        -- CardDefinition JSON（含 CARD_DEF + CARD_IMPL TypeScript 源码）
+  -- effect_dsl / effect_code / compiled_code 历史字段，migration v7 已 DROP
   art_url TEXT,
   art_prompt TEXT,
   status TEXT DEFAULT 'draft',    -- draft | published | flagged
@@ -389,33 +387,32 @@ Single centered illustration, no text, no borders, square format.
 
 ### C5. LLM 生成代码的安全验证
 
-**V1（推荐先做）：声明式 DSL，无代码执行**
+LLM 输出 **TypeScript 源码**（包含 `CARD_DEF` 定义、`CARD_IMPL.effect` hook 回调、`CARD_IMPL.listeners` 监听器）。后端三步走：验证 → 编译 → 沙盒执行。
 
-LLM 输出 JSON DSL（如上 C2 所示），服务器解析为 `ActionFlow` 节点树。不执行任意代码。DSL 运行器：
+**1. AST 验证** — `shared/custom-code/ast-validator.ts`
 
-```typescript
-// shared/cards/custom-dsl-runner.ts
-function dslToActionFlow(dsl: DslEffect): ActionFlow {
-  return {
-    type: 'seq',
-    optional: dsl.optional ?? false,
-    children: dsl.flow.map(step => ({
-      type: 'leaf',
-      actionId: step.action,     // 只允许白名单中的 action
-      params: step.params,
-      sourceCard: cardId,
-    }))
-  }
-}
-```
+用 TypeScript Compiler API 解析源码，AST 遍历拒绝以下构造：
 
-**V2（后续扩展）：AST 验证 + vm 沙盒**
+- **语句级**：`import` 声明、`export` 声明、动态 `import()`、`require()` 调用、class 声明 / 表达式、`with` 语句、generator 函数
+- **标识符黑名单**（裸引用）：`eval`、`Function`、`process`、`require`、`globalThis`、`global`、`window`、`document`、`__dirname`、`__filename`、`fetch`、`XMLHttpRequest`、`WebSocket`、`setTimeout`、`setInterval`、`setImmediate`、`clearTimeout`、`clearInterval`、`Deno`、`Bun`、`Proxy`、`Reflect`
+- **属性访问黑名单**（`obj.X` 或 `obj['X']`）：`constructor`、`__proto__`、`__defineGetter__`、`__defineSetter__`、`__lookupGetter__`、`__lookupSetter__`
+- **CARD_IMPL 白名单验证**：`CARD_IMPL.effect` 的 key 只允许 `cardEffectHooks` 中的 hook 名；`CARD_IMPL.listeners[].phases` 只允许 `actionHookPhases` 中的 phase 名
 
-1. 服务器用 TypeScript Compiler API 解析源码
-2. AST 遍历，拒绝：`import`（仅允许特定路径）、`eval`、`Function`、`require`、`process`、`fs`、`fetch`、`setTimeout`、`globalThis`
-3. 只允许：纯函数、state/player 属性访问、算术、条件、`registerCardEffect`、`registerCardListener`
-4. 通过验证后编译为 JS，存入 `compiled_code`
-5. 加载时用 `vm.runInContext()` 执行，超时 100ms
+**注**：AST 验证是用户友好的错误提示层；真正的安全边界是 isolated-vm（独立 V8 堆）。
+
+**2. 编译** — `server/custom-code/compiler.ts`
+
+AST 验证通过后，`ts.transpileModule()` 将 TypeScript 编译为 CommonJS JS，存入 `card_json`（card_json 同时含 CARD_DEF 元数据和编译产物由 engine 分别提取）。
+
+**3. 沙盒执行** — `server/custom-code/{engine, executor-worker, isolate-runner, runtime}.ts`
+
+- **isolated-vm** (`isolated-vm` npm 包)：独立 V8 堆（非 `node:vm`），无原型链逃逸；内存上限 8 MB；单次执行 CPU 超时 **100 ms**
+- **Worker Thread**（`executor-worker.ts`）：isolated-vm 执行在独立 Worker Thread，若 V8/native 崩溃只杀 worker，主进程自动重生 worker 继续服务
+- 主线程通过 `SharedArrayBuffer + Atomics.wait` 同步等待（整体超时 5000 ms）
+- 异常：try/catch 包裹，记录警告、返回 `null`、游戏继续
+- 注入给沙盒的辅助 API（`injected-helpers.ts`）：`gainLeaf`、`payLeaf`、`spaceHasPlayer`、`positionKey`、`getCardStack`、`readCardExtraData`（纯只读 / 构建叶节点，无写状态能力）
+
+**历史备注**：项目早期设计曾考虑过 V1 声明式 JSON DSL（无代码执行），最终未采用——直接走 LLM → TypeScript → AST 白名单 + isolated-vm 沙盒路径。
 
 ---
 
@@ -423,18 +420,14 @@ function dslToActionFlow(dsl: DslEffect): ActionFlow {
 
 ### D1. 自定义卡牌注册
 
-新增 `shared/cards/custom-registry.ts`：
+`shared/cards/custom-registry.ts`：
 
 ```typescript
 const customCards = new Map<string, CardBase>()
 
-export function registerCustomCard(card: CardBase, dslEffects?: DslEffects) {
+export function registerCustomCard(card: CardBase) {
   customCards.set(card.id, card)
-  if (dslEffects) {
-    // 将 DSL 转化为标准 CardEffect 并注册
-    const cardEffect = dslToCardEffect(card.id, dslEffects)
-    registerCardEffect(cardEffect)
-  }
+  // effect 和 listener 通过 server/custom-code/runtime.ts 在加载时动态注入，不在此处注册
 }
 
 export function getCustomCard(id: string): CardBase | undefined {
@@ -442,7 +435,7 @@ export function getCustomCard(id: string): CardBase | undefined {
 }
 ```
 
-现有 `catalog.ts` 的查找函数 fallback 到 custom registry：
+`shared/cards/catalog.ts` 的查找函数 fallback 到 custom registry：
 
 ```typescript
 export function getMinorImprovementCard(id: string) {
@@ -452,10 +445,10 @@ export function getMinorImprovementCard(id: string) {
 
 ### D2. 游戏中加载自定义卡牌
 
-1. 创建房间时可选 "启用工坊卡牌"
+1. 创建房间时可选 "启用工坊卡牌"（WS `createRoom.customCardIds` / HTTP `/api/game/new-sandbox`）
 2. `GameSession` 构造时从数据库加载房间关联的自定义卡牌
-3. 从 `card_json` 创建 `MinorImprovement`/`Occupation` 实例
-4. 从 `effect_dsl` 转化为 `CardEffect` 并注册
+3. 从 `card_json` 反序列化为 `MinorImprovement`/`Occupation` 实例，调用 `registerCustomCard()`
+4. `server/custom-code/runtime.ts` 的 `registerExecutorBackedCustomCard()` 从 `card_json` 中的编译产物 + `code_manifest` 注入 effect hook 和 listener，通过 `invokeCustomCodeEffectSync` / `invokeCustomCodeListenerSync` 委托给 Worker Thread + isolated-vm 执行
 5. 将自定义卡牌 ID 加入发牌池
 
 ### D3. 沙盒隔离与容错
@@ -475,13 +468,13 @@ WorkshopPage
 ├── CardDetail           卡牌详情
 │   ├── CardArt          美术预览
 │   ├── CardStats        费用/分数/描述
-│   ├── EffectViewer     效果代码/DSL 展示（只读）
+│   ├── EffectViewer     TypeScript 代码展示（只读）
 │   ├── LikeButton
 │   ├── CommentSection
 │   └── AddToSandbox
 ├── CardEditor           创建/编辑自己的卡牌
 │   ├── BasicInfoForm    名称/费用/分数/描述
-│   ├── EffectEditor     DSL 编辑器 或 代码编辑器
+│   ├── EffectEditor     TypeScript 代码编辑器
 │   ├── AiCardDesigner   LLM 对话式设计
 │   └── PreviewPanel     实时预览卡牌外观
 └── SandboxView          我的沙盒
@@ -551,7 +544,7 @@ WorkshopPage
 | 密码泄露          | `crypto.scrypt` 哈希，不存明文                      |
 | Session 劫持    | HTTPS（生产）+ HttpOnly 考虑（当前 Bearer token 简单可行） |
 | 暴力破解          | 登录 API 限流：5 次/分钟/IP                          |
-| 恶意卡牌代码        | V1 纯 DSL 无执行；V2 AST 白名单 + vm 沙盒 + 超时         |
+| 恶意卡牌代码        | AST 白名单（拒绝 import/export/eval/process/fetch/setTimeout/Proxy/Reflect/class 等 20+ 标识符）+ isolated-vm（独立 V8 堆，非 node:vm）+ Worker Thread + 执行超时 100 ms / 内存上限 8 MB + 状态快照可回滚 |
 | XSS via 卡牌描述  | React 默认转义 HTML；不用 dangerouslySetInnerHTML   |
 | WebSocket 未认证 | 连接后 5 秒内必须发 auth 消息，否则断开                     |
 
@@ -593,22 +586,22 @@ WorkshopPage
 ### Phase 3: 工坊（数据驱动卡牌）
 
 - 工坊 API 路由
-- `CustomCardRegistry` + DSL 运行器
+- `shared/cards/custom-registry.ts` + `server/custom-code/` AST 验证 + isolated-vm 沙盒执行
 - `client/app/WorkshopPage.tsx` (浏览/编辑/沙盒)
 - 社交功能（点赞/评论）
 
 ### Phase 4: LLM 卡牌设计师
 
-- `client/services/llmService.ts` (浏览器端 LLM 调用)
+- `client/services/llm/` 多 provider 聚合（Gemini / OpenRouter / DeepSeek / AiHubMix）
 - 系统提示词模板
 - AI 对话式设计 UI
 - 卡牌美术生成
 
-### Phase 5: 高级卡牌效果（可选）
+### Phase 5: 高级卡牌效果（已合并到 Phase 3）
 
-- TypeScript AST 验证器
-- `vm.runInContext()` 沙盒执行
-- 完整 `registerCardEffect`/`registerCardListener` 支持
+- TypeScript AST 验证（`shared/custom-code/ast-validator.ts`）
+- isolated-vm 沙盒执行 + Worker Thread crash isolation
+- `CARD_IMPL.effect` hook + `CARD_IMPL.listeners` 全支持
 
 ---
 
@@ -630,7 +623,15 @@ WorkshopPage
 - `server/workshop.ts` — 工坊 API
 - `server/lobby.ts` — 大厅 API
 - `shared/cards/custom-registry.ts` — 自定义卡牌注册
-- `shared/cards/custom-dsl-runner.ts` — DSL → ActionFlow 转换
+- `shared/custom-code/ast-validator.ts` — TypeScript AST 白名单验证
+- `shared/custom-code/types.ts` — custom card source / compiled 类型契约（`CustomCodeManifest`、`CustomCodeValidateResult` 等）
+- `server/custom-code/compiler.ts` — TS 源码 → CommonJS JS 编译（`ts.transpileModule`）
+- `server/custom-code/engine.ts` — 验证 + 编译 + manifest 提取；isolated-vm 执行（主线程路径）
+- `server/custom-code/client.ts` — Worker Thread 客户端；`SharedArrayBuffer + Atomics` 同步调用
+- `server/custom-code/executor-worker.ts` — Worker Thread 入口；处理 `invokeEffect` / `invokeListener` 消息
+- `server/custom-code/isolate-runner.ts` — isolated-vm 执行核心（Worker Thread 内，无项目模块依赖）
+- `server/custom-code/runtime.ts` — `registerExecutorBackedCustomCard()`：挂载 effect hook + listener 到 CardRegistry
+- `server/custom-code/injected-helpers.ts` — 注入沙盒的辅助 API（`gainLeaf`、`payLeaf` 等）
 - `client/app/LoginPage.tsx` — 登录/注册页
 - `client/app/LobbyPage.tsx` — 大厅页
 - `client/app/WorkshopPage.tsx` — 工坊页
@@ -654,7 +655,7 @@ WorkshopPage
 
 ## J. 实现状态（platform 分支）
 
-> 更新于 2026-03-29
+> 更新于 2026-05-09
 
 ### 已完成
 
@@ -679,19 +680,17 @@ WorkshopPage
 | 工坊卡牌 CRUD                      | `server/workshop.ts`, `client/app/WorkshopPage.tsx`                                                                             |
 | 工坊社交（点赞/评论）                    | `server/workshop.ts`                                                                                                         |
 | 工坊沙盒                           | `server/workshop.ts`, WorkshopPage SandboxView                                                                               |
-| 自定义 DSL 效果系统                   | `shared/cards/custom-dsl-runner.ts`                                                                                          |
 | 自定义卡牌注册表 + catalog fallback    | `shared/cards/custom-registry.ts`, `shared/cards/catalog.ts`                                                                 |
 | 自定义卡牌 try-catch 容错             | `shared/cards/card-effects.ts` (CUSTOM_ 前缀卡牌异常时跳过)                                                                           |
-| DSL 系统单元测试                     | `shared/cards/__tests__/custom-dsl-runner.test.ts`, `custom-registry.test.ts`                                                |
 | 单人沙盒游戏（含自定义卡牌）                 | `/api/game/new-sandbox`, `server/game-router.ts`                                                                             |
 | WS 多人游戏含自定义卡牌                  | `shared/protocol/ws.ts` (createRoom.customCardIds), `server/room-manager.ts`                                                 |
-| LLM 卡牌设计师                      | `client/app/workshop/AiCardDesigner.tsx`, `client/services/llmService.ts`, `client/services/llm/`*                           |
+| LLM 卡牌设计师                      | `client/app/workshop/AiCardDesigner.tsx`, `client/services/llm/`（多 provider 聚合层）                                            |
 | 多 LLM Provider 支持              | Gemini / OpenRouter / DeepSeek / AiHubMix；完整模型表见 §C1.1                                                                       |
 | API Key 浏览器隔离                  | localStorage 存储，绝不发往服务器                                                                                                      |
 | 卡牌美术生成 + 上传                    | Gemini / OpenRouter / AiHubMix 图片模型 + `POST /api/workshop/art` + `/card-art/` 静态服务                                           |
 | 资源图标解析                         | `client/components/common/ResourceText.tsx`                                                                                     |
 | auth/workshop 单元测试             | `server/__tests__/auth.test.ts`, `workshop-api.test.ts`                                                                      |
-| TypeScript AST 验证 + VM 沙盒      | `server/ast-validator.ts`, `server/card-compiler.ts`, WorkshopPage 代码模式                                                      |
+| TypeScript AST 验证 + isolated-vm 沙盒 | `shared/custom-code/ast-validator.ts`, `server/custom-code/{compiler, engine, client, executor-worker, isolate-runner, runtime, injected-helpers}.ts` |
 | 卡牌版本历史                         | `workshop_card_versions` 表, versions/revert API, WorkshopPage 版本面板                                                           |
 | 工坊精选页面                         | `workshop_cards.featured` 列, admin 精选切换, Featured 标签页                                                                        |
 | 生产部署 (Docker + GitHub Pages)   | `Dockerfile`, `docker-compose.yml`, `.github/workflows/deploy-pages.yml`, `client/config.ts`                                    |
