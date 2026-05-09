@@ -32,22 +32,6 @@ pnpm install
 ./restart-intranet.sh    # 同时启动后端 (5175) + 前端 (5173)
 ```
 
-或分开启动：
-
-```bash
-pnpm run server          # 后端 5175
-pnpm run dev             # 前端 5173
-```
-
-WS 多人模式（推荐）——浏览器开两个窗口：
-
-```
-玩家 1：http://<host>:5173/?player=p1&transport=ws
-玩家 2：http://<host>:5173/?player=p2&transport=ws
-```
-
-P1 自动创建房间，P2 自动加入，操作实时同步。
-
 ## URL Parameters
 
 | 参数 | 说明 |
