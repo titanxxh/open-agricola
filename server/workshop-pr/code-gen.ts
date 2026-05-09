@@ -515,6 +515,32 @@ export const ${wcard.card_id}_impl = CARD_IMPL satisfies CardImpl
 `
 }
 
+export function generateDisplayFile(
+  wcard: WorkshopCardForGen & { card_json?: string },
+  ctx: { githubLogin: string; iso: string },
+): string {
+  const classImport =
+    wcard.card_type === 'occupation'
+      ? `import { Occupation } from '../types'`
+      : `import { MinorImprovement } from '../types'`
+
+  const locales = readLocalesFromCardJson(wcard.card_json)
+  const normalised = normalizeWorkshopEffectCode(wcard.effect_code, wcard.card_id, { locales })
+  const cardDefSource = extractCardDefSource(normalised)
+
+  return `// Generated from Open Agricola workshop. Do not hand-edit.
+// Workshop card: ${wcard.card_id}
+// Author: ${wcard.author_name ?? 'unknown'} (github: @${ctx.githubLogin})
+// Submitted: ${ctx.iso}
+
+${classImport}
+
+${cardDefSource}
+
+export const ${wcard.card_id} = CARD_DEF
+`
+}
+
 // ---------------------------------------------------------------------------
 // C-14: Smoke test generator
 // ---------------------------------------------------------------------------
