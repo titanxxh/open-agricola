@@ -23,7 +23,7 @@
 | **边界 `breed.ts` `'harvest'` 魔法字符串** | ⏳ 仍待办 | sourceCard 用 `'harvest'` 当哨兵，未换枚举 |
 | **新发现：`ad-hoc-action-registry.ts` `card_` 前缀强约束** | ⏳ 待评估 | 用字符串前缀做 invariant assert，与 `Major_` / `CUSTOM_` 同类问题 |
 | **F 级 `legacy` 标记残留**（2026-05-09 新扫） | ⚠️ 主路径 79 处 + 测试 131 处 = 221 处 | 4 类：真 fallback / 兼容字段 / 迁移留痕注释 / 测试 baseline 命名；详见下文 |
-| **F5 `@deprecated` 标记**（2026-05-09 补扫） | ⏳ 全仓 8 处 | 3 个真 `@deprecated` 字段（engine snapshot + SQL 双列）需生产数据迁移；其余为注释自描述/测试黑名单 |
+| **F5 `@deprecated` 标记**（2026-05-09 补扫 + 同日清理） | ✅ 已收口 | 3 个真 `@deprecated` 字段（engine snapshot + SQL 双列）已删；DSL 一次性迁移脚本同步退役 |
 
 ---
 
@@ -207,40 +207,33 @@ S7 spec §0 列出 C6 / C146 / E123 / C148 各需独立基建（CropStack stone 
 
 11 处自描述，sprint 完成总结里说"以前的 legacy 设计是 X，现在是 Y"。属合理历史叙述，不动。
 
-### F5. `@deprecated` / `deprecated` 标记（2026-05-09 补扫）—— 全仓 8 处
+### F5. `@deprecated` / `deprecated` 标记（2026-05-09 补扫 + 同日清理）—— 已收口
 
-| 子分类 | 数量 | 处理 |
+#### F5.1 真 `@deprecated` 字段 —— ✅ 2026-05-09 已清理
+
+| 位置 | 字段 | 清理动作 |
 | --- | --- | --- |
-| 真 `@deprecated` 字段（代码/schema 仍保留） | **3 个字段** | P1，需要 owner 决定何时清 |
-| 注释自描述 "replaces deprecated XYZ"（无残留） | 4 处 | 不动 |
-| 测试拒收 deprecated 字段（回归保护） | 1 处 | 保留 |
+| `shared/engine/engine.ts:301-309`（已删） | `lastEmittedChoice` snapshot alias | 扫 prod DB 2262 个 rooms.state_json 全 0 含此字段 → 删字段定义 + 删 restore alias 接受逻辑 + 清相关注释 |
+| `server/db.ts` `effect_dsl` 双列 | SQL 列 | v7 migration 早已 `ALTER TABLE DROP COLUMN`（本地 schema_version v8 验证 effect_dsl/effect_code/compiled_code 三列均不在）；删 `@deprecated` 注释（misleading），保留 v2/v3/v7 migration 历史本身（不可变） |
+| `scripts/migrate-dsl-to-code.ts` + `__tests__/` + `package.json` `migrate:dsl-to-code` | 一次性迁移脚本 | 与 effect_dsl 列同时退役（DB 中已无该列，脚本无法运行）→ 整套删除 |
+| `scripts/check-no-dsl.ts` allowlist | DSL 关键字守卫的豁免列表 | 移除已删除的 `migrate-dsl-to-code` + `docs/superpowers` 引用 |
 
-#### F5.1 真 `@deprecated` 字段（**仍在代码/schema 中**，需 owner 决定何时清）
+**验证**：fast 测试 2283 全过 / lint 0 error / build OK。
 
-| 位置 | 字段 | 保留原因 | 删除条件 |
-| --- | --- | --- | --- |
-| `shared/engine/engine.ts:301-309` | `lastEmittedChoice?: {nodeId, promptKey, promptParams, options}` | `@deprecated S2 Task 8` —— 反序列化 pre-Task-8 snapshot 的 forward-compat。新 snapshot 写 `compositeEmit` | 所有持久化 snapshot（DB / JSON）都迁到 `compositeEmit`（生产 DB 老房间清场后） |
-| `server/db.ts:86` | SQL `community_cards.effect_dsl` 列 | `-- @deprecated: kept for historical data, no new writes since PR-2` | 备份/迁移历史 effect_dsl 数据 → `ALTER TABLE DROP COLUMN` |
-| `server/db.ts:133` | SQL `workshop_cards.effect_dsl` 列 | 同上 | 同上（与 86 同次清理） |
-
-**处理建议**：3 个字段都是**生产数据兼容期**问题，不能任意删——需要先确认：
-- engine `lastEmittedChoice`：扫 prod DB 的 snapshot JSON 看是否仍含此字段；不含 → 安全删
-- SQL `effect_dsl` 双列：confirm PR-2 之后所有自定义卡都用 `card_json` + `effect_code`；备份后 DROP COLUMN
-
-#### F5.2 注释自描述（无残留代码）
+#### F5.2 注释自描述（无残留代码）—— 不动
 
 - `server/__tests__/_helpers/legacy-confirms.ts:8, 23, 36` —— 3 处 test helper 注释，描述自己**替代**已删除的 `confirmNextPlayer()` / `confirmPlayerSwitch()` shim + `'choice' PendingAction` predicate（S2 Task 13.7 已删）
 - `shared/session/session-core.ts:173` —— 注释提 "the deprecated union"（PendingAction union 已删 S1 Task 13.6）
 
 **不动**——历史叙述，删了反而丢失迁移上下文。
 
-#### F5.3 测试拒收 deprecated 字段（回归保护）
+#### F5.3 测试拒收 deprecated 字段（回归保护）—— 保留
 
 - `shared/custom-code/__tests__/ast-validator.test.ts:83` —— `it('rejects scoringPriority as a deprecated meta field')`
 - 主路径已 0 处 `scoringPriority`（2026-04-30 Bonus scoring hook 双轨合并时删干净）
 - ast-validator 黑名单防止 LLM 生成的自定义卡复活此字段
 
-**保留**——回归保护是必要的；除非 owner 确认 LLM workshop 不再可能产此字段。
+**保留**——回归保护必要。
 
 ### F 级处理优先级
 
@@ -262,9 +255,9 @@ S7 spec §0 列出 C6 / C146 / E123 / C148 各需独立基建（CropStack stone 
 5. **E 级 注释举例**：可选，捎带清理。~5 min。
 6. **F2 legacy 注释清理**（可选）：批量删除"Replaces the legacy XYZ" 等迁移留痕注释。~10 min。
 7. **F1 真 fallback**：跟随对应主路径 sprint 自然清理，不单独立项。
-8. **F5.1 真 `@deprecated` 字段**：3 个字段需要生产数据迁移（`engine.ts:lastEmittedChoice` 扫 DB 后可决；`db.ts:effect_dsl` 双列需备份 → DROP COLUMN）。需 owner 决定排期。
+8. ~~F5.1 真 `@deprecated` 字段~~ ✅ 已于 2026-05-09 同日清理。
 
-合计 ~1h（不含 F1 / F5.1）即可清完所有可立即处理的 P3 坏味道。
+合计 ~1h（不含 F1）即可清完所有可立即处理的 P3 坏味道。
 
 ---
 

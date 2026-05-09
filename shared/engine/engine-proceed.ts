@@ -201,8 +201,7 @@ export function engineProceed(
       actionContext: undefined,
     }
     const compositePromptKey = node.promptKey ?? 'ui.interactionFlowSelect'
-    // S2 Task 8: write emit metadata to the OrNode/XorNode itself instead
-    // of the engine-level lastEmittedChoice cache.
+    // S2 Task 8: write emit metadata to the OrNode/XorNode itself.
     node.emittedChoices = options
     node.emittedPromptKey = compositePromptKey
     node.emittedPromptParams = undefined
@@ -292,8 +291,7 @@ export function engineProceed(
       },
       { value: '__skip__', labelKey: 'ui.interactionOptionalSkip' },
     ]
-    // S2 Task 8: write emit metadata to the OptionalNode itself instead
-    // of the engine-level lastEmittedChoice cache.
+    // S2 Task 8: write emit metadata to the OptionalNode itself.
     node.emittedChoices = optionalOptions
     node.emittedPromptKey = optionalPromptKey
     node.emittedPromptParams = undefined
