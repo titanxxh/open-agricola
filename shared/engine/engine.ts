@@ -78,9 +78,8 @@ export class Engine {
   /**
    * S2 Task 8: returns the pending-choice metadata regardless of whether the
    * pending node is an `InteractionNode` (leaf-paired) or one of the composite
-   * nodes (`OrNode` / `XorNode` / `OptionalNode`). Replaces the engine-level
-   * `lastEmittedChoice` cache — composite nodes now carry their own
-   * `emittedChoices` / `emittedPromptKey` / `emittedPromptParams` /
+   * nodes (`OrNode` / `XorNode` / `OptionalNode`). Composite nodes carry their
+   * own `emittedChoices` / `emittedPromptKey` / `emittedPromptParams` /
    * `emittedRequest` fields populated in {@link proceed}.
    *
    * @internal Package-internal coordination surface for EngineStack.
@@ -287,9 +286,7 @@ export class Engine {
     /**
      * S2 Task 8: composite (Or/Xor/Optional) emit metadata. On restore,
      * apply to the named node's `emittedChoices` / `emittedPromptKey` /
-     * `emittedPromptParams` / `emittedRequest` fields. Older snapshots that
-     * still serialize `lastEmittedChoice` flow through the same restore
-     * path (alias accepted below).
+     * `emittedPromptParams` / `emittedRequest` fields.
      */
     compositeEmit?: {
       nodeId: string
@@ -297,15 +294,6 @@ export class Engine {
       promptParams?: Record<string, unknown>
       options: ActionChoiceOption[]
       request?: InteractionRequest
-    } | null
-    /** @deprecated S2 Task 8 — accepted on restore for forward-compat with
-     * snapshots produced by pre-Task-8 builds. New snapshots write
-     * `compositeEmit` instead. */
-    lastEmittedChoice?: {
-      nodeId: string
-      promptKey?: PromptKey
-      promptParams?: Record<string, unknown>
-      options: ActionChoiceOption[]
     } | null
   }) {
     // Synthetic interaction-only frames (pushed by GameCore.startConfirm*/
@@ -379,12 +367,7 @@ export class Engine {
       snapshot.choiceData?.id ?? snapshot.compositeEmit?.nodeId ?? null
 
     // S2 Task 8: rebuild composite emit metadata onto Or/Xor/Optional nodes.
-    // Accept the legacy `lastEmittedChoice` alias for snapshots produced by
-    // pre-Task-8 builds.
-    const compositeEmit = snapshot.compositeEmit
-      ?? (snapshot.lastEmittedChoice
-        ? { ...snapshot.lastEmittedChoice, request: undefined as InteractionRequest | undefined }
-        : null)
+    const compositeEmit = snapshot.compositeEmit ?? null
     if (compositeEmit) {
       const node = nodeMap.get(compositeEmit.nodeId)
       if (node instanceof OrNode || node instanceof XorNode || node instanceof OptionalNode) {
