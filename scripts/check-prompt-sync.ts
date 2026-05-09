@@ -32,6 +32,7 @@ const SOURCES = {
   cardEffects: 'shared/cards/card-effects.ts',
   engine: 'server/custom-code/engine.ts',
   astValidator: 'shared/custom-code/ast-validator.ts',
+  injectedHelpers: 'server/custom-code/injected-helpers.ts',
 }
 
 const TARGETS = {
@@ -103,6 +104,43 @@ function parseStringArray(body: string): string[] {
   return [...body.matchAll(/'([^']+)'|"([^"]+)"/g)]
     .map(m => m[1] ?? m[2])
     .filter(Boolean)
+}
+
+/**
+ * Scan `server/custom-code/injected-helpers.ts` for top-level `function NAME(...)`
+ * declarations. These are the helpers the sandbox injects into user code.
+ */
+export function extractInjectedHelpers(): string[] {
+  const src = readFile(SOURCES.injectedHelpers)
+  const re = /^function\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/gm
+  const names: string[] = []
+  let m: RegExpExecArray | null
+  while ((m = re.exec(src)) !== null) {
+    names.push(m[1]!)
+  }
+  return names.sort()
+}
+
+/**
+ * Parse the `<!-- prompt-sync:begin id=sandbox-injections -->` block in
+ * CUSTOM_CARD_SANDBOX.md and extract helper names from the first column of
+ * the markdown table. Strips backticks + arg list.
+ */
+export function extractSandboxDocInjections(): string[] {
+  const src = readFile(TARGETS.sandboxDoc)
+  const startIdx = src.indexOf('<!-- prompt-sync:begin id=sandbox-injections -->')
+  const endIdx = src.indexOf('<!-- prompt-sync:end id=sandbox-injections -->')
+  if (startIdx < 0 || endIdx < 0) {
+    throw new Error('sandbox-injections markers not found in CUSTOM_CARD_SANDBOX.md')
+  }
+  const block = src.slice(startIdx, endIdx)
+  const re = /^\|\s*`([a-zA-Z_][a-zA-Z0-9_]*)/gm
+  const names = new Set<string>()
+  let m: RegExpExecArray | null
+  while ((m = re.exec(block)) !== null) {
+    names.add(m[1]!)
+  }
+  return Array.from(names).sort()
 }
 
 // ---------- Target parsers ----------
@@ -184,6 +222,25 @@ function main() {
   reports.push(...checkBlock('listener-scopes', listenerScopes, `${SOURCES.engine}:isCardListenerScope`))
   reports.push(...checkBlock('denied-identifiers', deniedIdentifiers, `${SOURCES.astValidator}:DENIED_IDENTIFIERS`))
   reports.push(...checkBlock('denied-property-access', deniedPropertyAccess, `${SOURCES.astValidator}:DENIED_PROPERTY_ACCESS`))
+
+  // sandbox-injections sub-check (S9 B4): verify every function in
+  // injected-helpers.ts is documented in the §1 table of CUSTOM_CARD_SANDBOX.md.
+  // The doc block additionally documents `MinorImprovement` / `Occupation` /
+  // `console.*` stubs which are not pure JS functions in injected-helpers.ts —
+  // hence we only check the injected helpers ⊆ doc direction.
+  {
+    const injectedHelpers = extractInjectedHelpers()
+    const sandboxDocInjections = extractSandboxDocInjections()
+    const docSet = new Set(sandboxDocInjections)
+    const missingInDoc = injectedHelpers.filter(h => !docSet.has(h))
+    reports.push({
+      blockId: 'sandbox-injections',
+      target: TARGETS.sandboxDoc,
+      source: `${SOURCES.injectedHelpers}:functions`,
+      missingInTarget: missingInDoc,
+      extraInTarget: [],
+    })
+  }
 
   // For the LLM prompt we only require that every hook + phase name appears
   // somewhere in the file (substring match). The prompt formats them as
