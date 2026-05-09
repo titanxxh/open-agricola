@@ -1,6 +1,6 @@
-import type { MajorCardData } from '../../cards/major/types'
+import type { MajorCardDisplay } from '../../cards/major/types'
 
-export const cookingHearth1: MajorCardData = {
+export const cookingHearth1: MajorCardDisplay = {
   id: 'Major_CookingHearth1',
   name: 'Cooking Hearth',
   deck: 'major',
@@ -30,7 +30,7 @@ export const cookingHearth1: MajorCardData = {
   ],
 }
 
-export const cookingHearth2: MajorCardData = {
+export const cookingHearth2: MajorCardDisplay = {
   ...cookingHearth1,
   id: 'Major_CookingHearth2',
   number: 4,

@@ -1,6 +1,6 @@
-import type { MajorCardData } from '../../cards/major/types'
+import type { MajorCardDisplay } from '../../cards/major/types'
 
-export const fireplace1: MajorCardData = {
+export const fireplace1: MajorCardDisplay = {
   id: 'Major_Fireplace1',
   name: 'Fireplace',
   deck: 'major',
@@ -27,7 +27,7 @@ export const fireplace1: MajorCardData = {
   ],
 }
 
-export const fireplace2: MajorCardData = {
+export const fireplace2: MajorCardDisplay = {
   ...fireplace1,
   id: 'Major_Fireplace2',
   number: 2,
