@@ -86,7 +86,7 @@ server/           后端
   room-manager.ts WS 房间管理与广播
   game-router.ts  HTTP REST API
 
-src/              前端 (React)
+client/              前端 (React)
   app/            主容器 GameContainerApi
   components/     UI 组件
   hooks/          状态管理 hooks

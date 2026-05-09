@@ -1475,7 +1475,7 @@ type CardContinuation = {
 
 可落在：
 
-- `src/services/` 的 WS transport（`GameContainerApi` 内联 `useTransportSetup` 管理连接）
+- `client/services/` 的 WS transport（`GameContainerApi` 内联 `useTransportSetup` 管理连接）
 
 ### 12.2 同步状态层
 
@@ -1487,7 +1487,7 @@ type CardContinuation = {
 
 可落在：
 
-- `src/hooks/useGameSync.ts`
+- `client/hooks/useGameSync.ts`
 
 ### 12.3 视图编排层
 
@@ -1499,7 +1499,7 @@ type CardContinuation = {
 
 可落在：
 
-- `src/app/GameContainerApi.tsx`
+- `client/app/GameContainerApi.tsx`
 - 或后续演进后的房间容器组件
 
 ### 12.4 客户端 bundle 边界（PR-4 懒加载落地）
