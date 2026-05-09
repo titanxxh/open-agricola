@@ -203,7 +203,7 @@ export const majorEffects: MajorEffectsMap = {
   Major_Pottery: {
     onHarvest: createSingleHarvestExchange('clay', { food: 2 }),
   },
-  Major_Basketmaker: {
+  Major_Basket: {
     onHarvest: createSingleHarvestExchange('reed', { food: 3 }),
   },
   // Major_StoneOven + Major_ClayOven 的 onBuy 是内联 ActionFlow object literal（与 well 不同，不依赖 internal helper）。
