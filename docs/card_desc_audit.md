@@ -7,7 +7,7 @@
 >
 > `docs/card_progress.md` 仍是卡牌实现进度的唯一权威源——本文件只是审查报告与历史快照。
 
-外部复核 `shared/cards/{A..E}/*.ts` 全量 887 张卡 vs BGA 同号 `.php`，按 spec `docs/superpowers/specs/2026-04-28-card-impl-vs-bga-audit-design.md` 流程执行。本次审查分两阶段：
+外部复核 `shared/cards/{A..E}/*.ts` 全量 887 张卡 vs BGA 同号 `.php`，按 spec `(spec/plan 已归档，见 git history)` 流程执行。本次审查分两阶段：
 - **Phase A（2026-04-28）**：架构 + i18n + 空壳扫描，构造深度池 140 张做行为对齐
 - **Phase B（2026-04-29）**：对深度池外的非深度池 ~746 张做紧凑续审
 
@@ -90,7 +90,7 @@
 
 ```bash
 pnpm tsx scripts/audit-card-architecture.ts > output/tmp/audit-summary.json
-# 详见 spec docs/superpowers/specs/2026-04-28-card-impl-vs-bga-audit-design.md §5
+# 详见 spec (spec/plan 已归档，见 git history) §5
 # Phase A: 4 个 Explore agent + 5 个深度对齐 agent
 # Phase B: 5 个 wide-scan agent，按 deck 切，紧凑输出
 ```
@@ -464,7 +464,7 @@ D35/D38/D45/D84 等卡的 `getExchangeResources()` 只看 `player.resources.{ani
 
 ## 附录 B：sub-agent prompt
 
-详见 `docs/superpowers/plans/2026-04-28-card-impl-vs-bga-audit.md` Phase 6 + Phase 8 + Phase 12。注意 plan 原本是 4 个 B agent，实施时因 D+E 合并 55 张超出单 agent ≤30 张建议（plan §8 风险条款），调整为 5 个（A/B/C/D/E 各一）。Wide-scan（Phase 12）同样 5 个 agent 按 deck 切。
+详见 `(spec/plan 已归档，见 git history)` Phase 6 + Phase 8 + Phase 12。注意 plan 原本是 4 个 B agent，实施时因 D+E 合并 55 张超出单 agent ≤30 张建议（plan §8 风险条款），调整为 5 个（A/B/C/D/E 各一）。Wide-scan（Phase 12）同样 5 个 agent 按 deck 切。
 
 ## 附录 C：本审查未做的事项
 
