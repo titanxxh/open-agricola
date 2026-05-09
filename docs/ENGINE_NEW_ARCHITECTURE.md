@@ -15,7 +15,7 @@
 
 它**不改变**：后端权威 / 全量快照 / WS 协议 / hook 系统 / 卡牌闭环原则 / 三层物理边界。
 
-> **当前 sprint 进度**（详见 §15）：S1 ✅（2026-05-03）/ S2 ✅（2026-05-05）/ S3 ✅（2026-05-04，PaymentSolver 收口）/ S4a ✅（2026-05-04）/ S4b ✅（2026-05-05，rich-node + step() dispatch + cursor round-trip 落地）/ S4c ✅（2026-05-08，Engine API 收敛 14 → 6 + mirror 字段删除 + engine.ts 447 行）/ S5 ✅（2026-05-06，RoomManager 拆 connection/persistence 三层）/ S6 ✅（2026-05-08，物理分层 + cards-display split + sandbox lazy + 5 ESLint error 级规则）/ S7 ✅（2026-05-09，B104 引擎修复 + E70 public API rewrite + 825 cards-impl 桥清理；e2e smoke 暴露 S6c 残留 TDZ — 见 §15 deferred）。
+> **当前 sprint 进度**（详见 §15）：S1 ✅（2026-05-03）/ S2 ✅（2026-05-05）/ S3 ✅（2026-05-04，PaymentSolver 收口）/ S4a ✅（2026-05-04）/ S4b ✅（2026-05-05，rich-node + step() dispatch + cursor round-trip 落地）/ S4c ✅（2026-05-08，Engine API 收敛 14 → 6 + mirror 字段删除 + engine.ts 447 行）/ S5 ✅（2026-05-06，RoomManager 拆 connection/persistence 三层）/ S6 ✅（2026-05-08，物理分层 + cards-display split + sandbox lazy + 5 ESLint error 级规则）/ S7 ✅（2026-05-09，B104 引擎修复 + E70 public API rewrite + 825 cards-impl 桥清理；e2e smoke 暴露 S6c 残留 TDZ — 已由 S8 闭环）/ S8 ✅（2026-05-09，majors 物理分层 + cards-display _lookup 双反向切断 + ESLint rule 7 豁免精简到 ≤2 项）。
 
 ---
 
@@ -1161,9 +1161,9 @@ S5 完成（2026-05-05）
 
 1. **cards-impl 文件 re-export 桥** — ✅ **已闭环（S7 Batch 3, 2026-05-09）**：`scripts/codemod-cards-display-redirect.ts` 重定向 ~85 caller 文件直接 import cards-display；`perl -i` 删除 825 cards-impl 文件的 `export { X }` 桥。callers grep 清干净，build/lint/test 全绿。
 
-2. **`shared/cards-display/major/**` 被 ESLint excluded** — major 卡（well.ts、fireplace.ts、joinery.ts 等 8 张）的 `onBuy` / `onPlay` hooks 是**内联实现**，违反 cards-display 纯 display 假设。S6c rule 7 给 `shared/cards-display/major/**` + `shared/cards-display/_lookup.ts` + `shared/cards-display/types.ts` 三个路径加了 `ignores` 豁免。**长期决策**：(a) 把 major hooks 抽到 `shared/cards/major/` impl 侧（需要新机制承载 hooks 数据）—— BGA 风格更纯；(b) 承认 major 卡是合法例外，将豁免登记为 ADR——更轻量但需写明。**S7 状态**：未变更（spec §0 已声明走 ADR，不进 sprint）。
+2. **`shared/cards-display/major/**` 被 ESLint excluded** — major 卡（well.ts、fireplace.ts、joinery.ts 等 8 张）的 `onBuy` / `onPlay` hooks 是**内联实现**，违反 cards-display 纯 display 假设。S6c rule 7 给 `shared/cards-display/major/**` + `shared/cards-display/_lookup.ts` + `shared/cards-display/types.ts` 三个路径加了 `ignores` 豁免。**Closed by S8**（2026-05-09）：选方案 (a)。S8 Batch 1 把 hooks 从 cards-display/major/* 全部剥离，cards-display/major 变纯数据；Batch 2 把 majors hooks 集中到 `shared/cards/major/effects.ts`（Map 6 hooks）+ index 合成；Batch 3 把 `shared/cards-display/_lookup.ts` 双反向切断（custom-registry forwarding 集中到 `_lookup-data.ts`），ESLint rule 7 豁免从 3 项（`major/**` + `_lookup.ts` + `types.ts`）精简到 2 项（`_lookup-data.ts` + `types.ts`）。详见 Sprint S8 收口段。
 
-3. **e2e workshop-smoke spec — Deferred（S7 Batch 4 实跑暴露 pre-existing TDZ bug）**：`e2e-tests/workshop-smoke.spec.ts` 在 sprint-S7 worktree 实跑（dev server BACKEND_PORT=5275 + vite --port 5273）发现页面无法渲染，浏览器控制台 3 次报 `ReferenceError: Cannot access 'majorCardDefinitions' before initialization`，stack 指向 `shared/cards-display/_lookup.ts:12`。**根因**：vite dev mode ESM 加载链中 `cards-display/_lookup.ts` (L6 import majorCardDefinitions, L7-12 import cards/catalog) 与 `cards/catalog.ts` (L5 import majorCardDefinitions from cards/major) 形成 TDZ — `_lookup` 在 `cards/major/index.ts` 完成 export 之前就尝试读 `majorCardDefinitions.map`。在回退到 commit `6b99c4fa`（仅含 Batch 1+2，无 Batch 3 改动）上同样复现，确认是 **S6c 残留**而非 S7 引入；S6c 未实跑掩盖了 bug。**清理路径**（独立任务）：消除 `cards-display/_lookup.ts` ↔ `cards/catalog.ts` ↔ `cards/major` 的循环；候选方案：(a) 把 majorCardDefinitions 移到 cards-display 侧（majors 已经"display 内联 hooks"，本就不该住 cards/）；(b) 抽出 `cards/major/_data.ts` 仅含数据数组，cards-display 和 cards/major 共同读它；(c) 拆分 _lookup 为 `_lookup-minor.ts` + `_lookup-major.ts`，让 minor lookup 与 major lookup 独立加载。需独立 brainstorm；不在 S7 范围。
+3. **e2e workshop-smoke spec — ✅ 已闭环（S7 实跑暴露 + S8 解 TDZ）**：S7 Batch 4 在 sprint-S7 worktree 实跑发现浏览器 3 次 `ReferenceError: Cannot access 'majorCardDefinitions' before initialization`（stack 指向 `_lookup.ts:12`）。**根因**：vite dev mode ESM 加载链中 `cards-display/_lookup.ts` 反向 import `cards/major` + `cards/catalog` 形成 TDZ —— `_lookup` 在 `cards/major/index.ts` 完成 export 之前就读 `majorCardDefinitions.map`。在 commit `6b99c4fa`（仅 Batch 1+2，无 Batch 3 改动）上同样复现，确认 **S6c 残留**而非 S7 引入。**Closed by S8**（2026-05-09）：选方案 (a) — majors 物理分层让 cards-display/major 成为权威数据源；S8 Batch 4 加 `&player=p1&devMode=1` auth dev shortcut，本地实跑 1 passed，浏览器 0 错误，TDZ 根除。CI 集成仍 deferred（需新建 e2e workflow + dev server）。
 
 ### Sprint S7（测试回归 + S6 已知遗留清理） ✅ 完成（2026-05-09）
 
@@ -1183,6 +1183,39 @@ S5 完成（2026-05-05）
 #### Sprint S7 已知遗留
 
 - **e2e workshop-smoke vite dev 循环依赖**（已知遗留 #3 升级版）—— 见上文。需独立 brainstorm 修 `cards-display/_lookup.ts` 反向 import。在该 bug 修复之前，e2e workshop-smoke 不能加入 CI。
+
+### Sprint S8：majors 物理分层 + cards-display _lookup 双反向切断 ✅ 完成（2026-05-09）
+
+> **完成总结**：S6 closeout 已知遗留 #2（`shared/cards-display/major/**` ESLint 豁免）+ #3（e2e workshop-smoke 未实跑）一并收口；附带解决 vite dev TDZ 循环（浏览器开发态 `Cannot access 'majorCardDefinitions' before initialization`）。
+
+#### 4 batch 拆分
+
+1. **B1（`38a8d288`）— cards-display 纯数据层落地**：拆 `shared/cards-display/types.ts` 把内联的 hooks 类型剥到 cards-impl 侧；`shared/cards-display/major/*.ts` 8 张 major 卡删除所有 `onBuy / onPlay` hooks 字段，只剩纯数据；新建 `shared/cards-display/major/index.ts` 统一 register；新建 `shared/cards-display/_lookup-data.ts` 承接 8 majors 注册；`shared/cards-display/_lookup.ts` 改 import `_lookup-data` 让 catalog 瘦身约 890 行（从 1700+ 降到 ~810）。
+2. **B2（`e5527a45`）— cards/major effects.ts 集中 hooks**：新建 `shared/cards/major/effects.ts`（Map<id, hooks> 6 项 — Well/Joinery/StoneOven/ClayOven/Pottery/Basketmaker hooks，CookingHearth/Fireplace 没有 onBuy hooks）；`shared/cards/major/index.ts` 用合成 helper 注入 hooks 给 display 副本；删除 `shared/cards/major/{well,fireplace,cooking-hearth,clay-oven,stone-oven,joinery,pottery,basketmaker}.ts` 8 个镜像（ID 相同，原文件作用是承载 hooks，effects.ts 已收口）。
+3. **B3（`9e3c8097`）— _lookup.ts 切断双反向**：custom-registry forwarding 集中到 `shared/cards-display/_lookup-data.ts`（之前 `_lookup.ts` 反向 import custom-registry 导致 cycle）；ESLint rule 7 豁免从 3 项（`major/**` + `_lookup.ts` + `types.ts`）精简到 2 项（`_lookup.ts` + `types.ts`）—— major/** 不再需要豁免因为已经是纯 display 数据。手动 navigate 验证浏览器 0 个 'majorCardDefinitions before initialization' 错误。
+4. **B4（`76ee2763`）— client tree-shake + e2e 实跑 + 文档闭环**：`client/app/hooks/use-harvest-flow.ts` import 从 `getMajorCard`（cards/major impl）改成 `getMajorCardDisplay`（cards-display/major），让 vite tree-shake majors hooks 离开 client bundle；`e2e-tests/workshop-smoke.spec.ts` `goto` URL 加 `&player=p1&devMode=1` auth dev shortcut（S6 deferred 实跑修复），本地实跑 1 passed + 浏览器 0 错误；`vite.config.ts` proxy target port 支持 `BACKEND_PORT` env（避开默认 5175 占用）；ENGINE_NEW_ARCHITECTURE.md L18 + §15 已知遗留 #2/#3 + S8 收口段同步。
+
+#### Sprint S8 整体 DoD
+
+- ✅ D1: cards-display/major 8 张卡纯数据（无 hooks），`shared/cards-display/major/index.ts` 统一 register；ESLint rule 7 豁免不再涵盖 `major/**`
+- ✅ D2: majors hooks 集中到 `shared/cards/major/effects.ts`（Map 6 项）；8 个镜像文件删除
+- ✅ D3: `shared/cards-display/_lookup.ts` 不再反向 import custom-registry；ESLint rule 7 豁免精简到 2 项（`_lookup.ts` + `types.ts`）
+- ✅ D4: vite dev TDZ 循环根除（浏览器实跑 0 个 'majorCardDefinitions before initialization' 错误）
+- ✅ D5: e2e workshop-smoke 本地实跑 1 passed
+- ✅ D6: bundle 限额满足（main 529.2 KB raw / 161.4 KB gz，limit 550 / 170）
+- ✅ D7: tsc app+server / lint / pnpm test:fast / build / check:bundle-size 全绿
+- ✅ D8: ENGINE_NEW_ARCHITECTURE.md §15 已知遗留 #2/#3 标 closed；S8 收口段回流
+
+#### 关键演进
+
+1. **物理分层 = 真实切边界，不是 ESLint warn**：S6 通过 ESLint rule 7 豁免临时承认 majors 内联 hooks 的"违规"；S8 通过把 hooks 物理剥到 `shared/cards/major/effects.ts` + 合成 helper 注入，让 display 真正成为纯数据。豁免数量从 3 → 2 是物理分层落地的可量化指标。
+2. **vite dev TDZ 是 ESM cycle 的征兆**：`shared/cards-display/_lookup.ts` 反向 import `shared/cards/custom-registry.ts`，custom-registry 又 import 回 cards-display 类型 — 在 vite dev unbundled HMR 下触发 TDZ。Production build（rollup tree-shake + topological sort）掩盖了这个问题。**经验**：cards-display 必须是无反向 import 的叶子层；任何 forwarding 集中到 sibling 数据文件（`_lookup-data.ts`）。
+3. **Client bundle 配合 tree-shake**：B4 把 `use-harvest-flow.ts` 的 majors lookup 切到 cards-display 侧后，vite 能把 cards/major hooks impl tree-shake 出 client bundle。bundle 数字几乎未变（541.93 vs 541.91 KB raw）— 说明 majors hooks 体积本就很小，主要价值在**架构纯度**：ESLint 豁免 -1 项 + 浏览器 TDZ 根除。
+4. **e2e auth dev shortcut**：S6c 写 e2e workshop-smoke spec 时假定 `?page=workshop` 直接进 workshop；实际 PageRouter 在未登录时跳 LoginPage。S8 B4 复用 sprint-S7 已发现的修法 `&player=p1&devMode=1`（AuthContext dev bypass），让 spec 真正可实跑。
+
+#### 4 batch 完整 SHA 链
+
+`38a8d288`（B1）/ `e5527a45`（B2）/ `9e3c8097`（B3）/ `76ee2763`（B4）
 
 ---
 
