@@ -238,7 +238,7 @@ return {
 | actionId | 说明 | params |
 |----------|------|--------|
 | gain | 获得资源 | { food: 2, wood: 1 } |
-| pay-resources | 支付资源 | { grain: 1 } |
+| pay | 支付资源 | { grain: 1 } |
 | bonus-vp | +1 VP（固定，不接受 amount） | {} |
 | gain-other-players | 其他每位玩家各获得 | { food: 1 } |
 | bake-bread | 烤面包 | {} |
@@ -258,7 +258,7 @@ return {
 | helper | 用法 |
 |--------|------|
 | \`gainLeaf(cardId, { food: 2 })\` | 创建 gain leaf 节点 |
-| \`payLeaf({ cardId, cost: { wood: 1 } })\` | 创建 pay-resources leaf 节点 |
+| \`payLeaf({ cardId, cost: { wood: 1 } })\` | 创建 pay leaf 节点 |
 | \`spaceHasPlayer(space, playerId)\` | 判断行动位是否被指定玩家占据 |
 | \`positionKey({ x, y })\` | 将位置转为字符串 \`"x,y"\` |
 | \`getCardStack(player, cardId)\` | 读取 \`cardStates[cardId].stack\` |
