@@ -20,7 +20,6 @@ type WorkshopCardRow = {
   name: string
   description: string
   card_json: string
-  effect_code: string | null
   art_url: string | null
   status: string
   author_name?: string
@@ -131,7 +130,12 @@ export async function handleProposeRequest(
 
     const artData = loadArtIfAny(wcard.art_url)
 
-    const effectCode = wcard.effect_code ?? ''
+    // v7 schema: TS source lives inside card_json under `_code`.
+    let effectCode = ''
+    try {
+      const parsed = JSON.parse(wcard.card_json) as Record<string, unknown>
+      if (typeof parsed._code === 'string') effectCode = parsed._code
+    } catch { /* malformed card_json — keep effectCode empty */ }
     const wcardForGen = {
       id: wcard.id,
       card_id: wcard.card_id,
