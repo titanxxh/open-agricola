@@ -490,41 +490,6 @@ export function extractCardImplSource(source: string): string {
   return printStatements(sf, stmts)
 }
 
-export function generateMainCardFile(
-  wcard: WorkshopCardForGen & { card_json?: string },
-  ctx: { githubLogin: string; iso: string },
-): string {
-  const classImport =
-    wcard.card_type === 'occupation'
-      ? `import { Occupation } from '../types'`
-      : `import { MinorImprovement } from '../types'`
-  const used = scanUsedHelpers(wcard.effect_code)
-  const helperImports = Array.from(used)
-    .map((h) => HELPER_IMPORTS[h])
-    .filter((x): x is string => !!x)
-    .sort()
-    .join('\n')
-
-  const locales = readLocalesFromCardJson(wcard.card_json)
-  const effectCode = normalizeWorkshopEffectCode(wcard.effect_code, wcard.card_id, { locales })
-
-  return `// Generated from Open Agricola workshop. Do not hand-edit.
-// Workshop card: ${wcard.card_id}
-// Author: ${wcard.author_name ?? 'unknown'} (github: @${ctx.githubLogin})
-// Submitted: ${ctx.iso}
-
-${classImport}
-import type { CardImpl } from '../registry'
-${helperImports ? helperImports + '\n' : ''}
-// --- BEGIN WORKSHOP CODE (validated in sandbox) ---
-${effectCode}
-// --- END WORKSHOP CODE ---
-
-export const ${wcard.card_id} = CARD_DEF
-export const ${wcard.card_id}_impl = CARD_IMPL satisfies CardImpl
-`
-}
-
 export function generateDisplayFile(
   wcard: WorkshopCardForGen & { card_json?: string },
   ctx: { githubLogin: string; iso: string },
