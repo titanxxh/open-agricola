@@ -920,8 +920,8 @@ S1–S5 期间频繁动 commit 入口（`confirmXxx` → `resolveChoice + payloa
 
 skip 机制：
 
-- 用 `it.skip` + 一行注释：`// SKIP: S2 confirm-feed 重构期，见 docs/skip-tracker.md`
-- 维护 `docs/skip-tracker.md` 简单 markdown 表：卡 ID + skip 原因 + 期望解除 sprint
+- 用 `it.skip` + 一行注释：`// SKIP: S2 confirm-feed 重构期，见 (已删除，见 git history)`
+- 维护 `(已删除，见 git history)` 简单 markdown 表：卡 ID + skip 原因 + 期望解除 sprint
 - PR 描述必须列出**新增 skip 数量增量**——CI 不强校验，但 reviewer 检查
 - 每个 sprint DoD 加一项："新增 skip 数 / 累计 skip 数 列在 PR 描述"
 
@@ -968,11 +968,11 @@ S6 物理分层完成后专设 S7"卡牌效果测试回归"：
 
 - 「强制 green 子集」（见 §13.1）保持全绿
 - 卡牌效果 session 测试可 skip，PR 描述列「新增 skip 数 / 累计 skip 数」
-- skip 必须登记在 `docs/skip-tracker.md`
+- skip 必须登记在 `(已删除，见 git history)`
 
 ### Sprint S1：消除 PendingAction 残留 + 引入 InteractionNode 骨架 + 落地 D-a 序列化 ✅ 完成（2026-05-03）
 
-> **完成总结**（详见 `docs/sprint-S1-progress.md`）
+> **完成总结**（详见 `(已删除，见 git history)`）
 >
 > - ✅ Tasks 1–11 全部落地（含 Task 11 reviewer C-1 / I-1 follow-ups）
 > - ✅ R1–R4 残留清掉：`pausedEngine` → `EngineStack`；`subFlowKind` 强类型；`stageResume.extra` 自描述化；`__subflow:reorganize` 命名收口
@@ -1005,7 +1005,7 @@ S6 物理分层完成后专设 S7"卡牌效果测试回归"：
 
 ### Sprint S2：InteractionNode 完整推广 + harvestFeed + cardDraft + Session 拆 traits ✅ 完成（2026-05-05）
 
-> **完成总结**（详见 `docs/sprint-S2-progress.md`）
+> **完成总结**（详见 `(已删除，见 git history)`）
 >
 > - ✅ Tasks 1–13 全部落地
 > - ✅ InteractionRequest 推广剩余 kind：`farm-select`（plow/sow/fence/room/stable）/ `selection`（farm-position/occupation-hand）/ `feed`（harvestFeed）/ `card-draft`（cardDraft）；GameCore.build{Plow,Sow,Fence,Selection,Farm}Interaction 全删；`isFarmPromptKey()` / `isSelectionPromptKey()` 字符串嗅探消除
@@ -1042,12 +1042,12 @@ S6 物理分层完成后专设 S7"卡牌效果测试回归"：
 ### Sprint S3：Payment 收口 + Improvement 瘦身 ✅ 完成（2026-05-04）
 
 - ✅ `payment.ts` + `pay-helpers.ts` + `room-payment.ts`（1974 行 / 41 export）合并为 `shared/actions/payment/`
-- ✅ `PaymentSolver` namespace 6 成员：4 core public（`computeOptions / canAfford / execute / pickAuto`）+ 2 utility（`clearCache / isComplexCost`）；详见 ADR-0006 D5
+- ✅ `PaymentSolver` namespace 6 成员：4 core public（`computeOptions / canAfford / execute / pickAuto`）+ 2 utility（`clearCache / isComplexCost`）
 - ✅ `improvement.ts` 1014 → 575（拆出 `improvement-options.ts` 364 + `improvement-pool.ts` 86）；plan ≤ 400 目标超 175 行（Task 9 commit message 记录权衡）
 - ✅ ESLint `no-restricted-imports` 守门：`shared/actions/effects/**` 与 `shared/cards/**` 禁 import `helpers/payment*`
 - ✅ 0 卡牌测试新增 skip；强制 green 子集 baseline 一致（1 pre-existing failure 与 S3 无关）
-- **完成度量**：21 commits on `sprint-S3-payment-solver` branch；ADR-0006 全部 6 个子决议（D1-D6）落地
-- **依赖关系**：与 S1 / S2 / S4 均无强前置（详见 `docs/superpowers/specs/2026-05-03-engine-redesign-S2-S4-contracts.md` §4.2）。在独立 worktree 推进，effect 改写严格限定在 `improvement.ts` 拆分相关
+- **完成度量**：21 commits on `sprint-S3-payment-solver` branch；6 个子决议（PaymentCtx 5 字段 / pickAuto / canAfford 复用 / improvement-pool 边界 / namespace export / Result + enum 错误）全部落地
+- **依赖关系**：与 S1 / S2 / S4 均无强前置（详见 `(spec/plan 已归档，见 git history)` §4.2）。在独立 worktree 推进，effect 改写严格限定在 `improvement.ts` 拆分相关
 
 ### Sprint S4：领域聚合层 `shared/domain/` + 节点充血 ✅ 完成（2026-05-06）
 
@@ -1055,7 +1055,7 @@ S4 拆分为两条独立轨道并行推进：
 
 #### S4a：领域聚合层 `shared/domain/` ✅ 完成（2026-05-05）
 
-> **完成总结**（详见 `docs/sprint-S4a-progress.md`）
+> **完成总结**（详见 `(已删除，见 git history)`）
 >
 > - ✅ PR1：scaffold `shared/domain/{index,player-board,farmyard,pasture,animal-zones,scoring}.ts`，wrap-only
 > - ✅ PR2：farm 类 effects（plow/sow/fence/room/stable）切换到 `playerBoard().farmyard.xxx()`
@@ -1069,7 +1069,7 @@ S4 拆分为两条独立轨道并行推进：
 
 #### S4b：节点充血 + Engine 公开 API 收敛 ✅ 完成（2026-05-06）
 
-> **完成总结**（详见 `docs/sprint-S4b-progress.md`）
+> **完成总结**（详见 `(已删除，见 git history)`）
 >
 > 节点充血（学 BGA `AbstractNode`）。`shared/engine/nodes/` 12 文件（每节点一文件，`nodes.ts` 删除）；`InteractionNode` 吸收 4 个 pending state field（`pendingActionId / ownerNodeId / contextSnapshot / promptParams`）+ `emit()` / `validateSelection()` / `step()` / `cursorData()`；leaf 节点（ActionNode/ActivateCardNode/PlayerSwitchNode）通过 `step()` 返回 `NodeStepResult` discriminator 驱动 `engine.proceed` 调度（`'execute'` / `'activateListener'` / `'playerSwitch'`）；composite 节点（OrNode/XorNode/OptionalNode）下沉 emit metadata + `pendingContextSnapshot`；外部 snapshot consumer 全部迁移到 `engine.peekInteractionHost()` 路径。
 >
@@ -1321,15 +1321,15 @@ S7 前半段 (shape-mismatch skip codemod) ── S4 完成后即可启动
 
 ---
 
-## 17. 决策溯源（与 ADR 关联）
+## 17. 决策溯源
 
-| 决策 | ADR | 不重新讨论的原因 |
+> 历史 ADR 文件（`docs/adr/`）已于 2026-05-09 整体删除——所有关键决策均已落地到对应 sprint，详情见 §15 各 sprint 完成总结。下表保留决策 → sprint 落地的快速索引：
+
+| 决策 | 落地 sprint | 现状 |
 |---|---|---|
-| 消除 PendingAction union | `0001-eliminate-pending-action-union.md` | ✅ S1 / S2 已落地：union 完全删除（Task 13.6），8 kind sum type 上线 |
-| Engine cursor 进 SerializedGameState (D-a) | `0002-engine-cursor-in-serialized-state.md` | ✅ S1 已落地：`Engine.snapshotCursor()` + `SerializedGameState.engineStack` |
-| 节点充血（学 BGA AbstractNode） | `0003-rich-node-vs-anemic-node.md`（待写） | 节点贫血是 engine.ts 1828 行单体的根因（S4 同期推进） |
-| 引入 `shared/domain/` 聚合层 | `0004-domain-aggregate-layer.md`（待写） | 行动层超 BGA 3300 行的反向来源（S4 范围） |
-| 不照搬 BGA 充血 Action | `0005-action-as-data-not-class.md`（待写） | 自定义卡 DSL 要求 Action 数据化 |
-| Payment 收口为单深 module | [`0006-payment-solver-deep-module.md`](./adr/0006-payment-solver-deep-module.md)（Accepted 2026-05-04） | ✅ S3 已落地：`PaymentSolver` namespace 6 成员，`payment/internal/` 深模块 |
-
-ADR 在 sprint 落地时同步建立；本文档在每个 sprint 完成后回流更新。
+| 消除 PendingAction union | S1 / S2 | ✅ union 完全删除（Task 13.6），8 kind sum type 上线 |
+| Engine cursor 进 SerializedGameState (D-a) | S1 | ✅ `Engine.snapshotCursor()` + `SerializedGameState.engineStack` |
+| 节点充血（学 BGA AbstractNode） | S4b | ✅ rich-node + step() dispatch + cursor round-trip 落地 |
+| 引入 `shared/domain/` 聚合层 | S4a | ✅ `shared/domain/{player-board,farmyard,pasture,animal-zones,scoring}` 落地，11 个 legacy 文件删除 |
+| Action as data not class | S2 / S6 | ✅ Action 仍为数据；卡牌 DSL 通过 `actionDefinition` + `registerAdHocAction` 实现 |
+| Payment 收口为单深 module | S3 | ✅ `PaymentSolver` namespace 6 成员，`payment/internal/` 深模块；旧 `helpers/{payment,pay-helpers,room-payment}.ts` 已删 |
