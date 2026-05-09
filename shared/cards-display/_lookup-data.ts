@@ -1840,3 +1840,14 @@ export const minorImprovementIdsList: readonly string[] =
 
 export const occupationIdsList: readonly string[] =
   implementedOccupationCardsList.map((card) => card.id)
+
+// ── Custom card registry forwarding ──
+// Runtime overlay registry lives in `shared/cards/custom-registry.ts` (impl
+// side). cards-display references it via this module to keep `_lookup.ts`
+// 0-reverse-import. ESLint rule 7 carves out `_lookup-data.ts` instead of
+// `_lookup.ts` (single forwarding seam). custom-registry has no transitive
+// import to cards/major or cards/catalog, so no TDZ risk.
+export {
+  getCustomMinorImprovement,
+  getCustomOccupation,
+} from '../cards/custom-registry'
