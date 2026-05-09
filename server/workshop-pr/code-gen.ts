@@ -433,6 +433,15 @@ function findTopLevelConst(
   return null
 }
 
+/**
+ * Print top-level statements with two normalizations:
+ * - Strip TS printer's trailing semicolons (line-end `;`) so the output style
+ *   matches `normalizeWorkshopEffectCode`'s `printer.printFile()` path which
+ *   omits them. Without this, hand-written fixtures and generator output drift.
+ * - Reverse `\\uXXXX` escapes back to their UTF-8 codepoints (TS printer
+ *   defaults to escaping every non-ASCII character) so generated files
+ *   match repo convention of verbatim CJK literals.
+ */
 function printStatements(sf: ts.SourceFile, stmts: ts.Statement[]): string {
   if (stmts.length === 0) return ''
   const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
