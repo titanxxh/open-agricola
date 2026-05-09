@@ -491,7 +491,7 @@ return {
 | `store-on-card`            | params 形如 `{ wood: 1, clay: 2 }`，写入 `player.cardStates[CARD_ID].counters`         |
 | `take-from-card`           | params 形如 `{ grain: 1 }`，从 `player.cardStates[CARD_ID].counters` 扣，扣完 leaf 就 fail |
 | `gain`                     | params 形如 `{ food: 2, wood: 1 }`                                                  |
-| `pay-resources`            | 同上，扣资源                                                                            |
+| `pay`                      | 同上，扣资源                                                                            |
 | `bake-bread`               | 启动一段烤面包子流程                                                                        |
 | `push-card-stack`          | 向 `player.cardStates[CARD_ID].stack` 推入一项                                         |
 | `special-effect`           | **唯一的 cardStates mutation 入口**（Sprint 6a/6b）。`params: { kind: 'set-flag' \| 'set-infobox' \| 'set-extra-data' \| 'increment-extra-data', ... }`。取代旧的 `flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data` 5 个 leaf。详见 §6.1。 |
