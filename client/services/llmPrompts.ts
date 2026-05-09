@@ -1,6 +1,12 @@
 /**
  * System prompt for LLM-powered card design.
  *
+ * **沙盒约束 vs 物理分层**：本 prompt 仅描述沙盒约束（LLM 输出格式：
+ * 单文件含 `CARD_DEF + CARD_IMPL` 两个常量）。提交到主仓库 PR 时由
+ * `server/workshop-pr/code-gen.ts` 把这两个常量**透明拆分**到
+ * `shared/cards-display/community/X.ts` + `shared/cards/community/X.ts`
+ * 两个物理文件，与 prompt 内容无关。详见 docs/CUSTOM_CARD_SANDBOX.md §1.1。
+ *
  * **Single source of truth for sandbox constraints**: docs/CUSTOM_CARD_SANDBOX.md
  *
  * Whenever you add / remove a hook, phase, scope, denied identifier or actionId
@@ -10,6 +16,7 @@
  *   - shared/cards/card-effects.ts        (cardEffectHooks)
  *   - server/custom-code/engine.ts (isActionHookPhase, isCardListenerScope)
  *   - shared/custom-code/ast-validator.ts (DENIED_IDENTIFIERS, DENIED_PROPERTY_ACCESS)
+ *   - server/custom-code/injected-helpers.ts (sandbox injections; S9)
  */
 
 import communityExamples from '../../docs/community-card-examples.md?raw'
