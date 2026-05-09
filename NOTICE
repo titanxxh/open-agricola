@@ -1,0 +1,19 @@
+Open Agricola
+Copyright 2024-2026 titanxxh
+
+This is an unofficial fan implementation of Agricola, a board game
+designed by Uwe Rosenberg and published by Lookout Spiele / Z-Man Games.
+The Agricola name, rules, card text, and artwork are the property of
+their respective copyright holders. This project is not affiliated
+with, endorsed by, or sponsored by Lookout Spiele, Z-Man Games, or
+Asmodee.
+
+Game logic and behavior reference the Board Game Arena (BGA) Agricola
+implementation. Per the BGA Studio license:
+  "This code has been produced on the BGA studio platform for use on
+   http://boardgamearena.com"
+
+Card artwork is loaded from external sources (BGA CDN) at runtime
+and is not distributed with this repository.
+
+Licensed under the Apache License, Version 2.0; see LICENSE.
