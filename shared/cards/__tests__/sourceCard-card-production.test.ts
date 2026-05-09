@@ -3,8 +3,7 @@ import { executeCardListener, getRegisteredCardListeners } from '../card-listene
 import { runCardEffectHook } from '../card-effects'
 import { getPlayerActionSpaceConfig } from '../player-action-space'
 import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
-import { clayOven } from '../major/clay-oven'
-import { stoneOven } from '../major/stone-oven'
+import { getMajorCard } from '../major'
 
 import '../B/B42_ForestInn'
 import '../C/C104_Collector'
@@ -109,8 +108,10 @@ const findListener = (id: string) => getRegisteredCardListeners().find((listener
 
 describe('sourceCard card production contract', () => {
   it('major ovens tag their immediate bake onBuy flow', () => {
-    const flowClay = clayOven.onBuy?.({} as GameState, {} as PlayerState)
-    const flowStone = stoneOven.onBuy?.({} as GameState, {} as PlayerState)
+    const clayOven = getMajorCard('Major_ClayOven')
+    const stoneOven = getMajorCard('Major_StoneOven')
+    const flowClay = clayOven?.onBuy?.({} as GameState, {} as PlayerState)
+    const flowStone = stoneOven?.onBuy?.({} as GameState, {} as PlayerState)
 
     expect(flowClay).toMatchObject({
       type: 'leaf',
