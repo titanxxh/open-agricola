@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { A68_AsparagusGift } from '../../shared/cards/A/A68_AsparagusGift'
+import { A68_AsparagusGift } from '../../shared/cards-display/A/A68_AsparagusGift'
 import '../../shared/cards/B/B30_WoodPalisades'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { A40_PottersYard } from '../../shared/cards/A/A40_PottersYard'
+import { A40_PottersYard } from '../../shared/cards-display/A/A40_PottersYard'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { getAllTilePositions } from '../../shared/domain/farm'
 

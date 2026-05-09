@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import type { ActionFlow } from '../../shared/contract/types'
 
-import { D1_ZigzagHarrow } from '../../shared/cards/D/D1_ZigzagHarrow'
+import { D1_ZigzagHarrow } from '../../shared/cards-display/D/D1_ZigzagHarrow'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 /**

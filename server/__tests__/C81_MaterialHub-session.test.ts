@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { C81_MaterialHub } from '../../shared/cards/C/C81_MaterialHub'
+import { C81_MaterialHub } from '../../shared/cards-display/C/C81_MaterialHub'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 describe('C81_MaterialHub prerequisite', () => {

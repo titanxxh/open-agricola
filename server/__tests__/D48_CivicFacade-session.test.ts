@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { D48_CivicFacade } from '../../shared/cards/D/D48_CivicFacade'
+import { D48_CivicFacade } from '../../shared/cards-display/D/D48_CivicFacade'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 describe('D48_CivicFacade prerequisite', () => {

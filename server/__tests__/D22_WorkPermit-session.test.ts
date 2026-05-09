@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import type { GameState, PlayerState } from '../../shared/contract/types'
 
-import { D22_WorkPermit } from '../../shared/cards/D/D22_WorkPermit'
+import { D22_WorkPermit } from '../../shared/cards-display/D/D22_WorkPermit'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { GameSession } from '../game/authoritative-session'
 import type { ActionFlow } from '../../shared/contract/types'

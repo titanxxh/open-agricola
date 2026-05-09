@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { B74_ThickForest } from '../../shared/cards/B/B74_ThickForest'
+import { B74_ThickForest } from '../../shared/cards-display/B/B74_ThickForest'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 describe('B74_ThickForest prerequisite', () => {

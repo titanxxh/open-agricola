@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { C109_SchnappsDistiller } from '../../shared/cards/C/C109_SchnappsDistiller'
+import { C109_SchnappsDistiller } from '../../shared/cards-display/C/C109_SchnappsDistiller'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
 import type { PlayerState, Resource } from '../../shared/contract/types'
 

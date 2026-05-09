@@ -4,7 +4,7 @@ import { computeScores , ScoreEntry } from '../../shared/domain/scoring'
 import type { ActionChoiceOption,  FarmTilePosition } from '../../shared/contract/types'
 import { positionKey } from '../../shared/domain/farm'
 
-import { B38_FutureBuildingSite } from '../../shared/cards/B/B38_FutureBuildingSite'
+import { B38_FutureBuildingSite } from '../../shared/cards-display/B/B38_FutureBuildingSite'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 const CARD_ID = 'B38_FutureBuildingSite'

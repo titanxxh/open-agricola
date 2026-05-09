@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { C95_BasketWeaver } from '../../shared/cards/C/C95_BasketWeaver'
+import { C95_BasketWeaver } from '../../shared/cards-display/C/C95_BasketWeaver'
 import { occupations } from '../../shared/cards-display/_lookup'
 
 import { setWorkersAtHome } from '../../shared/domain/player'

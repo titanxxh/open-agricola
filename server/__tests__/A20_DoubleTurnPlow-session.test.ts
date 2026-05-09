@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { A20_DoubleTurnPlow } from '../../shared/cards/A/A20_DoubleTurnPlow'
+import { A20_DoubleTurnPlow } from '../../shared/cards-display/A/A20_DoubleTurnPlow'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
 describe('A20_DoubleTurnPlow prerequisite', () => {

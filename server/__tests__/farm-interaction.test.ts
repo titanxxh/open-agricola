@@ -7,8 +7,8 @@ import {
   buildSowFarmInteraction,
   buildStableFarmInteraction,
 } from '../../shared/domain/farmyard'
-import { A14_CarpentersHammer } from '../../shared/cards/A/A14_CarpentersHammer'
-import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
+import { A14_CarpentersHammer } from '../../shared/cards-display/A/A14_CarpentersHammer'
+import { A123_FrameBuilder } from '../../shared/cards-display/A/A123_FrameBuilder'
 
 const stableTradeModifiers: PlayerState['activeModifiers'] = [
   {

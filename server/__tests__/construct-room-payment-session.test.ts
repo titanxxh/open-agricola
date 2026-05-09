@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { A14_CarpentersHammer } from '../../shared/cards/A/A14_CarpentersHammer'
-import { A123_FrameBuilder } from '../../shared/cards/A/A123_FrameBuilder'
+import { A14_CarpentersHammer } from '../../shared/cards-display/A/A14_CarpentersHammer'
+import { A123_FrameBuilder } from '../../shared/cards-display/A/A123_FrameBuilder'
 import type { PlayerState } from '../../shared/contract/types.ts'
 
 import { workersAvailable } from '../../shared/domain/player'

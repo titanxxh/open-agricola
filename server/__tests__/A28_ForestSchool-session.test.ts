@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { A28_ForestSchool as A28Card } from '../../shared/cards/A/A28_ForestSchool'
+import { A28_ForestSchool as A28Card } from '../../shared/cards-display/A/A28_ForestSchool'
 
 import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import { isLegacyChoicePending } from './_helpers/legacy-confirms'
