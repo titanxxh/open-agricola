@@ -5,7 +5,7 @@ import {
   getRegisteredMinorImprovement,
   getRegisteredOccupation,
 } from '../../../shared/cards-display/types'
-import { getMajorCard } from '../../../shared/cards/major'
+import { getMajorCardDisplay } from '../../../shared/cards-display/major'
 import {
   BASIC_CONVERSION_SOURCE_ID,
   basicConversionExchanges,
@@ -86,7 +86,7 @@ export const buildHarvestFeedOptions = (
 
   // 2. Improvements (includes majors)
   for (const cardId of player.improvements) {
-    const major = getMajorCard(cardId)
+    const major = getMajorCardDisplay(cardId)
     pushFromExchanges(cardId, cardLabel(cardId), major?.exchanges)
   }
 
