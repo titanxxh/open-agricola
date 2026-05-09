@@ -6,7 +6,7 @@ import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
 
 import '../A/A29_AleBenches'
 import '../A/A81_InterimStorage'
-import { A123_FrameBuilder as A123Card } from '../A/A123_FrameBuilder'
+import { A123_FrameBuilder as A123Card } from '../../cards-display/A/A123_FrameBuilder'
 import '../B/B94_StockProtector'
 import '../B/B103_FieldMerchant'
 import '../B/B34_SpecialFood'

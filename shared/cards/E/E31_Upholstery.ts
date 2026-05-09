@@ -2,7 +2,6 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { E31_Upholstery } from '../../cards-display/E/E31_Upholstery'
-export { E31_Upholstery }
 
 const CARD_ID = E31_Upholstery.id
 

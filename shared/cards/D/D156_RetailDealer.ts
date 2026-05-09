@@ -4,7 +4,6 @@ import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D156_RetailDealer } from '../../cards-display/D/D156_RetailDealer'
-export { D156_RetailDealer }
 
 const CARD_ID = D156_RetailDealer.id
 

@@ -2,7 +2,6 @@ import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import { playerBoard } from '../../domain'
 import type { CardImpl } from '../registry'
 import { C49_BeerStall } from '../../cards-display/C/C49_BeerStall'
-export { C49_BeerStall }
 
 const CARD_ID = C49_BeerStall.id
 

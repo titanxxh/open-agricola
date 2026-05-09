@@ -2,7 +2,6 @@ import { payLeaf } from '../helpers/pay-gain-node'
 import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { A100_Curator } from '../../cards-display/A/A100_Curator'
-export { A100_Curator }
 
 const CARD_ID = A100_Curator.id
 

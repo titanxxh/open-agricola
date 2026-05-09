@@ -5,7 +5,6 @@ import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { A28_ForestSchool } from '../../cards-display/A/A28_ForestSchool'
-export { A28_ForestSchool }
 
 const CARD_ID = A28_ForestSchool.id
 

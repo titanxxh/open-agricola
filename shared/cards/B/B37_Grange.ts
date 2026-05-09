@@ -1,7 +1,6 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B37_Grange } from '../../cards-display/B/B37_Grange'
-export { B37_Grange }
 
 const CARD_ID = B37_Grange.id
 

@@ -5,7 +5,6 @@ import { getMinorImprovementCard } from '../catalog'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E146_Reseller } from '../../cards-display/E/E146_Reseller'
-export { E146_Reseller }
 
 const CARD_ID = E146_Reseller.id
 

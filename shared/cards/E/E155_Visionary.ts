@@ -3,7 +3,6 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { familySize } from '../../domain/player'
 import { E155_Visionary } from '../../cards-display/E/E155_Visionary'
-export { E155_Visionary }
 
 const CARD_ID = E155_Visionary.id
 

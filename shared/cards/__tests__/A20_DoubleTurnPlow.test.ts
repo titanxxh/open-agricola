@@ -4,7 +4,7 @@ import { getCardEffect, runCardEffectHook } from '../card-effects'
 import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../contract/types'
 
 import '../A/A20_DoubleTurnPlow'
-import { A20_DoubleTurnPlow as A20Card } from '../A/A20_DoubleTurnPlow'
+import { A20_DoubleTurnPlow as A20Card } from '../../cards-display/A/A20_DoubleTurnPlow'
 import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'A20_DoubleTurnPlow'

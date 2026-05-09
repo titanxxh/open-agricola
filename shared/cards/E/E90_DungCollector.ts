@@ -1,7 +1,6 @@
 import { getPlowableTiles } from '../../actions/effects/plow'
 import type { CardImpl } from '../registry'
 import { E90_DungCollector } from '../../cards-display/E/E90_DungCollector'
-export { E90_DungCollector }
 
 const CARD_ID = E90_DungCollector.id
 

@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { E126_TaxCollector } from '../../cards-display/E/E126_TaxCollector'
-export { E126_TaxCollector }
 
 const CARD_ID = E126_TaxCollector.id
 

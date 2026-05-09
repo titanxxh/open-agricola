@@ -2,7 +2,6 @@ import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { A127_Lodger } from '../../cards-display/A/A127_Lodger'
-export { A127_Lodger }
 
 const CARD_ID = A127_Lodger.id
 

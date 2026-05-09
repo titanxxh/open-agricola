@@ -1,7 +1,6 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E158_StoneCustodian } from '../../cards-display/E/E158_StoneCustodian'
-export { E158_StoneCustodian }
 
 const CARD_ID = E158_StoneCustodian.id
 

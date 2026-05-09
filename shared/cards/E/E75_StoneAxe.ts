@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E75_StoneAxe } from '../../cards-display/E/E75_StoneAxe'
-export { E75_StoneAxe }
 
 const CARD_ID = E75_StoneAxe.id
 

@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E59_CombandCutter } from '../../cards-display/E/E59_CombandCutter'
-export { E59_CombandCutter }
 
 const CARD_ID = E59_CombandCutter.id
 

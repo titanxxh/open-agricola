@@ -2,7 +2,6 @@ import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { hasNoUnusedFarmyardSpaces } from '../../domain/farm'
 import type { CardImpl } from '../registry'
 import { A33_BigCountry } from '../../cards-display/A/A33_BigCountry'
-export { A33_BigCountry }
 
 const CARD_ID = A33_BigCountry.id
 

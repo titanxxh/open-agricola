@@ -4,7 +4,6 @@ import { getStoredResource } from '../helpers/card-storage'
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { C120_AgriculturalLabourer } from '../../cards-display/C/C120_AgriculturalLabourer'
-export { C120_AgriculturalLabourer }
 
 const CARD_ID = C120_AgriculturalLabourer.id
 

@@ -2,7 +2,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { B158_DistrictManager } from '../../cards-display/B/B158_DistrictManager'
-export { B158_DistrictManager }
 
 const CARD_ID = B158_DistrictManager.id
 

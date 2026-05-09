@@ -4,7 +4,6 @@ import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples
 import type { FutureMeepleRequest } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E47_SyrupTap } from '../../cards-display/E/E47_SyrupTap'
-export { E47_SyrupTap }
 
 const CARD_ID = E47_SyrupTap.id
 

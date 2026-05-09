@@ -2,7 +2,6 @@ import { getFenceCount } from '../../actions/effects/fencing'
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { C54_MarketBooth } from '../../cards-display/C/C54_MarketBooth'
-export { C54_MarketBooth }
 
 const CARD_ID = C54_MarketBooth.id
 

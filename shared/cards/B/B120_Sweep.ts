@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B120_Sweep } from '../../cards-display/B/B120_Sweep'
-export { B120_Sweep }
 
 const CARD_ID = B120_Sweep.id
 

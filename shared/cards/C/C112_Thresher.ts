@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C112_Thresher } from '../../cards-display/C/C112_Thresher'
-export { C112_Thresher }
 
 const CARD_ID = C112_Thresher.id
 

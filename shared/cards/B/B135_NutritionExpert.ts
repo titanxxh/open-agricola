@@ -1,7 +1,6 @@
 import { payGainActionFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B135_NutritionExpert } from '../../cards-display/B/B135_NutritionExpert'
-export { B135_NutritionExpert }
 
 const CARD_ID = B135_NutritionExpert.id
 

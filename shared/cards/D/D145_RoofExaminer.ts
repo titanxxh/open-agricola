@@ -2,7 +2,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { collectCardsAs } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
 import { D145_RoofExaminer } from '../../cards-display/D/D145_RoofExaminer'
-export { D145_RoofExaminer }
 
 const CARD_ID = D145_RoofExaminer.id
 

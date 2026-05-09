@@ -2,8 +2,6 @@ import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import type { BonusScoreLevel } from '../card-effects'
 import { paretoOptimal } from '../helpers/pareto-bonus'
-import { C99_GardenDesigner } from '../../cards-display/C/C99_GardenDesigner'
-export { C99_GardenDesigner }
 
 const CARD_ID = 'C99_GardenDesigner'
 

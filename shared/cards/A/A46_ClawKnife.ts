@@ -4,7 +4,6 @@ import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/int
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { A46_ClawKnife } from '../../cards-display/A/A46_ClawKnife'
-export { A46_ClawKnife }
 
 const CARD_ID = A46_ClawKnife.id
 

@@ -1,7 +1,6 @@
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
 import type { CardImpl } from '../registry'
 import { D127_HardworkingMan } from '../../cards-display/D/D127_HardworkingMan'
-export { D127_HardworkingMan }
 
 const CARD_ID = D127_HardworkingMan.id
 

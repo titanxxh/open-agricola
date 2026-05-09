@@ -8,7 +8,6 @@ import type { CardImpl } from '../registry'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
 import { B132_EstateMaster } from '../../cards-display/B/B132_EstateMaster'
-export { B132_EstateMaster }
 
 const CARD_ID = B132_EstateMaster.id
 

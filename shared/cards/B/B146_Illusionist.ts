@@ -4,7 +4,6 @@ import type { ActionChoiceOption, ActionDefinition, ActionFlow } from '../../con
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
 import { B146_Illusionist } from '../../cards-display/B/B146_Illusionist'
-export { B146_Illusionist }
 
 const CARD_ID = B146_Illusionist.id
 

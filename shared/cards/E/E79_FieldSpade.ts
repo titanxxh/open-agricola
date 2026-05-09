@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E79_FieldSpade } from '../../cards-display/E/E79_FieldSpade'
-export { E79_FieldSpade }
 
 const CARD_ID = E79_FieldSpade.id
 

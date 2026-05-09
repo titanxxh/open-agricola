@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { D137_TradeTeacher } from '../../cards-display/D/D137_TradeTeacher'
-export { D137_TradeTeacher }
 
 const CARD_ID = D137_TradeTeacher.id
 

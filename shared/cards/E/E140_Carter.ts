@@ -4,7 +4,6 @@ import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../help
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E140_Carter } from '../../cards-display/E/E140_Carter'
-export { E140_Carter }
 
 const CARD_ID = E140_Carter.id
 

@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { A99_FellowGrazer } from '../../cards-display/A/A99_FellowGrazer'
-export { A99_FellowGrazer }
 
 const CARD_ID = A99_FellowGrazer.id
 

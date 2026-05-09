@@ -2,7 +2,6 @@ import { playerBoard } from '../../domain'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B11_Feedyard } from '../../cards-display/B/B11_Feedyard'
-export { B11_Feedyard }
 
 const CARD_ID = B11_Feedyard.id
 

@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payThenActionFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E128_Saddler } from '../../cards-display/E/E128_Saddler'
-export { E128_Saddler }
 
 const CARD_ID = E128_Saddler.id
 

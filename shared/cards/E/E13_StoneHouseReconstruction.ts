@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { E13_StoneHouseReconstruction } from '../../cards-display/E/E13_StoneHouseReconstruction'
-export { E13_StoneHouseReconstruction }
 
 const CARD_ID = E13_StoneHouseReconstruction.id
 

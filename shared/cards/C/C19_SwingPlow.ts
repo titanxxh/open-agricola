@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { C19_SwingPlow } from '../../cards-display/C/C19_SwingPlow'
-export { C19_SwingPlow }
 
 const CARD_ID = C19_SwingPlow.id
 

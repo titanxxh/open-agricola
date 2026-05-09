@@ -1,7 +1,6 @@
 import { getPlayerCookeryCards } from '../helpers/cookery'
 import type { CardImpl } from '../registry'
 import { A101_CookeryOutfitter } from '../../cards-display/A/A101_CookeryOutfitter'
-export { A101_CookeryOutfitter }
 
 const CARD_ID = A101_CookeryOutfitter.id
 

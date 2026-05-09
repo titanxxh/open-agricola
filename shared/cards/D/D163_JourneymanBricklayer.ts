@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D163_JourneymanBricklayer } from '../../cards-display/D/D163_JourneymanBricklayer'
-export { D163_JourneymanBricklayer }
 
 const CARD_ID = D163_JourneymanBricklayer.id
 

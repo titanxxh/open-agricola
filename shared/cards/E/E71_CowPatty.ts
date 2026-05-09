@@ -6,8 +6,6 @@ import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { ActionFlow, PlayerState } from '../../contract/types'
 import { fieldTopStack } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { E71_CowPatty } from '../../cards-display/E/E71_CowPatty'
-export { E71_CowPatty }
 
 const CARD_ID = 'E71_CowPatty'
 

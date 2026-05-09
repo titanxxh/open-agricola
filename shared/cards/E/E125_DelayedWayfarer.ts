@@ -4,7 +4,6 @@ import type { ActionFlow } from '../../contract/types'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { E125_DelayedWayfarer } from '../../cards-display/E/E125_DelayedWayfarer'
-export { E125_DelayedWayfarer }
 
 const CARD_ID = E125_DelayedWayfarer.id
 

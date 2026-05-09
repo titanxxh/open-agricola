@@ -4,7 +4,6 @@ import { queueFutureMeeples, futureMeeplesNode, removeFutureMeeples } from '../.
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { B76_Ceilings } from '../../cards-display/B/B76_Ceilings'
-export { B76_Ceilings }
 
 const CARD_ID = B76_Ceilings.id
 

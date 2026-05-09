@@ -9,7 +9,6 @@ import {
 } from '../helpers/action-snapshot'
 import type { CardImpl } from '../registry'
 import { B27_Toolbox } from '../../cards-display/B/B27_Toolbox'
-export { B27_Toolbox }
 
 const CARD_ID = B27_Toolbox.id
 

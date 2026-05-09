@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B142_Greengrocer } from '../../cards-display/B/B142_Greengrocer'
-export { B142_Greengrocer }
 
 const CARD_ID = B142_Greengrocer.id
 

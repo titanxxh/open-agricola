@@ -4,7 +4,6 @@ import { payGainNode } from '../helpers/pay-gain-node'
 import { getFenceCount, maxFences } from '../../actions/effects/fencing'
 import type { CardImpl } from '../registry'
 import { A34_Loppers } from '../../cards-display/A/A34_Loppers'
-export { A34_Loppers }
 
 const CARD_ID = A34_Loppers.id
 

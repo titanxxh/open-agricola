@@ -2,7 +2,6 @@ import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import type { BonusScoreLevel } from '../card-effects'
 import { E132_VeggieLover } from '../../cards-display/E/E132_VeggieLover'
-export { E132_VeggieLover }
 
 const CARD_ID = E132_VeggieLover.id
 

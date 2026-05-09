@@ -4,7 +4,6 @@ import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D122_ClayCarrier } from '../../cards-display/D/D122_ClayCarrier'
-export { D122_ClayCarrier }
 
 const CARD_ID = D122_ClayCarrier.id
 

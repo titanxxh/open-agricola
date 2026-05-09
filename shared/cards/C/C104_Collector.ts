@@ -2,8 +2,6 @@ import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-a
 import { readCardExtraData } from '../helpers/card-state'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { C104_Collector } from '../../cards-display/C/C104_Collector'
-export { C104_Collector }
 
 const CARD_ID = 'C104_Collector'
 

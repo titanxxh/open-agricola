@@ -4,7 +4,6 @@ import type { ActionFlow } from '../../contract/types'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { C93_InnerDistrictsDirector } from '../../cards-display/C/C93_InnerDistrictsDirector'
-export { C93_InnerDistrictsDirector }
 
 const CARD_ID = C93_InnerDistrictsDirector.id
 

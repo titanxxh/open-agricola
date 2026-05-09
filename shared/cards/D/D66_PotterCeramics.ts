@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D66_PotterCeramics } from '../../cards-display/D/D66_PotterCeramics'
-export { D66_PotterCeramics }
 
 const CARD_ID = D66_PotterCeramics.id
 

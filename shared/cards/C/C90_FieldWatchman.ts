@@ -2,7 +2,6 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { C90_FieldWatchman } from '../../cards-display/C/C90_FieldWatchman'
-export { C90_FieldWatchman }
 
 const CARD_ID = C90_FieldWatchman.id
 

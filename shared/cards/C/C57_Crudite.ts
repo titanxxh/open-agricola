@@ -5,7 +5,6 @@ import type { Field } from '../../contract/types'
 import { fieldFindStackOfKind, fieldHasCrop, fieldPopIfDepleted } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { C57_Crudite } from '../../cards-display/C/C57_Crudite'
-export { C57_Crudite }
 
 const CARD_ID = C57_Crudite.id
 

@@ -1,7 +1,6 @@
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C113_WinterCaretaker } from '../../cards-display/C/C113_WinterCaretaker'
-export { C113_WinterCaretaker }
 
 const CARD_ID = C113_WinterCaretaker.id
 

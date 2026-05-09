@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getCardStack, pushToCardStack } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { D118_Bonehead } from '../../cards-display/D/D118_Bonehead'
-export { D118_Bonehead }
 
 const CARD_ID = D118_Bonehead.id
 

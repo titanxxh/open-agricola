@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { C7_BladeShears } from '../../cards-display/C/C7_BladeShears'
-export { C7_BladeShears }
 
 const CARD_ID = C7_BladeShears.id
 

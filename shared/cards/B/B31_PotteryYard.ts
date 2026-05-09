@@ -1,7 +1,6 @@
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { B31_PotteryYard } from '../../cards-display/B/B31_PotteryYard'
-export { B31_PotteryYard }
 
 const CARD_ID = B31_PotteryYard.id
 

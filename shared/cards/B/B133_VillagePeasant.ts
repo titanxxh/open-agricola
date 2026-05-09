@@ -1,7 +1,6 @@
 import { collectCardsAs } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
 import { B133_VillagePeasant } from '../../cards-display/B/B133_VillagePeasant'
-export { B133_VillagePeasant }
 
 const CARD_ID = B133_VillagePeasant.id
 

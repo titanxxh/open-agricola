@@ -4,7 +4,6 @@ import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { E62_SourDough } from '../../cards-display/E/E62_SourDough'
-export { E62_SourDough }
 
 const CARD_ID = E62_SourDough.id
 

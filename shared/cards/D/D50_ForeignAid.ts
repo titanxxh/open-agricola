@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D50_ForeignAid } from '../../cards-display/D/D50_ForeignAid'
-export { D50_ForeignAid }
 
 const CARD_ID = D50_ForeignAid.id
 

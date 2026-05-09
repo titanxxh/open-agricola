@@ -4,7 +4,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop, fieldTotalRemaining } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { A79_GardenHoe } from '../../cards-display/A/A79_GardenHoe'
-export { A79_GardenHoe }
 
 const CARD_ID = A79_GardenHoe.id
 

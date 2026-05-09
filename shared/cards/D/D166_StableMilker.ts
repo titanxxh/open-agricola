@@ -8,7 +8,6 @@ import {
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { D166_StableMilker } from '../../cards-display/D/D166_StableMilker'
-export { D166_StableMilker }
 
 const CARD_ID = D166_StableMilker.id
 

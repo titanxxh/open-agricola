@@ -5,7 +5,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { A65_SeedPellets } from '../../cards-display/A/A65_SeedPellets'
-export { A65_SeedPellets }
 
 const CARD_ID = A65_SeedPellets.id
 

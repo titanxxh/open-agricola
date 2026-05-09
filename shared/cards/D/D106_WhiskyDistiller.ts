@@ -4,7 +4,6 @@ import { payLeaf } from '../helpers/pay-gain-node'
 import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 import { D106_WhiskyDistiller } from '../../cards-display/D/D106_WhiskyDistiller'
-export { D106_WhiskyDistiller }
 
 const CARD_ID = D106_WhiskyDistiller.id
 

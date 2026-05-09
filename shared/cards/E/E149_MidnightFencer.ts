@@ -2,7 +2,6 @@ import { readCardExtraData } from '../helpers/card-state'
 import type { ActionChoiceOption, ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E149_MidnightFencer } from '../../cards-display/E/E149_MidnightFencer'
-export { E149_MidnightFencer }
 
 const CARD_ID = E149_MidnightFencer.id
 

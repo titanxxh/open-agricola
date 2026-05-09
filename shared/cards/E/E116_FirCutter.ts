@@ -4,7 +4,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { familySize, workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { E116_FirCutter } from '../../cards-display/E/E116_FirCutter'
-export { E116_FirCutter }
 
 const CARD_ID = E116_FirCutter.id
 

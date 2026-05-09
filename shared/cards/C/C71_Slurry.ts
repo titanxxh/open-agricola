@@ -1,7 +1,6 @@
 import { canSow } from '../../actions/effects/sow'
 import type { CardImpl } from '../registry'
 import { C71_Slurry } from '../../cards-display/C/C71_Slurry'
-export { C71_Slurry }
 
 const CARD_ID = C71_Slurry.id
 

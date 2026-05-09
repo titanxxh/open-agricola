@@ -5,7 +5,6 @@ import { getStableTilesBuiltThisAction } from '../helpers/action-snapshot'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { D168_Stockman } from '../../cards-display/D/D168_Stockman'
-export { D168_Stockman }
 
 const CARD_ID = D168_Stockman.id
 

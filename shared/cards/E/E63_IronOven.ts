@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { E63_IronOven } from '../../cards-display/E/E63_IronOven'
-export { E63_IronOven }
 
 const CARD_ID = E63_IronOven.id
 

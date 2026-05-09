@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getRenovation } from '../../actions/effects/renovation'
 import type { CardImpl } from '../registry'
 import { D13_Trowel } from '../../cards-display/D/D13_Trowel'
-export { D13_Trowel }
 
 const CARD_ID = D13_Trowel.id
 

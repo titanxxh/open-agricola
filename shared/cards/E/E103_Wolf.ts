@@ -5,7 +5,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E103_Wolf } from '../../cards-display/E/E103_Wolf'
-export { E103_Wolf }
 
 const CARD_ID = E103_Wolf.id
 

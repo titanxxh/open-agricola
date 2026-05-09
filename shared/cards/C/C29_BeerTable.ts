@@ -1,7 +1,5 @@
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { C29_BeerTable } from '../../cards-display/C/C29_BeerTable'
-export { C29_BeerTable }
 
 const CARD_ID = 'C29_BeerTable'
 

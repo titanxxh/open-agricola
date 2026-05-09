@@ -4,7 +4,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { B168_PastureMaster } from '../../cards-display/B/B168_PastureMaster'
-export { B168_PastureMaster }
 
 const CARD_ID = B168_PastureMaster.id
 

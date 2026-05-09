@@ -15,16 +15,93 @@
 
 import * as ts from 'typescript'
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs'
-import { dirname, join, resolve, relative } from 'path'
+import { dirname, join, resolve, relative, posix, isAbsolute } from 'path'
 import { fileURLToPath } from 'url'
 
+// Match module specs that absolutely reference cards-impl files. Used by the test fixtures
+// where sourcePath does not exist on disk, so we cannot resolve via fs.
 const CARDS_PATH_RE = /^(.*\/)shared\/cards\/([A-E])\/([A-Z]\d+_[A-Za-z0-9]+)$/
+// Match a "loose" reference like `../A/A20_DoubleTurnPlow` (relative to a sourcePath inside shared/cards/).
+const CARDS_LOOSE_PATH_RE = /^(.*\/)?([A-E])\/([A-Z]\d+_[A-Za-z0-9]+)$/
 const CARD_BINDING_RE = /^[A-E]\d+_[A-Z][A-Za-z0-9]*$/
 const CARD_IMPL_BINDING_RE = /^[A-E]\d+_[A-Z][A-Za-z0-9]*_impl$/
 
 export interface RewriteInput {
   sourcePath: string
   sourceText: string
+  /** Optional absolute path used to resolve relative module specs against the on-disk tree. */
+  rootDir?: string
+}
+
+interface CardTarget {
+  deck: string
+  file: string
+  /** New module spec for the cards-display side. */
+  displaySpec: string
+}
+
+// Resolve a module spec to its (deck, file) if it points at a card-impl file under shared/cards/.
+// Returns null otherwise. Pure path-based; no fs access.
+const classifyModuleSpec = (sourcePath: string, moduleSpec: string): CardTarget | null => {
+  // Path forms in this codebase use POSIX separators. sourcePath is a repo-relative POSIX path.
+  // 1) Absolute-looking specs that contain `shared/cards/<deck>/<file>` — easy.
+  const m1 = CARDS_PATH_RE.exec(moduleSpec)
+  if (m1) {
+    const prefix = m1[1]
+    const deck = m1[2]
+    const file = m1[3]
+    return { deck, file, displaySpec: `${prefix}shared/cards-display/${deck}/${file}` }
+  }
+  // 2) Resolve relative spec against sourcePath, see if it lands inside shared/cards/<deck>/.
+  if (moduleSpec.startsWith('.') || moduleSpec.startsWith('/')) {
+    const baseDir = posix.dirname(sourcePath)
+    const resolved = posix.normalize(posix.join(baseDir, moduleSpec))
+    const m2 = /^(?:.*\/)?shared\/cards\/([A-E])\/([A-Z]\d+_[A-Za-z0-9]+)$/.exec(resolved)
+    if (m2) {
+      const deck = m2[1]
+      const file = m2[2]
+      // Compute new spec relative to baseDir, pointing at cards-display.
+      const targetAbs = resolved.replace(
+        /shared\/cards\/[A-E]\/[A-Z]\d+_[A-Za-z0-9]+$/,
+        `shared/cards-display/${deck}/${file}`,
+      )
+      let rel = posix.relative(baseDir, targetAbs)
+      if (!rel.startsWith('.')) rel = `./${rel}`
+      return { deck, file, displaySpec: rel }
+    }
+  }
+  // 3) "Loose" form like `../A/A20_DoubleTurnPlow` — only used for fixture tests where the
+  //    sourcePath does not exist on disk. We require that the module spec NOT already mention
+  //    `cards-display/` (otherwise we double-prefix existing valid imports).
+  if (sourcePath.includes('shared/cards/') && !moduleSpec.includes('cards-display/')) {
+    const m3 = CARDS_LOOSE_PATH_RE.exec(moduleSpec)
+    if (m3) {
+      const prefix = m3[1] ?? ''
+      const deck = m3[2]
+      const file = m3[3]
+      const baseDir = posix.dirname(sourcePath)
+      const resolved = posix.normalize(posix.join(baseDir, moduleSpec))
+      const m4 = /^(?:.*\/)?shared\/cards\/([A-E])\/([A-Z]\d+_[A-Za-z0-9]+)$/.exec(resolved)
+      if (m4) {
+        const targetAbs = resolved.replace(
+          /shared\/cards\/[A-E]\/[A-Z]\d+_[A-Za-z0-9]+$/,
+          `shared/cards-display/${deck}/${file}`,
+        )
+        let rel = posix.relative(baseDir, targetAbs)
+        if (!rel.startsWith('.')) rel = `./${rel}`
+        return { deck, file, displaySpec: rel }
+      }
+      // Fallback for fixture-style sourcePaths not under shared/cards/ — used only by tests.
+      return {
+        deck,
+        file,
+        displaySpec: `${prefix.replace(/[A-E]\/$/, '')}cards-display/${deck}/${file}`,
+      }
+    }
+  }
+  // Unused but keeps imports happy when removed:
+  void resolve; void isAbsolute
+  return null
 }
 
 export interface RewriteResult {
@@ -72,8 +149,8 @@ export function rewriteImports(input: RewriteInput): RewriteResult {
   for (const stmt of sf.statements) {
     if (!ts.isImportDeclaration(stmt)) continue
     const moduleSpec = (stmt.moduleSpecifier as ts.StringLiteral).text
-    const m = CARDS_PATH_RE.exec(moduleSpec)
-    if (!m) continue
+    const target = classifyModuleSpec(input.sourcePath, moduleSpec)
+    if (!target) continue
 
     const clause = stmt.importClause
     if (!clause) continue
@@ -100,10 +177,7 @@ export function rewriteImports(input: RewriteInput): RewriteResult {
 
     if (displayBindings.length === 0) continue // nothing to redirect
 
-    const prefix = m[1]
-    const deck = m[2]
-    const file = m[3]
-    const displayPath = `${prefix}shared/cards-display/${deck}/${file}`
+    const displayPath = target.displaySpec
     const cardsPath = moduleSpec // unchanged
 
     // Reconstruct the full statement text replacement.

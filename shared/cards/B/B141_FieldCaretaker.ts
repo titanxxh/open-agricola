@@ -1,7 +1,6 @@
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B141_FieldCaretaker } from '../../cards-display/B/B141_FieldCaretaker'
-export { B141_FieldCaretaker }
 
 const CARD_ID = B141_FieldCaretaker.id
 

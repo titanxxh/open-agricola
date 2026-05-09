@@ -7,7 +7,6 @@ import { isMajorCardId } from '../helpers/card-type'
 import { PaymentSolver } from '../../actions/payment'
 import type { CardImpl } from '../registry'
 import { E156_ClaypitOwner } from '../../cards-display/E/E156_ClaypitOwner'
-export { E156_ClaypitOwner }
 
 const CARD_ID = E156_ClaypitOwner.id
 

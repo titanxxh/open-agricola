@@ -7,7 +7,6 @@ import { canSow } from '../../actions/effects/sow'
 import { dispatchReapListener } from '../../actions/effects/reap'
 import type { CardImpl } from '../registry'
 import { E70_CropRotationField } from '../../cards-display/E/E70_CropRotationField'
-export { E70_CropRotationField }
 
 const CARD_ID = E70_CropRotationField.id
 

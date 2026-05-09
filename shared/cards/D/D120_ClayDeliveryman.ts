@@ -1,7 +1,6 @@
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 import { D120_ClayDeliveryman } from '../../cards-display/D/D120_ClayDeliveryman'
-export { D120_ClayDeliveryman }
 
 const CARD_ID = D120_ClayDeliveryman.id
 

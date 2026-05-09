@@ -5,7 +5,6 @@ import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { A30_BakingSheet } from '../../cards-display/A/A30_BakingSheet'
-export { A30_BakingSheet }
 
 const CARD_ID = A30_BakingSheet.id
 

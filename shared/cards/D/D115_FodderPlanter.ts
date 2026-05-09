@@ -1,7 +1,6 @@
 import { canSow } from '../../actions/effects/sow'
 import type { CardImpl } from '../registry'
 import { D115_FodderPlanter } from '../../cards-display/D/D115_FodderPlanter'
-export { D115_FodderPlanter }
 
 const CARD_ID = D115_FodderPlanter.id
 

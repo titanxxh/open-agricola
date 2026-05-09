@@ -1,7 +1,6 @@
 import type { CardImpl } from '../registry'
 import type { BonusScoreLevel } from '../card-effects'
 import { D132_HideFarmer } from '../../cards-display/D/D132_HideFarmer'
-export { D132_HideFarmer }
 
 const CARD_ID = D132_HideFarmer.id
 

@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { C51_FishingNet } from '../../cards-display/C/C51_FishingNet'
-export { C51_FishingNet }
 
 const CARD_ID = C51_FishingNet.id
 

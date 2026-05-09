@@ -4,7 +4,6 @@ import { isCardFlagged } from '../helpers/card-state'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 import { A45_FireProtectionPond } from '../../cards-display/A/A45_FireProtectionPond'
-export { A45_FireProtectionPond }
 
 const CARD_ID = A45_FireProtectionPond.id
 

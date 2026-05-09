@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest'
-import { A123_FrameBuilder } from '../A/A123_FrameBuilder'
+import { A123_FrameBuilder } from '../../cards-display/A/A123_FrameBuilder'
 import { PaymentSolver } from '../../actions/payment'
 import { computeAllBuyableCombinations } from '../../actions/payment/internal'
 import type {

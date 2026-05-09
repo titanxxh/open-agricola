@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E118_KindlingGatherer } from '../../cards-display/E/E118_KindlingGatherer'
-export { E118_KindlingGatherer }
 
 const CARD_ID = E118_KindlingGatherer.id
 

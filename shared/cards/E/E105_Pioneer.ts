@@ -4,7 +4,6 @@ import type { ActionFlow } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E105_Pioneer } from '../../cards-display/E/E105_Pioneer'
-export { E105_Pioneer }
 
 const CARD_ID = E105_Pioneer.id
 

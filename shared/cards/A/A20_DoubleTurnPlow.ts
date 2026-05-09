@@ -3,7 +3,6 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { A20_DoubleTurnPlow } from '../../cards-display/A/A20_DoubleTurnPlow'
-export { A20_DoubleTurnPlow }
 
 const CARD_ID = A20_DoubleTurnPlow.id
 

@@ -1,7 +1,6 @@
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E138_LivestockExpert } from '../../cards-display/E/E138_LivestockExpert'
-export { E138_LivestockExpert }
 
 const CARD_ID = E138_LivestockExpert.id
 

@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D73_SupplyBoat } from '../../cards-display/D/D73_SupplyBoat'
-export { D73_SupplyBoat }
 
 const CARD_ID = D73_SupplyBoat.id
 

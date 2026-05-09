@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { D148_DomesticianExpert } from '../../cards-display/D/D148_DomesticianExpert'
-export { D148_DomesticianExpert }
 
 const CARD_ID = D148_DomesticianExpert.id
 

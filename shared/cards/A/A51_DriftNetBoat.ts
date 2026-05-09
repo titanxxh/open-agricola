@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A51_DriftNetBoat } from '../../cards-display/A/A51_DriftNetBoat'
-export { A51_DriftNetBoat }
 
 const CARD_ID = A51_DriftNetBoat.id
 

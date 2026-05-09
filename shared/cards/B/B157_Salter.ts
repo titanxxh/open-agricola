@@ -4,7 +4,6 @@ import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import { initCardState } from '../__stubs__/helpers'
 import type { CardImpl } from '../registry'
 import { B157_Salter } from '../../cards-display/B/B157_Salter'
-export { B157_Salter }
 
 const CARD_ID = B157_Salter.id
 

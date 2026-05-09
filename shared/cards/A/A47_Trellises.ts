@@ -2,7 +2,6 @@ import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-me
 import { getFenceCount } from '../../actions/effects/fencing'
 import type { CardImpl } from '../registry'
 import { A47_Trellises } from '../../cards-display/A/A47_Trellises'
-export { A47_Trellises }
 
 const CARD_ID = A47_Trellises.id
 

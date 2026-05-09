@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { C149_ResourceRecycler } from '../../cards-display/C/C149_ResourceRecycler'
-export { C149_ResourceRecycler }
 
 const CARD_ID = C149_ResourceRecycler.id
 

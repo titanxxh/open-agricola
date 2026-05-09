@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B143_ClayWarden } from '../../cards-display/B/B143_ClayWarden'
-export { B143_ClayWarden }
 
 const CARD_ID = B143_ClayWarden.id
 

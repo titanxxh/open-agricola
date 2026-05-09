@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { E32_Nave } from '../../cards-display/E/E32_Nave'
-export { E32_Nave }
 
 const CARD_ID = E32_Nave.id
 

@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { playerBoard, type AnimalZone, getPastureCapacity } from '../../domain'
 import type { CardImpl } from '../registry'
 import { E33_BeaverColony } from '../../cards-display/E/E33_BeaverColony'
-export { E33_BeaverColony }
 
 const CARD_ID = E33_BeaverColony.id
 

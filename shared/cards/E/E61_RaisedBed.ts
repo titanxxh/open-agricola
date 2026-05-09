@@ -1,7 +1,6 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E61_RaisedBed } from '../../cards-display/E/E61_RaisedBed'
-export { E61_RaisedBed }
 
 const CARD_ID = E61_RaisedBed.id
 

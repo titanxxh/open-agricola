@@ -2,7 +2,6 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { isSpaceOccupied, spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { D142_PotatoPlanter } from '../../cards-display/D/D142_PotatoPlanter'
-export { D142_PotatoPlanter }
 
 const CARD_ID = D142_PotatoPlanter.id
 

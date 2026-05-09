@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { D35_FodderChamber } from '../../cards-display/D/D35_FodderChamber'
-export { D35_FodderChamber }
 
 const CARD_ID = D35_FodderChamber.id
 

@@ -1,7 +1,6 @@
 import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { B33_Mantlepiece } from '../../cards-display/B/B33_Mantlepiece'
-export { B33_Mantlepiece }
 
 const CARD_ID = B33_Mantlepiece.id
 

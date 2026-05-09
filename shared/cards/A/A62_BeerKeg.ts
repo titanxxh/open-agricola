@@ -1,7 +1,6 @@
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { A62_BeerKeg } from '../../cards-display/A/A62_BeerKeg'
-export { A62_BeerKeg }
 
 const CARD_ID = A62_BeerKeg.id
 

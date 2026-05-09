@@ -1,6 +1,5 @@
 import type { CardImpl } from '../registry'
 import { A98_StableArchitect } from '../../cards-display/A/A98_StableArchitect'
-export { A98_StableArchitect }
 
 const CARD_ID = A98_StableArchitect.id
 

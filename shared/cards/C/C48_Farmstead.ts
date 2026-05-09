@@ -5,7 +5,6 @@ import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { C48_Farmstead } from '../../cards-display/C/C48_Farmstead'
-export { C48_Farmstead }
 
 const CARD_ID = C48_Farmstead.id
 

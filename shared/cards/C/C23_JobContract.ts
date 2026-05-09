@@ -5,7 +5,6 @@ import { addWorkerRef, isSpaceOccupied } from '../../domain/space'
 import { smallestAvailableWorker } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { C23_JobContract } from '../../cards-display/C/C23_JobContract'
-export { C23_JobContract }
 
 const CARD_ID = C23_JobContract.id
 

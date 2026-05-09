@@ -3,8 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { Resource } from '../../contract/types'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
-import { C25_SteamMachine } from '../../cards-display/C/C25_SteamMachine'
-export { C25_SteamMachine }
 
 const hasAccumulation = (space: { gainPerRound: Partial<Resource> }): boolean => {
   return Object.keys(space.gainPerRound).length > 0

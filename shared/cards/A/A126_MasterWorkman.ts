@@ -3,8 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { PlayerState, Resource } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { A126_MasterWorkman } from '../../cards-display/A/A126_MasterWorkman'
-export { A126_MasterWorkman }
 
 const CARD_ID = 'A126_MasterWorkman'
 

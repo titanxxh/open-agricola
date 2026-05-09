@@ -2,8 +2,6 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { E82_Profiteering } from '../../cards-display/E/E82_Profiteering'
-export { E82_Profiteering }
 
 const CARD_ID = 'E82_Profiteering'
 

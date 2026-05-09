@@ -4,7 +4,6 @@ import { setStoredResource, takeStoredResource } from '../helpers/card-storage'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { A144_Sequestrator } from '../../cards-display/A/A144_Sequestrator'
-export { A144_Sequestrator }
 
 const CARD_ID = A144_Sequestrator.id
 

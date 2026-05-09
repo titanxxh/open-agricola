@@ -2,7 +2,6 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { D19_PulverizerPlow } from '../../cards-display/D/D19_PulverizerPlow'
-export { D19_PulverizerPlow }
 
 const CARD_ID = D19_PulverizerPlow.id
 

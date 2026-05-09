@@ -68,6 +68,16 @@ describe('codemod-cards-display-redirect: rewriteImports', () => {
     expect(run(input)).toBe(expected)
   })
 
+  it('relative path from shared/cards/__tests__: redirects to ../cards-display', () => {
+    const input = `import { A20_DoubleTurnPlow as A20Card } from '../A/A20_DoubleTurnPlow'\n`
+    const expected = `import { A20_DoubleTurnPlow as A20Card } from '../../cards-display/A/A20_DoubleTurnPlow'\n`
+    const out = rewriteImports({
+      sourcePath: 'shared/cards/__tests__/A20_DoubleTurnPlow.test.ts',
+      sourceText: input,
+    }).text
+    expect(out).toBe(expected)
+  })
+
   it('non-card path: untouched', () => {
     const input =
       `import { foo } from '../../shared/cards/types'\n` +

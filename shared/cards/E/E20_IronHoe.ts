@@ -1,7 +1,6 @@
 import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { E20_IronHoe } from '../../cards-display/E/E20_IronHoe'
-export { E20_IronHoe }
 
 const CARD_ID = E20_IronHoe.id
 
