@@ -835,7 +835,11 @@ export async function generatePrFiles(args: GenArgs): Promise<PrFile[]> {
   } = args
   const iso = new Date().toISOString()
 
-  const mainContent = generateMainCardFile(wcard, {
+  const displayContent = generateDisplayFile(wcard, {
+    githubLogin: github_login,
+    iso,
+  })
+  const implContent = generateImplFile(wcard, {
     githubLogin: github_login,
     iso,
   })
@@ -867,8 +871,13 @@ export async function generatePrFiles(args: GenArgs): Promise<PrFile[]> {
 
   const files: PrFile[] = [
     {
+      path: `shared/cards-display/community/${wcard.card_id}.ts`,
+      content: displayContent,
+      encoding: 'utf-8',
+    },
+    {
       path: `shared/cards/community/${wcard.card_id}.ts`,
-      content: mainContent,
+      content: implContent,
       encoding: 'utf-8',
     },
     {
