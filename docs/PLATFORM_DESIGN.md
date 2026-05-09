@@ -242,124 +242,85 @@ OpenRouter 不在 provider 级别声明 `chat` / `image` 兜底能力；每个�
 
 ### C2. 系统提示词设计
 
-**结构：基础指令 + 卡牌模式 + Few-shot 示例 + 可用原语**
+**源文件**：`client/services/llmPrompts.ts`（`CARD_DESIGNER_SYSTEM_PROMPT`）。以下是其结构摘要；以源文件为准。
 
-```markdown
-# System Prompt (~2500 tokens)
+**结构：角色定义 + 输出格式 + 关键规则 + CARD_IMPL 结构详解 + effect hook 表 + listener 机制 + ActionFlow 类型 + 可用 helper + 可读 state/player 字段 + 沙盒限制 + 设计平衡参考 + 游戏规则速览 + few-shot 示例**
 
-你是 Open Agricola 的卡牌设计师。你根据用户描述生成符合项目规范的卡牌定义。
+---
 
-## 输出格式
-你必须输出一个 JSON 对象，包含以下字段：
+#### 输出格式
 
-{
-  "card": {
-    "id": "CUSTOM_CardName",
-    "name": "卡牌名称",
-    "card_type": "minor | occupation",
-    "cost": { "wood": 1, "clay": 2 },
-    "vp": 0,
-    "desc": ["获得 1 <WOOD> 和 1 <CLAY>"],
-    "prerequisite": "",
-    "modifiers": []
+LLM 每次回复**必须**包含一个 `` ```typescript `` 代码块，使用 `CARD_DEF` + `CARD_IMPL` 双常量结构（不使用 import / export）：
+
+```typescript
+const CARD_ID = 'CUSTOM_英文驼峰名'
+
+const CARD_DEF = new MinorImprovement({   // 或 new Occupation({...})
+  id: CARD_ID,
+  name: 'Card Name',          // 英文，与内置卡风格一致
+  deck: 'CUSTOM',
+  number: 0,
+  desc: ['Effect description; <WOOD> <FOOD> tags unchanged.'],
+  cost: { wood: 1 },
+  vp: 0,
+  implemented: true,
+  locales: {
+    zh: { name: '卡牌中文名', desc: ['中文描述'] },
   },
-  "effects": {
-    "onReturnHome": {
-      "optional": true,
-      "condition": { "player_has_resource": { "grain": 1 } },
-      "flow": [
-        { "action": "pay-resources", "params": { "grain": 1 } },
-        { "action": "gain", "params": { "food": 3 } }
-      ]
-    }
+})
+
+const CARD_IMPL = {
+  effect: {
+    id: CARD_ID,
+    onRoundStart: (state, player) => gainLeaf(CARD_ID, { food: 1 }),
   },
-  "listeners": [
+  listeners: [
     {
-      "phases": ["after"],
-      "actions": ["construct"],
-      "scope": "player",
-      "flow": [
-        { "action": "gain", "params": { "wood": 1 } }
-      ]
-    }
-  ]
-}
-
-## 可用资源
-wood, clay, reed, stone, food, grain, vegetable, sheep, boar, cattle
-
-## 可用效果触发点 (effects)
-onBuy, onRoundStart, onRoundEnd, onHarvest, onReturnHome,
-onBeforeFeed, onAfterFeed, onHarvestFieldPhase, onStartHarvestFeedingPhase
-
-## 可用监听器阶段 (listener phases)
-before, during, immediatelyAfter, after, computeCosts
-
-## 可用动作 (flow actions)
-- gain: 获得资源 { resource: amount }
-- pay-resources: 支付资源 { resource: amount }
-- bonus-vp: 获得 1 额外分数
-- gain-other-players: 从其他玩家处获得 { resource: amount }
-- exchange: 交换资源 { from: {...}, to: {...} }
-
-## 修改器类型 (modifiers)
-- trade: { appliesTo: ['construct'], from: { wood: 1 }, to: { clay: 2 }, max: 1 }
-- bonus: { appliesTo: ['gain'], bonus: { food: 1 } }
-
-## 条件类型 (condition)
-- player_has_resource: { resource: min_amount }
-- player_has_card: "card_id"
-- round_gte: number
-- family_size_gte: number
-
-## 设计原则
-1. ID 必须以 "CUSTOM_" 开头
-2. 保持 Agricola 的平衡性（参考官方卡牌的强度）
-3. 费用和收益应合理对应
-4. 描述文本使用 <RESOURCE> 标记表示资源图标
-
-## 示例 1: 简单获取类
-用户: "一个花 1 木头能额外获得 2 食物的小改进"
-
-{
-  "card": {
-    "id": "CUSTOM_WoodKitchen",
-    "name": "木质厨房",
-    "card_type": "minor",
-    "cost": { "wood": 1 },
-    "vp": 0,
-    "desc": ["每次回家时，你可以支付 1 <GRAIN> 获得 3 <FOOD>"]
-  },
-  "effects": {
-    "onReturnHome": {
-      "optional": true,
-      "condition": { "player_has_resource": { "grain": 1 } },
-      "flow": [
-        { "action": "pay-resources", "params": { "grain": 1 } },
-        { "action": "gain", "params": { "food": 3 } }
-      ]
-    }
-  }
-}
-
-## 示例 2: 带修改器的
-用户: "建造房间时木头减 1 的职业"
-
-{
-  "card": {
-    "id": "CUSTOM_Carpenter",
-    "name": "木匠",
-    "card_type": "occupation",
-    "cost": { "food": 1 },
-    "vp": 0,
-    "desc": ["建造房间时少花 1 <WOOD>"],
-    "modifiers": [
-      { "type": "trade", "appliesTo": ["construct"],
-        "from": { "wood": 1 }, "to": {}, "max": 1 }
-    ]
-  }
+      cardIds: [CARD_ID],
+      actions: ['plow'],
+      phases: ['after'],
+      handler: (context) => ({ flow: gainLeaf(CARD_ID, { clay: 1 }), sourceCard: CARD_ID }),
+    },
+  ],
 }
 ```
+
+#### 关键规则（prompt 硬性约束）
+
+- `CARD_ID` 必须以 `"CUSTOM_"` 开头，英文驼峰
+- `deck` 固定 `'CUSTOM'`，`number` 固定 `0`，`implemented` 固定 `true`
+- 禁止 `import` / `export` / `require` / `registerCardEffect` / `registerCardListener`
+- 禁止 `class`、generator、`with`、`eval`、`Function`、`fetch` 等
+- `name` / `desc` / `prerequisite` 顶层字段必须英文；`locales.zh` 必须填全
+- 即使只做小修改，也要重新输出完整代码
+
+#### effect hook（`CARD_IMPL.effect`）
+
+常用触发点：`onBuy`、`onRoundStart`、`onRoundEnd`、`onAllWorkersPlaced`、`onReturnHome`、`onBeforeFeed`、`onAfterFeed`、`onHarvestFieldPhase`、`onBeforeEndGame`、`computeBonusScore` 等（完整列表见源文件）。
+
+签名：`(state, player) => ActionFlow | void`（`onBuy` 额外接收 `paymentInfo`）。
+
+#### listener 机制（`CARD_IMPL.listeners`）
+
+监听行动触发：可用 `phases` 包括 `before`、`during`、`immediatelyAfter`、`after`、`computeCosts`、`computeArgs`、`computeReplace`、`isDoable`、`anytime`、`computeChoiceCandidates`。
+
+可监听的 `actions`：`collect`、`gain`、`receive`、`plow`、`sow`、`construct`、`renovate-house`、`fence`、`stables`、`improvement-any`、`minor-improvement`、`play-occupation`、`place-farmer`、`wish-children`、`family-growth`、`bake-bread`。
+
+#### 可用 actionId（ActionFlow leaf）
+
+`gain`、`pay-resources`、`bonus-vp`、`gain-other-players`、`bake-bread`、`store-on-card`、`take-from-card`、`push-card-stack`、`write-card-extra-data`、`hold-worker-on-card`、`release-worker-from-card`。
+
+#### 沙盒注入 helper
+
+`gainLeaf(cardId, {food:2})`、`payLeaf({cardId, cost:{wood:1}})`、`spaceHasPlayer(space, playerId)`、`positionKey({x,y})`、`getCardStack(player, cardId)`、`readCardExtraData(player, cardId)`。
+
+#### 设计平衡参考
+
+1 food ≈ 最弱收益；`onRoundStart` 每轮触发应偏弱；`bonus-vp` 很强需成本或严格条件；`onBuy` 只触发一次可稍强。
+
+#### few-shot 示例来源
+
+系统提示词末尾附加 `docs/community-card-examples.md`（原始 Markdown 通过 Vite `?raw` 导入），作为 few-shot 示例库随提示词一起发送给 LLM。
 
 ### C3. 多轮对话设计
 
@@ -402,7 +363,7 @@ LLM 输出 **TypeScript 源码**（包含 `CARD_DEF` 定义、`CARD_IMPL.effect`
 
 **2. 编译** — `server/custom-code/compiler.ts`
 
-AST 验证通过后，`ts.transpileModule()` 将 TypeScript 编译为 CommonJS JS，存入 `card_json`（card_json 同时含 CARD_DEF 元数据和编译产物由 engine 分别提取）。
+AST 验证通过后，`ts.transpileModule()` 将 TypeScript 编译为 CommonJS JS。数据库中 `card_json` 列只存储 `CARD_DEF` 的 JSON 序列化（卡牌元数据），TypeScript 源码存入 `effect_code` 列，编译后的 JS 存入 `compiled_code` 列，三者分列存储。
 
 **3. 沙盒执行** — `server/custom-code/{engine, executor-worker, isolate-runner, runtime}.ts`
 
@@ -448,7 +409,7 @@ export function getMinorImprovementCard(id: string) {
 1. 创建房间时可选 "启用工坊卡牌"（WS `createRoom.customCardIds` / HTTP `/api/game/new-sandbox`）
 2. `GameSession` 构造时从数据库加载房间关联的自定义卡牌
 3. 从 `card_json` 反序列化为 `MinorImprovement`/`Occupation` 实例，调用 `registerCustomCard()`
-4. `server/custom-code/runtime.ts` 的 `registerExecutorBackedCustomCard()` 从 `card_json` 中的编译产物 + `code_manifest` 注入 effect hook 和 listener，通过 `invokeCustomCodeEffectSync` / `invokeCustomCodeListenerSync` 委托给 Worker Thread + isolated-vm 执行
+4. `server/custom-code/runtime.ts` 的 `registerExecutorBackedCustomCard()` 从 `compiled_code`（编译后 JS）+ `code_manifest` 注入 effect hook 和 listener，通过 `invokeCustomCodeEffectSync` / `invokeCustomCodeListenerSync` 委托给 Worker Thread + isolated-vm 执行
 5. 将自定义卡牌 ID 加入发牌池
 
 ### D3. 沙盒隔离与容错
