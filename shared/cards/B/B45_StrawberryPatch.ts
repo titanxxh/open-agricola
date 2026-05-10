@@ -1,16 +1,13 @@
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { B45_StrawberryPatch } from '../../cards-display/B/B45_StrawberryPatch'
 
 const CARD_ID = B45_StrawberryPatch.id
 
-registerPrerequisite('2 Vegetable Fields', (player) =>
-  player.fields.filter((f) => fieldHasCrop(f, 'vegetable')).length >= 2,
-)
-
 export const B45_StrawberryPatch_impl = {
+  prerequisiteCheck: (player) =>
+    player.fields.filter((f) => fieldHasCrop(f, 'vegetable')).length >= 2,
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
