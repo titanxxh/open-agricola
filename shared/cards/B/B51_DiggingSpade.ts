@@ -13,8 +13,7 @@ const CARD_ID = B51_DiggingSpade.id
  *
  * BGA (B51_DiggingSpade.php): isBeforeCollectEvent($event, CLAY) → onPlayerPlaceFarmer
  * returns gainNode([FOOD => pigs]). Play-in-round-7-or-later is enforced via isBuyable
- * which we mirror via the prerequisite registration below. (A52_ThrowingAxe shares the
- * same label and registers an identical handler.)
+ * which we mirror via the inline `prerequisiteCheck` field below.
  */
 
 const countBoarInFarmyard = (player: PlayerState): number => {
