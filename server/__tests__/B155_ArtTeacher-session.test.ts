@@ -39,10 +39,14 @@ describe('B155 ArtTeacher onBuy listener', () => {
 
     let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId === 'wait') {
-      const opt = resp.interaction.options?.find((o) => o.value === CARD_ID)
-      expect(opt).toBeDefined()
-      resp = session.resolveChoice(0, opt!.value)
+    let safety = 8
+    while (safety-- > 0 && resp.interaction.stateId === 'wait') {
+      if (resp.interaction.request.kind !== 'choice') break
+      const matched = resp.interaction.options?.find((o) => o.value === CARD_ID)
+      const next = matched?.value
+        ?? resp.interaction.options?.find((o) => o.value !== '__skip__')?.value
+      if (!next) break
+      resp = session.resolveChoice(0, next)
     }
     expect(resp.state.players[0]!.occupationPlayed).toContain(CARD_ID)
     expect(resp.state.players[0]!.resources.wood).toBe(woodBefore + 1)

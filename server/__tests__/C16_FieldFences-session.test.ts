@@ -45,8 +45,7 @@ const playC16 = (session: GameSession): void => {
   let safety = 0
   while (resp.interaction.stateId === 'wait' && safety < 12) {
     safety += 1
-    const interaction = (resp as { interaction?: { stateId?: string } }).interaction
-    if (interaction?.stateId === 'wait') break
+    if (resp.interaction.request.kind !== 'choice') break
     const opts = (resp.interaction.options ?? []).map((o) => o.value)
     const cardOption = opts.find((v) => v === `minor:${CARD_ID}`)
     if (cardOption) {
