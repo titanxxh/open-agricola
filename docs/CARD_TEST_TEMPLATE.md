@@ -173,7 +173,7 @@
 | `performRoundEnd()` | — | `roundEnd` | 推进回合（一般由引擎自动触发） |
 | `undoStep()` / `undoAction()` | `undoStep` / `undoAction` | `undoStep` / `undoAction` | 单步 / 整动作回退 |
 
-> **协议名 vs 引擎名**：WS `ClientCommand.type` 与 `interaction.allowedCommands` 字符串并不完全相同（详见 `ENGINE_ARCHITECTURE.md §7.2`）。测试里如果直接调 `GameSession`，用左一列；如果走 WS，用右一列。
+> **协议名 vs 引擎名**：WS `ClientCommand.type` 与 `interaction.allowedCommands` 字符串并不完全相同（详见 `ARCHITECTURE.md §7.2`）。测试里如果直接调 `GameSession`，用左一列；如果走 WS，用右一列。
 
 ### 5.4 WebSocket 命令（若走 RoomManager 路径）
 
@@ -494,7 +494,7 @@ describe('CXX_SomeCard', () => {
 
 ## 11. 与架构文档的关系
 
-本模板是 `docs/ENGINE_ARCHITECTURE.md` 中“测试分层策略”的具体落地版本。
+本模板是 `docs/ARCHITECTURE.md` 中“测试分层策略”的具体落地版本。
 
 对应关系如下：
 

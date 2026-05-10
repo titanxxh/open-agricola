@@ -163,7 +163,7 @@ S7 spec §0 列出 C6 / C146 / E123 / C148 各需独立基建（CropStack stone 
 
 ## F 级：`legacy` 标记残留（2026-05-09 全仓扫描）
 
-**全仓总量 221 处**：主路径 79 + 测试 131 + 文档 11（`ENGINE_NEW_ARCHITECTURE.md` 自身的迁移留痕）。
+**全仓总量 210 处**：主路径 79 + 测试 131。文档 11 处随 2026-05-09 架构文档合并（旧 `ENGINE_ARCHITECTURE.md` / `ENGINE_NEW_ARCHITECTURE.md` → 新 `ARCHITECTURE.md`）一并消解。
 
 按"性质"分 4 类，按修复优先级排：
 
@@ -203,9 +203,9 @@ S7 spec §0 列出 C6 / C146 / E123 / C148 各需独立基建（CropStack stone 
 
 **性质**：测试自身命名约定，不是代码坏味道。**建议不动**——除非测试本身已弃用。
 
-### F4. 文档里的 `legacy`（`ENGINE_NEW_ARCHITECTURE.md` 等）—— P3
+### F4. 文档里的 `legacy` —— ✅ 2026-05-09 已收口
 
-11 处自描述，sprint 完成总结里说"以前的 legacy 设计是 X，现在是 Y"。属合理历史叙述，不动。
+原 11 处分布在旧 `ENGINE_NEW_ARCHITECTURE.md` 自身的 sprint 迁移说明里。新 `ARCHITECTURE.md` 只描述当前实现态，不写 legacy 对照，旧文档随合并删除自动归零。
 
 ### F5. `@deprecated` / `deprecated` 标记（2026-05-09 补扫 + 同日清理）—— 已收口
 
