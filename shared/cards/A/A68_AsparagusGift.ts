@@ -3,14 +3,11 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { getFenceCount } from '../../actions/effects/fencing'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { A68_AsparagusGift } from '../../cards-display/A/A68_AsparagusGift'
 
 const CARD_ID = A68_AsparagusGift.id
-
-registerPrerequisite('1 Unplanted Field', (player) => player.fields.some(fieldIsEmpty))
 
 const FENCES_BEFORE_KEY = 'fencesBefore'
 
@@ -39,5 +36,6 @@ const afterListener: CardListenerRegistration = {
 
 export const A68_AsparagusGift_impl = {
   listeners: [beforeListener, afterListener],
+  prerequisiteCheck: (player) => player.fields.some(fieldIsEmpty),
   reaches: [] as readonly string[],
 } satisfies CardImpl

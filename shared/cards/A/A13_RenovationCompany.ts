@@ -1,13 +1,7 @@
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { A13_RenovationCompany } from '../../cards-display/A/A13_RenovationCompany'
 
 const CARD_ID = A13_RenovationCompany.id
-
-registerPrerequisite(
-  'In Wooden House with Exactly 2 Rooms',
-  (player) => player.houseType === 'wood' && player.rooms === 2,
-)
 
 export const A13_RenovationCompany_impl = {
   effect: {
@@ -30,5 +24,6 @@ export const A13_RenovationCompany_impl = {
     ],
   }),
 },
+  prerequisiteCheck: (player) => player.houseType === 'wood' && player.rooms === 2,
   reaches: [] as readonly string[],
 } satisfies CardImpl
