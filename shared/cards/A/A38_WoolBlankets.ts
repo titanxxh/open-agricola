@@ -1,4 +1,3 @@
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import type { PlayerState } from '../../contract/types'
 import { A38_WoolBlankets } from '../../cards-display/A/A38_WoolBlankets'
@@ -17,8 +16,6 @@ const countSheepOnBoard = (player: PlayerState): number => {
   return total
 }
 
-registerPrerequisite('5 Sheep', (player) => countSheepOnBoard(player) >= 5)
-
 export const A38_WoolBlankets_impl = {
   effect: {
   id: CARD_ID,
@@ -28,5 +25,6 @@ export const A38_WoolBlankets_impl = {
     return 0
   },
 },
+  prerequisiteCheck: (player) => countSheepOnBoard(player) >= 5,
   reaches: [] as readonly string[],
 } satisfies CardImpl

@@ -1,13 +1,10 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { A46_ClawKnife } from '../../cards-display/A/A46_ClawKnife'
 
 const CARD_ID = A46_ClawKnife.id
-
-registerPrerequisite('Exactly 1 Pasture', (player) => player.pastures.length === 1)
 
 const listener: CardListenerRegistration = {
   id: 'A46-claw-knife-after-place-farmer',
@@ -29,5 +26,6 @@ const listener: CardListenerRegistration = {
 
 export const A46_ClawKnife_impl = {
   listeners: [listener],
+  prerequisiteCheck: (player) => player.pastures.length === 1,
   reaches: [] as readonly string[],
 } satisfies CardImpl

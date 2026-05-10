@@ -1,13 +1,8 @@
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { countUnusedFarmyardSpaces } from '../../domain/farm'
 import type { CardImpl } from '../registry'
 import { A57_MilkingParlor } from '../../cards-display/A/A57_MilkingParlor'
 
 const CARD_ID = A57_MilkingParlor.id
-
-registerPrerequisite('At Least 4 Unused Farmyard Spaces', (player) =>
-  countUnusedFarmyardSpaces(player) >= 4,
-)
 
 export const A57_MilkingParlor_impl = {
   effect: {
@@ -27,5 +22,6 @@ export const A57_MilkingParlor_impl = {
     }
   },
 },
+  prerequisiteCheck: (player) => countUnusedFarmyardSpaces(player) >= 4,
   reaches: [] as readonly string[],
 } satisfies CardImpl

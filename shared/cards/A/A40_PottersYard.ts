@@ -2,17 +2,12 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { countUnusedFarmyardSpaces } from '../../domain/farm'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { A40_PottersYard } from '../../cards-display/A/A40_PottersYard'
 
 const CARD_ID = A40_PottersYard.id
-
-registerPrerequisite('At Most 7 Unused Farmyard Spaces', (player) =>
-  countUnusedFarmyardSpaces(player) <= 7,
-)
 
 /**
  * A40 Potter's Yard:
@@ -169,5 +164,6 @@ export const A40_PottersYard_impl = {
     }
   },
 },
+  prerequisiteCheck: (player) => countUnusedFarmyardSpaces(player) <= 7,
   reaches: [] as readonly string[],
 } satisfies CardImpl
