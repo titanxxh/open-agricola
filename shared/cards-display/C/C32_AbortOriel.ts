@@ -11,6 +11,6 @@ export const C32_AbortOriel = new MinorImprovement({
   desc: ['You can no longer play this card when any player (including you) has 5 or more cards in front of them.'],
   cost: { clay: 2 },
   vp: 3,
-  prerequisite: 'No Player With 5 Or More Played Cards',
+  prerequisite: 'see below',
   newSet: true,
 })
