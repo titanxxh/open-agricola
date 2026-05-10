@@ -1,6 +1,11 @@
 import type { CardImpl } from '../registry'
 
 export const C32_AbortOriel_impl = {
+  /**
+   * C32 Abort Oriel: cannot be played once any player already has 5 or more
+   * cards in front of them. ("May be played as your fifth card" — i.e. you
+   * yourself only count BEFORE playing.)
+   */
   prerequisiteCheck: (_player, state) => {
     if (!state) return true
     for (const other of state.players ?? []) {
