@@ -1,22 +1,33 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { E109_BraidMaker as E109Card } from '../../shared/cards-display/E/E109_BraidMaker'
+import { E109_BraidMaker } from '../../shared/cards-display/E/E109_BraidMaker'
 import { A143_Stonecutter } from '../../shared/cards-display/A/A143_Stonecutter'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-
 const CARD_ID = 'E109_BraidMaker'
 
 // Keep side-effect imports referenced.
 void A143_Stonecutter
 
-// TODO: re-enable once the cross-file CardRegistry sharing race in vitest's
-// fork pool is root-caused. When run alongside other slow session files,
-// `Major_Basket` intermittently drops out of `major-improvement` options,
-// causing 1-2 of these its to fail at random. Single-file runs (and the
-// fast project) still pass deterministically. Tracked separately.
-describe.skip('E109_BraidMaker session', () => {
+/**
+ * NOTE on `minorHand: []` in setups below:
+ *
+ * `runEngineSteps` auto-resolves any choice with exactly one option
+ * (session-core.ts ~L2337). The default `new GameSession()` deals 7 random
+ * minor cards to each player's hand; some of those minors are affordable
+ * with `{reed:2,stone:3}`, others aren't. That randomness toggles the
+ * `improvement-any` option count between 1 (only `Major_Basket`) and N
+ * (`Major_Basket` + affordable minors), which in turn toggles between
+ * "auto-resolve, action completes immediately" and "yield a wait choice".
+ *
+ * Forcing `minorHand: []` removes the random axis: `improvement-any` always
+ * surfaces a single `Major_Basket` option, the engine always auto-resolves
+ * it, and `takeAction` always returns with `Major_Basket` already bought.
+ * Tests therefore assert post-purchase state directly (improvements +
+ * resources) without a `resolveChoice` round-trip.
+ */
+describe('E109_BraidMaker session', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -33,6 +44,14 @@ describe.skip('E109_BraidMaker session', () => {
       stone: 3,
       food: 0,
     }
+    // Force "no buyable minor in hand" without triggering normalizeState's
+    // re-deal path (which fires when any hand is empty). Placeholder ids
+    // resolve to undefined in `getMinorImprovement` and get filtered out
+    // of the option list.
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+    state.players[1]!.minorHand = ['__test_placeholder__']
+    state.players[1]!.occupationHand = ['__test_placeholder__']
 
     if (!state.availableMajorImprovements.includes('Major_Basket')) {
       state.availableMajorImprovements.push('Major_Basket')
@@ -41,7 +60,6 @@ describe.skip('E109_BraidMaker session', () => {
     return session
   }
 
-
   it('provides a harvest-time reed → food exchange', () => {
     // E109's exchange field enables 1 reed → 2 food exchange. We verify the
     // exchange registry returns this entry for the player.
@@ -49,10 +67,10 @@ describe.skip('E109_BraidMaker session', () => {
     const state = session.getState().state
     const player = state.players[0]!
     // The exchanges field is static metadata on the Occupation definition.
-    expect(E109Card.exchanges).toBeDefined()
-    expect(E109Card.exchanges?.[0]?.from?.reed).toBe(1)
-    expect(E109Card.exchanges?.[0]?.to?.food).toBe(2)
-    expect(E109Card.exchanges?.[0]?.max).toBe(1)
+    expect(E109_BraidMaker.exchanges).toBeDefined()
+    expect(E109_BraidMaker.exchanges?.[0]?.from?.reed).toBe(1)
+    expect(E109_BraidMaker.exchanges?.[0]?.to?.food).toBe(2)
+    expect(E109_BraidMaker.exchanges?.[0]?.max).toBe(1)
     // Guard: verify the card is still considered played by the player.
     expect(player.occupationPlayed).toContain(CARD_ID)
   })
@@ -62,6 +80,7 @@ describe.skip('E109_BraidMaker session', () => {
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
+    state.round = 1
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
     player.resources = {
@@ -70,31 +89,23 @@ describe.skip('E109_BraidMaker session', () => {
       stone: 2,
       food: 0,
     }
+    // Force "no buyable minor in hand" without triggering normalizeState's
+    // re-deal path (which fires when any hand is empty). Placeholder ids
+    // resolve to undefined in `getMinorImprovement` and get filtered out
+    // of the option list.
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+    state.players[1]!.minorHand = ['__test_placeholder__']
+    state.players[1]!.occupationHand = ['__test_placeholder__']
     if (!state.availableMajorImprovements.includes('Major_Basket')) {
       state.availableMajorImprovements.push('Major_Basket')
     }
     session.loadState(state)
 
-    let resp = session.takeAction(0, 'major-improvement')
+    // With minorHand=[] the only buyable improvement is Major_Basket;
+    // single-option auto-resolve fires inside `takeAction`.
+    const resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId !== 'wait') return
-    const basket = resp.interaction.options?.find(
-      (o) => o.value === 'major:Major_Basket',
-    )
-    expect(basket).toBeDefined()
-    resp = session.resolveChoice(0, basket!.value)
-
-    let steps = 0
-    while (resp.interaction.stateId === 'wait' && steps < 8) {
-      steps++
-      const options = resp.interaction.options ?? []
-      const next = options.find((o) => o.value !== 'cancel')
-      if (next) {
-        resp = session.resolveChoice(0, next.value)
-      } else {
-        break
-      }
-    }
 
     const after = resp.state.players[0]!
     expect(after.improvements).toContain('Major_Basket')
@@ -105,20 +116,8 @@ describe.skip('E109_BraidMaker session', () => {
 
   it('applies Basket discount when E109 is played (1 reed + 1 stone)', () => {
     const session = setup()
-    let resp = session.takeAction(0, 'major-improvement')
+    const resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId !== 'wait') return
-    const basket = resp.interaction.options?.find((o) => o.value === 'major:Major_Basket')
-    expect(basket).toBeDefined()
-    resp = session.resolveChoice(0, basket!.value)
-
-    let steps = 0
-    while (resp.interaction.stateId === 'wait' && steps < 8) {
-      steps++
-      const next = resp.interaction.options?.find((o) => o.value !== 'cancel')
-      if (!next) break
-      resp = session.resolveChoice(0, next.value)
-    }
 
     const after = resp.state.players[0]!
     expect(after.improvements).toContain('Major_Basket')
@@ -144,24 +143,21 @@ describe.skip('E109_BraidMaker session', () => {
       stone: 2,
       food: 0,
     }
+    // Force "no buyable minor in hand" without triggering normalizeState's
+    // re-deal path (which fires when any hand is empty). Placeholder ids
+    // resolve to undefined in `getMinorImprovement` and get filtered out
+    // of the option list.
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+    state.players[1]!.minorHand = ['__test_placeholder__']
+    state.players[1]!.occupationHand = ['__test_placeholder__']
     if (!state.availableMajorImprovements.includes('Major_Basket')) {
       state.availableMajorImprovements.push('Major_Basket')
     }
     session.loadState(state)
 
-    let resp = session.takeAction(0, 'major-improvement')
+    const resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId !== 'wait') return
-    const basket = resp.interaction.options?.find((o) => o.value === 'major:Major_Basket')
-    expect(basket).toBeDefined()
-    resp = session.resolveChoice(0, basket!.value)
-    let steps = 0
-    while (resp.interaction.stateId === 'wait' && steps < 8) {
-      steps++
-      const next = resp.interaction.options?.find((o) => o.value !== 'cancel')
-      if (!next) break
-      resp = session.resolveChoice(0, next.value)
-    }
 
     const after = resp.state.players[0]!
     expect(after.improvements).toContain('Major_Basket')
