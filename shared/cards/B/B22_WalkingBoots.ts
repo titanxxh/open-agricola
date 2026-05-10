@@ -3,7 +3,6 @@ import {
   readCardExtraData,
   writeCardExtraData,
 } from '../helpers/card-state'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { familySize } from '../../domain/player'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
@@ -11,9 +10,8 @@ import { B22_WalkingBoots } from '../../cards-display/B/B22_WalkingBoots'
 
 const CARD_ID = B22_WalkingBoots.id
 
-registerPrerequisite('At Most 4 People', (player) => familySize(player) <= 4)
-
 export const B22_WalkingBoots_impl = {
+  prerequisiteCheck: (player) => familySize(player) <= 4,
   effect: {
     id: CARD_ID,
     onBuy: (_state, _player): ActionFlow => ({

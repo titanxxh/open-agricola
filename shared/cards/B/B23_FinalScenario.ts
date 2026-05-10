@@ -1,16 +1,14 @@
 import { writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { B23_FinalScenario } from '../../cards-display/B/B23_FinalScenario'
 
 const CARD_ID = B23_FinalScenario.id
 
-registerPrerequisite('Round 13 or Before', (_player, state) => {
-  if (!state) return true
-  return state.round <= 13
-})
-
 export const B23_FinalScenario_impl = {
+  prerequisiteCheck: (_player, state) => {
+    if (!state) return true
+    return state.round <= 13
+  },
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
