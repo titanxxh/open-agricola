@@ -5,10 +5,11 @@ import { getMajorCard } from '../major'
 import { collectCardsAs } from './card-type'
 import { checkCustomPrerequisite } from './prerequisite-registry'
 import { fieldHasCrop } from '../../domain/field'
+import { getActiveCardRegistry } from '../active-registry'
 
 type CardPrerequisiteSource = Pick<
   CardDefinition,
-  'prerequisite' | 'occupationPrerequisites' | 'improvementPrerequisites' | 'maxRound'
+  'id' | 'prerequisite' | 'occupationPrerequisites' | 'improvementPrerequisites' | 'maxRound'
 >
 
 const countOccupations = (player: PlayerState) =>
@@ -154,5 +155,9 @@ export const meetsCardPrerequisites = (
   if (!meetsNumericPrerequisite(countAllImprovements(player), card.improvementPrerequisites)) {
     return false
   }
+  // Inline prerequisite check (registered on CardImpl) wins over declarative parser.
+  const registry = getActiveCardRegistry()
+  const inline = registry?.getPrerequisiteCheck(card.id)
+  if (inline) return inline(player, state)
   return meetsTextPrerequisite(player, card.prerequisite, state)
 }
