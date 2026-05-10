@@ -48,6 +48,7 @@ describe('B63_Tasting session', () => {
     let safety = 30
     // Accept Tasting exchange if presented
     while (safety-- > 0 && resp.interaction.stateId === 'wait') {
+      if (resp.interaction.request.kind !== 'choice') break
       const options = resp.interaction.options ?? []
       // Look for the grain-pay option
       const payOpt = options.find((o: ActionChoiceOption) =>
@@ -61,8 +62,8 @@ describe('B63_Tasting session', () => {
       } else if (occOpt) {
         resp = session.resolveChoice(0, occOpt.value)
       } else {
-        // Take the first non-skip option
         const first = options[0]
+        if (!first) break
         resp = session.resolveChoice(0, first.value)
       }
     }
@@ -84,6 +85,7 @@ describe('B63_Tasting session', () => {
     expect(resp.ok).toBe(true)
     let safety = 30
     while (safety-- > 0 && resp.interaction.stateId === 'wait') {
+      if (resp.interaction.request.kind !== 'choice') break
       const options = resp.interaction.options ?? []
       const skipOpt = options.find((o: ActionChoiceOption) => o.value === '__skip__')
       const occOpt = options.find((o: ActionChoiceOption) => o.value === 'A93_BedMaker')
@@ -92,7 +94,9 @@ describe('B63_Tasting session', () => {
       } else if (occOpt) {
         resp = session.resolveChoice(0, 'A93_BedMaker')
       } else {
-        resp = session.resolveChoice(0, options[0]!.value)
+        const first = options[0]
+        if (!first) break
+        resp = session.resolveChoice(0, first.value)
       }
     }
     resp = drainSwitches(session, resp)

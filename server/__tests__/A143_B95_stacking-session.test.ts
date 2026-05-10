@@ -31,6 +31,13 @@ describe('A143 + B95 stacking', () => {
     if (!state.availableMajorImprovements.includes('Major_Basket')) {
       state.availableMajorImprovements.push('Major_Basket')
     }
+    // Stabilize random hands so improvement-any options always = [Major_Basket]
+    // (single-option auto-resolves inside takeAction). Placeholder ids resolve
+    // to undefined in `getMinorImprovement` and get filtered out.
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+    state.players[1]!.minorHand = ['__test_placeholder__']
+    state.players[1]!.occupationHand = ['__test_placeholder__']
     session.loadState(state)
     return session
   }
@@ -41,14 +48,14 @@ describe('A143 + B95 stacking', () => {
     const session = setup(4)
     let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId !== 'wait') return
-    const basket = resp.interaction.options?.find((o) => o.value === 'major:Major_Basket')
-    expect(basket).toBeDefined()
-
-    resp = session.resolveChoice(0, basket!.value)
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'choice') {
+      const basket = resp.interaction.options?.find((o) => o.value === 'major:Major_Basket')
+      if (basket) resp = session.resolveChoice(0, basket.value)
+    }
     let steps = 0
     while (resp.interaction.stateId === 'wait' && steps < 8) {
       steps++
+      if (resp.interaction.request.kind !== 'choice') break
       const next = resp.interaction.options?.find((o) => o.value !== 'cancel')
       if (!next) break
       resp = session.resolveChoice(0, next.value)
@@ -63,12 +70,14 @@ describe('A143 + B95 stacking', () => {
   it('only Stonecutter applies when rooms=2 (B95 gives 0 discount)', () => {
     const session = setup(2) // no extra rooms, B95 no-op
     let resp = session.takeAction(0, 'major-improvement')
-    if (resp.interaction.stateId !== 'wait') return
-    const basket = resp.interaction.options?.find((o) => o.value === 'major:Major_Basket')
-    resp = session.resolveChoice(0, basket!.value)
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'choice') {
+      const basket = resp.interaction.options?.find((o) => o.value === 'major:Major_Basket')
+      if (basket) resp = session.resolveChoice(0, basket.value)
+    }
     let steps = 0
     while (resp.interaction.stateId === 'wait' && steps < 8) {
       steps++
+      if (resp.interaction.request.kind !== 'choice') break
       const next = resp.interaction.options?.find((o) => o.value !== 'cancel')
       if (!next) break
       resp = session.resolveChoice(0, next.value)

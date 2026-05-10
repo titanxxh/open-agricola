@@ -52,18 +52,22 @@ const isAdjacentToField = (
 
 export const getPlowableTiles = (player: PlayerState) => {
   const occupied = getOccupiedKeys(player)
+  const lockedKeys = collectLockedFarmTileKeys(player)
   const fieldKeys = new Set(
     player.fields.map((field) =>
       positionKey({ row: field.row, col: field.col }),
     ),
   )
   if (fieldKeys.size === 0) {
-    return getAllTilePositions().filter(
-      (pos) => !occupied.has(positionKey(pos)),
-    )
+    return getAllTilePositions().filter((pos) => {
+      const key = positionKey(pos)
+      return !occupied.has(key) && !lockedKeys.has(key)
+    })
   }
   return getAllTilePositions().filter((pos) => {
-    if (occupied.has(positionKey(pos))) return false
+    const key = positionKey(pos)
+    if (occupied.has(key)) return false
+    if (lockedKeys.has(key)) return false
     return isAdjacentToField(pos, fieldKeys)
   })
 }

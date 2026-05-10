@@ -49,8 +49,11 @@ const drainPending = (session: GameSession, resp: ReturnType<GameSession['getSta
     if (resp.interaction.stateId !== 'wait') {
       break
     }
+    if (resp.interaction.request.kind !== 'choice') break
+    const next = resp.interaction.options?.[0]?.value
+    if (!next) break
     const playerIdx = resp.interaction.playerIndex ?? 0
-    resp = session.resolveChoice(playerIdx, resp.interaction.options![0]!.value)
+    resp = session.resolveChoice(playerIdx, next)
   }
   return resp
 }
