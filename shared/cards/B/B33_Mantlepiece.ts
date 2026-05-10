@@ -1,12 +1,10 @@
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { B33_Mantlepiece } from '../../cards-display/B/B33_Mantlepiece'
 
 const CARD_ID = B33_Mantlepiece.id
 
-registerPrerequisite('Clay or Stone House', (player) => player.houseType !== 'wood')
-
 export const B33_Mantlepiece_impl = {
+  prerequisiteCheck: (player) => player.houseType !== 'wood',
   effect: {
   id: CARD_ID,
   onBuy: (state, _player) => {
