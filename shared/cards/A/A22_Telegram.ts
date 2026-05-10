@@ -1,13 +1,10 @@
 import { writeCardExtraData, readCardExtraData, writeCardInfobox, setCardFlag, isCardFlagged } from '../helpers/card-state'
 import { getFenceCount, maxFences } from '../../actions/effects/fencing'
 import { workersAvailable } from '../../domain/player'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { A22_Telegram } from '../../cards-display/A/A22_Telegram'
 
 const CARD_ID = A22_Telegram.id
-
-registerPrerequisite('At Least 1 Fence in Supply', (player) => maxFences - getFenceCount(player) >= 1)
 
 export const A22_Telegram_impl = {
   effect: {
@@ -44,5 +41,6 @@ export const A22_Telegram_impl = {
     }
   },
 },
+  prerequisiteCheck: (player) => maxFences - getFenceCount(player) >= 1,
   reaches: [] as readonly string[],
 } satisfies CardImpl

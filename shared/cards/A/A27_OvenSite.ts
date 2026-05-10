@@ -1,7 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { A27_OvenSite } from '../../cards-display/A/A27_OvenSite'
 
@@ -12,13 +11,6 @@ const OVEN_IDS = ['Major_ClayOven', 'Major_StoneOven'] as const
 const FIREPLACE_IDS = ['Major_Fireplace1', 'Major_Fireplace2', 'A60_OrientalFireplace']
 
 const HEARTH_IDS = ['Major_CookingHearth1', 'Major_CookingHearth2']
-
-registerPrerequisite('Both Fireplace and Cooking Hearth', (player) => {
-  const owned = new Set<string>([...player.improvements, ...player.minorPlayed])
-  const hasFireplace = FIREPLACE_IDS.some((id) => owned.has(id))
-  const hasHearth = HEARTH_IDS.some((id) => owned.has(id))
-  return hasFireplace && hasHearth
-})
 
 const computeCostsListener: CardListenerRegistration = {
   id: 'A27-oven-site-compute-costs',
@@ -65,5 +57,11 @@ export const A27_OvenSite_impl = {
     ],
   }),
 },
+  prerequisiteCheck: (player) => {
+    const owned = new Set<string>([...player.improvements, ...player.minorPlayed])
+    const hasFireplace = FIREPLACE_IDS.some((id) => owned.has(id))
+    const hasHearth = HEARTH_IDS.some((id) => owned.has(id))
+    return hasFireplace && hasHearth
+  },
   reaches: [] as readonly string[],
 } satisfies CardImpl

@@ -1,15 +1,9 @@
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { A20_DoubleTurnPlow } from '../../cards-display/A/A20_DoubleTurnPlow'
 
 const CARD_ID = A20_DoubleTurnPlow.id
-
-registerPrerequisite('Round 5 or Before', (_player, state) => {
-  if (!state) return true
-  return state.round <= 5
-})
 
 const computeCostsListener: CardListenerRegistration = {
   id: 'A20-double-turn-plow-compute-costs',
@@ -36,5 +30,9 @@ export const A20_DoubleTurnPlow_impl = {
     ],
   }),
 },
+  prerequisiteCheck: (_player, state) => {
+    if (!state) return true
+    return state.round <= 5
+  },
   reaches: [] as readonly string[],
 } satisfies CardImpl
