@@ -94,13 +94,13 @@ describe('D60_LargePottery', () => {
     it('requires a previously played Pottery to satisfy "Return the Pottery"', () => {
       const withoutPottery = createPlayer()
       expect(
-        meetsCardPrerequisites(withoutPottery, { prerequisite: 'Return the Pottery' } as any),
+        meetsCardPrerequisites(withoutPottery, D60Card),
       ).toBe(false)
 
       const withPottery = createPlayer()
       withPottery.improvements = ['Major_Pottery']
       expect(
-        meetsCardPrerequisites(withPottery, { prerequisite: 'Return the Pottery' } as any),
+        meetsCardPrerequisites(withPottery, D60Card),
       ).toBe(true)
     })
 

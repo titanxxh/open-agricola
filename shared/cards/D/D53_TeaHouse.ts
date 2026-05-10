@@ -3,17 +3,11 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { D53_TeaHouse } from '../../cards-display/D/D53_TeaHouse'
 
 const CARD_ID = D53_TeaHouse.id
-
-registerPrerequisite('Play in Round 6 or Later', (_player, state) => {
-  if (!state) return true
-  return state.round >= 6
-})
 
 const anytimeListener: CardListenerRegistration = {
   id: 'D53-tea-house-anytime',
@@ -41,6 +35,10 @@ const anytimeListener: CardListenerRegistration = {
 }
 
 export const D53_TeaHouse_impl = {
+  prerequisiteCheck: (_player, state) => {
+    if (!state) return true
+    return state.round >= 6
+  },
   listeners: [anytimeListener],
   effect: {
   id: CARD_ID,

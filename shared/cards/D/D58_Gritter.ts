@@ -1,17 +1,11 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { fieldHasCrop, fieldFindStackOfKind } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { D58_Gritter } from '../../cards-display/D/D58_Gritter'
 
 const CARD_ID = D58_Gritter.id
-
-registerPrerequisite('Play in Round 5 or Later', (_player, state) => {
-  if (!state) return true
-  return state.round >= 5
-})
 
 const listener: CardListenerRegistration = {
   id: 'D58-gritter-after-sow',
@@ -37,6 +31,10 @@ const listener: CardListenerRegistration = {
 }
 
 export const D58_Gritter_impl = {
+  prerequisiteCheck: (_player, state) => {
+    if (!state) return true
+    return state.round >= 5
+  },
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
