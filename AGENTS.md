@@ -13,7 +13,7 @@ Open Agricola——后端权威 + WebSocket 实时多人同步的 Agricola 桌�
 - WebSocket 房间对局是主链路；HTTP 仅用于调试、补拉快照、测试辅助。
 - 与游戏规则相关的实现优先放在 `shared/` + `server/`，不要在前端 UI 补规则逻辑。
 - 遇到不确定的实现，优先参考 `../bga-agricola`，除非架构文档已明确给出不同设计。
-- 详细架构（节点树引擎、Hook 系统、协议层、Pending 模型、房间系统）→ `docs/ENGINE_ARCHITECTURE.md`。
+- 详细架构（节点树引擎、Hook 系统、协议层、Pending 模型、房间系统）→ `docs/ARCHITECTURE.md`。
 
 ## Commands
 
@@ -76,7 +76,7 @@ pnpm run build              # tsc + vite build
 | `docs/card_progress.md` | 每次改卡牌相关代码（新实现 / 修 bug / 改简化 / 改 desc / 调 hook） |
 | `docs/card_desc_audit.md` | 改卡牌 desc 文案 / 改卡牌 ID 命名 / 跑完一轮 desc 重对齐 |
 | `docs/master-plan.md` | 启动 / 完成 sprint / 调整排期或工作量估算 |
-| `docs/ENGINE_ARCHITECTURE.md` | 改通用扩展点（hook phase、ActionFlow node、协议层） |
+| `docs/ARCHITECTURE.md` | 改通用扩展点（hook phase、ActionFlow node、协议层） |
 | `docs/CARD_TEST_TEMPLATE.md` | 测试策略 / 卡牌测试写法变化 |
 | `docs/PLATFORM_DESIGN.md` / `DEPLOY_PLAN.md` / `HOW_TO_DEPLOY.md` | 仅在对应议题改动时更新 |
 
@@ -129,7 +129,7 @@ Commit 标题规范：`feat: ...` / `fix: ...` / `refactor: ...` / `docs: ...`�
 
 | Topic | Doc |
 |---|---|
-| Architecture | `docs/ENGINE_ARCHITECTURE.md` |
+| Architecture | `docs/ARCHITECTURE.md` |
 | Deployment | `docs/HOW_TO_DEPLOY.md` |
 | Platform & Workshop | `docs/PLATFORM_DESIGN.md` |
 | Card Test Template | `docs/CARD_TEST_TEMPLATE.md` |

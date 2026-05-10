@@ -67,7 +67,7 @@ docs/      架构、部署、平台设计、卡牌进度
 
 | Topic | Doc |
 |---|---|
-| Architecture | [docs/ENGINE_ARCHITECTURE.md](docs/ENGINE_ARCHITECTURE.md) |
+| Architecture | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | Deployment | [docs/HOW_TO_DEPLOY.md](docs/HOW_TO_DEPLOY.md) |
 | Platform & Workshop | [docs/PLATFORM_DESIGN.md](docs/PLATFORM_DESIGN.md) |
 | Card Test Template | [docs/CARD_TEST_TEMPLATE.md](docs/CARD_TEST_TEMPLATE.md) |

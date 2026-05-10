@@ -7,7 +7,7 @@
 >
 > - 审查报告：`docs/card_desc_audit.md`（含每张卡 verdict + §8 P0–P3 清单）
 > - 进度权威源：`docs/card_progress.md`（每 sprint 收口必须回流）
-> - 架构约束：`docs/ENGINE_ARCHITECTURE.md`、根目录 `CLAUDE.md`「卡牌实现规范」
+> - 架构约束：`docs/ARCHITECTURE.md`、根目录 `CLAUDE.md`「卡牌实现规范」
 
 ## 0. 概览
 
