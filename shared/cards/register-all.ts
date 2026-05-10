@@ -429,6 +429,7 @@ import { C29_BeerTable_impl } from './C/C29_BeerTable'
 import { C2_Stable_impl } from './C/C2_Stable'
 import { C30_HalfTimberedHouse_impl } from './C/C30_HalfTimberedHouse'
 import { C31_WritingChamber_impl } from './C/C31_WritingChamber'
+import { C32_AbortOriel_impl } from './C/C32_AbortOriel'
 import { C33_GreeningPlan_impl } from './C/C33_GreeningPlan'
 import { C34_ElephantgrassPlant_impl } from './C/C34_ElephantgrassPlant'
 import { C35_LanternHouse_impl } from './C/C35_LanternHouse'
@@ -1256,6 +1257,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'C2_Stable': C2_Stable_impl,
   'C30_HalfTimberedHouse': C30_HalfTimberedHouse_impl,
   'C31_WritingChamber': C31_WritingChamber_impl,
+  'C32_AbortOriel': C32_AbortOriel_impl,
   'C33_GreeningPlan': C33_GreeningPlan_impl,
   'C34_ElephantgrassPlant': C34_ElephantgrassPlant_impl,
   'C35_LanternHouse': C35_LanternHouse_impl,

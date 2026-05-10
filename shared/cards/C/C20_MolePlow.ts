@@ -1,15 +1,9 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { C20_MolePlow } from '../../cards-display/C/C20_MolePlow'
 
 const CARD_ID = C20_MolePlow.id
-
-registerPrerequisite('Play in Round 9 or Later', (_player, state) => {
-  if (!state) return true
-  return state.round >= 9
-})
 
 const listener: CardListenerRegistration = {
   id: 'C20-mole-plow-after-place-farmer',
@@ -32,6 +26,10 @@ const listener: CardListenerRegistration = {
 }
 
 export const C20_MolePlow_impl = {
+  prerequisiteCheck: (_player, state) => {
+    if (!state) return true
+    return state.round >= 9
+  },
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
