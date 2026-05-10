@@ -6,7 +6,6 @@ import {
   writeCardExtraData,
   writeCardInfobox,
 } from '../helpers/card-state'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { workersAvailable } from '../../domain/player'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
@@ -16,18 +15,17 @@ const CARD_ID = D22_WorkPermit.id
 
 const TARGET_ROUND_KEY = 'targetRound'
 
-registerPrerequisite('At Least 1 Building Resource', (player, state) => {
-  const totalBuildRes =
-    (player.resources.wood ?? 0)
-    + (player.resources.stone ?? 0)
-    + (player.resources.clay ?? 0)
-    + (player.resources.reed ?? 0)
-  if (totalBuildRes === 0) return false
-  if (!state) return true
-  return workersAvailable(state, player) > 0
-})
-
 export const D22_WorkPermit_impl = {
+  prerequisiteCheck: (player, state) => {
+    const totalBuildRes =
+      (player.resources.wood ?? 0)
+      + (player.resources.stone ?? 0)
+      + (player.resources.clay ?? 0)
+      + (player.resources.reed ?? 0)
+    if (totalBuildRes === 0) return false
+    if (!state) return true
+    return workersAvailable(state, player) > 0
+  },
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
