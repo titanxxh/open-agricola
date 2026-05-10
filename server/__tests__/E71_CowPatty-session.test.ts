@@ -75,8 +75,13 @@ describe('E71_CowPatty session', () => {
     expect(resp.ok).toBe(true)
 
     // Continue through any remaining choices
-    while (resp.interaction.stateId === 'wait') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options[0]?.value ?? 'ok')
+    {
+      let safety = 16
+      while (resp.interaction.stateId === 'wait' && safety-- > 0) {
+        const next = resp.interaction.options?.[0]?.value
+        if (!next) break
+        resp = session.resolveChoice(resp.interaction.playerIndex, next)
+      }
     }
 
     // Field should have 4 grain (3 normal + 1 bonus)
@@ -111,8 +116,13 @@ describe('E71_CowPatty session', () => {
     })
     expect(resp.ok).toBe(true)
 
-    while (resp.interaction.stateId === 'wait') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options[0]?.value ?? 'ok')
+    {
+      let safety = 16
+      while (resp.interaction.stateId === 'wait' && safety-- > 0) {
+        const next = resp.interaction.options?.[0]?.value
+        if (!next) break
+        resp = session.resolveChoice(resp.interaction.playerIndex, next)
+      }
     }
 
     // Field should have 3 grain (normal, no bonus)
@@ -146,8 +156,13 @@ describe('E71_CowPatty session', () => {
     })
     expect(resp.ok).toBe(true)
 
-    while (resp.interaction.stateId === 'wait') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options[0]?.value ?? 'ok')
+    {
+      let safety = 16
+      while (resp.interaction.stateId === 'wait' && safety-- > 0) {
+        const next = resp.interaction.options?.[0]?.value
+        if (!next) break
+        resp = session.resolveChoice(resp.interaction.playerIndex, next)
+      }
     }
 
     const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 2)
@@ -170,8 +185,13 @@ describe('E71_CowPatty session', () => {
     })
     expect(resp.ok).toBe(true)
 
-    while (resp.interaction.stateId === 'wait') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options[0]?.value ?? 'ok')
+    {
+      let safety = 16
+      while (resp.interaction.stateId === 'wait' && safety-- > 0) {
+        const next = resp.interaction.options?.[0]?.value
+        if (!next) break
+        resp = session.resolveChoice(resp.interaction.playerIndex, next)
+      }
     }
 
     const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 2)
@@ -204,8 +224,13 @@ describe('E71_CowPatty session', () => {
     })
     expect(resp.ok).toBe(true)
 
-    while (resp.interaction.stateId === 'wait') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options[0]?.value ?? 'ok')
+    {
+      let safety = 16
+      while (resp.interaction.stateId === 'wait' && safety-- > 0) {
+        const next = resp.interaction.options?.[0]?.value
+        if (!next) break
+        resp = session.resolveChoice(resp.interaction.playerIndex, next)
+      }
     }
 
     const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 2)
@@ -247,8 +272,13 @@ describe('E71_CowPatty session', () => {
     expect(resp.ok).toBe(true)
 
     // Continue through any remaining choices
-    while (resp.interaction.stateId === 'wait') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options[0]?.value ?? 'ok')
+    {
+      let safety = 16
+      while (resp.interaction.stateId === 'wait' && safety-- > 0) {
+        const next = resp.interaction.options?.[0]?.value
+        if (!next) break
+        resp = session.resolveChoice(resp.interaction.playerIndex, next)
+      }
     }
 
     const player = resp.state.players[0]!
@@ -302,8 +332,13 @@ describe('E71_CowPatty session', () => {
     }
 
     // Continue through any remaining choices
-    while (resp.interaction.stateId === 'wait') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options[0]?.value ?? 'ok')
+    {
+      let safety = 16
+      while (resp.interaction.stateId === 'wait' && safety-- > 0) {
+        const next = resp.interaction.options?.[0]?.value
+        if (!next) break
+        resp = session.resolveChoice(resp.interaction.playerIndex, next)
+      }
     }
 
     const player = resp.state.players[0]!
