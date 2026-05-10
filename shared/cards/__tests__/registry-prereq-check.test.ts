@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { CardRegistry } from '../registry'
 import type { PlayerState } from '../../contract/types'
 
-const dummyPlayer = {} as PlayerState
-
 describe('CardRegistry prereqChecksByCard', () => {
   it('loadImpl stores prerequisiteCheck', () => {
     const r = new CardRegistry()
