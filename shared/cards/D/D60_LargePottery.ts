@@ -1,5 +1,4 @@
 import { returnCardToBoard } from '../helpers/return-card'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { D60_LargePottery } from '../../cards-display/D/D60_LargePottery'
 
@@ -16,10 +15,9 @@ const CARD_ID = D60_LargePottery.id
  * carrying its own scoring rule on top of the printed `vp: 3`.
  */
 
-registerPrerequisite('Return the Pottery', (player) =>
-  player.improvements.includes('Major_Pottery'))
-
 export const D60_LargePottery_impl = {
+  prerequisiteCheck: (player) =>
+    player.improvements.includes('Major_Pottery'),
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {

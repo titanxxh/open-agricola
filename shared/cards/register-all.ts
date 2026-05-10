@@ -600,6 +600,7 @@ import { D33_SummerHouse_impl } from './D/D33_SummerHouse'
 import { D34_LuxuriousHostel_impl } from './D/D34_LuxuriousHostel'
 import { D35_FodderChamber_impl } from './D/D35_FodderChamber'
 import { D36_BreedRegistry_impl } from './D/D36_BreedRegistry'
+import { D37_Sculpture_impl } from './D/D37_Sculpture'
 import { D38_MilkingStool_impl } from './D/D38_MilkingStool'
 import { D39_TruffleSlicer_impl } from './D/D39_TruffleSlicer'
 import { D3_Furrows_impl } from './D/D3_Furrows'
@@ -1428,6 +1429,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'D34_LuxuriousHostel': D34_LuxuriousHostel_impl,
   'D35_FodderChamber': D35_FodderChamber_impl,
   'D36_BreedRegistry': D36_BreedRegistry_impl,
+  'D37_Sculpture': D37_Sculpture_impl,
   'D38_MilkingStool': D38_MilkingStool_impl,
   'D39_TruffleSlicer': D39_TruffleSlicer_impl,
   'D3_Furrows': D3_Furrows_impl,
