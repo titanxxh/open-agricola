@@ -758,6 +758,7 @@ import { E25_BumperCrop_impl } from './E/E25_BumperCrop'
 import { E26_Sundial_impl } from './E/E26_Sundial'
 import { E27_PiggyBank_impl } from './E/E27_PiggyBank'
 import { E28_Bookmark_impl } from './E/E28_Bookmark'
+import { E29_Heirloom_impl } from './E/E29_Heirloom'
 import { E2_RenovationMaterials_impl } from './E/E2_RenovationMaterials'
 import { E30_ChildsToy_impl } from './E/E30_ChildsToy'
 import { E31_Upholstery_impl } from './E/E31_Upholstery'
@@ -1587,6 +1588,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'E26_Sundial': E26_Sundial_impl,
   'E27_PiggyBank': E27_PiggyBank_impl,
   'E28_Bookmark': E28_Bookmark_impl,
+  'E29_Heirloom': E29_Heirloom_impl,
   'E2_RenovationMaterials': E2_RenovationMaterials_impl,
   'E30_ChildsToy': E30_ChildsToy_impl,
   'E31_Upholstery': E31_Upholstery_impl,

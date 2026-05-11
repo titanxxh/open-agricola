@@ -1,14 +1,12 @@
 import { ensureCardState } from '../helpers/card-state'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { familySize, newbornCount } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { E30_ChildsToy } from '../../cards-display/E/E30_ChildsToy'
 
 const CARD_ID = E30_ChildsToy.id
 
-registerPrerequisite('Exactly 2 Adults', (player) => familySize(player) - newbornCount(player) === 2)
-
 export const E30_ChildsToy_impl = {
+  prerequisiteCheck: (player) => familySize(player) - newbornCount(player) === 2,
   effect: {
   id: CARD_ID,
   onBeforeFeed: (_state, player) => {
