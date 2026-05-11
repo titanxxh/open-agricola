@@ -1,3 +1,5 @@
+import type { ActionChoiceOption, InteractionRequest } from '../../contract/types'
+import type { PromptKey } from '../../contract/prompt-keys'
 import type { EngineContext, NodeStepResult } from '../types'
 import { BaseNode } from './base'
 import { ActivateCardNode } from './activate-card-node'
@@ -5,6 +7,11 @@ import { ActivateCardNode } from './activate-card-node'
 export class ParallelTriggerNode extends BaseNode {
   public children: ActivateCardNode[]
   public ownerPlayerId: string
+  public selectedChildId: string | null = null
+  public emittedChoices: ActionChoiceOption[] = []
+  public emittedPromptKey?: PromptKey
+  public emittedPromptParams?: Record<string, unknown>
+  public emittedRequest?: InteractionRequest
 
   constructor(id: string, children: ActivateCardNode[], ownerPlayerId: string) {
     super(id, 'parallelTrigger' as never)
@@ -19,7 +26,9 @@ export class ParallelTriggerNode extends BaseNode {
   }
 
   chooseCard(cardId: string): ActivateCardNode | null {
-    return this.children.find((c) => c.cardId === cardId && c.getState() !== 'resolved') ?? null
+    const child = this.children.find((c) => c.cardId === cardId && c.getState() !== 'resolved') ?? null
+    if (child) this.selectedChildId = child.id
+    return child
   }
 
   passAll(): void {
@@ -45,17 +54,42 @@ export class ParallelTriggerNode extends BaseNode {
     return [...cardOpts, { value: '__pass__', labelKey: 'ui.interactionSelectTriggerPass' }]
   }
 
+  private clearStaleSelection(): void {
+    if (this.selectedChildId) {
+      const sel = this.children.find((c) => c.id === this.selectedChildId)
+      if (!sel || sel.getState() === 'resolved') {
+        this.selectedChildId = null
+      }
+    }
+  }
+
   step(_ctx: EngineContext): NodeStepResult {
+    this.clearStaleSelection()
     if (this.children.every((c) => c.getState() === 'resolved')) {
       return { kind: 'done' }
     }
-    return { kind: 'continue' }
+    if (this.selectedChildId) {
+      return { kind: 'continue' }
+    }
+    return {
+      kind: 'request',
+      request: {
+        kind: 'select-trigger',
+        ownerPlayerId: this.ownerPlayerId,
+        options: this.buildSelectOptions(),
+      },
+    }
   }
 
   protected cursorData() {
     return {
       ownerPlayerId: this.ownerPlayerId,
       childrenIds: this.children.map((c) => c.id),
+      selectedChildId: this.selectedChildId,
+      emittedChoices: this.emittedChoices,
+      emittedPromptKey: this.emittedPromptKey,
+      emittedPromptParams: this.emittedPromptParams,
+      emittedRequest: this.emittedRequest,
     }
   }
 }

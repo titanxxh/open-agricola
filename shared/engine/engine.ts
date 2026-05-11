@@ -17,6 +17,7 @@ import {
   SequenceNode,
   XorNode,
 } from './nodes'
+import { ParallelTriggerNode } from './nodes/parallel-trigger-node'
 import type { EngineNode, EngineStepResult } from './types'
 import { ActionRegistry } from './registry'
 import { HookDispatcher } from './dispatcher'
@@ -98,6 +99,17 @@ export class Engine {
     const node = this.tree.findNodeById(this._pendingNodeIdRef.value)
     if (!node) return null
     if (node instanceof OrNode || node instanceof XorNode || node instanceof OptionalNode) {
+      if (node.emittedChoices.length === 0 && node.emittedRequest === undefined) return null
+      return {
+        nodeId: node.id,
+        promptKey: node.emittedPromptKey,
+        promptParams: node.emittedPromptParams,
+        options: node.emittedChoices,
+        request: node.emittedRequest,
+      }
+    }
+    if (node instanceof ParallelTriggerNode) {
+      if (node.getState() === 'resolved') return null
       if (node.emittedChoices.length === 0 && node.emittedRequest === undefined) return null
       return {
         nodeId: node.id,

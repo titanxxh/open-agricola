@@ -16,6 +16,7 @@ import {
   PlayerSwitchNode,
   XorNode,
 } from './nodes'
+import { ParallelTriggerNode } from './nodes/parallel-trigger-node'
 import {
   getOptionsSourceCard,
   resolveChoiceSourceCard,
@@ -219,6 +220,38 @@ export function engineProceed(
         options,
       },
     }
+  }
+  if (node instanceof ParallelTriggerNode) {
+    const ctx = {
+      resolveSubtree: (n: EngineNode) => resolveSubtree(n),
+      emitChoice: () => {},
+    }
+    const stepResult = node.step(ctx)
+    if (stepResult.kind === 'done') {
+      if (node.getState() !== 'resolved') node.resolve()
+      return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+    }
+    if (stepResult.kind === 'continue') {
+      return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+    }
+    if (stepResult.kind === 'request') {
+      const options = node.buildSelectOptions()
+      const promptKey = 'ui.interactionSelectTrigger' as import('../contract/prompt-keys').PromptKey
+      node.emittedChoices = options
+      node.emittedPromptKey = promptKey
+      node.emittedPromptParams = undefined
+      node.emittedRequest = stepResult.request
+      int.pendingNodeIdRef.value = node.id
+      return {
+        type: 'choice',
+        nodeId: node.id,
+        choice: {
+          promptKey,
+          options,
+        },
+      }
+    }
+    return { type: 'blocked', nodeId: node.id }
   }
   if (node instanceof OptionalNode) {
     if (node.active) {
