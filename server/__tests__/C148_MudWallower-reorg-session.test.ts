@@ -65,4 +65,21 @@ describe('C148_MudWallower reorg-after sync (zone-based)', () => {
     expect(resp.state.players[0]!.pastures[0]!.animalCount).toBe(2)
     expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.counters?.held).toBe(1)
   })
+
+  it('reorg cancel does not change held cap (listener fires but is no-op)', () => {
+    // After-listener still fires on resolveChoice('cancel') with result.type='ok'.
+    // But zones did NOT mutate, so pigsInC148 stays at boar - 0 - 0 - 0 = boar,
+    // which is >= held → no downward sync → held unchanged.
+    const session = setupWorkPhase({ boar: 2, held: 3 })
+    let resp = session.takeAction(0, 'pig-market')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
+      .toBe('ui.interactionAnimalReorg')
+
+    // 'cancel' is allowed only for the 'anytime' trigger (which is what pig-market uses).
+    resp = session.resolveChoice(0, 'cancel')
+
+    // Per reorganize-engine-session: cancel re-presents the reorg prompt because
+    // assigned < total. The intermediate state has held unchanged.
+    expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.counters?.held).toBe(3)
+  })
 })
