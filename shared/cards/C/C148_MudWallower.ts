@@ -92,18 +92,6 @@ const afterExchangeSyncListener: CardListenerRegistration = {
   },
 }
 
-const syncHeldAfterPlaceFarmerListener: CardListenerRegistration = {
-  id: 'C148-mud-wallower-sync-held-after-place-farmer',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
-  // Order > 0 so it runs after the increment listener (which has default order 0).
-  order: 10,
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    syncHeldDownward(context.player)
-  },
-}
-
 const afterReorgSyncListener: CardListenerRegistration = {
   id: 'C148-mud-wallower-after-reorg',
   cardIds: [CARD_ID],
@@ -135,7 +123,7 @@ const afterPaySyncListener: CardListenerRegistration = {
 }
 
 export const C148_MudWallower_impl = {
-  listeners: [afterPlaceFarmerListener, afterExchangeSyncListener, syncHeldAfterPlaceFarmerListener, afterPaySyncListener, afterReorgSyncListener],
+  listeners: [afterPlaceFarmerListener, afterExchangeSyncListener, afterPaySyncListener, afterReorgSyncListener],
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
