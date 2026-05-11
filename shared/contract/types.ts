@@ -635,6 +635,16 @@ export type InteractionRequest =
       pendingPicks: string[]
       kept: Record<string, { occ: string[]; minor: string[] }>
     }
+  | {
+      kind: 'select-trigger'
+      ownerPlayerId: string
+      options: Array<{
+        value: string
+        labelKey: string
+        labelParams?: Record<string, unknown>
+        sourceCard?: string
+      }>
+    }
 
 export type InteractionCommand =
   | 'takeAction'
