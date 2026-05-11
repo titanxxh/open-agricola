@@ -1,13 +1,11 @@
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { E43_BarnCats } from '../../cards-display/E/E43_BarnCats'
 
 const CARD_ID = E43_BarnCats.id
 
-registerPrerequisite('1 Stable', (player) => player.stableTiles.length >= 1)
-
 export const E43_BarnCats_impl = {
+  prerequisiteCheck: (player) => player.stableTiles.length >= 1,
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
