@@ -10,7 +10,6 @@ export class ParallelTriggerNode extends BaseNode {
     super(id, 'parallelTrigger' as never)
     this.children = children
     this.ownerPlayerId = ownerPlayerId
-    this.nodeState = 'pending'
   }
 
   getRemainingCardIds(): string[] {

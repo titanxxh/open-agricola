@@ -2751,6 +2751,7 @@ export class GameCore {
         case 'farm-select':
         case 'selection':
         case 'card-draft':
+        case 'select-trigger':
           // S2 Task 2 introduced the farm-select / selection / card-draft kinds
           // ahead of their resolvers (Tasks 5/6/7/12). Until those tasks wire
           // dedicated handlers, fall back to the legacy pending-options path so

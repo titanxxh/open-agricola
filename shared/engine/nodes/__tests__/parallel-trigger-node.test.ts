@@ -6,11 +6,11 @@ const makeActivate = (id: string, cardId: string) =>
   new ActivateCardNode(id, `listener-${id}`, cardId, 'after', 'place-farmer')
 
 describe('ParallelTriggerNode', () => {
-  it('starts pending with unresolved children', () => {
+  it('starts ready with unresolved children', () => {
     const a = makeActivate('a', 'C1')
     const b = makeActivate('b', 'C2')
     const node = new ParallelTriggerNode('ptn1', [a, b], 'p1')
-    expect(node.getState()).toBe('pending')
+    expect(node.getState()).toBe('ready')
     expect(node.getRemainingCardIds()).toEqual(['C1', 'C2'])
     expect(node.ownerPlayerId).toBe('p1')
   })
