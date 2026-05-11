@@ -9,7 +9,6 @@ import { listener as isDoableOverride } from './Stub_IsDoable_Override'
 import { effect as onReturnHomeAccumulate } from './Stub_OnReturnHome_Accumulate'
 import { effect as onRoundEndEffect } from './Stub_OnRoundEnd'
 import { listener as scopeOpponent } from './Stub_Scope_Opponent'
-import { listenerA as orderLow, listenerB as orderHigh } from './Stub_Order_Priority'
 import { listener as afterActionOptionalConstruct } from './Stub_AfterAction_OptionalConstruct'
 import { afterListener as payGainVpAfter } from './Stub_PayGainVp'
 import { computeCostsListener as cardStorageFence } from './Stub_CardStorage_ConsumeFence'
@@ -29,8 +28,6 @@ const allListeners = [
   computeArgsExtraOption,
   isDoableOverride,
   scopeOpponent,
-  orderLow,
-  orderHigh,
   afterActionOptionalConstruct,
   payGainVpAfter,
   cardStorageFence,
