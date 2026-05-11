@@ -68,8 +68,10 @@ describe('C148_MudWallower reorg-after sync (zone-based)', () => {
 
   it('reorg cancel does not change held cap (listener fires but is no-op)', () => {
     // After-listener still fires on resolveChoice('cancel') with result.type='ok'.
-    // But zones did NOT mutate, so pigsInC148 stays at boar - 0 - 0 - 0 = boar,
-    // which is >= held → no downward sync → held unchanged.
+    // After pig-market collect, boar = 3 (2 initial + 1 from pig-market). Cancel
+    // leaves all pigs in resources.boar (no pasture/house/stable assignment), so:
+    //   pigsInC148 = 3 - 0 - 0 - 0 = 3
+    // Condition: pigsInC148 (3) < held (3) → false → no downward sync → held stays 3.
     const session = setupWorkPhase({ boar: 2, held: 3 })
     let resp = session.takeAction(0, 'pig-market')
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
