@@ -1,4 +1,4 @@
-import type { ActionHookPhase } from '../../actions/hooks'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { EngineContext, NodeStepResult } from '../types'
 import { BaseNode } from './base'
 
@@ -8,6 +8,7 @@ export class ActivateCardNode extends BaseNode {
   public phase: ActionHookPhase
   public actionId: string
   public event: Record<string, unknown>
+  public preComputedResult?: ActionHookResult
 
   constructor(
     id: string,
@@ -16,6 +17,7 @@ export class ActivateCardNode extends BaseNode {
     phase: ActionHookPhase,
     actionId: string,
     event: Record<string, unknown> = {},
+    preComputedResult?: ActionHookResult,
   ) {
     super(id, 'activateCard')
     this.listenerId = listenerId
@@ -23,6 +25,7 @@ export class ActivateCardNode extends BaseNode {
     this.phase = phase
     this.actionId = actionId
     this.event = event
+    this.preComputedResult = preComputedResult
   }
 
   /**

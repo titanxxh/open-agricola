@@ -19,7 +19,7 @@ import type { EngineInternals } from './engine-internals'
 import {
   applyFallbackSourceCardToFlow,
   applyInteractionRequest,
-  buildActivateCardNodes,
+  buildPhaseTrailingNodes,
   buildChoiceExecutionContext,
   buildFlowNode,
   buildFollowUpNodes,
@@ -30,6 +30,7 @@ import {
   normalizeFollowUpAction,
   resolveSubtree,
 } from './engine-utils'
+import type { MatchedCardListener } from '../cards/card-listeners'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
@@ -188,8 +189,23 @@ export function engineResolveChoice(
         Object.keys(costOverride).length > 0 ? costOverride : undefined
       const skipBefore = int.beforePhaseFlowNodeIds.has(child.id)
       const beforePhase = skipBefore ? { matchedListeners: [] } : int.hooks.before({ ...executionContext, actionId })
-      const beforeActivateNodes = buildActivateCardNodes(int,
-        beforePhase.matchedListeners, 'before', actionId,
+      const beforeBaseEvent = buildListenerEvent(executionContext, {})
+      const beforeActivateNodes = buildPhaseTrailingNodes(
+        int,
+        beforePhase.matchedListeners,
+        'before',
+        actionId,
+        context.state,
+        beforeBaseEvent,
+        (ml: MatchedCardListener) => ({
+          state: context.state,
+          player: context.player,
+          space: context.space,
+          actionId,
+          phase: 'before' as const,
+          ...beforeBaseEvent,
+          ownerPlayerId: ml.ownerPlayerId,
+        }),
       )
       if (beforeActivateNodes.length > 0 && !child.beforePhaseResolved) {
         child.beforePhaseResolved = true
@@ -305,13 +321,40 @@ export function engineResolveChoice(
           ),
         )
         .filter((action) => action)
-      const immediateActivateNodes = buildActivateCardNodes(int,
-        immediatePhase.matchedListeners, 'immediatelyAfter', actionId,
-        buildListenerEvent(executionContext, { result, choice }),
+      const baseEvent = buildListenerEvent(executionContext, { result, choice })
+      const immediateActivateNodes = buildPhaseTrailingNodes(
+        int,
+        immediatePhase.matchedListeners,
+        'immediatelyAfter',
+        actionId,
+        context.state,
+        baseEvent,
+        (ml: MatchedCardListener) => ({
+          state: context.state,
+          player: context.player,
+          space: context.space,
+          actionId,
+          phase: 'immediatelyAfter' as const,
+          ...baseEvent,
+          ownerPlayerId: ml.ownerPlayerId,
+        }),
       )
-      const afterActivateNodes = buildActivateCardNodes(int,
-        afterPhase.matchedListeners, 'after', actionId,
-        buildListenerEvent(executionContext, { result, choice }),
+      const afterActivateNodes = buildPhaseTrailingNodes(
+        int,
+        afterPhase.matchedListeners,
+        'after',
+        actionId,
+        context.state,
+        baseEvent,
+        (ml: MatchedCardListener) => ({
+          state: context.state,
+          player: context.player,
+          space: context.space,
+          actionId,
+          phase: 'after' as const,
+          ...baseEvent,
+          ownerPlayerId: ml.ownerPlayerId,
+        }),
       )
       // 7b1: insert flow body BEFORE trailing hook nodes so wrapper-style
       // actions (renovate-house, occupation, improvement-any) emit their
@@ -447,13 +490,40 @@ export function engineResolveChoice(
       ),
     )
     .filter((action) => action)
-  const immediateActivateNodes = buildActivateCardNodes(int,
-    immediatePhase.matchedListeners, 'immediatelyAfter', actionId,
-    buildListenerEvent(executionContext, { result, choice }),
+  const baseEvent2 = buildListenerEvent(executionContext, { result, choice })
+  const immediateActivateNodes = buildPhaseTrailingNodes(
+    int,
+    immediatePhase.matchedListeners,
+    'immediatelyAfter',
+    actionId,
+    context.state,
+    baseEvent2,
+    (ml: MatchedCardListener) => ({
+      state: context.state,
+      player: context.player,
+      space: context.space,
+      actionId,
+      phase: 'immediatelyAfter' as const,
+      ...baseEvent2,
+      ownerPlayerId: ml.ownerPlayerId,
+    }),
   )
-  const afterActivateNodes = buildActivateCardNodes(int,
-    afterPhase.matchedListeners, 'after', actionId,
-    buildListenerEvent(executionContext, { result, choice }),
+  const afterActivateNodes = buildPhaseTrailingNodes(
+    int,
+    afterPhase.matchedListeners,
+    'after',
+    actionId,
+    context.state,
+    baseEvent2,
+    (ml: MatchedCardListener) => ({
+      state: context.state,
+      player: context.player,
+      space: context.space,
+      actionId,
+      phase: 'after' as const,
+      ...baseEvent2,
+      ownerPlayerId: ml.ownerPlayerId,
+    }),
   )
   // 7b1: insert flow body BEFORE the trailing hook nodes (followUps,
   // immediatelyAfter / after activate) so wrapper actions returning a
