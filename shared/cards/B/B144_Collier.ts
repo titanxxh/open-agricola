@@ -11,8 +11,6 @@ const listener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
-  // Higher order to run after regular place-farmer effects (onPlayerAfterPlaceFarmer)
-  order: 10,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const id = context.space?.id
     if (id === 'clay-pit') {
