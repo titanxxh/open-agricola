@@ -23,7 +23,15 @@ const setup = (withSheepRug: boolean) => {
   setWorkersAtHome(state, player, 2)
   setActiveWorkerCount(player, 2)
   player.rooms = 3
-  player.minorHand = []
+  // Placeholder ids in BOTH players' hands: avoid normalizeState's re-deal
+  // path (fires when any hand is empty) and keep minor-improvement options
+  // empty so the optional minor-improvement node consistently resolves
+  // without surfacing a wait. Placeholder ids resolve to undefined in
+  // `getMinorImprovement` and get filtered out of the buyable list.
+  player.minorHand = ['__test_placeholder__']
+  player.occupationHand = ['__test_placeholder__']
+  state.players[1]!.minorHand = ['__test_placeholder__']
+  state.players[1]!.occupationHand = ['__test_placeholder__']
 
   if (withSheepRug) {
     player.minorPlayed.push('E21_SheepRug')
@@ -64,10 +72,12 @@ describe('E21_SheepRug session', () => {
     expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)
     expect(resp.state.actionSpaces.find((space) => space.id === 'wish-children')?.takenBy.some((t) => t.playerId === resp.state.players[1]!.id)).toBe(true)
 
-    if (resp.interaction.stateId === 'wait') {
+    // With placeholder hands the optional minor-improvement node has no
+    // buyable target and resolves silently, so the engine lands directly
+    // on the confirm-next-player wait.
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'choice') {
       const skipOption = resp.interaction.options?.find((option) => option.value === '__skip__')
       expect(skipOption).toBeDefined()
-
       resp = session.resolveChoice(0, skipOption!.value)
       expect(resp.ok).toBe(true)
     }

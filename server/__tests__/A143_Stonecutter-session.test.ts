@@ -30,6 +30,15 @@ describe('A143_Stonecutter session', () => {
     if (!state.availableMajorImprovements.includes('Major_Basket')) {
       state.availableMajorImprovements.push('Major_Basket')
     }
+    // Placeholder ids in BOTH players' hands: random minors dealt by
+    // `new GameSession()` are non-deterministic across runs, which makes
+    // `improvement-any` option counts flaky. Placeholder ids resolve to
+    // undefined in `getMinorImprovement` and get filtered out of buyable
+    // options, so only Major improvements remain as candidates.
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+    state.players[1]!.minorHand = ['__test_placeholder__']
+    state.players[1]!.occupationHand = ['__test_placeholder__']
     session.loadState(state)
     return session
   }
@@ -37,22 +46,13 @@ describe('A143_Stonecutter session', () => {
   it('reduces Major improvement stone cost by 1', () => {
     const session = setup()
     // Major_Basket base cost: 2 reed + 2 stone. With Stonecutter: 2 reed + 1 stone.
-    let resp = session.takeAction(0, 'major-improvement')
+    // With placeholder hands Major_Basket is the only affordable improvement
+    // (player has reed=2, stone=2, wood=clay=food=0 — no other major fits).
+    // `improvement-any` therefore auto-resolves the single option inside
+    // takeAction, and the payment leaf also auto-resolves because the
+    // typed-flat payment has exactly one solution.
+    const resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId !== 'wait') return
-    const basket = resp.interaction.options?.find((o) => o.value === 'major:Major_Basket')
-    expect(basket).toBeDefined()
-
-    resp = session.resolveChoice(0, basket!.value)
-
-    // Drain any remaining payment choices
-    let steps = 0
-    while (resp.interaction.stateId === 'wait' && steps < 8) {
-      steps++
-      const next = resp.interaction.options?.find((o) => o.value !== 'cancel')
-      if (!next) break
-      resp = session.resolveChoice(0, next.value)
-    }
 
     const after = resp.state.players[0]!
     expect(after.improvements).toContain('Major_Basket')

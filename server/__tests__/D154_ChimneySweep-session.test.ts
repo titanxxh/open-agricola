@@ -37,6 +37,16 @@ const setup = (options: SetupOptions = {}) => {
   const p2 = state.players[1]!
   p2.houseType = options.p2HouseType ?? 'wood'
 
+  // Placeholder hands: random minors dealt by `new GameSession()` are
+  // non-deterministic. Some random cards can hook into renovation flow
+  // (compute-cost / compute-choice-candidates) and shift the choice/auto
+  // path between runs. Placeholder ids resolve to undefined in card
+  // lookups and never participate.
+  for (const p of state.players) {
+    p.minorHand = ['__test_placeholder__']
+    p.occupationHand = ['__test_placeholder__']
+  }
+
   const space = state.actionSpaces.find((s) => s.id === 'house-redevelopment')
   if (space) {
     space.roundAvailable = 1
@@ -96,11 +106,13 @@ describe('D154_ChimneySweep renovation cost hook', () => {
       occupationsP1: [CARD_ID, 'A87_Conservator'],
     })
 
-    // Two options (clay/stone): engine emits a choice. Pick 'stone'.
+    // With placeholder hands the renovation path has a single affordable
+    // candidate (clay tier is not affordable — clay=0; stone tier IS
+    // affordable: D154 gives -2 stone, A87 enables wood→stone direct).
+    // The engine auto-resolves the single option, so takeAction completes
+    // without surfacing a choice.
     let resp = session.takeAction(0, 'house-redevelopment')
-    if (!resp.ok && resp.interaction.stateId === 'wait') {
-      resp = session.resolveChoice(0, 'stone')
-    } else if (resp.ok && resp.interaction.stateId === 'wait') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'choice') {
       resp = session.resolveChoice(0, 'stone')
     }
 

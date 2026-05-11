@@ -224,6 +224,15 @@ describe('D103_CanalBoatman session', () => {
     player.rooms = 4
     player.resources.food = 1
 
+    // Placeholder hands: avoid `new GameSession()` random deal seeping into
+    // optional minor/occupation flows during fishing → wish-children. Random
+    // cards can flip option counts (single auto-resolve vs choice) and break
+    // the test's wait/resolveChoice expectations.
+    for (const p of state.players) {
+      p.minorHand = ['__test_placeholder__']
+      p.occupationHand = ['__test_placeholder__']
+    }
+
     const fishing = state.actionSpaces.find((space) => space.id === 'fishing')
     if (!fishing) throw new Error('fishing space missing')
     fishing.resources.food = 2
@@ -251,9 +260,14 @@ describe('D103_CanalBoatman session', () => {
     expect(getRoundPlacementOrder(resp.state.players[0]!)).toHaveLength(3)
     if (resp.interaction.stateId === 'wait') {
       expect(resp.interaction.promptKey).not.toBe('ui.interactionGodlySpouse')
-      expect(
-        resp.interaction.options?.some((option) => option.labelKey === 'ui.interactionGodlySpouseUse'),
-      ).toBe(false)
+      // `options` may be undefined when the wait carries a non-choice
+      // request (e.g. confirm-next-player after the optional flow auto-skipped).
+      // Treat that case as "no GodlySpouse option" — exactly what the test
+      // wants to prove.
+      const hasGodlySpouseOption = (resp.interaction.options ?? []).some(
+        (option) => option.labelKey === 'ui.interactionGodlySpouseUse',
+      )
+      expect(hasGodlySpouseOption).toBe(false)
     }
   })
 })
