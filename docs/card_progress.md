@@ -47,6 +47,8 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-05-11 — C6 StoneClearing 全对齐 BGA**：扩 `CropStack.kind` union 加 `'stone'`（`shared/contract/types.ts:125`）；C6 `onBuy` 改为在每块空 field push `{kind:'stone', remaining:1}`（不返回 leaf，不立即发石），stone 在下次 reap 主路径被收走、进 `harvestedPositions`、dispatch `reap` listener with `crop:'stone'`，但不增 `grainFields`/`vegetableFields`（`shared/actions/effects/reap.ts`）。`dispatchReapListener` 的 `crop` 参数 union 扩到 `'grain' | 'vegetable' | 'stone'`。`A72_CalciumFertilizers` listener 加 kind allow-list 守卫（`top.kind === 'grain' || top.kind === 'vegetable'`），跳过 stone stack 防过度膨胀。其余 15 张读 `top.kind`/`fieldHasCrop`/selection-filter 的 field-aware 卡（A71/A84/B165/E112/C69/B132/D71/C18/E71/B115/D72 等）自然安全——kind 严格 guard、`top.remaining >= 2` 条件、或 `INITIAL_REMAINING[kind]` 隐式过滤都让 stone 不会被误触发。"considered planted until then" 语义通过 `fieldIsEmpty(f) = f.stacks.length === 0` 自动生效，覆盖 ~16 张 empty-field-counter 卡（A11/A65/A68/B61/C18/C33/C47/C69/C99/C161/D8/D72/E25/E92/sow.ts 等）。前端零改动——`field-crop-${kind}` 是 placeholder class、`res-icon-stone` 已存在、i18n `resources.stone` 已存在。新增 `server/__tests__/C6_StoneClearing-session.test.ts` 8 case（6 unit + 2 集成：C6 × D63 Lynchet adjacency + C6 × A11-style empty-field counter），`shared/actions/effects/__tests__/reap.test.ts` 加 2 case（stone reap + 混合 kind listener fan-out），`server/__tests__/A72_CalciumFertilizers-session.test.ts` 加 1 case（stone field guard）。`pnpm test:fast` 2313 PASS / `pnpm test:slow` 1740 PASS / lint 0 errors。从 §2.5 deferred 基建依赖表移除 C6 行；deferred 队列总数 0——这是 §2.5 "deferred 基建依赖" 表最后一张卡的收口。**§1 总览数字不动**：C6 之前已计入 implemented 834。spec / plan：本地超能力文档，未提交。
+
 - **2026-05-11 — C148 MudWallower reorg-after listener**: 给 C148 加 `actions:['reorganize'] phases:['after']` listener，覆盖玩家 reorg 拖猪出 C148 zone 的场景；`syncHeldDownward` 公式从 `min(held, total_boars)` 升级为 zone-based 精确版（`pigsInC148 = boar − pasture_boars − house_boars − stable_boars`），与 BGA `decreaseRoom` 永久语义对齐。在 3 个既有路径（pay/exchange/place-farmer）上数学等价、行为零回归。所有 4 个 reorg trigger（anytime/returning-home/harvest-breed/round-end）共用同一 listener。从 §2.5 deferred 基建依赖表移除 C148 行。Sprint 7b1 deferred 队列收口。**Side note**: 实施过程发现 `ZoneAssignment.zoneType` 类型 union 不含 `'card'`，但 `applyReorganizeMutate.totals` reduce 不按 zoneType 过滤、所以 production UI 提交 card zone entry 是 silently accepted——latent 类型/契约 gap，待后续 sprint 收口。spec / plan：本地超能力文档，未提交。
 
 - **2026-05-11 — Prereq registry → inline `prerequisiteCheck`**：54 张卡的 `registerPrerequisite('label', handler)` 全部迁到 `CardImpl.prerequisiteCheck` 字段；删除 `shared/cards/helpers/prerequisite-registry.ts`；删除 `prerequisites.ts` 的 `checkCustomPrerequisite` 引用 + whole-string lookup 分支。三张 BGA `prerequisite='see below'` 卡（B52 GrowingFarm / C32 AbortOriel / D37 Sculpture）的 `cards-display` label 切回 BGA 原文（撤销 Sprint 7e B52 workaround + 老代码 C32/D37 描述性命名）；D25 WitchesDanceFloor 保持 `'see below'` + 无 `prerequisiteCheck` → fail-open，与 BGA `implemented=false` 一致。A52 ThrowingAxe / B51 DiggingSpade 同 `'Play in Round 7 or Later'` 静默覆盖地雷自然消除。Declarative parser（'No Occupations' / 'N Fields' / 'Wooden House' 等内置规则）保留不变。**Sprint side fixes**: C32 / D37 / E29 三张卡原为 raw `MinorImprovement` 导出且未注册到 `register-all.ts`，已重写为 `_impl` 模式并 regen manifest（828 entries）。spec / plan：本地超能力文档，未提交。
@@ -559,18 +561,18 @@ E 牌组（10 张）: E1 PoleBarns / E21 SheepRug / E2 RenovationMaterials / E30
 | D101_SugarBaker | "1 food bonus 留在 action space 给下一访客" 简化（food 直接消失）；`bannedWeak` |
 | E112_GrainThief | mid-reap mutation 影响其他 field-aware hooks 中间观测；最终通过 restore 平衡（10+ field-aware listener 中影响极小） |
 
-#### 2026-05-09 deferred 基建依赖（原 4 张 → Sprint 7b1 收口 2 张，剩 2 张）
+#### 2026-05-09 deferred 基建依赖（原 4 张 → Sprint 7b1 收口 2 张 → 2026-05-11 收口 C148 + C6，剩 0 张）
 
 > 原计划 4 张（C6 / C146 / E123 / C148）按 S7 spec §0 单独 brainstorm。Sprint 7b1（~2026-05-09）收口了 2 张：
 >
 > - **E123 ResourceHoarder ✅ Sprint 7b1 收口**——computeCosts emit `Bonus.choices` k=0..N + afterPay pop via `bonusChoiceIndex[CARD_ID]`；construct / renovate / improvement 全路径覆盖；从此表移除。详见 §2.0 "2026-05-09 Sprint 7b1 done"。
 > - **C146 WorkshopAssistant 🔀 Sprint 7b1 onBuy 多选已实现，跨玩家 drain 永久放弃**——`card_C146_WorkshopAssistant_choosePairs` ad-hoc action 提供 N 对 pair 多选 UI；single-shot gain，不放卡上、无对手 renovate drain。视为 §2.5 keep simplification（不再列 deferred 表；未单独入 keep 16 张表以避 §1 / §2.5 数字漂移，§2.0 7b1 changelog 即权威记录）。
 >
-> 剩 1 张仍 deferred，每张缺独立基建：
+> 0 张仍 deferred — 2026-05-11 C148 reorg listener 与 C6 CropStack 'stone' kind 双双落地后，整张表收口完成。下面保留的行均为 closed 历史。
 
 | 卡牌 | 现状（已对齐部分） | Deferred 部分 | 缺的基建 | 回归 BGA 的代价 |
 |---|---|---|---|---|
-| C6 StoneClearing | onBuy 给 `stone = emptyFields`（一次性发石头，等价 BGA 期末 reap 总量） | BGA 在每块空 field 上**堆 1 颗 stone 作物**，作为 stone-kind crop，收获时被 reap 收走 | (a) `CropStack` 数据模型新增 `'stone'` kind（现仅支持 grain/vegetable）；(b) 收获 reap 流程支持 stone kind 结算；(c) 田数据模型扩展 + crop 渲染层 stone 图标 | 田模型 + 收获主路径双重改动；独立 brainstorm |
+| ~~C6 StoneClearing~~ | ✅ Closed 2026-05-11 — CropStack `'stone'` kind + reap 主路径 stone 分支 + A72 guard 已落地。详见 §2.0 "2026-05-11 — C6 StoneClearing 全对齐 BGA"。 | — | — | — |
 | ~~C148 MudWallower~~ | ✅ Closed 2026-05-11 — `actions:['reorganize'] phases:['after']` listener 已落地，reorg-only 路径全覆盖。详见 §2.0 "2026-05-11 — C148 MudWallower reorg-after listener"。 | — | — | — |
 
 ### 2.6 ⏳ 待实现 / 待评估（1 张）
