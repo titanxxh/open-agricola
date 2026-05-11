@@ -71,14 +71,16 @@ export class ParallelTriggerNode extends BaseNode {
     if (this.selectedChildId) {
       return { kind: 'continue' }
     }
-    return {
-      kind: 'request',
-      request: {
-        kind: 'select-trigger',
-        ownerPlayerId: this.ownerPlayerId,
-        options: this.buildSelectOptions(),
-      },
+    const options = this.buildSelectOptions()
+    const request: InteractionRequest = {
+      kind: 'select-trigger',
+      ownerPlayerId: this.ownerPlayerId,
+      options,
     }
+    this.emittedRequest = request
+    this.emittedChoices = options
+    this.emittedPromptKey = 'ui.interactionSelectTrigger' as PromptKey
+    return { kind: 'request', request }
   }
 
   protected cursorData() {
