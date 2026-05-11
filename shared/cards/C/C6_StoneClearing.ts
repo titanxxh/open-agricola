@@ -1,4 +1,3 @@
-import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { C6_StoneClearing } from '../../cards-display/C/C6_StoneClearing'
 
@@ -8,14 +7,12 @@ export const C6_StoneClearing_impl = {
   effect: {
     id: CARD_ID,
     onBuy: (_state, player) => {
-      const emptyFields = player.fields.filter((f) => fieldIsEmpty(f)).length
-      if (emptyFields === 0) return
-      return {
-        type: 'leaf' as const,
-        actionId: 'gain',
-        sourceCard: CARD_ID,
-        params: { stone: emptyFields },
+      for (const f of player.fields) {
+        if (f.stacks.length === 0) {
+          f.stacks.push({ kind: 'stone', remaining: 1 })
+        }
       }
+      // No leaf returned — stone is granted by reap main path next harvest.
     },
   },
   reaches: [] as readonly string[],
