@@ -3,8 +3,11 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { reap } from '../../shared/actions/effects/reap'
 import { fieldIsEmpty } from '../../shared/domain/field'
+import type { ActionFlow } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C6_StoneClearing'
+import '../../shared/cards/D/D63_Lynchet'
+import '../../shared/cards/A/A11_MudPatch'
 
 /**
  * C6 Stone Clearing — full BGA alignment.
@@ -134,5 +137,64 @@ describe('C6_StoneClearing session (BGA-aligned)', () => {
     expect(result.reapSummary.vegetableFields).toBe(0)
     expect(result.reapSummary.resources.stone).toBe(2)
     expect(result.reapSummary.harvestedPositions!.length).toBe(3)
+  })
+})
+
+describe('C6_StoneClearing cross-card integration', () => {
+  it('D63 Lynchet: stone fields adjacent to room tiles count for the food bonus', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    const player = state.players[0]!
+    player.minorPlayed.push('C6_StoneClearing')
+    player.minorPlayed.push('D63_Lynchet')
+
+    player.roomTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }]
+    player.fields = [
+      { row: 1, col: 0, stacks: [] }, // orthogonally adjacent to (0,0)
+      { row: 3, col: 3, stacks: [] }, // not adjacent to any room tile
+    ]
+    session.loadState(state)
+
+    runCardEffectHook(state, player, 'C6_StoneClearing', 'onBuy')
+    expect(player.fields.every((f) => f.stacks[0]?.kind === 'stone')).toBe(true)
+
+    const result = reap(state, player)
+    expect(result.type).toBe('ok')
+
+    state.harvestReapSummary = {
+      ...(state.harvestReapSummary ?? {}),
+      [player.id]: result.reapSummary,
+    }
+
+    const flow = runCardEffectHook(state, player, 'D63_Lynchet', 'onAfterReap')
+    expect(flow).not.toBeNull()
+    const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
+    expect(leaf.type).toBe('leaf')
+    expect(leaf.params?.food).toBe(1) // only (1,0) is adjacent
+  })
+
+  it('A11-style empty-field counters: stone-clearing fields are NOT empty', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    const player = state.players[0]!
+    player.minorPlayed.push('C6_StoneClearing')
+    player.fields = [
+      { row: 1, col: 0, stacks: [] },
+      { row: 1, col: 1, stacks: [] },
+    ]
+    session.loadState(state)
+
+    expect(player.fields.every(fieldIsEmpty)).toBe(true)
+
+    runCardEffectHook(state, player, 'C6_StoneClearing', 'onBuy')
+
+    expect(player.fields.every((f) => !fieldIsEmpty(f))).toBe(true)
+    expect(player.fields.every((f) => f.stacks[0]?.kind === 'stone')).toBe(true)
   })
 })
