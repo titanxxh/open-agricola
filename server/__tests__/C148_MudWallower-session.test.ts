@@ -188,32 +188,11 @@ describe('C148_MudWallower', () => {
     expect(player.cardStates?.[CARD_ID]?.counters?.held).toBe(1)
   })
 
-  it('syncs held down to 0 when player has no pigs', () => {
-    const placeFarmerListener = findListener('C148-mud-wallower-sync-held-after-place-farmer')
-    expect(placeFarmerListener).toBeDefined()
-
-    const player = createPlayer()
-    player.cardStates = {
-      [CARD_ID]: { counters: { counter: 0, held: 1 } },
-    }
-    player.resources.boar = 0
-
-    const state = createState(player)
-
-    executeCardListener(placeFarmerListener!, {
-      state, player,
-      space: createSpace('boar-market'),
-      actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
-
-    expect(player.cardStates?.[CARD_ID]?.counters?.held).toBe(0)
-  })
-
   it('held is permanent - does not increase when pig count grows back', () => {
     // BGA behavior: once cap is reduced, it stays reduced even if pig count
     // returns to the original level (e.g., via breeding).
-    const placeFarmerListener = findListener('C148-mud-wallower-sync-held-after-place-farmer')
-    expect(placeFarmerListener).toBeDefined()
+    const exchangeListener = findListener('C148-mud-wallower-after-exchange')
+    expect(exchangeListener).toBeDefined()
 
     const player = createPlayer()
     player.cardStates = {
@@ -224,10 +203,10 @@ describe('C148_MudWallower', () => {
 
     const state = createState(player)
 
-    executeCardListener(placeFarmerListener!, {
+    executeCardListener(exchangeListener!, {
       state, player,
-      space: createSpace('boar-market'),
-      actionId: 'place-farmer', phase: 'after',
+      space: createSpace('exchange'),
+      actionId: 'exchange', phase: 'after',
     } as unknown as CardListenerContext)
 
     // held remains at 1 (no upward sync)
