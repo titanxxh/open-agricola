@@ -183,6 +183,28 @@ describe('A72_CalciumFertilizers session', () => {
     }
   })
 
+  it('does not bump stone-kind stack remaining when using a quarry', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    // Mixed: one grain field, one stone-clearing field (kind:'stone', remaining:1)
+    player.fields = [
+      { row: 0, col: 3, stacks: [{ kind: 'grain', remaining: 2 }] },
+      { row: 0, col: 4, stacks: [{ kind: 'stone', remaining: 1 }] },
+    ]
+    session.loadState(state)
+
+    const resp = session.takeAction(0, 'eastern-quarry')
+    expect(resp.ok).toBe(true)
+
+    const p = resp.state.players[0]!
+    // Grain field bumped from 2 → 3
+    expect(p.fields[0]!.stacks[0]?.remaining ?? 0).toBe(3)
+    // Stone field stays at 1 (guarded)
+    expect(p.fields[1]!.stacks[0]?.kind).toBe('stone')
+    expect(p.fields[1]!.stacks[0]?.remaining ?? 0).toBe(1)
+  })
+
   it('prerequisite: can buy if player has no fields (prerequisite text check)', () => {
     // The "No Field Tiles" prerequisite is handled by the prerequisite system.
     // We verify the prerequisite string is correctly set on the card definition.
