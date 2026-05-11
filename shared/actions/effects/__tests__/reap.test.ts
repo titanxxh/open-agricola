@@ -77,4 +77,34 @@ describe('reap with stacks', () => {
     expect(res.reapSummary.grainFields).toBe(1)
     expect(res.reapSummary.vegetableFields).toBe(1)
   })
+
+  it('harvests stone-kind top stack into player.resources.stone', () => {
+    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
+    const p = mkPlayer([
+      { stacks: [{ kind: 'stone', remaining: 1 }], row: 2, col: 3 },
+    ])
+    ;(p.resources as any).stone = 0
+    const res = reap(mkState(), p)
+    expect(res.type).toBe('ok')
+    expect((p.resources as any).stone).toBe(1)
+    expect(p.fields![0]!.stacks).toEqual([])
+    expect(res.reapSummary.resources.stone).toBe(1)
+    expect(res.reapSummary.grainFields).toBe(0)
+    expect(res.reapSummary.vegetableFields).toBe(0)
+    expect(res.reapSummary.harvestedPositions).toEqual([{ row: 2, col: 3 }])
+  })
+
+  it('dispatches reap listener once per crop kind including stone', () => {
+    const spy = vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
+    const p = mkPlayer([
+      { stacks: [{ kind: 'grain', remaining: 1 }], row: 0, col: 0 },
+      { stacks: [{ kind: 'stone', remaining: 1 }], row: 0, col: 1 },
+    ])
+    ;(p.resources as any).stone = 0
+    reap(mkState(), p)
+    const crops = spy.mock.calls.map((c) => (c[0] as { extraData?: { crop?: string } }).extraData?.crop)
+    expect(crops).toContain('grain')
+    expect(crops).toContain('stone')
+    expect(crops).not.toContain('vegetable')
+  })
 })
