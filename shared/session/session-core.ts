@@ -1324,6 +1324,7 @@ export class GameCore {
     // the cached options.
     const request: InteractionRequest =
       node?.request ??
+      composite?.request ??
       ({ kind: 'choice', options: composite?.options ?? node?.choices ?? [] } as InteractionRequest)
     const choiceOptions =
       request.kind === 'choice'
