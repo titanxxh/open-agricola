@@ -1,21 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
-import type { ActionFlow } from '../../shared/contract/types'
+import { reap } from '../../shared/actions/effects/reap'
+import { fieldIsEmpty } from '../../shared/domain/field'
 
 import '../../shared/cards/C/C6_StoneClearing'
 
 /**
- * C6 Stone Clearing (verify-only, Sprint 7a F1+F7).
+ * C6 Stone Clearing — full BGA alignment.
  *
- * BGA `C6_StoneClearing::onBuy` places 1 STONE on each empty field, harvested
- * during the next field-phase reap. Our model can't push a `kind: 'stone'`
- * onto `CropStack` without a main-path schema change (see implementation
- * comment), so we **deliberately diverge** by granting the stone immediately
- * to the player's supply at buy time. This test pins the divergence in place.
+ * BGA `C6_StoneClearing::onBuy` places 1 STONE meeple on each empty field;
+ * those fields are considered planted until the next field-phase reap, where
+ * the standard reap path moves the stone to the player's reserve.
+ *
+ * Implementation: onBuy directly pushes `{kind:'stone', remaining:1}` to each
+ * empty `player.fields` entry. No leaf is returned — stone is granted by the
+ * reap main path next harvest.
  */
-describe('C6_StoneClearing session (verify-only)', () => {
-  const setup = (emptyFieldCount: number) => {
+describe('C6_StoneClearing session (BGA-aligned)', () => {
+  const setupWithFields = (fields: Array<{ row: number; col: number; stacks: Array<{ kind: 'grain' | 'vegetable' | 'stone'; remaining: number }> }>) => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -23,52 +26,113 @@ describe('C6_StoneClearing session (verify-only)', () => {
     state.round = 1
     const player = state.players[0]!
     player.minorPlayed.push('C6_StoneClearing')
-    // Reset fields then add `emptyFieldCount` empty fields.
-    player.fields = []
-    for (let i = 0; i < emptyFieldCount; i++) {
-      player.fields.push({ stacks: [], row: 1, col: i })
-    }
+    player.fields = fields
     session.loadState(state)
     return session
   }
 
-  it('grants 1 stone per empty field as the deliberate-divergence onBuy', () => {
-    const session = setup(3)
+  it('onBuy returns no leaf and does not grant stone immediately', () => {
+    const session = setupWithFields([
+      { row: 1, col: 0, stacks: [] },
+      { row: 1, col: 1, stacks: [] },
+      { row: 1, col: 2, stacks: [] },
+    ])
+    const state = session.getState().state
+    const player = state.players[0]!
+    const beforeStone = player.resources.stone ?? 0
+
+    const flow = runCardEffectHook(state, player, 'C6_StoneClearing', 'onBuy')
+    // `runCardEffectHook` coerces `undefined` return to `null` (card-effects.ts:253).
+    expect(flow).toBeNull()
+
+    // Stone NOT granted immediately — it lands at next reap.
+    expect(player.resources.stone ?? 0).toBe(beforeStone)
+  })
+
+  it('onBuy pushes stone stack onto every empty field', () => {
+    const session = setupWithFields([
+      { row: 1, col: 0, stacks: [] },
+      { row: 1, col: 1, stacks: [] },
+      { row: 1, col: 2, stacks: [] },
+    ])
     const state = session.getState().state
     const player = state.players[0]!
 
-    const flow = runCardEffectHook(state, player, 'C6_StoneClearing', 'onBuy')
-    expect(flow).not.toBeNull()
-    const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
-    expect(leaf.type).toBe('leaf')
-    expect(leaf.actionId).toBe('gain')
-    expect(leaf.params).toEqual({ stone: 3 })
-    expect(leaf.sourceCard).toBe('C6_StoneClearing')
+    runCardEffectHook(state, player, 'C6_StoneClearing', 'onBuy')
+
+    for (const f of player.fields) {
+      expect(f.stacks).toEqual([{ kind: 'stone', remaining: 1 }])
+      expect(fieldIsEmpty(f)).toBe(false)
+    }
   })
 
-  it('returns null when player has no empty fields', () => {
-    const session = setup(0)
+  it('onBuy skips empty fields when player has none', () => {
+    const session = setupWithFields([])
     const state = session.getState().state
     const player = state.players[0]!
 
     const flow = runCardEffectHook(state, player, 'C6_StoneClearing', 'onBuy')
     expect(flow).toBeNull()
+    expect(player.fields).toEqual([])
   })
 
-  it('counts empty fields only — fields with crop stacks are ignored', () => {
-    const session = setup(0)
+  it('onBuy does not stone-fill fields that already have crops', () => {
+    const session = setupWithFields([
+      { row: 1, col: 0, stacks: [] },
+      { row: 1, col: 1, stacks: [{ kind: 'grain', remaining: 2 }] },
+      { row: 1, col: 2, stacks: [] },
+    ])
     const state = session.getState().state
     const player = state.players[0]!
-    player.fields = [
-      { stacks: [], row: 1, col: 0 },
-      { stacks: [{ kind: 'grain', remaining: 2 }], row: 1, col: 1 },
-      { stacks: [], row: 1, col: 2 },
-    ]
-    session.loadState(state)
 
-    const flow = runCardEffectHook(state, player, 'C6_StoneClearing', 'onBuy')
-    expect(flow).not.toBeNull()
-    const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
-    expect(leaf.params).toEqual({ stone: 2 })
+    runCardEffectHook(state, player, 'C6_StoneClearing', 'onBuy')
+
+    expect(player.fields[0]!.stacks).toEqual([{ kind: 'stone', remaining: 1 }])
+    expect(player.fields[1]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
+    expect(player.fields[2]!.stacks).toEqual([{ kind: 'stone', remaining: 1 }])
+  })
+
+  it('reap after C6 onBuy grants 1 stone per stone-bearing field and clears them', () => {
+    const session = setupWithFields([
+      { row: 1, col: 0, stacks: [] },
+      { row: 1, col: 1, stacks: [] },
+    ])
+    const state = session.getState().state
+    const player = state.players[0]!
+    const beforeStone = player.resources.stone ?? 0
+
+    runCardEffectHook(state, player, 'C6_StoneClearing', 'onBuy')
+    expect(player.fields.every((f) => f.stacks[0]?.kind === 'stone')).toBe(true)
+
+    const result = reap(state, player)
+    expect(result.type).toBe('ok')
+    expect((player.resources.stone ?? 0) - beforeStone).toBe(2)
+    expect(player.fields.every(fieldIsEmpty)).toBe(true)
+    expect(result.reapSummary.harvestedPositions!.length).toBe(2)
+    expect(result.reapSummary.grainFields).toBe(0)
+    expect(result.reapSummary.vegetableFields).toBe(0)
+    expect(result.reapSummary.resources.stone).toBe(2)
+  })
+
+  it('mixed grain + stone fields reap into both resources, grainFields counts only grain', () => {
+    const session = setupWithFields([
+      { row: 1, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] },
+      { row: 1, col: 1, stacks: [] },
+      { row: 1, col: 2, stacks: [] },
+    ])
+    const state = session.getState().state
+    const player = state.players[0]!
+    const beforeGrain = player.resources.grain ?? 0
+    const beforeStone = player.resources.stone ?? 0
+
+    runCardEffectHook(state, player, 'C6_StoneClearing', 'onBuy')
+    const result = reap(state, player)
+
+    expect((player.resources.grain ?? 0) - beforeGrain).toBe(1)
+    expect((player.resources.stone ?? 0) - beforeStone).toBe(2)
+    expect(result.reapSummary.grainFields).toBe(1)
+    expect(result.reapSummary.vegetableFields).toBe(0)
+    expect(result.reapSummary.resources.stone).toBe(2)
+    expect(result.reapSummary.harvestedPositions!.length).toBe(3)
   })
 })
