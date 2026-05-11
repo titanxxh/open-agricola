@@ -1,18 +1,16 @@
 import { recallWorkerById } from '../helpers/recall-worker'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { E3_TeaTime } from '../../cards-display/E/E3_TeaTime'
 
 const CARD_ID = E3_TeaTime.id
 
-registerPrerequisite('Own Person on Grain Utilization', (player, state) => {
-  if (!state) return true
-  const space = state.actionSpaces.find((s) => s.id === 'grain-utilization')
-  if (!space) return false
-  return space.takenBy.some((t) => t.playerId === player.id)
-})
-
 export const E3_TeaTime_impl = {
+  prerequisiteCheck: (player, state) => {
+    if (!state) return true
+    const space = state.actionSpaces.find((s) => s.id === 'grain-utilization')
+    if (!space) return false
+    return space.takenBy.some((t) => t.playerId === player.id)
+  },
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {

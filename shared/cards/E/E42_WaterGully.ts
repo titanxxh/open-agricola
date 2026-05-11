@@ -1,13 +1,11 @@
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { E42_WaterGully } from '../../cards-display/E/E42_WaterGully'
 
 const CARD_ID = E42_WaterGully.id
 
-registerPrerequisite('Major Well', (player) => player.improvements.includes('Major_Well'))
-
 export const E42_WaterGully_impl = {
+  prerequisiteCheck: (player) => player.improvements.includes('Major_Well'),
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {

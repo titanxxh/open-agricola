@@ -1,20 +1,18 @@
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E41_MuddyWaters } from '../../cards-display/E/E41_MuddyWaters'
 
 const CARD_ID = E41_MuddyWaters.id
 
-registerPrerequisite('5 Cards in Play', (player) => {
-  const total =
-    player.occupationPlayed.length
-    + player.minorPlayed.length
-    + player.improvements.length
-  return total >= 5
-})
-
 export const E41_MuddyWaters_impl = {
+  prerequisiteCheck: (player) => {
+    const total =
+      player.occupationPlayed.length
+      + player.minorPlayed.length
+      + player.improvements.length
+    return total >= 5
+  },
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {

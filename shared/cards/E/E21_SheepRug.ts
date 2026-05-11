@@ -3,7 +3,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, PlayerState } from '../../contract/types'
 import { isSpaceOccupied } from '../../domain/space'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { E21_SheepRug } from '../../cards-display/E/E21_SheepRug'
 
@@ -20,8 +19,6 @@ const countSheepOnBoard = (player: PlayerState): number => {
   }
   return total
 }
-
-registerPrerequisite('4 Sheep', (player) => countSheepOnBoard(player) >= 4)
 
 const WISH_SPACE_IDS = ['wish-children', 'urgent-wish-children']
 
@@ -48,6 +45,7 @@ const computeArgsListener: CardListenerRegistration = {
 }
 
 export const E21_SheepRug_impl = {
+  prerequisiteCheck: (player) => countSheepOnBoard(player) >= 4,
   listeners: [computeArgsListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
