@@ -122,7 +122,7 @@ export type PaymentSolution = {
 export type PaymentSource = 'reserve' | 'field' | 'card'
 
 export type CropStack = {
-  kind: 'grain' | 'vegetable'
+  kind: 'grain' | 'vegetable' | 'stone'
   remaining: number
 }
 

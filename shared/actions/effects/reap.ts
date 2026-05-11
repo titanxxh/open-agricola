@@ -10,7 +10,7 @@ import { runCardListeners } from '../../cards/card-listeners'
 export const dispatchReapListener = (
   state: GameState,
   player: PlayerState,
-  crop: 'grain' | 'vegetable',
+  crop: 'grain' | 'vegetable' | 'stone',
   amount: number,
 ): void => {
   if (amount <= 0) return
