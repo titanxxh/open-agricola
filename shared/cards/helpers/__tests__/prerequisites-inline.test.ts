@@ -3,6 +3,17 @@ import { CardRegistry } from '../../registry'
 import { setActiveCardRegistry, getActiveCardRegistry } from '../../active-registry'
 import { meetsCardPrerequisites } from '../prerequisites'
 import type { PlayerState, GameState } from '../../../contract/types'
+import { B52_GrowingFarm } from '../../../cards-display/B/B52_GrowingFarm'
+import { C32_AbortOriel } from '../../../cards-display/C/C32_AbortOriel'
+import { D37_Sculpture } from '../../../cards-display/D/D37_Sculpture'
+import { D25_WitchesDanceFloor } from '../../../cards-display/D/D25_WitchesDanceFloor'
+import { B52_GrowingFarm_impl } from '../../B/B52_GrowingFarm'
+import { C32_AbortOriel_impl } from '../../C/C32_AbortOriel'
+import { D37_Sculpture_impl } from '../../D/D37_Sculpture'
+import { A52_ThrowingAxe } from '../../../cards-display/A/A52_ThrowingAxe'
+import { B51_DiggingSpade } from '../../../cards-display/B/B51_DiggingSpade'
+import { A52_ThrowingAxe_impl } from '../../A/A52_ThrowingAxe'
+import { B51_DiggingSpade_impl } from '../../B/B51_DiggingSpade'
 
 const buildPlayer = (overrides: Partial<PlayerState> = {}): PlayerState =>
   ({
@@ -57,5 +68,65 @@ describe('meetsCardPrerequisites inline routing', () => {
     setActiveCardRegistry(null)
     const card = { id: 'X1_Test', prerequisite: 'No Occupations' }
     expect(meetsCardPrerequisites(buildPlayer(), card, 1, buildState(1))).toBe(true)
+  })
+})
+
+describe("prereq 'see below' coexistence", () => {
+  let prevRegistry: CardRegistry | null
+
+  beforeEach(() => {
+    prevRegistry = getActiveCardRegistry()
+    const reg = new CardRegistry()
+    reg.loadImpl(B52_GrowingFarm.id, B52_GrowingFarm_impl)
+    reg.loadImpl(C32_AbortOriel.id, C32_AbortOriel_impl)
+    reg.loadImpl(D37_Sculpture.id, D37_Sculpture_impl)
+    setActiveCardRegistry(reg)
+  })
+
+  afterEach(() => {
+    setActiveCardRegistry(prevRegistry)
+  })
+
+  it('all four share prerequisite="see below" without collision', () => {
+    expect(B52_GrowingFarm.prerequisite).toBe('see below')
+    expect(C32_AbortOriel.prerequisite).toBe('see below')
+    expect(D37_Sculpture.prerequisite).toBe('see below')
+    expect(D25_WitchesDanceFloor.prerequisite).toBe('see below')
+  })
+
+  it('D25 (no inline check) falls back to declarative parser → fail-open', () => {
+    // 'see below' has no built-in regex match → returns true (fail-open).
+    expect(meetsCardPrerequisites(buildPlayer(), D25_WitchesDanceFloor, 1, buildState(1))).toBe(true)
+  })
+
+  it('B52 inline check rejects when coveredZones < round-1', () => {
+    const player = buildPlayer({ pastures: [] })
+    expect(meetsCardPrerequisites(player, B52_GrowingFarm, 5, buildState(5))).toBe(false)
+  })
+})
+
+describe("A52 / B51 'Play in Round 7 or Later' independence", () => {
+  let prevRegistry: CardRegistry | null
+
+  beforeEach(() => {
+    prevRegistry = getActiveCardRegistry()
+    const reg = new CardRegistry()
+    reg.loadImpl(A52_ThrowingAxe.id, A52_ThrowingAxe_impl)
+    reg.loadImpl(B51_DiggingSpade.id, B51_DiggingSpade_impl)
+    setActiveCardRegistry(reg)
+  })
+
+  afterEach(() => {
+    setActiveCardRegistry(prevRegistry)
+  })
+
+  it('both reject at round 6', () => {
+    expect(meetsCardPrerequisites(buildPlayer(), A52_ThrowingAxe, 6, buildState(6))).toBe(false)
+    expect(meetsCardPrerequisites(buildPlayer(), B51_DiggingSpade, 6, buildState(6))).toBe(false)
+  })
+
+  it('both accept at round 7', () => {
+    expect(meetsCardPrerequisites(buildPlayer(), A52_ThrowingAxe, 7, buildState(7))).toBe(true)
+    expect(meetsCardPrerequisites(buildPlayer(), B51_DiggingSpade, 7, buildState(7))).toBe(true)
   })
 })
