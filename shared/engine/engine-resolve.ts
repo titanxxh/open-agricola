@@ -14,6 +14,7 @@ import {
   OrNode,
   XorNode,
 } from './nodes'
+import { ParallelTriggerNode } from './nodes/parallel-trigger-node'
 import { buildReplaceChoiceFlow } from './nodes/interaction-helpers'
 import type { EngineInternals } from './engine-internals'
 import {
@@ -102,6 +103,20 @@ export function engineResolveChoice(
 ): ActionExecutionResult {
   if (int.pendingNodeIdRef.value) {
     const node = int.tree.findNodeById(int.pendingNodeIdRef.value)
+    if (node instanceof ParallelTriggerNode) {
+      if (choice === '__pass__') {
+        node.passAll()
+        int.pendingNodeIdRef.value = null
+        return { type: 'ok' }
+      }
+      const child = node.chooseCard(choice)
+      if (!child) {
+        int.pendingNodeIdRef.value = null
+        return { type: 'fail', logKey: 'log.buildRoomFail' }
+      }
+      int.pendingNodeIdRef.value = null
+      return { type: 'ok' }
+    }
     if (node instanceof OptionalNode) {
       if (choice === '__skip__') {
         node.resolve()

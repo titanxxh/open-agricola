@@ -1,5 +1,6 @@
 import type { EngineNode } from './types'
 import { OptionalNode, OrNode, ParallelNode, SequenceNode, XorNode } from './nodes'
+import { ParallelTriggerNode } from './nodes/parallel-trigger-node'
 
 const isCompositeNode = (node: EngineNode) =>
   node instanceof SequenceNode ||
@@ -30,6 +31,13 @@ export class EngineTree {
   findNodeById(id: string) {
     const visit = (node: EngineNode): EngineNode | null => {
       if (node.id === id) return node
+      if (node instanceof ParallelTriggerNode) {
+        for (const child of node.children) {
+          const found = visit(child)
+          if (found) return found
+        }
+        return null
+      }
       if (isCompositeNode(node)) {
         if (node instanceof OptionalNode) {
           const found = visit(node.child)
@@ -56,6 +64,10 @@ export class EngineTree {
     const nodes: EngineNode[] = []
     const visit = (node: EngineNode) => {
       nodes.push(node)
+      if (node instanceof ParallelTriggerNode) {
+        node.children.forEach((child) => visit(child))
+        return
+      }
       if (isCompositeNode(node)) {
         if (node instanceof OptionalNode) {
           visit(node.child)
@@ -69,7 +81,7 @@ export class EngineTree {
     return nodes
   }
 
-  insertBefore(nodeId: string, nodes: EngineNode[]) {
+  insertBefore(nodeId: string, nodes: EngineNode[]): boolean {
     if (nodes.length === 0) return false
     if (this.root.id === nodeId) {
       this.root = new SequenceNode(`pre-${nodeId}`, [...nodes, this.root])
@@ -81,6 +93,9 @@ export class EngineTree {
     if (parent instanceof SequenceNode || parent instanceof ParallelNode) {
       parent.children.splice(index, 0, ...nodes)
       return true
+    }
+    if (parent instanceof ParallelTriggerNode) {
+      return this.insertBefore(parent.id, nodes)
     }
     const replacement = new SequenceNode(`pre-${nodeId}`, [...nodes, found.node])
     if (parent instanceof OptionalNode) {
@@ -94,7 +109,7 @@ export class EngineTree {
     return false
   }
 
-  insertAfter(nodeId: string, nodes: EngineNode[]) {
+  insertAfter(nodeId: string, nodes: EngineNode[]): boolean {
     if (nodes.length === 0) return false
     if (this.root.id === nodeId) {
       this.root = new SequenceNode(`chain-${nodeId}`, [this.root, ...nodes])
@@ -106,6 +121,9 @@ export class EngineTree {
     if (parent instanceof SequenceNode || parent instanceof ParallelNode) {
       parent.children.splice(index + 1, 0, ...nodes)
       return true
+    }
+    if (parent instanceof ParallelTriggerNode) {
+      return this.insertAfter(parent.id, nodes)
     }
     const replacement = new SequenceNode(`chain-${node.id}`, [node, ...nodes])
     if (parent instanceof OptionalNode) {
@@ -123,6 +141,17 @@ export class EngineTree {
     targetId: string,
     node: EngineNode,
   ): { node: EngineNode; parent: EngineNode; index: number } | null {
+    if (node instanceof ParallelTriggerNode) {
+      for (let index = 0; index < node.children.length; index += 1) {
+        const child = node.children[index]
+        if (child.id === targetId) {
+          return { node: child, parent: node, index }
+        }
+        const found = this.findNodeWithParent(targetId, child)
+        if (found) return found
+      }
+      return null
+    }
     if (isCompositeNode(node)) {
       if (node instanceof OptionalNode) {
         const child = node.child
@@ -149,6 +178,21 @@ export class EngineTree {
   nextUnresolved() {
     const visit = (node: EngineNode): EngineNode | null => {
       if (node.getState() === 'blocked') {
+        return null
+      }
+      if (node instanceof ParallelTriggerNode) {
+        if (node.getState() === 'resolved') return null
+        if (node.selectedChildId) {
+          const sel = node.children.find((c) => c.id === node.selectedChildId)
+          if (sel && sel.getState() !== 'resolved') {
+            const next = visit(sel)
+            if (next) return next
+          }
+        }
+        if (node.children.some((c) => c.getState() !== 'resolved')) {
+          return node
+        }
+        if (node.getState() !== 'resolved') node.resolve()
         return null
       }
       if (node instanceof OrNode || node instanceof XorNode) {
