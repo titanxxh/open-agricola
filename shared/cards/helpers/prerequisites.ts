@@ -3,7 +3,6 @@ import type { CardDefinition } from '../../contract/cards'
 import { getRegisteredMinorImprovement } from '../../cards-display/types'
 import { getMajorCard } from '../major'
 import { collectCardsAs } from './card-type'
-import { checkCustomPrerequisite } from './prerequisite-registry'
 import { fieldHasCrop } from '../../domain/field'
 import { getActiveCardRegistry } from '../active-registry'
 
@@ -60,12 +59,9 @@ const meetsNumericPrerequisite = (
   return true
 }
 
-const meetsTextClause = (player: PlayerState, clause: string, state?: GameState) => {
+const meetsTextClause = (player: PlayerState, clause: string) => {
   const trimmed = clause.trim()
   if (!trimmed) return true
-
-  const custom = checkCustomPrerequisite(trimmed, player, state)
-  if (custom !== null) return custom
 
   const fieldsMatch = trimmed.match(/^(\d+)\s+Fields?$/i)
   if (fieldsMatch) {
@@ -126,18 +122,13 @@ const meetsTextClause = (player: PlayerState, clause: string, state?: GameState)
 const meetsTextPrerequisite = (
   player: PlayerState,
   prerequisite?: string,
-  state?: GameState,
 ) => {
   if (!prerequisite) return true
   const trimmed = prerequisite.trim()
   if (!trimmed) return true
-  // Try whole-string custom handler first (supports prereqs containing " and ").
-  const customWhole = checkCustomPrerequisite(trimmed, player, state)
-  if (customWhole !== null) return customWhole
-  // Fall back: split on "and" and check each clause individually.
   return trimmed
     .split(/\s+and\s+/i)
-    .every((clause) => meetsTextClause(player, clause, state))
+    .every((clause) => meetsTextClause(player, clause))
 }
 
 export const meetsCardPrerequisites = (
@@ -159,5 +150,5 @@ export const meetsCardPrerequisites = (
   const registry = getActiveCardRegistry()
   const inline = registry?.getPrerequisiteCheck(card.id)
   if (inline) return inline(player, state)
-  return meetsTextPrerequisite(player, card.prerequisite, state)
+  return meetsTextPrerequisite(player, card.prerequisite)
 }
