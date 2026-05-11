@@ -1,13 +1,11 @@
 import { getFenceCount } from '../../actions/effects/fencing'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { C54_MarketBooth } from '../../cards-display/C/C54_MarketBooth'
 
 const CARD_ID = C54_MarketBooth.id
 
-registerPrerequisite('1 Stable in Reserve', (player) => player.stableTiles.length < 4)
-
 export const C54_MarketBooth_impl = {
+  prerequisiteCheck: (player) => player.stableTiles.length < 4,
   effect: {
     id: CARD_ID,
     onEndHarvestFieldPhase: (_state, player) => {

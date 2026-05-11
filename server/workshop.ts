@@ -39,8 +39,6 @@ type WorkshopCard = {
   name: string
   description: string
   card_json: string
-  effect_code?: string | null
-  compiled_code?: string | null
   code_manifest?: string | null
   art_url: string | null
   status: string
@@ -48,6 +46,42 @@ type WorkshopCard = {
   liked_by_me?: boolean
   created_at: number
   updated_at: number
+}
+
+/**
+ * v7 schema: TS source + compiled JS live inside `card_json` under
+ * the workshop-private fields `_code` / `_compiled` (same style as
+ * `_draft`). The legacy top-level `effect_code` / `compiled_code` SQL
+ * columns were dropped by migration v7 and are reconstructed from these
+ * fields when serialising API responses.
+ */
+const extractCodeFromCardJson = (cardJsonRaw: string): {
+  parsed: Record<string, unknown>
+  code: string | null
+  compiled: string | null
+} => {
+  const parsed = JSON.parse(cardJsonRaw) as Record<string, unknown>
+  const code = typeof parsed._code === 'string' ? parsed._code : null
+  const compiled = typeof parsed._compiled === 'string' ? parsed._compiled : null
+  return { parsed, code, compiled }
+}
+
+const stripCardJsonCode = (cardJson: Record<string, unknown>): Record<string, unknown> => {
+  const { _code: _c, _compiled: _cc, ...rest } = cardJson
+  void _c; void _cc
+  return rest
+}
+
+/** Serialise a DB row for the API: parse card_json, surface effect_code / compiled_code. */
+const serialiseCardForApi = (row: WorkshopCard, extras: Record<string, unknown> = {}): Record<string, unknown> => {
+  const { parsed, code, compiled } = extractCodeFromCardJson(row.card_json)
+  return {
+    ...row,
+    card_json: stripCardJsonCode(parsed),
+    effect_code: code,
+    compiled_code: compiled,
+    ...extras,
+  }
 }
 
 type SandboxSettings = {
@@ -235,11 +269,7 @@ export async function handleWorkshopRoute(
       likedIds = new Set(liked.map(r => r.card_id))
     }
 
-    const cards = rows.map(r => ({
-      ...r,
-      card_json: JSON.parse(r.card_json as string),
-      liked_by_me: likedIds.has(r.id),
-    }))
+    const cards = rows.map(r => serialiseCardForApi(r, { liked_by_me: likedIds.has(r.id) }))
 
     const total = (db.prepare(`SELECT COUNT(*) AS n FROM workshop_cards w WHERE 1 = 1${whereExtra}`)
       .get(...params) as { n: number }).n
@@ -273,11 +303,7 @@ export async function handleWorkshopRoute(
 
     sendJson(res, 200, {
       ok: true,
-      card: {
-        ...row,
-        card_json: JSON.parse(row.card_json as string),
-        liked_by_me: likedByMe,
-      },
+      card: serialiseCardForApi(row, { liked_by_me: likedByMe }),
     })
     return true
   }
@@ -332,7 +358,9 @@ export async function handleWorkshopRoute(
       return true
     }
 
-    // Validate + compile effect_code if provided
+    // Validate + compile effect_code if provided. TS source + compiled JS are
+    // folded into card_json (`_code` / `_compiled`). Manifest stays in its own
+    // SQL column so room loaders can SELECT it without parsing card_json.
     let effectCode: string | null = null
     let compiledCode: string | null = null
     let codeManifest: string | null = null
@@ -352,6 +380,13 @@ export async function handleWorkshopRoute(
       compiledCode = validation.compiledCode
       codeManifest = JSON.stringify(validation.manifest)
     }
+
+    // Build the v7 card_json blob: client-supplied def + folded code fields.
+    const cardJsonForDb = JSON.stringify({
+      ...stripCardJsonCode(body.card_json as Record<string, unknown>),
+      ...(effectCode !== null ? { _code: effectCode } : {}),
+      ...(compiledCode !== null ? { _compiled: compiledCode } : {}),
+    })
 
     const newStatus = body.status === 'published' ? 'published' : 'draft'
     const now = Date.now()
@@ -389,24 +424,24 @@ export async function handleWorkshopRoute(
         'SELECT COALESCE(MAX(version_number), 0) AS n FROM workshop_card_versions WHERE card_id = ?',
       ).get(body.id) as { n: number })?.n ?? 0) + 1
       db.prepare(`
-        INSERT INTO workshop_card_versions (id, card_id, card_json, effect_code, compiled_code, code_manifest, art_url, version_number, created_by, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO workshop_card_versions (id, card_id, card_json, code_manifest, art_url, version_number, created_by, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         nanoid(), body.id, existing.card_json,
-        existing.effect_code ?? null, existing.compiled_code ?? null, existing.code_manifest ?? null,
+        existing.code_manifest ?? null,
         existing.art_url ?? null, versionNum, user.id, now,
       )
 
       db.prepare(`
         UPDATE workshop_cards SET
           card_id = ?, card_type = ?, name = ?, description = ?,
-          card_json = ?, effect_code = ?, compiled_code = ?, code_manifest = ?,
+          card_json = ?, code_manifest = ?,
           art_url = ?, status = ?, updated_at = ?
         WHERE id = ?
       `).run(
         body.card_id, body.card_type, body.name, body.description ?? '',
-        JSON.stringify(body.card_json),
-        effectCode, compiledCode, codeManifest,
+        cardJsonForDb,
+        codeManifest,
         body.art_url ?? null, newStatus, now, body.id,
       )
 
@@ -416,12 +451,12 @@ export async function handleWorkshopRoute(
       const id = nanoid()
       db.prepare(`
         INSERT INTO workshop_cards
-          (id, author_id, card_id, card_type, name, description, card_json, effect_code, compiled_code, code_manifest, art_url, status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (id, author_id, card_id, card_type, name, description, card_json, code_manifest, art_url, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         id, user.id, body.card_id, body.card_type, body.name, body.description ?? '',
-        JSON.stringify(body.card_json),
-        effectCode, compiledCode, codeManifest,
+        cardJsonForDb,
+        codeManifest,
         body.art_url ?? null, newStatus, now, now,
       )
 
@@ -507,10 +542,7 @@ export async function handleWorkshopRoute(
       WHERE s.user_id = ?
       ORDER BY s.added_at DESC
     `).all(user.id) as WorkshopCard[]
-    const cards = rows.map(r => ({
-      ...r,
-      card_json: JSON.parse(r.card_json as string),
-    }))
+    const cards = rows.map(r => serialiseCardForApi(r))
     sendJson(res, 200, { ok: true, cards, settings: getSandboxSettings(user.id) })
     return true
   }
@@ -610,28 +642,24 @@ export async function handleWorkshopRoute(
     const version = db.prepare('SELECT * FROM workshop_card_versions WHERE id = ? AND card_id = ?')
       .get(body.version_id, cardDbId) as {
         card_json: string
-        effect_code: string | null
-        compiled_code: string | null
         code_manifest: string | null
         art_url: string | null
       } | undefined
     if (!version) { sendJson(res, 404, { ok: false, error: 'Version not found' }); return true }
 
     // Save current state as a version before reverting
-    const current = db.prepare('SELECT card_json, effect_code, compiled_code, code_manifest, art_url FROM workshop_cards WHERE id = ?').get(cardDbId) as WorkshopCard
+    const current = db.prepare('SELECT card_json, code_manifest, art_url FROM workshop_cards WHERE id = ?').get(cardDbId) as WorkshopCard
     const versionNum = ((db.prepare(
       'SELECT COALESCE(MAX(version_number), 0) AS n FROM workshop_card_versions WHERE card_id = ?',
     ).get(cardDbId) as { n: number })?.n ?? 0) + 1
     const now = Date.now()
     db.prepare(`
-      INSERT INTO workshop_card_versions (id, card_id, card_json, effect_code, compiled_code, code_manifest, art_url, version_number, created_by, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO workshop_card_versions (id, card_id, card_json, code_manifest, art_url, version_number, created_by, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       nanoid(),
       cardDbId,
       current.card_json,
-      current.effect_code ?? null,
-      current.compiled_code ?? null,
       current.code_manifest ?? null,
       current.art_url ?? null,
       versionNum,
@@ -643,12 +671,10 @@ export async function handleWorkshopRoute(
     const restored = JSON.parse(version.card_json)
     db.prepare(`
       UPDATE workshop_cards SET
-        card_json = ?, effect_code = ?, compiled_code = ?, code_manifest = ?, art_url = ?, name = ?, updated_at = ?
+        card_json = ?, code_manifest = ?, art_url = ?, name = ?, updated_at = ?
       WHERE id = ?
     `).run(
       version.card_json,
-      version.effect_code,
-      version.compiled_code,
       version.code_manifest,
       version.art_url,
       restored.name ?? '',

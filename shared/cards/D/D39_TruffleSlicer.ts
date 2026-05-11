@@ -1,16 +1,10 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { D39_TruffleSlicer } from '../../cards-display/D/D39_TruffleSlicer'
 
 const CARD_ID = D39_TruffleSlicer.id
-
-registerPrerequisite('Play in Round 8 or Later', (_player, state) => {
-  if (!state) return true
-  return state.round >= 8
-})
 
 /**
  * D39 Truffle Slicer (Minor Improvement):
@@ -46,6 +40,10 @@ const listener: CardListenerRegistration = {
 }
 
 export const D39_TruffleSlicer_impl = {
+  prerequisiteCheck: (_player, state) => {
+    if (!state) return true
+    return state.round >= 8
+  },
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl

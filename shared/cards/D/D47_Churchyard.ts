@@ -1,19 +1,17 @@
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { D47_Churchyard } from '../../cards-display/D/D47_Churchyard'
 
 const CARD_ID = D47_Churchyard.id
 
-registerPrerequisite('10 Cards* in Front of You', (player) => {
-  const total =
-    player.occupationPlayed.length
-    + player.minorPlayed.length
-    + player.improvements.length
-  return total >= 10
-})
-
 export const D47_Churchyard_impl = {
+  prerequisiteCheck: (player) => {
+    const total =
+      player.occupationPlayed.length
+      + player.minorPlayed.length
+      + player.improvements.length
+    return total >= 10
+  },
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {

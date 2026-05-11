@@ -1,13 +1,7 @@
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { A36_FacadesCarving } from '../../cards-display/A/A36_FacadesCarving'
 
 const CARD_ID = A36_FacadesCarving.id
-
-registerPrerequisite('Wood in Your Supply >= Current Round', (player, state) => {
-  if (!state) return true
-  return (player.resources.wood ?? 0) >= state.round
-})
 
 const HARVEST_MAP: Record<number, number> = {
   1: 0, 2: 0, 3: 0, 4: 0,
@@ -52,5 +46,9 @@ export const A36_FacadesCarving_impl = {
     }
   },
 },
+  prerequisiteCheck: (player, state) => {
+    if (!state) return true
+    return (player.resources.wood ?? 0) >= state.round
+  },
   reaches: [] as readonly string[],
 } satisfies CardImpl

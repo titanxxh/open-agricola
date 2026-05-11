@@ -9,7 +9,6 @@ import {
   readActionSnapshotToken,
 } from '../helpers/action-snapshot'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { A43_FarmyardManure } from '../../cards-display/A/A43_FarmyardManure'
 
@@ -46,23 +45,22 @@ const listener: CardListenerRegistration = {
   },
 }
 
-registerPrerequisite('1 Animal', (player) => {
-  const inStables = Object.values(player.stableAnimals ?? {}).filter(
-    (animal) => animal !== null,
-  ).length
-  const inHouse = player.houseAnimalCount ?? 0
-  const inPastures = (player.pastures ?? []).reduce(
-    (sum, pasture) => sum + (pasture.animalCount ?? 0),
-    0,
-  )
-  return inStables + inHouse + inPastures >= 1
-})
-
 export const A43_FarmyardManure_impl = {
   listeners: [listener],
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => queueFoodNextThree(state, player),
 },
+  prerequisiteCheck: (player) => {
+    const inStables = Object.values(player.stableAnimals ?? {}).filter(
+      (animal) => animal !== null,
+    ).length
+    const inHouse = player.houseAnimalCount ?? 0
+    const inPastures = (player.pastures ?? []).reduce(
+      (sum, pasture) => sum + (pasture.animalCount ?? 0),
+      0,
+    )
+    return inStables + inHouse + inPastures >= 1
+  },
   reaches: [] as readonly string[],
 } satisfies CardImpl

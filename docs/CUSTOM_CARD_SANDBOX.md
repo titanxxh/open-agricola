@@ -6,13 +6,13 @@
 >
 > - **AI 系统提示词作者** — `client/services/llmPrompts.ts` 必须与本文件一致
 > - **Workshop UI 文案作者** — `client/app/workshop/AiCardDesigner.tsx` / `WorkshopPage.tsx` 文案
-> - **设计文档作者** — `docs/CARD_DESIGN_PROMPT.md` / `docs/ENGINE_ARCHITECTURE.md` 提到沙盒的章节
+> - **设计文档作者** — `docs/CARD_DESIGN_PROMPT.md` / `docs/ARCHITECTURE.md` 提到沙盒的章节
 > - **LLM 自动化测试维护者** — `docs/test/llm-card-gen.md` 描述了用真 LLM 验证沙盒契约的 fixture 套件
 >
 > **修改本文件的同时**必须：
 >
 > 1. 同步修改 `client/services/llmPrompts.ts` 的 hook / phase / actionId 列表（CI `pnpm run check:prompt-sync` 会兜底）
-> 2. 让 `docs/CARD_DESIGN_PROMPT.md` / `docs/ENGINE_ARCHITECTURE.md` 引用本文件而不是各自维护一份
+> 2. 让 `docs/CARD_DESIGN_PROMPT.md` / `docs/ARCHITECTURE.md` 引用本文件而不是各自维护一份
 
 > **官方卡作者**（在 `shared/cards/<deck>/<id>.ts` 里写 TS 模块）**不受**本文件约束 —— 直接 import `shared/game/player.ts` 等任意 helper。本文件只覆盖 Workshop 自定义卡。
 
@@ -225,7 +225,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 | `computeLockedFarmTiles`                     | 返回锁定田地位置                                                         | 田地锁定                                                |
 | `handHooks`（meta）                            | `CardEffectHook[]`                                               | 声明哪些 hook 在卡牌还在手牌时也触发                               |
 
-> 围栏折扣（E16 BriarHedge / C16 FieldFences / C1 Overhaul）现走 listener `computeCosts` phase（actions: `['fence']`）；详见 ENGINE_ARCHITECTURE.md §15.7。
+> 围栏折扣（E16 BriarHedge / C16 FieldFences / C1 Overhaul）现走 listener `computeCosts` phase（actions: `['fence']`）；详见 ARCHITECTURE.md §15.7。
 
 
 ### 3.2 `CARD_IMPL.listeners[].phases` 可用 phase
@@ -596,7 +596,7 @@ const CARD_IMPL = {
 
 - `**client/services/llmPrompts.ts`**：必须人工同步对应段落，CI `pnpm run check:prompt-sync` 会校验 §3.1 / §3.2 / §3.3 / §5.1 / §5.2 这五个 `prompt-sync` 标记块与 `llmPrompts.ts` 字符串、`shared/cards/card-effects.ts` 的 `cardEffectHooks`、`server/custom-code/engine.ts` 的 `isActionHookPhase` / `isCardListenerScope`、`shared/custom-code/ast-validator.ts` 的 `DENIED_IDENTIFIERS` / `DENIED_PROPERTY_ACCESS` 一致。
 - `**docs/CARD_DESIGN_PROMPT.md**`：手工同步引用本文件即可（避免重复列表）。
-- `**docs/ENGINE_ARCHITECTURE.md**`：手工同步引用本文件即可。
+- `**docs/ARCHITECTURE.md**`：手工同步引用本文件即可。
 - `**client/app/workshop/AiCardDesigner.tsx**`：手工同步引用本文件即可。
 
 ### 9.2 修改 hook / phase / denylist 代码 → 必须更新本文件

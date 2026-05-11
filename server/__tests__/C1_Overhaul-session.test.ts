@@ -53,9 +53,9 @@ const playC1 = (session: GameSession): { resp: ReturnType<GameSession['takeActio
   let safety = 0
   while (resp.interaction.stateId === 'wait' && safety < 12) {
     safety += 1
-    const interaction = (resp as { interaction?: { stateId?: string } }).interaction
-    if (interaction?.stateId === 'wait') break
-    const opts = resp.interaction.options?.map((o) => o.value)
+    const interaction = resp.interaction
+    if (interaction.request.kind !== 'choice') break
+    const opts = interaction.options?.map((o) => o.value) ?? []
     const cardOption = opts.find((v) => v === `minor:${CARD_ID}`)
     if (cardOption) {
       resp = session.resolveChoice(0, cardOption)

@@ -1,12 +1,10 @@
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { D1_ZigzagHarrow } from '../../cards-display/D/D1_ZigzagHarrow'
 
 const CARD_ID = D1_ZigzagHarrow.id
 
-registerPrerequisite('3 Fields in an "L" Shape', (player) => player.fields.length >= 2)
-
 export const D1_ZigzagHarrow_impl = {
+  prerequisiteCheck: (player) => player.fields.length >= 2,
   effect: {
     id: CARD_ID,
     onBuy: () => ({

@@ -31,7 +31,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import { checkCustomPrerequisite } from '../../shared/cards/helpers/prerequisite-registry'
+import { A3_PaperKnife_impl } from '../../shared/cards/A/A3_PaperKnife'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import type { GameState, PlayerState } from '../../shared/contract/types'
 import { GameSession } from '../game/authoritative-session'
@@ -86,16 +86,16 @@ describe('A3_PaperKnife prerequisite', () => {
   it('registers "3 Occupations In Hand" as a custom prerequisite', () => {
     const player = createPlayer('p1')
     player.occupationHand = []
-    expect(checkCustomPrerequisite('3 Occupations In Hand', player)).toBe(false)
+    expect(A3_PaperKnife_impl.prerequisiteCheck!(player)).toBe(false)
 
     player.occupationHand = ['A1', 'A2']
-    expect(checkCustomPrerequisite('3 Occupations In Hand', player)).toBe(false)
+    expect(A3_PaperKnife_impl.prerequisiteCheck!(player)).toBe(false)
 
     player.occupationHand = ['A1', 'A2', 'A3']
-    expect(checkCustomPrerequisite('3 Occupations In Hand', player)).toBe(true)
+    expect(A3_PaperKnife_impl.prerequisiteCheck!(player)).toBe(true)
 
     player.occupationHand = ['A1', 'A2', 'A3', 'A4']
-    expect(checkCustomPrerequisite('3 Occupations In Hand', player)).toBe(true)
+    expect(A3_PaperKnife_impl.prerequisiteCheck!(player)).toBe(true)
   })
 
   it('is enforced by meetsCardPrerequisites on the card definition', () => {

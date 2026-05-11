@@ -1,4 +1,3 @@
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { rollAndCacheCardPick } from '../helpers/card-random'
 import type { ActionFlow, PlayerState } from '../../contract/types'
@@ -32,11 +31,6 @@ const EFFECT_ID = 'paper-knife-random-play'
  * check `getHand(OCCUPATION) >= 3`.
  */
 
-registerPrerequisite(
-  '3 Occupations In Hand',
-  (player: PlayerState) => (player.occupationHand?.length ?? 0) >= 3,
-)
-
 registerSelectionEffect(EFFECT_ID, ({ state, player, positions, sourceCard }): ActionFlow | void => {
   if (!sourceCard || sourceCard !== CARD_ID) return
   if (positions.length !== 3) return
@@ -69,5 +63,6 @@ export const A3_PaperKnife_impl = {
     }
   },
 },
+  prerequisiteCheck: (player: PlayerState) => (player.occupationHand?.length ?? 0) >= 3,
   reaches: [] as readonly string[],
 } satisfies CardImpl

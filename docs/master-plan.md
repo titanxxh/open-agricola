@@ -7,7 +7,7 @@
 >
 > - 审查报告：`docs/card_desc_audit.md`（含每张卡 verdict + §8 P0–P3 清单）
 > - 进度权威源：`docs/card_progress.md`（每 sprint 收口必须回流）
-> - 架构约束：`docs/ENGINE_ARCHITECTURE.md`、根目录 `CLAUDE.md`「卡牌实现规范」
+> - 架构约束：`docs/ARCHITECTURE.md`、根目录 `CLAUDE.md`「卡牌实现规范」
 
 ## 0. 概览
 
@@ -210,7 +210,7 @@ E149 MidnightFencer  ┃ 卡内 listener；按 BGA          ┃ 围栏数主路�
 A129/A139/A150/...    ┃                                 ┃
 B27/B29/B115/...      ┃                                 ┃
 ──────────────────────────────────────────────────────────────────────
-i18n 缺口           ┃ src/i18n/{zh,en}.ts             ┃ 不阻塞游戏；可缓
+i18n 缺口           ┃ client/i18n/{zh,en}.ts             ┃ 不阻塞游戏；可缓
 71 + 437 项           ┃ 直接补 key                      ┃
 ──────────────────────────────────────────────────────────────────────
 stub / 未实现       ┃ 卡内 effect/listener 实现       ┃ —

@@ -391,11 +391,10 @@ describe('D161_CabbageBuyer session', () => {
       resp = confirmPlayerSwitch(session)
     }
 
-    // p0 cannot afford cost=3, so no offer should appear
-    if (resp.interaction.stateId === 'wait') {
-      // Ensure it's not the D161 offer for p0 (which would be optional with pay + vegetable)
-      // A D161 offer would be for playerIndex=0 with a non-skip option that leads to food payment
-      // If playerIndex=1, that would be from something else (shouldn't happen after skip)
+    // p0 cannot afford cost=3, so no offer should appear. The remaining wait
+    // is either non-existent or `confirm-next-player` (end-of-turn) — anything
+    // is fine except a real `choice` request for p0 (that would be the D161 offer).
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'choice') {
       expect(resp.interaction.playerIndex).not.toBe(0)
     }
 
@@ -443,14 +442,11 @@ describe('D161_CabbageBuyer session', () => {
       resp = confirmPlayerSwitch(session)
     }
 
-    // No D161 offer should appear — pending should be 'none' or 'confirmNextPlayer'
-    // (end-of-turn transition) but NOT a choice for p0 (D161 offer).
-    if (resp.interaction.stateId === 'wait') {
-      // If there's a choice, it should not be an offer for p0
+    // No D161 offer should appear — remaining wait should be either idle,
+    // a `confirm-next-player` (end-of-turn transition), or anything except a
+    // `choice` request for p0 (which would be the D161 offer).
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'choice') {
       expect(resp.interaction.playerIndex).not.toBe(0)
-    } else {
-      // Either idle (no pending) or a confirm-next-player wait — both mean no D161 offer was presented.
-      // (note: the ts narrow above already covered the wait-with-choice case; this branch is the else.)
     }
 
     const after = session.getState().state

@@ -29,9 +29,10 @@ const playLessons = (
   // and may follow up with a payment-choice prompt. Walk both.
   let guard = 6
   while (guard-- > 0 && resp.interaction.stateId === 'wait') {
+    if (resp.interaction.request.kind !== 'choice') break
     const opt =
       resp.interaction.options?.find((o) => o.value === occupationId)
-      ?? resp.interaction.options[0]
+      ?? resp.interaction.options?.[0]
     if (!opt) break
     resp = session.resolveChoice(0, opt.value)
   }

@@ -1,16 +1,10 @@
 import type { FarmTilePosition } from '../../contract/types'
 import { getAllTilePositions, getUsedFarmyardTileKeys, positionKey } from '../../domain/farm'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { B38_FutureBuildingSite } from '../../cards-display/B/B38_FutureBuildingSite'
 
 const CARD_ID = B38_FutureBuildingSite.id
-
-registerPrerequisite('Play in Round 4 or Before', (_player, state) => {
-  if (!state) return true
-  return state.round <= 4
-})
 
 const DELTAS = [
   { dr: -1, dc: 0 },
@@ -20,6 +14,10 @@ const DELTAS = [
 ]
 
 export const B38_FutureBuildingSite_impl = {
+  prerequisiteCheck: (_player, state) => {
+    if (!state) return true
+    return state.round <= 4
+  },
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {

@@ -1,13 +1,11 @@
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { CardImpl } from '../registry'
 import { B74_ThickForest } from '../../cards-display/B/B74_ThickForest'
 
 const CARD_ID = B74_ThickForest.id
 
-registerPrerequisite('5 Clay in Your Supply', (player) => (player.resources.clay ?? 0) >= 5)
-
 export const B74_ThickForest_impl = {
+  prerequisiteCheck: (player) => (player.resources.clay ?? 0) >= 5,
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {

@@ -429,6 +429,7 @@ import { C29_BeerTable_impl } from './C/C29_BeerTable'
 import { C2_Stable_impl } from './C/C2_Stable'
 import { C30_HalfTimberedHouse_impl } from './C/C30_HalfTimberedHouse'
 import { C31_WritingChamber_impl } from './C/C31_WritingChamber'
+import { C32_AbortOriel_impl } from './C/C32_AbortOriel'
 import { C33_GreeningPlan_impl } from './C/C33_GreeningPlan'
 import { C34_ElephantgrassPlant_impl } from './C/C34_ElephantgrassPlant'
 import { C35_LanternHouse_impl } from './C/C35_LanternHouse'
@@ -599,6 +600,7 @@ import { D33_SummerHouse_impl } from './D/D33_SummerHouse'
 import { D34_LuxuriousHostel_impl } from './D/D34_LuxuriousHostel'
 import { D35_FodderChamber_impl } from './D/D35_FodderChamber'
 import { D36_BreedRegistry_impl } from './D/D36_BreedRegistry'
+import { D37_Sculpture_impl } from './D/D37_Sculpture'
 import { D38_MilkingStool_impl } from './D/D38_MilkingStool'
 import { D39_TruffleSlicer_impl } from './D/D39_TruffleSlicer'
 import { D3_Furrows_impl } from './D/D3_Furrows'
@@ -756,6 +758,7 @@ import { E25_BumperCrop_impl } from './E/E25_BumperCrop'
 import { E26_Sundial_impl } from './E/E26_Sundial'
 import { E27_PiggyBank_impl } from './E/E27_PiggyBank'
 import { E28_Bookmark_impl } from './E/E28_Bookmark'
+import { E29_Heirloom_impl } from './E/E29_Heirloom'
 import { E2_RenovationMaterials_impl } from './E/E2_RenovationMaterials'
 import { E30_ChildsToy_impl } from './E/E30_ChildsToy'
 import { E31_Upholstery_impl } from './E/E31_Upholstery'
@@ -1256,6 +1259,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'C2_Stable': C2_Stable_impl,
   'C30_HalfTimberedHouse': C30_HalfTimberedHouse_impl,
   'C31_WritingChamber': C31_WritingChamber_impl,
+  'C32_AbortOriel': C32_AbortOriel_impl,
   'C33_GreeningPlan': C33_GreeningPlan_impl,
   'C34_ElephantgrassPlant': C34_ElephantgrassPlant_impl,
   'C35_LanternHouse': C35_LanternHouse_impl,
@@ -1426,6 +1430,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'D34_LuxuriousHostel': D34_LuxuriousHostel_impl,
   'D35_FodderChamber': D35_FodderChamber_impl,
   'D36_BreedRegistry': D36_BreedRegistry_impl,
+  'D37_Sculpture': D37_Sculpture_impl,
   'D38_MilkingStool': D38_MilkingStool_impl,
   'D39_TruffleSlicer': D39_TruffleSlicer_impl,
   'D3_Furrows': D3_Furrows_impl,
@@ -1583,6 +1588,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'E26_Sundial': E26_Sundial_impl,
   'E27_PiggyBank': E27_PiggyBank_impl,
   'E28_Bookmark': E28_Bookmark_impl,
+  'E29_Heirloom': E29_Heirloom_impl,
   'E2_RenovationMaterials': E2_RenovationMaterials_impl,
   'E30_ChildsToy': E30_ChildsToy_impl,
   'E31_Upholstery': E31_Upholstery_impl,

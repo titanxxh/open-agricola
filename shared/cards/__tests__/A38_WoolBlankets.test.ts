@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { checkCustomPrerequisite } from '../helpers/prerequisite-registry'
 import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState, Pasture } from '../../contract/types'
 
-import '../A/A38_WoolBlankets'
+import { A38_WoolBlankets_impl } from '../A/A38_WoolBlankets'
 
 const CARD_ID = 'A38_WoolBlankets'
 
@@ -38,14 +37,14 @@ describe('A38_WoolBlankets prerequisite (5 Sheep)', () => {
       resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
         grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
     })
-    expect(checkCustomPrerequisite('5 Sheep', player)).toBe(false)
+    expect(A38_WoolBlankets_impl.prerequisiteCheck!(player)).toBe(false)
   })
 
   it('IS satisfied with 5 sheep in a single pasture', () => {
     const player = createPlayer({
       pastures: [makePasture(4, 5, 'sheep')],
     })
-    expect(checkCustomPrerequisite('5 Sheep', player)).toBe(true)
+    expect(A38_WoolBlankets_impl.prerequisiteCheck!(player)).toBe(true)
   })
 
   it('IS satisfied with 4 pasture sheep + 1 house sheep', () => {
@@ -53,7 +52,7 @@ describe('A38_WoolBlankets prerequisite (5 Sheep)', () => {
       pastures: [makePasture(2, 4, 'sheep')],
       houseAnimalType: 'sheep', houseAnimalCount: 1,
     })
-    expect(checkCustomPrerequisite('5 Sheep', player)).toBe(true)
+    expect(A38_WoolBlankets_impl.prerequisiteCheck!(player)).toBe(true)
   })
 
   it('IS satisfied counting stableAnimals (3 pasture + 2 stable sheep)', () => {
@@ -61,14 +60,14 @@ describe('A38_WoolBlankets prerequisite (5 Sheep)', () => {
       pastures: [makePasture(2, 3, 'sheep')],
       stableAnimals: { 's1': 'sheep', 's2': 'sheep' },
     })
-    expect(checkCustomPrerequisite('5 Sheep', player)).toBe(true)
+    expect(A38_WoolBlankets_impl.prerequisiteCheck!(player)).toBe(true)
   })
 
   it('does NOT count boar/cattle towards the 5 sheep threshold', () => {
     const player = createPlayer({
       pastures: [makePasture(2, 4, 'sheep'), makePasture(2, 4, 'boar')],
     })
-    expect(checkCustomPrerequisite('5 Sheep', player)).toBe(false)
+    expect(A38_WoolBlankets_impl.prerequisiteCheck!(player)).toBe(false)
   })
 })
 

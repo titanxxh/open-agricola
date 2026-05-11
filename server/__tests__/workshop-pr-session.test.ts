@@ -44,8 +44,6 @@ db.exec(`
     name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     card_json TEXT NOT NULL,
-    effect_code TEXT,
-    compiled_code TEXT,
     code_manifest TEXT,
     art_url TEXT,
     art_prompt TEXT,
@@ -386,8 +384,8 @@ describe('workshop PR propose — session', () => {
     db.prepare(
       `INSERT INTO workshop_cards
          (id, author_id, card_id, card_type, name, description, card_json,
-          effect_code, art_url, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          art_url, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       cardDbId,
       userId,
@@ -395,8 +393,10 @@ describe('workshop PR propose — session', () => {
       'minor',
       'Test Card',
       'A test card',
-      JSON.stringify({ name: 'Test Card' }),
-      `const CARD_DEF = new MinorImprovement({ id: 'CUSTOM_TestCard', deck: 'community', number: 0, name: 'Test Card', desc: [], cost: {}, vp: 0 })\nconst CARD_IMPL = {}`,
+      JSON.stringify({
+        name: 'Test Card',
+        _code: `const CARD_DEF = new MinorImprovement({ id: 'CUSTOM_TestCard', deck: 'community', number: 0, name: 'Test Card', desc: [], cost: {}, vp: 0 })\nconst CARD_IMPL = {}`,
+      }),
       null,
       'published',
       now,

@@ -1,4 +1,3 @@
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { isBorderEdge } from '../../domain/farm'
 import { getAllEdgeIds } from '../../domain'
 import type { CardImpl } from '../registry'
@@ -23,11 +22,6 @@ const countAllAnimalsOfType = (player: { resources: { sheep: number; boar: numbe
   }
   return totals
 }
-
-registerPrerequisite('1 Animal of Each Type', (player) => {
-  const totals = countAllAnimalsOfType(player)
-  return (totals.sheep ?? 0) >= 1 && (totals.boar ?? 0) >= 1 && (totals.cattle ?? 0) >= 1
-})
 
 const countAvailableBorderEdges = (player: { fenceSegments?: { edge: string }[] }): number => {
   const built = new Set((player.fenceSegments ?? []).map((s) => s.edge))
@@ -58,6 +52,10 @@ const E16FenceListener: CardListenerRegistration = {
 }
 
 export const E16_BriarHedge_impl = {
+  prerequisiteCheck: (player) => {
+    const totals = countAllAnimalsOfType(player)
+    return (totals.sheep ?? 0) >= 1 && (totals.boar ?? 0) >= 1 && (totals.cattle ?? 0) >= 1
+  },
   listeners: [E16FenceListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl

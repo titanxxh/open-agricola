@@ -2,7 +2,6 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { positionKey } from '../../domain/farm'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import type { ActionFlow, PlayerState } from '../../contract/types'
 import { fieldTopStack } from '../../domain/field'
 import type { CardImpl } from '../registry'
@@ -20,8 +19,6 @@ const countCattleOnBoard = (player: PlayerState): number => {
   }
   return total
 }
-
-registerPrerequisite('1 Cattle', (player) => countCattleOnBoard(player) >= 1)
 
 /**
  * E71 Cow Patty (Minor Improvement):
@@ -117,6 +114,7 @@ const afterSowListener: CardListenerRegistration = {
 }
 
 export const E71_CowPatty_impl = {
+  prerequisiteCheck: (player) => countCattleOnBoard(player) >= 1,
   listeners: [afterSowListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl

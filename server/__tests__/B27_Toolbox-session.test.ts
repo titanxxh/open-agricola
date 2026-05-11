@@ -131,7 +131,6 @@ describe('B27 Toolbox session', () => {
 
     let safety = 50
     while (resp.interaction.stateId === 'wait' && safety-- > 0) {
-      const opts = resp.interaction.options ?? []
       const promptKey = (resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       // Engine farm prompt: confirm with the first selectable room tile so we
       // actually build (test asserts construct → setFlag flow).
@@ -140,11 +139,14 @@ describe('B27 Toolbox session', () => {
         resp = session.resolveChoice(0, 'confirm', { rooms: [tile] })
         continue
       }
+      if (resp.interaction.request.kind !== 'choice') break
+      const opts = resp.interaction.options ?? []
       // 优先选 construct（如果有）以确保修房触发 setFlag；
       // 修房完成后 OR 会有 __done__，优先选它结束 OR 进入 B150/B27 prompt。
       const constructOption = opts.find(o => o.value === 'construct' || /construct/i.test(o.value))
       const doneOpt = opts.find(o => o.value === '__done__')
-      const choice = constructOption ?? doneOpt ?? opts.find(o => o.value !== '__skip__') ?? opts[0]!
+      const choice = constructOption ?? doneOpt ?? opts.find(o => o.value !== '__skip__') ?? opts[0]
+      if (!choice) break
       resp = session.resolveChoice(0, choice.value)
     }
 

@@ -1,11 +1,8 @@
-import { registerPrerequisite } from '../helpers/prerequisite-registry'
 import { hasNoUnusedFarmyardSpaces } from '../../domain/farm'
 import type { CardImpl } from '../registry'
 import { A33_BigCountry } from '../../cards-display/A/A33_BigCountry'
 
 const CARD_ID = A33_BigCountry.id
-
-registerPrerequisite('All Farmyard Spaces Used', hasNoUnusedFarmyardSpaces)
 
 export const A33_BigCountry_impl = {
   effect: {
@@ -32,5 +29,6 @@ export const A33_BigCountry_impl = {
     }
   },
 },
+  prerequisiteCheck: hasNoUnusedFarmyardSpaces,
   reaches: [] as readonly string[],
 } satisfies CardImpl
