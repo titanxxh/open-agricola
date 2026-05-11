@@ -10,7 +10,7 @@ import type {
   Resource,
 } from '../contract/types'
 import type { PromptKey } from '../contract/prompt-keys'
-import type { FollowUpAction } from '../actions/hooks'
+import type { FollowUpAction, ActionHookPhase, ActionHookResult } from '../actions/hooks'
 import {
   ActionNode,
   ActivateCardNode,
@@ -25,6 +25,11 @@ import {
 import { attachChoiceLabel } from './nodes/interaction-helpers'
 import type { EngineNode } from './types'
 import type { EngineInternals } from './engine-internals'
+import { analyzeFlowInteractivity } from './flow-interactivity'
+import { getPlayOrderIndex } from './matched-trigger'
+import { ParallelTriggerNode } from './nodes/parallel-trigger-node'
+import { executeCardListener, type MatchedCardListener, type CardListenerContext } from '../cards/card-listeners'
+import type { GameState } from '../contract/types'
 
 /**
  * S4c PR5 — module-private utilities extracted from `Engine`. Each function
@@ -142,6 +147,85 @@ export function buildActivateCardNodes(
   })
 }
 
+export function buildPhaseTrailingNodes(
+  int: EngineInternals,
+  matchedListeners: MatchedCardListener[],
+  phase: ActionHookPhase,
+  actionId: string,
+  state: GameState,
+  baseEvent: Record<string, unknown>,
+  buildListenerContext: (ml: MatchedCardListener) => CardListenerContext,
+): EngineNode[] {
+  if (matchedListeners.length === 0) return []
+
+  type Peeked = {
+    ml: MatchedCardListener
+    result: ActionHookResult | undefined
+    interactivity: 'auto' | 'interactive'
+    playOrderIndex: number
+  }
+
+  const peeked: Peeked[] = matchedListeners.map((ml) => {
+    const listenerCtx = buildListenerContext(ml)
+    const result = executeCardListener(ml.registration, listenerCtx, { ownerPlayerId: ml.ownerPlayerId })
+    const interactivity = result?.flow ? analyzeFlowInteractivity(result.flow) : 'auto'
+    const owner = state.players.find((p) => p.id === ml.ownerPlayerId)
+    const playOrderIndex = owner ? getPlayOrderIndex(owner, ml.cardId) : Number.MAX_SAFE_INTEGER
+    return { ml, result, interactivity, playOrderIndex }
+  })
+
+  const byOwner = new Map<string, Peeked[]>()
+  for (const p of peeked) {
+    const arr = byOwner.get(p.ml.ownerPlayerId) ?? []
+    arr.push(p)
+    byOwner.set(p.ml.ownerPlayerId, arr)
+  }
+
+  const activeId = state.players[state.currentPlayerIndex]?.id
+  const orderedOwners: string[] = []
+  if (activeId && byOwner.has(activeId)) orderedOwners.push(activeId)
+  for (const p of state.players) {
+    if (p.id !== activeId && byOwner.has(p.id)) orderedOwners.push(p.id)
+  }
+
+  const out: EngineNode[] = []
+  for (const ownerId of orderedOwners) {
+    const group = (byOwner.get(ownerId) ?? []).slice().sort((a, b) => a.playOrderIndex - b.playOrderIndex)
+
+    const buildNode = (p: Peeked) => {
+      const nodeId = `activate-${phase}-${actionId}-${int.counterRef.value++}`
+      return new ActivateCardNode(
+        nodeId,
+        p.ml.registration.id,
+        p.ml.cardId,
+        phase,
+        actionId,
+        { ...baseEvent, ownerPlayerId: p.ml.ownerPlayerId },
+        p.result,
+      )
+    }
+
+    const mandatory = group.filter((p) => p.ml.registration.mandatory)
+    const optional = group.filter((p) => !p.ml.registration.mandatory)
+    for (const p of mandatory) out.push(buildNode(p))
+
+    const optAuto = optional.filter((p) => p.interactivity === 'auto')
+    for (const p of optAuto) out.push(buildNode(p))
+
+    const optInteractive = optional.filter((p) => p.interactivity === 'interactive')
+    if (optInteractive.length > 0) {
+      const children = optInteractive.map(buildNode)
+      const ptn = new ParallelTriggerNode(
+        `parallel-trigger-${phase}-${actionId}-${ownerId}-${int.counterRef.value++}`,
+        children,
+        ownerId,
+      )
+      out.push(ptn)
+    }
+  }
+  return out
+}
+
 export function collectNodeIds(node: EngineNode, ids: Set<string>): void {
   ids.add(node.id)
   const children = (node as { children?: EngineNode[] }).children
@@ -218,6 +302,7 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
       node.phase,
       node.actionId,
       node.event,
+      node.preComputedResult,
     )
   }
   if (node instanceof PlayerSwitchNode) {
