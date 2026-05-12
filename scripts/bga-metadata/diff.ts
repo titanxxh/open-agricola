@@ -75,6 +75,10 @@ export function diffCards(bgaMap: Map<string, BgaCard>, tsMap: Map<string, TsCar
         if (isEmptyObj(bv)) bv = undefined
         if (isEmptyObj(ov)) ov = undefined
       }
+      if (field === 'players') {
+        if (bv === undefined) bv = '1+'
+        if (ov === undefined) ov = '1+'
+      }
       if (bv === undefined && ov === undefined) continue
       const equal = typeof bv === 'object' && typeof ov === 'object'
         ? objectShallowEqual(bv, ov)
