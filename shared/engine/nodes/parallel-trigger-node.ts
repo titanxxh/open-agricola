@@ -3,7 +3,6 @@ import type { PromptKey } from '../../contract/prompt-keys'
 import type { EngineContext, EngineNode, NodeStepResult } from '../types'
 import { BaseNode } from './base'
 import { ActivateCardNode } from './activate-card-node'
-import { analyzeFlowInteractivity } from '../flow-interactivity'
 
 /**
  * BGA-style PARALLEL trigger selector.
@@ -31,12 +30,6 @@ export class ParallelTriggerNode extends BaseNode {
   public children: EngineNode[]
   public ownerPlayerId: string
   public selectedChildId: string | null = null
-  // Lazy-peek flag: set true after engine-proceed first invokes each child's
-  // listener to compute preComputedResult. Peek happens at PARALLEL step time
-  // — which is post-resume from any mid-action interaction (animal-reorg /
-  // farm-select sub-flows) — so listeners see correct post-interaction state
-  // (e.g. A17 ReclamationPlow sees animals already in zones).
-  public peeked: boolean = false
   public emittedChoices: ActionChoiceOption[] = []
   public emittedPromptKey?: PromptKey
   public emittedPromptParams?: Record<string, unknown>
@@ -120,19 +113,6 @@ export class ParallelTriggerNode extends BaseNode {
     if (this.cardChildren().every((c) => c.getState() === 'resolved')) {
       // No more cards to choose, but some follow-up nodes still unresolved.
       // Let the tree walker descend into the follow-ups directly.
-      return { kind: 'continue' }
-    }
-    // After lazy peek (engine-proceed already populated preComputedResult on
-    // every child), check if all unresolved cards have auto-only flows. If so
-    // — no user choice is needed — auto-select the next card by playOrder so
-    // the engine runs them serially without an interruption UI.
-    const unresolvedCards = this.cardChildren().filter((c) => c.getState() !== 'resolved')
-    const allAuto = unresolvedCards.every((c) => {
-      const flow = c.preComputedResult?.flow
-      return !flow || analyzeFlowInteractivity(flow) === 'auto'
-    })
-    if (allAuto && unresolvedCards.length > 0) {
-      this.selectedChildId = unresolvedCards[0]!.id
       return { kind: 'continue' }
     }
     const options = this.buildSelectOptions()

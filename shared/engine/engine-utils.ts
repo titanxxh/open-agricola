@@ -10,7 +10,7 @@ import type {
   Resource,
 } from '../contract/types'
 import type { PromptKey } from '../contract/prompt-keys'
-import type { FollowUpAction, ActionHookPhase } from '../actions/hooks'
+import type { FollowUpAction, ActionHookPhase, ActionHookResult } from '../actions/hooks'
 import {
   ActionNode,
   ActivateCardNode,
@@ -25,9 +25,10 @@ import {
 import { attachChoiceLabel } from './nodes/interaction-helpers'
 import type { EngineNode } from './types'
 import type { EngineInternals } from './engine-internals'
+import { analyzeFlowInteractivity } from './flow-interactivity'
 import { getPlayOrderIndex } from './matched-trigger'
 import { ParallelTriggerNode } from './nodes/parallel-trigger-node'
-import { type MatchedCardListener, type CardListenerContext } from '../cards/card-listeners'
+import { executeCardListener, type MatchedCardListener, type CardListenerContext } from '../cards/card-listeners'
 import type { GameState } from '../contract/types'
 
 /**
@@ -153,37 +154,28 @@ export function buildPhaseTrailingNodes(
   actionId: string,
   state: GameState,
   baseEvent: Record<string, unknown>,
-  _buildListenerContext: (ml: MatchedCardListener) => CardListenerContext,
+  buildListenerContext: (ml: MatchedCardListener) => CardListenerContext,
 ): EngineNode[] {
   if (matchedListeners.length === 0) return []
 
-  // Lazy dispatch: do NOT peek listener handlers at dispatch time. peek would
-  // fire mutations on pre-mid-interaction state (e.g. before animal-reorg
-  // sub-flow) and break listeners that depend on post-interaction state (A17
-  // ReclamationPlow). Instead, wrap every matched listener as an
-  // unresolved ActivateCardNode and let engine-proceed lazy-peek it from
-  // inside ParallelTriggerNode.step — at which point any mid-action
-  // interaction has already resolved.
-  //
-  // Trade-off: lose the ability to statically partition listeners into auto
-  // vs interactive groups at dispatch time. To compensate, we always wrap in
-  // a ParallelTriggerNode (even single-listener cases) so the lazy-peek hook
-  // has a place to run. The node's own step() logic decides whether to emit
-  // select-trigger UI (multi-card with at least one interactive flow) or just
-  // run the listener serially (single-card / all-auto).
-  type Pending = {
+  type Peeked = {
     ml: MatchedCardListener
+    result: ActionHookResult | undefined
+    interactivity: 'auto' | 'interactive'
     playOrderIndex: number
   }
 
-  const pending: Pending[] = matchedListeners.map((ml) => {
+  const peeked: Peeked[] = matchedListeners.map((ml) => {
+    const listenerCtx = buildListenerContext(ml)
+    const result = executeCardListener(ml.registration, listenerCtx, { ownerPlayerId: ml.ownerPlayerId })
+    const interactivity = result?.flow ? analyzeFlowInteractivity(result.flow) : 'auto'
     const owner = state.players.find((p) => p.id === ml.ownerPlayerId)
     const playOrderIndex = owner ? getPlayOrderIndex(owner, ml.cardId) : Number.MAX_SAFE_INTEGER
-    return { ml, playOrderIndex }
+    return { ml, result, interactivity, playOrderIndex }
   })
 
-  const byOwner = new Map<string, Pending[]>()
-  for (const p of pending) {
+  const byOwner = new Map<string, Peeked[]>()
+  for (const p of peeked) {
     const arr = byOwner.get(p.ml.ownerPlayerId) ?? []
     arr.push(p)
     byOwner.set(p.ml.ownerPlayerId, arr)
@@ -203,7 +195,7 @@ export function buildPhaseTrailingNodes(
   for (const ownerId of orderedOwners) {
     const group = (byOwner.get(ownerId) ?? []).slice().sort((a, b) => a.playOrderIndex - b.playOrderIndex)
 
-    const buildNode = (p: Pending) => {
+    const buildNode = (p: Peeked) => {
       const nodeId = `activate-${phase}-${actionId}-${int.counterRef.value++}`
       return new ActivateCardNode(
         nodeId,
@@ -212,19 +204,30 @@ export function buildPhaseTrailingNodes(
         phase,
         actionId,
         { ...baseEvent, ownerPlayerId: p.ml.ownerPlayerId, mandatory: p.ml.registration.mandatory === true },
-        // No preComputedResult — engine-proceed lazy-peeks at activate time.
+        p.result,
       )
     }
 
     const ownerGroupNodes: EngineNode[] = []
-    if (group.length === 1) {
-      // Single listener: bypass PARALLEL — execution order is unambiguous.
-      // engine-proceed's ActivateCardNode path will lazy-invoke the handler.
-      ownerGroupNodes.push(buildNode(group[0]!))
-    } else if (group.length > 1) {
-      // Multi-listener: wrap in PARALLEL. ParallelTriggerNode.step lazy-peeks
-      // each child (via engine-proceed) to decide auto/interactive routing.
-      const children = group.map(buildNode)
+
+    // BGA semantics: trigger ordering is the choice; whether a trigger fires
+    // is controlled per-listener via the `mandatory` flag (default = true).
+    // - Auto listeners (no nested interaction in their flow) run serially in
+    //   playOrder regardless of mandatory.
+    // - Interactive listeners ALL go into a single PARALLEL together; the
+    //   node hides the __pass__ option when any unresolved child is mandatory
+    //   (so codex `silently skip mandatory` regression is impossible).
+    const autoOnes = group.filter((p) => p.interactivity === 'auto')
+    for (const p of autoOnes) ownerGroupNodes.push(buildNode(p))
+
+    const interactiveOnes = group.filter((p) => p.interactivity === 'interactive')
+    if (interactiveOnes.length === 1) {
+      // Single interactive listener: no PARALLEL — execution order is
+      // unambiguous. Direct ActivateCardNode preserves legacy behavior for
+      // single-listener cases (A17 ReclamationPlow, A129 Swagman, etc.).
+      ownerGroupNodes.push(buildNode(interactiveOnes[0]!))
+    } else if (interactiveOnes.length > 1) {
+      const children = interactiveOnes.map(buildNode)
       const ptn = new ParallelTriggerNode(
         `parallel-trigger-${phase}-${actionId}-${ownerId}-${int.counterRef.value++}`,
         children,

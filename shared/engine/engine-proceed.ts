@@ -222,37 +222,6 @@ export function engineProceed(
     }
   }
   if (node instanceof ParallelTriggerNode) {
-    // Lazy-peek: on first visit to PARALLEL, invoke each child's listener
-    // handler to populate preComputedResult. This happens *post* any
-    // mid-action interaction sub-flow (animal-reorg etc.) — listeners see
-    // post-interaction state (e.g. A17 ReclamationPlow sees animals in
-    // zones). Subsequent engine-proceed activateListener path reuses the
-    // peeked result, preventing handler double-invoke (codex P1 #3).
-    if (!node.peeked) {
-      for (const child of node.children) {
-        if (!(child instanceof ActivateCardNode)) continue
-        if (child.hasPreComputed) continue
-        const listener = getListenerById(child.listenerId)
-        if (!listener) continue
-        const ownerPlayerId = child.event.ownerPlayerId as string | undefined
-        const listenerContext = {
-          state: context.state,
-          player: context.player,
-          space: context.space,
-          actionId: child.actionId,
-          phase: child.phase,
-          ...child.event,
-        }
-        const peekResult = executeCardListener(
-          listener,
-          listenerContext as import('../cards/card-listeners').CardListenerContext,
-          { ownerPlayerId },
-        )
-        child.preComputedResult = peekResult
-        child.hasPreComputed = true
-      }
-      node.peeked = true
-    }
     const ctx = {
       resolveSubtree: (n: EngineNode) => resolveSubtree(n),
       emitChoice: () => {},
@@ -427,7 +396,7 @@ export function engineProceed(
   if (leafStep.kind === 'activateListener' && node instanceof ActivateCardNode) {
     const ownerPlayerId = node.event.ownerPlayerId as string | undefined
     let result: import('../actions/hooks').ActionHookResult | undefined
-    if (node.hasPreComputed) {
+    if (node.preComputedResult !== undefined) {
       result = node.preComputedResult
     } else {
       const listener = getListenerById(node.listenerId)
