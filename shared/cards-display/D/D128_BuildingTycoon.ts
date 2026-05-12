@@ -12,5 +12,5 @@ export const D128_BuildingTycoon = new Occupation({
     'Each time after another player builds 1 or more rooms, you can give them 1 <FOOD> to build exactly 1 room yourself. (You must pay the building cost of the room.)',
   ],
   cost: {},
-  players: '4+',
+  players: '3+',
 })

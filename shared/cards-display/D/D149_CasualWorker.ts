@@ -12,5 +12,5 @@ export const D149_CasualWorker = new Occupation({
     'Each time another player uses a __Quarry__ accumulation space, you can choose to get 1 <FOOD> or build a stable without paying wood.',
   ],
   cost: {},
-  players: '3+',
+  players: '4+',
 })
