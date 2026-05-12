@@ -47,6 +47,8 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-05-12** — §2.4 mechanical re-audit: `scripts/audit-bga-metadata-diff.ts` 沉淀 + 首次报告 → `docs/operations/bga-metadata-diff-report.md`（⚠ 83 / ❌ 729 / 🔍 36）。原 §2.4 表头 "剩 57 张" 已 stale。
+
 - **2026-05-12 — D100 LordoftheManor `extraVp:true` 元数据对齐 + §2.3 backlog cleanup**：D100 行为 fix（`standardCategories` 加 `'stables'`）于 2026-05-02 commit `999104e0` 已 land，但 §2.3 Sprint 7d backlog 条目 stale 残留。本次顺手补 `shared/cards-display/D/D100_LordoftheManor.ts` 加 `extraVp: true`（对齐 BGA `D100_LordoftheManor.php:21 $this->extraVp = true`，UI-only 元数据），加 metadata 断言测试（`server/__tests__/D100_LordoftheManor-session.test.ts` 6 case 全绿），并清理 §2.3 backlog 条目标 closed。无行为变化。spec / plan：无（≤1h 单字段 cleanup）。
 
 - **2026-05-11 — C6 StoneClearing 全对齐 BGA**：扩 `CropStack.kind` union 加 `'stone'`（`shared/contract/types.ts:125`）；C6 `onBuy` 改为在每块空 field push `{kind:'stone', remaining:1}`（不返回 leaf，不立即发石），stone 在下次 reap 主路径被收走、进 `harvestedPositions`、dispatch `reap` listener with `crop:'stone'`，但不增 `grainFields`/`vegetableFields`（`shared/actions/effects/reap.ts`）。`dispatchReapListener` 的 `crop` 参数 union 扩到 `'grain' | 'vegetable' | 'stone'`。`A72_CalciumFertilizers` listener 加 kind allow-list 守卫（`top.kind === 'grain' || top.kind === 'vegetable'`），跳过 stone stack 防过度膨胀。其余 15 张读 `top.kind`/`fieldHasCrop`/selection-filter 的 field-aware 卡（A71/A84/B165/E112/C69/B132/D71/C18/E71/B115/D72 等）自然安全——kind 严格 guard、`top.remaining >= 2` 条件、或 `INITIAL_REMAINING[kind]` 隐式过滤都让 stone 不会被误触发。"considered planted until then" 语义通过 `fieldIsEmpty(f) = f.stacks.length === 0` 自动生效，覆盖 ~16 张 empty-field-counter 卡（A11/A65/A68/B61/C18/C33/C47/C69/C99/C161/D8/D72/E25/E92/sow.ts 等）。前端零改动——`field-crop-${kind}` 是 placeholder class、`res-icon-stone` 已存在、i18n `resources.stone` 已存在。新增 `server/__tests__/C6_StoneClearing-session.test.ts` 8 case（6 unit + 2 集成：C6 × D63 Lynchet adjacency + C6 × A11-style empty-field counter），`shared/actions/effects/__tests__/reap.test.ts` 加 2 case（stone reap + 混合 kind listener fan-out），`server/__tests__/A72_CalciumFertilizers-session.test.ts` 加 1 case（stone field guard）。`pnpm test:fast` 2313 PASS / `pnpm test:slow` 1740 PASS / lint 0 errors。从 §2.5 deferred 基建依赖表移除 C6 行；deferred 队列总数 0——这是 §2.5 "deferred 基建依赖" 表最后一张卡的收口。**§1 总览数字不动**：C6 之前已计入 implemented 834。spec / plan：本地超能力文档，未提交。
@@ -465,7 +467,7 @@ E 牌组（10 张）: E1 PoleBarns / E21 SheepRug / E2 RenovationMaterials / E30
 
 > **历史记录**：D154 ChimneySweep（renovate -2 stone 在 wood→stone 直升时漏减、`players` 字段）已于 2026-04-19 修复，迁入 §2.1。C129 SecondSpouse 已于 2026-04-19 对齐 BGA（首置 farmer + ≤2 占用），迁入 §2.1。B143 ClayWarden 已于 2026-04-19 补 `hollow` 3 人版空间并确认 listener 已覆盖（见 §2.0）。
 
-### 2.4 ❌ 数值/元数据待修（原 83 张：2026-04-28 深度 13 + 2026-04-29 wide-scan 70；PR-1A 已修 10 张 players + PR-1B 已修 16 张 cost/vp → 实际剩 57 张）
+### 2.4 ❌ 数值/元数据待修（2026-05-12 重新 audit：⚠ literal 83 / ❌ complex 729 / 🔍 single-sided 36，详见 `docs/operations/bga-metadata-diff-report.md`；历史 83 → 57 张推断已 stale）
 
 > 完整证据链见 `docs/card_desc_audit.md` §4.4 + `docs/card_desc_audit.md` §3。
 
