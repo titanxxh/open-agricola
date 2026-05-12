@@ -207,6 +207,8 @@ export const zh = {
     interactionOptionalSkip: '跳过',
     interactionFlowSelect: '请选择要执行的动作',
     interactionFlowDone: '完成',
+    interactionSelectTrigger: '选择要先结算的卡牌效果',
+    interactionSelectTriggerPass: '跳过剩余',
     interactionFarmExpansionSelect: '选择扩建动作',
     interactionPlowSelect: '选择要开垦的田地',
     interactionPlowConfirm: '确认开垦',
