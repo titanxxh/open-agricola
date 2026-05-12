@@ -54,6 +54,8 @@ function parseCost(rawValue: string): { cost?: Record<string, number>; altCosts?
 function unwrapClientTranslate(value: string): string {
   const m = value.match(/clienttranslate\(\s*['"](.*?)['"]\s*\)/)
   if (m) return m[1]
+  const parenStr = value.match(/^\(\s*['"](.+?)['"]\s*\)$/)
+  if (parenStr) return parenStr[1]
   const sm = value.match(/^['"](.*?)['"]$/)
   return sm ? sm[1] : value
 }
