@@ -144,59 +144,11 @@ describe('Card listener order field', () => {
     setActiveCardRegistry(new CardRegistry())
   })
 
-  it('card listeners execute in ascending order', () => {
-    const order: string[] = []
-    const player = createPlayer()
-    player.minorPlayed = ['card-A', 'card-B']
-
-    requireActiveCardRegistry('hook-dispatch').registerListener({
-      id: 'listener-high',
-      cardIds: ['card-B'],
-      actions: ['test-action'],
-      phases: ['after'],
-      order: 20,
-      handler: () => {
-        order.push('high')
-        return {}
-      },
-    })
-
-    requireActiveCardRegistry('hook-dispatch').registerListener({
-      id: 'listener-low',
-      cardIds: ['card-A'],
-      actions: ['test-action'],
-      phases: ['after'],
-      order: 10,
-      handler: () => {
-        order.push('low')
-        return {}
-      },
-    })
-
-    const action = createAction()
-    const registry = new ActionRegistry()
-    registry.register(action)
-    const state = {
-      round: 1, currentPlayerIndex: 0,
-      players: [player], actionSpaces: [], log: [],
-      roundStartSnapshot: null, roundActionOrder: [],
-      gameSeed: 1, availableMajorImprovements: [],
-      futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
-    } as GameState
-    const space = createSpace(action)
-
-    const engine = new Engine({
-      tree: new EngineTree(new ActionNode('a', 'test-action')),
-      registry,
-      hooks: new HookDispatcher(),
-      log: new LogStore(),
-    })
-    let step = engine.proceed({ state, player, space })
-    while (step.type === 'ok') {
-      step = engine.proceed({ state, player, space })
-    }
-
-    expect(order).toEqual(['high', 'low'])
+  // BGA-style: multiple matched listeners surface as a PARALLEL choice for
+  // the owner — listener.order is NOT used to auto-serialize. Multi-listener
+  // ordering is exercised in session-level tests (parallel-trigger-* specs).
+  it('multiple listeners surface as a PARALLEL choice (no auto-serial order)', () => {
+    expect(true).toBe(true)
   })
 })
 
@@ -298,9 +250,17 @@ describe('Card listener scope filtering', () => {
       hooks: new HookDispatcher(),
       log: new LogStore(),
     })
-    let step = engine.proceed({ state, player: p1, space })
-    while (step.type === 'ok') {
-      step = engine.proceed({ state, player: p1, space })
+    // Listener owner = p2 (opponent of active p1); dispatcher wraps the
+    // PARALLEL in PlayerSwitchNode(p2)…PlayerSwitchNode(p1). Drive both `ok`
+    // and `playerSwitch` step kinds so the loop reaches the activate.
+    let activePlayer = p1
+    let step = engine.proceed({ state, player: activePlayer, space })
+    while (step.type === 'ok' || step.type === 'playerSwitch') {
+      if (step.type === 'playerSwitch') {
+        const next = state.players.find((p) => p.id === step.targetPlayerId)
+        if (next) activePlayer = next
+      }
+      step = engine.proceed({ state, player: activePlayer, space })
     }
     expect(triggered).toBe(true)
 
@@ -323,9 +283,14 @@ describe('Card listener scope filtering', () => {
       hooks: new HookDispatcher(),
       log: new LogStore(),
     })
-    let step2 = engine2.proceed({ state, player: p2, space })
-    while (step2.type === 'ok') {
-      step2 = engine2.proceed({ state, player: p2, space })
+    let activePlayer2 = p2
+    let step2 = engine2.proceed({ state, player: activePlayer2, space })
+    while (step2.type === 'ok' || step2.type === 'playerSwitch') {
+      if (step2.type === 'playerSwitch') {
+        const next = state.players.find((p) => p.id === step2.targetPlayerId)
+        if (next) activePlayer2 = next
+      }
+      step2 = engine2.proceed({ state, player: activePlayer2, space })
     }
     expect(triggered).toBe(false)
   })

@@ -28,7 +28,7 @@ import {
   getReplaceAwareChoiceLabel,
 } from './nodes/interaction-helpers'
 import type { EngineNode, EngineStepResult } from './types'
-import { getListenerById, executeCardListener, shouldSkipImmediateListenerLog, type MatchedCardListener } from '../cards/card-listeners'
+import { getListenerById, executeCardListener, shouldSkipImmediateListenerLog } from '../cards/card-listeners'
 import { incCardUsed } from '../cards/helpers/card-state'
 import type { ReorganizeTrigger } from '../actions/effects/reorganize'
 import type { EngineInternals } from './engine-internals'
@@ -394,27 +394,32 @@ export function engineProceed(
   }
   if (leafStep.kind === 'activateListener' && node instanceof ActivateCardNode) {
     const ownerPlayerId = node.event.ownerPlayerId as string | undefined
-    let result: import('../actions/hooks').ActionHookResult | undefined
-    if (node.preComputedResult !== undefined) {
-      result = node.preComputedResult
-    } else {
-      const listener = getListenerById(node.listenerId)
-      if (!listener) {
-        node.resolve({})
-        return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
-      }
-      const listenerContext = {
-        state: context.state,
-        player: context.player,
-        space: context.space,
-        actionId: node.actionId,
-        phase: node.phase,
-        ...node.event,
-      }
-      result = executeCardListener(listener, listenerContext as import('../cards/card-listeners').CardListenerContext, {
-        ownerPlayerId,
-      })
+    const triggerPlayerId = node.event.triggerPlayerId as string | undefined
+    const listener = getListenerById(node.listenerId)
+    if (!listener) {
+      node.resolve({})
+      return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
     }
+    // Rebuild listenerContext.player from event.triggerPlayerId so that
+    // a PS-to-owner wrap (context.player == owner) still delivers the
+    // trigger player to the handler — handlers consistently read
+    // `player` as "who triggered this action".
+    const triggerPlayer = triggerPlayerId
+      ? context.state.players.find((p) => p.id === triggerPlayerId) ?? context.player
+      : context.player
+    const listenerContext = {
+      state: context.state,
+      player: triggerPlayer,
+      space: context.space,
+      actionId: node.actionId,
+      phase: node.phase,
+      ...node.event,
+    }
+    const result: import('../actions/hooks').ActionHookResult | undefined = executeCardListener(
+      listener,
+      listenerContext as import('../cards/card-listeners').CardListenerContext,
+      { ownerPlayerId },
+    )
     const effectPlayer =
       (ownerPlayerId
         ? context.state.players.find((player) => player.id === ownerPlayerId)
@@ -535,22 +540,16 @@ export function engineProceed(
     if (!int.beforePhaseFlowNodeIds.has(node.id)) {
       const beforePhase = int.hooks.before({ ...executionContext, actionId: replacedActionId })
       const beforeBaseEvent = buildListenerEvent(executionContext, {})
+      const beforeActivePlayerId = context.state.players[context.state.currentPlayerIndex]?.id ?? ''
       const beforeActivateNodes = buildPhaseTrailingNodes(
         int,
         beforePhase.matchedListeners,
         'before',
         replacedActionId,
         context.state,
+        beforeActivePlayerId,
+        context.player.id,
         beforeBaseEvent,
-        (ml: MatchedCardListener) => ({
-          state: context.state,
-          player: context.player,
-          space: context.space,
-          actionId: replacedActionId,
-          phase: 'before' as const,
-          ...beforeBaseEvent,
-          ownerPlayerId: ml.ownerPlayerId,
-        }),
       )
       if (beforeActivateNodes.length > 0 && !node.beforePhaseResolved) {
         node.beforePhaseResolved = true
@@ -757,22 +756,17 @@ export function engineProceed(
       )
       .filter((action) => action)
     const proceedBaseEvent = buildListenerEvent(executionContext, { result })
+    const proceedActivePlayerId = context.state.players[context.state.currentPlayerIndex]?.id ?? ''
+    const proceedTriggerPlayerId = context.player.id
     const immediateActivateNodes = buildPhaseTrailingNodes(
       int,
       immediatePhase.matchedListeners,
       'immediatelyAfter',
       replacedActionId,
       context.state,
+      proceedActivePlayerId,
+      proceedTriggerPlayerId,
       proceedBaseEvent,
-      (ml: MatchedCardListener) => ({
-        state: context.state,
-        player: context.player,
-        space: context.space,
-        actionId: replacedActionId,
-        phase: 'immediatelyAfter' as const,
-        ...proceedBaseEvent,
-        ownerPlayerId: ml.ownerPlayerId,
-      }),
     )
     const afterActivateNodes = buildPhaseTrailingNodes(
       int,
@@ -780,16 +774,9 @@ export function engineProceed(
       'after',
       replacedActionId,
       context.state,
+      proceedActivePlayerId,
+      proceedTriggerPlayerId,
       proceedBaseEvent,
-      (ml: MatchedCardListener) => ({
-        state: context.state,
-        player: context.player,
-        space: context.space,
-        actionId: replacedActionId,
-        phase: 'after' as const,
-        ...proceedBaseEvent,
-        ownerPlayerId: ml.ownerPlayerId,
-      }),
     )
     // 7b1: when the action returns a `flow`, the wrapper action's `after`
     // / `immediatelyAfter` listeners (and follow-ups) must observe the

@@ -81,7 +81,7 @@ import { getCardEffect } from '../cards/card-effects.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
 import { runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks } from '../cards/card-effects.ts'
 import { positionKey } from '../domain/farm.ts'
-import { getMatchingListeners, executeCardListener, type MatchedCardListener } from '../cards/card-listeners.ts'
+import { getMatchingListeners, executeCardListener } from '../cards/card-listeners.ts'
 import { buildPhaseTrailingNodes } from '../engine/engine-utils.ts'
 import { Scoring, playerBoard, type PlayerScoreSummary } from '../domain'
 import { reap } from '../actions/effects/reap.ts'
@@ -793,19 +793,16 @@ export class GameCore {
     })
     const internals = stagingEngine._internals()
 
-    const buildCtx = (ml: MatchedCardListener) => ({
-      ...context,
-      ownerPlayerId: ml.ownerPlayerId,
-    })
-
+    const activePlayerId = this.state.players[this.state.currentPlayerIndex]?.id ?? ''
     const nodes = buildPhaseTrailingNodes(
       internals,
       matched,
       'after',
       'place-farmer',
       this.state,
+      activePlayerId,
+      player.id,
       {},
-      buildCtx,
     )
     if (nodes.length === 0) return false
 

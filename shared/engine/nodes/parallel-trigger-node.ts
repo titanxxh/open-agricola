@@ -7,23 +7,20 @@ import { ActivateCardNode } from './activate-card-node'
 /**
  * BGA-style PARALLEL trigger selector.
  *
- * When the dispatcher (`buildPhaseTrailingNodes`) detects multiple matched
- * listeners whose flows are `interactive`, it wraps them as `ActivateCardNode`
- * children of this node. The engine main loop emits `kind: 'select-trigger'`
- * with one option per remaining card (+ `__pass__`); after the player picks a
- * card, `chooseCard` records `selectedChildId` and the engine activates that
- * child. The child's flow nodes are then inserted **inside this node's
- * children array, right after the activated card**, so the tree walker
- * (`nextUnresolved`) executes the entire trigger's flow (including any nested
- * sub-PARALLELs) before returning here to prompt for the next card.
+ * `buildPhaseTrailingNodes` wraps **all** matched listeners (even a single
+ * listener) for an owner group as `ActivateCardNode` children of this node.
+ * When there are multiple unresolved children the engine emits
+ * `kind: 'select-trigger'`; PASS is offered only when **every** unresolved
+ * child is explicitly `mandatory: false` (default is mandatory). When only
+ * one option remains the node short-circuits to a `continue` step so the
+ * tree walker descends into that single child without surfacing a choice.
  *
- * `children` therefore holds a heterogeneous mix at runtime:
- *   - The initial `ActivateCardNode[]` placed by the dispatcher (one per card)
- *   - Flow nodes (`SequenceNode` / leaf / `ParallelTriggerNode` etc.) inserted
- *     by the engine **after** a card's activation, occupying the slot between
- *     the activated `ActivateCardNode` and the next card.
+ * `children` holds a heterogeneous mix at runtime:
+ *   - The initial `ActivateCardNode[]` placed by the dispatcher.
+ *   - Flow nodes (`SequenceNode` / leaf / nested `ParallelTriggerNode` etc.)
+ *     inserted by the engine after a card's activation.
  *
- * The selector-only methods (`getRemainingCardIds`, `chooseCard`,
+ * Selector-only methods (`getRemainingCardIds`, `chooseCard`,
  * `buildSelectOptions`, `passAll`) filter for `ActivateCardNode` instances.
  */
 export class ParallelTriggerNode extends BaseNode {
@@ -81,13 +78,10 @@ export class ParallelTriggerNode extends BaseNode {
       labelKey: `cards.${c.cardId}.name`,
       sourceCard: c.cardId,
     }))
-    // PASS hidden only when at least one unresolved trigger is explicitly
-    // mandatory (`mandatory: true`). Default is optional (PASS offered) — this
-    // preserves BGA-aligned behavior for the bulk of cards that have no
-    // explicit mandatory declaration, while letting future cards opt into
-    // mandatory by setting `mandatory: true` on the listener registration.
-    const anyMandatory = remaining.some((c) => c.event.mandatory === true)
-    if (!anyMandatory) {
+    // BGA-style: default mandatory = true. PASS shown only when **every**
+    // unresolved trigger is explicitly `mandatory: false`.
+    const allOptional = remaining.length > 0 && remaining.every((c) => c.event.mandatory === false)
+    if (allOptional) {
       return [...cardOpts, { value: '__pass__', labelKey: 'ui.interactionSelectTriggerPass' }]
     }
     return cardOpts
@@ -116,6 +110,18 @@ export class ParallelTriggerNode extends BaseNode {
       return { kind: 'continue' }
     }
     const options = this.buildSelectOptions()
+    // Single mandatory option (no PASS, exactly one card remaining) → auto
+    // resolve so the engine main loop stays on the `ok` path. This makes
+    // single-listener cases (the common shape) identical to the legacy
+    // direct-ActivateCardNode behavior without surfacing a choice the
+    // player has no real say in.
+    if (options.length === 1 && options[0]!.value !== '__pass__') {
+      const onlyCard = this.cardChildren().find((c) => c.cardId === options[0]!.value && c.getState() !== 'resolved')
+      if (onlyCard) {
+        this.selectedChildId = onlyCard.id
+        return { kind: 'continue' }
+      }
+    }
     const request: InteractionRequest = {
       kind: 'select-trigger',
       ownerPlayerId: this.ownerPlayerId,

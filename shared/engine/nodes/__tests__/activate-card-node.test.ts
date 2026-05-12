@@ -31,4 +31,28 @@ describe('ActivateCardNode.step', () => {
     expect(cursor.data.actionId).toBe('gain-wood')
     expect(cursor.data.event).toEqual({ ownerPlayerId: 'p2' })
   })
+
+  it('cursorData does not expose preComputedResult or hasPreComputed', () => {
+    const node = new ActivateCardNode('ac1', 'L1', 'C1', 'after', 'place-farmer', { triggerPlayerId: 'p1' })
+    const data: any = (node as any).cursorData()
+    expect(data).toHaveProperty('listenerId', 'L1')
+    expect(data).toHaveProperty('cardId', 'C1')
+    expect(data).toHaveProperty('event')
+    expect(data).not.toHaveProperty('preComputedResult')
+    expect(data).not.toHaveProperty('hasPreComputed')
+  })
+
+  it('exposes only the documented public fields', () => {
+    const node = new ActivateCardNode('ac1', 'L1', 'C1', 'after', 'gain', { x: 1 })
+    expect(node).toMatchObject({
+      id: 'ac1',
+      listenerId: 'L1',
+      cardId: 'C1',
+      phase: 'after',
+      actionId: 'gain',
+      event: { x: 1 },
+    })
+    expect((node as any).preComputedResult).toBeUndefined()
+    expect((node as any).hasPreComputed).toBeUndefined()
+  })
 })
