@@ -17,11 +17,7 @@ describe('stats: gain with recipientPlayerId records resourcesFromCards on targe
     return resp
   }
 
-  // TODO(lazy-dispatch): re-enable after auditing cross-player Publican path
-  // under the new lazy-peek + PlayerSwitchNode wrap. The listener fires but
-  // stats are not credited to recipientPlayerId in this flow — likely a
-  // sub-flow context handover issue, not a regression of the listener itself.
-  it.skip('Publican (gain with recipientPlayerId + sourceCard) credits opponent stats.resourcesFromCards', () => {
+  it('Publican (gain with recipientPlayerId + sourceCard) credits opponent stats.resourcesFromCards', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -63,16 +59,13 @@ describe('stats: gain with recipientPlayerId records resourcesFromCards on targe
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    // Lazy dispatch: single Publican listener bypasses PARALLEL — engine
-    // jumps straight into Publican's inner optional pay/accept choice once
-    // mid-action sub-flows (player switch confirms) settle. select-trigger
-    // only appears with 2+ interactive listeners on the same event.
+    // Under PARALLEL dispatch, the Publican listener is wrapped in a select-trigger prompt.
+    // Activate Publican via select-trigger first, then resolve its optional pay choice.
     if (resp.interaction.request.kind === 'select-trigger') {
       const publiOpt = resp.interaction.request.options.find((o) => o.sourceCard === 'A132_Publican')
-      if (publiOpt) {
-        resp = session.resolveChoice(0, publiOpt.value)
-        resp = advancePastPlayerSwitches(session, resp)
-      }
+      expect(publiOpt).toBeDefined()
+      resp = session.resolveChoice(0, publiOpt?.value ?? '__pass__')
+      resp = advancePastPlayerSwitches(session, resp)
     }
 
     const acceptOption = resp.interaction.options?.find(
