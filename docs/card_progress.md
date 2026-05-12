@@ -47,6 +47,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-05-12** — §2.4 sprint metadata-2 done: `--apply-safe` auto-fix landed 74 张 extraVp + 33 张 category (107 张代码改)，新增 `extraVp-bga-alignment.test.ts` (70 cases) + 扩展 `category-bga-alignment.test.ts` (+33 rows)；剩 ⚠ 1 / ❌ 95 / 🔍 36 进 metadata-3 人工核对。
 - **2026-05-12** — §2.4 cost:{} 标准化：`diff.ts` 对 cost 字段加 isEmptyObj 规范化（空对象 ≡ missing），消除 ~400+ 职业卡假阳性。报告从 ⚠ 74 / ❌ 644 / 🔍 36 降至 ⚠ 74 / ❌ 128 / 🔍 36。新增 2 回归测试（10/10 通过）。
 - **2026-05-12** — §2.4 parser bug fix: BGA category 正则扩为兼容 quoted-string（`'BONUS_POINTS_-_GET'` 类含连字符）+ vp:0 ≡ undefined 标准化，消除大批假阳性。报告从 ⚠ 83 / ❌ 729 / 🔍 36 降至 ⚠ 74 / ❌ 644 / 🔍 36。新增 2 回归测试（8/8 通过）。
 - **2026-05-12** — §2.4 mechanical re-audit: `scripts/audit-bga-metadata-diff.ts` 沉淀 + 首次报告 → `docs/operations/bga-metadata-diff-report.md`（⚠ 83 / ❌ 729 / 🔍 36）。原 §2.4 表头 "剩 57 张" 已 stale。
@@ -469,7 +470,7 @@ E 牌组（10 张）: E1 PoleBarns / E21 SheepRug / E2 RenovationMaterials / E30
 
 > **历史记录**：D154 ChimneySweep（renovate -2 stone 在 wood→stone 直升时漏减、`players` 字段）已于 2026-04-19 修复，迁入 §2.1。C129 SecondSpouse 已于 2026-04-19 对齐 BGA（首置 farmer + ≤2 占用），迁入 §2.1。B143 ClayWarden 已于 2026-04-19 补 `hollow` 3 人版空间并确认 listener 已覆盖（见 §2.0）。
 
-### 2.4 ❌ 数值/元数据待修（2026-05-12 重新 audit（cost:{} 标准化后）：⚠ literal 74 / ❌ complex 128 / 🔍 single-sided 36，详见 `docs/operations/bga-metadata-diff-report.md`；历史 83 → 57 张推断已 stale）
+### 2.4 ❌ 数值/元数据待修（2026-05-12 mechanical re-audit + auto-fix：⚠ 1 / ❌ 95 / 🔍 36；详见 `docs/operations/bga-metadata-diff-report.md`；85 张 category + 74 张 extraVp 已由 scripts/audit-bga-metadata-diff.ts --apply-safe 收口）
 
 > 完整证据链见 `docs/card_desc_audit.md` §4.4 + `docs/card_desc_audit.md` §3。
 
