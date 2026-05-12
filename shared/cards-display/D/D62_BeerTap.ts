@@ -10,7 +10,6 @@ export const D62_BeerTap = new MinorImprovement({
   category: 'FOOD_PROVIDER',
   desc: ['When you play this card, you immediately get 2 <FOOD>. In the feeding phase of each harvest, you can turn 2/3/4 <GRAIN> into 3/6/9 <FOOD>.'],
   cost: { wood: 1 },
-  newSet: true,
   // Three tiers share the same sourceId so per-source `max:1` caps the whole
   // card to a single tier per harvest (the consumer aggregates by sourceId).
   exchanges: [

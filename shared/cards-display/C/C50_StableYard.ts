@@ -14,5 +14,4 @@ export const C50_StableYard = new MinorImprovement({
   exchanges: [
     { from: { sheep: 1, boar: 1 }, to: { cattle: 1 }, triggers: ['anytime'] },
   ],
-  newSet: true,
 })

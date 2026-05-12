@@ -13,5 +13,4 @@ export const D160_Midwife = new Occupation({
   ],
   cost: {},
   players: '4+',
-  newSet: true,
 })

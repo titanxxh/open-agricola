@@ -13,5 +13,4 @@ export const C102_TreeGuard = new Occupation({
   ],
   cost: {},
   players: '1+',
-  newSet: true,
 })

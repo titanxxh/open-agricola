@@ -11,5 +11,4 @@ export const C138_AnimalFeeder = new Occupation({
   desc: ['On the __Day Laborer__ action space, you also get your choice of 1 <SHEEP> or 1 <GRAIN>. Instead of that good, you can buy 1 <PIG> for 1 <FOOD> or 1 <CATTLE> for 2 <FOOD>.'],
   cost: {},
   players: '3+',
-  newSet: true,
 })

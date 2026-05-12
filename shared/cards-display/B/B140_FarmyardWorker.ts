@@ -11,5 +11,4 @@ export const B140_FarmyardWorker = new Occupation({
   desc: ['At the end of each work phase in which you placed at least 1 good on 1 of your farmyard spaces, you get 2 <FOOD>.'],
   cost: {},
   players: '3+',
-  newSet: true,
 })

@@ -11,5 +11,4 @@ export const D48_CivicFacade = new MinorImprovement({
   desc: ['Before the start of each round, if you have more occupations than improvements in your hand, you get 1 <FOOD>.'],
   cost: { clay: 1 },
   prerequisite: '3 Rooms',
-  newSet: true,
 })

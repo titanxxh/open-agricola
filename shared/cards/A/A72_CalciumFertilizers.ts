@@ -33,10 +33,14 @@ const listener: CardListenerRegistration = {
     const plantedFields = context.player.fields.filter((f) => !fieldIsEmpty(f))
     if (plantedFields.length === 0) return
 
-    // Fully automatic: add 1 crop to top stack of each planted field
+    // Fully automatic: add 1 crop to top stack of each planted field.
+    // Skip stone-kind stacks (C6 StoneClearing) — BGA "additional crop"
+    // only applies to GRAIN/VEGETABLE.
     for (const field of plantedFields) {
       const top = fieldTopStack(field)
-      if (top) top.remaining += 1
+      if (top && (top.kind === 'grain' || top.kind === 'vegetable')) {
+        top.remaining += 1
+      }
     }
 
     return {

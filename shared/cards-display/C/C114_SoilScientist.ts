@@ -13,5 +13,4 @@ export const C114_SoilScientist = new Occupation({
   ],
   cost: {},
   players: '1+',
-  newSet: true,
 })

@@ -51,23 +51,35 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
 }
 
 /**
- * Sync C148.held downward when player's pig count is below the cap.
+ * Sync C148.held downward when fewer pigs remain on the card than the
+ * permanent capacity. BGA semantic: `decreaseRoom` — each pig that moves
+ * off the card permanently reduces capacity; pigs returning later (e.g.
+ * via breeding) do NOT restore it.
  *
- * BGA: when pigs leave the card (via cooking/exchange, paying, reorganize),
- * the card's capacity is permanently reduced (`decreaseRoom` / `decreaseRoomAll`).
- * We approximate by syncing `held` to `min(held, player.resources.boar)` after
- * actions that can move pigs off the card. The sync only goes downward — the
- * cap never grows back even if pig count later rises (e.g., via breeding).
+ * Zone-based formula: pigsInC148 = boar − pasture_boars − house_boars − stable_boars.
+ * Mathematically equivalent to the legacy `min(held, total_boars)` approximation
+ * on pay / exchange / place-farmer paths (those paths reduce total_boars
+ * without redistributing zones, so the subtraction reduces by the same amount).
+ * Correct on the reorg path where zones change but total_boars does not.
  */
 const syncHeldDownward = (player: PlayerState) => {
   const counters = player.cardStates?.[CARD_ID]?.counters
   if (!counters) return
   const held = counters.held ?? 0
   if (held <= 0) return
-  const boars = player.resources.boar ?? 0
-  if (boars < held) {
-    counters.held = boars
-  }
+
+  const pastureBoars = player.pastures
+    .filter((p) => p.animalType === 'boar')
+    .reduce((sum, p) => sum + p.animalCount, 0)
+  const houseBoars = player.houseAnimalType === 'boar' ? player.houseAnimalCount : 0
+  const stableBoars = Object.values(player.stableAnimals ?? {})
+    .filter((t) => t === 'boar').length
+  const pigsInC148 = Math.max(
+    0,
+    (player.resources.boar ?? 0) - pastureBoars - houseBoars - stableBoars,
+  )
+
+  if (pigsInC148 < held) counters.held = pigsInC148
 }
 
 const afterExchangeSyncListener: CardListenerRegistration = {
@@ -80,13 +92,11 @@ const afterExchangeSyncListener: CardListenerRegistration = {
   },
 }
 
-const syncHeldAfterPlaceFarmerListener: CardListenerRegistration = {
-  id: 'C148-mud-wallower-sync-held-after-place-farmer',
+const afterReorgSyncListener: CardListenerRegistration = {
+  id: 'C148-mud-wallower-after-reorg',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
-  // Order > 0 so it runs after the increment listener (which has default order 0).
-  order: 10,
+  actions: ['reorganize'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     syncHeldDownward(context.player)
   },
@@ -113,7 +123,7 @@ const afterPaySyncListener: CardListenerRegistration = {
 }
 
 export const C148_MudWallower_impl = {
-  listeners: [afterPlaceFarmerListener, afterExchangeSyncListener, syncHeldAfterPlaceFarmerListener, afterPaySyncListener],
+  listeners: [afterPlaceFarmerListener, afterExchangeSyncListener, afterPaySyncListener, afterReorgSyncListener],
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {

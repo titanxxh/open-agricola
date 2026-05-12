@@ -13,5 +13,4 @@ export const D103_CanalBoatman = new Occupation({
   ],
   cost: {},
   players: '1+',
-  newSet: true,
 })

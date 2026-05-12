@@ -13,5 +13,4 @@ export const B51_DiggingSpade = new MinorImprovement({
   ],
   cost: { wood: 1 },
   prerequisite: 'Play in Round 7 or Later',
-  newSet: true,
 })

@@ -11,5 +11,4 @@ export const A117_WoodCarrier = new Occupation({
   desc: ['When you play this card, you immediately get 1 <WOOD> for each improvement in front of you.'],
   cost: {},
   players: '1+',
-  newSet: true,
 })

@@ -137,7 +137,6 @@ export const C146_WorkshopAssistant = new Occupation({
   ],
   cost: {},
   players: "3+",
-  newSet: true,
 })
 
 export const C146_WorkshopAssistant_impl = {

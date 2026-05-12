@@ -13,5 +13,4 @@ export const D140_Loudmouth = new Occupation({
   ],
   cost: {},
   players: '3+',
-  newSet: true,
 })

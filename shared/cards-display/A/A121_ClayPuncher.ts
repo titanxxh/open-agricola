@@ -13,5 +13,4 @@ export const A121_ClayPuncher = new Occupation({
   ],
   cost: {},
   players: "1+",
-  newSet: true,
 })

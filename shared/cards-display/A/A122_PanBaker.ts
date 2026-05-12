@@ -11,5 +11,4 @@ export const A122_PanBaker = new Occupation({
   desc: ['Each time you use the __Grain Utilization__ action space, you also get 2 <CLAY> and 1 <WOOD>.'],
   cost: {},
   players: '1+',
-  newSet: true,
 })

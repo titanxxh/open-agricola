@@ -11,5 +11,4 @@ export const D3_Furrows = new MinorImprovement({
   desc: ['You can immediately sow in exactly 1 field.'],
   cost: {},
   passing: true,
-  newSet: true,
 })

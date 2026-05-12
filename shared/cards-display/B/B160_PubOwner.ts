@@ -13,5 +13,4 @@ export const B160_PubOwner = new Occupation({
   ],
   cost: {},
   players: '4+',
-  newSet: true,
 })

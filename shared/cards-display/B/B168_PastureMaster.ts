@@ -13,5 +13,4 @@ export const B168_PastureMaster = new Occupation({
   ],
   cost: {},
   players: '4+',
-  newSet: true,
 })

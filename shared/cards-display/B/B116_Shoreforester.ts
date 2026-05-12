@@ -13,5 +13,4 @@ export const B116_Shoreforester = new Occupation({
   ],
   cost: {},
   players: '1+',
-  newSet: true,
 })

@@ -11,5 +11,5 @@ export const D100_LordoftheManor = new Occupation({
   desc: ["During scoring, you get 1 bonus <SCORE> for each scoring category in which you score the maximum 4 points. (The bonus point is also awarded for 4 fenced stables.)"],
   cost: {},
   players: "1+",
-  newSet: true,
+  extraVp: true,
 })

@@ -13,5 +13,4 @@ export const C155_FoodDistributor = new Occupation({
   ],
   cost: {},
   players: '4+',
-  newSet: true,
 })

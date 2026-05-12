@@ -10,5 +10,4 @@ export const B17_ForestPlow = new MinorImprovement({
   category: 'FARM_PLANNER',
   desc: ['Each time after you use a wood accumulation space, you can pay 2 <WOOD> to plow 1 field. Place the paid <WOOD> on the accumulation space (for the next visitor).'],
   cost: { wood: 1 },
-  newSet: true,
 })

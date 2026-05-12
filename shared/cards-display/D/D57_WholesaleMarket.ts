@@ -11,5 +11,4 @@ export const D57_WholesaleMarket = new MinorImprovement({
   desc: ['Place 1 <FOOD> on each remaining round space. At the start of these rounds, you get the <FOOD>.'],
   cost: { wood: 2, vegetable: 2 },
   vp: 3,
-  newSet: true,
 })

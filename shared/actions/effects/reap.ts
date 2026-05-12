@@ -10,7 +10,7 @@ import { runCardListeners } from '../../cards/card-listeners'
 export const dispatchReapListener = (
   state: GameState,
   player: PlayerState,
-  crop: 'grain' | 'vegetable',
+  crop: 'grain' | 'vegetable' | 'stone',
   amount: number,
 ): void => {
   if (amount <= 0) return
@@ -34,6 +34,7 @@ export const reap = (
     vegetableFields: 0,
     harvestedPositions: [],
   }
+  let stoneFields = 0
   player.fields.forEach((field) => {
     const top = fieldTopStack(field)
     if (!top || top.remaining <= 0) return
@@ -42,20 +43,24 @@ export const reap = (
     reapSummary.resources[kind] = (reapSummary.resources[kind] ?? 0) + 1
     if (kind === 'grain') {
       reapSummary.grainFields += 1
-    } else {
+    } else if (kind === 'vegetable') {
       reapSummary.vegetableFields += 1
+    } else if (kind === 'stone') {
+      stoneFields += 1
     }
     reapSummary.harvestedPositions!.push({ row: field.row, col: field.col })
     top.remaining -= 1
     fieldPopIfDepleted(field)
   })
 
-  // Dispatch reap listeners per crop type
   if (reapSummary.grainFields > 0) {
     dispatchReapListener(state, player, 'grain', reapSummary.grainFields)
   }
   if (reapSummary.vegetableFields > 0) {
     dispatchReapListener(state, player, 'vegetable', reapSummary.vegetableFields)
+  }
+  if (stoneFields > 0) {
+    dispatchReapListener(state, player, 'stone', stoneFields)
   }
 
   return { type: 'ok', reapSummary }

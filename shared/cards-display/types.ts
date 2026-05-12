@@ -57,7 +57,6 @@ export class CardBase {
   improvementPrerequisites?: CardPrerequisites
   players?: string
   passing?: boolean
-  newSet?: boolean
   modifier?: CostModifier
   modifiers?: CostModifier[]
   exchanges?: CardExchange[]
@@ -104,7 +103,6 @@ export class CardBase {
     if (this.improvementPrerequisites) def.improvementPrerequisites = this.improvementPrerequisites
     if (this.players) def.players = this.players
     if (this.passing) def.passing = this.passing
-    if (this.newSet) def.newSet = this.newSet
     if (this.modifier) def.modifier = this.modifier
     if (this.modifiers) def.modifiers = this.modifiers
     if (this.exchanges) def.exchanges = this.exchanges

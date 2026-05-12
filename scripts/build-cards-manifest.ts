@@ -28,7 +28,6 @@ export type CardMeta = {
   cost?: Record<string, number>
   altCosts?: Record<string, number>[]
   players?: string
-  newSet?: boolean
   prerequisite?: unknown
   vp?: number
   isCookery?: boolean
@@ -48,7 +47,7 @@ export type CardsManifest = Record<string, CardManifestEntry>
 
 const META_FIELDS = new Set([
   'id', 'name', 'deck', 'number', 'category', 'desc',
-  'cost', 'altCosts', 'players', 'newSet', 'prerequisite', 'vp',
+  'cost', 'altCosts', 'players', 'prerequisite', 'vp',
   'isCookery', 'isBaking', 'passing', 'returnCards', 'alsoCountsAs',
 ])
 

@@ -13,5 +13,4 @@ export const A27_OvenSite = new MinorImprovement({
   ],
   prerequisite: 'Both Fireplace and Cooking Hearth',
   cost: {},
-  newSet: true,
 })

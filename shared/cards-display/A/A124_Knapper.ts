@@ -13,5 +13,4 @@ export const A124_Knapper = new Occupation({
   ],
   cost: {},
   players: '1+',
-  newSet: true,
 })

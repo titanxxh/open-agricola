@@ -11,5 +11,4 @@ export const A163_BuildingExpert = new Occupation({
   desc: ['Each time you use the __Resource Market__ action space with the 1st/2nd/3rd/4th/5th person you place, you also get 1 <WOOD>/<CLAY>/<REED>/<STONE>/<STONE>.'],
   cost: {},
   players: '4+',
-  newSet: true,
 })

@@ -11,5 +11,4 @@ export const A140_ShovelBearer = new Occupation({
   desc: ['Each time you use the __Clay Pit__ or __Hollow__ accumulation space, you also get a number of <FOOD> equal to the amount of <CLAY> on the respective other accumulation space.'],
   cost: {},
   players: '3+',
-  newSet: true,
 })

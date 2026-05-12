@@ -12,5 +12,4 @@ export const A77_Hod = new MinorImprovement({
     "When you play this card, you immediately get 1 <CLAY>. Each time any player (including you) uses the __Pig Market__ accumulation space, you immediately get 2 <CLAY>.",
   ],
   cost: { wood: 1 },
-  newSet: true,
 })

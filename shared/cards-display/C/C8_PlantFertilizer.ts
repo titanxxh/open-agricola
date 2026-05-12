@@ -11,5 +11,4 @@ export const C8_PlantFertilizer = new MinorImprovement({
   desc: ["In each field with exactly 1 good, you can immediately place 1 additional good of the same type."],
   cost: {},
   passing: true,
-  newSet: true,
 })

@@ -11,5 +11,4 @@ export const C20_MolePlow = new MinorImprovement({
   desc: ['Each time you use the __Farmland__ or __Cultivation__ action space, you can plow 1 additional field.'],
   cost: { wood: 3, food: 1 },
   prerequisite: 'Play in Round 9 or Later',
-  newSet: true,
 })

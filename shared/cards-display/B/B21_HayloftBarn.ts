@@ -12,5 +12,4 @@ export const B21_HayloftBarn = new MinorImprovement({
   cost: { wood: 3 },
   prerequisite: '1 Occupation',
   occupationPrerequisites: { min: 1 },
-  newSet: true,
 })

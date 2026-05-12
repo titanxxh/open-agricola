@@ -12,5 +12,4 @@ export const A82_WorkCertificate = new MinorImprovement({
   cost: { food: 1 },
   prerequisite: '3 Occupations',
   occupationPrerequisites: { min: 3 },
-  newSet: true,
 })

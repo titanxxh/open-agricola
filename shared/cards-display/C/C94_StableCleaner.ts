@@ -11,5 +11,4 @@ export const C94_StableCleaner = new Occupation({
   desc: ['At any time, you can take the __Build Stables__ action without placing a person. If you do, each stable costs you 1 <WOOD> and 1 <FOOD>.'],
   cost: {},
   players: '1+',
-  newSet: true,
 })

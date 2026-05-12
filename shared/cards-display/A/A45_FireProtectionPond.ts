@@ -11,5 +11,4 @@ export const A45_FireProtectionPond = new MinorImprovement({
   desc: ['Once you no longer live in a wooden house, place 1 <FOOD> on each of the next 6 round spaces. At the start of these rounds, you get the <FOOD>.'],
   cost: { food: 1 },
   prerequisite: 'Still in Wooden House',
-  newSet: true,
 })

@@ -11,5 +11,4 @@ export const A7_GardenersKnife = new MinorImprovement({
   desc: ['You immediately get 1 <FOOD> for each grain field you have and 1 <GRAIN> for each vegetable field you have.'],
   cost: { wood: 1 },
   passing: true,
-  newSet: true,
 })

@@ -12,5 +12,4 @@ export const C52_HuntsmansHat = new MinorImprovement({
   vp: 1,
   cost: { reed: 1 },
   prerequisite: "Cooking Improvement",
-  newSet: true,
 })

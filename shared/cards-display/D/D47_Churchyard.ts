@@ -12,5 +12,4 @@ export const D47_Churchyard = new MinorImprovement({
   cost: { stone: 1, reed: 1 },
   vp: 1,
   prerequisite: '10 Cards* in Front of You',
-  newSet: true,
 })

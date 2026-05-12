@@ -11,5 +11,4 @@ export const C82_HardwareStore = new MinorImprovement({
   desc: ['Each time after you use the __Day Laborer__ action space, you can pay 2 <FOOD> total to buy 1 <WOOD>, 1 <CLAY>, 1 <REED>, and 1 <STONE>.'],
   vp: 1,
   cost: { wood: 1, clay: 1 },
-  newSet: true,
 })

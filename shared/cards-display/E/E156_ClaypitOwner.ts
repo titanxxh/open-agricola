@@ -13,5 +13,4 @@ export const E156_ClaypitOwner = new Occupation({
   ],
   cost: {},
   players: '4+',
-  newSet: true,
 })

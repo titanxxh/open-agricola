@@ -12,5 +12,4 @@ export const D68_SmallBasket = new MinorImprovement({
   cost: {},
   prerequisite: '2 Occupations',
   occupationPrerequisites: { min: 2 },
-  newSet: true,
 })

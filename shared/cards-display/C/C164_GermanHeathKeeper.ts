@@ -13,6 +13,5 @@ export const C164_GermanHeathKeeper = new Occupation({
   ],
   cost: {},
   players: '4+',
-  newSet: true,
   implemented: true,
 })

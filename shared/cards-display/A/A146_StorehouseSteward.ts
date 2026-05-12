@@ -11,5 +11,4 @@ export const A146_StorehouseSteward = new Occupation({
   desc: ['Each time you take exactly 2/3/4/5 <FOOD> from a food accumulation space, you also get 1 <STONE>/<REED>/<CLAY>/<WOOD>. (If you take 6 or more <FOOD>, you do not get a bonus good).'],
   cost: {},
   players: '3+',
-  newSet: true,
 })

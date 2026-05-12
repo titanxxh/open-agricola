@@ -12,5 +12,4 @@ export const A57_MilkingParlor = new MinorImprovement({
   cost: { wood: 2 },
   vp: 1,
   prerequisite: 'At Least 4 Unused Farmyard Spaces',
-  newSet: true,
 })

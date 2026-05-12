@@ -13,5 +13,4 @@ export const A139_HollowWarden = new Occupation({
   ],
   cost: {},
   players: '3+',
-  newSet: true,
 })

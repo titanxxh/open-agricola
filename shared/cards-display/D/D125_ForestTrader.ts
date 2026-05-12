@@ -11,5 +11,4 @@ export const D125_ForestTrader = new Occupation({
   desc: ['Each time you use a wood or clay accumulation space, you can also buy exactly 1 building resource. <WOOD>, <CLAY>, and <REED> cost 1 <FOOD> each; <STONE> costs 2 food.'],
   cost: {},
   players: '1+',
-  newSet: true,
 })

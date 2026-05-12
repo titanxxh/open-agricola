@@ -13,5 +13,4 @@ export const D34_LuxuriousHostel = new MinorImprovement({
   ],
   cost: { wood: 1, clay: 2 },
   extraVp: true,
-  newSet: true,
 })

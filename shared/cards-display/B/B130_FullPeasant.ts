@@ -13,5 +13,4 @@ export const B130_FullPeasant = new Occupation({
   ],
   cost: {},
   players: '3+',
-  newSet: true,
 })

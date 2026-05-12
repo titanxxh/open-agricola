@@ -13,5 +13,4 @@ export const B143_ClayWarden = new Occupation({
   ],
   cost: {},
   players: '3+',
-  newSet: true,
 })

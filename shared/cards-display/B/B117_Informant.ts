@@ -13,5 +13,4 @@ export const B117_Informant = new Occupation({
   ],
   cost: {},
   players: '1+',
-  newSet: true,
 })

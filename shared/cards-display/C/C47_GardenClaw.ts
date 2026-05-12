@@ -10,5 +10,4 @@ export const C47_GardenClaw = new MinorImprovement({
   category: "FOOD_PROVIDER",
   desc: ["Place 1 <FOOD> on each remaining round space, up to three times the number of planted fields you have. At the start of these rounds, you get the <FOOD>."],
   cost: { wood: 1 },
-  newSet: true,
 })

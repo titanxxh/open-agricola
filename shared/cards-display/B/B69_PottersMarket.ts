@@ -11,5 +11,4 @@ export const B69_PottersMarket = new MinorImprovement({
   desc: ['At any time, you can pay 3 <CLAY> and 2 <FOOD>. If you do, place 1 <VEGETABLE> on each of the next 2 round spaces. At the start of these rounds, you get the <VEGETABLE>.'],
   cost: { wood: 2 },
   vp: 1,
-  newSet: true,
 })

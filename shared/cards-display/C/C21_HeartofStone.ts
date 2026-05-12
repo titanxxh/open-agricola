@@ -12,5 +12,4 @@ export const C21_HeartofStone = new MinorImprovement({
     'Each time a __Quarry__ accumulation space is revealed, if you have room in your house, you can immediately take a __Family Growth__ action without placing a person.',
   ],
   cost: { food: 4 },
-  newSet: true,
 })

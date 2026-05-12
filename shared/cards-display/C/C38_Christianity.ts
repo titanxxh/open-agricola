@@ -11,5 +11,4 @@ export const C38_Christianity = new MinorImprovement({
   desc: ["When you play this card, all other players get 1 <FOOD> each."],
   vp: 2,
   prerequisite: "Exactly 1 Sheep",
-  newSet: true,
 })

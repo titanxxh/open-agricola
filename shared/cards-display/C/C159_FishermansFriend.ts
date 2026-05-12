@@ -11,5 +11,4 @@ export const C159_FishermansFriend = new Occupation({
   desc: ['At the start of each round, if there is more <FOOD> on the __Traveling Players__ than on the __Fishing__ accumulation space, you get the difference from the general supply.'],
   cost: {},
   players: '4+',
-  newSet: true,
 })

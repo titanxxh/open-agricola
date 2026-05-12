@@ -12,5 +12,4 @@ export const C32_AbortOriel = new MinorImprovement({
   cost: { clay: 2 },
   vp: 3,
   prerequisite: 'see below',
-  newSet: true,
 })

@@ -10,5 +10,4 @@ export const A66_FeedingDish = new MinorImprovement({
   category: 'CROP_PROVIDER',
   desc: ['Each time you use an animal accumulation space while already having an animal of that type, you get 1 <GRAIN>.'],
   cost: { wood: 1 },
-  newSet: true,
 })
