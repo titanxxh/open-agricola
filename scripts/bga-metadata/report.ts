@@ -1,7 +1,7 @@
 import type { DiffResult, FieldDiff } from './diff'
 
 const LITERAL_FIELDS = ['extraVp', 'vp']
-const COMPLEX_FIELDS = ['category', 'players', 'cost', 'prerequisite']
+const COMPLEX_FIELDS = ['category', 'players', 'cost', 'altCosts', 'prerequisite']
 
 function fmt(v: unknown): string {
   if (v === undefined) return '(missing)'
