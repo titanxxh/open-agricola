@@ -32,11 +32,12 @@ const RESOURCE_MAP: Record<string, string> = {
 function parseResourceMap(body: string): Record<string, number> {
   const out: Record<string, number> = {}
   for (const pair of body.split(',')) {
-    const m = pair.match(/(\w+)\s*=>\s*(-?\d+)/)
+    const m = pair.trim().match(/^(\w+)\s*=>\s*(?:"(-?\d+)"|'(-?\d+)'|(-?\d+))$/)
     if (!m) continue
     const key = RESOURCE_MAP[m[1]]
     if (!key) continue
-    out[key] = Number(m[2])
+    const amount = Number(m[2] ?? m[3] ?? m[4])
+    out[key] = amount
   }
   return out
 }

@@ -41,6 +41,12 @@ describe('parseBgaCard', () => {
     const card = parseBgaCard(phpPath)
     expect(card.category).toBe('BONUS_POINTS_-_GET')
   })
+
+  it('parses quoted-number cost (single and double quotes)', () => {
+    const phpPath = path.join(FIXTURE_DIR, 'bga/A77_QuotedCost.php')
+    const card = parseBgaCard(phpPath)
+    expect(card.cost).toEqual({ wood: 2, reed: 1 })
+  })
 })
 
 describe('parseTsCard', () => {
