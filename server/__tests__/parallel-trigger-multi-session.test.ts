@@ -25,79 +25,59 @@ describe('PARALLEL trigger — multi-listener select-trigger loop', () => {
     return session
   }
 
-  it('emits select-trigger with 2 cards + pass when two interactive listeners match', () => {
+  it('emits select-trigger listing both cards + PASS (default optional)', () => {
     const session = setupWorkPhase()
     const resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') {
       throw new Error(`expected wait state, got ${resp.interaction.stateId}`)
     }
     expect(resp.interaction.request.kind).toBe('select-trigger')
-    if (resp.interaction.request.kind !== 'select-trigger') {
-      throw new Error(`expected select-trigger, got ${resp.interaction.request.kind}`)
-    }
+    if (resp.interaction.request.kind !== 'select-trigger') return
     const values = resp.interaction.request.options.map((o) => o.value).sort()
     expect(values).toContain('C82_HardwareStore')
     expect(values).toContain('C126_Excavator')
+    // Default optional → PASS offered (BGA: PARALLEL trigger ordering choice
+    // includes a PASS that skips remaining unresolved optional triggers).
     expect(values).toContain('__pass__')
   })
 
-  it('resolving a card removes it from select-trigger remaining; pass closes the loop', () => {
+  it('after picking C82 + skipping its optional, falls back to select-trigger for C126', () => {
     const session = setupWorkPhase()
     let resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
     expect(resp.interaction.request.kind).toBe('select-trigger')
 
     resp = session.resolveChoice(0, 'C82_HardwareStore')
     expect(resp.ok).toBe(true)
+    expect(resp.interaction.request.kind).toBe('choice')
+    resp = session.resolveChoice(0, '__skip__')
+    expect(resp.ok).toBe(true)
 
-    while (
-      resp.interaction.stateId === 'wait' &&
-      resp.interaction.request.kind === 'choice'
-    ) {
-      const skipOption = resp.interaction.request.options.find((o) => o.value === '__skip__')
-      if (!skipOption) break
-      resp = session.resolveChoice(0, '__skip__')
-    }
-
-    expect(resp.interaction.stateId).toBe('wait')
+    // Back to select-trigger with only C126 remaining (+ PASS).
     if (resp.interaction.stateId !== 'wait') {
-      throw new Error(`expected wait after C82 skip, got ${resp.interaction.stateId}`)
+      throw new Error(`expected wait, got ${resp.interaction.stateId}`)
     }
     expect(resp.interaction.request.kind).toBe('select-trigger')
-    if (resp.interaction.request.kind !== 'select-trigger') {
-      throw new Error(`expected select-trigger with remaining options, got ${resp.interaction.request.kind}: ${JSON.stringify(resp.interaction)}`)
-    }
+    if (resp.interaction.request.kind !== 'select-trigger') return
     const remaining = resp.interaction.request.options.map((o) => o.value).sort()
     expect(remaining).toContain('C126_Excavator')
     expect(remaining).not.toContain('C82_HardwareStore')
     expect(remaining).toContain('__pass__')
-
-    resp = session.resolveChoice(0, '__pass__')
-    expect(resp.ok).toBe(true)
-    // PARALLEL fully resolved; no further select-trigger pending.
-    if (resp.interaction.stateId === 'wait') {
-      expect(resp.interaction.request.kind).not.toBe('select-trigger')
-    }
   })
 
-  it('selecting __pass__ immediately closes the loop without firing either card', () => {
+  it('selecting __pass__ closes the loop without firing remaining cards', () => {
     const session = setupWorkPhase()
     let resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
-
+    expect(resp.interaction.request.kind).toBe('select-trigger')
     resp = session.resolveChoice(0, '__pass__')
     expect(resp.ok).toBe(true)
-    // PARALLEL fully resolved without firing either card; no select-trigger pending.
     if (resp.interaction.stateId === 'wait') {
       expect(resp.interaction.request.kind).not.toBe('select-trigger')
     }
-
     const player = resp.state.players[0]!
+    // Neither C82 nor C126 fired — no resources gained.
     expect(player.resources.wood).toBe(0)
     expect(player.resources.clay).toBe(0)
     expect(player.resources.reed).toBe(0)
