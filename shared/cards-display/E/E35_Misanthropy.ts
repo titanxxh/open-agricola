@@ -9,7 +9,7 @@ export const E35_Misanthropy = new MinorImprovement({
   number: 35,
   category: "BONUS_POINTS_-_GET",
   desc: ['During scoring, if you have exactly 4/3/2 people, you get 2/3/5 bonus <SCORE>.'],
-  cost: {},
+  cost: { wood: 1 },
   vp: 0,
   extraVp: true,
 })

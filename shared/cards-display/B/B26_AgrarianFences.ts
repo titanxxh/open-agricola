@@ -11,5 +11,4 @@ export const B26_AgrarianFences = new MinorImprovement({
   desc: [
     'Each time you use the __Grain Utilization__ action space, you can take a __Build Fences__ action instead of one of the two actions provide by the action space.',
   ],
-  cost: { wood: 1 },
 })

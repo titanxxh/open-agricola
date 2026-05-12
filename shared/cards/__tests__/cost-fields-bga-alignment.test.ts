@@ -36,6 +36,19 @@ const cases: Case[] = [
   { id: 'E34_LandRegister',        kind: 'minor', cost: { wood: 1 } },
   { id: 'E95_Miller',              kind: 'occupation', cost: {} },
   { id: 'A39_Chapel',             kind: 'minor', cost: { wood: 3, clay: 2 }, vp: 3 },
+  // metadata-3b forward 3
+  { id: 'A25_Bassinet',           kind: 'minor', cost: { wood: 1, reed: 1 } },
+  { id: 'A31_DebtSecurity',       kind: 'minor', cost: { food: 2 } },
+  { id: 'E35_Misanthropy',        kind: 'minor', cost: { wood: 1 } },
+  // metadata-3b reverse 8 (deleted to match BGA missing)
+  { id: 'A1_Shelter',             kind: 'minor', cost: {} },
+  { id: 'A64_BarleyMill',         kind: 'minor', cost: {} },
+  { id: 'B26_AgrarianFences',     kind: 'minor', cost: {} },
+  { id: 'B5_StoreofExperience',   kind: 'minor', cost: {} },
+  { id: 'B7_Wage',                kind: 'minor', cost: {} },
+  { id: 'B9_BeatingRod',          kind: 'minor', cost: {} },
+  { id: 'D82_HuntingTrophy',      kind: 'minor', cost: {} },
+  { id: 'E38_RodCollection',      kind: 'minor', cost: {} },
 ]
 
 describe('Sprint 1 PR-1B — cost/vp BGA alignment (16 cards)', () => {

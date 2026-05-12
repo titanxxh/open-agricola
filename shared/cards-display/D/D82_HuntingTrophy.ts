@@ -11,6 +11,5 @@ export const D82_HuntingTrophy = new MinorImprovement({
   desc: [
     'Improvements built on __House Redevelopment__ cost you 1 building resource of your choice less. Fences built on __Farm Redevelopment__ cost you a total of 3 <WOOD> less.',
   ],
-  cost: { boar: 1 },
   vp: 1,
 })
