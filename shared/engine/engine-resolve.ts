@@ -104,6 +104,13 @@ export function engineResolveChoice(
   if (int.pendingNodeIdRef.value) {
     const node = int.tree.findNodeById(int.pendingNodeIdRef.value)
     if (node instanceof ParallelTriggerNode) {
+      // Validate against currently-offered options (e.g. PASS only appears
+      // when every unresolved trigger is mandatory: false). Rejecting an
+      // unlisted choice keeps mandatory triggers un-skippable.
+      const offered = node.buildSelectOptions()
+      if (!offered.some((opt) => opt.value === choice)) {
+        return { type: 'fail', logKey: 'log.buildRoomFail' }
+      }
       if (choice === '__pass__') {
         node.passAll()
         int.pendingNodeIdRef.value = null

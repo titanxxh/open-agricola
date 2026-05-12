@@ -99,9 +99,10 @@ describe('Stub_PayGainVp mechanism', () => {
     expect(step.type).toBe('choice')
     if (step.type !== 'choice') return
 
-    // If this is a select-trigger prompt (single interactive listener wrapped in PARALLEL),
-    // resolve it by selecting the card first, then proceed to the actual optional choice.
-    if (step.choice.options.some(o => o.value === '__pass__')) {
+    // If this is a select-trigger prompt (single interactive listener wrapped
+    // in PARALLEL — mandatory default means no __pass__), resolve it by
+    // selecting the card first, then proceed to the actual optional choice.
+    if (step.choice.options.some(o => o.value === CARD_ID)) {
       const triggerResult = engine.resolveChoice(CARD_ID, { state, player, space })
       expect(triggerResult.type).not.toBe('fail')
       step = engine.proceed({ state, player, space })
