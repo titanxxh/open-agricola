@@ -47,8 +47,9 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-05-12** — C115 Sower + anytime nested pending 修复：`C115_Sower` after-major listener 改为返回 engine flow（`push-to-card-stack` + infobox）而非直接 mutate，避免 dispatch peek 与 lazy 执行造成双 reed；interactive nested anytime 完成后 `InteractionNode` 会重新写回 `pendingNodeIdRef`，parent exchange pending 自动恢复；`confirm-next-player` owner 改回刚完成行动的玩家，`nextPlayerIndex` 仅作为确认后的目标玩家。
 - **2026-05-12** — §2.4 metadata-3a parser bug 修复：(1) BGA cost 单/双引号数字 (2) BGA prereq `('...')` 简写 unwrap (3) TS cost JSON 双引号 key (4) diff 层 players default '1+' 归一。Report 重跑：❌ 95 → 33（消除假阳性）。后续真偏差在 metadata-3b 处理。
-- 2026-05-12 anytime 精细化过滤对齐 BGA：引入 `shared/session/anytime-policy.ts` helper，把"全屏蔽 anytime"改成按 entry.id 精细过滤；exchange / bake-bread / animal-reorg pending 内 card listener anytime 现可触发；feed 期间保持锁定（OA 刻意不同）；新增非当前 owner / 嵌套 / 负向 / stale resource / composite 一致性五类 session 测试。**Known limitation (P1)**：interactive nested anytime（如 C115 Sower xor）完成后，parent exchange pending 不自动 resume——exchange 需要玩家重新触发（详见 `server/__tests__/anytime-nested-pending.test.ts` "exchange re-triggered" case）。后续 sprint 评估 `engine.injectBeforeFlows` 在 sub-choice 完成路径上保留父 pending 的支持。
+- 2026-05-12 anytime 精细化过滤对齐 BGA：引入 `shared/session/anytime-policy.ts` helper，把"全屏蔽 anytime"改成按 entry.id 精细过滤；exchange / bake-bread / animal-reorg pending 内 card listener anytime 现可触发；feed 期间保持锁定（OA 刻意不同）；新增非当前 owner / 嵌套 / 负向 / stale resource / composite 一致性五类 session 测试。interactive nested anytime 曾有 parent exchange pending 不自动 resume 的 P1 limitation，已在同日后续修复（见上一条）。
 - **2026-05-12** — §2.4 sprint metadata-2 done: `--apply-safe` auto-fix landed 74 张 extraVp + 33 张 category (107 张代码改)，新增 `extraVp-bga-alignment.test.ts` (70 cases) + 扩展 `category-bga-alignment.test.ts` (+33 rows)；剩 ⚠ 1 / ❌ 95 / 🔍 36 进 metadata-3 人工核对。
 - **2026-05-12** — §2.4 cost:{} 标准化：`diff.ts` 对 cost 字段加 isEmptyObj 规范化（空对象 ≡ missing），消除 ~400+ 职业卡假阳性。报告从 ⚠ 74 / ❌ 644 / 🔍 36 降至 ⚠ 74 / ❌ 128 / 🔍 36。新增 2 回归测试（10/10 通过）。
 - **2026-05-12** — §2.4 parser bug fix: BGA category 正则扩为兼容 quoted-string（`'BONUS_POINTS_-_GET'` 类含连字符）+ vp:0 ≡ undefined 标准化，消除大批假阳性。报告从 ⚠ 83 / ❌ 729 / 🔍 36 降至 ⚠ 74 / ❌ 644 / 🔍 36。新增 2 回归测试（8/8 通过）。

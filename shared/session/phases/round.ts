@@ -146,7 +146,11 @@ export const takeAction = (
  * the sole source of truth surfaced through `getCurrentPending()` /
  * `buildInteraction()`.
  */
-export const startConfirmNextPlayer = (core: GameCore, nextPlayerIndex: number): void => {
+export const startConfirmNextPlayer = (
+  core: GameCore,
+  ownerPlayerIndex: number,
+  nextPlayerIndex: number,
+): void => {
   // confirmNextPlayer is only emitted after `engineStack.clear()` in
   // finishCompletedActionTurn / continueAfterReorganize_roundEnd, so we
   // always push a fresh synthetic frame.
@@ -156,7 +160,7 @@ export const startConfirmNextPlayer = (core: GameCore, nextPlayerIndex: number):
     { kind: 'confirm-next-player', nextPlayerIndex },
   )
   node.promptKey = 'ui.confirmNextPlayer'
-  core.pushSyntheticInteractionFrame(node, nextPlayerIndex, 'confirm-next-player')
+  core.pushSyntheticInteractionFrame(node, ownerPlayerIndex, 'confirm-next-player')
 }
 
 /**
@@ -245,7 +249,7 @@ export const continueAfterReorganizeRoundEnd = (
   const allUsed = core.state.players.every((p) => workersAvailable(core.state, p) <= 0)
   if (!allUsed) {
     const next = nextSeatedPlayerIdx(core.state, core.state.players, core.state.currentPlayerIndex)
-    startConfirmNextPlayer(core, next)
+    startConfirmNextPlayer(core, playerIndex, next)
   }
 }
 
@@ -322,10 +326,10 @@ export const finishCompletedActionTurn = (
   const allWorkersUsed = core.state.players.every((p) => workersAvailable(core.state, p) <= 0)
   if (!allWorkersUsed) {
     const next = nextSeatedPlayerIdx(core.state, core.state.players, core.state.currentPlayerIndex)
-    startConfirmNextPlayer(core, next)
+    startConfirmNextPlayer(core, playerIndex, next)
   } else {
     const startIdx = computeStartPlayerIdx(core.state)
-    startConfirmNextPlayer(core, startIdx)
+    startConfirmNextPlayer(core, playerIndex, startIdx)
   }
   return core.emitResponse()
 }

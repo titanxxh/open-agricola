@@ -71,7 +71,7 @@ describe('anytime nesting — sync card listener inside pending', () => {
     expect(cancel.ok).toBe(true)
   })
 
-  it('exchange pending → C115 xor anytime → sub-choice completes → exchange re-triggered → done', () => {
+  it('exchange pending → C115 xor anytime → sub-choice completes → exchange resumes', () => {
     const session = setupExchangeReady()
     const extraState = session.getState().state
     const p0 = extraState.players[0]!
@@ -92,15 +92,7 @@ describe('anytime nesting — sync card listener inside pending', () => {
     const subDone = session.resolveChoice(0, subOptions[0]!.value)
     expect(subDone.ok).toBe(true)
 
-    // After an interactive nested anytime (xor sub-choice) resolves, the engine
-    // does not auto-resume the parent exchange pending — unlike sync leaf
-    // anytime (see D106 test above). Exchange remains available as an anytime
-    // entry; player re-triggers it explicitly. P1 follow-up: investigate
-    // engine.injectBeforeFlows preservation of parent pending across nested
-    // pending resolution.
-    const exch2 = session.takeAnytimeAction(0, 'exchange')
-    expect(exch2.ok).toBe(true)
-    expect((exch2.interaction as { promptKey?: string }).promptKey)
+    expect((subDone.interaction as { promptKey?: string }).promptKey)
       .toMatch(/^ui\.interactionExchange/)
 
     const finalDone = session.resolveChoice(0, 'bulk:0=1')

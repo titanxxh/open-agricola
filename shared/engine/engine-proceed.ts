@@ -351,6 +351,7 @@ export function engineProceed(
     }
     const stepResult = node.step(ctx)
     if (stepResult.kind === 'choice') {
+      int.pendingNodeIdRef.value = node.id
       // S4c PR2 — backfill the InteractionNode's authoritative
       // contextSnapshot when no prior emit installed one (e.g. an
       // InteractionNode that was injected without going through
