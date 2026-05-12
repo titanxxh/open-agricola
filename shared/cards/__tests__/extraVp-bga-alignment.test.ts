@@ -75,6 +75,12 @@ const cases: Array<{ id: string; kind: 'minor' | 'occupation' }> = [
   { id: 'E39_Paintbrush', kind: 'minor' },
   { id: 'E98_Prodigy', kind: 'occupation' },
   { id: 'E99_UncaringParents', kind: 'occupation' },
+  { id: 'B132_EstateMaster', kind: 'occupation' },
+  { id: 'C31_WritingChamber', kind: 'minor' },
+  { id: 'C63_CraftBrewery', kind: 'minor' },
+  { id: 'C99_GardenDesigner', kind: 'occupation' },
+  { id: 'D33_SummerHouse', kind: 'minor' },
+  { id: 'D92_ChildOmbudsman', kind: 'occupation' },
 ]
 
 describe('extraVp BGA alignment (auto-fix lock-in)', () => {
