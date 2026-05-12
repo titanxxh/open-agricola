@@ -14,6 +14,12 @@ const cases: Array<{ id: string; expected: string }> = [
   { id: 'C158_ForestCampaigner', expected: '4+' },
   { id: 'C163_MaterialDeliveryman', expected: '4+' },
   { id: 'E154_Margrave', expected: '4+' },
+  { id: 'A133_Braggart', expected: '3+' },
+  { id: 'A134_FullFarmer', expected: '3+' },
+  { id: 'B132_EstateMaster', expected: '3+' },
+  { id: 'B153_Housemaster', expected: '4+' },
+  { id: 'D128_BuildingTycoon', expected: '3+' },
+  { id: 'D149_CasualWorker', expected: '4+' },
 ]
 
 describe('Sprint 1 PR-1A — players field BGA alignment (10 occupations)', () => {
