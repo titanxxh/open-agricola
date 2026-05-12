@@ -13,7 +13,7 @@ export const C35_LanternHouse = new MinorImprovement({
   vp: 7,
   // BGA parity: requires no occupations played before buying this minor.
   // Ref: bga-agricola/modules/php/Cards/C/C35_LanternHouse.php
-  prerequisite: "No Occupations",
+  prerequisite: 'No occupation',
   occupationPrerequisites: { max: 0 },
   extraVp: true,
 })
