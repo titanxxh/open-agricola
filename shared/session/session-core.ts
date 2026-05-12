@@ -117,6 +117,11 @@ import { isSpaceOccupied, removeWorkerRef } from '../domain/space.ts'
 import { smallestAvailableWorker } from '../domain/player.ts'
 import { computeAllowedPlacementSpaces } from '../actions/helpers/placement-availability.ts'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../actions/helpers/placement-constants.ts'
+import {
+  computeAnytimePolicy,
+  type AnytimePolicy,
+  type AnytimePolicyInput,
+} from './anytime-policy'
 
 /**
  * Synthetic action-space ID prefix for sub-flow frames pushed onto the
@@ -476,6 +481,25 @@ export class GameCore {
   }
   /** @internal Round phase — enumerate currently-available anytime entries for the active interaction context. */
   listAnytimeEntries(): { descriptor: AnytimeAction; flow: ActionFlow }[] { return this.buildAnytimeEntries() }
+
+  /** @internal — derive policy input from current frame; node + composite fallback. */
+  private getAnytimePolicyInput(): AnytimePolicyInput {
+    const node = this.engineStack.peekInteraction()
+    const composite = this.engineStack.peekPendingChoiceFromComposite()
+    const promptKey = node?.promptKey ?? composite?.promptKey
+    const request = node?.request ?? composite?.request
+    return {
+      hasActiveContext: !!this.getActiveInteractionContext(),
+      stageResume: this.stageResume,
+      interactionKind: request?.kind,
+      promptKey,
+    }
+  }
+
+  /** @internal — used by phases/round.ts takeAnytimeAction + buildInteraction allowedCommands sync. */
+  computeAnytimePolicySnapshot(): AnytimePolicy {
+    return computeAnytimePolicy(this.getAnytimePolicyInput())
+  }
   /** @internal Round phase — finalize per-action stats / detail log. */
   invokeFinalizeActionLog(player: PlayerState): void { this.finalizeActionLog(player) }
   /** @internal Round phase — `state.round` after-harvest finalization. */
