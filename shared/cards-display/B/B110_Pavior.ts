@@ -13,5 +13,4 @@ export const B110_Pavior = new Occupation({
   ],
   cost: {},
   players: '1+',
-  newSet: true,
 })

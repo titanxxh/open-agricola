@@ -12,5 +12,4 @@ export const A36_FacadesCarving = new MinorImprovement({
   cost: { clay: 2 },
   prerequisite: 'Wood in Your Supply >= Current Round',
   extraVp: true,
-  newSet: true,
 })

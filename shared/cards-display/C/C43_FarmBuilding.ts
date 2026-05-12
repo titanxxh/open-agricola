@@ -13,5 +13,4 @@ export const C43_FarmBuilding = new MinorImprovement({
   ],
   cost: { clay: 1, reed: 1 },
   vp: 1,
-  newSet: true,
 })

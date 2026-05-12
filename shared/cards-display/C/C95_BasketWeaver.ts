@@ -13,5 +13,4 @@ export const C95_BasketWeaver = new Occupation({
   ],
   cost: {},
   players: '1+',
-  newSet: true,
 })

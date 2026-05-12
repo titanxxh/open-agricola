@@ -13,5 +13,4 @@ export const D110_FishFarmer = new Occupation({
   ],
   cost: {},
   players: '1+',
-  newSet: true,
 })

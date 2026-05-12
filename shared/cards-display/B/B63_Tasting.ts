@@ -13,5 +13,4 @@ export const B63_Tasting = new MinorImprovement({
   ],
   cost: { wood: 2 },
   vp: 1,
-  newSet: true,
 })

@@ -11,5 +11,4 @@ export const D130_RecreationalCarpenter = new Occupation({
   desc: ['At the end of each work phase in which you did not use the __Meeting Place__ action space, you can take a __Build Rooms__ action without placing a person.'],
   cost: {},
   players: '3+',
-  newSet: true,
 })

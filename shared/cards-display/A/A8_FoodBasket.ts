@@ -14,5 +14,4 @@ export const A8_FoodBasket = new MinorImprovement({
   prerequisite: '2 Occupations and 2 Improvements',
   occupationPrerequisites: { min: 2 },
   improvementPrerequisites: { min: 2 },
-  newSet: true,
 })

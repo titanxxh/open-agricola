@@ -11,5 +11,4 @@ export const B151_LittlePeasant = new Occupation({
   desc: ["You immediately get 1 <STONE>. As long as you live in a wooden house with exactly 2 rooms, actions spaces—excluding Meeting Place—are not considered occupied for you."],
   cost: {},
   players: "4+",
-  newSet: true,
 })

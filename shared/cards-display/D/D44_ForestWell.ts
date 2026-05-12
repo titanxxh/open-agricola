@@ -13,5 +13,4 @@ export const D44_ForestWell = new MinorImprovement({
   vp: 1,
   prerequisite: '2 Occupations',
   occupationPrerequisites: { min: 2 },
-  newSet: true,
 })

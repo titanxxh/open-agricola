@@ -11,5 +11,4 @@ export const B147_Huntsman = new Occupation({
   desc: ['Each time after you use a wood accumulation space, you can pay 1 <GRAIN> to get 1 <PIG>.'],
   cost: {},
   players: '3+',
-  newSet: true,
 })

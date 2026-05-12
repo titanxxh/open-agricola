@@ -13,5 +13,4 @@ export const A158_CulinaryArtist = new Occupation({
   ],
   cost: {},
   players: '4+',
-  newSet: true,
 })

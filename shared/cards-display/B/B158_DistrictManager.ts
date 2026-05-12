@@ -11,5 +11,4 @@ export const B158_DistrictManager = new Occupation({
   desc: ['At the end of each work phase, if you used both the __Forest__ and __Grove__ accumulation spaces, you get 5 <FOOD>.'],
   cost: {},
   players: '4+',
-  newSet: true,
 })

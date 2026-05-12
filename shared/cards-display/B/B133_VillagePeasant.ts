@@ -11,5 +11,4 @@ export const B133_VillagePeasant = new Occupation({
   desc: ['At the start of scoring, you get a number of <VEGETABLE> equal to the smallest of the numbers of major improvements, minor improvements, and occupations you have.'],
   cost: {},
   players: '3+',
-  newSet: true,
 })

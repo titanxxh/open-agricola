@@ -13,6 +13,5 @@ export const D143_TreeCutter = new Occupation({
   ],
   cost: {},
   players: '3+',
-  newSet: true,
   implemented: true,
 })

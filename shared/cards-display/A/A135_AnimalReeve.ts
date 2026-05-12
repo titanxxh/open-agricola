@@ -12,5 +12,4 @@ export const A135_AnimalReeve = new Occupation({
   cost: {},
   players: '3+',
   extraVp: true,
-  newSet: true,
 })

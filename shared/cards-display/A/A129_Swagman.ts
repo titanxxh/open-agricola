@@ -13,5 +13,4 @@ export const A129_Swagman = new Occupation({
   ],
   cost: {},
   players: '3+',
-  newSet: true,
 })

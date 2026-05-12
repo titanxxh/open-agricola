@@ -11,5 +11,4 @@ export const C83_EarlyCattle = new MinorImprovement({
   desc: ["When you play this card, you immediately get 2 <CATTLE>."],
   vp: -3,
   prerequisite: "1 Pasture",
-  newSet: true,
 })

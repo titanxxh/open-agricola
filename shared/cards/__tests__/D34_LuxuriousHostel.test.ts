@@ -44,7 +44,6 @@ describe('D34_LuxuriousHostel', () => {
   it('card definition matches BGA (cost, flags, no purchase prereq)', () => {
     expect(D34Card.cost).toEqual({ wood: 1, clay: 2 })
     expect(D34Card.extraVp).toBe(true)
-    expect(D34Card.newSet).toBe(true)
     expect(D34Card.prerequisite).toBeUndefined()
   })
 

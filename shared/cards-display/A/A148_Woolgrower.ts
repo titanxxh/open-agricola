@@ -11,5 +11,4 @@ export const A148_Woolgrower = new Occupation({
   desc: ['This card can hold a number of <SHEEP> equal to the number of completed feeding phases.'],
   cost: {},
   players: '4+',
-  newSet: true,
 })

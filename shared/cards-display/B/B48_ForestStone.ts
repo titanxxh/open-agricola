@@ -13,5 +13,4 @@ export const B48_ForestStone = new MinorImprovement({
   vp: 1,
   prerequisite: '1 Occupation',
   occupationPrerequisites: { min: 1 },
-  newSet: true,
 })

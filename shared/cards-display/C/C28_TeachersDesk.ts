@@ -14,5 +14,4 @@ export const C28_TeachersDesk = new MinorImprovement({
   cost: { wood: 1 },
   prerequisite: '1 Occupation',
   occupationPrerequisites: { min: 1 },
-  newSet: true,
 })

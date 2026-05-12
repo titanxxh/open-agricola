@@ -11,6 +11,5 @@ export const A30_BakingSheet = new MinorImprovement({
   desc: ['Each time you take a __Bake Bread__ action, you can use this card to exchange exactly 1 <GRAIN> for 2 <FOOD> and 1 bonus <SCORE>.'],
   cost: {},
   prerequisite: 'No Grain Field',
-  newSet: true,
   extraVp: true,
 })

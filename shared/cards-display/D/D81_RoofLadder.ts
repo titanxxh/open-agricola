@@ -12,5 +12,4 @@ export const D81_RoofLadder = new MinorImprovement({
     'Each time you renovate, you pay 1 fewer <REED> and, at the end of the action, you get 1 <STONE>.',
   ],
   cost: { wood: 1 },
-  newSet: true,
 })

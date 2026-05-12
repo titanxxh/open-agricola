@@ -51,7 +51,6 @@ export const A107_Catcher = new Occupation({
   desc: ['Each time you place your 1st/2nd/3rd person in a round on a building resource accumulation space with exactly 5/4/3 building resources, you get 1 <FOOD>.'],
   cost: {},
   players: '1+',
-  newSet: true,
 })
 
 export const A107_Catcher_impl = {

@@ -51,7 +51,6 @@ export type CardDefinition = {
   improvementPrerequisites?: CardPrerequisites
   players?: string
   passing?: boolean
-  newSet?: boolean
   modifier?: CostModifier
   modifiers?: CostModifier[]
   exchanges?: CardExchange[]

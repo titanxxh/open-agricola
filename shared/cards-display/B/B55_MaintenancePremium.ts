@@ -12,5 +12,4 @@ export const B55_MaintenancePremium = new MinorImprovement({
   cost: {},
   prerequisite: '2 Occupations',
   occupationPrerequisites: { min: 2 },
-  newSet: true,
 })

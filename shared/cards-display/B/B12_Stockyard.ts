@@ -11,5 +11,4 @@ export const B12_Stockyard = new MinorImprovement({
   desc: ['This card can hold up to 3 animals of the same type. (It is not considered a pasture).'],
   cost: { wood: 1, stone: 1 },
   vp: 1,
-  newSet: true,
 })

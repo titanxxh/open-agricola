@@ -11,5 +11,4 @@ export const D55_NewMarket = new MinorImprovement({
   desc: ["Each time you use an action space card on round spaces 8 to 11, you get 1 additional <FOOD>."],
   cost: { wood: 1, clay: 1 },
   vp: 1,
-  newSet: true,
 })

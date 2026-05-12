@@ -11,5 +11,4 @@ export const B131_Equipper = new Occupation({
   desc: ['Immediately after each time you use a wood accumulation space, you can play a minor improvement.'],
   cost: {},
   players: '3+',
-  newSet: true,
 })

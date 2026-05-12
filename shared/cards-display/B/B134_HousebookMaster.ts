@@ -11,5 +11,4 @@ export const B134_HousebookMaster = new Occupation({
   desc: ['After playing this card, if you renovate to stone in round 13/12/11 or before, you immediately get 1/2/3 <FOOD> and 1/2/3 bonus <SCORE>.'],
   cost: {},
   players: '3+',
-  newSet: true,
 })

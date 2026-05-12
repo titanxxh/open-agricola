@@ -14,5 +14,4 @@ export const B49_Scales = new MinorImprovement({
   cost: { wood: 1 },
   prerequisite: 'No Occupation',
   occupationPrerequisites: { max: 0 },
-  newSet: true,
 })

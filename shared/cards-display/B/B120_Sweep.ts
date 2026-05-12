@@ -13,5 +13,4 @@ export const B120_Sweep = new Occupation({
   ],
   cost: {},
   players: '1+',
-  newSet: true,
 })

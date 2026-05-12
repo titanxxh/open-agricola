@@ -11,5 +11,4 @@ export const C5_Remodeling = new MinorImprovement({
   desc: ["You immediately get 1 <CLAY> for each clay room and for each major improvement you have."],
   cost: { food: 1 },
   passing: true,
-  newSet: true,
 })

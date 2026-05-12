@@ -11,5 +11,4 @@ export const A168_AnimalTeacher = new Occupation({
   desc: ['Immediately after each time you use a __Lessons__ action space, you can also buy 1 <SHEEP>/<PIG>/<CATTLE> for 0/1/2 <FOOD>.'],
   cost: {},
   players: '4+',
-  newSet: true,
 })

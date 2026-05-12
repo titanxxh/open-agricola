@@ -11,5 +11,4 @@ export const B92_LittleStickKnitter = new Occupation({
   desc: ['From Round 5 on, each time you use the __Sheep Market__ accumulation space, you can also take a __Family Growth with Room Only__ action.'],
   cost: {},
   players: '1+',
-  newSet: true,
 })

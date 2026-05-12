@@ -11,5 +11,4 @@ export const D105_Sculptor = new Occupation({
   desc: ['Each time you use a clay accumulation space, you also get 1 <FOOD>. Each time you use a stone accumulation space, you also get 1 <GRAIN>.'],
   cost: {},
   players: '1+',
-  newSet: true,
 })

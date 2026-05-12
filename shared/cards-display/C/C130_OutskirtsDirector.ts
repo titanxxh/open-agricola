@@ -13,5 +13,4 @@ export const C130_OutskirtsDirector = new Occupation({
   ],
   cost: {},
   players: '3+',
-  newSet: true,
 })

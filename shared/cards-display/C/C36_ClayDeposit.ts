@@ -14,5 +14,4 @@ export const C36_ClayDeposit = new MinorImprovement({
   cost: { food: 2 },
   prerequisite: '1 Occupation',
   occupationPrerequisites: { min: 1 },
-  newSet: true,
 })

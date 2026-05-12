@@ -11,5 +11,4 @@ export const B135_NutritionExpert = new Occupation({
   desc: ['At the start of each round, you can exchange a set comprised of 1 animal of any type, 1 <GRAIN>, and 1 <VEGETABLE> for 5 <FOOD> and 2 bonus <SCORE>.'],
   cost: {},
   players: '1+',
-  newSet: true,
 })

@@ -12,5 +12,4 @@ export const C73_SeaweedFertilizer = new MinorImprovement({
     'Each time after you take an unconditional __Sow__ action, you get 1 <GRAIN> from the general supply. From round 11 on, you can get 1 <VEGETABLE> instead.',
   ],
   cost: { food: 2 },
-  newSet: true,
 })

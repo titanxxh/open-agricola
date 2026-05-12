@@ -10,5 +10,4 @@ export const C127_Lover = new Occupation({
   category: "FARM_PLANNER",
   desc: ["When you play this card, immediately pay an amount of <FOOD> equal to the number of complete rounds left to play to take a __Family Growth Even without Room__ action."],
   players: "3+",
-  newSet: true,
 })

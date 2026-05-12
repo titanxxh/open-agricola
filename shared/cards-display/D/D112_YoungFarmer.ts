@@ -13,5 +13,4 @@ export const D112_YoungFarmer = new Occupation({
   ],
   cost: {},
   players: '1+',
-  newSet: true,
 })

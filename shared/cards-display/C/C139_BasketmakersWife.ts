@@ -13,5 +13,4 @@ export const C139_BasketmakersWife = new Occupation({
   exchanges: [
     { from: { reed: 1 }, to: { food: 2 }, triggers: ['anytime'] },
   ],
-  newSet: true,
 })

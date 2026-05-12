@@ -13,5 +13,4 @@ export const B42_ForestInn = new PlayerActionCard({
   vp: 1,
   prerequisite: "Play in Round 6 or Before",
   maxRound: 6,
-  newSet: true,
 })

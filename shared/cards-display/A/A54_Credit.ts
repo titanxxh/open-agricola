@@ -13,5 +13,4 @@ export const A54_Credit = new MinorImprovement({
   ],
   prerequisite: 'At Most 3 Occupations',
   occupationPrerequisites: { max: 3 },
-  newSet: true,
 })

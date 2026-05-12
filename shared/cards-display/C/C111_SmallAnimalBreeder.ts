@@ -11,5 +11,4 @@ export const C111_SmallAnimalBreeder = new Occupation({
   desc: ['Before the start of each round, if you have <FOOD> equal to or higher than the upcoming round number (e.g., 8+ <FOOD> before round 8), you get 1 <FOOD>.'],
   cost: {},
   players: '1+',
-  newSet: true,
 })

@@ -12,5 +12,4 @@ export const C7_BladeShears = new MinorImprovement({
   cost: { wood: 1 },
   passing: true,
   prerequisite: "1 Pasture",
-  newSet: true,
 })

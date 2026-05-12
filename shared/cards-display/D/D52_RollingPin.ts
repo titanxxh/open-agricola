@@ -12,5 +12,4 @@ export const D52_RollingPin = new MinorImprovement({
   cost: { wood: 1 },
   prerequisite: '1 Occupation',
   occupationPrerequisites: { min: 1 },
-  newSet: true,
 })
