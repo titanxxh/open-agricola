@@ -14,4 +14,5 @@ export const C59_SchnappsDistillery = new MinorImprovement({
   exchanges: [
     { from: { vegetable: 1 }, to: { food: 5 }, max: 1, sourceId: CARD_ID, triggers: ['harvest'] },
   ],
+  extraVp: true,
 })

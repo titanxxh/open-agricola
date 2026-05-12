@@ -9,4 +9,5 @@ export const E4_Thunderbolt = new MinorImprovement({
   cost: {},
   prerequisite: "1 Grain Field",
   passing: true,
+  category: 'PASSING_-_IMPROVEMENT/OCC_-_WOOD',
 })

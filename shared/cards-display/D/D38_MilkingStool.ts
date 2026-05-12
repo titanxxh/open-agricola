@@ -14,4 +14,5 @@ export const D38_MilkingStool = new MinorImprovement({
   cost: { wood: 1 },
   prerequisite: '2 Occupations',
   occupationPrerequisites: { min: 2 },
+  extraVp: true,
 })

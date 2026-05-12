@@ -12,4 +12,5 @@ export const B154_SheepKeeper = new Occupation({
   cost: {},
   players: '4+',
   prerequisite: 'Less Than 7 Sheep',
+  extraVp: true,
 })

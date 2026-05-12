@@ -10,4 +10,5 @@ export const E148_Lazybones = new Occupation({
   desc: ['Place (up to) 1 <STABLE> each on __Grain Seeds__, __Farmland__, __Day Laborer__, and __Farm Expansion__. Build the <STABLE> at no cost when another player uses that action space.'],
   cost: {},
   players: '4+',
+  category: 'FARMYARD_-_PLACE_FOR_ANIMALS',
 })

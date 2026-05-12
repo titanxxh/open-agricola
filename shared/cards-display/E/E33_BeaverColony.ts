@@ -12,4 +12,5 @@ export const E33_BeaverColony = new MinorImprovement({
   vp: 1,
   cost: {},
   prerequisite: "1 Fenced Stable",
+  extraVp: true,
 })

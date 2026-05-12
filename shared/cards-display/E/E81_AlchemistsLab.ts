@@ -11,4 +11,6 @@ export const E81_AlchemistsLab = new PlayerActionCard({
   cost: {},
   prerequisite: "3 Occupations",
   occupationPrerequisites: {"min":3},
+  vp: 1,
+  category: 'BUILDING_RESOURCES_-_ALL',
 })

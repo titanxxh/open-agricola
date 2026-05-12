@@ -12,4 +12,5 @@ export const E167_DairyCrier = new Occupation({
   ],
   cost: {},
   players: '4+',
+  category: 'ANIMALS_-_ALL',
 })

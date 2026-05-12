@@ -10,4 +10,5 @@ export const E140_Carter = new Occupation({
   desc: ['Next round, each time you use a building resource accumulation space, you also get 1 <FOOD> for each building resource that you take from the space.'],
   cost: {},
   players: '3+',
+  category: 'FOOD',
 })

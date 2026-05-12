@@ -11,4 +11,5 @@ export const E84_DollysMother = new MinorImprovement({
   cost: {},
   vp: 1,
   prerequisite: "1 Sheep",
+  category: 'ANIMALS_',
 })

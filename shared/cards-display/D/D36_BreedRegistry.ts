@@ -11,4 +11,5 @@ export const D36_BreedRegistry = new MinorImprovement({
   desc: ["During scoring, if you gained at most 2 <SHEEP> from sources other than breeding during the game and have not turned any sheep into food, you get 3 bonus <SCORE>."],
   cost: {},
   prerequisite: "No Sheep",
+  extraVp: true,
 })

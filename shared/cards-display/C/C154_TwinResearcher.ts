@@ -14,4 +14,5 @@ export const C154_TwinResearcher = new Occupation({
   cost: {},
   players: '4+',
   evenMoreSet: true,
+  extraVp: true,
 })

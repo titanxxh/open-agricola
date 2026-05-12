@@ -12,4 +12,5 @@ export const B33_Mantlepiece = new MinorImprovement({
   cost: { stone: 1 },
   vp: -3,
   prerequisite: 'Clay or Stone House',
+  extraVp: true,
 })
