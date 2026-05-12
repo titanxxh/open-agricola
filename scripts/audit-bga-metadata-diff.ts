@@ -14,6 +14,7 @@ import { parseTsCard } from './bga-metadata/parse-ts'
 import { diffCards } from './bga-metadata/diff'
 import { renderReport } from './bga-metadata/report'
 import { resolveBgaRoot } from './bga-metadata/resolve-bga-root'
+import { applySafeFix, type SafeFix } from './bga-metadata/apply-safe'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -67,8 +68,31 @@ function main() {
   const result = diffCards(bga, ts)
 
   if (applySafe) {
-    console.error('--apply-safe not implemented yet (sprint metadata-2)')
-    process.exitCode = 2
+    const literalDevs = result.deviations.filter(d => d.verdict === 'warn')
+    const complexCategoryDevs = result.deviations.filter(d => d.verdict === 'error' && d.field === 'category')
+    const allFixDevs = [...literalDevs, ...complexCategoryDevs]
+    let touched = 0
+    for (const dev of allFixDevs) {
+      const id = dev.id
+      const deck = id[0]
+      const tsPath = path.join(REPO_ROOT, 'shared/cards-display', deck, id + '.ts')
+      if (!fs.existsSync(tsPath)) {
+        console.warn(`Skip missing TS file: ${tsPath}`)
+        continue
+      }
+      const before = fs.readFileSync(tsPath, 'utf8')
+      const fixes: SafeFix[] = []
+      if (dev.field === 'vp' && typeof dev.bga === 'number') fixes.push({ field: 'vp', target: dev.bga })
+      if (dev.field === 'extraVp' && typeof dev.bga === 'boolean') fixes.push({ field: 'extraVp', target: dev.bga })
+      if (dev.field === 'category' && typeof dev.bga === 'string') fixes.push({ field: 'category', target: dev.bga })
+      if (!fixes.length) continue
+      const after = applySafeFix(before, fixes)
+      if (after !== before) {
+        fs.writeFileSync(tsPath, after, 'utf8')
+        touched++
+      }
+    }
+    console.log(`Auto-fix touched ${touched} files (${literalDevs.length} literal + ${complexCategoryDevs.length} category)`)
     return
   }
 
