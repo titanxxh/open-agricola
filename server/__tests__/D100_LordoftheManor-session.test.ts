@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState } from '../../shared/contract/types'
 import type { ScoreCategoryResult } from '../../shared/domain/scoring'
 import { D100_LordoftheManor_impl } from '../../shared/cards/D/D100_LordoftheManor'
+import { D100_LordoftheManor } from '../../shared/cards-display/D/D100_LordoftheManor'
 
 const makeCategory = (key: ScoreCategoryResult['key'], total: number): ScoreCategoryResult => ({
   key,
@@ -53,5 +54,9 @@ describe('D100_LordoftheManor scoring bonus', () => {
       makeCategory('empty', 4),
     ]
     expect(compute(dummyState, dummyPlayer, { categories })).toBe(0)
+  })
+
+  it('has extraVp:true metadata for UI display (BGA $this->extraVp = true)', () => {
+    expect(D100_LordoftheManor.extraVp).toBe(true)
   })
 })
