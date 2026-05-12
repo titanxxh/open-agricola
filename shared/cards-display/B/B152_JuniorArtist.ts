@@ -13,5 +13,4 @@ export const B152_JuniorArtist = new Occupation({
   ],
   cost: {},
   players: '4+',
-  newSet: true,
 })

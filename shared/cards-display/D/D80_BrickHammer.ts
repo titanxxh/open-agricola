@@ -11,5 +11,4 @@ export const D80_BrickHammer = new MinorImprovement({
   desc: ['Each time after you build an improvement costing at least 2 <CLAY>, you get 1 <STONE>.'],
   cost: { wood: 1 },
   altCosts: [{ food: 1 }],
-  newSet: true,
 })

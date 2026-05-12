@@ -13,5 +13,4 @@ export const C81_MaterialHub = new MinorImprovement({
   ],
   cost: { wood: 1, clay: 1 },
   prerequisite: '1 reed and 1 stone in your supply',
-  newSet: true,
 })

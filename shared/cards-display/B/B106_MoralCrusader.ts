@@ -11,5 +11,4 @@ export const B106_MoralCrusader = new Occupation({
   desc: ['Immediately before the start of each round, if there are goods on the remaining round spaces that are promised to you, you get 1 <FOOD>.'],
   cost: {},
   players: '1+',
-  newSet: true,
 })

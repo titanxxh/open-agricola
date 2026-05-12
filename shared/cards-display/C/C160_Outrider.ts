@@ -13,5 +13,4 @@ export const C160_Outrider = new Occupation({
   ],
   cost: {},
   players: '4+',
-  newSet: true,
 })

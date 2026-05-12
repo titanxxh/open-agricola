@@ -11,5 +11,4 @@ export const B112_Silokeeper = new Occupation({
   desc: ['Each time you use the action space card that has been revealed right before the most recent harvest, you also get 1 <GRAIN>.'],
   cost: {},
   players: '1+',
-  newSet: true,
 })

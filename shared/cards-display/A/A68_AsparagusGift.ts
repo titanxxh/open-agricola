@@ -11,5 +11,4 @@ export const A68_AsparagusGift = new MinorImprovement({
   desc: ['Each time you build a number of fences equal to or greater than the current round, you immediately get 1 <VEGETABLE>.'],
   cost: {},
   prerequisite: '1 Unplanted Field',
-  newSet: true,
 })

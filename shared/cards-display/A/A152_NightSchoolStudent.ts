@@ -11,5 +11,4 @@ export const A152_NightSchoolStudent = new Occupation({
   desc: ['Each returning home phase in which no player returns a person from a __Lessons__ action space, you can play an occupation for an occupation cost of 1 <FOOD>.'],
   cost: {},
   players: '4+',
-  newSet: true,
 })

@@ -13,5 +13,4 @@ export const D161_CabbageBuyer = new Occupation({
   ],
   cost: {},
   players: '4+',
-  newSet: true,
 })

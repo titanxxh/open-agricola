@@ -11,5 +11,4 @@ export const D18_SteamPlow = new MinorImprovement({
   desc: ['Immediately after each returning home phase, you can pay 2 <WOOD> and 1 <FOOD> to use the __Farmland__ action space without placing a person.'],
   cost: { wood: 1, food: 1 },
   vp: 1,
-  newSet: true,
 })

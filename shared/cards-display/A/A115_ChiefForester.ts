@@ -11,5 +11,4 @@ export const A115_ChiefForester = new Occupation({
   desc: ['Each time you use a wood accumulation space, you also get a __Sow__ action for exactly 1 field.'],
   cost: {},
   players: '1+',
-  newSet: true,
 })

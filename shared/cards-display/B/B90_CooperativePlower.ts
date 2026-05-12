@@ -11,5 +11,4 @@ export const B90_CooperativePlower = new Occupation({
   desc: ['Each time you use the __Farmland__ action space while the __Grain Seeds__ action space is occupied, you can plow 1 additional field.'],
   cost: {},
   players: '1+',
-  newSet: true,
 })

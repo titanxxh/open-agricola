@@ -13,5 +13,4 @@ export const A96_TaskArtisan = new Occupation({
   ],
   cost: {},
   players: '1+',
-  newSet: true,
 })

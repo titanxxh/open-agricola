@@ -11,5 +11,4 @@ export const A51_DriftNetBoat = new MinorImprovement({
   desc: ['Each time you use the __Fishing__ accumulation space, you get an additional 2 <FOOD>.'],
   cost: { wood: 1, reed: 1 },
   vp: 1,
-  newSet: true,
 })

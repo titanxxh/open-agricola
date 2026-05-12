@@ -12,5 +12,4 @@ export const B79_Corf = new MinorImprovement({
     'Each time any player (including you) takes at least 3 <STONE> from an accumulation space, you get 1 <STONE> from the general supply.',
   ],
   cost: { reed: 1 },
-  newSet: true,
 })

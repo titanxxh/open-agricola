@@ -10,5 +10,4 @@ export const D11_LawnFertilizer = new MinorImprovement({
   category: 'FARM_PLANNER',
   desc: ['Your pastures of size 1 can hold up to 3 animals of the same type. (With a stable, they can hold up to 6 animals of the same type.)'],
   cost: {},
-  newSet: true,
 })

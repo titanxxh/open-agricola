@@ -11,5 +11,4 @@ export const A91_ShiftingCultivator = new Occupation({
   desc: ['Each time you use a wood accumulation space, you can also pay 3 <FOOD> to plow 1 field.'],
   cost: {},
   players: '1+',
-  newSet: true,
 })

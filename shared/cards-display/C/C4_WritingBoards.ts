@@ -11,5 +11,4 @@ export const C4_WritingBoards = new MinorImprovement({
   desc: ["You immediately get 1 <WOOD> for each occupation you have in front of you."],
   cost: { food: 1 },
   passing: true,
-  newSet: true,
 })

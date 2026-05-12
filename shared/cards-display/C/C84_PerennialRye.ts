@@ -12,5 +12,4 @@ export const C84_PerennialRye = new MinorImprovement({
   cost: { food: 1 },
   prerequisite: '2 Occupations',
   occupationPrerequisites: { min: 2 },
-  newSet: true,
 })

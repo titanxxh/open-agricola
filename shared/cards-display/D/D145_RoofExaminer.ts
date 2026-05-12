@@ -11,5 +11,4 @@ export const D145_RoofExaminer = new Occupation({
   desc: ['When you play this card, if you have 1/2/3/4 major improvements, you immediately get 2/3/4/5 <REED>.'],
   cost: {},
   players: '3+',
-  newSet: true,
 })

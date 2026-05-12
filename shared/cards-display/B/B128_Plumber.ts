@@ -13,5 +13,4 @@ export const B128_Plumber = new Occupation({
   ],
   cost: {},
   players: '3+',
-  newSet: true,
 })

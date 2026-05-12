@@ -12,5 +12,4 @@ export const A49_NestSite = new MinorImprovement({
   cost: { food: 1 },
   prerequisite: '1 Occupation',
   occupationPrerequisites: { min: 1 },
-  newSet: true,
 })

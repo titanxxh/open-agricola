@@ -12,5 +12,4 @@ export const C61_BeerStein = new MinorImprovement({
     'Each time you take a __Bake Bread__ action, you can use this card once to turn 1 <GRAIN> into 2 <FOOD> and 1 bonus <SCORE>.',
   ],
   cost: { clay: 1 },
-  newSet: true,
 })

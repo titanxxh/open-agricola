@@ -11,5 +11,4 @@ export const D2_DwellingPlan = new MinorImprovement({
   desc: ['You can immediately take a __Renovation__ action.'],
   cost: { food: 1 },
   passing: true,
-  newSet: true,
 })

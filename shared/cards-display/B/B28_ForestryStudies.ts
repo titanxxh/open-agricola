@@ -10,5 +10,4 @@ export const B28_ForestryStudies = new MinorImprovement({
   category: 'ACTIONS_BOOSTER',
   desc: ['Each time after you use the __Forest__ accumulation space, you can return 2 <WOOD> to that space to play 1 occupation without paying an occupation costs.'],
   cost: { food: 2 },
-  newSet: true,
 })

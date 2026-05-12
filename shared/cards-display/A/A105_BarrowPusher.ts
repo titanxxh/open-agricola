@@ -11,5 +11,4 @@ export const A105_BarrowPusher = new Occupation({
   desc: ["For each new field tile you get, you also get 1 <CLAY> and 1 <FOOD>."],
   cost: {},
   players: "1+",
-  newSet: true,
 })

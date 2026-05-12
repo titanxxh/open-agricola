@@ -13,5 +13,4 @@ export const C58_Woodcraft = new MinorImprovement({
   ],
   prerequisite: '1 Occupation',
   occupationPrerequisites: { min: 1 },
-  newSet: true,
 })

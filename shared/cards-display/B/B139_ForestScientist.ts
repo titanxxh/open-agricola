@@ -11,5 +11,4 @@ export const B139_ForestScientist = new Occupation({
   desc: ['In the returning home phase of each round, if there is no wood left on the game board, you get 1 <FOOD>—from round 5 on, even 2 <FOOD>.'],
   cost: {},
   players: '3+',
-  newSet: true,
 })

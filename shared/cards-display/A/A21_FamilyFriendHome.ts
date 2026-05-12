@@ -12,5 +12,4 @@ export const A21_FamilyFriendHome = new MinorImprovement({
   cost: {},
   prerequisite: '1 Occupation',
   occupationPrerequisites: { min: 1 },
-  newSet: true,
 })

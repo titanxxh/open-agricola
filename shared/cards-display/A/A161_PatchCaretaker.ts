@@ -11,5 +11,4 @@ export const A161_PatchCaretaker = new Occupation({
   desc: ['Each time you use an accumulation space while already having used another accumulation space for the same type of good that work phase, you also get 1 <VEGETABLE>.'],
   cost: {},
   players: '4+',
-  newSet: true,
 })

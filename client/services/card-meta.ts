@@ -27,7 +27,6 @@ export type CardMeta = {
   cost?: Record<string, number>
   altCosts?: Record<string, number>[]
   players?: string
-  newSet?: boolean
   prerequisite?: unknown
   vp?: number
   isCookery?: boolean
@@ -97,7 +96,6 @@ const customCardToMeta = (card: CardBase, type: 'minor' | 'occupation'): CardMet
   cost: card.cost as Record<string, number> | undefined,
   altCosts: card.altCosts,
   players: card.players,
-  newSet: card.newSet,
   prerequisite: card.prerequisite,
   vp: card.vp,
   isCookery: card.isCookery,

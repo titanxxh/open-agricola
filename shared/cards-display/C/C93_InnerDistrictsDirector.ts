@@ -13,5 +13,4 @@ export const C93_InnerDistrictsDirector = new Occupation({
   ],
   cost: {},
   players: '1+',
-  newSet: true,
 })

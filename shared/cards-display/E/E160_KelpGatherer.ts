@@ -13,5 +13,4 @@ export const E160_KelpGatherer = new Occupation({
   ],
   cost: {},
   players: '4+',
-  newSet: true,
 })

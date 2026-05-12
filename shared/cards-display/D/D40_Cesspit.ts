@@ -13,5 +13,4 @@ export const D40_Cesspit = new MinorImprovement({
   vp: -1,
   prerequisite: '2 Fields and 1 Occupation',
   occupationPrerequisites: { min: 1 },
-  newSet: true,
 })

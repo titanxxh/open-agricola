@@ -11,5 +11,4 @@ export const C67_MineralFeeder = new MinorImprovement({
   desc: ['At the start of each round that does not end with a harvest, if you have at least 1 <SHEEP> in a pasture, you get 1 <GRAIN>.'],
   cost: { reed: 1 },
   vp: 1,
-  newSet: true,
 })

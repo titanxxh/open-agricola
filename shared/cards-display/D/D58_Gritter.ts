@@ -13,5 +13,4 @@ export const D58_Gritter = new MinorImprovement({
   ],
   cost: { wood: 1 },
   prerequisite: 'Play in Round 5 or Later',
-  newSet: true,
 })

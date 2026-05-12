@@ -13,5 +13,4 @@ export const A156_Buyer = new Occupation({
   ],
   cost: {},
   players: "4+",
-  newSet: true,
 })

@@ -13,5 +13,4 @@ export const B159_LieutenantGeneral = new Occupation({
   ],
   cost: {},
   players: '4+',
-  newSet: true,
 })

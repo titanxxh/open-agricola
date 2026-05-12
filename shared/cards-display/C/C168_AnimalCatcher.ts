@@ -13,5 +13,4 @@ export const C168_AnimalCatcher = new Occupation({
   ],
   cost: {},
   players: '4+',
-  newSet: true,
 })

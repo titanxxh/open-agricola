@@ -11,5 +11,4 @@ export const A128_RiparianBuilder = new Occupation({
   desc: ["Each time another player uses the __Reed Bank__ accumulation space, you can build a room: if you build a clay/stone room, you get a discount of 1 <CLAY>/2 <STONE>."],
   cost: {},
   players: "3+",
-  newSet: true,
 })

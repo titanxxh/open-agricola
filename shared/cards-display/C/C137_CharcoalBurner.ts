@@ -13,5 +13,4 @@ export const C137_CharcoalBurner = new Occupation({
   ],
   cost: {},
   players: '3+',
-  newSet: true,
 })

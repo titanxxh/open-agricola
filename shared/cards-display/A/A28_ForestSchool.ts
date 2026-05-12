@@ -14,7 +14,6 @@ export const A28_ForestSchool = new MinorImprovement({
   desc: ["You can consider the __Lessons__ action spaces not occupied. You can replace each <FOOD> that an occupation costs with <WOOD>."],
   cost: {"wood":1,"clay":1},
   vp: 1,
-  newSet: true,
   modifier: {
     type: 'trade',
     cardId: CARD_ID,

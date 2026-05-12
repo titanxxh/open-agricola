@@ -11,5 +11,4 @@ export const D147_TrapBuilder = new Occupation({
   desc: ['Each time you use the __Day Laborer__ action space, place 1 <FOOD>, 1 <FOOD>, and 1 <PIG> on the next 3 round spaces, respectively. At the start of these rounds, you get the good.'],
   cost: {},
   players: '3+',
-  newSet: true,
 })

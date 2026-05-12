@@ -11,5 +11,4 @@ export const C80_RockyTerrain = new MinorImprovement({
   desc: ['Each time you plow a field (tile or card), you can also buy 1 <STONE> for 1 <FOOD>.'],
   cost: { food: 1 },
   players: '1+',
-  newSet: true,
 })

@@ -12,5 +12,4 @@ export const A46_ClawKnife = new MinorImprovement({
   cost: { wood: 1 },
   vp: 1,
   prerequisite: 'Exactly 1 Pasture',
-  newSet: true,
 })

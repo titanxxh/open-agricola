@@ -12,6 +12,5 @@ export const A29_AleBenches = new MinorImprovement({
   cost: {"wood":1},
   prerequisite: "2 Occupations",
   occupationPrerequisites: {"min":2},
-  newSet: true,
   extraVp: true,
 })

@@ -9,5 +9,4 @@ export const C17_NewlyPlowedField = new MinorImprovement({
   desc: ["When you play this card, you can immediately plow 1 field, which needs not be adjacent to another field."],
   cost: {},
   prerequisite: "Exactly 3 Field Tiles",
-  newSet: true,
 })

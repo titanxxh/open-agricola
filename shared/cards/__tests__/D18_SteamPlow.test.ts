@@ -44,7 +44,6 @@ describe('D18_SteamPlow', () => {
   it('card definition has correct properties', () => {
     expect(D18Card.cost).toEqual({ wood: 1, food: 1 })
     expect(D18Card.vp).toBe(1)
-    expect(D18Card.newSet).toBe(true)
   })
 
   it('onStartReturnHome returns optional pay+plow flow when player can afford (no sow per BGA)', () => {

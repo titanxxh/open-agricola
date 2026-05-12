@@ -13,5 +13,4 @@ export const D6_PetrifiedWood = new MinorImprovement({
   passing: true,
   prerequisite: '2 Occupations',
   occupationPrerequisites: { min: 2 },
-  newSet: true,
 })

@@ -12,6 +12,5 @@ export const A35_SwimmingClass = new MinorImprovement({
   cost: { food: 1 },
   prerequisite: '2 Occupations',
   occupationPrerequisites: { min: 2 },
-  newSet: true,
   extraVp: true,
 })

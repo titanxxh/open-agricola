@@ -11,5 +11,4 @@ export const A157_Bohemian = new Occupation({
   desc: ['At the start of each returning home phase, if at least one __Lessons__ action space is unoccupied, you get 1 <FOOD>.'],
   cost: {},
   players: '4+',
-  newSet: true,
 })
