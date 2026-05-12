@@ -517,7 +517,7 @@ anytime                  额外注册的 anytime 行动
 
 ### 7.7 ActivateCardNode + PlayerSwitchNode + ParallelTriggerNode
 
-- 当 `HookDispatcher.getMatchingListeners()` 找到匹配 listener，引擎在 dispatch 阶段（`buildPhaseTrailingNodes` 内）调用 `executeCardListener` **peek 一次** 拿到 `ActionHookResult`，存到 `ActivateCardNode.preComputedResult`。推进到 `ActivateCardNode` 时若有 `preComputedResult` 直接复用（不重跑 handler）；若无（legacy 路径）才 fall back 到 lazy 调 listener。
+- 当 `HookDispatcher.getMatchingListeners()` 找到匹配 listener，引擎在 dispatch 阶段（`buildPhaseTrailingNodes` 内）调用 `executeCardListener` **peek 一次** 拿到 `ActionHookResult`，非 `undefined` 结果存到 `ActivateCardNode.preComputedResult` 并直接复用（不重跑 handler）；`undefined` 保持 lazy fallback，让依赖 post-reorg / post-mutation 状态的 listener 在真正推进时重新判断。
 - 当 owner ≠ 当前行动玩家（opponent scope），dispatch 自动在该 owner 的 trigger 组前后插 `PlayerSwitchNode`。`PlayerSwitchNode` 暂停时通过 `confirm-player-switch` interaction 等玩家确认；`undoBoundary` 标记 undo 不能跨切人。
 - **多 listener 同 phase 触发**（BGA-style PARALLEL trigger selection）：
   - dispatch 阶段静态分析每个 listener 的 flow（`shared/engine/flow-interactivity.ts`：`xor` / `optional` / `altCosts payLeaf` / 含 `interactionRequest` 的 leaf → `interactive`；纯 `gain` / 单路径 `pay` / 全 auto seq → `auto`）。
@@ -556,6 +556,8 @@ Three consumers share this snapshot:
 1. `buildAnytimeEntries()` — filters the auto-discovered registry + card-listener entries; returns `[]` if `!allowed`, otherwise removes any entry whose id is in `blockedIds`.
 2. `buildInteraction()` — derives `'takeAnytimeAction'` inclusion in `allowedCommands` strictly from `allowed && entries.length > 0`, keeping the UI and server views synchronised.
 3. `phases/round.ts::takeAnytimeAction()` — server-entry enforcement before any anytime injection. Additional guards (gameOver, draft phase, active-owner mismatch) sit at the function entry; the policy itself only sees pending-shape inputs.
+
+Nested anytime flows are injected ahead of the current pending tree. When an interactive nested flow resolves, the engine re-encounters the parent `InteractionNode` and rewrites `pendingNodeIdRef` before returning `choice`, so `buildInteraction()` surfaces the parent pending again instead of going idle.
 
 OA-vs-BGA design notes:
 
