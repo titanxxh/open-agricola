@@ -538,6 +538,33 @@ farmType 第一轮 payload 形态：`fence: {edges, palisadeEdges, extraWood}` /
 
 ---
 
+## Anytime Window Policy
+
+The set of card-listener anytime actions available in a given pending is computed once per `buildInteraction()` via `computeAnytimePolicy()` (`shared/session/anytime-policy.ts`). The helper is **server-only** — `client/` never imports it.
+
+Inputs (derived by `GameCore.getAnytimePolicyInput()` using the same node + composite fallback as `buildInteraction`):
+
+- `hasActiveContext` — `getActiveInteractionContext()` non-null
+- `stageResume` — current frame's `stageResume`
+- `interactionKind` — `node?.request?.kind ?? composite?.request?.kind`
+- `promptKey` — `node?.promptKey ?? composite?.promptKey`
+
+Output: `{ allowed: false, reason }` or `{ allowed: true, blockedIds }`. The seven rules are priority-ordered (first match wins): no-context → feed-locked → confirm-window → animal-reorg → exchange/bake-bread promptKey → stage-hook-chain default block → everything else allowed with no blocks.
+
+Three consumers share this snapshot:
+
+1. `buildAnytimeEntries()` — filters the auto-discovered registry + card-listener entries; returns `[]` if `!allowed`, otherwise removes any entry whose id is in `blockedIds`.
+2. `buildInteraction()` — derives `'takeAnytimeAction'` inclusion in `allowedCommands` strictly from `allowed && entries.length > 0`, keeping the UI and server views synchronised.
+3. `phases/round.ts::takeAnytimeAction()` — server-entry enforcement before any anytime injection. Additional guards (gameOver, draft phase, active-owner mismatch) sit at the function entry; the policy itself only sees pending-shape inputs.
+
+OA-vs-BGA design notes:
+
+- Reorganize is a system-driven sub-flow in OA (not a player-triggerable anytime) — the policy never produces a `'reorganize'` entry to filter.
+- `feed` pending is locked in OA because `executeFeedingLogic()` freezes `remaining`/`foodUsed` into the InteractionRequest. BGA allows nested anytime in its `ST_HARVEST_FEED` flow because its predecessor is the `EXCHANGE` state, which has no fixed budget.
+- `stageResume`-bearing harvest stage hook chains default to blocked to preserve the "system-driven hook chains do not yield to player anytime" invariant; the explicit allow-list (`animal-reorg`, exchange/bake-bread promptKey) overrides this.
+
+---
+
 ## 8. shared/cards/ + shared/cards-display/ — 卡牌闭环
 
 ### 8.1 双产物：display vs impl
