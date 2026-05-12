@@ -215,6 +215,7 @@ const expectedCategories: Record<string, string> = {
   'E91_PlowBuilder': 'FARMYARD_-_PLOWING',
   'E92_FieldDoctor': 'ACTION_-_FAMILY_GROWTH',
   'E93_Motivator': 'ACTION_-_GUEST',
+  'E22_GuestRoom': 'FARMYARD_-_PLACE_FOR_PERSON',
 }
 
 describe('Sprint 4 PR-4B — category BGA alignment', () => {

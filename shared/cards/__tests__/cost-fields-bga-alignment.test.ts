@@ -35,6 +35,7 @@ const cases: Case[] = [
   { id: 'E32_Nave',                kind: 'minor', cost: { stone: 2, reed: 1 } },
   { id: 'E34_LandRegister',        kind: 'minor', cost: { wood: 1 } },
   { id: 'E95_Miller',              kind: 'occupation', cost: {} },
+  { id: 'A39_Chapel',             kind: 'minor', cost: { wood: 3, clay: 2 }, vp: 3 },
 ]
 
 describe('Sprint 1 PR-1B — cost/vp BGA alignment (16 cards)', () => {

@@ -11,4 +11,5 @@ export const A39_Chapel = new PlayerActionCard({
   prerequisite: "2 Occupations",
   occupationPrerequisites: {"min":2},
   extraVp: true,
+  vp: 3,
 })
