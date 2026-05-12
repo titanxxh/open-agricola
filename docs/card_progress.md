@@ -589,6 +589,48 @@ E 牌组（10 张）: E1 PoleBarns / E21 SheepRug / E2 RenovationMaterials / E30
 | ~~C6 StoneClearing~~ | ✅ Closed 2026-05-11 — CropStack `'stone'` kind + reap 主路径 stone 分支 + A72 guard 已落地。详见 §2.0 "2026-05-11 — C6 StoneClearing 全对齐 BGA"。 | — | — | — |
 | ~~C148 MudWallower~~ | ✅ Closed 2026-05-11 — `actions:['reorganize'] phases:['after']` listener 已落地，reorg-only 路径全覆盖。详见 §2.0 "2026-05-11 — C148 MudWallower reorg-after listener"。 | — | — | — |
 
+#### 2.5.1 BGA-banned 但 OA 保留实现（33 张，2026-05-12 metadata-3b）
+
+按 memory `feedback_no_banned_schema`，OA 不实施 BGA `banned=true` 字段过滤。以下 33 张 BGA 标 banned 但 OA 仍 active：
+
+| Card | OA 状态 |
+|---|---|
+| A131_CraftTeacher | active in OA |
+| A133_Braggart | active in OA |
+| A14_CarpentersHammer | active in OA |
+| A33_BigCountry | active in OA |
+| A39_Chapel | active in OA |
+| A48_ShavingHorse | active in OA |
+| A82_WorkCertificate | active in OA |
+| A97_Freshman | active in OA |
+| B10_Caravan | active in OA |
+| B117_Informant | active in OA |
+| B132_EstateMaster | active in OA |
+| B15_CarpentersBench | active in OA |
+| B151_LittlePeasant | active in OA |
+| B161_Weakling | active in OA |
+| B21_HayloftBarn | active in OA |
+| B22_WalkingBoots | active in OA |
+| C102_TreeGuard | active in OA |
+| C125_Nightworker | active in OA |
+| C28_TeachersDesk | active in OA |
+| C31_WritingChamber | active in OA |
+| C3_CarriageTrip | active in OA |
+| C60_SmallPottersOven | active in OA |
+| C63_CraftBrewery | active in OA |
+| C99_GardenDesigner | active in OA |
+| D137_TradeTeacher | active in OA |
+| D19_PulverizerPlow | active in OA |
+| D21_Recruitment | active in OA |
+| D33_SummerHouse | active in OA |
+| D4_CrossCutWood | active in OA |
+| D74_RoyalWood | active in OA |
+| D92_ChildOmbudsman | active in OA |
+| D97_BeggingStudent | active in OA |
+| E22_GuestRoom | active in OA |
+
+完整 banned 名单来源：`scripts/audit-bga-metadata-diff.ts` 报告 "Banned in BGA but present in TS" section。
+
 ### 2.6 ⏳ 待实现 / 待评估（1 张）
 
 #### Tier 1 — BGA 自身无逻辑，我们也无逻辑（数据 only）
