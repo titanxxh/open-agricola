@@ -11,4 +11,5 @@ export const C134_CowPrince = new Occupation({
   desc: ["During scoring, you get 1 bonus <SCORE> for each space in your farmyard (including rooms) holding at least 1 <CATTLE>."],
   cost: {},
   players: "3+",
+  extraVp: true,
 })

@@ -11,4 +11,5 @@ export const C110_HomeBrewer = new Occupation({
   desc: ["After the field phase of each harvest, you can use this card to turn exactly 1 <GRAIN> into your choice of 3 <FOOD> or 1 bonus <SCORE>."],
   cost: {},
   players: "1+",
+  extraVp: true,
 })

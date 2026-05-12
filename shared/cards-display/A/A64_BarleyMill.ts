@@ -10,6 +10,5 @@ export const A64_BarleyMill = new MinorImprovement({
   category: "FOOD_PROVIDER",
   desc: ["In the field phase of each harvest, you get 1 <FOOD> for each grain field that you harvest."],
   vp: 1,
-  cost: { wood: 1 },
   altCosts: [{ clay: 4 }, { stone: 2 }],
 })

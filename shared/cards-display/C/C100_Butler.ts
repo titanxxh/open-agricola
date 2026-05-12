@@ -12,4 +12,5 @@ export const C100_Butler = new Occupation({
   cost: {},
   players: "1+",
   maxRound: 11,
+  extraVp: true,
 })

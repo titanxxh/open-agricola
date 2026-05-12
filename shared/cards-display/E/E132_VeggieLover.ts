@@ -16,4 +16,5 @@ export const E132_VeggieLover = new Occupation({
   ],
   cost: {},
   players: "3+",
+  extraVp: true,
 })

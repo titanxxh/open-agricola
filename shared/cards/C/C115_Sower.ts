@@ -1,6 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { getCardStack, pushToCardStack, writeCardInfobox } from '../helpers/card-state'
+import { getCardStack } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
@@ -36,10 +36,17 @@ const afterImprovementListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const choice = context.choice
     if (!choice || !choice.startsWith('major:')) return
-    // Add 1 reed to the card stack
-    pushToCardStack(context.player, CARD_ID, ['reed'])
-    const newCount = getCardStack(context.player, CARD_ID).length
-    writeCardInfobox(context.player, CARD_ID, `${newCount} Reed`)
+    const newCount = getCardStack(context.player, CARD_ID).length + 1
+    return {
+      flow: {
+        type: 'seq',
+        children: [
+          { type: 'leaf', actionId: 'push-to-card-stack', sourceCard: CARD_ID, params: { item: 'reed' } },
+          updateInfobox(newCount),
+        ],
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 

@@ -44,6 +44,7 @@ import {
   findActionNode,
   findInteractionNode,
   findPairedInteractionNode,
+  getNodeDescriptionPreview,
   getNodeEffectPreview,
   maybeBuildChoiceCandidates,
   normalizeFollowUpAction,
@@ -169,14 +170,10 @@ export function engineProceed(
           labelParams: label.labelParams,
           sourceCard: label.sourceCard ?? getNodeSourceCard(entry.node),
           effectPreview: getNodeEffectPreview(entry.node),
+          descriptionPreview: getNodeDescriptionPreview(entry.node, int.registry),
         }
       })
-      .filter((option) => option !== null) as {
-      value: string
-      labelKey: string
-      labelParams?: Record<string, unknown>
-      sourceCard?: string
-    }[]
+      .filter((option) => option !== null) as ActionChoiceOption[]
     if (
       node instanceof OrNode &&
       node.children.some((child) => child.getState() === 'resolved')
@@ -322,6 +319,7 @@ export function engineProceed(
         labelParams: label.labelParams,
         sourceCard: actionNode.sourceCard,
         effectPreview: getNodeEffectPreview(node.child),
+        descriptionPreview: getNodeDescriptionPreview(node.child, int.registry),
       },
       { value: '__skip__', labelKey: 'ui.interactionOptionalSkip' },
     ]
@@ -351,6 +349,7 @@ export function engineProceed(
     }
     const stepResult = node.step(ctx)
     if (stepResult.kind === 'choice') {
+      int.pendingNodeIdRef.value = node.id
       // S4c PR2 — backfill the InteractionNode's authoritative
       // contextSnapshot when no prior emit installed one (e.g. an
       // InteractionNode that was injected without going through

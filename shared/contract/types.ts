@@ -419,12 +419,26 @@ export type ChoiceEffectPreview =
       text: string
     }
 
+export type ChoiceDescriptionPreview =
+  | {
+      kind: 'action'
+      labelKey: string
+      labelParams?: Record<string, unknown>
+      effectPreview?: ChoiceEffectPreview
+    }
+  | {
+      kind: 'group'
+      separator: string
+      parts: ChoiceDescriptionPreview[]
+    }
+
 export type ActionChoiceOption = {
   value: string
   labelKey: string
   labelParams?: Record<string, unknown>
   sourceCard?: string
   effectPreview?: ChoiceEffectPreview
+  descriptionPreview?: ChoiceDescriptionPreview
   /** When true, UI greys out the option and server rejects attempts to pick it. */
   disabled?: boolean
   /** i18n key shown as tooltip explaining why the option is disabled. */

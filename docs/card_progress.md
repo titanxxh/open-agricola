@@ -47,6 +47,18 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-05-13** — C115 Sower idle anytime + 中文文案修复：idle work-phase 现在按当前玩家暴露并执行合法 anytime action，C115 可在回合开始/落子前使用卡上 reed 取资源或换 sow；修正中文按钮文案从错误的“付1食物 → 获1谷物”为“取1芦苇或换取播种行动”。新增 C115 idle session 回归 + AnytimeBar 中文文案回归，并更新 no-active-interaction 负例为非当前玩家拒绝。
+- **2026-05-13** — ActionFlow option 描述 BGA-style 生成：`ActionChoiceOption.descriptionPreview` 现在从 EngineNode 递归生成，SEQ/XOR/OR/PARALLEL 按 BGA separator 拼接 leaf action 描述；C115 Sower 的“换播种行动”选项自动显示移除资源、支付芦苇、播种三段动作，纯 infobox 更新不污染 UI。新增 C115 session 描述结构回归 + InteractionBar composite description 渲染回归。
+- **2026-05-13** — C115 Sower confirm-window BGA 对齐：`confirm-next-player` 重新作为当前行动玩家的 anytime window，允许合法 card anytime（含 `C115-sower-anytime`），但继续屏蔽 generic `exchange` 防递归；`confirm-player-switch` 仍封锁 anytime。新增 C115 session 回归覆盖 Major 后确认前选择 sow 并回到确认切换。
+- **2026-05-12** — C115 Sower + anytime nested pending 修复：`C115_Sower` after-major listener 改为返回 engine flow（`push-to-card-stack` + infobox）而非直接 mutate，避免 dispatch peek 与 lazy 执行造成双 reed；interactive nested anytime 完成后 `InteractionNode` 会重新写回 `pendingNodeIdRef`，parent exchange pending 自动恢复；`confirm-next-player` owner 改回刚完成行动的玩家，`nextPlayerIndex` 仅作为确认后的目标玩家。
+- **2026-05-12** — §2.4 metadata-3b real-deviation fixes: 3 parser hotfix (altCosts diff + banned no-skip + dual-id canonical pick) → ❌ 33 → 7；fixed 50 real deviations (8 banned-auto-fix + 6 players + 11 cost + 6 altCosts P0 + 9 prereq + C148 spot-check)；33 banned 文档化进 §2.5.1；3 BGA-duplicate 在 report appendix；C148 + 6 prereq + D1 parser artifact 残留登记。§2.4 收口。
+- **2026-05-12** — §2.4 metadata-3a parser bug 修复：(1) BGA cost 单/双引号数字 (2) BGA prereq `('...')` 简写 unwrap (3) TS cost JSON 双引号 key (4) diff 层 players default '1+' 归一。Report 重跑：❌ 95 → 33（消除假阳性）。后续真偏差在 metadata-3b 处理。
+- 2026-05-12 anytime 精细化过滤对齐 BGA：引入 `shared/session/anytime-policy.ts` helper，把"全屏蔽 anytime"改成按 entry.id 精细过滤；exchange / bake-bread / animal-reorg pending 内 card listener anytime 现可触发；feed 期间保持锁定（OA 刻意不同）；新增非当前 owner / 嵌套 / 负向 / stale resource / composite 一致性五类 session 测试。interactive nested anytime 曾有 parent exchange pending 不自动 resume 的 P1 limitation，已在同日后续修复（见上一条）。
+- **2026-05-12** — §2.4 sprint metadata-2 done: `--apply-safe` auto-fix landed 74 张 extraVp + 33 张 category (107 张代码改)，新增 `extraVp-bga-alignment.test.ts` (70 cases) + 扩展 `category-bga-alignment.test.ts` (+33 rows)；剩 ⚠ 1 / ❌ 95 / 🔍 36 进 metadata-3 人工核对。
+- **2026-05-12** — §2.4 cost:{} 标准化：`diff.ts` 对 cost 字段加 isEmptyObj 规范化（空对象 ≡ missing），消除 ~400+ 职业卡假阳性。报告从 ⚠ 74 / ❌ 644 / 🔍 36 降至 ⚠ 74 / ❌ 128 / 🔍 36。新增 2 回归测试（10/10 通过）。
+- **2026-05-12** — §2.4 parser bug fix: BGA category 正则扩为兼容 quoted-string（`'BONUS_POINTS_-_GET'` 类含连字符）+ vp:0 ≡ undefined 标准化，消除大批假阳性。报告从 ⚠ 83 / ❌ 729 / 🔍 36 降至 ⚠ 74 / ❌ 644 / 🔍 36。新增 2 回归测试（8/8 通过）。
+- **2026-05-12** — §2.4 mechanical re-audit: `scripts/audit-bga-metadata-diff.ts` 沉淀 + 首次报告 → `docs/operations/bga-metadata-diff-report.md`（⚠ 83 / ❌ 729 / 🔍 36）。原 §2.4 表头 "剩 57 张" 已 stale。
+
 - **2026-05-12 — D100 LordoftheManor `extraVp:true` 元数据对齐 + §2.3 backlog cleanup**：D100 行为 fix（`standardCategories` 加 `'stables'`）于 2026-05-02 commit `999104e0` 已 land，但 §2.3 Sprint 7d backlog 条目 stale 残留。本次顺手补 `shared/cards-display/D/D100_LordoftheManor.ts` 加 `extraVp: true`（对齐 BGA `D100_LordoftheManor.php:21 $this->extraVp = true`，UI-only 元数据），加 metadata 断言测试（`server/__tests__/D100_LordoftheManor-session.test.ts` 6 case 全绿），并清理 §2.3 backlog 条目标 closed。无行为变化。spec / plan：无（≤1h 单字段 cleanup）。
 
 - **2026-05-11 — C6 StoneClearing 全对齐 BGA**：扩 `CropStack.kind` union 加 `'stone'`（`shared/contract/types.ts:125`）；C6 `onBuy` 改为在每块空 field push `{kind:'stone', remaining:1}`（不返回 leaf，不立即发石），stone 在下次 reap 主路径被收走、进 `harvestedPositions`、dispatch `reap` listener with `crop:'stone'`，但不增 `grainFields`/`vegetableFields`（`shared/actions/effects/reap.ts`）。`dispatchReapListener` 的 `crop` 参数 union 扩到 `'grain' | 'vegetable' | 'stone'`。`A72_CalciumFertilizers` listener 加 kind allow-list 守卫（`top.kind === 'grain' || top.kind === 'vegetable'`），跳过 stone stack 防过度膨胀。其余 15 张读 `top.kind`/`fieldHasCrop`/selection-filter 的 field-aware 卡（A71/A84/B165/E112/C69/B132/D71/C18/E71/B115/D72 等）自然安全——kind 严格 guard、`top.remaining >= 2` 条件、或 `INITIAL_REMAINING[kind]` 隐式过滤都让 stone 不会被误触发。"considered planted until then" 语义通过 `fieldIsEmpty(f) = f.stacks.length === 0` 自动生效，覆盖 ~16 张 empty-field-counter 卡（A11/A65/A68/B61/C18/C33/C47/C69/C99/C161/D8/D72/E25/E92/sow.ts 等）。前端零改动——`field-crop-${kind}` 是 placeholder class、`res-icon-stone` 已存在、i18n `resources.stone` 已存在。新增 `server/__tests__/C6_StoneClearing-session.test.ts` 8 case（6 unit + 2 集成：C6 × D63 Lynchet adjacency + C6 × A11-style empty-field counter），`shared/actions/effects/__tests__/reap.test.ts` 加 2 case（stone reap + 混合 kind listener fan-out），`server/__tests__/A72_CalciumFertilizers-session.test.ts` 加 1 case（stone field guard）。`pnpm test:fast` 2313 PASS / `pnpm test:slow` 1740 PASS / lint 0 errors。从 §2.5 deferred 基建依赖表移除 C6 行；deferred 队列总数 0——这是 §2.5 "deferred 基建依赖" 表最后一张卡的收口。**§1 总览数字不动**：C6 之前已计入 implemented 834。spec / plan：本地超能力文档，未提交。
@@ -465,7 +477,7 @@ E 牌组（10 张）: E1 PoleBarns / E21 SheepRug / E2 RenovationMaterials / E30
 
 > **历史记录**：D154 ChimneySweep（renovate -2 stone 在 wood→stone 直升时漏减、`players` 字段）已于 2026-04-19 修复，迁入 §2.1。C129 SecondSpouse 已于 2026-04-19 对齐 BGA（首置 farmer + ≤2 占用），迁入 §2.1。B143 ClayWarden 已于 2026-04-19 补 `hollow` 3 人版空间并确认 listener 已覆盖（见 §2.0）。
 
-### 2.4 ❌ 数值/元数据待修（原 83 张：2026-04-28 深度 13 + 2026-04-29 wide-scan 70；PR-1A 已修 10 张 players + PR-1B 已修 16 张 cost/vp → 实际剩 57 张）
+### 2.4 ❌ 数值/元数据待修（2026-05-12 metadata-3b final：⚠ 1 / ❌ 7 / 🔍 33；详见 `docs/operations/bga-metadata-diff-report.md`；全副代码偏差已逐项修复；剩 33 banned 文档化于 §2.5.1；C148 extraVp + 6 prereq + D1 解析伪差 是 BGA upstream 漏标或 parser 伪差已登记）
 
 > 完整证据链见 `docs/card_desc_audit.md` §4.4 + `docs/card_desc_audit.md` §3。
 
@@ -578,6 +590,48 @@ E 牌组（10 张）: E1 PoleBarns / E21 SheepRug / E2 RenovationMaterials / E30
 | ~~C6 StoneClearing~~ | ✅ Closed 2026-05-11 — CropStack `'stone'` kind + reap 主路径 stone 分支 + A72 guard 已落地。详见 §2.0 "2026-05-11 — C6 StoneClearing 全对齐 BGA"。 | — | — | — |
 | ~~C148 MudWallower~~ | ✅ Closed 2026-05-11 — `actions:['reorganize'] phases:['after']` listener 已落地，reorg-only 路径全覆盖。详见 §2.0 "2026-05-11 — C148 MudWallower reorg-after listener"。 | — | — | — |
 
+#### 2.5.1 BGA-banned 但 OA 保留实现（33 张，2026-05-12 metadata-3b）
+
+按 memory `feedback_no_banned_schema`，OA 不实施 BGA `banned=true` 字段过滤。以下 33 张 BGA 标 banned 但 OA 仍 active：
+
+| Card | OA 状态 |
+|---|---|
+| A131_CraftTeacher | active in OA |
+| A133_Braggart | active in OA |
+| A14_CarpentersHammer | active in OA |
+| A33_BigCountry | active in OA |
+| A39_Chapel | active in OA |
+| A48_ShavingHorse | active in OA |
+| A82_WorkCertificate | active in OA |
+| A97_Freshman | active in OA |
+| B10_Caravan | active in OA |
+| B117_Informant | active in OA |
+| B132_EstateMaster | active in OA |
+| B15_CarpentersBench | active in OA |
+| B151_LittlePeasant | active in OA |
+| B161_Weakling | active in OA |
+| B21_HayloftBarn | active in OA |
+| B22_WalkingBoots | active in OA |
+| C102_TreeGuard | active in OA |
+| C125_Nightworker | active in OA |
+| C28_TeachersDesk | active in OA |
+| C31_WritingChamber | active in OA |
+| C3_CarriageTrip | active in OA |
+| C60_SmallPottersOven | active in OA |
+| C63_CraftBrewery | active in OA |
+| C99_GardenDesigner | active in OA |
+| D137_TradeTeacher | active in OA |
+| D19_PulverizerPlow | active in OA |
+| D21_Recruitment | active in OA |
+| D33_SummerHouse | active in OA |
+| D4_CrossCutWood | active in OA |
+| D74_RoyalWood | active in OA |
+| D92_ChildOmbudsman | active in OA |
+| D97_BeggingStudent | active in OA |
+| E22_GuestRoom | active in OA |
+
+完整 banned 名单来源：`scripts/audit-bga-metadata-diff.ts` 报告 "Banned in BGA but present in TS" section。
+
 ### 2.6 ⏳ 待实现 / 待评估（1 张）
 
 #### Tier 1 — BGA 自身无逻辑，我们也无逻辑（数据 only）
@@ -604,6 +658,7 @@ E 牌组（10 张）: E1 PoleBarns / E21 SheepRug / E2 RenovationMaterials / E30
 
 | 设施 | 状态 | 说明 |
 |---|---|---|
+| **Anytime window policy** (`shared/session/anytime-policy.ts`)：单一 server-side helper 输出 `{ allowed, blockedIds | reason }`，由 `buildAnytimeEntries` / `buildInteraction` / `takeAnytimeAction` 三处共用。规则按优先级匹配，覆盖 feed locked、confirm window、animal-reorg、exchange/bake-bread 自屏蔽、stage hook chain 默认 blocked、普通 pending 允许。 | ✅ | 2026-05-12 |
 | PlayerActionCard 行动格 | ✅ | 11 张卡，含 owner 显示、meeple 渲染 |
 | `onComputeAnimalZones` | ✅ | 动物容量修改器 |
 | `CardExchange` + `exchange-registry` | ✅ | 烹饪/交换改良 |

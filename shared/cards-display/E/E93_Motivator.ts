@@ -10,4 +10,5 @@ export const E93_Motivator = new Occupation({
   desc: ['On your first turn each round, if you have no unused farmyard spaces, you can place a person from your supply.'],
   cost: {},
   players: '1+',
+  category: 'ACTION_-_GUEST',
 })

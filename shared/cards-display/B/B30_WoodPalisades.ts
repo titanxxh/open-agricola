@@ -12,4 +12,5 @@ export const B30_WoodPalisades = new MinorImprovement({
   cost: { food: 1 },
   vp: 0,
   enablesPalisades: true,
+  extraVp: true,
 })

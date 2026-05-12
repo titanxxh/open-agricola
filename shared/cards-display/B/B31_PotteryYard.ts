@@ -14,4 +14,5 @@ export const B31_PotteryYard = new MinorImprovement({
   cost: {},
   vp: 1,
   prerequisite: 'Pottery (or an Upgrade Thereof)',
+  extraVp: true,
 })

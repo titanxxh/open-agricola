@@ -483,10 +483,14 @@ export const GameContainerApi = () => {
 
   const takeAnytimeAction = useCallback((actionId: string) => {
     if (!state || !isInteractive) return
-    void transport.takeAnytimeAction(state.currentPlayerIndex, actionId).catch((e) => {
+    const targetIdx =
+      interaction.stateId === 'wait'
+        ? interaction.playerIndex
+        : state.currentPlayerIndex
+    void transport.takeAnytimeAction(targetIdx, actionId).catch((e) => {
       console.error('takeAnytimeAction error', e)
     })
-  }, [state, transport, isInteractive])
+  }, [state, transport, isInteractive, interaction])
 
   const setFarmCommitError = useCallback((farmType: FarmCommitType, error?: string) => {
     if (farmType === 'fence') {

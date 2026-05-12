@@ -13,4 +13,5 @@ export const D99_EarthenwarePotter = new Occupation({
   ],
   cost: {},
   players: "1+",
+  extraVp: true,
 })

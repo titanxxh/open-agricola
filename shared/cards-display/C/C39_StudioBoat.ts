@@ -14,4 +14,5 @@ export const C39_StudioBoat = new PlayerActionCard({
   cost: { wood: 1 },
   prerequisite: '1 Occupation',
   occupationPrerequisites: { min: 1 },
+  extraVp: true,
 })

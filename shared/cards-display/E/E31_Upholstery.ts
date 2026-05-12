@@ -12,4 +12,5 @@ export const E31_Upholstery = new MinorImprovement({
     'Each time you build or play an improvement after this one, you can place 1 <REED> on this card, irretrievably, to get 1 bonus <SCORE>, up to the number of rooms in your house.',
   ],
   cost: {},
+  extraVp: true,
 })

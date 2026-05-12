@@ -11,4 +11,5 @@ export const B98_OrganicFarmer = new Occupation({
   desc: ['During the scoring, you get 1 bonus <SCORE> for each pasture containing at least 1 animal while having unused capacity for at least three more animals.'],
   cost: {},
   players: "1+",
+  extraVp: true,
 })

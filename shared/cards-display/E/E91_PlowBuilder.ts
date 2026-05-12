@@ -10,4 +10,5 @@ export const E91_PlowBuilder = new Occupation({
   desc: ['You can build the Joinery when taking a __Minor Improvement__ action. If you use the Joinery (or an upgrade thereof) during the harvest, you can pay 1 <FOOD> to plow 1 field.'],
   cost: {},
   players: '1+',
+  category: 'FARMYARD_-_PLOWING',
 })

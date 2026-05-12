@@ -255,7 +255,7 @@ takeAction | resolveChoice | commitFarm | commitSelection | takeAnytimeAction | 
 
 注意 WS 协议名（`ClientCommand.type`）与 `InteractionCommand` 不完全同名：前端"现在能做什么"以 `allowedCommands` 为准；线上 WS 命令名归一到 `choice` / `commitSelection` / `action` 等。
 
-### 4.7 ActionChoiceOption + effectPreview
+### 4.7 ActionChoiceOption + previews
 
 ```ts
 type ActionChoiceOption = {
@@ -264,10 +264,13 @@ type ActionChoiceOption = {
   labelParams?: Record<string, unknown>
   sourceCard?: string
   effectPreview?: ResourceExchangePreview | PaymentPreview | TextPreview
+  descriptionPreview?: ActionDescription | ActionDescriptionGroup
 }
 ```
 
 `effectPreview` 三类（`resourceExchange` / `payment` / `text`）。引擎对 `seq(pay-resources, gain[, bonus-vp])` option 自动聚合 preview；卡牌手写 `payLeaf+gainLeaf` 也能拿到 preview。生产点：`shared/cards/helpers/pay-gain-node.ts`、`shared/actions/effects/pay-helpers.ts`、`shared/actions/effects/exchange.ts`。
+
+`descriptionPreview` 是 BGA-style 递归 ActionFlow 描述：leaf 使用 `ActionDefinition.nameKey` + leaf `effectPreview`，组合节点按类型拼接子描述（`SeqNode: ', '` / `XorNode: ' / '` / `OrNode: ' + '` / `ParallelNode: ' | '`）。前端优先渲染 `descriptionPreview`，这样普通 leaf、pay/gain 组合、嵌套 XOR/SEQ 都由引擎自动生成 option 文案；卡牌不要为单个 flow 手写 UI label。纯状态同步 leaf（如 `special-effect.set-infobox`）不进入描述。
 
 ### 4.8 LogEntry
 
@@ -517,7 +520,7 @@ anytime                  额外注册的 anytime 行动
 
 ### 7.7 ActivateCardNode + PlayerSwitchNode + ParallelTriggerNode
 
-- 当 `HookDispatcher.getMatchingListeners()` 找到匹配 listener，引擎在 dispatch 阶段（`buildPhaseTrailingNodes` 内）调用 `executeCardListener` **peek 一次** 拿到 `ActionHookResult`，存到 `ActivateCardNode.preComputedResult`。推进到 `ActivateCardNode` 时若有 `preComputedResult` 直接复用（不重跑 handler）；若无（legacy 路径）才 fall back 到 lazy 调 listener。
+- 当 `HookDispatcher.getMatchingListeners()` 找到匹配 listener，引擎在 dispatch 阶段（`buildPhaseTrailingNodes` 内）调用 `executeCardListener` **peek 一次** 拿到 `ActionHookResult`，非 `undefined` 结果存到 `ActivateCardNode.preComputedResult` 并直接复用（不重跑 handler）；`undefined` 保持 lazy fallback，让依赖 post-reorg / post-mutation 状态的 listener 在真正推进时重新判断。
 - 当 owner ≠ 当前行动玩家（opponent scope），dispatch 自动在该 owner 的 trigger 组前后插 `PlayerSwitchNode`。`PlayerSwitchNode` 暂停时通过 `confirm-player-switch` interaction 等玩家确认；`undoBoundary` 标记 undo 不能跨切人。
 - **多 listener 同 phase 触发**（BGA-style PARALLEL trigger selection）：
   - dispatch 阶段静态分析每个 listener 的 flow（`shared/engine/flow-interactivity.ts`：`xor` / `optional` / `altCosts payLeaf` / 含 `interactionRequest` 的 leaf → `interactive`；纯 `gain` / 单路径 `pay` / 全 auto seq → `auto`）。
@@ -535,6 +538,36 @@ anytime                  额外注册的 anytime 行动
 - **sow** (`sow.ts`)：validate + finalize（无 payment combo），含 extra-field card effect（`getPermittedExtraSowableFields` + `handleSowExtraField`）。
 
 farmType 第一轮 payload 形态：`fence: {edges, palisadeEdges, extraWood}` / `room: {rooms}` / `stable: {stables}` / `plow: {tile}` / `sow: {crops}`。WS `{type:'choice', value:'confirm', payload}` 经 `resolveChoice` 透传；二轮时由 `extraData.actionContextWrite: {farmPayload}` 持久化到 `pending.actionContext.farmPayload`，二轮 prompt 解析时 ActionDef 从 `ctx.actionContext.farmPayload` 读回。
+
+---
+
+## Anytime Window Policy
+
+The set of card-listener anytime actions available in a given pending is computed once per `buildInteraction()` via `computeAnytimePolicy()` (`shared/session/anytime-policy.ts`). The helper is **server-only** — `client/` never imports it.
+
+Inputs (derived by `GameCore.getAnytimePolicyInput()` using the same node + composite fallback as `buildInteraction`):
+
+- `hasActiveContext` — `getActiveInteractionContext()` non-null
+- `stageResume` — current frame's `stageResume`
+- `interactionKind` — `node?.request?.kind ?? composite?.request?.kind`
+- `promptKey` — `node?.promptKey ?? composite?.promptKey`
+
+Output: `{ allowed: false, reason }` or `{ allowed: true, blockedIds }`. The rules are priority-ordered (first match wins): no-context → feed-locked → `confirm-next-player` allowed with `exchange` blocked → `confirm-player-switch` blocked → animal-reorg → exchange/bake-bread promptKey → stage-hook-chain default block → everything else allowed with no blocks.
+
+Three consumers share this snapshot:
+
+1. `buildAnytimeEntries()` — filters the auto-discovered registry + card-listener entries; returns `[]` if `!allowed`, otherwise removes any entry whose id is in `blockedIds`.
+2. `buildInteraction()` — derives `'takeAnytimeAction'` inclusion in `allowedCommands` strictly from `allowed && entries.length > 0`, keeping the UI and server views synchronised.
+3. `phases/round.ts::takeAnytimeAction()` — server-entry enforcement before any anytime injection. Additional guards (gameOver, draft phase, active-owner mismatch) sit at the function entry; the policy itself only sees pending-shape inputs.
+
+Nested anytime flows are injected ahead of the current pending tree. When an interactive nested flow resolves, the engine re-encounters the parent `InteractionNode` and rewrites `pendingNodeIdRef` before returning `choice`, so `buildInteraction()` surfaces the parent pending again instead of going idle.
+
+OA-vs-BGA design notes:
+
+- Reorganize is a system-driven sub-flow in OA (not a player-triggerable anytime) — the policy never produces a `'reorganize'` entry to filter.
+- `feed` pending is locked in OA because `executeFeedingLogic()` freezes `remaining`/`foodUsed` into the InteractionRequest. BGA allows nested anytime in its `ST_HARVEST_FEED` flow because its predecessor is the `EXCHANGE` state, which has no fixed budget.
+- Idle work-phase turns and `confirm-next-player` are acting-player anytime windows: legal anytime actions remain available before a worker is placed and before control passes to the next player. In `confirm-next-player`, `exchange` stays blocked to avoid recursive generic exchange prompts. `confirm-player-switch` remains blocked because it is a system-controlled cross-player transition inside another flow.
+- `stageResume`-bearing harvest stage hook chains default to blocked to preserve the "system-driven hook chains do not yield to player anytime" invariant; the explicit allow-list (`animal-reorg`, exchange/bake-bread promptKey) overrides this.
 
 ---
 

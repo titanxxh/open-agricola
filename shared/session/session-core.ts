@@ -117,6 +117,11 @@ import { isSpaceOccupied, removeWorkerRef } from '../domain/space.ts'
 import { smallestAvailableWorker } from '../domain/player.ts'
 import { computeAllowedPlacementSpaces } from '../actions/helpers/placement-availability.ts'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../actions/helpers/placement-constants.ts'
+import {
+  computeAnytimePolicy,
+  type AnytimePolicy,
+  type AnytimePolicyInput,
+} from './anytime-policy'
 
 /**
  * Synthetic action-space ID prefix for sub-flow frames pushed onto the
@@ -468,14 +473,33 @@ export class GameCore {
   /** @internal Round phase — read engineSource (used by takeAnytimeAction). */
   peekEngineSource(): EngineSource | null { return this.engineSource }
   /** @internal Round phase — engine context for ad-hoc anytime invocations. */
-  buildAdhocEngineFrame(actionId: string, sourceCard: string | undefined): {
+  buildAdhocEngineFrame(actionId: string, sourceCard: string | undefined, flowOverride?: ActionFlow): {
     engine: import('../engine').Engine; source: EngineSource
   } {
-    const flow: ActionFlow = { type: 'leaf', actionId, sourceCard }
+    const flow: ActionFlow = flowOverride ?? { type: 'leaf', actionId, sourceCard }
     return { engine: this.createFlowEngine(flow), source: { kind: 'flow', flow } }
   }
   /** @internal Round phase — enumerate currently-available anytime entries for the active interaction context. */
   listAnytimeEntries(): { descriptor: AnytimeAction; flow: ActionFlow }[] { return this.buildAnytimeEntries() }
+
+  /** @internal — derive policy input from current frame; node + composite fallback. */
+  private getAnytimePolicyInput(): AnytimePolicyInput {
+    const node = this.engineStack.peekInteraction()
+    const composite = this.engineStack.peekPendingChoiceFromComposite()
+    const promptKey = node?.promptKey ?? composite?.promptKey
+    const request = node?.request ?? composite?.request
+    return {
+      hasActiveContext: !!this.getActiveInteractionContext(),
+      stageResume: this.stageResume,
+      interactionKind: request?.kind,
+      promptKey,
+    }
+  }
+
+  /** @internal — used by phases/round.ts takeAnytimeAction + buildInteraction allowedCommands sync. */
+  computeAnytimePolicySnapshot(): AnytimePolicy {
+    return computeAnytimePolicy(this.getAnytimePolicyInput())
+  }
   /** @internal Round phase — finalize per-action stats / detail log. */
   invokeFinalizeActionLog(player: PlayerState): void { this.finalizeActionLog(player) }
   /** @internal Round phase — `state.round` after-harvest finalization. */
@@ -1014,9 +1038,11 @@ export class GameCore {
   }
 
   private getActiveInteractionContext() {
-    if (this.activePlayerIndex === null || !this.activeSpaceId) return null
-    const player = this.state.players[this.activePlayerIndex]
-    const space = this.getSpaceById(this.activeSpaceId)
+    const playerIndex = this.activePlayerIndex ?? (this.engineStack.depth() === 0 ? this.state.currentPlayerIndex : null)
+    const spaceId = this.activeSpaceId ?? (this.engineStack.depth() === 0 ? subflowSpaceId('top-level') : null)
+    if (playerIndex === null || !spaceId) return null
+    const player = this.state.players[playerIndex]
+    const space = this.getSpaceById(spaceId)
     if (!player || !space) return null
     return { player, space }
   }
@@ -1186,36 +1212,16 @@ export class GameCore {
   }
 
   private buildAnytimeEntries(): { descriptor: AnytimeAction; flow: ActionFlow }[] {
-    if (this.stageResume) return []
+    const policy = this.computeAnytimePolicySnapshot()
+    if (!policy.allowed) return []
     const context = this.getActiveInteractionContext()
     if (!context) return []
-    // Suppress anytime entries while a feed sub-flow is awaiting input.
-    // Detect via the InteractionNode's typed `request.kind` (R2 strong-typing).
-    const interactionNode = this.engineStack.peekInteraction()
-    const interactionKind = interactionNode?.request?.kind
-    if (interactionKind === 'feed') {
-      return []
-    }
-    // Suppress anytime entries while a reorganize sub-flow is awaiting input.
-    if (interactionKind === 'animal-reorg') {
-      return []
-    }
-    // Suppress anytime actions during sub-choice resolution (e.g. bake-bread, exchange)
-    // to avoid recursive anytime interrupts.
-    const promptKey = interactionNode?.promptKey
-    if (
-      interactionNode &&
-      promptKey &&
-      (promptKey.startsWith('ui.interactionBakeBread') ||
-       promptKey.startsWith('ui.interactionExchange'))
-    ) {
-      return []
-    }
+    const blockedIds = new Set(policy.blockedIds)
     const { player, space } = context
     const anytimeEntries: { descriptor: AnytimeAction; flow: ActionFlow }[] = []
-    // Auto-discover anytime actions from registry instead of hardcoding
     for (const action of this.registry.values()) {
       if (!action.anytime) continue
+      if (blockedIds.has(action.id)) continue
       const doable = this.hookDispatcher.applyIsDoable(
         { state: this.state, player, space, actionId: action.id },
         action,
@@ -1243,6 +1249,7 @@ export class GameCore {
     for (const entry of matchedAnytime) {
       if (!entry.cardId) continue
       if (entry.ownerPlayerId !== player.id) continue
+      if (blockedIds.has(entry.registration.id)) continue
       const result = executeCardListener(entry.registration, anytimeContext, {
         ownerPlayerId: entry.ownerPlayerId,
       })
@@ -1305,7 +1312,9 @@ export class GameCore {
       const anytimeActions = this.buildAnytimeEntries().map((entry) => entry.descriptor)
       return {
         stateId: 'idle',
-        allowedCommands: ['takeAction', 'undoStep', 'undoAction'],
+        allowedCommands: anytimeActions.length > 0
+          ? ['takeAction', 'undoStep', 'undoAction', 'takeAnytimeAction']
+          : ['takeAction', 'undoStep', 'undoAction'],
         anytimeActions,
       }
     }
@@ -1330,7 +1339,17 @@ export class GameCore {
         ? request.options
         : (node?.choices ?? composite?.options ?? [])
     const player = this.state.players[playerIndex]
-    const anytimeActions = this.buildAnytimeEntries().map((entry) => entry.descriptor)
+
+    const policy = this.computeAnytimePolicySnapshot()
+    const anytimeEntries = policy.allowed ? this.buildAnytimeEntries() : []
+    const includeAnytimeCmd = policy.allowed && anytimeEntries.length > 0
+    const buildCmds = (
+      base: ReadonlyArray<InteractionCommand>,
+    ): InteractionCommand[] => {
+      if (!includeAnytimeCmd) return [...base]
+      return [...base, 'takeAnytimeAction']
+    }
+    const anytimeDescriptors = anytimeEntries.map((entry) => entry.descriptor)
 
     switch (request.kind) {
       case 'animal-reorg':
@@ -1344,8 +1363,8 @@ export class GameCore {
           request,
           options: choiceOptions,
           zones: player ? this.buildAnimalReorgZones(player) : [],
-          allowedCommands: ['resolveChoice', 'undoStep', 'undoAction'],
-          anytimeActions: [],
+          allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
+          anytimeActions: anytimeDescriptors,
         }
       case 'confirm-next-player':
         return {
@@ -1357,8 +1376,8 @@ export class GameCore {
           sourceCard,
           request,
           nextPlayerIndex: request.nextPlayerIndex,
-          allowedCommands: ['resolveChoice', 'undoStep', 'undoAction'],
-          anytimeActions: [],
+          allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
+          anytimeActions: anytimeDescriptors,
         }
       case 'confirm-player-switch':
         return {
@@ -1371,8 +1390,8 @@ export class GameCore {
           request,
           fromPlayerIndex: request.fromPlayerIndex,
           toPlayerIndex: request.toPlayerIndex,
-          allowedCommands: ['resolveChoice', 'undoStep', 'undoAction'],
-          anytimeActions: [],
+          allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
+          anytimeActions: anytimeDescriptors,
         }
       case 'feed':
         return {
@@ -1386,8 +1405,8 @@ export class GameCore {
           remaining: request.remaining,
           foodUsed: request.foodUsed,
           feedQueue: request.feedQueue,
-          allowedCommands: ['resolveChoice', 'undoStep', 'undoAction'],
-          anytimeActions: [],
+          allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
+          anytimeActions: anytimeDescriptors,
         }
       case 'farm-select':
         return {
@@ -1401,8 +1420,8 @@ export class GameCore {
           options: choiceOptions,
           costOverride,
           farm: request.farm,
-          allowedCommands: ['resolveChoice', 'commitFarm', 'takeAnytimeAction', 'undoStep', 'undoAction'],
-          anytimeActions,
+          allowedCommands: buildCmds(['resolveChoice', 'commitFarm', 'undoStep', 'undoAction']),
+          anytimeActions: anytimeDescriptors,
         }
       case 'select-trigger':
         return {
@@ -1414,8 +1433,8 @@ export class GameCore {
           sourceCard,
           request,
           options: choiceOptions,
-          allowedCommands: ['resolveChoice', 'takeAnytimeAction', 'undoStep', 'undoAction'],
-          anytimeActions,
+          allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
+          anytimeActions: anytimeDescriptors,
         }
       case 'choice':
       default: {
@@ -1432,14 +1451,14 @@ export class GameCore {
             options: choiceOptions,
             costOverride,
             selection: this.buildSelectionInteractionFromNode(node, player),
-            allowedCommands: ['resolveChoice', 'commitSelection', 'takeAnytimeAction', 'undoStep', 'undoAction'],
-            anytimeActions,
+            allowedCommands: buildCmds(['resolveChoice', 'commitSelection', 'undoStep', 'undoAction']),
+            anytimeActions: anytimeDescriptors,
           }
         }
         const farm = node && player ? this.buildFarmInteractionFromNode(node, player) : null
         const allowedCommands: InteractionCommand[] = farm
-          ? ['resolveChoice', 'commitFarm', 'takeAnytimeAction', 'undoStep', 'undoAction']
-          : ['resolveChoice', 'takeAnytimeAction', 'undoStep', 'undoAction']
+          ? buildCmds(['resolveChoice', 'commitFarm', 'undoStep', 'undoAction'])
+          : buildCmds(['resolveChoice', 'undoStep', 'undoAction'])
         if (farm) {
           return {
             stateId: 'wait',
@@ -1453,7 +1472,7 @@ export class GameCore {
             costOverride,
             farm,
             allowedCommands,
-            anytimeActions,
+            anytimeActions: anytimeDescriptors,
           }
         }
         return {
@@ -1467,7 +1486,7 @@ export class GameCore {
           options: choiceOptions,
           costOverride,
           allowedCommands,
-          anytimeActions,
+          anytimeActions: anytimeDescriptors,
         }
       }
     }

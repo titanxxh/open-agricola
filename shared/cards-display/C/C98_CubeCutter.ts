@@ -11,4 +11,5 @@ export const C98_CubeCutter = new Occupation({
   desc: ['When you play this card, you immediately get 1 <WOOD>. In the field phase of each harvest, you can use this card to exchange exactly 1 <WOOD> and 1 <FOOD> for 1 bonus <SCORE>.'],
   cost: {},
   players: '1+',
+  extraVp: true,
 })

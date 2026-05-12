@@ -13,4 +13,5 @@ export const D31_Storeroom = new MinorImprovement({
   ],
   cost: { wood: 1, stone: 2 },
   vp: 1,
+  extraVp: true,
 })

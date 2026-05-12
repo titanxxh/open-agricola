@@ -10,4 +10,6 @@ export const E124_MayorCandidate = new Occupation({
   desc: ["You immediately get 2 <WOOD> and 2 <STONE>. During scoring, you get 1 negative point for each <WOOD> and each <STONE> in your supply. You can no longer discard <WOOD> or <STONE>."],
   cost: {},
   players: "1+",
+  extraVp: true,
+  category: 'BUILDING_RESOURCES_-_STONE',
 })

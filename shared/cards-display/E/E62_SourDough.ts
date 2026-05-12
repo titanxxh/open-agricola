@@ -12,4 +12,5 @@ export const E62_SourDough = new MinorImprovement({
   vp: 1,
   prerequisite: '3 Occupations and 1 Baking Improvement',
   occupationPrerequisites: { min: 3 },
+  category: 'FOOD_-_GRAIN',
 })
