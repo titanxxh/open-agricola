@@ -25,8 +25,10 @@ function extractObjectLiteral(line: string): Record<string, number> | undefined 
   if (!m) return undefined
   const out: Record<string, number> = {}
   for (const pair of m[1].split(',')) {
-    const p = pair.trim().match(/^(\w+)\s*:\s*(-?\d+)$/)
-    if (p) out[p[1]] = Number(p[2])
+    const p = pair.trim().match(/^(?:"(\w+)"|(\w+))\s*:\s*(-?\d+)$/)
+    if (!p) continue
+    const key = p[1] ?? p[2]
+    out[key] = Number(p[3])
   }
   return out
 }
