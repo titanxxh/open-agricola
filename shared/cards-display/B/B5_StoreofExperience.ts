@@ -9,6 +9,5 @@ export const B5_StoreofExperience = new MinorImprovement({
   number: 5,
   category: "BUILDING_RESOURCE_PROVIDER",
   desc: ["If you have 0-4/5/6/7 occupations left in hand, you immediately get 1 <STONE>/<REED>/<CLAY>/<WOOD>."],
-  cost: { food: 1 },
   passing: true,
 })

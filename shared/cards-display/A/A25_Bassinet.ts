@@ -11,6 +11,6 @@ export const A25_Bassinet = new MinorImprovement({
   desc: [
     'You can place a(nother) person on the first non-accumulating action space used in each work phase, if there is only 1 person, including newborns, on that space. (There can never be two people on __Meeting Place__.)',
   ],
-  cost: {},
+  cost: { wood: 1, reed: 1 },
   vp: 0,
 })
