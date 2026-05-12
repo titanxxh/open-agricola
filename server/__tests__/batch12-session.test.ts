@@ -113,22 +113,41 @@ describe('A129_Swagman session', () => {
   ) => {
     let resp = initialResp
     let safety = 20
-    let swagmanSeen = false
+    let swagmanActivated = false
     while (resp.interaction.stateId === 'wait' && safety > 0) {
+      const req = resp.interaction.request
+      // Handle select-trigger prompt (PARALLEL wrapper for card listeners)
+      if (req.kind === 'select-trigger') {
+        const swagmanOpt = req.options.find((o) => o.sourceCard === 'A129_Swagman')
+        if (swagmanOpt && accept) {
+          // Activate swagman's interactive flow
+          resp = session.resolveChoice(0, swagmanOpt.value)
+          swagmanActivated = true
+        } else {
+          // Pass on all triggers (decline)
+          resp = session.resolveChoice(0, '__pass__')
+        }
+        safety--
+        continue
+      }
       const opts = resp.interaction.options ?? []
       const skipOpt = opts.find((o: ActionChoiceOption) => o.value === '__skip__')
       const cancelOpt = opts.find((o: ActionChoiceOption) => o.value === 'cancel')
-      const swagmanOpt = opts.find((o: ActionChoiceOption) => o.sourceCard === 'A129_Swagman')
-      if (swagmanOpt && !swagmanSeen) {
-        swagmanSeen = true
-        if (accept) {
-          resp = session.resolveChoice(0, swagmanOpt.value)
+      // If swagman was activated, next optional choice is the actual jump prompt
+      if (swagmanActivated) {
+        swagmanActivated = false
+        const acceptOpt = opts.find((o: ActionChoiceOption) => o.value !== '__skip__')
+        if (accept && acceptOpt) {
+          resp = session.resolveChoice(0, acceptOpt.value)
+          safety--
+          continue
         } else if (skipOpt) {
           resp = session.resolveChoice(0, '__skip__')
-        } else {
-          break
+          safety--
+          continue
         }
-      } else if (skipOpt) {
+      }
+      if (skipOpt) {
         resp = session.resolveChoice(0, '__skip__')
       } else if (cancelOpt) {
         // Stable/room/plow farm-select prompts: cancel out of irrelevant choices.
@@ -223,23 +242,28 @@ describe('A82_WorkCertificate session', () => {
     expect(resp.ok).toBe(true)
     // The Work Certificate listener should fire and offer xor choices
     let foundChoice = false
-    let safety = 10
-    while (safety > 0) {
-      if (resp.interaction.stateId === 'wait') {
-        const skipOpt = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
-        if (skipOpt) {
-          foundChoice = true
-          resp = session.resolveChoice(0, '__skip__')
-          break
-        }
-        break
+    let safety = 15
+    while (resp.interaction.stateId === 'wait' && safety > 0) {
+      const req = resp.interaction.request
+      if (req.kind === 'select-trigger') {
+        // Activate A82 listener via select-trigger
+        const a82Opt = req.options.find((o) => o.sourceCard === 'A82_WorkCertificate')
+        resp = session.resolveChoice(0, a82Opt ? a82Opt.value : '__pass__')
+        safety--
+        continue
       }
-      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      if (req.kind === 'confirm-player-switch') {
         resp = confirmPlayerSwitch(session)
-      } else {
+        safety--
+        continue
+      }
+      const skipOpt = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+      if (skipOpt) {
+        foundChoice = true
+        resp = session.resolveChoice(0, '__skip__')
         break
       }
-      safety--
+      break
     }
     // With accumulation spaces at 5+ resources, should have triggered
     expect(foundChoice).toBe(true)
@@ -251,30 +275,33 @@ describe('A82_WorkCertificate session', () => {
     const woodBefore = s.players[0]!.resources.wood
     let resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
-    // Find and accept a wood option
-    let safety = 10
-    while (safety > 0) {
-      if (resp.interaction.stateId === 'wait') {
-        const options = resp.interaction.options ?? []
-        // Try to find a non-skip option (take wood)
-        const woodOpt = options.find((o: ActionChoiceOption) => o.value !== '__skip__')
-        if (woodOpt) {
-          resp = session.resolveChoice(0, woodOpt.value)
-          break
-        }
-        const skipOpt = options.find((o: ActionChoiceOption) => o.value === '__skip__')
-        if (skipOpt) {
-          resp = session.resolveChoice(0, '__skip__')
-          break
-        }
-        break
+    // Find and accept a wood option (drive through select-trigger first if needed)
+    let safety = 15
+    while (resp.interaction.stateId === 'wait' && safety > 0) {
+      const req = resp.interaction.request
+      if (req.kind === 'select-trigger') {
+        const a82Opt = req.options.find((o) => o.sourceCard === 'A82_WorkCertificate')
+        resp = session.resolveChoice(0, a82Opt ? a82Opt.value : '__pass__')
+        safety--
+        continue
       }
-      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      if (req.kind === 'confirm-player-switch') {
         resp = confirmPlayerSwitch(session)
-      } else {
+        safety--
+        continue
+      }
+      const options = resp.interaction.options ?? []
+      const woodOpt = options.find((o: ActionChoiceOption) => o.value !== '__skip__')
+      if (woodOpt) {
+        resp = session.resolveChoice(0, woodOpt.value)
         break
       }
-      safety--
+      const skipOpt = options.find((o: ActionChoiceOption) => o.value === '__skip__')
+      if (skipOpt) {
+        resp = session.resolveChoice(0, '__skip__')
+        break
+      }
+      break
     }
     // Walk remaining
     while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
@@ -310,30 +337,34 @@ describe('A82_WorkCertificate session', () => {
     let resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
 
-    let safety = 10
+    let safety = 15
     let acceptedTake = false
-    while (safety > 0) {
-      if (resp.interaction.stateId === 'wait') {
-        const options = resp.interaction.options ?? []
-        const takeOpt = options.find((o: ActionChoiceOption) => o.value !== '__skip__')
-        if (takeOpt) {
-          resp = session.resolveChoice(0, takeOpt.value)
-          acceptedTake = true
-          break
-        }
-        const skipOpt = options.find((o: ActionChoiceOption) => o.value === '__skip__')
-        if (skipOpt) {
-          resp = session.resolveChoice(0, '__skip__')
-          break
-        }
-        break
+    while (resp.interaction.stateId === 'wait' && safety > 0) {
+      const req = resp.interaction.request
+      if (req.kind === 'select-trigger') {
+        const a82Opt = req.options.find((o) => o.sourceCard === 'A82_WorkCertificate')
+        resp = session.resolveChoice(0, a82Opt ? a82Opt.value : '__pass__')
+        safety--
+        continue
       }
-      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      if (req.kind === 'confirm-player-switch') {
         resp = confirmPlayerSwitch(session)
-      } else {
+        safety--
+        continue
+      }
+      const options = resp.interaction.options ?? []
+      const takeOpt = options.find((o: ActionChoiceOption) => o.value !== '__skip__')
+      if (takeOpt) {
+        resp = session.resolveChoice(0, takeOpt.value)
+        acceptedTake = true
         break
       }
-      safety--
+      const skipOpt = options.find((o: ActionChoiceOption) => o.value === '__skip__')
+      if (skipOpt) {
+        resp = session.resolveChoice(0, '__skip__')
+        break
+      }
+      break
     }
     while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
