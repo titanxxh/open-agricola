@@ -107,6 +107,37 @@ describe('diffCards vp normalization', () => {
   })
 })
 
+describe('diffCards cost normalization', () => {
+  it('treats cost:{} on either side as missing — no deviation', () => {
+    const bgaMap = new Map([
+      ['X1_Y', { id: 'X1_Y', deck: 'X', number: 1, banned: false }],
+      ['X2_Z', { id: 'X2_Z', deck: 'X', number: 2, cost: {}, banned: false }],
+    ])
+    const tsMap = new Map([
+      ['X1_Y', { id: 'X1_Y', deck: 'X', number: 1, cost: {} }],
+      ['X2_Z', { id: 'X2_Z', deck: 'X', number: 2 }],
+    ])
+    const result = diffCards(bgaMap as never, tsMap as never)
+    expect(result.deviations.filter(d => d.field === 'cost')).toEqual([])
+  })
+
+  it('still reports real cost differences (non-empty vs empty / different values)', () => {
+    const bgaMap = new Map([
+      ['X3_W', { id: 'X3_W', deck: 'X', number: 3, cost: { wood: 1 }, banned: false }],
+      ['X4_V', { id: 'X4_V', deck: 'X', number: 4, cost: { wood: 2 }, banned: false }],
+    ])
+    const tsMap = new Map([
+      ['X3_W', { id: 'X3_W', deck: 'X', number: 3 }],
+      ['X4_V', { id: 'X4_V', deck: 'X', number: 4, cost: { wood: 1 } }],
+    ])
+    const result = diffCards(bgaMap as never, tsMap as never)
+    const costDevs = result.deviations.filter(d => d.field === 'cost')
+    expect(costDevs).toHaveLength(2)
+    expect(costDevs.find(d => d.id === 'X3_W')?.ours).toBeUndefined()
+    expect(costDevs.find(d => d.id === 'X4_V')?.bga).toEqual({ wood: 2 })
+  })
+})
+
 describe('renderReport', () => {
   it('produces a markdown report with summary section', () => {
     const md = renderReport({
