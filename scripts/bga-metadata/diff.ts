@@ -21,7 +21,7 @@ export type DiffResult = {
 }
 
 const LITERAL_FIELDS = ['extraVp', 'vp'] as const
-const COMPLEX_FIELDS = ['category', 'players', 'cost', 'prerequisite'] as const
+const COMPLEX_FIELDS = ['category', 'players', 'cost', 'altCosts', 'prerequisite'] as const
 
 function objectShallowEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true
@@ -36,8 +36,21 @@ function objectShallowEqual(a: unknown, b: unknown): boolean {
   return true
 }
 
+function arrayOfObjectsEqual(a: unknown, b: unknown): boolean {
+  if (!Array.isArray(a) || !Array.isArray(b)) return a === b
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (!objectShallowEqual(a[i], b[i])) return false
+  }
+  return true
+}
+
 function isEmptyObj(v: unknown): boolean {
-  return typeof v === 'object' && v !== null && Object.keys(v as Record<string, unknown>).length === 0
+  return typeof v === 'object' && v !== null && !Array.isArray(v) && Object.keys(v as Record<string, unknown>).length === 0
+}
+
+function isEmptyArr(v: unknown): boolean {
+  return Array.isArray(v) && v.length === 0
 }
 
 export function diffCards(bgaMap: Map<string, BgaCard>, tsMap: Map<string, TsCard>): DiffResult {
@@ -46,16 +59,21 @@ export function diffCards(bgaMap: Map<string, BgaCard>, tsMap: Map<string, TsCar
   const tsOnly: string[] = []
   const bannedButPresent: string[] = []
 
-  const allIds = new Set<string>([...bgaMap.keys(), ...tsMap.keys()])
-  for (const id of allIds) {
-    const bga = bgaMap.get(id)
-    const ts = tsMap.get(id)
+  const allKeys = new Set<string>([...bgaMap.keys(), ...tsMap.keys()])
+  for (const key of allKeys) {
+    const bga = bgaMap.get(key)
+    const ts = tsMap.get(key)
+    // Prefer the card's own id (e.g. 'A100_Curator') for human-readable reporting.
+    const id = bga?.id ?? ts?.id ?? key
 
     if (bga && !ts) { bgaOnly.push(id); continue }
     if (!bga && ts) { tsOnly.push(id); continue }
     if (!bga || !ts) continue
 
-    if (bga.banned) { bannedButPresent.push(id); continue }
+    // BGA-banned: OA still keeps the card active (memory feedback_no_banned_schema).
+    // Track in bannedButPresent list AND still compare fields — OA keeps banned cards
+    // in active pool, so metadata still needs to align with BGA.
+    if (bga.banned) bannedButPresent.push(id)
 
     for (const field of LITERAL_FIELDS) {
       let bv = bga[field]
@@ -74,6 +92,15 @@ export function diffCards(bgaMap: Map<string, BgaCard>, tsMap: Map<string, TsCar
       if (field === 'cost') {
         if (isEmptyObj(bv)) bv = undefined
         if (isEmptyObj(ov)) ov = undefined
+      }
+      if (field === 'altCosts') {
+        if (isEmptyArr(bv)) bv = undefined
+        if (isEmptyArr(ov)) ov = undefined
+        if (bv === undefined && ov === undefined) continue
+        if (!arrayOfObjectsEqual(bv, ov)) {
+          deviations.push({ id, field, bga: bv, ours: ov, verdict: 'error' })
+        }
+        continue
       }
       if (field === 'players') {
         if (bv === undefined) bv = '1+'

@@ -20,8 +20,24 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const REPO_ROOT = path.resolve(__dirname, '..')
 
-function loadBga(bgaRoot: string) {
-  const map = new Map<string, ReturnType<typeof parseBgaCard>>()
+type BgaCard = ReturnType<typeof parseBgaCard>
+type TsCard = ReturnType<typeof parseTsCard>
+
+function pickCanonical(cards: BgaCard[], tsIds: Set<string>): BgaCard {
+  if (cards.length === 1) return cards[0]
+  // Priority 1: prefer a card whose id matches some TS card id
+  const tsMatch = cards.find(c => tsIds.has(c.id))
+  if (tsMatch) return tsMatch
+  // Priority 2: prefer non-banned
+  const nonBanned = cards.filter(c => !c.banned)
+  if (nonBanned.length >= 1) return nonBanned[0]
+  // Fallback: alphabetic-first id
+  return [...cards].sort((a, b) => a.id.localeCompare(b.id))[0]
+}
+
+function loadBga(bgaRoot: string, tsIds: Set<string>) {
+  // Stage 1: parse all PHP, group by deck+number
+  const buckets = new Map<string, BgaCard[]>()
   for (const deck of ['A', 'B', 'C', 'D', 'E']) {
     const dir = path.join(bgaRoot, 'modules/php/Cards', deck)
     if (!fs.existsSync(dir)) continue
@@ -30,17 +46,25 @@ function loadBga(bgaRoot: string) {
       const phpPath = path.join(dir, f)
       try {
         const card = parseBgaCard(phpPath)
-        map.set(card.id, card)
+        const key = `${card.deck}${card.number}`
+        if (!buckets.has(key)) buckets.set(key, [])
+        buckets.get(key)!.push(card)
       } catch (e) {
         console.warn(`Skipping unparseable BGA: ${f} (${e})`)
       }
     }
   }
+  // Stage 2: pick canonical per bucket, key by deck+number
+  const map = new Map<string, BgaCard>()
+  for (const [key, cards] of buckets) {
+    map.set(key, pickCanonical(cards, tsIds))
+  }
   return map
 }
 
 function loadTs() {
-  const map = new Map<string, ReturnType<typeof parseTsCard>>()
+  // Key by deck+number (e.g. 'A100') to align with loadBga canonical bucket key.
+  const map = new Map<string, TsCard>()
   for (const deck of ['A', 'B', 'C', 'D', 'E']) {
     const dir = path.join(REPO_ROOT, 'shared/cards-display', deck)
     if (!fs.existsSync(dir)) continue
@@ -49,7 +73,8 @@ function loadTs() {
       const tsPath = path.join(dir, f)
       try {
         const card = parseTsCard(tsPath)
-        map.set(card.id, card)
+        const key = `${card.deck}${card.number}`
+        map.set(key, card)
       } catch (e) {
         console.warn(`Skipping unparseable TS: ${f} (${e})`)
       }
@@ -63,8 +88,12 @@ function main() {
   const applySafe = args.includes('--apply-safe')
 
   const bgaRoot = resolveBgaRoot()
-  const bga = loadBga(bgaRoot)
   const ts = loadTs()
+  // Build the set of TS card ids to drive canonical-pick when BGA has multiple
+  // files for the same deck+number.
+  const tsIds = new Set<string>()
+  for (const card of ts.values()) tsIds.add(card.id)
+  const bga = loadBga(bgaRoot, tsIds)
   const result = diffCards(bga, ts)
 
   if (applySafe) {

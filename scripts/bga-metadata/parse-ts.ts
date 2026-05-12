@@ -33,6 +33,26 @@ function extractObjectLiteral(line: string): Record<string, number> | undefined 
   return out
 }
 
+function extractArrayOfObjectsLiteral(line: string): Record<string, number>[] | undefined {
+  // Find a top-level [ ... ] containing one or more { ... } object literals.
+  const arrMatch = line.match(/\[(.*)\]/)
+  if (!arrMatch) return undefined
+  const inner = arrMatch[1]
+  const objs = inner.match(/\{[^}]*\}/g)
+  if (!objs) return []
+  return objs.map(obj => {
+    const out: Record<string, number> = {}
+    const body = obj.slice(1, -1)
+    for (const pair of body.split(',')) {
+      const p = pair.trim().match(/^(?:"(\w+)"|(\w+))\s*:\s*(-?\d+)$/)
+      if (!p) continue
+      const key = p[1] ?? p[2]
+      out[key] = Number(p[3])
+    }
+    return out
+  })
+}
+
 export function parseTsCard(tsPath: string): TsCard {
   const src = fs.readFileSync(tsPath, 'utf8')
   const id = path.basename(tsPath, '.ts')
@@ -51,6 +71,7 @@ export function parseTsCard(tsPath: string): TsCard {
       if (m) card.vp = Number(m[1])
     }
     else if (line.startsWith('cost:')) card.cost = extractObjectLiteral(line)
+    else if (line.startsWith('altCosts:')) card.altCosts = extractArrayOfObjectsLiteral(line)
     else if (line.startsWith('prerequisite:')) card.prerequisite = extractStringLiteral(line)
   }
 

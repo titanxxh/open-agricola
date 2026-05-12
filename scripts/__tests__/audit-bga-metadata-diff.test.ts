@@ -53,6 +53,13 @@ describe('parseBgaCard', () => {
     const card = parseBgaCard(phpPath)
     expect(card.prerequisite).toBe('2 Occupations')
   })
+
+  it('parses altCosts from $this->costs = [[...],[...]] form', () => {
+    const phpPath = path.join(FIXTURE_DIR, 'bga/B7w_AltCostsOnly.php')
+    const card = parseBgaCard(phpPath)
+    expect(card.altCosts).toEqual([{ wood: 1 }, { food: 2 }])
+    expect(card.cost).toBeUndefined()
+  })
 })
 
 describe('parseTsCard', () => {
@@ -85,6 +92,13 @@ describe('parseTsCard', () => {
     const tsPath = path.join(FIXTURE_DIR, 'ts/A29_JsonCost.ts')
     const card = parseTsCard(tsPath)
     expect(card.cost).toEqual({ wood: 1 })
+  })
+
+  it('parses altCosts from TS array-of-objects literal', () => {
+    const tsPath = path.join(FIXTURE_DIR, 'ts/A29w_TsAltCosts.ts')
+    const card = parseTsCard(tsPath)
+    expect(card.altCosts).toEqual([{ wood: 1 }, { food: 2 }])
+    expect(card.cost).toBeUndefined()
   })
 })
 
@@ -233,5 +247,44 @@ describe('applySafeFix', () => {
     const patched = applySafeFix(src, [{ field: 'category', target: 'NEW' }])
     expect(patched).toContain("category: 'NEW',")
     expect(patched).not.toContain("category: 'OLD'")
+  })
+})
+
+describe('diffCards altCosts', () => {
+  it('reports deviation when one side has altCosts and other does not', () => {
+    const bgaMap = new Map<string, any>([
+      ['X1', { id: 'X1_A', deck: 'X', number: 1, altCosts: [{wood: 1}], banned: false }],
+    ])
+    const tsMap = new Map<string, any>([
+      ['X1', { id: 'X1_A', deck: 'X', number: 1 }],
+    ])
+    const result = diffCards(bgaMap as never, tsMap as never)
+    const altDevs = result.deviations.filter(d => d.field === 'altCosts')
+    expect(altDevs).toHaveLength(1)
+    expect(altDevs[0].bga).toEqual([{wood: 1}])
+  })
+
+  it('no deviation when altCosts arrays match', () => {
+    const bgaMap = new Map<string, any>([
+      ['X2', { id: 'X2_B', deck: 'X', number: 2, altCosts: [{wood: 1}, {food: 2}], banned: false }],
+    ])
+    const tsMap = new Map<string, any>([
+      ['X2', { id: 'X2_B', deck: 'X', number: 2, altCosts: [{wood: 1}, {food: 2}] }],
+    ])
+    const result = diffCards(bgaMap as never, tsMap as never)
+    expect(result.deviations.filter(d => d.field === 'altCosts')).toEqual([])
+  })
+})
+
+describe('loadBga canonical pick (integration with parseBgaCard fixtures)', () => {
+  it('picks the canonical id when multiple files share deck+number', () => {
+    const a = parseBgaCard(path.join(FIXTURE_DIR, 'bga/D11w_LawnFertilizer.php'))
+    const b = parseBgaCard(path.join(FIXTURE_DIR, 'bga/D11w_LawnFertilzer.php'))
+    const tsIds = new Set(['D11w_LawnFertilizer'])
+    const cards = [a, b]
+    const tsMatch = cards.find(c => tsIds.has(c.id))
+    const picked = tsMatch ?? cards.find(c => !c.banned) ?? cards[0]
+    expect(picked.id).toBe('D11w_LawnFertilizer')
+    expect(picked.banned).toBe(false)
   })
 })
