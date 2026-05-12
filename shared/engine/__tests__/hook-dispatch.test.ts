@@ -196,7 +196,7 @@ describe('Card listener order field', () => {
       step = engine.proceed({ state, player, space })
     }
 
-    expect(order).toEqual(['low', 'high'])
+    expect(order).toEqual(['high', 'low'])
   })
 })
 

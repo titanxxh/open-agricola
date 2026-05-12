@@ -177,10 +177,9 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
     return session
   }
 
-  // Drain any non-A92 optional choices that wish-children's flow may surface
-  // before A92's after-place-farmer offer. With the deterministic setup above
-  // there should be none, but we keep this as a safety net so the test doesn't
-  // re-regress if some other listener later injects a benign optional choice.
+  // Drain any non-A92 optional choices or select-trigger prompts that wish-children's
+  // flow may surface before A92's offer. Stops when A92's select-trigger (or optional
+  // choice in legacy mode) is at the front.
   const advanceToA92Offer = (
     session: GameSession,
     initial: ReturnType<typeof session.takeAction>,
@@ -188,6 +187,11 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
     let resp = initial
     for (let i = 0; i < 5; i++) {
       if (resp.interaction.stateId !== 'wait') break
+      const req = resp.interaction.request
+      if (req.kind === 'select-trigger') {
+        // Stop here: caller will decide to activate A92 or pass
+        break
+      }
       const accept = resp.interaction.options?.find((o) => o.value !== '__skip__')
       if (accept?.sourceCard === 'A92_AdoptiveParents') break
       resp = session.resolveChoice(0, '__skip__')
@@ -210,8 +214,22 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
     expect(a92Resp.interaction.stateId).toBe('wait')
     if (a92Resp.interaction.stateId !== 'wait') return
 
-    // Step 3: accept the A92 optional offer (pay 1 food to grow child as adult + extra placement).
-    const acceptOption = a92Resp.interaction.options?.find((o) => o.value !== '__skip__')
+    // Step 3: accept the A92 offer.
+    // Under PARALLEL dispatch, a92Resp presents a select-trigger prompt; activating A92
+    // then exposes the actual optional pay choice.
+    const req = a92Resp.interaction.request
+    let payResp = a92Resp
+    if (req.kind === 'select-trigger') {
+      const a92TriggerOpt = req.options.find((o) => o.sourceCard === 'A92_AdoptiveParents')
+      expect(a92TriggerOpt).toBeDefined()
+      if (!a92TriggerOpt) return
+      payResp = session.resolveChoice(0, a92TriggerOpt.value)
+      expect(payResp.ok).toBe(true)
+      expect(payResp.interaction.stateId).toBe('wait')
+    }
+
+    // Now payResp holds the optional pay choice for A92
+    const acceptOption = payResp.interaction.options?.find((o) => o.value !== '__skip__')
     expect(acceptOption).toBeDefined()
     expect(acceptOption!.sourceCard).toBe('A92_AdoptiveParents')
     if (!acceptOption) return
@@ -258,9 +276,16 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
 
     // Step 2: drain to A92's offer, then skip it.
     const a92Resp = advanceToA92Offer(session, fgResp)
-    const skipResp = a92Resp.interaction.stateId === 'wait'
-      ? session.resolveChoice(0, '__skip__')
-      : a92Resp
+    let skipResp = a92Resp
+    if (a92Resp.interaction.stateId === 'wait') {
+      const req = a92Resp.interaction.request
+      if (req.kind === 'select-trigger') {
+        // Pass all triggers (decline A92 activation)
+        skipResp = session.resolveChoice(0, '__pass__')
+      } else {
+        skipResp = session.resolveChoice(0, '__skip__')
+      }
+    }
     expect(skipResp.ok).toBe(true)
 
     const p1 = skipResp.state.players[0]!
