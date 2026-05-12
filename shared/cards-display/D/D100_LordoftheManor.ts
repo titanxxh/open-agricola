@@ -12,4 +12,5 @@ export const D100_LordoftheManor = new Occupation({
   cost: {},
   players: "1+",
   newSet: true,
+  extraVp: true,
 })
