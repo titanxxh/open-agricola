@@ -116,16 +116,20 @@ describe('A129_Swagman session', () => {
     let swagmanActivated = false
     while (resp.interaction.stateId === 'wait' && safety > 0) {
       const req = resp.interaction.request
-      // Handle select-trigger prompt (PARALLEL wrapper for card listeners)
+      // Handle select-trigger prompt (PARALLEL wrapper for card listeners).
+      // Default mandatory=true means PASS may not be offered; we always
+      // activate Swagman's flow and let its inner optional decide accept/skip.
       if (req.kind === 'select-trigger') {
         const swagmanOpt = req.options.find((o) => o.sourceCard === 'A129_Swagman')
-        if (swagmanOpt && accept) {
-          // Activate swagman's interactive flow
+        const passOpt = req.options.find((o) => o.value === '__pass__')
+        if (swagmanOpt) {
           resp = session.resolveChoice(0, swagmanOpt.value)
           swagmanActivated = true
-        } else {
-          // Pass on all triggers (decline)
+        } else if (passOpt) {
           resp = session.resolveChoice(0, '__pass__')
+        } else {
+          // Pick first available (other mandatory trigger).
+          resp = session.resolveChoice(0, req.options[0]!.value)
         }
         safety--
         continue
@@ -133,10 +137,15 @@ describe('A129_Swagman session', () => {
       const opts = resp.interaction.options ?? []
       const skipOpt = opts.find((o: ActionChoiceOption) => o.value === '__skip__')
       const cancelOpt = opts.find((o: ActionChoiceOption) => o.value === 'cancel')
-      // If swagman was activated, next optional choice is the actual jump prompt
-      if (swagmanActivated) {
+      // Swagman's inner optional jump choice is recognised by sourceCard.
+      // The single-option mandatory select-trigger may have been auto-resolved
+      // by the session, so we may land here without seeing select-trigger.
+      const swagmanJumpOpt = opts.find(
+        (o: ActionChoiceOption) => o.sourceCard === 'A129_Swagman' && o.value !== '__skip__',
+      )
+      if (swagmanActivated || swagmanJumpOpt) {
         swagmanActivated = false
-        const acceptOpt = opts.find((o: ActionChoiceOption) => o.value !== '__skip__')
+        const acceptOpt = swagmanJumpOpt ?? opts.find((o: ActionChoiceOption) => o.value !== '__skip__')
         if (accept && acceptOpt) {
           resp = session.resolveChoice(0, acceptOpt.value)
           safety--

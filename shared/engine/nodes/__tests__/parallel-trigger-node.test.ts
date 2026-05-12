@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { ParallelTriggerNode } from '../parallel-trigger-node'
 import { ActivateCardNode } from '../activate-card-node'
 
-const makeActivate = (id: string, cardId: string) =>
-  new ActivateCardNode(id, `listener-${id}`, cardId, 'after', 'place-farmer')
+const makeActivate = (id: string, cardId: string, mandatory = true) =>
+  new ActivateCardNode(id, `listener-${id}`, cardId, 'after', 'place-farmer', { mandatory })
 
 describe('ParallelTriggerNode', () => {
   it('starts ready with unresolved children', () => {
@@ -41,9 +41,20 @@ describe('ParallelTriggerNode', () => {
     expect(node.getState()).toBe('resolved')
   })
 
-  it('exposes select-trigger options including pass', () => {
-    const a = makeActivate('a', 'C1')
-    const b = makeActivate('b', 'C2')
+  it('exposes select-trigger options without pass when any child is mandatory', () => {
+    const a = makeActivate('a', 'C1', true)
+    const b = makeActivate('b', 'C2', false)
+    const node = new ParallelTriggerNode('ptn1', [a, b], 'p1')
+    const opts = node.buildSelectOptions()
+    expect(opts).toEqual([
+      { value: 'C1', labelKey: 'cards.C1.name', sourceCard: 'C1' },
+      { value: 'C2', labelKey: 'cards.C2.name', sourceCard: 'C2' },
+    ])
+  })
+
+  it('exposes __pass__ option when every child is optional', () => {
+    const a = makeActivate('a', 'C1', false)
+    const b = makeActivate('b', 'C2', false)
     const node = new ParallelTriggerNode('ptn1', [a, b], 'p1')
     const opts = node.buildSelectOptions()
     expect(opts).toEqual([

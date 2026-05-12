@@ -183,6 +183,9 @@ export function buildPhaseTrailingNodes(
 
   const activeId = state.players[state.currentPlayerIndex]?.id
   const orderedOwners: string[] = []
+  // Global listeners (no cardIds → ownerPlayerId='') run first in the active
+  // player's context with no PlayerSwitchNode wrap.
+  if (byOwner.has('')) orderedOwners.push('')
   if (activeId && byOwner.has(activeId)) orderedOwners.push(activeId)
   for (const p of state.players) {
     if (p.id !== activeId && byOwner.has(p.id)) orderedOwners.push(p.id)
@@ -200,23 +203,31 @@ export function buildPhaseTrailingNodes(
         p.ml.cardId,
         phase,
         actionId,
-        { ...baseEvent, ownerPlayerId: p.ml.ownerPlayerId },
+        { ...baseEvent, ownerPlayerId: p.ml.ownerPlayerId, mandatory: p.ml.registration.mandatory === true },
         p.result,
       )
     }
 
     const ownerGroupNodes: EngineNode[] = []
 
-    const mandatory = group.filter((p) => p.ml.registration.mandatory)
-    const optional = group.filter((p) => !p.ml.registration.mandatory)
-    for (const p of mandatory) ownerGroupNodes.push(buildNode(p))
+    // BGA semantics: trigger ordering is the choice; whether a trigger fires
+    // is controlled per-listener via the `mandatory` flag (default = true).
+    // - Auto listeners (no nested interaction in their flow) run serially in
+    //   playOrder regardless of mandatory.
+    // - Interactive listeners ALL go into a single PARALLEL together; the
+    //   node hides the __pass__ option when any unresolved child is mandatory
+    //   (so codex `silently skip mandatory` regression is impossible).
+    const autoOnes = group.filter((p) => p.interactivity === 'auto')
+    for (const p of autoOnes) ownerGroupNodes.push(buildNode(p))
 
-    const optAuto = optional.filter((p) => p.interactivity === 'auto')
-    for (const p of optAuto) ownerGroupNodes.push(buildNode(p))
-
-    const optInteractive = optional.filter((p) => p.interactivity === 'interactive')
-    if (optInteractive.length > 0) {
-      const children = optInteractive.map(buildNode)
+    const interactiveOnes = group.filter((p) => p.interactivity === 'interactive')
+    if (interactiveOnes.length === 1) {
+      // Single interactive listener: no PARALLEL — execution order is
+      // unambiguous. Direct ActivateCardNode preserves legacy behavior for
+      // single-listener cases (A17 ReclamationPlow, A129 Swagman, etc.).
+      ownerGroupNodes.push(buildNode(interactiveOnes[0]!))
+    } else if (interactiveOnes.length > 1) {
+      const children = interactiveOnes.map(buildNode)
       const ptn = new ParallelTriggerNode(
         `parallel-trigger-${phase}-${actionId}-${ownerId}-${int.counterRef.value++}`,
         children,
@@ -229,7 +240,9 @@ export function buildPhaseTrailingNodes(
     // owned by the card's player, not the action-active player. Active
     // player group runs in-context (no wrap).
     if (ownerGroupNodes.length === 0) continue
-    if (ownerId !== activeId) {
+    // Empty ownerId == global listener (no cardIds) — runs in active player's
+    // frame, no PlayerSwitchNode wrap.
+    if (ownerId !== activeId && ownerId !== '') {
       out.push(new PlayerSwitchNode(`ps-to-${phase}-${actionId}-${ownerId}-${int.counterRef.value++}`, ownerId))
       out.push(...ownerGroupNodes)
       out.push(new PlayerSwitchNode(`ps-back-${phase}-${actionId}-${activeId ?? ''}-${int.counterRef.value++}`, activeId ?? ownerId))
