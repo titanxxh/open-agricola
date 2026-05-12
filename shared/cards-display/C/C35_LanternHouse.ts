@@ -15,4 +15,5 @@ export const C35_LanternHouse = new MinorImprovement({
   // Ref: bga-agricola/modules/php/Cards/C/C35_LanternHouse.php
   prerequisite: "No Occupations",
   occupationPrerequisites: { max: 0 },
+  extraVp: true,
 })

@@ -13,4 +13,5 @@ export const D136_AnimalActivist = new Occupation({
   ],
   cost: {},
   players: "3+",
+  extraVp: true,
 })

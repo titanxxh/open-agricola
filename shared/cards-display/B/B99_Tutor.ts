@@ -11,4 +11,5 @@ export const B99_Tutor = new Occupation({
   desc: ['During scoring, you get 1 bonus <SCORE> for each occupation played after this one.'],
   cost: {},
   players: "1+",
+  extraVp: true,
 })

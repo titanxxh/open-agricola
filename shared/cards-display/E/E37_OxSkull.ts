@@ -12,4 +12,5 @@ export const E37_OxSkull = new MinorImprovement({
   cost: {},
   prerequisite: "1 Cattle",
   vp: 0,
+  extraVp: true,
 })

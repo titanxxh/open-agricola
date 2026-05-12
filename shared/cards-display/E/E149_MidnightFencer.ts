@@ -10,4 +10,5 @@ export const E149_MidnightFencer = new Occupation({
   desc: ["At the start of the last harvest, you can take up to 2 of each other player's unbuilt fences and build them on your farm at no cost. (Your farm can then have over 15 fences.)"],
   cost: {},
   players: '4+',
+  category: 'FARMYARD',
 })

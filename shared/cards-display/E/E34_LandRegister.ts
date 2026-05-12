@@ -11,4 +11,5 @@ export const E34_LandRegister = new MinorImprovement({
   desc: ['During scoring, if your farm has no unused spaces, you get 2 bonus <SCORE>.'],
   cost: { wood: 1 },
   vp: 0,
+  extraVp: true,
 })

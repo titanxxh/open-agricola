@@ -10,4 +10,6 @@ export const E133_ChampionBreeder = new Occupation({
   desc: ["Each time you place 2 or 3+ newborn animals on your farm during the breeding phase of the harvest, you get 1 or 2 bonus <SCORE>, respectively."],
   cost: {},
   players: "3+",
+  extraVp: true,
+  category: 'BONUS_POINTS',
 })

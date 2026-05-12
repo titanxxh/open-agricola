@@ -12,4 +12,5 @@ export const E75_StoneAxe = new MinorImprovement({
   vp: 1,
   prerequisite: "2 Occupations",
   occupationPrerequisites: { min: 2 },
+  category: 'BUILDING_RESOURCES_-_WOOD',
 })

@@ -3,8 +3,8 @@
 ## Summary
 - Total BGA cards scanned: 892
 - Total TS cards scanned: 889
-- ⚠ Literal deviations: 74
-- ❌ Complex deviations: 128
+- ⚠ Literal deviations: 1
+- ❌ Complex deviations: 95
 - 🔍 BGA-only: 3
 - 🔍 TS-only: 0
 - 🔍 Banned-but-present: 33
@@ -13,123 +13,9 @@
 ### extraVp
 | Card | BGA | Ours |
 |---|---|---|
-| B100_Clutterer | true | (missing) |
-| B101_FurnitureCarpenter | true | (missing) |
-| B111_Rustic | true | (missing) |
-| B134_HousebookMaster | true | (missing) |
-| B135_NutritionExpert | true | (missing) |
-| B153_Housemaster | true | (missing) |
-| B154_SheepKeeper | true | (missing) |
-| B30_WoodPalisades | true | (missing) |
-| B31_PotteryYard | true | (missing) |
-| B33_Mantlepiece | true | (missing) |
-| B34_SpecialFood | true | (missing) |
-| B35_HookKnife | true | (missing) |
-| B39_Loom | true | (missing) |
-| B98_OrganicFarmer | true | (missing) |
-| B99_Tutor | true | (missing) |
-| C100_Butler | true | (missing) |
-| C101_StallHolder | true | (missing) |
-| C110_HomeBrewer | true | (missing) |
-| C133_Soldier | true | (missing) |
-| C134_CowPrince | true | (missing) |
-| C135_Constable | true | (missing) |
-| C136_RanchProvost | true | (missing) |
 | C148_MudWallower | (missing) | true |
-| C153_PatternMaker | true | (missing) |
-| C154_TwinResearcher | true | (missing) |
-| C29_BeerTable | true | (missing) |
-| C30_HalfTimberedHouse | true | (missing) |
-| C33_GreeningPlan | true | (missing) |
-| C34_ElephantgrassPlant | true | (missing) |
-| C35_LanternHouse | true | (missing) |
-| C36_ClayDeposit | true | (missing) |
-| C39_StudioBoat | true | (missing) |
-| C46_Mandoline | true | (missing) |
-| C59_SchnappsDistillery | true | (missing) |
-| C61_BeerStein | true | (missing) |
-| C98_CubeCutter | true | (missing) |
-| D101_SugarBaker | true | (missing) |
-| D107_Bellfounder | true | (missing) |
-| D133_BeerTentOperator | true | (missing) |
-| D134_OysterEater | true | (missing) |
-| D135_GardeningHeadOfficial | true | (missing) |
-| D136_AnimalActivist | true | (missing) |
-| D153_WealthyMan | true | (missing) |
-| D154_ChimneySweep | true | (missing) |
-| D157_PartyOrganizer | true | (missing) |
-| D29_MuckRake | true | (missing) |
-| D30_ArtisanDistrict | true | (missing) |
-| D31_Storeroom | true | (missing) |
-| D32_WoodRake | true | (missing) |
-| D35_FodderChamber | true | (missing) |
-| D36_BreedRegistry | true | (missing) |
-| D38_MilkingStool | true | (missing) |
-| D39_TruffleSlicer | true | (missing) |
-| D99_EarthenwarePotter | true | (missing) |
-| E100_MuseumCaretaker | true | (missing) |
-| E101_Blighter | true | (missing) |
-| E124_MayorCandidate | true | (missing) |
-| E132_VeggieLover | true | (missing) |
-| E133_ChampionBreeder | true | (missing) |
-| E134_Omnifarmer | true | (missing) |
-| E135_Pickler | true | (missing) |
-| E136_AnimalHusbandryWorker | true | (missing) |
-| E154_Margrave | true | (missing) |
-| E31_Upholstery | true | (missing) |
-| E32_Nave | true | (missing) |
-| E33_BeaverColony | true | (missing) |
-| E34_LandRegister | true | (missing) |
-| E35_Misanthropy | true | (missing) |
-| E37_OxSkull | true | (missing) |
-| E38_RodCollection | true | (missing) |
-| E39_Paintbrush | true | (missing) |
-| E98_Prodigy | true | (missing) |
-| E99_UncaringParents | true | (missing) |
-
-### vp
-| Card | BGA | Ours |
-|---|---|---|
-| E81_AlchemistsLab | 1 | (missing) |
 
 ## ❌ Complex deviations (manual review)
-### category
-| Card | BGA | Ours |
-|---|---|---|
-| B148_PetBroker | FARM_PLANNER | (missing) |
-| D148_DomesticianExpert | FARM_PLANNER | (missing) |
-| E103_Wolf | GOODS_-_GET | (missing) |
-| E10_StrawHat | ACTION_-_GUEST | (missing) |
-| E112_GrainThief | CROPS_-_GRAIN | (missing) |
-| E123_ResourceHoarder | BUILDING_RESOURCES_-_CLAY_AND/OR_STONE | (missing) |
-| E124_MayorCandidate | BUILDING_RESOURCES_-_STONE | (missing) |
-| E133_ChampionBreeder | BONUS_POINTS | (missing) |
-| E140_Carter | FOOD | (missing) |
-| E148_Lazybones | FARMYARD_-_PLACE_FOR_ANIMALS | (missing) |
-| E149_MidnightFencer | FARMYARD | (missing) |
-| E151_DeliveryNurse | ACTION | (missing) |
-| E161_ElderBaker | CROPS | (missing) |
-| E162_Entrepreneur | BUILDING_RESOURCES | (missing) |
-| E167_DairyCrier | ANIMALS_-_ALL | (missing) |
-| E16_BriarHedge | FARMYARD_-__FENCING_OR_STABLE_BUILDING | (missing) |
-| E27_PiggyBank | ACTION_-_IMPROVEMENT | (missing) |
-| E28_Bookmark | ACTION_-_OCCUPATION | (missing) |
-| E47_SyrupTap | FOOD | (missing) |
-| E4_Thunderbolt | PASSING_-_IMPROVEMENT/OCC_-_WOOD | (missing) |
-| E62_SourDough | FOOD_-_GRAIN | (missing) |
-| E71_CowPatty | CROPS_-_GRAIN_AND_VEGETABLE | (missing) |
-| E73_Scythe | CROPS_-_GRAIN_AND_VEGETABLE | (missing) |
-| E74_AshTrees | BUILDING_RESOURCES_-_WOOD | (missing) |
-| E75_StoneAxe | BUILDING_RESOURCES_-_WOOD | (missing) |
-| E81_AlchemistsLab | BUILDING_RESOURCES_-_ALL | (missing) |
-| E82_Profiteering | BUILDING_RESOURCES_-_ALL | (missing) |
-| E84_DollysMother | ANIMALS_ | (missing) |
-| E85_MasterTanner | FARMYARD_-_PLACE_FOR_PERSON | (missing) |
-| E90_DungCollector | FARMYARD_-_PLOWING | (missing) |
-| E91_PlowBuilder | FARMYARD_-_PLOWING | (missing) |
-| E92_FieldDoctor | ACTION_-_FAMILY_GROWTH | (missing) |
-| E93_Motivator | ACTION_-_GUEST | (missing) |
-
 ### players
 | Card | BGA | Ours |
 |---|---|---|

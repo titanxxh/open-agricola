@@ -11,4 +11,5 @@ export const B101_FurnitureCarpenter = new Occupation({
   desc: ['Each harvest, if any player (including you) owns the Joinery or an upgrade thereof, you can buy exactly 1 bonus <SCORE> for 2 <FOOD>.'],
   cost: {},
   players: '1+',
+  extraVp: true,
 })

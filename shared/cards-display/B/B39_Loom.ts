@@ -13,4 +13,5 @@ export const B39_Loom = new MinorImprovement({
   prerequisite: '2 Occupations',
   occupationPrerequisites: { min: 2 },
   vp: 1,
+  extraVp: true,
 })

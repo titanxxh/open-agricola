@@ -13,4 +13,5 @@ export const D154_ChimneySweep = new Occupation({
   ],
   cost: {},
   players: "4+",
+  extraVp: true,
 })

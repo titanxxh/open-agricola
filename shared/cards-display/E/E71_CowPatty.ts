@@ -10,4 +10,5 @@ export const E71_CowPatty = new MinorImprovement({
   vp: 1,
   prerequisite: '1 Cattle',
   implemented: true,
+  category: 'CROPS_-_GRAIN_AND_VEGETABLE',
 })

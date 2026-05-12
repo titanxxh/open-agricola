@@ -10,4 +10,5 @@ export const E90_DungCollector = new Occupation({
   desc: ["Each time you get 2 or more newborn animals, you can pay 1 <FOOD> to plow 1 field."],
   cost: {},
   players: "1+",
+  category: 'FARMYARD_-_PLOWING',
 })

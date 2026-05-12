@@ -10,4 +10,5 @@ export const B148_PetBroker = new Occupation({
   desc: ['When you play this card, you immediately get 1 <SHEEP>. You can keep 1 <SHEEP> on this card for each occupation in front of you.'],
   cost: {},
   players: '4+',
+  category: 'FARM_PLANNER',
 })

@@ -11,4 +11,5 @@ export const E99_UncaringParents = new Occupation({
   desc: ["At the end of each harvest, if you live in a stone house, you get 1 bonus <SCORE>."],
   cost: {},
   players: "1+",
+  extraVp: true,
 })

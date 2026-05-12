@@ -11,4 +11,5 @@ export const B100_Clutterer = new Occupation({
   desc: ["During scoring, you get 1 bonus <SCORE> for each card played after this one that has \"accumulation space(s)\" in its text."],
   cost: {},
   players: "1+",
+  extraVp: true,
 })

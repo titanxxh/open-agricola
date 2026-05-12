@@ -12,4 +12,5 @@ export const E103_Wolf = new Occupation({
   ],
   cost: {},
   players: '1+',
+  category: 'GOODS_-_GET',
 })

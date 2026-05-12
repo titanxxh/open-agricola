@@ -10,4 +10,5 @@ export const E151_DeliveryNurse = new Occupation({
   desc: ['Once this game, if you have all types of animals, you can use any __Wish for Children__ action space even without room.'],
   cost: {},
   players: '4+',
+  category: 'ACTION',
 })

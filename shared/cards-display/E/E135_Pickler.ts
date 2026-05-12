@@ -11,4 +11,5 @@ export const E135_Pickler = new Occupation({
   desc: ['If there are still 1/3/6/9 complete rounds left to play, you immediately get 1/2/3/4 <WOOD>. During scoring, each player with the most total <VEGETABLE> gets 3 bonus <SCORE>.'],
   cost: {},
   players: "3+",
+  extraVp: true,
 })

@@ -11,4 +11,5 @@ export const D133_BeerTentOperator = new Occupation({
   desc: ["In the feeding phase of each harvest, you can use this card to turn 1 <WOOD> plus 1 <GRAIN> into 1 bonus <SCORE> and 2 <FOOD>."],
   cost: {},
   players: "3+",
+  extraVp: true,
 })

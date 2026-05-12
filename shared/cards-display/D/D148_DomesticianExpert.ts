@@ -10,4 +10,5 @@ export const D148_DomesticianExpert = new Occupation({
   desc: ['You can keep 2 sheep on the border between each pair of orthogonally adjacent rooms.'],
   cost: {},
   players: '4+',
+  category: 'FARM_PLANNER',
 })
