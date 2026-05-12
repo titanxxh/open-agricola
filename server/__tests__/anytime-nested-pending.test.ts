@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/B/B32_Kettle'
+import '../../shared/cards/C/C115_Sower'
 import '../../shared/cards/D/D106_WhiskyDistiller'
 
 const KETTLE = 'B32_Kettle'
 const WHISKY = 'D106_WhiskyDistiller'
 const WHISKY_ANYTIME_ID = 'D106-whisky-distiller-anytime'
+const SOWER = 'C115_Sower'
+const SOWER_ANYTIME_ID = 'C115-sower-anytime'
 
 const setupExchangeReady = () => {
   const session = new GameSession()
@@ -66,5 +69,41 @@ describe('anytime nesting — sync card listener inside pending', () => {
 
     const cancel = session.resolveChoice(0, 'cancel')
     expect(cancel.ok).toBe(true)
+  })
+
+  it('exchange pending → C115 xor anytime → sub-choice completes → exchange re-triggered → done', () => {
+    const session = setupExchangeReady()
+    const extraState = session.getState().state
+    const p0 = extraState.players[0]!
+    p0.minorPlayed.push(SOWER)
+    if (!p0.cardStates[SOWER]) p0.cardStates[SOWER] = {}
+    p0.cardStates[SOWER]!.stack = ['reed']
+    session.loadState(extraState)
+
+    expect(session.takeAction(0, 'farmland').ok).toBe(true)
+    expect(session.takeAnytimeAction(0, 'exchange').ok).toBe(true)
+
+    const nested = session.takeAnytimeAction(0, SOWER_ANYTIME_ID)
+    expect(nested.ok).toBe(true)
+    expect((nested.interaction as { promptKey?: string }).promptKey)
+      .not.toMatch(/^ui\.interactionExchange/)
+
+    const subOptions = (nested.interaction as { options?: Array<{ value: string }> }).options ?? []
+    const subDone = session.resolveChoice(0, subOptions[0]!.value)
+    expect(subDone.ok).toBe(true)
+
+    // After an interactive nested anytime (xor sub-choice) resolves, the engine
+    // does not auto-resume the parent exchange pending — unlike sync leaf
+    // anytime (see D106 test above). Exchange remains available as an anytime
+    // entry; player re-triggers it explicitly. P1 follow-up: investigate
+    // engine.injectBeforeFlows preservation of parent pending across nested
+    // pending resolution.
+    const exch2 = session.takeAnytimeAction(0, 'exchange')
+    expect(exch2.ok).toBe(true)
+    expect((exch2.interaction as { promptKey?: string }).promptKey)
+      .toMatch(/^ui\.interactionExchange/)
+
+    const finalDone = session.resolveChoice(0, 'bulk:0=1')
+    expect(finalDone.ok).toBe(true)
   })
 })
