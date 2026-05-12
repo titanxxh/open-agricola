@@ -163,6 +163,7 @@ describe('renderReport', () => {
 describe('applySafeFix', () => {
   it('replaces vp literal, inserts extraVp:true, inserts category', () => {
     const tsPath = path.join(FIXTURE_DIR, 'ts/A88_FixMe.ts')
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const fs = require('node:fs') as typeof import('node:fs')
     const before = fs.readFileSync(tsPath, 'utf8') as string
     const patched = applySafeFix(before, [
