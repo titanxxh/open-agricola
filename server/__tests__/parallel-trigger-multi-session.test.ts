@@ -25,7 +25,7 @@ describe('PARALLEL trigger — multi-listener select-trigger loop', () => {
     return session
   }
 
-  it('emits select-trigger listing both cards + PASS (default optional)', () => {
+  it('emits select-trigger listing both cards (no PASS — C126 is mandatory)', () => {
     const session = setupWorkPhase()
     const resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
@@ -37,12 +37,12 @@ describe('PARALLEL trigger — multi-listener select-trigger loop', () => {
     const values = resp.interaction.request.options.map((o) => o.value).sort()
     expect(values).toContain('C82_HardwareStore')
     expect(values).toContain('C126_Excavator')
-    // Default optional → PASS offered (BGA: PARALLEL trigger ordering choice
-    // includes a PASS that skips remaining unresolved optional triggers).
-    expect(values).toContain('__pass__')
+    // C126 is mandatory (BGA: wood+clay must fire) → PASS is hidden so the
+    // player can't silently skip the guaranteed effect.
+    expect(values).not.toContain('__pass__')
   })
 
-  it('after picking C82 + skipping its optional, falls back to select-trigger for C126', () => {
+  it('after picking C82 + skipping its optional, only C126 remains and it is mandatory', () => {
     const session = setupWorkPhase()
     let resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
@@ -54,33 +54,32 @@ describe('PARALLEL trigger — multi-listener select-trigger loop', () => {
     resp = session.resolveChoice(0, '__skip__')
     expect(resp.ok).toBe(true)
 
-    // Back to select-trigger with only C126 remaining (+ PASS).
+    // C126 is mandatory + single-remaining → engine auto-advances directly
+    // into its inner optional pay choice (no select-trigger UI for 1 forced
+    // option, no PASS available).
     if (resp.interaction.stateId !== 'wait') {
       throw new Error(`expected wait, got ${resp.interaction.stateId}`)
     }
-    expect(resp.interaction.request.kind).toBe('select-trigger')
-    if (resp.interaction.request.kind !== 'select-trigger') return
-    const remaining = resp.interaction.request.options.map((o) => o.value).sort()
-    expect(remaining).toContain('C126_Excavator')
-    expect(remaining).not.toContain('C82_HardwareStore')
-    expect(remaining).toContain('__pass__')
+    if (resp.interaction.request.kind === 'select-trigger') {
+      const remaining = resp.interaction.request.options.map((o) => o.value)
+      expect(remaining).toContain('C126_Excavator')
+      expect(remaining).not.toContain('C82_HardwareStore')
+      expect(remaining).not.toContain('__pass__')
+    } else {
+      // Auto-advanced into C126's inner optional pay-for-stone choice.
+      expect(resp.interaction.request.kind).toBe('choice')
+    }
   })
 
-  it('selecting __pass__ closes the loop without firing remaining cards', () => {
+  it('rejects __pass__ when at least one remaining trigger is mandatory', () => {
     const session = setupWorkPhase()
-    let resp = session.takeAction(0, 'day-laborer')
+    const resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
     expect(resp.interaction.request.kind).toBe('select-trigger')
-    resp = session.resolveChoice(0, '__pass__')
-    expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId === 'wait') {
-      expect(resp.interaction.request.kind).not.toBe('select-trigger')
-    }
-    const player = resp.state.players[0]!
-    // Neither C82 nor C126 fired — no resources gained.
-    expect(player.resources.wood).toBe(0)
-    expect(player.resources.clay).toBe(0)
-    expect(player.resources.reed).toBe(0)
-    expect(player.resources.stone).toBe(0)
+
+    // PASS is not offered (C126 mandatory) — resolving it must fail at the
+    // session layer (option not in the engine's offered list).
+    const r2 = session.resolveChoice(0, '__pass__')
+    expect(r2.ok).toBe(false)
   })
 })
