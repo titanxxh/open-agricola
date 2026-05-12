@@ -78,11 +78,11 @@ import * as harvestPhase from './phases/harvest.ts'
 import * as draftPhase from './phases/draft.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { getCardEffect } from '../cards/card-effects.ts'
-import { incCardUsed } from '../cards/helpers/card-state.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
 import { runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks } from '../cards/card-effects.ts'
 import { positionKey } from '../domain/farm.ts'
-import { getMatchingListeners, executeCardListener, shouldSkipImmediateListenerLog } from '../cards/card-listeners.ts'
+import { getMatchingListeners, executeCardListener, type MatchedCardListener } from '../cards/card-listeners.ts'
+import { buildPhaseTrailingNodes } from '../engine/engine-utils.ts'
 import { Scoring, playerBoard, type PlayerScoreSummary } from '../domain'
 import { reap } from '../actions/effects/reap.ts'
 import { breedLeaf } from '../actions/effects/breed'
@@ -754,42 +754,41 @@ export class GameCore {
       result: { type: 'ok' as const },
     }
     const matched = getMatchingListeners(context)
-    const counter = { value: 0 }
-    const nodes: EngineNode[] = []
-    for (const entry of matched) {
-      const result = executeCardListener(entry.registration, context, {
-        ownerPlayerId: entry.ownerPlayerId,
-      })
-      // Track BGA-style per-card `used` stat for the owner of the card whose
-      // listener actually produced an effect. This place-farmer 'after' path
-      // bypasses ActivateCardNode, so we book-keep here directly.
-      if (result && entry.cardId) {
-        const owner =
-          this.state.players.find((candidate) => candidate.id === entry.ownerPlayerId) ?? player
-        incCardUsed(owner, entry.cardId)
-      }
-      if (!result?.flow) continue
-      if (result.logKey && !shouldSkipImmediateListenerLog(result)) {
-        const logPlayer =
-          this.state.players.find((candidate) => candidate.id === entry.ownerPlayerId) ?? player
-        this.state.log.unshift({
-          key: result.logKey,
-          params: { player: logPlayer.name, ...result.logParams },
-        })
-      }
-      const flowNode = this.buildEngineNode(result.flow, counter)
-      const needsSwitch = entry.ownerPlayerId && entry.ownerPlayerId !== player.id
-      if (needsSwitch) {
-        nodes.push(
-          new PlayerSwitchNode(`pf-ps-to-${counter.value++}`, entry.ownerPlayerId),
-          flowNode,
-          new PlayerSwitchNode(`pf-ps-back-${counter.value++}`, player.id),
-        )
-      } else {
-        nodes.push(flowNode)
-      }
-    }
+    if (matched.length === 0) return false
+
+    // Build a placeholder Engine so buildPhaseTrailingNodes has EngineInternals
+    // (it needs counterRef for unique node ids + tree.insertAfter for nested
+    // PARALLEL inserts). The placeholder root is replaced with the dispatched
+    // nodes below.
+    const placeholderRoot = new SequenceNode('pf-after-root-0', [])
+    const stagingEngine = new Engine({
+      tree: new EngineTree(placeholderRoot),
+      registry: this.registry,
+      hooks: this.hookDispatcher,
+      log: this.engineLog,
+    })
+    const internals = stagingEngine._internals()
+
+    const buildCtx = (ml: MatchedCardListener) => ({
+      ...context,
+      ownerPlayerId: ml.ownerPlayerId,
+    })
+
+    const nodes = buildPhaseTrailingNodes(
+      internals,
+      matched,
+      'after',
+      'place-farmer',
+      this.state,
+      {},
+      buildCtx,
+    )
     if (nodes.length === 0) return false
+
+    // Wrap the dispatched nodes — buildPhaseTrailingNodes returns ActivateCardNode
+    // and optional ParallelTriggerNode in playOrder. Side effects (incCardUsed,
+    // logs, follow-up flows) are handled by engine-proceed when each
+    // ActivateCardNode steps; we don't repeat them here.
     const root = nodes.length === 1 ? nodes[0] : new SequenceNode(`pf-after-seq`, nodes)
     const newEngine = new Engine({
       tree: new EngineTree(root),
