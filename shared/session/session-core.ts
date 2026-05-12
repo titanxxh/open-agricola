@@ -1210,36 +1210,16 @@ export class GameCore {
   }
 
   private buildAnytimeEntries(): { descriptor: AnytimeAction; flow: ActionFlow }[] {
-    if (this.stageResume) return []
+    const policy = this.computeAnytimePolicySnapshot()
+    if (!policy.allowed) return []
     const context = this.getActiveInteractionContext()
     if (!context) return []
-    // Suppress anytime entries while a feed sub-flow is awaiting input.
-    // Detect via the InteractionNode's typed `request.kind` (R2 strong-typing).
-    const interactionNode = this.engineStack.peekInteraction()
-    const interactionKind = interactionNode?.request?.kind
-    if (interactionKind === 'feed') {
-      return []
-    }
-    // Suppress anytime entries while a reorganize sub-flow is awaiting input.
-    if (interactionKind === 'animal-reorg') {
-      return []
-    }
-    // Suppress anytime actions during sub-choice resolution (e.g. bake-bread, exchange)
-    // to avoid recursive anytime interrupts.
-    const promptKey = interactionNode?.promptKey
-    if (
-      interactionNode &&
-      promptKey &&
-      (promptKey.startsWith('ui.interactionBakeBread') ||
-       promptKey.startsWith('ui.interactionExchange'))
-    ) {
-      return []
-    }
+    const blockedIds = new Set(policy.blockedIds)
     const { player, space } = context
     const anytimeEntries: { descriptor: AnytimeAction; flow: ActionFlow }[] = []
-    // Auto-discover anytime actions from registry instead of hardcoding
     for (const action of this.registry.values()) {
       if (!action.anytime) continue
+      if (blockedIds.has(action.id)) continue
       const doable = this.hookDispatcher.applyIsDoable(
         { state: this.state, player, space, actionId: action.id },
         action,
@@ -1267,6 +1247,7 @@ export class GameCore {
     for (const entry of matchedAnytime) {
       if (!entry.cardId) continue
       if (entry.ownerPlayerId !== player.id) continue
+      if (blockedIds.has(entry.registration.id)) continue
       const result = executeCardListener(entry.registration, anytimeContext, {
         ownerPlayerId: entry.ownerPlayerId,
       })
