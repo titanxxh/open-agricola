@@ -5,6 +5,7 @@ import { parseBgaCard } from '../bga-metadata/parse-bga'
 import { parseTsCard } from '../bga-metadata/parse-ts'
 import { diffCards, type FieldDiff } from '../bga-metadata/diff'
 import { renderReport } from '../bga-metadata/report'
+import { applySafeFix } from '../bga-metadata/apply-safe'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const FIXTURE_DIR = path.resolve(__dirname, 'fixtures')
@@ -156,5 +157,29 @@ describe('renderReport', () => {
     expect(md).toContain('## ⚠ Literal deviations (auto-fixable)')
     expect(md).toContain('A99_Test')
     expect(md).toContain('A14_Banned')
+  })
+})
+
+describe('applySafeFix', () => {
+  it('replaces vp literal, inserts extraVp:true, inserts category', () => {
+    const tsPath = path.join(FIXTURE_DIR, 'ts/A88_FixMe.ts')
+    const fs = require('node:fs') as typeof import('node:fs')
+    const before = fs.readFileSync(tsPath, 'utf8') as string
+    const patched = applySafeFix(before, [
+      { field: 'vp', target: 2 },
+      { field: 'extraVp', target: true },
+      { field: 'category', target: 'POINTS_PROVIDER' },
+    ])
+    expect(patched).toContain('vp: 2,')
+    expect(patched).toContain('extraVp: true,')
+    expect(patched).toContain("category: 'POINTS_PROVIDER',")
+    expect(patched).not.toContain('vp: 0')
+  })
+
+  it('replaces existing category value', () => {
+    const src = `import { Occupation } from '../../../../shared/cards-display/types'\n\nexport const X = new Occupation({\n  id: 'X1_A',\n  name: 'X',\n  deck: 'X',\n  number: 1,\n  category: 'OLD',\n  desc: ['x'],\n  cost: {},\n  players: '1+',\n})\n`
+    const patched = applySafeFix(src, [{ field: 'category', target: 'NEW' }])
+    expect(patched).toContain("category: 'NEW',")
+    expect(patched).not.toContain("category: 'OLD'")
   })
 })
