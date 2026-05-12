@@ -205,12 +205,14 @@ export function buildPhaseTrailingNodes(
       )
     }
 
+    const ownerGroupNodes: EngineNode[] = []
+
     const mandatory = group.filter((p) => p.ml.registration.mandatory)
     const optional = group.filter((p) => !p.ml.registration.mandatory)
-    for (const p of mandatory) out.push(buildNode(p))
+    for (const p of mandatory) ownerGroupNodes.push(buildNode(p))
 
     const optAuto = optional.filter((p) => p.interactivity === 'auto')
-    for (const p of optAuto) out.push(buildNode(p))
+    for (const p of optAuto) ownerGroupNodes.push(buildNode(p))
 
     const optInteractive = optional.filter((p) => p.interactivity === 'interactive')
     if (optInteractive.length > 0) {
@@ -220,7 +222,19 @@ export function buildPhaseTrailingNodes(
         children,
         ownerId,
       )
-      out.push(ptn)
+      ownerGroupNodes.push(ptn)
+    }
+
+    // Wrap opponent groups in PlayerSwitchNode pair so the choice/UI is
+    // owned by the card's player, not the action-active player. Active
+    // player group runs in-context (no wrap).
+    if (ownerGroupNodes.length === 0) continue
+    if (ownerId !== activeId) {
+      out.push(new PlayerSwitchNode(`ps-to-${phase}-${actionId}-${ownerId}-${int.counterRef.value++}`, ownerId))
+      out.push(...ownerGroupNodes)
+      out.push(new PlayerSwitchNode(`ps-back-${phase}-${actionId}-${activeId ?? ''}-${int.counterRef.value++}`, activeId ?? ownerId))
+    } else {
+      out.push(...ownerGroupNodes)
     }
   }
   return out
