@@ -541,3 +541,7 @@ D35/D38/D45/D84 等卡的 `getExchangeResources()` 只看 `player.resources.{ani
 ### 9.5 Major cards — 已全部对齐 ✅
 
 10 张 Major 全部逐行对齐（fireplace1/2 与 cookingHearth1/2 通过 spread 复用同一份 `description`，与 BGA 两个 PHP 文件复制粘贴的文本完全相等）。之前 audit 提到的 "ours uses prose with `→` + explicit `(max N)`" 已经全部改成 `<ARROW>` / `<ARROW-1X>` / `<ARROW-2X>` 的 token 形式。
+
+## 8. 2026-05-12 — Mechanical re-audit via `scripts/audit-bga-metadata-diff.ts`
+
+A standalone diff script now compares BGA `$this->field` literals against our `shared/cards-display/*.ts` for 6 fields: category / extraVp / players / cost / vp / prerequisite. Output: `docs/operations/bga-metadata-diff-report.md` (committed). Replaces the stale 2026-04-29 wide-scan §5.3 67-card count with a fresh tally each run. `newSet` deliberately not aligned (memory `feedback_no_newset_field`).
