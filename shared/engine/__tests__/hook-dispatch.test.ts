@@ -196,7 +196,11 @@ describe('Card listener order field', () => {
       step = engine.proceed({ state, player, space })
     }
 
-    expect(order).toEqual(['high', 'low'])
+    // Order now derives from playOrderIndex (card play order on the player),
+    // not from listener id. minorPlayed = ['card-A', 'card-B'] → card-A is
+    // played first → listener-low (cardIds ['card-A']) fires before
+    // listener-high (cardIds ['card-B']).
+    expect(order).toEqual(['low', 'high'])
   })
 })
 
@@ -299,7 +303,10 @@ describe('Card listener scope filtering', () => {
       log: new LogStore(),
     })
     let step = engine.proceed({ state, player: p1, space })
-    while (step.type === 'ok') {
+    // Cross-player listeners now run inside a PlayerSwitchNode wrap; engine
+    // returns type='playerSwitch' between the switch and the listener fire.
+    // Drive past those steps until the listener has had a chance to run.
+    while (step.type === 'ok' || step.type === 'playerSwitch') {
       step = engine.proceed({ state, player: p1, space })
     }
     expect(triggered).toBe(true)
