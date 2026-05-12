@@ -3,8 +3,8 @@
 ## Summary
 - Total BGA cards scanned: 892
 - Total TS cards scanned: 889
-- ⚠ Literal deviations: 83
-- ❌ Complex deviations: 729
+- ⚠ Literal deviations: 74
+- ❌ Complex deviations: 644
 - 🔍 BGA-only: 3
 - 🔍 TS-only: 0
 - 🔍 Banned-but-present: 33
@@ -90,15 +90,6 @@
 ### vp
 | Card | BGA | Ours |
 |---|---|---|
-| A25_Bassinet | (missing) | 0 |
-| B30_WoodPalisades | (missing) | 0 |
-| D25_WitchesDanceFloor | (missing) | 0 |
-| E17_SkimmerPlow | 0 | (missing) |
-| E20_IronHoe | 0 | (missing) |
-| E32_Nave | (missing) | 0 |
-| E34_LandRegister | (missing) | 0 |
-| E35_Misanthropy | (missing) | 0 |
-| E37_OxSkull | (missing) | 0 |
 | E81_AlchemistsLab | 1 | (missing) |
 
 ## ❌ Complex deviations (manual review)
@@ -107,122 +98,37 @@
 |---|---|---|
 | B148_PetBroker | FARM_PLANNER | (missing) |
 | D148_DomesticianExpert | FARM_PLANNER | (missing) |
-| E100_MuseumCaretaker | (missing) | BONUS_POINTS_-_GET |
-| E101_Blighter | (missing) | BONUS_POINTS_-_GET |
-| E102_Acquirer | (missing) | GOODS_-_GET |
-| E104_SpiceTrader | (missing) | GOODS_-_GET |
-| E105_Pioneer | (missing) | GOODS_-_GET |
-| E113_Godmother | (missing) | CROPS_-_VEGETABLE |
-| E114_ShedBuilder | (missing) | CROPS_-_GRAIN_AND_VEGETABLE |
-| E115_SeedServant | (missing) | CROPS_-_SOWING |
-| E116_FirCutter | (missing) | BUILDING_RESOURCES_-_WOOD |
-| E117_PipeSmoker | (missing) | BUILDING_RESOURCES_-_WOOD |
-| E118_KindlingGatherer | (missing) | BUILDING_RESOURCES_-_WOOD |
-| E119_LandHeir | (missing) | BUILDING_RESOURCES_-_WOOD_(AND_CLAY) |
-| E11_PettingZoo | (missing) | FARMYARD_-_PLACE_FOR_ANIMALS |
-| E120_ScrapCollector | (missing) | BUILDING_RESOURCES_-_CLAY_(AND_WOOD) |
-| E121_HillCultivator | (missing) | BUILDING_RESOURCES_-_CLAY |
-| E122_Cottar | (missing) | BUILDING_RESOURCES_-_CLAY |
-| E125_DelayedWayfarer | (missing) | BUILDING_RESOURCES_-_ALL |
-| E126_TaxCollector | (missing) | BUILDING_RESOURCES_-_ALL |
-| E127_DiligentFarmer | (missing) | FARMYARD_-_PLACE_FOR_PERSON |
-| E128_Saddler | (missing) | FARMYARD |
-| E129_Imitator | (missing) | ACTION |
-| E12_AnimalBedding | (missing) | FARMYARD_-_PLACE_FOR_ANIMALS |
-| E130_Overachiever | (missing) | ACTION_-_IMPROVEMENTS_OR_OCCUPATIONS |
-| E131_MarketMaster | (missing) | ACTION_-_IMPROVEMENTS_OR_OCCUPATIONS |
-| E132_VeggieLover | (missing) | BONUS_POINTS |
-| E134_Omnifarmer | (missing) | BONUS_POINTS |
-| E135_Pickler | (missing) | BONUS_POINTS_-_4_WOOD_CARD_COMPETITION |
-| E136_AnimalHusbandryWorker | (missing) | BONUS_POINTS_-_4_WOOD_CARD_COMPETITION |
-| E137_FlaxFarmer | (missing) | GOODS_-_GET |
-| E138_LivestockExpert | (missing) | GOODS_-_GET |
-| E13_StoneHouseReconstruction | (missing) | FARMYARD_-_HOUSE_BUILDING_OR_RENOVATION |
+| E103_Wolf | GOODS_-_GET | (missing) |
+| E10_StrawHat | ACTION_-_GUEST | (missing) |
+| E112_GrainThief | CROPS_-_GRAIN | (missing) |
+| E123_ResourceHoarder | BUILDING_RESOURCES_-_CLAY_AND/OR_STONE | (missing) |
+| E124_MayorCandidate | BUILDING_RESOURCES_-_STONE | (missing) |
+| E133_ChampionBreeder | BONUS_POINTS | (missing) |
 | E140_Carter | FOOD | (missing) |
-| E141_VegetableVendor | (missing) | CROPS |
-| E142_Smuggler | (missing) | CROPS |
-| E143_Hewer | (missing) | BUILDING_RESOURCES_-_CLAY_OR_STONE |
-| E144_WaresSalesman | (missing) | BUILDING_RESOURCES_-_REED |
-| E145_Parvenu | (missing) | BUILDING_RESOURCES_-_REED |
-| E146_Reseller | (missing) | BUILDING_RESOURCES_-_ALL |
-| E147_AnimalDriver | (missing) | ANIMALS_-_ALL |
-| E14_WoodSaw | (missing) | FARMYARD_-_HOUSE_BUILDING_OR_RENOVATION |
-| E150_RockBeater | (missing) | ACTION |
-| E152_BargainHunter | (missing) | ACTION_-_IMPROVEMENTS_OR_OCCUPATIONS |
-| E153_StoneSculptor | (missing) | BONUS_POINTS |
-| E154_Margrave | (missing) | BONUS_POINTS |
-| E155_Visionary | (missing) | GOODS_-_GET |
-| E156_ClaypitOwner | (missing) | GOODS_-_GET |
-| E15_NailBasket | (missing) | FARMYARD_-__FENCING_OR_STABLE_BUILDING |
-| E160_KelpGatherer | (missing) | CROPS |
-| E163_Patroness | (missing) | BUILDING_RESOURCES |
-| E164_MountainPlowman | (missing) | ANIMALS_-_SHEEP |
-| E165_MasterHuntsman | (missing) | ANIMALS_-_WILD_BOAR |
-| E166_Roastmaster | (missing) | ANIMALS_-_CATTLE |
-| E168_AnimalTamersApprentice | (missing) | ANIMALS_-_ALL |
-| E17_SkimmerPlow | (missing) | FARMYARD_-_PLOWING |
-| E18_SeedAlmanac | (missing) | FARMYARD_-_PLOWING |
-| E19_OxGoad | (missing) | FARMYARD_-_PLOWING |
-| E1_PoleBarns | (missing) | PASSING_-_FARMYARD |
-| E20_IronHoe | (missing) | FARMYARD_-_PLOWING |
-| E21_SheepRug | (missing) | ACTION_-_FAMILY_GROWTH |
-| E23_Apiary | (missing) | ACTION |
-| E24_Ambition | (missing) | ACTION |
-| E25_BumperCrop | (missing) | ACTION |
-| E26_Sundial | (missing) | ACTION |
-| E29_Heirloom | (missing) | BONUS_POINTS_-_GET |
-| E2_RenovationMaterials | (missing) | PASSING_-_ACTION_-_FARMYARD |
-| E30_ChildsToy | (missing) | BONUS_POINTS_-_GET |
-| E31_Upholstery | (missing) | BONUS_POINTS_-_GET |
-| E32_Nave | (missing) | BONUS_POINTS_-_GET |
-| E33_BeaverColony | (missing) | BONUS_POINTS_-_GET |
-| E34_LandRegister | (missing) | BONUS_POINTS_-_GET |
-| E35_Misanthropy | (missing) | BONUS_POINTS_-_GET |
-| E36_HerbalGarden | (missing) | BONUS_POINTS_-_GET |
-| E37_OxSkull | (missing) | BONUS_POINTS_-_GET |
-| E38_RodCollection | (missing) | BONUS_POINTS_-_GET |
-| E39_Paintbrush | (missing) | BONUS_POINTS_-_GET |
-| E3_TeaTime | (missing) | PASSING_-_ACTION_-_FARMYARD |
-| E40_BeeStatue | (missing) | GOODS_-_GET |
-| E41_MuddyWaters | (missing) | GOODS_-_GET |
-| E42_WaterGully | (missing) | GOODS_-_GET |
-| E43_BarnCats | (missing) | FOOD_-_FUTURE_ROUND_SPACES |
-| E44_FodderBeets | (missing) | FOOD_-_FUTURE_ROUND_SPACES |
-| E46_WaterlilyPond | (missing) | FOOD_-_FUTURE_ROUND_SPACES |
+| E148_Lazybones | FARMYARD_-_PLACE_FOR_ANIMALS | (missing) |
+| E149_MidnightFencer | FARMYARD | (missing) |
+| E151_DeliveryNurse | ACTION | (missing) |
+| E161_ElderBaker | CROPS | (missing) |
+| E162_Entrepreneur | BUILDING_RESOURCES | (missing) |
+| E167_DairyCrier | ANIMALS_-_ALL | (missing) |
+| E16_BriarHedge | FARMYARD_-__FENCING_OR_STABLE_BUILDING | (missing) |
+| E27_PiggyBank | ACTION_-_IMPROVEMENT | (missing) |
+| E28_Bookmark | ACTION_-_OCCUPATION | (missing) |
 | E47_SyrupTap | FOOD | (missing) |
-| E56_RomanPot | (missing) | FOOD_-_FUTURE_ROUND_SPACES |
-| E5_NightLoot | (missing) | PASSING_-_BUILDING_RESOURCES_ |
-| E60_WorkingGloves | (missing) | FOOD_-_CONVERT |
-| E61_RaisedBed | (missing) | FOOD_-_GRAIN |
-| E63_IronOven | (missing) | FOOD_-_GRAIN |
-| E64_SimpleOven | (missing) | FOOD_-_GRAIN |
-| E65_Almsbag | (missing) | CROPS_-_GRAIN |
-| E66_BarnShed | (missing) | CROPS_-_GRAIN |
-| E67_GrainBag | (missing) | CROPS_-_GRAIN |
-| E68_CherryOrchard | (missing) | CROPS_-_VEGETABLE |
-| E69_MelonPatch | (missing) | CROPS_-_VEGETABLE |
-| E6_Recount | (missing) | PASSING_-_BUILDING_RESOURCES_ |
-| E70_CropRotationField | (missing) | CROPS_-_VEGETABLE |
-| E72_ArtichokeField | (missing) | CROPS_-_GRAIN_AND_VEGETABLE |
-| E76_LumberPile | (missing) | BUILDING_RESOURCES_-_WOOD_OR_CLAY |
-| E77_Mattock | (missing) | BUILDING_RESOURCES_-_CLAY |
-| E78_SleightofHand | (missing) | BUILDING_RESOURCES_-_REED |
-| E79_FieldSpade | (missing) | BUILDING_RESOURCES_-_STONE |
-| E7_Pumpernickel | (missing) | PASSING_-_FOOD |
-| E80_RockGarden | (missing) | BUILDING_RESOURCES_-_STONE |
-| E83_ShepherdsWhistle | (missing) | ANIMALS_ |
-| E86_PenBuilder | (missing) | FARMYARD_-_PLACE_FOR_ANIMALS |
-| E87_MasterRenovator | (missing) | FARMYARD_-_HOUSE_BUILDING_OR_RENOVATION |
-| E88_MasterFencer | (missing) | FARMYARD_-_FENCING |
-| E89_Stallwright | (missing) | FARMYARD_-_STABLE_BUILDING |
-| E8_FarmersMarket | (missing) | PASSING_-_CROP |
-| E94_Prophet | (missing) | ACTION |
-| E95_Miller | (missing) | ACTION_-_MAJOR_IMPROVEMENT |
-| E96_Elder | (missing) | ACTION_-_IMPROVEMENT |
-| E97_Beneficiary | (missing) | ACTION_-_OCCUPATION |
-| E98_Prodigy | (missing) | BONUS_POINTS_-_GET |
-| E99_UncaringParents | (missing) | BONUS_POINTS_-_GET |
-| E9_BarteringHut | (missing) | PASSING_-_ANIMAL |
+| E4_Thunderbolt | PASSING_-_IMPROVEMENT/OCC_-_WOOD | (missing) |
+| E62_SourDough | FOOD_-_GRAIN | (missing) |
+| E71_CowPatty | CROPS_-_GRAIN_AND_VEGETABLE | (missing) |
+| E73_Scythe | CROPS_-_GRAIN_AND_VEGETABLE | (missing) |
+| E74_AshTrees | BUILDING_RESOURCES_-_WOOD | (missing) |
+| E75_StoneAxe | BUILDING_RESOURCES_-_WOOD | (missing) |
+| E81_AlchemistsLab | BUILDING_RESOURCES_-_ALL | (missing) |
+| E82_Profiteering | BUILDING_RESOURCES_-_ALL | (missing) |
+| E84_DollysMother | ANIMALS_ | (missing) |
+| E85_MasterTanner | FARMYARD_-_PLACE_FOR_PERSON | (missing) |
+| E90_DungCollector | FARMYARD_-_PLOWING | (missing) |
+| E91_PlowBuilder | FARMYARD_-_PLOWING | (missing) |
+| E92_FieldDoctor | ACTION_-_FAMILY_GROWTH | (missing) |
+| E93_Motivator | ACTION_-_GUEST | (missing) |
 
 ### players
 | Card | BGA | Ours |

@@ -34,6 +34,12 @@ describe('parseBgaCard', () => {
     expect(card.banned).toBe(true)
     expect(card.id).toBe('A14_Banned')
   })
+
+  it('parses quoted-string category with hyphens', () => {
+    const phpPath = path.join(FIXTURE_DIR, 'bga/E100_Quoted.php')
+    const card = parseBgaCard(phpPath)
+    expect(card.category).toBe('BONUS_POINTS_-_GET')
+  })
 })
 
 describe('parseTsCard', () => {
@@ -83,6 +89,21 @@ describe('diffCards', () => {
     expect(result.bannedButPresent).toEqual([])
     expect(result.bgaOnly).toEqual(['A14_Banned'])
     expect(result.tsOnly).toEqual(['A77_TsOnly'])
+  })
+})
+
+describe('diffCards vp normalization', () => {
+  it('treats vp:0 on either side as missing — no deviation', () => {
+    const bgaMap = new Map([
+      ['X1_A', { id: 'X1_A', deck: 'X', number: 1, vp: 0, banned: false }],
+      ['X2_B', { id: 'X2_B', deck: 'X', number: 2, banned: false }],
+    ])
+    const tsMap = new Map([
+      ['X1_A', { id: 'X1_A', deck: 'X', number: 1 }],
+      ['X2_B', { id: 'X2_B', deck: 'X', number: 2, vp: 0 }],
+    ])
+    const result = diffCards(bgaMap as never, tsMap as never)
+    expect(result.deviations.filter(d => d.field === 'vp')).toEqual([])
   })
 })
 

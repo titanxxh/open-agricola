@@ -54,8 +54,13 @@ export function diffCards(bgaMap: Map<string, BgaCard>, tsMap: Map<string, TsCar
     if (bga.banned) { bannedButPresent.push(id); continue }
 
     for (const field of LITERAL_FIELDS) {
-      const bv = bga[field]
-      const ov = ts[field]
+      let bv = bga[field]
+      let ov = ts[field]
+      // vp: 0 is semantically equivalent to missing vp.
+      if (field === 'vp') {
+        if (bv === 0) bv = undefined
+        if (ov === 0) ov = undefined
+      }
       if (bv === undefined && ov === undefined) continue
       if (bv !== ov) deviations.push({ id, field, bga: bv, ours: ov, verdict: 'warn' })
     }
