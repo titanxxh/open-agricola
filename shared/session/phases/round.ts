@@ -341,17 +341,25 @@ export const takeAnytimeAction = (
   actionId: string,
 ): SessionResponse => {
   if (core.state.gameOver) return core.emitResponse(false, 'game is over')
-  if (playerIndex !== core.state.currentPlayerIndex) return core.emitResponse(false, 'not your turn')
+  if (core.state.phase === 'draft') return core.emitResponse(false, 'draft in progress')
+
+  const activeOwner = core.readActivePlayerIndex()
+  if (activeOwner === null) return core.emitResponse(false, 'no active interaction')
+  if (playerIndex !== activeOwner) return core.emitResponse(false, 'not your turn')
+
+  const policy = core.computeAnytimePolicySnapshot()
+  if (!policy.allowed) {
+    return core.emitResponse(false, `anytime blocked: ${policy.reason}`)
+  }
+
   const engine = core.peekEngine()
-  if (!engine || core.readActivePlayerIndex() === null || !core.readActiveSpaceId()) {
-    return core.emitResponse(false, 'no active interaction to interrupt')
+  if (!engine || !core.readActiveSpaceId()) {
+    return core.emitResponse(false, 'no active engine')
   }
-  const entry = core.listAnytimeEntries().find(
-    (candidate) => candidate.descriptor.id === actionId,
-  )
-  if (!entry) {
-    return core.emitResponse(false, 'anytime action unavailable')
-  }
+
+  const entry = core.listAnytimeEntries().find((c) => c.descriptor.id === actionId)
+  if (!entry) return core.emitResponse(false, 'anytime action unavailable')
+
   core.appendHistory()
   engine.injectBeforeFlows([entry.flow])
   core.driveEngineSteps()
