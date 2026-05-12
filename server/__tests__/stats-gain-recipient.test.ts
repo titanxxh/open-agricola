@@ -59,6 +59,15 @@ describe('stats: gain with recipientPlayerId records resourcesFromCards on targe
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
+    // Under PARALLEL dispatch, the Publican listener is wrapped in a select-trigger prompt.
+    // Activate Publican via select-trigger first, then resolve its optional pay choice.
+    if (resp.interaction.request.kind === 'select-trigger') {
+      const publiOpt = resp.interaction.request.options.find((o) => o.sourceCard === 'A132_Publican')
+      expect(publiOpt).toBeDefined()
+      resp = session.resolveChoice(0, publiOpt?.value ?? '__pass__')
+      resp = advancePastPlayerSwitches(session, resp)
+    }
+
     const acceptOption = resp.interaction.options?.find(
       (o: ActionChoiceOption) => o.value !== '__skip__',
     )
