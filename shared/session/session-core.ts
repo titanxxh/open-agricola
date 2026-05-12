@@ -1326,7 +1326,7 @@ export class GameCore {
       composite?.request ??
       ({ kind: 'choice', options: composite?.options ?? node?.choices ?? [] } as InteractionRequest)
     const choiceOptions =
-      request.kind === 'choice'
+      request.kind === 'choice' || request.kind === 'select-trigger'
         ? request.options
         : (node?.choices ?? composite?.options ?? [])
     const player = this.state.players[playerIndex]
@@ -1402,6 +1402,19 @@ export class GameCore {
           costOverride,
           farm: request.farm,
           allowedCommands: ['resolveChoice', 'commitFarm', 'takeAnytimeAction', 'undoStep', 'undoAction'],
+          anytimeActions,
+        }
+      case 'select-trigger':
+        return {
+          stateId: 'wait',
+          playerIndex,
+          spaceId,
+          promptKey,
+          promptParams,
+          sourceCard,
+          request,
+          options: choiceOptions,
+          allowedCommands: ['resolveChoice', 'takeAnytimeAction', 'undoStep', 'undoAction'],
           anytimeActions,
         }
       case 'choice':
