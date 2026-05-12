@@ -178,6 +178,39 @@ describe('renderReport', () => {
   })
 })
 
+describe('diffCards players normalization', () => {
+  it('treats players undefined as "1+" on either side and both missing', () => {
+    const bgaMap = new Map([
+      ['X1', { id: 'X1', deck: 'X', number: 1, banned: false }],                  // BGA missing
+      ['X2', { id: 'X2', deck: 'X', number: 2, players: '1+', banned: false }],   // BGA 1+
+      ['X3', { id: 'X3', deck: 'X', number: 3, banned: false }],                  // both missing
+    ])
+    const tsMap = new Map([
+      ['X1', { id: 'X1', deck: 'X', number: 1, players: '1+' }],   // TS 1+
+      ['X2', { id: 'X2', deck: 'X', number: 2 }],                  // TS missing
+      ['X3', { id: 'X3', deck: 'X', number: 3 }],                  // TS missing
+    ])
+    const result = diffCards(bgaMap as never, tsMap as never)
+    expect(result.deviations.filter(d => d.field === 'players')).toEqual([])
+  })
+
+  it('still reports players deviation when one side is non-default', () => {
+    const bgaMap = new Map([
+      ['Y1', { id: 'Y1', deck: 'Y', number: 1, players: '3+', banned: false }],   // BGA 3+
+      ['Y2', { id: 'Y2', deck: 'Y', number: 2, banned: false }],                  // BGA missing
+    ])
+    const tsMap = new Map([
+      ['Y1', { id: 'Y1', deck: 'Y', number: 1 }],                                 // TS missing → 1+
+      ['Y2', { id: 'Y2', deck: 'Y', number: 2, players: '3+' }],                  // TS 3+
+    ])
+    const result = diffCards(bgaMap as never, tsMap as never)
+    const playerDevs = result.deviations.filter(d => d.field === 'players')
+    expect(playerDevs).toHaveLength(2)
+    expect(playerDevs.find(d => d.id === 'Y1')?.bga).toBe('3+')
+    expect(playerDevs.find(d => d.id === 'Y2')?.ours).toBe('3+')
+  })
+})
+
 describe('applySafeFix', () => {
   it('replaces vp literal, inserts extraVp:true, inserts category', () => {
     const tsPath = path.join(FIXTURE_DIR, 'ts/A88_FixMe.ts')
