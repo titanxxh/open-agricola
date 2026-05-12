@@ -515,10 +515,15 @@ anytime                  额外注册的 anytime 行动
 
 阶段 hook 已可返回 `ActionFlow`（`continueStageHook` / `continueAllWorkersPlacedHooks`），用于"hook 触发子流程"统一走 `EngineStack.push`。
 
-### 7.7 ActivateCardNode + PlayerSwitchNode
+### 7.7 ActivateCardNode + PlayerSwitchNode + ParallelTriggerNode
 
-- 当 `HookDispatcher.getMatchingListeners()` 找到匹配 listener，引擎为每个 listener 创建 `ActivateCardNode` 插入引擎树（不立即执行 handler）。推进到 `ActivateCardNode` 时执行 `executeCardListener`；若 handler 返 `flow`，`buildFlowNode` 插入引擎树。
-- 当 owner ≠ 当前行动玩家（opponent scope），引擎自动在 flow 前后插 `PlayerSwitchNode`。`PlayerSwitchNode` 暂停时通过 `confirm-player-switch` interaction 等玩家确认；`undoBoundary` 标记 undo 不能跨切人。
+- 当 `HookDispatcher.getMatchingListeners()` 找到匹配 listener，引擎在 dispatch 阶段（`buildPhaseTrailingNodes` 内）调用 `executeCardListener` **peek 一次** 拿到 `ActionHookResult`，存到 `ActivateCardNode.preComputedResult`。推进到 `ActivateCardNode` 时若有 `preComputedResult` 直接复用（不重跑 handler）；若无（legacy 路径）才 fall back 到 lazy 调 listener。
+- 当 owner ≠ 当前行动玩家（opponent scope），dispatch 自动在该 owner 的 trigger 组前后插 `PlayerSwitchNode`。`PlayerSwitchNode` 暂停时通过 `confirm-player-switch` interaction 等玩家确认；`undoBoundary` 标记 undo 不能跨切人。
+- **多 listener 同 phase 触发**（BGA-style PARALLEL trigger selection）：
+  - dispatch 阶段静态分析每个 listener 的 flow（`shared/engine/flow-interactivity.ts`：`xor` / `optional` / `altCosts payLeaf` / 含 `interactionRequest` 的 leaf → `interactive`；纯 `gain` / 单路径 `pay` / 全 auto seq → `auto`）。
+  - 同 owner 内分组：mandatory + optional auto 直接串行 `ActivateCardNode`；optional interactive 包成 `ParallelTriggerNode`。
+  - `ParallelTriggerNode.step()` 在 children 未 resolved 且 `selectedChildId === null` 时 emit `kind: 'select-trigger'` InteractionRequest，给卡主玩家选触发顺序（含 `__pass__` 一次性跳过剩余）。玩家选 cardId → `chooseCard` 设 `selectedChildId` → 引擎下一轮 `tree.nextUnresolved` 找到选中 child activate。child 完整结算后（含嵌套子触发的递归 ParallelTriggerNode）`selectedChildId` 自动清空 → 下一轮 step 重新 emit。全部 children resolved 或 `passAll` → 节点 resolved。
+  - `order` 字段已删除（曾经 4 张卡的 `order: 10` hack 全 cleanup）；执行顺序由 `playOrderIndex`（occupation < minor < improvement，数组 index）决定。
 
 ### 7.8 farm-type 提交
 
