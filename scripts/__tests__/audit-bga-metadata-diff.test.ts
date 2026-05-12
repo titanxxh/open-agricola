@@ -47,6 +47,12 @@ describe('parseBgaCard', () => {
     const card = parseBgaCard(phpPath)
     expect(card.cost).toEqual({ wood: 2, reed: 1 })
   })
+
+  it('unwraps paren-wrapped prerequisite shorthand', () => {
+    const phpPath = path.join(FIXTURE_DIR, 'bga/A18_ParenPrereq.php')
+    const card = parseBgaCard(phpPath)
+    expect(card.prerequisite).toBe('2 Occupations')
+  })
 })
 
 describe('parseTsCard', () => {
