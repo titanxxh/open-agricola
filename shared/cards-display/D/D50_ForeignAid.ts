@@ -12,4 +12,5 @@ export const D50_ForeignAid = new MinorImprovement({
   cost: {},
   maxRound: 11,
   players: '1+',
+  prerequisite: 'Play in Round 11 or Before',
 })

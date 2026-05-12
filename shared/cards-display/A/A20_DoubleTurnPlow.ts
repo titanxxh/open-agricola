@@ -11,6 +11,6 @@ export const A20_DoubleTurnPlow = new MinorImprovement({
   desc: ['When you play this card, you can immediately plow up to 2 fields.'],
   cost: { grain: 1 },
   maxRound: 5,
-  prerequisite: 'Round 5 or Before',
+  prerequisite: 'Play in Round 3 (5) or Before',
   evenMoreSet: true,
 })
