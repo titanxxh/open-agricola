@@ -36,6 +36,10 @@ function objectShallowEqual(a: unknown, b: unknown): boolean {
   return true
 }
 
+function isEmptyObj(v: unknown): boolean {
+  return typeof v === 'object' && v !== null && Object.keys(v as Record<string, unknown>).length === 0
+}
+
 export function diffCards(bgaMap: Map<string, BgaCard>, tsMap: Map<string, TsCard>): DiffResult {
   const deviations: FieldDiff[] = []
   const bgaOnly: string[] = []
@@ -65,8 +69,12 @@ export function diffCards(bgaMap: Map<string, BgaCard>, tsMap: Map<string, TsCar
       if (bv !== ov) deviations.push({ id, field, bga: bv, ours: ov, verdict: 'warn' })
     }
     for (const field of COMPLEX_FIELDS) {
-      const bv = bga[field as keyof BgaCard]
-      const ov = ts[field as keyof TsCard]
+      let bv = bga[field as keyof BgaCard]
+      let ov = ts[field as keyof TsCard]
+      if (field === 'cost') {
+        if (isEmptyObj(bv)) bv = undefined
+        if (isEmptyObj(ov)) ov = undefined
+      }
       if (bv === undefined && ov === undefined) continue
       const equal = typeof bv === 'object' && typeof ov === 'object'
         ? objectShallowEqual(bv, ov)
