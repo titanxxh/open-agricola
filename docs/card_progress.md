@@ -51,6 +51,7 @@
 - **2026-05-13** — ActionFlow option 描述 BGA-style 生成：`ActionChoiceOption.descriptionPreview` 现在从 EngineNode 递归生成，SEQ/XOR/OR/PARALLEL 按 BGA separator 拼接 leaf action 描述；C115 Sower 的“换播种行动”选项自动显示移除资源、支付芦苇、播种三段动作，纯 infobox 更新不污染 UI。新增 C115 session 描述结构回归 + InteractionBar composite description 渲染回归。
 - **2026-05-13** — C115 Sower confirm-window BGA 对齐：`confirm-next-player` 重新作为当前行动玩家的 anytime window，允许合法 card anytime（含 `C115-sower-anytime`），但继续屏蔽 generic `exchange` 防递归；`confirm-player-switch` 仍封锁 anytime。新增 C115 session 回归覆盖 Major 后确认前选择 sow 并回到确认切换。
 - **2026-05-12** — C115 Sower + anytime nested pending 修复：`C115_Sower` after-major listener 改为返回 engine flow（`push-to-card-stack` + infobox）而非直接 mutate，避免 dispatch peek 与 lazy 执行造成双 reed；interactive nested anytime 完成后 `InteractionNode` 会重新写回 `pendingNodeIdRef`，parent exchange pending 自动恢复；`confirm-next-player` owner 改回刚完成行动的玩家，`nextPlayerIndex` 仅作为确认后的目标玩家。
+- **2026-05-12** — §2.4 metadata-3b real-deviation fixes: 3 parser hotfix (altCosts diff + banned no-skip + dual-id canonical pick) → ❌ 33 → 7；fixed 50 real deviations (8 banned-auto-fix + 6 players + 11 cost + 6 altCosts P0 + 9 prereq + C148 spot-check)；33 banned 文档化进 §2.5.1；3 BGA-duplicate 在 report appendix；C148 + 6 prereq + D1 parser artifact 残留登记。§2.4 收口。
 - **2026-05-12** — §2.4 metadata-3a parser bug 修复：(1) BGA cost 单/双引号数字 (2) BGA prereq `('...')` 简写 unwrap (3) TS cost JSON 双引号 key (4) diff 层 players default '1+' 归一。Report 重跑：❌ 95 → 33（消除假阳性）。后续真偏差在 metadata-3b 处理。
 - 2026-05-12 anytime 精细化过滤对齐 BGA：引入 `shared/session/anytime-policy.ts` helper，把"全屏蔽 anytime"改成按 entry.id 精细过滤；exchange / bake-bread / animal-reorg pending 内 card listener anytime 现可触发；feed 期间保持锁定（OA 刻意不同）；新增非当前 owner / 嵌套 / 负向 / stale resource / composite 一致性五类 session 测试。interactive nested anytime 曾有 parent exchange pending 不自动 resume 的 P1 limitation，已在同日后续修复（见上一条）。
 - **2026-05-12** — §2.4 sprint metadata-2 done: `--apply-safe` auto-fix landed 74 张 extraVp + 33 张 category (107 张代码改)，新增 `extraVp-bga-alignment.test.ts` (70 cases) + 扩展 `category-bga-alignment.test.ts` (+33 rows)；剩 ⚠ 1 / ❌ 95 / 🔍 36 进 metadata-3 人工核对。
@@ -476,7 +477,7 @@ E 牌组（10 张）: E1 PoleBarns / E21 SheepRug / E2 RenovationMaterials / E30
 
 > **历史记录**：D154 ChimneySweep（renovate -2 stone 在 wood→stone 直升时漏减、`players` 字段）已于 2026-04-19 修复，迁入 §2.1。C129 SecondSpouse 已于 2026-04-19 对齐 BGA（首置 farmer + ≤2 占用），迁入 §2.1。B143 ClayWarden 已于 2026-04-19 补 `hollow` 3 人版空间并确认 listener 已覆盖（见 §2.0）。
 
-### 2.4 ❌ 数值/元数据待修（2026-05-12 mechanical re-audit + auto-fix + parser fixes：⚠ 1 / ❌ 33 / 🔍 36；详见 `docs/operations/bga-metadata-diff-report.md`；85 张 category + 74 张 extraVp 已由 scripts/audit-bga-metadata-diff.ts --apply-safe 收口；BGA cost quote / prereq paren / TS JSON cost / players default 4 个 parser bug 已修）
+### 2.4 ❌ 数值/元数据待修（2026-05-12 metadata-3b final：⚠ 1 / ❌ 7 / 🔍 33；详见 `docs/operations/bga-metadata-diff-report.md`；全副代码偏差已逐项修复；剩 33 banned 文档化于 §2.5.1；C148 extraVp + 6 prereq + D1 解析伪差 是 BGA upstream 漏标或 parser 伪差已登记）
 
 > 完整证据链见 `docs/card_desc_audit.md` §4.4 + `docs/card_desc_audit.md` §3。
 
