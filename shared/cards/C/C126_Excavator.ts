@@ -11,7 +11,11 @@ const listener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
-  order: 10,
+  // BGA C126_Excavator.php:36 — the wood + clay gain is mandatory; the
+  // inner pay/stone branch stays optional. Marking the listener mandatory
+  // hides __pass__ from the PARALLEL select-trigger prompt so the player
+  // cannot silently skip the guaranteed effect.
+  mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'day-laborer') return
     return {

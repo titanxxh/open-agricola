@@ -213,6 +213,8 @@ export const en = {
     interactionOptionalSkip: 'Skip',
     interactionFlowSelect: 'Choose an action',
     interactionFlowDone: 'Done',
+    interactionSelectTrigger: 'Choose which card effect to resolve first',
+    interactionSelectTriggerPass: 'Pass (skip remaining)',
     interactionFarmExpansionSelect: 'Choose expansion actions',
     interactionPlowSelect: 'Select a tile to plow',
     interactionPlowConfirm: 'Confirm plow',

@@ -26,8 +26,8 @@ export type CardListenerRegistration = {
   cardIds?: string[]
   actions?: string[]
   phases?: ActionHookPhase[]
-  order?: number
   scope?: CardListenerScope
+  mandatory?: boolean
   handler: (context: CardListenerContext) => ActionHookResult | void
 }
 
@@ -93,14 +93,7 @@ const getAllListeners = (): CardListenerRegistration[] => {
 const getOrderedListeners = (context: CardListenerContext) =>
   getAllListeners()
     .filter((registration) => matchesListener(registration, context))
-    .sort((left, right) => {
-      const leftOrder = left.order ?? 0
-      const rightOrder = right.order ?? 0
-      if (leftOrder !== rightOrder) {
-        return leftOrder - rightOrder
-      }
-      return left.id.localeCompare(right.id)
-    })
+    .sort((left, right) => left.id.localeCompare(right.id))
 
 export const runCardListeners = (context: CardListenerContext) => {
   const results: ActionHookResult[] = []

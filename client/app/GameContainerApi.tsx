@@ -631,7 +631,8 @@ export const GameContainerApi = () => {
       }
       return
     }
-    if (interaction.stateId !== 'wait' || interaction.request.kind !== 'choice') return
+    if (interaction.stateId !== 'wait') return
+    if (interaction.request.kind !== 'choice' && interaction.request.kind !== 'select-trigger') return
     void transport.resolveChoice(interaction.playerIndex, value).catch((e) => console.error(e))
   }, [interaction, currentPlayer, animalReorg, pendingFenceEdges, pendingPalisadeEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, setPlowError, setSowError, setStableError, isInteractive, commitFarmWithError, setFarmCommitError])
 
@@ -685,6 +686,7 @@ export const GameContainerApi = () => {
   const pendingChoice =
     interaction.stateId === 'wait' &&
     (interaction.request.kind === 'choice' ||
+      interaction.request.kind === 'select-trigger' ||
       interaction.request.kind === 'farm-select' ||
       interaction.request.kind === 'selection' ||
       interaction.farm !== undefined ||

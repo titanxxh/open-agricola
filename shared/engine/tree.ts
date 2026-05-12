@@ -1,5 +1,7 @@
 import type { EngineNode } from './types'
 import { OptionalNode, OrNode, ParallelNode, SequenceNode, XorNode } from './nodes'
+import { ParallelTriggerNode } from './nodes/parallel-trigger-node'
+import { ActivateCardNode } from './nodes/activate-card-node'
 
 const isCompositeNode = (node: EngineNode) =>
   node instanceof SequenceNode ||
@@ -30,6 +32,13 @@ export class EngineTree {
   findNodeById(id: string) {
     const visit = (node: EngineNode): EngineNode | null => {
       if (node.id === id) return node
+      if (node instanceof ParallelTriggerNode) {
+        for (const child of node.children) {
+          const found = visit(child)
+          if (found) return found
+        }
+        return null
+      }
       if (isCompositeNode(node)) {
         if (node instanceof OptionalNode) {
           const found = visit(node.child)
@@ -56,6 +65,10 @@ export class EngineTree {
     const nodes: EngineNode[] = []
     const visit = (node: EngineNode) => {
       nodes.push(node)
+      if (node instanceof ParallelTriggerNode) {
+        node.children.forEach((child) => visit(child))
+        return
+      }
       if (isCompositeNode(node)) {
         if (node instanceof OptionalNode) {
           visit(node.child)
@@ -69,7 +82,7 @@ export class EngineTree {
     return nodes
   }
 
-  insertBefore(nodeId: string, nodes: EngineNode[]) {
+  insertBefore(nodeId: string, nodes: EngineNode[]): boolean {
     if (nodes.length === 0) return false
     if (this.root.id === nodeId) {
       this.root = new SequenceNode(`pre-${nodeId}`, [...nodes, this.root])
@@ -81,6 +94,9 @@ export class EngineTree {
     if (parent instanceof SequenceNode || parent instanceof ParallelNode) {
       parent.children.splice(index, 0, ...nodes)
       return true
+    }
+    if (parent instanceof ParallelTriggerNode) {
+      return this.insertBefore(parent.id, nodes)
     }
     const replacement = new SequenceNode(`pre-${nodeId}`, [...nodes, found.node])
     if (parent instanceof OptionalNode) {
@@ -94,7 +110,7 @@ export class EngineTree {
     return false
   }
 
-  insertAfter(nodeId: string, nodes: EngineNode[]) {
+  insertAfter(nodeId: string, nodes: EngineNode[]): boolean {
     if (nodes.length === 0) return false
     if (this.root.id === nodeId) {
       this.root = new SequenceNode(`chain-${nodeId}`, [this.root, ...nodes])
@@ -104,6 +120,13 @@ export class EngineTree {
     if (!found) return false
     const { parent, index, node } = found
     if (parent instanceof SequenceNode || parent instanceof ParallelNode) {
+      parent.children.splice(index + 1, 0, ...nodes)
+      return true
+    }
+    if (parent instanceof ParallelTriggerNode) {
+      // Insert flow follow-ups INSIDE the ParallelTriggerNode right after the
+      // activated ActivateCardNode. nextUnresolved walks selectedChild + its
+      // follow-ups before returning to PARALLEL for the next card prompt.
       parent.children.splice(index + 1, 0, ...nodes)
       return true
     }
@@ -123,6 +146,17 @@ export class EngineTree {
     targetId: string,
     node: EngineNode,
   ): { node: EngineNode; parent: EngineNode; index: number } | null {
+    if (node instanceof ParallelTriggerNode) {
+      for (let index = 0; index < node.children.length; index += 1) {
+        const child = node.children[index]
+        if (child.id === targetId) {
+          return { node: child, parent: node, index }
+        }
+        const found = this.findNodeWithParent(targetId, child)
+        if (found) return found
+      }
+      return null
+    }
     if (isCompositeNode(node)) {
       if (node instanceof OptionalNode) {
         const child = node.child
@@ -149,6 +183,39 @@ export class EngineTree {
   nextUnresolved() {
     const visit = (node: EngineNode): EngineNode | null => {
       if (node.getState() === 'blocked') {
+        return null
+      }
+      if (node instanceof ParallelTriggerNode) {
+        if (node.getState() === 'resolved') return null
+        if (node.selectedChildId) {
+          const idx = node.children.findIndex((c) => c.id === node.selectedChildId)
+          if (idx >= 0) {
+            // Visit the selected card AND any follow-up flow nodes inserted
+            // after it, until the next ActivateCardNode (next card option) or
+            // end of children. This makes the selected trigger's flow finish
+            // BEFORE the engine returns to PARALLEL to prompt the next card.
+            for (let i = idx; i < node.children.length; i += 1) {
+              const child = node.children[i]
+              if (i > idx && child instanceof ActivateCardNode) break
+              if (child.getState() !== 'resolved') {
+                const next = visit(child)
+                if (next) return next
+              }
+            }
+          }
+        }
+        const hasUnresolvedCard = node.children.some(
+          (c) => c instanceof ActivateCardNode && c.getState() !== 'resolved',
+        )
+        if (hasUnresolvedCard) return node
+        // All cards picked; drain any trailing follow-up nodes.
+        for (const child of node.children) {
+          if (child.getState() !== 'resolved') {
+            const next = visit(child)
+            if (next) return next
+          }
+        }
+        if (node.getState() !== 'resolved') node.resolve()
         return null
       }
       if (node instanceof OrNode || node instanceof XorNode) {

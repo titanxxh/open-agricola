@@ -20,7 +20,6 @@ import { CARD_ID as COMPUTE_ARGS_ID } from '../Stub_ComputeArgs_ExtraOption'
 import { CARD_ID as IS_DOABLE_ID } from '../Stub_IsDoable_Override'
 import { CARD_ID as ON_RETURN_HOME_ID } from '../Stub_OnReturnHome_Accumulate'
 import { CARD_ID as SCOPE_OPPONENT_ID } from '../Stub_Scope_Opponent'
-import { CARD_A as ORDER_LOW_ID, CARD_B as ORDER_HIGH_ID } from '../Stub_Order_Priority'
 import { runReturnHomeHooks } from '../../card-effects'
 import { internalActionDefinitions } from '../../../actions/internal-actions'
 import { getFenceCount } from '../../../actions/effects/fencing'
@@ -449,56 +448,6 @@ describe('Stub card: Stub_Scope_Opponent', () => {
 
     expect(p1.cardStates[SCOPE_OPPONENT_ID]).toBeUndefined()
     expect(p1.resources.food).toBe(5)
-  })
-})
-
-describe('Stub card: Stub_Order_Priority', () => {
-  beforeEach(() => {
-    clearActionHooks()
-    clearStubCards()
-    registerStubCards()
-  })
-
-  it('executes low-order card before high-order card', () => {
-    const triggerOrder: string[] = []
-    clearStubCards()
-
-    requireActiveCardRegistry('hook-coverage-matrix').registerListener({
-      id: 'stub-order-low',
-      cardIds: [ORDER_LOW_ID],
-      phases: ['immediatelyAfter'],
-      actions: ['collect'],
-      order: 10,
-      handler: (context) => {
-        if (!context.player.minorPlayed.includes(ORDER_LOW_ID)) return
-        triggerOrder.push('low')
-        return {}
-      },
-    })
-
-    requireActiveCardRegistry('hook-coverage-matrix').registerListener({
-      id: 'stub-order-high',
-      cardIds: [ORDER_HIGH_ID],
-      phases: ['immediatelyAfter'],
-      actions: ['collect'],
-      order: 20,
-      handler: (context) => {
-        if (!context.player.minorPlayed.includes(ORDER_HIGH_ID)) return
-        triggerOrder.push('high')
-        return {}
-      },
-    })
-
-    const player = createPlayer()
-    player.minorPlayed = [ORDER_LOW_ID, ORDER_HIGH_ID]
-    const action = makeCollectAction()
-    const { engine, space } = buildEngine(action)('common-forest')
-    space.resources.wood = 1
-    const state = createState(player)
-
-    runToCompletion(engine, { state, player, space })
-
-    expect(triggerOrder).toEqual(['low', 'high'])
   })
 })
 
