@@ -11,4 +11,5 @@ export const B132_EstateMaster = new Occupation({
   desc: ['Once you have no unused farmyard spaces left, you get 1 bonus <SCORE> for each <VEGETABLE> that you harvest.'],
   cost: {},
   players: '1+',
+  extraVp: true,
 })

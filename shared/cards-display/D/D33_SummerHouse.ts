@@ -13,4 +13,5 @@ export const D33_SummerHouse = new MinorImprovement({
   ],
   cost: { wood: 3, stone: 1 },
   prerequisite: "Still in Wooden House",
+  extraVp: true,
 })
