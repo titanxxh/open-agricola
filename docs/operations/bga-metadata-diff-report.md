@@ -1,11 +1,11 @@
 # BGA Metadata Diff Report (2026-05-12)
 
 ## Summary
-- Total BGA cards scanned: 892
-- Total TS cards scanned: 889
-- ⚠ Literal deviations: 1
-- ❌ Complex deviations: 33
-- 🔍 BGA-only: 3
+- Total BGA cards scanned: 888
+- Total TS cards scanned: 888
+- ⚠ Literal deviations: 8
+- ❌ Complex deviations: 42
+- 🔍 BGA-only: 0
 - 🔍 TS-only: 0
 - 🔍 Banned-but-present: 33
 
@@ -13,13 +13,31 @@
 ### extraVp
 | Card | BGA | Ours |
 |---|---|---|
+| B132_EstateMaster | true | (missing) |
 | C148_MudWallower | (missing) | true |
+| C31_WritingChamber | true | (missing) |
+| C63_CraftBrewery | true | (missing) |
+| C99_GardenDesigner | true | (missing) |
+| D33_SummerHouse | true | (missing) |
+| D92_ChildOmbudsman | true | (missing) |
+
+### vp
+| Card | BGA | Ours |
+|---|---|---|
+| A39_Chapel | 3 | (missing) |
 
 ## ❌ Complex deviations (manual review)
+### category
+| Card | BGA | Ours |
+|---|---|---|
+| E22_GuestRoom | FARMYARD_-_PLACE_FOR_PERSON | (missing) |
+
 ### players
 | Card | BGA | Ours |
 |---|---|---|
+| A133_Braggart | 3+ | 1+ |
 | A134_FullFarmer | 3+ | 1+ |
+| B132_EstateMaster | 3+ | 1+ |
 | B153_Housemaster | 4+ | 1+ |
 | D128_BuildingTycoon | 3+ | 4+ |
 | D149_CasualWorker | 4+ | 3+ |
@@ -42,6 +60,16 @@
 | E35_Misanthropy | `{"wood":1}` | (missing) |
 | E38_RodCollection | (missing) | `{"wood":1}` |
 
+### altCosts
+| Card | BGA | Ours |
+|---|---|---|
+| B48_ForestStone | `[{"wood":2},{"stone":1}]` | (missing) |
+| C40_CanvasSack | `[{"grain":1},{"reed":1}]` | (missing) |
+| C44_ChickenCoop | `[{"clay":2},{"wood":2}]` | `[{"clay":2,"reed":1},{"wood":2,"reed":1}]` |
+| D80_BrickHammer | `[{"wood":1},{"food":1}]` | `[{"food":1}]` |
+| E30_ChildsToy | `[{"wood":1},{"clay":1}]` | `[{"clay":1}]` |
+| E52_Cubbyhole | `[{"wood":1},{"clay":1}]` | (missing) |
+
 ### prerequisite
 | Card | BGA | Ours |
 |---|---|---|
@@ -63,9 +91,6 @@
 
 ## 🔍 Single-sided
 ### BGA-only (no matching TS file)
-- C54_MarketStall
-- D11_LawnFertilzer
-- E132_Shearer
 
 ### TS-only (no matching BGA file)
 
