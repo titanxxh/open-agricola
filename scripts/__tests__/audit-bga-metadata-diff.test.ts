@@ -80,6 +80,12 @@ describe('parseTsCard', () => {
     expect(card.extraVp).toBeUndefined()
     expect(card.vp).toBeUndefined()
   })
+
+  it('parses JSON double-quoted cost key', () => {
+    const tsPath = path.join(FIXTURE_DIR, 'ts/A29_JsonCost.ts')
+    const card = parseTsCard(tsPath)
+    expect(card.cost).toEqual({ wood: 1 })
+  })
 })
 
 describe('diffCards', () => {
