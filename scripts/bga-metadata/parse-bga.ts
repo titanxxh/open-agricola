@@ -73,8 +73,15 @@ export function parseBgaCard(phpPath: string): BgaCard {
     switch (key) {
       case 'name': card.name = unwrapClientTranslate(val); break
       case 'category': {
-        const cm = val.match(/^([A-Z][A-Z_]*)$/)
-        if (cm) card.category = cm[1]
+        // Form A: unquoted PHP const e.g. POINTS_PROVIDER (uppercase letters + underscores)
+        // Form B: quoted string e.g. 'BONUS_POINTS_-_GET' (may contain hyphens)
+        const quoted = val.match(/^['"](.+?)['"]$/)
+        if (quoted) {
+          card.category = quoted[1]
+        } else {
+          const constMatch = val.match(/^([A-Z][A-Z0-9_-]*)$/)
+          if (constMatch) card.category = constMatch[1]
+        }
         break
       }
       case 'players': card.players = unwrapClientTranslate(val); break

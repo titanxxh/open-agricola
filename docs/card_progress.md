@@ -47,6 +47,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-05-12** — §2.4 parser bug fix: BGA category 正则扩为兼容 quoted-string（`'BONUS_POINTS_-_GET'` 类含连字符）+ vp:0 ≡ undefined 标准化，消除大批假阳性。报告从 ⚠ 83 / ❌ 729 / 🔍 36 降至 ⚠ 74 / ❌ 644 / 🔍 36。新增 2 回归测试（8/8 通过）。
 - **2026-05-12** — §2.4 mechanical re-audit: `scripts/audit-bga-metadata-diff.ts` 沉淀 + 首次报告 → `docs/operations/bga-metadata-diff-report.md`（⚠ 83 / ❌ 729 / 🔍 36）。原 §2.4 表头 "剩 57 张" 已 stale。
 
 - **2026-05-12 — D100 LordoftheManor `extraVp:true` 元数据对齐 + §2.3 backlog cleanup**：D100 行为 fix（`standardCategories` 加 `'stables'`）于 2026-05-02 commit `999104e0` 已 land，但 §2.3 Sprint 7d backlog 条目 stale 残留。本次顺手补 `shared/cards-display/D/D100_LordoftheManor.ts` 加 `extraVp: true`（对齐 BGA `D100_LordoftheManor.php:21 $this->extraVp = true`，UI-only 元数据），加 metadata 断言测试（`server/__tests__/D100_LordoftheManor-session.test.ts` 6 case 全绿），并清理 §2.3 backlog 条目标 closed。无行为变化。spec / plan：无（≤1h 单字段 cleanup）。
@@ -467,7 +468,7 @@ E 牌组（10 张）: E1 PoleBarns / E21 SheepRug / E2 RenovationMaterials / E30
 
 > **历史记录**：D154 ChimneySweep（renovate -2 stone 在 wood→stone 直升时漏减、`players` 字段）已于 2026-04-19 修复，迁入 §2.1。C129 SecondSpouse 已于 2026-04-19 对齐 BGA（首置 farmer + ≤2 占用），迁入 §2.1。B143 ClayWarden 已于 2026-04-19 补 `hollow` 3 人版空间并确认 listener 已覆盖（见 §2.0）。
 
-### 2.4 ❌ 数值/元数据待修（2026-05-12 重新 audit：⚠ literal 83 / ❌ complex 729 / 🔍 single-sided 36，详见 `docs/operations/bga-metadata-diff-report.md`；历史 83 → 57 张推断已 stale）
+### 2.4 ❌ 数值/元数据待修（2026-05-12 重新 audit（parser bug fix 后）：⚠ literal 74 / ❌ complex 644 / 🔍 single-sided 36，详见 `docs/operations/bga-metadata-diff-report.md`；历史 83 → 57 张推断已 stale）
 
 > 完整证据链见 `docs/card_desc_audit.md` §4.4 + `docs/card_desc_audit.md` §3。
 
