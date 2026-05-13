@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { ActionFlow } from '../../contract/types'
 import type { CardListenerContext } from '../card-listeners'
 import { B48_ForestStone_impl } from '../B/B48_ForestStone'
+import { E103_Wolf_impl } from '../E/E103_Wolf'
 
 const CARD_ID = 'B48_ForestStone'
+const WOLF_CARD_ID = 'E103_Wolf'
 
 const makeB48Context = (
   foodCount = 2,
@@ -35,6 +37,32 @@ const collectLeaves = (flow: ActionFlow): ActionFlow[] => {
   if (flow.type === 'leaf') return [flow]
   if ('children' in flow) return flow.children.flatMap(collectLeaves)
   return []
+}
+
+const makeE103Context = (
+  stack: string[] = ['clay', 'wood', 'grain'],
+  resourcesGained: Record<string, number> = { grain: 1 },
+): CardListenerContext => {
+  const player = {
+    id: 'p1',
+    name: 'P1',
+    resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 1, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
+    cardStates: { [WOLF_CARD_ID]: { stack: [...stack] } },
+    improvements: [],
+    minorPlayed: [],
+    occupationPlayed: [WOLF_CARD_ID],
+  } as never
+  return {
+    state: { players: [player], actionSpaces: [] } as never,
+    player,
+    triggerPlayer: player,
+    ownerPlayer: player,
+    effectPlayer: player,
+    space: { id: 'grain-seeds' } as never,
+    actionId: 'gain',
+    phase: 'after',
+    result: { type: 'ok', resourcesGained },
+  }
 }
 
 describe('listener purity wave 1', () => {
@@ -102,5 +130,57 @@ describe('listener purity wave 1', () => {
         }),
       ]),
     )
+  })
+
+  it('E103 handler returns stack-pop and boar-gain flow without popping stack immediately', () => {
+    const listener = E103_Wolf_impl.listeners![0]!
+    const ctx = makeE103Context()
+    const before = JSON.stringify(ctx.player.cardStates)
+
+    const result = listener.handler(ctx)
+
+    expect(result?.flow).toEqual({
+      type: 'seq',
+      children: [
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: WOLF_CARD_ID,
+          params: { kind: 'pop-card-stack-top' },
+        },
+        {
+          type: 'leaf',
+          actionId: 'gain',
+          sourceCard: WOLF_CARD_ID,
+          params: { boar: 1 },
+          choiceLabelKey: undefined,
+          choiceLabelParams: undefined,
+        },
+      ],
+    })
+    expect(result?.sourceCard).toBe(WOLF_CARD_ID)
+    expect(JSON.stringify(ctx.player.cardStates)).toBe(before)
+  })
+
+  it('E103 handler returns no flow for non-matching gained resource', () => {
+    const listener = E103_Wolf_impl.listeners![0]!
+    const ctx = makeE103Context(['clay', 'wood', 'grain'], { wood: 1 })
+    const before = JSON.stringify(ctx.player.cardStates)
+
+    const result = listener.handler(ctx)
+
+    expect(result).toBeUndefined()
+    expect(JSON.stringify(ctx.player.cardStates)).toBe(before)
+  })
+
+  it('E103 handler returns no flow for an empty stack', () => {
+    const listener = E103_Wolf_impl.listeners![0]!
+    const ctx = makeE103Context([], { grain: 1 })
+    const before = JSON.stringify(ctx.player.cardStates)
+
+    const result = listener.handler(ctx)
+
+    expect(result).toBeUndefined()
+    expect(JSON.stringify(ctx.player.cardStates)).toBe(before)
   })
 })
