@@ -112,10 +112,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
     const player = makePlayer()
     player.resources.wood = 1
     player.cardStates[CARD_ID] = {
-      stack: [
-        { resource: 'clay', amount: 2 },
-        { resource: 'wood', amount: 3 },
-      ],
+      stack: ['clay', 'wood'],
     }
 
     const result = specialEffectAction.execute(
@@ -123,7 +120,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
     )
 
     expect(result.type).toBe('ok')
-    expect(player.cardStates[CARD_ID]?.stack).toEqual([{ resource: 'clay', amount: 2 }])
+    expect(player.cardStates[CARD_ID]?.stack).toEqual(['clay'])
     expect(player.resources.wood).toBe(1)
   })
 
@@ -145,8 +142,52 @@ describe('specialEffectAction — mutation dispatcher', () => {
     )
 
     expect(result.type).toBe('ok')
-    expect(player.improvements).toEqual(['minor-1', 'major-to'])
-    expect(state.availableMajorImprovements).toEqual(['major-other', 'major-from'])
+    expect(player.improvements).toEqual(['major-to', 'minor-1'])
+    expect(state.availableMajorImprovements).toEqual(['major-from', 'major-other'])
+  })
+
+  it('swap-improvement-with-board: no-ops when player already has target improvement', () => {
+    const player = makePlayer()
+    player.improvements = ['major-from', 'major-to', 'minor-1']
+    const state = {
+      players: [player],
+      availableMajorImprovements: ['major-to', 'major-other'],
+    } as unknown as GameState
+
+    const result = specialEffectAction.execute(
+      makeCtx(
+        player,
+        { kind: 'swap-improvement-with-board', from: 'major-from', to: 'major-to' },
+        CARD_ID,
+        state,
+      ),
+    )
+
+    expect(result.type).toBe('ok')
+    expect(player.improvements).toEqual(['major-from', 'major-to', 'minor-1'])
+    expect(state.availableMajorImprovements).toEqual(['major-to', 'major-other'])
+  })
+
+  it('swap-improvement-with-board: removes board target without duplicating board source', () => {
+    const player = makePlayer()
+    player.improvements = ['major-from', 'minor-1']
+    const state = {
+      players: [player],
+      availableMajorImprovements: ['major-to', 'major-from', 'major-other'],
+    } as unknown as GameState
+
+    const result = specialEffectAction.execute(
+      makeCtx(
+        player,
+        { kind: 'swap-improvement-with-board', from: 'major-from', to: 'major-to' },
+        CARD_ID,
+        state,
+      ),
+    )
+
+    expect(result.type).toBe('ok')
+    expect(player.improvements).toEqual(['major-to', 'minor-1'])
+    expect(state.availableMajorImprovements).toEqual(['major-from', 'major-other'])
   })
 
   it('swap-improvement-with-board: no-ops when player lacks from or board lacks to', () => {
