@@ -1,91 +1,56 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { setCardFlag } from '../../shared/cards/helpers/card-state'
-import { resolveCardCostWithModifiers } from '../../shared/actions/payment/internal'
-import { isComplexCost } from '../../shared/actions/payment/internal'
+import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/D/D82_HuntingTrophy'
-import '../../shared/cards/B/B81_Handcart'
 
 const CARD_ID = 'D82_HuntingTrophy'
 
-describe('D82_HuntingTrophy session — chooseOne improvement discount on house-redevelopment', () => {
-  const setup = () => {
+describe('D82_HuntingTrophy session', () => {
+  const setupFarmRedevelopment = () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
-    state.round = 5
+    state.round = 10
+
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
+    player.houseType = 'clay'
+    player.rooms = 2
     player.resources = {
       ...player.resources,
-      wood: 2,
-      clay: 2,
+      wood: 1,
+      clay: 0,
       stone: 2,
-      reed: 2,
+      reed: 1,
       food: 0,
     }
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+    setWorkersAtHome(state, player, 2)
+
+    const space = state.actionSpaces.find((entry) => entry.id === 'farm-redevelopment')
+    if (space) {
+      space.roundAvailable = 1
+      space.takenBy = []
+    }
+
     session.loadState(state)
-    return { session, state, player }
+    return { session, player }
   }
 
-  it('without house-redev flag → improvement cost listener is silent', () => {
-    const { state, player } = setup()
-    // Buy an improvement OUTSIDE house-redev: D82 listener should NOT inject
-    // bonuses. B81_Handcart costs { wood: 1 }.
-    const baseCost = { wood: 1 }
-    const resolved = resolveCardCostWithModifiers(
-      state,
-      player,
-      'improvement-any',
-      'B81_Handcart',
-      baseCost,
-    )
-    // Listener returns nothing → flat cost preserved.
-    expect(isComplexCost(resolved)).toBe(false)
-    expect(resolved).toEqual(baseCost)
-  })
+  it('farm-redevelopment can reach the fence prompt with only 1 wood and no modifier mutation', () => {
+    const { session, player } = setupFarmRedevelopment()
 
-  it('with house-redev flag → listener injects 4-choice BonusModifier', () => {
-    const { state, player } = setup()
-    setCardFlag(player, CARD_ID, true)
-    const baseCost = { wood: 1 }
-    const resolved = resolveCardCostWithModifiers(
-      state,
-      player,
-      'improvement-any',
-      'B81_Handcart',
-      baseCost,
-    )
-    // Listener returns bonuses → ComplexCost wraps base fee + bonuses.
-    expect(isComplexCost(resolved)).toBe(true)
-    if (!isComplexCost(resolved)) return
-    expect(resolved.bonuses).toBeDefined()
-    expect(resolved.bonuses!.length).toBeGreaterThanOrEqual(1)
-    const d82Bonus = resolved.bonuses!.find((b) =>
-      (b.sources ?? []).includes(CARD_ID),
-    )
-    expect(d82Bonus).toBeDefined()
-    expect(d82Bonus!.choices).toBeDefined()
-    expect(d82Bonus!.choices!.length).toBe(4)
-    const discountKeys = d82Bonus!.choices!.map(
-      (c) => Object.keys(c.discount)[0],
-    )
-    expect(discountKeys.sort()).toEqual(['clay', 'reed', 'stone', 'wood'])
-  })
+    const resp = session.takeAction(0, 'farm-redevelopment')
 
-  it('ownership-required: listener does not fire if player does not own D82', () => {
-    const { state } = setup()
-    const other = state.players[1]!
-    setCardFlag(other, CARD_ID, true)
-    const baseCost = { wood: 1 }
-    const resolved = resolveCardCostWithModifiers(
-      state,
-      other, // other doesn't have D82 in minorPlayed
-      'improvement-any',
-      'B81_Handcart',
-      baseCost,
-    )
-    expect(isComplexCost(resolved)).toBe(false)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.options?.map((option) => option.value)).toContain('action-fence-3')
+
+    const updatedPlayer = resp.state.players[0]!
+    expect(updatedPlayer.activeModifiers?.some((modifier) => modifier.cardId === CARD_ID)).toBe(false)
+    expect(updatedPlayer.cardStates?.[CARD_ID]?.flagged).toBeUndefined()
+    expect(player.activeModifiers?.some((modifier) => modifier.cardId === CARD_ID)).toBe(false)
   })
 })
