@@ -549,7 +549,7 @@ Inputs (derived by `GameCore.getAnytimePolicyInput()` using the same node + comp
 - `interactionKind` — `node?.request?.kind ?? composite?.request?.kind`
 - `promptKey` — `node?.promptKey ?? composite?.promptKey`
 
-Output: `{ allowed: false, reason }` or `{ allowed: true, blockedIds }`. The seven rules are priority-ordered (first match wins): no-context → feed-locked → confirm-window → animal-reorg → exchange/bake-bread promptKey → stage-hook-chain default block → everything else allowed with no blocks.
+Output: `{ allowed: false, reason }` or `{ allowed: true, blockedIds }`. The rules are priority-ordered (first match wins): no-context → feed-locked → `confirm-next-player` allowed with `exchange` blocked → `confirm-player-switch` blocked → animal-reorg → exchange/bake-bread promptKey → stage-hook-chain default block → everything else allowed with no blocks.
 
 Three consumers share this snapshot:
 
@@ -563,6 +563,7 @@ OA-vs-BGA design notes:
 
 - Reorganize is a system-driven sub-flow in OA (not a player-triggerable anytime) — the policy never produces a `'reorganize'` entry to filter.
 - `feed` pending is locked in OA because `executeFeedingLogic()` freezes `remaining`/`foodUsed` into the InteractionRequest. BGA allows nested anytime in its `ST_HARVEST_FEED` flow because its predecessor is the `EXCHANGE` state, which has no fixed budget.
+- `confirm-next-player` is treated as the acting player's final anytime window before control passes to the next player; legal anytime actions remain available there, with `exchange` blocked to avoid recursive generic exchange prompts. `confirm-player-switch` remains blocked because it is a system-controlled cross-player transition inside another flow.
 - `stageResume`-bearing harvest stage hook chains default to blocked to preserve the "system-driven hook chains do not yield to player anytime" invariant; the explicit allow-list (`animal-reorg`, exchange/bake-bread promptKey) overrides this.
 
 ---

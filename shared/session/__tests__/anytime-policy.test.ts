@@ -21,9 +21,9 @@ describe('computeAnytimePolicy', () => {
       .toEqual({ allowed: false, reason: 'feed-window-locked' })
   })
 
-  it('rule 3 — confirm-next-player → blocked', () => {
+  it('rule 3 — confirm-next-player → allowed, blocks exchange', () => {
     expect(computeAnytimePolicy(base({ interactionKind: 'confirm-next-player' })))
-      .toEqual({ allowed: false, reason: 'confirm-window' })
+      .toEqual({ allowed: true, blockedIds: ['exchange'] })
   })
 
   it('rule 3 — confirm-player-switch → blocked', () => {

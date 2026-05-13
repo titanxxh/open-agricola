@@ -31,10 +31,10 @@ export function computeAnytimePolicy(input: AnytimePolicyInput): AnytimePolicy {
   if (input.interactionKind === 'feed') {
     return { allowed: false, reason: 'feed-window-locked' }
   }
-  if (
-    input.interactionKind === 'confirm-next-player' ||
-    input.interactionKind === 'confirm-player-switch'
-  ) {
+  if (input.interactionKind === 'confirm-next-player') {
+    return { allowed: true, blockedIds: ['exchange'] }
+  }
+  if (input.interactionKind === 'confirm-player-switch') {
     return { allowed: false, reason: 'confirm-window' }
   }
   if (input.interactionKind === 'animal-reorg') {
