@@ -19,16 +19,12 @@ export const B114_Childless_impl = {
           actionId: 'gain',
           params: { food: 1, grain: 1 },
           sourceCard: CARD_ID,
-          choiceLabelKey: 'ui.interactionResourceExchange',
-          choiceLabelParams: { resourcesGained: { food: 1, grain: 1 } },
         },
         {
           type: 'leaf',
           actionId: 'gain',
           params: { food: 1, vegetable: 1 },
           sourceCard: CARD_ID,
-          choiceLabelKey: 'ui.interactionResourceExchange',
-          choiceLabelParams: { resourcesGained: { food: 1, vegetable: 1 } },
         },
       ],
     }

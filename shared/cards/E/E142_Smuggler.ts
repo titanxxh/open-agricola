@@ -23,8 +23,6 @@ export const E142_Smuggler_impl = {
           { type: 'leaf', actionId: 'pay', params: { wood: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { grain: 1 }, sourceCard: CARD_ID },
         ],
-        choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { wood: 1 }, resourcesGained: { grain: 1 } },
       })
     }
     if (canGrain1) {
@@ -34,8 +32,6 @@ export const E142_Smuggler_impl = {
           { type: 'leaf', actionId: 'pay', params: { grain: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { stone: 1 }, sourceCard: CARD_ID },
         ],
-        choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { grain: 1 }, resourcesGained: { stone: 1 } },
       })
     }
 
@@ -49,8 +45,6 @@ export const E142_Smuggler_impl = {
           { type: 'leaf', actionId: 'pay', params: { wood: 2 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { grain: 2 }, sourceCard: CARD_ID },
         ],
-        choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { wood: 2 }, resourcesGained: { grain: 2 } },
       })
     }
     if (canGrain2) {
@@ -60,8 +54,6 @@ export const E142_Smuggler_impl = {
           { type: 'leaf', actionId: 'pay', params: { grain: 2 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { stone: 2 }, sourceCard: CARD_ID },
         ],
-        choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { grain: 2 }, resourcesGained: { stone: 2 } },
       })
     }
 

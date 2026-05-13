@@ -15,8 +15,6 @@ export const C113_WinterCaretaker_impl = {
       optional: true,
       children: [
         payLeaf({ cardId: CARD_ID, cost: { food: 2 },
-          choiceLabelKey: 'ui.interactionResourceExchange',
-          choiceLabelParams: { resourcesPaid: { food: 2 }, resourcesGained: { vegetable: 1 } },
         }),
         gainLeaf(CARD_ID, { vegetable: 1 }),
       ],

@@ -26,16 +26,12 @@ export const E167_DairyCrier_impl = {
             actionId: 'gain',
             params: { sheep: 2 },
             sourceCard: CARD_ID,
-            choiceLabelKey: 'ui.interactionResourceExchange',
-            choiceLabelParams: { resourcesPaid: {}, resourcesGained: { sheep: 2 } },
           },
           {
             type: 'leaf',
             actionId: 'gain',
             params: { food: 2 },
             sourceCard: CARD_ID,
-            choiceLabelKey: 'ui.interactionResourceExchange',
-            choiceLabelParams: { resourcesPaid: {}, resourcesGained: { food: 2 } },
           },
         ],
       })

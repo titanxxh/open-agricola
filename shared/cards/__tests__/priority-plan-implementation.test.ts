@@ -161,8 +161,8 @@ describe('priority plan implementations', () => {
       type: 'leaf',
       actionId: 'pay',
       params: { grain: 1 },
-      choiceLabelKey: 'ui.interactionResourceExchange',
-      choiceLabelParams: {
+      effectPreview: {
+        kind: 'resourceExchange',
         resourcesPaid: { grain: 1 },
         bonusVp: 1,
       },

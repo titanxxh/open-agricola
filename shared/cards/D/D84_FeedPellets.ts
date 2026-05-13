@@ -21,8 +21,6 @@ export const D84_FeedPellets_impl = {
         payLeaf({ cardId: CARD_ID, cost: { vegetable: 1 } }),
         gainLeaf(CARD_ID, { [type]: 1 }),
       ],
-      choiceLabelKey: 'ui.interactionResourceExchange',
-      choiceLabelParams: { resourcesPaid: { vegetable: 1 }, resourcesGained: { [type]: 1 } },
     }))
     if (children.length === 1) {
       return {

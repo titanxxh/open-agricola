@@ -21,8 +21,6 @@ export const B135_NutritionExpert_impl = {
         cardId: CARD_ID,
         cost: { [animal]: 1, grain: 1, vegetable: 1 },
         gain: { food: 5, score: 2 },
-        choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { [animal]: 1, grain: 1, vegetable: 1 }, resourcesGained: { food: 5 }, bonusVp: 2 },
       }),
     )
 

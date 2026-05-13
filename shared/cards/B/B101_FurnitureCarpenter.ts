@@ -23,8 +23,6 @@ export const B101_FurnitureCarpenter_impl = {
             { type: 'leaf' as const, actionId: 'pay', params: { food: 2 }, sourceCard: CARD_ID },
             { type: 'leaf' as const, actionId: 'bonus-vp', sourceCard: CARD_ID },
           ],
-          choiceLabelKey: 'ui.interactionResourceExchange',
-          choiceLabelParams: { resourcesPaid: { food: 2 }, bonusVp: 1 },
         },
       ],
     }

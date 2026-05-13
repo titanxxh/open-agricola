@@ -25,8 +25,6 @@ export const E102_Acquirer_impl = {
             actionId: 'gain',
             params: { [good]: 1 },
             sourceCard: CARD_ID,
-            choiceLabelKey: 'ui.interactionResourceExchange',
-            choiceLabelParams: { resourcesGained: { [good]: 1 } },
           })),
         },
       ],

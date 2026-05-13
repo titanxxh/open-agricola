@@ -17,8 +17,6 @@ export const C41_FarmStore_impl = {
           { type: 'leaf', actionId: 'pay', params: { food: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { vegetable: 1 }, sourceCard: CARD_ID },
         ],
-        choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { food: 1 }, resourcesGained: { vegetable: 1 } },
       },
       {
         type: 'seq',
@@ -26,8 +24,6 @@ export const C41_FarmStore_impl = {
           { type: 'leaf', actionId: 'pay', params: { food: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { wood: 1, clay: 1 }, sourceCard: CARD_ID },
         ],
-        choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { food: 1 }, resourcesGained: { wood: 1, clay: 1 } },
       },
       {
         type: 'seq',
@@ -35,8 +31,6 @@ export const C41_FarmStore_impl = {
           { type: 'leaf', actionId: 'pay', params: { food: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { wood: 1, stone: 1 }, sourceCard: CARD_ID },
         ],
-        choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { food: 1 }, resourcesGained: { wood: 1, stone: 1 } },
       },
       {
         type: 'seq',
@@ -44,8 +38,6 @@ export const C41_FarmStore_impl = {
           { type: 'leaf', actionId: 'pay', params: { food: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { wood: 1, reed: 1 }, sourceCard: CARD_ID },
         ],
-        choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { food: 1 }, resourcesGained: { wood: 1, reed: 1 } },
       },
       {
         type: 'seq',
@@ -53,8 +45,6 @@ export const C41_FarmStore_impl = {
           { type: 'leaf', actionId: 'pay', params: { food: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { clay: 1, stone: 1 }, sourceCard: CARD_ID },
         ],
-        choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { food: 1 }, resourcesGained: { clay: 1, stone: 1 } },
       },
       {
         type: 'seq',
@@ -62,8 +52,6 @@ export const C41_FarmStore_impl = {
           { type: 'leaf', actionId: 'pay', params: { food: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { clay: 1, reed: 1 }, sourceCard: CARD_ID },
         ],
-        choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { food: 1 }, resourcesGained: { clay: 1, reed: 1 } },
       },
       {
         type: 'seq',
@@ -71,8 +59,6 @@ export const C41_FarmStore_impl = {
           { type: 'leaf', actionId: 'pay', params: { food: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { stone: 1, reed: 1 }, sourceCard: CARD_ID },
         ],
-        choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { food: 1 }, resourcesGained: { stone: 1, reed: 1 } },
       },
     ]
 
