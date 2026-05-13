@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
+import { getAllTilePositions } from '../../shared/domain/farm'
 import '../../shared/cards/E/E148_Lazybones'
 
 describe('E148_Lazybones session', () => {
@@ -187,5 +188,28 @@ describe('E148_Lazybones session', () => {
     // Stable should still be on the space
     const spaces = owner.cardStates?.['E148_Lazybones']?.extraData?.reservedActionSpaces as string[]
     expect(spaces).toContain('grain-seeds')
+  })
+
+  it('removes the reserved space without a stable gain log when owner has no empty tile', () => {
+    const session = setup()
+    const state = session.getState().state
+    state.players[0]!.fields = getAllTilePositions().map((tile) => ({
+      row: tile.row,
+      col: tile.col,
+      stacks: [],
+    }))
+    session.loadState(state)
+
+    const resp = session.takeAction(1, 'grain-seeds')
+    expect(resp.ok).toBe(true)
+
+    const owner = resp.state.players[0]!
+    expect(owner.stableTiles.length).toBe(0)
+    const spaces = owner.cardStates?.['E148_Lazybones']?.extraData?.reservedActionSpaces as string[]
+    expect(spaces).not.toContain('grain-seeds')
+    expect(resp.state.log.some((entry) =>
+      entry.key === 'log.cardEffectGain' &&
+      entry.params?.cardId === 'E148_Lazybones',
+    )).toBe(false)
   })
 })

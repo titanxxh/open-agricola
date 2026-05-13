@@ -16,7 +16,22 @@ const CARD_ID = C130_OutskirtsDirector.id
  * BGA: After PlaceFarmer on Grove → place 2 reed on Hollow (and vice versa).
  * In 4-player games, the Hollow accumulation space is 'hollow-4' (different
  * gain rate). We use `pairedSpaceIdFor` to resolve the variant.
+ *
+ * OA behavior: the reed placement is mandatory after the trigger and is not
+ * declined together with the optional extra placement.
  */
+
+const addReedToSpaceFlow = (spaceId: string): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: CARD_ID,
+  params: {
+    kind: 'add-resource-to-space',
+    spaceId,
+    resource: 'reed',
+    amount: 2,
+  },
+})
 
 const listener: CardListenerRegistration = {
   id: 'C130-outskirts-director-after-place-farmer',
@@ -45,17 +60,20 @@ const listener: CardListenerRegistration = {
     )
     if (!otherSpace) return
 
-    // Place 2 reed on the other space (from general supply)
-    otherSpace.resources.reed = (otherSpace.resources.reed ?? 0) + 2
+    const addResourceFlow = addReedToSpaceFlow(otherSpace.id)
 
-    // Offer to place another farmer (requires available workers)
-    if (workersAvailable(context.state, context.player) <= 0) return
+    if (workersAvailable(context.state, context.player) <= 0) {
+      return {
+        flow: addResourceFlow,
+        sourceCard: CARD_ID,
+      }
+    }
 
     return {
       flow: {
         type: 'seq',
-        optional: true,
         children: [
+          addResourceFlow,
           {
             type: 'leaf',
             actionId: 'place-farmer',
