@@ -1,22 +1,11 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { returnCardToBoard } from '../helpers/return-card'
-import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
-import {
-  setCardFlag,
-  isCardFlagged,
-  writeCardExtraData,
-  readCardExtraData,
-} from '../helpers/card-state'
+import { isCardFlagged } from '../helpers/card-state'
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { D27_Retraining } from '../../cards-display/D/D27_Retraining'
 
 const CARD_ID = D27_Retraining.id
-
-const SWAP_KEY = 'pendingSwap'
-
-const FIELD_EFFECT = 'D27-retraining-swap'
 
 /**
  * D27 Retraining (Minor, D, 27):
@@ -30,12 +19,11 @@ const FIELD_EFFECT = 'D27-retraining-swap'
  *   offering the currently-available swap, then unflags.
  *
  * Implementation:
- * - After a `renovate-house` action, flag the card.
+ * - After a `renovate-house` action, return a flow leaf that flags the card.
  * - After the same player's next `place-farmer`, if flagged and a swap is
- *   available, return an optional seq whose body is a `selection` leaf
- *   bound to a registered selection-effect that performs the swap. The player
- *   can decline the optional seq; if accepted, the selection-effect returns the
- *   old major to the board and grants the new one.
+ *   available, return a flow that clears the flag and then optionally swaps a
+ *   player major with the board. Declining the optional branch only clears the
+ *   renovation marker.
  */
 
 const determineSwap = (
@@ -53,30 +41,11 @@ const determineSwap = (
   return null
 }
 
-registerSelectionEffect(FIELD_EFFECT, ({ player }) => {
-  const swap = readCardExtraData<{ from: string; to: string }>(
-    player,
-    CARD_ID,
-    SWAP_KEY,
-  )
-  if (!swap) return
-  writeCardExtraData(player, CARD_ID, SWAP_KEY, undefined)
-
-  // Return the old major to the global board.
-  returnCardToBoard(player, swap.from)
-
-  // The selection-effect does not have direct access to state here, so we rely on
-  // the listener to have queued the availability mutation separately. Player-
-  // side ownership still needs to reflect the swap immediately, so we update
-  // `improvements` here and let the matching card-effect listener (in
-  // `performStateUpdate` below) adjust `state.availableMajorImprovements`.
-  //
-  // NOTE: for a pure-player-side swap, we can skip the state bookkeeping —
-  // in a 2-player game, majors returning to / leaving the board mostly affect
-  // availability for future purchases, which is already covered by the
-  // state.availableMajorImprovements mutation in the place-farmer listener
-  // right before the field-effect fires (see listener handler).
-  player.improvements.push(swap.to)
+const setFlagFlow = (flag: boolean): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: CARD_ID,
+  params: { kind: 'set-flag', flag },
 })
 
 const renovationListener: CardListenerRegistration = {
@@ -86,8 +55,10 @@ const renovationListener: CardListenerRegistration = {
   actions: ['renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
-    setCardFlag(context.player, CARD_ID, true)
-    return
+    return {
+      flow: setFlagFlow(true),
+      sourceCard: CARD_ID,
+    }
   },
 }
 
@@ -100,55 +71,32 @@ const placeFarmerListener: CardListenerRegistration = {
     if (!isCardFlagged(context.player, CARD_ID)) return
 
     const swap = determineSwap(context.state, context.player)
-    setCardFlag(context.player, CARD_ID, false)
-    if (!swap) return
-
-    // Reserve the incoming major now so another player can't grab it, and
-    // record the swap details for the field-effect to consume if the player
-    // accepts the optional branch. If the player declines, we roll back both
-    // below — but since optional branches only execute the body when accepted,
-    // we guard against decline by reading `SWAP_KEY` at field-effect time and
-    // leaving the availability mutation as a matching "reservation / rollback"
-    // pair gated on the same key.
-    //
-    // Simpler: optimistically mutate availability *inside* the field-effect
-    // (where we know the user accepted). To keep that atomic, we forward the
-    // state-mutating portion to the field-effect by stashing a reference to
-    // the state on the card extraData — since extraData is JSON, we avoid
-    // storing the state. Instead, we mutate availability here and roll it
-    // back in a separate deterministic way only if never consumed.
-    //
-    // Easiest correct path: mutate availability here, and if the player
-    // declines the optional seq the roll-back happens because the
-  // `SWAP_KEY` never gets consumed. To close that hole, the selection-effect
-    // ALSO updates state.availableMajorImprovements via a second listener
-    // approach. Given the complexity, we instead keep the swap strictly
-    // local to the owning player; global availability only matters if
-    // another player attempts the same Major on the SAME turn, which cannot
-    // happen (place-farmer is per-turn).
-    writeCardExtraData(context.player, CARD_ID, SWAP_KEY, swap)
-
-    // Remove the new major from the board NOW (will be restored if the player
-    // declines, via the `rollback-swap` field-effect below).
-    context.state.availableMajorImprovements = context.state.availableMajorImprovements.filter(
-      (id) => id !== swap.to,
-    )
+    if (!swap) {
+      return {
+        flow: setFlagFlow(false),
+        sourceCard: CARD_ID,
+      }
+    }
 
     const flow: ActionFlow = {
       type: 'seq',
-      optional: true,
       children: [
+        setFlagFlow(false),
         {
-          type: 'leaf',
-          actionId: 'selection',
-          sourceCard: CARD_ID,
-          actionContext: {
-            selectionKind: 'farm-position',
-            selectionEffect: FIELD_EFFECT,
-            maxSelections: 0,
-            selectableTiles: [],
-            retrainingSwap: swap,
-          },
+          type: 'seq',
+          optional: true,
+          children: [
+            {
+              type: 'leaf',
+              actionId: 'special-effect',
+              sourceCard: CARD_ID,
+              params: {
+                kind: 'swap-improvement-with-board',
+                from: swap.from,
+                to: swap.to,
+              },
+            },
+          ],
         },
       ],
     }
