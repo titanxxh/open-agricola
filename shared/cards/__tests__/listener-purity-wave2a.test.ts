@@ -1,19 +1,29 @@
 import { describe, expect, it } from 'vitest'
 import type { ActionFlow, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
+import { A130_MummysBoy_impl } from '../A/A130_MummysBoy'
 import { A17_ReclamationPlow_impl } from '../A/A17_ReclamationPlow'
+import { B124_Trimmer_impl } from '../B/B124_Trimmer'
+import { B132_EstateMaster_impl } from '../B/B132_EstateMaster'
 import { B137_Wholesaler_impl } from '../B/B137_Wholesaler'
+import { B21_HayloftBarn_impl } from '../B/B21_HayloftBarn'
 import { B55_MaintenancePremium_impl } from '../B/B55_MaintenancePremium'
 import { D156_RetailDealer_impl } from '../D/D156_RetailDealer'
 import { D157_PartyOrganizer_impl } from '../D/D157_PartyOrganizer'
+import { E27_PiggyBank_impl } from '../E/E27_PiggyBank'
 import { E51_WhaleOil_impl } from '../E/E51_WhaleOil'
 import { E91_PlowBuilder_impl } from '../E/E91_PlowBuilder'
 
+const A130 = 'A130_MummysBoy'
 const A17 = 'A17_ReclamationPlow'
+const B124 = 'B124_Trimmer'
+const B132 = 'B132_EstateMaster'
 const B137 = 'B137_Wholesaler'
+const B21 = 'B21_HayloftBarn'
 const B55 = 'B55_MaintenancePremium'
 const D156 = 'D156_RetailDealer'
 const D157 = 'D157_PartyOrganizer'
+const E27 = 'E27_PiggyBank'
 const E51 = 'E51_WhaleOil'
 const E91 = 'E91_PlowBuilder'
 
@@ -173,6 +183,221 @@ const expectCardStatesUnchanged = (
 }
 
 describe('listener purity wave 2a', () => {
+  it('B21 HayloftBarn grain-gain listener returns state-update leaves before reward flow without mutating cardStates', () => {
+    const p = player(B21, {
+      cardStates: { [B21]: { extraData: { foodCount: 1 }, infobox: '1 Food' } },
+      workers: [
+        { id: '1', isActive: true, isNewborn: false },
+        { id: '2', isActive: true, isNewborn: false },
+        { id: '3', isActive: false, isNewborn: false },
+      ],
+    })
+    const ctx = context(p, {
+      actionId: 'gain',
+      result: { type: 'ok', resourcesGained: { grain: 1 } },
+    })
+    const before = snapshot(p)
+
+    const result = listenerById(
+      B21_HayloftBarn_impl.listeners,
+      'B21-hayloft-barn-after-grain-gain',
+    ).handler(ctx)
+
+    expectCardStatesUnchanged(p, before, 'B21 owner')
+    expect(result?.flow?.type).toBe('seq')
+    if (result?.flow?.type !== 'seq') return
+    expect(result.flow.children).toHaveLength(3)
+    expect(leafSummary(result.flow.children[0] as LeafFlow)).toEqual({
+      actionId: 'special-effect',
+      sourceCard: B21,
+      params: { kind: 'set-extra-data', key: 'foodCount', value: 0 },
+    })
+    expect(leafSummary(result.flow.children[1] as LeafFlow)).toEqual({
+      actionId: 'special-effect',
+      sourceCard: B21,
+      params: { kind: 'set-infobox', text: 'Empty' },
+    })
+    const rewardFlow = result.flow.children[2]
+    expect(rewardFlow?.type).toBe('seq')
+    if (rewardFlow?.type !== 'seq') return
+    expect(
+      rewardFlow.children.map((child) => {
+        expect(child.type).toBe('leaf')
+        return leafSummary(child as LeafFlow)
+      }),
+    ).toEqual([
+      { actionId: 'gain', sourceCard: B21, params: { food: 1 } },
+      { actionId: 'family-growth', sourceCard: B21, params: undefined },
+    ])
+    expect((rewardFlow.children[1] as LeafFlow).actionContext).toEqual({ skipRoomCheck: true })
+  })
+
+  it('A130 MummysBoy after-place-farmer listener returns flag leaf without mutating cardStates', () => {
+    const p = player(A130, {
+      occupationPlayed: [A130],
+      minorPlayed: [],
+      workers: [
+        { id: '1', isActive: true, isNewborn: false },
+        { id: '2', isActive: true, isNewborn: false },
+        { id: '3', isActive: true, isNewborn: false },
+      ],
+      cardStates: {
+        [A130]: {},
+        __roundPlacement__: {
+          extraData: {
+            placements: [
+              { spaceId: 'forest', workerId: '1' },
+              { spaceId: 'clay-pit', workerId: '2' },
+            ],
+          },
+        },
+      },
+    })
+    const targetSpace = space('clay-pit', {
+      takenBy: [
+        { playerId: p.id, workerId: '2' },
+        { playerId: p.id, workerId: '3' },
+      ],
+    })
+    const ctx = context(p, {
+      state: {
+        players: [p],
+        actionSpaces: [
+          space('forest', { takenBy: [{ playerId: p.id, workerId: '1' }] }),
+          targetSpace,
+        ],
+        round: 1,
+      } as GameState,
+      actionId: 'place-farmer',
+      space: targetSpace,
+    })
+    const before = snapshot(p)
+
+    const result = listenerById(
+      A130_MummysBoy_impl.listeners,
+      'A130-mummys-boy-after-place-farmer',
+    ).handler(ctx)
+
+    expectCardStatesUnchanged(p, before, 'A130 owner')
+    expectSeqLeaves(result?.flow, [
+      {
+        actionId: 'special-effect',
+        sourceCard: A130,
+        params: { kind: 'set-flag', flag: true },
+      },
+    ])
+  })
+
+  it('E27 PiggyBank update-infobox listener returns infobox leaf without mutating cardStates', () => {
+    const p = player(E27, {
+      cardStates: { [E27]: { counters: { food: 4 }, infobox: 'stale' } },
+    })
+    const ctx = context(p, { actionId: 'store-on-card' })
+    const before = snapshot(p)
+
+    const result = listenerById(
+      E27_PiggyBank_impl.listeners,
+      'E27-piggy-bank-after-store',
+    ).handler(ctx)
+
+    expectCardStatesUnchanged(p, before, 'E27 owner')
+    expectLeaf(result?.flow, {
+      actionId: 'special-effect',
+      sourceCard: E27,
+      params: { kind: 'set-infobox', text: '4 / 6' },
+    })
+  })
+
+  it('B124 Trimmer after-fencing listener returns state-update leaves before optional gain without mutating cardStates', () => {
+    const p = player(B124, {
+      cardStates: { [B124]: { extraData: { pastureArea: 1 }, flagged: false } },
+      pastures: [
+        {
+          id: 'p1',
+          size: 3,
+          tiles: [
+            { row: 0, col: 0 },
+            { row: 0, col: 1 },
+            { row: 0, col: 2 },
+          ],
+          stables: 0,
+          animalType: null,
+          animalCount: 0,
+        },
+      ],
+    })
+    const ctx = context(p, { actionId: 'fencing' })
+    const before = snapshot(p)
+
+    const result = listenerById(
+      B124_Trimmer_impl.listeners,
+      'B124-trimmer-after-fencing',
+    ).handler(ctx)
+
+    expectCardStatesUnchanged(p, before, 'B124 owner')
+    expectSeqLeaves(result?.flow, [
+      {
+        actionId: 'special-effect',
+        sourceCard: B124,
+        params: { kind: 'set-extra-data', key: 'pastureArea', value: 3 },
+      },
+      {
+        actionId: 'special-effect',
+        sourceCard: B124,
+        params: { kind: 'set-flag', flag: true },
+      },
+      { actionId: 'gain', sourceCard: B124, params: { stone: 2 } },
+    ])
+  })
+
+  it('B132 EstateMaster saturation listener returns saturated leaf without mutating cardStates', () => {
+    const p = player(B132, {
+      cardStates: { [B132]: { extraData: { saturated: false } } },
+      roomTiles: Array.from({ length: 15 }, (_, index) => ({
+        row: Math.floor(index / 5),
+        col: index % 5,
+      })),
+    })
+    const ctx = context(p, { actionId: 'construct', phase: 'immediatelyAfter' })
+    const before = snapshot(p)
+
+    const result = listenerById(
+      B132_EstateMaster_impl.listeners,
+      'B132-saturate-after-construct',
+    ).handler(ctx)
+
+    expectCardStatesUnchanged(p, before, 'B132 owner')
+    expectLeaf(result?.flow, {
+      actionId: 'special-effect',
+      sourceCard: B132,
+      params: { kind: 'set-extra-data', key: 'saturated', value: true },
+    })
+  })
+
+  it('B132 EstateMaster reap listener returns bonusVp increment leaf without mutating cardStates', () => {
+    const p = player(B132, {
+      cardStates: { [B132]: { extraData: { saturated: true }, counters: { bonusVp: 1 } } },
+    })
+    const ctx = context(p, {
+      actionId: 'reap',
+      phase: 'immediatelyAfter',
+      extraData: { crop: 'vegetable', amount: 2 },
+    })
+    const before = snapshot(p)
+
+    const result = listenerById(
+      B132_EstateMaster_impl.listeners,
+      'B132-estate-master-reap',
+    ).handler(ctx)
+
+    expectCardStatesUnchanged(p, before, 'B132 owner')
+    expectLeaf(result?.flow, {
+      actionId: 'special-effect',
+      sourceCard: B132,
+      params: { kind: 'increment-counter', key: 'bonusVp', amount: 2 },
+    })
+  })
+
   it('B137 Wholesaler vegetable listener returns state-write leaf before gain without mutating cardStates', () => {
     const p = player(B137, {
       occupationPlayed: [B137],

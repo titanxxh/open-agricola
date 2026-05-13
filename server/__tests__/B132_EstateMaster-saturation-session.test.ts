@@ -6,6 +6,7 @@ import {
   type CardListenerContext,
 } from '../../shared/cards/card-listeners'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
+import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 import type { PlayerState, ActionSpace } from '../../shared/contract/types'
 
 import '../../shared/cards/B/B132_EstateMaster'
@@ -78,10 +79,28 @@ describe('B132_EstateMaster — saturation flag listeners', () => {
 
       const matched = findListenersByAction(action)
       expect(matched.length).toBeGreaterThan(0)
-      executeCardListener(matched[0]!, {
-        state, player, space: createSpace(action),
+      const space = createSpace(action)
+      const result = executeCardListener(matched[0]!, {
+        state, player, space,
         actionId: action, phase: 'immediatelyAfter',
       } as unknown as CardListenerContext)
+
+      expect(readCardExtraData<boolean>(player, CARD_ID, 'saturated')).toBeUndefined()
+      expect(result?.flow).toMatchObject({
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: { kind: 'set-extra-data', key: 'saturated', value: true },
+      })
+      if (result?.flow?.type !== 'leaf') return
+      specialEffectAction.execute({
+        state,
+        player,
+        space,
+        sourceCard: result.flow.sourceCard,
+        params: result.flow.params,
+        actionContext: result.flow.actionContext,
+      })
 
       expect(readCardExtraData<boolean>(player, CARD_ID, 'saturated')).toBe(true)
     })
@@ -95,11 +114,12 @@ describe('B132_EstateMaster — saturation flag listeners', () => {
 
       const matched = findListenersByAction(action)
       expect(matched.length).toBeGreaterThan(0)
-      executeCardListener(matched[0]!, {
+      const result = executeCardListener(matched[0]!, {
         state, player, space: createSpace(action),
         actionId: action, phase: 'immediatelyAfter',
       } as unknown as CardListenerContext)
 
+      expect(result?.flow).toBeUndefined()
       expect(readCardExtraData<boolean>(player, CARD_ID, 'saturated')).toBeUndefined()
     })
   }
