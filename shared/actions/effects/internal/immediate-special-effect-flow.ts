@@ -26,7 +26,7 @@ const executeFlow = (
   space: ActionSpace,
   flow: ActionFlow | undefined,
 ) => {
-  if (!flow || flow.optional) return
+  if (!flow || ('optional' in flow && flow.optional)) return
 
   if (flow.type === 'leaf') {
     if (flow.actionId !== 'special-effect') return
