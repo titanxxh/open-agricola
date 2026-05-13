@@ -520,13 +520,19 @@ anytime                  额外注册的 anytime 行动
 
 ### 7.7 ActivateCardNode + PlayerSwitchNode + ParallelTriggerNode
 
-- 当 `HookDispatcher.getMatchingListeners()` 找到匹配 listener，引擎在 dispatch 阶段（`buildPhaseTrailingNodes` 内）调用 `executeCardListener` **peek 一次** 拿到 `ActionHookResult`，非 `undefined` 结果存到 `ActivateCardNode.preComputedResult` 并直接复用（不重跑 handler）；`undefined` 保持 lazy fallback，让依赖 post-reorg / post-mutation 状态的 listener 在真正推进时重新判断。
-- 当 owner ≠ 当前行动玩家（opponent scope），dispatch 自动在该 owner 的 trigger 组前后插 `PlayerSwitchNode`。`PlayerSwitchNode` 暂停时通过 `confirm-player-switch` interaction 等玩家确认；`undoBoundary` 标记 undo 不能跨切人。
-- **多 listener 同 phase 触发**（BGA-style PARALLEL trigger selection）：
-  - dispatch 阶段静态分析每个 listener 的 flow（`shared/engine/flow-interactivity.ts`：`xor` / `optional` / `altCosts payLeaf` / 含 `interactionRequest` 的 leaf → `interactive`；纯 `gain` / 单路径 `pay` / 全 auto seq → `auto`）。
-  - 同 owner 内分组：mandatory + optional auto 直接串行 `ActivateCardNode`；optional interactive 包成 `ParallelTriggerNode`。
-  - `ParallelTriggerNode.step()` 在 children 未 resolved 且 `selectedChildId === null` 时 emit `kind: 'select-trigger'` InteractionRequest，给卡主玩家选触发顺序（含 `__pass__` 一次性跳过剩余）。玩家选 cardId → `chooseCard` 设 `selectedChildId` → 引擎下一轮 `tree.nextUnresolved` 找到选中 child activate。child 完整结算后（含嵌套子触发的递归 ParallelTriggerNode）`selectedChildId` 自动清空 → 下一轮 step 重新 emit。全部 children resolved 或 `passAll` → 节点 resolved。
-  - `order` 字段已删除（曾经 4 张卡的 `order: 10` hack 全 cleanup）；执行顺序由 `playOrderIndex`（occupation < minor < improvement，数组 index）决定。
+**Lazy dispatch（无 peek）**：dispatch 阶段（`buildPhaseTrailingNodes`）只构造节点，不执行 listener handler。handler 在 `engine.proceed` 推进到对应 `ActivateCardNode` 时通过 `engine-proceed.ts` 的 `activateListener` 分支调用一次——保证 listener 看到 post-mid-interaction 状态、不会双调用，也不会因 dispatch 阶段提前执行而 cache stale flow。`ActivateCardNode` 只持有 `listenerId / cardId / phase / actionId / event`，没有 `preComputedResult`-类缓存字段。
+
+**triggerPlayerId 不变量**：`buildPhaseTrailingNodes` 把 `triggerPlayerId`（触发动作的玩家 id，不是卡主）写进 `event`。`activateListener` 分支用 `event.triggerPlayerId` 在 `state.players` 里查到对应玩家并覆盖 `listenerContext.player`——这样 cross-player listener handler（PS-to-owner wrap 后 `context.player == owner`）也能稳定地拿到 trigger player。
+
+**Cross-player wrap**：当 listener owner ≠ 当前行动玩家（opponent scope），dispatch 自动在该 owner 的 trigger 组前后插 `PlayerSwitchNode`。`PlayerSwitchNode` 暂停时通过 `confirm-player-switch` interaction 等玩家确认；`undoBoundary` 标记 undo 不能跨切人。
+
+**ParallelTriggerNode 总是包裹**（BGA-style 选择层）：
+- `buildPhaseTrailingNodes` 把每个 owner group 的子节点（即使只有 1 个）一律包进 `ParallelTriggerNode`，并把 `mandatory: ml.registration.mandatory !== false`（默认 true）写进每个子 `ActivateCardNode.event`。
+- `ParallelTriggerNode.step()` 在 children 未 resolved 且 `selectedChildId === null` 时通过 `buildSelectOptions()` 构造选项；只有当 **每个** 未 resolved 子节点 `event.mandatory === false` 时才显示 `__pass__`，否则玩家被强制选一个 trigger 触发。
+- **单选自动 resolve**：`buildSelectOptions()` 返回单一非-pass 选项时（典型单 listener mandatory 默认），`step()` 直接设 `selectedChildId` 并 emit `kind: 'continue'`，跳过 UI 选择提示，engine 下一轮自动 activate child。多选 / 显式 optional 才 emit `kind: 'select-trigger'` 让玩家选。
+- child 完整结算后（含嵌套子触发的递归 ParallelTriggerNode）`selectedChildId` 自动清空 → 下一轮 step 重新选剩余 child。全部 children resolved 或 `passAll` → 节点 resolved。
+- 执行顺序由 `playOrderIndex`（occupation < minor < improvement，数组 index）决定。曾经 `CardListenerRegistration.order` 字段以及 4 张卡的 `order: 10` hack 全部 cleanup（顺序选择是玩家在 PARALLEL UI 里做的，不再由后端 `order` 字段隐式串行）。
+- **mandatory 默认 BGA-style true**：listener 不显式设 `mandatory: false` 就被视为必触发。BGA 上玩家可选择拒绝的 listener（A17 ReclamationPlow / A129 Swagman / C82 HardwareStore / D161 CabbageBuyer 等）应显式标 `mandatory: false`，否则 PARALLEL 不展示 PASS 按钮。这部分跨卡 audit 尚未完成，留作 follow-up。
 
 ### 7.8 farm-type 提交
 
