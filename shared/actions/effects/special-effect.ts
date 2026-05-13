@@ -13,6 +13,9 @@ import {
   fieldPopIfDepleted,
 } from '../../domain/field'
 import { clearPendingFenceBonus } from '../../cards/helpers/pending-fence-bonus'
+import { removeFutureMeeples } from './internal/future-meeples'
+import { findFirstNewborn } from '../../domain/player'
+import { removeWorkerRef } from '../../domain/space'
 
 export type SpecialEffectParams =
   | { kind: 'increment-extra-data'; key: string; amount: number }
@@ -24,6 +27,8 @@ export type SpecialEffectParams =
   | { kind: 'set-flag'; flag: boolean }
   | { kind: 'set-infobox'; text: string }
   | { kind: 'clear-pending-fence-bonus' }
+  | { kind: 'remove-future-meeples'; rounds?: number[] }
+  | { kind: 'promote-first-newborn' }
   | { kind: 'remove-field-crop'; crop: 'grain' | 'vegetable'; minRemaining?: number }
   | { kind: 'consume-fence'; count?: number }
   | {
@@ -111,6 +116,24 @@ export const specialEffectAction: ActionDefinition = {
       case 'clear-pending-fence-bonus':
         clearPendingFenceBonus(target)
         return { type: 'ok' }
+      case 'remove-future-meeples':
+        if (!state) return { type: 'fail', logKey: 'log.specialEffectFail' }
+        removeFutureMeeples(state, {
+          playerId: target.id,
+          cardId: sourceCard,
+          rounds: p.rounds,
+        })
+        return { type: 'ok' }
+      case 'promote-first-newborn': {
+        if (!state) return { type: 'fail', logKey: 'log.specialEffectFail' }
+        const newborn = findFirstNewborn(target)
+        if (!newborn) return { type: 'ok' }
+        newborn.isNewborn = false
+        for (const space of state.actionSpaces) {
+          removeWorkerRef(space, target.id, newborn.id)
+        }
+        return { type: 'ok' }
+      }
       case 'remove-field-crop': {
         // Used by C57 Crudite-style "discard 1 crop on top of another" effects.
         // Picks the FIRST player field that has the crop with at least

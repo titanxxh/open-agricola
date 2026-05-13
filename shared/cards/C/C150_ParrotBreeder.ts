@@ -55,6 +55,35 @@ const clearTracker = (owner: PlayerState) => {
   setCardFlag(owner, CARD_ID, false)
 }
 
+const trackerFlow = (
+  right: string | null,
+  targetPlayerId?: string,
+): ActionHookResult => {
+  const actionContext = targetPlayerId ? { targetPlayerId } : undefined
+  return {
+    flow: {
+      type: 'seq',
+      children: [
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: CARD_ID,
+          ...(actionContext ? { actionContext } : {}),
+          params: { kind: 'set-extra-data', key: RIGHT_KEY, value: right },
+        },
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: CARD_ID,
+          ...(actionContext ? { actionContext } : {}),
+          params: { kind: 'set-flag', flag: false },
+        },
+      ],
+    },
+    sourceCard: CARD_ID,
+  }
+}
+
 const afterPlaceFarmerSelfListener: CardListenerRegistration = {
   id: 'C150-parrot-breeder-after-self-place',
   cardIds: [CARD_ID],
@@ -63,7 +92,10 @@ const afterPlaceFarmerSelfListener: CardListenerRegistration = {
   scope: 'player',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     // Owner just placed; consume the flag/tracker pairing.
-    clearTracker(context.player)
+    const flagged = isCardFlagged(context.player, CARD_ID)
+    const right = readCardExtraData<string | null>(context.player, CARD_ID, RIGHT_KEY) ?? null
+    if (!flagged && right === null) return
+    return trackerFlow(null)
   },
 }
 
@@ -79,12 +111,11 @@ const afterPlaceFarmerOpponentListener: CardListenerRegistration = {
     const placer = context.player
     const rightIdx = rightNeighbourIndex(context.state, owner.id)
     const rightId = rightIdx >= 0 ? context.state.players[rightIdx]?.id : undefined
-    if (placer.id === rightId && context.space?.id) {
-      writeCardExtraData(owner, CARD_ID, RIGHT_KEY, context.space.id)
-    } else {
-      writeCardExtraData(owner, CARD_ID, RIGHT_KEY, null)
-    }
-    setCardFlag(owner, CARD_ID, false)
+    const right = placer.id === rightId && context.space?.id ? context.space.id : null
+    const flagged = isCardFlagged(owner, CARD_ID)
+    const currentRight = readCardExtraData<string | null>(owner, CARD_ID, RIGHT_KEY) ?? null
+    if (!flagged && currentRight === right) return
+    return trackerFlow(right, owner.id)
   },
 }
 
