@@ -1,5 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionFlow } from '../../contract/types'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
@@ -24,6 +25,21 @@ const INITIAL_DATA: WholesalerData = {
 const getData = (context: CardListenerContext): WholesalerData =>
   readCardExtraData<WholesalerData>(context.player, CARD_ID, 'wholesaler') ?? { ...INITIAL_DATA }
 
+const setWholesalerDataLeaf = (value: WholesalerData): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: CARD_ID,
+  params: { kind: 'set-extra-data', key: 'wholesaler', value },
+})
+
+const takeRewardFlow = (value: WholesalerData, reward: Parameters<typeof gainLeaf>[1]): ActionFlow => ({
+  type: 'seq',
+  children: [
+    setWholesalerDataLeaf(value),
+    gainLeaf(CARD_ID, reward),
+  ],
+})
+
 /**
  * After using VegetableSeeds, gain 1 vegetable from card.
  */
@@ -36,10 +52,8 @@ const afterVegetableSeedsListener: CardListenerRegistration = {
     if (context.space?.id !== 'vegetable-seeds') return
     const data = getData(context)
     if (data.vegetableTaken) return
-    data.vegetableTaken = true
-    writeCardExtraData(context.player, CARD_ID, 'wholesaler', data)
     return {
-      flow: gainLeaf(CARD_ID, { vegetable: 1 }),
+      flow: takeRewardFlow({ ...data, vegetableTaken: true }, { vegetable: 1 }),
       sourceCard: CARD_ID,
     }
   },
@@ -57,10 +71,8 @@ const afterPigMarketListener: CardListenerRegistration = {
     if (context.space?.id !== 'pig-market') return
     const data = getData(context)
     if (data.boarTaken) return
-    data.boarTaken = true
-    writeCardExtraData(context.player, CARD_ID, 'wholesaler', data)
     return {
-      flow: gainLeaf(CARD_ID, { boar: 1 }),
+      flow: takeRewardFlow({ ...data, boarTaken: true }, { boar: 1 }),
       sourceCard: CARD_ID,
     }
   },
@@ -78,10 +90,8 @@ const afterEasternQuarryListener: CardListenerRegistration = {
     if (context.space?.id !== 'eastern-quarry') return
     const data = getData(context)
     if (data.stoneTaken) return
-    data.stoneTaken = true
-    writeCardExtraData(context.player, CARD_ID, 'wholesaler', data)
     return {
-      flow: gainLeaf(CARD_ID, { stone: 1 }),
+      flow: takeRewardFlow({ ...data, stoneTaken: true }, { stone: 1 }),
       sourceCard: CARD_ID,
     }
   },
@@ -99,10 +109,8 @@ const afterCattleMarketListener: CardListenerRegistration = {
     if (context.space?.id !== 'cattle-market') return
     const data = getData(context)
     if (data.cattleTaken) return
-    data.cattleTaken = true
-    writeCardExtraData(context.player, CARD_ID, 'wholesaler', data)
     return {
-      flow: gainLeaf(CARD_ID, { cattle: 1 }),
+      flow: takeRewardFlow({ ...data, cattleTaken: true }, { cattle: 1 }),
       sourceCard: CARD_ID,
     }
   },

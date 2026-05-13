@@ -1,5 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionFlow } from '../../contract/types'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
@@ -11,6 +12,18 @@ const updateInfobox = (player: Parameters<typeof writeCardInfobox>[0], count: nu
   writeCardInfobox(player, CARD_ID, `${count} Food`)
 }
 
+const specialEffect = (params: Record<string, unknown>): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: CARD_ID,
+  params,
+})
+
+const setStoredFoodFlow = (count: number): ActionFlow[] => [
+  specialEffect({ kind: 'set-extra-data', key: 'foodCount', value: count }),
+  specialEffect({ kind: 'set-infobox', text: `${count} Food` }),
+]
+
 const fishingListener: CardListenerRegistration = {
   id: 'E51-whale-oil-after-collect-fishing',
   cardIds: [CARD_ID],
@@ -21,8 +34,13 @@ const fishingListener: CardListenerRegistration = {
     if (context.space?.id !== 'fishing') return
     const foodCount = readCardExtraData<number>(context.player, CARD_ID, 'foodCount') ?? 0
     const newCount = foodCount + 1
-    writeCardExtraData(context.player, CARD_ID, 'foodCount', newCount)
-    updateInfobox(context.player, newCount)
+    return {
+      flow: {
+        type: 'seq',
+        children: setStoredFoodFlow(newCount),
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 
@@ -34,9 +52,16 @@ const occupationListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const foodCount = readCardExtraData<number>(context.player, CARD_ID, 'foodCount') ?? 0
     if (foodCount <= 0) return
-    writeCardExtraData(context.player, CARD_ID, 'foodCount', 0)
-    updateInfobox(context.player, 0)
-    return { flow: gainLeaf(CARD_ID, { food: foodCount }), sourceCard: CARD_ID }
+    return {
+      flow: {
+        type: 'seq',
+        children: [
+          ...setStoredFoodFlow(0),
+          gainLeaf(CARD_ID, { food: foodCount }),
+        ],
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 
