@@ -1,12 +1,21 @@
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import type { ActionFlow } from '../../contract/types'
+import { isCardFlagged } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { D157_PartyOrganizer } from '../../cards-display/D/D157_PartyOrganizer'
 
 const CARD_ID = D157_PartyOrganizer.id
+
+const setFlagLeaf = (ownerPlayerId?: string): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: CARD_ID,
+  params: { kind: 'set-flag', flag: true },
+  ...(ownerPlayerId ? { actionContext: { targetPlayerId: ownerPlayerId } } : {}),
+})
 
 /**
  * D157 Party Organizer — When an opponent reaches their 5th family member
@@ -23,15 +32,21 @@ const opponentGrowsToFiveListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['family-growth'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (isCardFlagged(context.player, CARD_ID)) return
-    const opponent = context.triggerPlayer
+    const owner = context.ownerPlayer ?? context.effectPlayer ?? context.player
+    if (isCardFlagged(owner, CARD_ID)) return
+    const opponent = context.triggerPlayer ?? context.player
     if (!opponent) return
     // BGA: trigger only at the moment the opponent reaches family of 5.
     if (familySize(opponent) !== 5) return
 
-    setCardFlag(context.player, CARD_ID, true)
     return {
-      flow: gainLeaf(CARD_ID, { food: 8 }),
+      flow: {
+        type: 'seq',
+        children: [
+          setFlagLeaf(owner.id),
+          gainLeaf(CARD_ID, { food: 8 }),
+        ],
+      },
       sourceCard: CARD_ID,
     }
   },

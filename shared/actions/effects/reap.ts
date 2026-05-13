@@ -2,6 +2,7 @@ import type { ActionExecutionResult, GameState, HarvestReapSummary, PlayerState 
 import type { ActionSpace } from '../../contract/types'
 import { fieldTopStack, fieldPopIfDepleted } from '../../domain/field'
 import { runCardListeners } from '../../cards/card-listeners'
+import { executeImmediateSpecialEffectFlows } from './internal/immediate-special-effect-flow'
 
 /**
  * Dispatch a 'reap' synthetic action event to card listeners.
@@ -14,14 +15,16 @@ export const dispatchReapListener = (
   amount: number,
 ): void => {
   if (amount <= 0) return
-  runCardListeners({
+  const space = {} as ActionSpace
+  const results = runCardListeners({
     state,
     player,
-    space: {} as ActionSpace,
+    space,
     actionId: 'reap',
     phase: 'immediatelyAfter',
     extraData: { crop, amount },
   })
+  executeImmediateSpecialEffectFlows({ state, player, space, results })
 }
 
 export const reap = (

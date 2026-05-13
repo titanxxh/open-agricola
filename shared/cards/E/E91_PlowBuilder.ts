@@ -1,5 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionFlow } from '../../contract/types'
 import { isCardFlagged, setCardFlag, readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
@@ -10,6 +11,13 @@ const CARD_ID = E91_PlowBuilder.id
 const JOINERY_SOURCE_PREFIX = 'Major_Joinery'
 
 const HARVEST_ROUNDS = [4, 7, 9, 11, 13, 14]
+
+const specialEffect = (params: Record<string, unknown>): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: CARD_ID,
+  params,
+})
 
 /**
  * BGA isListeningTo: catches Exchange events; if `trade.sourceId` belongs to
@@ -27,7 +35,10 @@ const tradeAppliedListener: CardListenerRegistration = {
     const sourceId = context.extraData?.sourceId
     if (typeof sourceId !== 'string') return
     if (!sourceId.startsWith(JOINERY_SOURCE_PREFIX)) return
-    writeCardExtraData(context.player, CARD_ID, 'usedJoinery', true)
+    return {
+      flow: specialEffect({ kind: 'set-extra-data', key: 'usedJoinery', value: true }),
+      sourceCard: CARD_ID,
+    }
   },
 }
 

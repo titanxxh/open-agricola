@@ -25,6 +25,7 @@ import type { CardExchange, ExchangeWindow } from '../../contract/cards'
 import { getMajorCard } from '../../cards/major'
 import { collectComputeExchanges, runCardListeners } from '../../cards/card-listeners'
 import { isMajorCardId } from '../../cards/helpers/card-type'
+import { executeImmediateSpecialEffectFlows } from './internal/immediate-special-effect-flow'
 
 const scaleResources = (resources: Partial<Resource>, times: number) => {
   const scaled: Partial<Resource> = {}
@@ -121,14 +122,16 @@ export const dispatchTradeAppliedListener = (
   if (times <= 0) return
   const sourceId = trade.sourceId ?? trade.source ?? null
   if (!sourceId) return
-  runCardListeners({
+  const space = {} as ActionSpace
+  const results = runCardListeners({
     state,
     player,
-    space: {} as ActionSpace,
+    space,
     actionId: 'trade-applied',
     phase: 'immediatelyAfter',
     extraData: { sourceId, times },
   })
+  executeImmediateSpecialEffectFlows({ state, player, space, results })
 }
 
 /**
