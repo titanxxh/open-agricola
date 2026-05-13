@@ -375,6 +375,92 @@ describe('FarmBoard', () => {
     expect(html).toContain('-80-0-sow-choice')
   })
 
+  it('renders 2 wood stacks on D75 card when extraData.stacks has 2 entries', () => {
+    const player: PlayerState = {
+      ...createPlayer('p1', 'Player A', 'red'),
+      minorPlayed: ['D75_WoodField'],
+      cardStates: {
+        D75_WoodField: {
+          counters: {},
+          infobox: undefined,
+          stack: [],
+          extraData: {
+            stacks: [
+              { kind: 'wood', remaining: 3 },
+              { kind: 'wood', remaining: 2 },
+            ],
+          },
+        },
+      },
+    }
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        locale="en"
+        players={[player]}
+        currentPlayer={player}
+        displayPlayer={player}
+        devMode={false}
+        currentStartPlayerId=""
+        nextStartPlayerId=""
+        playedCards={['minor:D75_WoodField']}
+        farmCells={[]}
+        roomPositions={new Set()}
+        fieldPositions={new Set()}
+        fieldMap={new Map()}
+        stablePositions={new Set()}
+        pendingRoomSet={new Set()}
+        pendingStableSet={new Set()}
+        roomSelectableSet={new Set()}
+        stableSelectableSet={new Set()}
+        maxStableSelections={0}
+        plowSelectableSet={new Set()}
+        pendingPlowTile={null}
+        positionSelectableSet={new Set()}
+        pendingPositionSelections={new Set()}
+        togglePositionSelection={() => {}}
+        pendingSowSelections={{}}
+        sowRemaining={{ grain: 0, vegetable: 0, wood: 0, stone: 0 }}
+        sowSelectableMap={new Map()}
+        pastureTiles={new Map()}
+        pastureDisplayMap={new Map()}
+        pastureCapacityMap={new Map()}
+        houseDisplay={{ animalType: null, animalCount: 0 }}
+        stableDisplayMap={new Map()}
+        isReorgActive={false}
+        reorgRemaining={null}
+        hasReorgOverflow={false}
+        animalReorg={null}
+        pendingFenceSet={new Set()}
+        existingFenceSet={new Set()}
+        fenceSelectableSet={new Set()}
+        toggleRoomTile={() => {}}
+        toggleStableTile={() => {}}
+        togglePlowTile={() => {}}
+        updateSowSelection={() => {}}
+        toggleFenceEdge={() => {}}
+        adjustReorgAnimal={() => {}}
+        confirmAnimalReorg={() => {}}
+        cancelAnimalDiscardPrompt={() => {}}
+        setViewPlayerId={() => {}}
+        isSelectingMinor={false}
+        isSelectingOccupation={false}
+        isSelectingImprovementAny={false}
+        selectableMinorIds={new Set()}
+        selectableOccupationIds={new Set()}
+        cardAvailability={{}}
+        futureCardResources={{}}
+        resolveChoice={() => {}}
+        isInteractive={true}
+        {...({ extraSowTargets: [] } as any)}
+      />,
+    )
+
+    // Each stack renders a separate `field-crop-segment` span. With 2 wood
+    // stacks we expect 2 segments to be present (multi-stack render path).
+    const segments = html.match(/field-crop-segment/g) ?? []
+    expect(segments.length).toBeGreaterThanOrEqual(2)
+  })
 })
 
 // ---------------------------------------------------------------------------

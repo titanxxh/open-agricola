@@ -1118,12 +1118,17 @@ export const FarmBoard = ({
           const resourceStats = readCardResourceStats(displayPlayer, rawId)
           const cardStack = displayPlayer.cardStates?.[rawId]?.stack ?? []
           const rawCardCrop = displayPlayer.cardStates?.[rawId]?.extraData?.cardCrop as
-            | { crop: 'grain' | 'vegetable'; remaining: number }
+            | { crop: 'grain' | 'vegetable' | 'wood'; remaining: number }
+            | undefined
+          const rawStacks = displayPlayer.cardStates?.[rawId]?.extraData?.stacks as
+            | { kind: 'grain' | 'vegetable' | 'wood' | 'stone'; remaining: number }[]
             | undefined
           const cardStacks: CropStack[] | null =
-            rawCardCrop && rawCardCrop.remaining > 0
-              ? [{ kind: rawCardCrop.crop, remaining: rawCardCrop.remaining }]
-              : null
+            rawStacks && rawStacks.length > 0
+              ? rawStacks.map((s) => ({ kind: s.kind, remaining: s.remaining }))
+              : rawCardCrop && rawCardCrop.remaining > 0
+                ? [{ kind: rawCardCrop.crop, remaining: rawCardCrop.remaining }]
+                : null
           const internalKeys = new Set(['usedRound'])
           const displayCounters = Object.fromEntries(
             Object.entries(cardStateCounters).filter(([key, count]) => !internalKeys.has(key) && count > 0),
