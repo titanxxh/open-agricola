@@ -126,7 +126,6 @@ export function getNodeSourceCard(node: EngineNode): string | undefined {
  */
 export function getFlowSourceCard(flow: ActionFlow): string | undefined {
   if (flow.type === 'leaf') return flow.sourceCard
-  if (flow.type === 'playerSwitch') return undefined
   const sourceCards = [...new Set(
     flow.children
       .map((child) => getFlowSourceCard(child))
