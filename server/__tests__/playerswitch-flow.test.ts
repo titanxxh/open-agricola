@@ -4,14 +4,14 @@ import type { ActionFlow } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 /**
- * Tests for ActionFlow playerSwitch support with lazy confirmation.
+ * Tests for ActionFlow targetPlayerId metadata with lazy confirmation.
  *
  * These tests directly set up a flow engine on the session to verify:
  * 1. Auto-gain after switch completes without confirmPlayerSwitch
  * 2. Choice after switch shows confirmPlayerSwitch first (lazy confirmation)
  * 3. Multiple ok steps then choice still shows confirmPlayerSwitch
  */
-describe('ActionFlow playerSwitch', () => {
+describe('ActionFlow targetPlayerId', () => {
   const setupSession = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -72,16 +72,13 @@ describe('ActionFlow playerSwitch', () => {
   it('auto-gain after switch completes without confirmPlayerSwitch', () => {
     const session = setupSession()
     const state = session.getState().state
-    const p1 = state.players[0]!
     const p2 = state.players[1]!
     const p2FoodBefore = p2.resources.food
 
     const flow: ActionFlow = {
       type: 'seq',
       children: [
-        { type: 'playerSwitch', targetPlayerId: p2.id },
-        { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: 'TestAutoGain' },
-        { type: 'playerSwitch', targetPlayerId: p1.id },
+        { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: 'TestAutoGain', targetPlayerId: p2.id },
       ],
     }
 
@@ -97,21 +94,19 @@ describe('ActionFlow playerSwitch', () => {
   it('choice after switch shows confirmPlayerSwitch first (lazy confirmation)', () => {
     const session = setupSession()
     const state = session.getState().state
-    const p1 = state.players[0]!
     const p2 = state.players[1]!
 
     const flow: ActionFlow = {
       type: 'seq',
       children: [
-        { type: 'playerSwitch', targetPlayerId: p2.id },
         {
           type: 'xor',
+          targetPlayerId: p2.id,
           children: [
             { type: 'leaf', actionId: 'gain', params: { sheep: 2 }, sourceCard: 'TestChoice', choiceLabelKey: 'sheep' },
             { type: 'leaf', actionId: 'gain', params: { food: 2 }, sourceCard: 'TestChoice', choiceLabelKey: 'food' },
           ],
         },
-        { type: 'playerSwitch', targetPlayerId: p1.id },
       ],
     }
 
@@ -133,7 +128,6 @@ describe('ActionFlow playerSwitch', () => {
   it('multiple ok steps then choice still shows confirmPlayerSwitch', () => {
     const session = setupSession()
     const state = session.getState().state
-    const p1 = state.players[0]!
     const p2 = state.players[1]!
     const p2FoodBefore = p2.resources.food
     const p2WoodBefore = p2.resources.wood
@@ -141,17 +135,16 @@ describe('ActionFlow playerSwitch', () => {
     const flow: ActionFlow = {
       type: 'seq',
       children: [
-        { type: 'playerSwitch', targetPlayerId: p2.id },
-        { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: 'TestMulti' },
-        { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: 'TestMulti' },
+        { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: 'TestMulti', targetPlayerId: p2.id },
+        { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: 'TestMulti', targetPlayerId: p2.id },
         {
           type: 'xor',
+          targetPlayerId: p2.id,
           children: [
             { type: 'leaf', actionId: 'gain', params: { sheep: 1 }, sourceCard: 'TestMulti', choiceLabelKey: 'sheep' },
             { type: 'leaf', actionId: 'gain', params: { clay: 1 }, sourceCard: 'TestMulti', choiceLabelKey: 'clay' },
           ],
         },
-        { type: 'playerSwitch', targetPlayerId: p1.id },
       ],
     }
 

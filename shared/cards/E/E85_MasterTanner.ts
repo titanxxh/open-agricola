@@ -1,6 +1,6 @@
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { readCardExtraData, writeCardExtraData, getCardStack } from '../helpers/card-state'
+import { readCardExtraData, getCardStack } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
@@ -14,8 +14,26 @@ const beforeExchangeListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['exchange'],
   handler: (context): ActionHookResult | void => {
-    writeCardExtraData(context.player, CARD_ID, 'boarBefore', context.player.resources.boar)
-    writeCardExtraData(context.player, CARD_ID, 'cattleBefore', context.player.resources.cattle)
+    return {
+      flow: {
+        type: 'seq',
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'set-extra-data', key: 'boarBefore', value: context.player.resources.boar },
+          },
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'set-extra-data', key: 'cattleBefore', value: context.player.resources.cattle },
+          },
+        ],
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 

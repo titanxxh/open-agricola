@@ -2,7 +2,7 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionFlow } from '../../contract/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionSpace, PlayerState, Pasture } from '../../contract/types'
-import { isCardFlagged, setCardFlag, writeCardInfobox } from '../helpers/card-state'
+import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { A17_ReclamationPlow } from '../../cards-display/A/A17_ReclamationPlow'
 
@@ -38,6 +38,13 @@ const buildReclamationPlowUseFlow = (): ActionFlow => ({
   optional: true,
   promptKey: 'ui.interactionReclamationPlow',
   choiceLabelKey: 'ui.interactionReclamationPlowUse',
+})
+
+const specialEffect = (params: Record<string, unknown>): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: CARD_ID,
+  params,
 })
 
 const reclamationPlowAfterCollectListener: CardListenerRegistration = {
@@ -77,8 +84,16 @@ const reclamationPlowAfterPlowListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.sourceCard !== CARD_ID) return
     if (isCardFlagged(context.player, CARD_ID)) return
-    setCardFlag(context.player, CARD_ID, true)
-    writeCardInfobox(context.player, CARD_ID, USED_INFOBOX)
+    return {
+      flow: {
+        type: 'seq',
+        children: [
+          specialEffect({ kind: 'set-flag', flag: true }),
+          specialEffect({ kind: 'set-infobox', text: USED_INFOBOX }),
+        ],
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 

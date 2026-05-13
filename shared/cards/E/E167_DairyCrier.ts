@@ -8,40 +8,31 @@ const CARD_ID = E167_DairyCrier.id
 export const E167_DairyCrier_impl = {
   effect: {
   id: CARD_ID,
-  onBuy: (state, player) => {
+  onBuy: (state, _player) => {
     const children: ActionFlow[] = [gainLeaf(CARD_ID, { cattle: 1 })]
 
     // Each player chooses 2 sheep or 2 food
     for (const p of state.players) {
-      if (p.id !== player.id) {
-        children.push({ type: 'playerSwitch', targetPlayerId: p.id })
-      }
       children.push({
         type: 'xor',
         optional: true,
         promptKey: 'ui.interactionDairyCrierChoice',
+        targetPlayerId: p.id,
         children: [
           {
             type: 'leaf',
             actionId: 'gain',
             params: { sheep: 2 },
             sourceCard: CARD_ID,
-            choiceLabelKey: 'ui.interactionResourceExchange',
-            choiceLabelParams: { resourcesPaid: {}, resourcesGained: { sheep: 2 } },
           },
           {
             type: 'leaf',
             actionId: 'gain',
             params: { food: 2 },
             sourceCard: CARD_ID,
-            choiceLabelKey: 'ui.interactionResourceExchange',
-            choiceLabelParams: { resourcesPaid: {}, resourcesGained: { food: 2 } },
           },
         ],
       })
-      if (p.id !== player.id) {
-        children.push({ type: 'playerSwitch', targetPlayerId: player.id })
-      }
     }
 
     return { type: 'seq', children }

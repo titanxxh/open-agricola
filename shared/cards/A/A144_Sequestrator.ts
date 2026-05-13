@@ -1,6 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { setStoredResource, takeStoredResource } from '../helpers/card-storage'
+import { getStoredResource, setStoredResource } from '../helpers/card-storage'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { A144_Sequestrator } from '../../cards-display/A/A144_Sequestrator'
@@ -24,16 +24,26 @@ const createStorageReleaseListener = (params: {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const owner = getOwner(context)
     if (!owner || !params.shouldTrigger(context.player)) return
-    const amount = takeStoredResource(owner, CARD_ID, params.resource)
+    const amount = getStoredResource(owner, CARD_ID, params.resource)
     if (amount <= 0) return
-    const gain = { [params.resource]: amount } as Partial<Resource>
-    // Give resources directly to the acting player (who met the threshold),
-    // not the card owner — returning a flow would PlayerSwitch to the owner.
-    const target = context.player
-    target.resources[params.resource] = (target.resources[params.resource] ?? 0) + amount
     return {
-      logKey: 'log.cardEffectGain',
-      logParams: { gain, cardId: CARD_ID },
+      flow: {
+        type: 'seq',
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'set-counter', key: params.resource, value: 0 },
+          },
+          {
+            type: 'leaf',
+            actionId: 'gain',
+            sourceCard: CARD_ID,
+            params: { [params.resource]: amount, recipientPlayerId: context.player.id },
+          },
+        ],
+      },
       sourceCard: CARD_ID,
     }
   },

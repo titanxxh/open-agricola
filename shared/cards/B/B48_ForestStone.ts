@@ -1,5 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionFlow, PlayerState } from '../../contract/types'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
@@ -7,9 +8,30 @@ import { B48_ForestStone } from '../../cards-display/B/B48_ForestStone'
 
 const CARD_ID = B48_ForestStone.id
 
-const updateInfobox = (player: Parameters<typeof writeCardInfobox>[0], count: number) => {
+const updateInfobox = (player: PlayerState, count: number) => {
   writeCardInfobox(player, CARD_ID, `${count} Food`)
 }
+
+const setStoredFoodFlow = (count: number): ActionFlow[] => [
+  {
+    type: 'leaf',
+    actionId: 'special-effect',
+    sourceCard: CARD_ID,
+    params: { kind: 'set-extra-data', key: 'foodCount', value: count },
+  },
+  {
+    type: 'leaf',
+    actionId: 'special-effect',
+    sourceCard: CARD_ID,
+    params: { kind: 'set-counter', key: 'foodCount', value: count },
+  },
+  {
+    type: 'leaf',
+    actionId: 'special-effect',
+    sourceCard: CARD_ID,
+    params: { kind: 'set-infobox', text: `${count} Food` },
+  },
+]
 
 const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =>
   (space?.gainPerRound?.wood ?? 0) > 0
@@ -27,9 +49,16 @@ const woodCollectListener: CardListenerRegistration = {
     const foodCount = readCardExtraData<number>(context.player, CARD_ID, 'foodCount') ?? 0
     if (foodCount <= 0) return
     const newCount = foodCount - 1
-    writeCardExtraData(context.player, CARD_ID, 'foodCount', newCount)
-    updateInfobox(context.player, newCount)
-    return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
+    return {
+      flow: {
+        type: 'seq',
+        children: [
+          ...setStoredFoodFlow(newCount),
+          gainLeaf(CARD_ID, { food: 1 }),
+        ],
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 
@@ -42,8 +71,13 @@ const stoneCollectListener: CardListenerRegistration = {
     if (!isStoneAccumulationSpace(context.space)) return
     const foodCount = readCardExtraData<number>(context.player, CARD_ID, 'foodCount') ?? 0
     const newCount = foodCount + 2
-    writeCardExtraData(context.player, CARD_ID, 'foodCount', newCount)
-    updateInfobox(context.player, newCount)
+    return {
+      flow: {
+        type: 'seq',
+        children: setStoredFoodFlow(newCount),
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 

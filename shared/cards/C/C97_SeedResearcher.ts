@@ -26,8 +26,6 @@ export const C97_SeedResearcher_impl = {
           children: [
             { type: 'leaf', actionId: 'gain', params: { food: 2 }, sourceCard: CARD_ID },
           ],
-          choiceLabelKey: 'ui.interactionResourceExchange',
-          choiceLabelParams: { resourcesGained: { food: 2 } },
         },
         {
           type: 'seq',

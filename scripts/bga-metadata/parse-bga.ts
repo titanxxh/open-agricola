@@ -51,13 +51,46 @@ function parseCost(rawValue: string): { cost?: Record<string, number>; altCosts?
   return { cost: parseResourceMap(trimmed) }
 }
 
+// Match a PHP-style quoted string while honoring `\'` / `\"` escapes:
+// the closing quote must match the opening quote type and not be backslash-
+// escaped. Returns the inner literal with the matching escape removed.
+function matchQuotedLiteral(input: string): { literal: string; raw: string } | null {
+  const open = input[0]
+  if (open !== "'" && open !== '"') return null
+  let i = 1
+  while (i < input.length) {
+    const ch = input[i]
+    if (ch === '\\') { i += 2; continue }
+    if (ch === open) {
+      const raw = input.slice(0, i + 1)
+      const inner = input.slice(1, i)
+      // Strip PHP escape backslashes before quote characters (handles both
+      // `\'` in single-quoted strings and vestigial `\"` copied into single-
+      // quoted strings — BGA source uses both inconsistently).
+      const literal = inner.replace(/\\(['"])/g, '$1')
+      return { literal, raw }
+    }
+    i += 1
+  }
+  return null
+}
+
 function unwrapClientTranslate(value: string): string {
-  const m = value.match(/clienttranslate\(\s*['"](.*?)['"]\s*\)/)
-  if (m) return m[1]
-  const parenStr = value.match(/^\(\s*['"](.+?)['"]\s*\)$/)
-  if (parenStr) return parenStr[1]
-  const sm = value.match(/^['"](.*?)['"]$/)
-  return sm ? sm[1] : value
+  const ct = value.match(/clienttranslate\(\s*/)
+  if (ct) {
+    const tail = value.slice(ct.index! + ct[0].length)
+    const quoted = matchQuotedLiteral(tail)
+    if (quoted) return quoted.literal
+  }
+  const paren = value.match(/^\(\s*/)
+  if (paren) {
+    const tail = value.slice(paren[0].length)
+    const quoted = matchQuotedLiteral(tail)
+    if (quoted) return quoted.literal
+  }
+  const direct = matchQuotedLiteral(value.trim())
+  if (direct) return direct.literal
+  return value
 }
 
 export function parseBgaCard(phpPath: string): BgaCard {

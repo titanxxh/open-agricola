@@ -28,7 +28,12 @@ import {
   getReplaceAwareChoiceLabel,
 } from './nodes/interaction-helpers'
 import type { EngineNode, EngineStepResult } from './types'
-import { getListenerById, executeCardListener, shouldSkipImmediateListenerLog, type MatchedCardListener } from '../cards/card-listeners'
+import {
+  executeCardListener,
+  getListenerById,
+  shouldSkipImmediateListenerLog,
+  type CardListenerContext,
+} from '../cards/card-listeners'
 import { incCardUsed } from '../cards/helpers/card-state'
 import type { ReorganizeTrigger } from '../actions/effects/reorganize'
 import type { EngineInternals } from './engine-internals'
@@ -394,36 +399,39 @@ export function engineProceed(
   }
   if (leafStep.kind === 'activateListener' && node instanceof ActivateCardNode) {
     const ownerPlayerId = node.event.ownerPlayerId as string | undefined
-    let result: import('../actions/hooks').ActionHookResult | undefined
-    if (node.preComputedResult !== undefined) {
-      result = node.preComputedResult
-    } else {
-      const listener = getListenerById(node.listenerId)
-      if (!listener) {
-        node.resolve({})
-        return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
-      }
-      const listenerContext = {
-        state: context.state,
-        player: context.player,
-        space: context.space,
-        actionId: node.actionId,
-        phase: node.phase,
-        ...node.event,
-      }
-      result = executeCardListener(listener, listenerContext as import('../cards/card-listeners').CardListenerContext, {
-        ownerPlayerId,
-      })
+    const triggerPlayerId = node.event.triggerPlayerId as string | undefined
+    const listener = getListenerById(node.listenerId)
+    if (!listener) {
+      node.resolve({})
+      return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
     }
+    const triggerPlayer =
+      (triggerPlayerId
+        ? context.state.players.find((player) => player.id === triggerPlayerId)
+        : null) ?? context.player
     const effectPlayer =
       (ownerPlayerId
         ? context.state.players.find((player) => player.id === ownerPlayerId)
-        : null) ?? context.player
+        : null) ?? triggerPlayer
+    const listenerContext: CardListenerContext = {
+      state: context.state,
+      player: triggerPlayer,
+      triggerPlayer,
+      ownerPlayer: effectPlayer,
+      effectPlayer,
+      space: context.space,
+      actionId: node.actionId,
+      phase: node.phase,
+      ...node.event,
+    }
+    const result = executeCardListener(listener, listenerContext, {
+      ownerPlayerId,
+    })
     // Track BGA-style per-card `used` stat: count a use only when the
     // listener actually returned an effect (flow / followUp / decision /
     // log etc.). Pure no-op fires (handler returned undefined / void) and
     // universal listeners without a cardId are skipped.
-    if (node.cardId && result) {
+    if (node.cardId && result && result.countCardUse !== false) {
       incCardUsed(effectPlayer, node.cardId)
     }
     const normalizedFollowUps = (result?.followUpActions ?? []).map((followUp) =>
@@ -440,6 +448,7 @@ export function engineProceed(
       if (result?.flow) {
         const flowNode = buildFlowNode(int,
           applyFallbackSourceCardToFlow(result.flow, result.sourceCard),
+          effectPlayer.id,
         )
         if (node.phase === 'before') {
           collectNodeIds(flowNode, int.beforePhaseFlowNodeIds)
@@ -482,6 +491,7 @@ export function engineProceed(
           ),
           replacedActionId,
         ),
+        context.player.id,
       )
       int.tree.insertAfter(node.id, [flowNode])
       node.resolve({ type: 'ok' })
@@ -542,15 +552,7 @@ export function engineProceed(
         replacedActionId,
         context.state,
         beforeBaseEvent,
-        (ml: MatchedCardListener) => ({
-          state: context.state,
-          player: context.player,
-          space: context.space,
-          actionId: replacedActionId,
-          phase: 'before' as const,
-          ...beforeBaseEvent,
-          ownerPlayerId: ml.ownerPlayerId,
-        }),
+        executionContext.player.id,
       )
       if (beforeActivateNodes.length > 0 && !node.beforePhaseResolved) {
         node.beforePhaseResolved = true
@@ -748,7 +750,7 @@ export function engineProceed(
         ? applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
         : null)
       .filter((flow) => flow)
-      .map((flow) => buildFlowNode(int, flow as ActionFlow))
+      .map((flow) => buildFlowNode(int, flow as ActionFlow, context.player.id))
     const followUps = allActionHookResults
       .flatMap((entry) =>
         (entry.followUpActions ?? []).map((followUp) =>
@@ -764,15 +766,7 @@ export function engineProceed(
       replacedActionId,
       context.state,
       proceedBaseEvent,
-      (ml: MatchedCardListener) => ({
-        state: context.state,
-        player: context.player,
-        space: context.space,
-        actionId: replacedActionId,
-        phase: 'immediatelyAfter' as const,
-        ...proceedBaseEvent,
-        ownerPlayerId: ml.ownerPlayerId,
-      }),
+      executionContext.player.id,
     )
     const afterActivateNodes = buildPhaseTrailingNodes(
       int,
@@ -781,15 +775,7 @@ export function engineProceed(
       replacedActionId,
       context.state,
       proceedBaseEvent,
-      (ml: MatchedCardListener) => ({
-        state: context.state,
-        player: context.player,
-        space: context.space,
-        actionId: replacedActionId,
-        phase: 'after' as const,
-        ...proceedBaseEvent,
-        ownerPlayerId: ml.ownerPlayerId,
-      }),
+      executionContext.player.id,
     )
     // 7b1: when the action returns a `flow`, the wrapper action's `after`
     // / `immediatelyAfter` listeners (and follow-ups) must observe the
@@ -807,7 +793,7 @@ export function engineProceed(
       ...hookFlows,
     ]
     if (result.type === 'flow') {
-      const flowNode = buildFlowNode(int, result.flow)
+      const flowNode = buildFlowNode(int, result.flow, context.player.id)
       // Insertion order: trailing hooks first (deepest behind), then flow
       // body, then leading nodes. insertAfter prepends each batch to
       // node.id+1, so the resulting child layout is:

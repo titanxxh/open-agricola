@@ -81,7 +81,7 @@ import { getCardEffect } from '../cards/card-effects.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
 import { runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks } from '../cards/card-effects.ts'
 import { positionKey } from '../domain/farm.ts'
-import { getMatchingListeners, executeCardListener, type MatchedCardListener } from '../cards/card-listeners.ts'
+import { getMatchingListeners, executeCardListener } from '../cards/card-listeners.ts'
 import { buildPhaseTrailingNodes } from '../engine/engine-utils.ts'
 import { Scoring, playerBoard, type PlayerScoreSummary } from '../domain'
 import { reap } from '../actions/effects/reap.ts'
@@ -640,8 +640,8 @@ export class GameCore {
 
   private restoreEngineStackFromCursor(cursor: EngineStackCursor): void {
     if (!cursor || cursor.frames.length === 0) return
-    this.engineStack = EngineStack.fromCursor(cursor, (source, snapshot) => {
-      const engine = this.createEngineFromSource(source)
+    this.engineStack = EngineStack.fromCursor(cursor, (source, snapshot, frame) => {
+      const engine = this.createEngineFromSource(source, frame.ownerPlayerIndex)
       engine.restore(snapshot)
       return engine
     })
@@ -719,9 +719,22 @@ export class GameCore {
     setupPhase.updatePlayerName(this.state.players[playerIndex], name)
   }
 
-  private buildEngineNode(flow: ActionFlow, counter: { value: number }): EngineNode {
-    if (flow.type === 'playerSwitch') {
-      return new PlayerSwitchNode(`ps-${counter.value++}`, flow.targetPlayerId)
+  private buildEngineNode(
+    flow: ActionFlow,
+    counter: { value: number },
+    ownerPlayerId?: string,
+  ): EngineNode {
+    if (flow.targetPlayerId) {
+      const { targetPlayerId, ...innerFlow } = flow
+      const scopedNode = this.buildEngineNode(innerFlow as ActionFlow, counter, targetPlayerId)
+      if (!ownerPlayerId || ownerPlayerId === targetPlayerId) {
+        return scopedNode
+      }
+      return new SequenceNode(`seq-target-${counter.value++}`, [
+        new PlayerSwitchNode(`ps-to-${counter.value++}`, targetPlayerId),
+        scopedNode,
+        new PlayerSwitchNode(`ps-back-${counter.value++}`, ownerPlayerId),
+      ])
     }
     if (flow.type === 'leaf') {
       const actionNode = new ActionNode(
@@ -746,7 +759,7 @@ export class GameCore {
         : actionNode
     }
 
-    const children = flow.children.map((child) => this.buildEngineNode(child, counter))
+    const children = flow.children.map((child) => this.buildEngineNode(child, counter, ownerPlayerId))
     if (flow.type === 'seq') {
       const seq = new SequenceNode(`seq-${counter.value++}`, children)
       return flow.optional ? new OptionalNode(`opt-${counter.value++}`, seq, flow.promptKey) : seq
@@ -793,11 +806,6 @@ export class GameCore {
     })
     const internals = stagingEngine._internals()
 
-    const buildCtx = (ml: MatchedCardListener) => ({
-      ...context,
-      ownerPlayerId: ml.ownerPlayerId,
-    })
-
     const nodes = buildPhaseTrailingNodes(
       internals,
       matched,
@@ -805,7 +813,7 @@ export class GameCore {
       'place-farmer',
       this.state,
       {},
-      buildCtx,
+      context.player.id,
     )
     if (nodes.length === 0) return false
 
@@ -827,10 +835,14 @@ export class GameCore {
     return true
   }
 
-  private createFlowEngine(flow: ActionFlow): Engine {
+  private createFlowEngine(
+    flow: ActionFlow,
+    ownerPlayerIndex = this.activePlayerIndex ?? this.state.currentPlayerIndex,
+  ): Engine {
     const counter = { value: 0 }
+    const ownerPlayerId = this.state.players[ownerPlayerIndex]?.id
     return new Engine({
-      tree: new EngineTree(this.buildEngineNode(flow, counter)),
+      tree: new EngineTree(this.buildEngineNode(flow, counter, ownerPlayerId)),
       registry: this.registry,
       hooks: this.hookDispatcher,
       log: this.engineLog,
@@ -850,7 +862,7 @@ export class GameCore {
       actionContext: { trigger },
     }
     this.engineStack.push({
-      engine: this.createFlowEngine(flow),
+      engine: this.createFlowEngine(flow, playerIndex),
       source: { kind: 'flow', flow },
       ownerPlayerIndex: playerIndex,
       spaceId: subflowSpaceId('reorganize'),
@@ -879,7 +891,7 @@ export class GameCore {
     reason: SubFlowReason,
   ): void {
     const flow: ActionFlow = { type: 'leaf', actionId: INTERACTION_ONLY_ACTION_ID }
-    const engine = this.createFlowEngine(flow)
+    const engine = this.createFlowEngine(flow, ownerPlayerIndex)
     engine.injectInteraction(node)
     this.engineStack.push({
       engine,
@@ -909,12 +921,15 @@ export class GameCore {
     roundPhase.startFeedSubFlow(this, playerIndex, remaining, foodUsed, feedQueue)
   }
 
-  private createEngine(actionId: string): Engine {
+  private createEngine(
+    actionId: string,
+    ownerPlayerIndex = this.state.currentPlayerIndex,
+  ): Engine {
     const action = this.registry.get(actionId)
     const counter = { value: 0 }
     const an = new ActionNode(`action-${actionId}`, actionId)
     const root = action?.flow
-      ? this.buildEngineNode(action.flow, counter)
+      ? this.buildEngineNode(action.flow, counter, this.state.players[ownerPlayerIndex]?.id)
       : action?.resolveChoice
         ? new SequenceNode(`seq-${actionId}`, [an, new InteractionNode(`choice-${actionId}`, [])])
         : an
@@ -926,10 +941,13 @@ export class GameCore {
     })
   }
 
-  private createEngineFromSource(source: EngineSource): Engine {
+  private createEngineFromSource(
+    source: EngineSource,
+    ownerPlayerIndex = this.state.currentPlayerIndex,
+  ): Engine {
     return source.kind === 'action'
-      ? this.createEngine(source.actionId)
-      : this.createFlowEngine(source.flow)
+      ? this.createEngine(source.actionId, ownerPlayerIndex)
+      : this.createFlowEngine(source.flow, ownerPlayerIndex)
   }
 
   private clonePlayer(p: PlayerState): PlayerState {
@@ -1610,7 +1628,7 @@ export class GameCore {
     // null-checks on activeSpaceId/activePlayerIndex were defensive but
     // redundant. Use a non-null assertion on the two synced fields.
     if (source) {
-      const engine = this.createEngineFromSource(source)
+      const engine = this.createEngineFromSource(source, entry.activePlayerIndex!)
       if (entry.engineSnapshot) {
         engine.restore(entry.engineSnapshot)
       }
@@ -1866,7 +1884,7 @@ export class GameCore {
     nextCardIndex: number,
   ) {
     this.engineStack.push({
-      engine: this.createFlowEngine(flow),
+      engine: this.createFlowEngine(flow, playerIndex),
       source: { kind: 'flow', flow },
       spaceId: `__stage:${hook}`,
       ownerPlayerIndex: playerIndex,
@@ -2707,7 +2725,7 @@ export class GameCore {
         if (cardFlow && this.engine) {
           // Insert the follow-up so it runs after the engine finishes resolving the choice.
           // Mirrors the `{ type: 'flow' }` branch of the engine's own resolveChoice.
-          this.engineStack.insertFlowAfterPendingChoice(cardFlow)
+          this.engineStack.insertFlowAfterPendingChoice(cardFlow, player.id)
         }
       }
     }
@@ -2820,7 +2838,7 @@ export class GameCore {
     )
     node.promptKey = 'ui.interactionFenceSelect'
     const flow: ActionFlow = { type: 'leaf', actionId: INTERACTION_ONLY_ACTION_ID }
-    const engine = this.createFlowEngine(flow)
+    const engine = this.createFlowEngine(flow, playerIndex)
     engine.injectInteraction(node)
     this.engineStack.push({
       engine,
@@ -3088,8 +3106,7 @@ export class GameCore {
     if (players.length === 0) return null
     const children: ActionFlow[] = []
     for (const p of players) {
-      children.push({ type: 'playerSwitch', targetPlayerId: p.id })
-      children.push(breedLeaf('harvest'))
+      children.push({ ...breedLeaf('harvest'), targetPlayerId: p.id })
     }
     if (children.length === 1) {
       return children[0]

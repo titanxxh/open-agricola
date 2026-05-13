@@ -12,14 +12,10 @@ export const E126_TaxCollector_impl = {
       type: 'xor',
       optional: true,
       children: [
-        { type: 'leaf', actionId: 'gain', params: { wood: 2 }, sourceCard: CARD_ID,
-          choiceLabelKey: 'ui.interactionResourceExchange', choiceLabelParams: { resourcesGained: { wood: 2 } } },
-        { type: 'leaf', actionId: 'gain', params: { clay: 2 }, sourceCard: CARD_ID,
-          choiceLabelKey: 'ui.interactionResourceExchange', choiceLabelParams: { resourcesGained: { clay: 2 } } },
-        { type: 'leaf', actionId: 'gain', params: { reed: 1 }, sourceCard: CARD_ID,
-          choiceLabelKey: 'ui.interactionResourceExchange', choiceLabelParams: { resourcesGained: { reed: 1 } } },
-        { type: 'leaf', actionId: 'gain', params: { stone: 1 }, sourceCard: CARD_ID,
-          choiceLabelKey: 'ui.interactionResourceExchange', choiceLabelParams: { resourcesGained: { stone: 1 } } },
+        { type: 'leaf', actionId: 'gain', params: { wood: 2 }, sourceCard: CARD_ID },
+        { type: 'leaf', actionId: 'gain', params: { clay: 2 }, sourceCard: CARD_ID },
+        { type: 'leaf', actionId: 'gain', params: { reed: 1 }, sourceCard: CARD_ID },
+        { type: 'leaf', actionId: 'gain', params: { stone: 1 }, sourceCard: CARD_ID },
       ],
     }
   },

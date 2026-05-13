@@ -26,12 +26,6 @@ const listener: CardListenerRegistration = {
           payLeaf({
             cardId: CARD_ID,
             cost: { wood: 2 },
-            choiceLabelKey: 'ui.interactionResourceExchange',
-            choiceLabelParams: {
-              resourcesPaid: { wood: 2 },
-              resourcesGained: { grain: 1, food: 1 },
-              bonusVp: 1,
-            },
           }),
           {
             type: 'leaf',

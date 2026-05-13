@@ -30,5 +30,6 @@ describe('ActivateCardNode.step', () => {
     expect(cursor.data.phase).toBe('after')
     expect(cursor.data.actionId).toBe('gain-wood')
     expect(cursor.data.event).toEqual({ ownerPlayerId: 'p2' })
+    expect(cursor.data).not.toHaveProperty('preComputedResult')
   })
 })

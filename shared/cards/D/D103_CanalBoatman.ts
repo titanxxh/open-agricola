@@ -29,18 +29,8 @@ const listener: CardListenerRegistration = {
           {
             type: 'xor',
             children: [
-              gainLeaf(
-                CARD_ID,
-                { stone: 3 },
-                'ui.interactionResourceExchange',
-                { resourcesGained: { stone: 3 } },
-              ),
-              gainLeaf(
-                CARD_ID,
-                { grain: 1, vegetable: 1 },
-                'ui.interactionResourceExchange',
-                { resourcesGained: { grain: 1, vegetable: 1 } },
-              ),
+              gainLeaf(CARD_ID, { stone: 3 }),
+              gainLeaf(CARD_ID, { grain: 1, vegetable: 1 }),
             ],
           },
         ],

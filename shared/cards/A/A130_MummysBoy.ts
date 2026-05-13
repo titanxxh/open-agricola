@@ -1,6 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionChoiceOption } from '../../contract/types'
+import type { ActionChoiceOption, ActionFlow } from '../../contract/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
@@ -29,6 +29,13 @@ const getSecondFarmerSpaceId = (context: CardListenerContext): string | null => 
 }
 
 const MEETING_PLACE_IDS = new Set(['meeting-place', 'meeting-place-solo'])
+
+const setFlagLeaf = (): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: CARD_ID,
+  params: { kind: 'set-flag', flag: true },
+})
 
 const computeArgsListener: CardListenerRegistration = {
   id: 'A130-mummys-boy-compute-args-place-farmer',
@@ -71,7 +78,13 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
     const secondSpaceId = getSecondFarmerSpaceId(context)
     if (!secondSpaceId) return
     if (context.space?.id === secondSpaceId) {
-      setCardFlag(context.player, CARD_ID, true)
+      return {
+        flow: {
+          type: 'seq',
+          children: [setFlagLeaf()],
+        },
+        sourceCard: CARD_ID,
+      }
     }
   },
 }

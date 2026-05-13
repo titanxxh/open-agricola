@@ -28,8 +28,6 @@ const listener: CardListenerRegistration = {
         optional: true,
         children: [
           payLeaf({ cardId: CARD_ID, cost: { food: 1 },
-            choiceLabelKey: 'ui.interactionResourceExchange',
-            choiceLabelParams: { resourcesPaid: { food: 1 }, bonusVp: 1 },
           }),
           { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID },
         ],

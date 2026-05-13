@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import { getCardEffect } from '../card-effects'
 import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
-import { readCardResourceStats } from '../helpers/card-state'
 
 import '../A/A144_Sequestrator'
 import type { CardListenerContext } from '../card-listeners'
@@ -65,7 +64,7 @@ describe('A144_Sequestrator', () => {
     })
   })
 
-  it('gives all stored reed to the first player reaching 3 pastures', () => {
+  it('returns a flow to release stored reed to the first player reaching 3 pastures', () => {
     const owner = createPlayer('p1', 'Owner')
     owner.occupationPlayed = ['A144_Sequestrator']
     owner.cardStates = { A144_Sequestrator: { counters: { reed: 3, clay: 4 } } }
@@ -82,15 +81,30 @@ describe('A144_Sequestrator', () => {
       result: { type: 'ok' },
     } as unknown as CardListenerContext)
 
-    // Resources go directly to the triggering player (no flow returned)
-    expect(result?.flow).toBeUndefined()
-    expect(result?.logKey).toBe('log.cardEffectGain')
-    expect(triggerPlayer.resources.reed).toBe(3)
-    expect(owner.cardStates?.A144_Sequestrator?.counters?.reed).toBe(0)
-    expect(readCardResourceStats(owner, 'A144_Sequestrator')).toBeUndefined()
+    expect(result?.flow).toEqual({
+      type: 'seq',
+      children: [
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: 'A144_Sequestrator',
+          params: { kind: 'set-counter', key: 'reed', value: 0 },
+        },
+        {
+          type: 'leaf',
+          actionId: 'gain',
+          sourceCard: 'A144_Sequestrator',
+          params: { reed: 3, recipientPlayerId: 'p2' },
+        },
+      ],
+    })
+    expect(result?.logKey).toBeUndefined()
+    expect(result?.logParams).toBeUndefined()
+    expect(triggerPlayer.resources.reed).toBe(0)
+    expect(owner.cardStates?.A144_Sequestrator?.counters?.reed).toBe(3)
   })
 
-  it('gives all stored clay to the first player reaching 5 fields', () => {
+  it('returns a flow to release stored clay to the first player reaching 5 fields', () => {
     const owner = createPlayer('p1', 'Owner')
     owner.occupationPlayed = ['A144_Sequestrator']
     owner.cardStates = { A144_Sequestrator: { counters: { reed: 3, clay: 4 } } }
@@ -112,11 +126,48 @@ describe('A144_Sequestrator', () => {
       result: { type: 'ok' },
     } as unknown as CardListenerContext)
 
-    // Resources go directly to the triggering player (no flow returned)
-    expect(result?.flow).toBeUndefined()
-    expect(result?.logKey).toBe('log.cardEffectGain')
-    expect(triggerPlayer.resources.clay).toBe(4)
-    expect(owner.cardStates?.A144_Sequestrator?.counters?.clay).toBe(0)
-    expect(readCardResourceStats(owner, 'A144_Sequestrator')).toBeUndefined()
+    expect(result?.flow).toEqual({
+      type: 'seq',
+      children: [
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: 'A144_Sequestrator',
+          params: { kind: 'set-counter', key: 'clay', value: 0 },
+        },
+        {
+          type: 'leaf',
+          actionId: 'gain',
+          sourceCard: 'A144_Sequestrator',
+          params: { clay: 4, recipientPlayerId: 'p2' },
+        },
+      ],
+    })
+    expect(result?.logKey).toBeUndefined()
+    expect(result?.logParams).toBeUndefined()
+    expect(triggerPlayer.resources.clay).toBe(0)
+    expect(owner.cardStates?.A144_Sequestrator?.counters?.clay).toBe(4)
+  })
+
+  it('returns no flow when the threshold is met but the stored resource is empty', () => {
+    const owner = createPlayer('p1', 'Owner')
+    owner.occupationPlayed = ['A144_Sequestrator']
+    owner.cardStates = { A144_Sequestrator: { counters: { reed: 0, clay: 4 } } }
+    const triggerPlayer = createPlayer('p2', 'Trigger')
+    triggerPlayer.pastures = [{ id: 'a' }, { id: 'b' }, { id: 'c' }] as any
+    const listener = findListener('A144-sequestrator-after-fencing')
+
+    const result = executeCardListener(listener!, {
+      state: createState(owner, triggerPlayer),
+      player: triggerPlayer,
+      space: createSpace('fence'),
+      actionId: 'fence',
+      phase: 'after',
+      result: { type: 'ok' },
+    } as unknown as CardListenerContext)
+
+    expect(result).toBeUndefined()
+    expect(triggerPlayer.resources.reed).toBe(0)
+    expect(owner.cardStates?.A144_Sequestrator?.counters?.reed).toBe(0)
   })
 })

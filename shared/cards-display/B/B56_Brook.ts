@@ -10,5 +10,5 @@ export const B56_Brook = new MinorImprovement({
   category: 'FOOD_PROVIDER',
   desc: ['Each time you use one of the four action spaces above the __Fishing__ accumulation space, you get 1 additional <FOOD>.'],
   cost: {},
-  prerequisite: '1 Occupation',
+  prerequisite: 'Farmer on Fishing Space',
 })

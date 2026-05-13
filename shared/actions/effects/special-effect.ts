@@ -4,22 +4,36 @@ import {
   writeCardInfobox,
   readCardExtraData,
   writeCardExtraData,
+  popFromCardStack,
 } from '../../cards/helpers/card-state'
-import { incCounter } from '../../cards/__stubs__/helpers'
+import { incCounter, initCardState } from '../../cards/__stubs__/helpers'
 import {
   fieldFindStackOfKind,
   fieldHasCrop,
   fieldPopIfDepleted,
 } from '../../domain/field'
+import { clearPendingFenceBonus } from '../../cards/helpers/pending-fence-bonus'
+import { removeFutureMeeples } from './internal/future-meeples'
+import { findFirstNewborn } from '../../domain/player'
+import { removeWorkerRef } from '../../domain/space'
+import { getNextEmptyTileForPlayer } from '../../domain/farm'
 
 export type SpecialEffectParams =
   | { kind: 'increment-extra-data'; key: string; amount: number }
   | { kind: 'set-extra-data'; key: string; value: unknown }
   | { kind: 'increment-counter'; key: string; amount: number }
+  | { kind: 'set-counter'; key: string; value: number }
+  | { kind: 'pop-card-stack-top' }
+  | { kind: 'swap-improvement-with-board'; from: string; to: string }
   | { kind: 'set-flag'; flag: boolean }
   | { kind: 'set-infobox'; text: string }
+  | { kind: 'clear-pending-fence-bonus' }
+  | { kind: 'remove-future-meeples'; rounds?: number[] }
+  | { kind: 'promote-first-newborn' }
   | { kind: 'remove-field-crop'; crop: 'grain' | 'vegetable'; minRemaining?: number }
   | { kind: 'consume-fence'; count?: number }
+  | { kind: 'add-resource-to-space'; spaceId: string; resource: keyof Resource; amount: number }
+  | { kind: 'build-stable-on-first-empty-tile' }
   | {
       kind: 'move-resource-between-spaces'
       fromSpaceId: string
@@ -74,12 +88,55 @@ export const specialEffectAction: ActionDefinition = {
       case 'increment-counter':
         incCounter(target, sourceCard, p.key, p.amount)
         return { type: 'ok' }
+      case 'set-counter': {
+        const counters = initCardState(target, sourceCard)
+        counters[p.key] = Math.max(0, p.value)
+        return { type: 'ok' }
+      }
+      case 'pop-card-stack-top':
+        popFromCardStack(target, sourceCard)
+        return { type: 'ok' }
+      case 'swap-improvement-with-board': {
+        if (!state) return { type: 'fail', logKey: 'log.specialEffectFail' }
+        const playerIndex = target.improvements.indexOf(p.from)
+        const board = state.availableMajorImprovements ?? []
+        const boardIndex = board.indexOf(p.to)
+        if (playerIndex < 0 || boardIndex < 0) return { type: 'ok' }
+        if (target.improvements.includes(p.to)) return { type: 'ok' }
+        target.improvements[playerIndex] = p.to
+        board.splice(boardIndex, 1)
+        if (!board.includes(p.from)) {
+          board.splice(boardIndex, 0, p.from)
+        }
+        return { type: 'ok' }
+      }
       case 'set-flag':
         setCardFlag(target, sourceCard, p.flag)
         return { type: 'ok' }
       case 'set-infobox':
         writeCardInfobox(target, sourceCard, p.text)
         return { type: 'ok' }
+      case 'clear-pending-fence-bonus':
+        clearPendingFenceBonus(target)
+        return { type: 'ok' }
+      case 'remove-future-meeples':
+        if (!state) return { type: 'fail', logKey: 'log.specialEffectFail' }
+        removeFutureMeeples(state, {
+          playerId: target.id,
+          cardId: sourceCard,
+          rounds: p.rounds,
+        })
+        return { type: 'ok' }
+      case 'promote-first-newborn': {
+        if (!state) return { type: 'fail', logKey: 'log.specialEffectFail' }
+        const newborn = findFirstNewborn(target)
+        if (!newborn) return { type: 'ok' }
+        newborn.isNewborn = false
+        for (const space of state.actionSpaces) {
+          removeWorkerRef(space, target.id, newborn.id)
+        }
+        return { type: 'ok' }
+      }
       case 'remove-field-crop': {
         // Used by C57 Crudite-style "discard 1 crop on top of another" effects.
         // Picks the FIRST player field that has the crop with at least
@@ -111,6 +168,24 @@ export const specialEffectAction: ActionDefinition = {
         if (removed < count) {
           return { type: 'fail', logKey: 'log.specialEffectFail' }
         }
+        return { type: 'ok' }
+      }
+      case 'add-resource-to-space': {
+        if (!state) return { type: 'fail', logKey: 'log.specialEffectFail' }
+        const targetSpace = state.actionSpaces.find((space) => space.id === p.spaceId)
+        if (!targetSpace?.resources) {
+          return { type: 'fail', logKey: 'log.specialEffectFail' }
+        }
+        const current =
+          (targetSpace.resources as Partial<Record<keyof Resource, number>>)[p.resource] ?? 0
+        ;(targetSpace.resources as Record<keyof Resource, number>)[p.resource] =
+          current + p.amount
+        return { type: 'ok' }
+      }
+      case 'build-stable-on-first-empty-tile': {
+        const tile = getNextEmptyTileForPlayer(target)
+        if (!tile) return { type: 'ok' }
+        target.stableTiles.push(tile)
         return { type: 'ok' }
       }
       case 'move-resource-between-spaces': {

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
+import { specialEffectAction } from '../../shared/actions/effects/special-effect'
+import { futureMeeplesAction } from '../../shared/actions/effects/internal/future-meeples'
+import type { GameState, PlayerState, ActionSpace, ActionFlow } from '../../shared/contract/types'
 
 import '../../shared/cards/B/B18_GrasslandHarrow'
 
@@ -49,13 +52,49 @@ const createSpace = (id: string): ActionSpace =>
 
 const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
 
+const executeDeterministicLeaves = (
+  flow: ActionFlow | undefined,
+  state: GameState,
+  player: PlayerState,
+  space: ActionSpace = createSpace('test'),
+) => {
+  if (!flow) return
+  if (flow.type === 'seq') {
+    flow.children.forEach((child) => executeDeterministicLeaves(child, state, player, space))
+    return
+  }
+  if (flow.type !== 'leaf') return
+  if (flow.actionId === 'special-effect') {
+    specialEffectAction.execute({
+      state,
+      player,
+      space,
+      params: flow.params,
+      sourceCard: flow.sourceCard,
+      actionContext: flow.actionContext,
+    })
+  }
+  if (flow.actionId === 'future-meeples') {
+    futureMeeplesAction.execute({
+      state,
+      player,
+      space,
+      params: flow.params,
+      sourceCard: flow.sourceCard,
+      actionContext: flow.actionContext,
+    })
+  }
+}
+
 describe('B18 GrasslandHarrow — after-pay listener', () => {
   it('listener registered with actions:[pay] and after phase', () => {
     const listener = findListener('B18-grassland-harrow-after-pay')
     expect(listener).toBeDefined()
     expect(listener!.actions).toEqual(['pay'])
     expect(listener!.phases).toEqual(['after'])
-    expect(listener!.cardIds).toEqual([CARD_ID])
+    // Purchase payment fires before B18 enters minorPlayed, so this listener
+    // must be sourceCard-gated rather than cardIds-gated.
+    expect(listener!.cardIds).toBeUndefined()
   })
 
   it('reserve 0: silent return (no future meeple queued)', () => {
@@ -87,9 +126,21 @@ describe('B18 GrasslandHarrow — after-pay listener', () => {
     } as unknown as CardListenerContext)
     expect(result).toBeDefined()
     expect(result!.flow).toBeDefined()
-    expect(state.pendingFutureMeeples.length).toBe(1)
-    const req = state.pendingFutureMeeples[0]!
-    if ('entries' in req) {
+    expect(result!.flow).toMatchObject({
+      type: 'seq',
+      children: [
+        { type: 'leaf', actionId: 'special-effect', params: { kind: 'set-extra-data', key: 'targetRound', value: 7 } },
+        { type: 'leaf', actionId: 'future-meeples', params: { __futureMeepleRequest: { cardId: CARD_ID, playerId: 'p1' } } },
+      ],
+    })
+    executeDeterministicLeaves(result!.flow, state, player)
+    expect(state.futureMeeples.length).toBe(1)
+    const entry = state.futureMeeples[0]!
+    expect(entry.round).toBe(7)
+    expect(entry.cardId).toBe(CARD_ID)
+    expect(entry.playerId).toBe('p1')
+    const req = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children[1]!.params!.__futureMeepleRequest
+    if (req && typeof req === 'object' && 'entries' in req) {
       // current round 3 + reserve 4 = round 7
       expect(req.entries.map((e) => e.round)).toEqual([7])
       expect(req.cardId).toBe(CARD_ID)
@@ -104,14 +155,16 @@ describe('B18 GrasslandHarrow — after-pay listener', () => {
     const player = createPlayer()
     player.resources = { ...player.resources, wood: 5, clay: 5, stone: 5, reed: 5 }
     const state = createState(12, player)
-    executeCardListener(listener, {
+    const result = executeCardListener(listener, {
       state, player, space: createSpace('improvement-any'),
       actionId: 'pay', phase: 'after',
       sourceCard: CARD_ID,
       result: { type: 'ok', resourcesPaid: {} },
     } as unknown as CardListenerContext)
-    const req = state.pendingFutureMeeples[0]!
-    if ('entries' in req) {
+    expect(result?.flow).toBeDefined()
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
+    const req = flow.children[1]!.params!.__futureMeepleRequest
+    if (req && typeof req === 'object' && 'entries' in req) {
       expect(req.entries[0]!.round).toBe(14)
     } else {
       throw new Error('expected entries-shaped future request')
@@ -158,5 +211,46 @@ describe('B18 GrasslandHarrow — after-pay listener', () => {
     expect(flow).toBeUndefined()
     // onBuy must NOT queue any future meeple now — listener owns that.
     expect(state.pendingFutureMeeples.length).toBe(0)
+  })
+
+  it('real purchase path queues future field before B18 is in minorPlayed', () => {
+    const session = new GameSession(1)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 3
+    state.roundPhase = 'work'
+
+    const player = state.players[0]!
+    player.minorHand = [CARD_ID]
+    player.occupationPlayed = ['__test_occ_1__', '__test_occ_2__']
+    player.resources = {
+      ...player.resources,
+      wood: 3,
+      clay: 1,
+      reed: 0,
+      stone: 0,
+      food: 0,
+    }
+    state.players[1]!.minorHand = ['__test_placeholder__']
+    state.players[1]!.occupationHand = ['__test_placeholder__']
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'meeting-place')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+
+    resp = session.resolveChoice(0, `minor:${CARD_ID}`)
+    expect(resp.ok).toBe(true)
+    const p0 = resp.state.players[0]!
+    expect(p0.minorPlayed).toContain(CARD_ID)
+    expect(p0.cardStates?.[CARD_ID]?.extraData?.targetRound).toBe(5)
+    expect(resp.state.futureMeeples).toEqual([
+      expect.objectContaining({
+        cardId: CARD_ID,
+        playerId: p0.id,
+        round: 5,
+      }),
+    ])
   })
 })

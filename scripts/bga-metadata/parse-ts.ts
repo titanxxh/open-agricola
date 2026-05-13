@@ -16,8 +16,24 @@ export type TsCard = {
 }
 
 function extractStringLiteral(line: string): string | undefined {
-  const m = line.match(/['"](.*?)['"]/)
-  return m ? m[1] : undefined
+  // Find the first quote character, then walk to the matching same-type quote
+  // while honoring backslash escapes. Naive `['"](.*?)['"]` mishandles strings
+  // that contain the *other* quote character (e.g. `'3 Fields in an "L" Shape'`).
+  for (let i = 0; i < line.length; i += 1) {
+    const open = line[i]
+    if (open !== "'" && open !== '"') continue
+    let j = i + 1
+    while (j < line.length) {
+      const ch = line[j]
+      if (ch === '\\') { j += 2; continue }
+      if (ch === open) {
+        return line.slice(i + 1, j).replace(/\\(['"])/g, '$1')
+      }
+      j += 1
+    }
+    return undefined
+  }
+  return undefined
 }
 
 function extractObjectLiteral(line: string): Record<string, number> | undefined {

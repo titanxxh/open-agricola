@@ -20,6 +20,12 @@ const listener: CardListenerRegistration = {
 }
 
 export const B56_Brook_impl = {
+  prerequisiteCheck: (player, state) => {
+    if (!state) return true
+    const fishing = state.actionSpaces.find((s) => s.id === 'fishing')
+    if (!fishing) return false
+    return fishing.takenBy.some((w) => w.playerId === player.id)
+  },
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl

@@ -17,8 +17,6 @@ export const E39_Paintbrush_impl = {
           { type: 'leaf', actionId: 'pay', params: { clay: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { food: 2 }, sourceCard: CARD_ID },
         ],
-        choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { clay: 1 }, resourcesGained: { food: 2 } },
       },
       {
         type: 'seq',
@@ -26,8 +24,6 @@ export const E39_Paintbrush_impl = {
           { type: 'leaf', actionId: 'pay', params: { clay: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID },
         ],
-        choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { clay: 1 }, bonusVp: 1 },
       },
     ]
 

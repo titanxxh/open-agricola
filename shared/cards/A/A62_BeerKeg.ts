@@ -16,8 +16,6 @@ export const A62_BeerKeg_impl = {
           { type: 'leaf', actionId: 'pay', params: { grain: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { food: 3 }, sourceCard: CARD_ID },
         ],
-        choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { grain: 1 }, resourcesGained: { food: 3 } },
       },
       {
         type: 'seq',
@@ -26,8 +24,6 @@ export const A62_BeerKeg_impl = {
           { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { food: 3 }, sourceCard: CARD_ID },
         ],
-        choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { grain: 2 }, resourcesGained: { food: 3 }, bonusVp: 1 },
       },
       {
         type: 'seq',
@@ -37,8 +33,6 @@ export const A62_BeerKeg_impl = {
           { type: 'leaf', actionId: 'bonus-vp', sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { food: 3 }, sourceCard: CARD_ID },
         ],
-        choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { grain: 3 }, resourcesGained: { food: 3 }, bonusVp: 2 },
       },
     ]
 

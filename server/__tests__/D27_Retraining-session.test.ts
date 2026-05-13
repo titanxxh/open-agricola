@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
-import { setCardFlag, isCardFlagged, readCardExtraData } from '../../shared/cards/helpers/card-state'
-import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
+import { setCardFlag, isCardFlagged } from '../../shared/cards/helpers/card-state'
+import { setWorkersAtHome } from '../../shared/domain/player'
+import type { GameState, PlayerState, ActionSpace, ActionChoiceOption } from '../../shared/contract/types'
 
 import '../../shared/cards/D/D27_Retraining'
 
@@ -53,28 +55,56 @@ const createSpace = (id: string): ActionSpace =>
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
 
+const setupSwapSession = () => {
+  const session = new GameSession()
+  const state = session.getState().state
+  state.players = state.players.slice(0, 2)
+  state.currentPlayerIndex = 0
+  state.round = 1
+
+  const player = state.players[0]!
+  player.minorPlayed.push(CARD_ID)
+  player.improvements = ['Major_Joinery']
+  player.minorHand = ['__test_placeholder__']
+  player.occupationHand = ['__test_placeholder__']
+  setCardFlag(player, CARD_ID, true)
+  setWorkersAtHome(state, player, 2)
+  state.availableMajorImprovements = ['Major_Pottery', 'Major_Basket']
+  const forest = state.actionSpaces.find((space) => space.id === 'forest')!
+  forest.resources = { ...(forest.resources ?? {}), wood: 1 }
+
+  session.loadState(state)
+  return session
+}
+
 describe('D27_Retraining listeners', () => {
   it('registers both renovation-after and place-farmer-after listeners', () => {
     expect(findListener('D27-retraining-after-renovation')).toBeDefined()
     expect(findListener('D27-retraining-after-place-farmer')).toBeDefined()
   })
 
-  it('renovation listener flags the card when owner played it', () => {
+  it('renovation listener returns a set-flag flow without mutating immediately', () => {
     const listener = findListener('D27-retraining-after-renovation')!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
     const state = createState([player])
 
-    executeCardListener(listener, {
+    const result = executeCardListener(listener, {
       state, player, space: createSpace('renovate-house'),
       actionId: 'renovate-house', phase: 'after',
     } as unknown as CardListenerContext)
 
-    expect(isCardFlagged(player, CARD_ID)).toBe(true)
+    expect(result?.flow).toEqual({
+      type: 'leaf',
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'set-flag', flag: true },
+    })
+    expect(isCardFlagged(player, CARD_ID)).toBe(false)
   })
 
 
-  it('place-farmer listener offers Joinery→Pottery swap when the player has Joinery', () => {
+  it('place-farmer listener offers Joinery→Pottery swap without immediate mutation', () => {
     const listener = findListener('D27-retraining-after-place-farmer')!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
@@ -88,16 +118,39 @@ describe('D27_Retraining listeners', () => {
     } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
-    expect(result!.flow?.type).toBe('seq')
-    expect(isCardFlagged(player, CARD_ID)).toBe(false)
-    // Pottery was reserved (removed from available board)
-    expect(state.availableMajorImprovements).not.toContain('Major_Pottery')
-    // Pending swap stored on card state
-    const pending = readCardExtraData<{ from: string; to: string }>(player, CARD_ID, 'pendingSwap')
-    expect(pending).toEqual({ from: 'Major_Joinery', to: 'Major_Pottery' })
+    expect(result!.flow).toEqual({
+      type: 'seq',
+      children: [
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: CARD_ID,
+          params: { kind: 'set-flag', flag: false },
+        },
+        {
+          type: 'seq',
+          optional: true,
+          children: [
+            {
+              type: 'leaf',
+              actionId: 'special-effect',
+              sourceCard: CARD_ID,
+              params: {
+                kind: 'swap-improvement-with-board',
+                from: 'Major_Joinery',
+                to: 'Major_Pottery',
+              },
+            },
+          ],
+        },
+      ],
+    })
+    expect(isCardFlagged(player, CARD_ID)).toBe(true)
+    expect(state.availableMajorImprovements).toContain('Major_Pottery')
+    expect(player.improvements).toContain('Major_Joinery')
   })
 
-  it('place-farmer listener prefers Pottery→Basket when Pottery is played', () => {
+  it('place-farmer listener offers Pottery→Basket when Pottery is played', () => {
     const listener = findListener('D27-retraining-after-place-farmer')!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
@@ -111,11 +164,38 @@ describe('D27_Retraining listeners', () => {
     } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
-    const pending = readCardExtraData<{ from: string; to: string }>(player, CARD_ID, 'pendingSwap')
-    expect(pending).toEqual({ from: 'Major_Pottery', to: 'Major_Basket' })
+    expect(result!.flow).toEqual({
+      type: 'seq',
+      children: [
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: CARD_ID,
+          params: { kind: 'set-flag', flag: false },
+        },
+        {
+          type: 'seq',
+          optional: true,
+          children: [
+            {
+              type: 'leaf',
+              actionId: 'special-effect',
+              sourceCard: CARD_ID,
+              params: {
+                kind: 'swap-improvement-with-board',
+                from: 'Major_Pottery',
+                to: 'Major_Basket',
+              },
+            },
+          ],
+        },
+      ],
+    })
+    expect(isCardFlagged(player, CARD_ID)).toBe(true)
+    expect(state.availableMajorImprovements).toContain('Major_Basket')
   })
 
-  it('place-farmer listener does nothing when no swap is available', () => {
+  it('place-farmer listener clears the flag by flow when no swap is available', () => {
     const listener = findListener('D27-retraining-after-place-farmer')!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
@@ -127,9 +207,13 @@ describe('D27_Retraining listeners', () => {
       actionId: 'place-farmer', phase: 'after',
     } as unknown as CardListenerContext)
 
-    expect(result).toBeUndefined()
-    // Flag is unset even when no swap was possible
-    expect(isCardFlagged(player, CARD_ID)).toBe(false)
+    expect(result?.flow).toEqual({
+      type: 'leaf',
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'set-flag', flag: false },
+    })
+    expect(isCardFlagged(player, CARD_ID)).toBe(true)
   })
 
   it('place-farmer listener does nothing if card is not flagged', () => {
@@ -146,5 +230,45 @@ describe('D27_Retraining listeners', () => {
 
     expect(result).toBeUndefined()
     expect(state.availableMajorImprovements).toContain('Major_Pottery')
+  })
+
+  it('declining the optional swap clears the flag but leaves board and player majors unchanged', () => {
+    const session = setupSwapSession()
+
+    const resp = session.takeAction(0, 'forest')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(isCardFlagged(resp.state.players[0]!, CARD_ID)).toBe(false)
+    expect(resp.state.players[0]!.improvements).toContain('Major_Joinery')
+    expect(resp.state.players[0]!.improvements).not.toContain('Major_Pottery')
+    expect(resp.state.availableMajorImprovements).toContain('Major_Pottery')
+
+    const declined = session.resolveChoice(0, '__skip__')
+
+    expect(declined.ok).toBe(true)
+    expect(declined.state.players[0]!.improvements).toContain('Major_Joinery')
+    expect(declined.state.players[0]!.improvements).not.toContain('Major_Pottery')
+    expect(declined.state.availableMajorImprovements).toContain('Major_Pottery')
+    expect(declined.state.availableMajorImprovements).not.toContain('Major_Joinery')
+  })
+
+  it('accepting the optional swap exchanges the player major with the board', () => {
+    const session = setupSwapSession()
+
+    const resp = session.takeAction(0, 'forest')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    const acceptOption = resp.interaction.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
+    expect(acceptOption).toBeDefined()
+
+    const accepted = session.resolveChoice(0, acceptOption!.value)
+
+    expect(accepted.ok).toBe(true)
+    expect(accepted.state.players[0]!.improvements).toContain('Major_Pottery')
+    expect(accepted.state.players[0]!.improvements).not.toContain('Major_Joinery')
+    expect(accepted.state.availableMajorImprovements).toContain('Major_Joinery')
+    expect(accepted.state.availableMajorImprovements).not.toContain('Major_Pottery')
   })
 })

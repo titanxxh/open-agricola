@@ -13,18 +13,27 @@ const CARD_ID = C93_InnerDistrictsDirector.id
  * on the other space. If you do, you can immediately place another person.
  *
  * BGA: After PlaceFarmer on Forest → place 1 stone on Clay Pit (and vice versa),
- * then optionally place another farmer. The entire sequence is optional.
+ * then optionally place another farmer.
  *
- * Implementation note: The stone placement on the other space (from general supply)
- * is applied as an immediate side effect when the player triggers the card. The
- * "place another person" is offered as an optional follow-up flow. In BGA the stone
- * placement is also conditional on accepting the sequence, but since the stone comes
- * from an unlimited supply this simplification has minimal game impact.
+ * OA behavior: the stone placement is mandatory after the trigger and is not
+ * declined together with the optional extra placement.
  */
 const PAIRED_SPACE: Record<string, string> = {
   forest: 'clay-pit',
   'clay-pit': 'forest',
 }
+
+const addStoneToSpaceFlow = (spaceId: string): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: CARD_ID,
+  params: {
+    kind: 'add-resource-to-space',
+    spaceId,
+    resource: 'stone',
+    amount: 1,
+  },
+})
 
 const listener: CardListenerRegistration = {
   id: 'C93-inner-districts-director-after-place-farmer',
@@ -39,17 +48,20 @@ const listener: CardListenerRegistration = {
     const otherSpace = context.state.actionSpaces.find((s) => s.id === otherSpaceId)
     if (!otherSpace) return
 
-    // Place 1 stone on the other space (from general supply)
-    otherSpace.resources.stone = (otherSpace.resources.stone ?? 0) + 1
+    const addResourceFlow = addStoneToSpaceFlow(otherSpaceId)
 
-    // Offer to place another farmer (requires available workers)
-    if (workersAvailable(context.state, context.player) <= 0) return
+    if (workersAvailable(context.state, context.player) <= 0) {
+      return {
+        flow: addResourceFlow,
+        sourceCard: CARD_ID,
+      }
+    }
 
     return {
       flow: {
         type: 'seq',
-        optional: true,
         children: [
+          addResourceFlow,
           {
             type: 'leaf',
             actionId: 'place-farmer',

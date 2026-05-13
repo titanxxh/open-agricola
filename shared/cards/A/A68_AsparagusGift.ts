@@ -1,7 +1,7 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
+import { readCardExtraData } from '../helpers/card-state'
 import { getFenceCount } from '../../actions/effects/fencing'
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
@@ -17,7 +17,19 @@ const beforeListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    writeCardExtraData(context.player, CARD_ID, FENCES_BEFORE_KEY, getFenceCount(context.player))
+    return {
+      flow: {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: {
+          kind: 'set-extra-data',
+          key: FENCES_BEFORE_KEY,
+          value: getFenceCount(context.player),
+        },
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 

@@ -1,7 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { ensureCardState } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D158_BeanCounter'
@@ -19,18 +18,33 @@ const listener: CardListenerRegistration = {
     const roundAvailable = context.space?.roundAvailable ?? 99
     if (roundAvailable > 8) return
 
-    const cs = ensureCardState(context.player, CARD_ID)
-    if (!cs.counters) cs.counters = {}
-    const current = (cs.counters.food ?? 0) + 1
+    const current = ((context.player.cardStates?.[CARD_ID]?.counters?.food ?? 0) as number) + 1
 
     if (current >= 3) {
-      cs.counters.food = 0
       return {
-        flow: gainLeaf(CARD_ID, { food: 3 }),
+        flow: {
+          type: 'seq',
+          children: [
+            {
+              type: 'leaf',
+              actionId: 'special-effect',
+              sourceCard: CARD_ID,
+              params: { kind: 'set-counter', key: 'food', value: 0 },
+            },
+            gainLeaf(CARD_ID, { food: 3 }),
+          ],
+        },
         sourceCard: CARD_ID,
       }
-    } else {
-      cs.counters.food = current
+    }
+    return {
+      flow: {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: { kind: 'set-counter', key: 'food', value: current },
+      },
+      sourceCard: CARD_ID,
     }
   },
 }

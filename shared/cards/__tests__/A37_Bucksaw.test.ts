@@ -71,12 +71,6 @@ describe('A37_Bucksaw', () => {
           actionId: 'pay',
           params: { wood: 1 },
           sourceCard: 'A37_Bucksaw',
-          choiceLabelKey: 'ui.interactionResourceExchange',
-          choiceLabelParams: {
-            resourcesPaid: { wood: 1 },
-            resourcesGained: { grain: 1 },
-            bonusVp: 1,
-          },
           effectPreview: {
             kind: 'resourceExchange',
             resourcesPaid: { wood: 1 },

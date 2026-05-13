@@ -2,9 +2,13 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type {
   ActionDefinition,
   ActionSpace,
+  ChoiceDescriptionPreview,
   GameState,
   PlayerState,
 } from '../../contract/types'
+import { payAction } from '../../actions/effects/pay'
+import { gainAction } from '../../actions/effects/gain'
+import { bonusVpAction } from '../../actions/effects/bonus-vp'
 import { ActionRegistry } from '../registry'
 import { CardRegistry } from '../../cards/registry'
 import { setActiveCardRegistry, requireActiveCardRegistry } from '../../cards/active-registry'
@@ -105,6 +109,65 @@ describe('Engine flow nodes', () => {
   beforeEach(() => {
     clearActionHooks()
   setActiveCardRegistry(new CardRegistry())
+  })
+
+  it('dynamic result.flow targetPlayerId switches back before later siblings', () => {
+    const p1 = createPlayer()
+    const p2 = { ...createPlayer(), id: 'p2', name: 'P2', color: 'blue' as const }
+    const state = createState()
+    state.players = [p1, p2]
+
+    const triggerAction: ActionDefinition = {
+      id: 'trigger-target-flow',
+      nameKey: 'test.trigger',
+      descriptionKey: 'test.trigger',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({
+        type: 'flow',
+        flow: {
+          type: 'seq',
+          children: [
+            {
+              type: 'leaf',
+              actionId: 'gain',
+              params: { food: 1 },
+              targetPlayerId: p2.id,
+            },
+            {
+              type: 'leaf',
+              actionId: 'gain',
+              params: { wood: 1 },
+            },
+          ],
+        },
+      }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(triggerAction)
+    registry.register(gainAction)
+    const space = createSpace(triggerAction)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('trigger', triggerAction.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+
+    let currentPlayer = p1
+    let step = engine.proceed({ state, player: currentPlayer, space })
+    let safety = 20
+    while (safety-- > 0 && (step.type === 'ok' || step.type === 'playerSwitch')) {
+      if (step.type === 'playerSwitch') {
+        currentPlayer = state.players.find((player) => player.id === step.targetPlayerId) ?? currentPlayer
+      }
+      step = engine.proceed({ state, player: currentPlayer, space })
+    }
+
+    expect(p2.resources.food).toBe(1)
+    expect(p2.resources.wood).toBe(0)
+    expect(p1.resources.wood).toBe(1)
   })
 
   it('or node removes completed choice and exposes done', () => {
@@ -809,5 +872,119 @@ describe('Engine flow nodes', () => {
     engine.resolveChoice('__done__', { state, player, space })
     const done = engine.proceed({ state, player, space })
     expect(done.type).toBe('done')
+  })
+
+  const collectDescriptionLabelKeys = (preview: ChoiceDescriptionPreview | undefined): string[] => {
+    if (!preview) return []
+    if (preview.kind === 'action') return [preview.labelKey]
+    return preview.parts.flatMap(collectDescriptionLabelKeys)
+  }
+
+  it('xor of pure gain branches: options use action nameKeys not ui.interactionResourceExchange', () => {
+    const registry = new ActionRegistry()
+    registry.register(payAction)
+    registry.register(gainAction)
+    const root = new XorNode('xor-gains', [
+      new ActionNode('gain-wood', 'gain', 'E126_TaxCollector', { wood: 2 }),
+      new ActionNode('gain-clay', 'gain', 'E126_TaxCollector', { clay: 2 }),
+    ])
+    const engine = new Engine({
+      tree: new EngineTree(root),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(gainAction)
+    const first = engine.proceed({ state, player, space })
+    expect(first.type).toBe('choice')
+    if (first.type !== 'choice') return
+    for (const opt of first.choice.options) {
+      expect(opt.labelKey).not.toBe('ui.interactionResourceExchange')
+      expect(collectDescriptionLabelKeys(opt.descriptionPreview)).toEqual(['actions.gain.name'])
+    }
+  })
+
+  it('xor of pay-then-gain sequences: descriptionPreview groups pay and gain', () => {
+    const registry = new ActionRegistry()
+    registry.register(payAction)
+    registry.register(gainAction)
+    const root = new XorNode('xor-studio', [
+      new SequenceNode('seq-wood', [
+        new ActionNode('pay-w', 'pay', 'C55_Studio', { wood: 1 }),
+        new ActionNode('gain-w', 'gain', 'C55_Studio', { food: 2 }),
+      ]),
+      new SequenceNode('seq-clay', [
+        new ActionNode('pay-c', 'pay', 'C55_Studio', { clay: 1 }),
+        new ActionNode('gain-c', 'gain', 'C55_Studio', { food: 2 }),
+      ]),
+    ])
+    const engine = new Engine({
+      tree: new EngineTree(root),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    player.resources.wood = 2
+    player.resources.clay = 2
+    const space = createSpace(payAction)
+    const first = engine.proceed({ state, player, space })
+    expect(first.type).toBe('choice')
+    if (first.type !== 'choice') return
+    for (const opt of first.choice.options) {
+      expect(opt.labelKey).not.toBe('ui.interactionResourceExchange')
+      expect(collectDescriptionLabelKeys(opt.descriptionPreview)).toEqual([
+        'actions.pay.name',
+        'actions.gain.name',
+      ])
+    }
+  })
+
+  it('xor of pay-then-bonus-vp vs pay-then-gain: descriptionPreview reflects each branch', () => {
+    const registry = new ActionRegistry()
+    registry.register(payAction)
+    registry.register(gainAction)
+    registry.register(bonusVpAction)
+    const root = new XorNode('xor-paint', [
+      new SequenceNode('seq-food', [
+        new ActionNode('pay-f', 'pay', 'E39_Paintbrush', { clay: 1 }),
+        new ActionNode('gain-f', 'gain', 'E39_Paintbrush', { food: 2 }),
+      ]),
+      new SequenceNode('seq-vp', [
+        new ActionNode('pay-v', 'pay', 'E39_Paintbrush', { clay: 1 }),
+        new ActionNode('bv', 'bonus-vp', 'E39_Paintbrush'),
+      ]),
+    ])
+    const engine = new Engine({
+      tree: new EngineTree(root),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    player.resources.clay = 2
+    const space = createSpace(payAction)
+    const first = engine.proceed({ state, player, space })
+    expect(first.type).toBe('choice')
+    if (first.type !== 'choice') return
+    const byValue = Object.fromEntries(first.choice.options.map((o) => [o.value, o]))
+    const foodBranch = byValue['seq-food']
+    const vpBranch = byValue['seq-vp']
+    expect(foodBranch).toBeDefined()
+    expect(vpBranch).toBeDefined()
+    expect(foodBranch!.labelKey).not.toBe('ui.interactionResourceExchange')
+    expect(vpBranch!.labelKey).not.toBe('ui.interactionResourceExchange')
+    expect(collectDescriptionLabelKeys(foodBranch!.descriptionPreview)).toEqual([
+      'actions.pay.name',
+      'actions.gain.name',
+    ])
+    expect(collectDescriptionLabelKeys(vpBranch!.descriptionPreview)).toEqual([
+      'actions.pay.name',
+      'actions.bonus-vp.name',
+    ])
   })
 })

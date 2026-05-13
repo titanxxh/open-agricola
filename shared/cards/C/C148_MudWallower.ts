@@ -1,6 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { PlayerState } from '../../contract/types'
+import type { ActionFlow, PlayerState } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { initCardState } from '../__stubs__/helpers'
 import { writeCardInfobox } from '../helpers/card-state'
@@ -29,6 +29,13 @@ const isAccumulationSpace = (context: CardListenerContext): boolean => {
   return Object.values(gainPerRound).some((v) => (v ?? 0) > 0)
 }
 
+const specialEffect = (params: Record<string, unknown>): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: CARD_ID,
+  params,
+})
+
 const afterPlaceFarmerListener: CardListenerRegistration = {
   id: 'C148-mud-wallower-after-place-farmer',
   cardIds: [CARD_ID],
@@ -37,15 +44,35 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isAccumulationSpace(context)) return
 
-    const counters = initCardState(context.player, CARD_ID)
-    counters.counter = (counters.counter ?? 0) + 1
-    writeCardInfobox(context.player, CARD_ID, `${counters.counter % 4} / 4`)
+    const current = context.player.cardStates?.[CARD_ID]?.counters ?? {}
+    const counter = current.counter ?? 0
+    const held = current.held ?? 0
+    const nextCounter = counter + 1
 
-    if (counters.counter >= 4) {
-      counters.counter -= 4
-      counters.held = (counters.held ?? 0) + 1
-      writeCardInfobox(context.player, CARD_ID, `${counters.counter % 4} / 4`)
-      return { flow: gainLeaf(CARD_ID, { boar: 1 }), sourceCard: CARD_ID }
+    if (nextCounter >= 4) {
+      const resetCounter = nextCounter - 4
+      return {
+        flow: {
+          type: 'seq',
+          children: [
+            specialEffect({ kind: 'set-counter', key: 'counter', value: resetCounter }),
+            specialEffect({ kind: 'set-counter', key: 'held', value: held + 1 }),
+            specialEffect({ kind: 'set-infobox', text: `${resetCounter % 4} / 4` }),
+            gainLeaf(CARD_ID, { boar: 1 }),
+          ],
+        },
+        sourceCard: CARD_ID,
+      }
+    }
+    return {
+      flow: {
+        type: 'seq',
+        children: [
+          specialEffect({ kind: 'set-counter', key: 'counter', value: nextCounter }),
+          specialEffect({ kind: 'set-infobox', text: `${nextCounter % 4} / 4` }),
+        ],
+      },
+      sourceCard: CARD_ID,
     }
   },
 }
@@ -62,24 +89,28 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
  * without redistributing zones, so the subtraction reduces by the same amount).
  * Correct on the reorg path where zones change but total_boars does not.
  */
-const syncHeldDownward = (player: PlayerState) => {
-  const counters = player.cardStates?.[CARD_ID]?.counters
-  if (!counters) return
-  const held = counters.held ?? 0
-  if (held <= 0) return
-
+const computePigsInC148 = (player: PlayerState): number => {
   const pastureBoars = player.pastures
     .filter((p) => p.animalType === 'boar')
     .reduce((sum, p) => sum + p.animalCount, 0)
   const houseBoars = player.houseAnimalType === 'boar' ? player.houseAnimalCount : 0
   const stableBoars = Object.values(player.stableAnimals ?? {})
     .filter((t) => t === 'boar').length
-  const pigsInC148 = Math.max(
+  return Math.max(
     0,
     (player.resources.boar ?? 0) - pastureBoars - houseBoars - stableBoars,
   )
+}
 
-  if (pigsInC148 < held) counters.held = pigsInC148
+const syncHeldDownwardFlow = (player: PlayerState): ActionFlow | undefined => {
+  const counters = player.cardStates?.[CARD_ID]?.counters
+  if (!counters) return undefined
+  const held = counters.held ?? 0
+  if (held <= 0) return undefined
+
+  const pigsInC148 = computePigsInC148(player)
+  if (pigsInC148 >= held) return undefined
+  return specialEffect({ kind: 'set-counter', key: 'held', value: pigsInC148 })
 }
 
 const afterExchangeSyncListener: CardListenerRegistration = {
@@ -88,7 +119,8 @@ const afterExchangeSyncListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['exchange'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    syncHeldDownward(context.player)
+    const flow = syncHeldDownwardFlow(context.player)
+    return flow ? { flow, sourceCard: CARD_ID } : undefined
   },
 }
 
@@ -98,7 +130,8 @@ const afterReorgSyncListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['reorganize'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    syncHeldDownward(context.player)
+    const flow = syncHeldDownwardFlow(context.player)
+    return flow ? { flow, sourceCard: CARD_ID } : undefined
   },
 }
 
@@ -118,7 +151,8 @@ const afterPaySyncListener: CardListenerRegistration = {
     if (!result || result.type !== 'ok') return
     const resourcesPaid = (result.resourcesPaid as { boar?: number } | undefined) ?? {}
     if (!resourcesPaid.boar || resourcesPaid.boar <= 0) return
-    syncHeldDownward(context.player)
+    const flow = syncHeldDownwardFlow(context.player)
+    return flow ? { flow, sourceCard: CARD_ID } : undefined
   },
 }
 
