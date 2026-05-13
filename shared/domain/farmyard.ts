@@ -1257,6 +1257,21 @@ export const buildSowFarmInteraction = (
   const excludedKeys = getExcludedFieldKeys(actionContext)
   const allowedKeys = getAllowedSelectedFieldKeys(player, actionContext)
 
+  // Derive normal-field allow-list from actionContext.cropType. wood/stone =>
+  // [] because normal fields physically host only grain/vegetable stacks
+  // (3/2 initial). See spec §2.5 "P0 修正" — wood/stone sow exclusively via
+  // extra-field path.
+  const ctxCropType =
+    typeof actionContext?.cropType === 'string'
+      ? (actionContext.cropType as SowSelection['crop'])
+      : undefined
+  const normalAllowed: readonly SowSelection['crop'][] =
+    ctxCropType === 'grain' || ctxCropType === 'vegetable'
+      ? [ctxCropType]
+      : ctxCropType === 'wood' || ctxCropType === 'stone'
+        ? []
+        : DEFAULT_NORMAL_FIELD_CROPS
+
   const selectableFields: {
     tile: FarmTilePosition
     allowedCrops: ('grain' | 'vegetable' | 'wood' | 'stone')[]
@@ -1268,10 +1283,13 @@ export const buildSowFarmInteraction = (
     if (excludedKeys.has(key)) return []
     if (allowedKeys && !allowedKeys.has(key)) return []
     const allowedCrops: ('grain' | 'vegetable' | 'wood' | 'stone')[] = []
-    if ((normalized.resources.grain ?? 0) > 0) {
+    if (normalAllowed.includes('grain') && (normalized.resources.grain ?? 0) > 0) {
       allowedCrops.push('grain')
     }
-    if ((normalized.resources.vegetable ?? 0) > 0) {
+    if (
+      normalAllowed.includes('vegetable') &&
+      (normalized.resources.vegetable ?? 0) > 0
+    ) {
       allowedCrops.push('vegetable')
     }
     if (allowedCrops.length === 0) return []
@@ -1280,16 +1298,16 @@ export const buildSowFarmInteraction = (
   const extraFields = getPermittedExtraSowableFields(player, actionContext)
   for (const extra of extraFields) {
     const filteredCrops = extra.allowedCrops.filter((crop) => {
-      if (crop === 'grain') return (normalized.resources.grain ?? 0) > 0
-      if (crop === 'vegetable') return (normalized.resources.vegetable ?? 0) > 0
-      if (crop === 'wood') return (normalized.resources.wood ?? 0) > 0
-      return false
+      if ((normalized.resources[crop] ?? 0) <= 0) return false
+      if (ctxCropType !== undefined && crop !== ctxCropType) return false
+      return true
     })
     if (filteredCrops.length === 0) continue
     selectableFields.push({
       tile: extra.tile,
       allowedCrops: filteredCrops,
       sourceCard: extra.sourceCard,
+      groupKey: extra.groupKey,
     })
   }
 

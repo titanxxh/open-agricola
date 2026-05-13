@@ -14,8 +14,9 @@ export type BlankPlayerOverrides = {
   fenceSegments?: PlayerFarmState['fenceSegments']
   pastures?: PlayerFarmState['pastures']
   // Extra fields tolerated for downstream PlayerState callers
+  improvements?: string[]
   minorPlayed?: string[]
-  occupationsPlayed?: string[]
+  occupationPlayed?: string[]
 }
 
 const DEFAULT_RESOURCES: PlayerFarmState['resources'] = {
@@ -58,19 +59,17 @@ export const makeBlankPlayer = (overrides: BlankPlayerOverrides = {}) => {
     fenceSegments: overrides.fenceSegments ?? [],
     pastures: overrides.pastures ?? [],
     // PlayerState extras kept blank but present so PlayerState consumers
-    // (e.g. buildSowFarmInteraction) don't trip on missing card-state fields.
+    // (e.g. buildSowFarmInteraction → computeExtraSowableFields) don't trip
+    // on missing card-state fields. Names match shared/contract/types.ts.
+    improvements: overrides.improvements ?? [],
     minorPlayed: overrides.minorPlayed ?? [],
-    occupationsPlayed: overrides.occupationsPlayed ?? [],
+    occupationPlayed: overrides.occupationPlayed ?? [],
     occupationHand: [] as string[],
     minorHand: [] as string[],
-    majorPlayed: [] as string[],
     cardStates: {} as Record<string, unknown>,
     actionStateUsed: {} as Record<string, unknown>,
-    listeners: [] as unknown[],
     flags: {} as Record<string, unknown>,
     counts: {} as Record<string, number>,
-    extraSowableFields: [] as unknown[],
-    family: { adults: 2, newborns: 0 } as unknown,
   }
   return base
 }
