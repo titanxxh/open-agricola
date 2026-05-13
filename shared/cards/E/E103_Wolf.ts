@@ -1,6 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { getCardStack, pushToCardStack, popFromCardStack } from '../helpers/card-state'
+import { getCardStack, pushToCardStack } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
@@ -25,10 +25,19 @@ const afterGainCollectListener: CardListenerRegistration = {
     const gained =
       context.result?.type === 'ok' ? context.result.resourcesGained : undefined
     if (!gained || (gained[top] ?? 0) <= 0) return
-    // Pop top and gain pig
-    popFromCardStack(context.player, CARD_ID)
     return {
-      flow: gainLeaf(CARD_ID, { boar: 1 }),
+      flow: {
+        type: 'seq',
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'pop-card-stack-top' },
+          },
+          gainLeaf(CARD_ID, { boar: 1 }),
+        ],
+      },
       sourceCard: CARD_ID,
     }
   },
