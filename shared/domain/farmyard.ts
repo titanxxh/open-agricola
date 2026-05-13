@@ -138,11 +138,22 @@ export type SowValidationResult<T extends PlayerFarmState = PlayerFarmState> =
   | { ok: false; error: SowValidationError }
 
 type SowValidationOptions = {
+  /** Selection cap, counted by LOGICAL GROUP (extra-field same groupKey merges to 1). */
   maxSelections?: number
   excludedFields?: FarmTilePosition[]
   /** Extra sowable fields keyed by position, with their allowed crops. */
   extraAllowedCrops?: Map<string, SowSelection['crop'][]>
+  /** Extra sowable fields' logical-field group keys. Multi-slot virtual tiles
+   *  with the same groupKey count as 1 selection towards maxSelections. */
+  extraGroupKeys?: Map<string, string>
+  /** Normal field allowed crops. Defaults to ['grain','vegetable']. Caller
+   *  should derive from `actionContext.cropType` (wood/stone → [] since
+   *  normal fields don't physically host wood/stone stacks). */
+  normalFieldAllowedCrops?: SowSelection['crop'][]
 }
+
+const DEFAULT_NORMAL_FIELD_CROPS = ['grain', 'vegetable'] as const satisfies readonly SowSelection['crop'][]
+const ALL_CROPS = ['grain', 'vegetable', 'wood', 'stone'] as const satisfies readonly SowSelection['crop'][]
 
 export type RoomSelectionResult =
   | { ok: true; selectedKeys: Set<string> }
@@ -524,30 +535,37 @@ export const validateSowSelection = <T extends PlayerFarmState>(
   }
   const normalized = normalizePlayerFarm(player)
   const fieldMap = buildFieldMap(normalized.fields)
+  const normalAllowed: readonly SowSelection['crop'][] =
+    options.normalFieldAllowedCrops ?? DEFAULT_NORMAL_FIELD_CROPS
   const used = new Set<string>()
+  const usedGroups = new Set<string>()
   const excluded = new Set(
     (options.excludedFields ?? []).map((field) => localPositionKey(field)),
   )
-  let grainCount = 0
-  let vegetableCount = 0
+  const cropCount: Record<SowSelection['crop'], number> = {
+    grain: 0,
+    vegetable: 0,
+    wood: 0,
+    stone: 0,
+  }
   for (const selection of selections) {
     const row = Number(selection?.row)
     const col = Number(selection?.col)
     if (!Number.isFinite(row) || !Number.isFinite(col)) {
       return { ok: false, error: { code: 'INVALID_POSITION' } }
     }
-    const crop = selection?.crop
-    if (crop !== 'grain' && crop !== 'vegetable' && crop !== 'wood') {
+    const crop = selection?.crop as SowSelection['crop']
+    if (!ALL_CROPS.includes(crop)) {
       return { ok: false, error: { code: 'INVALID_CROP' } }
     }
     const pos = { row, col }
     const key = localPositionKey(pos)
     const extraAllowedCrops = options.extraAllowedCrops?.get(key)
-    const isExtraField = !!extraAllowedCrops
-    if (!isExtraField && crop === 'wood') {
-      return { ok: false, error: { code: 'INVALID_CROP' } }
-    }
-    if (extraAllowedCrops && !extraAllowedCrops.includes(crop)) {
+    const isExtraField = extraAllowedCrops !== undefined
+    const allowedHere: readonly SowSelection['crop'][] = isExtraField
+      ? extraAllowedCrops
+      : normalAllowed
+    if (!allowedHere.includes(crop)) {
       return { ok: false, error: { code: 'INVALID_CROP' } }
     }
     if (!isExtraField && !isWithinFarm(pos)) {
@@ -562,21 +580,23 @@ export const validateSowSelection = <T extends PlayerFarmState>(
       return { ok: false, error: { code: 'NOT_EMPTY' } }
     }
     used.add(key)
+    const groupKey = isExtraField
+      ? (options.extraGroupKeys?.get(key) ?? key)
+      : key
+    usedGroups.add(groupKey)
     if (isExtraField) continue
-    if (crop === 'grain') grainCount += 1
-    if (crop === 'vegetable') vegetableCount += 1
+    cropCount[crop] += 1
   }
   if (
     typeof options.maxSelections === 'number' &&
-    used.size > Math.max(0, Math.floor(options.maxSelections))
+    usedGroups.size > Math.max(0, Math.floor(options.maxSelections))
   ) {
     return { ok: false, error: { code: 'INVALID_POSITION' } }
   }
-  if (grainCount > (normalized.resources?.grain ?? 0)) {
-    return { ok: false, error: { code: 'NOT_ENOUGH_SEEDS' } }
-  }
-  if (vegetableCount > (normalized.resources?.vegetable ?? 0)) {
-    return { ok: false, error: { code: 'NOT_ENOUGH_SEEDS' } }
+  for (const crop of ALL_CROPS) {
+    if (cropCount[crop] > (normalized.resources?.[crop] ?? 0)) {
+      return { ok: false, error: { code: 'NOT_ENOUGH_SEEDS' } }
+    }
   }
   const updatedFields: FarmField[] = normalized.fields.map((field) => {
     const selection = selections.find(
@@ -604,8 +624,8 @@ export const validateSowSelection = <T extends PlayerFarmState>(
     fields: updatedFields,
     resources: {
       ...normalized.resources,
-      grain: (normalized.resources?.grain ?? 0) - grainCount,
-      vegetable: (normalized.resources?.vegetable ?? 0) - vegetableCount,
+      grain: (normalized.resources?.grain ?? 0) - cropCount.grain,
+      vegetable: (normalized.resources?.vegetable ?? 0) - cropCount.vegetable,
     },
   }
   return { ok: true, player: updated as T }
@@ -1239,14 +1259,15 @@ export const buildSowFarmInteraction = (
 
   const selectableFields: {
     tile: FarmTilePosition
-    allowedCrops: ('grain' | 'vegetable' | 'wood')[]
+    allowedCrops: ('grain' | 'vegetable' | 'wood' | 'stone')[]
     sourceCard?: string
+    groupKey?: string
   }[] = normalized.fields.flatMap((field) => {
     if (field.stacks.length !== 0) return []
     const key = positionKey({ row: field.row, col: field.col })
     if (excludedKeys.has(key)) return []
     if (allowedKeys && !allowedKeys.has(key)) return []
-    const allowedCrops: ('grain' | 'vegetable' | 'wood')[] = []
+    const allowedCrops: ('grain' | 'vegetable' | 'wood' | 'stone')[] = []
     if ((normalized.resources.grain ?? 0) > 0) {
       allowedCrops.push('grain')
     }

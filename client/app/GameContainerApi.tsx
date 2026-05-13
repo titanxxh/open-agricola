@@ -1299,6 +1299,7 @@ export const GameContainerApi = () => {
     grain: Math.max(0, (displayPlayer?.resources.grain ?? 0) - Object.values(pendingSowSelections).filter((v) => v === 'grain').length),
     vegetable: Math.max(0, (displayPlayer?.resources.vegetable ?? 0) - Object.values(pendingSowSelections).filter((v) => v === 'vegetable').length),
     wood: Math.max(0, (displayPlayer?.resources.wood ?? 0) - Object.values(pendingSowSelections).filter((v) => v === 'wood').length),
+    stone: Math.max(0, (displayPlayer?.resources.stone ?? 0) - Object.values(pendingSowSelections).filter((v) => v === 'stone').length),
   }), [displayPlayer?.resources, pendingSowSelections])
   const futureCardResources = useMemo(() => {
     if (!state) return {}
