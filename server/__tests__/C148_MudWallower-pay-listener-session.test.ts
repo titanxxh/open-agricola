@@ -57,37 +57,49 @@ describe('C148 MudWallower — after-pay sync listener', () => {
     expect(listener!.cardIds).toEqual([CARD_ID])
   })
 
-  it('syncs held downward when boar pay drains player below cap', () => {
+  it('returns held-downward sync flow when boar pay drains player below cap', () => {
     const listener = findListener('C148-mud-wallower-after-pay-sync')!
     const player = createPlayer()
     player.cardStates = { [CARD_ID]: { counters: { counter: 0, held: 2 } } }
     // Player paid 1 boar (e.g. cooking): now has 1 boar, but cap is 2
     player.resources.boar = 1
     const state = createState(player)
-    executeCardListener(listener, {
+    const result = executeCardListener(listener, {
       state, player,
       space: createSpace('cooking'),
       actionId: 'pay', phase: 'after',
       sourceCard: undefined,
       result: { type: 'ok', resourcesPaid: { boar: 1 } },
     } as unknown as CardListenerContext)
-    expect(player.cardStates![CARD_ID]!.counters!.held).toBe(1)
+    expect(result?.flow).toEqual({
+      type: 'leaf',
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'set-counter', key: 'held', value: 1 },
+    })
+    expect(player.cardStates![CARD_ID]!.counters!.held).toBe(2)
   })
 
-  it('syncs to 0 when boar pay drains all pigs', () => {
+  it('returns held sync-to-zero flow when boar pay drains all pigs', () => {
     const listener = findListener('C148-mud-wallower-after-pay-sync')!
     const player = createPlayer()
     player.cardStates = { [CARD_ID]: { counters: { counter: 0, held: 2 } } }
     player.resources.boar = 0
     const state = createState(player)
-    executeCardListener(listener, {
+    const result = executeCardListener(listener, {
       state, player,
       space: createSpace('begging-card-pay'),
       actionId: 'pay', phase: 'after',
       sourceCard: undefined,
       result: { type: 'ok', resourcesPaid: { boar: 2 } },
     } as unknown as CardListenerContext)
-    expect(player.cardStates![CARD_ID]!.counters!.held).toBe(0)
+    expect(result?.flow).toEqual({
+      type: 'leaf',
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'set-counter', key: 'held', value: 0 },
+    })
+    expect(player.cardStates![CARD_ID]!.counters!.held).toBe(2)
   })
 
   it('does not sync when no boar paid (e.g. wood/food only payment)', () => {

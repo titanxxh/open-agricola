@@ -5,7 +5,6 @@ import { computeAnimalZones } from '../../shared/domain/animal-zones'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C148_MudWallower'
-import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'C148_MudWallower'
 
@@ -67,7 +66,7 @@ describe('C148_MudWallower', () => {
     expect(player.cardStates?.[CARD_ID]?.infobox).toBe('0 / 4')
   })
 
-  it('increments counter on accumulation space use', () => {
+  it('returns counter increment flow on accumulation space use', () => {
     const listener = findListener('C148-mud-wallower-after-place-farmer')
     expect(listener).toBeDefined()
 
@@ -82,11 +81,27 @@ describe('C148_MudWallower', () => {
       actionId: 'place-farmer', phase: 'after',
     } as unknown as CardListenerContext)
 
-    expect(player.cardStates?.[CARD_ID]?.counters?.counter).toBe(1)
-    expect(result).toBeUndefined() // Not 4th placement yet
+    expect(result?.flow).toEqual({
+      type: 'seq',
+      children: [
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: CARD_ID,
+          params: { kind: 'set-counter', key: 'counter', value: 1 },
+        },
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: CARD_ID,
+          params: { kind: 'set-infobox', text: '1 / 4' },
+        },
+      ],
+    })
+    expect(player.cardStates?.[CARD_ID]?.counters?.counter).toBe(0)
   })
 
-  it('gains 1 pig on 4th accumulation space use', () => {
+  it('returns reset, held increment, and pig gain flow on 4th accumulation space use', () => {
     const listener = findListener('C148-mud-wallower-after-place-farmer')
     expect(listener).toBeDefined()
 
@@ -106,13 +121,41 @@ describe('C148_MudWallower', () => {
     } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
-    expect(result!.flow!.type).toBe('leaf')
-    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
-    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ boar: 1 })
+    expect(result!.flow).toEqual({
+      type: 'seq',
+      children: [
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: CARD_ID,
+          params: { kind: 'set-counter', key: 'counter', value: 0 },
+        },
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: CARD_ID,
+          params: { kind: 'set-counter', key: 'held', value: 1 },
+        },
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: CARD_ID,
+          params: { kind: 'set-infobox', text: '0 / 4' },
+        },
+        {
+          type: 'leaf',
+          actionId: 'gain',
+          sourceCard: CARD_ID,
+          params: { boar: 1 },
+          choiceLabelKey: undefined,
+          choiceLabelParams: undefined,
+        },
+      ],
+    })
 
-    // Counter should reset, held should increase
-    expect(player.cardStates?.[CARD_ID]?.counters?.counter).toBe(0)
-    expect(player.cardStates?.[CARD_ID]?.counters?.held).toBe(1)
+    // Counter and held update only when the engine executes the returned flow.
+    expect(player.cardStates?.[CARD_ID]?.counters?.counter).toBe(3)
+    expect(player.cardStates?.[CARD_ID]?.counters?.held).toBe(0)
   })
 
   it('does not trigger on non-accumulation spaces', () => {
@@ -165,7 +208,7 @@ describe('C148_MudWallower', () => {
     expect(cardZone).toBeUndefined()
   })
 
-  it('syncs held down when player has fewer pigs than cap (after exchange / place-farmer)', () => {
+  it('returns held-downward sync flow when player has fewer pigs than cap', () => {
     const exchangeListener = findListener('C148-mud-wallower-after-exchange')
     expect(exchangeListener).toBeDefined()
 
@@ -178,14 +221,19 @@ describe('C148_MudWallower', () => {
 
     const state = createState(player)
 
-    executeCardListener(exchangeListener!, {
+    const result = executeCardListener(exchangeListener!, {
       state, player,
       space: createSpace('exchange'),
       actionId: 'exchange', phase: 'after',
     } as unknown as CardListenerContext)
 
-    // held should drop to 1 (player only has 1 pig left)
-    expect(player.cardStates?.[CARD_ID]?.counters?.held).toBe(1)
+    expect(result?.flow).toEqual({
+      type: 'leaf',
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'set-counter', key: 'held', value: 1 },
+    })
+    expect(player.cardStates?.[CARD_ID]?.counters?.held).toBe(2)
   })
 
   it('held is permanent - does not increase when pig count grows back', () => {
