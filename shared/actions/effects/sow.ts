@@ -7,6 +7,7 @@ import type {
 import { fieldIsEmpty } from '../../domain/field'
 import { positionKey } from '../../domain/farm'
 import { playerBoard, type SowSelection } from '../../domain'
+import { buildSowFarmInteraction } from '../../domain/farmyard'
 import { handleSowExtraField } from '../../cards/card-effects'
 
 export const getEmptyFields = (player: PlayerState) =>
@@ -63,12 +64,34 @@ const finalizeSow = (
   const extraAllowedCrops = new Map(
     extraFields.map((field) => [positionKey(field.tile), field.allowedCrops] as const),
   )
+  const extraGroupKeys = new Map(
+    extraFields
+      .filter((field): field is typeof field & { groupKey: string } =>
+        field.groupKey !== undefined,
+      )
+      .map((field) => [positionKey(field.tile), field.groupKey] as const),
+  )
+  // §2.5 P0 修正: normal field 物理只支持 grain/vegetable stack. 当 cropType
+  // ∈ {wood,stone} 时 normal field 必须拒绝 (否则 validateSow 通过但
+  // updatedFields 不 push stack 也不扣资源, silent gap).
+  const ctxCropType =
+    typeof ctx.actionContext?.cropType === 'string'
+      ? (ctx.actionContext.cropType as SowSelection['crop'])
+      : undefined
+  const normalFieldAllowedCrops: SowSelection['crop'][] | undefined =
+    ctxCropType === 'grain' || ctxCropType === 'vegetable'
+      ? [ctxCropType]
+      : ctxCropType === 'wood' || ctxCropType === 'stone'
+        ? []
+        : undefined
   const validated = board.farmyard.canSow(
     { fields: crops },
     {
       maxSelections,
       excludedFields,
       extraAllowedCrops: extraAllowedCrops.size > 0 ? extraAllowedCrops : undefined,
+      extraGroupKeys: extraGroupKeys.size > 0 ? extraGroupKeys : undefined,
+      normalFieldAllowedCrops,
     },
   )
   if (!validated.ok) {
@@ -94,7 +117,10 @@ export const sowAction: ActionDefinition = {
   descriptionKey: 'actions.sow.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (_, player) => canSow(player),
+  canBeExecutedByPlayer: (_state, player, context) => {
+    const farm = buildSowFarmInteraction(player, context?.actionContext)
+    return farm.farmType === 'sow' && farm.selectableFields.length > 0
+  },
   execute: ({ state, player, actionContext }): ActionExecutionResult => {
     const idx = state.players.indexOf(player)
     const farm = playerBoard(state, idx).farmyard.selectableTiles('sow', { actionContext })
