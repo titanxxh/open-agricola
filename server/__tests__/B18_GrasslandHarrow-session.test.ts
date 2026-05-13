@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
+import { specialEffectAction } from '../../shared/actions/effects/special-effect'
+import { futureMeeplesAction } from '../../shared/actions/effects/internal/future-meeples'
 
 import '../../shared/cards/B/B18_GrasslandHarrow'
-import type { ActionFlow } from '../../shared/contract/types'
+import type { ActionFlow, ActionSpace, GameState, PlayerState } from '../../shared/contract/types'
 
 const CARD_ID = 'B18_GrasslandHarrow'
 
@@ -27,30 +29,52 @@ describe('B18_GrasslandHarrow onRoundStart (post 7b1 listener migration)', () =>
     return { session, state, player }
   }
 
+  const executeDeterministicLeaves = (
+    flow: ActionFlow | undefined,
+    state: GameState,
+    player: PlayerState,
+    space: ActionSpace = { id: 'test' } as ActionSpace,
+  ) => {
+    if (!flow) return
+    if (flow.type === 'seq') {
+      flow.children.forEach((child) => executeDeterministicLeaves(child, state, player, space))
+      return
+    }
+    if (flow.type !== 'leaf') return
+    if (flow.actionId === 'special-effect') {
+      specialEffectAction.execute({ state, player, space, params: flow.params, sourceCard: flow.sourceCard, actionContext: flow.actionContext })
+    }
+    if (flow.actionId === 'future-meeples') {
+      futureMeeplesAction.execute({ state, player, space, params: flow.params, sourceCard: flow.sourceCard, actionContext: flow.actionContext })
+    }
+  }
+
   const fireAfterPay = (state: ReturnType<typeof setupState>['state'], player: ReturnType<typeof setupState>['player']) => {
     const listener = findListener('B18-grassland-harrow-after-pay')!
-    executeCardListener(listener, {
+    const result = executeCardListener(listener, {
       state, player,
       space: { id: 'improvement-any' } as never,
       actionId: 'pay', phase: 'after',
       sourceCard: CARD_ID,
       result: { type: 'ok', resourcesPaid: { wood: 2 } },
     } as unknown as CardListenerContext)
+    executeDeterministicLeaves(result?.flow, state, player)
+    return result
   }
 
   it('after-pay listener queues field at current round + reserve', () => {
     const { state, player } = setupState(3, {
       wood: 2, stone: 1, clay: 1, reed: 0, food: 0,
     })
-    fireAfterPay(state, player)
-    expect(state.pendingFutureMeeples.length).toBe(1)
-    const req = state.pendingFutureMeeples[0]!
-    if ('entries' in req) {
-      // 2 + 1 + 1 + 0 = 4 → round 7
-      expect(req.entries.map((e) => e.round)).toEqual([7])
-    } else {
-      throw new Error('expected entries-shaped future request')
-    }
+    const result = fireAfterPay(state, player)
+    expect(result?.flow).toMatchObject({
+      type: 'seq',
+      children: [
+        { type: 'leaf', actionId: 'special-effect', params: { kind: 'set-extra-data', key: 'targetRound', value: 7 } },
+        { type: 'leaf', actionId: 'future-meeples' },
+      ],
+    })
+    expect(state.futureMeeples.map((entry) => entry.round)).toEqual([7])
   })
 
   it('onBuy is now a no-op (listener drives the future meeple)', () => {

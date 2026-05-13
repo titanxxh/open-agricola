@@ -1,6 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { readCardExtraData } from '../helpers/card-state'
 import { positionKey } from '../../domain/farm'
 import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
@@ -23,7 +23,19 @@ const beforeListener: CardListenerRegistration = {
   actions: ['construct', 'fence', 'stables'],
   phases: ['before' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    writeCardExtraData(context.player, CARD_ID, 'spacesBefore', countUsedSpaces(context.player))
+    return {
+      flow: {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: {
+          kind: 'set-extra-data',
+          key: 'spacesBefore',
+          value: countUsedSpaces(context.player),
+        },
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 

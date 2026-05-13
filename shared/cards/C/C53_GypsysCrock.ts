@@ -2,7 +2,6 @@ import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import {
   readCardExtraData,
-  writeCardExtraData,
 } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getMajorCard } from '../major'
@@ -43,7 +42,15 @@ const tradeAppliedListener: CardListenerRegistration = {
     const times = typeof extra.times === 'number' ? extra.times : 0
     if (times <= 0) return
     const prior = readCardExtraData<number>(context.player, CARD_ID, COUNTER_KEY) ?? 0
-    writeCardExtraData(context.player, CARD_ID, COUNTER_KEY, prior + times)
+    return {
+      flow: {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: { kind: 'set-extra-data', key: COUNTER_KEY, value: prior + times },
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 
@@ -60,11 +67,19 @@ const afterExchangeListener: CardListenerRegistration = {
   handler: (context): ActionHookResult | void => {
     const cooked = readCardExtraData<number>(context.player, CARD_ID, COUNTER_KEY) ?? 0
     if (cooked <= 0) return
-    writeCardExtraData(context.player, CARD_ID, COUNTER_KEY, 0)
     const bonus = Math.floor(cooked / 2)
-    if (bonus <= 0) return
+    const reset = {
+      type: 'leaf' as const,
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'set-extra-data', key: COUNTER_KEY, value: 0 },
+    }
+    if (bonus <= 0) return { flow: reset, sourceCard: CARD_ID }
     return {
-      flow: gainLeaf(CARD_ID, { food: bonus }),
+      flow: {
+        type: 'seq',
+        children: [reset, gainLeaf(CARD_ID, { food: bonus })],
+      },
       sourceCard: CARD_ID,
     }
   },

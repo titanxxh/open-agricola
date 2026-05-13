@@ -1,6 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
+import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
@@ -20,7 +20,6 @@ const TARGET_ROUND_KEY = 'targetRound'
  */
 const afterPayListener: CardListenerRegistration = {
   id: 'B18-grassland-harrow-after-pay',
-  cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['pay'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
@@ -35,13 +34,23 @@ const afterPayListener: CardListenerRegistration = {
       (supply.reed ?? 0)
     if (reserve <= 0) return
     const targetRound = Math.min(14, context.state.round + reserve)
-    writeCardExtraData(context.player, CARD_ID, TARGET_ROUND_KEY, targetRound)
     return {
-      flow: queueFutureMeeplesFlow(context.state, {
-        cardId: CARD_ID,
-        playerId: context.player.id,
-        entries: [{ round: targetRound, resources: {} }],
-      }),
+      flow: {
+        type: 'seq',
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'set-extra-data', key: TARGET_ROUND_KEY, value: targetRound },
+          },
+          futureMeeplesNode({
+            cardId: CARD_ID,
+            playerId: context.player.id,
+            entries: [{ round: targetRound, resources: {} }],
+          }),
+        ],
+      },
       sourceCard: CARD_ID,
     }
   },

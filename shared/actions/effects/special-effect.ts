@@ -12,6 +12,7 @@ import {
   fieldHasCrop,
   fieldPopIfDepleted,
 } from '../../domain/field'
+import { clearPendingFenceBonus } from '../../cards/helpers/pending-fence-bonus'
 
 export type SpecialEffectParams =
   | { kind: 'increment-extra-data'; key: string; amount: number }
@@ -22,6 +23,7 @@ export type SpecialEffectParams =
   | { kind: 'swap-improvement-with-board'; from: string; to: string }
   | { kind: 'set-flag'; flag: boolean }
   | { kind: 'set-infobox'; text: string }
+  | { kind: 'clear-pending-fence-bonus' }
   | { kind: 'remove-field-crop'; crop: 'grain' | 'vegetable'; minRemaining?: number }
   | { kind: 'consume-fence'; count?: number }
   | {
@@ -105,6 +107,9 @@ export const specialEffectAction: ActionDefinition = {
         return { type: 'ok' }
       case 'set-infobox':
         writeCardInfobox(target, sourceCard, p.text)
+        return { type: 'ok' }
+      case 'clear-pending-fence-bonus':
+        clearPendingFenceBonus(target)
         return { type: 'ok' }
       case 'remove-field-crop': {
         // Used by C57 Crudite-style "discard 1 crop on top of another" effects.
