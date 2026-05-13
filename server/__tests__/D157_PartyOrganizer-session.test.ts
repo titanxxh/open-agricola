@@ -8,12 +8,13 @@ import {
   familySize,
 } from '../../shared/domain/player'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
+import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 import type {
   ActionHookPhase,
   ActionHookResult,
 } from '../../shared/actions/hooks'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
-import type { GameState, PlayerState } from '../../shared/contract/types'
+import type { ActionSpace, GameState, PlayerState } from '../../shared/contract/types'
 
 const CARD_ID = 'D157_PartyOrganizer'
 
@@ -40,18 +41,46 @@ describe('D157 Party Organizer — listener', () => {
     const handler = D157_PartyOrganizer_impl.listeners[0]!.handler
     const ctx: CardListenerContext = {
       state,
-      player: owner,
+      player: opponent,
       triggerPlayer: opponent,
+      ownerPlayer: owner,
+      effectPlayer: owner,
       actionId: 'family-growth',
       phase: 'after' as ActionHookPhase,
     } as unknown as CardListenerContext
     const result = handler(ctx) as ActionHookResult | undefined
     expect(result).toBeTruthy()
     expect(result?.sourceCard).toBe(CARD_ID)
-    // After listener fires, the owner is flagged so re-trigger is suppressed.
+    expect(isCardFlagged(owner, CARD_ID)).toBe(false)
+    expect(result?.flow?.type).toBe('seq')
+    if (result?.flow?.type !== 'seq') throw new Error('expected seq flow')
+    expect(result.flow.children).toHaveLength(2)
+    expect(result.flow.children[0]).toMatchObject({
+      type: 'leaf',
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'set-flag', flag: true },
+      actionContext: { targetPlayerId: owner.id },
+    })
+    expect(result.flow.children[1]).toMatchObject({
+      type: 'leaf',
+      actionId: 'gain',
+      sourceCard: CARD_ID,
+      params: { food: 8 },
+    })
+
+    const flagLeaf = result.flow.children[0]
+    if (flagLeaf.type !== 'leaf') throw new Error('expected flag leaf')
+    specialEffectAction.execute({
+      state,
+      player: opponent,
+      space: { id: 'special-effect' } as ActionSpace,
+      sourceCard: flagLeaf.sourceCard,
+      params: flagLeaf.params,
+      actionContext: flagLeaf.actionContext,
+    })
     expect(isCardFlagged(owner, CARD_ID)).toBe(true)
 
-    // Re-invoking returns nothing (flag suppression).
     const result2 = handler(ctx)
     expect(result2).toBeUndefined()
   })

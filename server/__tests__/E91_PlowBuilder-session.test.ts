@@ -5,12 +5,8 @@ import {
   writeCardExtraData,
   setCardFlag,
 } from '../../shared/cards/helpers/card-state'
-import {
-  getRegisteredCardListeners,
-  executeCardListener,
-  type CardListenerContext,
-} from '../../shared/cards/card-listeners'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
+import { dispatchTradeAppliedListener } from '../../shared/actions/effects/exchange'
 
 import '../../shared/cards/E/E91_PlowBuilder'
 import type { AnytimeAction } from '../../shared/contract/types'
@@ -127,20 +123,13 @@ describe('E91_PlowBuilder session', () => {
     player.occupationPlayed.push(CARD_ID)
     session.loadState(state)
 
-    const listener = getRegisteredCardListeners().find(
-      (l) => l.id === 'E91-plow-builder-trade-applied',
-    )
-    expect(listener).toBeDefined()
-
     expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBeUndefined()
-
-    executeCardListener(listener!, {
+    dispatchTradeAppliedListener(
       state,
       player,
-      actionId: 'trade-applied',
-      phase: 'immediatelyAfter',
-      extraData: { sourceId: 'Major_Joinery', times: 1 },
-    } as unknown as CardListenerContext)
+      { from: { wood: 1 }, to: { food: 2 }, sourceId: 'Major_Joinery' },
+      1,
+    )
     expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBe(true)
   })
 
@@ -152,17 +141,12 @@ describe('E91_PlowBuilder session', () => {
     player.occupationPlayed.push(CARD_ID)
     session.loadState(state)
 
-    const listener = getRegisteredCardListeners().find(
-      (l) => l.id === 'E91-plow-builder-trade-applied',
-    )!
-
-    executeCardListener(listener, {
+    dispatchTradeAppliedListener(
       state,
       player,
-      actionId: 'trade-applied',
-      phase: 'immediatelyAfter',
-      extraData: { sourceId: 'Major_Fireplace1', times: 1 },
-    } as unknown as CardListenerContext)
+      { from: { wood: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace1' },
+      1,
+    )
     expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBeFalsy()
   })
 
@@ -176,17 +160,12 @@ describe('E91_PlowBuilder session', () => {
     player.occupationPlayed.push(CARD_ID)
     session.loadState(state)
 
-    const listener = getRegisteredCardListeners().find(
-      (l) => l.id === 'E91-plow-builder-trade-applied',
-    )!
-
-    executeCardListener(listener, {
+    dispatchTradeAppliedListener(
       state,
       player,
-      actionId: 'trade-applied',
-      phase: 'immediatelyAfter',
-      extraData: { sourceId: 'Major_JoineryDeluxe', times: 1 },
-    } as unknown as CardListenerContext)
+      { from: { wood: 1 }, to: { food: 2 }, sourceId: 'Major_JoineryDeluxe' },
+      1,
+    )
     expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBe(true)
   })
 

@@ -1,5 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionFlow } from '../../contract/types'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
@@ -10,6 +11,18 @@ const CARD_ID = B55_MaintenancePremium.id
 const updateInfobox = (player: Parameters<typeof writeCardInfobox>[0], count: number) => {
   writeCardInfobox(player, CARD_ID, `${count} Food`)
 }
+
+const specialEffect = (params: Record<string, unknown>): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: CARD_ID,
+  params,
+})
+
+const setStoredFoodFlow = (count: number): ActionFlow[] => [
+  specialEffect({ kind: 'set-extra-data', key: 'foodCount', value: count }),
+  specialEffect({ kind: 'set-infobox', text: `${count} Food` }),
+]
 
 const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =>
   (space?.gainPerRound?.wood ?? 0) > 0
@@ -24,9 +37,16 @@ const woodCollectListener: CardListenerRegistration = {
     const foodCount = readCardExtraData<number>(context.player, CARD_ID, 'foodCount') ?? 0
     if (foodCount <= 0) return
     const newCount = foodCount - 1
-    writeCardExtraData(context.player, CARD_ID, 'foodCount', newCount)
-    updateInfobox(context.player, newCount)
-    return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
+    return {
+      flow: {
+        type: 'seq',
+        children: [
+          ...setStoredFoodFlow(newCount),
+          gainLeaf(CARD_ID, { food: 1 }),
+        ],
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 
@@ -35,9 +55,14 @@ const renovationListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['renovate-house'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    writeCardExtraData(context.player, CARD_ID, 'foodCount', 3)
-    updateInfobox(context.player, 3)
+  handler: (_context: CardListenerContext): ActionHookResult | void => {
+    return {
+      flow: {
+        type: 'seq',
+        children: setStoredFoodFlow(3),
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 
