@@ -2,14 +2,6 @@ import { MinorImprovement } from '../types'
 
 const CARD_ID = 'D75_WoodField'
 
-/**
- * Sprint 7d (isField stub): full sow / harvest behaviour deferred to a later
- * sprint — needs sow-multiple infrastructure + WOOD-as-crop modelling on a
- * field card (CAN_SOW_MULTIPLE). For now we register the card with `isField:
- * true` so C80 Rocky Terrain can fire on its onBuy event (BGA "playing field
- * cards counts as plowing"); `implemented: false` keeps it out of the dealt
- * pool until the full mechanic lands.
- */
 export const D75_WoodField = new MinorImprovement({
   id: CARD_ID,
   name: 'Wood Field',
@@ -24,5 +16,4 @@ export const D75_WoodField = new MinorImprovement({
   prerequisite: '1 Occupation',
   occupationPrerequisites: { min: 1 },
   isField: true,
-  implemented: false,
 })
