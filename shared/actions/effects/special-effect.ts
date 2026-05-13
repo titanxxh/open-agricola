@@ -92,10 +92,12 @@ export const specialEffectAction: ActionDefinition = {
         const board = state.availableMajorImprovements ?? []
         const boardIndex = board.indexOf(p.to)
         if (playerIndex < 0 || boardIndex < 0) return { type: 'ok' }
-        target.improvements.splice(playerIndex, 1)
-        target.improvements.push(p.to)
+        if (target.improvements.includes(p.to)) return { type: 'ok' }
+        target.improvements[playerIndex] = p.to
         board.splice(boardIndex, 1)
-        board.push(p.from)
+        if (!board.includes(p.from)) {
+          board.splice(boardIndex, 0, p.from)
+        }
         return { type: 'ok' }
       }
       case 'set-flag':
