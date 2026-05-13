@@ -1,10 +1,33 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardListeners } from '../../shared/cards/card-listeners'
+import { specialEffectAction } from '../../shared/actions/effects/special-effect'
+import type { ActionFlow, GameState, PlayerState } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C53_GypsysCrock'
 
 describe('C53_GypsysCrock session', () => {
+  const executeSpecialEffectLeaves = (
+    flow: ActionFlow | undefined,
+    state: GameState,
+    player: PlayerState,
+  ) => {
+    if (!flow) return
+    if (flow.type === 'seq') {
+      flow.children.forEach((child) => executeSpecialEffectLeaves(child, state, player))
+      return
+    }
+    if (flow.type !== 'leaf' || flow.actionId !== 'special-effect') return
+    specialEffectAction.execute({
+      state,
+      player,
+      space: { id: 'test' } as never,
+      params: flow.params,
+      sourceCard: flow.sourceCard,
+      actionContext: flow.actionContext,
+    })
+  }
+
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -148,8 +171,8 @@ describe('C53_GypsysCrock session', () => {
 
     // Synthesize the trade-applied event for a non-cooking source twice (so
     // we'd cross the pair threshold if the filter were broken).
-    const fire = (sourceId: string, times: number) =>
-      runCardListeners({
+    const fire = (sourceId: string, times: number) => {
+      const results = runCardListeners({
         state,
         player,
         space: { id: 'test' } as never,
@@ -157,6 +180,8 @@ describe('C53_GypsysCrock session', () => {
         phase: 'immediatelyAfter',
         extraData: { sourceId, times },
       })
+      results.forEach((result) => executeSpecialEffectLeaves(result.flow, state, player))
+    }
     fire('E64_SimpleOven', 2)
     // C53 counter must remain 0 (non-cooking source filtered out).
     const cooked = player.cardStates?.['C53_GypsysCrock']?.extraData?.cookedCount

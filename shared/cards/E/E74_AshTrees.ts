@@ -2,9 +2,6 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { initCardState } from '../__stubs__/helpers'
 import { writeCardInfobox } from '../helpers/card-state'
-import {
-  clearPendingFenceBonus,
-} from '../helpers/pending-fence-bonus'
 import { getFenceCount, getTotalPastureCells, maxFences, maxPastureCells, minimumFenceSegments } from '../../actions/effects/fencing'
 import type { CardImpl } from '../registry'
 import { E74_AshTrees } from '../../cards-display/E/E74_AshTrees'
@@ -19,8 +16,7 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const counters = initCardState(context.player, CARD_ID)
-    const stored = counters['fences'] ?? 0
+    const stored = context.player.cardStates?.[CARD_ID]?.counters?.fences ?? 0
     if (stored <= 0) return
     if ((context.player.resources.wood ?? 0) + stored < minimumFenceSegments) return
     if (getFenceCount(context.player) + minimumFenceSegments > maxFences) return
@@ -35,8 +31,7 @@ const beforeFenceListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const counters = initCardState(context.player, CARD_ID)
-    const stored = counters['fences'] ?? 0
+    const stored = context.player.cardStates?.[CARD_ID]?.counters?.fences ?? 0
     if (stored <= 0) return
 
     return {
@@ -70,10 +65,27 @@ const afterFenceListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    clearPendingFenceBonus(context.player)
-    const counters = initCardState(context.player, CARD_ID)
-    const remaining = counters['fences'] ?? 0
-    writeCardInfobox(context.player, CARD_ID, `${remaining} / ${MAX_FREE_FENCES}`)
+    const remaining = context.player.cardStates?.[CARD_ID]?.counters?.fences ?? 0
+    return {
+      flow: {
+        type: 'seq',
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'clear-pending-fence-bonus' },
+          },
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'set-infobox', text: `${remaining} / ${MAX_FREE_FENCES}` },
+          },
+        ],
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 

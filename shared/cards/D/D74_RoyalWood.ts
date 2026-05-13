@@ -27,7 +27,19 @@ const beforeListener: CardListenerRegistration = {
   actions: TRACKED_PAIRED_ACTIONS,
   phases: ['before' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    writeCardExtraData(context.player, CARD_ID, 'woodBefore', context.player.resources.wood)
+    return {
+      flow: {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: {
+          kind: 'set-extra-data',
+          key: 'woodBefore',
+          value: context.player.resources.wood,
+        },
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 
@@ -41,7 +53,15 @@ const afterListener: CardListenerRegistration = {
     const spent = Math.max(0, before - context.player.resources.wood)
     if (spent <= 0) return
     const total = (readCardExtraData<number>(context.player, CARD_ID, 'woodSpent') ?? 0) + spent
-    writeCardExtraData(context.player, CARD_ID, 'woodSpent', total)
+    return {
+      flow: {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: { kind: 'set-extra-data', key: 'woodSpent', value: total },
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 
@@ -66,7 +86,15 @@ const afterPayListener: CardListenerRegistration = {
     const wood = (result.resourcesPaid as { wood?: number } | undefined)?.wood
     if (!wood || wood <= 0) return
     const total = (readCardExtraData<number>(context.player, CARD_ID, 'woodSpent') ?? 0) + wood
-    writeCardExtraData(context.player, CARD_ID, 'woodSpent', total)
+    return {
+      flow: {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: { kind: 'set-extra-data', key: 'woodSpent', value: total },
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 

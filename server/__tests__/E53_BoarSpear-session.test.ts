@@ -4,12 +4,35 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import { recordActionSnapshot } from '../../shared/cards/helpers/action-snapshot'
 import { E53_BoarSpear_impl } from '../../shared/cards/E/E53_BoarSpear'
+import { specialEffectAction } from '../../shared/actions/effects/special-effect'
+import type { ActionFlow, GameState, PlayerState } from '../../shared/contract/types'
 
 import '../../shared/cards/E/E53_BoarSpear'
 import '../../shared/cards/E/E85_MasterTanner'
 
 const CARD_ID = 'E53_BoarSpear'
 const E85_ID = 'E85_MasterTanner'
+
+const executeSpecialEffectLeaves = (
+  flow: ActionFlow | undefined,
+  state: GameState,
+  player: PlayerState,
+) => {
+  if (!flow) return
+  if (flow.type === 'seq') {
+    flow.children.forEach((child) => executeSpecialEffectLeaves(child, state, player))
+    return
+  }
+  if (flow.type !== 'leaf' || flow.actionId !== 'special-effect') return
+  specialEffectAction.execute({
+    state,
+    player,
+    space: { id: 'test' } as never,
+    params: flow.params,
+    sourceCard: flow.sourceCard,
+    actionContext: flow.actionContext,
+  })
+}
 
 type AnimalZone = {
   id: string
@@ -190,6 +213,7 @@ describe('E53_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
 
     const result1 = handler(ctx as never)
     expect(result1).toBeDefined()
+    executeSpecialEffectLeaves(result1?.flow, state, player)
     expect(readCardExtraData<number>(player, CARD_ID, 'E53UsedActionToken')).toBe(99)
 
     const result2 = handler(ctx as never)

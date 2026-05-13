@@ -1,7 +1,7 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
+import { readCardExtraData } from '../helpers/card-state'
 import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { C48_Farmstead } from '../../cards-display/C/C48_Farmstead'
@@ -25,7 +25,19 @@ const beforeListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    writeCardExtraData(context.player, CARD_ID, 'usedTilesBefore', countUsedTiles(context.player))
+    return {
+      flow: {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: {
+          kind: 'set-extra-data',
+          key: 'usedTilesBefore',
+          value: countUsedTiles(context.player),
+        },
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 
@@ -37,9 +49,31 @@ const afterListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const before = readCardExtraData<number>(context.player, CARD_ID, 'usedTilesBefore') ?? 0
     const after = countUsedTiles(context.player)
-    writeCardExtraData(context.player, CARD_ID, 'usedTilesBefore', undefined)
     if (after > before) {
-      return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
+      return {
+        flow: {
+          type: 'seq',
+          children: [
+            {
+              type: 'leaf',
+              actionId: 'special-effect',
+              sourceCard: CARD_ID,
+              params: { kind: 'set-extra-data', key: 'usedTilesBefore', value: undefined },
+            },
+            gainLeaf(CARD_ID, { food: 1 }),
+          ],
+        },
+        sourceCard: CARD_ID,
+      }
+    }
+    return {
+      flow: {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: { kind: 'set-extra-data', key: 'usedTilesBefore', value: undefined },
+      },
+      sourceCard: CARD_ID,
     }
   },
 }
