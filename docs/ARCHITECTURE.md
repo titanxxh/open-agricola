@@ -306,7 +306,9 @@ shared/engine/
 
 ### 5.2 节点类型
 
-**架构决策（2026-05-13）：领域层 `ActionFlow` 对齐 BGA node algebra，只保留 `leaf / seq / parallel / xor / or`。** `optional`、`promptKey`、`sourceCard`、`choiceLabel*` 是节点 metadata，不是新的领域节点类型。卡牌和 listener 只能构造这个小集合；新规则不应向 `ActionFlow` 暴露 runtime-only node。
+**架构决策（2026-05-13）：领域层 `ActionFlow` 对齐 BGA node algebra，只保留 `leaf / seq / parallel / xor / or`。** `optional`、`promptKey`、`sourceCard`、`choiceLabel*`、`targetPlayerId` 是节点 metadata，不是新的领域节点类型。卡牌和 listener 只能构造这个小集合；新规则不应向 `ActionFlow` 暴露 runtime-only node。
+
+`targetPlayerId` 表示"这个普通 flow node 在另一个玩家视角下执行"。编译到 runtime engine 时，它会被降级为内部 `PlayerSwitchNode` wrapper；card-facing flow 不再写 `{ type: 'playerSwitch' }`。Session 顶层 flow builder 和动态插入路径（hook / listener / action `result.flow` / resolveChoice follow-up）都必须带上当前 owner id，让 wrapper 成对生成 switch-to / flow / switch-back。cursor restore 使用 frame 的 `ownerPlayerIndex` rebuild flow engine，避免反序列化后把 switch-back 指向当前全局玩家。
 
 当前 engine 仍有若干过渡期 runtime node，用来承接 WS pending、跨玩家确认、listener 激活和序列化恢复。它们是实现细节，不是卡牌 DSL：
 
@@ -315,7 +317,7 @@ shared/engine/
 - `OptionalNode`：过渡 wrapper；目标语义是任意 node 的 `optional` metadata，后续不在其上增加新行为。
 - `InteractionNode`：leaf action 执行后产生的 pending/protocol state；带 `request: InteractionRequest`、`promptKey`、`promptParams`、`sourceCard`。新等待形态 = 加 `InteractionRequest` 新 kind，不加卡牌可见节点类型。
 - `ActivateCardNode`：listener 激活的过渡 wrapper；目标是普通 leaf action（如 `activate-card`）+ `{ listenerId, cardId, event }` params。
-- `PlayerSwitchNode`：跨玩家确认 / undo boundary 的过渡 wrapper；目标是普通 leaf action 或 node metadata，不作为领域 flow primitive。
+- `PlayerSwitchNode`：runtime-only 跨玩家确认 / owner 切换 wrapper；由 `targetPlayerId` metadata 编译产生，不作为领域 flow primitive。
 - `ParallelTriggerNode`：多 listener 选择顺序的过渡 specialization；目标是把 select/pass/mandatory/independent 语义并入 generic `ParallelNode`，与 BGA `ParallelNode::getChoices()` 模型一致。
 
 `AbstractNode` 提供：`isDoable / isAutomatic / resolve / parent / children / push / replace / isResolved / getNextUnresolved / toCursor / fromCursor`。
@@ -554,6 +556,14 @@ OA 对齐规则：
 - 只影响可达性或费用的 listener 应返回纯 `doable` / `costs` / `bonuses`。典型例子：D82 Hunting Trophy 通过 `space.id` scoped `isDoable` + `computeCosts` 建模 farm/house redevelopment，不再用 before/after flag 或 `activeModifiers` 临时桥。
 
 **2026-05-13 Wave2a 合成 dispatch 边界：`trade-applied` / `reap` 这类没有完整 engine 的 listener dispatch，只通过 immediate-special-effect helper 执行确定性的状态同步叶子。** 该 helper 只遍历非 optional 的 `special-effect` leaf，以及确定性的 `seq` / `parallel` flow；刻意跳过 `gain`、`pay`、interactive、optional、`or` / `xor`、`playerSwitch`。需要更丰富合成 listener 效果时，必须接入真实 engine flow 路径，而不是扩展这个 helper；这样 Wave2a 的 cardState-only 合成 listener 能保持 pure handler，同时不重新引入 dispatch-time handler mutation。
+
+**2026-05-13 Wave2b/c 落地规则：listener 内的 cardState / structural mutation 也必须通过 action leaf 执行。** 本轮把 A68 / A73 / A92 / B18 / B34 / B76 / C48 / C53 / C93 / C130 / C150 / D36 / D56 / D74 / D158 / E53 / E74 / E85 / E148 的剩余 handler mutation 迁出：
+
+- `special-effect` 扩展为 listener-purity 的通用 mutation dispatcher：`clear-pending-fence-bonus`、`remove-future-meeples`、`promote-first-newborn`、`add-resource-to-space`、`build-stable-on-first-empty-tile`。
+- B18 这类 future-meeple 写入走 lazy flow；after-pay listener 不再立即 queue。
+- C93 / C130 对 action space 的资源写入返回 `special-effect.add-resource-to-space`，额外放人仍保持 optional。
+- E148 opponent-scope listener 用 owner-targeted `special-effect` 更新 reserved action spaces / stable；"无空地但需要移除 marker" 这种无收益状态同步可返回 `countCardUse: false`，避免把纯清理计入卡牌 used stats。
+- `countCardUse: false` 只用于 listener 结果需要执行 housekeeping flow、但不应被视为卡牌效果触发的场景；不要用它隐藏真实收益或玩家选择。
 
 **多 listener 同 phase 触发**采用 BGA-style PARALLEL trigger selection：
 
