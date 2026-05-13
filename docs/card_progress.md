@@ -47,6 +47,7 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-05-13** — C115 Sower confirm-window BGA 对齐：`confirm-next-player` 重新作为当前行动玩家的 anytime window，允许合法 card anytime（含 `C115-sower-anytime`），但继续屏蔽 generic `exchange` 防递归；`confirm-player-switch` 仍封锁 anytime。新增 C115 session 回归覆盖 Major 后确认前选择 sow 并回到确认切换。
 - **2026-05-12** — C115 Sower + anytime nested pending 修复：`C115_Sower` after-major listener 改为返回 engine flow（`push-to-card-stack` + infobox）而非直接 mutate，避免 dispatch peek 与 lazy 执行造成双 reed；interactive nested anytime 完成后 `InteractionNode` 会重新写回 `pendingNodeIdRef`，parent exchange pending 自动恢复；`confirm-next-player` owner 改回刚完成行动的玩家，`nextPlayerIndex` 仅作为确认后的目标玩家。
 - **2026-05-12** — §2.4 metadata-3a parser bug 修复：(1) BGA cost 单/双引号数字 (2) BGA prereq `('...')` 简写 unwrap (3) TS cost JSON 双引号 key (4) diff 层 players default '1+' 归一。Report 重跑：❌ 95 → 33（消除假阳性）。后续真偏差在 metadata-3b 处理。
 - 2026-05-12 anytime 精细化过滤对齐 BGA：引入 `shared/session/anytime-policy.ts` helper，把"全屏蔽 anytime"改成按 entry.id 精细过滤；exchange / bake-bread / animal-reorg pending 内 card listener anytime 现可触发；feed 期间保持锁定（OA 刻意不同）；新增非当前 owner / 嵌套 / 负向 / stale resource / composite 一致性五类 session 测试。interactive nested anytime 曾有 parent exchange pending 不自动 resume 的 P1 limitation，已在同日后续修复（见上一条）。

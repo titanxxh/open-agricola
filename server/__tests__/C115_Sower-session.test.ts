@@ -13,6 +13,11 @@ describe('C115_Sower session', () => {
     state.currentPlayerIndex = 0
     state.round = 1
 
+    for (const p of state.players) {
+      p.minorHand = ['__test_placeholder__']
+      p.occupationHand = ['__test_placeholder__']
+    }
+
     const player = state.players[0]!
     player.occupationHand.push('C115_Sower')
     session.loadState(state)
@@ -62,6 +67,54 @@ describe('C115_Sower session', () => {
     const stack = getCardStack(player, 'C115_Sower')
     expect(stack).toEqual(['reed'])
     expect(player.cardStates?.C115_Sower?.infobox).toBe('1 Reed')
+  })
+
+  it('after major improvement, C115 anytime can sow before confirming next player', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.resources.grain = 2
+    player.fields = [{ row: 0, col: 0, stacks: [] }]
+    session.loadState(state)
+
+    let resp = playMajorImprovement(session)
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('confirm-next-player')
+    expect(resp.interaction.playerIndex).toBe(0)
+    expect(resp.interaction.nextPlayerIndex).toBe(1)
+    expect(getCardStack(resp.state.players[0]!, 'C115_Sower')).toEqual(['reed'])
+
+    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
+    expect(anytimeIds).toContain('C115-sower-anytime')
+    expect(anytimeIds).not.toContain('exchange')
+
+    resp = session.takeAnytimeAction(0, 'C115-sower-anytime')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+
+    const sowOption = resp.interaction.options?.[1]
+    expect(sowOption).toBeDefined()
+    resp = session.resolveChoice(0, sowOption!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('ui.interactionSowSelect')
+
+    resp = session.resolveChoice(0, 'confirm', {
+      crops: [{ row: 0, col: 0, crop: 'grain' }],
+    })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.grain).toBe(1)
+    expect(getCardStack(resp.state.players[0]!, 'C115_Sower')).toEqual([])
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('confirm-next-player')
+    expect(resp.interaction.playerIndex).toBe(0)
+    expect(resp.interaction.nextPlayerIndex).toBe(1)
   })
 
   it('playing a minor improvement does not add reed to card', () => {
