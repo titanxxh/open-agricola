@@ -1,9 +1,8 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
-import { isCardFlagged, setCardFlag } from '../helpers/card-state'
-import { findFirstNewborn, newbornCount } from '../../domain/player'
-import { removeWorkerRef } from '../../domain/space'
+import { isCardFlagged } from '../helpers/card-state'
+import { newbornCount } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { A92_AdoptiveParents } from '../../cards-display/A/A92_AdoptiveParents'
 
@@ -51,7 +50,15 @@ const beforePlaceFarmerListener: CardListenerRegistration = {
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isCardFlagged(context.player, CARD_ID)) return
-    setCardFlag(context.player, CARD_ID, false)
+    return {
+      flow: {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: { kind: 'set-flag', flag: false },
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 
@@ -100,16 +107,27 @@ const immediatelyAfterGainActivation: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     // Only fire for the A92-triggered gain (sourceCard is spread into the listener context)
     if (context.sourceCard !== CARD_ID) return
-    // Find the specific newborn worker and flip it to adult
-    const newborn = findFirstNewborn(context.player)
-    if (!newborn) return
-    newborn.isNewborn = false
-    // Remove the newborn's WorkerRef from whichever space it's on
-    for (const space of context.state.actionSpaces) {
-      const removed = removeWorkerRef(space, context.player.id, newborn.id)
-      if (removed) break
+    if (newbornCount(context.player) <= 0) return
+    return {
+      flow: {
+        type: 'seq',
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'promote-first-newborn' },
+          },
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'set-flag', flag: true },
+          },
+        ],
+      },
+      sourceCard: CARD_ID,
     }
-    setCardFlag(context.player, CARD_ID, true)
   },
 }
 

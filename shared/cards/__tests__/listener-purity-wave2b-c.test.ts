@@ -295,6 +295,18 @@ describe('listener purity wave 2b/c', () => {
     })
   })
 
+  it('A92 AdoptiveParents does not arm the place-farmer flag without a newborn', () => {
+    const p = player('A92_AdoptiveParents')
+    const game = state([p])
+    const before = stateSnapshot(game)
+
+    const result = listenerById(A92_AdoptiveParents_impl.listeners, 'A92-adoptive-parents-before-gain-activation')
+      .handler(context(p, { state: game, actionId: 'gain', phase: 'immediatelyAfter', sourceCard: 'A92_AdoptiveParents' }))
+
+    expectUnchanged(before, game)
+    expect(result).toBeUndefined()
+  })
+
   it('A92 AdoptiveParents before-place-farmer clears flag by flow only', () => {
     const p = player('A92_AdoptiveParents', {
       cardStates: { A92_AdoptiveParents: { flagged: true } },
@@ -509,6 +521,20 @@ describe('listener purity wave 2b/c', () => {
     })
   })
 
+  it('C150 ParrotBreeder self placement does not dispatch a no-op clear flow', () => {
+    const p = player('C150_ParrotBreeder', {
+      cardStates: { C150_ParrotBreeder: { flagged: false, extraData: { right: null } } },
+    })
+    const game = state([p])
+    const before = stateSnapshot(game)
+
+    const result = listenerById(C150_ParrotBreeder_impl.listeners, 'C150-parrot-breeder-after-self-place')
+      .handler(context(p, { state: game, actionId: 'place-farmer', phase: 'after' }))
+
+    expectUnchanged(before, game)
+    expect(result).toBeUndefined()
+  })
+
   it('C150 ParrotBreeder opponent placement updates right-neighbour tracker by flow only', () => {
     const owner = player('C150_ParrotBreeder', {
       id: 'owner',
@@ -543,6 +569,36 @@ describe('listener purity wave 2b/c', () => {
         { type: 'leaf', actionId: 'special-effect', sourceCard: 'C150_ParrotBreeder', actionContext: { targetPlayerId: owner.id }, params: { kind: 'set-flag', flag: false } },
       ],
     })
+  })
+
+  it('C150 ParrotBreeder opponent placement does not dispatch when tracker is already clear', () => {
+    const owner = player('C150_ParrotBreeder', {
+      id: 'owner',
+      name: 'Owner',
+      occupationPlayed: ['C150_ParrotBreeder'],
+      minorPlayed: [],
+      cardStates: { C150_ParrotBreeder: { flagged: false, extraData: { right: null } } },
+    })
+    const right = player('__right__', { id: 'right', name: 'Right', color: 'blue', minorPlayed: [], cardStates: {} })
+    const left = player('__left__', { id: 'left', name: 'Left', color: 'green', minorPlayed: [], cardStates: {} })
+    const forest = space('forest')
+    const game = state([right, owner, left], { actionSpaces: [forest] })
+    const before = stateSnapshot(game)
+
+    const result = listenerById(C150_ParrotBreeder_impl.listeners, 'C150-parrot-breeder-after-opponent-place')
+      .handler(context(owner, {
+        state: game,
+        player: left,
+        triggerPlayer: left,
+        ownerPlayer: owner,
+        effectPlayer: owner,
+        actionId: 'place-farmer',
+        phase: 'after',
+        space: forest,
+      }))
+
+    expectUnchanged(before, game)
+    expect(result).toBeUndefined()
   })
 
   it('D36 BreedRegistry after-collect stores sheep counter and infobox by flow only', () => {
