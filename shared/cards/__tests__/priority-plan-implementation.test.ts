@@ -182,6 +182,14 @@ describe('priority plan implementations', () => {
     player.minorPlayed = ['B34_SpecialFood']
     player.houseAnimalType = 'sheep'
     player.houseAnimalCount = 1
+    player.cardStates = {
+      ...(player.cardStates ?? {}),
+      B34_SpecialFood: {
+        extraData: {
+          animalsBeforeCollecting: { sheep: 1, boar: 0, cattle: 0 },
+        },
+      },
+    }
 
     executeCardListener(beforeListener!, {
       state: createState(player),
