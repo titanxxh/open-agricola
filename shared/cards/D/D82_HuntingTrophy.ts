@@ -1,7 +1,7 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { Bonus, CostModifier } from '../../contract/types'
-import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import type { Bonus } from '../../contract/types'
+import { canStartFencing } from '../../actions/effects/fencing'
 import type { CardImpl } from '../registry'
 import { D82_HuntingTrophy } from '../../cards-display/D/D82_HuntingTrophy'
 
@@ -20,12 +20,10 @@ const HOUSE_REDEV = 'house-redevelopment'
  *   2. Fences built on FarmRedevelopment cost a total of 3 wood less.
  *
  * Implementation:
- *   - Effect 1: `before:place-farmer` (space=house-redev) flags D82 via
- *     setCardFlag; `computeCosts` listener for `improvement-any` checks the
- *     flag and emits a BonusModifier with 4 chooseOne entries (one per building
- *     resource); `after:place-farmer` clears the flag.
- *   - Effect 2: `before:place-farmer` (space=farm-redev) pushes a fencing
- *     BonusModifier into player.activeModifiers; `after:place-farmer` pops it.
+ *   - Effect 1: `computeCosts` on house-redevelopment's improvement leaf emits
+ *     a Bonus with 4 chooseOne entries (one per building resource).
+ *   - Effect 2: `computeCosts` on farm-redevelopment's fence leaf discounts
+ *     3 wood; `isDoable` mirrors that discount for the fence entry guard.
  */
 
 const isFarmRedev = (context: CardListenerContext): boolean =>
@@ -34,63 +32,27 @@ const isFarmRedev = (context: CardListenerContext): boolean =>
 const isHouseRedev = (context: CardListenerContext): boolean =>
   context.space?.id === HOUSE_REDEV
 
-const beforeFarmRedev: CardListenerRegistration = {
-  id: 'D82-hunting-trophy-before-farm-redevelopment',
+const farmRedevFenceCostListener: CardListenerRegistration = {
+  id: 'D82-hunting-trophy-farm-redevelopment-fence-compute-costs',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['computeCosts' as ActionHookPhase],
+  actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isFarmRedev(context)) return
-    const mod: CostModifier = {
-      type: 'bonus',
-      cardId: CARD_ID,
-      appliesTo: ['fencing'],
-      discount: { wood: 3 },
-      optional: false,
-    }
-    if (!context.player.activeModifiers) {
-      ;(context.player as unknown as { activeModifiers: CostModifier[] }).activeModifiers = []
-    }
-    const existing = context.player.activeModifiers!.some(
-      (m) => m.cardId === CARD_ID,
-    )
-    if (!existing) context.player.activeModifiers!.push(mod)
+    return { costs: { wood: -3 } }
   },
 }
 
-const afterFarmRedev: CardListenerRegistration = {
-  id: 'D82-hunting-trophy-after-farm-redevelopment',
+const farmRedevFenceIsDoableListener: CardListenerRegistration = {
+  id: 'D82-hunting-trophy-farm-redevelopment-fence-isdoable',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.doable) return
     if (!isFarmRedev(context)) return
-    if (!context.player.activeModifiers) return
-    context.player.activeModifiers = context.player.activeModifiers.filter(
-      (m) => m.cardId !== CARD_ID,
-    )
-  },
-}
-
-const beforeHouseRedev: CardListenerRegistration = {
-  id: 'D82-hunting-trophy-before-house-redevelopment',
-  cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['place-farmer'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isHouseRedev(context)) return
-    setCardFlag(context.player, CARD_ID, true)
-  },
-}
-
-const afterHouseRedev: CardListenerRegistration = {
-  id: 'D82-hunting-trophy-after-house-redevelopment',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isHouseRedev(context)) return
-    setCardFlag(context.player, CARD_ID, false)
+    if (!canStartFencing(context.state, context.player, { wood: -3 })) return
+    return { doable: true }
   },
 }
 
@@ -100,7 +62,7 @@ const improvementCostListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['improvement-any', 'minor-improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isCardFlagged(context.player, CARD_ID)) return
+    if (!isHouseRedev(context)) return
     const bonus: Bonus = {
       choices: [
         { discount: { wood: 1 }, sources: [CARD_ID] },
@@ -117,10 +79,8 @@ const improvementCostListener: CardListenerRegistration = {
 
 export const D82_HuntingTrophy_impl = {
   listeners: [
-    beforeFarmRedev,
-    afterFarmRedev,
-    beforeHouseRedev,
-    afterHouseRedev,
+    farmRedevFenceCostListener,
+    farmRedevFenceIsDoableListener,
     improvementCostListener,
   ],
   reaches: [] as readonly string[],
