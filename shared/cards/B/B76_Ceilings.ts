@@ -1,7 +1,7 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { queueFutureMeeples, futureMeeplesNode, removeFutureMeeples } from '../../actions/effects/internal/future-meeples'
-import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
+import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { B76_Ceilings } from '../../cards-display/B/B76_Ceilings'
 
@@ -14,11 +14,26 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
-    removeFutureMeeples(context.state, {
-      playerId: context.player.id,
-      cardId: CARD_ID,
-    })
-    setCardFlag(context.player, CARD_ID, true)
+    return {
+      flow: {
+        type: 'seq',
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'remove-future-meeples' },
+          },
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'set-flag', flag: true },
+          },
+        ],
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 
