@@ -885,6 +885,8 @@ pnpm run build              # tsc + vite build
 11. **不为单卡改主路径**。
 12. **测试默认 2 人游戏**；规则正确性站后端边界，不通过 DOM 反推规则。
 13. **前端不做乐观提交**：等 `stateUpdate` 到达再改 UI。
+14. **ActionFlow 对齐 BGA 小代数**：卡牌 DSL 只暴露 `leaf / seq / parallel / xor / or` + metadata；runtime-only node 不进入卡牌 flow。
+15. **listener handler 不改 state**：listener / preview / doable 路径只 build flow 或返回结构化结果；状态修改必须落在 action leaf 执行阶段。
 
 ---
 
