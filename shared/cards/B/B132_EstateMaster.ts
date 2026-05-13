@@ -1,9 +1,7 @@
-import { incCounter } from '../__stubs__/helpers'
 import {
   readCardExtraData,
-  writeCardExtraData,
 } from '../helpers/card-state'
-import type { PlayerState } from '../../contract/types'
+import type { ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
@@ -25,6 +23,13 @@ const isFarmSaturated = (player: PlayerState): boolean => {
 const isSaturatedFlagged = (player: PlayerState): boolean =>
   readCardExtraData<boolean>(player, CARD_ID, 'saturated') === true
 
+const specialEffect = (params: Record<string, unknown>): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: CARD_ID,
+  params,
+})
+
 /**
  * BGA pattern: lazily set a saturation flag once the farmyard fills via any
  * Construct/Stables/Fencing/Plow event. Reap then awards bonus VP only when
@@ -42,7 +47,10 @@ const saturationCheckListener = (
   handler: (ctx) => {
     if (isSaturatedFlagged(ctx.player)) return
     if (isFarmSaturated(ctx.player)) {
-      writeCardExtraData(ctx.player, CARD_ID, 'saturated', true)
+      return {
+        flow: specialEffect({ kind: 'set-extra-data', key: 'saturated', value: true }),
+        sourceCard: CARD_ID,
+      }
     }
   },
 })
@@ -60,7 +68,10 @@ const reapListener: CardListenerRegistration = {
     // BGA: bonus VP gated on saturation flag; defensive fallback to live check
     // for paths that bypass the four flag-setting hooks.
     if (!isSaturatedFlagged(player) && !isFarmSaturated(player)) return
-    incCounter(player, CARD_ID, 'bonusVp', amount)
+    return {
+      flow: specialEffect({ kind: 'increment-counter', key: 'bonusVp', amount }),
+      sourceCard: CARD_ID,
+    }
   },
 }
 

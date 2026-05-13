@@ -13,6 +13,18 @@ const updateInfobox = (player: Parameters<typeof writeCardInfobox>[0], count: nu
   writeCardInfobox(player, CARD_ID, count > 0 ? `${count} Food` : 'Empty')
 }
 
+const specialEffect = (params: Record<string, unknown>): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: CARD_ID,
+  params,
+})
+
+const setStoredFoodFlow = (count: number): ActionFlow[] => [
+  specialEffect({ kind: 'set-extra-data', key: 'foodCount', value: count }),
+  specialEffect({ kind: 'set-infobox', text: count > 0 ? `${count} Food` : 'Empty' }),
+]
+
 const familyGrowthLeaf = (): ActionFlow => ({
   type: 'leaf',
   actionId: 'family-growth',
@@ -54,9 +66,16 @@ const grainGainListener: CardListenerRegistration = {
     const foodCount = readCardExtraData<number>(context.player, CARD_ID, 'foodCount') ?? 0
     if (foodCount <= 0) return
     const newCount = foodCount - 1
-    writeCardExtraData(context.player, CARD_ID, 'foodCount', newCount)
-    updateInfobox(context.player, newCount)
-    return { flow: buildFlow(newCount, context.player), sourceCard: CARD_ID }
+    return {
+      flow: {
+        type: 'seq',
+        children: [
+          ...setStoredFoodFlow(newCount),
+          buildFlow(newCount, context.player),
+        ],
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 

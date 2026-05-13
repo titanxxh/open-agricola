@@ -1,5 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionFlow } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag, writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
@@ -35,6 +36,13 @@ const getStoredArea = (player: CardListenerContext['player']): number =>
 const setStoredArea = (player: CardListenerContext['player'], area: number) =>
   writeCardExtraData(player, CARD_ID, 'pastureArea', area)
 
+const specialEffect = (params: Record<string, unknown>): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: CARD_ID,
+  params,
+})
+
 const afterFencingListener: CardListenerRegistration = {
   id: 'B124-trimmer-after-fencing',
   cardIds: [CARD_ID],
@@ -44,13 +52,14 @@ const afterFencingListener: CardListenerRegistration = {
     if (isCardFlagged(context.player, CARD_ID)) return
     const currentArea = countPastureTiles(context.player)
     const storedArea = getStoredArea(context.player)
-    // Update stored area regardless
-    setStoredArea(context.player, currentArea)
-    // Flag to prevent multiple triggers per work phase
-    setCardFlag(context.player, CARD_ID, true)
+    const children: ActionFlow[] = [
+      specialEffect({ kind: 'set-extra-data', key: 'pastureArea', value: currentArea }),
+      specialEffect({ kind: 'set-flag', flag: true }),
+    ]
     if (currentArea > storedArea) {
-      return { flow: gainLeaf(CARD_ID, { stone: 2 }), sourceCard: CARD_ID }
+      children.push(gainLeaf(CARD_ID, { stone: 2 }))
     }
+    return { flow: { type: 'seq', children }, sourceCard: CARD_ID }
   },
 }
 

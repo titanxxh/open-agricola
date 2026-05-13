@@ -1,6 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { isCardFlagged, writeCardInfobox } from '../helpers/card-state'
+import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { E27_PiggyBank } from '../../cards-display/E/E27_PiggyBank'
 
@@ -70,7 +70,15 @@ const updateInfoboxListener: CardListenerRegistration = {
   actions: ['store-on-card', 'take-from-card'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const food = context.player.cardStates?.[CARD_ID]?.counters?.[FOOD_KEY] ?? 0
-    writeCardInfobox(context.player, CARD_ID, `${food} / ${FOOD_THRESHOLD}`)
+    return {
+      flow: {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: { kind: 'set-infobox', text: `${food} / ${FOOD_THRESHOLD}` },
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 
