@@ -21,13 +21,14 @@ export type AnimalReorgState = {
   confirmDiscard: boolean
 }
 
-export type PendingSowCrop = 'grain' | 'vegetable' | 'wood'
+export type PendingSowCrop = 'grain' | 'vegetable' | 'wood' | 'stone'
 
 export type ExtraSowTarget = {
   key: string
   tile: FarmTilePosition
   allowedCrops: PendingSowCrop[]
   sourceCard?: string
+  groupKey?: string
 }
 
 export type EngineSnapshot = {
