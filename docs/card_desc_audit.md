@@ -28,13 +28,13 @@
 | ⏳ 待实现 | 1（D159 Reed Seller） | §2.6 | 等"可阻止行动 + 拍卖式选择"基建 |
 | 🔍 待 owner 确认 | 14 | §2.7 | BGA 自身有歧义或需 game-design 判断 |
 
-### 1.3 BGA 实现但 OA 完全缺（真 missing — 3 张）
+### 1.3 BGA 实现但 OA 完全缺（真 missing — 0 张 active；1 张 BGA legacy 不需要补）
 
 | Card | BGA 状态 | OA 状态 | 备注 |
 |---|---|---|---|
-| **D75 WoodField** | implemented | 无文件 | sowable field 模型（wood 作物），同 E68_CherryOrchard 套路；2026-04-17 desc audit 发现，未排期 |
-| **E80 RockGarden** | implemented | 无文件 | sowable field 模型（stone 作物）；2026-04-17 desc audit 发现，未排期 |
 | **E132 Shearer** | BGA `implemented=false`（legacy 名） | 用 E132_VeggieLover（canonical 新印本）已对齐 | 不需要补——BGA 同号双文件，OA 选了 canonical |
+
+> **2026-05-13 更新**：D75 WoodField / E80 RockGarden 从 Sprint 7d `implemented:false` stub 升级为完整 multi-slot sowable-field 实现（详见 `card_progress.md` §2.0 同日条目），从此表移除。
 
 ---
 
@@ -101,9 +101,9 @@
 
 ## 3. 当前残留 gap
 
-### 3.1 真 missing 卡（3 张）
+### 3.1 真 missing 卡（0 张 active）
 
-见 §1.3。D75 / E80 sowable field 双卡未排期，套 E68 CherryOrchard 模板即可上手。
+D75 WoodField / E80 RockGarden 已 2026-05-13 完整实现（multi-slot sowable field）。E132_Shearer 是 BGA `implemented=false` legacy 名，OA 用 E132_VeggieLover canonical 已对齐，不需要补。
 
 ### 3.2 41 张 ⚠ 行为偏差
 
