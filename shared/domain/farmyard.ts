@@ -121,7 +121,7 @@ export type PlowValidationResult<T extends PlayerFarmState = PlayerFarmState> =
 export type SowSelection = {
   row: number
   col: number
-  crop: 'grain' | 'vegetable' | 'wood'
+  crop: 'grain' | 'vegetable' | 'wood' | 'stone'
 }
 
 export type SowValidationError = {
