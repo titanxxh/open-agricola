@@ -190,8 +190,10 @@ describe('sourceCard card production contract', () => {
     expect(after?.sourceCard).toBe('E53_BoarSpear')
     expect(after?.flow).toMatchObject({
       type: 'seq',
-      optional: true,
-      children: [{ type: 'leaf', actionId: 'exchange', sourceCard: 'E53_BoarSpear' }],
+      children: [
+        { type: 'leaf', actionId: 'special-effect', sourceCard: 'E53_BoarSpear' },
+        { type: 'leaf', actionId: 'exchange', optional: true, sourceCard: 'E53_BoarSpear' },
+      ],
     })
   })
 
