@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { ActionFlow } from '../../contract/types'
 import type { CardListenerContext } from '../card-listeners'
+import { A144_Sequestrator_impl } from '../A/A144_Sequestrator'
 import { B48_ForestStone_impl } from '../B/B48_ForestStone'
 import { C148_MudWallower_impl } from '../C/C148_MudWallower'
 import { E103_Wolf_impl } from '../E/E103_Wolf'
 
+const SEQUESTRATOR_CARD_ID = 'A144_Sequestrator'
 const CARD_ID = 'B48_ForestStone'
 const MUD_WALLOWER_CARD_ID = 'C148_MudWallower'
 const WOLF_CARD_ID = 'E103_Wolf'
@@ -39,6 +41,39 @@ const collectLeaves = (flow: ActionFlow): ActionFlow[] => {
   if (flow.type === 'leaf') return [flow]
   if ('children' in flow) return flow.children.flatMap(collectLeaves)
   return []
+}
+
+const makeA144Context = (): CardListenerContext => {
+  const owner = {
+    id: 'p1',
+    name: 'Owner',
+    resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
+    cardStates: { [SEQUESTRATOR_CARD_ID]: { counters: { reed: 3, clay: 4 } } },
+    improvements: [],
+    minorPlayed: [],
+    occupationPlayed: [SEQUESTRATOR_CARD_ID],
+  } as never
+  const triggerPlayer = {
+    id: 'p2',
+    name: 'Trigger',
+    resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
+    pastures: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+    cardStates: {},
+    improvements: [],
+    minorPlayed: [],
+    occupationPlayed: [],
+  } as never
+  return {
+    state: { players: [owner, triggerPlayer], actionSpaces: [] } as never,
+    player: triggerPlayer,
+    triggerPlayer,
+    ownerPlayer: owner,
+    effectPlayer: owner,
+    space: { id: 'fence' } as never,
+    actionId: 'fence',
+    phase: 'after',
+    result: { type: 'ok' },
+  }
 }
 
 const makeC148Context = (
@@ -100,6 +135,36 @@ const makeE103Context = (
 }
 
 describe('listener purity wave 1', () => {
+  it('A144 handler returns storage-clear and trigger-player gain flow without mutating immediately', () => {
+    const listener = A144_Sequestrator_impl.listeners![0]!
+    const ctx = makeA144Context()
+    const owner = ctx.state.players[0]!
+    const triggerPlayer = ctx.state.players[1]!
+    const beforeOwnerCardStates = JSON.stringify(owner.cardStates)
+
+    const result = listener.handler(ctx)
+
+    expect(result?.flow).toEqual({
+      type: 'seq',
+      children: [
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: SEQUESTRATOR_CARD_ID,
+          params: { kind: 'set-counter', key: 'reed', value: 0 },
+        },
+        {
+          type: 'leaf',
+          actionId: 'gain',
+          sourceCard: SEQUESTRATOR_CARD_ID,
+          params: { reed: 3, recipientPlayerId: 'p2' },
+        },
+      ],
+    })
+    expect(JSON.stringify(owner.cardStates)).toBe(beforeOwnerCardStates)
+    expect(triggerPlayer.resources.reed).toBe(0)
+  })
+
   it('B48 wood handler returns flow without decrementing stored food immediately', () => {
     const listener = B48_ForestStone_impl.listeners![0]!
     const ctx = makeB48Context(2, { wood: 3 })
