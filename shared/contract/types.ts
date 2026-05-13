@@ -122,7 +122,7 @@ export type PaymentSolution = {
 export type PaymentSource = 'reserve' | 'field' | 'card'
 
 export type CropStack = {
-  kind: 'grain' | 'vegetable' | 'stone'
+  kind: 'grain' | 'vegetable' | 'wood' | 'stone'
   remaining: number
 }
 
@@ -620,8 +620,9 @@ export type InteractionRequest =
             farmType: 'sow'
             selectableFields: {
               tile: FarmTilePosition
-              allowedCrops: ('grain' | 'vegetable' | 'wood')[]
+              allowedCrops: ('grain' | 'vegetable' | 'wood' | 'stone')[]
               sourceCard?: string
+              groupKey?: string
             }[]
             maxSelections?: number
           }
@@ -717,8 +718,9 @@ export type InteractionFarmSelection =
       farmType: 'sow'
       selectableFields: {
         tile: FarmTilePosition
-        allowedCrops: ('grain' | 'vegetable' | 'wood')[]
+        allowedCrops: ('grain' | 'vegetable' | 'wood' | 'stone')[]
         sourceCard?: string
+        groupKey?: string
       }[]
       maxSelections?: number
     }

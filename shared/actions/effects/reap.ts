@@ -11,7 +11,7 @@ import { executeImmediateSpecialEffectFlows } from './internal/immediate-special
 export const dispatchReapListener = (
   state: GameState,
   player: PlayerState,
-  crop: 'grain' | 'vegetable' | 'stone',
+  crop: 'grain' | 'vegetable' | 'wood' | 'stone',
   amount: number,
 ): void => {
   if (amount <= 0) return
