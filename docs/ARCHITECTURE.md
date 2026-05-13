@@ -553,6 +553,8 @@ OA 对齐规则：
 - optional accept/decline 语义必须由 flow 表达。典型例子：D27 Retraining 先执行 `set-flag false`，再把 `swap-improvement-with-board` 放入 optional child；decline 只清 flag，不预留 / 回滚公共 major 池。
 - 只影响可达性或费用的 listener 应返回纯 `doable` / `costs` / `bonuses`。典型例子：D82 Hunting Trophy 通过 `space.id` scoped `isDoable` + `computeCosts` 建模 farm/house redevelopment，不再用 before/after flag 或 `activeModifiers` 临时桥。
 
+**2026-05-13 Wave2a 合成 dispatch 边界：`trade-applied` / `reap` 这类没有完整 engine 的 listener dispatch，只通过 immediate-special-effect helper 执行确定性的状态同步叶子。** 该 helper 只遍历非 optional 的 `special-effect` leaf，以及确定性的 `seq` / `parallel` flow；刻意跳过 `gain`、`pay`、interactive、optional、`or` / `xor`、`playerSwitch`。需要更丰富合成 listener 效果时，必须接入真实 engine flow 路径，而不是扩展这个 helper；这样 Wave2a 的 cardState-only 合成 listener 能保持 pure handler，同时不重新引入 dispatch-time handler mutation。
+
 **多 listener 同 phase 触发**采用 BGA-style PARALLEL trigger selection：
 
 - Phase 1 过渡期：handler 尚未全 pure，dispatch 不执行 handler 来判断 interactivity；使用显式静态 `dispatchMode: 'select'` 标出需要玩家选择触发顺序的 listener，其余保持 serial。
