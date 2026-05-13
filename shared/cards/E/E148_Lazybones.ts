@@ -1,5 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionFlow } from '../../contract/types'
 import {
   getReservedActionSpaces,
   setReservedActionSpaces,
@@ -13,6 +14,17 @@ const CARD_ID = E148_Lazybones.id
 const MAX_STABLES = 4
 
 const TRIGGER_SPACES = ['grain-seeds', 'farmland', 'day-laborer', 'farm-expansion']
+
+const ownerSpecialEffect = (
+  ownerPlayerId: string,
+  params: Record<string, unknown>,
+): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: CARD_ID,
+  actionContext: { targetPlayerId: ownerPlayerId },
+  params,
+})
 
 /**
  * Count stables in reserve: total supply (4) minus those on farm and those
@@ -47,18 +59,30 @@ const listener: CardListenerRegistration = {
     const spaces = getReservedActionSpaces(ownerPlayer, CARD_ID)
     if (!spaces.includes(spaceId)) return
 
-    // Remove this space from the list (stable collected)
-    setReservedActionSpaces(ownerPlayer, CARD_ID, spaces.filter((s) => s !== spaceId))
-
-    // Build the stable directly on the owner's farm
     const tile = getNextEmptyTileForPlayer(ownerPlayer)
-    if (!tile) return // No empty tile available
-
-    ownerPlayer.stableTiles.push(tile)
+    const children: ActionFlow[] = [
+      ownerSpecialEffect(ownerPlayer.id, {
+        kind: 'set-extra-data',
+        key: 'reservedActionSpaces',
+        value: spaces.filter((s) => s !== spaceId),
+      }),
+    ]
+    if (tile) {
+      children.push(
+        ownerSpecialEffect(ownerPlayer.id, {
+          kind: 'build-stable-on-first-empty-tile',
+        }),
+      )
+    }
 
     return {
-      logKey: 'log.cardEffectGain',
-      logParams: { cardId: CARD_ID, gain: '1 STABLE' },
+      flow: children.length === 1 ? children[0] : { type: 'seq', children },
+      ...(tile
+        ? {
+            logKey: 'log.cardEffectGain',
+            logParams: { cardId: CARD_ID, gain: '1 STABLE' },
+          }
+        : {}),
       sourceCard: CARD_ID,
     }
   },
