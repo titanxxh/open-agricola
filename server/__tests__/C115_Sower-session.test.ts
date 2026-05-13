@@ -109,6 +109,12 @@ describe('C115_Sower session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
+
+    resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionSowSelect')
 
     resp = session.resolveChoice(0, 'confirm', {
@@ -185,6 +191,12 @@ describe('C115_Sower session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
+
+    resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionSowSelect')
 
     resp = session.resolveChoice(0, 'confirm', {
@@ -254,7 +266,7 @@ describe('C115_Sower session', () => {
 
     enterActiveInteraction(session)
 
-    const resp = session.takeAnytimeAction(0, 'C115-sower-anytime')
+    let resp = session.takeAnytimeAction(0, 'C115-sower-anytime')
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
@@ -273,20 +285,21 @@ describe('C115_Sower session', () => {
     const resp2 = session.resolveChoice(0, optionB.value)
     expect(resp2.ok).toBe(true)
 
-    // After choosing sow, the sow interaction should be presented
     expect(resp2.interaction.stateId).toBe('wait')
     if (resp2.interaction.stateId !== 'wait') return
-    expect(resp2.interaction.promptKey).toBe('ui.interactionSowSelect')
+    expect(resp2.interaction.promptKey).toBe('ui.interactionOptionalAction')
+    resp = session.resolveChoice(0, resp2.interaction.options[0]!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('ui.interactionSowSelect')
 
-    // Reed should not have been gained (pop + pay = net zero)
-    const updatedPlayer = resp2.state.players[0]!
+    const updatedPlayer = resp.state.players[0]!
     expect(updatedPlayer.resources.reed).toBe(0)
 
-    // Stack should be empty
     const stack = getCardStack(updatedPlayer, 'C115_Sower')
     expect(stack.length).toBe(0)
 
-    // Complete the sow by committing a crop
     const resp3 = session.resolveChoice(0, 'confirm', {
       crops: [{ row: 0, col: 0, crop: 'grain' }],
     })
@@ -297,6 +310,43 @@ describe('C115_Sower session', () => {
       col: 0,
       stacks: [{ kind: 'grain', remaining: 3 }],
     })
+  })
+
+  it('Option B: sow branch is available and skips sow when player cannot sow', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.resources.reed = 0
+    player.resources.grain = 0
+    player.resources.vegetable = 0
+    player.fields = []
+    if (!player.cardStates) player.cardStates = {}
+    if (!player.cardStates.C115_Sower) player.cardStates.C115_Sower = {}
+    player.cardStates.C115_Sower.stack = ['reed']
+    player.cardStates.C115_Sower.infobox = '1 Reed'
+    session.loadState(state)
+
+    enterActiveInteraction(session)
+
+    const resp = session.takeAnytimeAction(0, 'C115-sower-anytime')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+
+    const optionB = resp.interaction.options[1]!
+    expect(collectDescriptionLabelKeys(optionB.descriptionPreview)).toEqual([
+      'actions.pop-card-stack.name',
+      'actions.pay.name',
+      'actions.sow.name',
+    ])
+    const resp2 = session.resolveChoice(0, optionB.value)
+    expect(resp2.ok).toBe(true)
+    expect(resp2.interaction.stateId).toBe('wait')
+    if (resp2.interaction.stateId !== 'wait') return
+    expect(resp2.interaction.promptKey).not.toBe('ui.interactionSowSelect')
+    expect(resp2.state.players[0]!.resources.reed).toBe(0)
+    expect(getCardStack(resp2.state.players[0]!, 'C115_Sower')).toEqual([])
+    expect(resp2.state.players[0]!.cardStates?.C115_Sower?.infobox).toBe('')
   })
 
   it('reed accumulates from multiple major improvements', () => {

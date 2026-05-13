@@ -84,7 +84,7 @@ const anytimeListener: CardListenerRegistration = {
               { type: 'leaf', actionId: 'pop-card-stack', sourceCard: CARD_ID },
               payLeaf({ cardId: CARD_ID, cost: { reed: 1 } }),
               updateInfobox(remainingAfterPop),
-              { type: 'leaf', actionId: 'sow', sourceCard: CARD_ID },
+              { type: 'leaf', actionId: 'sow', sourceCard: CARD_ID, optional: true },
             ],
           } as ActionFlow,
         ],
