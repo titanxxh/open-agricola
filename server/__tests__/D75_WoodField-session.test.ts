@@ -1,19 +1,61 @@
 import { describe, expect, it } from 'vitest'
+import { GameSession } from '../game/authoritative-session'
+import { runCardEffectHook } from '../../shared/cards/card-effects'
+import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import { D75_WoodField } from '../../shared/cards-display/D/D75_WoodField'
-import { getMinorImprovementCard, isFieldCard, implementedMinorImprovementCards } from '../../shared/cards/catalog'
+import {
+  getMinorImprovementCard,
+  isFieldCard,
+  implementedMinorImprovementCards,
+} from '../../shared/cards/catalog'
+import '../../shared/cards/D/D75_WoodField'
 
-describe('D75_WoodField (Sprint 7d isField stub)', () => {
+const CARD_ID = 'D75_WoodField'
+const ROW = -75
+
+const setup = (options?: {
+  wood?: number
+  stacks?: { kind: 'wood'; remaining: number }[]
+}) => {
+  const session = new GameSession()
+  const state = session.getState().state
+  state.players = state.players.slice(0, 2)
+  state.currentPlayerIndex = 0
+  state.round = 1
+  state.roundPhase = 'work'
+  state.roundActionOrder = state.roundActionOrder.map(() => null)
+  state.roundActionOrder[0] = 'grain-utilization'
+
+  const player = state.players[0]!
+  player.workersAvailable = 2
+  player.resources.food = 10
+  player.resources.wood = options?.wood ?? 0
+  player.minorPlayed.push(CARD_ID)
+
+  // D75 sow path doesn't require empty normal fields (extra-field path).
+  player.fields = []
+
+  if (options?.stacks !== undefined) {
+    player.cardStates = player.cardStates ?? {}
+    player.cardStates[CARD_ID] = { extraData: { stacks: options.stacks } }
+  }
+
+  session.loadState(state)
+  return session
+}
+
+describe('D75_WoodField metadata', () => {
   it('is registered as a field card via isField metadata', () => {
     expect(D75_WoodField.isField).toBe(true)
-    expect(isFieldCard('D75_WoodField')).toBe(true)
+    expect(isFieldCard(CARD_ID)).toBe(true)
   })
 
-  it('is registered in catalog but excluded from dealt pool (implemented:false)', () => {
-    const card = getMinorImprovementCard('D75_WoodField')
+  it('is now part of the dealt pool (implemented flag is no longer set)', () => {
+    const card = getMinorImprovementCard(CARD_ID)
     expect(card).toBeDefined()
-    expect(card!.implemented).toBe(false)
+    expect(card!.implemented).toBeUndefined()
     const dealtIds = implementedMinorImprovementCards.map((c) => c.id)
-    expect(dealtIds).not.toContain('D75_WoodField')
+    expect(dealtIds).toContain(CARD_ID)
   })
 
   it('carries BGA cost / vp / prerequisite metadata', () => {
@@ -21,5 +63,107 @@ describe('D75_WoodField (Sprint 7d isField stub)', () => {
     expect(D75_WoodField.vp).toBe(1)
     expect(D75_WoodField.prerequisite).toBe('1 Occupation')
     expect(D75_WoodField.occupationPrerequisites).toEqual({ min: 1 })
+  })
+})
+
+describe('D75_WoodField session', () => {
+  it('sows 1 wood through the real sow interaction and gains 1 wood on the next harvest', () => {
+    const session = setup({ wood: 1 })
+
+    let resp = session.takeAction(0, 'grain-utilization')
+    expect(resp.ok).toBe(true)
+    if (!resp.ok || resp.interaction.stateId !== 'wait') {
+      throw new Error('expected sow interaction')
+    }
+    if (resp.interaction.farm.farmType !== 'sow') throw new Error('expected sow farm')
+    expect(resp.interaction.farm.selectableFields).toContainEqual({
+      tile: { row: ROW, col: 0 },
+      allowedCrops: ['wood'],
+      sourceCard: CARD_ID,
+      groupKey: CARD_ID,
+    })
+
+    resp = session.resolveChoice(0, 'confirm', {
+      crops: [{ row: ROW, col: 0, crop: 'wood' }],
+    })
+    expect(resp.ok).toBe(true)
+    const playerAfter = resp.state.players[0]!
+    expect(playerAfter.resources.wood).toBe(0)
+    expect(readCardExtraData(playerAfter, CARD_ID, 'stacks')).toEqual([
+      { kind: 'wood', remaining: 3 },
+    ])
+
+    // Drive a single harvest tick directly: onHarvestFieldPhase is the unit
+    // of work — running it on the post-sow state must hand back 1 wood.
+    runCardEffectHook(resp.state, playerAfter, CARD_ID, 'onHarvestFieldPhase')
+    expect(playerAfter.resources.wood).toBe(1)
+    expect(readCardExtraData(playerAfter, CARD_ID, 'stacks')).toEqual([
+      { kind: 'wood', remaining: 2 },
+    ])
+  })
+
+  it('sows 2 wood across 2 slots in a single sow action and gains 2 wood on the next harvest', () => {
+    const session = setup({ wood: 2 })
+
+    let resp = session.takeAction(0, 'grain-utilization')
+    expect(resp.ok).toBe(true)
+    if (!resp.ok || resp.interaction.stateId !== 'wait') {
+      throw new Error('expected sow interaction')
+    }
+    if (resp.interaction.farm.farmType !== 'sow') throw new Error('expected sow farm')
+    const slot0 = resp.interaction.farm.selectableFields.find(
+      (f) => f.tile.row === ROW && f.tile.col === 0,
+    )
+    const slot1 = resp.interaction.farm.selectableFields.find(
+      (f) => f.tile.row === ROW && f.tile.col === 1,
+    )
+    expect(slot0).toBeDefined()
+    expect(slot1).toBeDefined()
+    // Both slots share groupKey so they merge into a single logical field
+    // for maxSelections counting (BGA "considered 1 field" semantics).
+    expect(slot0!.groupKey).toBe(CARD_ID)
+    expect(slot1!.groupKey).toBe(CARD_ID)
+
+    resp = session.resolveChoice(0, 'confirm', {
+      crops: [
+        { row: ROW, col: 0, crop: 'wood' },
+        { row: ROW, col: 1, crop: 'wood' },
+      ],
+    })
+    expect(resp.ok).toBe(true)
+    const playerAfter = resp.state.players[0]!
+    expect(playerAfter.resources.wood).toBe(0)
+    expect(readCardExtraData(playerAfter, CARD_ID, 'stacks')).toEqual([
+      { kind: 'wood', remaining: 3 },
+      { kind: 'wood', remaining: 3 },
+    ])
+
+    runCardEffectHook(resp.state, playerAfter, CARD_ID, 'onHarvestFieldPhase')
+    expect(playerAfter.resources.wood).toBe(2)
+    expect(readCardExtraData(playerAfter, CARD_ID, 'stacks')).toEqual([
+      { kind: 'wood', remaining: 2 },
+      { kind: 'wood', remaining: 2 },
+    ])
+  })
+
+  it('clears all stacks after 3 harvest ticks against a fully sown 2-stack card', () => {
+    const session = setup({
+      wood: 0,
+      stacks: [
+        { kind: 'wood', remaining: 3 },
+        { kind: 'wood', remaining: 3 },
+      ],
+    })
+    const state = session.getState().state
+    const player = state.players[0]!
+
+    let total = 0
+    for (let i = 0; i < 3; i++) {
+      const before = player.resources.wood
+      runCardEffectHook(state, player, CARD_ID, 'onHarvestFieldPhase')
+      total += player.resources.wood - before
+    }
+    expect(total).toBe(6)
+    expect(readCardExtraData(player, CARD_ID, 'stacks')).toEqual([])
   })
 })
