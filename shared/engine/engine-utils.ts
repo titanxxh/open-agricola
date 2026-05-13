@@ -59,7 +59,6 @@ export function applyFallbackSourceCardToFlow(
   if (flow.type === 'leaf') {
     return flow.sourceCard ? flow : { ...flow, sourceCard }
   }
-  if (flow.type === 'playerSwitch') return flow
   return {
     ...flow,
     children: flow.children.map((child) => applyFallbackSourceCardToFlow(child, sourceCard)),
@@ -527,8 +526,12 @@ export function getNodeDescriptionPreview(
 
 export function buildFlowNode(int: EngineInternals, flow: ActionFlow): EngineNode {
   const nextId = () => `flow-${int.counterRef.value++}`
-  if (flow.type === 'playerSwitch') {
-    return new PlayerSwitchNode(`ps-flow-${int.counterRef.value++}`, flow.targetPlayerId)
+  if (flow.targetPlayerId) {
+    const { targetPlayerId, ...innerFlow } = flow
+    return new SequenceNode(nextId(), [
+      new PlayerSwitchNode(`ps-flow-${int.counterRef.value++}`, targetPlayerId),
+      buildFlowNode(int, innerFlow as ActionFlow),
+    ])
   }
   if (flow.type === 'leaf') {
     if (flow.expandFlow) {
@@ -621,9 +624,6 @@ export function mergeContextIntoFlow(
       sourceCard: flow.sourceCard ?? outerSourceCard,
       actionContext: merged,
     }
-  }
-  if (flow.type === 'playerSwitch') {
-    return { ...flow }
   }
   return {
     ...flow,

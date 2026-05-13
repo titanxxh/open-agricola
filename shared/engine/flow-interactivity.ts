@@ -24,7 +24,6 @@ export function analyzeFlowInteractivity(flow: ActionFlow): 'auto' | 'interactiv
     return 'auto'
   }
   if (flow.type === 'xor' || flow.type === 'or') return 'interactive'
-  if (flow.type === 'playerSwitch') return 'auto'
   // seq or parallel
   if (flow.optional) return 'interactive'
   return flow.children.some((c) => analyzeFlowInteractivity(c) === 'interactive')
