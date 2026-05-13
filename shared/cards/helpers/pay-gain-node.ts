@@ -65,17 +65,7 @@ const resolveChoiceLabelParams = (
   }
 }
 
-const resolveChoiceLabelKey = (
-  gain: CardGain | undefined,
-  choiceLabelKey?: string,
-) => {
-  if (choiceLabelKey) return choiceLabelKey
-  const { resources, score } = splitCardGain(gain)
-  if (Object.keys(resources).length > 0 || score > 0) {
-    return 'ui.interactionResourceExchange'
-  }
-  return undefined
-}
+const resolveChoiceLabelKey = (choiceLabelKey?: string) => choiceLabelKey
 
 const buildEffectPreview = (
   cost: Partial<Resource>,
@@ -149,7 +139,7 @@ export const payGainActionFlow = ({
   followUp,
 }: PayGainNodeOptions): SequenceFlow => {
   const { resources } = splitCardGain(gain)
-  const resolvedChoiceLabelKey = resolveChoiceLabelKey(gain, choiceLabelKey)
+  const resolvedChoiceLabelKey = resolveChoiceLabelKey(choiceLabelKey)
   return buildSequenceNode(undefined, [
     payLeaf({
       cardId,
@@ -195,7 +185,7 @@ export const payThenGainActionFlow = ({
 }: PayGainNodeOptions): SequenceFlow => {
   const resolvedGain = gain ?? {}
   const { resources } = splitCardGain(resolvedGain)
-  const resolvedChoiceLabelKey = resolveChoiceLabelKey(gain, choiceLabelKey)
+  const resolvedChoiceLabelKey = resolveChoiceLabelKey(choiceLabelKey)
   return buildSequenceNode(undefined, [
     payLeaf({
       cardId,

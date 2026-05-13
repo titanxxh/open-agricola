@@ -33,8 +33,6 @@ export const C49_BeerStall_impl = {
           payLeaf({ cardId: CARD_ID, cost: { grain: count } }),
           gainLeaf(CARD_ID, { food: count * 5 }),
         ],
-        choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { grain: count }, resourcesGained: { food: count * 5 } },
       }
     })
     return {

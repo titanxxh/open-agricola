@@ -19,8 +19,6 @@ export const B53_SculptureCourse_impl = {
           { type: 'leaf', actionId: 'pay', params: { wood: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { food: 2 }, sourceCard: CARD_ID },
         ],
-        choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { wood: 1 }, resourcesGained: { food: 2 } },
       },
       {
         type: 'seq',
@@ -28,8 +26,6 @@ export const B53_SculptureCourse_impl = {
           { type: 'leaf', actionId: 'pay', params: { stone: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { food: 4 }, sourceCard: CARD_ID },
         ],
-        choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { stone: 1 }, resourcesGained: { food: 4 } },
       },
     ]
 

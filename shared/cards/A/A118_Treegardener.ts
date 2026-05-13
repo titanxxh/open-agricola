@@ -16,8 +16,6 @@ export const A118_Treegardener_impl = {
           { type: 'leaf', actionId: 'pay', params: { food: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: CARD_ID },
         ],
-        choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { food: 1 }, resourcesGained: { wood: 1 } },
       },
       {
         type: 'seq',
@@ -25,8 +23,6 @@ export const A118_Treegardener_impl = {
           { type: 'leaf', actionId: 'pay', params: { food: 2 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'gain', params: { wood: 2 }, sourceCard: CARD_ID },
         ],
-        choiceLabelKey: 'ui.interactionResourceExchange',
-        choiceLabelParams: { resourcesPaid: { food: 2 }, resourcesGained: { wood: 2 } },
       },
     ]
 
