@@ -68,6 +68,8 @@ describe('B48_ForestStone session', () => {
     const player = resp.state.players[0]!
     // foodCount should decrease from 2 to 1
     expect(readCardExtraData<number>(player, CARD_ID, 'foodCount')).toBe(1)
+    expect(player.cardStates?.[CARD_ID]?.counters?.foodCount).toBe(1)
+    expect(player.cardStates?.[CARD_ID]?.infobox).toBe('1 Food')
     // Player should have gained 1 food from card + 6 wood from forest
     expect(player.resources.food).toBe(foodBefore + 1)
     expect(player.resources.wood).toBeGreaterThan(10) // collected some wood
@@ -82,6 +84,8 @@ describe('B48_ForestStone session', () => {
     const player = resp.state.players[0]!
     // foodCount should increase from 2 to 4
     expect(readCardExtraData<number>(player, CARD_ID, 'foodCount')).toBe(4)
+    expect(player.cardStates?.[CARD_ID]?.counters?.foodCount).toBe(4)
+    expect(player.cardStates?.[CARD_ID]?.infobox).toBe('4 Food')
   })
 
   it('does not release food when card is empty', () => {
@@ -100,6 +104,7 @@ describe('B48_ForestStone session', () => {
     // No extra food from card
     expect(updated.resources.food).toBe(foodBefore)
     expect(readCardExtraData<number>(updated, CARD_ID, 'foodCount')).toBe(0)
+    expect(updated.cardStates?.[CARD_ID]?.infobox).toBe('2 Food')
   })
 
   it('wood then stone: releases 1, then adds 2', () => {
