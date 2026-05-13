@@ -3,6 +3,17 @@ import type { FarmTilePosition } from '../../shared/contract/types'
 import type { PendingSowCrop } from '../types/ui'
 import { isBorderEdge } from '../../shared/domain/farm'
 
+const computeEffectiveCount = (
+  selections: Record<string, PendingSowCrop>,
+  groupKeyByTile: Map<string, string | undefined>,
+): number => {
+  const groups = new Set<string>()
+  for (const tileKey of Object.keys(selections)) {
+    groups.add(groupKeyByTile.get(tileKey) ?? tileKey)
+  }
+  return groups.size
+}
+
 export const useFarmSelection = () => {
   const [pendingFenceEdges, setPendingFenceEdges] = useState<string[]>([])
   const [pendingPalisadeEdges, setPendingPalisadeEdges] = useState<string[]>([])
@@ -103,6 +114,7 @@ export const useFarmSelection = () => {
     value: string,
     maxSowSelections: number | undefined,
     positionKey: (tile: FarmTilePosition) => string,
+    groupKeyByTile: Map<string, string | undefined> = new Map(),
   ) => {
     const key = positionKey(tile)
     setPendingSowSelections((prev) => {
@@ -111,17 +123,29 @@ export const useFarmSelection = () => {
         delete next[key]
         return next
       }
-      if (value !== 'grain' && value !== 'vegetable' && value !== 'wood') return prev
+      if (
+        value !== 'grain' &&
+        value !== 'vegetable' &&
+        value !== 'wood' &&
+        value !== 'stone'
+      ) {
+        return prev
+      }
       const alreadySelected = Object.prototype.hasOwnProperty.call(prev, key)
       if (
         !alreadySelected &&
         typeof maxSowSelections === 'number' &&
-        maxSowSelections >= 0 &&
-        Object.keys(prev).length >= maxSowSelections
+        maxSowSelections >= 0
       ) {
-        return prev
+        const candidate: Record<string, PendingSowCrop> = {
+          ...prev,
+          [key]: value as PendingSowCrop,
+        }
+        if (computeEffectiveCount(candidate, groupKeyByTile) > maxSowSelections) {
+          return prev
+        }
       }
-      return { ...prev, [key]: value }
+      return { ...prev, [key]: value as PendingSowCrop }
     })
     setSowError(null)
   }
