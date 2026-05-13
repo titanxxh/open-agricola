@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
 
+import { markAllWorkersUsed } from '../../shared/domain/player'
+import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 import '../../shared/cards/C/C130_OutskirtsDirector'
 import type { ActionFlow } from '../../shared/contract/types'
 
@@ -55,7 +57,7 @@ const createState = (player: PlayerState): GameState => {
 const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
 
 describe('C130_OutskirtsDirector', () => {
-  it('places 2 reed on hollow-4 when using grove', () => {
+  it('returns a special-effect flow that places 2 reed on hollow-4 when using grove', () => {
     const listener = findListener('C130-outskirts-director-after-place-farmer')
     expect(listener).toBeDefined()
 
@@ -71,14 +73,28 @@ describe('C130_OutskirtsDirector', () => {
       actionId: 'place-farmer', phase: 'after',
     } as unknown as CardListenerContext)
 
-    expect(hollowSpace.resources.reed).toBe(2)
+    expect(hollowSpace.resources.reed).toBe(0)
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('seq')
     const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
-    expect(children[0].actionId).toBe('place-farmer')
+    expect(children[0]).toMatchObject({
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'add-resource-to-space', spaceId: 'hollow-4', resource: 'reed', amount: 2 },
+    })
+    expect(children[1]).toMatchObject({ actionId: 'place-farmer', optional: true })
+
+    specialEffectAction.execute({
+      state,
+      player,
+      space: groveSpace,
+      sourceCard: CARD_ID,
+      params: (children[0] as Extract<ActionFlow, { type: 'leaf' }>).params,
+    })
+    expect(hollowSpace.resources.reed).toBe(2)
   })
 
-  it('places 2 reed on grove when using hollow-4', () => {
+  it('returns a special-effect flow that places 2 reed on grove when using hollow-4', () => {
     const listener = findListener('C130-outskirts-director-after-place-farmer')
     expect(listener).toBeDefined()
 
@@ -89,12 +105,42 @@ describe('C130_OutskirtsDirector', () => {
 
     expect(groveSpace.resources.reed).toBe(0)
 
-    executeCardListener(listener!, {
+    const result = executeCardListener(listener!, {
       state, player, space: hollowSpace,
       actionId: 'place-farmer', phase: 'after',
     } as unknown as CardListenerContext)
 
-    expect(groveSpace.resources.reed).toBe(2)
+    expect(groveSpace.resources.reed).toBe(0)
+    expect(result?.flow?.type).toBe('seq')
+    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
+    expect(children[0]).toMatchObject({
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'add-resource-to-space', spaceId: 'grove', resource: 'reed', amount: 2 },
+    })
+    expect(children[1]).toMatchObject({ actionId: 'place-farmer', optional: true })
+  })
+
+  it('returns only the add-resource leaf when no workers are available', () => {
+    const listener = findListener('C130-outskirts-director-after-place-farmer')
+    expect(listener).toBeDefined()
+
+    const player = createPlayer()
+    const state = createState(player)
+    markAllWorkersUsed(state, player)
+
+    const result = executeCardListener(listener!, {
+      state, player, space: state.actionSpaces.find(s => s.id === 'grove')!,
+      actionId: 'place-farmer', phase: 'after',
+    } as unknown as CardListenerContext)
+
+    expect(result?.flow).toMatchObject({
+      type: 'leaf',
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'add-resource-to-space', spaceId: 'hollow-4', resource: 'reed', amount: 2 },
+    })
+    expect(state.actionSpaces.find(s => s.id === 'hollow-4')!.resources.reed).toBe(0)
   })
 
   it('does not trigger on unrelated spaces', () => {
@@ -131,12 +177,20 @@ describe('C130_OutskirtsDirector', () => {
 
     expect(hollowSpace.resources.reed).toBe(0)
 
-    executeCardListener(listener!, {
+    const result = executeCardListener(listener!, {
       state, player, space: groveSpace,
       actionId: 'place-farmer', phase: 'after',
     } as unknown as CardListenerContext)
 
-    expect(hollowSpace.resources.reed).toBe(2)
+    expect(hollowSpace.resources.reed).toBe(0)
+    expect(result?.flow?.type).toBe('seq')
+    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
+    expect(children[0]).toMatchObject({
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'add-resource-to-space', spaceId: 'hollow', resource: 'reed', amount: 2 },
+    })
+    expect(children[1]).toMatchObject({ actionId: 'place-farmer', optional: true })
   })
 
   it('3p variant: places 2 reed on grove when using hollow', () => {
@@ -157,11 +211,19 @@ describe('C130_OutskirtsDirector', () => {
 
     expect(groveSpace.resources.reed).toBe(0)
 
-    executeCardListener(listener!, {
+    const result = executeCardListener(listener!, {
       state, player, space: hollowSpace,
       actionId: 'place-farmer', phase: 'after',
     } as unknown as CardListenerContext)
 
-    expect(groveSpace.resources.reed).toBe(2)
+    expect(groveSpace.resources.reed).toBe(0)
+    expect(result?.flow?.type).toBe('seq')
+    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
+    expect(children[0]).toMatchObject({
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'add-resource-to-space', spaceId: 'grove', resource: 'reed', amount: 2 },
+    })
+    expect(children[1]).toMatchObject({ actionId: 'place-farmer', optional: true })
   })
 })

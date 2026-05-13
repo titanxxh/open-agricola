@@ -16,6 +16,7 @@ import { clearPendingFenceBonus } from '../../cards/helpers/pending-fence-bonus'
 import { removeFutureMeeples } from './internal/future-meeples'
 import { findFirstNewborn } from '../../domain/player'
 import { removeWorkerRef } from '../../domain/space'
+import { getNextEmptyTileForPlayer } from '../../domain/farm'
 
 export type SpecialEffectParams =
   | { kind: 'increment-extra-data'; key: string; amount: number }
@@ -31,6 +32,8 @@ export type SpecialEffectParams =
   | { kind: 'promote-first-newborn' }
   | { kind: 'remove-field-crop'; crop: 'grain' | 'vegetable'; minRemaining?: number }
   | { kind: 'consume-fence'; count?: number }
+  | { kind: 'add-resource-to-space'; spaceId: string; resource: keyof Resource; amount: number }
+  | { kind: 'build-stable-on-first-empty-tile' }
   | {
       kind: 'move-resource-between-spaces'
       fromSpaceId: string
@@ -165,6 +168,24 @@ export const specialEffectAction: ActionDefinition = {
         if (removed < count) {
           return { type: 'fail', logKey: 'log.specialEffectFail' }
         }
+        return { type: 'ok' }
+      }
+      case 'add-resource-to-space': {
+        if (!state) return { type: 'fail', logKey: 'log.specialEffectFail' }
+        const targetSpace = state.actionSpaces.find((space) => space.id === p.spaceId)
+        if (!targetSpace?.resources) {
+          return { type: 'fail', logKey: 'log.specialEffectFail' }
+        }
+        const current =
+          (targetSpace.resources as Partial<Record<keyof Resource, number>>)[p.resource] ?? 0
+        ;(targetSpace.resources as Record<keyof Resource, number>)[p.resource] =
+          current + p.amount
+        return { type: 'ok' }
+      }
+      case 'build-stable-on-first-empty-tile': {
+        const tile = getNextEmptyTileForPlayer(target)
+        if (!tile) return { type: 'ok' }
+        target.stableTiles.push(tile)
         return { type: 'ok' }
       }
       case 'move-resource-between-spaces': {

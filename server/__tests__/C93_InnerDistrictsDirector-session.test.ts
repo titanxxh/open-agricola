@@ -3,6 +3,7 @@ import { getRegisteredCardListeners, executeCardListener, type CardListenerConte
 import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
 
 import { markAllWorkersUsed } from '../../shared/domain/player'
+import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 import '../../shared/cards/C/C93_InnerDistrictsDirector'
 import type { ActionFlow } from '../../shared/contract/types'
 
@@ -56,7 +57,7 @@ const createState = (player: PlayerState): GameState => {
 const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
 
 describe('C93_InnerDistrictsDirector', () => {
-  it('places 1 stone on clay-pit when using forest', () => {
+  it('returns a special-effect flow that places 1 stone on clay-pit when using forest', () => {
     const listener = findListener('C93-inner-districts-director-after-place-farmer')
     expect(listener).toBeDefined()
 
@@ -72,16 +73,29 @@ describe('C93_InnerDistrictsDirector', () => {
       actionId: 'place-farmer', phase: 'after',
     } as unknown as CardListenerContext)
 
-    // Stone should be placed on clay-pit
-    expect(clayPitSpace.resources.stone).toBe(1)
-    // Should offer place-farmer
+    // Listener stays pure; the returned special-effect leaf performs the mutation.
+    expect(clayPitSpace.resources.stone).toBe(0)
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('seq')
     const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
-    expect(children[0].actionId).toBe('place-farmer')
+    expect(children[0]).toMatchObject({
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'add-resource-to-space', spaceId: 'clay-pit', resource: 'stone', amount: 1 },
+    })
+    expect(children[1]).toMatchObject({ actionId: 'place-farmer', optional: true })
+
+    specialEffectAction.execute({
+      state,
+      player,
+      space: forestSpace,
+      sourceCard: CARD_ID,
+      params: (children[0] as Extract<ActionFlow, { type: 'leaf' }>).params,
+    })
+    expect(clayPitSpace.resources.stone).toBe(1)
   })
 
-  it('places 1 stone on forest when using clay-pit', () => {
+  it('returns a special-effect flow that places 1 stone on forest when using clay-pit', () => {
     const listener = findListener('C93-inner-districts-director-after-place-farmer')
     expect(listener).toBeDefined()
 
@@ -92,15 +106,23 @@ describe('C93_InnerDistrictsDirector', () => {
 
     expect(forestSpace.resources.stone).toBe(0)
 
-    executeCardListener(listener!, {
+    const result = executeCardListener(listener!, {
       state, player, space: clayPitSpace,
       actionId: 'place-farmer', phase: 'after',
     } as unknown as CardListenerContext)
 
-    expect(forestSpace.resources.stone).toBe(1)
+    expect(forestSpace.resources.stone).toBe(0)
+    expect(result?.flow?.type).toBe('seq')
+    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
+    expect(children[0]).toMatchObject({
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'add-resource-to-space', spaceId: 'forest', resource: 'stone', amount: 1 },
+    })
+    expect(children[1]).toMatchObject({ actionId: 'place-farmer', optional: true })
   })
 
-  it('does not offer place-farmer when no workers available', () => {
+  it('returns only the add-resource leaf when no workers are available', () => {
     const listener = findListener('C93-inner-districts-director-after-place-farmer')
     expect(listener).toBeDefined()
 
@@ -113,9 +135,13 @@ describe('C93_InnerDistrictsDirector', () => {
       actionId: 'place-farmer', phase: 'after',
     } as unknown as CardListenerContext)
 
-    // Stone still placed but no farmer flow returned
-    expect(result).toBeUndefined()
-    expect(state.actionSpaces.find(s => s.id === 'clay-pit')!.resources.stone).toBe(1)
+    expect(result?.flow).toMatchObject({
+      type: 'leaf',
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'add-resource-to-space', spaceId: 'clay-pit', resource: 'stone', amount: 1 },
+    })
+    expect(state.actionSpaces.find(s => s.id === 'clay-pit')!.resources.stone).toBe(0)
   })
 
   it('does not trigger on unrelated spaces', () => {
