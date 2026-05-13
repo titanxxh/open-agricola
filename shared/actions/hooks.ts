@@ -58,6 +58,7 @@ export type ActionHookResult = {
   logKey?: string
   logParams?: Record<string, unknown>
   immediateLogs?: import('../contract/types').ImmediateLogEntry[]
+  countCardUse?: boolean
   labelKey?: string
   labelParams?: Record<string, unknown>
   decline?: boolean

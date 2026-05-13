@@ -431,7 +431,7 @@ export function engineProceed(
     // listener actually returned an effect (flow / followUp / decision /
     // log etc.). Pure no-op fires (handler returned undefined / void) and
     // universal listeners without a cardId are skipped.
-    if (node.cardId && result) {
+    if (node.cardId && result && result.countCardUse !== false) {
       incCardUsed(effectPlayer, node.cardId)
     }
     const normalizedFollowUps = (result?.followUpActions ?? []).map((followUp) =>
@@ -448,6 +448,7 @@ export function engineProceed(
       if (result?.flow) {
         const flowNode = buildFlowNode(int,
           applyFallbackSourceCardToFlow(result.flow, result.sourceCard),
+          effectPlayer.id,
         )
         if (node.phase === 'before') {
           collectNodeIds(flowNode, int.beforePhaseFlowNodeIds)
@@ -490,6 +491,7 @@ export function engineProceed(
           ),
           replacedActionId,
         ),
+        context.player.id,
       )
       int.tree.insertAfter(node.id, [flowNode])
       node.resolve({ type: 'ok' })
@@ -748,7 +750,7 @@ export function engineProceed(
         ? applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
         : null)
       .filter((flow) => flow)
-      .map((flow) => buildFlowNode(int, flow as ActionFlow))
+      .map((flow) => buildFlowNode(int, flow as ActionFlow, context.player.id))
     const followUps = allActionHookResults
       .flatMap((entry) =>
         (entry.followUpActions ?? []).map((followUp) =>
@@ -791,7 +793,7 @@ export function engineProceed(
       ...hookFlows,
     ]
     if (result.type === 'flow') {
-      const flowNode = buildFlowNode(int, result.flow)
+      const flowNode = buildFlowNode(int, result.flow, context.player.id)
       // Insertion order: trailing hooks first (deepest behind), then flow
       // body, then leading nodes. insertAfter prepends each batch to
       // node.id+1, so the resulting child layout is:

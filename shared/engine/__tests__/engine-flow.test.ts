@@ -111,6 +111,65 @@ describe('Engine flow nodes', () => {
   setActiveCardRegistry(new CardRegistry())
   })
 
+  it('dynamic result.flow targetPlayerId switches back before later siblings', () => {
+    const p1 = createPlayer()
+    const p2 = { ...createPlayer(), id: 'p2', name: 'P2', color: 'blue' as const }
+    const state = createState()
+    state.players = [p1, p2]
+
+    const triggerAction: ActionDefinition = {
+      id: 'trigger-target-flow',
+      nameKey: 'test.trigger',
+      descriptionKey: 'test.trigger',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({
+        type: 'flow',
+        flow: {
+          type: 'seq',
+          children: [
+            {
+              type: 'leaf',
+              actionId: 'gain',
+              params: { food: 1 },
+              targetPlayerId: p2.id,
+            },
+            {
+              type: 'leaf',
+              actionId: 'gain',
+              params: { wood: 1 },
+            },
+          ],
+        },
+      }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(triggerAction)
+    registry.register(gainAction)
+    const space = createSpace(triggerAction)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('trigger', triggerAction.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+
+    let currentPlayer = p1
+    let step = engine.proceed({ state, player: currentPlayer, space })
+    let safety = 20
+    while (safety-- > 0 && (step.type === 'ok' || step.type === 'playerSwitch')) {
+      if (step.type === 'playerSwitch') {
+        currentPlayer = state.players.find((player) => player.id === step.targetPlayerId) ?? currentPlayer
+      }
+      step = engine.proceed({ state, player: currentPlayer, space })
+    }
+
+    expect(p2.resources.food).toBe(1)
+    expect(p2.resources.wood).toBe(0)
+    expect(p1.resources.wood).toBe(1)
+  })
+
   it('or node removes completed choice and exposes done', () => {
     const buildRooms: ActionDefinition = {
       id: 'build-rooms',
