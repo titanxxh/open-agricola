@@ -26,7 +26,6 @@ const createStorageReleaseListener = (params: {
     if (!owner || !params.shouldTrigger(context.player)) return
     const amount = getStoredResource(owner, CARD_ID, params.resource)
     if (amount <= 0) return
-    const gain = { [params.resource]: amount } as Partial<Resource>
     return {
       flow: {
         type: 'seq',
@@ -41,12 +40,10 @@ const createStorageReleaseListener = (params: {
             type: 'leaf',
             actionId: 'gain',
             sourceCard: CARD_ID,
-            params: { ...gain, recipientPlayerId: context.player.id },
+            params: { [params.resource]: amount, recipientPlayerId: context.player.id },
           },
         ],
       },
-      logKey: 'log.cardEffectGain',
-      logParams: { gain, cardId: CARD_ID },
       sourceCard: CARD_ID,
     }
   },
