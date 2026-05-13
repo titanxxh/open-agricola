@@ -1,6 +1,6 @@
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { readCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { D56_FatstockStretcher } from '../../cards-display/D/D56_FatstockStretcher'
@@ -13,8 +13,26 @@ const beforeExchangeListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['exchange'],
   handler: (context): ActionHookResult | void => {
-    writeCardExtraData(context.player, CARD_ID, 'sheepBefore', context.player.resources.sheep)
-    writeCardExtraData(context.player, CARD_ID, 'boarBefore', context.player.resources.boar)
+    return {
+      flow: {
+        type: 'seq',
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'set-extra-data', key: 'sheepBefore', value: context.player.resources.sheep },
+          },
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'set-extra-data', key: 'boarBefore', value: context.player.resources.boar },
+          },
+        ],
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 

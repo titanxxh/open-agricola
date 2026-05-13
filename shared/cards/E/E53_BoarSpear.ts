@@ -1,6 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { readCardExtraData } from '../helpers/card-state'
 import { readActionSnapshotToken } from '../helpers/action-snapshot'
 import type { CardImpl } from '../registry'
 import { E53_BoarSpear } from '../../cards-display/E/E53_BoarSpear'
@@ -29,19 +29,24 @@ const obtainListener: CardListenerRegistration = {
     if (token === undefined) return
     const used = readCardExtraData<number>(context.player, CARD_ID, USED_TOKEN_KEY)
     if (used === token) return
-    writeCardExtraData(context.player, CARD_ID, USED_TOKEN_KEY, token)
 
     return {
       flow: {
         type: 'seq',
-        optional: true,
-        choiceLabelKey: 'cards.E53_BoarSpear.choice',
         children: [
           {
             type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'set-extra-data', key: USED_TOKEN_KEY, value: token },
+          },
+          {
+            type: 'leaf',
             actionId: 'exchange',
+            optional: true,
             sourceCard: CARD_ID,
             actionContext: { tradeIds: ['E53_BoarSpear'] },
+            choiceLabelKey: 'cards.E53_BoarSpear.choice',
           },
         ],
       },

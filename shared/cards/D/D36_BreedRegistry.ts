@@ -1,6 +1,6 @@
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
+import { readCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { D36_BreedRegistry } from '../../cards-display/D/D36_BreedRegistry'
 
@@ -18,8 +18,26 @@ const afterCollectListener: CardListenerRegistration = {
     if (gained <= 0) return
     const current = readCardExtraData<number>(context.player, CARD_ID, 'sheepGained') ?? 0
     const next = current + gained
-    writeCardExtraData(context.player, CARD_ID, 'sheepGained', next)
-    writeCardInfobox(context.player, CARD_ID, `${next} / 2`)
+    return {
+      flow: {
+        type: 'seq',
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'set-extra-data', key: 'sheepGained', value: next },
+          },
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'set-infobox', text: `${next} / 2` },
+          },
+        ],
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 
@@ -29,7 +47,19 @@ const beforeExchangeListener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['exchange'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    writeCardExtraData(context.player, CARD_ID, 'sheepBeforeExchange', context.player.resources.sheep)
+    return {
+      flow: {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: {
+          kind: 'set-extra-data',
+          key: 'sheepBeforeExchange',
+          value: context.player.resources.sheep,
+        },
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 
@@ -41,7 +71,15 @@ const afterExchangeListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const sheepBefore = readCardExtraData<number>(context.player, CARD_ID, 'sheepBeforeExchange') ?? 0
     if (context.player.resources.sheep < sheepBefore) {
-      writeCardExtraData(context.player, CARD_ID, 'sheepConverted', true)
+      return {
+        flow: {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: CARD_ID,
+          params: { kind: 'set-extra-data', key: 'sheepConverted', value: true },
+        },
+        sourceCard: CARD_ID,
+      }
     }
   },
 }

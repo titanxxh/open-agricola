@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import { getCardEffect } from '../card-effects'
 import { readPendingFenceBonus, storePendingFenceBonus } from '../helpers/pending-fence-bonus'
-import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
+import { specialEffectAction } from '../../actions/effects/special-effect'
+import type { ActionFlow, ActionSpace, GameState, PlayerState } from '../../contract/types'
 import { setFencesForTest } from './__fixtures__/fence'
 
 import '../E/E74_AshTrees'
@@ -54,6 +55,28 @@ const createSpace = (id: string): ActionSpace =>
   }) as ActionSpace
 
 const findListener = (id: string) => getRegisteredCardListeners().find((listener) => listener.id === id)
+
+const executeSpecialEffectLeaves = (
+  flow: ActionFlow | undefined,
+  state: GameState,
+  player: PlayerState,
+  space: ActionSpace = createSpace('test'),
+) => {
+  if (!flow) return
+  if (flow.type === 'seq') {
+    flow.children.forEach((child) => executeSpecialEffectLeaves(child, state, player, space))
+    return
+  }
+  if (flow.type !== 'leaf' || flow.actionId !== 'special-effect') return
+  specialEffectAction.execute({
+    state,
+    player,
+    space,
+    params: flow.params,
+    sourceCard: flow.sourceCard,
+    actionContext: flow.actionContext,
+  })
+}
 
 describe('E74_AshTrees', () => {
   it('stores only available fences on buy', () => {
@@ -107,6 +130,35 @@ describe('E74_AshTrees', () => {
     expect(result?.doable).toBe(true)
   })
 
+  it('does not create card state while probing isDoable or before-fence', () => {
+    const isDoable = findListener('E74-ash-trees-isdoable-fence')
+    const beforeFence = findListener('E74-ash-trees-before-fence')
+    const player = createPlayer()
+    delete player.cardStates.E74_AshTrees
+    const state = createState(player)
+    const before = JSON.stringify(player.cardStates)
+
+    const isDoableResult = executeCardListener(isDoable!, {
+      state,
+      player,
+      space: createSpace('fence'),
+      actionId: 'fence',
+      phase: 'isDoable',
+      doable: false,
+    } as unknown as CardListenerContext)
+    const beforeResult = executeCardListener(beforeFence!, {
+      state,
+      player,
+      space: createSpace('fence'),
+      actionId: 'fence',
+      phase: 'before',
+    } as unknown as CardListenerContext)
+
+    expect(isDoableResult).toBeUndefined()
+    expect(beforeResult).toBeUndefined()
+    expect(JSON.stringify(player.cardStates)).toBe(before)
+  })
+
   it('clears reserved free fences after fencing finishes', () => {
     const listener = findListener('E74-ash-trees-after-fence')
     const player = createPlayer()
@@ -116,8 +168,9 @@ describe('E74_AshTrees', () => {
       freeFences: 2,
     })
 
-    executeCardListener(listener!, {
-      state: createState(player),
+    const state = createState(player)
+    const result = executeCardListener(listener!, {
+      state,
       player,
       space: createSpace('fence'),
       actionId: 'fence',
@@ -125,6 +178,7 @@ describe('E74_AshTrees', () => {
       choice: 'cancel',
       result: { type: 'ok' },
     } as unknown as CardListenerContext)
+    executeSpecialEffectLeaves(result?.flow, state, player)
 
     expect(readPendingFenceBonus(player)).toBeUndefined()
   })

@@ -4,7 +4,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import {
   isCardFlagged,
   readCardExtraData,
-  writeCardExtraData,
 } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { B34_SpecialFood } from '../../cards-display/B/B34_SpecialFood'
@@ -77,12 +76,19 @@ const beforeListener: CardListenerRegistration = {
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
-    writeCardExtraData(
-      context.player,
-      CARD_ID,
-      ANIMALS_BEFORE_KEY,
-      getAnimalCountByType(context.player),
-    )
+    return {
+      flow: {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: {
+          kind: 'set-extra-data',
+          key: ANIMALS_BEFORE_KEY,
+          value: getAnimalCountByType(context.player),
+        },
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 
