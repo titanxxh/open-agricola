@@ -1,7 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { canStartFencing, getFenceCount } from '../../actions/effects/fencing'
-import { clearPendingFenceBonus } from '../helpers/pending-fence-bonus'
 import type { CardImpl } from '../registry'
 import { C88_CarpentersApprentice } from '../../cards-display/C/C88_CarpentersApprentice'
 
@@ -80,9 +79,14 @@ const fenceAfterListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['fence'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    clearPendingFenceBonus(context.player)
-  },
+  handler: (_context: CardListenerContext): ActionHookResult | void => ({
+    flow: {
+      type: 'leaf',
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'clear-pending-fence-bonus' },
+    },
+  }),
 }
 
 export const C88_CarpentersApprentice_impl = {
