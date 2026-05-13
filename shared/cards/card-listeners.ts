@@ -20,6 +20,7 @@ export type CardListenerContext = ActionExecutionContext & {
 }
 
 export type CardListenerScope = 'player' | 'opponent' | 'any'
+export type CardListenerDispatchMode = 'serial' | 'select'
 
 export type CardListenerRegistration = {
   id: string
@@ -28,6 +29,18 @@ export type CardListenerRegistration = {
   phases?: ActionHookPhase[]
   scope?: CardListenerScope
   mandatory?: boolean
+  /**
+   * Legacy listener priority. Higher values execute earlier; default is 0.
+   */
+  order?: number
+  /**
+   * Static dispatch grouping for trailing listener nodes.
+   *
+   * Default `serial` listeners are activated in play order without probing the
+   * handler. `select` listeners for the same owner/phase/action are wrapped in
+   * a ParallelTriggerNode when two or more match.
+   */
+  dispatchMode?: CardListenerDispatchMode
   handler: (context: CardListenerContext) => ActionHookResult | void
 }
 

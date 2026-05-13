@@ -72,6 +72,23 @@ const createSpace = (action: ActionDefinition): ActionSpace => ({
   takenBy: [],
 })
 
+const drainEngine = (
+  engine: Engine,
+  state: GameState,
+  player: PlayerState,
+  space: ActionSpace,
+) => {
+  let currentPlayer = player
+  let step = engine.proceed({ state, player: currentPlayer, space })
+  while (step.type === 'ok' || step.type === 'playerSwitch') {
+    if (step.type === 'playerSwitch') {
+      currentPlayer = state.players.find((candidate) => candidate.id === step.targetPlayerId) ?? currentPlayer
+    }
+    step = engine.proceed({ state, player: currentPlayer, space })
+  }
+  return step
+}
+
 describe('Hook dispatch merge order', () => {
   beforeEach(() => {
     clearActionHooks()
@@ -298,10 +315,7 @@ describe('Card listener scope filtering', () => {
       hooks: new HookDispatcher(),
       log: new LogStore(),
     })
-    let step = engine.proceed({ state, player: p1, space })
-    while (step.type === 'ok') {
-      step = engine.proceed({ state, player: p1, space })
-    }
+    drainEngine(engine, state, p1, space)
     expect(triggered).toBe(true)
 
     triggered = false
@@ -323,10 +337,7 @@ describe('Card listener scope filtering', () => {
       hooks: new HookDispatcher(),
       log: new LogStore(),
     })
-    let step2 = engine2.proceed({ state, player: p2, space })
-    while (step2.type === 'ok') {
-      step2 = engine2.proceed({ state, player: p2, space })
-    }
+    drainEngine(engine2, state, p2, space)
     expect(triggered).toBe(false)
   })
 

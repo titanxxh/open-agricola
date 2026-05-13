@@ -16,6 +16,7 @@ const listener: CardListenerRegistration = {
   // hides __pass__ from the PARALLEL select-trigger prompt so the player
   // cannot silently skip the guaranteed effect.
   mandatory: true,
+  dispatchMode: 'select',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'day-laborer') return
     return {

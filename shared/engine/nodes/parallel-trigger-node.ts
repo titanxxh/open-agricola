@@ -7,15 +7,16 @@ import { ActivateCardNode } from './activate-card-node'
 /**
  * BGA-style PARALLEL trigger selector.
  *
- * When the dispatcher (`buildPhaseTrailingNodes`) detects multiple matched
- * listeners whose flows are `interactive`, it wraps them as `ActivateCardNode`
- * children of this node. The engine main loop emits `kind: 'select-trigger'`
- * with one option per remaining card (+ `__pass__`); after the player picks a
- * card, `chooseCard` records `selectedChildId` and the engine activates that
- * child. The child's flow nodes are then inserted **inside this node's
- * children array, right after the activated card**, so the tree walker
- * (`nextUnresolved`) executes the entire trigger's flow (including any nested
- * sub-PARALLELs) before returning here to prompt for the next card.
+ * When the dispatcher (`buildPhaseTrailingNodes`) sees multiple matched
+ * listeners explicitly marked `dispatchMode: 'select'`, it wraps them as
+ * `ActivateCardNode` children of this node. The engine main loop emits
+ * `kind: 'select-trigger'` with one option per remaining card (+ `__pass__`);
+ * after the player picks a card, `chooseCard` records `selectedChildId` and the
+ * engine activates that child. The child's flow nodes are then inserted
+ * **inside this node's children array, right after the activated card**, so
+ * the tree walker (`nextUnresolved`) executes the entire trigger's flow
+ * (including any nested sub-PARALLELs) before returning here to prompt for the
+ * next card.
  *
  * `children` therefore holds a heterogeneous mix at runtime:
  *   - The initial `ActivateCardNode[]` placed by the dispatcher (one per card)

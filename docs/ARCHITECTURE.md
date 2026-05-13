@@ -300,16 +300,23 @@ shared/engine/
     ├── leaf-node.ts       原子动作叶子
     ├── interaction-node.ts 单一"等输入"叶子
     ├── seq-node.ts、parallel-node.ts、xor-node.ts、or-node.ts、optional-node.ts
-    ├── choice-node.ts、player-switch-node.ts、activate-card-node.ts
+    ├── player-switch-node.ts、activate-card-node.ts、parallel-trigger-node.ts
     └── ...
 ```
 
 ### 5.2 节点类型
 
-- `LeafNode`：原子 action（`gain` / `pay-resources` / `place-farmer` / `bake-bread` / ...）；以 `actionId` + `params` 调 `ActionDefinition.execute`。
-- `InteractionNode`：唯一"等待玩家输入"的叶子；带 `request: InteractionRequest`、`promptKey`、`promptParams`、`sourceCard`。新等待形态 = 加 `InteractionRequest` 新 kind，不加新节点类型。
-- 组合节点：`SeqNode`（顺序）/ `ParallelNode`（并行）/ `OrNode`（任选其一）/ `XorNode`（互斥分支）/ `OptionalNode`（可选）/ `ChoiceNode`（前向分支）。
-- 控制节点：`PlayerSwitchNode`（切换活跃玩家，跨人 hook 用）/ `ActivateCardNode`（hook 触发，按 listener 注入）。
+**架构决策（2026-05-13）：领域层 `ActionFlow` 对齐 BGA node algebra，只保留 `leaf / seq / parallel / xor / or`。** `optional`、`promptKey`、`sourceCard`、`choiceLabel*` 是节点 metadata，不是新的领域节点类型。卡牌和 listener 只能构造这个小集合；新规则不应向 `ActionFlow` 暴露 runtime-only node。
+
+当前 engine 仍有若干过渡期 runtime node，用来承接 WS pending、跨玩家确认、listener 激活和序列化恢复。它们是实现细节，不是卡牌 DSL：
+
+- `ActionNode`：BGA `LeafNode(action)` 等价物；以 `actionId` + `params` 调 `ActionDefinition.execute`。
+- `SequenceNode` / `ParallelNode` / `OrNode` / `XorNode`：组合节点，对应 BGA `SEQ` / `PARALLEL` / `OR` / `XOR`。
+- `OptionalNode`：过渡 wrapper；目标语义是任意 node 的 `optional` metadata，后续不在其上增加新行为。
+- `InteractionNode`：leaf action 执行后产生的 pending/protocol state；带 `request: InteractionRequest`、`promptKey`、`promptParams`、`sourceCard`。新等待形态 = 加 `InteractionRequest` 新 kind，不加卡牌可见节点类型。
+- `ActivateCardNode`：listener 激活的过渡 wrapper；目标是普通 leaf action（如 `activate-card`）+ `{ listenerId, cardId, event }` params。
+- `PlayerSwitchNode`：跨玩家确认 / undo boundary 的过渡 wrapper；目标是普通 leaf action 或 node metadata，不作为领域 flow primitive。
+- `ParallelTriggerNode`：多 listener 选择顺序的过渡 specialization；目标是把 select/pass/mandatory/independent 语义并入 generic `ParallelNode`，与 BGA `ParallelNode::getChoices()` 模型一致。
 
 `AbstractNode` 提供：`isDoable / isAutomatic / resolve / parent / children / push / replace / isResolved / getNextUnresolved / toCursor / fromCursor`。
 
@@ -422,7 +429,7 @@ WS 广播、HTTP 查询、单测断言同一结构。`pending` 字段已不是�
 ```
 shared/actions/
 ├── index.ts               actionDefinitionLookup Map（27 base + internal 共发现）
-├── flow.ts                ActionFlow 节点表达式（leaf / seq / parallel / xor / or / optional / choice）
+├── flow.ts                ActionFlow 节点表达式（leaf / seq / parallel / xor / or + optional metadata）
 ├── hooks.ts               Hook 注册 + 调度
 ├── hook-matrix.ts         buildHookMatrix() 优化矩阵
 ├── internal-actions.ts    引擎内部辅助 action（mark-card-trigger 等）
@@ -494,7 +501,7 @@ anytime                  额外注册的 anytime 行动
 
 `ActionHookResult { doable?, actionId?, extraOptions?, followUpActions?, flow?, costs?, sourceCard?, logKey?, logParams? }`。
 
-`sourceCard` 兜底：`ActionHookResult.flow` 顶层 `sourceCard` 递归补到缺失 child leaf；`OptionalNode` / `OrNode` / `XorNode` / `ChoiceNode` 写入 `pendingChoiceContext.sourceCard`，`authoritative-session.ts` 透传到 `interaction`。
+`sourceCard` 兜底：`ActionHookResult.flow` 顶层 `sourceCard` 递归补到缺失 child leaf；组合 pending / `InteractionNode` 写入 `pendingChoiceContext.sourceCard`，`authoritative-session.ts` 透传到 `interaction`。
 
 作用域 scope：`player` / `opponent` / `any`。同 phase 内按 `order` → `id` 排序，同步、确定性。
 
@@ -518,15 +525,34 @@ anytime                  额外注册的 anytime 行动
 
 阶段 hook 已可返回 `ActionFlow`（`continueStageHook` / `continueAllWorkersPlacedHooks`），用于"hook 触发子流程"统一走 `EngineStack.push`。
 
-### 7.7 ActivateCardNode + PlayerSwitchNode + ParallelTriggerNode
+### 7.7 Listener activation purity + BGA 对齐
 
-- 当 `HookDispatcher.getMatchingListeners()` 找到匹配 listener，引擎在 dispatch 阶段（`buildPhaseTrailingNodes` 内）调用 `executeCardListener` **peek 一次** 拿到 `ActionHookResult`，非 `undefined` 结果存到 `ActivateCardNode.preComputedResult` 并直接复用（不重跑 handler）；`undefined` 保持 lazy fallback，让依赖 post-reorg / post-mutation 状态的 listener 在真正推进时重新判断。
-- 当 owner ≠ 当前行动玩家（opponent scope），dispatch 自动在该 owner 的 trigger 组前后插 `PlayerSwitchNode`。`PlayerSwitchNode` 暂停时通过 `confirm-player-switch` interaction 等玩家确认；`undoBoundary` 标记 undo 不能跨切人。
-- **多 listener 同 phase 触发**（BGA-style PARALLEL trigger selection）：
-  - dispatch 阶段静态分析每个 listener 的 flow（`shared/engine/flow-interactivity.ts`：`xor` / `optional` / `altCosts payLeaf` / 含 `interactionRequest` 的 leaf → `interactive`；纯 `gain` / 单路径 `pay` / 全 auto seq → `auto`）。
-  - 同 owner 内分组：mandatory + optional auto 直接串行 `ActivateCardNode`；optional interactive 包成 `ParallelTriggerNode`。
-  - `ParallelTriggerNode.step()` 在 children 未 resolved 且 `selectedChildId === null` 时 emit `kind: 'select-trigger'` InteractionRequest，给卡主玩家选触发顺序（含 `__pass__` 一次性跳过剩余）。玩家选 cardId → `chooseCard` 设 `selectedChildId` → 引擎下一轮 `tree.nextUnresolved` 找到选中 child activate。child 完整结算后（含嵌套子触发的递归 ParallelTriggerNode）`selectedChildId` 自动清空 → 下一轮 step 重新 emit。全部 children resolved 或 `passAll` → 节点 resolved。
-  - `order` 字段已删除（曾经 4 张卡的 `order: 10` hack 全 cleanup）；执行顺序由 `playOrderIndex`（occupation < minor < improvement，数组 index）决定。
+**架构决策（2026-05-13）：`CardListenerRegistration.handler` 在 listener dispatch / preview / doable 路径中必须是 state-pure flow builder。** 它可以读取 `GameState` / `PlayerState` / event，返回 `ActionHookResult`、`ActionFlow`、`costs`、`doable`、`extraOptions` 等结构化结果；不能直接修改 `GameState`、`PlayerState`、`ActionSpace`、`player.cardStates`、资源、农场格、日志或 pending。
+
+当前 no-peek worktree 已把 `buildPhaseTrailingNodes` 改为不执行 handler；这只是 Phase 1 安全切口。后续设计不能再依赖 dispatch-time handler peek 或一次性 `preComputedResult`。
+
+BGA 参考语义：
+
+- `PlayerCards::getReaction($event)` 只收集 listening cards 并生成 `ACTIVATE_CARD` leaf，不执行卡牌 listener body。
+- `ActivateCard::getFlow()` 在 leaf 真正推进时调用卡牌方法得到 flow；`isDoable()` / `isIndependent()` / `getDescription()` 也可能重建 flow，因此 listener 方法必须可重复调用且无副作用。
+- 真正的状态修改放在 action / `SPECIAL_EFFECT` leaf 里执行，而不是放在 reaction 构建阶段。
+
+OA 对齐规则：
+
+- 需要改资源、动物、农场、`cardStates` 或 log 的 listener，必须返回 leaf / seq flow，让 `gain`、`pay-resources`、`special-effect`、`exchange` 等 action 执行状态修改。
+- 如果缺通用 mutation leaf，新增可复用 internal action；不要在单卡 handler 内直接 mutate，也不要在核心路径加单卡分支。
+- `effect.onBuy` 等非-listener 执行路径可保留现状；但一旦被 listener / preview / doable 复用，也必须遵守 state-pure flow builder 语义。
+- dispatch 阶段不得通过执行 handler 来制造一次性 `preComputedResult` 语义；可以收集 registration metadata、构造 activation leaf、或做纯 `isDoable` / preview 查询。
+- listener activation 的目标形态是普通 `leaf actionId='activate-card'`，params 携 `{ listenerId, cardId, event }`。当前 `ActivateCardNode` 只是过渡实现。
+- owner 与 trigger player 必须显式进入 event / params。opponent scope 触发时，activation 以 owner 为执行玩家；跨玩家 UI 确认和 undo boundary 由 runtime 处理，目标上不暴露为卡牌 flow primitive。
+
+**多 listener 同 phase 触发**采用 BGA-style PARALLEL trigger selection：
+
+- Phase 1 过渡期：handler 尚未全 pure，dispatch 不执行 handler 来判断 interactivity；使用显式静态 `dispatchMode: 'select'` 标出需要玩家选择触发顺序的 listener，其余保持 serial。
+- 不在 Phase 1 翻转 `mandatory` 默认值；`mandatory: true` 仍只影响 `ParallelTriggerNode`：任一未 resolved child mandatory 时隐藏 `__pass__`，避免 guaranteed effect 被静默跳过。
+- 目标形态：同 owner、同 phase 下，mandatory 或纯自动 trigger 可按确定性顺序自动结算；多个 optional / interactive trigger 同时可用时，必须显式给卡主玩家选择触发顺序，并允许 pass 跳过剩余 optional trigger。
+- 长期目标是 generic `ParallelNode` 负责 select/pass/mandatory/independent 语义；当前 `ParallelTriggerNode` 可作为迁移期承载，但不再扩展其领域语义。
+- 不为 `CardListenerRegistration` 引入 / 复活 `order` 排序字段；默认执行顺序来自 `playOrderIndex`（occupation < minor < improvement，数组 index）。需要玩家选择时用 parallel trigger selection 显式化。
 
 ### 7.8 farm-type 提交
 
