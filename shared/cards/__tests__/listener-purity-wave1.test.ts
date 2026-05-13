@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { ActionFlow } from '../../contract/types'
 import type { CardListenerContext } from '../card-listeners'
 import { B48_ForestStone_impl } from '../B/B48_ForestStone'
+import { C148_MudWallower_impl } from '../C/C148_MudWallower'
 import { E103_Wolf_impl } from '../E/E103_Wolf'
 
 const CARD_ID = 'B48_ForestStone'
+const MUD_WALLOWER_CARD_ID = 'C148_MudWallower'
 const WOLF_CARD_ID = 'E103_Wolf'
 
 const makeB48Context = (
@@ -38,6 +40,38 @@ const collectLeaves = (flow: ActionFlow): ActionFlow[] => {
   if ('children' in flow) return flow.children.flatMap(collectLeaves)
   return []
 }
+
+const makeC148Context = (
+  counter: number,
+  held: number,
+  gainPerRound: Partial<Record<'wood' | 'clay' | 'boar', number>> = { wood: 3 },
+): CardListenerContext => {
+  const player = {
+    id: 'p1',
+    name: 'P1',
+    resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
+    cardStates: { [MUD_WALLOWER_CARD_ID]: { counters: { counter, held }, infobox: `${counter} / 4` } },
+    improvements: [],
+    minorPlayed: [],
+    occupationPlayed: [MUD_WALLOWER_CARD_ID],
+  } as never
+  return {
+    state: { players: [player], actionSpaces: [] } as never,
+    player,
+    triggerPlayer: player,
+    ownerPlayer: player,
+    effectPlayer: player,
+    space: { id: 'forest', gainPerRound } as never,
+    actionId: 'place-farmer',
+    phase: 'after',
+    result: { type: 'ok' },
+  }
+}
+
+const mudWallowerAfterPlaceFarmerListener = () =>
+  C148_MudWallower_impl.listeners!.find(
+    (entry) => entry.id === 'C148-mud-wallower-after-place-farmer',
+  )!
 
 const makeE103Context = (
   stack: string[] = ['clay', 'wood', 'grain'],
@@ -181,6 +215,101 @@ describe('listener purity wave 1', () => {
     const result = listener.handler(ctx)
 
     expect(result).toBeUndefined()
+    expect(JSON.stringify(ctx.player.cardStates)).toBe(before)
+  })
+
+  it('C148 handler returns boar flow without resetting counters immediately', () => {
+    const listener = mudWallowerAfterPlaceFarmerListener()
+    const ctx = makeC148Context(3, 0)
+    const before = JSON.stringify(ctx.player.cardStates)
+
+    const result = listener.handler(ctx)
+
+    expect(result?.flow).toBeDefined()
+    expect(ctx.player.cardStates?.[MUD_WALLOWER_CARD_ID]?.counters).toEqual({ counter: 3, held: 0 })
+    expect(JSON.stringify(ctx.player.cardStates)).toBe(before)
+  })
+
+  it('C148 handler returns no flow and no mutation for non-accumulation spaces', () => {
+    const listener = mudWallowerAfterPlaceFarmerListener()
+    const ctx = makeC148Context(0, 0, {})
+    const before = JSON.stringify(ctx.player.cardStates)
+
+    const result = listener.handler(ctx)
+
+    expect(result).toBeUndefined()
+    expect(JSON.stringify(ctx.player.cardStates)).toBe(before)
+  })
+
+  it.each([
+    [0, 1],
+    [1, 2],
+    [2, 3],
+  ])('C148 handler returns counter %i -> %i flow without mutating immediately', (counter, nextCounter) => {
+    const listener = mudWallowerAfterPlaceFarmerListener()
+    const ctx = makeC148Context(counter, 2)
+    const before = JSON.stringify(ctx.player.cardStates)
+
+    const result = listener.handler(ctx)
+
+    expect(result?.flow).toEqual({
+      type: 'seq',
+      children: [
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: MUD_WALLOWER_CARD_ID,
+          params: { kind: 'set-counter', key: 'counter', value: nextCounter },
+        },
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: MUD_WALLOWER_CARD_ID,
+          params: { kind: 'set-infobox', text: `${nextCounter} / 4` },
+        },
+      ],
+    })
+    expect(JSON.stringify(ctx.player.cardStates)).toBe(before)
+  })
+
+  it('C148 handler returns reset, held, infobox, and boar flow on every fourth accumulation space', () => {
+    const listener = mudWallowerAfterPlaceFarmerListener()
+    const ctx = makeC148Context(3, 2)
+    const before = JSON.stringify(ctx.player.cardStates)
+
+    const result = listener.handler(ctx)
+
+    expect(result?.flow).toEqual({
+      type: 'seq',
+      children: [
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: MUD_WALLOWER_CARD_ID,
+          params: { kind: 'set-counter', key: 'counter', value: 0 },
+        },
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: MUD_WALLOWER_CARD_ID,
+          params: { kind: 'set-counter', key: 'held', value: 3 },
+        },
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: MUD_WALLOWER_CARD_ID,
+          params: { kind: 'set-infobox', text: '0 / 4' },
+        },
+        {
+          type: 'leaf',
+          actionId: 'gain',
+          sourceCard: MUD_WALLOWER_CARD_ID,
+          params: { boar: 1 },
+          choiceLabelKey: undefined,
+          choiceLabelParams: undefined,
+        },
+      ],
+    })
     expect(JSON.stringify(ctx.player.cardStates)).toBe(before)
   })
 })
