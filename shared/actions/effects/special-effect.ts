@@ -4,8 +4,9 @@ import {
   writeCardInfobox,
   readCardExtraData,
   writeCardExtraData,
+  popFromCardStack,
 } from '../../cards/helpers/card-state'
-import { incCounter } from '../../cards/__stubs__/helpers'
+import { incCounter, initCardState } from '../../cards/__stubs__/helpers'
 import {
   fieldFindStackOfKind,
   fieldHasCrop,
@@ -16,6 +17,9 @@ export type SpecialEffectParams =
   | { kind: 'increment-extra-data'; key: string; amount: number }
   | { kind: 'set-extra-data'; key: string; value: unknown }
   | { kind: 'increment-counter'; key: string; amount: number }
+  | { kind: 'set-counter'; key: string; value: number }
+  | { kind: 'pop-card-stack-top' }
+  | { kind: 'swap-improvement-with-board'; from: string; to: string }
   | { kind: 'set-flag'; flag: boolean }
   | { kind: 'set-infobox'; text: string }
   | { kind: 'remove-field-crop'; crop: 'grain' | 'vegetable'; minRemaining?: number }
@@ -74,6 +78,26 @@ export const specialEffectAction: ActionDefinition = {
       case 'increment-counter':
         incCounter(target, sourceCard, p.key, p.amount)
         return { type: 'ok' }
+      case 'set-counter': {
+        const counters = initCardState(target, sourceCard)
+        counters[p.key] = Math.max(0, p.value)
+        return { type: 'ok' }
+      }
+      case 'pop-card-stack-top':
+        popFromCardStack(target, sourceCard)
+        return { type: 'ok' }
+      case 'swap-improvement-with-board': {
+        if (!state) return { type: 'fail', logKey: 'log.specialEffectFail' }
+        const playerIndex = target.improvements.indexOf(p.from)
+        const board = state.availableMajorImprovements ?? []
+        const boardIndex = board.indexOf(p.to)
+        if (playerIndex < 0 || boardIndex < 0) return { type: 'ok' }
+        target.improvements.splice(playerIndex, 1)
+        target.improvements.push(p.to)
+        board.splice(boardIndex, 1)
+        board.push(p.from)
+        return { type: 'ok' }
+      }
       case 'set-flag':
         setCardFlag(target, sourceCard, p.flag)
         return { type: 'ok' }
