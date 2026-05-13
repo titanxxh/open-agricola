@@ -127,8 +127,8 @@ export class EngineStack {
     return this.current()?.engine.hasPendingChoiceCompositeAncestor() ?? false
   }
 
-  insertFlowAfterPendingChoice(flow: ActionFlow): void {
-    this.current()?.engine.insertFlowAfterPendingChoice(flow)
+  insertFlowAfterPendingChoice(flow: ActionFlow, ownerPlayerId?: string): void {
+    this.current()?.engine.insertFlowAfterPendingChoice(flow, ownerPlayerId)
   }
 
   toCursor(): EngineStackCursor {
@@ -147,11 +147,15 @@ export class EngineStack {
 
   static fromCursor(
     cursor: EngineStackCursor,
-    rebuild: (source: EngineSource, snapshot: ReturnType<Engine['snapshot']>) => Engine,
+    rebuild: (
+      source: EngineSource,
+      snapshot: ReturnType<Engine['snapshot']>,
+      frame: EngineFrameCursor,
+    ) => Engine,
   ): EngineStack {
     const stack = new EngineStack()
     for (const fc of cursor.frames) {
-      const engine = rebuild(fc.source, fc.engineSnapshot)
+      const engine = rebuild(fc.source, fc.engineSnapshot, fc)
       stack.push({
         engine,
         source: fc.source,

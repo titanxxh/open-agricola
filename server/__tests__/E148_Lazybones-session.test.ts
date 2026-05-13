@@ -207,6 +207,7 @@ describe('E148_Lazybones session', () => {
     expect(owner.stableTiles.length).toBe(0)
     const spaces = owner.cardStates?.['E148_Lazybones']?.extraData?.reservedActionSpaces as string[]
     expect(spaces).not.toContain('grain-seeds')
+    expect(owner.cardStates?.['E148_Lazybones']?.resourceStats?.used ?? 0).toBe(0)
     expect(resp.state.log.some((entry) =>
       entry.key === 'log.cardEffectGain' &&
       entry.params?.cardId === 'E148_Lazybones',

@@ -82,7 +82,7 @@ const listener: CardListenerRegistration = {
             logKey: 'log.cardEffectGain',
             logParams: { cardId: CARD_ID, gain: '1 STABLE' },
           }
-        : {}),
+        : { countCardUse: false }),
       sourceCard: CARD_ID,
     }
   },

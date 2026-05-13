@@ -640,8 +640,8 @@ export class GameCore {
 
   private restoreEngineStackFromCursor(cursor: EngineStackCursor): void {
     if (!cursor || cursor.frames.length === 0) return
-    this.engineStack = EngineStack.fromCursor(cursor, (source, snapshot) => {
-      const engine = this.createEngineFromSource(source)
+    this.engineStack = EngineStack.fromCursor(cursor, (source, snapshot, frame) => {
+      const engine = this.createEngineFromSource(source, frame.ownerPlayerIndex)
       engine.restore(snapshot)
       return engine
     })
@@ -921,12 +921,15 @@ export class GameCore {
     roundPhase.startFeedSubFlow(this, playerIndex, remaining, foodUsed, feedQueue)
   }
 
-  private createEngine(actionId: string): Engine {
+  private createEngine(
+    actionId: string,
+    ownerPlayerIndex = this.state.currentPlayerIndex,
+  ): Engine {
     const action = this.registry.get(actionId)
     const counter = { value: 0 }
     const an = new ActionNode(`action-${actionId}`, actionId)
     const root = action?.flow
-      ? this.buildEngineNode(action.flow, counter, this.state.players[this.state.currentPlayerIndex]?.id)
+      ? this.buildEngineNode(action.flow, counter, this.state.players[ownerPlayerIndex]?.id)
       : action?.resolveChoice
         ? new SequenceNode(`seq-${actionId}`, [an, new InteractionNode(`choice-${actionId}`, [])])
         : an
@@ -938,10 +941,13 @@ export class GameCore {
     })
   }
 
-  private createEngineFromSource(source: EngineSource): Engine {
+  private createEngineFromSource(
+    source: EngineSource,
+    ownerPlayerIndex = this.state.currentPlayerIndex,
+  ): Engine {
     return source.kind === 'action'
-      ? this.createEngine(source.actionId)
-      : this.createFlowEngine(source.flow)
+      ? this.createEngine(source.actionId, ownerPlayerIndex)
+      : this.createFlowEngine(source.flow, ownerPlayerIndex)
   }
 
   private clonePlayer(p: PlayerState): PlayerState {
@@ -1622,7 +1628,7 @@ export class GameCore {
     // null-checks on activeSpaceId/activePlayerIndex were defensive but
     // redundant. Use a non-null assertion on the two synced fields.
     if (source) {
-      const engine = this.createEngineFromSource(source)
+      const engine = this.createEngineFromSource(source, entry.activePlayerIndex!)
       if (entry.engineSnapshot) {
         engine.restore(entry.engineSnapshot)
       }
@@ -2719,7 +2725,7 @@ export class GameCore {
         if (cardFlow && this.engine) {
           // Insert the follow-up so it runs after the engine finishes resolving the choice.
           // Mirrors the `{ type: 'flow' }` branch of the engine's own resolveChoice.
-          this.engineStack.insertFlowAfterPendingChoice(cardFlow)
+          this.engineStack.insertFlowAfterPendingChoice(cardFlow, player.id)
         }
       }
     }

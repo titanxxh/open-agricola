@@ -178,6 +178,7 @@ export function engineResolveChoice(
             ),
             actionId,
           ),
+          context.player.id,
         )
         int.tree.insertAfter(node.id, [flowNode])
         targetNode!.resolve(choice)
@@ -326,7 +327,7 @@ export function engineResolveChoice(
           ? applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
           : null)
         .filter((flow) => flow)
-        .map((flow) => buildFlowNode(int, flow as ActionFlow))
+        .map((flow) => buildFlowNode(int, flow as ActionFlow, context.player.id))
       const followUps = allResults
         .flatMap((entry) =>
           (entry.followUpActions ?? []).map((followUp) =>
@@ -364,7 +365,7 @@ export function engineResolveChoice(
         ...afterActivateNodes,
       ]
       if (result.type === 'flow') {
-        const flowNode = buildFlowNode(int, result.flow)
+        const flowNode = buildFlowNode(int, result.flow, context.player.id)
         if (trailingHookNodes.length > 0) {
           int.tree.insertAfter(insertAnchor, trailingHookNodes)
         }
@@ -479,7 +480,7 @@ export function engineResolveChoice(
       ? applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
       : null)
     .filter((flow) => flow)
-    .map((flow) => buildFlowNode(int, flow as ActionFlow))
+    .map((flow) => buildFlowNode(int, flow as ActionFlow, context.player.id))
   const followUps = allResults
     .flatMap((entry) =>
       (entry.followUpActions ?? []).map((followUp) =>
@@ -520,7 +521,7 @@ export function engineResolveChoice(
       ...afterActivateNodes,
     ]
     if (result.type === 'flow') {
-      const flowNode = buildFlowNode(int, result.flow)
+      const flowNode = buildFlowNode(int, result.flow, context.player.id)
       if (trailingHookNodes.length > 0) {
         int.tree.insertAfter(insertionTargetId, trailingHookNodes)
       }

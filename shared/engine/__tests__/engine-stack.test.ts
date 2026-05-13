@@ -72,7 +72,10 @@ describe('EngineStack', () => {
       hook: 'onReorganizeComplete', playerIndex: 1, cardIndex: 0, extra: { trigger: 'anytime' },
     })
 
-    const rebuilt = EngineStack.fromCursor(cursor, () => frame.engine)
+    const rebuilt = EngineStack.fromCursor(cursor, (_source, _snapshot, frameCursor) => {
+      expect(frameCursor.ownerPlayerIndex).toBe(1)
+      return frame.engine
+    })
     expect(rebuilt.depth()).toBe(1)
     expect(rebuilt.current()!.ownerPlayerIndex).toBe(1)
     expect(rebuilt.current()!.reason).toBe('reorganize')
@@ -136,7 +139,7 @@ describe('EngineStack query/write delegation', () => {
     pushStubFrame(stack, engine)
     const flow = { type: 'leaf' as const, actionId: 'test' }
     stack.insertFlowAfterPendingChoice(flow)
-    expect(spy).toHaveBeenCalledWith(flow)
+    expect(spy).toHaveBeenCalledWith(flow, undefined)
   })
 
   it('insertFlowAfterPendingChoice on empty stack is a no-op', () => {

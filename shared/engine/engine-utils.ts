@@ -524,13 +524,22 @@ export function getNodeDescriptionPreview(
   return undefined
 }
 
-export function buildFlowNode(int: EngineInternals, flow: ActionFlow): EngineNode {
+export function buildFlowNode(
+  int: EngineInternals,
+  flow: ActionFlow,
+  ownerPlayerId?: string,
+): EngineNode {
   const nextId = () => `flow-${int.counterRef.value++}`
   if (flow.targetPlayerId) {
     const { targetPlayerId, ...innerFlow } = flow
+    const scopedNode = buildFlowNode(int, innerFlow as ActionFlow, targetPlayerId)
+    if (!ownerPlayerId || ownerPlayerId === targetPlayerId) {
+      return scopedNode
+    }
     return new SequenceNode(nextId(), [
-      new PlayerSwitchNode(`ps-flow-${int.counterRef.value++}`, targetPlayerId),
-      buildFlowNode(int, innerFlow as ActionFlow),
+      new PlayerSwitchNode(`ps-flow-to-${int.counterRef.value++}`, targetPlayerId),
+      scopedNode,
+      new PlayerSwitchNode(`ps-flow-back-${int.counterRef.value++}`, ownerPlayerId),
     ])
   }
   if (flow.type === 'leaf') {
@@ -542,7 +551,7 @@ export function buildFlowNode(int: EngineInternals, flow: ActionFlow): EngineNod
           flow.actionContext,
           flow.sourceCard,
         )
-        return buildFlowNode(int, inner)
+        return buildFlowNode(int, inner, ownerPlayerId)
       }
       // Fallback: action has no inner flow (plain leaf action like
       // grain-seeds / day-laborer / traveling-players). Drop into the
@@ -574,7 +583,7 @@ export function buildFlowNode(int: EngineInternals, flow: ActionFlow): EngineNod
       : actionNode
     return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
   }
-  const children = flow.children.map((child) => buildFlowNode(int, child))
+  const children = flow.children.map((child) => buildFlowNode(int, child, ownerPlayerId))
   if (flow.type === 'seq') {
     const sequence = new SequenceNode(nextId(), children)
     const node = flow.optional
