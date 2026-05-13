@@ -56,23 +56,15 @@ const drainPending = (session: GameSession, accept: boolean) => {
 }
 
 describe('C54_MarketBooth session', () => {
-  it('prerequisite "1 Stable in Reserve" rejects players with 4 stables built', () => {
+  it('has no prerequisite (BGA C54_MarketBooth has no isBuyable / prerequisite)', () => {
     const card = getRegisteredMinorImprovement(CARD_ID)!
     const session = new GameSession()
     const state = session.getState().state
     const player = state.players[0]!
+    // Even with all 4 stables built, BGA does not gate the purchase.
     player.stableTiles = [
       { row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }, { row: 1, col: 0 },
     ]
-    expect(meetsCardPrerequisites(player, card as never, 1, state)).toBe(false)
-  })
-
-  it('prerequisite "1 Stable in Reserve" passes when at least one stable is unbuilt', () => {
-    const card = getRegisteredMinorImprovement(CARD_ID)!
-    const session = new GameSession()
-    const state = session.getState().state
-    const player = state.players[0]!
-    player.stableTiles = []
     expect(meetsCardPrerequisites(player, card as never, 1, state)).toBe(true)
   })
 

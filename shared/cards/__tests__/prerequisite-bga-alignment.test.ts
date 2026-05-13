@@ -23,14 +23,17 @@ const wordingFixed: Case[] = [
   { id: 'E39_Paintbrush', prerequisite: '1 pig', kind: 'minor' },
 ]
 
-// Reverse 6 (kept on OA side, BGA upstream omits — UI-only metadata)
+// Reverse 4 — BGA enforces these via `isBuyable()` method (no `$this->prerequisite`
+// field); OA promotes the check to the `prerequisite` schema string + a matching
+// `prerequisiteCheck` handler so the gate is visible to players in the UI.
+// (2026-05-13: C30 / C54 removed — they were OA-extra hard gates with no
+// equivalent BGA isBuyable check; B56 re-labelled to match BGA's real Fishing
+// farmer requirement.)
 const oaExtraKept: Case[] = [
   { id: 'A3_PaperKnife', prerequisite: '3 Occupations In Hand', kind: 'minor' },
   { id: 'B154_SheepKeeper', prerequisite: 'Less Than 7 Sheep', kind: 'occupation' },
-  { id: 'B56_Brook', prerequisite: '1 Occupation', kind: 'minor' },
+  { id: 'B56_Brook', prerequisite: 'Farmer on Fishing Space', kind: 'minor' },
   { id: 'B74_ThickForest', prerequisite: '5 Clay in Your Supply', kind: 'minor' },
-  { id: 'C30_HalfTimberedHouse', prerequisite: 'Stone House', kind: 'minor' },
-  { id: 'C54_MarketBooth', prerequisite: '1 Stable in Reserve', kind: 'minor' },
 ]
 
 const allCases: Case[] = [...forwardAdded, ...wordingFixed, ...oaExtraKept]

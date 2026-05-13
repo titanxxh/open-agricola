@@ -10,5 +10,4 @@ export const C54_MarketBooth = new MinorImprovement({
   category: "FOOD_PROVIDER",
   desc: ["After the field phase of each harvest, you can exchange 1 <GRAIN> plus 1 <FENCE> (both from your supply) for 5 <FOOD>."],
   cost: {},
-  prerequisite: '1 Stable in Reserve',
 })

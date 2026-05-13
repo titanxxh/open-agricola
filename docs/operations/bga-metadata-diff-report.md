@@ -1,31 +1,23 @@
-# BGA Metadata Diff Report (2026-05-12)
+# BGA Metadata Diff Report (2026-05-13)
 
 ## Summary
 - Total BGA cards scanned: 888
 - Total TS cards scanned: 888
-- ⚠ Literal deviations: 1
-- ❌ Complex deviations: 7
+- ⚠ Literal deviations: 0
+- ❌ Complex deviations: 4
 - 🔍 BGA-only: 0
 - 🔍 TS-only: 0
 - 🔍 Banned-but-present: 33
 
 ## ⚠ Literal deviations (auto-fixable)
-### extraVp
-| Card | BGA | Ours |
-|---|---|---|
-| C148_MudWallower | (missing) | true |
-
 ## ❌ Complex deviations (manual review)
 ### prerequisite
 | Card | BGA | Ours |
 |---|---|---|
 | A3_PaperKnife | (missing) | 3 Occupations In Hand |
 | B154_SheepKeeper | (missing) | Less Than 7 Sheep |
-| B56_Brook | (missing) | 1 Occupation |
+| B56_Brook | (missing) | Farmer on Fishing Space |
 | B74_ThickForest | (missing) | 5 Clay in Your Supply |
-| C30_HalfTimberedHouse | (missing) | Stone House |
-| C54_MarketBooth | (missing) | 1 Stable in Reserve |
-| D1_ZigzagHarrow | 3 Fields in an \"L\" Shape | 3 Fields in an  |
 
 ## 🔍 Single-sided
 ### BGA-only (no matching TS file)
@@ -66,13 +58,3 @@
 - D92_ChildOmbudsman
 - D97_BeggingStudent
 - E22_GuestRoom
-
----
-
-## Appendix: BGA same-deck-number multi-file
-
-These BGA cards have 2 PHP files for the same deck+number; the parser canonical pick (TS-id-match > non-banned > alphabetic) selects the OA-aligned one:
-
-- C54: BGA C54_MarketBooth (canonical) + C54_MarketStall (legacy name)
-- D11: BGA D11_LawnFertilizer (canonical) + D11_LawnFertilzer (typo, legacy)
-- E132: BGA E132_VeggieLover (canonical) + E132_Shearer (legacy name)
