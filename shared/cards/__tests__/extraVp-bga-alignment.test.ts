@@ -81,8 +81,6 @@ const cases: Array<{ id: string; kind: 'minor' | 'occupation' }> = [
   { id: 'C99_GardenDesigner', kind: 'occupation' },
   { id: 'D33_SummerHouse', kind: 'minor' },
   { id: 'D92_ChildOmbudsman', kind: 'occupation' },
-  // OA-extra: BGA upstream omits extraVp (2026-05-12 metadata-3b spot-check)
-  { id: 'C148_MudWallower', kind: 'occupation' },
 ]
 
 describe('extraVp BGA alignment (auto-fix lock-in)', () => {

@@ -12,5 +12,4 @@ export const C148_MudWallower = new Occupation({
   cost: {},
   players: '4+',
   evenMoreSet: true,
-  extraVp: true,
 })

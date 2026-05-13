@@ -5,7 +5,6 @@ import { C54_MarketBooth } from '../../cards-display/C/C54_MarketBooth'
 const CARD_ID = C54_MarketBooth.id
 
 export const C54_MarketBooth_impl = {
-  prerequisiteCheck: (player) => player.stableTiles.length < 4,
   effect: {
     id: CARD_ID,
     onEndHarvestFieldPhase: (_state, player) => {
