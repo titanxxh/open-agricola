@@ -479,6 +479,12 @@ export type ActionFlow =
       choiceLabelParams?: Record<string, unknown>
       effectPreview?: ChoiceEffectPreview
       /**
+       * Runs this flow node under another player when compiled into the
+       * runtime engine. Card-facing flows describe ownership as metadata; the
+       * engine keeps the concrete PlayerSwitchNode internal.
+       */
+      targetPlayerId?: string
+      /**
        * Opt-in: when true and `registry.get(actionId).flow` exists, the engine
        * expands this leaf into the action's inner flow subtree (mirroring
        * `createEngine(actionId)` semantics). The outer leaf's `actionContext`
@@ -496,10 +502,12 @@ export type ActionFlow =
       optional?: boolean
       choiceLabelKey?: string
       choiceLabelParams?: Record<string, unknown>
-    }
-  | {
-      type: 'playerSwitch'
-      targetPlayerId: string
+      /**
+       * Runs this flow node under another player when compiled into the
+       * runtime engine. Card-facing flows describe ownership as metadata; the
+       * engine keeps the concrete PlayerSwitchNode internal.
+       */
+      targetPlayerId?: string
     }
 
 export type ActionDefinition = {
