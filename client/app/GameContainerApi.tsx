@@ -609,7 +609,10 @@ export const GameContainerApi = () => {
           .filter(
             (entry): entry is { row: number; col: number; crop: PendingSowCrop } =>
               !!entry &&
-              (entry.crop === 'grain' || entry.crop === 'vegetable' || entry.crop === 'wood'),
+              (entry.crop === 'grain' ||
+                entry.crop === 'vegetable' ||
+                entry.crop === 'wood' ||
+                entry.crop === 'stone'),
           )
         if (crops.length === 0) {
           setSowError('NO_SELECTION')
@@ -1197,12 +1200,22 @@ export const GameContainerApi = () => {
           tile: entry.tile,
           allowedCrops: entry.allowedCrops,
           sourceCard: entry.sourceCard,
+          groupKey: entry.groupKey,
         })
         return
       }
       map.set(key, entry.allowedCrops)
     })
     return { sowSelectableMap: map, extraSowTargets: extraTargets }
+  }, [farmInteraction])
+  const groupKeyByTile = useMemo(() => {
+    const map = new Map<string, string | undefined>()
+    if (farmInteraction?.farmType === 'sow') {
+      farmInteraction.selectableFields.forEach((entry) => {
+        map.set(positionKey(entry.tile), entry.groupKey)
+      })
+    }
+    return map
   }, [farmInteraction])
   const wrappedToggleRoom = (tile: FarmTilePosition) =>
     toggleRoomTileInternal(tile, maxRoomSelections, positionKey)
@@ -1211,7 +1224,7 @@ export const GameContainerApi = () => {
   const wrappedTogglePlow = (tile: FarmTilePosition) =>
     togglePlowTileInternal(tile, positionKey)
   const wrappedUpdateSow = (tile: FarmTilePosition, value: string) =>
-    updateSowSelectionInternal(tile, value, maxSowSelections, positionKey)
+    updateSowSelectionInternal(tile, value, maxSowSelections, positionKey, groupKeyByTile)
   const wrappedTogglePositionSelection = (tile: FarmTilePosition) =>
     togglePositionSelectionInternal(tile, maxPositionSelections, positionKey)
   const setViewPlayerIdSafe = useCallback((value: string) => {

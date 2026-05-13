@@ -94,6 +94,7 @@ const SowChoiceButtons = ({
   availableGrain,
   availableVegetable,
   availableWood,
+  availableStone,
   isInteractive,
   updateSowSelection,
   tile,
@@ -105,6 +106,7 @@ const SowChoiceButtons = ({
   availableGrain: number
   availableVegetable: number
   availableWood: number
+  availableStone: number
   isInteractive: boolean
   updateSowSelection: (tile: FarmTilePosition, value: string) => void
   tile: FarmTilePosition
@@ -121,6 +123,10 @@ const SowChoiceButtons = ({
     {
       crop: 'wood',
       enabled: allowedCrops.includes('wood') && availableWood > 0,
+    },
+    {
+      crop: 'stone',
+      enabled: allowedCrops.includes('stone') && availableStone > 0,
     },
   ] as const).filter((option) => option.enabled || currentValue === option.crop)
 
@@ -731,6 +737,8 @@ export const FarmBoard = ({
             sowRemaining.vegetable + (currentSowChoice === 'vegetable' ? 1 : 0)
           const availableWood =
             sowRemaining.wood + (currentSowChoice === 'wood' ? 1 : 0)
+          const availableStone =
+            sowRemaining.stone + (currentSowChoice === 'stone' ? 1 : 0)
           const pastureInfo = pastureTiles.get(tileKey)
           const pastureDisplay = pastureInfo
             ? pastureDisplayMap.get(pastureInfo.pastureId)
@@ -812,6 +820,7 @@ export const FarmBoard = ({
                   availableGrain={availableGrain}
                   availableVegetable={availableVegetable}
                   availableWood={availableWood}
+                  availableStone={availableStone}
                   isInteractive={isInteractive}
                   updateSowSelection={updateSowSelection}
                   tile={{ row: tileRow, col: tileCol }}
@@ -1001,34 +1010,49 @@ export const FarmBoard = ({
     {isInteractive && extraSowTargets.length > 0 ? (
       <div className="extra-sow-tray" aria-label="extra-sow-tray">
         <div className="extra-sow-targets">
-          {extraSowTargets.map((target) => {
-            const currentSowChoice = isInteractive ? (pendingSowSelections[target.key] ?? '') : ''
-            const availableGrain =
-              sowRemaining.grain + (currentSowChoice === 'grain' ? 1 : 0)
-            const availableVegetable =
-              sowRemaining.vegetable + (currentSowChoice === 'vegetable' ? 1 : 0)
-            const availableWood =
-              sowRemaining.wood + (currentSowChoice === 'wood' ? 1 : 0)
-            return (
-              <div key={target.key} className="extra-sow-target">
-                <div className="extra-sow-label">
-                  {getExtraSowTargetLabel(target.sourceCard, target.key)}
+          {(() => {
+            const counts = new Map<string, number>()
+            extraSowTargets.forEach((target) => {
+              const src = target.sourceCard ?? ''
+              counts.set(src, (counts.get(src) ?? 0) + 1)
+            })
+            const seen = new Map<string, number>()
+            return extraSowTargets.map((target) => {
+              const src = target.sourceCard ?? ''
+              const idx = (seen.get(src) ?? 0) + 1
+              seen.set(src, idx)
+              const total = counts.get(src) ?? 1
+              const baseLabel = getExtraSowTargetLabel(target.sourceCard, target.key)
+              const label = total > 1 ? `${baseLabel} (${idx}/${total})` : baseLabel
+              const currentSowChoice = isInteractive ? (pendingSowSelections[target.key] ?? '') : ''
+              const availableGrain =
+                sowRemaining.grain + (currentSowChoice === 'grain' ? 1 : 0)
+              const availableVegetable =
+                sowRemaining.vegetable + (currentSowChoice === 'vegetable' ? 1 : 0)
+              const availableWood =
+                sowRemaining.wood + (currentSowChoice === 'wood' ? 1 : 0)
+              const availableStone =
+                sowRemaining.stone + (currentSowChoice === 'stone' ? 1 : 0)
+              return (
+                <div key={target.key} className="extra-sow-target">
+                  <div className="extra-sow-label">{label}</div>
+                  <SowChoiceButtons
+                    locale={locale}
+                    tileKey={target.key}
+                    currentValue={currentSowChoice}
+                    allowedCrops={target.allowedCrops}
+                    availableGrain={availableGrain}
+                    availableVegetable={availableVegetable}
+                    availableWood={availableWood}
+                    availableStone={availableStone}
+                    isInteractive={isInteractive}
+                    updateSowSelection={updateSowSelection}
+                    tile={target.tile}
+                  />
                 </div>
-                <SowChoiceButtons
-                  locale={locale}
-                  tileKey={target.key}
-                  currentValue={currentSowChoice}
-                  allowedCrops={target.allowedCrops}
-                  availableGrain={availableGrain}
-                  availableVegetable={availableVegetable}
-                  availableWood={availableWood}
-                  isInteractive={isInteractive}
-                  updateSowSelection={updateSowSelection}
-                  tile={target.tile}
-                />
-              </div>
-            )
-          })}
+              )
+            })
+          })()}
         </div>
       </div>
     ) : null}
