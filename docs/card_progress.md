@@ -47,6 +47,8 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
+- **2026-05-13** — C115 Sower idle anytime + 中文文案修复：idle work-phase 现在按当前玩家暴露并执行合法 anytime action，C115 可在回合开始/落子前使用卡上 reed 取资源或换 sow；修正中文按钮文案从错误的“付1食物 → 获1谷物”为“取1芦苇或换取播种行动”。新增 C115 idle session 回归 + AnytimeBar 中文文案回归，并更新 no-active-interaction 负例为非当前玩家拒绝。
+- **2026-05-13** — ActionFlow option 描述 BGA-style 生成：`ActionChoiceOption.descriptionPreview` 现在从 EngineNode 递归生成，SEQ/XOR/OR/PARALLEL 按 BGA separator 拼接 leaf action 描述；C115 Sower 的“换播种行动”选项自动显示移除资源、支付芦苇、播种三段动作，纯 infobox 更新不污染 UI。新增 C115 session 描述结构回归 + InteractionBar composite description 渲染回归。
 - **2026-05-13** — C115 Sower confirm-window BGA 对齐：`confirm-next-player` 重新作为当前行动玩家的 anytime window，允许合法 card anytime（含 `C115-sower-anytime`），但继续屏蔽 generic `exchange` 防递归；`confirm-player-switch` 仍封锁 anytime。新增 C115 session 回归覆盖 Major 后确认前选择 sow 并回到确认切换。
 - **2026-05-12** — C115 Sower + anytime nested pending 修复：`C115_Sower` after-major listener 改为返回 engine flow（`push-to-card-stack` + infobox）而非直接 mutate，避免 dispatch peek 与 lazy 执行造成双 reed；interactive nested anytime 完成后 `InteractionNode` 会重新写回 `pendingNodeIdRef`，parent exchange pending 自动恢复；`confirm-next-player` owner 改回刚完成行动的玩家，`nextPlayerIndex` 仅作为确认后的目标玩家。
 - **2026-05-12** — §2.4 metadata-3a parser bug 修复：(1) BGA cost 单/双引号数字 (2) BGA prereq `('...')` 简写 unwrap (3) TS cost JSON 双引号 key (4) diff 层 players default '1+' 归一。Report 重跑：❌ 95 → 33（消除假阳性）。后续真偏差在 metadata-3b 处理。

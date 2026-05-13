@@ -1172,7 +1172,7 @@ export const zh = {
       anytime: '摊主：付1食物 → 获1食物',
     },
     C115_Sower: {
-      anytime: '播种人：付1食物 → 获1谷物',
+      anytime: '播种者：取1芦苇或换取播种行动',
     },
     C143_StoneBuyer: {
       anytime: '石材买家：付1食物 → 获1石头',

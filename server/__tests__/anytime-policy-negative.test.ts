@@ -43,11 +43,11 @@ describe('anytime — negative server-execution paths', () => {
     expect(r.error).toContain('draft')
   })
 
-  it('rejects with no active interaction', () => {
+  it('rejects idle anytime from a non-current player', () => {
     const session = baseSetup()
-    const r = session.takeAnytimeAction(0, WHISKY_ANYTIME_ID)
+    const r = session.takeAnytimeAction(1, WHISKY_ANYTIME_ID)
     expect(r.ok).toBe(false)
-    expect(r.error).toMatch(/no active interaction|no active engine/)
+    expect(r.error).toContain('not your turn')
   })
 
   it.todo('feed-window-locked rejection — covered indirectly via harvest E2E flows')

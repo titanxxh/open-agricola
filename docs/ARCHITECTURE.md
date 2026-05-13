@@ -255,7 +255,7 @@ takeAction | resolveChoice | commitFarm | commitSelection | takeAnytimeAction | 
 
 注意 WS 协议名（`ClientCommand.type`）与 `InteractionCommand` 不完全同名：前端"现在能做什么"以 `allowedCommands` 为准；线上 WS 命令名归一到 `choice` / `commitSelection` / `action` 等。
 
-### 4.7 ActionChoiceOption + effectPreview
+### 4.7 ActionChoiceOption + previews
 
 ```ts
 type ActionChoiceOption = {
@@ -264,10 +264,13 @@ type ActionChoiceOption = {
   labelParams?: Record<string, unknown>
   sourceCard?: string
   effectPreview?: ResourceExchangePreview | PaymentPreview | TextPreview
+  descriptionPreview?: ActionDescription | ActionDescriptionGroup
 }
 ```
 
 `effectPreview` 三类（`resourceExchange` / `payment` / `text`）。引擎对 `seq(pay-resources, gain[, bonus-vp])` option 自动聚合 preview；卡牌手写 `payLeaf+gainLeaf` 也能拿到 preview。生产点：`shared/cards/helpers/pay-gain-node.ts`、`shared/actions/effects/pay-helpers.ts`、`shared/actions/effects/exchange.ts`。
+
+`descriptionPreview` 是 BGA-style 递归 ActionFlow 描述：leaf 使用 `ActionDefinition.nameKey` + leaf `effectPreview`，组合节点按类型拼接子描述（`SeqNode: ', '` / `XorNode: ' / '` / `OrNode: ' + '` / `ParallelNode: ' | '`）。前端优先渲染 `descriptionPreview`，这样普通 leaf、pay/gain 组合、嵌套 XOR/SEQ 都由引擎自动生成 option 文案；卡牌不要为单个 flow 手写 UI label。纯状态同步 leaf（如 `special-effect.set-infobox`）不进入描述。
 
 ### 4.8 LogEntry
 
@@ -563,7 +566,7 @@ OA-vs-BGA design notes:
 
 - Reorganize is a system-driven sub-flow in OA (not a player-triggerable anytime) — the policy never produces a `'reorganize'` entry to filter.
 - `feed` pending is locked in OA because `executeFeedingLogic()` freezes `remaining`/`foodUsed` into the InteractionRequest. BGA allows nested anytime in its `ST_HARVEST_FEED` flow because its predecessor is the `EXCHANGE` state, which has no fixed budget.
-- `confirm-next-player` is treated as the acting player's final anytime window before control passes to the next player; legal anytime actions remain available there, with `exchange` blocked to avoid recursive generic exchange prompts. `confirm-player-switch` remains blocked because it is a system-controlled cross-player transition inside another flow.
+- Idle work-phase turns and `confirm-next-player` are acting-player anytime windows: legal anytime actions remain available before a worker is placed and before control passes to the next player. In `confirm-next-player`, `exchange` stays blocked to avoid recursive generic exchange prompts. `confirm-player-switch` remains blocked because it is a system-controlled cross-player transition inside another flow.
 - `stageResume`-bearing harvest stage hook chains default to blocked to preserve the "system-driven hook chains do not yield to player anytime" invariant; the explicit allow-list (`animal-reorg`, exchange/bake-bread promptKey) overrides this.
 
 ---

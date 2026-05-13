@@ -6,6 +6,7 @@ import type {
   ActionFlow,
   PlayerState,
   ActionChoiceOption,
+  ChoiceDescriptionPreview,
   InteractionRequest,
   Resource,
 } from '../contract/types'
@@ -25,6 +26,7 @@ import {
 import { attachChoiceLabel } from './nodes/interaction-helpers'
 import type { EngineNode } from './types'
 import type { EngineInternals } from './engine-internals'
+import type { ActionRegistry } from './registry'
 import { analyzeFlowInteractivity } from './flow-interactivity'
 import { getPlayOrderIndex } from './matched-trigger'
 import { ParallelTriggerNode } from './nodes/parallel-trigger-node'
@@ -473,6 +475,56 @@ export function getNodeEffectPreview(node: EngineNode): ChoiceEffectPreview | un
     for (const child of node.children) {
       const preview = getNodeEffectPreview(child)
       if (preview) return preview
+    }
+  }
+  return undefined
+}
+
+const isHiddenDescriptionAction = (node: ActionNode): boolean =>
+  node.actionId === 'special-effect' &&
+  (node.params as { kind?: unknown } | undefined)?.kind === 'set-infobox'
+
+const descriptionSeparatorForNode = (node: EngineNode): string => {
+  if (node instanceof SequenceNode) return ', '
+  if (node instanceof XorNode) return ' / '
+  if (node instanceof OrNode) return ' + '
+  if (node instanceof ParallelNode) return ' | '
+  return ''
+}
+
+export function getNodeDescriptionPreview(
+  node: EngineNode,
+  registry: ActionRegistry,
+): ChoiceDescriptionPreview | undefined {
+  if (node instanceof ActionNode) {
+    if (isHiddenDescriptionAction(node)) return undefined
+    const action = registry.get(node.actionId)
+    if (!action) return undefined
+    return {
+      kind: 'action',
+      labelKey: node.choiceLabelKey ?? action.nameKey,
+      labelParams: node.choiceLabelParams,
+      effectPreview: getActionEffectPreview(node),
+    }
+  }
+  if (node instanceof OptionalNode) {
+    return getNodeDescriptionPreview(node.child, registry)
+  }
+  if (
+    node instanceof SequenceNode ||
+    node instanceof XorNode ||
+    node instanceof OrNode ||
+    node instanceof ParallelNode
+  ) {
+    const parts = node.children
+      .map((child) => getNodeDescriptionPreview(child, registry))
+      .filter((part): part is ChoiceDescriptionPreview => part !== undefined)
+    if (parts.length === 0) return undefined
+    if (parts.length === 1) return parts[0]
+    return {
+      kind: 'group',
+      separator: descriptionSeparatorForNode(node),
+      parts,
     }
   }
   return undefined

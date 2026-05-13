@@ -298,9 +298,16 @@ describe('Engine flow nodes', () => {
     const first = engine.proceed({ state, player, space })
     expect(first.type).toBe('choice')
     if (first.type !== 'choice') return
-    expect(first.choice.options).toEqual([
-      { value: 'action-a', labelKey: 'ui.customChoice', labelParams: { count: 2 } },
-    ])
+    expect(first.choice.options[0]).toMatchObject({
+      value: 'action-a',
+      labelKey: 'ui.customChoice',
+      labelParams: { count: 2 },
+      descriptionPreview: {
+        kind: 'action',
+        labelKey: 'ui.customChoice',
+        labelParams: { count: 2 },
+      },
+    })
   })
 
   it('sequence node runs actions in order', () => {
