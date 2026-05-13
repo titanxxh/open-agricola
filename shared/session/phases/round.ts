@@ -367,7 +367,8 @@ export const takeAnytimeAction = (
 
   core.appendHistory()
   if (engine) {
-    engine.injectBeforeFlows([entry.flow])
+    const owner = core.state.players[playerIndex]
+    engine.injectBeforeFlows([entry.flow], undefined, owner?.id)
   } else {
     const frame = core.buildAdhocEngineFrame(actionId, entry.descriptor.sourceCard, entry.flow)
     core.pushEngineFrame({

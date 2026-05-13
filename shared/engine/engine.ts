@@ -197,10 +197,14 @@ export class Engine {
    * With ctx (`injectBeforeFlows(flows, ctx)`), this is the before-phase inject
    * pattern: build → inject → proceed-loop.
    */
-  injectBeforeFlows(flows: ActionFlow[], ctx?: EngineContext): void {
+  injectBeforeFlows(
+    flows: ActionFlow[],
+    ctx?: EngineContext,
+    ownerPlayerId = ctx?.player.id,
+  ): void {
     if (flows.length === 0) return
     const internals = this._internals()
-    const flowNodes = flows.map((flow) => buildFlowNode(internals, flow))
+    const flowNodes = flows.map((flow) => buildFlowNode(internals, flow, ownerPlayerId))
     const nextUnresolved = this.tree.nextUnresolved()
     if (nextUnresolved) {
       this.tree.insertBefore(nextUnresolved.id, flowNodes)
@@ -431,12 +435,12 @@ export class Engine {
    * `engine-public-surface.test.ts:PRIVATE_HELPERS` so the surface guard
    * stays green.
    */
-  insertFlowAfterPendingChoice(flow: ActionFlow): void {
+  insertFlowAfterPendingChoice(flow: ActionFlow, ownerPlayerId?: string): void {
     // S4c PR2 — read owner from the InteractionNode (was: pendingInteractionOwnerNodeId mirror).
     const interactionNode = this.peekInteraction()
     const insertionTargetId = interactionNode?.ownerNodeId ?? this._pendingNodeIdRef.value
     if (!insertionTargetId) return
-    const flowNode = buildFlowNode(this._internals(), flow)
+    const flowNode = buildFlowNode(this._internals(), flow, ownerPlayerId)
     this.tree.insertAfter(insertionTargetId, [flowNode])
   }
 }
