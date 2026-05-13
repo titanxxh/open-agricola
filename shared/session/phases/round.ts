@@ -347,7 +347,8 @@ export const takeAnytimeAction = (
   if (core.state.gameOver) return core.emitResponse(false, 'game is over')
   if (core.state.phase === 'draft') return core.emitResponse(false, 'draft in progress')
 
-  const activeOwner = core.readActivePlayerIndex()
+  const engine = core.peekEngine()
+  const activeOwner = core.readActivePlayerIndex() ?? (engine ? null : core.state.currentPlayerIndex)
   if (activeOwner === null) return core.emitResponse(false, 'no active interaction')
   if (playerIndex !== activeOwner) return core.emitResponse(false, 'not your turn')
 
@@ -356,16 +357,28 @@ export const takeAnytimeAction = (
     return core.emitResponse(false, `anytime blocked: ${policy.reason}`)
   }
 
-  const engine = core.peekEngine()
-  if (!engine || !core.readActiveSpaceId()) {
-    return core.emitResponse(false, 'no active engine')
-  }
-
   const entry = core.listAnytimeEntries().find((c) => c.descriptor.id === actionId)
   if (!entry) return core.emitResponse(false, 'anytime action unavailable')
 
+  const activeSpaceId = core.readActiveSpaceId()
+  if (engine && !activeSpaceId) {
+    return core.emitResponse(false, 'no active engine')
+  }
+
   core.appendHistory()
-  engine.injectBeforeFlows([entry.flow])
+  if (engine) {
+    engine.injectBeforeFlows([entry.flow])
+  } else {
+    const frame = core.buildAdhocEngineFrame(actionId, entry.descriptor.sourceCard, entry.flow)
+    core.pushEngineFrame({
+      ...frame,
+      ownerPlayerIndex: playerIndex,
+      spaceId: '__subflow:top-level',
+      stageResume: null,
+      deferredPlayerSwitch: null,
+      reason: 'top-level',
+    })
+  }
   core.driveEngineSteps()
   return core.emitResponse()
 }

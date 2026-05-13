@@ -473,10 +473,10 @@ export class GameCore {
   /** @internal Round phase — read engineSource (used by takeAnytimeAction). */
   peekEngineSource(): EngineSource | null { return this.engineSource }
   /** @internal Round phase — engine context for ad-hoc anytime invocations. */
-  buildAdhocEngineFrame(actionId: string, sourceCard: string | undefined): {
+  buildAdhocEngineFrame(actionId: string, sourceCard: string | undefined, flowOverride?: ActionFlow): {
     engine: import('../engine').Engine; source: EngineSource
   } {
-    const flow: ActionFlow = { type: 'leaf', actionId, sourceCard }
+    const flow: ActionFlow = flowOverride ?? { type: 'leaf', actionId, sourceCard }
     return { engine: this.createFlowEngine(flow), source: { kind: 'flow', flow } }
   }
   /** @internal Round phase — enumerate currently-available anytime entries for the active interaction context. */
@@ -1038,9 +1038,11 @@ export class GameCore {
   }
 
   private getActiveInteractionContext() {
-    if (this.activePlayerIndex === null || !this.activeSpaceId) return null
-    const player = this.state.players[this.activePlayerIndex]
-    const space = this.getSpaceById(this.activeSpaceId)
+    const playerIndex = this.activePlayerIndex ?? (this.engineStack.depth() === 0 ? this.state.currentPlayerIndex : null)
+    const spaceId = this.activeSpaceId ?? (this.engineStack.depth() === 0 ? subflowSpaceId('top-level') : null)
+    if (playerIndex === null || !spaceId) return null
+    const player = this.state.players[playerIndex]
+    const space = this.getSpaceById(spaceId)
     if (!player || !space) return null
     return { player, space }
   }
@@ -1310,7 +1312,9 @@ export class GameCore {
       const anytimeActions = this.buildAnytimeEntries().map((entry) => entry.descriptor)
       return {
         stateId: 'idle',
-        allowedCommands: ['takeAction', 'undoStep', 'undoAction'],
+        allowedCommands: anytimeActions.length > 0
+          ? ['takeAction', 'undoStep', 'undoAction', 'takeAnytimeAction']
+          : ['takeAction', 'undoStep', 'undoAction'],
         anytimeActions,
       }
     }

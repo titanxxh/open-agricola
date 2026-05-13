@@ -6,6 +6,7 @@ import { ResourceLine } from '../common/ResourceLine'
 import type {
   ActionChoiceOption,
   AnytimeAction,
+  ChoiceDescriptionPreview,
   ChoiceEffectPreview,
   Resource,
 } from '../../../shared/contract/types'
@@ -87,6 +88,47 @@ const renderEffectPreview = (
     )
   }
   return effectPreview.text
+}
+
+const renderDescriptionAction = (
+  locale: Locale,
+  preview: Extract<ChoiceDescriptionPreview, { kind: 'action' }>,
+): ReactNode => {
+  const label = translateCardText(
+    locale,
+    preview.labelKey,
+    preview.labelParams as Record<string, string | number> | undefined,
+  )
+  if (!preview.effectPreview) return label
+  return (
+    <span className="interaction-description-action">
+      <span className="interaction-description-action-main">
+        {renderEffectPreview(locale, preview.effectPreview)}
+      </span>
+      <span className="interaction-option-subtitle">{label}</span>
+    </span>
+  )
+}
+
+const renderDescriptionPreview = (
+  locale: Locale,
+  preview: ChoiceDescriptionPreview,
+): ReactNode => {
+  if (preview.kind === 'action') return renderDescriptionAction(locale, preview)
+  return (
+    <>
+      {preview.parts.map((part, index) => (
+        <span key={index} className="interaction-description-part">
+          {index > 0 ? (
+            <span className="interaction-description-separator">
+              {preview.separator}
+            </span>
+          ) : null}
+          {renderDescriptionPreview(locale, part)}
+        </span>
+      ))}
+    </>
+  )
 }
 
 const getEffectPreviewSubtitle = (
@@ -191,6 +233,15 @@ const renderOptionContent = (
   locale: Locale,
   option: ActionChoiceOption,
 ): ReactNode => {
+  if (option.descriptionPreview) {
+    return (
+      <span className="interaction-option-stack">
+        <span className="interaction-option-main">
+          {renderDescriptionPreview(locale, option.descriptionPreview)}
+        </span>
+      </span>
+    )
+  }
   if (!option.effectPreview) {
     return renderOptionLabel(locale, option)
   }
