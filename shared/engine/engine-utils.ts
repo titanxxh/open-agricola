@@ -26,7 +26,6 @@ import type { PendingEnvelope, PendingSyntheticKind } from './types'
 import type { EngineInternals } from './engine-internals'
 import type { ActionRegistry } from './registry'
 import { getPlayOrderIndex } from './matched-trigger'
-import { ParallelTriggerNode } from './nodes/parallel-trigger-node'
 import type { MatchedCardListener } from '../cards/card-listeners'
 import type { GameState } from '../contract/types'
 import {
@@ -106,7 +105,6 @@ export function buildFollowUpNodes(
 }
 
 export function getNodeChildren(node: EngineNode): EngineNode[] {
-  if (node instanceof ParallelTriggerNode) return node.children
   if (
     node instanceof SequenceNode ||
     node instanceof ParallelNode ||
@@ -317,11 +315,19 @@ export function buildPhaseTrailingNodes(
       ownerGroupNodes.push(buildNode(selectOnes[0]!))
     } else if (selectOnes.length > 1) {
       const children = selectOnes.map(buildNode)
-      const ptn = new ParallelTriggerNode(
+      const ptn = new ParallelNode(
         `parallel-trigger-${phase}-${actionId}-${ownerId}-${int.counterRef.value++}`,
         children,
-        ownerId,
       )
+      ptn.mode = 'trigger-select'
+      ptn.triggerOwnerPlayerId = ownerId
+      ptn.ownerPlayerId = ownerId
+      ptn.triggerChildren = children.map((child) => ({
+        nodeId: child.id,
+        cardId: child.params.cardId,
+        listenerId: child.params.listenerId,
+        mandatory: child.params.mandatory === true,
+      }))
       ownerGroupNodes.push(ptn)
     }
 
@@ -375,10 +381,19 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
     ))
   }
   if (node instanceof ParallelNode) {
-    return copySharedNodeMetadata(node, new ParallelNode(
+    const clone = new ParallelNode(
       `${node.id}-clone-${int.counterRef.value++}`,
       node.children.map((child) => cloneNode(int, child)),
-    ))
+    )
+    clone.mode = node.mode
+    clone.selectedChildId = node.selectedChildId
+    clone.triggerOwnerPlayerId = node.triggerOwnerPlayerId
+    clone.triggerChildren = node.triggerChildren.map((entry) => ({ ...entry }))
+    clone.emittedChoices = [...node.emittedChoices]
+    clone.emittedPromptKey = node.emittedPromptKey
+    clone.emittedPromptParams = node.emittedPromptParams
+    clone.emittedRequest = node.emittedRequest
+    return copySharedNodeMetadata(node, clone)
   }
   if (node instanceof OrNode) {
     return copySharedNodeMetadata(node, new OrNode(
@@ -874,6 +889,16 @@ export function snapshotCompositeEmit(int: EngineInternals): {
       request: node.emittedRequest,
     }
   }
+  if (node instanceof ParallelNode && node.mode === 'trigger-select') {
+    if (node.emittedChoices.length === 0 && node.emittedRequest === undefined) return null
+    return {
+      nodeId: node.id,
+      promptKey: node.emittedPromptKey,
+      promptParams: node.emittedPromptParams,
+      options: node.emittedChoices,
+      request: node.emittedRequest,
+    }
+  }
   return null
 }
 
@@ -946,7 +971,7 @@ export function pendingEnvelopeFromHostNode(node: EngineNode | null): PendingEnv
     }
   }
 
-  if (node instanceof ParallelTriggerNode) {
+  if (node instanceof ParallelNode && node.mode === 'trigger-select') {
     if (node.emittedChoices.length === 0 && !node.emittedRequest) return null
     const request = node.emittedRequest ?? choiceRequest(node.emittedChoices)
     return {
