@@ -14,11 +14,13 @@ import {
   InteractionNode,
   OptionalNode,
   OrNode,
+  ParallelNode,
   SequenceNode,
   XorNode,
+  ActivateCardNode,
 } from './nodes'
 import { ParallelTriggerNode } from './nodes/parallel-trigger-node'
-import type { EngineNode, EngineStepResult } from './types'
+import type { EngineNode, EngineStepResult, NodeCursor } from './types'
 import type { PendingEnvelope } from './types'
 import { ActionRegistry } from './registry'
 import { HookDispatcher } from './dispatcher'
@@ -39,6 +41,176 @@ type EngineContext = {
   state: GameState
   player: PlayerState
   space: ActionSpace
+}
+
+type MutableNodeState = EngineNode & {
+  setState?: (state: 'ready' | 'resolved' | 'blocked') => void
+}
+
+const setNodeState = (
+  node: EngineNode,
+  state: 'ready' | 'resolved' | 'blocked',
+): void => {
+  const mutable = node as MutableNodeState
+  if (mutable.setState) {
+    mutable.setState(state)
+    return
+  }
+  if (state === 'resolved') node.resolve()
+}
+
+const restoreSharedCursorData = (node: EngineNode, data: Record<string, unknown>): void => {
+  if (typeof data.ownerPlayerId === 'string') node.ownerPlayerId = data.ownerPlayerId
+  if (typeof data.optional === 'boolean') node.optional = data.optional
+  if (typeof data.optionalActive === 'boolean') node.optionalActive = data.optionalActive
+  if (typeof data.optionalPromptKey === 'string') {
+    node.optionalPromptKey = data.optionalPromptKey as PromptKey
+  }
+  if (data.pending && typeof data.pending === 'object') {
+    node.setPending(data.pending as PendingEnvelope)
+  }
+}
+
+const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
+  if (cursors.length === 0) return null
+  const byId = new Map(cursors.map((cursor) => [cursor.id, cursor]))
+  const referenced = new Set<string>()
+  for (const cursor of cursors) {
+    const childrenIds = cursor.data.childrenIds
+    if (Array.isArray(childrenIds)) {
+      childrenIds.forEach((id) => {
+        if (typeof id === 'string') referenced.add(id)
+      })
+    }
+    if (typeof cursor.data.childId === 'string') referenced.add(cursor.data.childId)
+  }
+  const rootCursor = cursors.find((cursor) => !referenced.has(cursor.id)) ?? cursors[0]
+  if (!rootCursor) return null
+  const built = new Map<string, EngineNode>()
+
+  const build = (id: string): EngineNode | null => {
+    const cached = built.get(id)
+    if (cached) return cached
+    const cursor = byId.get(id)
+    if (!cursor) return null
+    const data = cursor.data
+    const buildChildren = (): EngineNode[] => {
+      const childrenIds = Array.isArray(data.childrenIds) ? data.childrenIds : []
+      return childrenIds
+        .map((childId) => (typeof childId === 'string' ? build(childId) : null))
+        .filter((child): child is EngineNode => child !== null)
+    }
+
+    let node: EngineNode | null = null
+    switch (cursor.type as string) {
+      case 'action': {
+        const action = new ActionNode(
+          cursor.id,
+          data.actionId as string,
+          data.sourceCard as string | undefined,
+          data.params as ActionNode['params'],
+          data.choiceLabelKey as string | undefined,
+          data.choiceLabelParams as Record<string, unknown> | undefined,
+          data.actionContext as Record<string, unknown> | undefined,
+          data.effectPreview as ActionNode['effectPreview'],
+        )
+        action.beforePhaseResolved = data.beforePhaseResolved === true
+        action.emittedRequest = data.emittedRequest as InteractionRequest | undefined
+        node = action
+        break
+      }
+      case 'interaction': {
+        const interaction = new InteractionNode(
+          cursor.id,
+          (data.choices as ActionChoiceOption[] | undefined) ?? [],
+          data.request as InteractionRequest | undefined,
+        )
+        interaction.promptKey = data.promptKey as PromptKey | undefined
+        interaction.promptParams = data.promptParams as Record<string, unknown> | undefined
+        interaction.pendingActionId = data.pendingActionId as string | undefined
+        interaction.ownerNodeId = data.ownerNodeId as string | undefined
+        interaction.contextSnapshot = data.contextSnapshot as InteractionNode['contextSnapshot']
+        node = interaction
+        break
+      }
+      case 'sequence':
+        node = new SequenceNode(cursor.id, buildChildren())
+        break
+      case 'parallel':
+        node = new ParallelNode(cursor.id, buildChildren())
+        break
+      case 'or': {
+        const or = new OrNode(cursor.id, buildChildren(), data.promptKey as PromptKey | undefined)
+        or.emittedChoices = (data.emittedChoices as ActionChoiceOption[] | undefined) ?? []
+        or.emittedPromptKey = data.emittedPromptKey as PromptKey | undefined
+        or.emittedPromptParams = data.emittedPromptParams as Record<string, unknown> | undefined
+        or.emittedRequest = data.emittedRequest as InteractionRequest | undefined
+        or.pendingActionId = data.pendingActionId as string | null | undefined
+        or.pendingContextSnapshot = data.pendingContextSnapshot as OrNode['pendingContextSnapshot']
+        node = or
+        break
+      }
+      case 'xor': {
+        const xor = new XorNode(cursor.id, buildChildren(), data.promptKey as PromptKey | undefined)
+        xor.emittedChoices = (data.emittedChoices as ActionChoiceOption[] | undefined) ?? []
+        xor.emittedPromptKey = data.emittedPromptKey as PromptKey | undefined
+        xor.emittedPromptParams = data.emittedPromptParams as Record<string, unknown> | undefined
+        xor.emittedRequest = data.emittedRequest as InteractionRequest | undefined
+        xor.pendingActionId = data.pendingActionId as string | null | undefined
+        xor.pendingContextSnapshot = data.pendingContextSnapshot as XorNode['pendingContextSnapshot']
+        node = xor
+        break
+      }
+      case 'optional': {
+        const child = typeof data.childId === 'string' ? build(data.childId) : null
+        if (!child) return null
+        const optional = new OptionalNode(cursor.id, child, data.promptKey as PromptKey | undefined)
+        optional.active = data.active === true
+        optional.emittedChoices = (data.emittedChoices as ActionChoiceOption[] | undefined) ?? []
+        optional.emittedPromptKey = data.emittedPromptKey as PromptKey | undefined
+        optional.emittedPromptParams = data.emittedPromptParams as Record<string, unknown> | undefined
+        optional.emittedRequest = data.emittedRequest as InteractionRequest | undefined
+        optional.pendingActionId = data.pendingActionId as string | null | undefined
+        optional.pendingContextSnapshot = data.pendingContextSnapshot as OptionalNode['pendingContextSnapshot']
+        node = optional
+        break
+      }
+      case 'activateCard':
+        node = new ActivateCardNode(
+          cursor.id,
+          data.listenerId as string,
+          data.cardId as string,
+          data.phase as ActivateCardNode['phase'],
+          data.actionId as string,
+          (data.event as Record<string, unknown> | undefined) ?? {},
+        )
+        break
+      case 'parallelTrigger': {
+        const trigger = new ParallelTriggerNode(
+          cursor.id,
+          [],
+          data.ownerPlayerId as string,
+        )
+        trigger.children = buildChildren()
+        trigger.selectedChildId = data.selectedChildId as string | null
+        trigger.emittedChoices = (data.emittedChoices as ActionChoiceOption[] | undefined) ?? []
+        trigger.emittedPromptKey = data.emittedPromptKey as PromptKey | undefined
+        trigger.emittedPromptParams = data.emittedPromptParams as Record<string, unknown> | undefined
+        trigger.emittedRequest = data.emittedRequest as InteractionRequest | undefined
+        node = trigger
+        break
+      }
+      default:
+        return null
+    }
+
+    restoreSharedCursorData(node, data)
+    setNodeState(node, cursor.state)
+    built.set(id, node)
+    return node
+  }
+
+  return build(rootCursor.id)
 }
 
 export class Engine {
@@ -318,6 +490,7 @@ export class Engine {
           }
         : null
     return {
+      treeCursor: nodes.map((node) => (node as EngineNode & { toCursor: () => NodeCursor }).toCursor()),
       nodeStates,
       choiceData,
       pendingData,
@@ -348,6 +521,7 @@ export class Engine {
   }
 
   restore(snapshot: {
+    treeCursor?: NodeCursor[]
     nodeStates: {
       id: string
       state: 'ready' | 'resolved' | 'blocked'
@@ -406,6 +580,10 @@ export class Engine {
         this._pendingNodeIdRef.value = restored.id
       }
       return
+    }
+    const restoredRoot = snapshot.treeCursor ? restoreTreeFromCursor(snapshot.treeCursor) : null
+    if (restoredRoot) {
+      this.tree.root = restoredRoot
     }
     const nodeMap = new Map(
       this.tree.allNodes().map((node) => [node.id, node]),
