@@ -37,6 +37,10 @@ import {
   isSyntheticInteractionFrame,
 } from '../engine/index.ts'
 import type { EngineFrame, EngineNode, EngineSource, EngineStackCursor, SubFlowReason } from '../engine/index.ts'
+import {
+  isPendingChoiceValueAllowed,
+  pendingEnvelopeChoices,
+} from '../engine/pending-validation.ts'
 import type { PendingEnvelope } from '../engine/types.ts'
 import type { ReorganizeTrigger } from '../actions/effects/reorganize.ts'
 import {
@@ -147,15 +151,6 @@ const pendingContextSnapshot = (
   return snapshot && typeof snapshot === 'object'
     ? snapshot as PendingContextSnapshot
     : null
-}
-
-const pendingEnvelopeChoices = (envelope: PendingEnvelope | null): ActionChoiceOption[] => {
-  if (!envelope) return []
-  if (envelope.choices) return envelope.choices
-  const request = envelope.request
-  if (request.kind === 'choice' || request.kind === 'select-trigger') return request.options
-  if (request.kind === 'farm-select') return request.options ?? []
-  return envelope.choices ?? []
 }
 
 const choicesSourceCard = (choices: ActionChoiceOption[]): string | undefined => {
@@ -2782,23 +2777,15 @@ export class GameCore {
     const envelope = this.engineStack.peekPendingEnvelope()
     const request = envelope?.request
     if (request) {
-      // Reviewer C-1: validate `value` against the pending envelope's known
-      // choices before dispatching. Pre-S1, `resolvePendingChoice` rejected
-      // any call whose top-of-stack pending wasn't a plain `choice`; the
-      // S1 dispatch widens the entry-point to also handle confirm/feed kinds,
-      // but a stray client value must still be rejected (otherwise an
-      // unrelated submission like `resolveChoice('sow')` against a
-      // `confirm-next-player` frame silently advances the turn).
-      const isValidValue = pendingEnvelopeChoices(envelope).some((opt) => opt.value === value)
+      if (!isPendingChoiceValueAllowed(envelope, value)) {
+        return this.respond(false, 'invalid choice value')
+      }
       switch (request.kind) {
         case 'confirm-next-player':
-          if (!isValidValue) return this.respond(false, 'invalid choice value')
           return this.handleConfirmNextPlayerResolved(request.nextPlayerIndex)
         case 'confirm-player-switch':
-          if (!isValidValue) return this.respond(false, 'invalid choice value')
           return this.handleConfirmPlayerSwitchResolved(request.fromPlayerIndex, request.toPlayerIndex)
         case 'feed': {
-          if (!isValidValue) return this.respond(false, 'invalid choice value')
           const sels = (payload as { selections?: FeedSelections } | undefined)?.selections
             ?? (Array.isArray(payload) ? (payload as unknown as FeedSelections) : [])
           return this.handleFeedResolved(playerIndex, sels)
@@ -2806,9 +2793,8 @@ export class GameCore {
         case 'animal-reorg':
         case 'choice':
           // animal-reorg today still flows through the legacy commit pathway;
-          // plain choice (ChoiceNode-emitted requests not yet typed) follows
-          // the existing options-driven pending model. `resolvePendingChoice`
-          // already validates `value` against pendingOptions/composite cache.
+          // plain choices follow the existing engine pending model after the
+          // finite envelope choices have been validated above.
           return this.resolvePendingChoice(playerIndex, value, true, payload)
         case 'farm-select':
         case 'selection':
@@ -2816,7 +2802,7 @@ export class GameCore {
           // S2 Task 2 introduced these kinds ahead of their dedicated
           // resolvers. Until those tasks wire dedicated handlers, fall back to
           // the legacy pending-options path so tests/UX continue working
-          // through ChoiceNode.choices validation.
+          // through PendingEnvelope choice validation.
           return this.resolvePendingChoice(playerIndex, value, true, payload)
         case 'card-draft':
           return this.respond(false, 'card-draft resolveChoice not supported')

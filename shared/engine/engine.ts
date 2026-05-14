@@ -1,5 +1,4 @@
 import type {
-  ActionExecutionContext,
   ActionExecutionResult,
   ActionFlow,
   ActionSpace,
@@ -40,6 +39,21 @@ type EngineContext = {
 
 type MutableNodeState = EngineNode & {
   setState?: (state: 'ready' | 'resolved' | 'blocked') => void
+}
+
+type ChoiceDataSnapshot = {
+  id: string
+  hostNodeId?: string
+  promptKey?: PromptKey
+  promptParams?: Record<string, unknown>
+  choices?: ActionChoiceOption[]
+  request?: InteractionRequest
+  pendingActionId?: string
+  ownerNodeId?: string | null
+  contextSnapshot?: unknown
+  effectiveOwnerPlayerId?: string
+  sourceCard?: string
+  syntheticKind?: PendingEnvelope['syntheticKind']
 }
 
 const setNodeState = (
@@ -358,19 +372,9 @@ export class Engine {
       this._pendingNodeIdRef.value !== null
         ? this.tree.findNodeById(this._pendingNodeIdRef.value)
         : null
-    const choiceData = choiceNode?.getPending()
-      ? {
-          id: choiceNode.id,
-          promptKey: choiceNode.getPending()?.promptKey,
-          choices: choiceNode.getPending()?.choices ?? [],
-          request: choiceNode.getPending()?.request,
-          pendingActionId: choiceNode.getPending()?.pendingActionId,
-          ownerNodeId: choiceNode.getPending()?.ownerNodeId ?? undefined,
-          effectiveOwnerPlayerId: choiceNode.getPending()?.effectiveOwnerPlayerId,
-          contextSnapshot: choiceNode.getPending()?.contextSnapshot as
-            | Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'>
-            | undefined,
-        }
+    const pendingChoice = choiceNode?.getPending()
+    const choiceData: ChoiceDataSnapshot | null = choiceNode && pendingChoice
+      ? { id: choiceNode.id, ...pendingChoice }
       : null
     return {
       treeCursor: nodes.map((node) => (node as EngineNode & { toCursor: () => NodeCursor }).toCursor()),
@@ -410,16 +414,7 @@ export class Engine {
       id: string
       state: 'ready' | 'resolved' | 'blocked'
     }[]
-    choiceData: {
-      id: string
-      promptKey?: PromptKey
-      choices: ActionChoiceOption[]
-      request?: InteractionRequest
-      pendingActionId?: string
-      ownerNodeId?: string
-      contextSnapshot?: Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'>
-      effectiveOwnerPlayerId?: string
-    } | null
+    choiceData: ChoiceDataSnapshot | null
     pendingData?: {
       nodeId: string
       pending: PendingEnvelope
@@ -464,23 +459,33 @@ export class Engine {
         node.setState(state)
       }
     })
+    let legacyChoicePendingNodeId: string | null = null
     if (snapshot.choiceData) {
       const node = nodeMap.get(snapshot.choiceData.id)
-      if (node && snapshot.choiceData.request) {
+      if (node && !node.getPending() && snapshot.choiceData.request) {
         node.setPending({
-          hostNodeId: node.id,
+          hostNodeId: snapshot.choiceData.hostNodeId ?? node.id,
           request: snapshot.choiceData.request,
           choices: snapshot.choiceData.choices,
           promptKey: snapshot.choiceData.promptKey,
+          promptParams: snapshot.choiceData.promptParams,
+          sourceCard: snapshot.choiceData.sourceCard,
           pendingActionId: snapshot.choiceData.pendingActionId,
           ownerNodeId: snapshot.choiceData.ownerNodeId ?? null,
           effectiveOwnerPlayerId: snapshot.choiceData.effectiveOwnerPlayerId,
           contextSnapshot: snapshot.choiceData.contextSnapshot,
+          syntheticKind: snapshot.choiceData.syntheticKind,
         })
+        legacyChoicePendingNodeId = node.id
       }
     }
+    const restoredPendingNodeId =
+      explicitPendingNodeId ??
+      legacyChoicePendingNodeId ??
+      this.tree.allNodes().find((node) => node.getPending() !== null)?.id ??
+      null
     this._pendingNodeIdRef.value =
-      explicitPendingNodeId ?? snapshot.choiceData?.id ?? snapshot.compositeEmit?.nodeId ?? null
+      restoredPendingNodeId ?? snapshot.compositeEmit?.nodeId ?? null
 
     // S2 Task 8 / Wave3: rebuild composite emit metadata onto Or/Xor
     // and trigger-select Parallel nodes.

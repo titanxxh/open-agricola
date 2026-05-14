@@ -154,6 +154,42 @@ describe('Engine tree flow', () => {
     expect(done.type).toBe('done')
   })
 
+  it('rejects invalid finite values for ActionNode pending choices', () => {
+    let resolveCount = 0
+    const action: ActionDefinition = {
+      id: 'choice-action',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({
+        type: 'request',
+        request: { kind: 'choice', options: [{ value: 'a', labelKey: 'a' }] },
+        promptKey: 'choose',
+      }),
+      resolveChoice: () => {
+        resolveCount += 1
+        return { type: 'ok' }
+      },
+    }
+    const engine = buildEngine(action, true)
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(action)
+    engine.proceed({ state, player, space })
+
+    const result = engine.resolveChoice('not-a-choice', {
+      state,
+      player,
+      space,
+    })
+
+    expect(result.type).toBe('fail')
+    expect(resolveCount).toBe(0)
+    expect(engine.peekPendingEnvelope()?.request.kind).toBe('choice')
+  })
+
   it('handles action without choice', () => {
     const action: ActionDefinition = {
       id: 'simple-action',
