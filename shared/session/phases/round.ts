@@ -164,10 +164,10 @@ export const startConfirmNextPlayer = (
 }
 
 /**
- * Mirror of `startConfirmNextPlayer` for the `playerSwitch` flow node /
- * deferredPlayerSwitch detour. Leaves the outer engine frame intact
- * underneath so resolution can pop only the synthetic prompt frame and
- * resume the parent action.
+ * Mirror of `startConfirmNextPlayer` for deferred owner-metadata transitions.
+ * The owner switch itself is represented on runtime nodes; this synthetic
+ * pending frame only asks the target player to confirm before the parent
+ * action frame resumes.
  */
 export const startConfirmPlayerSwitch = (
   core: GameCore,

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import type { ActionFlow } from '../../shared/contract/types'
+import type { ActionDefinition, ActionFlow } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { rehydrateState, serializeState } from '../../shared/session/serialization'
 
 /**
  * Tests for ActionFlow targetPlayerId metadata with lazy confirmation.
@@ -69,13 +70,13 @@ describe('ActionFlow targetPlayerId', () => {
     s.runEngineSteps()
   }
 
-  const compileFlowNodeTypes = (session: GameSession, flow: ActionFlow, playerIndex: number) => {
+  const compileFlowNodeCursors = (session: GameSession, flow: ActionFlow, playerIndex: number) => {
     const s = session as unknown as {
       createFlowEngine: (flow: ActionFlow, ownerPlayerIndex?: number) => {
         _internals: () => {
           tree: {
             allNodes: () => Array<{
-              toCursor: () => { type: string }
+              toCursor: () => { type: string; data: Record<string, unknown> }
             }>
           }
         }
@@ -85,7 +86,7 @@ describe('ActionFlow targetPlayerId', () => {
       .createFlowEngine(flow, playerIndex)
       ._internals()
       .tree.allNodes()
-      .map((node) => node.toCursor().type)
+      .map((node) => node.toCursor())
   }
 
   it('compiles targetPlayerId flows without playerSwitch cursors', () => {
@@ -107,7 +108,31 @@ describe('ActionFlow targetPlayerId', () => {
       ],
     }
 
-    expect(compileFlowNodeTypes(session, flow, 0)).not.toContain('playerSwitch')
+    expect(compileFlowNodeCursors(session, flow, 0).map((cursor) => cursor.type)).not.toContain('playerSwitch')
+  })
+
+  it('compiled nested targetPlayerId preserves the inner owner override', () => {
+    const session = setupSession()
+    const state = session.getState().state
+    const p1 = state.players[0]!
+    const p2 = state.players[1]!
+
+    const flow: ActionFlow = {
+      type: 'seq',
+      targetPlayerId: p2.id,
+      children: [
+        { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: 'OuterTarget' },
+        { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: 'InnerTarget', targetPlayerId: p1.id },
+      ],
+    }
+
+    const actionCursors = compileFlowNodeCursors(session, flow, 0)
+      .filter((cursor) => cursor.type === 'action')
+    const outerLeaf = actionCursors.find((cursor) => cursor.data.sourceCard === 'OuterTarget')
+    const innerLeaf = actionCursors.find((cursor) => cursor.data.sourceCard === 'InnerTarget')
+
+    expect(outerLeaf?.data.ownerPlayerId).toBe(p2.id)
+    expect(innerLeaf?.data.ownerPlayerId).toBe(p1.id)
   })
 
   it('auto-gain after switch completes without confirmPlayerSwitch', () => {
@@ -203,5 +228,63 @@ describe('ActionFlow targetPlayerId', () => {
     confirmPlayerSwitch(session)
     const resp2 = session.getState()
     expect(resp2.interaction.stateId).toBe('wait')
+  })
+
+  it('restores dynamic targeted pending flow and resumes unowned sibling as frame owner', () => {
+    const session = setupSession()
+    const state = session.getState().state
+    const p1 = state.players[0]!
+    const p2 = state.players[1]!
+    const triggerAction: ActionDefinition = {
+      id: 'trigger-dynamic-targeted-pending',
+      nameKey: 'test.triggerDynamicTargetedPending',
+      descriptionKey: 'test.triggerDynamicTargetedPending',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({
+        type: 'flow',
+        flow: {
+          type: 'seq',
+          children: [
+            {
+              type: 'xor',
+              targetPlayerId: p2.id,
+              children: [
+                { type: 'leaf', actionId: 'gain', params: { sheep: 1 }, sourceCard: 'DynamicTargetedPending', choiceLabelKey: 'sheep' },
+                { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: 'DynamicTargetedPending', choiceLabelKey: 'food' },
+              ],
+            },
+            { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: 'DynamicUntargetedSibling' },
+          ],
+        },
+      }),
+    }
+    ;(session as unknown as { registry: { register: (action: ActionDefinition) => void } })
+      .registry.register(triggerAction)
+
+    startFlowEngine(session, { type: 'leaf', actionId: triggerAction.id }, 0)
+    const confirmResp = session.getState()
+    expect(confirmResp.interaction.stateId === 'wait' ? confirmResp.interaction.request.kind : confirmResp.interaction.stateId).toBe('confirm-player-switch')
+
+    const pendingResp = confirmPlayerSwitch(session)
+    expect(pendingResp.ok).toBe(true)
+    expect(pendingResp.interaction.stateId).toBe('wait')
+    if (pendingResp.interaction.stateId !== 'wait') return
+    const sheepOption = pendingResp.interaction.options?.find((option) => option.labelKey === 'sheep')
+    expect(sheepOption).toBeDefined()
+    expect(session.getEngineStack().peekPendingEnvelope()?.effectiveOwnerPlayerId).toBe(p2.id)
+
+    const serialized = serializeState(session.getState().state, {
+      engineStack: session.getEngineStack(),
+    })
+    const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serialized))))
+    expect(restored.getEngineStack().peekPendingEnvelope()?.effectiveOwnerPlayerId).toBe(p2.id)
+
+    const resolved = restored.resolveChoice(1, sheepOption!.value)
+    expect(resolved.ok).toBe(true)
+    expect(resolved.state.players[1]!.resources.sheep).toBe(p2.resources.sheep + 1)
+    expect(resolved.state.players[0]!.resources.wood).toBe(p1.resources.wood + 1)
+    expect(resolved.state.players[1]!.resources.wood).toBe(p2.resources.wood)
   })
 })

@@ -117,7 +117,7 @@ export function getNodeChildren(node: EngineNode): EngineNode[] {
 }
 
 export function stampOwner(node: EngineNode, ownerPlayerId: string): EngineNode {
-  node.ownerPlayerId = ownerPlayerId
+  node.ownerPlayerId ??= ownerPlayerId
   for (const child of getNodeChildren(node)) {
     stampOwner(child, ownerPlayerId)
   }
