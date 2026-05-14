@@ -9,16 +9,15 @@
 | BGA canonical 卡牌数 | 888 |
 | Open Agricola canonical 卡牌 bucket 数 | 888 |
 | canonical 层面 BGA-only / OA-only | 0 / 0 |
-| TypeScript 实体卡牌文件数 | 889 |
+| TypeScript 实体卡牌文件数 | 888 |
 | BGA active implemented 但 OA 缺失 | 0 |
-| 待修行为 / 注册差异 | 11 |
+| 待修行为 / 注册差异 | 10 |
 | metadata schema 上抬差异 | 4 |
 | BGA 标 banned 但 OA 按策略保留 | 33 |
 | 待 owner 确认队列 | 0 |
 
-多出来的 1 个 TS 实体文件是 `C71` 重复：`C71_Slurry.ts` 和 legacy
-`C71_SlurrySpreader.ts` 同时存在。BGA canonical 名是 `C71_Slurry`；
-`C71_SlurrySpreader` 是 legacy wrong-name 条目。
+`C71` 已只保留 canonical `C71_Slurry`。BGA 里的 `C71_SlurrySpreader`
+是 legacy wrong-name 且 `implemented=false`，OA 不再注册或展示该名称。
 
 ## 2. 待修行为 / 注册差异
 
@@ -31,7 +30,6 @@
 | `B157_Salter` | 玩家可以腌制多种 / 多只动物，并按数量获得未来食物。 | 当前 flow 是 XOR，只能三选一且只能选 1 只动物。 | BGA 一次交互可选择 sheep / boar / cattle 的多个数量。 | 改成显式多类型计数选择，并按类型 / 数量发放 future food。 |
 | `C8_PlantFertilizer` | 支持 grain / vegetable / wood / stone 等逻辑田组。 | 只处理物理 grain / vegetable field。 | BGA 可作用于后续卡牌创建的 wood / stone field 逻辑组。 | 田地查找改成 group-aware，并纳入已激活的 wood / stone 可播种组。 |
 | `C57_Crudite` | 收获时可选触发，玩家选择移除哪个 vegetable 来源。 | harvest handler 直接移除第一个符合条件的 vegetable，效果上是强制触发。 | BGA 在多来源时给 optional choice。 | 改成显式 optional pending / flow，并让玩家选择来源。 |
-| `C71_Slurry` / `C71_SlurrySpreader` | canonical 卡是 `C71_Slurry`；legacy wrong-name 条目未实现。 | 两个名字都有 TS 实体文件。 | 重复注册可能把 legacy 名暴露到只应使用 canonical `Slurry` 的路径。 | 删除或隔离 legacy `C71_SlurrySpreader` 实现路径。 |
 | `C140_PackagingArtist` | 把 Major Improvement action 加入 replacement action pool。 | 实现了 minor replacement / `isDoable`，但没有把 Major Improvement 加进可替换 action pool。 | BGA 允许此卡扩展 replacement action 集合。 | 增加缺失的通用 action-pool 扩展点。 |
 | `D13_Trowel` | 木屋可直接翻修到 stone。 | 当前 renovate-house 路径仍只能 wood -> clay。 | BGA 传入 `toStone=true` 提供 wood -> stone 选项。 | 当此卡激活时，renovate flow 暴露 wood -> stone 选项。 |
 | `D15_ClaySupports` | 提供替代 clay trade，同时保留基础翻修费用语义。 | 当前实现成强制 cost delta。 | BGA 把它建模成可选替代支付，不是强制折扣路径。 | 显式建模 BGA 的 alternate-payment option。 |
@@ -114,7 +112,7 @@ prerequisite label / handler。当前没有证据表明运行时行为错误。
 | `D159_ReedSeller` | 不缺失。BGA 标记 `implemented=false`，OA 也只保留 data-only 定义。 |
 | `E132_VeggieLover` | canonical 名下已实现并对齐。BGA legacy `E132_Shearer` 不是当前 active card。 |
 | `C54_MarketBooth` | canonical 名；BGA legacy alias `MarketStall` 不应算作 OA 缺卡。 |
-| `C71_Slurry` | canonical 名；重复 `SlurrySpreader` 已作为第 2 节注册清理项追踪。 |
+| `C71_Slurry` | canonical 名；BGA legacy `SlurrySpreader` wrong-name 条目已从 OA 删除。 |
 | `D11_LawnFertilizer` | canonical 名；BGA legacy typo `LawnFertilzer` 不应算作 OA 缺卡。 |
 
 ## 8. 必跑检查

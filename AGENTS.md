@@ -60,6 +60,12 @@ pnpm run build              # tsc + vite build
 
 ## Card Workflow
 
+新增 / 修改卡牌实现前，先做一轮简短设计判断，并把结论写进测试说明或实现计划：
+- **难易程度**：判断是单卡局部修复、复用现有 hook/helper、还是需要通用机制。
+- **基础设施缺口**：明确是否缺 ActionFlow / pending / payment / field / animal / action-pool 等通用能力；缺基础设施时先设计通用扩展，禁止在主路径塞单卡 `if-else`。
+- **BGA 对照**：阅读 `../bga-agricola/modules/php/Cards/<Deck>/<Card>.php` 对应实现，记录 BGA 的事件点、node 形态、是否 optional / mandatory、是否有自定义 args/act 交互。
+- **落地边界**：优先选择最小可验证切片；如果要改主路径，说明它服务哪些卡和哪些测试，而不是只服务单卡。
+
 新增 / 修改卡牌实现时，**必须先提供测试说明**，得到确认后再编码。测试说明基于 `docs/CARD_TEST_TEMPLATE.md` 编写，必须包含：
 - 从一局新的 2 人游戏开始的初始状态准备
 - 前置条件（玩家资源、已打出卡牌、行动格占用、农场版图、`cardStates`）

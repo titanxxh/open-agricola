@@ -10,14 +10,13 @@
 
 - canonical 覆盖维持 `888 / 888`。
 - literal metadata mismatch 维持 `0`。
-- `docs/card_progress.md` 中的 11 个行为 / 注册 gap 被修掉，或明确迁入刻意差异。
+- `docs/card_progress.md` 中的 10 个行为 / 注册 gap 被修掉，或明确迁入刻意差异。
 - BGA-banned 但 OA 保留的卡继续作为策略差异记录，不当作 bug。
 
 ## 2. 当前工作队列
 
 | 优先级 | 卡牌 | 原因 |
 |---|---|---|
-| P0 | `C71_Slurry` / `C71_SlurrySpreader` | 重复注册 / 名称清理可能暴露错误 legacy 卡牌身份。 |
 | P0 | `D13_Trowel`, `D15_ClaySupports`, `D66_PotterCeramics` | 翻修 / 烘焙支付路径和 BGA 不一致，属于核心规则流。 |
 | P0 | `A148_Woolgrower`, `B86_TruffleSearcher` | 晚打出后容量计算错误，会漏算之前的收获阶段。 |
 | P1 | `B157_Salter`, `C57_Crudite`, `E5_NightLoot` | 需要显式玩家选择，不能继续用 first-match 或单选 shortcut。 |
@@ -31,13 +30,11 @@
 范围：
 
 - `A148_Woolgrower` 和 `B86_TruffleSearcher` 改用全局 completed feeding / harvest 计数。
-- 删除或隔离重复的 `C71_SlurrySpreader` 注册路径。
 - 修复 `D66_PotterCeramics`，让 bake continuation 必选。
 
 验证：
 
 - `A148` / `B86` 晚打出容量的 targeted session tests。
-- `C71` 只暴露 canonical `Slurry` 的 targeted session 或 unit test。
 - `D66` 转换后必须 bake 的 targeted session test。
 - `pnpm test:fast`
 - `pnpm run lint`
