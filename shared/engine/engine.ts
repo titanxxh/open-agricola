@@ -17,7 +17,6 @@ import {
   SequenceNode,
   XorNode,
 } from './nodes'
-import { ParallelTriggerNode } from './nodes/parallel-trigger-node'
 import type { EngineNode, EngineStepResult, NodeCursor } from './types'
 import type { PendingEnvelope } from './types'
 import { ActionRegistry } from './registry'
@@ -134,9 +133,25 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
       case 'sequence':
         node = new SequenceNode(cursor.id, buildChildren())
         break
-      case 'parallel':
-        node = new ParallelNode(cursor.id, buildChildren())
+      case 'parallel': {
+        const parallel = new ParallelNode(cursor.id, buildChildren())
+        if (data.mode === 'trigger-select') parallel.mode = 'trigger-select'
+        parallel.selectedChildId = typeof data.selectedChildId === 'string'
+          ? data.selectedChildId
+          : null
+        parallel.triggerOwnerPlayerId = typeof data.triggerOwnerPlayerId === 'string'
+          ? data.triggerOwnerPlayerId
+          : undefined
+        parallel.triggerChildren = Array.isArray(data.triggerChildren)
+          ? data.triggerChildren as ParallelNode['triggerChildren']
+          : []
+        parallel.emittedChoices = (data.emittedChoices as ActionChoiceOption[] | undefined) ?? []
+        parallel.emittedPromptKey = data.emittedPromptKey as PromptKey | undefined
+        parallel.emittedPromptParams = data.emittedPromptParams as Record<string, unknown> | undefined
+        parallel.emittedRequest = data.emittedRequest as InteractionRequest | undefined
+        node = parallel
         break
+      }
       case 'or': {
         const or = new OrNode(cursor.id, buildChildren(), data.promptKey as PromptKey | undefined)
         or.emittedChoices = (data.emittedChoices as ActionChoiceOption[] | undefined) ?? []
@@ -157,21 +172,6 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
         xor.pendingActionId = data.pendingActionId as string | null | undefined
         xor.pendingContextSnapshot = data.pendingContextSnapshot as XorNode['pendingContextSnapshot']
         node = xor
-        break
-      }
-      case 'parallelTrigger': {
-        const trigger = new ParallelTriggerNode(
-          cursor.id,
-          [],
-          data.ownerPlayerId as string,
-        )
-        trigger.children = buildChildren()
-        trigger.selectedChildId = data.selectedChildId as string | null
-        trigger.emittedChoices = (data.emittedChoices as ActionChoiceOption[] | undefined) ?? []
-        trigger.emittedPromptKey = data.emittedPromptKey as PromptKey | undefined
-        trigger.emittedPromptParams = data.emittedPromptParams as Record<string, unknown> | undefined
-        trigger.emittedRequest = data.emittedRequest as InteractionRequest | undefined
-        node = trigger
         break
       }
       default:
@@ -260,7 +260,7 @@ export class Engine {
         request: node.emittedRequest,
       }
     }
-    if (node instanceof ParallelTriggerNode) {
+    if (node instanceof ParallelNode && node.mode === 'trigger-select') {
       if (node.getState() === 'resolved') return null
       if (node.emittedChoices.length === 0 && node.emittedRequest === undefined) return null
       return {
@@ -610,11 +610,18 @@ export class Engine {
     this._pendingNodeIdRef.value =
       explicitPendingNodeId ?? snapshot.choiceData?.id ?? snapshot.compositeEmit?.nodeId ?? null
 
-    // S2 Task 8: rebuild composite emit metadata onto Or/Xor nodes.
+    // S2 Task 8 / Wave3: rebuild composite emit metadata onto Or/Xor
+    // and trigger-select Parallel nodes.
     const compositeEmit = snapshot.compositeEmit ?? null
     if (compositeEmit) {
       const node = nodeMap.get(compositeEmit.nodeId)
       if (node instanceof OrNode || node instanceof XorNode) {
+        node.emittedChoices = compositeEmit.options
+        node.emittedPromptKey = compositeEmit.promptKey
+        node.emittedPromptParams = compositeEmit.promptParams
+        node.emittedRequest = compositeEmit.request
+      }
+      if (node instanceof ParallelNode && node.mode === 'trigger-select') {
         node.emittedChoices = compositeEmit.options
         node.emittedPromptKey = compositeEmit.promptKey
         node.emittedPromptParams = compositeEmit.promptParams

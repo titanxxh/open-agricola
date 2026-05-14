@@ -11,9 +11,9 @@ import {
   ActionNode,
   InteractionNode,
   OrNode,
+  ParallelNode,
   XorNode,
 } from './nodes'
-import { ParallelTriggerNode } from './nodes/parallel-trigger-node'
 import {
   getOptionsSourceCard,
   resolveChoiceSourceCard,
@@ -419,7 +419,7 @@ export function engineProceed(
       },
     }
   }
-  if (node instanceof ParallelTriggerNode) {
+  if (node instanceof ParallelNode && node.mode === 'trigger-select') {
     const ctx = {
       resolveSubtree: (n: EngineNode) => resolveSubtree(n),
       emitChoice: () => {},
