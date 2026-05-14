@@ -376,6 +376,86 @@ describe('Engine flow nodes', () => {
     expect(activationNodes).toHaveLength(1)
   })
 
+  it('restores before-flow skip ids for pending optional listener flow', () => {
+    const p1 = createPlayer()
+    p1.minorPlayed = ['RESTORED_OPTIONAL_BEFORE_CARD']
+    const state = createState()
+    state.players = [p1]
+
+    let listenerCalls = 0
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'restored-optional-before-flow',
+      cardIds: ['RESTORED_OPTIONAL_BEFORE_CARD'],
+      phases: ['before'],
+      handler: () => {
+        listenerCalls += 1
+        return {
+          sourceCard: 'RESTORED_OPTIONAL_BEFORE_CARD',
+          flow: {
+            type: 'leaf',
+            actionId: 'gain',
+            params: { food: 1 },
+            sourceCard: 'RESTORED_OPTIONAL_BEFORE_CARD',
+            optional: true,
+          },
+        }
+      },
+    })
+    setActiveCardRegistry(cardRegistry)
+
+    const triggerAction: ActionDefinition = {
+      id: 'trigger-restored-optional-before',
+      nameKey: 'test.restoredOptionalBefore',
+      descriptionKey: 'test.restoredOptionalBefore',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(triggerAction)
+    registry.register(gainAction)
+    const space = createSpace(triggerAction)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('trigger', triggerAction.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const context = () => ({ state, player: p1, space })
+
+    expect(engine.proceed(context()).type).toBe('ok')
+    expect(engine.proceed(context()).type).toBe('ok')
+    const choiceStep = engine.proceed(context())
+    expect(choiceStep.type).toBe('choice')
+    if (choiceStep.type !== 'choice') throw new Error('expected optional flow choice')
+    const optionalActionId = choiceStep.choice.options.find((option) => option.value !== '__skip__')?.value
+    expect(optionalActionId).toBeTruthy()
+    expect(listenerCalls).toBe(1)
+
+    const restored = new Engine({
+      tree: new EngineTree(new ActionNode('dummy', triggerAction.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    restored.restore(engine.snapshot())
+
+    const accepted = restored.resolveChoice(optionalActionId!, context())
+    expect(accepted.type).toBe('ok')
+    const childStep = restored.proceed(context())
+    expect(childStep.type).toBe('ok')
+    expect(p1.resources.food).toBe(1)
+    expect(listenerCalls).toBe(1)
+    const activationNodes = restored
+      ._internals()
+      .tree
+      .allNodes()
+      .filter((node) => node instanceof ActionNode && node.actionId === 'activate-card')
+    expect(activationNodes).toHaveLength(1)
+  })
+
   it('dynamic result.flow nested targetPlayerId preserves inner owner override', () => {
     const p1 = createPlayer()
     const p2 = { ...createPlayer(), id: 'p2', name: 'P2', color: 'blue' as const }
