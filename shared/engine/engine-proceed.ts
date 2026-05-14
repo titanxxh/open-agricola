@@ -592,6 +592,8 @@ export function engineProceed(
     const duringPhase = int.hooks.during({ ...executionContext, actionId: replacedActionId }, result)
     const duringActivateNodes = buildActivationActionNodes(int,
       duringPhase.matchedListeners, 'during', replacedActionId,
+      {},
+      executionContext.player.id,
     )
     if (result.type === 'request') {
       node.resolve(result)

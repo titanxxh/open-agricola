@@ -27,7 +27,7 @@ import {
 } from '../nodes'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
 import { buildPhaseTrailingNodes } from '../engine-utils'
-import type { MatchedCardListener } from '../../cards/card-listeners'
+import type { CardListenerContext, MatchedCardListener } from '../../cards/card-listeners'
 
 const createState = () =>
   ({
@@ -227,6 +227,79 @@ describe('Engine flow nodes', () => {
       triggerPlayerId: p2.id,
       mandatory: true,
     })
+  })
+
+  it('during listener activation preserves original trigger player for cross-owner listeners', () => {
+    const p1 = createPlayer()
+    const p2 = { ...createPlayer(), id: 'p2', name: 'P2', color: 'blue' as const }
+    p2.minorPlayed = ['CROSS_DURING_CARD']
+    const state = createState()
+    state.players = [p1, p2]
+
+    const seen: Array<{
+      playerId?: string
+      triggerPlayerId?: string
+      ownerPlayerId?: string
+      mandatory?: unknown
+    }> = []
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'cross-owner-during',
+      cardIds: ['CROSS_DURING_CARD'],
+      actions: ['trigger-cross-owner-during'],
+      phases: ['during'],
+      scope: 'any',
+      mandatory: true,
+      handler: (context: CardListenerContext) => {
+        seen.push({
+          playerId: context.player.id,
+          triggerPlayerId: context.triggerPlayer?.id,
+          ownerPlayerId: context.ownerPlayer?.id,
+          mandatory: (context as CardListenerContext & { mandatory?: unknown }).mandatory,
+        })
+        return { logKey: 'log.testCrossOwnerDuring' }
+      },
+    })
+    setActiveCardRegistry(cardRegistry)
+
+    const triggerAction: ActionDefinition = {
+      id: 'trigger-cross-owner-during',
+      nameKey: 'test.crossOwnerDuring',
+      descriptionKey: 'test.crossOwnerDuring',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(triggerAction)
+    const space = createSpace(triggerAction)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('trigger', triggerAction.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const playerForNextNode = () => {
+      const nodeId = engine.peekNextUnresolvedNodeId()
+      const ownerId = nodeId ? engine.getEffectiveOwnerPlayerId(nodeId, p1.id) : p1.id
+      return state.players.find((player) => player.id === ownerId) ?? p1
+    }
+
+    let step = engine.proceed({ state, player: playerForNextNode(), space })
+    let safety = 10
+    while (safety-- > 0 && step.type === 'ok') {
+      step = engine.proceed({ state, player: playerForNextNode(), space })
+    }
+
+    expect(seen).toEqual([
+      {
+        playerId: p1.id,
+        triggerPlayerId: p1.id,
+        ownerPlayerId: p2.id,
+        mandatory: true,
+      },
+    ])
   })
 
   it('dynamic result.flow nested targetPlayerId preserves inner owner override', () => {
