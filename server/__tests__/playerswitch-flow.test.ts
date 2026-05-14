@@ -271,6 +271,7 @@ describe('ActionFlow targetPlayerId', () => {
     expect(pendingResp.ok).toBe(true)
     expect(pendingResp.interaction.stateId).toBe('wait')
     if (pendingResp.interaction.stateId !== 'wait') return
+    expect(pendingResp.interaction.playerIndex).toBe(1)
     const sheepOption = pendingResp.interaction.options?.find((option) => option.labelKey === 'sheep')
     expect(sheepOption).toBeDefined()
     expect(session.getEngineStack().peekPendingEnvelope()?.effectiveOwnerPlayerId).toBe(p2.id)
