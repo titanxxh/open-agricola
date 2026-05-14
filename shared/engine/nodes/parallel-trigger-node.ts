@@ -2,14 +2,15 @@ import type { ActionChoiceOption, InteractionRequest } from '../../contract/type
 import type { PromptKey } from '../../contract/prompt-keys'
 import type { EngineContext, EngineNode, NodeStepResult } from '../types'
 import { BaseNode } from './base'
-import { ActivateCardNode } from './activate-card-node'
+import { ActionNode } from './action-node'
+import { isActivateCardActionNode, type ActivateCardActionNode } from '../activation-action'
 
 /**
  * BGA-style PARALLEL trigger selector.
  *
  * When the dispatcher (`buildPhaseTrailingNodes`) sees multiple matched
  * listeners explicitly marked `dispatchMode: 'select'`, it wraps them as
- * `ActivateCardNode` children of this node. The engine main loop emits
+ * internal activation action children of this node. The engine main loop emits
  * `kind: 'select-trigger'` with one option per remaining card (+ `__pass__`);
  * after the player picks a card, `chooseCard` records `selectedChildId` and the
  * engine activates that child. The child's flow nodes are then inserted
@@ -19,13 +20,13 @@ import { ActivateCardNode } from './activate-card-node'
  * next card.
  *
  * `children` therefore holds a heterogeneous mix at runtime:
- *   - The initial `ActivateCardNode[]` placed by the dispatcher (one per card)
+ *   - The initial activation action leaves placed by the dispatcher (one per card)
  *   - Flow nodes (`SequenceNode` / leaf / `ParallelTriggerNode` etc.) inserted
  *     by the engine **after** a card's activation, occupying the slot between
- *     the activated `ActivateCardNode` and the next card.
+ *     the activated leaf and the next card.
  *
  * The selector-only methods (`getRemainingCardIds`, `chooseCard`,
- * `buildSelectOptions`, `passAll`) filter for `ActivateCardNode` instances.
+ * `buildSelectOptions`, `passAll`) filter for internal activation leaves.
  */
 export class ParallelTriggerNode extends BaseNode {
   public children: EngineNode[]
@@ -36,24 +37,24 @@ export class ParallelTriggerNode extends BaseNode {
   public emittedPromptParams?: Record<string, unknown>
   public emittedRequest?: InteractionRequest
 
-  constructor(id: string, children: ActivateCardNode[], ownerPlayerId: string) {
+  constructor(id: string, children: ActivateCardActionNode[], ownerPlayerId: string) {
     super(id, 'parallelTrigger' as never)
     this.children = children
     this.ownerPlayerId = ownerPlayerId
   }
 
-  private cardChildren(): ActivateCardNode[] {
-    return this.children.filter((c): c is ActivateCardNode => c instanceof ActivateCardNode)
+  private cardChildren(): ActivateCardActionNode[] {
+    return this.children.filter(isActivateCardActionNode)
   }
 
   getRemainingCardIds(): string[] {
     return this.cardChildren()
       .filter((c) => c.getState() !== 'resolved')
-      .map((c) => c.cardId)
+      .map((c) => c.params.cardId)
   }
 
-  chooseCard(cardId: string): ActivateCardNode | null {
-    const child = this.cardChildren().find((c) => c.cardId === cardId && c.getState() !== 'resolved') ?? null
+  chooseCard(cardId: string): ActionNode | null {
+    const child = this.cardChildren().find((c) => c.params.cardId === cardId && c.getState() !== 'resolved') ?? null
     if (child) this.selectedChildId = child.id
     return child
   }
@@ -78,16 +79,16 @@ export class ParallelTriggerNode extends BaseNode {
   buildSelectOptions() {
     const remaining = this.cardChildren().filter((c) => c.getState() !== 'resolved')
     const cardOpts = remaining.map((c) => ({
-      value: c.cardId,
-      labelKey: `cards.${c.cardId}.name`,
-      sourceCard: c.cardId,
+      value: c.params.cardId,
+      labelKey: `cards.${c.params.cardId}.name`,
+      sourceCard: c.params.cardId,
     }))
     // PASS hidden only when at least one unresolved trigger is explicitly
     // mandatory (`mandatory: true`). Default is optional (PASS offered) — this
     // preserves BGA-aligned behavior for the bulk of cards that have no
     // explicit mandatory declaration, while letting future cards opt into
     // mandatory by setting `mandatory: true` on the listener registration.
-    const anyMandatory = remaining.some((c) => c.event.mandatory === true)
+    const anyMandatory = remaining.some((c) => c.params.mandatory === true)
     if (!anyMandatory) {
       return [...cardOpts, { value: '__pass__', labelKey: 'ui.interactionSelectTriggerPass' }]
     }

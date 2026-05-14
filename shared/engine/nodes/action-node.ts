@@ -3,7 +3,6 @@ import type {
   ActionExecutionContext,
   ActionExecutionResult,
   InteractionRequest,
-  Resource,
 } from '../../contract/types'
 import type { EngineContext, NodeStepResult } from '../types'
 import { BaseNode } from './base'
@@ -11,7 +10,7 @@ import { BaseNode } from './base'
 export class ActionNode extends BaseNode {
   public actionId: string
   public sourceCard?: string
-  public params?: Partial<Resource>
+  public params?: Record<string, unknown>
   public actionContext?: Record<string, unknown>
   public effectPreview?: ChoiceEffectPreview
   public choiceLabelKey?: string
@@ -39,7 +38,7 @@ export class ActionNode extends BaseNode {
     id: string,
     actionId: string,
     sourceCard?: string,
-    params?: Partial<Resource>,
+    params?: Record<string, unknown>,
     choiceLabelKey?: string,
     choiceLabelParams?: Record<string, unknown>,
     actionContext?: Record<string, unknown>,

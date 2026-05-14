@@ -26,6 +26,8 @@ import {
   XorNode,
 } from '../nodes'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
+import { buildPhaseTrailingNodes } from '../engine-utils'
+import type { MatchedCardListener } from '../../cards/card-listeners'
 
 const createState = () =>
   ({
@@ -170,6 +172,61 @@ describe('Engine flow nodes', () => {
     expect(p2.resources.food).toBe(1)
     expect(p2.resources.wood).toBe(0)
     expect(p1.resources.wood).toBe(1)
+  })
+
+  it('phase trailing listener activation is emitted as an internal action leaf', () => {
+    const p1 = createPlayer()
+    const p2 = { ...createPlayer(), id: 'p2', name: 'P2', color: 'blue' as const }
+    const state = createState()
+    state.players = [p1, p2]
+
+    const registry = new ActionRegistry()
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('trigger', 'gain')),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const matched: MatchedCardListener[] = [
+      {
+        registration: {
+          id: 'listener-1',
+          cardIds: ['C1'],
+          mandatory: true,
+          handler: () => undefined,
+        },
+        cardId: 'C1',
+        ownerPlayerId: p1.id,
+      },
+    ]
+
+    const nodes = buildPhaseTrailingNodes(
+      engine._internals(),
+      matched,
+      'after',
+      'gain',
+      state,
+      { foo: 'bar' },
+      p2.id,
+    )
+
+    expect(nodes).toHaveLength(1)
+    const node = nodes[0]
+    expect(node).toBeInstanceOf(ActionNode)
+    const actionNode = node as ActionNode
+    expect(actionNode.actionId).toBe('activate-card')
+    expect(actionNode.sourceCard).toBe('C1')
+    expect(actionNode.ownerPlayerId).toBe(p1.id)
+    expect(actionNode.params).toMatchObject({
+      listenerId: 'listener-1',
+      cardId: 'C1',
+      phase: 'after',
+      actionId: 'gain',
+      event: { foo: 'bar' },
+      ownerPlayerId: p1.id,
+      triggerPlayerId: p2.id,
+      mandatory: true,
+    })
   })
 
   it('dynamic result.flow nested targetPlayerId preserves inner owner override', () => {
