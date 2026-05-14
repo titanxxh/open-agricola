@@ -26,7 +26,12 @@ import { EngineTree } from './tree'
 import { LogStore } from './log-store'
 import { INTERACTION_ONLY_ACTION_ID } from './engine-stack'
 import type { EngineInternals } from './engine-internals'
-import { buildFlowNode, pendingEnvelopeFromHostNode, snapshotCompositeEmit } from './engine-utils'
+import {
+  buildFlowNode,
+  effectiveOwnerPlayerId,
+  pendingEnvelopeFromHostNode,
+  snapshotCompositeEmit,
+} from './engine-utils'
 import { engineProceed } from './engine-proceed'
 import { engineResolveChoice } from './engine-resolve'
 
@@ -186,6 +191,23 @@ export class Engine {
     if (pendingEnvelopeFromHostNode(pendingNode)) return pendingNode
 
     return this.tree.allNodes().find((node) => node.getPending() !== null) ?? null
+  }
+
+  /**
+   * @internal Package-internal owner lookup for session execution contexts.
+   */
+  peekNextUnresolvedNodeId(): string | null {
+    return this.tree.nextUnresolved()?.id ?? null
+  }
+
+  /**
+   * @internal Package-internal owner lookup for session execution contexts.
+   */
+  getEffectiveOwnerPlayerId(
+    nodeId: string,
+    frameOwnerPlayerId?: string,
+  ): string | undefined {
+    return effectiveOwnerPlayerId(this._internals(), nodeId, frameOwnerPlayerId)
   }
 
   /**

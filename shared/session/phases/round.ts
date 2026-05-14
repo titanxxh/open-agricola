@@ -386,12 +386,13 @@ export const takeAnytimeAction = (
 
 /**
  * Resolve the synthetic `confirm-player-switch` InteractionNode frame:
- * pop the prompt frame, transfer ownership to `toPlayerIndex` on the
- * parent frame underneath, and resume engine stepping. Migrated from
+ * pop the prompt frame, mark the pending owner transition as confirmed on
+ * the parent frame underneath, and resume engine stepping. Migrated from
  * GameCore.handleConfirmPlayerSwitchResolved (S2 Task 10 part 3).
  */
 export const handleConfirmPlayerSwitchResolved = (
   core: GameCore,
+  fromPlayerIndex: number,
   toPlayerIndex: number,
 ): SessionResponse => {
   core.appendHistoryWithUndoBoundary()
@@ -401,8 +402,11 @@ export const handleConfirmPlayerSwitchResolved = (
   if (top?.reason === 'confirm-player-switch') core.popEngineFrame()
   const parent = core.peekEngineFrame()
   if (parent) {
-    parent.ownerPlayerIndex = toPlayerIndex
-    parent.deferredPlayerSwitch = null
+    parent.deferredPlayerSwitch = {
+      fromPlayerIndex,
+      toPlayerIndex,
+      confirmed: true,
+    }
   }
   core.driveEngineSteps()
   return core.emitResponse()

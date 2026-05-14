@@ -19,7 +19,6 @@ import {
   OptionalNode,
   OrNode,
   ParallelNode,
-  PlayerSwitchNode,
   SequenceNode,
   XorNode,
 } from './nodes'
@@ -97,8 +96,55 @@ export function buildFollowUpNodes(
           },
         })
       }
-      return new ActionNode(`chain-${baseId}-${index}`, actionId, sourceCard)
+      const node = new ActionNode(`chain-${baseId}-${index}`, actionId, sourceCard)
+      node.ownerPlayerId = player.id
+      return node
     })
+}
+
+export function getNodeChildren(node: EngineNode): EngineNode[] {
+  if (node instanceof OptionalNode) return [node.child]
+  if (node instanceof ParallelTriggerNode) return node.children
+  if (
+    node instanceof SequenceNode ||
+    node instanceof ParallelNode ||
+    node instanceof OrNode ||
+    node instanceof XorNode
+  ) {
+    return node.children
+  }
+  return []
+}
+
+export function stampOwner(node: EngineNode, ownerPlayerId: string): EngineNode {
+  node.ownerPlayerId = ownerPlayerId
+  for (const child of getNodeChildren(node)) {
+    stampOwner(child, ownerPlayerId)
+  }
+  return node
+}
+
+function copySharedNodeMetadata(source: EngineNode, target: EngineNode): EngineNode {
+  target.ownerPlayerId = source.ownerPlayerId
+  target.optional = source.optional
+  target.optionalActive = source.optionalActive
+  target.optionalPromptKey = source.optionalPromptKey
+  const pending = source.getPending()
+  if (pending) target.setPending(pending)
+  return target
+}
+
+export function effectiveOwnerPlayerId(
+  int: EngineInternals,
+  nodeId: string,
+  frameOwnerPlayerId?: string,
+): string | undefined {
+  let node = int.tree.findNodeById(nodeId)
+  while (node) {
+    if (node.ownerPlayerId) return node.ownerPlayerId
+    node = int.tree.findParent(node.id)
+  }
+  return frameOwnerPlayerId
 }
 
 export function findActionNode(node: EngineNode): ActionNode | null {
@@ -182,7 +228,7 @@ export function buildPhaseTrailingNodes(
   const effectiveTriggerPlayerId = triggerPlayerId ?? activeId
   const orderedOwners: string[] = []
   // Global listeners (no cardIds → ownerPlayerId='') run first in the active
-  // player's context with no PlayerSwitchNode wrap.
+  // player's context.
   if (byOwner.has('')) orderedOwners.push('')
   if (activeId && byOwner.has(activeId)) orderedOwners.push(activeId)
   for (const p of state.players) {
@@ -234,19 +280,15 @@ export function buildPhaseTrailingNodes(
       ownerGroupNodes.push(ptn)
     }
 
-    // Wrap opponent groups in PlayerSwitchNode pair so the choice/UI is
-    // owned by the card's player, not the action-active player. Active
-    // player group runs in-context (no wrap).
     if (ownerGroupNodes.length === 0) continue
-    // Empty ownerId == global listener (no cardIds) — runs in active player's
-    // frame, no PlayerSwitchNode wrap.
+    // Empty ownerId == global listener (no cardIds) runs in the active
+    // player's frame. Card-owned listener groups carry owner metadata.
     if (ownerId !== activeId && ownerId !== '') {
-      out.push(new PlayerSwitchNode(`ps-to-${phase}-${actionId}-${ownerId}-${int.counterRef.value++}`, ownerId))
-      out.push(...ownerGroupNodes)
-      out.push(new PlayerSwitchNode(`ps-back-${phase}-${actionId}-${activeId ?? ''}-${int.counterRef.value++}`, activeId ?? ownerId))
+      ownerGroupNodes.forEach((node) => stampOwner(node, ownerId))
     } else {
-      out.push(...ownerGroupNodes)
+      if (ownerId) ownerGroupNodes.forEach((node) => stampOwner(node, ownerId))
     }
+    out.push(...ownerGroupNodes)
   }
   return out
 }
@@ -272,7 +314,7 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
       node.effectPreview,
     )
     clone.beforePhaseResolved = node.beforePhaseResolved
-    return clone
+    return copySharedNodeMetadata(node, clone)
   }
   if (node instanceof InteractionNode) {
     const clone = new InteractionNode(
@@ -282,33 +324,33 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
     if (node.promptKey) {
       clone.setChoice(node.promptKey, [...node.choices])
     }
-    return clone
+    return copySharedNodeMetadata(node, clone)
   }
   if (node instanceof SequenceNode) {
-    return new SequenceNode(
+    return copySharedNodeMetadata(node, new SequenceNode(
       `${node.id}-clone-${int.counterRef.value++}`,
       node.children.map((child) => cloneNode(int, child)),
-    )
+    ))
   }
   if (node instanceof ParallelNode) {
-    return new ParallelNode(
+    return copySharedNodeMetadata(node, new ParallelNode(
       `${node.id}-clone-${int.counterRef.value++}`,
       node.children.map((child) => cloneNode(int, child)),
-    )
+    ))
   }
   if (node instanceof OrNode) {
-    return new OrNode(
+    return copySharedNodeMetadata(node, new OrNode(
       `${node.id}-clone-${int.counterRef.value++}`,
       node.children.map((child) => cloneNode(int, child)),
       node.promptKey,
-    )
+    ))
   }
   if (node instanceof XorNode) {
-    return new XorNode(
+    return copySharedNodeMetadata(node, new XorNode(
       `${node.id}-clone-${int.counterRef.value++}`,
       node.children.map((child) => cloneNode(int, child)),
       node.promptKey,
-    )
+    ))
   }
   if (node instanceof OptionalNode) {
     const clone = new OptionalNode(
@@ -317,23 +359,17 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
       node.promptKey,
     )
     clone.active = node.active
-    return clone
+    return copySharedNodeMetadata(node, clone)
   }
   if (node instanceof ActivateCardNode) {
-    return new ActivateCardNode(
+    return copySharedNodeMetadata(node, new ActivateCardNode(
       `${node.id}-clone-${int.counterRef.value++}`,
       node.listenerId,
       node.cardId,
       node.phase,
       node.actionId,
       node.event,
-    )
-  }
-  if (node instanceof PlayerSwitchNode) {
-    return new PlayerSwitchNode(
-      `${node.id}-clone-${int.counterRef.value++}`,
-      node.targetPlayerId,
-    )
+    ))
   }
   return node
 }
@@ -533,15 +569,8 @@ export function buildFlowNode(
   const nextId = () => `flow-${int.counterRef.value++}`
   if (flow.targetPlayerId) {
     const { targetPlayerId, ...innerFlow } = flow
-    const scopedNode = buildFlowNode(int, innerFlow as ActionFlow, targetPlayerId)
-    if (!ownerPlayerId || ownerPlayerId === targetPlayerId) {
-      return scopedNode
-    }
-    return new SequenceNode(nextId(), [
-      new PlayerSwitchNode(`ps-flow-to-${int.counterRef.value++}`, targetPlayerId),
-      scopedNode,
-      new PlayerSwitchNode(`ps-flow-back-${int.counterRef.value++}`, ownerPlayerId),
-    ])
+    const scopedNode = buildFlowNode(int, innerFlow as ActionFlow, ownerPlayerId)
+    return stampOwner(scopedNode, targetPlayerId)
   }
   if (flow.type === 'leaf') {
     if (flow.expandFlow) {

@@ -5,12 +5,11 @@ import { InteractionNode } from '../interaction-node'
 import { OptionalNode } from '../optional-node'
 import { OrNode } from '../or-node'
 import { ParallelNode } from '../parallel-node'
-import { PlayerSwitchNode } from '../player-switch-node'
 import { SequenceNode } from '../sequence-node'
 import { XorNode } from '../xor-node'
 
 /**
- * S4b PR5 — cursor round-trip guards (DoD D13/D15: 9 cases, one per node type).
+ * S4b PR5 — cursor round-trip guards (one per runtime node type).
  *
  * Each test:
  *   1. constructs a fresh node with realistic field values + state
@@ -129,14 +128,6 @@ describe('cursor round-trip', () => {
     rebuilt.pendingActionId = c1.data.pendingActionId as string | undefined
     rebuilt.ownerNodeId = c1.data.ownerNodeId as string | undefined
     rebuilt.contextSnapshot = c1.data.contextSnapshot as never
-    rebuilt.setState(c1.state)
-    expect(rebuilt.toCursor()).toEqual(c1)
-  })
-
-  it('PlayerSwitchNode preserves targetPlayerId through toCursor', () => {
-    const original = new PlayerSwitchNode('ps-1', 'p3')
-    const c1 = original.toCursor()
-    const rebuilt = new PlayerSwitchNode(c1.id, c1.data.targetPlayerId as string)
     rebuilt.setState(c1.state)
     expect(rebuilt.toCursor()).toEqual(c1)
   })

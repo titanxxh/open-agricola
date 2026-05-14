@@ -111,7 +111,7 @@ describe('Engine flow nodes', () => {
   setActiveCardRegistry(new CardRegistry())
   })
 
-  it('dynamic result.flow targetPlayerId switches back before later siblings', () => {
+  it('dynamic result.flow targetPlayerId scopes only the targeted subtree', () => {
     const p1 = createPlayer()
     const p2 = { ...createPlayer(), id: 'p2', name: 'P2', color: 'blue' as const }
     const state = createState()
@@ -155,14 +155,16 @@ describe('Engine flow nodes', () => {
       log: new LogStore(),
     })
 
-    let currentPlayer = p1
-    let step = engine.proceed({ state, player: currentPlayer, space })
+    const playerForNextNode = () => {
+      const nodeId = engine.peekNextUnresolvedNodeId()
+      const ownerId = nodeId ? engine.getEffectiveOwnerPlayerId(nodeId, p1.id) : p1.id
+      return state.players.find((player) => player.id === ownerId) ?? p1
+    }
+
+    let step = engine.proceed({ state, player: playerForNextNode(), space })
     let safety = 20
-    while (safety-- > 0 && (step.type === 'ok' || step.type === 'playerSwitch')) {
-      if (step.type === 'playerSwitch') {
-        currentPlayer = state.players.find((player) => player.id === step.targetPlayerId) ?? currentPlayer
-      }
-      step = engine.proceed({ state, player: currentPlayer, space })
+    while (safety-- > 0 && step.type === 'ok') {
+      step = engine.proceed({ state, player: playerForNextNode(), space })
     }
 
     expect(p2.resources.food).toBe(1)

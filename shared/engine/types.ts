@@ -17,7 +17,6 @@ export type EngineNodeType =
   | 'xor'
   | 'optional'
   | 'activateCard'
-  | 'playerSwitch'
 
 export type EngineNode = {
   id: string
@@ -74,14 +73,12 @@ export type EngineStepResult =
   | { type: 'blocked'; nodeId: string }
   | { type: 'choice'; nodeId: string; choice: EngineChoice }
   | { type: 'ok'; nodeId: string; actionId?: string; result: ActionExecutionResult }
-  | { type: 'playerSwitch'; nodeId: string; targetPlayerId: string }
 
 export type NodeStepResult =
   | { kind: 'continue' }
   | { kind: 'done' }
   | { kind: 'blocked'; reason?: string }
   | { kind: 'choice'; nodeId: string }
-  | { kind: 'playerSwitch'; targetPlayerId: string }
   | { kind: 'request'; request: InteractionRequest }
   /**
    * S4b PR5 sub-commit 4 — leaf node signals it is ready for the
