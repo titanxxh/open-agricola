@@ -1,16 +1,12 @@
 import type { ActionChoiceOption, InteractionRequest } from '../../contract/types'
 import type { PromptKey } from '../../contract/prompt-keys'
-import type { EngineNode, EngineContext, NodeStepResult } from '../types'
+import type { EngineNode, EngineContext, NodeStepResult, InteractionContextSnapshot } from '../types'
 import { BaseNode } from './base'
-import type { InteractionContextSnapshot } from './interaction-node'
 
 /**
  * S2 Task 8: composite emit nodes (Or/Xor/Optional) carry their own
- * pending-choice metadata (`emittedChoices`, `emittedPromptKey`,
- * `emittedRequest`) when `Engine.proceed` has emitted a `'choice'` step
- * for them. This makes `Engine.peekInteractionHost` able to surface the
- * same shape regardless of whether the pending node is a leaf-paired
- * `InteractionNode` or one of the composite nodes below.
+ * pending-choice metadata when `Engine.proceed` has emitted a `'choice'`
+ * step for them. The production pending surface is `BaseNode.pending`.
  */
 export class OrNode extends BaseNode {
   public children: EngineNode[]
@@ -22,10 +18,10 @@ export class OrNode extends BaseNode {
   /**
    * S4b PR5 — composite host node carries the pending-interaction context
    * snapshot when `Engine.proceed` emits a 'choice' for it. Mirrors
-   * InteractionNode.contextSnapshot semantics so external consumers can read
-   * `peekInteractionHost()?.pendingContextSnapshot` uniformly without
-   * dispatching on node type. `pendingActionId` is null for composite-hosted
-   * choices (the actual action runs on the chosen child after resolveChoice).
+   * Composite host node carries the pending context snapshot when
+   * `Engine.proceed` emits a choice. `pendingActionId` is null for
+   * composite-hosted choices (the actual action runs on the chosen child
+   * after resolveChoice).
    */
   public pendingActionId?: string | null
   public pendingContextSnapshot?: InteractionContextSnapshot

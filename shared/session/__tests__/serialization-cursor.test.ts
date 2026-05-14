@@ -193,7 +193,7 @@ describe('serialization cursor round-trip', () => {
 
   // ── confirm-next-player sub-flow (Task 9) ─────────────────────────────
   // Drive a normal worker-placement turn to completion: takeAction emits a
-  // synthetic '__interaction_only__' frame whose InteractionNode carries
+  // synthetic '__interaction_only__' frame whose pending envelope carries
   // request.kind === 'confirm-next-player'. Round-trip the cursor and verify
   // the restored session can resolve the prompt to advance the turn.
   it('confirm-next-player sub-flow survives serialize/rehydrate', () => {
@@ -216,8 +216,7 @@ describe('serialization cursor round-trip', () => {
     expect(stack.depth()).toBe(1)
     const top = stack.current()!
     expect(top.reason).toBe('confirm-next-player')
-    const interaction = stack.peekInteraction()
-    expect(interaction?.request?.kind).toBe('confirm-next-player')
+    expect(stack.peekPendingEnvelope()?.request.kind).toBe('confirm-next-player')
 
     // Round-trip via JSON.
     const serialized = serializeState(session.getState().state, { engineStack: stack })
@@ -229,8 +228,6 @@ describe('serialization cursor round-trip', () => {
     const restored = new GameSession(rehydrated)
     expect(restored.getEngineStack().depth()).toBe(1)
     expect(restored.getEngineStack().current()?.reason).toBe('confirm-next-player')
-    const restoredInteraction = restored.getEngineStack().peekInteraction()
-    expect(restoredInteraction?.request?.kind).toBe('confirm-next-player')
     const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
     expect(restoredEnvelope?.request.kind).toBe('confirm-next-player')
     expect(restoredEnvelope?.hostNodeId).toBeTruthy()
@@ -276,8 +273,7 @@ describe('serialization cursor round-trip', () => {
     expect(stack.depth()).toBeGreaterThanOrEqual(2)
     const top = stack.current()!
     expect(top.reason).toBe('confirm-player-switch')
-    const interaction = stack.peekInteraction()
-    expect(interaction?.request?.kind).toBe('confirm-player-switch')
+    expect(stack.peekPendingEnvelope()?.request.kind).toBe('confirm-player-switch')
 
     // Round-trip via JSON.
     const initialDepth = stack.depth()
@@ -290,15 +286,13 @@ describe('serialization cursor round-trip', () => {
     const restored = new GameSession(rehydrated)
     expect(restored.getEngineStack().depth()).toBe(initialDepth)
     expect(restored.getEngineStack().current()?.reason).toBe('confirm-player-switch')
-    const restoredInteraction = restored.getEngineStack().peekInteraction()
-    expect(restoredInteraction?.request?.kind).toBe('confirm-player-switch')
     const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
     expect(restoredEnvelope?.request.kind).toBe('confirm-player-switch')
     expect(restoredEnvelope?.hostNodeId).toBeTruthy()
 
     // Resolving the synthetic frame pops it and resumes the parent action
     // engine. The parent's exact follow-up (a 'choice' for reed-bank's OR
-    // arms, or a no-op 'none' once the InteractionNode rehydrates as
+    // arms, or a no-op 'none' once the pending host rehydrates as
     // already-resolved) is not the contract we're asserting here — what we
     // care about is that the round-trip preserved the synthetic frame and
     // resolveChoice no longer reports an error.
@@ -308,7 +302,7 @@ describe('serialization cursor round-trip', () => {
 
   // ── feed sub-flow (Task 9) ────────────────────────────────────────────
   // Drive harvest with a player that owes food: the harvest queue pushes a
-  // synthetic '__interaction_only__' frame whose InteractionNode carries
+  // synthetic '__interaction_only__' frame whose pending envelope carries
   // request.kind === 'feed'. Round-trip and resolve.
   it('feed sub-flow survives serialize/rehydrate', () => {
     const session = new GameSession()
@@ -339,8 +333,7 @@ describe('serialization cursor round-trip', () => {
     expect(stack.depth()).toBeGreaterThanOrEqual(1)
     const top = stack.current()!
     expect(top.reason).toBe('feed')
-    const interaction = stack.peekInteraction()
-    expect(interaction?.request?.kind).toBe('feed')
+    expect(stack.peekPendingEnvelope()?.request.kind).toBe('feed')
 
     // Round-trip via JSON.
     const initialDepth = stack.depth()
@@ -353,8 +346,6 @@ describe('serialization cursor round-trip', () => {
     const restored = new GameSession(rehydrated)
     expect(restored.getEngineStack().depth()).toBe(initialDepth)
     expect(restored.getEngineStack().current()?.reason).toBe('feed')
-    const restoredInteraction = restored.getEngineStack().peekInteraction()
-    expect(restoredInteraction?.request?.kind).toBe('feed')
     const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
     expect(restoredEnvelope?.request.kind).toBe('feed')
     expect(restoredEnvelope?.hostNodeId).toBeTruthy()

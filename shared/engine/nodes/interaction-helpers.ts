@@ -24,6 +24,25 @@ import { ParallelNode } from './parallel-node'
 import { OrNode } from './or-node'
 import { XorNode } from './xor-node'
 
+export function getOptionsSourceCard(options: ActionChoiceOption[]): string | undefined {
+  if (options.length === 0) return undefined
+  const normalized = options.map((option) =>
+    typeof option.sourceCard === 'string' && option.sourceCard.length > 0
+      ? option.sourceCard
+      : null,
+  )
+  if (normalized.some((sourceCard) => sourceCard === null)) return undefined
+  const sourceCards = [...new Set(normalized)] as string[]
+  return sourceCards.length === 1 ? sourceCards[0] : undefined
+}
+
+export function resolveChoiceSourceCard(
+  sourceCard: string | undefined,
+  options: ActionChoiceOption[],
+): string | undefined {
+  return sourceCard ?? getOptionsSourceCard(options)
+}
+
 /**
  * Stamp `choiceLabelKey` / `choiceLabelParams` onto an EngineNode. The fields
  * live on `BaseNode` (assignable on every node subclass) so the cast is
@@ -214,9 +233,6 @@ export function getReplaceAwareChoiceLabel(
   }
 }
 
-// Re-export ActionChoiceOption-derived helpers from interaction-node so
-// callers that already import the helpers module see one cohesive surface.
-export { getOptionsSourceCard, resolveChoiceSourceCard } from './interaction-node'
 // Suppress unused-import warning for ActionChoiceOption — it's part of the
 // re-export's transitive type surface.
 export type { ActionChoiceOption }

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session'
 import { rehydrateState, serializeState } from '../serialization'
-import { InteractionNode, INTERACTION_ONLY_ACTION_ID } from '../../engine'
-import type { ActionFlow, InteractionRequest } from '../../contract/types'
+import { INTERACTION_ONLY_ACTION_ID } from '../../engine'
+import type { InteractionRequest } from '../../contract/types'
 
 /**
  * S2 Task 13 step 10 — verify the three S2-new InteractionRequest kinds
@@ -14,7 +14,7 @@ import type { ActionFlow, InteractionRequest } from '../../contract/types'
  * full GameSession flows. The three kinds added in S2 Task 2 don't yet have
  * effect-side emitters wired up (deferred per `docs/sprint-S2-progress.md`
  * §3), so we exercise them here by constructing a minimal session that
- * inject-pushes the new-kind InteractionNode onto its engineStack.
+ * pushes a synthetic pending frame onto its engineStack.
  */
 
 const pushSyntheticInteraction = (
@@ -23,43 +23,31 @@ const pushSyntheticInteraction = (
   promptKey: string,
   choices = [{ value: 'confirm', labelKey: 'ui.cursorTestConfirm' }],
 ): void => {
-  // Mirror GameCore.startDevFenceSelect's pattern: push a synthetic
-  // interaction-only frame whose engine hosts an injected InteractionNode
-  // carrying the new-kind request.
-  const node = new InteractionNode(
-    `interaction:cursor-test-${request.kind}`,
-    choices,
-    request,
-  )
-  // setChoice writes promptKey + choices on the node so snapshot.choiceData
-  // captures both alongside the request.
-  node.setChoice(promptKey as never, [
-    ...choices,
-  ])
-
-  const flow: ActionFlow = { type: 'leaf', actionId: INTERACTION_ONLY_ACTION_ID }
-  // Using the public `startDevFenceSelect` indirectly is too tied to
-  // 'fence-select' shape; instead reach into the engineStack via the
-  // public getEngineStack accessor and synthesise a frame.
+  // Drive the public synthetic-frame path, then repurpose the envelope for
+  // the specific request kind under test.
   const engineStack = session.getEngineStack()
-  // Hack: we rely on internal createFlowEngine being exposed through some
-  // path. Instead, drive a real engine via injectInteraction on a fresh one.
-  // The simplest in-test approach is to call startDevFenceSelect (which
-  // pushes a fence-select frame) then mutate the InteractionNode in place.
   session.startDevFenceSelect(0)
   const frame = engineStack.current()
   expect(frame).toBeDefined()
   if (!frame) return
-  // S4c PR4: peekInteraction is private on Engine; cast for package-internal test access.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const interactionNode = (frame.engine as any).peekInteraction()
-  expect(interactionNode).toBeDefined()
-  if (!interactionNode) return
-  // Repurpose the existing InteractionNode: rewrite its request + promptKey
-  // so the cursor round-trip captures the new kind.
-  interactionNode.request = request
-  interactionNode.setChoice(promptKey as never, node.choices)
-  void flow
+  const host = frame.engine.peekPendingHost()
+  expect(host).toBeDefined()
+  if (!host) return
+  host.setPending({
+    hostNodeId: host.id,
+    request,
+    choices,
+    promptKey: promptKey as never,
+    pendingActionId: INTERACTION_ONLY_ACTION_ID,
+    ownerNodeId: null,
+    contextSnapshot: {
+      params: undefined,
+      costs: undefined,
+      sourceCard: undefined,
+      actionContext: undefined,
+    },
+    syntheticKind: 'interaction-only',
+  })
 }
 
 describe('serialization cursor — new InteractionRequest kinds', () => {
@@ -109,7 +97,6 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
 
     const before = session.getState()
     const stack = session.getEngineStack()
-    expect(stack.peekInteraction()?.request?.kind).toBe('farm-select')
     const envelope = stack.peekPendingEnvelope()
     expect(envelope?.request.kind).toBe('farm-select')
     expect(envelope?.hostNodeId).toBeTruthy()
@@ -118,11 +105,9 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     const wireSafe = JSON.parse(JSON.stringify(serialized))
     const rehydrated = rehydrateState(wireSafe)
     const restored = new GameSession(rehydrated)
-    const restoredNode = restored.getEngineStack().peekInteraction()
-    expect(restoredNode?.request?.kind).toBe('farm-select')
-    expect(restoredNode?.request).toEqual(request)
     const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
     expect(restoredEnvelope?.request.kind).toBe('farm-select')
+    expect(restoredEnvelope?.request).toEqual(request)
     expect(restoredEnvelope?.hostNodeId).toBeTruthy()
   })
 
@@ -152,11 +137,9 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     const wireSafe = JSON.parse(JSON.stringify(serialized))
     const rehydrated = rehydrateState(wireSafe)
     const restored = new GameSession(rehydrated)
-    const restoredNode = restored.getEngineStack().peekInteraction()
-    expect(restoredNode?.request?.kind).toBe('selection')
-    expect(restoredNode?.request).toEqual(request)
     const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
     expect(restoredEnvelope?.request.kind).toBe('selection')
+    expect(restoredEnvelope?.request).toEqual(request)
     expect(restoredEnvelope?.hostNodeId).toBeTruthy()
   })
 
@@ -186,11 +169,9 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     const wireSafe = JSON.parse(JSON.stringify(serialized))
     const rehydrated = rehydrateState(wireSafe)
     const restored = new GameSession(rehydrated)
-    const restoredNode = restored.getEngineStack().peekInteraction()
-    expect(restoredNode?.request?.kind).toBe('selection')
-    expect(restoredNode?.request).toEqual(request)
     const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
     expect(restoredEnvelope?.request.kind).toBe('selection')
+    expect(restoredEnvelope?.request).toEqual(request)
     expect(restoredEnvelope?.hostNodeId).toBeTruthy()
   })
 
@@ -228,11 +209,9 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     const wireSafe = JSON.parse(JSON.stringify(serialized))
     const rehydrated = rehydrateState(wireSafe)
     const restored = new GameSession(rehydrated)
-    const restoredNode = restored.getEngineStack().peekInteraction()
-    expect(restoredNode?.request?.kind).toBe('card-draft')
-    expect(restoredNode?.request).toEqual(request)
     const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
     expect(restoredEnvelope?.request.kind).toBe('card-draft')
+    expect(restoredEnvelope?.request).toEqual(request)
     expect(restoredEnvelope?.hostNodeId).toBeTruthy()
     const restoredInteraction = restored.getState().interaction
     expect(restoredInteraction.stateId).toBe('wait')
