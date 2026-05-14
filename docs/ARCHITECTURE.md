@@ -286,7 +286,7 @@ type ActionChoiceOption = {
 
 ```
 shared/engine/
-├── engine.ts              Engine 类（~430 行）
+├── engine.ts              Engine 类
 ├── engine-stack.ts        EngineStack：子流程帧栈
 ├── engine-resolve.ts      resolveChoice 路径
 ├── engine-proceed.ts      step / 推进路径
@@ -296,43 +296,47 @@ shared/engine/
 ├── log-store.ts           日志缓冲
 ├── types.ts               EngineContext / EngineFrame / EngineStackCursor
 └── nodes/                 节点类型实现
-    ├── abstract-node.ts   AbstractNode 基类
-    ├── leaf-node.ts       原子动作叶子
-    ├── interaction-node.ts 单一"等输入"叶子
-    ├── seq-node.ts、parallel-node.ts、xor-node.ts、or-node.ts、optional-node.ts
-    ├── player-switch-node.ts、activate-card-node.ts、parallel-trigger-node.ts
-    └── ...
+    ├── base.ts            BaseNode 基类 + 共享 metadata/pending
+    ├── action-node.ts     原子 action leaf
+    ├── sequence-node.ts
+    ├── parallel-node.ts
+    ├── xor-node.ts
+    └── or-node.ts
 ```
 
 ### 5.2 节点类型
 
 **架构决策（2026-05-13）：领域层 `ActionFlow` 对齐 BGA node algebra，只保留 `leaf / seq / parallel / xor / or`。** `optional`、`promptKey`、`sourceCard`、`choiceLabel*`、`targetPlayerId` 是节点 metadata，不是新的领域节点类型。卡牌和 listener 只能构造这个小集合；新规则不应向 `ActionFlow` 暴露 runtime-only node。
 
-`targetPlayerId` 表示"这个普通 flow node 在另一个玩家视角下执行"。编译到 runtime engine 时，它会被降级为内部 `PlayerSwitchNode` wrapper；card-facing flow 不再写 `{ type: 'playerSwitch' }`。Session 顶层 flow builder 和动态插入路径（hook / listener / action `result.flow` / resolveChoice follow-up）都必须带上当前 owner id，让 wrapper 成对生成 switch-to / flow / switch-back。cursor restore 使用 frame 的 `ownerPlayerIndex` rebuild flow engine，避免反序列化后把 switch-back 指向当前全局玩家。
+**架构决策（2026-05-14）：runtime engine tree 也收敛到五种具体 node：`ActionNode / SequenceNode / ParallelNode / XorNode / OrNode`。** 跨玩家 owner、optional、trigger selection、listener activation、pending 都不再由额外 wrapper node 表达，而是由 node metadata、internal action leaf、pending envelope 和 frame state 表达。
 
-当前 engine 仍有若干过渡期 runtime node，用来承接 WS pending、跨玩家确认、listener 激活和序列化恢复。它们是实现细节，不是卡牌 DSL：
+`targetPlayerId` 表示"这个普通 flow node 在另一个玩家视角下执行"。编译到 runtime engine 时，它会转成目标 subtree 的 `ownerPlayerId` metadata；child 如果显式带自己的 owner，则保留 child owner。Session 顶层 flow builder 和动态插入路径（hook / listener / action `result.flow` / resolveChoice follow-up）都必须带上当前 effective owner，让后续 sibling 能回到 frame/ancestor owner。cursor restore 持久化 node owner metadata，不依赖全局 `currentPlayerIndex` 重新推断 owner。
+
+当前 runtime node 类型：
 
 - `ActionNode`：BGA `LeafNode(action)` 等价物；以 `actionId` + `params` 调 `ActionDefinition.execute`。
-- `SequenceNode` / `ParallelNode` / `OrNode` / `XorNode`：组合节点，对应 BGA `SEQ` / `PARALLEL` / `OR` / `XOR`。
-- `OptionalNode`：过渡 wrapper；目标语义是任意 node 的 `optional` metadata，后续不在其上增加新行为。
-- `InteractionNode`：leaf action 执行后产生的 pending/protocol state；带 `request: InteractionRequest`、`promptKey`、`promptParams`、`sourceCard`。新等待形态 = 加 `InteractionRequest` 新 kind，不加卡牌可见节点类型。
-- `ActivateCardNode`：listener 激活的过渡 wrapper；目标是普通 leaf action（如 `activate-card`）+ `{ listenerId, cardId, event }` params。
-- `PlayerSwitchNode`：runtime-only 跨玩家确认 / owner 切换 wrapper；由 `targetPlayerId` metadata 编译产生，不作为领域 flow primitive。
-- `ParallelTriggerNode`：多 listener 选择顺序的过渡 specialization；目标是把 select/pass/mandatory/independent 语义并入 generic `ParallelNode`，与 BGA `ParallelNode::getChoices()` 模型一致。
+- `SequenceNode` / `ParallelNode` / `OrNode` / `XorNode`：组合节点，对应 BGA `SEQ` / `PARALLEL` / `OR` / `XOR`。`ParallelNode(mode='trigger-select')` 承接多 listener select/pass/mandatory 语义。
 
-`AbstractNode` 提供：`isDoable / isAutomatic / resolve / parent / children / push / replace / isResolved / getNextUnresolved / toCursor / fromCursor`。
+共享 runtime metadata：
+
+- `ownerPlayerId`：跨玩家执行 owner；继承自 ancestor/frame，child explicit owner 优先。
+- `optional` / `optionalActive` / `optionalPromptKey`：optional accept/skip 状态；`xor` / `or` 保留直接 `__skip__` 选项。
+- `pending: PendingEnvelope | null`：等待输入的数据 envelope。`InteractionRequest` 是 WS/session protocol，不是 tree node。leaf request、`xor` / `or`、optional、trigger-select parallel 和 synthetic confirm/feed/farm-select 都通过 pending envelope 暂停并 cursor-restore。
+
+listener activation 是 internal action leaf：`ActionNode(actionId='activate-card')`，params 携 `{ listenerId, cardId, phase, actionId, event, ownerPlayerId, triggerPlayerId }`。它 bypass 普通 public action pipeline，只执行 listener body 并把返回 flow / follow-up actions 插入 engine。
+
+`BaseNode` 提供共享 metadata / pending / cursor round-trip；具体 traversal 由 `EngineTree` 和五种 node 实现。
 
 ### 5.3 Engine 公共 API
 
 `Engine` class 暴露给 `SessionCore` 的接口（小集合）：
 
-- `step(ctx)` —— 推进到下一个 unresolved 节点；遇到 `InteractionNode` 暂停，返回 envelope。
+- `step(ctx)` —— 推进到下一个 unresolved 节点；遇到 node pending 暂停，返回 envelope。
 - `resolveChoice(value, ctx, payload?)` —— 提供玩家选择，继续推进。
-- `peekInteraction()` —— 返回当前等待的 `InteractionNode`（或 null）。
-- `peekInteractionHost()` —— 返回托管该 interaction 的最近 host 节点（用于 sourceCard / actionContext 反查）。
-- `peekPendingChoiceFromComposite()` —— 从 OrNode/XorNode/OptionalNode 派生待选项。
-- `injectInteraction(node)` / `injectBeforeFlows(flows, ctx?)` —— hook 与 anytime 注入子流程。
-- `snapshot()` / `restore(snapshot)` —— 序列化与重建节点树（含 `nodeStates`、`choiceData`、`pendingActionId`）。
+- `peekPendingEnvelope()` —— 返回当前等待的 `PendingEnvelope`（或 null）。
+- `peekPendingHost()` —— 返回托管该 pending envelope 的 node（用于 sourceCard / actionContext / owner 反查）。
+- `injectBeforeFlows(flows, ctx?)` —— hook 注入子流程。
+- `snapshot()` / `restore(snapshot)` —— 序列化与重建节点树（含 `nodeStates`、pending envelope、owner/optional/trigger metadata）。
 - `hasPendingChoiceCompositeAncestor()` —— 用于 anytime 判断是否处在分支祖先内。
 
 ### 5.4 EngineStack（子流程栈）
@@ -350,9 +354,9 @@ type EngineFrame = {
 }
 ```
 
-API：`push / pop / current / depth / peekInteraction / toCursor`。
+API：`push / pop / current / depth / peekPendingEnvelope / peekPendingHost / toCursor`。
 
-`EngineStackCursor` 序列化成 `SerializedGameState.engineStack`，恢复路径：`engine.snapshot()` → `AbstractNode.fromCursor()` 重建节点树并定位光标。
+`EngineStackCursor` 序列化成 `SerializedGameState.engineStack`，恢复路径：`engine.snapshot()` → 各 concrete node cursor restore 重建节点树并定位 pending host / traversal state。
 
 `SubFlowKind` ∈ { `choice` / `animal-reorg` / `confirm-next-player` / `confirm-player-switch` / `feed` / `farm-select` / `selection` / `card-draft` }。
 
@@ -503,7 +507,7 @@ anytime                  额外注册的 anytime 行动
 
 `ActionHookResult { doable?, actionId?, extraOptions?, followUpActions?, flow?, costs?, sourceCard?, logKey?, logParams? }`。
 
-`sourceCard` 兜底：`ActionHookResult.flow` 顶层 `sourceCard` 递归补到缺失 child leaf；组合 pending / `InteractionNode` 写入 `pendingChoiceContext.sourceCard`，`authoritative-session.ts` 透传到 `interaction`。
+`sourceCard` 兜底：`ActionHookResult.flow` 顶层 `sourceCard` 递归补到缺失 child leaf；组合 pending / leaf request 写入 `PendingEnvelope.sourceCard`，`SessionCore` 透传到 `interaction`。
 
 作用域 scope：`player` / `opponent` / `any`。同 phase 内按 `order` → `id` 排序，同步、确定性。
 
@@ -545,7 +549,7 @@ OA 对齐规则：
 - 如果缺通用 mutation leaf，新增可复用 internal action；不要在单卡 handler 内直接 mutate，也不要在核心路径加单卡分支。
 - `effect.onBuy` 等非-listener 执行路径可保留现状；但一旦被 listener / preview / doable 复用，也必须遵守 state-pure flow builder 语义。
 - dispatch 阶段不得通过执行 handler 来制造一次性 `preComputedResult` 语义；可以收集 registration metadata、构造 activation leaf、或做纯 `isDoable` / preview 查询。
-- listener activation 的目标形态是普通 `leaf actionId='activate-card'`，params 携 `{ listenerId, cardId, event }`。当前 `ActivateCardNode` 只是过渡实现。
+- listener activation 是普通 internal leaf：`leaf actionId='activate-card'`，params 携 `{ listenerId, cardId, event, ownerPlayerId, triggerPlayerId }`。它 bypass public action pipeline，不跑普通 action hooks / cost / generic log；listener 返回的 `flow` / `followUpActions` 仍回到 engine 统一执行。
 - owner 与 trigger player 必须显式进入 event / params。opponent scope 触发时，activation 以 owner 为执行玩家；跨玩家 UI 确认和 undo boundary 由 runtime 处理，目标上不暴露为卡牌 flow primitive。
 
 **2026-05-13 Wave 1 落地规则：listener handler 不再承担"先改状态再返回 flow"的桥接职责。** 对于本轮已迁移的 B48 / E103 / C148 / A144 / D82 / D27，handler 只读取当前状态并返回可重放 flow 或纯查询结果：
@@ -555,7 +559,7 @@ OA 对齐规则：
 - optional accept/decline 语义必须由 flow 表达。典型例子：D27 Retraining 先执行 `set-flag false`，再把 `swap-improvement-with-board` 放入 optional child；decline 只清 flag，不预留 / 回滚公共 major 池。
 - 只影响可达性或费用的 listener 应返回纯 `doable` / `costs` / `bonuses`。典型例子：D82 Hunting Trophy 通过 `space.id` scoped `isDoable` + `computeCosts` 建模 farm/house redevelopment，不再用 before/after flag 或 `activeModifiers` 临时桥。
 
-**2026-05-13 Wave2a 合成 dispatch 边界：`trade-applied` / `reap` 这类没有完整 engine 的 listener dispatch，只通过 immediate-special-effect helper 执行确定性的状态同步叶子。** 该 helper 只遍历非 optional 的 `special-effect` leaf，以及确定性的 `seq` / `parallel` flow；刻意跳过 `gain`、`pay`、interactive、optional、`or` / `xor`、`playerSwitch`。需要更丰富合成 listener 效果时，必须接入真实 engine flow 路径，而不是扩展这个 helper；这样 Wave2a 的 cardState-only 合成 listener 能保持 pure handler，同时不重新引入 dispatch-time handler mutation。
+**2026-05-13 Wave2a 合成 dispatch 边界：`trade-applied` / `reap` 这类没有完整 engine 的 listener dispatch，只通过 immediate-special-effect helper 执行确定性的状态同步叶子。** 该 helper 只遍历非 optional 的 `special-effect` leaf，以及确定性的 `seq` / `parallel` flow；刻意跳过 `gain`、`pay`、interactive、optional、`or` / `xor`、跨 owner targeted flow。需要更丰富合成 listener 效果时，必须接入真实 engine flow 路径，而不是扩展这个 helper；这样 Wave2a 的 cardState-only 合成 listener 能保持 pure handler，同时不重新引入 dispatch-time handler mutation。
 
 **2026-05-13 Wave2b/c 落地规则：listener 内的 cardState / structural mutation 也必须通过 action leaf 执行。** 本轮把 A68 / A73 / A92 / B18 / B34 / B76 / C48 / C53 / C88 / C93 / C130 / C150 / D36 / D56 / D74 / D158 / E53 / E74 / E85 / E148 的剩余 handler mutation 迁出：
 
@@ -568,9 +572,9 @@ OA 对齐规则：
 **多 listener 同 phase 触发**采用 BGA-style PARALLEL trigger selection：
 
 - Phase 1 过渡期：handler 尚未全 pure，dispatch 不执行 handler 来判断 interactivity；使用显式静态 `dispatchMode: 'select'` 标出需要玩家选择触发顺序的 listener，其余保持 serial。
-- 不在 Phase 1 翻转 `mandatory` 默认值；`mandatory: true` 仍只影响 `ParallelTriggerNode`：任一未 resolved child mandatory 时隐藏 `__pass__`，避免 guaranteed effect 被静默跳过。
+- 不翻转 `mandatory` 默认值；`mandatory: true` 只影响 `ParallelNode(mode='trigger-select')`：任一未 resolved child mandatory 时隐藏 `__pass__`，避免 guaranteed effect 被静默跳过。
 - 目标形态：同 owner、同 phase 下，mandatory 或纯自动 trigger 可按确定性顺序自动结算；多个 optional / interactive trigger 同时可用时，必须显式给卡主玩家选择触发顺序，并允许 pass 跳过剩余 optional trigger。
-- 长期目标是 generic `ParallelNode` 负责 select/pass/mandatory/independent 语义；当前 `ParallelTriggerNode` 可作为迁移期承载，但不再扩展其领域语义。
+- generic `ParallelNode` 负责 select/pass/mandatory/independent 语义；不再引入 listener-trigger 专用 runtime node。
 - 不为 `CardListenerRegistration` 引入 / 复活 `order` 排序字段；默认执行顺序来自 `playOrderIndex`（occupation < minor < improvement，数组 index）。需要玩家选择时用 parallel trigger selection 显式化。
 
 ### 7.8 farm-type 提交
@@ -605,7 +609,7 @@ Three consumers share this snapshot:
 2. `buildInteraction()` — derives `'takeAnytimeAction'` inclusion in `allowedCommands` strictly from `allowed && entries.length > 0`, keeping the UI and server views synchronised.
 3. `phases/round.ts::takeAnytimeAction()` — server-entry enforcement before any anytime injection. Additional guards (gameOver, draft phase, active-owner mismatch) sit at the function entry; the policy itself only sees pending-shape inputs.
 
-Nested anytime flows are injected ahead of the current pending tree. When an interactive nested flow resolves, the engine re-encounters the parent `InteractionNode` and rewrites `pendingNodeIdRef` before returning `choice`, so `buildInteraction()` surfaces the parent pending again instead of going idle.
+Nested anytime flows are injected ahead of the current pending tree. Parent pending state remains on its original pending host as a `PendingEnvelope`; when the nested flow resolves, `EngineStack` resumes the parent frame and `buildInteraction()` surfaces the parent envelope again instead of going idle.
 
 OA-vs-BGA design notes:
 
@@ -889,7 +893,7 @@ pnpm run build              # tsc + vite build
 3. **双 client bundle**：`client-app` 不引 `shared/{engine,session,actions,cards,custom-code,draft}`；`client/sandbox` 全开。
 4. **WS 主链路**：`/ws` 收 `ClientCommand`，发 `StateUpdateEnvelope`；HTTP 仅调试。
 5. **InteractionState 是前端唯一真相**：`stateId ∈ {idle, wait, gameover}`；`wait` 下用 `request.kind` 分流。
-6. **节点树是唯一状态机**：`PendingAction` union 已消除；"等什么"由 `engine.peekInteraction()` 派生。
+6. **节点树是唯一状态机**：`PendingAction` union 已消除；"等什么"由 `engine.peekPendingEnvelope()` / pending host 派生。
 7. **EngineStack.push / pop**：hook / anytime / 嵌套子流程唯一注入路径，不直接改 `pending`。
 8. **卡牌就地闭环**：`shared/cards/{Deck}/{Card}.ts` 内部完成；不改 `pay.ts` / `improvement.ts` / `game-session.ts` 等核心文件。新增 Hook 点必须同时补测试和文档。
 9. **cardStates 局部状态**：持续计数 / 标记写 `player.cardStates[cardId]`；后续选择走显式 `pending` / continuation。
