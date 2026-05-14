@@ -23,6 +23,7 @@ import { EngineTree } from './tree'
 import { LogStore } from './log-store'
 import type { EngineInternals } from './engine-internals'
 import {
+  buildOwnedFlowNode,
   buildFlowNode,
   effectiveOwnerPlayerId,
   pendingEnvelopeFromHostNode,
@@ -551,7 +552,9 @@ export class Engine {
     const envelope = this.peekPendingEnvelope()
     const insertionTargetId = envelope?.ownerNodeId ?? this._pendingNodeIdRef.value
     if (!insertionTargetId) return
-    const flowNode = buildFlowNode(this._internals(), flow, ownerPlayerId)
+    const flowNode = ownerPlayerId
+      ? buildOwnedFlowNode(this._internals(), flow, ownerPlayerId)
+      : buildFlowNode(this._internals(), flow)
     this.tree.insertAfter(insertionTargetId, [flowNode])
   }
 }
