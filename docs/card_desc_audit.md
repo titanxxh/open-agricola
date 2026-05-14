@@ -11,22 +11,23 @@
 ## 1. 当前对齐状态（截至 2026-05-14）
 
 ### 1.1 总览
-- BGA 卡数 888 / OA 卡数 888（含 33 张 BGA banned，OA 不实施过滤）
-- `docs/operations/bga-metadata-diff-report.md` 机械化 metadata 报告：⚠ 0 / ❌ 4 / 🔍 33 banned
-- BGA 实现而 OA 完全缺：3 张（详见 §3.1）
+- BGA canonical 卡数 888 / OA canonical TS bucket 888（含 33 张 BGA banned，OA 不实施过滤）
+- OA physical card files 是 889 display / 889 impl；多出来的 1 张是 `C71_SlurrySpreader` legacy wrong-name duplicate，已登记到 `card_progress.md` §2.3
+- `docs/operations/bga-metadata-diff-report.md` 机械化 metadata 报告（2026-05-14 重跑，BGA `f6647b9f`）：⚠ 0 / ❌ 4 / 🔍 single-sided 0 / 🔍 33 banned
+- BGA active implemented 而 OA 完全缺：0 张（详见 §3.1）
 
 ### 1.2 Verdict 分布（按 `card_progress.md` §1 / §2）
 
 | 维度 | 数量 | 出处 | 处理 |
 |---|---|---|---|
 | ✅ 完全对齐 | 587+（旧审计已确认 587；后续修复持续迁入，未重跑全量行为审计） | — | — |
-| 🟡 简化实现（owner-accepted） | 130 | §2.2 / §2.5 simplifications | 按需排期 |
-| ⚠ 行为偏差 | 0（当前已确认待修队列为空） | §2.3 | 新发现必须逐卡登记 |
+| 🟡 简化实现（历史候选） | 历史 130 候选；当前单独 🟡 队列为 0，15 张 Sprint 7c keep + 3 张 source-documented simplification 迁入 §2.5 | §2.2 / §2.5 simplifications | 不再按 130 作为当前 backlog |
+| ⚠ 行为/注册偏差 | 11（2026-05-14 全量重审新增） | §2.3 | 已逐卡登记；修复前补对应 session/unit 测试 |
 | ❌ 数值/元数据 | 4（schema 上抬） | §2.4 + metadata diff | BGA `isBuyable()` 方法等效行为，OA 把守卫上抬到 `prerequisite` schema 字段 + handler，**UI 清晰度故意保留** |
-| 🔀 刻意偏离 BGA | 32 | §2.5 | owner 签字 |
+| 🔀 刻意偏离 BGA | 不再使用历史 `31` 聚合数 | §2.5 | 以 §2.5 主表、keep simplification 表、banned 表逐项为准 |
 | 🔍 BGA banned but OA active | 33 | §2.5.1 | OA 决议不实施 banned 过滤 |
-| ⏳ 待实现 | 1（D159 Reed Seller） | §2.6 | 等"可阻止行动 + 拍卖式选择"基建 |
-| 🔍 待 owner 确认 | 14 | §2.7 | BGA 自身有歧义或需 game-design 判断 |
+| ⏳ 待实现 / 待评估 | 0（D159 是 BGA `implemented=false` data-only，不算 BGA 对齐 gap） | §2.6 | 如要超越 BGA 实现 D159，单独立项 |
+| 🔍 待 owner 确认 | 0（旧 14 已收口 / 重分类） | §2.7 | 当前没有可执行 owner 决策队列 |
 
 ### 1.3 BGA 实现但 OA 完全缺（真 missing — 0 张 active；1 张 BGA legacy 不需要补）
 
@@ -48,9 +49,9 @@
   - **A113 HeresyTeacher** — BGA 自身 `implemented=false`，OA 2026-04-18 借 Field.stacks 多堆模型抢先实现
   - **C54 MarketStall** — BGA legacy 名，OA 用 C54_MarketBooth canonical
   - **D11 LawnFertilzer**（typo） — BGA legacy `implemented=false`，OA 用正确拼写 `D11_LawnFertilizer`
-  - **D75 WoodField** / **E80 RockGarden** — 真 missing，见 §1.3
+  - **D75 WoodField** / **E80 RockGarden** — 当时真 missing，2026-05-13 已完整实现并从 missing 表移除
   - **E132 Shearer** — BGA legacy，OA 用 E132_VeggieLover canonical
-- **接班**：2026-04-28 起，desc 对齐通过 `scripts/audit-card-architecture.ts` 的 S11 信号持续监控（当前 0 diff / 0 missing 除上述 3 张）
+- **接班**：历史 S11 脚本已删除；当前以 `scripts/audit-bga-metadata-diff.ts` 的 single-sided 报告 + 定向源码复核接班（2026-05-14：BGA-only 0 / TS-only 0）
 
 ### 2.2 2026-04-28~29 — 全量行为对齐审计（两阶段，881 张）
 
@@ -105,13 +106,25 @@
 
 D75 WoodField / E80 RockGarden 已 2026-05-13 完整实现（multi-slot sowable field）。E132_Shearer 是 BGA `implemented=false` legacy 名，OA 用 E132_VeggieLover canonical 已对齐，不需要补。
 
-### 3.2 ⚠ 行为偏差（当前已确认 0 张）
+2026-05-14 机械重跑确认：BGA-only 0、TS-only 0。D159 Reed Seller 在 BGA 源码中显式 `$this->implemented = false`，OA 也仅保留 data-only card definition；这不是"BGA 有实现但 OA 缺实现"。
 
-详见 `card_progress.md` §2.3 当前队列表。旧 `41 张` 数字是 stale aggregate：Sprint 7a 已收口 Sprint 7 audit 的 P0/P1 主体，Sprint 7d 修 A10 / C51 / C125 / D21 / B104，Sprint 7e 修 prereq 双模 38 张并确认 5 张 BGA 也 label-only，2026-05-14 `178b2146` 又补了 B104 forced reorg 后 harvest breed resume。当前没有已确认且未修的行为偏差卡；新发现需逐卡列出原始描述、当前问题、BGA 差距与证据。
+### 3.2 ⚠ 行为/注册偏差（当前 11 张）
+
+详见 `card_progress.md` §2.3 当前队列表。旧 `41 张` 数字是 stale aggregate：Sprint 7a 已收口 Sprint 7 audit 的 P0/P1 主体，Sprint 7d 修 A10 / C51 / C125 / D21 / B104，Sprint 7e 修 prereq 双模 38 张并确认 5 张 BGA 也 label-only，2026-05-14 `178b2146` 又补了 B104 forced reorg 后 harvest breed resume。但本轮重新按最新代码/BGA 源码并行审计后，发现当前仍有 11 张未修行为/注册 gap：
 
 | 卡牌 | 原始描述 | 当前问题 | BGA 差距 | 处理 / 证据 |
 |---|---|---|---|---|
-| _无_ | — | 当前 `main` 没有已确认且未修的行为偏差卡。 | — | 新发现必须先补本表与 `card_progress.md` §2.3，不能只写 aggregate 数字。 |
+| A148 Woolgrower | 容纳羊，容量等于 completed feeding phases | 用本卡 counter，只从打出后开始计数 | BGA 用全局 completed feeding phases，晚打也应有容量 | `card_progress.md` §2.3 |
+| B86 TruffleSearcher | 容纳野猪，容量等于 completed feeding phases | 同 A148 | BGA 同样用全局 completed feeding phases | `card_progress.md` §2.3 |
+| B157 Salter | 腌制动物换未来食物 | 只允许一次三选一且每次 1 只动物 | BGA 一次可选多种/多只动物并按类型排未来食物 | `card_progress.md` §2.3 |
+| C8 PlantFertilizer | 给“恰好 1 作物”的逻辑田补作物 | 只支持 grain/vegetable 物理 field | BGA groupFields 且支持 WOOD/STONE；D75/E80 已上线 | `card_progress.md` §2.3 |
+| C57 Crudite | 丢田里蔬菜换 4 food | harvest phase 强制移除第一个符合条件蔬菜 | BGA optional 且多田可选 source | `card_progress.md` §2.3 |
+| C71 Slurry / SlurrySpreader | breeding 后可 Sow | OA 注册两张同号同效果 C71 | BGA `SlurrySpreader` 是 `implemented=false` wrong-name legacy | `card_progress.md` §2.3 |
+| C140 PackagingArtist | Minor Improvement action 可改 Bake Bread | 未把 Major Improvement action 加入可替换 action pool | BGA `onPlayerComputeArgsPlaceFarmer` 加 visible Major Improvement action | `card_progress.md` §2.3 |
+| D13 Trowel | 任意时机翻修到 stone | 木屋仍走 wood->clay | BGA `toStone=true` 支持 wood->stone | `card_progress.md` §2.3 |
+| D15 ClaySupports | clay room 可用替代费用 | 强制替代费用，不能选择原 base cost | BGA 追加 alternative trade，保留 base cost | `card_progress.md` §2.3 |
+| D66 PotterCeramics | bake 前 clay->grain | 换粮后仍可 skip bake | BGA 使用换粮后强制 bake | `card_progress.md` §2.3 |
+| E5 NightLoot | 从累积格拿不同 building resources | 每种资源自动取第一个匹配 space | BGA 玩家选择具体 space/resource | `card_progress.md` §2.3 |
 
 ### 3.3 4 张 ❌ schema 上抬（A3 / B154 / B74 / B56）
 
@@ -124,15 +137,27 @@ BGA 这 4 张用 `isBuyable()` 方法实现等效硬检查（PHP 源里 `$this->
 - BGA 1732 unique `clienttranslate` 仍有 1477 gap（非阻塞，UI 设计架构非 1:1）
 - 详见 `docs/i18n-bga-coverage-report.md`
 
-### 3.5 130 张 🟡 简化（owner-accepted）
+### 3.5 🟡 简化候选（历史 130；当前单独队列 0）
 
-不是 bug，是签字过的简化。详见 `card_progress.md` §2.2 / §2.5。
+`130 张` 是 2026-04-28/29 行为审计产出的历史候选总数，不是当前仍然存在的 130 张 owner-accepted backlog。2026-05-02 Sprint 7 复核后，候选被拆分为：29 张已对齐、27 张进入 §2.5 进一步分类、61 张真偏差进入后续修复、14 张名单 typo / ID collision 清理。Sprint 7c 又把 27 张 source-verified 为 6 张 aligned、16 张 keep、5 张 promote-to-fix。2026-05-14 重审后 C8 因 D75/E80 已上线迁回 §2.3；当前仍明确保留的 simplification 见 `card_progress.md` §2.5 的 keep 表和 source-documented simplification 表。
 
-### 3.6 未审范围
+### 3.6 Owner-confirm 队列（当前 0 张）
+
+旧 `14 张待 owner 确认` 是 2026-04-28/29 人工审计的聚合数字，不是当前可执行卡牌清单；原 sub-agent 逐卡输出在 gitignored `output/tmp/` 下，已不能作为当前权威来源。按最新代码与文档复核后，当前没有"先决策、不能直接开发"的 owner-confirm 队列。
+
+| 历史来源 | 最新处理 |
+|---|---|
+| A14/A33/A100 等 BGA banned / draft-policy 分歧 | 归入 §2.5.1：OA 明确不实施 banned 过滤，33 张统一登记 |
+| A22 Telegram extraPlacement 时序差异 | 已归入 §2.5 deliberate divergence |
+| E58/E139/E153/E155/C62 等 stub / missing 批次 | Sprint 6a/6c/6d/6e 已实现，stub 队列归零 |
+| A135/C136 sharedScoring 机制 | Sprint 4 PR-4A 已收口 |
+| Sprint 7 stale-list / ID-collision 类条目 | Sprint 7a/7d/7e 与 2026-05-14 follow-up 已重分类或清理；新发现必须逐卡重审后登记 |
+
+### 3.7 未审范围
 
 - **Major Improvements**（10 张）— Sprint 1+ 已主路径覆盖
 - **Community / Workshop 卡** — 自定义卡池，无 BGA 对应
-- **BGA 远端 ahead commits** — 历史快照冻结到 `3082e4d3`；下次 audit 可跟最新 BGA
+- **历史行为审计快照** — 2026-04-28 人工行为审计冻结在 OA `2b5ddee6` / BGA `3082e4d3`；2026-05-14 metadata 机械审计已跟当前 BGA `f6647b9f` 重跑
 - **i18n 翻译质量** — 仅"齐不齐"裁定，不评判翻译信达雅
 
 ---
@@ -152,19 +177,14 @@ pnpm tsx scripts/audit-bga-metadata-diff.ts
 
 ### 4.2 架构合规扫描
 
+历史审计使用过的 `scripts/audit-card-architecture.ts` 已不在当前代码库；不要再按旧命令复现。当前可复现的机械入口是 metadata diff，架构/行为复核改用定向 `rg` 信号 + 源码对照：
+
 ```bash
-pnpm tsx scripts/audit-card-architecture.ts > output/tmp/audit-summary.json
+pnpm exec tsx scripts/audit-bga-metadata-diff.ts
+rg -n "TODO|stub|implemented=false|isImplemented=false|owner 确认|待 owner|待实现|待评估" shared/cards shared/cards-display docs -g '!docs/superpowers/**'
 ```
 
-机械信号：
-- **S1** 主路径 cardId 命中（pay.ts / improvement.ts / game-core.ts）
-- **S4** 跨层 import（cards 文件 import server/* 或 client/*）— 当前 0
-- **S5** 聚合字段直接 mutation — 当前 0
-- **S6** 行数比 OA/BGA 异常
-- **S7** 卡牌外 cardId 引用
-- **S10** 高度疑似空壳（无 listener / effect / onBuy）
-- **S11** desc 对齐（归一化后字面比对）
-- **S12** i18n key 缺失
+人工复核仍按旧 S 信号的意图执行：主路径 cardId 命中、跨层 import、聚合字段 mutation、OA/BGA 行数异常、卡牌外 cardId 引用、空壳卡、desc 对齐和 i18n 缺口。
 
 ### 4.3 下一次全量行为审计（按 2026-04-28 两阶段方法）
 
@@ -201,6 +221,7 @@ BGA 在同 deck 同 number 留多个 PHP 文件（旧印本与新印本/重命�
 | Deck/Number | Canonical（OA 用） | Legacy（BGA 保留） |
 |---|---|---|
 | C54 | MarketBooth | MarketStall |
+| C71 | Slurry | SlurrySpreader（BGA `implemented=false` wrong-name；OA 当前误注册为第二张实现，见 `card_progress.md` §2.3） |
 | D11 | LawnFertilizer | LawnFertilzer（typo） |
 | E132 | VeggieLover | Shearer |
 

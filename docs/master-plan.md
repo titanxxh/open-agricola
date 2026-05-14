@@ -1,22 +1,22 @@
 # BGA 对齐 Master Plan
 
-> **本文件的角色**：基于 `docs/card_desc_audit.md` §8 修复优先级表产出的跨 sprint 主计划。
-> 仅本文件是"对齐 BGA"工作的总入口，每个 sprint 自己单独走 brainstorming → spec → plan → 实施。
+> **本文件的角色**：历史 BGA 对齐 sprint 主计划 + 当前 follow-up 入口。
+> 历史 sprint 本体保留用于解释修复顺序；当前状态以 `docs/card_progress.md` §1/§2 和 `docs/card_desc_audit.md` §1/§3 为准。
 >
 > 关联文档：
 >
-> - 审查报告：`docs/card_desc_audit.md`（含每张卡 verdict + §8 P0–P3 清单）
+> - 审查报告：`docs/card_desc_audit.md`（当前 audit dashboard + 历史审计方法）
 > - 进度权威源：`docs/card_progress.md`（每 sprint 收口必须回流）
 > - 架构约束：`docs/ARCHITECTURE.md`、根目录 `CLAUDE.md`「卡牌实现规范」
 
 ## 0. 概览
 
 - **审计原始范围**：审查发现 ⚠ 行为偏差 44 张 + ❌ 数值/元数据 83 张 + 16 张 stub + i18n / category / sharedScoring 系统性问题 + 5 张 P0 玩法完全错。（注：原 audit 报的"getExchangeResources 系统性简化"已 PR-4C 推翻——`player.resources.{animal}` 在我方已聚合 board+supply，等价 BGA `$player->getExchangeResources()`，不是 gap，见 §8 row 4。）
-- **当前待修队列**：已确认未修的行为偏差为 0 张；当前逐卡表见 `docs/card_progress.md` §2.3。
-- **非范围**：130 张 P3 简化实现（默认不做，本计划留口子）。
+- **当前待修队列**：已确认未修的行为/注册偏差为 11 张；当前逐卡表见 `docs/card_progress.md` §2.3。
+- **非范围**：历史 130 张 P3 简化候选已经 Sprint 7 复核，不再作为当前 backlog；当前非 bug 队列以 `docs/card_progress.md` §2.5 的 deliberate divergence / keep simplification 为准。
 - **总工作量估算**：P0+P1+P2 合计 30 person-day（不含 P3）。
 - **单 owner 推荐排期**：5 周完成 P0+P1+P2。
-- **冻结基线**：`docs/card_desc_audit.md` §2.4 输入快照（我方 SHA `2b5ddee651...`，BGA SHA `3082e4d358...`）。如基线漂移过大需重启审查。
+- **历史行为审计冻结基线**：`docs/card_desc_audit.md` §2.4 输入快照（我方 SHA `2b5ddee651...`，BGA SHA `3082e4d358...`）。2026-05-14 metadata 机械审计已跟当前 BGA `f6647b9f` 重跑。
 
 ### Master Plan 收口状态（2026-05-14）
 
@@ -28,8 +28,8 @@ Sprint 2   done             7 张 P0 玩法完全错 + 2 个机制扩展（onBef
 Sprint 2.5 skipped           4 张 BeforeEndOfGame interactive — deliberate divergence (auto-max ≡ player optimum; E132 canonical 已对齐)
 Sprint 3   done             1 张 P0 E149 MidnightFencer — deliberate divergence (+K raw VP per owedFence)
 Sprint 4   done           178 张 category + 2 张 sharedScoring + PR-4C skipped (audit premise wrong)
-Sprint 5   partially done   27/28 张 P1 行为修复（PR-5 7 张 + mech-A 4 张 + mech-D B27 Toolbox + mech-B D117 WoodExpert + mech-E 6 张 + 5b 5 张 + 5c 2 张 A165/B155；同期落地 breed unified effect / Trade.sideEffect.drainSpace / harvest leaf flow / onAfterRoundEnd hook adoption；~1 张 deferred）
-Sprint 6   partially done   21 张 extraVp + E30 + D12/D148（i18n 71+437 / 14 张 stub / 双轨重构 deferred）
+Sprint 5   done             原 P1 行为修复批次已收口；历史 27/28 口径不再代表当前队列
+Sprint 6   done             21 张 extraVp + E30 + D12/D148 + 14 张 stub 后续 6a-6e 全部收口
 Sprint 6a  done             6 张 cookery/family/future-meeple stub（C109/C105/D62/D108/D157/E139）+ D92 重写 + 4 通用机制
 Sprint 6b  done             effects/ 反模式清理（dead code + 7 helper 迁出 + 4 张 mutation 卡 + 51 caller 迁移）
 Sprint 6c  done             D94 HenpeckedHusband + E155 Visionary 两张 stub 卡补实现
@@ -47,12 +47,12 @@ Sprint 7e  done             38 prereq dual-mode fixes + 5 BGA-label-only confirm
 
 **§0 "对齐 BGA 完成"严格判定（当前已知 P0/P1/P2 bug 队列）**：
 
-- ⚠ 行为偏差待修：**0 张已确认**。旧 50/11 Sprint 7 audit 队列已由 Sprint 7a 收口；旧 41 张 aggregate 又被 Sprint 7d/7e 与 2026-05-14 B104 follow-up 清掉。当前如再发现行为偏差，必须逐卡登记到 `docs/card_progress.md` §2.3 表（原始描述 / 当前问题 / BGA 差距 / 证据）。
+- ⚠ 行为/注册偏差待修：**11 张已确认**（A148 / B86 / B157 / C8 / C57 / C71 / C140 / D13 / D15 / D66 / E5）。旧 50/11 Sprint 7 audit 队列已由 Sprint 7a 收口；旧 41 张 aggregate 又被 Sprint 7d/7e 与 2026-05-14 B104 follow-up 清掉。本轮 11 张来自最新代码/BGA 源码重审，必须按 `docs/card_progress.md` §2.3 逐卡修复和补测。
 - ❌ 数值/元数据待修：**4 张 schema 上抬**（A3 / B154 / B74 / B56），行为等效，不作为 bug 修；见 `docs/card_desc_audit.md` §3.3 与 `docs/card_progress.md` §2.4。
 - ~~i18n 缺口 437 BGA `clienttranslate` 未补~~ — ✅ 2026-05-03 i18n sprint：玩家可见真 bug（85 张 zh/en 缺 value）已补完 + `pnpm run lint:i18n` CI 守门避免回潮。BGA `clienttranslate` 集合差作为可观测报告留在 `docs/i18n-bga-coverage-report.md`（gap 1477 / 1732 total），不补全部（架构非 1:1，多数为我方未引用过的状态机文案）。详见 `docs/card_progress.md` §2.0 + spec/plan。
 - ~~Sprint 7 P3 130 张简化未启动~~ — ✅ Sprint 7 audit done 2026-05-02：29 →§2.0 / 27 →§2.5 / 61 P0/P1 → Sprint 7a / 14 名单 typo 清理
 
-**Follow-up 路线**：本 master plan 主体 P0+P1（核心机制 + 关键 bug）已闭环。剩余不是 §2.3 行为 bug：130 张 owner-accepted 简化、32 张 deliberate divergence、33 张 BGA banned 但 OA active 决议、14 张 owner 确认、1 张 D159 待实现 / 待评估。是否继续收敛按 `docs/card_progress.md` §2.2 / §2.5 / §2.6 / §2.7 单独立项。
+**Follow-up 路线**：本 master plan 主体历史 P0+P1 已闭环，但最新重审重新打开 11 张具体 behavior/registration gap。剩余非 bug 队列包括 §2.5 deliberate/source-documented simplifications、33 张 BGA banned 但 OA active 决议。历史 130 张 P3 简化候选已在 Sprint 7 拆分收口，不再作为当前 backlog；owner-confirm 队列为 0，D159 是 BGA `implemented=false` data-only，不算 BGA 对齐待实现。
 
 详见 `docs/card_progress.md` §2.3 / §2.4 各"deferred to follow-up"小节。
 
@@ -113,7 +113,7 @@ P2/P3 ────────────────────────�
             ├─ i18n 缺口（71 + 437 项）
             └─ 16 张 stub（A135 / A165 已含 P0；剩 14 张）
 
-  Sprint 7  P3 简化 130 张              (默认不做, 视情况)
+  Sprint 7  历史 P3 简化候选 130 张     (已复核，不再作为当前 backlog)
             按需启动；启动时单独 brainstorming
 ```
 
@@ -290,7 +290,7 @@ P1 单卡偏差         ┃ helper 的卡测调用 helper（不重复 mock）   
 Sprint 6            ┃ extraVp / banned / E30 / D12↔D148：      ┃ 长尾，按需
 P2 长尾             ┃ session 测；i18n 用现有翻译完整性 lint    ┃
 ─────────────────────────────────────────────────────────────────────────
-Sprint 7            ┃ P3 简化 130 张 — 视情况；这一 sprint     ┃ 默认不加测
+Sprint 7            ┃ 历史 P3 简化候选 130 张 — 已复核          ┃ 默认不加测
                     ┃ 不属于硬性范围                            ┃
 ```
 
@@ -338,7 +338,7 @@ Sprint 3   E149 MidnightFencer            3 day    （≈3 person-day）
 Sprint 4   3 个 helper                    5 day    （≈5 person-day）
 Sprint 5   28 张单卡偏差                  9 day    （≈9 person-day）
 Sprint 6   P2 长尾                        7 day    （≈7 person-day）
-Sprint 7   P3 130 张                      视情况   （15-20 person-day, 默认不做）
+Sprint 7   历史 P3 130 候选               已复核   （实际走 audit/reclassification）
 ─────────────────────────────────────────────
 P0 总     Sprint 1+2+3                   9 day
 P0+P1     Sprint 1-5                    23 day
@@ -387,8 +387,8 @@ R1  Sprint 4 helper 设计可能改变 sharedScoring 通用模式
 R2  Sprint 5 跨 sprint 撞 helper 接口
     → 缓解：Sprint 4 helper 接口 freeze 之后才能开 Sprint 5 brainstorming
 
-R3  Sprint 7 P3 130 张简化是否做
-    → 默认不做；本 master plan 留出口子，未来按需启动
+R3  Sprint 7 历史 P3 130 张简化候选是否做
+    → 已通过 Sprint 7 audit/reclassification 收口；未来只按 §2.5 具体条目单独启动
 
 R4  并行路径 B 的 PR 撞工
     → Sprint 1 改卡定义字段、Sprint 4 改 helper 文件，互不干扰，可放心并行
@@ -441,9 +441,9 @@ docs/master-plan.md         本 master plan
 
 ```
 docs/card_desc_audit.md §1 总览数字降到：
-  ⚠ 行为偏差 0 张
-  ❌ 数值/元数据 0 张
-  + Sprint 7 决策已落（修 / 不修 / 部分修）
+  ⚠ 行为/注册偏差 0 张
+  ❌ 数值/元数据只剩已登记的 schema-up deliberate entries，或降到 0
+  + §2.5 deliberate / source-documented simplification 均已有 owner 决策
 
 满足 → docs/card_progress.md §2.0 加 milestone 行
      "YYYY-MM-DD BGA alignment complete (P0+P1+P2)"
