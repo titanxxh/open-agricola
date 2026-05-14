@@ -38,7 +38,7 @@ export type CardListenerRegistration = {
    *
    * Default `serial` listeners are activated in play order without probing the
    * handler. `select` listeners for the same owner/phase/action are wrapped in
-   * a ParallelTriggerNode when two or more match.
+   * a trigger-select ParallelNode when two or more match.
    */
   dispatchMode?: CardListenerDispatchMode
   handler: (context: CardListenerContext) => ActionHookResult | void

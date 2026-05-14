@@ -1,6 +1,5 @@
 import type { EngineNode } from './types'
 import { OrNode, ParallelNode, SequenceNode, XorNode } from './nodes'
-import { ParallelTriggerNode } from './nodes/parallel-trigger-node'
 import { isActivateCardActionNode } from './activation-action'
 
 const isCompositeNode = (node: EngineNode) =>
@@ -18,6 +17,9 @@ const hasStartedDescendant = (node: EngineNode): boolean => {
   return node.getState() === 'resolved'
 }
 
+const isTriggerSelectParallel = (node: EngineNode): node is ParallelNode =>
+  node instanceof ParallelNode && node.mode === 'trigger-select'
+
 export class EngineTree {
   public root: EngineNode
 
@@ -28,13 +30,6 @@ export class EngineTree {
   findNodeById(id: string) {
     const visit = (node: EngineNode): EngineNode | null => {
       if (node.id === id) return node
-      if (node instanceof ParallelTriggerNode) {
-        for (const child of node.children) {
-          const found = visit(child)
-          if (found) return found
-        }
-        return null
-      }
       if (isCompositeNode(node)) {
         const composite = node as SequenceNode | ParallelNode | OrNode | XorNode
         for (const child of composite.children) {
@@ -56,10 +51,6 @@ export class EngineTree {
     const nodes: EngineNode[] = []
     const visit = (node: EngineNode) => {
       nodes.push(node)
-      if (node instanceof ParallelTriggerNode) {
-        node.children.forEach((child) => visit(child))
-        return
-      }
       if (isCompositeNode(node)) {
         const composite = node as SequenceNode | ParallelNode | OrNode | XorNode
         composite.children.forEach((child) => visit(child))
@@ -78,12 +69,12 @@ export class EngineTree {
     const found = this.findNodeWithParent(nodeId, this.root)
     if (!found) return false
     const { parent, index } = found
+    if (isTriggerSelectParallel(parent)) {
+      return this.insertBefore(parent.id, nodes)
+    }
     if (parent instanceof SequenceNode || parent instanceof ParallelNode) {
       parent.children.splice(index, 0, ...nodes)
       return true
-    }
-    if (parent instanceof ParallelTriggerNode) {
-      return this.insertBefore(parent.id, nodes)
     }
     const replacement = new SequenceNode(`pre-${nodeId}`, [...nodes, found.node])
     if (parent instanceof OrNode || parent instanceof XorNode) {
@@ -106,13 +97,6 @@ export class EngineTree {
       parent.children.splice(index + 1, 0, ...nodes)
       return true
     }
-    if (parent instanceof ParallelTriggerNode) {
-      // Insert flow follow-ups INSIDE the ParallelTriggerNode right after the
-      // activated listener leaf. nextUnresolved walks selectedChild + its
-      // follow-ups before returning to PARALLEL for the next card prompt.
-      parent.children.splice(index + 1, 0, ...nodes)
-      return true
-    }
     const replacement = new SequenceNode(`chain-${node.id}`, [node, ...nodes])
     if (parent instanceof OrNode || parent instanceof XorNode) {
       parent.children[index] = replacement
@@ -125,17 +109,6 @@ export class EngineTree {
     targetId: string,
     node: EngineNode,
   ): { node: EngineNode; parent: EngineNode; index: number } | null {
-    if (node instanceof ParallelTriggerNode) {
-      for (let index = 0; index < node.children.length; index += 1) {
-        const child = node.children[index]
-        if (child.id === targetId) {
-          return { node: child, parent: node, index }
-        }
-        const found = this.findNodeWithParent(targetId, child)
-        if (found) return found
-      }
-      return null
-    }
     if (isCompositeNode(node)) {
       const composite = node as SequenceNode | ParallelNode | OrNode | XorNode
       for (let index = 0; index < composite.children.length; index += 1) {
@@ -161,7 +134,7 @@ export class EngineTree {
       if (node.optional === true && node.optionalActive === false) {
         return node.getState() === 'resolved' ? null : node
       }
-      if (node instanceof ParallelTriggerNode) {
+      if (isTriggerSelectParallel(node)) {
         if (node.getState() === 'resolved') return null
         if (node.selectedChildId) {
           const idx = node.children.findIndex((c) => c.id === node.selectedChildId)

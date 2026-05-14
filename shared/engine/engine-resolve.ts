@@ -11,9 +11,9 @@ import type {
 import {
   InteractionNode,
   OrNode,
+  ParallelNode,
   XorNode,
 } from './nodes'
-import { ParallelTriggerNode } from './nodes/parallel-trigger-node'
 import { buildReplaceChoiceFlow } from './nodes/interaction-helpers'
 import type { EngineInternals } from './engine-internals'
 import {
@@ -129,7 +129,7 @@ export function engineResolveChoice(
       }
       return { type: 'ok' }
     }
-    if (node instanceof ParallelTriggerNode) {
+    if (node instanceof ParallelNode && node.mode === 'trigger-select') {
       // Validate against currently-offered options (e.g. PASS only appears
       // when every unresolved trigger is mandatory: false). Rejecting an
       // unlisted choice keeps mandatory triggers un-skippable.
@@ -138,7 +138,10 @@ export function engineResolveChoice(
         return { type: 'fail', logKey: 'log.buildRoomFail' }
       }
       if (choice === '__pass__') {
-        node.passAll()
+        if (!node.passAll()) {
+          int.pendingNodeIdRef.value = null
+          return { type: 'fail', logKey: 'log.buildRoomFail' }
+        }
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
