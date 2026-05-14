@@ -126,6 +126,22 @@ export function stampOwner(node: EngineNode, ownerPlayerId: string): EngineNode 
   return node
 }
 
+function unanimousActionOwner(node: EngineNode): string | undefined {
+  const owners = new Set<string>()
+  let sawUnownedAction = false
+  const visit = (entry: EngineNode) => {
+    if (entry instanceof ActionNode) {
+      if (entry.ownerPlayerId) owners.add(entry.ownerPlayerId)
+      else sawUnownedAction = true
+      return
+    }
+    for (const child of getNodeChildren(entry)) visit(child)
+  }
+  visit(node)
+  if (sawUnownedAction || owners.size !== 1) return undefined
+  return [...owners][0]
+}
+
 export function markOptional<T extends EngineNode>(
   node: T,
   promptKey?: PromptKey,
@@ -133,6 +149,7 @@ export function markOptional<T extends EngineNode>(
   node.optional = true
   node.optionalActive = false
   if (promptKey !== undefined) node.optionalPromptKey = promptKey
+  node.ownerPlayerId ??= unanimousActionOwner(node)
   return node
 }
 
