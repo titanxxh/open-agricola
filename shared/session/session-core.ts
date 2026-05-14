@@ -1316,7 +1316,7 @@ export class GameCore {
       }
     }
 
-    const playerIndex = frame.ownerPlayerIndex
+    const playerIndex = this.effectiveOwnerIndexForFrame(frame, envelope.hostNodeId, envelope)
     const spaceId = frame.spaceId
     const promptKey = envelope.promptKey
     const promptParams = envelope.promptParams
@@ -3218,7 +3218,10 @@ export class GameCore {
     const envelope = this.engineStack.peekPendingEnvelope()
     const frame = this.engineStack.current()
     const isPlainChoice = envelope?.request.kind === 'choice'
-    if (!isPlainChoice || frame?.ownerPlayerIndex !== playerIndex) {
+    const pendingPlayerIndex = frame && envelope
+      ? this.effectiveOwnerIndexForFrame(frame, envelope.hostNodeId, envelope)
+      : -1
+    if (!isPlainChoice || pendingPlayerIndex !== playerIndex) {
       return this.respond(false, 'no pending selection choice for this player')
     }
     const player = this.state.players[playerIndex]
