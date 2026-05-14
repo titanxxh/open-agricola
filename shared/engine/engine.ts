@@ -488,6 +488,7 @@ export class Engine {
       // to persist it so cursor round-trip / undo restoreHistory can rebuild
       // the pending-choice host on rehydrate.
       compositeEmit: snapshotCompositeEmit(this._internals()),
+      beforePhaseFlowNodeIds: [...this.beforePhaseFlowNodeIds],
     }
   }
 
@@ -541,7 +542,9 @@ export class Engine {
       options: ActionChoiceOption[]
       request?: InteractionRequest
     } | null
+    beforePhaseFlowNodeIds?: string[]
   }) {
+    this.beforePhaseFlowNodeIds = new Set(snapshot.beforePhaseFlowNodeIds ?? [])
     // Synthetic interaction-only frames (pushed by GameCore.startConfirm*/
     // startFeedSubFlow) have a single InteractionNode at root. The cursor
     // serializes them with `pendingActionId === '__interaction_only__'`
