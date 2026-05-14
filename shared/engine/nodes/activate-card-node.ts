@@ -29,7 +29,7 @@ export class ActivateCardNode extends BaseNode {
    * S4b Task 17 / PR5 sub-commit 4 — ActivateCardNode signals
    * `'activateListener'` (with its `nodeId`) so the engine main loop can
    * dispatch `executeCardListener`, follow-up flow insertion and
-   * player-switch wrapping without an `instanceof ActivateCardNode` test.
+   * effective-owner metadata handling without an `instanceof ActivateCardNode` test.
    * Once resolved → `'done'`. Side-effect implementation stays in the
    * engine (executeCardListener, tree.insertAfter, log emission).
    */
