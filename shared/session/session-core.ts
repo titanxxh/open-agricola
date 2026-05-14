@@ -2344,12 +2344,17 @@ export class GameCore {
         // frame on the stack and push a reorganize sub-flow frame.
         // Task 2: read the request discriminator through PendingEnvelope.
         // The engine owns the pending envelope regardless of host node type.
-        const hostRequestKind = this.engineStack.peekPendingEnvelope()?.request.kind ?? null
+        const pendingEnvelope = this.engineStack.peekPendingEnvelope()
+        const hostRequestKind = pendingEnvelope?.request.kind ?? null
         const isReorgSubFlow =
           frame.source.kind === 'flow'
           && (frame.source.flow as { actionId?: string }).actionId === 'reorganize'
         if (hostRequestKind === 'animal-reorg' && !isReorgSubFlow) {
-          const pIdx = frame.ownerPlayerIndex
+          const pIdx = this.effectiveOwnerIndexForFrame(
+            frame,
+            pendingEnvelope?.hostNodeId,
+            pendingEnvelope,
+          )
           this.startReorganizeSubFlow(pIdx, 'anytime')
           return
         }
@@ -2377,7 +2382,6 @@ export class GameCore {
           return
         }
         const pendingHost = this.engineStack.peekPendingHost()
-        const pendingEnvelope = this.engineStack.peekPendingEnvelope()
         const pendingActionId = pendingEnvelope?.pendingActionId
         const pendingActionCanResolve = pendingActionId
           ? this.registry.get(pendingActionId)?.resolveChoice !== undefined
@@ -2418,7 +2422,7 @@ export class GameCore {
               return
             }
             if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
-              const pIdx = frame.ownerPlayerIndex
+              const pIdx = effectivePlayerIndex
               // Match legacy behaviour: this is a fall-through reorganize
               // detour from auto-resolved choice — the parent frame is
               // discarded (no resume) before the sub-flow starts.
@@ -2466,7 +2470,7 @@ export class GameCore {
       // post-mutate state.
 
       if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
-        const pIdx = frame.ownerPlayerIndex
+        const pIdx = effectivePlayerIndex
         // Parent frame stays on the stack; reorganize sub-flow is pushed on
         // top. When it completes, resumeStageFlow's onReorganizeComplete
         // branch detects the parent frame and calls runEngineSteps again.
