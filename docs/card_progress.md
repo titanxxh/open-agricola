@@ -20,7 +20,7 @@
 | E | 169 | 163 | 0 | 0 | 0 |
 | **总计** | **892** | **836** | **5** | **0** | **0** |
 
-**截至 2026-05-13：836/892 = 93.7%。**（2026-05-13 新增 2 张：D75 WoodField / E80 RockGarden，从 Sprint 7d `implemented:false` stub 升级为完整 multi-slot sowable-field 实现。）（Sprint 7a 是 Sprint 7 audit P0/P1 follow-up 的修复 sprint，不是新实现，修 ~50 ⚠/❌ 卡 → ✅/§2.5；详见 §2.0 / §8。Sprint 6e 新增 1 张：C62 CookeryExtension。Sprint 6d 新增 3 张：D131 / E58 / E153。Sprint 6c 新增 2 张：D94 / E155。Sprint 6a 新增 6 张：C109 / C105 / D62 / D108 / D157 / E139。）
+**截至 2026-05-14：836/892 = 93.7%。**（2026-05-13 新增 2 张：D75 WoodField / E80 RockGarden，从 Sprint 7d `implemented:false` stub 升级为完整 multi-slot sowable-field 实现。）（Sprint 7a 是 Sprint 7 audit P0/P1 follow-up 的修复 sprint，不是新实现，修 ~50 ⚠/❌ 卡 → ✅/§2.5；详见 §2.0 / §8。Sprint 6e 新增 1 张：C62 CookeryExtension。Sprint 6d 新增 3 张：D131 / E58 / E153。Sprint 6c 新增 2 张：D94 / E155。Sprint 6a 新增 6 张：C109 / C105 / D62 / D108 / D157 / E139。）
 
 > Major Improvements (10 张) 单独实现，不计入上表，全部已落地。
 > 5+ 人卡（169-180 号段，~48 张）BGA 自身 `isImplemented=false`，不计入 BGA 总数。
@@ -35,10 +35,10 @@
 
 | 状态 | 数量 | 含义 | 处理方式 |
 |---|---|---|---|
-| ✅ 完全对齐 | 587 张（含深度池 64 + wide-scan 475 + 数据 only 48） | 行为 + 元数据均与 BGA 一致 | 不用动 |
+| ✅ 完全对齐 | 587+ 张（旧审计已确认 587；后续修复持续迁入，未重跑全量行为审计） | 行为 + 元数据均与 BGA 一致 | 不用动 |
 | 🟡 简化实现（§2.2） | 130 张（2026-04-28 深度 40 + 2026-04-29 wide 90） | 主路径工作，分支未做；缺啥基础设施有写 | 已知简化，按需排期 |
-| ⚠ 行为偏差待修（§2.3） | 41 张（36 + Sprint 7c re-audit 5 张 promote: A10 / B104 / C51 / C125 / D21） | 行为与 BGA 偏差，是 bug | 排期修 |
-| ❌ 数值/元数据待修（§2.4） | 55 张（原 83；Sprint 1 PR-1A 修 10 张 players + Sprint 1 PR-1B 修 16 张 cost/vp + Sprint 2 PR-2A 修 1 张 D60 reserved.clay + 2026-04-30 A14 banned 迁入 §2.5——含 ~50 张 category 字段批量不齐 + 0 张 players 字段错残留） | cost / prereq / vp / players / category 与 BGA 不同 | 排期修 |
+| ⚠ 行为偏差待修（§2.3） | 0 张（已确认待修队列为空；旧 41 张口径已由 Sprint 7a/7d/7e + 2026-05-14 B104 resume 修复收口） | 行为与 BGA 偏差，是 bug | 有新发现时必须逐卡登记到 §2.3 表 |
+| ❌ 数值/元数据待修（§2.4） | 4 张（A3 / B154 / B74 / B56 schema 上抬；行为等效） | BGA `isBuyable()` 方法等效行为被 OA 上抬到 schema/UI | 不当作 bug 修；保留登记 |
 | 🔀 刻意偏离 BGA（§2.5） | 14 张主表 + Sprint 7c re-audit keep 16 张 simplifications + Sprint 7a-c1c16 2 项 = 32 张（2026-04-28 复核 4 张 + Sprint 2.5 登记 5 张 BeforeEndOfGame interactive + Sprint 3 E149 + 2026-04-30 A14 banned + Sprint 5b A22 extraPlacement + Sprint 7a-c1c16 C1 min:n / noWoodPalisades 2 项 + Sprint 7c 16 张 keep） | owner 签字过的设计差异 | **不要当 bug 修**，先开 issue |
 | ⏳ 待实现 / 待评估（§2.6） | 1 张（深度池 D159；E149 已 Sprint 3 实现并迁入 §2.5；wide-scan 新发现 ~15 张 stub/TODO，详见 §2.7 + audit 报告 §3.5）| 未实现或需核心扩展 | 见 §2.6 优先级 |
 | 🔍 待 owner 确认（§2.7 新增）| 14 张（深度池 1 + wide-scan 13） | BGA 自身有歧义、或需 game-design 知识判断 | 见 §2.7 |
@@ -47,7 +47,10 @@
 
 > 任何卡牌相关 commit 必须在这里加一行（见 §6 文档维护规则）。
 
-- **2026-05-13** — **D75 Wood Field + E80 Rock Garden 完整实现**（Sprint 7d `implemented:false` stub → full multi-slot sowable-field）。架构变更：sow 主路径 generic 化——`CropStack.kind` 加 `'wood'`；`SowSelection.crop` / `InteractionRequest`/`InteractionFarmSelection.selectableFields.allowedCrops` / `ExtraSowableField.allowedCrops` 加 `'stone'` + 新 `groupKey?: string`；`SowValidationOptions` 新增 `normalFieldAllowedCrops` + `extraGroupKeys`；`validateSowSelection` 用 `usedGroups: Set` 按 logical group 计 `maxSelections`（BGA "considered 1 field"）；`buildSowFarmInteraction` 派生 `actionContext.cropType` 到 normal-allow-list（wood/stone → `[]`）+ 透出 `groupKey`；`sow.ts canBeExecutedByPlayer` 改用 `selectableFields.length > 0` —— **顺带修 D8 FernSeeds cropType actionContext 派生 latent bug**（之前 cropType 设了但 server 端不消费）；reap union 加 `'wood'`。D75：MAX_STACKS=2 / STACK_INITIAL=3（grain rhythm）/ groupKey=`'D75_WoodField'` / 保留 `cost: { food: 1 }` + `vp:1` + `prerequisite:'1 Occupation'` + `occupationPrerequisites: { min: 1 }`；E80：MAX_STACKS=3 / STACK_INITIAL=2（vege rhythm）/ groupKey=`'E80_RockGarden'` / 无 cost/vp/prereq。每张 9 unit + 3 session 测试；新增 `farmyard-sow.test` 6 例 + `farmyard-build-sow-interaction.test` 4 例 + `sow.test.ts` 3 例 doable / cropType 回归 + `useFarmSelection.sow.test` 3 例 group counting。client 端 `PendingSowCrop` + `ExtraSowTarget` 加 `'stone'` + `groupKey?: string`；`useFarmSelection.updateSowSelection` 按 candidate next-state effective-group 计数（不再 prev-tile-count）；`SowChoiceButtons` 加 stone 按钮；extra-sow-tray 同 sourceCard 多 entry 时 label 加 `(i/N)` 后缀；`PlayedCardStats` 加 `extraData.stacks: CropStack[]` 多 stack 渲染分支并顺手修 E68 latent（旧 cardCrop 类型断言只允许 `'grain'|'vegetable'`，E68 实际写 `'wood'`）。`docs/card_desc_audit.md` §1.3 / §3.1 D75 / E80 从真 missing 移除（剩 0 张 active；E132_Shearer 是 BGA legacy 不需要补）。BGA "considered 1 field" 但 `player.fields.length` 不算 isField 卡是 5+ 张卡的共同 latent gap，本 PR 不修。spec / plan：本地超能力文档，未提交。
+- **2026-05-13** — **D75 Wood Field + E80 Rock Garden 完整实现**（Sprint 7d `implemented:false` stub → full multi-slot sowable-field）。架构变更：sow 主路径 generic 化——`CropStack.kind` 加 `'wood'`；`SowSelection.crop` / `InteractionRequest`/`InteractionFarmSelection.selectableFields.allowedCrops` / `ExtraSowableField.allowedCrops` 加 `'stone'` + 新 `groupKey?: string`；`SowValidationOptions` 新增 `normalFieldAllowedCrops` + `extraGroupKeys`；`validateSowSelection` 用 `usedGroups: Set` 按 logical group 计 `maxSelections`（BGA "considered 1 field"）；`buildSowFarmInteraction` 派生 `actionContext.cropType` 到 normal-allow-list（wood/stone → `[]`）+ 透出 `groupKey`；`sow.ts canBeExecutedByPlayer` 改用 `selectableFields.length > 0` —— **顺带修 D8 FernSeeds cropType actionContext 派生 latent bug**（之前 cropType 设了但 server 端不消费）；reap union 加 `'wood'`。D75：MAX_STACKS=2 / STACK_INITIAL=3（grain rhythm）/ groupKey=`'D75_WoodField'` / 保留 `cost: { food: 1 }` + `vp:1` + `prerequisite:'1 Occupation'` + `occupationPrerequisites: { min: 1 }`；E80：MAX_STACKS=3 / STACK_INITIAL=2（vege rhythm）/ groupKey=`'E80_RockGarden'` / 无 cost/vp/prereq。每张 9 unit + 3 session 测试；新增 `farmyard-sow.test` 6 例 + `farmyard-build-sow-interaction.test` 4 例 + `sow.test.ts` 3 例 doable / cropType 回归 + `useFarmSelection.sow.test` 3 例 group counting。client 端 `PendingSowCrop` + `ExtraSowTarget` 加 `'stone'` + `groupKey?: string`；`useFarmSelection.updateSowSelection` 按 candidate next-state effective-group 计数（不再 prev-tile-count）；`SowChoiceButtons` 加 stone 按钮；extra-sow-tray 同 sourceCard 多 entry 时 label 加 `(i/N)` 后缀；`PlayedCardStats` 加 `extraData.stacks: CropStack[]` 多 stack 渲染分支并顺手修 E68 latent（旧 cardCrop 类型断言只允许 `'grain'|'vegetable'`，E68 实际写 `'wood'`）。`docs/card_desc_audit.md` §1.3 / §3.1 D75 / E80 从真 missing 移除（剩 0 张 active；E132_Shearer 是 BGA legacy 不需要补）。BGA "considered 1 field" 终局计分已在 2026-05-14 `isField` scoring follow-up 中收口。spec / plan：本地超能力文档，未提交。
+- **2026-05-14** — §2.3 / audit stale cleanup：复核最近提交后，旧 `41 张行为偏差` 口径已过时。Sprint 7a 已修 Sprint 7 audit P0/P1 主体；Sprint 7d 已修 A10 / C51 / C125 / D21 / B104；Sprint 7e 已修 prereq 双模 38 张并确认 5 张 BGA 也 label-only；2026-05-14 `178b2146` 进一步修 B104 forced reorg 后 harvest breed resume；`84e80185` 修 isField 卡终局计分按 BGA `countLogicalFields()` 计入。当前已确认行为偏差待修队列为 0；未来新发现必须逐卡填 §2.3 表（原始描述 / 当前问题 / BGA 差距 / 证据）。
+- **2026-05-14** — isField scoring latent gap 已关闭：`computeScores` 现在按 BGA `PlayerBoard::countLogicalFields()` 把每张 `isField: true` 已打出卡计为 +1 logical field（覆盖 D75 / E80 / E68 / B68 / C70 / E69 / E70 / E72 / B113 / B141 等）。D75/E80 2026-05-13 changelog 中的终局田数备注已过时。
+- **2026-05-14** — B104 SheepWalker last-harvest reorg resume follow-up：`animal-reorg` 从 harvest-breed action request 转成 reorg sub-flow 时先 acknowledge parent pending，再以 `trigger:'harvest-breed'` resume；forced reorg 后继续后续玩家 breed/reorg，不再中断 harvest。新增 `continues harvest breeding after a forced last-harvest reorg` session 回归。
 - **2026-05-14** — Engine Node Convergence（infra）：runtime tree 收敛到 `ActionNode / SequenceNode / ParallelNode / XorNode / OrNode` 五类 node；`PlayerSwitchNode` / `ActivateCardNode` / `OptionalNode` / `ParallelTriggerNode` / `InteractionNode` 的语义分别迁到 owner metadata、internal `activate-card` leaf、optional metadata、`ParallelNode(mode='trigger-select')` 和 `PendingEnvelope`。补 cross-player owner、listener activation、optional/trigger selection、synthetic pending restore、finite pending choice validation 回归；§1 实现数不变。
 - **2026-05-13** — Listener purity Wave2a：把 A17 / A130 / B21 / B124 / B132 / B137 / B55 / D156 / D157 / E27 / E51 / E91 的 cardState-only listener handler 迁到纯 flow builder；handler 不再直接写 cardStates / flag / infobox / counters，状态修改统一通过 special-effect leaf 执行；同时让 trade-applied / reap 合成 listener dispatch 执行确定性的 special-effect leaf。新增 listener-purity-wave2a 覆盖与 targeted session 回归。
 - **2026-05-13** — Listener purity Wave2b/c + ActionFlow 小代数：把 A68 / A73 / A92 / B18 / B34 / B76 / C48 / C53 / C88 / C93 / C130 / C150 / D36 / D56 / D74 / D158 / E53 / E74 / E85 / E148 的剩余 listener handler mutation 迁到 flow leaf；补 `special-effect` 的 `clear-pending-fence-bonus` / `remove-future-meeples` / `promote-first-newborn` / `add-resource-to-space` / `build-stable-on-first-empty-tile`；B18 future meeple、C93/C130 action-space resource、E148 owner-targeted stable 都通过 engine 执行。ActionFlow card-facing union 移除 `{type:'playerSwitch'}`，跨玩家 flow 改用 `targetPlayerId` metadata 编译到 runtime `PlayerSwitchNode`，并补动态 result.flow switch-back 与 cursor restore owner 回归。新增 listener-purity-wave2b-c、playerswitch-flow、engine-flow targeted 覆盖。§1 实现数不变。
@@ -384,9 +387,15 @@
 | ~~C150 ParrotBreeder~~ | ~~占位：付 1 谷 + 归还 1 谷，没有跟踪右邻~~ | 已实现（2026-04-24）——双 listener 跟踪右邻 place-farmer + `computeArgs:place-farmer` 注入 occupied-override option |
 | ~~D102 / E76~~ | ~~跳过 FarmHand 分支~~ | 已实现（2026-04-24）——`shared/cards/helpers/stable-removal.ts` 抽象"可归还 stable"层；消费者无感知 FarmHand 储存 |
 
-### 2.3 ⚠ 行为偏差待修（44 张：2026-04-28 深度 18 + 2026-04-29 wide-scan 26 + Sprint 7c re-audit 5 张 promote = 49 张）
+### 2.3 ⚠ 行为偏差待修（当前已确认 0 张）
 
-> 完整证据链见 `docs/card_desc_audit.md` §4.3 + `docs/card_desc_audit.md` §3 + `output/tmp/audit-agent-b{1..10}.md`。
+> **当前队列口径（2026-05-14）**：本节只放"确认是 bug、还没修、需要排期"的卡。旧的 44/49/41 张行为偏差数字来自 2026-04-28~05-02 审计与中间 sprint 状态，已被后续 Sprint 5/7a/7d/7e、D75/E80、B104 follow-up、isField scoring 修复收口或迁入 §2.5 deliberate divergence。下面的历史块仅作审计归档，不再代表当前待修队列。
+
+| 卡牌 | 原始描述 | 当前问题 | BGA 差距 | 处理 / 证据 |
+|---|---|---|---|---|
+| _无_ | — | 当前 `main` 没有已确认且未修的行为偏差卡。 | — | 新发现必须在本表逐卡登记，不能只写 aggregate 数字。 |
+
+> 历史证据链见 `docs/card_desc_audit.md` §4.3 + `docs/card_desc_audit.md` §3 + git history 中已删除的 `docs/sprint-7-audit-report.md` / `docs/sprint-5d-audit-report.md`。这些历史条目用于解释为何某些卡曾进入 §2.3；若条目后面已有 ✅ / demote / §2.5 标记，表示不再待修。
 
 > **2026-04-29 wide-scan 新增 26 张**（紧凑审查未做完整 5 维度对比，需抽样复核）：
 >
@@ -463,11 +472,11 @@ Sprint 5b/5c collectively closed 5 entries (C23/A1/A22/A38/E16). **Sprint 5d aud
 **Sprint 1 PR-1C 已修（prerequisite 注册系统性缺失，wide-scan P0 类 d）**：
 - **D7 Trident / D8 FernSeeds / D39 TruffleSlicer / D53 TeaHouse / D58 Gritter** — 五张卡 prerequisite 字符串已注册 handler，购买时按 BGA 条件强制校验；同时 `meetsTextPrerequisite` 增加 whole-string 自定义查找（D8 含 `" and "`）— ✅ Sprint 1 PR-1C on branch sprint-1-pr-1c
 
-**2026-05-02 Sprint 7d prereq 双模扫描（spec §2 顺手扫描）— 41 张候选 backlog（不在 7d scope 内 fix）**：
+**2026-05-02 Sprint 7d prereq 双模扫描（历史归档；Sprint 7e 已收口）**：
 
-我方 `prerequisite: '<string>'` label-only + 无对应 `registerPrerequisite` 注册 + `meetsCardPrerequisites` 的 generic patterns 不覆盖 + BGA 真有 `isBuyable` / `canBePlayed` 守卫 ⇒ silently 视为 prereq 满足，等价 D21 patten。
+我方 `prerequisite: '<string>'` label-only + 无对应 `registerPrerequisite` 注册 + `meetsCardPrerequisites` 的 generic patterns 不覆盖 + BGA 真有 `isBuyable` / `canBePlayed` 守卫 ⇒ silently 视为 prereq 满足，等价 D21 pattern。该 scan 后续由 Sprint 7e 集中处理：38 张补 handler / inline `prerequisiteCheck`，5 张确认 BGA 也 label-only 无需修；D1 几何与 B52 label 后续也已单独收口。
 
-下面是 7d 顺手 grep + BGA-spotcheck 出的待 register 候选（**NOT in 7d scope**，登记到 §2.3 backlog 等后续 sprint 处理）：
+下面是 7d 当时 grep + BGA-spotcheck 出的候选清单（历史，不再是 backlog）：
 
 A 牌组（13 张）: A13 RenovationCompany / A20 DoubleTurnPlow / A22 Telegram / A27 OvenSite / A30 BakingSheet / A33 BigCountry / A36 FacadesCarving / A3 PaperKnife / A40 PottersYard / A46 ClawKnife / A52 ThrowingAxe / A57 MilkingParlor / A68 AsparagusGift
 
@@ -481,9 +490,9 @@ E 牌组（10 张）: E1 PoleBarns / E21 SheepRug / E2 RenovationMaterials / E30
 
 **Label-only 但 BGA 也是 label-only**（不算 bug）: A44 PondHut / B49 Scales / D25 WitchesDanceFloor / D42 EducationBonus / E46 WaterlilyPond — BGA 没 `isBuyable` / `canBePlayed`，纯文案。
 
-**严重度评估**：所有 candidate 当前在 buyable 时**完全不验**，玩家可在条件不满足时打出。深度池方向（A33 BigCountry "All Farmyard Spaces Used" / E1 PoleBarns "15 Fences Built" / D47 Churchyard "10 Cards In Front of You"）影响最大；弱条件方向（A20 "Round 5 or Before" / B14 "Round 7 or Before" / B23 "Round 13 or Before" / B38 "Round 4 or Before"）受 maxRound 字段缺失影响（部分卡可能已用 maxRound——需逐张复核）。
+**历史严重度评估**：当时 candidate 在 buyable 时可能完全不验，玩家可在条件不满足时打出。该风险已由 Sprint 7e 的 prereq dual-mode registration / inline migration 处理；当前如再发现类似问题，应新增到本节顶部当前队列表。
 
-**实施建议**: ~1 day 工作量集中实施（每张卡 +1 行 registerPrerequisite + handler ~3-5 LOC + 单元测试 ~10 LOC）。已在系统中的 generic-pattern 解析器无须改动。
+**历史实施建议**: ~1 day 工作量集中实施（每张卡 +1 行 registerPrerequisite + handler ~3-5 LOC + 单元测试 ~10 LOC）。该建议已执行完成。
 
 > **历史记录**：D154 ChimneySweep（renovate -2 stone 在 wood→stone 直升时漏减、`players` 字段）已于 2026-04-19 修复，迁入 §2.1。C129 SecondSpouse 已于 2026-04-19 对齐 BGA（首置 farmer + ≤2 占用），迁入 §2.1。B143 ClayWarden 已于 2026-04-19 补 `hollow` 3 人版空间并确认 listener 已覆盖（见 §2.0）。
 
@@ -702,8 +711,8 @@ E 牌组（10 张）: E1 PoleBarns / E21 SheepRug / E2 RenovationMaterials / E30
 | `CardEffect.computeFenceDiscount` hook + `collectFenceDiscount(state, player, ctx)` | ✅ | `shared/cards/card-effects.ts`：围栏支付时调用，卡牌可按边数返回免费 segment 数；E16 BriarHedge 消费者 |
 | `PALISADE_NOT_ON_BORDER` 错误码 | ✅ | `server/fence-validation.ts`：palisade 模式下不允许选内部 edge，对齐 BGA B30 限制 |
 | **Field.stacks 多堆模型 + `shared/game/field.ts` helper**（2026-04-18） | ✅ | `Field.{crop, remaining}` → `Field.stacks: CropStack[]`（数组顺序 = 底→顶）。Helpers：`fieldIsEmpty` / `fieldTopStack` / `fieldBottomStack` / `fieldHasCrop` / `fieldTotalRemaining` / `fieldPopIfDepleted` / `fieldDecrementTop` / `fieldFindStackOfKind` / `countFieldsWithCrop` / `countEmptyFields`。**口径**：(a) 任一 stack 含作物即算该田含该作物（scoring / prereq 都走 `fieldHasCrop`——混合田同时算谷田+菜田）；(b) reap 只收顶堆，`remaining===0` 时 pop，下次收获暴露下一堆；(c) sow 仍要求空田（`fieldIsEmpty`）；(d) 单卡（当前仅 A113 Heresy Teacher）可 `unshift` 到底堆。`rehydrateState` 加 legacy `{crop, remaining}` → `stacks` 迁移。消费者：~22 张 field-相关卡 + sow/reap/scythe-harvest-field/swap-field-crop/plow/pay-grain-any/grain-thief-protect/scoring/prerequisites；前端 `FarmBoard` 按 stack 分段竖向渲染（底在下、顶在上）。 |
-| **`providesField` 标志 + `countFields` helper**（2026-04-17） | ✅ | D25：次要改良卡可标记 `providesField: true` 提供虚拟田；`countFields(player)` helper 聚合农民自有田地 + 卡牌虚拟田。虚拟田仅计入前置条件检查（如 `prerequisite: { fields: 2 }`），不计入终局田数计分（计分仅看 `player.fields.length`）。 |
-| **`isField` 标志 + `isFieldCard(id)` helper**（2026-05-02 Sprint 7d） | ✅ | Mirrors BGA `$this->field = true`：`CardDefinition.isField?: boolean` 标记卡牌本身是 field（含 sowable field cards 与 field-only occupations）。`shared/cards/catalog.ts` `isFieldCard(id)` 由 `getCardDefinition(id)?.isField === true` 实现。当前消费者：C80 RockyTerrain（`improvement-any` / `play-occupation` after listener gate "playing field cards counts as plowing"）。打标卡：B68 / B113 / B141 / C70 / D75 stub / E68 / E69 / E70 / E72 / E80 stub。 |
+| **`providesField` 标志 + `countFields` helper**（2026-04-17） | ✅ | D25：次要改良卡可标记 `providesField: true` 提供虚拟田；`countFields(player)` helper 聚合农民自有田地 + 卡牌虚拟田。虚拟田仅计入前置条件检查（如 `prerequisite: { fields: 2 }`），不作为终局田数计分卡；终局 logical field 计分由真实农田 + `isField` 卡负责。 |
+| **`isField` 标志 + `isFieldCard(id)` helper**（2026-05-02 Sprint 7d；2026-05-14 scoring follow-up） | ✅ | Mirrors BGA `$this->field = true`：`CardDefinition.isField?: boolean` 标记卡牌本身是 field（含 sowable field cards 与 field-only occupations）。`shared/cards/catalog.ts` `isFieldCard(id)` 由 `getCardDefinition(id)?.isField === true` 实现。当前消费者：C80 RockyTerrain（`improvement-any` / `play-occupation` after listener gate "playing field cards counts as plowing"）+ `computeScores` logical field count（按 BGA `PlayerBoard::countLogicalFields()`，每张已打出的 `isField` 卡 +1 field）。打标卡：B68 / B113 / B141 / C70 / D75 / E68 / E69 / E70 / E72 / E80。 |
 | **`providesOccupation` 标志 + `extraOccupationsFromCards` 字段 + `countOccupations` helper**（2026-04-17） | ✅ | D25：次要改良卡可标记 `providesOccupation: true` 提供虚拟职业；`PlayerState.extraOccupationsFromCards` 记录从卡牌获得的额外职业数（打出卡时累加）；`countOccupations(player)` helper 返回已放农民数 + 虚拟职业数的总和。前置条件（如 `prerequisite: { occupations: 2 }`）与终局计分（`E101 Blighter` 等）都走 helper 计数。 |
 | **`fireplaceIdentity` 标志 + `cardMatchesCostList` helper**（2026-04-17） | ✅ | D25：次要改良卡可标记 `fireplaceIdentity: true` 作为"可返还 Fireplace"代价；`cardMatchesCostList(card, costList)` helper 用于 `CookingHearth` / `A60_OrientalFireplace` 等卡检测代价卡是否匹配（支持 `subtype` / `id` / `providedFields` / `providedOccupations` / `fireplaceIdentity` 等多种匹配模式）。 |
 | **`mustBePlayedViaMinorAction` 标志**（2026-04-17） | ✅ | D25：次要改良卡可标记 `mustBePlayedViaMinorAction: true` 强制仅能通过"次要改良"行动打出；`playMinorImprovement` action 的 `isDoable` listener 检查此标志，防止其他路径打出。 |
@@ -933,8 +942,10 @@ per-action 簿记不重置：actionToken / actionStartPlayerSnapshot / `_activeA
 | Sprint 5e (Sprint 5d audit P1 follow-up — 4 ⚠ closed: B163 effect.onBuy / E161 computeChoiceCandidates / E91 trade-applied gate + dispatchTradeAppliedListener / E72 verified equivalent → §2.5 demote) | 05-02 | 0 | 834 | 93.5% |
 | Sprint 7 (§2.2 simplification audit, 131 cards re-validated; 29 → §2.0 / 27 → §2.5 / 50 ⚠ + 11 ❌ → Sprint 7a backlog / 14 名单 typo) | 05-02 | 0 | 834 | 93.5% |
 | Sprint 7a (§2.2 audit P0/P1 follow-up — 5 family batches + C1+C16 reclaimed + F11 3 cards + verify-only sweeps; ~50 ⚠/❌ → ✅/§2.5; 4 hooks/helpers: pairedSpaceIdFor / take-from-space leaf / onBeforePlayerTurn hook / getInvalidAnimals hook + remove-field-crop SE + place-farmer fromSupply pattern; PR #51 merged 6317cd89; E123 多选 + C148 reorg sync 推 7b; C6 / C146 仍 deferred 7b) | 05-02 | 0 | 834 | 93.5% |
-| Sprint 7d isField (CardDefinition.isField + isFieldCard helper; 8 implemented field cards flagged: B68/B113/B141/C70/E68/E69/E70/E72; D75 WoodField + E80 RockGarden registered as isField stubs with implemented:false — full sow/harvest deferred to 7e; C80 RockyTerrain promoted from §2.5 simplification to §2.0 by adding `improvement-any` + `play-occupation` after listeners gated on isFieldCard) | 05-02 | 0 | 834 | 93.5% |
-| Engine Node Convergence（runtime 五节点 + PendingEnvelope） | 05-14 | 0 | 834 | 93.5% |
+| Sprint 7d isField (CardDefinition.isField + isFieldCard helper; 8 implemented field cards flagged: B68/B113/B141/C70/E68/E69/E70/E72; C80 RockyTerrain promoted from §2.5 simplification to §2.0 by adding `improvement-any` + `play-occupation` after listeners gated on isFieldCard) | 05-02 | 0 | 834 | 93.5% |
+| D75 WoodField + E80 RockGarden full multi-slot sowable-field implementation（D75/E80 no longer stubs） | 05-13 | +2 | 836 | 93.7% |
+| isField scoring + B104 forced reorg resume follow-up（behavior backlog stale cleanup） | 05-14 | 0 | 836 | 93.7% |
+| Engine Node Convergence（runtime 五节点 + PendingEnvelope） | 05-14 | 0 | 836 | 93.7% |
 
 ### 2026-04-17 Wave 1-9 明细
 

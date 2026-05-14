@@ -11,13 +11,14 @@
 
 ## 0. 概览
 
-- **范围**：审查发现 ⚠ 行为偏差 44 张 + ❌ 数值/元数据 83 张 + 16 张 stub + i18n / category / sharedScoring 系统性问题 + 5 张 P0 玩法完全错。（注：原 audit 报的"getExchangeResources 系统性简化"已 PR-4C 推翻——`player.resources.{animal}` 在我方已聚合 board+supply，等价 BGA `$player->getExchangeResources()`，不是 gap，见 §8 row 4。）
+- **审计原始范围**：审查发现 ⚠ 行为偏差 44 张 + ❌ 数值/元数据 83 张 + 16 张 stub + i18n / category / sharedScoring 系统性问题 + 5 张 P0 玩法完全错。（注：原 audit 报的"getExchangeResources 系统性简化"已 PR-4C 推翻——`player.resources.{animal}` 在我方已聚合 board+supply，等价 BGA `$player->getExchangeResources()`，不是 gap，见 §8 row 4。）
+- **当前待修队列**：已确认未修的行为偏差为 0 张；当前逐卡表见 `docs/card_progress.md` §2.3。
 - **非范围**：130 张 P3 简化实现（默认不做，本计划留口子）。
 - **总工作量估算**：P0+P1+P2 合计 30 person-day（不含 P3）。
 - **单 owner 推荐排期**：5 周完成 P0+P1+P2。
 - **冻结基线**：`docs/card_desc_audit.md` §2.4 输入快照（我方 SHA `2b5ddee651...`，BGA SHA `3082e4d358...`）。如基线漂移过大需重启审查。
 
-### Master Plan 收口状态（2026-04-29）
+### Master Plan 收口状态（2026-05-14）
 
 7 个 sprint 全部走完一轮（详见 §8 Sprint 进度表）：
 
@@ -37,22 +38,27 @@ Sprint 6e  done             C62 CookeryExtension 补实现 + 2 处通用扩展�
 Sprint 5d  done             Sprint 5 deferred audit（42 cards re-validated; surfaced 4 P1 → Sprint 5e backlog）
 Sprint 5e  done             4 P1 follow-up（B163 / E161 / E91 fixed + E72 demoted to §2.5）
 Sprint 7   audit done       §2.2 simplification re-validation — 131 cards deep-audited; 29 → §2.0 / 27 → §2.5 / 50 ⚠ + 11 ❌ → Sprint 7a backlog / 14 stale-list
+Sprint 7a  done             Sprint 7 audit P0/P1 follow-up — ~50 cards across family batches + 4 hooks/helpers
+Sprint 7d  done             A10 / C51 / C125 / D21 / B104 promoted fixes + D100 cleanup
+Sprint 7e  done             38 prereq dual-mode fixes + 5 BGA-label-only confirmations
 ```
 
 **已修复**：~250 项次（含 Sprint 4 178 张 category 字段批量；不计 deferred）。
 
-**未达 §0 "对齐 BGA 完成"严格判定**（⚠=0 / ❌=0 + Sprint 7 决策已落）：
+**§0 "对齐 BGA 完成"严格判定（当前已知 P0/P1/P2 bug 队列）**：
 
-- ⚠ 残留：**50 张** P1 行为偏差（Sprint 5e 2026-05-02 关闭 5d backlog 4 张后短暂归零；Sprint 7 audit 2026-05-02 在 §2.2 130 张"simplification"中 deep-audit 暴露 50 张真 ⚠ → Sprint 7a backlog）。caveat：Phase 1 audit 未 check BGA `banned` 字段，spot-check 显示部分 ⚠/❌ 严重度高估（双方都 banned 的卡行为差不会触发）；Sprint 7a Phase 0 必须先 banned-filter，预估真实 fix list **20-40 张**。具体 ⚠/❌ 列表见 `docs/card_progress.md` §2.3 / §2.4（per-card audit 详情见 git history；原 sprint-7 audit-report 已删除）。
-- ❌ 残留：**11 张** P0 行为偏差（Sprint 6e 关闭原 stub queue 后短暂归零；Sprint 7 audit 暴露 11 张 P0 → Sprint 7a backlog，同上 caveat）。
+- ⚠ 行为偏差待修：**0 张已确认**。旧 50/11 Sprint 7 audit 队列已由 Sprint 7a 收口；旧 41 张 aggregate 又被 Sprint 7d/7e 与 2026-05-14 B104 follow-up 清掉。当前如再发现行为偏差，必须逐卡登记到 `docs/card_progress.md` §2.3 表（原始描述 / 当前问题 / BGA 差距 / 证据）。
+- ❌ 数值/元数据待修：**4 张 schema 上抬**（A3 / B154 / B74 / B56），行为等效，不作为 bug 修；见 `docs/card_desc_audit.md` §3.3 与 `docs/card_progress.md` §2.4。
 - ~~i18n 缺口 437 BGA `clienttranslate` 未补~~ — ✅ 2026-05-03 i18n sprint：玩家可见真 bug（85 张 zh/en 缺 value）已补完 + `pnpm run lint:i18n` CI 守门避免回潮。BGA `clienttranslate` 集合差作为可观测报告留在 `docs/i18n-bga-coverage-report.md`（gap 1477 / 1732 total），不补全部（架构非 1:1，多数为我方未引用过的状态机文案）。详见 `docs/card_progress.md` §2.0 + spec/plan。
 - ~~Sprint 7 P3 130 张简化未启动~~ — ✅ Sprint 7 audit done 2026-05-02：29 →§2.0 / 27 →§2.5 / 61 P0/P1 → Sprint 7a / 14 名单 typo 清理
 
-**Follow-up 路线**：上述 deferred 项作为后续 sprint 单独立项；本 master plan 主体 P0+P1（核心机制 + 关键 bug）已闭环，残留为 P2/P3 范围细节。
+**Follow-up 路线**：本 master plan 主体 P0+P1（核心机制 + 关键 bug）已闭环。剩余不是 §2.3 行为 bug：130 张 owner-accepted 简化、32 张 deliberate divergence、33 张 BGA banned 但 OA active 决议、14 张 owner 确认、1 张 D159 待实现 / 待评估。是否继续收敛按 `docs/card_progress.md` §2.2 / §2.5 / §2.6 / §2.7 单独立项。
 
 详见 `docs/card_progress.md` §2.3 / §2.4 各"deferred to follow-up"小节。
 
 ## 1. Sprint 切分
+
+> 以下保留原始 sprint 切分，用于解释历史修复顺序；不代表当前仍未修。当前已知行为偏差待修队列见 §0 和 `docs/card_progress.md` §2.3。
 
 ```
 P0 ────────────────────────────────────────────
