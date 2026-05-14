@@ -821,10 +821,9 @@ export class GameCore {
     )
     if (nodes.length === 0) return false
 
-    // Wrap the dispatched nodes — buildPhaseTrailingNodes returns ActivateCardNode
-    // and optional ParallelTriggerNode in playOrder. Side effects (incCardUsed,
-    // logs, follow-up flows) are handled by engine-proceed when each
-    // ActivateCardNode steps; we don't repeat them here.
+    // Wrap the dispatched nodes in play order. Listener activation side
+    // effects (incCardUsed, logs, follow-up flows) are handled by
+    // engine-proceed when each internal activation leaf executes.
     const root = nodes.length === 1 ? nodes[0] : new SequenceNode(`pf-after-seq`, nodes)
     const newEngine = new Engine({
       tree: new EngineTree(root),
@@ -2270,7 +2269,7 @@ export class GameCore {
   private runEngineSteps(): void {
     let frame = this.engineStack.current()
     if (!frame || frame.ownerPlayerIndex === null || !frame.spaceId) return
-    let space = this.getSpaceById(frame.spaceId)
+    const space = this.getSpaceById(frame.spaceId)
     if (!this.state.players[frame.ownerPlayerIndex] || !space) return
 
     while (true) {

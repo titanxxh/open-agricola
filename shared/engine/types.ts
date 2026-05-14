@@ -16,7 +16,6 @@ export type EngineNodeType =
   | 'or'
   | 'xor'
   | 'optional'
-  | 'activateCard'
 
 export type EngineNode = {
   id: string
@@ -87,12 +86,6 @@ export type NodeStepResult =
    * `ActionNode.step()`.
    */
   | { kind: 'execute'; nodeId: string; actionId: string }
-  /**
-   * S4b PR5 sub-commit 4 — leaf node signals it is ready for the engine
-   * to fire its registered card listener and apply any returned flow /
-   * follow-up actions. Returned by `ActivateCardNode.step()`.
-   */
-  | { kind: 'activateListener'; nodeId: string }
 
 export type NodeCursor = {
   type: EngineNodeType
