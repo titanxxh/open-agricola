@@ -229,4 +229,64 @@ describe('Engine tree flow', () => {
     })
     expect(executeCount).toBe(0)
   })
+
+  it('restores pending metadata and does not re-execute the restored host node', () => {
+    let executeCount = 0
+    const action: ActionDefinition = {
+      id: 'restore-pending-action',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        executeCount += 1
+        return { type: 'ok' }
+      },
+    }
+    const registry = new ActionRegistry()
+    registry.register(action)
+    const node = new ActionNode('action-restore-pending', action.id)
+    node.setPending({
+      hostNodeId: node.id,
+      request: { kind: 'choice', options: [{ value: 'resume', labelKey: 'ui.resume' }] },
+      choices: [{ value: 'resume', labelKey: 'ui.resume' }],
+      promptKey: 'ui.interactionFlowSelect',
+      effectiveOwnerPlayerId: 'p1',
+    })
+    const original = new Engine({
+      tree: new EngineTree(node),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const restored = new Engine({
+      tree: new EngineTree(new ActionNode('action-restore-pending', action.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    restored.restore(original.snapshot())
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(action)
+
+    expect(restored.peekPendingEnvelope()).toMatchObject({
+      hostNodeId: 'action-restore-pending',
+      promptKey: 'ui.interactionFlowSelect',
+      effectiveOwnerPlayerId: 'p1',
+    })
+    const step = restored.proceed({ state, player, space })
+
+    expect(step).toEqual({
+      type: 'choice',
+      nodeId: 'action-restore-pending',
+      choice: {
+        promptKey: 'ui.interactionFlowSelect',
+        promptParams: undefined,
+        options: [{ value: 'resume', labelKey: 'ui.resume' }],
+      },
+    })
+    expect(executeCount).toBe(0)
+  })
 })
