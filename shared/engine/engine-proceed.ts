@@ -9,15 +9,11 @@ import type {
 } from '../contract/types'
 import {
   ActionNode,
-  InteractionNode,
   OrNode,
   ParallelNode,
   XorNode,
 } from './nodes'
-import {
-  getOptionsSourceCard,
-  resolveChoiceSourceCard,
-} from './nodes/interaction-node'
+import { resolveChoiceSourceCard } from './nodes/interaction-helpers'
 import {
   buildReplaceChoiceFlow,
   getChoiceLabel,
@@ -44,8 +40,6 @@ import {
   buildOwnedFlowNode,
   collectNodeIds,
   findActionNode,
-  findInteractionNode,
-  findPairedInteractionNode,
   getNodeDescriptionPreview,
   getNodeEffectPreview,
   maybeBuildChoiceCandidates,
@@ -401,13 +395,25 @@ export function engineProceed(
     const compositePromptKey = optionalHost
       ? (node.optionalPromptKey ?? node.promptKey ?? 'ui.interactionFlowSelect')
       : (node.promptKey ?? 'ui.interactionFlowSelect')
-    // S2 Task 8: write emit metadata to the OrNode/XorNode itself.
+    node.setPending({
+      hostNodeId: node.id,
+      request: { kind: 'choice', options },
+      choices: options,
+      promptKey: compositePromptKey,
+      promptParams: undefined,
+      sourceCard: compositeCtxSnapshot.sourceCard,
+      pendingActionId: undefined,
+      ownerNodeId: null,
+      contextSnapshot: compositeCtxSnapshot,
+      effectiveOwnerPlayerId: node.ownerPlayerId,
+    })
+    // Transitional cursor fields retained for older tests/snapshots; the
+    // production pending surface is the envelope above.
     node.emittedChoices = options
     node.emittedPromptKey = compositePromptKey
     node.emittedPromptParams = undefined
     node.emittedRequest = undefined
-    // S4b PR5 / S4c PR2 — composite host owns pending-interaction context
-    // snapshot. peekInteractionHost() reads it off the node directly.
+    // Composite host owns pending context snapshot through its envelope.
     node.pendingActionId = null
     node.pendingContextSnapshot = compositeCtxSnapshot
     return {
@@ -435,6 +441,17 @@ export function engineProceed(
     if (stepResult.kind === 'request') {
       const options = node.buildSelectOptions()
       const promptKey = 'ui.interactionSelectTrigger' as import('../contract/prompt-keys').PromptKey
+      node.setPending({
+        hostNodeId: node.id,
+        request: stepResult.request,
+        choices: options,
+        promptKey,
+        promptParams: undefined,
+        ownerNodeId: null,
+        effectiveOwnerPlayerId: stepResult.request.kind === 'select-trigger'
+          ? stepResult.request.ownerPlayerId || node.ownerPlayerId
+          : node.ownerPlayerId,
+      })
       node.emittedChoices = options
       node.emittedPromptKey = promptKey
       node.emittedPromptParams = undefined
@@ -449,44 +466,6 @@ export function engineProceed(
         },
       }
     }
-    return { type: 'blocked', nodeId: node.id }
-  }
-  if (node instanceof InteractionNode) {
-    // S4b Task 14 — InteractionNode owns its lifecycle dispatch via
-    // `node.step(ctx)`. The engine main loop only needs to translate the
-    // node-level NodeStepResult ('choice' / 'blocked' / 'done') into the
-    // top-level EngineStepResult shape and handle the engine-level
-    // pending-context backfill (when no prior emit installed one).
-    const ctx = {
-      resolveSubtree: (n: EngineNode) => resolveSubtree(n),
-      emitChoice: () => {},
-    }
-    const stepResult = node.step(ctx)
-    if (stepResult.kind === 'choice') {
-      int.pendingNodeIdRef.value = node.id
-      // S4c PR2 — backfill the InteractionNode's authoritative
-      // contextSnapshot when no prior emit installed one (e.g. an
-      // InteractionNode that was injected without going through
-      // applyInteractionRequest). Pre-PR2 this wrote to the engine-level
-      // pendingInteractionContext mirror; the InteractionNode is now the
-      // canonical owner.
-      if (!node.contextSnapshot) {
-        node.contextSnapshot = {
-          params: undefined,
-          costs: undefined,
-          sourceCard: getOptionsSourceCard(node.choices),
-          actionContext: undefined,
-        }
-      }
-      return {
-        type: 'choice',
-        nodeId: node.id,
-        choice: { promptKey: node.promptKey, options: node.choices },
-      }
-    }
-    // 'blocked' (no choices) or 'done' (already resolved) — both surface
-    // as a blocked step at this level; the resolved case is unreachable
-    // here because nextUnresolved() filters resolved nodes.
     return { type: 'blocked', nodeId: node.id }
   }
   const leafCtx = {
@@ -599,7 +578,6 @@ export function engineProceed(
       executionContext.player.id,
     )
     if (result.type === 'request') {
-      node.resolve(result)
       // Mirror the resolveChoice second-pass: ActionDef-declared
       // actionContext patches in result.extraData.actionContextWrite are
       // shallow-merged into the pending-interaction context so subsequent
@@ -646,8 +624,7 @@ export function engineProceed(
         //
         // Removing this shim requires teaching resolvePendingChoice to
         // bypass the options.find check for `request.kind === 'animal-reorg'`
-        // (or to read the allowed values off InteractionNode.choices /
-        // request directly). Task 7 deliberately did not modify
+        // (or to read the allowed values off the request directly). Task 7 deliberately did not modify
         // resolvePendingChoice (out of scope per task constraints), so
         // the shim stays. Task 9 or Task 10 (when buildInteraction is
         // rewritten and pending.options is removed) is the natural
@@ -700,9 +677,8 @@ export function engineProceed(
         void _exhaustive
         choiceOptions = []
       }
-      const choiceNode = findPairedInteractionNode(int, node) ?? findInteractionNode(int.tree.root)
       applyInteractionRequest(int, {
-        targetNode: choiceNode ?? null,
+        targetNode: node,
         fallbackNodeId: node.id,
         request: updatedRequest,
         promptKey: result.promptKey,
@@ -716,16 +692,7 @@ export function engineProceed(
         actionContext: executionContext.actionContext,
         contextWritePatch,
       })
-      // S7 Batch 1: when no InteractionNode is paired with this ActionNode
-      // (no resolveChoice on the ActionDef → buildFlowNode emitted a bare
-      // ActionNode), `applyInteractionRequest` only sets
-      // `pendingNodeIdRef = node.id` and the request payload would otherwise
-      // be lost. Mirror the request onto the ActionNode itself so
-      // `peekInteractionHost()` callers (e.g. session-core's choice-step
-      // animal-reorg pivot) can read the kind regardless of host node type.
-      if (!choiceNode && node instanceof ActionNode) {
-        node.emittedRequest = updatedRequest
-      }
+      node.emittedRequest = updatedRequest
       if (duringActivateNodes.length > 0) {
         int.tree.insertAfter(node.id, [...duringActivateNodes])
       }
@@ -739,7 +706,6 @@ export function engineProceed(
         },
       }
     }
-    findPairedInteractionNode(int, node)?.setState('resolved')
     if (result.type === 'ok' || result.type === 'flow') {
       collectImmediateLogs(context.player.name, result).forEach((entry) => {
         int.log.append(entry)

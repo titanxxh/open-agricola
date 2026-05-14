@@ -1,8 +1,7 @@
 import type { ActionChoiceOption, InteractionRequest } from '../../contract/types'
 import type { PromptKey } from '../../contract/prompt-keys'
-import type { EngineNode, EngineContext, NodeStepResult } from '../types'
+import type { EngineNode, EngineContext, NodeStepResult, InteractionContextSnapshot } from '../types'
 import { BaseNode } from './base'
-import type { InteractionContextSnapshot } from './interaction-node'
 
 export class XorNode extends BaseNode {
   public children: EngineNode[]

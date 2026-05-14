@@ -10,7 +10,6 @@ export type NodeState = 'ready' | 'resolved' | 'blocked'
 
 export type EngineNodeType =
   | 'action'
-  | 'interaction'
   | 'sequence'
   | 'parallel'
   | 'or'
@@ -65,6 +64,11 @@ export type PendingEnvelope = {
   effectiveOwnerPlayerId?: string
   syntheticKind?: PendingSyntheticKind
 }
+
+export type InteractionContextSnapshot = Pick<
+  ActionExecutionContext,
+  'params' | 'costs' | 'sourceCard' | 'actionContext'
+>
 
 export type EngineStepResult =
   | { type: 'done' }

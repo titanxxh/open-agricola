@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Engine } from '../../engine'
 
 /**
- * S4c — Engine surface guard (target: 6 public methods).
+ * S4c — Engine surface guard (target: 5 public methods).
  *
  * PR1 sets the target. Tests fail until PR4+PR5 internalize the 8 methods.
  * Update PUBLIC_API here when methods are intentionally added/removed.
@@ -11,7 +11,6 @@ import { Engine } from '../../engine'
 describe('Engine surface guard', () => {
   const PUBLIC_API = [
     'injectBeforeFlows',
-    'injectInteraction',
     'proceed',
     'resolveChoice',
     'restore',
@@ -26,15 +25,13 @@ describe('Engine surface guard', () => {
     'hasPendingChoiceCompositeAncestor',
     'insertFlowAfterPendingChoice',
     'getEffectiveOwnerPlayerId',
-    'peekInteraction',
-    'peekInteractionHost',
     'peekNextUnresolvedNodeId',
     'peekPendingEnvelope',
     'peekPendingChoiceFromComposite',
     'peekPendingHost',
   ]
 
-  it('public API matches the S4c target surface (6 methods)', () => {
+  it('public API matches the S4c target surface (5 methods)', () => {
     const proto = Engine.prototype
     const ownMethods = Object.getOwnPropertyNames(proto)
       .filter((name) => name !== 'constructor')
@@ -45,7 +42,7 @@ describe('Engine surface guard', () => {
     expect(ownMethods).toEqual(expected)
   })
 
-  it('public API count is exactly 6', () => {
-    expect(PUBLIC_API.length).toBe(6)
+  it('public API count is exactly 5', () => {
+    expect(PUBLIC_API.length).toBe(5)
   })
 })

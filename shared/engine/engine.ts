@@ -11,7 +11,6 @@ import type {
 import type { PromptKey } from '../contract/prompt-keys'
 import {
   ActionNode,
-  InteractionNode,
   OrNode,
   ParallelNode,
   SequenceNode,
@@ -23,7 +22,6 @@ import { ActionRegistry } from './registry'
 import { HookDispatcher } from './dispatcher'
 import { EngineTree } from './tree'
 import { LogStore } from './log-store'
-import { INTERACTION_ONLY_ACTION_ID } from './engine-stack'
 import type { EngineInternals } from './engine-internals'
 import {
   buildFlowNode,
@@ -116,20 +114,6 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
         node = action
         break
       }
-      case 'interaction': {
-        const interaction = new InteractionNode(
-          cursor.id,
-          (data.choices as ActionChoiceOption[] | undefined) ?? [],
-          data.request as InteractionRequest | undefined,
-        )
-        interaction.promptKey = data.promptKey as PromptKey | undefined
-        interaction.promptParams = data.promptParams as Record<string, unknown> | undefined
-        interaction.pendingActionId = data.pendingActionId as string | undefined
-        interaction.ownerNodeId = data.ownerNodeId as string | undefined
-        interaction.contextSnapshot = data.contextSnapshot as InteractionNode['contextSnapshot']
-        node = interaction
-        break
-      }
       case 'sequence':
         node = new SequenceNode(cursor.id, buildChildren())
         break
@@ -192,16 +176,6 @@ export class Engine {
   private registry: ActionRegistry
   private hooks: HookDispatcher
   private log: LogStore
-  // S4c PR2 — the engine's own runtime pointer to the currently presented
-  // InteractionNode (or composite host: Or/Xor/Optional). NOT a mirror — the
-  // 3 mirror fields (pendingInteractionActionId / OwnerNodeId / Context) were
-  // deleted in S4c PR2 once snapshot consumers migrated to read pending data
-  // off the InteractionNode in `choiceData` (and composite emit metadata).
-  //
-  // S4c PR5 — boxed as `{ value }` ref objects so module-private functions
-  // in engine-utils / engine-proceed / engine-resolve (extracted in
-  // subsequent steps) can mutate them via the `EngineInternals` snapshot.
-  // Module functions cannot mutate primitives on `this` by reference.
   private _pendingNodeIdRef: { value: string | null } = { value: null }
   private _counterRef: { value: number } = { value: 0 }
   private beforePhaseFlowNodeIds = new Set<string>()
@@ -230,8 +204,8 @@ export class Engine {
   /**
   /**
    * S2 Task 8: returns the pending-choice metadata regardless of whether the
-   * pending node is an `InteractionNode` (leaf-paired) or one of the composite
-   * nodes (`OrNode` / `XorNode`). Composite nodes carry their
+   * pending node is a leaf or one of the composite nodes (`OrNode` /
+   * `XorNode`). Composite nodes carry their
    * own `emittedChoices` / `emittedPromptKey` / `emittedPromptParams` /
    * `emittedRequest` fields populated in {@link proceed}.
    *
@@ -272,38 +246,6 @@ export class Engine {
       }
     }
     return null
-  }
-
-  /**
-   * @internal Package-internal coordination surface for EngineStack.
-   * Do not call from outside shared/engine/. Listed in
-   * `engine-public-surface.test.ts:PRIVATE_HELPERS` so the surface guard
-   * stays green.
-   */
-  peekInteraction(): InteractionNode | null {
-    if (this._pendingNodeIdRef.value === null) return null
-    const node = this.tree.findNodeById(this._pendingNodeIdRef.value)
-    return node instanceof InteractionNode ? node : null
-  }
-
-  /**
-   * S4b PR5 — return the current pending-interaction host, regardless of
-   * whether it is a leaf-paired `InteractionNode` or one of the composite
-   * nodes (`OrNode` / `XorNode`). All composite host types now
-   * carry a uniform `{ pendingActionId, pendingContextSnapshot, choices,
-   * promptKey, request }` shape (composite nodes mirror onto the equivalent
-   * `emittedXxx` fields), so consumers can read pending metadata off this
-   * single accessor instead of going through the engine-level
-   * `pendingInteractionXxx` mirrors.
-   *
-   * @internal Package-internal coordination surface for EngineStack.
-   * Do not call from outside shared/engine/. Listed in
-   * `engine-public-surface.test.ts:PRIVATE_HELPERS` so the surface guard
-   * stays green.
-   */
-  peekInteractionHost(): EngineNode | null {
-    if (this._pendingNodeIdRef.value === null) return null
-    return this.tree.findNodeById(this._pendingNodeIdRef.value) ?? null
   }
 
   /**
@@ -354,36 +296,6 @@ export class Engine {
     frameOwnerPlayerId?: string,
   ): string | undefined {
     return effectiveOwnerPlayerId(this._internals(), nodeId, frameOwnerPlayerId)
-  }
-
-  /**
-   * Replace this engine's tree with a single synthetic InteractionNode and pin
-   * the pending-interaction pointers at it. Used by GameCore.startConfirm*/
-  /* startFeedSubFlow when promoting GameCore-driven prompts (confirmNextPlayer,
-   * confirmPlayerSwitch, harvest-feed) into the InteractionNode pipeline. The
-   * parent context (current player, space) is owned by the EngineStack frame
-   * GameCore pushes — the engine itself just hosts the InteractionNode so
-   * `peekInteraction()` / `snapshot()` round-trip the pending request.
-   *
-   * We swap the entire tree root rather than `insertBefore` because the
-   * synthetic frames pushed for confirm/feed have no real action body; the
-   * InteractionNode IS the only thing the engine should surface.
-   */
-  injectInteraction(node: InteractionNode): void {
-    this.tree.root = node
-    this._pendingNodeIdRef.value = node.id
-    // Synthetic action id — never resolves through the registry. Engine paths
-    // that look up `node.pendingActionId` (e.g. flushLeafActionDetail) tolerate
-    // unknown ids gracefully. Authoritative owner is the InteractionNode
-    // itself (S4b Task 11; S4c PR2 deleted the engine-level mirrors).
-    node.pendingActionId = INTERACTION_ONLY_ACTION_ID
-    node.ownerNodeId = undefined
-    node.contextSnapshot = {
-      params: undefined,
-      costs: undefined,
-      sourceCard: undefined,
-      actionContext: undefined,
-    }
   }
 
   /**
@@ -446,22 +358,20 @@ export class Engine {
       this._pendingNodeIdRef.value !== null
         ? this.tree.findNodeById(this._pendingNodeIdRef.value)
         : null
-    // S4c PR2 — the engine no longer keeps top-level pendingInteractionXxx
-    // mirror fields. choiceData carries the InteractionNode-authoritative
-    // pending state (pendingActionId / ownerNodeId / contextSnapshot) so
-    // restore() can rebuild without consulting deleted engine fields.
-    const choiceData =
-      choiceNode instanceof InteractionNode
-        ? {
-            id: choiceNode.id,
-            promptKey: choiceNode.promptKey,
-            choices: choiceNode.choices,
-            request: choiceNode.request,
-            pendingActionId: choiceNode.pendingActionId,
-            ownerNodeId: choiceNode.ownerNodeId,
-            contextSnapshot: choiceNode.contextSnapshot,
-          }
-        : null
+    const choiceData = choiceNode?.getPending()
+      ? {
+          id: choiceNode.id,
+          promptKey: choiceNode.getPending()?.promptKey,
+          choices: choiceNode.getPending()?.choices ?? [],
+          request: choiceNode.getPending()?.request,
+          pendingActionId: choiceNode.getPending()?.pendingActionId,
+          ownerNodeId: choiceNode.getPending()?.ownerNodeId ?? undefined,
+          effectiveOwnerPlayerId: choiceNode.getPending()?.effectiveOwnerPlayerId,
+          contextSnapshot: choiceNode.getPending()?.contextSnapshot as
+            | Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'>
+            | undefined,
+        }
+      : null
     return {
       treeCursor: nodes.map((node) => (node as EngineNode & { toCursor: () => NodeCursor }).toCursor()),
       nodeStates,
@@ -508,6 +418,7 @@ export class Engine {
       pendingActionId?: string
       ownerNodeId?: string
       contextSnapshot?: Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'>
+      effectiveOwnerPlayerId?: string
     } | null
     pendingData?: {
       nodeId: string
@@ -528,34 +439,6 @@ export class Engine {
     beforePhaseFlowNodeIds?: string[]
   }) {
     this.beforePhaseFlowNodeIds = new Set(snapshot.beforePhaseFlowNodeIds ?? [])
-    // Synthetic interaction-only frames (pushed by GameCore.startConfirm*/
-    // startFeedSubFlow) have a single InteractionNode at root. The cursor
-    // serializes them with `pendingActionId === '__interaction_only__'`
-    // on the InteractionNode itself (S4c PR2 — the previous engine-level
-    // mirror was deleted; choiceData now carries the marker). Re-inject
-    // before the normal nodeStates pass so subsequent `nextUnresolved()`
-    // finds the same InteractionNode the original session held.
-    if (snapshot.choiceData?.pendingActionId === INTERACTION_ONLY_ACTION_ID) {
-      const data = snapshot.choiceData
-      const restored = new InteractionNode(data.id, data.choices, data.request)
-      restored.promptKey = data.promptKey
-      restored.pendingActionId = data.pendingActionId
-      restored.ownerNodeId = data.ownerNodeId
-      restored.contextSnapshot = data.contextSnapshot ?? undefined
-      this.injectInteraction(restored)
-      // Replay the node state in case the interaction was already
-      // partially resolved before serialization.
-      const nodeStateEntry = snapshot.nodeStates.find((entry) => entry.id === data.id)
-      if (nodeStateEntry) {
-        restored.setState(nodeStateEntry.state)
-      }
-      const pendingEntry = snapshot.pendingData?.find((entry) => entry.nodeId === restored.id)
-      if (pendingEntry) {
-        restored.setPending(pendingEntry.pending)
-        this._pendingNodeIdRef.value = restored.id
-      }
-      return
-    }
     const restoredRoot = snapshot.treeCursor ? restoreTreeFromCursor(snapshot.treeCursor) : null
     if (restoredRoot) {
       this.tree.root = restoredRoot
@@ -573,10 +456,6 @@ export class Engine {
     snapshot.nodeStates.forEach(({ id, state }) => {
       const node = nodeMap.get(id)
       if (!node) return
-      if (node instanceof InteractionNode) {
-        node.setState(state)
-        return
-      }
       if (
         node instanceof ActionNode ||
         node instanceof OrNode ||
@@ -587,26 +466,19 @@ export class Engine {
     })
     if (snapshot.choiceData) {
       const node = nodeMap.get(snapshot.choiceData.id)
-      if (node instanceof InteractionNode) {
-        node.setChoice(snapshot.choiceData.promptKey, snapshot.choiceData.choices)
-        if (snapshot.choiceData.request) {
-          node.request = snapshot.choiceData.request
-        }
-        if (snapshot.choiceData.pendingActionId !== undefined) {
-          node.pendingActionId = snapshot.choiceData.pendingActionId
-        }
-        if (snapshot.choiceData.ownerNodeId !== undefined) {
-          node.ownerNodeId = snapshot.choiceData.ownerNodeId
-        }
-        if (snapshot.choiceData.contextSnapshot !== undefined) {
-          node.contextSnapshot = snapshot.choiceData.contextSnapshot
-        }
+      if (node && snapshot.choiceData.request) {
+        node.setPending({
+          hostNodeId: node.id,
+          request: snapshot.choiceData.request,
+          choices: snapshot.choiceData.choices,
+          promptKey: snapshot.choiceData.promptKey,
+          pendingActionId: snapshot.choiceData.pendingActionId,
+          ownerNodeId: snapshot.choiceData.ownerNodeId ?? null,
+          effectiveOwnerPlayerId: snapshot.choiceData.effectiveOwnerPlayerId,
+          contextSnapshot: snapshot.choiceData.contextSnapshot,
+        })
       }
     }
-    // S4c PR2 — rebuild the engine's runtime pointer from choiceData.id
-    // (InteractionNode host) or compositeEmit.nodeId (Or/Xor host).
-    // Replaces the deleted top-level pendingInteractionNodeId/ActionId/
-    // OwnerNodeId/Context mirror fields.
     this._pendingNodeIdRef.value =
       explicitPendingNodeId ?? snapshot.choiceData?.id ?? snapshot.compositeEmit?.nodeId ?? null
 
@@ -662,7 +534,7 @@ export class Engine {
   /**
    * Insert an ActionFlow to run after the pending choice is resolved.
    * Precondition: a pending choice is currently active
-   * (pendingInteractionNodeId is set). No-op otherwise. Mirrors the
+   * (a pending node id is set). No-op otherwise. Mirrors the
    * `{ type: 'flow' }` branch of resolveChoice.
    *
    * @internal Package-internal coordination surface for EngineStack.
@@ -671,9 +543,8 @@ export class Engine {
    * stays green.
    */
   insertFlowAfterPendingChoice(flow: ActionFlow, ownerPlayerId?: string): void {
-    // S4c PR2 — read owner from the InteractionNode (was: pendingInteractionOwnerNodeId mirror).
-    const interactionNode = this.peekInteraction()
-    const insertionTargetId = interactionNode?.ownerNodeId ?? this._pendingNodeIdRef.value
+    const envelope = this.peekPendingEnvelope()
+    const insertionTargetId = envelope?.ownerNodeId ?? this._pendingNodeIdRef.value
     if (!insertionTargetId) return
     const flowNode = buildFlowNode(this._internals(), flow, ownerPlayerId)
     this.tree.insertAfter(insertionTargetId, [flowNode])

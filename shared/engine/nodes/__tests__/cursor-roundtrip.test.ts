@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { ActionNode } from '../action-node'
-import { InteractionNode } from '../interaction-node'
 import { OrNode } from '../or-node'
 import { ParallelNode } from '../parallel-node'
 import { SequenceNode } from '../sequence-node'
@@ -77,37 +76,6 @@ describe('cursor round-trip', () => {
       c1.data.effectPreview as never,
     )
     rebuilt.beforePhaseResolved = c1.data.beforePhaseResolved as boolean
-    rebuilt.setState(c1.state)
-    expect(rebuilt.toCursor()).toEqual(c1)
-  })
-
-  it('InteractionNode preserves all fields through toCursor', () => {
-    const original = new InteractionNode(
-      'i-1',
-      [{ value: 'a', labelKey: 'ui.a' }],
-      { kind: 'choice', options: [{ value: 'a', labelKey: 'ui.a' }] },
-    )
-    original.promptKey = 'ui.test.prompt'
-    original.promptParams = { x: 9 }
-    original.pendingActionId = 'gain-wood'
-    original.ownerNodeId = 'parent-9'
-    original.contextSnapshot = {
-      params: { wood: 1 },
-      costs: { food: 2 },
-      sourceCard: 'D7_X',
-      actionContext: { trigger: 'anytime' },
-    }
-    const c1 = original.toCursor()
-    const rebuilt = new InteractionNode(
-      c1.id,
-      c1.data.choices as never,
-      c1.data.request as never,
-    )
-    rebuilt.promptKey = c1.data.promptKey as never
-    rebuilt.promptParams = c1.data.promptParams as never
-    rebuilt.pendingActionId = c1.data.pendingActionId as string | undefined
-    rebuilt.ownerNodeId = c1.data.ownerNodeId as string | undefined
-    rebuilt.contextSnapshot = c1.data.contextSnapshot as never
     rebuilt.setState(c1.state)
     expect(rebuilt.toCursor()).toEqual(c1)
   })

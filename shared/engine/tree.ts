@@ -9,6 +9,7 @@ const isCompositeNode = (node: EngineNode) =>
   node instanceof XorNode
 
 const hasStartedDescendant = (node: EngineNode): boolean => {
+  if (node.getPending() !== null) return true
   if (node instanceof SequenceNode || node instanceof ParallelNode || node instanceof OrNode || node instanceof XorNode) {
     return node.children.some((child) =>
       child.getState() === 'resolved' || hasStartedDescendant(child),

@@ -21,8 +21,8 @@ import { recordRoundPlacement } from '../../cards/helpers/round-placement.ts'
 import { executeCardListener, getMatchingListeners } from '../../cards/card-listeners.ts'
 import { runRoundEndHooks, shouldSkipPlayerTurn } from '../../cards/card-effects.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
-import { InteractionNode } from '../../engine/index.ts'
 import type { FeedQueueEntry } from '../../contract/types.ts'
+import type { PendingEnvelope } from '../../engine/types.ts'
 
 /**
  * Find the next seated player (in turn order) who still has at least one
@@ -140,11 +140,9 @@ export const takeAction = (
 }
 
 /**
- * Promote `confirmNextPlayer` to a synthetic InteractionNode-hosted frame.
+ * Promote `confirmNextPlayer` to a synthetic pending frame.
  * The accompanying `handleConfirmNextPlayerResolved` (still on GameCore for
- * now) resolves it via `resolveChoice`. The synthetic InteractionNode is
- * the sole source of truth surfaced through `getCurrentPending()` /
- * `buildInteraction()`.
+ * now) resolves it via `resolveChoice`.
  */
 export const startConfirmNextPlayer = (
   core: GameCore,
@@ -154,13 +152,15 @@ export const startConfirmNextPlayer = (
   // confirmNextPlayer is only emitted after `engineStack.clear()` in
   // finishCompletedActionTurn / continueAfterReorganize_roundEnd, so we
   // always push a fresh synthetic frame.
-  const node = new InteractionNode(
-    core.mintSyntheticNodeId('interaction:confirm-next-player'),
-    [{ value: 'confirm', labelKey: 'ui.interactionConfirm' }],
-    { kind: 'confirm-next-player', nextPlayerIndex },
-  )
-  node.promptKey = 'ui.confirmNextPlayer'
-  core.pushSyntheticInteractionFrame(node, ownerPlayerIndex, 'confirm-next-player')
+  const options = [{ value: 'confirm', labelKey: 'ui.interactionConfirm' }]
+  core.pushSyntheticPendingFrame({
+    hostNodeId: core.mintSyntheticNodeId('interaction:confirm-next-player'),
+    request: { kind: 'confirm-next-player', nextPlayerIndex },
+    choices: options,
+    promptKey: 'ui.confirmNextPlayer',
+    ownerNodeId: null,
+    syntheticKind: 'confirm-next-player',
+  } satisfies PendingEnvelope, ownerPlayerIndex, 'confirm-next-player')
 }
 
 /**
@@ -174,17 +174,19 @@ export const startConfirmPlayerSwitch = (
   fromPlayerIndex: number,
   toPlayerIndex: number,
 ): void => {
-  const node = new InteractionNode(
-    core.mintSyntheticNodeId('interaction:confirm-player-switch'),
-    [{ value: 'confirm', labelKey: 'ui.interactionConfirm' }],
-    { kind: 'confirm-player-switch', fromPlayerIndex, toPlayerIndex },
-  )
-  node.promptKey = 'ui.confirmPlayerSwitch'
-  core.pushSyntheticInteractionFrame(node, toPlayerIndex, 'confirm-player-switch')
+  const options = [{ value: 'confirm', labelKey: 'ui.interactionConfirm' }]
+  core.pushSyntheticPendingFrame({
+    hostNodeId: core.mintSyntheticNodeId('interaction:confirm-player-switch'),
+    request: { kind: 'confirm-player-switch', fromPlayerIndex, toPlayerIndex },
+    choices: options,
+    promptKey: 'ui.confirmPlayerSwitch',
+    ownerNodeId: null,
+    syntheticKind: 'confirm-player-switch',
+  } satisfies PendingEnvelope, toPlayerIndex, 'confirm-player-switch')
 }
 
 /**
- * Promote `harvestFeed` to an InteractionNode-hosted sub-flow. Each player
+ * Promote `harvestFeed` to a pending sub-flow. Each player
  * in the feed queue gets a fresh synthetic frame (recursively pushed by
  * `handleFeedResolved` once the previous player's selections apply).
  */
@@ -195,13 +197,15 @@ export const startFeedSubFlow = (
   foodUsed: number,
   feedQueue?: FeedQueueEntry[],
 ): void => {
-  const node = new InteractionNode(
-    core.mintSyntheticNodeId('interaction:feed'),
-    [{ value: 'confirm', labelKey: 'ui.interactionConfirm' }],
-    { kind: 'feed', remaining, foodUsed, feedQueue },
-  )
-  node.promptKey = 'ui.harvestFeed'
-  core.pushSyntheticInteractionFrame(node, playerIndex, 'feed')
+  const options = [{ value: 'confirm', labelKey: 'ui.interactionConfirm' }]
+  core.pushSyntheticPendingFrame({
+    hostNodeId: core.mintSyntheticNodeId('interaction:feed'),
+    request: { kind: 'feed', remaining, foodUsed, feedQueue },
+    choices: options,
+    promptKey: 'ui.harvestFeed',
+    ownerNodeId: null,
+    syntheticKind: 'feed',
+  } satisfies PendingEnvelope, playerIndex, 'feed')
 }
 
 /**
@@ -385,7 +389,7 @@ export const takeAnytimeAction = (
 }
 
 /**
- * Resolve the synthetic `confirm-player-switch` InteractionNode frame:
+ * Resolve the synthetic `confirm-player-switch` pending frame:
  * pop the prompt frame, mark the pending owner transition as confirmed on
  * the parent frame underneath, and resume engine stepping. Migrated from
  * GameCore.handleConfirmPlayerSwitchResolved (S2 Task 10 part 3).
@@ -413,7 +417,7 @@ export const handleConfirmPlayerSwitchResolved = (
 }
 
 /**
- * Resolve the synthetic `confirm-next-player` InteractionNode frame:
+ * Resolve the synthetic `confirm-next-player` pending frame:
  * advance state.currentPlayerIndex, clear engine stack + history, then
  * run the BGA `stLabor()` skip-next loop. If every player's workers are
  * spent, trampoline into `onAllWorkersPlaced` -> performRoundEnd.
