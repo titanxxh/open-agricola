@@ -69,6 +69,38 @@ const setNodeState = (
   if (state === 'resolved') node.resolve()
 }
 
+const nextCounterValueFromIds = (nodes: EngineNode[]): number =>
+  nodes.reduce((next, node) => {
+    const match = node.id.match(/-(\d+)$/)
+    if (!match) return next
+    const parsed = Number(match[1])
+    return Number.isSafeInteger(parsed) ? Math.max(next, parsed + 1) : next
+  }, 0)
+
+const findChoiceRestoreNode = (
+  choiceData: ChoiceDataSnapshot,
+  nodes: EngineNode[],
+  nodeMap: Map<string, EngineNode>,
+): EngineNode | null => {
+  const byChoiceId = nodeMap.get(choiceData.id)
+  if (byChoiceId) return byChoiceId
+
+  const byHostId = choiceData.hostNodeId ? nodeMap.get(choiceData.hostNodeId) : null
+  if (byHostId) return byHostId
+
+  if (choiceData.pendingActionId) {
+    const actionCandidates = nodes.filter((node): node is ActionNode =>
+      node instanceof ActionNode &&
+      node.actionId === choiceData.pendingActionId &&
+      node.getState() !== 'resolved',
+    )
+    if (actionCandidates.length === 1) return actionCandidates[0]
+  }
+
+  const unresolvedCandidates = nodes.filter((node) => node.getState() !== 'resolved')
+  return unresolvedCandidates.length === 1 ? unresolvedCandidates[0]! : null
+}
+
 const restoreSharedCursorData = (node: EngineNode, data: Record<string, unknown>): void => {
   if (typeof data.ownerPlayerId === 'string') node.ownerPlayerId = data.ownerPlayerId
   if (typeof data.optional === 'boolean') node.optional = data.optional
@@ -439,9 +471,9 @@ export class Engine {
     if (restoredRoot) {
       this.tree.root = restoredRoot
     }
-    const nodeMap = new Map(
-      this.tree.allNodes().map((node) => [node.id, node]),
-    )
+    const nodes = this.tree.allNodes()
+    this._counterRef.value = Math.max(this._counterRef.value, nextCounterValueFromIds(nodes))
+    const nodeMap = new Map(nodes.map((node) => [node.id, node]))
     let explicitPendingNodeId: string | null = null
     for (const entry of snapshot.pendingData ?? []) {
       const node = nodeMap.get(entry.nodeId)
@@ -462,10 +494,15 @@ export class Engine {
     })
     let legacyChoicePendingNodeId: string | null = null
     if (snapshot.choiceData) {
-      const node = nodeMap.get(snapshot.choiceData.id)
+      const node = findChoiceRestoreNode(snapshot.choiceData, nodes, nodeMap)
       if (node && !node.getPending() && snapshot.choiceData.request) {
+        const storedHostStillExists = snapshot.choiceData.hostNodeId
+          ? nodeMap.has(snapshot.choiceData.hostNodeId)
+          : true
         node.setPending({
-          hostNodeId: snapshot.choiceData.hostNodeId ?? node.id,
+          hostNodeId: storedHostStillExists
+            ? (snapshot.choiceData.hostNodeId ?? node.id)
+            : node.id,
           request: snapshot.choiceData.request,
           choices: snapshot.choiceData.choices,
           promptKey: snapshot.choiceData.promptKey,

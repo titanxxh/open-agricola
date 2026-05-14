@@ -471,4 +471,27 @@ describe('ActionFlow targetPlayerId', () => {
     expect(resolved.state.players[1]!.resources.wood).toBe(p2WoodBefore + 1)
     expect(resolved.state.players[0]!.resources.wood).toBe(p1WoodBefore)
   })
+
+  it('targeted animal gain opens reorganize for the player who gained animals', () => {
+    const session = setupSession()
+    const state = session.getState().state
+    const p2 = state.players[1]!
+    const p2SheepBefore = p2.resources.sheep
+
+    const flow: ActionFlow = {
+      type: 'leaf',
+      actionId: 'gain',
+      params: { sheep: 1 },
+      targetPlayerId: p2.id,
+    }
+
+    startFlowEngine(session, flow, 0)
+
+    const resp = session.getState()
+    expect(resp.state.players[1]!.resources.sheep).toBe(p2SheepBefore + 1)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('animal-reorg')
+    expect(resp.interaction.playerIndex).toBe(1)
+  })
 })
