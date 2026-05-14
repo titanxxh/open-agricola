@@ -53,8 +53,10 @@ import {
   getNodeEffectPreview,
   maybeBuildChoiceCandidates,
   normalizeFollowUpAction,
+  pendingEnvelopeFromHostNode,
   resolveSubtree,
 } from './engine-utils'
+import type { PendingEnvelope } from './types'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
@@ -112,6 +114,14 @@ const collectImmediateLogs = (
   }))
 }
 
+const pendingEnvelopeChoices = (envelope: PendingEnvelope): ActionChoiceOption[] => {
+  if (envelope.choices) return envelope.choices
+  if (envelope.request.kind === 'choice') return envelope.request.options
+  if (envelope.request.kind === 'farm-select') return envelope.request.options ?? []
+  if (envelope.request.kind === 'select-trigger') return envelope.request.options
+  return []
+}
+
 /**
  * S4c PR5 — extracted from `Engine.proceed`. Drives one step of the engine
  * tree. Mutates `int.tree` / `int.pendingNodeIdRef` / `int.beforePhaseFlowNodeIds`
@@ -124,6 +134,20 @@ export function engineProceed(
   const node = int.tree.nextUnresolved()
   if (!node) {
     return { type: 'done' }
+  }
+  if (node.getPending() !== null) {
+    const envelope = pendingEnvelopeFromHostNode(node)
+    if (!envelope) return { type: 'blocked', nodeId: node.id }
+    int.pendingNodeIdRef.value = node.id
+    return {
+      type: 'choice',
+      nodeId: node.id,
+      choice: {
+        promptKey: envelope.promptKey,
+        promptParams: envelope.promptParams,
+        options: pendingEnvelopeChoices(envelope),
+      },
+    }
   }
   if (node instanceof OrNode || node instanceof XorNode) {
     const availableActions = node.children

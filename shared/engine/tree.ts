@@ -185,6 +185,9 @@ export class EngineTree {
       if (node.getState() === 'blocked') {
         return null
       }
+      if (node.getPending() !== null) {
+        return node
+      }
       if (node instanceof ParallelTriggerNode) {
         if (node.getState() === 'resolved') return null
         if (node.selectedChildId) {
