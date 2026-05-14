@@ -182,4 +182,51 @@ describe('Engine tree flow', () => {
     })
     expect(done.type).toBe('done')
   })
+
+  it('does not re-execute a ready action node while it hosts pending metadata', () => {
+    let executeCount = 0
+    const action: ActionDefinition = {
+      id: 'pending-action',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        executeCount += 1
+        return { type: 'ok' }
+      },
+    }
+    const registry = new ActionRegistry()
+    registry.register(action)
+    const node = new ActionNode('action-pending', action.id)
+    node.setPending({
+      hostNodeId: node.id,
+      request: { kind: 'choice', options: [{ value: 'resume', labelKey: 'ui.resume' }] },
+      choices: [{ value: 'resume', labelKey: 'ui.resume' }],
+      promptKey: 'ui.interactionFlowSelect',
+    })
+    const engine = new Engine({
+      tree: new EngineTree(node),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(action)
+
+    const step = engine.proceed({ state, player, space })
+
+    expect(step).toEqual({
+      type: 'choice',
+      nodeId: 'action-pending',
+      choice: {
+        promptKey: 'ui.interactionFlowSelect',
+        promptParams: undefined,
+        options: [{ value: 'resume', labelKey: 'ui.resume' }],
+      },
+    })
+    expect(executeCount).toBe(0)
+  })
 })

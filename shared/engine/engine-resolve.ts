@@ -29,8 +29,10 @@ import {
   findActionNode,
   findInteractionNode,
   normalizeFollowUpAction,
+  pendingEnvelopeFromHostNode,
   resolveSubtree,
 } from './engine-utils'
+import type { PendingEnvelope } from './types'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
@@ -88,6 +90,14 @@ const collectImmediateLogs = (
   }))
 }
 
+const pendingEnvelopeChoices = (envelope: PendingEnvelope): ActionChoiceOption[] => {
+  if (envelope.choices) return envelope.choices
+  if (envelope.request.kind === 'choice') return envelope.request.options
+  if (envelope.request.kind === 'farm-select') return envelope.request.options ?? []
+  if (envelope.request.kind === 'select-trigger') return envelope.request.options
+  return []
+}
+
 /**
  * S4c PR5 — extracted from `Engine.resolveChoice`. Resolve a pending choice
  * against the engine tree. Threading the optional `payload` lets
@@ -102,6 +112,17 @@ export function engineResolveChoice(
 ): ActionExecutionResult {
   if (int.pendingNodeIdRef.value) {
     const node = int.tree.findNodeById(int.pendingNodeIdRef.value)
+    const explicitPending = node?.getPending()
+    if (node && explicitPending) {
+      const envelope = pendingEnvelopeFromHostNode(node)
+      const choices = envelope ? pendingEnvelopeChoices(envelope) : []
+      if (choices.length > 0 && !choices.some((option) => option.value === choice)) {
+        return { type: 'fail', logKey: 'log.buildRoomFail' }
+      }
+      node.clearPending()
+      int.pendingNodeIdRef.value = null
+      return { type: 'ok' }
+    }
     if (node instanceof ParallelTriggerNode) {
       // Validate against currently-offered options (e.g. PASS only appears
       // when every unresolved trigger is mandatory: false). Rejecting an
