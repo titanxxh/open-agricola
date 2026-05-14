@@ -269,6 +269,12 @@ export class Engine {
       state: node.getState(),
       active: node instanceof OptionalNode ? node.active : undefined,
     }))
+    const pendingData = nodes
+      .map((node) => {
+        const pending = node.getPending()
+        return pending ? { nodeId: node.id, pending } : null
+      })
+      .filter((item): item is { nodeId: string; pending: PendingEnvelope } => item !== null)
     const choiceNode =
       this._pendingNodeIdRef.value !== null
         ? this.tree.findNodeById(this._pendingNodeIdRef.value)
@@ -292,6 +298,7 @@ export class Engine {
     return {
       nodeStates,
       choiceData,
+      pendingData,
       // S2 Task 8: composite (Or/Xor/Optional) emit metadata is now stored
       // on the node itself instead of an engine-level cache. We still need
       // to persist it so cursor round-trip / undo restoreHistory can rebuild
@@ -333,6 +340,10 @@ export class Engine {
       ownerNodeId?: string
       contextSnapshot?: Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'>
     } | null
+    pendingData?: {
+      nodeId: string
+      pending: PendingEnvelope
+    }[]
     /**
      * S2 Task 8: composite (Or/Xor/Optional) emit metadata. On restore,
      * apply to the named node's `emittedChoices` / `emittedPromptKey` /
@@ -367,11 +378,23 @@ export class Engine {
       if (nodeStateEntry) {
         restored.setState(nodeStateEntry.state)
       }
+      const pendingEntry = snapshot.pendingData?.find((entry) => entry.nodeId === restored.id)
+      if (pendingEntry) {
+        restored.setPending(pendingEntry.pending)
+        this._pendingNodeIdRef.value = restored.id
+      }
       return
     }
     const nodeMap = new Map(
       this.tree.allNodes().map((node) => [node.id, node]),
     )
+    let explicitPendingNodeId: string | null = null
+    for (const entry of snapshot.pendingData ?? []) {
+      const node = nodeMap.get(entry.nodeId)
+      if (!node) continue
+      node.setPending(entry.pending)
+      explicitPendingNodeId ??= node.id
+    }
     snapshot.nodeStates.forEach(({ id, state }) => {
       const node = nodeMap.get(id)
       if (!node) return
@@ -414,7 +437,7 @@ export class Engine {
     // Replaces the deleted top-level pendingInteractionNodeId/ActionId/
     // OwnerNodeId/Context mirror fields.
     this._pendingNodeIdRef.value =
-      snapshot.choiceData?.id ?? snapshot.compositeEmit?.nodeId ?? null
+      explicitPendingNodeId ?? snapshot.choiceData?.id ?? snapshot.compositeEmit?.nodeId ?? null
 
     // S2 Task 8: rebuild composite emit metadata onto Or/Xor/Optional nodes.
     const compositeEmit = snapshot.compositeEmit ?? null
