@@ -78,13 +78,14 @@ const drainEngine = (
   player: PlayerState,
   space: ActionSpace,
 ) => {
-  let currentPlayer = player
-  let step = engine.proceed({ state, player: currentPlayer, space })
-  while (step.type === 'ok' || step.type === 'playerSwitch') {
-    if (step.type === 'playerSwitch') {
-      currentPlayer = state.players.find((candidate) => candidate.id === step.targetPlayerId) ?? currentPlayer
-    }
-    step = engine.proceed({ state, player: currentPlayer, space })
+  const playerForNextNode = () => {
+    const nodeId = engine.peekNextUnresolvedNodeId()
+    const ownerId = nodeId ? engine.getEffectiveOwnerPlayerId(nodeId, player.id) : player.id
+    return state.players.find((candidate) => candidate.id === ownerId) ?? player
+  }
+  let step = engine.proceed({ state, player: playerForNextNode(), space })
+  while (step.type === 'ok') {
+    step = engine.proceed({ state, player: playerForNextNode(), space })
   }
   return step
 }

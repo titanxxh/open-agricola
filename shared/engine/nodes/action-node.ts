@@ -3,7 +3,6 @@ import type {
   ActionExecutionContext,
   ActionExecutionResult,
   InteractionRequest,
-  Resource,
 } from '../../contract/types'
 import type { EngineContext, NodeStepResult } from '../types'
 import { BaseNode } from './base'
@@ -11,7 +10,7 @@ import { BaseNode } from './base'
 export class ActionNode extends BaseNode {
   public actionId: string
   public sourceCard?: string
-  public params?: Partial<Resource>
+  public params?: Record<string, unknown>
   public actionContext?: Record<string, unknown>
   public effectPreview?: ChoiceEffectPreview
   public choiceLabelKey?: string
@@ -19,17 +18,16 @@ export class ActionNode extends BaseNode {
   public beforePhaseResolved = false
   /**
    * S7 Batch 1 (Sprint S7) — when a leaf ActionNode is built from an
-   * ActionDef without `resolveChoice` (no paired InteractionNode wrap), its
+   * ActionDef without `resolveChoice`, its
    * `execute()` may still return `{ type: 'request', request: {...} }`
    * (e.g. `breedAction` emitting `kind: 'animal-reorg'` for B104
    * SheepWalker's last-harvest enforcement). In that case engine-proceed
    * routes the emit via `applyInteractionRequest` with `targetNode === null`
    * and falls back to `pendingNodeIdRef = ActionNode.id`. Without this
-   * field the request payload would be lost (no InteractionNode hosts it
-   * and `peekInteraction()` returns null), so session-core could not pivot
+   * field the request payload would be lost, so session-core could not pivot
    * into `startReorganizeSubFlow`. Mirrors `OrNode.emittedRequest` /
-   * `XorNode.emittedRequest` / `OptionalNode.emittedRequest` so
-   * `peekInteractionHost()` callers can read the kind off the host node
+   * `XorNode.emittedRequest` so
+   * pending-envelope callers can read the kind off the host node
    * uniformly regardless of whether the pending node is leaf-paired or
    * leaf-only.
    */
@@ -39,7 +37,7 @@ export class ActionNode extends BaseNode {
     id: string,
     actionId: string,
     sourceCard?: string,
-    params?: Partial<Resource>,
+    params?: Record<string, unknown>,
     choiceLabelKey?: string,
     choiceLabelParams?: Record<string, unknown>,
     actionContext?: Record<string, unknown>,

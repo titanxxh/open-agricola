@@ -5,13 +5,10 @@ export { HookDispatcher } from './dispatcher'
 export { LogStore } from './log-store'
 export {
   ActionNode,
-  InteractionNode,
   SequenceNode,
   ParallelNode,
   OrNode,
   XorNode,
-  OptionalNode,
-  PlayerSwitchNode,
 } from './nodes'
 export type { EngineNode, EngineStepResult } from './types'
 export {

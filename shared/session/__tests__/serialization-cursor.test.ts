@@ -3,8 +3,176 @@ import { GameSession } from '../../../server/game/authoritative-session'
 import { setWorkersAtHome } from '../../domain/player'
 import { rehydrateState, serializeState } from '../serialization'
 import { isLegacyChoicePending } from '../../../server/__tests__/_helpers/legacy-confirms'
+import { EngineStack } from '../../engine'
 
 describe('serialization cursor round-trip', () => {
+  it('restored one-option ActionNode pending envelope remains pending', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    state.roundPhase = 'work'
+    state.players[0]!.resources.wood = 0
+
+    const flow = { type: 'leaf' as const, actionId: 'gain', params: { wood: 1 } }
+    const nodeId = 'action-gain-0'
+    const serialized = serializeState(state, { engineStack: new EngineStack() })
+    serialized.engineStack = {
+      frames: [{
+        source: { kind: 'flow', flow },
+        engineSnapshot: {
+          nodeStates: [{ id: nodeId, state: 'ready' }],
+          choiceData: {
+            id: nodeId,
+            promptKey: 'ui.interactionOptionalAction',
+            choices: [{ value: 'confirm', labelKey: 'ui.cursorTestConfirm' }],
+            request: {
+              kind: 'choice',
+              options: [{ value: 'confirm', labelKey: 'ui.cursorTestConfirm' }],
+            },
+            pendingActionId: 'gain',
+            ownerNodeId: null,
+          },
+          pendingData: [{
+            nodeId,
+            pending: {
+              hostNodeId: nodeId,
+              request: {
+                kind: 'choice',
+                options: [{ value: 'confirm', labelKey: 'ui.cursorTestConfirm' }],
+              },
+              choices: [{ value: 'confirm', labelKey: 'ui.cursorTestConfirm' }],
+              promptKey: 'ui.interactionOptionalAction',
+              promptParams: { source: 'pendingData' },
+              sourceCard: 'T7_SourceCard',
+              pendingActionId: 'gain',
+              contextSnapshot: { params: { wood: 1 } },
+              syntheticKind: 'interaction-only',
+            },
+          }],
+          compositeEmit: null,
+        },
+        ownerPlayerIndex: 0,
+        spaceId: 'day-laborer',
+        stageResume: null,
+        deferredPlayerSwitch: null,
+        reason: 'top-level',
+      }],
+    }
+
+    const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serialized))))
+    const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
+    expect(restoredEnvelope?.request.kind).toBe('choice')
+    expect(restoredEnvelope?.hostNodeId).toBe(nodeId)
+    expect(restoredEnvelope?.promptParams).toEqual({ source: 'pendingData' })
+    expect(restoredEnvelope?.sourceCard).toBe('T7_SourceCard')
+    expect(restoredEnvelope?.syntheticKind).toBe('interaction-only')
+    expect(restored.getEngineStack().depth()).toBe(1)
+    expect(restored.getState().state.players[0]!.resources.wood).toBe(0)
+  })
+
+  it('rejects invalid finite choice values before dispatch', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    state.roundPhase = 'work'
+
+    const flow = { type: 'leaf' as const, actionId: 'gain', params: { wood: 1 } }
+    const nodeId = 'action-gain-0'
+    const serialized = serializeState(state, { engineStack: new EngineStack() })
+    serialized.engineStack = {
+      frames: [{
+        source: { kind: 'flow', flow },
+        engineSnapshot: {
+          nodeStates: [{ id: nodeId, state: 'ready' }],
+          choiceData: null,
+          pendingData: [{
+            nodeId,
+            pending: {
+              hostNodeId: nodeId,
+              request: {
+                kind: 'choice',
+                options: [{ value: 'confirm', labelKey: 'ui.cursorTestConfirm' }],
+              },
+              choices: [{ value: 'confirm', labelKey: 'ui.cursorTestConfirm' }],
+              promptKey: 'ui.interactionOptionalAction',
+              pendingActionId: 'gain',
+              effectiveOwnerPlayerId: state.players[0]!.id,
+            },
+          }],
+          compositeEmit: null,
+        },
+        ownerPlayerIndex: 0,
+        spaceId: 'day-laborer',
+        stageResume: null,
+        deferredPlayerSwitch: null,
+        reason: 'top-level',
+      }],
+    }
+
+    const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serialized))))
+    const rejected = restored.resolveChoice(0, 'not-a-real-option')
+
+    expect(rejected.ok).toBe(false)
+    expect(rejected.error).toBe('invalid choice value')
+    expect(restored.getEngineStack().peekPendingEnvelope()?.request.kind).toBe('choice')
+  })
+
+  it('rejects invalid select-trigger values before dispatch', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    state.roundPhase = 'work'
+
+    const ownerPlayerId = state.players[0]!.id
+    const flow = { type: 'leaf' as const, actionId: '__interaction_only__' }
+    const nodeId = 'action-__interaction_only__-0'
+    const options = [
+      { value: 'C1', labelKey: 'cards.C1.name', sourceCard: 'C1' },
+      { value: 'C2', labelKey: 'cards.C2.name', sourceCard: 'C2' },
+    ]
+    const serialized = serializeState(state, { engineStack: new EngineStack() })
+    serialized.engineStack = {
+      frames: [{
+        source: { kind: 'flow', flow },
+        engineSnapshot: {
+          nodeStates: [{ id: nodeId, state: 'ready' }],
+          choiceData: null,
+          pendingData: [{
+            nodeId,
+            pending: {
+              hostNodeId: nodeId,
+              request: { kind: 'select-trigger', ownerPlayerId, options },
+              choices: options,
+              promptKey: 'ui.interactionSelectTrigger',
+              pendingActionId: '__interaction_only__',
+              effectiveOwnerPlayerId: ownerPlayerId,
+              syntheticKind: 'interaction-only',
+            },
+          }],
+          compositeEmit: null,
+        },
+        ownerPlayerIndex: 0,
+        spaceId: '__subflow:top-level',
+        stageResume: null,
+        deferredPlayerSwitch: null,
+        reason: 'top-level',
+      }],
+    }
+
+    const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serialized))))
+    const rejected = restored.resolveChoice(0, 'C3')
+
+    expect(rejected.ok).toBe(false)
+    expect(rejected.error).toBe('invalid choice value')
+    expect(restored.getEngineStack().peekPendingEnvelope()?.request.kind).toBe('select-trigger')
+  })
+
   // ── reorganize sub-flow ────────────────────────────────────────────────
   // Mirrors server/__tests__/reorganize-engine-session.test.ts setup so we
   // drive the session into a real animal-reorg pending interaction, then
@@ -75,6 +243,9 @@ describe('serialization cursor round-trip', () => {
     const restored = new GameSession(rehydrated)
     expect(restored.getEngineStack().depth()).toBe(initialDepth)
     expect(restored.getEngineStack().current()?.reason).toBe('reorganize')
+    const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
+    expect(restoredEnvelope?.request.kind).toBe('animal-reorg')
+    expect(restoredEnvelope?.hostNodeId).toBeTruthy()
 
     const resp = restored.resolveChoice(0, 'confirm', [
       { id: 'pasture-1', zoneType: 'pasture', animalType: 'boar', animalCount: 1 },
@@ -118,6 +289,9 @@ describe('serialization cursor round-trip', () => {
 
     const restored = new GameSession(rehydrated)
     expect(restored.getEngineStack().depth()).toBeGreaterThanOrEqual(1)
+    const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
+    expect(restoredEnvelope?.request.kind).toBe('farm-select')
+    expect(restoredEnvelope?.hostNodeId).toBeTruthy()
 
     // The pending interaction is preserved (plow surfaces a 'choice' /
     // farm-position pick) and the engine state matches what the original
@@ -136,7 +310,7 @@ describe('serialization cursor round-trip', () => {
 
   // ── confirm-next-player sub-flow (Task 9) ─────────────────────────────
   // Drive a normal worker-placement turn to completion: takeAction emits a
-  // synthetic '__interaction_only__' frame whose InteractionNode carries
+  // synthetic '__interaction_only__' frame whose pending envelope carries
   // request.kind === 'confirm-next-player'. Round-trip the cursor and verify
   // the restored session can resolve the prompt to advance the turn.
   it('confirm-next-player sub-flow survives serialize/rehydrate', () => {
@@ -159,8 +333,7 @@ describe('serialization cursor round-trip', () => {
     expect(stack.depth()).toBe(1)
     const top = stack.current()!
     expect(top.reason).toBe('confirm-next-player')
-    const interaction = stack.peekInteraction()
-    expect(interaction?.request?.kind).toBe('confirm-next-player')
+    expect(stack.peekPendingEnvelope()?.request.kind).toBe('confirm-next-player')
 
     // Round-trip via JSON.
     const serialized = serializeState(session.getState().state, { engineStack: stack })
@@ -172,8 +345,9 @@ describe('serialization cursor round-trip', () => {
     const restored = new GameSession(rehydrated)
     expect(restored.getEngineStack().depth()).toBe(1)
     expect(restored.getEngineStack().current()?.reason).toBe('confirm-next-player')
-    const restoredInteraction = restored.getEngineStack().peekInteraction()
-    expect(restoredInteraction?.request?.kind).toBe('confirm-next-player')
+    const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
+    expect(restoredEnvelope?.request.kind).toBe('confirm-next-player')
+    expect(restoredEnvelope?.hostNodeId).toBeTruthy()
 
     // Resolving the prompt advances to the next player and clears the stack.
     const after = restored.resolveChoice(0, 'confirm')
@@ -216,8 +390,7 @@ describe('serialization cursor round-trip', () => {
     expect(stack.depth()).toBeGreaterThanOrEqual(2)
     const top = stack.current()!
     expect(top.reason).toBe('confirm-player-switch')
-    const interaction = stack.peekInteraction()
-    expect(interaction?.request?.kind).toBe('confirm-player-switch')
+    expect(stack.peekPendingEnvelope()?.request.kind).toBe('confirm-player-switch')
 
     // Round-trip via JSON.
     const initialDepth = stack.depth()
@@ -230,12 +403,13 @@ describe('serialization cursor round-trip', () => {
     const restored = new GameSession(rehydrated)
     expect(restored.getEngineStack().depth()).toBe(initialDepth)
     expect(restored.getEngineStack().current()?.reason).toBe('confirm-player-switch')
-    const restoredInteraction = restored.getEngineStack().peekInteraction()
-    expect(restoredInteraction?.request?.kind).toBe('confirm-player-switch')
+    const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
+    expect(restoredEnvelope?.request.kind).toBe('confirm-player-switch')
+    expect(restoredEnvelope?.hostNodeId).toBeTruthy()
 
     // Resolving the synthetic frame pops it and resumes the parent action
     // engine. The parent's exact follow-up (a 'choice' for reed-bank's OR
-    // arms, or a no-op 'none' once the InteractionNode rehydrates as
+    // arms, or a no-op 'none' once the pending host rehydrates as
     // already-resolved) is not the contract we're asserting here — what we
     // care about is that the round-trip preserved the synthetic frame and
     // resolveChoice no longer reports an error.
@@ -245,7 +419,7 @@ describe('serialization cursor round-trip', () => {
 
   // ── feed sub-flow (Task 9) ────────────────────────────────────────────
   // Drive harvest with a player that owes food: the harvest queue pushes a
-  // synthetic '__interaction_only__' frame whose InteractionNode carries
+  // synthetic '__interaction_only__' frame whose pending envelope carries
   // request.kind === 'feed'. Round-trip and resolve.
   it('feed sub-flow survives serialize/rehydrate', () => {
     const session = new GameSession()
@@ -276,8 +450,7 @@ describe('serialization cursor round-trip', () => {
     expect(stack.depth()).toBeGreaterThanOrEqual(1)
     const top = stack.current()!
     expect(top.reason).toBe('feed')
-    const interaction = stack.peekInteraction()
-    expect(interaction?.request?.kind).toBe('feed')
+    expect(stack.peekPendingEnvelope()?.request.kind).toBe('feed')
 
     // Round-trip via JSON.
     const initialDepth = stack.depth()
@@ -290,8 +463,9 @@ describe('serialization cursor round-trip', () => {
     const restored = new GameSession(rehydrated)
     expect(restored.getEngineStack().depth()).toBe(initialDepth)
     expect(restored.getEngineStack().current()?.reason).toBe('feed')
-    const restoredInteraction = restored.getEngineStack().peekInteraction()
-    expect(restoredInteraction?.request?.kind).toBe('feed')
+    const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
+    expect(restoredEnvelope?.request.kind).toBe('feed')
+    expect(restoredEnvelope?.hostNodeId).toBeTruthy()
 
     // Resolve with empty selections (player just begs the deficit). The feed
     // queue empties and the synthetic frame is popped.

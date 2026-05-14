@@ -480,8 +480,7 @@ export type ActionFlow =
       effectPreview?: ChoiceEffectPreview
       /**
        * Runs this flow node under another player when compiled into the
-       * runtime engine. Card-facing flows describe ownership as metadata; the
-       * engine keeps the concrete PlayerSwitchNode internal.
+       * runtime engine. Card-facing flows describe ownership as metadata.
        */
       targetPlayerId?: string
       /**
@@ -504,8 +503,7 @@ export type ActionFlow =
       choiceLabelParams?: Record<string, unknown>
       /**
        * Runs this flow node under another player when compiled into the
-       * runtime engine. Card-facing flows describe ownership as metadata; the
-       * engine keeps the concrete PlayerSwitchNode internal.
+       * runtime engine. Card-facing flows describe ownership as metadata.
        */
       targetPlayerId?: string
     }
@@ -529,11 +527,11 @@ export type ActionDefinition = {
   ) => ActionExecutionResult
   /**
    * Opt-out: when true the engine builds a bare ActionNode instead of the
-   * default `Sequence([ActionNode, InteractionNode])` wrap that is normally
+   * default pending-choice wrap that is normally
    * triggered by the presence of `resolveChoice`. Used by leaf actions whose
-   * `execute` typically returns `ok` (so the paired InteractionNode would dangle
+   * `execute` typically returns `ok` (so a paired pending host would dangle
    * empty and block the seq), and which only emit `choice` for one specific
-   * branch (handled via the engine's fallback `pendingInteractionNodeId = node.id`
+   * branch (handled via the engine's fallback pending host id
    * path that already routes the player choice back through `resolveChoice`).
    * Currently set on the `pay` leaf — typed-flat costs resolve eagerly while
    * ComplexCost multi-solution still emits a payment choice.

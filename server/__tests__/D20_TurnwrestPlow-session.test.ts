@@ -80,7 +80,7 @@ describe('D20_TurnwrestPlow session', () => {
     expect(resp.ok).toBe(true)
 
     // S2 Task 5/8 (post-farm-select kind): D20's `after place-farmer` hook
-    // prepends its OptionalNode wrapper before cultivation's main OrNode,
+    // prepends its optional metadata host before cultivation's main OrNode,
     // so the first surfaced choice is the D20 'do/skip' prompt — accept it.
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionOptionalAction') {
       const acceptStack = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')

@@ -12,7 +12,7 @@ import { Engine } from '../engine'
 import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
-import { ActionNode, InteractionNode, SequenceNode } from '../nodes'
+import { ActionNode, SequenceNode } from '../nodes'
 import { clearActionHooks } from '../../actions/hooks'
 
 const createState = () =>
@@ -99,7 +99,6 @@ const buildEngine = (action: ActionDefinition, withChoice: boolean) => {
   const root = withChoice
     ? new SequenceNode(`sequence-${action.id}`, [
         new ActionNode(`action-${action.id}`, action.id),
-        new InteractionNode(`choice-${action.id}`, []),
       ])
     : new ActionNode(`action-${action.id}`, action.id)
   return new Engine({
@@ -155,6 +154,42 @@ describe('Engine tree flow', () => {
     expect(done.type).toBe('done')
   })
 
+  it('rejects invalid finite values for ActionNode pending choices', () => {
+    let resolveCount = 0
+    const action: ActionDefinition = {
+      id: 'choice-action',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({
+        type: 'request',
+        request: { kind: 'choice', options: [{ value: 'a', labelKey: 'a' }] },
+        promptKey: 'choose',
+      }),
+      resolveChoice: () => {
+        resolveCount += 1
+        return { type: 'ok' }
+      },
+    }
+    const engine = buildEngine(action, true)
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(action)
+    engine.proceed({ state, player, space })
+
+    const result = engine.resolveChoice('not-a-choice', {
+      state,
+      player,
+      space,
+    })
+
+    expect(result.type).toBe('fail')
+    expect(resolveCount).toBe(0)
+    expect(engine.peekPendingEnvelope()?.request.kind).toBe('choice')
+  })
+
   it('handles action without choice', () => {
     const action: ActionDefinition = {
       id: 'simple-action',
@@ -181,5 +216,112 @@ describe('Engine tree flow', () => {
       space,
     })
     expect(done.type).toBe('done')
+  })
+
+  it('does not re-execute a ready action node while it hosts pending metadata', () => {
+    let executeCount = 0
+    const action: ActionDefinition = {
+      id: 'pending-action',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        executeCount += 1
+        return { type: 'ok' }
+      },
+    }
+    const registry = new ActionRegistry()
+    registry.register(action)
+    const node = new ActionNode('action-pending', action.id)
+    node.setPending({
+      hostNodeId: node.id,
+      request: { kind: 'choice', options: [{ value: 'resume', labelKey: 'ui.resume' }] },
+      choices: [{ value: 'resume', labelKey: 'ui.resume' }],
+      promptKey: 'ui.interactionFlowSelect',
+    })
+    const engine = new Engine({
+      tree: new EngineTree(node),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(action)
+
+    const step = engine.proceed({ state, player, space })
+
+    expect(step).toEqual({
+      type: 'choice',
+      nodeId: 'action-pending',
+      choice: {
+        promptKey: 'ui.interactionFlowSelect',
+        promptParams: undefined,
+        options: [{ value: 'resume', labelKey: 'ui.resume' }],
+      },
+    })
+    expect(executeCount).toBe(0)
+  })
+
+  it('restores pending metadata and does not re-execute the restored host node', () => {
+    let executeCount = 0
+    const action: ActionDefinition = {
+      id: 'restore-pending-action',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        executeCount += 1
+        return { type: 'ok' }
+      },
+    }
+    const registry = new ActionRegistry()
+    registry.register(action)
+    const node = new ActionNode('action-restore-pending', action.id)
+    node.setPending({
+      hostNodeId: node.id,
+      request: { kind: 'choice', options: [{ value: 'resume', labelKey: 'ui.resume' }] },
+      choices: [{ value: 'resume', labelKey: 'ui.resume' }],
+      promptKey: 'ui.interactionFlowSelect',
+      effectiveOwnerPlayerId: 'p1',
+    })
+    const original = new Engine({
+      tree: new EngineTree(node),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const restored = new Engine({
+      tree: new EngineTree(new ActionNode('action-restore-pending', action.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    restored.restore(original.snapshot())
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(action)
+
+    expect(restored.peekPendingEnvelope()).toMatchObject({
+      hostNodeId: 'action-restore-pending',
+      promptKey: 'ui.interactionFlowSelect',
+      effectiveOwnerPlayerId: 'p1',
+    })
+    const step = restored.proceed({ state, player, space })
+
+    expect(step).toEqual({
+      type: 'choice',
+      nodeId: 'action-restore-pending',
+      choice: {
+        promptKey: 'ui.interactionFlowSelect',
+        promptParams: undefined,
+        options: [{ value: 'resume', labelKey: 'ui.resume' }],
+      },
+    })
+    expect(executeCount).toBe(0)
   })
 })

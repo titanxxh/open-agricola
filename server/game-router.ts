@@ -260,7 +260,7 @@ export const handleGameRoute = async (
 
   if (req.method === 'POST' && req.url === '/api/game/next-player') {
     // Task 9: forwarded through resolveChoice; the synthetic
-    // confirm-next-player InteractionNode supplies `nextPlayerIndex`.
+    // confirm-next-player pending envelope supplies `nextPlayerIndex`.
     const { resp, result } = callAndRespond(req, (s) => {
       const idx = s.getState().state.currentPlayerIndex
       return s.resolveChoice(idx, 'confirm')

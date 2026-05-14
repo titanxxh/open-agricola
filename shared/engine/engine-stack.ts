@@ -1,7 +1,7 @@
 import type { Engine } from './engine'
 import type { ActionChoiceOption, ActionFlow, InteractionRequest } from '../contract/types'
 import type { PromptKey } from '../contract/prompt-keys'
-import type { EngineNode } from './types'
+import type { EngineNode, PendingEnvelope } from './types'
 
 export type EngineSource =
   | { kind: 'action'; actionId: string }
@@ -11,7 +11,7 @@ export type EngineSource =
  * Synthetic action id used for `__interaction_only__` engine frames pushed by
  * `GameCore.startConfirmNextPlayer` / `startConfirmPlayerSwitch` /
  * `startFeedSubFlow`. The engine treats this as a no-body action: the frame's
- * sole purpose is to host an `InteractionNode` that surfaces a typed
+ * sole purpose is to host a pending envelope that surfaces a typed
  * `InteractionRequest` (confirm-next-player / confirm-player-switch / feed)
  * which is resolved by `resolveChoice`. The id never resolves through the
  * `ActionRegistry`; consumers (`Engine.restore`, `runEngineSteps`) recognise
@@ -41,7 +41,11 @@ export type EngineFrame = {
   ownerPlayerIndex: number
   spaceId: string
   stageResume: StageResumeState | null
-  deferredPlayerSwitch: { fromPlayerIndex: number; toPlayerIndex: number } | null
+  deferredPlayerSwitch: {
+    fromPlayerIndex: number
+    toPlayerIndex: number
+    confirmed?: boolean
+  } | null
   reason: SubFlowReason
 }
 
@@ -51,7 +55,11 @@ export type EngineFrameCursor = {
   ownerPlayerIndex: number
   spaceId: string
   stageResume: StageResumeState | null
-  deferredPlayerSwitch: { fromPlayerIndex: number; toPlayerIndex: number } | null
+  deferredPlayerSwitch: {
+    fromPlayerIndex: number
+    toPlayerIndex: number
+    confirmed?: boolean
+  } | null
   reason: SubFlowReason
 }
 
@@ -62,7 +70,7 @@ export type EngineStackCursor = {
 /**
  * Predicate for synthetic interaction-only frames (the `__interaction_only__`
  * leaf-flow frames pushed by start* triggers in `GameCore`). These frames
- * carry an `InteractionNode` but have no real action body — `runEngineSteps`
+ * carry a pending envelope but have no real action body — `runEngineSteps`
  * / `Engine.restore` use this predicate to short-circuit auto-resolve and
  * registry lookup paths that would otherwise infinite-loop.
  */
@@ -75,7 +83,7 @@ export function isSyntheticInteractionFrame(frame: EngineFrame): boolean {
 
 /**
  * EngineStack — delegates to a small set of `@internal`-marked methods on
- * Engine (peekInteraction*, peekPendingChoiceFromComposite,
+ * Engine (peekPending*, peekPendingChoiceFromComposite,
  * hasPendingChoiceCompositeAncestor, insertFlowAfterPendingChoice). These
  * methods are implementation details of the shared/engine/ package; the
  * `engine-public-surface.test.ts` guard enumerates them in PRIVATE_HELPERS
@@ -105,12 +113,23 @@ export class EngineStack {
     this.frames.length = 0
   }
 
-  peekInteraction(): import('./nodes').InteractionNode | null {
-    return this.current()?.engine.peekInteraction() ?? null
+  peekPendingEnvelope(): PendingEnvelope | null {
+    return this.current()?.engine.peekPendingEnvelope() ?? null
   }
 
-  peekInteractionHost(): EngineNode | null {
-    return this.current()?.engine.peekInteractionHost() ?? null
+  peekPendingHost(): EngineNode | null {
+    return this.current()?.engine.peekPendingHost() ?? null
+  }
+
+  peekNextUnresolvedNodeId(): string | null {
+    return this.current()?.engine.peekNextUnresolvedNodeId() ?? null
+  }
+
+  getEffectiveOwnerPlayerId(
+    nodeId: string,
+    frameOwnerPlayerId?: string,
+  ): string | undefined {
+    return this.current()?.engine.getEffectiveOwnerPlayerId(nodeId, frameOwnerPlayerId)
   }
 
   peekPendingChoiceFromComposite(): {

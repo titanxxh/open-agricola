@@ -9,26 +9,28 @@ import type {
   LogEntry,
 } from '../contract/types'
 import {
-  InteractionNode,
-  OptionalNode,
+  ActionNode,
   OrNode,
+  ParallelNode,
   XorNode,
 } from './nodes'
-import { ParallelTriggerNode } from './nodes/parallel-trigger-node'
 import { buildReplaceChoiceFlow } from './nodes/interaction-helpers'
 import type { EngineInternals } from './engine-internals'
+import {
+  isPendingChoiceValueAllowed,
+} from './pending-validation'
 import {
   applyFallbackSourceCardToFlow,
   applyInteractionRequest,
   buildPhaseTrailingNodes,
   buildChoiceExecutionContext,
-  buildFlowNode,
+  buildOwnedFlowNode,
   buildFollowUpNodes,
   buildListenerEvent,
   cloneNode,
   findActionNode,
-  findInteractionNode,
   normalizeFollowUpAction,
+  pendingEnvelopeFromHostNode,
   resolveSubtree,
 } from './engine-utils'
 
@@ -102,7 +104,59 @@ export function engineResolveChoice(
 ): ActionExecutionResult {
   if (int.pendingNodeIdRef.value) {
     const node = int.tree.findNodeById(int.pendingNodeIdRef.value)
-    if (node instanceof ParallelTriggerNode) {
+    const explicitPending = node?.getPending()
+    if (node && explicitPending) {
+      const envelope = pendingEnvelopeFromHostNode(node)
+      if (envelope && !isPendingChoiceValueAllowed(envelope, choice)) {
+        return { type: 'fail', logKey: 'log.buildRoomFail' }
+      }
+      if (
+        node.optional === true &&
+        node.optionalActive === false &&
+        !(node instanceof OrNode) &&
+        !(node instanceof XorNode)
+      ) {
+        node.clearPending()
+        int.pendingNodeIdRef.value = null
+        if (choice === '__skip__') {
+          resolveSubtree(node)
+        } else {
+          node.optionalActive = true
+        }
+        return { type: 'ok' }
+      }
+      if (node instanceof ParallelNode && node.mode === 'trigger-select') {
+        node.clearPending()
+        const offered = node.buildSelectOptions()
+        if (!offered.some((opt) => opt.value === choice)) {
+          int.pendingNodeIdRef.value = null
+          return { type: 'fail', logKey: 'log.buildRoomFail' }
+        }
+        if (choice === '__pass__') {
+          if (!node.passAll()) {
+            int.pendingNodeIdRef.value = null
+            return { type: 'fail', logKey: 'log.buildRoomFail' }
+          }
+          int.pendingNodeIdRef.value = null
+          return { type: 'ok' }
+        }
+        const child = node.chooseCard(choice)
+        if (!child) {
+          int.pendingNodeIdRef.value = null
+          return { type: 'fail', logKey: 'log.buildRoomFail' }
+        }
+        int.pendingNodeIdRef.value = null
+        return { type: 'ok' }
+      }
+      if (node instanceof OrNode || node instanceof XorNode) {
+        node.clearPending()
+      } else if (!(node instanceof ActionNode)) {
+        node.clearPending()
+        int.pendingNodeIdRef.value = null
+        return { type: 'ok' }
+      }
+    }
+    if (node instanceof ParallelNode && node.mode === 'trigger-select') {
       // Validate against currently-offered options (e.g. PASS only appears
       // when every unresolved trigger is mandatory: false). Rejecting an
       // unlisted choice keeps mandatory triggers un-skippable.
@@ -111,7 +165,10 @@ export function engineResolveChoice(
         return { type: 'fail', logKey: 'log.buildRoomFail' }
       }
       if (choice === '__pass__') {
-        node.passAll()
+        if (!node.passAll()) {
+          int.pendingNodeIdRef.value = null
+          return { type: 'fail', logKey: 'log.buildRoomFail' }
+        }
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
@@ -123,16 +180,6 @@ export function engineResolveChoice(
       int.pendingNodeIdRef.value = null
       return { type: 'ok' }
     }
-    if (node instanceof OptionalNode) {
-      if (choice === '__skip__') {
-        node.resolve()
-        int.pendingNodeIdRef.value = null
-        return { type: 'ok' }
-      }
-      node.active = true
-      int.pendingNodeIdRef.value = null
-      return { type: 'ok' }
-    }
     if (node instanceof OrNode || node instanceof XorNode) {
       if (choice === '__done__' && node instanceof OrNode) {
         node.resolve(choice)
@@ -140,13 +187,14 @@ export function engineResolveChoice(
         return { type: 'ok' }
       }
       if (choice === '__skip__') {
-        const parent = int.tree.findParent(node.id)
-        if (parent instanceof OptionalNode) {
+        if (node.optional === true && node.optionalActive === false) {
           resolveSubtree(node)
-          parent.resolve()
           int.pendingNodeIdRef.value = null
           return { type: 'ok' }
         }
+      }
+      if (node.optional === true && node.optionalActive === false) {
+        node.optionalActive = true
       }
       const targetNode = node.children.find((item) => item.id === choice)
       const child = targetNode ? findActionNode(targetNode) : null
@@ -169,7 +217,7 @@ export function engineResolveChoice(
       const actionId = replaceResult.actionId
       executionContext.sourceCard = replaceResult.sourceCard ?? child.sourceCard
       if (replaceResult.declined && replaceResult.alternativeFlow) {
-        const flowNode = buildFlowNode(int,
+        const flowNode = buildOwnedFlowNode(int,
           buildReplaceChoiceFlow(
             child,
             applyFallbackSourceCardToFlow(
@@ -239,13 +287,10 @@ export function engineResolveChoice(
       const result = action.execute(executionContext)
       int.hooks.during({ ...executionContext, actionId }, result)
       if (result.type === 'request' && (result.request.kind === 'choice' || result.request.kind === 'farm-select')) {
-        child.resolve(result)
         // S2 Task 6: also accept farm-select kind emitted from an Or/Xor
         // child leaf. The computeArgs merging path only applies to 'choice'
         // kind (extraOptions hook); farm-select carries its own structured
-        // payload + optional `options` (confirm/cancel) — we synthesise
-        // a default options surface when absent for the InteractionNode
-        // setChoice call.
+        // payload + optional `options` (confirm/cancel).
         const argResults = result.request.kind === 'choice'
           ? int.hooks.computeArgs({ ...executionContext, actionId }, result)
           : []
@@ -276,9 +321,8 @@ export function engineResolveChoice(
           result.extraData && typeof result.extraData === 'object'
             ? (result.extraData.actionContextWrite as Record<string, unknown> | undefined)
             : undefined
-        const choiceNode = targetNode ? findInteractionNode(targetNode) : null
         applyInteractionRequest(int, {
-          targetNode: choiceNode ?? null,
+          targetNode: child,
           fallbackNodeId: child.id,
           request: updatedRequest,
           promptKey: result.promptKey,
@@ -327,7 +371,7 @@ export function engineResolveChoice(
           ? applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
           : null)
         .filter((flow) => flow)
-        .map((flow) => buildFlowNode(int, flow as ActionFlow, context.player.id))
+        .map((flow) => buildOwnedFlowNode(int, flow as ActionFlow, context.player.id))
       const followUps = allResults
         .flatMap((entry) =>
           (entry.followUpActions ?? []).map((followUp) =>
@@ -365,7 +409,7 @@ export function engineResolveChoice(
         ...afterActivateNodes,
       ]
       if (result.type === 'flow') {
-        const flowNode = buildFlowNode(int, result.flow, context.player.id)
+        const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id)
         if (trailingHookNodes.length > 0) {
           int.tree.insertAfter(insertAnchor, trailingHookNodes)
         }
@@ -387,13 +431,12 @@ export function engineResolveChoice(
       return result
     }
   }
-  // S4c PR2 — second-pass dispatch (after Or/Xor/Optional handling above).
-  // The pending host MUST be an InteractionNode here (composite hosts are
-  // already drained by the early-return branches above). Read actionId,
-  // ownerNodeId and contextSnapshot off the InteractionNode itself —
-  // the engine no longer keeps those as top-level mirrors.
-  const interactionHost = peekInteractionNode(int)
-  const actionId = interactionHost?.pendingActionId ?? null
+  const pendingHost = int.pendingNodeIdRef.value
+    ? int.tree.findNodeById(int.pendingNodeIdRef.value)
+    : null
+  const pendingEnvelope = pendingEnvelopeFromHostNode(pendingHost)
+  const actionId = pendingEnvelope?.pendingActionId
+    ?? (pendingHost instanceof ActionNode ? pendingHost.actionId : null)
   if (!actionId) {
     return { type: 'ok' }
   }
@@ -403,12 +446,13 @@ export function engineResolveChoice(
   }
   const executionContext = buildChoiceExecutionContext(
     context,
-    interactionHost?.contextSnapshot ?? null,
+    pendingEnvelope?.contextSnapshot as Parameters<typeof buildChoiceExecutionContext>[1],
   )
   executionContext.params = {
     ...(executionContext.params ?? {}),
     selectedOption: choice,
   }
+  pendingHost?.clearPending()
   let result: ActionExecutionResult
   if (action.resolveChoice) {
     result = action.resolveChoice(executionContext, choice, payload)
@@ -417,33 +461,23 @@ export function engineResolveChoice(
   }
   int.hooks.during({ ...executionContext, actionId }, result)
   if (result.type === 'request' && result.request.kind === 'choice') {
-    // Merge ActionDef-declared actionContext patches into the InteractionNode's
-    // `contextSnapshot.actionContext`. Used by farm ActionDefs to persist payload
-    // (e.g. fence geometry) across payment-combo second prompts. The shallow merge
-    // itself happens inside `applyInteractionRequest` so all three sites share one
-    // implementation.
+    // Merge ActionDef-declared actionContext patches into the pending context.
+    // Used by farm ActionDefs to persist payload (e.g. fence geometry) across
+    // payment-combo second prompts.
     const contextWritePatch =
       result.extraData && typeof result.extraData === 'object'
         ? (result.extraData.actionContextWrite as Record<string, unknown> | undefined)
         : undefined
     const requestOptions = result.request.options
-    const existingNode = int.pendingNodeIdRef.value
-      ? int.tree.findNodeById(int.pendingNodeIdRef.value)
-      : null
-    const interactionTarget = existingNode instanceof InteractionNode ? existingNode : null
     applyInteractionRequest(int, {
-      targetNode: interactionTarget,
-      fallbackNodeId: null,
+      targetNode: pendingHost,
+      fallbackNodeId: pendingHost?.id ?? null,
       request: result.request,
       promptKey: result.promptKey,
       promptParams: result.promptParams,
       choiceOptions: requestOptions,
       actionId,
-      // resolveChoice second-pass keeps the existing owner pointer (e.g.
-      // XorNode owner when the second prompt is still nested under the
-      // same parent). `preserveOwner: true` makes InteractionNode.emit()
-      // ignore this value, so passing a stale read is safe.
-      ownerNodeId: interactionHost?.ownerNodeId ?? null,
+      ownerNodeId: pendingEnvelope?.ownerNodeId ?? null,
       preserveOwner: true,
       params: executionContext.params,
       costs: executionContext.costs,
@@ -451,8 +485,6 @@ export function engineResolveChoice(
       actionContext: executionContext.actionContext,
       contextWritePatch,
     })
-    // Don't clear the InteractionNode's pendingActionId — the action still needs
-    // to resolve its choice (the next prompt is queued on the same node).
     return result
   }
   if (result.type === 'ok' || result.type === 'flow') {
@@ -460,8 +492,7 @@ export function engineResolveChoice(
       int.log.append(entry)
     })
   }
-  // S4c PR2 — read owner from the InteractionNode (was: pendingInteractionOwnerNodeId mirror).
-  const insertionTargetId = interactionHost?.ownerNodeId ?? int.pendingNodeIdRef.value
+  const insertionTargetId = pendingEnvelope?.ownerNodeId ?? pendingHost?.id ?? int.pendingNodeIdRef.value
   const immediatePhase = int.hooks.immediatelyAfter({ ...executionContext, actionId, choice }, result, choice)
   const afterPhase = int.hooks.after({ ...executionContext, actionId, choice }, result, choice)
 
@@ -480,7 +511,7 @@ export function engineResolveChoice(
       ? applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
       : null)
     .filter((flow) => flow)
-    .map((flow) => buildFlowNode(int, flow as ActionFlow, context.player.id))
+    .map((flow) => buildOwnedFlowNode(int, flow as ActionFlow, context.player.id))
   const followUps = allResults
     .flatMap((entry) =>
       (entry.followUpActions ?? []).map((followUp) =>
@@ -521,7 +552,7 @@ export function engineResolveChoice(
       ...afterActivateNodes,
     ]
     if (result.type === 'flow') {
-      const flowNode = buildFlowNode(int, result.flow, context.player.id)
+      const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id)
       if (trailingHookNodes.length > 0) {
         int.tree.insertAfter(insertionTargetId, trailingHookNodes)
       }
@@ -536,21 +567,10 @@ export function engineResolveChoice(
       }
     }
   }
-  if (int.pendingNodeIdRef.value) {
-    const node = int.tree.findNodeById(int.pendingNodeIdRef.value)
-    if (node instanceof InteractionNode) {
-      if (
-        node.promptKey === 'ui.interactionBakeBreadChoice' &&
-        choice.startsWith('bulk:')
-      ) {
-        node.setState('resolved')
-      } else {
-        node.resolve(choice)
-      }
-    }
+  if (pendingHost instanceof ActionNode) {
+    pendingHost.resolve(result)
   }
-  // S4c PR2 — read owner from the InteractionNode (was: pendingInteractionOwnerNodeId mirror).
-  const ownerNodeIdToResolve = interactionHost?.ownerNodeId ?? null
+  const ownerNodeIdToResolve = pendingEnvelope?.ownerNodeId ?? null
   if (ownerNodeIdToResolve) {
     const ownerNode = int.tree.findNodeById(ownerNodeIdToResolve)
     if (ownerNode instanceof XorNode) {
@@ -559,12 +579,4 @@ export function engineResolveChoice(
   }
   int.pendingNodeIdRef.value = null
   return result
-}
-
-/** Local equivalent of `Engine.peekInteraction()` — returns the pending
- *  InteractionNode (when the pending host is an InteractionNode) or null. */
-function peekInteractionNode(int: EngineInternals): InteractionNode | null {
-  if (int.pendingNodeIdRef.value === null) return null
-  const node = int.tree.findNodeById(int.pendingNodeIdRef.value)
-  return node instanceof InteractionNode ? node : null
 }

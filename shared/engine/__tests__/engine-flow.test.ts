@@ -18,14 +18,14 @@ import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import {
   ActionNode,
-  InteractionNode,
-  OptionalNode,
   OrNode,
   ParallelNode,
   SequenceNode,
   XorNode,
 } from '../nodes'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
+import { buildPhaseTrailingNodes } from '../engine-utils'
+import type { CardListenerContext, MatchedCardListener } from '../../cards/card-listeners'
 
 const createState = () =>
   ({
@@ -111,7 +111,7 @@ describe('Engine flow nodes', () => {
   setActiveCardRegistry(new CardRegistry())
   })
 
-  it('dynamic result.flow targetPlayerId switches back before later siblings', () => {
+  it('dynamic result.flow targetPlayerId scopes only the targeted subtree', () => {
     const p1 = createPlayer()
     const p2 = { ...createPlayer(), id: 'p2', name: 'P2', color: 'blue' as const }
     const state = createState()
@@ -155,14 +155,360 @@ describe('Engine flow nodes', () => {
       log: new LogStore(),
     })
 
-    let currentPlayer = p1
-    let step = engine.proceed({ state, player: currentPlayer, space })
+    const playerForNextNode = () => {
+      const nodeId = engine.peekNextUnresolvedNodeId()
+      const ownerId = nodeId ? engine.getEffectiveOwnerPlayerId(nodeId, p1.id) : p1.id
+      return state.players.find((player) => player.id === ownerId) ?? p1
+    }
+
+    let step = engine.proceed({ state, player: playerForNextNode(), space })
     let safety = 20
-    while (safety-- > 0 && (step.type === 'ok' || step.type === 'playerSwitch')) {
-      if (step.type === 'playerSwitch') {
-        currentPlayer = state.players.find((player) => player.id === step.targetPlayerId) ?? currentPlayer
-      }
-      step = engine.proceed({ state, player: currentPlayer, space })
+    while (safety-- > 0 && step.type === 'ok') {
+      step = engine.proceed({ state, player: playerForNextNode(), space })
+    }
+
+    expect(p2.resources.food).toBe(1)
+    expect(p2.resources.wood).toBe(0)
+    expect(p1.resources.wood).toBe(1)
+  })
+
+  it('phase trailing listener activation is emitted as an internal action leaf', () => {
+    const p1 = createPlayer()
+    const p2 = { ...createPlayer(), id: 'p2', name: 'P2', color: 'blue' as const }
+    const state = createState()
+    state.players = [p1, p2]
+
+    const registry = new ActionRegistry()
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('trigger', 'gain')),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const matched: MatchedCardListener[] = [
+      {
+        registration: {
+          id: 'listener-1',
+          cardIds: ['C1'],
+          mandatory: true,
+          handler: () => undefined,
+        },
+        cardId: 'C1',
+        ownerPlayerId: p1.id,
+      },
+    ]
+
+    const nodes = buildPhaseTrailingNodes(
+      engine._internals(),
+      matched,
+      'after',
+      'gain',
+      state,
+      { foo: 'bar' },
+      p2.id,
+    )
+
+    expect(nodes).toHaveLength(1)
+    const node = nodes[0]
+    expect(node).toBeInstanceOf(ActionNode)
+    const actionNode = node as ActionNode
+    expect(actionNode.actionId).toBe('activate-card')
+    expect(actionNode.sourceCard).toBe('C1')
+    expect(actionNode.ownerPlayerId).toBe(p1.id)
+    expect(actionNode.params).toMatchObject({
+      listenerId: 'listener-1',
+      cardId: 'C1',
+      phase: 'after',
+      actionId: 'gain',
+      event: { foo: 'bar' },
+      ownerPlayerId: p1.id,
+      triggerPlayerId: p2.id,
+      mandatory: true,
+    })
+  })
+
+  it('during listener activation preserves original trigger player for cross-owner listeners', () => {
+    const p1 = createPlayer()
+    const p2 = { ...createPlayer(), id: 'p2', name: 'P2', color: 'blue' as const }
+    p2.minorPlayed = ['CROSS_DURING_CARD']
+    const state = createState()
+    state.players = [p1, p2]
+
+    const seen: Array<{
+      playerId?: string
+      triggerPlayerId?: string
+      ownerPlayerId?: string
+      mandatory?: unknown
+    }> = []
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'cross-owner-during',
+      cardIds: ['CROSS_DURING_CARD'],
+      actions: ['trigger-cross-owner-during'],
+      phases: ['during'],
+      scope: 'any',
+      mandatory: true,
+      handler: (context: CardListenerContext) => {
+        seen.push({
+          playerId: context.player.id,
+          triggerPlayerId: context.triggerPlayer?.id,
+          ownerPlayerId: context.ownerPlayer?.id,
+          mandatory: (context as CardListenerContext & { mandatory?: unknown }).mandatory,
+        })
+        return { logKey: 'log.testCrossOwnerDuring' }
+      },
+    })
+    setActiveCardRegistry(cardRegistry)
+
+    const triggerAction: ActionDefinition = {
+      id: 'trigger-cross-owner-during',
+      nameKey: 'test.crossOwnerDuring',
+      descriptionKey: 'test.crossOwnerDuring',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(triggerAction)
+    const space = createSpace(triggerAction)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('trigger', triggerAction.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const playerForNextNode = () => {
+      const nodeId = engine.peekNextUnresolvedNodeId()
+      const ownerId = nodeId ? engine.getEffectiveOwnerPlayerId(nodeId, p1.id) : p1.id
+      return state.players.find((player) => player.id === ownerId) ?? p1
+    }
+
+    let step = engine.proceed({ state, player: playerForNextNode(), space })
+    let safety = 10
+    while (safety-- > 0 && step.type === 'ok') {
+      step = engine.proceed({ state, player: playerForNextNode(), space })
+    }
+
+    expect(seen).toEqual([
+      {
+        playerId: p1.id,
+        triggerPlayerId: p1.id,
+        ownerPlayerId: p2.id,
+        mandatory: true,
+      },
+    ])
+  })
+
+  it('before listener optional flow does not re-trigger before hooks on its child', () => {
+    const p1 = createPlayer()
+    p1.minorPlayed = ['OPTIONAL_BEFORE_CARD']
+    const state = createState()
+    state.players = [p1]
+
+    let listenerCalls = 0
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'optional-before-flow',
+      cardIds: ['OPTIONAL_BEFORE_CARD'],
+      phases: ['before'],
+      handler: () => {
+        listenerCalls += 1
+        if (listenerCalls > 1) return undefined
+        return {
+          sourceCard: 'OPTIONAL_BEFORE_CARD',
+          flow: {
+            type: 'leaf',
+            actionId: 'gain',
+            params: { food: 1 },
+            sourceCard: 'OPTIONAL_BEFORE_CARD',
+            optional: true,
+          },
+        }
+      },
+    })
+    setActiveCardRegistry(cardRegistry)
+
+    const triggerAction: ActionDefinition = {
+      id: 'trigger-optional-before',
+      nameKey: 'test.optionalBefore',
+      descriptionKey: 'test.optionalBefore',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(triggerAction)
+    registry.register(gainAction)
+    const space = createSpace(triggerAction)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('trigger', triggerAction.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const context = () => ({ state, player: p1, space })
+
+    expect(engine.proceed(context()).type).toBe('ok')
+    expect(engine.proceed(context()).type).toBe('ok')
+    expect(listenerCalls).toBe(1)
+
+    const choiceStep = engine.proceed(context())
+    expect(choiceStep.type).toBe('choice')
+    if (choiceStep.type !== 'choice') throw new Error('expected optional flow choice')
+    const optionalActionId = choiceStep.choice.options.find((option) => option.value !== '__skip__')?.value
+    expect(optionalActionId).toBeTruthy()
+    const accepted = engine.resolveChoice(optionalActionId!, context())
+    expect(accepted.type).toBe('ok')
+
+    const childStep = engine.proceed(context())
+    expect(childStep.type).toBe('ok')
+    expect(p1.resources.food).toBe(1)
+    expect(listenerCalls).toBe(1)
+    const activationNodes = engine
+      ._internals()
+      .tree
+      .allNodes()
+      .filter((node) => node instanceof ActionNode && node.actionId === 'activate-card')
+    expect(activationNodes).toHaveLength(1)
+  })
+
+  it('restores before-flow skip ids for pending optional listener flow', () => {
+    const p1 = createPlayer()
+    p1.minorPlayed = ['RESTORED_OPTIONAL_BEFORE_CARD']
+    const state = createState()
+    state.players = [p1]
+
+    let listenerCalls = 0
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'restored-optional-before-flow',
+      cardIds: ['RESTORED_OPTIONAL_BEFORE_CARD'],
+      phases: ['before'],
+      handler: () => {
+        listenerCalls += 1
+        return {
+          sourceCard: 'RESTORED_OPTIONAL_BEFORE_CARD',
+          flow: {
+            type: 'leaf',
+            actionId: 'gain',
+            params: { food: 1 },
+            sourceCard: 'RESTORED_OPTIONAL_BEFORE_CARD',
+            optional: true,
+          },
+        }
+      },
+    })
+    setActiveCardRegistry(cardRegistry)
+
+    const triggerAction: ActionDefinition = {
+      id: 'trigger-restored-optional-before',
+      nameKey: 'test.restoredOptionalBefore',
+      descriptionKey: 'test.restoredOptionalBefore',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(triggerAction)
+    registry.register(gainAction)
+    const space = createSpace(triggerAction)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('trigger', triggerAction.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const context = () => ({ state, player: p1, space })
+
+    expect(engine.proceed(context()).type).toBe('ok')
+    expect(engine.proceed(context()).type).toBe('ok')
+    const choiceStep = engine.proceed(context())
+    expect(choiceStep.type).toBe('choice')
+    if (choiceStep.type !== 'choice') throw new Error('expected optional flow choice')
+    const optionalActionId = choiceStep.choice.options.find((option) => option.value !== '__skip__')?.value
+    expect(optionalActionId).toBeTruthy()
+    expect(listenerCalls).toBe(1)
+
+    const restored = new Engine({
+      tree: new EngineTree(new ActionNode('dummy', triggerAction.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    restored.restore(engine.snapshot())
+
+    const accepted = restored.resolveChoice(optionalActionId!, context())
+    expect(accepted.type).toBe('ok')
+    const childStep = restored.proceed(context())
+    expect(childStep.type).toBe('ok')
+    expect(p1.resources.food).toBe(1)
+    expect(listenerCalls).toBe(1)
+    const activationNodes = restored
+      ._internals()
+      .tree
+      .allNodes()
+      .filter((node) => node instanceof ActionNode && node.actionId === 'activate-card')
+    expect(activationNodes).toHaveLength(1)
+  })
+
+  it('dynamic result.flow nested targetPlayerId preserves inner owner override', () => {
+    const p1 = createPlayer()
+    const p2 = { ...createPlayer(), id: 'p2', name: 'P2', color: 'blue' as const }
+    const state = createState()
+    state.players = [p1, p2]
+
+    const triggerAction: ActionDefinition = {
+      id: 'trigger-nested-target-flow',
+      nameKey: 'test.triggerNested',
+      descriptionKey: 'test.triggerNested',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({
+        type: 'flow',
+        flow: {
+          type: 'seq',
+          targetPlayerId: p2.id,
+          children: [
+            {
+              type: 'leaf',
+              actionId: 'gain',
+              params: { food: 1 },
+            },
+            {
+              type: 'leaf',
+              actionId: 'gain',
+              params: { wood: 1 },
+              targetPlayerId: p1.id,
+            },
+          ],
+        },
+      }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(triggerAction)
+    registry.register(gainAction)
+    const space = createSpace(triggerAction)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('trigger', triggerAction.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+
+    const playerForNextNode = () => {
+      const nodeId = engine.peekNextUnresolvedNodeId()
+      const ownerId = nodeId ? engine.getEffectiveOwnerPlayerId(nodeId, p1.id) : p1.id
+      return state.players.find((player) => player.id === ownerId) ?? p1
+    }
+
+    let step = engine.proceed({ state, player: playerForNextNode(), space })
+    let safety = 20
+    while (safety-- > 0 && step.type === 'ok') {
+      step = engine.proceed({ state, player: playerForNextNode(), space })
     }
 
     expect(p2.resources.food).toBe(1)
@@ -198,8 +544,7 @@ describe('Engine flow nodes', () => {
     registry.register(buildRooms)
     registry.register(buildStables)
     const roomsAction = new ActionNode('action-rooms', buildRooms.id)
-    const roomsChoice = new InteractionNode('choice-rooms', [])
-    const roomsSeq = new SequenceNode('seq-rooms', [roomsAction, roomsChoice])
+    const roomsSeq = new SequenceNode('seq-rooms', [roomsAction])
     const stablesAction = new ActionNode('action-stables', buildStables.id)
     const root = new OrNode('or-root', [roomsSeq, stablesAction])
     const engine = new Engine({
@@ -303,7 +648,6 @@ describe('Engine flow nodes', () => {
     registry.register(skip)
     const plowSeq = new SequenceNode('seq-plow', [
       new ActionNode('action-plow', plow.id),
-      new InteractionNode('choice-plow', []),
     ])
     const root = new XorNode('xor-root', [
       plowSeq,
@@ -754,7 +1098,7 @@ describe('Engine flow nodes', () => {
     expect(sowOption?.labelParams).toEqual({ actionNameKey: 'actions.sow.name' })
   })
 
-  it('optional node auto-skips when child is not doable', () => {
+  it('optional metadata auto-skips when host is not doable', () => {
     const action: ActionDefinition = {
       id: 'blocked-action',
       nameKey: 'test',
@@ -766,11 +1110,10 @@ describe('Engine flow nodes', () => {
     }
     const registry = new ActionRegistry()
     registry.register(action)
-    const optional = new OptionalNode(
-      'opt',
-      new ActionNode('action-blocked', 'blocked-action'),
-      'ui.interactionOptionalAction',
-    )
+    const optional = new ActionNode('action-blocked', 'blocked-action')
+    optional.optional = true
+    optional.optionalActive = false
+    optional.optionalPromptKey = 'ui.interactionOptionalAction'
     const engine = new Engine({
       tree: new EngineTree(optional),
       registry,
@@ -786,7 +1129,7 @@ describe('Engine flow nodes', () => {
     expect(optional.getState()).toBe('resolved')
   })
 
-  it('optional node resolves when choosing __skip__', () => {
+  it('optional metadata resolves when choosing __skip__', () => {
     const action: ActionDefinition = {
       id: 'skippable',
       nameKey: 'test',
@@ -798,11 +1141,10 @@ describe('Engine flow nodes', () => {
     }
     const registry = new ActionRegistry()
     registry.register(action)
-    const optional = new OptionalNode(
-      'opt',
-      new ActionNode('action-skip', 'skippable'),
-      'ui.interactionOptionalAction',
-    )
+    const optional = new ActionNode('action-skip', 'skippable')
+    optional.optional = true
+    optional.optionalActive = false
+    optional.optionalPromptKey = 'ui.interactionOptionalAction'
     const engine = new Engine({
       tree: new EngineTree(optional),
       registry,
@@ -822,6 +1164,92 @@ describe('Engine flow nodes', () => {
 
     const done = engine.proceed({ state, player, space })
     expect(done.type).toBe('done')
+  })
+
+  it('optional xor exposes branch choices plus direct skip without accept prompt', () => {
+    let executed = false
+    const action: ActionDefinition = {
+      id: 'xor-skippable',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        executed = true
+        return { type: 'ok' }
+      },
+    }
+    const registry = new ActionRegistry()
+    registry.register(action)
+    const optional = new XorNode('xor-opt', [
+      new ActionNode('action-xor-skip', 'xor-skippable'),
+    ], 'ui.interactionOptionalAction')
+    optional.optional = true
+    optional.optionalActive = false
+    optional.optionalPromptKey = 'ui.interactionOptionalAction'
+    const engine = new Engine({
+      tree: new EngineTree(optional),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(action)
+
+    const step = engine.proceed({ state, player, space })
+    expect(step.type).toBe('choice')
+    if (step.type !== 'choice') return
+    expect(step.choice.options.map((option) => option.value)).toEqual([
+      'action-xor-skip',
+      '__skip__',
+    ])
+
+    const result = engine.resolveChoice('__skip__', { state, player, space })
+    expect(result.type).toBe('ok')
+    expect(optional.getState()).toBe('resolved')
+    expect(executed).toBe(false)
+  })
+
+  it('accepting optional xor activates the host and executes selected branch', () => {
+    let executed = false
+    const action: ActionDefinition = {
+      id: 'xor-accept',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        executed = true
+        return { type: 'ok' }
+      },
+    }
+    const registry = new ActionRegistry()
+    registry.register(action)
+    const optional = new XorNode('xor-opt', [
+      new ActionNode('action-xor-accept', 'xor-accept'),
+    ], 'ui.interactionOptionalAction')
+    optional.optional = true
+    optional.optionalActive = false
+    optional.optionalPromptKey = 'ui.interactionOptionalAction'
+    const engine = new Engine({
+      tree: new EngineTree(optional),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(action)
+
+    const step = engine.proceed({ state, player, space })
+    expect(step.type).toBe('choice')
+    const result = engine.resolveChoice('action-xor-accept', { state, player, space })
+    expect(result.type).toBe('ok')
+    expect(optional.optionalActive).toBe(true)
+    expect(executed).toBe(true)
   })
 
   it('or node resolves when choosing __done__', () => {

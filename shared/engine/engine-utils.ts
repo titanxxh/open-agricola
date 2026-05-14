@@ -14,23 +14,24 @@ import type { PromptKey } from '../contract/prompt-keys'
 import type { FollowUpAction, ActionHookPhase } from '../actions/hooks'
 import {
   ActionNode,
-  ActivateCardNode,
-  InteractionNode,
-  OptionalNode,
   OrNode,
   ParallelNode,
-  PlayerSwitchNode,
   SequenceNode,
   XorNode,
 } from './nodes'
-import { attachChoiceLabel } from './nodes/interaction-helpers'
+import { attachChoiceLabel, resolveChoiceSourceCard } from './nodes/interaction-helpers'
 import type { EngineNode } from './types'
+import type { PendingEnvelope, PendingSyntheticKind } from './types'
 import type { EngineInternals } from './engine-internals'
 import type { ActionRegistry } from './registry'
 import { getPlayOrderIndex } from './matched-trigger'
-import { ParallelTriggerNode } from './nodes/parallel-trigger-node'
 import type { MatchedCardListener } from '../cards/card-listeners'
 import type { GameState } from '../contract/types'
+import {
+  ACTIVATE_CARD_ACTION_ID,
+  type ActivateCardActionNode,
+  type ActivateCardActionParams,
+} from './activation-action'
 
 /**
  * S4c PR5 — module-private utilities extracted from `Engine`. Each function
@@ -96,15 +97,84 @@ export function buildFollowUpNodes(
           },
         })
       }
-      return new ActionNode(`chain-${baseId}-${index}`, actionId, sourceCard)
+      const node = new ActionNode(`chain-${baseId}-${index}`, actionId, sourceCard)
+      node.ownerPlayerId = player.id
+      return node
     })
+}
+
+export function getNodeChildren(node: EngineNode): EngineNode[] {
+  if (
+    node instanceof SequenceNode ||
+    node instanceof ParallelNode ||
+    node instanceof OrNode ||
+    node instanceof XorNode
+  ) {
+    return node.children
+  }
+  return []
+}
+
+export function stampOwner(node: EngineNode, ownerPlayerId: string): EngineNode {
+  node.ownerPlayerId ??= ownerPlayerId
+  for (const child of getNodeChildren(node)) {
+    stampOwner(child, ownerPlayerId)
+  }
+  return node
+}
+
+function unanimousActionOwner(node: EngineNode): string | undefined {
+  const owners = new Set<string>()
+  let sawUnownedAction = false
+  const visit = (entry: EngineNode) => {
+    if (entry instanceof ActionNode) {
+      if (entry.ownerPlayerId) owners.add(entry.ownerPlayerId)
+      else sawUnownedAction = true
+      return
+    }
+    for (const child of getNodeChildren(entry)) visit(child)
+  }
+  visit(node)
+  if (sawUnownedAction || owners.size !== 1) return undefined
+  return [...owners][0]
+}
+
+export function markOptional<T extends EngineNode>(
+  node: T,
+  promptKey?: PromptKey,
+): T {
+  node.optional = true
+  node.optionalActive = false
+  if (promptKey !== undefined) node.optionalPromptKey = promptKey
+  node.ownerPlayerId ??= unanimousActionOwner(node)
+  return node
+}
+
+function copySharedNodeMetadata(source: EngineNode, target: EngineNode): EngineNode {
+  target.ownerPlayerId = source.ownerPlayerId
+  target.optional = source.optional
+  target.optionalActive = source.optionalActive
+  target.optionalPromptKey = source.optionalPromptKey
+  const pending = source.getPending()
+  if (pending) target.setPending(pending)
+  return target
+}
+
+export function effectiveOwnerPlayerId(
+  int: EngineInternals,
+  nodeId: string,
+  frameOwnerPlayerId?: string,
+): string | undefined {
+  let node = int.tree.findNodeById(nodeId)
+  while (node) {
+    if (node.ownerPlayerId) return node.ownerPlayerId
+    node = int.tree.findParent(node.id)
+  }
+  return frameOwnerPlayerId
 }
 
 export function findActionNode(node: EngineNode): ActionNode | null {
   if (node instanceof ActionNode) return node
-  if (node instanceof OptionalNode) {
-    return findActionNode(node.child)
-  }
   if ('children' in node) {
     const composite = node as { children: EngineNode[] }
     for (const child of composite.children) {
@@ -115,35 +185,35 @@ export function findActionNode(node: EngineNode): ActionNode | null {
   return null
 }
 
-export function findPairedInteractionNode(
+export function buildActivationActionNodes(
   int: EngineInternals,
-  node: ActionNode,
-): InteractionNode | null {
-  const parent = int.tree.findParent(node.id)
-  if (!(parent instanceof SequenceNode)) return null
-  const index = parent.children.findIndex((child) => child.id === node.id)
-  if (index === -1) return null
-  const candidate = parent.children[index + 1]
-  return candidate instanceof InteractionNode ? candidate : null
-}
-
-export function buildActivateCardNodes(
-  int: EngineInternals,
-  matched: { registration: { id: string; cardIds?: string[] }; cardId: string; ownerPlayerId: string }[],
-  phase: string,
+  matched: MatchedCardListener[],
+  phase: ActionHookPhase,
   actionId: string,
   event: Record<string, unknown> = {},
+  triggerPlayerId?: string,
 ): EngineNode[] {
   return matched.map((entry, index) => {
     const nodeId = `activate-${phase}-${actionId}-${index}-${int.counterRef.value++}`
-    return new ActivateCardNode(
-      nodeId,
-      entry.registration.id,
-      entry.cardId,
-      phase as import('../actions/hooks').ActionHookPhase,
+    const params: ActivateCardActionParams = {
+      listenerId: entry.registration.id,
+      cardId: entry.cardId,
+      phase,
       actionId,
-      { ...event, ownerPlayerId: entry.ownerPlayerId },
+      event,
+      ownerPlayerId: entry.ownerPlayerId,
+      triggerPlayerId,
+      mandatory: entry.registration.mandatory === true,
+      countCardUse: typeof event.countCardUse === 'boolean' ? event.countCardUse : undefined,
+    }
+    const node = new ActionNode(
+      nodeId,
+      ACTIVATE_CARD_ACTION_ID,
+      entry.cardId,
+      params,
     )
+    if (entry.ownerPlayerId) node.ownerPlayerId = entry.ownerPlayerId
+    return node
   })
 }
 
@@ -181,7 +251,7 @@ export function buildPhaseTrailingNodes(
   const effectiveTriggerPlayerId = triggerPlayerId ?? activeId
   const orderedOwners: string[] = []
   // Global listeners (no cardIds → ownerPlayerId='') run first in the active
-  // player's context with no PlayerSwitchNode wrap.
+  // player's context.
   if (byOwner.has('')) orderedOwners.push('')
   if (activeId && byOwner.has(activeId)) orderedOwners.push(activeId)
   for (const p of state.players) {
@@ -198,21 +268,28 @@ export function buildPhaseTrailingNodes(
       return a.matchedIndex - b.matchedIndex
     })
 
-    const buildNode = (p: Prepared) => {
+    const buildNode = (p: Prepared): ActivateCardActionNode => {
       const nodeId = `activate-${phase}-${actionId}-${int.counterRef.value++}`
-      return new ActivateCardNode(
-        nodeId,
-        p.ml.registration.id,
-        p.ml.cardId,
+      const params: ActivateCardActionParams = {
+        listenerId: p.ml.registration.id,
+        cardId: p.ml.cardId,
         phase,
         actionId,
-        {
-          ...baseEvent,
-          triggerPlayerId: effectiveTriggerPlayerId,
-          ownerPlayerId: p.ml.ownerPlayerId,
-          mandatory: p.ml.registration.mandatory === true,
-        },
+        event: baseEvent,
+        triggerPlayerId: effectiveTriggerPlayerId,
+        ownerPlayerId: p.ml.ownerPlayerId,
+        mandatory: p.ml.registration.mandatory === true,
+        countCardUse:
+          typeof baseEvent.countCardUse === 'boolean' ? baseEvent.countCardUse : undefined,
+      }
+      const node = new ActionNode(
+        nodeId,
+        ACTIVATE_CARD_ACTION_ID,
+        p.ml.cardId,
+        params,
       )
+      if (p.ml.ownerPlayerId) node.ownerPlayerId = p.ml.ownerPlayerId
+      return node as ActivateCardActionNode
     }
 
     const ownerGroupNodes: EngineNode[] = []
@@ -225,37 +302,38 @@ export function buildPhaseTrailingNodes(
       ownerGroupNodes.push(buildNode(selectOnes[0]!))
     } else if (selectOnes.length > 1) {
       const children = selectOnes.map(buildNode)
-      const ptn = new ParallelTriggerNode(
+      const ptn = new ParallelNode(
         `parallel-trigger-${phase}-${actionId}-${ownerId}-${int.counterRef.value++}`,
         children,
-        ownerId,
       )
+      ptn.mode = 'trigger-select'
+      ptn.triggerOwnerPlayerId = ownerId
+      ptn.ownerPlayerId = ownerId
+      ptn.triggerChildren = children.map((child) => ({
+        nodeId: child.id,
+        cardId: child.params.cardId,
+        listenerId: child.params.listenerId,
+        mandatory: child.params.mandatory === true,
+      }))
       ownerGroupNodes.push(ptn)
     }
 
-    // Wrap opponent groups in PlayerSwitchNode pair so the choice/UI is
-    // owned by the card's player, not the action-active player. Active
-    // player group runs in-context (no wrap).
     if (ownerGroupNodes.length === 0) continue
-    // Empty ownerId == global listener (no cardIds) — runs in active player's
-    // frame, no PlayerSwitchNode wrap.
+    // Empty ownerId == global listener (no cardIds) runs in the active
+    // player's frame. Card-owned listener groups carry owner metadata.
     if (ownerId !== activeId && ownerId !== '') {
-      out.push(new PlayerSwitchNode(`ps-to-${phase}-${actionId}-${ownerId}-${int.counterRef.value++}`, ownerId))
-      out.push(...ownerGroupNodes)
-      out.push(new PlayerSwitchNode(`ps-back-${phase}-${actionId}-${activeId ?? ''}-${int.counterRef.value++}`, activeId ?? ownerId))
+      ownerGroupNodes.forEach((node) => stampOwner(node, ownerId))
     } else {
-      out.push(...ownerGroupNodes)
+      if (ownerId) ownerGroupNodes.forEach((node) => stampOwner(node, ownerId))
     }
+    out.push(...ownerGroupNodes)
   }
   return out
 }
 
 export function collectNodeIds(node: EngineNode, ids: Set<string>): void {
   ids.add(node.id)
-  const children = (node as { children?: EngineNode[] }).children
-  if (children) {
-    for (const child of children) collectNodeIds(child, ids)
-  }
+  for (const child of getNodeChildren(node)) collectNodeIds(child, ids)
 }
 
 export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
@@ -271,78 +349,47 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
       node.effectPreview,
     )
     clone.beforePhaseResolved = node.beforePhaseResolved
-    return clone
-  }
-  if (node instanceof InteractionNode) {
-    const clone = new InteractionNode(
-      `${node.id}-clone-${int.counterRef.value++}`,
-      [...node.choices],
-    )
-    if (node.promptKey) {
-      clone.setChoice(node.promptKey, [...node.choices])
-    }
-    return clone
+    return copySharedNodeMetadata(node, clone)
   }
   if (node instanceof SequenceNode) {
-    return new SequenceNode(
+    return copySharedNodeMetadata(node, new SequenceNode(
       `${node.id}-clone-${int.counterRef.value++}`,
       node.children.map((child) => cloneNode(int, child)),
-    )
+    ))
   }
   if (node instanceof ParallelNode) {
-    return new ParallelNode(
+    const clone = new ParallelNode(
       `${node.id}-clone-${int.counterRef.value++}`,
       node.children.map((child) => cloneNode(int, child)),
     )
+    clone.mode = node.mode
+    clone.selectedChildId = node.selectedChildId
+    clone.triggerOwnerPlayerId = node.triggerOwnerPlayerId
+    clone.triggerChildren = node.triggerChildren.map((entry) => ({ ...entry }))
+    clone.emittedChoices = [...node.emittedChoices]
+    clone.emittedPromptKey = node.emittedPromptKey
+    clone.emittedPromptParams = node.emittedPromptParams
+    clone.emittedRequest = node.emittedRequest
+    return copySharedNodeMetadata(node, clone)
   }
   if (node instanceof OrNode) {
-    return new OrNode(
+    return copySharedNodeMetadata(node, new OrNode(
       `${node.id}-clone-${int.counterRef.value++}`,
       node.children.map((child) => cloneNode(int, child)),
       node.promptKey,
-    )
+    ))
   }
   if (node instanceof XorNode) {
-    return new XorNode(
+    return copySharedNodeMetadata(node, new XorNode(
       `${node.id}-clone-${int.counterRef.value++}`,
       node.children.map((child) => cloneNode(int, child)),
       node.promptKey,
-    )
-  }
-  if (node instanceof OptionalNode) {
-    const clone = new OptionalNode(
-      `${node.id}-clone-${int.counterRef.value++}`,
-      cloneNode(int, node.child),
-      node.promptKey,
-    )
-    clone.active = node.active
-    return clone
-  }
-  if (node instanceof ActivateCardNode) {
-    return new ActivateCardNode(
-      `${node.id}-clone-${int.counterRef.value++}`,
-      node.listenerId,
-      node.cardId,
-      node.phase,
-      node.actionId,
-      node.event,
-    )
-  }
-  if (node instanceof PlayerSwitchNode) {
-    return new PlayerSwitchNode(
-      `${node.id}-clone-${int.counterRef.value++}`,
-      node.targetPlayerId,
-    )
+    ))
   }
   return node
 }
 
 export function resolveSubtree(node: EngineNode): void {
-  if (node instanceof OptionalNode) {
-    resolveSubtree(node.child)
-    node.resolve()
-    return
-  }
   if (
     node instanceof SequenceNode ||
     node instanceof ParallelNode ||
@@ -353,7 +400,7 @@ export function resolveSubtree(node: EngineNode): void {
     node.resolve()
     return
   }
-  if (node instanceof ActionNode || node instanceof InteractionNode) {
+  if (node instanceof ActionNode) {
     node.setState('resolved')
     return
   }
@@ -402,10 +449,6 @@ export function getActionEffectPreview(node: ActionNode): ChoiceEffectPreview | 
 
 export function collectOrderedActionNodes(node: EngineNode): ActionNode[] | null {
   if (node instanceof ActionNode) return [node]
-  if (node instanceof InteractionNode) return []
-  if (node instanceof OptionalNode) {
-    return collectOrderedActionNodes(node.child)
-  }
   if (node instanceof SequenceNode) {
     const flattened: ActionNode[] = []
     for (const child of node.children) {
@@ -448,9 +491,6 @@ export function getSequenceEffectPreview(node: SequenceNode): ChoiceEffectPrevie
 export function getNodeEffectPreview(node: EngineNode): ChoiceEffectPreview | undefined {
   if (node instanceof ActionNode) {
     return getActionEffectPreview(node)
-  }
-  if (node instanceof OptionalNode) {
-    return getNodeEffectPreview(node.child)
   }
   if (node instanceof SequenceNode) {
     const aggregated = getSequenceEffectPreview(node)
@@ -501,9 +541,6 @@ export function getNodeDescriptionPreview(
       effectPreview: getActionEffectPreview(node),
     }
   }
-  if (node instanceof OptionalNode) {
-    return getNodeDescriptionPreview(node.child, registry)
-  }
   if (
     node instanceof SequenceNode ||
     node instanceof XorNode ||
@@ -532,15 +569,8 @@ export function buildFlowNode(
   const nextId = () => `flow-${int.counterRef.value++}`
   if (flow.targetPlayerId) {
     const { targetPlayerId, ...innerFlow } = flow
-    const scopedNode = buildFlowNode(int, innerFlow as ActionFlow, targetPlayerId)
-    if (!ownerPlayerId || ownerPlayerId === targetPlayerId) {
-      return scopedNode
-    }
-    return new SequenceNode(nextId(), [
-      new PlayerSwitchNode(`ps-flow-to-${int.counterRef.value++}`, targetPlayerId),
-      scopedNode,
-      new PlayerSwitchNode(`ps-flow-back-${int.counterRef.value++}`, ownerPlayerId),
-    ])
+    const scopedNode = buildFlowNode(int, innerFlow as ActionFlow, ownerPlayerId)
+    return stampOwner(scopedNode, targetPlayerId)
   }
   if (flow.type === 'leaf') {
     if (flow.expandFlow) {
@@ -569,43 +599,40 @@ export function buildFlowNode(
     )
     const definition = int.registry.get(flow.actionId)
     if (definition?.resolveChoice && !definition.skipChoiceWrap) {
-      const sequence = new SequenceNode(nextId(), [
-        actionNode,
-        new InteractionNode(nextId(), []),
-      ])
-      const node = flow.optional
-        ? new OptionalNode(nextId(), sequence, flow.promptKey)
-        : sequence
+      const sequence = new SequenceNode(nextId(), [actionNode])
+      const node = flow.optional ? markOptional(sequence, flow.promptKey) : sequence
       return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
     }
-    const node = flow.optional
-      ? new OptionalNode(nextId(), actionNode, flow.promptKey)
-      : actionNode
+    const node = flow.optional ? markOptional(actionNode, flow.promptKey) : actionNode
     return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
   }
   const children = flow.children.map((child) => buildFlowNode(int, child, ownerPlayerId))
   if (flow.type === 'seq') {
     const sequence = new SequenceNode(nextId(), children)
-    const node = flow.optional
-      ? new OptionalNode(nextId(), sequence, flow.promptKey)
-      : sequence
+    const node = flow.optional ? markOptional(sequence, flow.promptKey) : sequence
     return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
   }
   if (flow.type === 'parallel') {
     const parallel = new ParallelNode(nextId(), children)
-    const node = flow.optional
-      ? new OptionalNode(nextId(), parallel, flow.promptKey)
-      : parallel
+    const node = flow.optional ? markOptional(parallel, flow.promptKey) : parallel
     return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
   }
   if (flow.type === 'xor') {
     const xor = new XorNode(nextId(), children, flow.promptKey)
-    const node = flow.optional ? new OptionalNode(nextId(), xor, flow.promptKey) : xor
+    const node = flow.optional ? markOptional(xor, flow.promptKey) : xor
     return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
   }
   const or = new OrNode(nextId(), children, flow.promptKey)
-  const node = flow.optional ? new OptionalNode(nextId(), or, flow.promptKey) : or
+  const node = flow.optional ? markOptional(or, flow.promptKey) : or
   return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
+}
+
+export function buildOwnedFlowNode(
+  int: EngineInternals,
+  flow: ActionFlow,
+  ownerPlayerId: string,
+): EngineNode {
+  return stampOwner(buildFlowNode(int, flow, ownerPlayerId), ownerPlayerId)
 }
 
 /**
@@ -640,21 +667,6 @@ export function mergeContextIntoFlow(
       mergeContextIntoFlow(c, outerContext, outerSourceCard),
     ),
   }
-}
-
-export function findInteractionNode(node: EngineNode): InteractionNode | null {
-  if (node instanceof InteractionNode) return node
-  if (node instanceof OptionalNode) {
-    return findInteractionNode(node.child)
-  }
-  if ('children' in node) {
-    const composite = node as { children: EngineNode[] }
-    for (const child of composite.children) {
-      const found = findInteractionNode(child)
-      if (found) return found
-    }
-  }
-  return null
 }
 
 export function resolveTrueAction(actionContext?: Record<string, unknown>) {
@@ -749,25 +761,15 @@ export function buildChoiceExecutionContext(
 }
 
 /**
- * Apply an InteractionRequest emitted by an action.execute / resolveChoice
- * call to the engine's pending-interaction state. Centralises the three
- * mirror branches (top-level execute, XorNode follow-up execute,
- * resolveChoice second-pass) so that every interaction request goes
- * through the same setChoice + pending-interaction wiring path.
- *
- * Caller is responsible for:
- *   - locating the right InteractionNode (paired with an ActionNode, child
- *     of the XorNode, or pending node from tree lookup) — pass it as
- *     `targetNode` (null when no node exists; pendingNodeId falls back to
- *     `fallbackNodeId`).
- *   - building the final `choiceOptions` (e.g. animal-reorg confirm/cancel
- *     shim, computeArgs extraOptions merge).
- *   - any prior shallow-merge of actionContextWrite from extraData.
+ * Apply an InteractionRequest emitted by action execution to the node that
+ * now owns the waiting state. The host remains unresolved; `pending` is the
+ * marker that makes subsequent `proceed()` calls re-emit the prompt instead
+ * of executing the action again.
  */
 export function applyInteractionRequest(
   int: EngineInternals,
   args: {
-    targetNode: InteractionNode | null
+    targetNode: EngineNode | null
     fallbackNodeId: string | null
     request: InteractionRequest
     promptKey?: PromptKey
@@ -784,38 +786,40 @@ export function applyInteractionRequest(
      *  performs the shallow merge so all three call sites can stop repeating
      *  the same boilerplate inline. */
     contextWritePatch?: Record<string, unknown>
-    /** When true, leave the InteractionNode's existing `ownerNodeId` untouched
-     *  (used by the resolveChoice second-pass that wants to preserve the
-     *  existing owner pointer). Forwarded to `InteractionNode.emit()`. */
+    /** When true, keep the existing envelope owner pointer during multi-step
+     *  resolveChoice prompts. */
     preserveOwner?: boolean
   },
 ): void {
   const { targetNode, fallbackNodeId, request, promptKey, promptParams, choiceOptions, actionId, ownerNodeId } = args
-  if (targetNode) {
-    // S4b Task 12 — delegate the heavy lift (setChoice + request + node
-    // pending fields + context snapshot) to InteractionNode.emit().
-    targetNode.emit({
-      request,
-      promptKey,
-      promptParams,
-      choiceOptions,
-      actionId,
-      ownerNodeId,
+  const host = targetNode ?? (fallbackNodeId ? int.tree.findNodeById(fallbackNodeId) : null)
+  if (!host) {
+    int.pendingNodeIdRef.value = fallbackNodeId
+    return
+  }
+  const existingOwnerNodeId = host.getPending()?.ownerNodeId
+  const mergedActionContext = args.contextWritePatch
+    ? { ...(args.actionContext ?? {}), ...args.contextWritePatch }
+    : args.actionContext
+  host.setPending({
+    hostNodeId: host.id,
+    request,
+    choices: choiceOptions,
+    promptKey,
+    promptParams,
+    sourceCard: resolveChoiceSourceCard(args.sourceCard, choiceOptions),
+    pendingActionId: actionId,
+    ownerNodeId: args.preserveOwner ? (existingOwnerNodeId ?? ownerNodeId) : ownerNodeId,
+    contextSnapshot: {
       params: args.params,
       costs: args.costs,
-      sourceCard: args.sourceCard,
-      actionContext: args.actionContext,
-      contextWritePatch: args.contextWritePatch,
-      preserveOwner: args.preserveOwner,
-    })
-    int.pendingNodeIdRef.value = targetNode.id
-  } else {
-    // No-targetNode path: pending context (params/costs/sourceCard/actionContext)
-    // will be installed when the eventual InteractionNode emits — engine carries
-    // no fallback snapshot post-PR2 (the deleted `pendingInteractionContext` mirror
-    // used to live here).
-    int.pendingNodeIdRef.value = fallbackNodeId
-  }
+      sourceCard: resolveChoiceSourceCard(args.sourceCard, choiceOptions),
+      actionContext: mergedActionContext,
+    },
+    effectiveOwnerPlayerId: ownerFromRequest(request) ?? host.ownerPlayerId,
+    syntheticKind: requestSyntheticKind(request, actionId),
+  })
+  int.pendingNodeIdRef.value = host.id
 }
 
 export function snapshotCompositeEmit(int: EngineInternals): {
@@ -828,7 +832,7 @@ export function snapshotCompositeEmit(int: EngineInternals): {
   if (int.pendingNodeIdRef.value === null) return null
   const node = int.tree.findNodeById(int.pendingNodeIdRef.value)
   if (!node) return null
-  if (node instanceof OrNode || node instanceof XorNode || node instanceof OptionalNode) {
+  if (node instanceof OrNode || node instanceof XorNode) {
     if (node.emittedChoices.length === 0 && node.emittedRequest === undefined) return null
     return {
       nodeId: node.id,
@@ -838,5 +842,97 @@ export function snapshotCompositeEmit(int: EngineInternals): {
       request: node.emittedRequest,
     }
   }
+  if (node instanceof ParallelNode && node.mode === 'trigger-select') {
+    if (node.emittedChoices.length === 0 && node.emittedRequest === undefined) return null
+    return {
+      nodeId: node.id,
+      promptKey: node.emittedPromptKey,
+      promptParams: node.emittedPromptParams,
+      options: node.emittedChoices,
+      request: node.emittedRequest,
+    }
+  }
+  return null
+}
+
+function requestSyntheticKind(
+  request: InteractionRequest,
+  pendingActionId?: string | null,
+): PendingSyntheticKind | undefined {
+  if (pendingActionId === '__interaction_only__') return 'interaction-only'
+  if (request.kind === 'feed') return 'feed'
+  if (request.kind === 'confirm-next-player') return 'confirm-next-player'
+  if (request.kind === 'confirm-player-switch') return 'confirm-player-switch'
+  if (request.kind === 'farm-select') return 'farm-select'
+  return undefined
+}
+
+function sourceCardFromContextSnapshot(snapshot: unknown): string | undefined {
+  if (!snapshot || typeof snapshot !== 'object') return undefined
+  const sourceCard = (snapshot as { sourceCard?: unknown }).sourceCard
+  return typeof sourceCard === 'string' ? sourceCard : undefined
+}
+
+function ownerFromRequest(request: InteractionRequest): string | undefined {
+  return request.kind === 'select-trigger' ? request.ownerPlayerId : undefined
+}
+
+function choiceRequest(options: ActionChoiceOption[]): InteractionRequest {
+  return { kind: 'choice', options }
+}
+
+export function pendingEnvelopeFromHostNode(node: EngineNode | null): PendingEnvelope | null {
+  if (!node) return null
+  const pending = node.getPending()
+  if (pending) return pending
+
+  if (node instanceof OrNode || node instanceof XorNode) {
+    if (node.emittedChoices.length === 0 && !node.emittedRequest) return null
+    const request = node.emittedRequest ?? choiceRequest(node.emittedChoices)
+    const sourceCard = sourceCardFromContextSnapshot(node.pendingContextSnapshot)
+    return {
+      hostNodeId: node.id,
+      request,
+      choices: node.emittedChoices,
+      promptKey: node.emittedPromptKey,
+      promptParams: node.emittedPromptParams,
+      sourceCard,
+      pendingActionId: node.pendingActionId ?? undefined,
+      ownerNodeId: null,
+      contextSnapshot: node.pendingContextSnapshot,
+      effectiveOwnerPlayerId: ownerFromRequest(request) ?? node.ownerPlayerId,
+      syntheticKind: requestSyntheticKind(request, node.pendingActionId),
+    }
+  }
+
+  if (node instanceof ParallelNode && node.mode === 'trigger-select') {
+    if (node.emittedChoices.length === 0 && !node.emittedRequest) return null
+    const request = node.emittedRequest ?? choiceRequest(node.emittedChoices)
+    return {
+      hostNodeId: node.id,
+      request,
+      choices: node.emittedChoices,
+      promptKey: node.emittedPromptKey,
+      promptParams: node.emittedPromptParams,
+      ownerNodeId: null,
+      effectiveOwnerPlayerId: ownerFromRequest(request) ?? node.ownerPlayerId,
+      syntheticKind: requestSyntheticKind(request),
+    }
+  }
+
+  if (node instanceof ActionNode && node.emittedRequest) {
+    const request = node.emittedRequest
+    return {
+      hostNodeId: node.id,
+      request,
+      choices: request.kind === 'choice' ? request.options : undefined,
+      sourceCard: node.sourceCard,
+      pendingActionId: node.actionId,
+      ownerNodeId: null,
+      effectiveOwnerPlayerId: ownerFromRequest(request) ?? node.ownerPlayerId,
+      syntheticKind: requestSyntheticKind(request, node.actionId),
+    }
+  }
+
   return null
 }

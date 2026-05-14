@@ -6,7 +6,7 @@ import '../../shared/cards/A/A116_WoodCutter'
 
 // A116_WoodCutter has a simple `after place-farmer` listener that fires once
 // per wood-space visit. We use it as a representative card to assert that
-// ActivateCardNode increments cardStates[id].extraData.resourceStats.used
+// Internal listener activation increments cardStates[id].extraData.resourceStats.used
 // every time a listener fires (the engine-level cross-cutting concern).
 
 describe('per-card used stat', () => {

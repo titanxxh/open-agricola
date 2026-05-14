@@ -1,8 +1,8 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { ActionRegistry } from '../registry'
 import { CardRegistry } from '../../cards/registry'
-import { setActiveCardRegistry, requireActiveCardRegistry } from '../../cards/active-registry'
-import { ActionNode, InteractionNode, OptionalNode, OrNode, SequenceNode, XorNode } from '../nodes'
+import { setActiveCardRegistry } from '../../cards/active-registry'
+import { ActionNode, OrNode, SequenceNode } from '../nodes'
 import { Engine } from '../engine'
 import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
@@ -177,7 +177,7 @@ describe('engine follow-up actions', () => {
     expect(wrapped.children.map((node) => node.id)).toEqual(['action-a', 'chain-action-a-0'])
   })
 
-  it('keeps tree shape when parent is optional node', () => {
+  it('keeps tree shape when root action has active optional metadata', () => {
     const actionA = {
       id: 'optional-a',
       nameKey: 'actions.bonus-wood.name',
@@ -200,12 +200,10 @@ describe('engine follow-up actions', () => {
     const registry = new ActionRegistry()
     registry.register(actionA)
     registry.register(actionB)
-    const optional = new OptionalNode(
-      'optional-root',
-      new ActionNode('action-optional-a', 'optional-a'),
-      'ui.interactionOptionalAction',
-    )
-    optional.active = true
+    const optional = new ActionNode('action-optional-a', 'optional-a')
+    optional.optional = true
+    optional.optionalActive = true
+    optional.optionalPromptKey = 'ui.interactionOptionalAction'
     const tree = new EngineTree(optional)
     const engine = new Engine({
       tree,
@@ -219,9 +217,8 @@ describe('engine follow-up actions', () => {
 
     const first = engine.proceed({ state, player, space })
     expect(first.type).toBe('ok')
-    expect(tree.root).toBe(optional)
-    expect(optional.child).toBeInstanceOf(SequenceNode)
-    const wrapped = optional.child as SequenceNode
+    expect(tree.root).toBeInstanceOf(SequenceNode)
+    const wrapped = tree.root as SequenceNode
     expect(wrapped.children.map((node) => node.id)).toEqual([
       'action-optional-a',
       'chain-action-optional-a-0',
@@ -372,7 +369,6 @@ describe('engine follow-up actions', () => {
     const tree = new EngineTree(
       new SequenceNode('seq', [
         new ActionNode('action-main', 'resolve-flow-main'),
-        new InteractionNode('choice-main', []),
       ]),
     )
     const engine = new Engine({

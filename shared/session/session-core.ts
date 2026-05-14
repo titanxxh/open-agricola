@@ -1,4 +1,5 @@
 import type {
+  ActionChoiceOption,
   ActionFlow,
   ActionSpace,
   AnytimeAction,
@@ -25,20 +26,22 @@ import {
   ActionRegistry,
   EngineStack,
   INTERACTION_ONLY_ACTION_ID,
-  InteractionNode,
   Engine,
   EngineTree,
   HookDispatcher,
   LogStore,
-  OptionalNode,
   OrNode,
   ParallelNode,
-  PlayerSwitchNode,
   SequenceNode,
   XorNode,
   isSyntheticInteractionFrame,
 } from '../engine/index.ts'
 import type { EngineFrame, EngineNode, EngineSource, EngineStackCursor, SubFlowReason } from '../engine/index.ts'
+import {
+  isPendingChoiceValueAllowed,
+  pendingEnvelopeChoices,
+} from '../engine/pending-validation.ts'
+import type { PendingEnvelope } from '../engine/types.ts'
 import type { ReorganizeTrigger } from '../actions/effects/reorganize.ts'
 import {
   createInitialState,
@@ -82,7 +85,7 @@ import type { CardEffectHook } from '../cards/card-effects.ts'
 import { runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks } from '../cards/card-effects.ts'
 import { positionKey } from '../domain/farm.ts'
 import { getMatchingListeners, executeCardListener } from '../cards/card-listeners.ts'
-import { buildPhaseTrailingNodes } from '../engine/engine-utils.ts'
+import { buildPhaseTrailingNodes, markOptional, stampOwner } from '../engine/engine-utils.ts'
 import { Scoring, playerBoard, type PlayerScoreSummary } from '../domain'
 import { reap } from '../actions/effects/reap.ts'
 import { breedLeaf } from '../actions/effects/breed'
@@ -134,24 +137,28 @@ const SUBFLOW_SPACE_PREFIX = '__subflow:' as const
 const subflowSpaceId = (reason: SubFlowReason): string =>
   `${SUBFLOW_SPACE_PREFIX}${reason}`
 
-/**
- * S7 Batch 1 — uniform discriminator for the InteractionRequest carried by
- * the current pending host node. InteractionNode exposes `request`; the
- * composite hosts (OrNode / XorNode / OptionalNode) and the bare leaf
- * ActionNode (S7) expose `emittedRequest`. Returns the request `kind` or
- * null when no request payload is attached. Used by runEngineSteps' choice
- * branch to decide whether to pivot into `startReorganizeSubFlow` for
- * `kind: 'animal-reorg'` regardless of which host node type currently
- * carries the pending interaction.
- */
-const getHostRequestKind = (host: EngineNode | null): string | null => {
-  if (!host) return null
-  if (host instanceof InteractionNode) return host.request?.kind ?? null
-  if (host instanceof OrNode || host instanceof XorNode || host instanceof OptionalNode) {
-    return host.emittedRequest?.kind ?? null
-  }
-  if (host instanceof ActionNode) return host.emittedRequest?.kind ?? null
-  return null
+type PendingContextSnapshot = {
+  params?: Record<string, unknown>
+  costs?: Partial<Resource>
+  sourceCard?: string
+  actionContext?: Record<string, unknown>
+}
+
+const pendingContextSnapshot = (
+  envelope: PendingEnvelope | null,
+): PendingContextSnapshot | null => {
+  const snapshot = envelope?.contextSnapshot
+  return snapshot && typeof snapshot === 'object'
+    ? snapshot as PendingContextSnapshot
+    : null
+}
+
+const choicesSourceCard = (choices: ActionChoiceOption[]): string | undefined => {
+  const sourceCards = choices
+    .map((choice) => choice.sourceCard)
+    .filter((sourceCard): sourceCard is string => typeof sourceCard === 'string' && sourceCard.length > 0)
+  const unique = [...new Set(sourceCards)]
+  return unique.length === 1 && sourceCards.length === choices.length ? unique[0] : undefined
 }
 
 /**
@@ -347,15 +354,15 @@ export class GameCore {
    *   1. `recordActionSnapshot(player, n)` — per-player action token used by
    *      undo/replay to label whose turn produced each player snapshot.
    *   2. `nextSyntheticNodeId(prefix)` — generates `${prefix}-${n}` ids for
-   *      synthetic InteractionNodes (`startConfirmNextPlayer` etc.).
+   *      synthetic pending frames (`startConfirmNextPlayer` etc.).
    *
-   * Cursor restore (Task 9 / I-2): cursor.choiceData.id carries the original
+   * Cursor restore: the pending envelope carries the original
    * synthetic id (e.g. `interaction:feed-7`); after `loadState` the freshly-
    * constructed `GameCore` resets `nextActionToken` to 1, so the next
    * `startConfirm*` call mints `interaction:confirm-next-player-1`.
    * Collisions on synthetic *node ids* are impossible because each id lives
    * on a separate `Engine` instance (one per stack frame) and
-   * `injectInteraction` replaces the engine tree's root wholesale.
+   * synthetic frames are isolated engine instances.
    *
    * Caveat (Task 10 S-2 / Task 11 carry-over): the same counter also stamps
    * per-player action snapshots (`recordActionSnapshot(player, token)`).
@@ -395,8 +402,8 @@ export class GameCore {
   popEngineFrame(): EngineFrame | undefined { return this.engineStack.pop() }
   /** @internal phase access — current top frame (read-only view). */
   peekEngineFrame(): EngineFrame | undefined { return this.engineStack.current() }
-  /** @internal phase access — current pending InteractionNode if any. */
-  peekEngineInteraction(): InteractionNode | null { return this.engineStack.peekInteraction() }
+  /** @internal phase access — current pending envelope if any. */
+  peekEnginePendingEnvelope(): PendingEnvelope | null { return this.engineStack.peekPendingEnvelope() }
   /** @internal phase access — total stack depth. */
   engineStackDepth(): number { return this.engineStack.depth() }
   /** @internal phase access — drop all frames (used by confirm-next-player turn switch). */
@@ -448,7 +455,7 @@ export class GameCore {
   startReorgSubFlow(playerIndex: number, trigger: ReorganizeTrigger, options?: { originPlayerIndex?: number }): void {
     this.startReorganizeSubFlow(playerIndex, trigger, options)
   }
-  /** @internal phase access — synthetic InteractionNode id generator. */
+  /** @internal phase access — synthetic pending id generator. */
   mintSyntheticNodeId(prefix: string): string { return this.nextSyntheticNodeId(prefix) }
   /** @internal phase access — Round phase listenersVetoIsDoable check. */
   listenersVetoIsDoableCheck(player: PlayerState, space: ActionSpace): boolean {
@@ -482,12 +489,11 @@ export class GameCore {
   /** @internal Round phase — enumerate currently-available anytime entries for the active interaction context. */
   listAnytimeEntries(): { descriptor: AnytimeAction; flow: ActionFlow }[] { return this.buildAnytimeEntries() }
 
-  /** @internal — derive policy input from current frame; node + composite fallback. */
+  /** @internal — derive policy input from the current pending envelope. */
   private getAnytimePolicyInput(): AnytimePolicyInput {
-    const node = this.engineStack.peekInteraction()
-    const composite = this.engineStack.peekPendingChoiceFromComposite()
-    const promptKey = node?.promptKey ?? composite?.promptKey
-    const request = node?.request ?? composite?.request
+    const envelope = this.engineStack.peekPendingEnvelope()
+    const promptKey = envelope?.promptKey
+    const request = envelope?.request
     return {
       hasActiveContext: !!this.getActiveInteractionContext(),
       stageResume: this.stageResume,
@@ -531,9 +537,9 @@ export class GameCore {
   invokeAfterRoundEnd(): SessionResponse { return this.continueAfterRoundEnd() }
   /** @internal phase access — build a fresh Engine for a top-level action space. */
   createEngineForSpace(actionId: string): Engine { return this.createEngine(actionId) }
-  /** @internal phase access — push a synthetic interaction-only frame. */
-  pushSyntheticInteractionFrame(node: InteractionNode, ownerPlayerIndex: number, reason: SubFlowReason): void {
-    this.pushInteractionFrame(node, ownerPlayerIndex, reason)
+  /** @internal phase access — push a synthetic pending-only frame. */
+  pushSyntheticPendingFrame(envelope: PendingEnvelope, ownerPlayerIndex: number, reason: SubFlowReason): void {
+    this.pushPendingFrame(envelope, ownerPlayerIndex, reason)
   }
 
   private registry: ActionRegistry
@@ -645,24 +651,23 @@ export class GameCore {
       engine.restore(snapshot)
       return engine
     })
-    // Capture the pre-`runEngineSteps` interaction node id so the dev-only
+    // Capture the pre-`runEngineSteps` pending host id so the dev-only
     // assert below can detect a non-idempotent `proceed()` (Task 8 reviewer
-    // Important): if `runEngineSteps` advances the interaction node out from
+    // Important): if `runEngineSteps` advances the pending host out from
     // under the freshly-restored cursor we silently lose the client's
     // already-shown prompt and the next ServerEvent surfaces a different
     // request. The assert is a cheap canary — it has no production cost
     // because the comparison is a string equality.
-    const preRestoreNodeId = this.engineStack.peekInteraction()?.id ?? null
+    const preRestoreNodeId = this.engineStack.peekPendingHost()?.id ?? null
     // Task 10: `this.pending` is gone — every consumer derives the legacy
-    // PendingAction shape from `engineStack.peekInteraction()` via
-    // `getCurrentPending()`. No dual-write rebuild is needed; the
-    // InteractionNode survived the cursor round-trip with its `request` and
-    // `choices` intact, which is the single source of truth.
+    // PendingAction shape from the current pending envelope. No dual-write
+    // rebuild is needed; the envelope survived the cursor round-trip with its
+    // `request` and `choices` intact, which is the single source of truth.
     //
     // Re-run engine steps so the freshly-restored frame proceeds through any
     // already-emitted choice node. `proceed()` is idempotent on a still-
-    // pending InteractionNode (it re-emits `step.type === 'choice'`), so the
-    // canonical pre/post node-id assert below catches drift.
+    // pending host (it re-emits `step.type === 'choice'`), so the
+    // canonical pre/post pending-host-id assert below catches drift.
     this.runEngineSteps()
     // Cross-platform NODE_ENV check that works in both Node (server) and
     // browser (esbuild-style `process.env.NODE_ENV` replacement). Vite/Rollup
@@ -671,7 +676,7 @@ export class GameCore {
     const env =
       (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV
     if (env !== 'production') {
-      const postRestoreNodeId = this.engineStack.peekInteraction()?.id ?? null
+      const postRestoreNodeId = this.engineStack.peekPendingHost()?.id ?? null
       if (
         preRestoreNodeId !== null &&
         postRestoreNodeId !== null &&
@@ -726,15 +731,8 @@ export class GameCore {
   ): EngineNode {
     if (flow.targetPlayerId) {
       const { targetPlayerId, ...innerFlow } = flow
-      const scopedNode = this.buildEngineNode(innerFlow as ActionFlow, counter, targetPlayerId)
-      if (!ownerPlayerId || ownerPlayerId === targetPlayerId) {
-        return scopedNode
-      }
-      return new SequenceNode(`seq-target-${counter.value++}`, [
-        new PlayerSwitchNode(`ps-to-${counter.value++}`, targetPlayerId),
-        scopedNode,
-        new PlayerSwitchNode(`ps-back-${counter.value++}`, ownerPlayerId),
-      ])
+      const scopedNode = this.buildEngineNode(innerFlow as ActionFlow, counter, ownerPlayerId)
+      return stampOwner(scopedNode, targetPlayerId)
     }
     if (flow.type === 'leaf') {
       const actionNode = new ActionNode(
@@ -750,32 +748,27 @@ export class GameCore {
       if (def?.resolveChoice && !def.skipChoiceWrap) {
         const seq = new SequenceNode(`seq-${flow.actionId}-${counter.value++}`, [
           actionNode,
-          new InteractionNode(`choice-${flow.actionId}-${counter.value++}`, []),
         ])
-        return flow.optional ? new OptionalNode(`opt-${counter.value++}`, seq, flow.promptKey) : seq
+        return flow.optional ? markOptional(seq, flow.promptKey) : seq
       }
-      return flow.optional
-        ? new OptionalNode(`opt-${counter.value++}`, actionNode, flow.promptKey)
-        : actionNode
+      return flow.optional ? markOptional(actionNode, flow.promptKey) : actionNode
     }
 
     const children = flow.children.map((child) => this.buildEngineNode(child, counter, ownerPlayerId))
     if (flow.type === 'seq') {
       const seq = new SequenceNode(`seq-${counter.value++}`, children)
-      return flow.optional ? new OptionalNode(`opt-${counter.value++}`, seq, flow.promptKey) : seq
+      return flow.optional ? markOptional(seq, flow.promptKey) : seq
     }
     if (flow.type === 'parallel') {
       const parallel = new ParallelNode(`par-${counter.value++}`, children)
-      return flow.optional
-        ? new OptionalNode(`opt-${counter.value++}`, parallel, flow.promptKey)
-        : parallel
+      return flow.optional ? markOptional(parallel, flow.promptKey) : parallel
     }
     if (flow.type === 'xor') {
       const xor = new XorNode(`xor-${counter.value++}`, children, flow.promptKey)
-      return flow.optional ? new OptionalNode(`opt-${counter.value++}`, xor, flow.promptKey) : xor
+      return flow.optional ? markOptional(xor, flow.promptKey) : xor
     }
     const or = new OrNode(`or-${counter.value++}`, children, flow.promptKey)
-    return flow.optional ? new OptionalNode(`opt-${counter.value++}`, or, flow.promptKey) : or
+    return flow.optional ? markOptional(or, flow.promptKey) : or
   }
 
   private runPlaceFarmerAfterHooks(
@@ -817,10 +810,9 @@ export class GameCore {
     )
     if (nodes.length === 0) return false
 
-    // Wrap the dispatched nodes — buildPhaseTrailingNodes returns ActivateCardNode
-    // and optional ParallelTriggerNode in playOrder. Side effects (incCardUsed,
-    // logs, follow-up flows) are handled by engine-proceed when each
-    // ActivateCardNode steps; we don't repeat them here.
+    // Wrap the dispatched nodes in play order. Listener activation side
+    // effects (incCardUsed, logs, follow-up flows) are handled by
+    // engine-proceed when each internal activation leaf executes.
     const root = nodes.length === 1 ? nodes[0] : new SequenceNode(`pf-after-seq`, nodes)
     const newEngine = new Engine({
       tree: new EngineTree(root),
@@ -880,19 +872,32 @@ export class GameCore {
 
   /**
    * Synthetic frame factory used by the start*-confirm/start*-feed triggers.
-   * Pushes an `__interaction_only__` leaf flow frame, then immediately
-   * `injectInteraction(node)` so the engine yields the request via
-   * `peekInteraction()`. Frame deserialization (cursor round-trip) recreates
-   * the same shape via `Engine.restore`'s synthetic-frame branch.
+   * Pushes an `__interaction_only__` leaf flow frame whose root ActionNode
+   * already owns the pending envelope.
    */
-  private pushInteractionFrame(
-    node: InteractionNode,
+  private pushPendingFrame(
+    envelope: PendingEnvelope,
     ownerPlayerIndex: number,
     reason: SubFlowReason,
   ): void {
     const flow: ActionFlow = { type: 'leaf', actionId: INTERACTION_ONLY_ACTION_ID }
-    const engine = this.createFlowEngine(flow, ownerPlayerIndex)
-    engine.injectInteraction(node)
+    const owner = this.state.players[ownerPlayerIndex]
+    const root = new ActionNode(envelope.hostNodeId, INTERACTION_ONLY_ACTION_ID)
+    root.ownerPlayerId = owner?.id
+    root.setPending({
+      ...envelope,
+      hostNodeId: root.id,
+      pendingActionId: INTERACTION_ONLY_ACTION_ID,
+      ownerNodeId: envelope.ownerNodeId ?? null,
+      effectiveOwnerPlayerId: envelope.effectiveOwnerPlayerId ?? owner?.id,
+      syntheticKind: envelope.syntheticKind ?? 'interaction-only',
+    })
+    const engine = new Engine({
+      tree: new EngineTree(root),
+      registry: this.registry,
+      hooks: this.hookDispatcher,
+      log: this.engineLog,
+    })
     this.engineStack.push({
       engine,
       source: { kind: 'flow', flow },
@@ -931,7 +936,7 @@ export class GameCore {
     const root = action?.flow
       ? this.buildEngineNode(action.flow, counter, this.state.players[ownerPlayerIndex]?.id)
       : action?.resolveChoice
-        ? new SequenceNode(`seq-${actionId}`, [an, new InteractionNode(`choice-${actionId}`, [])])
+        ? new SequenceNode(`seq-${actionId}`, [an])
         : an
     return new Engine({
       tree: new EngineTree(root),
@@ -1132,13 +1137,12 @@ export class GameCore {
   }
 
   /**
-   * Refactored from `buildFenceInteraction(pending)` to take the
-   * InteractionNode + player directly (Task 10: `this.pending` deleted).
+   * Refactored from `buildFenceInteraction(pending)` to take the current
+   * player directly (Task 2: pending metadata is read through the envelope).
    * `selectableTiles('fence', ...)` only needs the active space id (used
    * to detect the `farm-redevelopment` `extraWood` adjustment).
    */
   private buildFenceInteractionFromNode(
-    _node: InteractionNode,
     player: PlayerState,
   ): InteractionFarmSelection {
     const frame = this.engineStack.current()
@@ -1149,7 +1153,6 @@ export class GameCore {
   }
 
   private buildSelectionInteractionFromNode(
-    _node: InteractionNode,
     player: PlayerState,
   ): InteractionSelection {
     const actionContext = this.getActionContextFromTopFrame()
@@ -1162,16 +1165,16 @@ export class GameCore {
   }
 
   private buildFarmInteractionFromNode(
-    node: InteractionNode,
+    promptKey: string | undefined,
     player: PlayerState,
   ): InteractionFarmSelection | null {
-    const farmType = this.isFarmPromptKey(node.promptKey)
+    const farmType = this.isFarmPromptKey(promptKey)
     if (!farmType) return null
     const ctx = this.getActionContextFromTopFrame()
     const costOverride = this.peekHostContextSnapshot()?.costs
     switch (farmType) {
       case 'fence':
-        return this.buildFenceInteractionFromNode(node, player)
+        return this.buildFenceInteractionFromNode(player)
       case 'room':
         return this.buildRoomInteraction(player, costOverride, ctx)
       case 'stable':
@@ -1186,47 +1189,28 @@ export class GameCore {
   }
 
   /**
-   * Read-through helper for the engine's `pendingInteractionContext.actionContext`
-   * on the current engine-stack frame. Replaces the legacy `this.pending.actionContext`
-   * accessor (Task 10).
-   *
-   * S4b PR5 — reads the context snapshot directly off the current
-   * pending-interaction host (InteractionNode | OrNode | XorNode |
-   * OptionalNode) via `peekInteractionHost()`. The legacy engine-mirror
-   * `getPendingInteractionContext()` accessor is gone.
+   * Read-through helper for the pending envelope's context snapshot on the
+   * current engine-stack frame. Replaces the legacy `this.pending.actionContext`
+   * and host-node-specific context readers.
    */
   private getActionContextFromTopFrame(): Record<string, unknown> | undefined {
     return this.peekHostContextSnapshot()?.actionContext
   }
 
   /**
-   * S4b PR5 — read the pending-interaction context snapshot off whichever
-   * host node is currently active (`InteractionNode.contextSnapshot` or
-   * `Or/Xor/OptionalNode.pendingContextSnapshot`).
+   * Task 2 — read pending context through PendingEnvelope. The envelope
+   * adapter owns pending host lookup.
    */
-  private peekHostContextSnapshot() {
-    const host = this.engineStack.peekInteractionHost()
-    if (!host) return null
-    if (host instanceof InteractionNode) return host.contextSnapshot ?? null
-    if (host instanceof OrNode || host instanceof XorNode || host instanceof OptionalNode) {
-      return host.pendingContextSnapshot ?? null
-    }
-    return null
+  private peekHostContextSnapshot(): PendingContextSnapshot | null {
+    return pendingContextSnapshot(this.engineStack.peekPendingEnvelope())
   }
 
   /**
-   * S4b PR5 — read the pending-interaction action id off the current host.
-   * Returns undefined when no pending host or the host did not record an
-   * actionId (composite host emit metadata).
+   * Task 2 — read the pending action id through PendingEnvelope. Returns
+   * undefined when no pending envelope or the host did not record an action id.
    */
   private peekHostPendingActionId(): string | undefined {
-    const host = this.engineStack.peekInteractionHost()
-    if (!host) return undefined
-    if (host instanceof InteractionNode) return host.pendingActionId
-    if (host instanceof OrNode || host instanceof XorNode || host instanceof OptionalNode) {
-      return host.pendingActionId ?? undefined
-    }
-    return undefined
+    return this.engineStack.peekPendingEnvelope()?.pendingActionId
   }
 
   private buildAnytimeEntries(): { descriptor: AnytimeAction; flow: ActionFlow }[] {
@@ -1304,10 +1288,9 @@ export class GameCore {
 
   /**
    * Derive the client-facing `InteractionState` from the current engine
-   * stack. Replaces the legacy pending-driven implementation (Task 10):
-   * `engineStack.peekInteraction()` + `engineStack.current()` is now the
-   * single source of truth. Draft phase is handled in `respond()` (which
-   * passes the cardDraft pending into a separate code path).
+   * stack. Pending prompts are read through `PendingEnvelope`; the envelope
+   * adapter keeps host details hidden
+   * hidden from production session reads.
    */
   private buildInteraction(): InteractionState {
     if (this.state.gameOver) {
@@ -1320,13 +1303,10 @@ export class GameCore {
       }
     }
     const frame = this.engineStack.current()
-    const node = this.engineStack.peekInteraction()
-    // Fallback for composite-node pending choices (OrNode / XorNode /
-    // OptionalNode): the engine has a pending choice but no InteractionNode
-    // wraps it. Surface the cached options so the wait+choice shape works.
-    const composite = !node ? this.engineStack.peekPendingChoiceFromComposite() : null
+    const envelope = this.engineStack.peekPendingEnvelope()
+    const pendingHost = this.engineStack.peekPendingHost()
 
-    if (!frame || (!node && !composite)) {
+    if (!frame || !envelope) {
       const anytimeActions = this.buildAnytimeEntries().map((entry) => entry.descriptor)
       return {
         stateId: 'idle',
@@ -1337,25 +1317,15 @@ export class GameCore {
       }
     }
 
-    const playerIndex = frame.ownerPlayerIndex
+    const playerIndex = this.effectiveOwnerIndexForFrame(frame, envelope.hostNodeId, envelope)
     const spaceId = frame.spaceId
-    const promptKey = node?.promptKey ?? composite?.promptKey
-    const promptParams = node?.promptParams ?? composite?.promptParams
-    const ctx = this.peekHostContextSnapshot()
-    const sourceCard = ctx?.sourceCard
+    const promptKey = envelope.promptKey
+    const promptParams = envelope.promptParams
+    const ctx = pendingContextSnapshot(envelope)
+    const request: InteractionRequest = envelope.request
+    const choiceOptions = pendingEnvelopeChoices(envelope)
+    const sourceCard = envelope.sourceCard ?? ctx?.sourceCard ?? choicesSourceCard(choiceOptions)
     const costOverride = ctx?.costs
-
-    // Resolve the InteractionRequest for the wait state. node.request is the
-    // primary source; composite-fallback synthesises a `choice` request from
-    // the cached options.
-    const request: InteractionRequest =
-      node?.request ??
-      composite?.request ??
-      ({ kind: 'choice', options: composite?.options ?? node?.choices ?? [] } as InteractionRequest)
-    const choiceOptions =
-      request.kind === 'choice' || request.kind === 'select-trigger'
-        ? request.options
-        : (node?.choices ?? composite?.options ?? [])
     const player = this.state.players[playerIndex]
 
     const policy = this.computeAnytimePolicySnapshot()
@@ -1454,10 +1424,23 @@ export class GameCore {
           allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
           anytimeActions: anytimeDescriptors,
         }
+      case 'card-draft':
+        return {
+          stateId: 'wait',
+          playerIndex,
+          spaceId,
+          promptKey,
+          promptParams,
+          sourceCard,
+          request,
+          options: choiceOptions,
+          allowedCommands: buildCmds(['undoStep', 'undoAction']),
+          anytimeActions: anytimeDescriptors,
+        }
       case 'choice':
       default: {
         const selectionKind = this.isSelectionPromptKey(promptKey)
-        if (node && selectionKind && player) {
+        if (pendingHost && selectionKind && player) {
           return {
             stateId: 'wait',
             playerIndex,
@@ -1468,12 +1451,12 @@ export class GameCore {
             request,
             options: choiceOptions,
             costOverride,
-            selection: this.buildSelectionInteractionFromNode(node, player),
+            selection: this.buildSelectionInteractionFromNode(player),
             allowedCommands: buildCmds(['resolveChoice', 'commitSelection', 'undoStep', 'undoAction']),
             anytimeActions: anytimeDescriptors,
           }
         }
-        const farm = node && player ? this.buildFarmInteractionFromNode(node, player) : null
+        const farm = pendingHost && player ? this.buildFarmInteractionFromNode(promptKey, player) : null
         const allowedCommands: InteractionCommand[] = farm
           ? buildCmds(['resolveChoice', 'commitFarm', 'undoStep', 'undoAction'])
           : buildCmds(['resolveChoice', 'undoStep', 'undoAction'])
@@ -1555,26 +1538,20 @@ export class GameCore {
 
   /**
    * Whether the current engine-stack state is a "legacy choice" — i.e. the
-   * top-of-stack InteractionNode has a `choice` / `animal-reorg` /
+   * top-of-stack pending envelope has a `choice` / `animal-reorg` /
    * `farm-select` / `selection` request, OR a composite-fallback pending
-   * choice from OrNode / XorNode / OptionalNode. Used by `pushHistory()`
+   * choice from OrNode / XorNode or an optional metadata host. Used by `pushHistory()`
    * to populate `HistoryEntry.hadChoicePending`, which `undoStep()`
    * consults via the `canRestorePriorChoice` branch.
    */
   private currentIsChoicePending(): boolean {
     const frame = this.engineStack.current()
     if (!frame) return false
-    const node = this.engineStack.peekInteraction()
-    if (node) {
-      const kind = node.request?.kind
-      return kind === 'choice'
-        || kind === 'animal-reorg'
-        || kind === 'farm-select'
-        || kind === 'selection'
-        || kind == null // ChoiceNode-emitted untyped request
-    }
-    // Composite-fallback (OrNode / XorNode / OptionalNode) pending choice.
-    return this.engineStack.peekPendingChoiceFromComposite() != null
+    const kind = this.engineStack.peekPendingEnvelope()?.request.kind
+    return kind === 'choice'
+      || kind === 'animal-reorg'
+      || kind === 'farm-select'
+      || kind === 'selection'
   }
 
   private pushHistory(actionStart = false, undoBoundary = false) {
@@ -1588,7 +1565,7 @@ export class GameCore {
     const entry: HistoryEntry = {
       state: cloneState(this.state),
       // Task 10/11: `this.pending` field is gone; derive the snapshot from
-      // `engineStack.peekInteraction()`. S2 Task 13.6 contracted the
+      // the pending envelope. S2 Task 13.6 contracted the
       // HistoryEntry pending snapshot down to a single boolean — `undoStep()`
       // only consults the 'choice' discriminator (see `canRestorePriorChoice`).
       hadChoicePending: this.currentIsChoicePending(),
@@ -1615,7 +1592,7 @@ export class GameCore {
     // 13.6 collapsed the HistoryEntry pending snapshot to a single boolean
     // (`hadChoicePending`) consumed by `undoStep()`'s `canRestorePriorChoice`
     // branch. Live pending/interaction shape is rederived from
-    // `engineStack.peekInteraction()` after the stack is restored below.
+    // the pending envelope after the stack is restored below.
     this.turnOwnerPlayerIndex = entry.turnOwnerPlayerIndex
     this.engineStack.clear()
     const source = entry.engineSource
@@ -2247,6 +2224,10 @@ export class GameCore {
         return this.continueAfterReorganize_returningHome(stageResume.playerIndex)
       }
       if (trigger === 'harvest-breed') {
+        if (this.engineStack.depth() > 0) {
+          this.runEngineSteps()
+          return
+        }
         return this.continueAfterReorganize_harvestBreed(stageResume.playerIndex)
       }
       if (trigger === 'round-end') {
@@ -2274,14 +2255,55 @@ export class GameCore {
     this.resumeStageFlow(stageResume)
   }
 
+  private effectiveOwnerIndexForFrame(
+    frame: EngineFrame,
+    nodeId?: string | null,
+    envelope?: PendingEnvelope | null,
+  ): number {
+    const frameOwnerId = this.state.players[frame.ownerPlayerIndex]?.id
+    const ownerId =
+      envelope?.effectiveOwnerPlayerId ??
+      (nodeId ? frame.engine.getEffectiveOwnerPlayerId(nodeId, frameOwnerId) : frameOwnerId)
+    if (!ownerId) return frame.ownerPlayerIndex
+    const ownerIndex = this.state.players.findIndex((player) => player.id === ownerId)
+    return ownerIndex === -1 ? frame.ownerPlayerIndex : ownerIndex
+  }
+
+  private acknowledgeCurrentActionAnimalReorgRequest(): void {
+    const pendingHost = this.engineStack.peekPendingHost()
+    if (!(pendingHost instanceof ActionNode)) return
+    pendingHost.clearPending()
+    pendingHost.emittedRequest = undefined
+    pendingHost.resolve({ type: 'ok' })
+  }
+
   private runEngineSteps(): void {
     let frame = this.engineStack.current()
     if (!frame || frame.ownerPlayerIndex === null || !frame.spaceId) return
-    let player = this.state.players[frame.ownerPlayerIndex]
-    let space = this.getSpaceById(frame.spaceId)
-    if (!player || !space) return
+    const space = this.getSpaceById(frame.spaceId)
+    if (!this.state.players[frame.ownerPlayerIndex] || !space) return
 
     while (true) {
+      const nextNodeId = frame.engine.peekNextUnresolvedNodeId()
+      const effectivePlayerIndex = this.effectiveOwnerIndexForFrame(frame, nextNodeId)
+      const frameOwnerPlayer = this.state.players[frame.ownerPlayerIndex]
+      const player = this.state.players[effectivePlayerIndex]
+      if (!frameOwnerPlayer || !player) return
+      if (effectivePlayerIndex !== frame.ownerPlayerIndex) {
+        const existing = frame.deferredPlayerSwitch
+        if (
+          !existing ||
+          existing.fromPlayerIndex !== frame.ownerPlayerIndex ||
+          existing.toPlayerIndex !== effectivePlayerIndex
+        ) {
+          frame.deferredPlayerSwitch = {
+            fromPlayerIndex: frame.ownerPlayerIndex,
+            toPlayerIndex: effectivePlayerIndex,
+          }
+        }
+      } else {
+        frame.deferredPlayerSwitch = null
+      }
       const before = this.clonePlayer(player)
       const step = frame.engine.proceed({ state: this.state, player, space })
       this.flushEngineLog()
@@ -2299,13 +2321,13 @@ export class GameCore {
           this.resumeStageFlow(stageResume)
           return
         }
-        if (isActionEngine && this.runPlaceFarmerAfterHooks(player, space)) {
+        if (isActionEngine && this.runPlaceFarmerAfterHooks(frameOwnerPlayer, space)) {
           // The frame's engine/source were replaced in-place; loop again with
           // the same frame.
           frame = this.engineStack.current()!
           continue
         }
-        if (this.hasPendingAnimals(player)) {
+        if (this.hasPendingAnimals(frameOwnerPlayer)) {
           const originIdx = this.turnOwnerPlayerIndex ?? ownerIdx
           this.engineStack.pop()
           this.startReorganizeSubFlow(ownerIdx, 'anytime', { originPlayerIndex: originIdx })
@@ -2313,27 +2335,14 @@ export class GameCore {
         }
         if (this.turnOwnerPlayerIndex !== null) {
           const ownerIndexLocal = this.turnOwnerPlayerIndex
-          this.finalizeActionLog(player)
+          this.finalizeActionLog(frameOwnerPlayer)
           this.engineStack.pop()
           this.continueEndTurnHooks(ownerIndexLocal)
           return
         }
-        this.finalizeActionLog(player)
+        this.finalizeActionLog(frameOwnerPlayer)
         this.engineStack.pop()
         return
-      }
-
-      if (step.type === 'playerSwitch') {
-        const toIndex = this.state.players.findIndex((p) => p.id === step.targetPlayerId)
-        if (toIndex !== -1 && toIndex !== frame.ownerPlayerIndex) {
-          this.pushHistory(false, true)
-          const fromIndex = frame.ownerPlayerIndex
-          frame.ownerPlayerIndex = toIndex
-          player = this.state.players[toIndex]!
-          space = this.getSpaceById(frame.spaceId) ?? space
-          frame.deferredPlayerSwitch = { fromPlayerIndex: fromIndex, toPlayerIndex: toIndex }
-        }
-        continue
       }
 
       if (step.type === 'choice') {
@@ -2345,20 +2354,24 @@ export class GameCore {
         // field and pivot to the same anytime sub-flow path the legacy
         // 'animalReorg' result took. After Task 6 we leave the parent
         // frame on the stack and push a reorganize sub-flow frame.
-        // S7 Batch 1: read the request via `peekInteractionHost()` (returns
-        // the host node, which can be InteractionNode for resolveChoice-wrapped
-        // actions OR ActionNode for bare leaves like `breedAction`). Both
-        // host types now expose a `request`/`emittedRequest` field carrying
-        // the InteractionRequest payload — uniform discrimination via
-        // `getHostRequestKind()`.
-        const host = this.engineStack.peekInteractionHost()
-        const hostRequestKind = getHostRequestKind(host)
+        // Task 2: read the request discriminator through PendingEnvelope.
+        // The engine owns the pending envelope regardless of host node type.
+        const pendingEnvelope = this.engineStack.peekPendingEnvelope()
+        const hostRequestKind = pendingEnvelope?.request.kind ?? null
         const isReorgSubFlow =
           frame.source.kind === 'flow'
           && (frame.source.flow as { actionId?: string }).actionId === 'reorganize'
         if (hostRequestKind === 'animal-reorg' && !isReorgSubFlow) {
-          const pIdx = frame.ownerPlayerIndex
-          this.startReorganizeSubFlow(pIdx, 'anytime')
+          const pIdx = this.effectiveOwnerIndexForFrame(
+            frame,
+            pendingEnvelope?.hostNodeId,
+            pendingEnvelope,
+          )
+          this.acknowledgeCurrentActionAnimalReorgRequest()
+          const trigger = frame.stageResume?.hook === 'onBreedPhase'
+            ? 'harvest-breed'
+            : 'anytime'
+          this.startReorganizeSubFlow(pIdx, trigger)
           return
         }
         // Synthetic interaction-only frames (the `__interaction_only__`
@@ -2366,9 +2379,9 @@ export class GameCore {
         // confirm-player-switch / feed / dev-fence-select) must NOT enter
         // the auto-resolve path below. Their engine has no registered
         // handler for `__interaction_only__`, so `resolveChoice` would
-        // silently no-op without resolving the InteractionNode and the
+        // silently no-op without resolving the pending host and the
         // next `proceed()` would surface the same step again — an infinite
-        // loop. The InteractionNode itself is the source of truth (Task 10);
+        // loop. The pending envelope itself is the source of truth;
         // yield to the client and wait for the matching resolveChoice
         // command. Predicate `isSyntheticInteractionFrame` (S-2) replaces
         // the legacy hard-coded kind list so future synthetic frames
@@ -2376,12 +2389,31 @@ export class GameCore {
         if (isSyntheticInteractionFrame(frame)) {
           return
         }
+        // Reorganize confirmations carry the zone assignment in the resolve
+        // payload. Even when only "confirm" is offered (harvest/return-home),
+        // this cannot use the generic single-option auto-resolve path.
+        if (hostRequestKind === 'animal-reorg') {
+          return
+        }
         // Lazy confirmation: if we silently switched players and now hit a choice,
-        // show confirmPlayerSwitch first. The InteractionNode stays unresolved in the engine.
-        if (frame.deferredPlayerSwitch) {
+        // show confirmPlayerSwitch first. The parent pending host stays unresolved in the engine.
+        if (frame.deferredPlayerSwitch && !frame.deferredPlayerSwitch.confirmed) {
           const { fromPlayerIndex, toPlayerIndex } = frame.deferredPlayerSwitch
           frame.deferredPlayerSwitch = null
           this.startConfirmPlayerSwitch(fromPlayerIndex, toPlayerIndex)
+          return
+        }
+        const pendingHost = this.engineStack.peekPendingHost()
+        const pendingActionId = pendingEnvelope?.pendingActionId
+        const pendingActionCanResolve = pendingActionId
+          ? this.registry.get(pendingActionId)?.resolveChoice !== undefined
+          : false
+        if (
+          pendingHost?.getPending() !== null &&
+          !(pendingHost instanceof OrNode) &&
+          !(pendingHost instanceof XorNode) &&
+          !pendingActionCanResolve
+        ) {
           return
         }
         if (step.choice.options.length === 1) {
@@ -2400,11 +2432,10 @@ export class GameCore {
                 autoOptions = requestOptions
                 continue
               }
-              // The follow-up InteractionNode now lives on the engine's tree
-              // (applyInteractionRequest -> setChoice with promptParams). The
+              // The follow-up pending host now lives on the engine's tree
+              // (applyInteractionRequest -> pending envelope). The
               // legacy `this.pending = { ... }` mirror is gone (Task 10): every
-              // consumer reads the live InteractionNode via
-              // `engineStack.peekInteraction()`.
+              // consumer reads the live pending envelope.
               return
             }
             if (result.type === 'fail') {
@@ -2413,7 +2444,7 @@ export class GameCore {
               return
             }
             if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
-              const pIdx = frame.ownerPlayerIndex
+              const pIdx = effectivePlayerIndex
               // Match legacy behaviour: this is a fall-through reorganize
               // detour from auto-resolved choice — the parent frame is
               // discarded (no resume) before the sub-flow starts.
@@ -2425,10 +2456,10 @@ export class GameCore {
           }
           continue
         }
-        // The InteractionNode that produced this `step.type === 'choice'`
+        // The pending host that produced this `step.type === 'choice'`
         // is the canonical source of the pending interaction (Task 10).
         // Yield to the client; `buildInteraction()` derives the response
-        // shape from `engineStack.peekInteraction()`.
+        // shape from the pending envelope.
         return
       }
 
@@ -2454,14 +2485,14 @@ export class GameCore {
       // Task 5 migrated breed to emit `'request' + kind: 'animal-reorg'`,
       // the engine now wraps it in step.type === 'choice' (handled in the
       // dedicated reorg branch in the `step.type === 'choice'` block above
-      // via `peekInteraction()?.request.kind === 'animal-reorg'`). The
+      // via the pending envelope request kind). The
       // generic `getAnimalCount > before` check below still picks up the
       // animals-bred path where breed returns `'ok'` so engine after-hooks
       // (D60 LargePottery, B104 SheepWalker, ...) keep firing on the
       // post-mutate state.
 
       if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
-        const pIdx = frame.ownerPlayerIndex
+        const pIdx = effectivePlayerIndex
         // Parent frame stays on the stack; reorganize sub-flow is pushed on
         // top. When it completes, resumeStageFlow's onReorganizeComplete
         // branch detects the parent frame and calls runEngineSteps again.
@@ -2665,30 +2696,32 @@ export class GameCore {
     pushHistoryEntry: boolean,
     payload?: Record<string, unknown>,
   ): SessionResponse {
-    const node = this.engineStack.peekInteraction()
+    const envelope = this.engineStack.peekPendingEnvelope()
     const frame = this.engineStack.current()
-    const composite = this.engineStack.peekPendingChoiceFromComposite()
-    const pendingPlayerIndex = frame?.ownerPlayerIndex ?? -1
-    const pendingPromptKey = node?.promptKey ?? composite?.promptKey
-    const pendingOptions = node?.choices ?? composite?.options ?? []
-    const pendingActionContext = this.peekHostContextSnapshot()?.actionContext
-    const pendingSourceCard = this.peekHostContextSnapshot()?.sourceCard
+    const pendingPlayerIndex = frame
+      ? this.effectiveOwnerIndexForFrame(frame, envelope?.hostNodeId, envelope)
+      : -1
+    const pendingPromptKey = envelope?.promptKey
+    const pendingOptions = pendingEnvelopeChoices(envelope)
+    const pendingSnapshot = pendingContextSnapshot(envelope)
+    const pendingActionContext = pendingSnapshot?.actionContext
+    const pendingSourceCard =
+      envelope?.sourceCard ?? pendingSnapshot?.sourceCard ?? choicesSourceCard(pendingOptions)
     // 'choice' (typed), 'animal-reorg' (legacy commit pathway), and any
     // ChoiceNode-emitted untyped request all flow through the engine's
-    // resolveChoice path. Composite-node (OrNode/XorNode/OptionalNode)
-    // emissions are also accepted: those don't carry an InteractionNode but
-    // the engine has a pending choice on the composite node itself.
+    // resolveChoice path. Composite-node and optional-host emissions are
+    // also accepted: those don't carry a special node but the engine
+    // has a pending choice on the host node itself.
     // 'feed' / 'confirm-next-player' / 'confirm-player-switch' are
     // dispatched by the public `resolveChoice` to dedicated handlers and
     // never reach this method.
-    const isInteractionNodeTarget =
-      node &&
-      (!node.request ||
-        node.request.kind === 'choice' ||
-        node.request.kind === 'animal-reorg' ||
-        node.request.kind === 'farm-select' ||
-        node.request.kind === 'selection')
-    const isResolveChoiceTarget = Boolean(isInteractionNodeTarget || composite)
+    const requestKind = envelope?.request.kind
+    const isResolveChoiceTarget =
+      requestKind === 'choice' ||
+      requestKind === 'animal-reorg' ||
+      requestKind === 'farm-select' ||
+      requestKind === 'selection' ||
+      requestKind === 'select-trigger'
     if (!isResolveChoiceTarget || pendingPlayerIndex !== playerIndex) {
       return this.respond(false, 'no pending choice for this player')
     }
@@ -2705,7 +2738,7 @@ export class GameCore {
       }
       return this.respond(false, 'no active engine')
     }
-    const player = this.state.players[playerIndex]
+    const player = this.state.players[pendingPlayerIndex]
     const space = this.getSpaceById(this.activeSpaceId)
     if (!player || !space) return this.respond(false, 'invalid state')
 
@@ -2737,7 +2770,7 @@ export class GameCore {
     }
     if (result.type === 'request' && result.request.kind === 'choice') {
       // The engine's `applyInteractionRequest` already wired the follow-up
-      // InteractionNode (with promptKey + promptParams + options) onto the
+      // pending envelope (with promptKey + promptParams + options) onto the
       // tree; no `this.pending` mirror is needed (Task 10).
       return this.respond()
     }
@@ -2754,7 +2787,7 @@ export class GameCore {
   }
 
   /**
-   * Unified entry-point for resolving any InteractionNode hosted on the
+   * Unified entry-point for resolving any pending envelope hosted on the
    * engineStack. Dispatches on the top-of-stack InteractionRequest's `kind`
    * discriminator so the legacy `confirmNextPlayer` / `confirmPlayerSwitch` /
    * `confirmHarvestFeed` / `commitAnimalReorg` paths collapse into one
@@ -2767,26 +2800,18 @@ export class GameCore {
     value: string,
     payload?: Record<string, unknown>,
   ): SessionResponse {
-    const node = this.engineStack.peekInteraction()
-    const request = node?.request
+    const envelope = this.engineStack.peekPendingEnvelope()
+    const request = envelope?.request
     if (request) {
-      // Reviewer C-1: validate `value` against the InteractionNode's known
-      // choices before dispatching. Pre-S1, `resolvePendingChoice` rejected
-      // any call whose top-of-stack pending wasn't a plain `choice`; the
-      // S1 dispatch widens the entry-point to also handle confirm/feed kinds,
-      // but a stray client value must still be rejected (otherwise an
-      // unrelated submission like `resolveChoice('sow')` against a
-      // `confirm-next-player` frame silently advances the turn).
-      const isValidValue = node!.choices.some((opt) => opt.value === value)
+      if (!isPendingChoiceValueAllowed(envelope, value)) {
+        return this.respond(false, 'invalid choice value')
+      }
       switch (request.kind) {
         case 'confirm-next-player':
-          if (!isValidValue) return this.respond(false, 'invalid choice value')
           return this.handleConfirmNextPlayerResolved(request.nextPlayerIndex)
         case 'confirm-player-switch':
-          if (!isValidValue) return this.respond(false, 'invalid choice value')
-          return this.handleConfirmPlayerSwitchResolved(request.toPlayerIndex)
+          return this.handleConfirmPlayerSwitchResolved(request.fromPlayerIndex, request.toPlayerIndex)
         case 'feed': {
-          if (!isValidValue) return this.respond(false, 'invalid choice value')
           const sels = (payload as { selections?: FeedSelections } | undefined)?.selections
             ?? (Array.isArray(payload) ? (payload as unknown as FeedSelections) : [])
           return this.handleFeedResolved(playerIndex, sels)
@@ -2794,19 +2819,19 @@ export class GameCore {
         case 'animal-reorg':
         case 'choice':
           // animal-reorg today still flows through the legacy commit pathway;
-          // plain choice (ChoiceNode-emitted requests not yet typed) follows
-          // the existing options-driven pending model. `resolvePendingChoice`
-          // already validates `value` against pendingOptions/composite cache.
+          // plain choices follow the existing engine pending model after the
+          // finite envelope choices have been validated above.
           return this.resolvePendingChoice(playerIndex, value, true, payload)
         case 'farm-select':
         case 'selection':
-        case 'card-draft':
         case 'select-trigger':
-          // S2 Task 2 introduced the farm-select / selection / card-draft kinds
-          // ahead of their resolvers (Tasks 5/6/7/12). Until those tasks wire
-          // dedicated handlers, fall back to the legacy pending-options path so
-          // tests/UX continue working through ChoiceNode.choices validation.
+          // S2 Task 2 introduced these kinds ahead of their dedicated
+          // resolvers. Until those tasks wire dedicated handlers, fall back to
+          // the legacy pending-options path so tests/UX continue working
+          // through PendingEnvelope choice validation.
           return this.resolvePendingChoice(playerIndex, value, true, payload)
+        case 'card-draft':
+          return this.respond(false, 'card-draft resolveChoice not supported')
         default: {
           const _exhaustive: never = request
           return this.respond(false, `unhandled interaction kind: ${JSON.stringify(_exhaustive)}`)
@@ -2821,34 +2846,30 @@ export class GameCore {
     if (playerIndex !== this.state.currentPlayerIndex) return this.respond(false, 'not your turn')
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
-    if (this.engineStack.peekInteraction()) return this.respond(false, 'pending action exists')
-    // Push a synthetic interaction-only frame so `buildInteraction()` surfaces
+    if (this.engineStack.peekPendingEnvelope()) return this.respond(false, 'pending action exists')
+    // Push a synthetic pending-only frame so `buildInteraction()` surfaces
     // the dev fence-select prompt via the same engineStack-driven path as
     // every other choice (Task 10).
-    const node = new InteractionNode(
-      this.nextSyntheticNodeId('interaction:dev-fence-select'),
-      [
+    const options: ActionChoiceOption[] = [
         { value: 'confirm', labelKey: 'ui.interactionFenceConfirm' },
         { value: 'cancel', labelKey: 'ui.interactionFenceCancel' },
-      ],
-      { kind: 'choice', options: [
-        { value: 'confirm', labelKey: 'ui.interactionFenceConfirm' },
-        { value: 'cancel', labelKey: 'ui.interactionFenceCancel' },
-      ] },
-    )
-    node.promptKey = 'ui.interactionFenceSelect'
-    const flow: ActionFlow = { type: 'leaf', actionId: INTERACTION_ONLY_ACTION_ID }
-    const engine = this.createFlowEngine(flow, playerIndex)
-    engine.injectInteraction(node)
-    this.engineStack.push({
-      engine,
-      source: { kind: 'flow', flow },
-      ownerPlayerIndex: playerIndex,
-      spaceId: 'dev-create-pasture',
-      stageResume: null,
-      deferredPlayerSwitch: null,
-      reason: 'top-level',
-    })
+    ]
+    this.pushPendingFrame({
+      hostNodeId: this.nextSyntheticNodeId('interaction:dev-fence-select'),
+      request: { kind: 'choice', options },
+      choices: options,
+      promptKey: 'ui.interactionFenceSelect',
+      pendingActionId: INTERACTION_ONLY_ACTION_ID,
+      ownerNodeId: null,
+      contextSnapshot: {
+        params: undefined,
+        costs: undefined,
+        sourceCard: undefined,
+        actionContext: undefined,
+      },
+      effectiveOwnerPlayerId: player.id,
+      syntheticKind: 'interaction-only',
+    }, playerIndex, 'top-level')
     return this.respond()
   }
 
@@ -2856,18 +2877,17 @@ export class GameCore {
     playerIndex: number,
     selections: FeedSelections,
   ): SessionResponse {
-    // Task 10 / I-1: the synthetic feed InteractionNode on the engine stack
-    // is now the source of truth (no more `this.pending` mirror). Read the
-    // request payload (`remaining`, `foodUsed`, `feedQueue`) directly off it.
-    const node = this.engineStack.peekInteraction()
+    // Read the synthetic feed request payload through PendingEnvelope.
+    const envelope = this.engineStack.peekPendingEnvelope()
+    const request = envelope?.request
     const frame = this.engineStack.current()
     if (
-      node?.request?.kind !== 'feed' ||
+      request?.kind !== 'feed' ||
       frame?.ownerPlayerIndex !== playerIndex
     ) {
       return this.respond(false, 'no pending feed')
     }
-    const feedRequest = node.request
+    const feedRequest = request
     const pendingRemaining = feedRequest.remaining
     const pendingFoodUsed = feedRequest.foodUsed
     const pendingFeedQueue = feedRequest.feedQueue ?? []
@@ -3010,8 +3030,11 @@ export class GameCore {
   }
 
   /** S2 Task 10 part 3: thin delegator — body lives in `phases/round.ts`. */
-  private handleConfirmPlayerSwitchResolved(toPlayerIndex: number): SessionResponse {
-    return roundPhase.handleConfirmPlayerSwitchResolved(this, toPlayerIndex)
+  private handleConfirmPlayerSwitchResolved(
+    fromPlayerIndex: number,
+    toPlayerIndex: number,
+  ): SessionResponse {
+    return roundPhase.handleConfirmPlayerSwitchResolved(this, fromPlayerIndex, toPlayerIndex)
   }
 
   /** S2 Task 10 part 3: thin delegator — body lives in `phases/round.ts`. */
@@ -3194,7 +3217,7 @@ export class GameCore {
     this.flushEngineLog()
 
     if (result.type === 'request' && result.request.kind === 'choice') {
-      // Engine wired the new InteractionNode (with promptKey + promptParams);
+      // Engine wired the new pending envelope (with promptKey + promptParams);
       // no `this.pending` mirror needed (Task 10).
       return this.respond()
     }
@@ -3212,10 +3235,13 @@ export class GameCore {
     playerIndex: number,
     payload: { positions?: FarmTilePosition[]; cardIds?: string[] },
   ): SessionResponse {
-    const node = this.engineStack.peekInteraction()
+    const envelope = this.engineStack.peekPendingEnvelope()
     const frame = this.engineStack.current()
-    const isPlainChoice = node && (!node.request || node.request.kind === 'choice')
-    if (!isPlainChoice || frame?.ownerPlayerIndex !== playerIndex) {
+    const isPlainChoice = envelope?.request.kind === 'choice'
+    const pendingPlayerIndex = frame && envelope
+      ? this.effectiveOwnerIndexForFrame(frame, envelope.hostNodeId, envelope)
+      : -1
+    if (!isPlainChoice || pendingPlayerIndex !== playerIndex) {
       return this.respond(false, 'no pending selection choice for this player')
     }
     const player = this.state.players[playerIndex]
@@ -3376,21 +3402,24 @@ export class GameCore {
   }
 
   undoStep(): SessionResponse {
-    const interactionNode = this.engineStack.peekInteraction()
+    const envelope = this.engineStack.peekPendingEnvelope()
     const interactionFrame = this.engineStack.current()
     // S2 Task 5/6 — farm-select kind also flows through the
     // farm-prompt undo special-cancel path (it carries the same
     // promptKey shape as the legacy 'choice' farm-prompts).
     const isPlainChoiceOrFarmSelect =
-      interactionNode &&
-      (!interactionNode.request ||
-        interactionNode.request.kind === 'choice' ||
-        interactionNode.request.kind === 'farm-select')
-    const farmPrompt = isPlainChoiceOrFarmSelect ? this.isFarmPromptKey(interactionNode.promptKey) : null
+      envelope &&
+      (envelope.request.kind === 'choice' ||
+        envelope.request.kind === 'farm-select')
+    const farmPrompt = isPlainChoiceOrFarmSelect ? this.isFarmPromptKey(envelope.promptKey) : null
     if (isPlainChoiceOrFarmSelect && farmPrompt && interactionFrame) {
-      const currentPromptKey = interactionNode.promptKey
+      const currentPromptKey = envelope.promptKey
       const currentSpaceId = interactionFrame.spaceId
-      const currentPlayerIndex = interactionFrame.ownerPlayerIndex
+      const currentPlayerIndex = this.effectiveOwnerIndexForFrame(
+        interactionFrame,
+        envelope.hostNodeId,
+        envelope,
+      )
       const entry = this.history[this.history.length - 1]
       const canRestorePriorChoice =
         !!entry &&

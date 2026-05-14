@@ -10,7 +10,7 @@ import { Engine } from '../../../engine/engine'
 import { EngineTree } from '../../../engine/tree'
 import { HookDispatcher } from '../../../engine/dispatcher'
 import { LogStore } from '../../../engine/log-store'
-import { ActionNode, InteractionNode, SequenceNode } from '../../../engine/nodes'
+import { ActionNode, SequenceNode } from '../../../engine/nodes'
 import { clearActionHooks } from '../../../actions/hooks'
 import { registerStubCards, clearStubCards } from '../index'
 import { CARD_ID as IMMEDIATELY_AFTER_ID } from '../Stub_ImmediatelyAfter_GainFlow'
@@ -325,7 +325,6 @@ describe('Stub card: Stub_ComputeArgs_ExtraOption', () => {
       tree: new EngineTree(
         new SequenceNode('seq', [
           new ActionNode('a', 'improvement-any'),
-          new InteractionNode('c', []),
         ]),
       ),
       registry,

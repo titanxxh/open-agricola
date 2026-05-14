@@ -95,15 +95,61 @@ describe('EngineStack query/write delegation', () => {
     })
   }
 
-  it('peekInteractionHost delegates to top frame engine; returns null when empty', () => {
+  it('peekPendingHost delegates to top frame engine; returns null when empty', () => {
     const stack = new EngineStack()
-    expect(stack.peekInteractionHost()).toBeNull()
+    expect(stack.peekPendingHost()).toBeNull()
     const engine = makeEngine()
-    const fakeHost = { id: 'n1' } as unknown as ReturnType<Engine['peekInteractionHost']>
-    const spy = vi.spyOn(engine, 'peekInteractionHost').mockReturnValue(fakeHost)
+    const fakeHost = { id: 'n1' } as unknown as ReturnType<Engine['peekPendingHost']>
+    const spy = vi.spyOn(engine, 'peekPendingHost').mockReturnValue(fakeHost)
     pushStubFrame(stack, engine)
-    expect(stack.peekInteractionHost()).toBe(fakeHost)
+    expect(stack.peekPendingHost()).toBe(fakeHost)
     expect(spy).toHaveBeenCalledTimes(1)
+  })
+
+  it('peekPendingEnvelope delegates to top frame engine; returns null when empty', () => {
+    const stack = new EngineStack()
+    expect(stack.peekPendingEnvelope()).toBeNull()
+    const engine = makeEngine()
+    const envelope = {
+      hostNodeId: 'n1',
+      request: { kind: 'choice', options: [{ value: 'yes', labelKey: 'ui.yes' }] },
+      choices: [{ value: 'yes', labelKey: 'ui.yes' }],
+    } as ReturnType<Engine['peekPendingEnvelope']>
+    const spy = vi.spyOn(engine, 'peekPendingEnvelope').mockReturnValue(envelope)
+    pushStubFrame(stack, engine)
+    expect(stack.peekPendingEnvelope()).toBe(envelope)
+    expect(spy).toHaveBeenCalledTimes(1)
+  })
+
+  it('peekPendingHost delegates to top frame engine; returns null when empty', () => {
+    const stack = new EngineStack()
+    expect(stack.peekPendingHost()).toBeNull()
+    const engine = makeEngine()
+    const fakeHost = { id: 'n1' } as unknown as ReturnType<Engine['peekPendingHost']>
+    const spy = vi.spyOn(engine, 'peekPendingHost').mockReturnValue(fakeHost)
+    pushStubFrame(stack, engine)
+    expect(stack.peekPendingHost()).toBe(fakeHost)
+    expect(spy).toHaveBeenCalledTimes(1)
+  })
+
+  it('peekNextUnresolvedNodeId delegates to top frame engine; returns null when empty', () => {
+    const stack = new EngineStack()
+    expect(stack.peekNextUnresolvedNodeId()).toBeNull()
+    const engine = makeEngine()
+    const spy = vi.spyOn(engine, 'peekNextUnresolvedNodeId').mockReturnValue('n1')
+    pushStubFrame(stack, engine)
+    expect(stack.peekNextUnresolvedNodeId()).toBe('n1')
+    expect(spy).toHaveBeenCalledTimes(1)
+  })
+
+  it('getEffectiveOwnerPlayerId delegates to top frame engine', () => {
+    const stack = new EngineStack()
+    expect(stack.getEffectiveOwnerPlayerId('n1', 'p1')).toBeUndefined()
+    const engine = makeEngine()
+    const spy = vi.spyOn(engine, 'getEffectiveOwnerPlayerId').mockReturnValue('p2')
+    pushStubFrame(stack, engine)
+    expect(stack.getEffectiveOwnerPlayerId('n1', 'p1')).toBe('p2')
+    expect(spy).toHaveBeenCalledWith('n1', 'p1')
   })
 
   it('peekPendingChoiceFromComposite delegates to top frame engine', () => {
