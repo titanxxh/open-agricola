@@ -106,6 +106,32 @@ describe('EngineStack query/write delegation', () => {
     expect(spy).toHaveBeenCalledTimes(1)
   })
 
+  it('peekPendingEnvelope delegates to top frame engine; returns null when empty', () => {
+    const stack = new EngineStack()
+    expect(stack.peekPendingEnvelope()).toBeNull()
+    const engine = makeEngine()
+    const envelope = {
+      hostNodeId: 'n1',
+      request: { kind: 'choice', options: [{ value: 'yes', labelKey: 'ui.yes' }] },
+      choices: [{ value: 'yes', labelKey: 'ui.yes' }],
+    } as ReturnType<Engine['peekPendingEnvelope']>
+    const spy = vi.spyOn(engine, 'peekPendingEnvelope').mockReturnValue(envelope)
+    pushStubFrame(stack, engine)
+    expect(stack.peekPendingEnvelope()).toBe(envelope)
+    expect(spy).toHaveBeenCalledTimes(1)
+  })
+
+  it('peekPendingHost delegates to top frame engine; returns null when empty', () => {
+    const stack = new EngineStack()
+    expect(stack.peekPendingHost()).toBeNull()
+    const engine = makeEngine()
+    const fakeHost = { id: 'n1' } as unknown as ReturnType<Engine['peekPendingHost']>
+    const spy = vi.spyOn(engine, 'peekPendingHost').mockReturnValue(fakeHost)
+    pushStubFrame(stack, engine)
+    expect(stack.peekPendingHost()).toBe(fakeHost)
+    expect(spy).toHaveBeenCalledTimes(1)
+  })
+
   it('peekPendingChoiceFromComposite delegates to top frame engine', () => {
     const stack = new EngineStack()
     const engine = makeEngine()
