@@ -75,6 +75,9 @@ describe('serialization cursor round-trip', () => {
     const restored = new GameSession(rehydrated)
     expect(restored.getEngineStack().depth()).toBe(initialDepth)
     expect(restored.getEngineStack().current()?.reason).toBe('reorganize')
+    const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
+    expect(restoredEnvelope?.request.kind).toBe('animal-reorg')
+    expect(restoredEnvelope?.hostNodeId).toBeTruthy()
 
     const resp = restored.resolveChoice(0, 'confirm', [
       { id: 'pasture-1', zoneType: 'pasture', animalType: 'boar', animalCount: 1 },
@@ -118,6 +121,9 @@ describe('serialization cursor round-trip', () => {
 
     const restored = new GameSession(rehydrated)
     expect(restored.getEngineStack().depth()).toBeGreaterThanOrEqual(1)
+    const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
+    expect(restoredEnvelope?.request.kind).toBe('farm-select')
+    expect(restoredEnvelope?.hostNodeId).toBeTruthy()
 
     // The pending interaction is preserved (plow surfaces a 'choice' /
     // farm-position pick) and the engine state matches what the original
@@ -174,6 +180,9 @@ describe('serialization cursor round-trip', () => {
     expect(restored.getEngineStack().current()?.reason).toBe('confirm-next-player')
     const restoredInteraction = restored.getEngineStack().peekInteraction()
     expect(restoredInteraction?.request?.kind).toBe('confirm-next-player')
+    const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
+    expect(restoredEnvelope?.request.kind).toBe('confirm-next-player')
+    expect(restoredEnvelope?.hostNodeId).toBeTruthy()
 
     // Resolving the prompt advances to the next player and clears the stack.
     const after = restored.resolveChoice(0, 'confirm')
@@ -232,6 +241,9 @@ describe('serialization cursor round-trip', () => {
     expect(restored.getEngineStack().current()?.reason).toBe('confirm-player-switch')
     const restoredInteraction = restored.getEngineStack().peekInteraction()
     expect(restoredInteraction?.request?.kind).toBe('confirm-player-switch')
+    const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
+    expect(restoredEnvelope?.request.kind).toBe('confirm-player-switch')
+    expect(restoredEnvelope?.hostNodeId).toBeTruthy()
 
     // Resolving the synthetic frame pops it and resumes the parent action
     // engine. The parent's exact follow-up (a 'choice' for reed-bank's OR
@@ -292,6 +304,9 @@ describe('serialization cursor round-trip', () => {
     expect(restored.getEngineStack().current()?.reason).toBe('feed')
     const restoredInteraction = restored.getEngineStack().peekInteraction()
     expect(restoredInteraction?.request?.kind).toBe('feed')
+    const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
+    expect(restoredEnvelope?.request.kind).toBe('feed')
+    expect(restoredEnvelope?.hostNodeId).toBeTruthy()
 
     // Resolve with empty selections (player just begs the deficit). The feed
     // queue empties and the synthetic frame is popped.

@@ -66,7 +66,7 @@ export const takeAction = (
   const state = core.state
   if (state.gameOver) return core.emitResponse(false, 'game is over')
   if (state.phase === 'draft') return core.emitResponse(false, 'draft in progress')
-  if (core.peekEngineInteraction()) return core.emitResponse(false, 'interaction in progress')
+  if (core.peekEnginePendingEnvelope()) return core.emitResponse(false, 'interaction in progress')
   if (playerIndex !== state.currentPlayerIndex) return core.emitResponse(false, 'not your turn')
   const player = state.players[playerIndex]
   if (!player || workersAvailable(state, player) <= 0) {
@@ -279,7 +279,7 @@ export const performRoundEnd = (core: GameCore): SessionResponse => {
   const state = core.state
   const allUsed = state.players.every((p) => workersAvailable(state, p) <= 0)
   if (!allUsed) return core.emitResponse(false, 'not all workers used')
-  if (core.peekEngineInteraction()) return core.emitResponse(false, 'pending action exists')
+  if (core.peekEnginePendingEnvelope()) return core.emitResponse(false, 'pending action exists')
 
   const pendingAnimal = state.players.findIndex((p) => core.hasPendingAnimalsCheck(p))
   if (pendingAnimal !== -1) {
