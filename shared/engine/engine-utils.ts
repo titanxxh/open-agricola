@@ -318,10 +318,7 @@ export function buildPhaseTrailingNodes(
 
 export function collectNodeIds(node: EngineNode, ids: Set<string>): void {
   ids.add(node.id)
-  const children = (node as { children?: EngineNode[] }).children
-  if (children) {
-    for (const child of children) collectNodeIds(child, ids)
-  }
+  for (const child of getNodeChildren(node)) collectNodeIds(child, ids)
 }
 
 export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
