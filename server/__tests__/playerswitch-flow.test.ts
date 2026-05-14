@@ -288,4 +288,31 @@ describe('ActionFlow targetPlayerId', () => {
     expect(resolved.state.players[0]!.resources.wood).toBe(p1.resources.wood + 1)
     expect(resolved.state.players[1]!.resources.wood).toBe(p2.resources.wood)
   })
+
+  it('undoStep cancels a targeted farm prompt as the effective owner', () => {
+    const session = setupSession()
+    const state = session.getState().state
+    const p2 = state.players[1]!
+
+    const flow: ActionFlow = {
+      type: 'leaf',
+      actionId: 'plow',
+      targetPlayerId: p2.id,
+    }
+
+    startFlowEngine(session, flow, 0)
+    const confirmResp = session.getState()
+    expect(confirmResp.interaction.stateId === 'wait' ? confirmResp.interaction.request.kind : confirmResp.interaction.stateId).toBe('confirm-player-switch')
+
+    const pendingResp = confirmPlayerSwitch(session)
+    expect(pendingResp.ok).toBe(true)
+    expect(pendingResp.interaction.stateId).toBe('wait')
+    if (pendingResp.interaction.stateId !== 'wait') return
+    expect(pendingResp.interaction.playerIndex).toBe(1)
+    expect(pendingResp.interaction.farm).toBeDefined()
+
+    const undoResp = session.undoStep()
+    expect(undoResp.ok).toBe(true)
+    expect(undoResp.ok ? '' : undoResp.error).not.toBe('no pending choice for this player')
+  })
 })
