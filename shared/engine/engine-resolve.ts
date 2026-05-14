@@ -31,6 +31,7 @@ import {
   normalizeFollowUpAction,
   pendingEnvelopeFromHostNode,
   resolveSubtree,
+  stampOwner,
 } from './engine-utils'
 import type { PendingEnvelope } from './types'
 
@@ -97,6 +98,12 @@ const pendingEnvelopeChoices = (envelope: PendingEnvelope): ActionChoiceOption[]
   if (envelope.request.kind === 'select-trigger') return envelope.request.options
   return []
 }
+
+const buildOwnedFlowNode = (
+  int: EngineInternals,
+  flow: ActionFlow,
+  ownerPlayerId: string,
+) => stampOwner(buildFlowNode(int, flow, ownerPlayerId), ownerPlayerId)
 
 /**
  * S4c PR5 — extracted from `Engine.resolveChoice`. Resolve a pending choice
@@ -348,7 +355,7 @@ export function engineResolveChoice(
           ? applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
           : null)
         .filter((flow) => flow)
-        .map((flow) => buildFlowNode(int, flow as ActionFlow, context.player.id))
+        .map((flow) => buildOwnedFlowNode(int, flow as ActionFlow, context.player.id))
       const followUps = allResults
         .flatMap((entry) =>
           (entry.followUpActions ?? []).map((followUp) =>
@@ -386,7 +393,7 @@ export function engineResolveChoice(
         ...afterActivateNodes,
       ]
       if (result.type === 'flow') {
-        const flowNode = buildFlowNode(int, result.flow, context.player.id)
+        const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id)
         if (trailingHookNodes.length > 0) {
           int.tree.insertAfter(insertAnchor, trailingHookNodes)
         }
@@ -501,7 +508,7 @@ export function engineResolveChoice(
       ? applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
       : null)
     .filter((flow) => flow)
-    .map((flow) => buildFlowNode(int, flow as ActionFlow, context.player.id))
+    .map((flow) => buildOwnedFlowNode(int, flow as ActionFlow, context.player.id))
   const followUps = allResults
     .flatMap((entry) =>
       (entry.followUpActions ?? []).map((followUp) =>
@@ -542,7 +549,7 @@ export function engineResolveChoice(
       ...afterActivateNodes,
     ]
     if (result.type === 'flow') {
-      const flowNode = buildFlowNode(int, result.flow, context.player.id)
+      const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id)
       if (trailingHookNodes.length > 0) {
         int.tree.insertAfter(insertionTargetId, trailingHookNodes)
       }

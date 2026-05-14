@@ -315,4 +315,65 @@ describe('ActionFlow targetPlayerId', () => {
     expect(undoResp.ok).toBe(true)
     expect(undoResp.ok ? '' : undoResp.error).not.toBe('no pending choice for this player')
   })
+
+  it('targeted xor dynamic flow executes as the target owner', () => {
+    const session = setupSession()
+    const state = session.getState().state
+    const p1 = state.players[0]!
+    const p2 = state.players[1]!
+    const p1WoodBefore = p1.resources.wood
+    const p2WoodBefore = p2.resources.wood
+    const dynamicGainWood: ActionDefinition = {
+      id: 'dynamic-gain-wood-flow',
+      nameKey: 'test.dynamicGainWoodFlow',
+      descriptionKey: 'test.dynamicGainWoodFlow',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({
+        type: 'flow',
+        flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 } },
+      }),
+    }
+    ;(session as unknown as { registry: { register: (action: ActionDefinition) => void } })
+      .registry.register(dynamicGainWood)
+
+    const flow: ActionFlow = {
+      type: 'xor',
+      targetPlayerId: p2.id,
+      children: [
+        {
+          type: 'leaf',
+          actionId: dynamicGainWood.id,
+          sourceCard: 'TargetedDynamicXor',
+          choiceLabelKey: 'wood',
+        },
+        {
+          type: 'leaf',
+          actionId: 'gain',
+          params: { food: 1 },
+          sourceCard: 'TargetedDynamicXor',
+          choiceLabelKey: 'food',
+        },
+      ],
+    }
+
+    startFlowEngine(session, flow, 0)
+    expect(session.getState().interaction.stateId === 'wait'
+      ? session.getState().interaction.request.kind
+      : session.getState().interaction.stateId).toBe('confirm-player-switch')
+
+    const pendingResp = confirmPlayerSwitch(session)
+    expect(pendingResp.ok).toBe(true)
+    expect(pendingResp.interaction.stateId).toBe('wait')
+    if (pendingResp.interaction.stateId !== 'wait') return
+    expect(pendingResp.interaction.playerIndex).toBe(1)
+    const woodOption = pendingResp.interaction.options?.find((option) => option.labelKey === 'wood')
+    expect(woodOption).toBeDefined()
+
+    const resolved = session.resolveChoice(1, woodOption!.value)
+    expect(resolved.ok).toBe(true)
+    expect(resolved.state.players[1]!.resources.wood).toBe(p2WoodBefore + 1)
+    expect(resolved.state.players[0]!.resources.wood).toBe(p1WoodBefore)
+  })
 })
