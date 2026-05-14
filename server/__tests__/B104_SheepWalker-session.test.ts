@@ -57,10 +57,65 @@ describe('B104_SheepWalker session — last harvest enforcement', () => {
     if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
     expect(resp.interaction.request.kind).toBe('animal-reorg')
     expect(resp.interaction.playerIndex).toBe(0)
+    expect(resp.interaction.promptParams).toEqual({ trigger: 'harvest-breed' })
 
     // Confirm reorg leaving the sheep on its pasture.
     resp = session.resolveChoice(0, 'confirm', [
       { id: 'a-pasture', zoneType: 'pasture', animalType: 'sheep', animalCount: 1 },
+    ])
+
+    expect(resp.state.gameOver).toBe(true)
+  })
+
+  it('continues harvest breeding after a forced last-harvest reorg', () => {
+    const { session, state, playerA, playerB } = setupRound14Harvest()
+    playerA.occupationPlayed.push(CARD_ID)
+    playerA.resources.sheep = 1
+    playerA.pastures = [
+      {
+        id: 'a-pasture',
+        size: 2,
+        tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
+        stables: 0,
+        animalType: 'sheep',
+        animalCount: 1,
+      },
+    ]
+    playerB.resources.boar = 2
+    playerB.pastures = [
+      {
+        id: 'b-pasture',
+        size: 2,
+        tiles: [{ row: 1, col: 0 }, { row: 1, col: 1 }],
+        stables: 0,
+        animalType: 'boar',
+        animalCount: 2,
+      },
+    ]
+    session.loadState(state)
+
+    let resp = session.performRoundEnd()
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
+      resp = session.resolveChoice(0, 'confirm', { selections: [] })
+    }
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected playerA reorg')
+    expect(resp.interaction.request.kind).toBe('animal-reorg')
+    expect(resp.interaction.playerIndex).toBe(0)
+
+    resp = session.resolveChoice(0, 'confirm', [
+      { id: 'a-pasture', zoneType: 'pasture', animalType: 'sheep', animalCount: 1 },
+    ])
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected playerB reorg')
+    expect(resp.interaction.request.kind).toBe('animal-reorg')
+    expect(resp.interaction.playerIndex).toBe(1)
+    expect(resp.state.players[1]!.resources.boar).toBe(3)
+
+    resp = session.resolveChoice(1, 'confirm', [
+      { id: 'b-pasture', zoneType: 'pasture', animalType: 'boar', animalCount: 3 },
     ])
 
     expect(resp.state.gameOver).toBe(true)

@@ -2224,6 +2224,10 @@ export class GameCore {
         return this.continueAfterReorganize_returningHome(stageResume.playerIndex)
       }
       if (trigger === 'harvest-breed') {
+        if (this.engineStack.depth() > 0) {
+          this.runEngineSteps()
+          return
+        }
         return this.continueAfterReorganize_harvestBreed(stageResume.playerIndex)
       }
       if (trigger === 'round-end') {
@@ -2263,6 +2267,14 @@ export class GameCore {
     if (!ownerId) return frame.ownerPlayerIndex
     const ownerIndex = this.state.players.findIndex((player) => player.id === ownerId)
     return ownerIndex === -1 ? frame.ownerPlayerIndex : ownerIndex
+  }
+
+  private acknowledgeCurrentActionAnimalReorgRequest(): void {
+    const pendingHost = this.engineStack.peekPendingHost()
+    if (!(pendingHost instanceof ActionNode)) return
+    pendingHost.clearPending()
+    pendingHost.emittedRequest = undefined
+    pendingHost.resolve({ type: 'ok' })
   }
 
   private runEngineSteps(): void {
@@ -2355,7 +2367,11 @@ export class GameCore {
             pendingEnvelope?.hostNodeId,
             pendingEnvelope,
           )
-          this.startReorganizeSubFlow(pIdx, 'anytime')
+          this.acknowledgeCurrentActionAnimalReorgRequest()
+          const trigger = frame.stageResume?.hook === 'onBreedPhase'
+            ? 'harvest-breed'
+            : 'anytime'
+          this.startReorganizeSubFlow(pIdx, trigger)
           return
         }
         // Synthetic interaction-only frames (the `__interaction_only__`
@@ -2371,6 +2387,12 @@ export class GameCore {
         // the legacy hard-coded kind list so future synthetic frames
         // (Task 11+) inherit the right behaviour automatically.
         if (isSyntheticInteractionFrame(frame)) {
+          return
+        }
+        // Reorganize confirmations carry the zone assignment in the resolve
+        // payload. Even when only "confirm" is offered (harvest/return-home),
+        // this cannot use the generic single-option auto-resolve path.
+        if (hostRequestKind === 'animal-reorg') {
           return
         }
         // Lazy confirmation: if we silently switched players and now hit a choice,
