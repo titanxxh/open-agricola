@@ -10,7 +10,6 @@ export {
   ParallelNode,
   OrNode,
   XorNode,
-  OptionalNode,
 } from './nodes'
 export type { EngineNode, EngineStepResult } from './types'
 export {

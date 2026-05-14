@@ -6,7 +6,7 @@ import { EngineTree } from '../tree'
 import { Engine } from '../engine'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
-import { ActionNode, OptionalNode } from '../nodes'
+import { ActionNode } from '../nodes'
 import { clearActionHooks } from '../../actions/hooks'
 import { mkActionSpace } from '../../cards/__tests__/fixtures'
 
@@ -15,7 +15,7 @@ beforeEach(() => {
   setActiveCardRegistry(new CardRegistry())
 })
 
-describe('OptionalNode passes actionContext to isDoable', () => {
+describe('optional metadata passes actionContext to isDoable', () => {
   const makePlayer = () =>
     ({
       id: 'p1',
@@ -45,7 +45,7 @@ describe('OptionalNode passes actionContext to isDoable', () => {
       gameOver: false,
     }) as any
 
-  it('isDoable listener receives actionContext from OptionalNode', () => {
+  it('isDoable listener receives actionContext from optional metadata host', () => {
     const actionNode = new ActionNode(
       'action-1',
       'test-action',
@@ -55,8 +55,10 @@ describe('OptionalNode passes actionContext to isDoable', () => {
       undefined,        // choiceLabelParams
       { override: true, customKey: 42 },  // actionContext
     )
-    const optionalNode = new OptionalNode('optional-1', actionNode)
-    const tree = new EngineTree(optionalNode)
+    actionNode.optional = true
+    actionNode.optionalActive = false
+    actionNode.optionalPromptKey = 'ui.interactionOptionalAction'
+    const tree = new EngineTree(actionNode)
 
     const registry = new ActionRegistry()
     registry.register({
@@ -70,7 +72,7 @@ describe('OptionalNode passes actionContext to isDoable', () => {
     })
 
     let receivedActionContext: Record<string, unknown> | undefined
-    requireActiveCardRegistry('optional-node-context').registerListener({
+    requireActiveCardRegistry('optional-metadata-context').registerListener({
       id: 'test-isdoable',
       cardIds: ['TestCard'],
       phases: ['isDoable'],
@@ -95,14 +97,16 @@ describe('OptionalNode passes actionContext to isDoable', () => {
     expect(step.type).toBe('choice')
   })
 
-  it('isDoable listener receives sourceCard from OptionalNode', () => {
+  it('isDoable listener receives sourceCard from optional metadata host', () => {
     const actionNode = new ActionNode(
       'action-1',
       'test-action',
       'TestCard',       // sourceCard
     )
-    const optionalNode = new OptionalNode('optional-1', actionNode)
-    const tree = new EngineTree(optionalNode)
+    actionNode.optional = true
+    actionNode.optionalActive = false
+    actionNode.optionalPromptKey = 'ui.interactionOptionalAction'
+    const tree = new EngineTree(actionNode)
 
     const registry = new ActionRegistry()
     registry.register({
@@ -116,7 +120,7 @@ describe('OptionalNode passes actionContext to isDoable', () => {
     })
 
     let receivedSourceCard: string | undefined
-    requireActiveCardRegistry('optional-node-context').registerListener({
+    requireActiveCardRegistry('optional-metadata-context').registerListener({
       id: 'test-isdoable-source',
       cardIds: ['TestCard'],
       phases: ['isDoable'],

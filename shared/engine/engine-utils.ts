@@ -15,7 +15,6 @@ import type { FollowUpAction, ActionHookPhase } from '../actions/hooks'
 import {
   ActionNode,
   InteractionNode,
-  OptionalNode,
   OrNode,
   ParallelNode,
   SequenceNode,
@@ -107,7 +106,6 @@ export function buildFollowUpNodes(
 }
 
 export function getNodeChildren(node: EngineNode): EngineNode[] {
-  if (node instanceof OptionalNode) return [node.child]
   if (node instanceof ParallelTriggerNode) return node.children
   if (
     node instanceof SequenceNode ||
@@ -125,6 +123,16 @@ export function stampOwner(node: EngineNode, ownerPlayerId: string): EngineNode 
   for (const child of getNodeChildren(node)) {
     stampOwner(child, ownerPlayerId)
   }
+  return node
+}
+
+export function markOptional<T extends EngineNode>(
+  node: T,
+  promptKey?: PromptKey,
+): T {
+  node.optional = true
+  node.optionalActive = false
+  if (promptKey !== undefined) node.optionalPromptKey = promptKey
   return node
 }
 
@@ -153,9 +161,6 @@ export function effectiveOwnerPlayerId(
 
 export function findActionNode(node: EngineNode): ActionNode | null {
   if (node instanceof ActionNode) return node
-  if (node instanceof OptionalNode) {
-    return findActionNode(node.child)
-  }
   if ('children' in node) {
     const composite = node as { children: EngineNode[] }
     for (const child of composite.children) {
@@ -372,24 +377,10 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
       node.promptKey,
     ))
   }
-  if (node instanceof OptionalNode) {
-    const clone = new OptionalNode(
-      `${node.id}-clone-${int.counterRef.value++}`,
-      cloneNode(int, node.child),
-      node.promptKey,
-    )
-    clone.active = node.active
-    return copySharedNodeMetadata(node, clone)
-  }
   return node
 }
 
 export function resolveSubtree(node: EngineNode): void {
-  if (node instanceof OptionalNode) {
-    resolveSubtree(node.child)
-    node.resolve()
-    return
-  }
   if (
     node instanceof SequenceNode ||
     node instanceof ParallelNode ||
@@ -450,9 +441,6 @@ export function getActionEffectPreview(node: ActionNode): ChoiceEffectPreview | 
 export function collectOrderedActionNodes(node: EngineNode): ActionNode[] | null {
   if (node instanceof ActionNode) return [node]
   if (node instanceof InteractionNode) return []
-  if (node instanceof OptionalNode) {
-    return collectOrderedActionNodes(node.child)
-  }
   if (node instanceof SequenceNode) {
     const flattened: ActionNode[] = []
     for (const child of node.children) {
@@ -495,9 +483,6 @@ export function getSequenceEffectPreview(node: SequenceNode): ChoiceEffectPrevie
 export function getNodeEffectPreview(node: EngineNode): ChoiceEffectPreview | undefined {
   if (node instanceof ActionNode) {
     return getActionEffectPreview(node)
-  }
-  if (node instanceof OptionalNode) {
-    return getNodeEffectPreview(node.child)
   }
   if (node instanceof SequenceNode) {
     const aggregated = getSequenceEffectPreview(node)
@@ -547,9 +532,6 @@ export function getNodeDescriptionPreview(
       labelParams: node.choiceLabelParams,
       effectPreview: getActionEffectPreview(node),
     }
-  }
-  if (node instanceof OptionalNode) {
-    return getNodeDescriptionPreview(node.child, registry)
   }
   if (
     node instanceof SequenceNode ||
@@ -613,38 +595,30 @@ export function buildFlowNode(
         actionNode,
         new InteractionNode(nextId(), []),
       ])
-      const node = flow.optional
-        ? new OptionalNode(nextId(), sequence, flow.promptKey)
-        : sequence
+      const node = flow.optional ? markOptional(sequence, flow.promptKey) : sequence
       return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
     }
-    const node = flow.optional
-      ? new OptionalNode(nextId(), actionNode, flow.promptKey)
-      : actionNode
+    const node = flow.optional ? markOptional(actionNode, flow.promptKey) : actionNode
     return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
   }
   const children = flow.children.map((child) => buildFlowNode(int, child, ownerPlayerId))
   if (flow.type === 'seq') {
     const sequence = new SequenceNode(nextId(), children)
-    const node = flow.optional
-      ? new OptionalNode(nextId(), sequence, flow.promptKey)
-      : sequence
+    const node = flow.optional ? markOptional(sequence, flow.promptKey) : sequence
     return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
   }
   if (flow.type === 'parallel') {
     const parallel = new ParallelNode(nextId(), children)
-    const node = flow.optional
-      ? new OptionalNode(nextId(), parallel, flow.promptKey)
-      : parallel
+    const node = flow.optional ? markOptional(parallel, flow.promptKey) : parallel
     return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
   }
   if (flow.type === 'xor') {
     const xor = new XorNode(nextId(), children, flow.promptKey)
-    const node = flow.optional ? new OptionalNode(nextId(), xor, flow.promptKey) : xor
+    const node = flow.optional ? markOptional(xor, flow.promptKey) : xor
     return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
   }
   const or = new OrNode(nextId(), children, flow.promptKey)
-  const node = flow.optional ? new OptionalNode(nextId(), or, flow.promptKey) : or
+  const node = flow.optional ? markOptional(or, flow.promptKey) : or
   return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
 }
 
@@ -692,9 +666,6 @@ export function mergeContextIntoFlow(
 
 export function findInteractionNode(node: EngineNode): InteractionNode | null {
   if (node instanceof InteractionNode) return node
-  if (node instanceof OptionalNode) {
-    return findInteractionNode(node.child)
-  }
   if ('children' in node) {
     const composite = node as { children: EngineNode[] }
     for (const child of composite.children) {
@@ -876,7 +847,7 @@ export function snapshotCompositeEmit(int: EngineInternals): {
   if (int.pendingNodeIdRef.value === null) return null
   const node = int.tree.findNodeById(int.pendingNodeIdRef.value)
   if (!node) return null
-  if (node instanceof OrNode || node instanceof XorNode || node instanceof OptionalNode) {
+  if (node instanceof OrNode || node instanceof XorNode) {
     if (node.emittedChoices.length === 0 && node.emittedRequest === undefined) return null
     return {
       nodeId: node.id,
@@ -939,7 +910,7 @@ export function pendingEnvelopeFromHostNode(node: EngineNode | null): PendingEnv
     }
   }
 
-  if (node instanceof OrNode || node instanceof XorNode || node instanceof OptionalNode) {
+  if (node instanceof OrNode || node instanceof XorNode) {
     if (node.emittedChoices.length === 0 && !node.emittedRequest) return null
     const request = node.emittedRequest ?? choiceRequest(node.emittedChoices)
     const sourceCard = sourceCardFromContextSnapshot(node.pendingContextSnapshot)

@@ -7,7 +7,7 @@ describe('meeting-place session', () => {
   it('grants start player immediately and starts the next round with that player', () => {
     // Fixed seed: `new GameSession()` defaulted to a `Math.random()` seed
     // which left `players[1].minorHand` non-deterministically empty after
-    // `loadState`'s re-deal — when empty, the OptionalNode under
+    // `loadState`'s re-deal — when empty, the optional host under
     // meeting-place auto-resolves (no doable minor), and the engine flushes
     // straight to confirm-next-player; when populated, it emits a
     // `__skip__`-bearing choice. The test below assumes the latter, so the
@@ -26,7 +26,7 @@ describe('meeting-place session', () => {
 
     session.loadState(state)
     // loadState's normalizeState re-deals empty minorHand from the seed.
-    // Clear it again on the live state so the OptionalNode under
+    // Clear it again on the live state so the optional host under
     // meeting-place sees no playable minor and auto-resolves.
     session.getState().state.players[1]!.minorHand = []
 
