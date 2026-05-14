@@ -14,7 +14,6 @@ import type { PromptKey } from '../contract/prompt-keys'
 import type { FollowUpAction, ActionHookPhase } from '../actions/hooks'
 import {
   ActionNode,
-  ActivateCardNode,
   InteractionNode,
   OptionalNode,
   OrNode,
@@ -31,6 +30,11 @@ import { getPlayOrderIndex } from './matched-trigger'
 import { ParallelTriggerNode } from './nodes/parallel-trigger-node'
 import type { MatchedCardListener } from '../cards/card-listeners'
 import type { GameState } from '../contract/types'
+import {
+  ACTIVATE_CARD_ACTION_ID,
+  type ActivateCardActionNode,
+  type ActivateCardActionParams,
+} from './activation-action'
 
 /**
  * S4c PR5 — module-private utilities extracted from `Engine`. Each function
@@ -174,7 +178,7 @@ export function findPairedInteractionNode(
   return candidate instanceof InteractionNode ? candidate : null
 }
 
-export function buildActivateCardNodes(
+export function buildActivationActionNodes(
   int: EngineInternals,
   matched: { registration: { id: string; cardIds?: string[] }; cardId: string; ownerPlayerId: string }[],
   phase: string,
@@ -183,14 +187,23 @@ export function buildActivateCardNodes(
 ): EngineNode[] {
   return matched.map((entry, index) => {
     const nodeId = `activate-${phase}-${actionId}-${index}-${int.counterRef.value++}`
-    return new ActivateCardNode(
-      nodeId,
-      entry.registration.id,
-      entry.cardId,
-      phase as import('../actions/hooks').ActionHookPhase,
+    const params: ActivateCardActionParams = {
+      listenerId: entry.registration.id,
+      cardId: entry.cardId,
+      phase: phase as ActionHookPhase,
       actionId,
-      { ...event, ownerPlayerId: entry.ownerPlayerId },
+      event,
+      ownerPlayerId: entry.ownerPlayerId,
+      countCardUse: typeof event.countCardUse === 'boolean' ? event.countCardUse : undefined,
+    }
+    const node = new ActionNode(
+      nodeId,
+      ACTIVATE_CARD_ACTION_ID,
+      entry.cardId,
+      params,
     )
+    if (entry.ownerPlayerId) node.ownerPlayerId = entry.ownerPlayerId
+    return node
   })
 }
 
@@ -245,21 +258,28 @@ export function buildPhaseTrailingNodes(
       return a.matchedIndex - b.matchedIndex
     })
 
-    const buildNode = (p: Prepared) => {
+    const buildNode = (p: Prepared): ActivateCardActionNode => {
       const nodeId = `activate-${phase}-${actionId}-${int.counterRef.value++}`
-      return new ActivateCardNode(
-        nodeId,
-        p.ml.registration.id,
-        p.ml.cardId,
+      const params: ActivateCardActionParams = {
+        listenerId: p.ml.registration.id,
+        cardId: p.ml.cardId,
         phase,
         actionId,
-        {
-          ...baseEvent,
-          triggerPlayerId: effectiveTriggerPlayerId,
-          ownerPlayerId: p.ml.ownerPlayerId,
-          mandatory: p.ml.registration.mandatory === true,
-        },
+        event: baseEvent,
+        triggerPlayerId: effectiveTriggerPlayerId,
+        ownerPlayerId: p.ml.ownerPlayerId,
+        mandatory: p.ml.registration.mandatory === true,
+        countCardUse:
+          typeof baseEvent.countCardUse === 'boolean' ? baseEvent.countCardUse : undefined,
+      }
+      const node = new ActionNode(
+        nodeId,
+        ACTIVATE_CARD_ACTION_ID,
+        p.ml.cardId,
+        params,
       )
+      if (p.ml.ownerPlayerId) node.ownerPlayerId = p.ml.ownerPlayerId
+      return node as ActivateCardActionNode
     }
 
     const ownerGroupNodes: EngineNode[] = []
@@ -360,16 +380,6 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
     )
     clone.active = node.active
     return copySharedNodeMetadata(node, clone)
-  }
-  if (node instanceof ActivateCardNode) {
-    return copySharedNodeMetadata(node, new ActivateCardNode(
-      `${node.id}-clone-${int.counterRef.value++}`,
-      node.listenerId,
-      node.cardId,
-      node.phase,
-      node.actionId,
-      node.event,
-    ))
   }
   return node
 }

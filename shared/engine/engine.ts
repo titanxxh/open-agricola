@@ -17,7 +17,6 @@ import {
   ParallelNode,
   SequenceNode,
   XorNode,
-  ActivateCardNode,
 } from './nodes'
 import { ParallelTriggerNode } from './nodes/parallel-trigger-node'
 import type { EngineNode, EngineStepResult, NodeCursor } from './types'
@@ -175,16 +174,6 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
         node = optional
         break
       }
-      case 'activateCard':
-        node = new ActivateCardNode(
-          cursor.id,
-          data.listenerId as string,
-          data.cardId as string,
-          data.phase as ActivateCardNode['phase'],
-          data.actionId as string,
-          (data.event as Record<string, unknown> | undefined) ?? {},
-        )
-        break
       case 'parallelTrigger': {
         const trigger = new ParallelTriggerNode(
           cursor.id,

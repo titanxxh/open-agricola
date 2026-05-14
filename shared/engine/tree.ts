@@ -1,7 +1,7 @@
 import type { EngineNode } from './types'
 import { OptionalNode, OrNode, ParallelNode, SequenceNode, XorNode } from './nodes'
 import { ParallelTriggerNode } from './nodes/parallel-trigger-node'
-import { ActivateCardNode } from './nodes/activate-card-node'
+import { isActivateCardActionNode } from './activation-action'
 
 const isCompositeNode = (node: EngineNode) =>
   node instanceof SequenceNode ||
@@ -125,7 +125,7 @@ export class EngineTree {
     }
     if (parent instanceof ParallelTriggerNode) {
       // Insert flow follow-ups INSIDE the ParallelTriggerNode right after the
-      // activated ActivateCardNode. nextUnresolved walks selectedChild + its
+      // activated listener leaf. nextUnresolved walks selectedChild + its
       // follow-ups before returning to PARALLEL for the next card prompt.
       parent.children.splice(index + 1, 0, ...nodes)
       return true
@@ -194,12 +194,12 @@ export class EngineTree {
           const idx = node.children.findIndex((c) => c.id === node.selectedChildId)
           if (idx >= 0) {
             // Visit the selected card AND any follow-up flow nodes inserted
-            // after it, until the next ActivateCardNode (next card option) or
+            // after it, until the next activation leaf (next card option) or
             // end of children. This makes the selected trigger's flow finish
             // BEFORE the engine returns to PARALLEL to prompt the next card.
             for (let i = idx; i < node.children.length; i += 1) {
               const child = node.children[i]
-              if (i > idx && child instanceof ActivateCardNode) break
+              if (i > idx && isActivateCardActionNode(child)) break
               if (child.getState() !== 'resolved') {
                 const next = visit(child)
                 if (next) return next
@@ -208,7 +208,7 @@ export class EngineTree {
           }
         }
         const hasUnresolvedCard = node.children.some(
-          (c) => c instanceof ActivateCardNode && c.getState() !== 'resolved',
+          (c) => isActivateCardActionNode(c) && c.getState() !== 'resolved',
         )
         if (hasUnresolvedCard) return node
         // All cards picked; drain any trailing follow-up nodes.

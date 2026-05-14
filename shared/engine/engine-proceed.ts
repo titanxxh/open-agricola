@@ -9,7 +9,6 @@ import type {
 } from '../contract/types'
 import {
   ActionNode,
-  ActivateCardNode,
   InteractionNode,
   OptionalNode,
   OrNode,
@@ -39,7 +38,7 @@ import type { EngineInternals } from './engine-internals'
 import {
   applyFallbackSourceCardToFlow,
   applyInteractionRequest,
-  buildActivateCardNodes,
+  buildActivationActionNodes,
   buildPhaseTrailingNodes,
   buildFollowUpNodes,
   buildListenerEvent,
@@ -56,6 +55,7 @@ import {
   resolveSubtree,
 } from './engine-utils'
 import type { PendingEnvelope } from './types'
+import { isActivateCardActionNode, type ActivateCardActionNode } from './activation-action'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
@@ -119,6 +119,89 @@ const pendingEnvelopeChoices = (envelope: PendingEnvelope): ActionChoiceOption[]
   if (envelope.request.kind === 'farm-select') return envelope.request.options ?? []
   if (envelope.request.kind === 'select-trigger') return envelope.request.options
   return []
+}
+
+const executeActivateCardAction = (
+  int: EngineInternals,
+  context: EngineContext,
+  node: ActivateCardActionNode,
+): EngineStepResult => {
+  const params = node.params
+  const ownerPlayerId = params.ownerPlayerId ?? node.ownerPlayerId
+  const triggerPlayerId = params.triggerPlayerId
+  const listener = getListenerById(params.listenerId)
+  if (!listener) {
+    node.resolve({})
+    return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+  }
+  const triggerPlayer =
+    (triggerPlayerId
+      ? context.state.players.find((player) => player.id === triggerPlayerId)
+      : null) ?? context.player
+  const effectPlayer =
+    (ownerPlayerId
+      ? context.state.players.find((player) => player.id === ownerPlayerId)
+      : null) ?? triggerPlayer
+  const event: Record<string, unknown> = {
+    ...params.event,
+    triggerPlayerId,
+    ownerPlayerId,
+    mandatory: params.mandatory,
+  }
+  if (params.countCardUse !== undefined) event.countCardUse = params.countCardUse
+  const listenerContext: CardListenerContext = {
+    state: context.state,
+    player: triggerPlayer,
+    triggerPlayer,
+    ownerPlayer: effectPlayer,
+    effectPlayer,
+    space: context.space,
+    actionId: params.actionId,
+    phase: params.phase,
+    ...event,
+  }
+  const result = executeCardListener(listener, listenerContext, {
+    ownerPlayerId,
+  })
+  // Track BGA-style per-card `used` stat: count a use only when the listener
+  // actually returned an effect. Pure no-op fires and universal listeners
+  // without a cardId are skipped.
+  if (
+    params.cardId &&
+    result &&
+    params.countCardUse !== false &&
+    result.countCardUse !== false
+  ) {
+    incCardUsed(effectPlayer, params.cardId)
+  }
+  const normalizedFollowUps = (result?.followUpActions ?? []).map((followUp) =>
+    normalizeFollowUpAction(followUp, result?.sourceCard),
+  )
+  collectImmediateLogs(effectPlayer.name, result, {
+    includeLegacyLogKey: result ? !shouldSkipImmediateListenerLog(result) : true,
+  }).forEach((entry) => {
+    int.log.append(entry)
+  })
+  if (result?.flow || normalizedFollowUps.length > 0) {
+    const insertedNodes: EngineNode[] = []
+    if (result?.flow) {
+      insertedNodes.push(buildOwnedFlowNode(int,
+        applyFallbackSourceCardToFlow(result.flow, result.sourceCard),
+        effectPlayer.id,
+      ))
+    }
+    insertedNodes.push(...buildFollowUpNodes(int, normalizedFollowUps, node.id, effectPlayer))
+    if (params.phase === 'before') {
+      insertedNodes.forEach((insertedNode) =>
+        collectNodeIds(insertedNode, int.beforePhaseFlowNodeIds),
+      )
+    }
+    if (insertedNodes.length > 0) {
+      int.tree.insertAfter(node.id, insertedNodes)
+    }
+  }
+  node.resolve(result ?? {})
+  return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
 }
 
 /**
@@ -403,82 +486,15 @@ export function engineProceed(
     // here because nextUnresolved() filters resolved nodes.
     return { type: 'blocked', nodeId: node.id }
   }
-  // S4b PR5 sub-commit 4 — leaf-node dispatch routes through `node.step(ctx)`
-  // returning a NodeStepResult discriminator. The engine main loop uses the
-  // `kind` discriminant instead of `instanceof` for behavior dispatch.
   const leafCtx = {
     resolveSubtree: (n: EngineNode) => resolveSubtree(n),
     emitChoice: () => {},
   }
   const leafStep = node.step(leafCtx)
-  if (leafStep.kind === 'activateListener' && node instanceof ActivateCardNode) {
-    const ownerPlayerId = node.event.ownerPlayerId as string | undefined
-    const triggerPlayerId = node.event.triggerPlayerId as string | undefined
-    const listener = getListenerById(node.listenerId)
-    if (!listener) {
-      node.resolve({})
-      return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
-    }
-    const triggerPlayer =
-      (triggerPlayerId
-        ? context.state.players.find((player) => player.id === triggerPlayerId)
-        : null) ?? context.player
-    const effectPlayer =
-      (ownerPlayerId
-        ? context.state.players.find((player) => player.id === ownerPlayerId)
-        : null) ?? triggerPlayer
-    const listenerContext: CardListenerContext = {
-      state: context.state,
-      player: triggerPlayer,
-      triggerPlayer,
-      ownerPlayer: effectPlayer,
-      effectPlayer,
-      space: context.space,
-      actionId: node.actionId,
-      phase: node.phase,
-      ...node.event,
-    }
-    const result = executeCardListener(listener, listenerContext, {
-      ownerPlayerId,
-    })
-    // Track BGA-style per-card `used` stat: count a use only when the
-    // listener actually returned an effect (flow / followUp / decision /
-    // log etc.). Pure no-op fires (handler returned undefined / void) and
-    // universal listeners without a cardId are skipped.
-    if (node.cardId && result && result.countCardUse !== false) {
-      incCardUsed(effectPlayer, node.cardId)
-    }
-    const normalizedFollowUps = (result?.followUpActions ?? []).map((followUp) =>
-      normalizeFollowUpAction(followUp, result?.sourceCard),
-    )
-    collectImmediateLogs(effectPlayer.name, result, {
-      includeLegacyLogKey: result ? !shouldSkipImmediateListenerLog(result) : true,
-    }).forEach((entry) => {
-      int.log.append(entry)
-    })
-    if (result?.flow || normalizedFollowUps.length > 0) {
-      const insertedNodes: EngineNode[] = []
-      if (result?.flow) {
-        const flowNode = buildOwnedFlowNode(int,
-          applyFallbackSourceCardToFlow(result.flow, result.sourceCard),
-          effectPlayer.id,
-        )
-        if (node.phase === 'before') {
-          collectNodeIds(flowNode, int.beforePhaseFlowNodeIds)
-        }
-        insertedNodes.push(flowNode)
-      }
-      insertedNodes.push(...buildFollowUpNodes(int, normalizedFollowUps, node.id, effectPlayer))
-      if (insertedNodes.length === 0) {
-        node.resolve(result ?? {})
-        return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
-      }
-      int.tree.insertAfter(node.id, insertedNodes)
-    }
-    node.resolve(result ?? {})
-    return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
-  }
   if (leafStep.kind === 'execute' && node instanceof ActionNode) {
+    if (isActivateCardActionNode(node)) {
+      return executeActivateCardAction(int, context, node)
+    }
     const replaceResult = int.hooks.applyComputeReplace({
       ...context,
       params: node.params,
@@ -574,7 +590,7 @@ export function engineProceed(
     )
     const result = optInChoice ?? action.execute(executionContext)
     const duringPhase = int.hooks.during({ ...executionContext, actionId: replacedActionId }, result)
-    const duringActivateNodes = buildActivateCardNodes(int,
+    const duringActivateNodes = buildActivationActionNodes(int,
       duringPhase.matchedListeners, 'during', replacedActionId,
     )
     if (result.type === 'request') {

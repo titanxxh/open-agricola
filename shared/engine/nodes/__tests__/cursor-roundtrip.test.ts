@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { ActionNode } from '../action-node'
-import { ActivateCardNode } from '../activate-card-node'
 import { InteractionNode } from '../interaction-node'
 import { OptionalNode } from '../optional-node'
 import { OrNode } from '../or-node'
@@ -79,24 +78,6 @@ describe('cursor round-trip', () => {
       c1.data.effectPreview as never,
     )
     rebuilt.beforePhaseResolved = c1.data.beforePhaseResolved as boolean
-    rebuilt.setState(c1.state)
-    expect(rebuilt.toCursor()).toEqual(c1)
-  })
-
-  it('ActivateCardNode preserves all fields through toCursor', () => {
-    const original = new ActivateCardNode('ac-1', 'L77', 'D88', 'after', 'gain-wood', {
-      ownerPlayerId: 'p2',
-    })
-    original.setState('resolved')
-    const c1 = original.toCursor()
-    const rebuilt = new ActivateCardNode(
-      c1.id,
-      c1.data.listenerId as string,
-      c1.data.cardId as string,
-      c1.data.phase as never,
-      c1.data.actionId as string,
-      c1.data.event as Record<string, unknown>,
-    )
     rebuilt.setState(c1.state)
     expect(rebuilt.toCursor()).toEqual(c1)
   })

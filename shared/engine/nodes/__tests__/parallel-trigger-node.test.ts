@@ -1,9 +1,23 @@
 import { describe, it, expect } from 'vitest'
 import { ParallelTriggerNode } from '../parallel-trigger-node'
-import { ActivateCardNode } from '../activate-card-node'
+import { ActionNode } from '../action-node'
+import {
+  ACTIVATE_CARD_ACTION_ID,
+  type ActivateCardActionNode,
+  type ActivateCardActionParams,
+} from '../../activation-action'
 
-const makeActivate = (id: string, cardId: string, mandatory = true) =>
-  new ActivateCardNode(id, `listener-${id}`, cardId, 'after', 'place-farmer', { mandatory })
+const makeActivate = (id: string, cardId: string, mandatory = true): ActivateCardActionNode => {
+  const params: ActivateCardActionParams = {
+    listenerId: `listener-${id}`,
+    cardId,
+    phase: 'after',
+    actionId: 'place-farmer',
+    event: {},
+    mandatory,
+  }
+  return new ActionNode(id, ACTIVATE_CARD_ACTION_ID, cardId, params) as ActivateCardActionNode
+}
 
 describe('ParallelTriggerNode', () => {
   it('starts ready with unresolved children', () => {
