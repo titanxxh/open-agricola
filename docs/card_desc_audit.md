@@ -8,7 +8,7 @@
 
 ---
 
-## 1. 当前对齐状态（截至 2026-05-13）
+## 1. 当前对齐状态（截至 2026-05-14）
 
 ### 1.1 总览
 - BGA 卡数 888 / OA 卡数 888（含 33 张 BGA banned，OA 不实施过滤）
@@ -19,9 +19,9 @@
 
 | 维度 | 数量 | 出处 | 处理 |
 |---|---|---|---|
-| ✅ 完全对齐 | 587（含 48 数据 only） | — | — |
+| ✅ 完全对齐 | 587+（旧审计已确认 587；后续修复持续迁入，未重跑全量行为审计） | — | — |
 | 🟡 简化实现（owner-accepted） | 130 | §2.2 / §2.5 simplifications | 按需排期 |
-| ⚠ 行为偏差 | 41 | §2.3 | 排期修，无 P0 残留 |
+| ⚠ 行为偏差 | 0（当前已确认待修队列为空） | §2.3 | 新发现必须逐卡登记 |
 | ❌ 数值/元数据 | 4（schema 上抬） | §2.4 + metadata diff | BGA `isBuyable()` 方法等效行为，OA 把守卫上抬到 `prerequisite` schema 字段 + handler，**UI 清晰度故意保留** |
 | 🔀 刻意偏离 BGA | 32 | §2.5 | owner 签字 |
 | 🔍 BGA banned but OA active | 33 | §2.5.1 | OA 决议不实施 banned 过滤 |
@@ -105,12 +105,13 @@
 
 D75 WoodField / E80 RockGarden 已 2026-05-13 完整实现（multi-slot sowable field）。E132_Shearer 是 BGA `implemented=false` legacy 名，OA 用 E132_VeggieLover canonical 已对齐，不需要补。
 
-### 3.2 41 张 ⚠ 行为偏差
+### 3.2 ⚠ 行为偏差（当前已确认 0 张）
 
-详见 `card_progress.md` §2.3。无 P0 残留，全部 P1~P2，包括：
-- A10 / B104 / C51 / C125 / D21（Sprint 7c re-audit 5 张 promote）
-- B27 Toolbox / D160 Midwife / C23 触发条件 / D117 WoodExpert 等历史 ⚠
-- B130 / B150 / B152 `useActionSpace(other)` 语义组
+详见 `card_progress.md` §2.3 当前队列表。旧 `41 张` 数字是 stale aggregate：Sprint 7a 已收口 Sprint 7 audit 的 P0/P1 主体，Sprint 7d 修 A10 / C51 / C125 / D21 / B104，Sprint 7e 修 prereq 双模 38 张并确认 5 张 BGA 也 label-only，2026-05-14 `178b2146` 又补了 B104 forced reorg 后 harvest breed resume。当前没有已确认且未修的行为偏差卡；新发现需逐卡列出原始描述、当前问题、BGA 差距与证据。
+
+| 卡牌 | 原始描述 | 当前问题 | BGA 差距 | 处理 / 证据 |
+|---|---|---|---|---|
+| _无_ | — | 当前 `main` 没有已确认且未修的行为偏差卡。 | — | 新发现必须先补本表与 `card_progress.md` §2.3，不能只写 aggregate 数字。 |
 
 ### 3.3 4 张 ❌ schema 上抬（A3 / B154 / B74 / B56）
 
