@@ -172,6 +172,68 @@ describe('Engine flow nodes', () => {
     expect(p1.resources.wood).toBe(1)
   })
 
+  it('dynamic result.flow nested targetPlayerId preserves inner owner override', () => {
+    const p1 = createPlayer()
+    const p2 = { ...createPlayer(), id: 'p2', name: 'P2', color: 'blue' as const }
+    const state = createState()
+    state.players = [p1, p2]
+
+    const triggerAction: ActionDefinition = {
+      id: 'trigger-nested-target-flow',
+      nameKey: 'test.triggerNested',
+      descriptionKey: 'test.triggerNested',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({
+        type: 'flow',
+        flow: {
+          type: 'seq',
+          targetPlayerId: p2.id,
+          children: [
+            {
+              type: 'leaf',
+              actionId: 'gain',
+              params: { food: 1 },
+            },
+            {
+              type: 'leaf',
+              actionId: 'gain',
+              params: { wood: 1 },
+              targetPlayerId: p1.id,
+            },
+          ],
+        },
+      }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(triggerAction)
+    registry.register(gainAction)
+    const space = createSpace(triggerAction)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('trigger', triggerAction.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+
+    const playerForNextNode = () => {
+      const nodeId = engine.peekNextUnresolvedNodeId()
+      const ownerId = nodeId ? engine.getEffectiveOwnerPlayerId(nodeId, p1.id) : p1.id
+      return state.players.find((player) => player.id === ownerId) ?? p1
+    }
+
+    let step = engine.proceed({ state, player: playerForNextNode(), space })
+    let safety = 20
+    while (safety-- > 0 && step.type === 'ok') {
+      step = engine.proceed({ state, player: playerForNextNode(), space })
+    }
+
+    expect(p2.resources.food).toBe(1)
+    expect(p2.resources.wood).toBe(0)
+    expect(p1.resources.wood).toBe(1)
+  })
+
   it('or node removes completed choice and exposes done', () => {
     const buildRooms: ActionDefinition = {
       id: 'build-rooms',
