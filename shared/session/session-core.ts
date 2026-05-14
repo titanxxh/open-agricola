@@ -3395,7 +3395,11 @@ export class GameCore {
     if (isPlainChoiceOrFarmSelect && farmPrompt && interactionFrame) {
       const currentPromptKey = envelope.promptKey
       const currentSpaceId = interactionFrame.spaceId
-      const currentPlayerIndex = interactionFrame.ownerPlayerIndex
+      const currentPlayerIndex = this.effectiveOwnerIndexForFrame(
+        interactionFrame,
+        envelope.hostNodeId,
+        envelope,
+      )
       const entry = this.history[this.history.length - 1]
       const canRestorePriorChoice =
         !!entry &&
