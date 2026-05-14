@@ -473,7 +473,6 @@ import { C69_LandConsolidation_impl } from './C/C69_LandConsolidation'
 import { C6_StoneClearing_impl } from './C/C6_StoneClearing'
 import { C70_LettucePatch_impl } from './C/C70_LettucePatch'
 import { C71_Slurry_impl } from './C/C71_Slurry'
-import { C71_SlurrySpreader_impl } from './C/C71_SlurrySpreader'
 import { C72_FestivalPlanning_impl } from './C/C72_FestivalPlanning'
 import { C73_SeaweedFertilizer_impl } from './C/C73_SeaweedFertilizer'
 import { C74_PrivateForest_impl } from './C/C74_PrivateForest'
@@ -1303,7 +1302,6 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'C6_StoneClearing': C6_StoneClearing_impl,
   'C70_LettucePatch': C70_LettucePatch_impl,
   'C71_Slurry': C71_Slurry_impl,
-  'C71_SlurrySpreader': C71_SlurrySpreader_impl,
   'C72_FestivalPlanning': C72_FestivalPlanning_impl,
   'C73_SeaweedFertilizer': C73_SeaweedFertilizer_impl,
   'C74_PrivateForest': C74_PrivateForest_impl,

@@ -1,4 +1,4 @@
-# BGA Metadata Diff Report (2026-05-13)
+# BGA Metadata Diff Report (2026-05-14)
 
 ## Summary
 - Total BGA cards scanned: 888
