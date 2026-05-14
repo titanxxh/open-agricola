@@ -22,7 +22,7 @@ import {
   applyInteractionRequest,
   buildPhaseTrailingNodes,
   buildChoiceExecutionContext,
-  buildFlowNode,
+  buildOwnedFlowNode,
   buildFollowUpNodes,
   buildListenerEvent,
   cloneNode,
@@ -31,7 +31,6 @@ import {
   normalizeFollowUpAction,
   pendingEnvelopeFromHostNode,
   resolveSubtree,
-  stampOwner,
 } from './engine-utils'
 import type { PendingEnvelope } from './types'
 
@@ -98,12 +97,6 @@ const pendingEnvelopeChoices = (envelope: PendingEnvelope): ActionChoiceOption[]
   if (envelope.request.kind === 'select-trigger') return envelope.request.options
   return []
 }
-
-const buildOwnedFlowNode = (
-  int: EngineInternals,
-  flow: ActionFlow,
-  ownerPlayerId: string,
-) => stampOwner(buildFlowNode(int, flow, ownerPlayerId), ownerPlayerId)
 
 /**
  * S4c PR5 — extracted from `Engine.resolveChoice`. Resolve a pending choice
@@ -197,7 +190,7 @@ export function engineResolveChoice(
       const actionId = replaceResult.actionId
       executionContext.sourceCard = replaceResult.sourceCard ?? child.sourceCard
       if (replaceResult.declined && replaceResult.alternativeFlow) {
-        const flowNode = buildFlowNode(int,
+        const flowNode = buildOwnedFlowNode(int,
           buildReplaceChoiceFlow(
             child,
             applyFallbackSourceCardToFlow(
