@@ -180,20 +180,23 @@ export function findPairedInteractionNode(
 
 export function buildActivationActionNodes(
   int: EngineInternals,
-  matched: { registration: { id: string; cardIds?: string[] }; cardId: string; ownerPlayerId: string }[],
-  phase: string,
+  matched: MatchedCardListener[],
+  phase: ActionHookPhase,
   actionId: string,
   event: Record<string, unknown> = {},
+  triggerPlayerId?: string,
 ): EngineNode[] {
   return matched.map((entry, index) => {
     const nodeId = `activate-${phase}-${actionId}-${index}-${int.counterRef.value++}`
     const params: ActivateCardActionParams = {
       listenerId: entry.registration.id,
       cardId: entry.cardId,
-      phase: phase as ActionHookPhase,
+      phase,
       actionId,
       event,
       ownerPlayerId: entry.ownerPlayerId,
+      triggerPlayerId,
+      mandatory: entry.registration.mandatory === true,
       countCardUse: typeof event.countCardUse === 'boolean' ? event.countCardUse : undefined,
     }
     const node = new ActionNode(
