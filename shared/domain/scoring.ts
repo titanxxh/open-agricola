@@ -348,7 +348,22 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
   const summaries = state.players.map((player) => {
     const categories: ScoreCategoryResult[] = []
 
-    const fieldCount = player.fields.length
+    // BGA PlayerBoard::countLogicalFields(): each `isField: true` card a player
+    // has played also counts as 1 field (e.g. D75 Wood Field, E80 Rock Garden,
+    // E68 Cherry Orchard, B68 Beanfield, C70 Lettuce Patch, E69 Melon Patch,
+    // E70 Crop Rotation Field, E72 Artichoke Field, B113 Patch Caregiver,
+    // B141 Field Caretaker — every such card states "considered 1 field").
+    const playedCards = [
+      ...player.improvements,
+      ...player.minorPlayed,
+      ...player.occupationPlayed,
+    ]
+    const isFieldCardCount = playedCards.reduce((count, cardId) => {
+      const card =
+        getRegisteredMinorImprovement(cardId) ?? getRegisteredOccupation(cardId)
+      return card?.isField ? count + 1 : count
+    }, 0)
+    const fieldCount = player.fields.length + isFieldCardCount
     const fieldScore = scoreByRanges(fieldCount, ['0-1', '2', '3', '4', '5+'])
     categories.push({
       key: 'fields',

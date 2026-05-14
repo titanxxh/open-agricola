@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { sowCrop, getEmptyFields, canSow } from '../sow'
-import type { Field, PlayerState } from '../../../contract/types'
+import { sowCrop, getEmptyFields, canSow, sowAction } from '../sow'
+import { makeBlankPlayer } from '../../../domain/__tests__/helpers'
+import type { Field, GameState, PlayerState } from '../../../contract/types'
 
 const mkPlayer = (fields: Field[], grain = 0, veg = 0): Partial<PlayerState> => ({
   fields,
@@ -47,5 +48,44 @@ describe('sowCrop with stacks', () => {
       0,
     )
     expect(canSow(player)).toBe(false)
+  })
+})
+
+const STATE_STUB = {} as unknown as GameState
+
+describe('sowAction.canBeExecutedByPlayer', () => {
+  it('returns false when cropType="grain" and player has only vegetable', () => {
+    const player = makeBlankPlayer({
+      resources: { grain: 0, vegetable: 3 },
+      fields: [{ row: 0, col: 0, stacks: [] }],
+    }) as unknown as PlayerState
+    const doable = sowAction.canBeExecutedByPlayer!(STATE_STUB, player, {
+      actionContext: { cropType: 'grain', maxSelections: 1 },
+    })
+    expect(doable).toBe(false)
+  })
+
+  it('returns true when cropType="grain" and player has grain + empty field', () => {
+    const player = makeBlankPlayer({
+      resources: { grain: 1, vegetable: 0 },
+      fields: [{ row: 0, col: 0, stacks: [] }],
+    }) as unknown as PlayerState
+    expect(
+      sowAction.canBeExecutedByPlayer!(STATE_STUB, player, {
+        actionContext: { cropType: 'grain', maxSelections: 1 },
+      }),
+    ).toBe(true)
+  })
+
+  it('returns false when cropType="wood" and no extra-field card is in play', () => {
+    const player = makeBlankPlayer({
+      resources: { wood: 5 },
+      fields: [{ row: 0, col: 0, stacks: [] }],
+    }) as unknown as PlayerState
+    expect(
+      sowAction.canBeExecutedByPlayer!(STATE_STUB, player, {
+        actionContext: { cropType: 'wood' },
+      }),
+    ).toBe(false)
   })
 })

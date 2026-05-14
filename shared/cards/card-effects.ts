@@ -10,8 +10,9 @@ import { positionKey } from '../domain/farm'
  */
 export type ExtraSowableField = {
   tile: FarmTilePosition
-  allowedCrops: ('grain' | 'vegetable' | 'wood')[]
+  allowedCrops: ('grain' | 'vegetable' | 'wood' | 'stone')[]
   sourceCard: string
+  groupKey?: string
 }
 
 export type ExtraSowableCrop = ExtraSowableField['allowedCrops'][number]

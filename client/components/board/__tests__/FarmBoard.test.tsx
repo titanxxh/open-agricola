@@ -74,7 +74,7 @@ describe('FarmBoard', () => {
         pendingPositionSelections={new Set()}
         togglePositionSelection={() => {}}
         pendingSowSelections={{}}
-        sowRemaining={{ grain: 0, vegetable: 0, wood: 2 }}
+        sowRemaining={{ grain: 0, vegetable: 0, wood: 2, stone: 0 }}
         sowSelectableMap={new Map()}
         pastureTiles={new Map()}
         pastureDisplayMap={new Map()}
@@ -158,7 +158,7 @@ describe('FarmBoard', () => {
       pendingPositionSelections: new Set<string>(),
       togglePositionSelection: () => {},
       pendingSowSelections: {},
-      sowRemaining: { grain: 0, vegetable: 0, wood: 0 },
+      sowRemaining: { grain: 0, vegetable: 0, wood: 0, stone: 0 },
       sowSelectableMap: new Map(),
       pastureTiles: new Map(),
       pastureDisplayMap: new Map(),
@@ -245,7 +245,7 @@ describe('FarmBoard', () => {
         pendingPositionSelections={new Set()}
         togglePositionSelection={() => {}}
         pendingSowSelections={{}}
-        sowRemaining={{ grain: 0, vegetable: 0, wood: 0 }}
+        sowRemaining={{ grain: 0, vegetable: 0, wood: 0, stone: 0 }}
         sowSelectableMap={new Map()}
         pastureTiles={new Map()}
         pastureDisplayMap={new Map()}
@@ -286,6 +286,180 @@ describe('FarmBoard', () => {
     // `palisade` class marker so CSS can style it distinctly.
     expect(html).toMatch(/farm-fence-h[^"]*\bpalisade\b/)
     expect(html).toContain('selected')
+  })
+
+  it('renders stone sow button when allowedCrops includes stone and player has stone', () => {
+    const player: PlayerState = {
+      ...createPlayer('p1', 'Player A', 'red'),
+      resources: { ...resources(), stone: 2 },
+    }
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        locale="en"
+        players={[player]}
+        currentPlayer={player}
+        displayPlayer={player}
+        devMode={false}
+        currentStartPlayerId=""
+        nextStartPlayerId=""
+        playedCards={[]}
+        farmCells={[{ key: '1-1', type: 'tile', tileRow: 0, tileCol: 0 }]}
+        roomPositions={new Set()}
+        fieldPositions={new Set()}
+        fieldMap={new Map()}
+        stablePositions={new Set()}
+        pendingRoomSet={new Set()}
+        pendingStableSet={new Set()}
+        roomSelectableSet={new Set()}
+        stableSelectableSet={new Set()}
+        maxStableSelections={0}
+        plowSelectableSet={new Set()}
+        pendingPlowTile={null}
+        positionSelectableSet={new Set()}
+        pendingPositionSelections={new Set()}
+        togglePositionSelection={() => {}}
+        pendingSowSelections={{}}
+        sowRemaining={{ grain: 0, vegetable: 0, wood: 0, stone: 2 }}
+        sowSelectableMap={new Map()}
+        pastureTiles={new Map()}
+        pastureDisplayMap={new Map()}
+        pastureCapacityMap={new Map()}
+        houseDisplay={{ animalType: null, animalCount: 0 }}
+        stableDisplayMap={new Map()}
+        isReorgActive={false}
+        reorgRemaining={null}
+        hasReorgOverflow={false}
+        animalReorg={null}
+        pendingFenceSet={new Set()}
+        existingFenceSet={new Set()}
+        fenceSelectableSet={new Set()}
+        toggleRoomTile={() => {}}
+        toggleStableTile={() => {}}
+        togglePlowTile={() => {}}
+        updateSowSelection={() => {}}
+        toggleFenceEdge={() => {}}
+        adjustReorgAnimal={() => {}}
+        confirmAnimalReorg={() => {}}
+        cancelAnimalDiscardPrompt={() => {}}
+        setViewPlayerId={() => {}}
+        isSelectingMinor={false}
+        isSelectingOccupation={false}
+        isSelectingImprovementAny={false}
+        selectableMinorIds={new Set()}
+        selectableOccupationIds={new Set()}
+        cardAvailability={{}}
+        futureCardResources={{}}
+        resolveChoice={() => {}}
+        isInteractive={true}
+        {...({
+          extraSowTargets: [
+            {
+              key: '-80-0',
+              tile: { row: -80, col: 0 },
+              allowedCrops: ['stone'],
+              sourceCard: 'E80_RockGarden',
+              groupKey: 'E80_RockGarden',
+            },
+          ],
+        } as any)}
+      />,
+    )
+
+    // The extra-sow-tray for the E80 slot must include a sow-choice button
+    // whose inner icon span carries the stone class. We assert via a regex
+    // that finds a `<button class="sow-choice-button..."` followed by a
+    // `res-icon-stone` icon span before the closing button tag.
+    expect(html).toMatch(/sow-choice-button[^<]*<span class="res-icon res-icon-stone/)
+    // Sow-choice radiogroup must exist for the E80 slot key.
+    expect(html).toContain('-80-0-sow-choice')
+  })
+
+  it('renders 2 wood stacks on D75 card when extraData.stacks has 2 entries', () => {
+    const player: PlayerState = {
+      ...createPlayer('p1', 'Player A', 'red'),
+      minorPlayed: ['D75_WoodField'],
+      cardStates: {
+        D75_WoodField: {
+          counters: {},
+          infobox: undefined,
+          stack: [],
+          extraData: {
+            stacks: [
+              { kind: 'wood', remaining: 3 },
+              { kind: 'wood', remaining: 2 },
+            ],
+          },
+        },
+      },
+    }
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        locale="en"
+        players={[player]}
+        currentPlayer={player}
+        displayPlayer={player}
+        devMode={false}
+        currentStartPlayerId=""
+        nextStartPlayerId=""
+        playedCards={['minor:D75_WoodField']}
+        farmCells={[]}
+        roomPositions={new Set()}
+        fieldPositions={new Set()}
+        fieldMap={new Map()}
+        stablePositions={new Set()}
+        pendingRoomSet={new Set()}
+        pendingStableSet={new Set()}
+        roomSelectableSet={new Set()}
+        stableSelectableSet={new Set()}
+        maxStableSelections={0}
+        plowSelectableSet={new Set()}
+        pendingPlowTile={null}
+        positionSelectableSet={new Set()}
+        pendingPositionSelections={new Set()}
+        togglePositionSelection={() => {}}
+        pendingSowSelections={{}}
+        sowRemaining={{ grain: 0, vegetable: 0, wood: 0, stone: 0 }}
+        sowSelectableMap={new Map()}
+        pastureTiles={new Map()}
+        pastureDisplayMap={new Map()}
+        pastureCapacityMap={new Map()}
+        houseDisplay={{ animalType: null, animalCount: 0 }}
+        stableDisplayMap={new Map()}
+        isReorgActive={false}
+        reorgRemaining={null}
+        hasReorgOverflow={false}
+        animalReorg={null}
+        pendingFenceSet={new Set()}
+        existingFenceSet={new Set()}
+        fenceSelectableSet={new Set()}
+        toggleRoomTile={() => {}}
+        toggleStableTile={() => {}}
+        togglePlowTile={() => {}}
+        updateSowSelection={() => {}}
+        toggleFenceEdge={() => {}}
+        adjustReorgAnimal={() => {}}
+        confirmAnimalReorg={() => {}}
+        cancelAnimalDiscardPrompt={() => {}}
+        setViewPlayerId={() => {}}
+        isSelectingMinor={false}
+        isSelectingOccupation={false}
+        isSelectingImprovementAny={false}
+        selectableMinorIds={new Set()}
+        selectableOccupationIds={new Set()}
+        cardAvailability={{}}
+        futureCardResources={{}}
+        resolveChoice={() => {}}
+        isInteractive={true}
+        {...({ extraSowTargets: [] } as any)}
+      />,
+    )
+
+    // Each stack renders a separate `field-crop-segment` span. With 2 wood
+    // stacks we expect 2 segments to be present (multi-stack render path).
+    const segments = html.match(/field-crop-segment/g) ?? []
+    expect(segments.length).toBeGreaterThanOrEqual(2)
   })
 })
 
@@ -333,7 +507,7 @@ const renderWithOccSelection = (
       pendingPositionSelections={new Set()}
       togglePositionSelection={() => {}}
       pendingSowSelections={{}}
-      sowRemaining={{ grain: 0, vegetable: 0, wood: 0 }}
+      sowRemaining={{ grain: 0, vegetable: 0, wood: 0, stone: 0 }}
       sowSelectableMap={new Map()}
       pastureTiles={new Map()}
       pastureDisplayMap={new Map()}
