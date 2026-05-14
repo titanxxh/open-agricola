@@ -1,6 +1,5 @@
 export { BaseNode } from './base'
 export { ActionNode } from './action-node'
-export { InteractionNode } from './interaction-node'
 export { SequenceNode } from './sequence-node'
 export { ParallelNode } from './parallel-node'
 export { OrNode } from './or-node'

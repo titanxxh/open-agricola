@@ -12,7 +12,7 @@ import { Engine } from '../engine'
 import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
-import { ActionNode, InteractionNode, SequenceNode } from '../nodes'
+import { ActionNode, SequenceNode } from '../nodes'
 import { clearActionHooks } from '../../actions/hooks'
 
 const createState = () =>
@@ -96,7 +96,6 @@ const buildEngine = (action: ActionDefinition) => {
   registry.register(action)
   const root = new SequenceNode(`sequence-${action.id}`, [
     new ActionNode(`action-${action.id}`, action.id),
-    new InteractionNode(`choice-${action.id}`, []),
   ])
   return new Engine({
     tree: new EngineTree(root),
@@ -177,10 +176,7 @@ describe('engine resolveChoice payload', () => {
     const space = createSpace(action)
     engine.proceed({ state, player, space })
     engine.resolveChoice('commit', { state, player, space })
-    // S4b PR5: read pending interaction context off the InteractionNode (host) directly.
-    // S4c PR4: peekInteractionHost is `@internal` on Engine — package-internal test access.
-    const host = engine.peekInteractionHost()
-    const ctx = host instanceof InteractionNode ? host.contextSnapshot : undefined
+    const ctx = engine.peekPendingEnvelope()?.contextSnapshot as { actionContext?: unknown } | undefined
     expect(ctx?.actionContext).toEqual({ stashed: { foo: 42 } })
     expect(callCount).toBe(1)
   })
@@ -225,10 +221,7 @@ describe('engine resolveChoice payload', () => {
     engine.proceed({ state, player, space })
     engine.resolveChoice('a', { state, player, space })
     engine.resolveChoice('b', { state, player, space })
-    // S4b PR5: read pending interaction context off the InteractionNode (host) directly.
-    // S4c PR4: peekInteractionHost is `@internal` on Engine — package-internal test access.
-    const host = engine.peekInteractionHost()
-    const ctx = host instanceof InteractionNode ? host.contextSnapshot : undefined
+    const ctx = engine.peekPendingEnvelope()?.contextSnapshot as { actionContext?: unknown } | undefined
     expect(ctx?.actionContext).toEqual({ x: 1, y: 99, z: 3 })
   })
 })

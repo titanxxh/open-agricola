@@ -12,7 +12,7 @@ import { Engine } from '../engine'
 import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
-import { ActionNode, InteractionNode, SequenceNode } from '../nodes'
+import { ActionNode, SequenceNode } from '../nodes'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
 
 const createState = (): GameState =>
@@ -177,7 +177,6 @@ describe('Engine pipeline phase order', () => {
       tree: new EngineTree(
         new SequenceNode('seq', [
           new ActionNode('a', 'choice-action'),
-          new InteractionNode('c', []),
         ]),
       ),
       registry,
@@ -272,7 +271,6 @@ describe('Engine pipeline phase order', () => {
       tree: new EngineTree(
         new SequenceNode('seq', [
           new ActionNode('a', 'args-action'),
-          new InteractionNode('c', []),
         ]),
       ),
       registry,

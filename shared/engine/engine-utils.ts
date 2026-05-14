@@ -14,13 +14,12 @@ import type { PromptKey } from '../contract/prompt-keys'
 import type { FollowUpAction, ActionHookPhase } from '../actions/hooks'
 import {
   ActionNode,
-  InteractionNode,
   OrNode,
   ParallelNode,
   SequenceNode,
   XorNode,
 } from './nodes'
-import { attachChoiceLabel } from './nodes/interaction-helpers'
+import { attachChoiceLabel, resolveChoiceSourceCard } from './nodes/interaction-helpers'
 import type { EngineNode } from './types'
 import type { PendingEnvelope, PendingSyntheticKind } from './types'
 import type { EngineInternals } from './engine-internals'
@@ -184,18 +183,6 @@ export function findActionNode(node: EngineNode): ActionNode | null {
     }
   }
   return null
-}
-
-export function findPairedInteractionNode(
-  int: EngineInternals,
-  node: ActionNode,
-): InteractionNode | null {
-  const parent = int.tree.findParent(node.id)
-  if (!(parent instanceof SequenceNode)) return null
-  const index = parent.children.findIndex((child) => child.id === node.id)
-  if (index === -1) return null
-  const candidate = parent.children[index + 1]
-  return candidate instanceof InteractionNode ? candidate : null
 }
 
 export function buildActivationActionNodes(
@@ -364,16 +351,6 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
     clone.beforePhaseResolved = node.beforePhaseResolved
     return copySharedNodeMetadata(node, clone)
   }
-  if (node instanceof InteractionNode) {
-    const clone = new InteractionNode(
-      `${node.id}-clone-${int.counterRef.value++}`,
-      [...node.choices],
-    )
-    if (node.promptKey) {
-      clone.setChoice(node.promptKey, [...node.choices])
-    }
-    return copySharedNodeMetadata(node, clone)
-  }
   if (node instanceof SequenceNode) {
     return copySharedNodeMetadata(node, new SequenceNode(
       `${node.id}-clone-${int.counterRef.value++}`,
@@ -423,7 +400,7 @@ export function resolveSubtree(node: EngineNode): void {
     node.resolve()
     return
   }
-  if (node instanceof ActionNode || node instanceof InteractionNode) {
+  if (node instanceof ActionNode) {
     node.setState('resolved')
     return
   }
@@ -472,7 +449,6 @@ export function getActionEffectPreview(node: ActionNode): ChoiceEffectPreview | 
 
 export function collectOrderedActionNodes(node: EngineNode): ActionNode[] | null {
   if (node instanceof ActionNode) return [node]
-  if (node instanceof InteractionNode) return []
   if (node instanceof SequenceNode) {
     const flattened: ActionNode[] = []
     for (const child of node.children) {
@@ -623,10 +599,7 @@ export function buildFlowNode(
     )
     const definition = int.registry.get(flow.actionId)
     if (definition?.resolveChoice && !definition.skipChoiceWrap) {
-      const sequence = new SequenceNode(nextId(), [
-        actionNode,
-        new InteractionNode(nextId(), []),
-      ])
+      const sequence = new SequenceNode(nextId(), [actionNode])
       const node = flow.optional ? markOptional(sequence, flow.promptKey) : sequence
       return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
     }
@@ -694,18 +667,6 @@ export function mergeContextIntoFlow(
       mergeContextIntoFlow(c, outerContext, outerSourceCard),
     ),
   }
-}
-
-export function findInteractionNode(node: EngineNode): InteractionNode | null {
-  if (node instanceof InteractionNode) return node
-  if ('children' in node) {
-    const composite = node as { children: EngineNode[] }
-    for (const child of composite.children) {
-      const found = findInteractionNode(child)
-      if (found) return found
-    }
-  }
-  return null
 }
 
 export function resolveTrueAction(actionContext?: Record<string, unknown>) {
@@ -800,25 +761,15 @@ export function buildChoiceExecutionContext(
 }
 
 /**
- * Apply an InteractionRequest emitted by an action.execute / resolveChoice
- * call to the engine's pending-interaction state. Centralises the three
- * mirror branches (top-level execute, XorNode follow-up execute,
- * resolveChoice second-pass) so that every interaction request goes
- * through the same setChoice + pending-interaction wiring path.
- *
- * Caller is responsible for:
- *   - locating the right InteractionNode (paired with an ActionNode, child
- *     of the XorNode, or pending node from tree lookup) — pass it as
- *     `targetNode` (null when no node exists; pendingNodeId falls back to
- *     `fallbackNodeId`).
- *   - building the final `choiceOptions` (e.g. animal-reorg confirm/cancel
- *     shim, computeArgs extraOptions merge).
- *   - any prior shallow-merge of actionContextWrite from extraData.
+ * Apply an InteractionRequest emitted by action execution to the node that
+ * now owns the waiting state. The host remains unresolved; `pending` is the
+ * marker that makes subsequent `proceed()` calls re-emit the prompt instead
+ * of executing the action again.
  */
 export function applyInteractionRequest(
   int: EngineInternals,
   args: {
-    targetNode: InteractionNode | null
+    targetNode: EngineNode | null
     fallbackNodeId: string | null
     request: InteractionRequest
     promptKey?: PromptKey
@@ -835,38 +786,40 @@ export function applyInteractionRequest(
      *  performs the shallow merge so all three call sites can stop repeating
      *  the same boilerplate inline. */
     contextWritePatch?: Record<string, unknown>
-    /** When true, leave the InteractionNode's existing `ownerNodeId` untouched
-     *  (used by the resolveChoice second-pass that wants to preserve the
-     *  existing owner pointer). Forwarded to `InteractionNode.emit()`. */
+    /** When true, keep the existing envelope owner pointer during multi-step
+     *  resolveChoice prompts. */
     preserveOwner?: boolean
   },
 ): void {
   const { targetNode, fallbackNodeId, request, promptKey, promptParams, choiceOptions, actionId, ownerNodeId } = args
-  if (targetNode) {
-    // S4b Task 12 — delegate the heavy lift (setChoice + request + node
-    // pending fields + context snapshot) to InteractionNode.emit().
-    targetNode.emit({
-      request,
-      promptKey,
-      promptParams,
-      choiceOptions,
-      actionId,
-      ownerNodeId,
+  const host = targetNode ?? (fallbackNodeId ? int.tree.findNodeById(fallbackNodeId) : null)
+  if (!host) {
+    int.pendingNodeIdRef.value = fallbackNodeId
+    return
+  }
+  const existingOwnerNodeId = host.getPending()?.ownerNodeId
+  const mergedActionContext = args.contextWritePatch
+    ? { ...(args.actionContext ?? {}), ...args.contextWritePatch }
+    : args.actionContext
+  host.setPending({
+    hostNodeId: host.id,
+    request,
+    choices: choiceOptions,
+    promptKey,
+    promptParams,
+    sourceCard: resolveChoiceSourceCard(args.sourceCard, choiceOptions),
+    pendingActionId: actionId,
+    ownerNodeId: args.preserveOwner ? (existingOwnerNodeId ?? ownerNodeId) : ownerNodeId,
+    contextSnapshot: {
       params: args.params,
       costs: args.costs,
-      sourceCard: args.sourceCard,
-      actionContext: args.actionContext,
-      contextWritePatch: args.contextWritePatch,
-      preserveOwner: args.preserveOwner,
-    })
-    int.pendingNodeIdRef.value = targetNode.id
-  } else {
-    // No-targetNode path: pending context (params/costs/sourceCard/actionContext)
-    // will be installed when the eventual InteractionNode emits — engine carries
-    // no fallback snapshot post-PR2 (the deleted `pendingInteractionContext` mirror
-    // used to live here).
-    int.pendingNodeIdRef.value = fallbackNodeId
-  }
+      sourceCard: resolveChoiceSourceCard(args.sourceCard, choiceOptions),
+      actionContext: mergedActionContext,
+    },
+    effectiveOwnerPlayerId: ownerFromRequest(request) ?? host.ownerPlayerId,
+    syntheticKind: requestSyntheticKind(request, actionId),
+  })
+  int.pendingNodeIdRef.value = host.id
 }
 
 export function snapshotCompositeEmit(int: EngineInternals): {
@@ -932,25 +885,6 @@ export function pendingEnvelopeFromHostNode(node: EngineNode | null): PendingEnv
   if (!node) return null
   const pending = node.getPending()
   if (pending) return pending
-
-  if (node instanceof InteractionNode) {
-    if (node.choices.length === 0 && !node.request) return null
-    const request = node.request ?? choiceRequest(node.choices)
-    const sourceCard = sourceCardFromContextSnapshot(node.contextSnapshot)
-    return {
-      hostNodeId: node.id,
-      request,
-      choices: node.choices,
-      promptKey: node.promptKey,
-      promptParams: node.promptParams,
-      sourceCard,
-      pendingActionId: node.pendingActionId,
-      ownerNodeId: node.ownerNodeId ?? null,
-      contextSnapshot: node.contextSnapshot,
-      effectiveOwnerPlayerId: ownerFromRequest(request) ?? node.ownerPlayerId,
-      syntheticKind: requestSyntheticKind(request, node.pendingActionId),
-    }
-  }
 
   if (node instanceof OrNode || node instanceof XorNode) {
     if (node.emittedChoices.length === 0 && !node.emittedRequest) return null

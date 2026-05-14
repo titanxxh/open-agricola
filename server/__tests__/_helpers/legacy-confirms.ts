@@ -2,7 +2,7 @@ import type { GameSession } from '../../game/authoritative-session'
 import type { SessionResponse } from '../../../shared/session/session-core'
 
 /**
- * Test helper: drive the synthetic `confirm-next-player` InteractionNode
+ * Test helper: drive the synthetic `confirm-next-player` pending frame
  * forward by reading the current `nextPlayerIndex` off the active
  * `InteractionState.request` and resolving via `resolveChoice`. Replaces
  * the deprecated `GameSession.confirmNextPlayer()` shim (deleted in S2 Task
@@ -17,7 +17,7 @@ export function confirmNextPlayer(session: GameSession): SessionResponse {
 }
 
 /**
- * Test helper: drive the synthetic `confirm-player-switch` InteractionNode
+ * Test helper: drive the synthetic `confirm-player-switch` pending frame
  * forward by reading the current `toPlayerIndex` off the active
  * `InteractionState.request` and resolving via `resolveChoice`. Replaces
  * the deprecated `GameSession.confirmPlayerSwitch()` shim (deleted in S2

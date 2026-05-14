@@ -95,14 +95,14 @@ describe('EngineStack query/write delegation', () => {
     })
   }
 
-  it('peekInteractionHost delegates to top frame engine; returns null when empty', () => {
+  it('peekPendingHost delegates to top frame engine; returns null when empty', () => {
     const stack = new EngineStack()
-    expect(stack.peekInteractionHost()).toBeNull()
+    expect(stack.peekPendingHost()).toBeNull()
     const engine = makeEngine()
-    const fakeHost = { id: 'n1' } as unknown as ReturnType<Engine['peekInteractionHost']>
-    const spy = vi.spyOn(engine, 'peekInteractionHost').mockReturnValue(fakeHost)
+    const fakeHost = { id: 'n1' } as unknown as ReturnType<Engine['peekPendingHost']>
+    const spy = vi.spyOn(engine, 'peekPendingHost').mockReturnValue(fakeHost)
     pushStubFrame(stack, engine)
-    expect(stack.peekInteractionHost()).toBe(fakeHost)
+    expect(stack.peekPendingHost()).toBe(fakeHost)
     expect(spy).toHaveBeenCalledTimes(1)
   })
 
