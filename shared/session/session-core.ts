@@ -154,9 +154,10 @@ const pendingContextSnapshot = (
 
 const pendingEnvelopeChoices = (envelope: PendingEnvelope | null): ActionChoiceOption[] => {
   if (!envelope) return []
+  if (envelope.choices) return envelope.choices
   const request = envelope.request
   if (request.kind === 'choice' || request.kind === 'select-trigger') return request.options
-  if (request.kind === 'farm-select') return request.options ?? envelope.choices ?? []
+  if (request.kind === 'farm-select') return request.options ?? []
   return envelope.choices ?? []
 }
 
@@ -1334,10 +1335,7 @@ export class GameCore {
     // Resolve the InteractionRequest for the wait state from the envelope.
     // The engine adapter synthesizes legacy choice requests for old hosts.
     const request: InteractionRequest = envelope.request
-    const choiceOptions =
-      request.kind === 'choice' || request.kind === 'select-trigger'
-        ? request.options
-        : pendingEnvelopeChoices(envelope)
+    const choiceOptions = pendingEnvelopeChoices(envelope)
     const player = this.state.players[playerIndex]
 
     const policy = this.computeAnytimePolicySnapshot()
@@ -1434,6 +1432,19 @@ export class GameCore {
           request,
           options: choiceOptions,
           allowedCommands: buildCmds(['resolveChoice', 'undoStep', 'undoAction']),
+          anytimeActions: anytimeDescriptors,
+        }
+      case 'card-draft':
+        return {
+          stateId: 'wait',
+          playerIndex,
+          spaceId,
+          promptKey,
+          promptParams,
+          sourceCard,
+          request,
+          options: choiceOptions,
+          allowedCommands: buildCmds(['undoStep', 'undoAction']),
           anytimeActions: anytimeDescriptors,
         }
       case 'choice':
@@ -2313,6 +2324,10 @@ export class GameCore {
       }
 
       if (step.type === 'choice') {
+        const pendingHost = this.engineStack.peekPendingHost()
+        if (pendingHost?.getPending() !== null) {
+          return
+        }
         // breed action (e.g. harvest reap or B104 last-harvest enforcement)
         // emits ActionExecutionResult { type: 'request', request: { kind:
         // 'animal-reorg' } } — the engine wraps it in the new 'request'
@@ -2771,13 +2786,14 @@ export class GameCore {
           return this.resolvePendingChoice(playerIndex, value, true, payload)
         case 'farm-select':
         case 'selection':
-        case 'card-draft':
         case 'select-trigger':
-          // S2 Task 2 introduced the farm-select / selection / card-draft kinds
-          // ahead of their resolvers (Tasks 5/6/7/12). Until those tasks wire
-          // dedicated handlers, fall back to the legacy pending-options path so
-          // tests/UX continue working through ChoiceNode.choices validation.
+          // S2 Task 2 introduced these kinds ahead of their dedicated
+          // resolvers. Until those tasks wire dedicated handlers, fall back to
+          // the legacy pending-options path so tests/UX continue working
+          // through ChoiceNode.choices validation.
           return this.resolvePendingChoice(playerIndex, value, true, payload)
+        case 'card-draft':
+          return this.respond(false, 'card-draft resolveChoice not supported')
         default: {
           const _exhaustive: never = request
           return this.respond(false, `unhandled interaction kind: ${JSON.stringify(_exhaustive)}`)

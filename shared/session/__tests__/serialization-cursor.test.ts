@@ -3,8 +3,59 @@ import { GameSession } from '../../../server/game/authoritative-session'
 import { setWorkersAtHome } from '../../domain/player'
 import { rehydrateState, serializeState } from '../serialization'
 import { isLegacyChoicePending } from '../../../server/__tests__/_helpers/legacy-confirms'
+import { EngineStack } from '../../engine'
 
 describe('serialization cursor round-trip', () => {
+  it('restored one-option ActionNode pending envelope remains pending', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    state.roundPhase = 'work'
+    state.players[0]!.resources.wood = 0
+
+    const flow = { type: 'leaf' as const, actionId: 'gain', params: { wood: 1 } }
+    const nodeId = 'action-gain-0'
+    const serialized = serializeState(state, { engineStack: new EngineStack() })
+    serialized.engineStack = {
+      frames: [{
+        source: { kind: 'flow', flow },
+        engineSnapshot: {
+          nodeStates: [{ id: nodeId, state: 'ready' }],
+          choiceData: null,
+          pendingData: [{
+            nodeId,
+            pending: {
+              hostNodeId: nodeId,
+              request: {
+                kind: 'choice',
+                options: [{ value: 'confirm', labelKey: 'ui.cursorTestConfirm' }],
+              },
+              choices: [{ value: 'confirm', labelKey: 'ui.cursorTestConfirm' }],
+              promptKey: 'ui.interactionOptionalAction',
+              pendingActionId: 'gain',
+              contextSnapshot: { params: { wood: 1 } },
+            },
+          }],
+          compositeEmit: null,
+        },
+        ownerPlayerIndex: 0,
+        spaceId: 'day-laborer',
+        stageResume: null,
+        deferredPlayerSwitch: null,
+        reason: 'top-level',
+      }],
+    }
+
+    const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serialized))))
+    const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
+    expect(restoredEnvelope?.request.kind).toBe('choice')
+    expect(restoredEnvelope?.hostNodeId).toBe(nodeId)
+    expect(restored.getEngineStack().depth()).toBe(1)
+    expect(restored.getState().state.players[0]!.resources.wood).toBe(0)
+  })
+
   // ── reorganize sub-flow ────────────────────────────────────────────────
   // Mirrors server/__tests__/reorganize-engine-session.test.ts setup so we
   // drive the session into a real animal-reorg pending interaction, then
