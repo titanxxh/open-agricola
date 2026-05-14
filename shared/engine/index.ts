@@ -11,7 +11,6 @@ export {
   OrNode,
   XorNode,
   OptionalNode,
-  PlayerSwitchNode,
 } from './nodes'
 export type { EngineNode, EngineStepResult } from './types'
 export {

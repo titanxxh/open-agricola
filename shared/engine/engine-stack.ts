@@ -41,7 +41,11 @@ export type EngineFrame = {
   ownerPlayerIndex: number
   spaceId: string
   stageResume: StageResumeState | null
-  deferredPlayerSwitch: { fromPlayerIndex: number; toPlayerIndex: number } | null
+  deferredPlayerSwitch: {
+    fromPlayerIndex: number
+    toPlayerIndex: number
+    confirmed?: boolean
+  } | null
   reason: SubFlowReason
 }
 
@@ -51,7 +55,11 @@ export type EngineFrameCursor = {
   ownerPlayerIndex: number
   spaceId: string
   stageResume: StageResumeState | null
-  deferredPlayerSwitch: { fromPlayerIndex: number; toPlayerIndex: number } | null
+  deferredPlayerSwitch: {
+    fromPlayerIndex: number
+    toPlayerIndex: number
+    confirmed?: boolean
+  } | null
   reason: SubFlowReason
 }
 
@@ -119,6 +127,17 @@ export class EngineStack {
 
   peekPendingHost(): EngineNode | null {
     return this.current()?.engine.peekPendingHost() ?? null
+  }
+
+  peekNextUnresolvedNodeId(): string | null {
+    return this.current()?.engine.peekNextUnresolvedNodeId() ?? null
+  }
+
+  getEffectiveOwnerPlayerId(
+    nodeId: string,
+    frameOwnerPlayerId?: string,
+  ): string | undefined {
+    return this.current()?.engine.getEffectiveOwnerPlayerId(nodeId, frameOwnerPlayerId)
   }
 
   peekPendingChoiceFromComposite(): {

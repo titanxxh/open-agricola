@@ -13,7 +13,6 @@ import {
   InteractionNode,
   OptionalNode,
   OrNode,
-  PlayerSwitchNode,
   XorNode,
 } from './nodes'
 import { ParallelTriggerNode } from './nodes/parallel-trigger-node'
@@ -406,21 +405,12 @@ export function engineProceed(
   }
   // S4b PR5 sub-commit 4 — leaf-node dispatch routes through `node.step(ctx)`
   // returning a NodeStepResult discriminator. The engine main loop uses the
-  // `kind` discriminant instead of `instanceof` for behavior dispatch on the
-  // three leaf types (PlayerSwitch / ActivateCard / Action). The
-  // implementation body of each leaf still lives in the engine because it
-  // depends on the engine-private hooks/tree/log machinery.
+  // `kind` discriminant instead of `instanceof` for behavior dispatch.
   const leafCtx = {
     resolveSubtree: (n: EngineNode) => resolveSubtree(n),
     emitChoice: () => {},
   }
   const leafStep = node.step(leafCtx)
-  if (leafStep.kind === 'playerSwitch') {
-    // PlayerSwitchNode signals dispatch — engine resolves the node and
-    // surfaces the top-level EngineStepResult.playerSwitch.
-    node.resolve({})
-    return { type: 'playerSwitch', nodeId: node.id, targetPlayerId: leafStep.targetPlayerId }
-  }
   if (leafStep.kind === 'activateListener' && node instanceof ActivateCardNode) {
     const ownerPlayerId = node.event.ownerPlayerId as string | undefined
     const triggerPlayerId = node.event.triggerPlayerId as string | undefined
@@ -467,7 +457,6 @@ export function engineProceed(
       int.log.append(entry)
     })
     if (result?.flow || normalizedFollowUps.length > 0) {
-      const needsSwitch = ownerPlayerId && ownerPlayerId !== context.player.id
       const insertedNodes: EngineNode[] = []
       if (result?.flow) {
         const flowNode = buildFlowNode(int,
@@ -484,13 +473,7 @@ export function engineProceed(
         node.resolve(result ?? {})
         return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
       }
-      if (needsSwitch) {
-        const switchTo = new PlayerSwitchNode(`ps-to-${node.id}`, ownerPlayerId)
-        const switchBack = new PlayerSwitchNode(`ps-back-${node.id}`, context.player.id)
-        int.tree.insertAfter(node.id, [switchTo, ...insertedNodes, switchBack])
-      } else {
-        int.tree.insertAfter(node.id, insertedNodes)
-      }
+      int.tree.insertAfter(node.id, insertedNodes)
     }
     node.resolve(result ?? {})
     return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }

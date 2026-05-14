@@ -480,8 +480,7 @@ export type ActionFlow =
       effectPreview?: ChoiceEffectPreview
       /**
        * Runs this flow node under another player when compiled into the
-       * runtime engine. Card-facing flows describe ownership as metadata; the
-       * engine keeps the concrete PlayerSwitchNode internal.
+       * runtime engine. Card-facing flows describe ownership as metadata.
        */
       targetPlayerId?: string
       /**
@@ -504,8 +503,7 @@ export type ActionFlow =
       choiceLabelParams?: Record<string, unknown>
       /**
        * Runs this flow node under another player when compiled into the
-       * runtime engine. Card-facing flows describe ownership as metadata; the
-       * engine keeps the concrete PlayerSwitchNode internal.
+       * runtime engine. Card-facing flows describe ownership as metadata.
        */
       targetPlayerId?: string
     }
