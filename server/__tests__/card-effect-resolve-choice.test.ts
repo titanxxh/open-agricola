@@ -19,7 +19,7 @@ import { occupations } from '../../shared/cards-display/_lookup'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { ActionFlow } from '../../shared/contract/types'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
-import { isLegacyChoicePending } from './_helpers/legacy-confirms'
+import { confirmPlayerSwitch, isLegacyChoicePending } from './_helpers/legacy-confirms'
 
 const TEST_CARD_ID = '__TEST_RC_CARD__'
 
@@ -171,6 +171,51 @@ describe('CardEffect.resolveChoice hook', () => {
     // The handler returned a gain-food flow; engine should have executed it
     const foodAfter = resp.state.players[0]!.resources.food
     expect(foodAfter).toBeGreaterThanOrEqual(foodBefore + BONUS_FOOD)
+  })
+
+  it('resolveChoice follow-up flow inherits targeted pending owner', () => {
+    const BONUS_FOOD = 5
+
+    requireActiveCardRegistry('card-effect-resolve-choice').setEffect({
+      id: TEST_CARD_ID,
+      onBuy: (): ActionFlow => ({
+        ...buildTestOnBuyFlow(),
+        targetPlayerId: 'p2',
+      }),
+      resolveChoice: (): ActionFlow => ({
+        type: 'leaf',
+        actionId: 'gain',
+        sourceCard: TEST_CARD_ID,
+        params: { food: BONUS_FOOD },
+      }),
+    })
+
+    const session = makeSession()
+    const before = session.getState().state
+    const p1FoodBefore = before.players[0]!.resources.food
+    const p2FoodBefore = before.players[1]!.resources.food
+
+    let resp = session.takeAction(0, 'lessons')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+
+    resp = confirmPlayerSwitch(session)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.playerIndex).toBe(1)
+    expect(resp.interaction.sourceCard).toBe(TEST_CARD_ID)
+
+    const xorOption = resp.interaction.options[0]
+    expect(xorOption).toBeDefined()
+
+    resp = session.resolveChoice(1, xorOption!.value)
+    expect(resp.ok).toBe(true)
+
+    expect(resp.state.players[1]!.resources.food).toBe(p2FoodBefore + BONUS_FOOD)
+    expect(resp.state.players[0]!.resources.food).toBe(p1FoodBefore)
   })
 
   it('resolveChoice handler is NOT called when sourceCard does not match', () => {
