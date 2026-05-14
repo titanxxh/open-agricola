@@ -83,6 +83,9 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     const before = session.getState()
     const stack = session.getEngineStack()
     expect(stack.peekInteraction()?.request?.kind).toBe('farm-select')
+    const envelope = stack.peekPendingEnvelope()
+    expect(envelope?.request.kind).toBe('farm-select')
+    expect(envelope?.hostNodeId).toBeTruthy()
 
     const serialized = serializeState(before.state, { engineStack: stack })
     const wireSafe = JSON.parse(JSON.stringify(serialized))
@@ -91,6 +94,9 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     const restoredNode = restored.getEngineStack().peekInteraction()
     expect(restoredNode?.request?.kind).toBe('farm-select')
     expect(restoredNode?.request).toEqual(request)
+    const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
+    expect(restoredEnvelope?.request.kind).toBe('farm-select')
+    expect(restoredEnvelope?.hostNodeId).toBeTruthy()
   })
 
   it('selection kind (farm-position) survives serialize/rehydrate', () => {
@@ -122,6 +128,9 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     const restoredNode = restored.getEngineStack().peekInteraction()
     expect(restoredNode?.request?.kind).toBe('selection')
     expect(restoredNode?.request).toEqual(request)
+    const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
+    expect(restoredEnvelope?.request.kind).toBe('selection')
+    expect(restoredEnvelope?.hostNodeId).toBeTruthy()
   })
 
   it('selection kind (occupation-hand) survives serialize/rehydrate', () => {
@@ -153,6 +162,9 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     const restoredNode = restored.getEngineStack().peekInteraction()
     expect(restoredNode?.request?.kind).toBe('selection')
     expect(restoredNode?.request).toEqual(request)
+    const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
+    expect(restoredEnvelope?.request.kind).toBe('selection')
+    expect(restoredEnvelope?.hostNodeId).toBeTruthy()
   })
 
   it('card-draft kind survives serialize/rehydrate', () => {
@@ -192,5 +204,8 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     const restoredNode = restored.getEngineStack().peekInteraction()
     expect(restoredNode?.request?.kind).toBe('card-draft')
     expect(restoredNode?.request).toEqual(request)
+    const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
+    expect(restoredEnvelope?.request.kind).toBe('card-draft')
+    expect(restoredEnvelope?.hostNodeId).toBeTruthy()
   })
 })
