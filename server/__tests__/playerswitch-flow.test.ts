@@ -69,6 +69,47 @@ describe('ActionFlow targetPlayerId', () => {
     s.runEngineSteps()
   }
 
+  const compileFlowNodeTypes = (session: GameSession, flow: ActionFlow, playerIndex: number) => {
+    const s = session as unknown as {
+      createFlowEngine: (flow: ActionFlow, ownerPlayerIndex?: number) => {
+        _internals: () => {
+          tree: {
+            allNodes: () => Array<{
+              toCursor: () => { type: string }
+            }>
+          }
+        }
+      }
+    }
+    return s
+      .createFlowEngine(flow, playerIndex)
+      ._internals()
+      .tree.allNodes()
+      .map((node) => node.toCursor().type)
+  }
+
+  it('compiles targetPlayerId flows without playerSwitch cursors', () => {
+    const session = setupSession()
+    const state = session.getState().state
+    const p2 = state.players[1]!
+
+    const flow: ActionFlow = {
+      type: 'seq',
+      children: [
+        {
+          type: 'xor',
+          targetPlayerId: p2.id,
+          children: [
+            { type: 'leaf', actionId: 'gain', params: { sheep: 1 }, sourceCard: 'TestNoSwitch', choiceLabelKey: 'sheep' },
+            { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: 'TestNoSwitch', choiceLabelKey: 'food' },
+          ],
+        },
+      ],
+    }
+
+    expect(compileFlowNodeTypes(session, flow, 0)).not.toContain('playerSwitch')
+  })
+
   it('auto-gain after switch completes without confirmPlayerSwitch', () => {
     const session = setupSession()
     const state = session.getState().state

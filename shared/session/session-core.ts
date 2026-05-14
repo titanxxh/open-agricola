@@ -34,7 +34,6 @@ import {
   OptionalNode,
   OrNode,
   ParallelNode,
-  PlayerSwitchNode,
   SequenceNode,
   XorNode,
   isSyntheticInteractionFrame,
@@ -84,7 +83,7 @@ import type { CardEffectHook } from '../cards/card-effects.ts'
 import { runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks } from '../cards/card-effects.ts'
 import { positionKey } from '../domain/farm.ts'
 import { getMatchingListeners, executeCardListener } from '../cards/card-listeners.ts'
-import { buildPhaseTrailingNodes } from '../engine/engine-utils.ts'
+import { buildPhaseTrailingNodes, stampOwner } from '../engine/engine-utils.ts'
 import { Scoring, playerBoard, type PlayerScoreSummary } from '../domain'
 import { reap } from '../actions/effects/reap.ts'
 import { breedLeaf } from '../actions/effects/breed'
@@ -738,15 +737,8 @@ export class GameCore {
   ): EngineNode {
     if (flow.targetPlayerId) {
       const { targetPlayerId, ...innerFlow } = flow
-      const scopedNode = this.buildEngineNode(innerFlow as ActionFlow, counter, targetPlayerId)
-      if (!ownerPlayerId || ownerPlayerId === targetPlayerId) {
-        return scopedNode
-      }
-      return new SequenceNode(`seq-target-${counter.value++}`, [
-        new PlayerSwitchNode(`ps-to-${counter.value++}`, targetPlayerId),
-        scopedNode,
-        new PlayerSwitchNode(`ps-back-${counter.value++}`, ownerPlayerId),
-      ])
+      const scopedNode = this.buildEngineNode(innerFlow as ActionFlow, counter, ownerPlayerId)
+      return stampOwner(scopedNode, targetPlayerId)
     }
     if (flow.type === 'leaf') {
       const actionNode = new ActionNode(
@@ -2261,14 +2253,47 @@ export class GameCore {
     this.resumeStageFlow(stageResume)
   }
 
+  private effectiveOwnerIndexForFrame(
+    frame: EngineFrame,
+    nodeId?: string | null,
+    envelope?: PendingEnvelope | null,
+  ): number {
+    const frameOwnerId = this.state.players[frame.ownerPlayerIndex]?.id
+    const ownerId =
+      envelope?.effectiveOwnerPlayerId ??
+      (nodeId ? frame.engine.getEffectiveOwnerPlayerId(nodeId, frameOwnerId) : frameOwnerId)
+    if (!ownerId) return frame.ownerPlayerIndex
+    const ownerIndex = this.state.players.findIndex((player) => player.id === ownerId)
+    return ownerIndex === -1 ? frame.ownerPlayerIndex : ownerIndex
+  }
+
   private runEngineSteps(): void {
     let frame = this.engineStack.current()
     if (!frame || frame.ownerPlayerIndex === null || !frame.spaceId) return
-    let player = this.state.players[frame.ownerPlayerIndex]
     let space = this.getSpaceById(frame.spaceId)
-    if (!player || !space) return
+    if (!this.state.players[frame.ownerPlayerIndex] || !space) return
 
     while (true) {
+      const nextNodeId = frame.engine.peekNextUnresolvedNodeId()
+      const effectivePlayerIndex = this.effectiveOwnerIndexForFrame(frame, nextNodeId)
+      const frameOwnerPlayer = this.state.players[frame.ownerPlayerIndex]
+      const player = this.state.players[effectivePlayerIndex]
+      if (!frameOwnerPlayer || !player) return
+      if (effectivePlayerIndex !== frame.ownerPlayerIndex) {
+        const existing = frame.deferredPlayerSwitch
+        if (
+          !existing ||
+          existing.fromPlayerIndex !== frame.ownerPlayerIndex ||
+          existing.toPlayerIndex !== effectivePlayerIndex
+        ) {
+          frame.deferredPlayerSwitch = {
+            fromPlayerIndex: frame.ownerPlayerIndex,
+            toPlayerIndex: effectivePlayerIndex,
+          }
+        }
+      } else {
+        frame.deferredPlayerSwitch = null
+      }
       const before = this.clonePlayer(player)
       const step = frame.engine.proceed({ state: this.state, player, space })
       this.flushEngineLog()
@@ -2286,13 +2311,13 @@ export class GameCore {
           this.resumeStageFlow(stageResume)
           return
         }
-        if (isActionEngine && this.runPlaceFarmerAfterHooks(player, space)) {
+        if (isActionEngine && this.runPlaceFarmerAfterHooks(frameOwnerPlayer, space)) {
           // The frame's engine/source were replaced in-place; loop again with
           // the same frame.
           frame = this.engineStack.current()!
           continue
         }
-        if (this.hasPendingAnimals(player)) {
+        if (this.hasPendingAnimals(frameOwnerPlayer)) {
           const originIdx = this.turnOwnerPlayerIndex ?? ownerIdx
           this.engineStack.pop()
           this.startReorganizeSubFlow(ownerIdx, 'anytime', { originPlayerIndex: originIdx })
@@ -2300,27 +2325,14 @@ export class GameCore {
         }
         if (this.turnOwnerPlayerIndex !== null) {
           const ownerIndexLocal = this.turnOwnerPlayerIndex
-          this.finalizeActionLog(player)
+          this.finalizeActionLog(frameOwnerPlayer)
           this.engineStack.pop()
           this.continueEndTurnHooks(ownerIndexLocal)
           return
         }
-        this.finalizeActionLog(player)
+        this.finalizeActionLog(frameOwnerPlayer)
         this.engineStack.pop()
         return
-      }
-
-      if (step.type === 'playerSwitch') {
-        const toIndex = this.state.players.findIndex((p) => p.id === step.targetPlayerId)
-        if (toIndex !== -1 && toIndex !== frame.ownerPlayerIndex) {
-          this.pushHistory(false, true)
-          const fromIndex = frame.ownerPlayerIndex
-          frame.ownerPlayerIndex = toIndex
-          player = this.state.players[toIndex]!
-          space = this.getSpaceById(frame.spaceId) ?? space
-          frame.deferredPlayerSwitch = { fromPlayerIndex: fromIndex, toPlayerIndex: toIndex }
-        }
-        continue
       }
 
       if (step.type === 'choice') {
@@ -2365,7 +2377,7 @@ export class GameCore {
         }
         // Lazy confirmation: if we silently switched players and now hit a choice,
         // show confirmPlayerSwitch first. The InteractionNode stays unresolved in the engine.
-        if (frame.deferredPlayerSwitch) {
+        if (frame.deferredPlayerSwitch && !frame.deferredPlayerSwitch.confirmed) {
           const { fromPlayerIndex, toPlayerIndex } = frame.deferredPlayerSwitch
           frame.deferredPlayerSwitch = null
           this.startConfirmPlayerSwitch(fromPlayerIndex, toPlayerIndex)
@@ -2654,7 +2666,9 @@ export class GameCore {
   ): SessionResponse {
     const envelope = this.engineStack.peekPendingEnvelope()
     const frame = this.engineStack.current()
-    const pendingPlayerIndex = frame?.ownerPlayerIndex ?? -1
+    const pendingPlayerIndex = frame
+      ? this.effectiveOwnerIndexForFrame(frame, envelope?.hostNodeId, envelope)
+      : -1
     const pendingPromptKey = envelope?.promptKey
     const pendingOptions = pendingEnvelopeChoices(envelope)
     const pendingSnapshot = pendingContextSnapshot(envelope)
@@ -2691,7 +2705,7 @@ export class GameCore {
       }
       return this.respond(false, 'no active engine')
     }
-    const player = this.state.players[playerIndex]
+    const player = this.state.players[pendingPlayerIndex]
     const space = this.getSpaceById(this.activeSpaceId)
     if (!player || !space) return this.respond(false, 'invalid state')
 
@@ -2770,7 +2784,7 @@ export class GameCore {
           return this.handleConfirmNextPlayerResolved(request.nextPlayerIndex)
         case 'confirm-player-switch':
           if (!isValidValue) return this.respond(false, 'invalid choice value')
-          return this.handleConfirmPlayerSwitchResolved(request.toPlayerIndex)
+          return this.handleConfirmPlayerSwitchResolved(request.fromPlayerIndex, request.toPlayerIndex)
         case 'feed': {
           if (!isValidValue) return this.respond(false, 'invalid choice value')
           const sels = (payload as { selections?: FeedSelections } | undefined)?.selections
@@ -2996,8 +3010,11 @@ export class GameCore {
   }
 
   /** S2 Task 10 part 3: thin delegator — body lives in `phases/round.ts`. */
-  private handleConfirmPlayerSwitchResolved(toPlayerIndex: number): SessionResponse {
-    return roundPhase.handleConfirmPlayerSwitchResolved(this, toPlayerIndex)
+  private handleConfirmPlayerSwitchResolved(
+    fromPlayerIndex: number,
+    toPlayerIndex: number,
+  ): SessionResponse {
+    return roundPhase.handleConfirmPlayerSwitchResolved(this, fromPlayerIndex, toPlayerIndex)
   }
 
   /** S2 Task 10 part 3: thin delegator — body lives in `phases/round.ts`. */

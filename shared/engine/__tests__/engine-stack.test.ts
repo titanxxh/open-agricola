@@ -132,6 +132,26 @@ describe('EngineStack query/write delegation', () => {
     expect(spy).toHaveBeenCalledTimes(1)
   })
 
+  it('peekNextUnresolvedNodeId delegates to top frame engine; returns null when empty', () => {
+    const stack = new EngineStack()
+    expect(stack.peekNextUnresolvedNodeId()).toBeNull()
+    const engine = makeEngine()
+    const spy = vi.spyOn(engine, 'peekNextUnresolvedNodeId').mockReturnValue('n1')
+    pushStubFrame(stack, engine)
+    expect(stack.peekNextUnresolvedNodeId()).toBe('n1')
+    expect(spy).toHaveBeenCalledTimes(1)
+  })
+
+  it('getEffectiveOwnerPlayerId delegates to top frame engine', () => {
+    const stack = new EngineStack()
+    expect(stack.getEffectiveOwnerPlayerId('n1', 'p1')).toBeUndefined()
+    const engine = makeEngine()
+    const spy = vi.spyOn(engine, 'getEffectiveOwnerPlayerId').mockReturnValue('p2')
+    pushStubFrame(stack, engine)
+    expect(stack.getEffectiveOwnerPlayerId('n1', 'p1')).toBe('p2')
+    expect(spy).toHaveBeenCalledWith('n1', 'p1')
+  })
+
   it('peekPendingChoiceFromComposite delegates to top frame engine', () => {
     const stack = new EngineStack()
     const engine = makeEngine()
