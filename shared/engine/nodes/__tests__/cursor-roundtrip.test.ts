@@ -25,6 +25,37 @@ import { XorNode } from '../xor-node'
  * is what a future `fromCursor()` factory would do automatically.
  */
 describe('cursor round-trip', () => {
+  it('BaseNode cursor data includes shared metadata and pending envelope', () => {
+    const node = new ActionNode('a-pending', 'gain-wood')
+    node.ownerPlayerId = 'p2'
+    node.optional = true
+    node.optionalActive = false
+    node.optionalPromptKey = 'ui.interactionOptionalAction'
+    node.pending = {
+      hostNodeId: node.id,
+      request: { kind: 'choice', options: [{ value: 'yes', labelKey: 'ui.yes' }] },
+      choices: [{ value: 'yes', labelKey: 'ui.yes' }],
+      promptKey: 'ui.interactionOptionalAction',
+      effectiveOwnerPlayerId: 'p2',
+      syntheticKind: 'interaction-only',
+    }
+
+    expect(node.toCursor().data).toMatchObject({
+      ownerPlayerId: 'p2',
+      optional: true,
+      optionalActive: false,
+      optionalPromptKey: 'ui.interactionOptionalAction',
+      pending: {
+        hostNodeId: 'a-pending',
+        request: { kind: 'choice', options: [{ value: 'yes', labelKey: 'ui.yes' }] },
+        choices: [{ value: 'yes', labelKey: 'ui.yes' }],
+        promptKey: 'ui.interactionOptionalAction',
+        effectiveOwnerPlayerId: 'p2',
+        syntheticKind: 'interaction-only',
+      },
+    })
+  })
+
   it('ActionNode preserves all fields through toCursor', () => {
     const original = new ActionNode(
       'a-1',

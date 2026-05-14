@@ -4,6 +4,7 @@ import type {
   ActionExecutionResult,
   InteractionRequest,
 } from '../contract/types'
+import type { PromptKey } from '../contract/prompt-keys'
 
 export type NodeState = 'ready' | 'resolved' | 'blocked'
 
@@ -21,10 +22,18 @@ export type EngineNodeType =
 export type EngineNode = {
   id: string
   type: EngineNodeType
+  ownerPlayerId?: string
+  optional?: boolean
+  optionalActive?: boolean
+  optionalPromptKey?: PromptKey
+  pending?: PendingEnvelope | null
   getState(): NodeState
   getArgs(): Record<string, unknown>
   resolve(result?: unknown): void
   isDoable(context: ActionExecutionContext): boolean
+  setPending(envelope: PendingEnvelope): void
+  clearPending(): void
+  getPending(): PendingEnvelope | null
   /**
    * S4b PR5 sub-commit 4 — every node exposes a step() that returns a
    * NodeStepResult discriminator the engine main loop dispatches on.
@@ -37,6 +46,27 @@ export type EngineChoice = {
   promptKey?: string
   promptParams?: Record<string, unknown>
   options: ActionChoiceOption[]
+}
+
+export type PendingSyntheticKind =
+  | 'interaction-only'
+  | 'feed'
+  | 'confirm-next-player'
+  | 'confirm-player-switch'
+  | 'farm-select'
+
+export type PendingEnvelope = {
+  hostNodeId: string
+  request: InteractionRequest
+  choices?: ActionChoiceOption[]
+  promptKey?: PromptKey
+  promptParams?: Record<string, unknown>
+  sourceCard?: string
+  pendingActionId?: string
+  ownerNodeId?: string | null
+  contextSnapshot?: unknown
+  effectiveOwnerPlayerId?: string
+  syntheticKind?: PendingSyntheticKind
 }
 
 export type EngineStepResult =

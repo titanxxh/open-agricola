@@ -25,6 +25,7 @@ import {
 } from './nodes'
 import { attachChoiceLabel } from './nodes/interaction-helpers'
 import type { EngineNode } from './types'
+import type { PendingEnvelope, PendingSyntheticKind } from './types'
 import type { EngineInternals } from './engine-internals'
 import type { ActionRegistry } from './registry'
 import { getPlayOrderIndex } from './matched-trigger'
@@ -838,5 +839,106 @@ export function snapshotCompositeEmit(int: EngineInternals): {
       request: node.emittedRequest,
     }
   }
+  return null
+}
+
+function requestSyntheticKind(
+  request: InteractionRequest,
+  pendingActionId?: string | null,
+): PendingSyntheticKind | undefined {
+  if (pendingActionId === '__interaction_only__') return 'interaction-only'
+  if (request.kind === 'feed') return 'feed'
+  if (request.kind === 'confirm-next-player') return 'confirm-next-player'
+  if (request.kind === 'confirm-player-switch') return 'confirm-player-switch'
+  if (request.kind === 'farm-select') return 'farm-select'
+  return undefined
+}
+
+function sourceCardFromContextSnapshot(snapshot: unknown): string | undefined {
+  if (!snapshot || typeof snapshot !== 'object') return undefined
+  const sourceCard = (snapshot as { sourceCard?: unknown }).sourceCard
+  return typeof sourceCard === 'string' ? sourceCard : undefined
+}
+
+function ownerFromRequest(request: InteractionRequest): string | undefined {
+  return request.kind === 'select-trigger' ? request.ownerPlayerId : undefined
+}
+
+function choiceRequest(options: ActionChoiceOption[]): InteractionRequest {
+  return { kind: 'choice', options }
+}
+
+export function pendingEnvelopeFromHostNode(node: EngineNode | null): PendingEnvelope | null {
+  if (!node) return null
+  const pending = node.getPending()
+  if (pending) return pending
+
+  if (node instanceof InteractionNode) {
+    if (node.choices.length === 0 && !node.request) return null
+    const request = node.request ?? choiceRequest(node.choices)
+    const sourceCard = sourceCardFromContextSnapshot(node.contextSnapshot)
+    return {
+      hostNodeId: node.id,
+      request,
+      choices: node.choices,
+      promptKey: node.promptKey,
+      promptParams: node.promptParams,
+      sourceCard,
+      pendingActionId: node.pendingActionId,
+      ownerNodeId: node.ownerNodeId ?? null,
+      contextSnapshot: node.contextSnapshot,
+      effectiveOwnerPlayerId: ownerFromRequest(request) ?? node.ownerPlayerId,
+      syntheticKind: requestSyntheticKind(request, node.pendingActionId),
+    }
+  }
+
+  if (node instanceof OrNode || node instanceof XorNode || node instanceof OptionalNode) {
+    if (node.emittedChoices.length === 0 && !node.emittedRequest) return null
+    const request = node.emittedRequest ?? choiceRequest(node.emittedChoices)
+    const sourceCard = sourceCardFromContextSnapshot(node.pendingContextSnapshot)
+    return {
+      hostNodeId: node.id,
+      request,
+      choices: node.emittedChoices,
+      promptKey: node.emittedPromptKey,
+      promptParams: node.emittedPromptParams,
+      sourceCard,
+      pendingActionId: node.pendingActionId ?? undefined,
+      ownerNodeId: null,
+      contextSnapshot: node.pendingContextSnapshot,
+      effectiveOwnerPlayerId: ownerFromRequest(request) ?? node.ownerPlayerId,
+      syntheticKind: requestSyntheticKind(request, node.pendingActionId),
+    }
+  }
+
+  if (node instanceof ParallelTriggerNode) {
+    if (node.emittedChoices.length === 0 && !node.emittedRequest) return null
+    const request = node.emittedRequest ?? choiceRequest(node.emittedChoices)
+    return {
+      hostNodeId: node.id,
+      request,
+      choices: node.emittedChoices,
+      promptKey: node.emittedPromptKey,
+      promptParams: node.emittedPromptParams,
+      ownerNodeId: null,
+      effectiveOwnerPlayerId: ownerFromRequest(request) ?? node.ownerPlayerId,
+      syntheticKind: requestSyntheticKind(request),
+    }
+  }
+
+  if (node instanceof ActionNode && node.emittedRequest) {
+    const request = node.emittedRequest
+    return {
+      hostNodeId: node.id,
+      request,
+      choices: request.kind === 'choice' ? request.options : undefined,
+      sourceCard: node.sourceCard,
+      pendingActionId: node.actionId,
+      ownerNodeId: null,
+      effectiveOwnerPlayerId: ownerFromRequest(request) ?? node.ownerPlayerId,
+      syntheticKind: requestSyntheticKind(request, node.actionId),
+    }
+  }
+
   return null
 }

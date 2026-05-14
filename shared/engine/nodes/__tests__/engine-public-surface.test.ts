@@ -27,7 +27,9 @@ describe('Engine surface guard', () => {
     'insertFlowAfterPendingChoice',
     'peekInteraction',
     'peekInteractionHost',
+    'peekPendingEnvelope',
     'peekPendingChoiceFromComposite',
+    'peekPendingHost',
   ]
 
   it('public API matches the S4c target surface (6 methods)', () => {
