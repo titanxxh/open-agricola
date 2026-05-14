@@ -86,14 +86,14 @@ describe('B38 FutureBuildingSite — session', () => {
     session.loadState(state)
 
     // meeting-place flow: seq[ set-first-player, optional(minor-improvement) ]
-    // After takeAction the engine surfaces the OptionalNode choice
+    // After takeAction the engine surfaces the optional metadata choice
     // (accept-execute / __skip__).
     let resp = session.takeAction(0, 'meeting-place')
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
-    // Sole choice surfaced: the OptionalNode wrapping `minor-improvement`
+    // Sole choice surfaced: the optional host for `minor-improvement`
     // (accept-execute / __skip__). Because B38 is the only playable minor in the
     // player's hand, `minor-improvement.execute` short-circuits the per-card
     // choice and B38's onBuy runs immediately.

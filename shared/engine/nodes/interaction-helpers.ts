@@ -19,7 +19,6 @@ import type { ActionRegistry } from '../registry'
 import type { HookDispatcher } from '../dispatcher'
 import type { EngineNode } from '../types'
 import { ActionNode } from './action-node'
-import { OptionalNode } from './optional-node'
 import { SequenceNode } from './sequence-node'
 import { ParallelNode } from './parallel-node'
 import { OrNode } from './or-node'
@@ -47,9 +46,9 @@ export function attachChoiceLabel(
 
 /**
  * Walk an EngineNode subtree to derive the choice label: explicit
- * `choiceLabelKey` wins; OptionalNode unwraps to its child; ActionNode falls
- * back to its registered action's `nameKey`; composite nodes recurse into
- * their first labelled descendant. Returns `null` when no label is found.
+ * `choiceLabelKey` wins; ActionNode falls back to its registered action's
+ * `nameKey`; composite nodes recurse into their first labelled descendant.
+ * Returns `null` when no label is found.
  *
  * Needs the `ActionRegistry` to look up `nameKey` for ActionNode fallbacks.
  */
@@ -66,9 +65,6 @@ export function getChoiceLabel(
       labelKey: labeledNode.choiceLabelKey,
       labelParams: labeledNode.choiceLabelParams,
     }
-  }
-  if (node instanceof OptionalNode) {
-    return getChoiceLabel(node.child, registry)
   }
   if (node instanceof ActionNode) {
     const action = registry.get(node.actionId)
@@ -99,10 +95,6 @@ export function getNodeSourceCard(node: EngineNode): string | undefined {
   const visit = (entry: EngineNode) => {
     if (entry instanceof ActionNode) {
       if (entry.sourceCard) sourceCards.add(entry.sourceCard)
-      return
-    }
-    if (entry instanceof OptionalNode) {
-      visit(entry.child)
       return
     }
     if (

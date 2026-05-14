@@ -147,7 +147,7 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
   //      empty hand, so we cannot just clear them.
   // With placeholder ids the hands stay non-empty (no re-deal) but the cards are
   // unknown to every registry/listener, so wish-children's
-  // `optional(minor-improvement)` finds zero playable minors and the OptionalNode
+  // `optional(minor-improvement)` finds zero playable minors and the optional host
   // resolves silently, putting A92's offer as the very next pending choice.
   const FILLER = '__test_filler__'
   const setup = () => {

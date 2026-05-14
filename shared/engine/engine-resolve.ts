@@ -10,7 +10,6 @@ import type {
 } from '../contract/types'
 import {
   InteractionNode,
-  OptionalNode,
   OrNode,
   XorNode,
 } from './nodes'
@@ -121,6 +120,13 @@ export function engineResolveChoice(
       }
       node.clearPending()
       int.pendingNodeIdRef.value = null
+      if (node.optional === true && node.optionalActive === false) {
+        if (choice === '__skip__') {
+          resolveSubtree(node)
+        } else {
+          node.optionalActive = true
+        }
+      }
       return { type: 'ok' }
     }
     if (node instanceof ParallelTriggerNode) {
@@ -144,16 +150,6 @@ export function engineResolveChoice(
       int.pendingNodeIdRef.value = null
       return { type: 'ok' }
     }
-    if (node instanceof OptionalNode) {
-      if (choice === '__skip__') {
-        node.resolve()
-        int.pendingNodeIdRef.value = null
-        return { type: 'ok' }
-      }
-      node.active = true
-      int.pendingNodeIdRef.value = null
-      return { type: 'ok' }
-    }
     if (node instanceof OrNode || node instanceof XorNode) {
       if (choice === '__done__' && node instanceof OrNode) {
         node.resolve(choice)
@@ -161,13 +157,14 @@ export function engineResolveChoice(
         return { type: 'ok' }
       }
       if (choice === '__skip__') {
-        const parent = int.tree.findParent(node.id)
-        if (parent instanceof OptionalNode) {
+        if (node.optional === true && node.optionalActive === false) {
           resolveSubtree(node)
-          parent.resolve()
           int.pendingNodeIdRef.value = null
           return { type: 'ok' }
         }
+      }
+      if (node.optional === true && node.optionalActive === false) {
+        node.optionalActive = true
       }
       const targetNode = node.children.find((item) => item.id === choice)
       const child = targetNode ? findActionNode(targetNode) : null

@@ -27,7 +27,7 @@ export class ActionNode extends BaseNode {
    * field the request payload would be lost (no InteractionNode hosts it
    * and `peekInteraction()` returns null), so session-core could not pivot
    * into `startReorganizeSubFlow`. Mirrors `OrNode.emittedRequest` /
-   * `XorNode.emittedRequest` / `OptionalNode.emittedRequest` so
+   * `XorNode.emittedRequest` so
    * `peekInteractionHost()` callers can read the kind off the host node
    * uniformly regardless of whether the pending node is leaf-paired or
    * leaf-only.
