@@ -12,7 +12,6 @@ import type { PromptKey } from '../contract/prompt-keys'
 import {
   ActionNode,
   InteractionNode,
-  OptionalNode,
   OrNode,
   ParallelNode,
   SequenceNode,
@@ -160,20 +159,6 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
         node = xor
         break
       }
-      case 'optional': {
-        const child = typeof data.childId === 'string' ? build(data.childId) : null
-        if (!child) return null
-        const optional = new OptionalNode(cursor.id, child, data.promptKey as PromptKey | undefined)
-        optional.active = data.active === true
-        optional.emittedChoices = (data.emittedChoices as ActionChoiceOption[] | undefined) ?? []
-        optional.emittedPromptKey = data.emittedPromptKey as PromptKey | undefined
-        optional.emittedPromptParams = data.emittedPromptParams as Record<string, unknown> | undefined
-        optional.emittedRequest = data.emittedRequest as InteractionRequest | undefined
-        optional.pendingActionId = data.pendingActionId as string | null | undefined
-        optional.pendingContextSnapshot = data.pendingContextSnapshot as OptionalNode['pendingContextSnapshot']
-        node = optional
-        break
-      }
       case 'parallelTrigger': {
         const trigger = new ParallelTriggerNode(
           cursor.id,
@@ -246,7 +231,7 @@ export class Engine {
   /**
    * S2 Task 8: returns the pending-choice metadata regardless of whether the
    * pending node is an `InteractionNode` (leaf-paired) or one of the composite
-   * nodes (`OrNode` / `XorNode` / `OptionalNode`). Composite nodes carry their
+   * nodes (`OrNode` / `XorNode`). Composite nodes carry their
    * own `emittedChoices` / `emittedPromptKey` / `emittedPromptParams` /
    * `emittedRequest` fields populated in {@link proceed}.
    *
@@ -265,7 +250,7 @@ export class Engine {
     if (this._pendingNodeIdRef.value === null) return null
     const node = this.tree.findNodeById(this._pendingNodeIdRef.value)
     if (!node) return null
-    if (node instanceof OrNode || node instanceof XorNode || node instanceof OptionalNode) {
+    if (node instanceof OrNode || node instanceof XorNode) {
       if (node.emittedChoices.length === 0 && node.emittedRequest === undefined) return null
       return {
         nodeId: node.id,
@@ -304,7 +289,7 @@ export class Engine {
   /**
    * S4b PR5 — return the current pending-interaction host, regardless of
    * whether it is a leaf-paired `InteractionNode` or one of the composite
-   * nodes (`OrNode` / `XorNode` / `OptionalNode`). All four host types now
+   * nodes (`OrNode` / `XorNode`). All composite host types now
    * carry a uniform `{ pendingActionId, pendingContextSnapshot, choices,
    * promptKey, request }` shape (composite nodes mirror onto the equivalent
    * `emittedXxx` fields), so consumers can read pending metadata off this
@@ -450,7 +435,6 @@ export class Engine {
     const nodeStates = nodes.map((node) => ({
       id: node.id,
       state: node.getState(),
-      active: node instanceof OptionalNode ? node.active : undefined,
     }))
     const pendingData = nodes
       .map((node) => {
@@ -483,7 +467,7 @@ export class Engine {
       nodeStates,
       choiceData,
       pendingData,
-      // S2 Task 8: composite (Or/Xor/Optional) emit metadata is now stored
+      // S2 Task 8: composite (Or/Xor) emit metadata is now stored
       // on the node itself instead of an engine-level cache. We still need
       // to persist it so cursor round-trip / undo restoreHistory can rebuild
       // the pending-choice host on rehydrate.
@@ -515,7 +499,6 @@ export class Engine {
     nodeStates: {
       id: string
       state: 'ready' | 'resolved' | 'blocked'
-      active?: boolean
     }[]
     choiceData: {
       id: string
@@ -531,7 +514,7 @@ export class Engine {
       pending: PendingEnvelope
     }[]
     /**
-     * S2 Task 8: composite (Or/Xor/Optional) emit metadata. On restore,
+     * S2 Task 8: composite (Or/Xor) emit metadata. On restore,
      * apply to the named node's `emittedChoices` / `emittedPromptKey` /
      * `emittedPromptParams` / `emittedRequest` fields.
      */
@@ -597,13 +580,9 @@ export class Engine {
       if (
         node instanceof ActionNode ||
         node instanceof OrNode ||
-        node instanceof XorNode ||
-        node instanceof OptionalNode
+        node instanceof XorNode
       ) {
         node.setState(state)
-      }
-      if (node instanceof OptionalNode) {
-        node.active = !!snapshot.nodeStates.find((item) => item.id === id)?.active
       }
     })
     if (snapshot.choiceData) {
@@ -625,17 +604,17 @@ export class Engine {
       }
     }
     // S4c PR2 — rebuild the engine's runtime pointer from choiceData.id
-    // (InteractionNode host) or compositeEmit.nodeId (Or/Xor/Optional host).
+    // (InteractionNode host) or compositeEmit.nodeId (Or/Xor host).
     // Replaces the deleted top-level pendingInteractionNodeId/ActionId/
     // OwnerNodeId/Context mirror fields.
     this._pendingNodeIdRef.value =
       explicitPendingNodeId ?? snapshot.choiceData?.id ?? snapshot.compositeEmit?.nodeId ?? null
 
-    // S2 Task 8: rebuild composite emit metadata onto Or/Xor/Optional nodes.
+    // S2 Task 8: rebuild composite emit metadata onto Or/Xor nodes.
     const compositeEmit = snapshot.compositeEmit ?? null
     if (compositeEmit) {
       const node = nodeMap.get(compositeEmit.nodeId)
-      if (node instanceof OrNode || node instanceof XorNode || node instanceof OptionalNode) {
+      if (node instanceof OrNode || node instanceof XorNode) {
         node.emittedChoices = compositeEmit.options
         node.emittedPromptKey = compositeEmit.promptKey
         node.emittedPromptParams = compositeEmit.promptParams

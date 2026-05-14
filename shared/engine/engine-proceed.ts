@@ -10,7 +10,6 @@ import type {
 import {
   ActionNode,
   InteractionNode,
-  OptionalNode,
   OrNode,
   XorNode,
 } from './nodes'
@@ -119,6 +118,93 @@ const pendingEnvelopeChoices = (envelope: PendingEnvelope): ActionChoiceOption[]
   if (envelope.request.kind === 'farm-select') return envelope.request.options ?? []
   if (envelope.request.kind === 'select-trigger') return envelope.request.options
   return []
+}
+
+const isInactiveOptionalHost = (node: EngineNode): boolean =>
+  node.optional === true && node.optionalActive === false
+
+const buildOptionalPrompt = (
+  int: EngineInternals,
+  context: EngineContext,
+  node: EngineNode,
+): EngineStepResult => {
+  const actionNode = findActionNode(node)
+  if (!actionNode) {
+    resolveSubtree(node)
+    return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+  }
+  const action = int.registry.get(actionNode.actionId)
+  if (!action) {
+    resolveSubtree(node)
+    return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+  }
+  const executionContext: ActionExecutionContext = {
+    state: context.state,
+    player: context.player,
+    space: context.space,
+    params: actionNode.params,
+    sourceCard: actionNode.sourceCard,
+    actionContext: actionNode.actionContext,
+  }
+  const doable = int.hooks.applyIsDoable(
+    { ...executionContext, actionId: actionNode.actionId },
+    action,
+    action.canBeExecutedByPlayer(
+      executionContext.state,
+      executionContext.player,
+      {
+        sourceCard: executionContext.sourceCard,
+        actionContext: executionContext.actionContext,
+      },
+    ),
+  )
+  if (!doable) {
+    resolveSubtree(node)
+    return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+  }
+
+  const label = getChoiceLabel(node, int.registry) ?? {
+    labelKey: actionNode.choiceLabelKey ?? action.nameKey,
+    labelParams: actionNode.choiceLabelParams,
+  }
+  const optionalOptions: ActionChoiceOption[] = [
+    {
+      value: actionNode.id,
+      labelKey: label.labelKey,
+      labelParams: label.labelParams,
+      sourceCard: actionNode.sourceCard,
+      effectPreview: getNodeEffectPreview(node),
+      descriptionPreview: getNodeDescriptionPreview(node, int.registry),
+    },
+    { value: '__skip__', labelKey: 'ui.interactionOptionalSkip' },
+  ]
+  const optionalPromptKey = node.optionalPromptKey ?? 'ui.interactionOptionalAction'
+  const request: InteractionRequest = { kind: 'choice', options: optionalOptions }
+  node.setPending({
+    hostNodeId: node.id,
+    request,
+    choices: optionalOptions,
+    promptKey: optionalPromptKey,
+    promptParams: undefined,
+    sourceCard: actionNode.sourceCard,
+    ownerNodeId: null,
+    contextSnapshot: {
+      params: actionNode.params,
+      costs: undefined,
+      sourceCard: actionNode.sourceCard,
+      actionContext: actionNode.actionContext,
+    },
+    effectiveOwnerPlayerId: node.ownerPlayerId,
+  })
+  int.pendingNodeIdRef.value = node.id
+  return {
+    type: 'choice',
+    nodeId: node.id,
+    choice: {
+      promptKey: optionalPromptKey,
+      options: optionalOptions,
+    },
+  }
 }
 
 const executeActivateCardAction = (
@@ -231,6 +317,9 @@ export function engineProceed(
       },
     }
   }
+  if (isInactiveOptionalHost(node) && !(node instanceof OrNode) && !(node instanceof XorNode)) {
+    return buildOptionalPrompt(int, context, node)
+  }
   if (node instanceof OrNode || node instanceof XorNode) {
     const availableActions = node.children
       .filter((child) => child.getState() !== 'resolved')
@@ -291,14 +380,13 @@ export function engineProceed(
     ) {
       options.push({ value: '__done__', labelKey: 'ui.interactionFlowDone' })
     }
-    const parent = int.tree.findParent(node.id)
-    const optionalParent = parent instanceof OptionalNode ? parent : null
-    if (optionalParent && options.length > 0) {
+    const optionalHost = isInactiveOptionalHost(node)
+    if (optionalHost && options.length > 0) {
       options.push({ value: '__skip__', labelKey: 'ui.interactionOptionalSkip' })
     }
     if (options.length === 0) {
-      if (optionalParent) {
-        optionalParent.resolve()
+      if (optionalHost) {
+        resolveSubtree(node)
         return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
       }
       return { type: 'blocked', nodeId: node.id }
@@ -310,7 +398,9 @@ export function engineProceed(
       sourceCard: resolveChoiceSourceCard(getNodeSourceCard(node), options),
       actionContext: undefined,
     }
-    const compositePromptKey = node.promptKey ?? 'ui.interactionFlowSelect'
+    const compositePromptKey = optionalHost
+      ? (node.optionalPromptKey ?? node.promptKey ?? 'ui.interactionFlowSelect')
+      : (node.promptKey ?? 'ui.interactionFlowSelect')
     // S2 Task 8: write emit metadata to the OrNode/XorNode itself.
     node.emittedChoices = options
     node.emittedPromptKey = compositePromptKey
@@ -360,93 +450,6 @@ export function engineProceed(
       }
     }
     return { type: 'blocked', nodeId: node.id }
-  }
-  if (node instanceof OptionalNode) {
-    if (node.active) {
-      // 当 active 为 true 时，子节点会被 nextUnresolved 返回
-      // 返回 ok 让引擎继续处理子节点
-      return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
-    }
-    // 当 child 是 OrNode/XorNode 时，跳过 "do/skip" 这一步——
-    // 让 OrNode/XorNode 直接呈现 "N 个分支 + skip" 一层选择
-    if (node.child instanceof OrNode || node.child instanceof XorNode) {
-      node.active = true
-      return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
-    }
-    const actionNode = findActionNode(node.child)
-    if (!actionNode) {
-      node.resolve()
-      return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
-    }
-    const action = int.registry.get(actionNode.actionId)
-    if (!action) {
-      node.resolve()
-      return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
-    }
-    const executionContext: ActionExecutionContext = {
-      state: context.state,
-      player: context.player,
-      space: context.space,
-      params: actionNode.params,
-      sourceCard: actionNode.sourceCard,
-      actionContext: actionNode.actionContext,
-    }
-    const doable = int.hooks.applyIsDoable(
-      { ...executionContext, actionId: actionNode.actionId },
-      action,
-      action.canBeExecutedByPlayer(
-        executionContext.state,
-        executionContext.player,
-        {
-          sourceCard: executionContext.sourceCard,
-          actionContext: executionContext.actionContext,
-        },
-      ),
-    )
-    if (!doable) {
-      node.resolve()
-      return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
-    }
-    int.pendingNodeIdRef.value = node.id
-    const optionalCtxSnapshot = {
-      params: actionNode.params,
-      costs: undefined,
-      sourceCard: actionNode.sourceCard,
-      actionContext: actionNode.actionContext,
-    }
-    // S4b PR5 / S4c PR2 — OptionalNode owns pending-interaction context.
-    // peekInteractionHost() reads it off the node directly.
-    node.pendingActionId = null
-    node.pendingContextSnapshot = optionalCtxSnapshot
-    const label = getChoiceLabel(node, int.registry) ?? {
-      labelKey: actionNode.choiceLabelKey ?? action.nameKey,
-      labelParams: actionNode.choiceLabelParams,
-    }
-    const optionalPromptKey = node.promptKey ?? 'ui.interactionOptionalAction'
-    const optionalOptions: ActionChoiceOption[] = [
-      {
-        value: actionNode.id,
-        labelKey: label.labelKey,
-        labelParams: label.labelParams,
-        sourceCard: actionNode.sourceCard,
-        effectPreview: getNodeEffectPreview(node.child),
-        descriptionPreview: getNodeDescriptionPreview(node.child, int.registry),
-      },
-      { value: '__skip__', labelKey: 'ui.interactionOptionalSkip' },
-    ]
-    // S2 Task 8: write emit metadata to the OptionalNode itself.
-    node.emittedChoices = optionalOptions
-    node.emittedPromptKey = optionalPromptKey
-    node.emittedPromptParams = undefined
-    node.emittedRequest = undefined
-    return {
-      type: 'choice',
-      nodeId: node.id,
-      choice: {
-        promptKey: optionalPromptKey,
-        options: optionalOptions,
-      },
-    }
   }
   if (node instanceof InteractionNode) {
     // S4b Task 14 — InteractionNode owns its lifecycle dispatch via

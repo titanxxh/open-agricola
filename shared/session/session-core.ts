@@ -31,7 +31,6 @@ import {
   EngineTree,
   HookDispatcher,
   LogStore,
-  OptionalNode,
   OrNode,
   ParallelNode,
   SequenceNode,
@@ -83,7 +82,7 @@ import type { CardEffectHook } from '../cards/card-effects.ts'
 import { runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks } from '../cards/card-effects.ts'
 import { positionKey } from '../domain/farm.ts'
 import { getMatchingListeners, executeCardListener } from '../cards/card-listeners.ts'
-import { buildPhaseTrailingNodes, stampOwner } from '../engine/engine-utils.ts'
+import { buildPhaseTrailingNodes, markOptional, stampOwner } from '../engine/engine-utils.ts'
 import { Scoring, playerBoard, type PlayerScoreSummary } from '../domain'
 import { reap } from '../actions/effects/reap.ts'
 import { breedLeaf } from '../actions/effects/breed'
@@ -756,30 +755,26 @@ export class GameCore {
           actionNode,
           new InteractionNode(`choice-${flow.actionId}-${counter.value++}`, []),
         ])
-        return flow.optional ? new OptionalNode(`opt-${counter.value++}`, seq, flow.promptKey) : seq
+        return flow.optional ? markOptional(seq, flow.promptKey) : seq
       }
-      return flow.optional
-        ? new OptionalNode(`opt-${counter.value++}`, actionNode, flow.promptKey)
-        : actionNode
+      return flow.optional ? markOptional(actionNode, flow.promptKey) : actionNode
     }
 
     const children = flow.children.map((child) => this.buildEngineNode(child, counter, ownerPlayerId))
     if (flow.type === 'seq') {
       const seq = new SequenceNode(`seq-${counter.value++}`, children)
-      return flow.optional ? new OptionalNode(`opt-${counter.value++}`, seq, flow.promptKey) : seq
+      return flow.optional ? markOptional(seq, flow.promptKey) : seq
     }
     if (flow.type === 'parallel') {
       const parallel = new ParallelNode(`par-${counter.value++}`, children)
-      return flow.optional
-        ? new OptionalNode(`opt-${counter.value++}`, parallel, flow.promptKey)
-        : parallel
+      return flow.optional ? markOptional(parallel, flow.promptKey) : parallel
     }
     if (flow.type === 'xor') {
       const xor = new XorNode(`xor-${counter.value++}`, children, flow.promptKey)
-      return flow.optional ? new OptionalNode(`opt-${counter.value++}`, xor, flow.promptKey) : xor
+      return flow.optional ? markOptional(xor, flow.promptKey) : xor
     }
     const or = new OrNode(`or-${counter.value++}`, children, flow.promptKey)
-    return flow.optional ? new OptionalNode(`opt-${counter.value++}`, or, flow.promptKey) : or
+    return flow.optional ? markOptional(or, flow.promptKey) : or
   }
 
   private runPlaceFarmerAfterHooks(
@@ -1541,7 +1536,7 @@ export class GameCore {
    * Whether the current engine-stack state is a "legacy choice" — i.e. the
    * top-of-stack InteractionNode has a `choice` / `animal-reorg` /
    * `farm-select` / `selection` request, OR a composite-fallback pending
-   * choice from OrNode / XorNode / OptionalNode. Used by `pushHistory()`
+   * choice from OrNode / XorNode or an optional metadata host. Used by `pushHistory()`
    * to populate `HistoryEntry.hadChoicePending`, which `undoStep()`
    * consults via the `canRestorePriorChoice` branch.
    */
@@ -2336,9 +2331,6 @@ export class GameCore {
 
       if (step.type === 'choice') {
         const pendingHost = this.engineStack.peekPendingHost()
-        if (pendingHost?.getPending() !== null) {
-          return
-        }
         // breed action (e.g. harvest reap or B104 last-harvest enforcement)
         // emits ActionExecutionResult { type: 'request', request: { kind:
         // 'animal-reorg' } } — the engine wraps it in the new 'request'
@@ -2380,6 +2372,9 @@ export class GameCore {
           const { fromPlayerIndex, toPlayerIndex } = frame.deferredPlayerSwitch
           frame.deferredPlayerSwitch = null
           this.startConfirmPlayerSwitch(fromPlayerIndex, toPlayerIndex)
+          return
+        }
+        if (pendingHost?.getPending() !== null) {
           return
         }
         if (step.choice.options.length === 1) {
@@ -2675,9 +2670,9 @@ export class GameCore {
     const pendingSourceCard = envelope?.sourceCard ?? pendingSnapshot?.sourceCard
     // 'choice' (typed), 'animal-reorg' (legacy commit pathway), and any
     // ChoiceNode-emitted untyped request all flow through the engine's
-    // resolveChoice path. Composite-node (OrNode/XorNode/OptionalNode)
-    // emissions are also accepted: those don't carry an InteractionNode but
-    // the engine has a pending choice on the composite node itself.
+    // resolveChoice path. Composite-node and optional-host emissions are
+    // also accepted: those don't carry an InteractionNode but the engine
+    // has a pending choice on the host node itself.
     // 'feed' / 'confirm-next-player' / 'confirm-player-switch' are
     // dispatched by the public `resolveChoice` to dedicated handlers and
     // never reach this method.

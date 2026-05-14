@@ -1,5 +1,5 @@
 import type { EngineNode } from './types'
-import { OptionalNode, OrNode, ParallelNode, SequenceNode, XorNode } from './nodes'
+import { OrNode, ParallelNode, SequenceNode, XorNode } from './nodes'
 import { ParallelTriggerNode } from './nodes/parallel-trigger-node'
 import { isActivateCardActionNode } from './activation-action'
 
@@ -7,13 +7,9 @@ const isCompositeNode = (node: EngineNode) =>
   node instanceof SequenceNode ||
   node instanceof ParallelNode ||
   node instanceof OrNode ||
-  node instanceof XorNode ||
-  node instanceof OptionalNode
+  node instanceof XorNode
 
 const hasStartedDescendant = (node: EngineNode): boolean => {
-  if (node instanceof OptionalNode) {
-    return node.active || hasStartedDescendant(node.child)
-  }
   if (node instanceof SequenceNode || node instanceof ParallelNode || node instanceof OrNode || node instanceof XorNode) {
     return node.children.some((child) =>
       child.getState() === 'resolved' || hasStartedDescendant(child),
@@ -40,15 +36,10 @@ export class EngineTree {
         return null
       }
       if (isCompositeNode(node)) {
-        if (node instanceof OptionalNode) {
-          const found = visit(node.child)
+        const composite = node as SequenceNode | ParallelNode | OrNode | XorNode
+        for (const child of composite.children) {
+          const found = visit(child)
           if (found) return found
-        } else {
-          const composite = node as SequenceNode | ParallelNode | OrNode | XorNode
-          for (const child of composite.children) {
-            const found = visit(child)
-            if (found) return found
-          }
         }
       }
       return null
@@ -70,12 +61,8 @@ export class EngineTree {
         return
       }
       if (isCompositeNode(node)) {
-        if (node instanceof OptionalNode) {
-          visit(node.child)
-        } else {
-          const composite = node as SequenceNode | ParallelNode | OrNode | XorNode
-          composite.children.forEach((child) => visit(child))
-        }
+        const composite = node as SequenceNode | ParallelNode | OrNode | XorNode
+        composite.children.forEach((child) => visit(child))
       }
     }
     visit(this.root)
@@ -99,10 +86,6 @@ export class EngineTree {
       return this.insertBefore(parent.id, nodes)
     }
     const replacement = new SequenceNode(`pre-${nodeId}`, [...nodes, found.node])
-    if (parent instanceof OptionalNode) {
-      parent.child = replacement
-      return true
-    }
     if (parent instanceof OrNode || parent instanceof XorNode) {
       parent.children[index] = replacement
       return true
@@ -131,10 +114,6 @@ export class EngineTree {
       return true
     }
     const replacement = new SequenceNode(`chain-${node.id}`, [node, ...nodes])
-    if (parent instanceof OptionalNode) {
-      parent.child = replacement
-      return true
-    }
     if (parent instanceof OrNode || parent instanceof XorNode) {
       parent.children[index] = replacement
       return true
@@ -158,23 +137,14 @@ export class EngineTree {
       return null
     }
     if (isCompositeNode(node)) {
-      if (node instanceof OptionalNode) {
-        const child = node.child
+      const composite = node as SequenceNode | ParallelNode | OrNode | XorNode
+      for (let index = 0; index < composite.children.length; index += 1) {
+        const child = composite.children[index]
         if (child.id === targetId) {
-          return { node: child, parent: node, index: 0 }
+          return { node: child, parent: node, index }
         }
         const found = this.findNodeWithParent(targetId, child)
         if (found) return found
-      } else {
-        const composite = node as SequenceNode | ParallelNode | OrNode | XorNode
-        for (let index = 0; index < composite.children.length; index += 1) {
-          const child = composite.children[index]
-          if (child.id === targetId) {
-            return { node: child, parent: node, index }
-          }
-          const found = this.findNodeWithParent(targetId, child)
-          if (found) return found
-        }
       }
     }
     return null
@@ -187,6 +157,9 @@ export class EngineTree {
       }
       if (node.getPending() !== null) {
         return node
+      }
+      if (node.optional === true && node.optionalActive === false) {
+        return node.getState() === 'resolved' ? null : node
       }
       if (node instanceof ParallelTriggerNode) {
         if (node.getState() === 'resolved') return null
@@ -231,20 +204,6 @@ export class EngineTree {
         }
         if (node.getState() === 'ready') {
           return node
-        }
-        return null
-      }
-      if (node instanceof OptionalNode) {
-        if (node.getState() === 'resolved') {
-          return null
-        }
-        if (!node.active) {
-          return node
-        }
-        const next = visit(node.child)
-        if (next) return next
-        if (node.getState() === 'resolved') {
-          node.resolve()
         }
         return null
       }

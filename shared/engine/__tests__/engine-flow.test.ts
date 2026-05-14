@@ -19,7 +19,6 @@ import { LogStore } from '../log-store'
 import {
   ActionNode,
   InteractionNode,
-  OptionalNode,
   OrNode,
   ParallelNode,
   SequenceNode,
@@ -1102,7 +1101,7 @@ describe('Engine flow nodes', () => {
     expect(sowOption?.labelParams).toEqual({ actionNameKey: 'actions.sow.name' })
   })
 
-  it('optional node auto-skips when child is not doable', () => {
+  it('optional metadata auto-skips when host is not doable', () => {
     const action: ActionDefinition = {
       id: 'blocked-action',
       nameKey: 'test',
@@ -1114,11 +1113,10 @@ describe('Engine flow nodes', () => {
     }
     const registry = new ActionRegistry()
     registry.register(action)
-    const optional = new OptionalNode(
-      'opt',
-      new ActionNode('action-blocked', 'blocked-action'),
-      'ui.interactionOptionalAction',
-    )
+    const optional = new ActionNode('action-blocked', 'blocked-action')
+    optional.optional = true
+    optional.optionalActive = false
+    optional.optionalPromptKey = 'ui.interactionOptionalAction'
     const engine = new Engine({
       tree: new EngineTree(optional),
       registry,
@@ -1134,7 +1132,7 @@ describe('Engine flow nodes', () => {
     expect(optional.getState()).toBe('resolved')
   })
 
-  it('optional node resolves when choosing __skip__', () => {
+  it('optional metadata resolves when choosing __skip__', () => {
     const action: ActionDefinition = {
       id: 'skippable',
       nameKey: 'test',
@@ -1146,11 +1144,10 @@ describe('Engine flow nodes', () => {
     }
     const registry = new ActionRegistry()
     registry.register(action)
-    const optional = new OptionalNode(
-      'opt',
-      new ActionNode('action-skip', 'skippable'),
-      'ui.interactionOptionalAction',
-    )
+    const optional = new ActionNode('action-skip', 'skippable')
+    optional.optional = true
+    optional.optionalActive = false
+    optional.optionalPromptKey = 'ui.interactionOptionalAction'
     const engine = new Engine({
       tree: new EngineTree(optional),
       registry,
@@ -1170,6 +1167,92 @@ describe('Engine flow nodes', () => {
 
     const done = engine.proceed({ state, player, space })
     expect(done.type).toBe('done')
+  })
+
+  it('optional xor exposes branch choices plus direct skip without accept prompt', () => {
+    let executed = false
+    const action: ActionDefinition = {
+      id: 'xor-skippable',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        executed = true
+        return { type: 'ok' }
+      },
+    }
+    const registry = new ActionRegistry()
+    registry.register(action)
+    const optional = new XorNode('xor-opt', [
+      new ActionNode('action-xor-skip', 'xor-skippable'),
+    ], 'ui.interactionOptionalAction')
+    optional.optional = true
+    optional.optionalActive = false
+    optional.optionalPromptKey = 'ui.interactionOptionalAction'
+    const engine = new Engine({
+      tree: new EngineTree(optional),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(action)
+
+    const step = engine.proceed({ state, player, space })
+    expect(step.type).toBe('choice')
+    if (step.type !== 'choice') return
+    expect(step.choice.options.map((option) => option.value)).toEqual([
+      'action-xor-skip',
+      '__skip__',
+    ])
+
+    const result = engine.resolveChoice('__skip__', { state, player, space })
+    expect(result.type).toBe('ok')
+    expect(optional.getState()).toBe('resolved')
+    expect(executed).toBe(false)
+  })
+
+  it('accepting optional xor activates the host and executes selected branch', () => {
+    let executed = false
+    const action: ActionDefinition = {
+      id: 'xor-accept',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        executed = true
+        return { type: 'ok' }
+      },
+    }
+    const registry = new ActionRegistry()
+    registry.register(action)
+    const optional = new XorNode('xor-opt', [
+      new ActionNode('action-xor-accept', 'xor-accept'),
+    ], 'ui.interactionOptionalAction')
+    optional.optional = true
+    optional.optionalActive = false
+    optional.optionalPromptKey = 'ui.interactionOptionalAction'
+    const engine = new Engine({
+      tree: new EngineTree(optional),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(action)
+
+    const step = engine.proceed({ state, player, space })
+    expect(step.type).toBe('choice')
+    const result = engine.resolveChoice('action-xor-accept', { state, player, space })
+    expect(result.type).toBe('ok')
+    expect(optional.optionalActive).toBe(true)
+    expect(executed).toBe(true)
   })
 
   it('or node resolves when choosing __done__', () => {

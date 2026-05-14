@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ActionNode } from '../action-node'
 import { InteractionNode } from '../interaction-node'
-import { OptionalNode } from '../optional-node'
 import { OrNode } from '../or-node'
 import { ParallelNode } from '../parallel-node'
 import { SequenceNode } from '../sequence-node'
@@ -186,28 +185,16 @@ describe('cursor round-trip', () => {
     expect(rebuilt.toCursor()).toEqual(c1)
   })
 
-  it('OptionalNode preserves child reference + active flag + emit metadata through toCursor', () => {
-    const inner = new ActionNode('opt-child', 'gain-wood')
-    const original = new OptionalNode('opt-1', inner, 'ui.test.opt')
-    original.active = true
-    original.emittedChoices = [{ value: '__skip__', labelKey: 'ui.skip' }]
-    original.emittedPromptKey = 'ui.test.opt-emit'
-    original.pendingActionId = null
-    original.pendingContextSnapshot = {
-      params: undefined,
-      costs: undefined,
-      sourceCard: undefined,
-      actionContext: undefined,
-    }
+  it('ActionNode preserves optional metadata through toCursor', () => {
+    const original = new ActionNode('opt-action', 'gain-wood')
+    original.optional = true
+    original.optionalActive = true
+    original.optionalPromptKey = 'ui.test.opt'
     const c1 = original.toCursor()
-    const rebuilt = new OptionalNode(c1.id, inner, c1.data.promptKey as never)
-    rebuilt.active = c1.data.active as boolean
-    rebuilt.emittedChoices = c1.data.emittedChoices as never
-    rebuilt.emittedPromptKey = c1.data.emittedPromptKey as never
-    rebuilt.emittedPromptParams = c1.data.emittedPromptParams as never
-    rebuilt.emittedRequest = c1.data.emittedRequest as never
-    rebuilt.pendingActionId = c1.data.pendingActionId as string | null | undefined
-    rebuilt.pendingContextSnapshot = c1.data.pendingContextSnapshot as never
+    const rebuilt = new ActionNode(c1.id, c1.data.actionId as string)
+    rebuilt.optional = c1.data.optional as boolean
+    rebuilt.optionalActive = c1.data.optionalActive as boolean
+    rebuilt.optionalPromptKey = c1.data.optionalPromptKey as never
     rebuilt.setState(c1.state)
     expect(rebuilt.toCursor()).toEqual(c1)
   })

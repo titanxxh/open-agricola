@@ -15,7 +15,6 @@ export type EngineNodeType =
   | 'parallel'
   | 'or'
   | 'xor'
-  | 'optional'
 
 export type EngineNode = {
   id: string
