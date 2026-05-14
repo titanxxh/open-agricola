@@ -1,7 +1,7 @@
 import type { Engine } from './engine'
 import type { ActionChoiceOption, ActionFlow, InteractionRequest } from '../contract/types'
 import type { PromptKey } from '../contract/prompt-keys'
-import type { EngineNode } from './types'
+import type { EngineNode, PendingEnvelope } from './types'
 
 export type EngineSource =
   | { kind: 'action'; actionId: string }
@@ -111,6 +111,14 @@ export class EngineStack {
 
   peekInteractionHost(): EngineNode | null {
     return this.current()?.engine.peekInteractionHost() ?? null
+  }
+
+  peekPendingEnvelope(): PendingEnvelope | null {
+    return this.current()?.engine.peekPendingEnvelope() ?? null
+  }
+
+  peekPendingHost(): EngineNode | null {
+    return this.current()?.engine.peekPendingHost() ?? null
   }
 
   peekPendingChoiceFromComposite(): {

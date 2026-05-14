@@ -19,13 +19,14 @@ import {
 } from './nodes'
 import { ParallelTriggerNode } from './nodes/parallel-trigger-node'
 import type { EngineNode, EngineStepResult } from './types'
+import type { PendingEnvelope } from './types'
 import { ActionRegistry } from './registry'
 import { HookDispatcher } from './dispatcher'
 import { EngineTree } from './tree'
 import { LogStore } from './log-store'
 import { INTERACTION_ONLY_ACTION_ID } from './engine-stack'
 import type { EngineInternals } from './engine-internals'
-import { buildFlowNode, snapshotCompositeEmit } from './engine-utils'
+import { buildFlowNode, pendingEnvelopeFromHostNode, snapshotCompositeEmit } from './engine-utils'
 import { engineProceed } from './engine-proceed'
 import { engineResolveChoice } from './engine-resolve'
 
@@ -152,6 +153,39 @@ export class Engine {
   peekInteractionHost(): EngineNode | null {
     if (this._pendingNodeIdRef.value === null) return null
     return this.tree.findNodeById(this._pendingNodeIdRef.value) ?? null
+  }
+
+  /**
+   * PendingEnvelope compatibility API. New runtime nodes can host
+   * `node.pending` directly; while legacy wrapper/composite nodes still exist,
+   * this adapts their existing emitted choice fields into the same shape.
+   *
+   * @internal Package-internal coordination surface for EngineStack.
+   */
+  peekPendingEnvelope(): PendingEnvelope | null {
+    const pendingNode = this._pendingNodeIdRef.value
+      ? this.tree.findNodeById(this._pendingNodeIdRef.value)
+      : null
+    const pendingEnvelope = pendingEnvelopeFromHostNode(pendingNode)
+    if (pendingEnvelope) return pendingEnvelope
+
+    for (const node of this.tree.allNodes()) {
+      const explicitPending = node.getPending()
+      if (explicitPending) return explicitPending
+    }
+    return null
+  }
+
+  /**
+   * @internal Package-internal coordination surface for EngineStack.
+   */
+  peekPendingHost(): EngineNode | null {
+    const pendingNode = this._pendingNodeIdRef.value
+      ? this.tree.findNodeById(this._pendingNodeIdRef.value)
+      : null
+    if (pendingEnvelopeFromHostNode(pendingNode)) return pendingNode
+
+    return this.tree.allNodes().find((node) => node.getPending() !== null) ?? null
   }
 
   /**
