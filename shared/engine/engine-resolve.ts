@@ -17,6 +17,9 @@ import {
 import { buildReplaceChoiceFlow } from './nodes/interaction-helpers'
 import type { EngineInternals } from './engine-internals'
 import {
+  isPendingChoiceValueAllowed,
+} from './pending-validation'
+import {
   applyFallbackSourceCardToFlow,
   applyInteractionRequest,
   buildPhaseTrailingNodes,
@@ -30,7 +33,6 @@ import {
   pendingEnvelopeFromHostNode,
   resolveSubtree,
 } from './engine-utils'
-import type { PendingEnvelope } from './types'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
@@ -88,14 +90,6 @@ const collectImmediateLogs = (
   }))
 }
 
-const pendingEnvelopeChoices = (envelope: PendingEnvelope): ActionChoiceOption[] => {
-  if (envelope.choices) return envelope.choices
-  if (envelope.request.kind === 'choice') return envelope.request.options
-  if (envelope.request.kind === 'farm-select') return envelope.request.options ?? []
-  if (envelope.request.kind === 'select-trigger') return envelope.request.options
-  return []
-}
-
 /**
  * S4c PR5 — extracted from `Engine.resolveChoice`. Resolve a pending choice
  * against the engine tree. Threading the optional `payload` lets
@@ -113,12 +107,7 @@ export function engineResolveChoice(
     const explicitPending = node?.getPending()
     if (node && explicitPending) {
       const envelope = pendingEnvelopeFromHostNode(node)
-      const choices = envelope ? pendingEnvelopeChoices(envelope) : []
-      if (
-        !(node instanceof ActionNode) &&
-        choices.length > 0 &&
-        !choices.some((option) => option.value === choice)
-      ) {
+      if (envelope && !isPendingChoiceValueAllowed(envelope, choice)) {
         return { type: 'fail', logKey: 'log.buildRoomFail' }
       }
       if (
