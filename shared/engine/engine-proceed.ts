@@ -41,9 +41,9 @@ import {
   applyInteractionRequest,
   buildActivateCardNodes,
   buildPhaseTrailingNodes,
-  buildFlowNode,
   buildFollowUpNodes,
   buildListenerEvent,
+  buildOwnedFlowNode,
   collectNodeIds,
   findActionNode,
   findInteractionNode,
@@ -459,7 +459,7 @@ export function engineProceed(
     if (result?.flow || normalizedFollowUps.length > 0) {
       const insertedNodes: EngineNode[] = []
       if (result?.flow) {
-        const flowNode = buildFlowNode(int,
+        const flowNode = buildOwnedFlowNode(int,
           applyFallbackSourceCardToFlow(result.flow, result.sourceCard),
           effectPlayer.id,
         )
@@ -489,7 +489,7 @@ export function engineProceed(
     const replacedActionId = replaceResult.actionId
     const replaceSourceCard = replaceResult.sourceCard ?? node.sourceCard
     if (replaceResult.declined && replaceResult.alternativeFlow) {
-      const flowNode = buildFlowNode(int,
+      const flowNode = buildOwnedFlowNode(int,
         buildReplaceChoiceFlow(
           node,
           applyFallbackSourceCardToFlow(
@@ -757,7 +757,7 @@ export function engineProceed(
         ? applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
         : null)
       .filter((flow) => flow)
-      .map((flow) => buildFlowNode(int, flow as ActionFlow, context.player.id))
+      .map((flow) => buildOwnedFlowNode(int, flow as ActionFlow, context.player.id))
     const followUps = allActionHookResults
       .flatMap((entry) =>
         (entry.followUpActions ?? []).map((followUp) =>
@@ -800,7 +800,7 @@ export function engineProceed(
       ...hookFlows,
     ]
     if (result.type === 'flow') {
-      const flowNode = buildFlowNode(int, result.flow, context.player.id)
+      const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id)
       // Insertion order: trailing hooks first (deepest behind), then flow
       // body, then leading nodes. insertAfter prepends each batch to
       // node.id+1, so the resulting child layout is:

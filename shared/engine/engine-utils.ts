@@ -638,6 +638,14 @@ export function buildFlowNode(
   return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
 }
 
+export function buildOwnedFlowNode(
+  int: EngineInternals,
+  flow: ActionFlow,
+  ownerPlayerId: string,
+): EngineNode {
+  return stampOwner(buildFlowNode(int, flow, ownerPlayerId), ownerPlayerId)
+}
+
 /**
  * Walk a flow subtree and stamp outer `actionContext` / `sourceCard` onto
  * every leaf — used by the leaf `expandFlow` path so the inner flow's

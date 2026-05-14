@@ -316,6 +316,41 @@ describe('ActionFlow targetPlayerId', () => {
     expect(undoResp.ok ? '' : undoResp.error).not.toBe('no pending choice for this player')
   })
 
+  it('targeted action dynamic flow executes as the target owner', () => {
+    const session = setupSession()
+    const state = session.getState().state
+    const p1 = state.players[0]!
+    const p2 = state.players[1]!
+    const p1WoodBefore = p1.resources.wood
+    const p2WoodBefore = p2.resources.wood
+    const dynamicGainWood: ActionDefinition = {
+      id: 'dynamic-gain-wood-flow-from-action',
+      nameKey: 'test.dynamicGainWoodFlowFromAction',
+      descriptionKey: 'test.dynamicGainWoodFlowFromAction',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({
+        type: 'flow',
+        flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 } },
+      }),
+    }
+    ;(session as unknown as { registry: { register: (action: ActionDefinition) => void } })
+      .registry.register(dynamicGainWood)
+
+    const flow: ActionFlow = {
+      type: 'leaf',
+      actionId: dynamicGainWood.id,
+      targetPlayerId: p2.id,
+    }
+
+    startFlowEngine(session, flow, 0)
+
+    const resp = session.getState()
+    expect(resp.state.players[1]!.resources.wood).toBe(p2WoodBefore + 1)
+    expect(resp.state.players[0]!.resources.wood).toBe(p1WoodBefore)
+  })
+
   it('targeted xor dynamic flow executes as the target owner', () => {
     const session = setupSession()
     const state = session.getState().state
