@@ -135,6 +135,25 @@ describe('ActionFlow targetPlayerId', () => {
     expect(innerLeaf?.data.ownerPlayerId).toBe(p1.id)
   })
 
+  it('does not derive optional owner for mixed-owner subtrees', () => {
+    const session = setupSession()
+    const state = session.getState().state
+    const p2 = state.players[1]!
+
+    const flow: ActionFlow = {
+      type: 'seq',
+      optional: true,
+      children: [
+        { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: 'MixedOwnerTarget', targetPlayerId: p2.id },
+        { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: 'MixedOwnerFrame' },
+      ],
+    }
+
+    const optionalSeq = compileFlowNodeCursors(session, flow, 0)
+      .find((cursor) => cursor.type === 'sequence' && cursor.data.optional === true)
+    expect(optionalSeq?.data.ownerPlayerId).toBeUndefined()
+  })
+
   it('auto-gain after switch completes without confirmPlayerSwitch', () => {
     const session = setupSession()
     const state = session.getState().state
@@ -189,6 +208,47 @@ describe('ActionFlow targetPlayerId', () => {
     // Now should be a choice (XOR)
     const resp3 = session.getState()
     expect(resp3.interaction.stateId).toBe('wait')
+  })
+
+  it('optional sequence with targeted xor prompts as the target owner', () => {
+    const session = setupSession()
+    const state = session.getState().state
+    const p2 = state.players[1]!
+
+    const flow: ActionFlow = {
+      type: 'seq',
+      optional: true,
+      promptKey: 'ui.interactionOptionalAction',
+      children: [
+        {
+          type: 'xor',
+          targetPlayerId: p2.id,
+          children: [
+            { type: 'leaf', actionId: 'gain', params: { sheep: 1 }, sourceCard: 'TestOptionalTarget', choiceLabelKey: 'sheep' },
+            { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: 'TestOptionalTarget', choiceLabelKey: 'food' },
+          ],
+        },
+      ],
+    }
+
+    startFlowEngine(session, flow, 0)
+    const confirmResp = session.getState()
+    expect(confirmResp.interaction.stateId === 'wait' ? confirmResp.interaction.request.kind : confirmResp.interaction.stateId).toBe('confirm-player-switch')
+
+    const pendingResp = confirmPlayerSwitch(session)
+    expect(pendingResp.ok).toBe(true)
+    expect(pendingResp.interaction.stateId).toBe('wait')
+    if (pendingResp.interaction.stateId !== 'wait') return
+    expect(pendingResp.interaction.playerIndex).toBe(1)
+    const acceptOption = pendingResp.interaction.options?.find((option) => option.value !== '__skip__')
+    expect(acceptOption).toBeDefined()
+
+    const wrongPlayer = session.resolveChoice(0, acceptOption!.value)
+    expect(wrongPlayer.ok).toBe(false)
+    expect(wrongPlayer.ok ? '' : wrongPlayer.error).toBe('no pending choice for this player')
+
+    const accepted = session.resolveChoice(1, acceptOption!.value)
+    expect(accepted.ok).toBe(true)
   })
 
   it('multiple ok steps then choice still shows confirmPlayerSwitch', () => {
