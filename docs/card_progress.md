@@ -1,66 +1,61 @@
-# Card Progress
+# 卡牌进度
 
-> Current-only status for BGA alignment. Completed sprint notes are omitted.
+> 本文只记录当前 BGA 对齐状态；已完成批次说明不在本文保留。
 
-## 1. Current Snapshot
+## 1. 当前快照
 
-| Area | Current status |
+| 维度 | 当前状态 |
 |---|---:|
-| BGA canonical cards scanned | 888 |
-| Open Agricola canonical card buckets scanned | 888 |
-| Canonical BGA-only / OA-only buckets | 0 / 0 |
-| Physical TypeScript card files | 889 |
-| Active BGA cards missing in OA | 0 |
-| Behavior or registration gaps to fix | 11 |
-| Metadata schema-up gaps | 4 |
-| BGA-banned cards still present in OA by policy | 33 |
-| Owner-confirmation queue | 0 |
+| BGA canonical 卡牌数 | 888 |
+| Open Agricola canonical 卡牌 bucket 数 | 888 |
+| canonical 层面 BGA-only / OA-only | 0 / 0 |
+| TypeScript 实体卡牌文件数 | 889 |
+| BGA active implemented 但 OA 缺失 | 0 |
+| 待修行为 / 注册差异 | 11 |
+| metadata schema 上抬差异 | 4 |
+| BGA 标 banned 但 OA 按策略保留 | 33 |
+| 待 owner 确认队列 | 0 |
 
-The one extra physical TS file is the `C71` duplicate:
-`C71_Slurry.ts` plus legacy `C71_SlurrySpreader.ts`. Canonically BGA uses
-`C71_Slurry`; `C71_SlurrySpreader` is the legacy wrong-name entry.
+多出来的 1 个 TS 实体文件是 `C71` 重复：`C71_Slurry.ts` 和 legacy
+`C71_SlurrySpreader.ts` 同时存在。BGA canonical 名是 `C71_Slurry`；
+`C71_SlurrySpreader` 是 legacy wrong-name 条目。
 
-## 2. Behavior And Registration Gaps
+## 2. 待修行为 / 注册差异
 
-These are the remaining cards whose current implementation differs from BGA
-runtime behavior or registration. They are implementation work, not owner-policy
-questions.
+这些卡牌当前实现和 BGA 运行时行为或注册语义不一致。它们是可执行的实现任务，不是 owner 策略问题。
 
-| Card | Original behavior | Current OA behavior | BGA gap | Needed fix |
+| 卡牌 | 原始行为 | 当前 OA 行为 | BGA 差距 | 需要修复 |
 |---|---|---|---|---|
-| `A148_Woolgrower` | Past feeding phases count toward sheep capacity. | Capacity is tracked from card-local `completedHarvests` after the card enters play. | BGA reads global completed feeding phases, so late play still benefits from earlier harvests. | Base capacity on global completed feeding/harvest count, not card-local post-play count. |
-| `B86_TruffleSearcher` | Past feeding phases count toward boar capacity. | Same card-local post-play counter shape as `A148`. | BGA reads global completed feeding phases for late-play capacity. | Use the same global completed-feeding source as `A148`. |
-| `B157_Salter` | Player may preserve multiple animal types/counts and gain future food by preserved amount. | Current flow is XOR/exactly one animal type and one animal. | BGA supports sheep/boar/cattle counts in one interaction. | Replace single-choice flow with explicit multi-type count selection and matching future food. |
-| `C8_PlantFertilizer` | Works with logical field groups including grain/vegetable/wood/stone plantings. | Only physical grain/vegetable fields are handled. | BGA can apply to logical groups used by later cards such as wood/stone fields. | Make field lookup group-aware and include wood/stone plantable groups where active. |
-| `C57_Crudite` | Optional harvest-time choice; player selects which vegetable source to remove. | Harvest handler directly mutates the first qualifying vegetable source and is effectively mandatory. | BGA presents an optional choice when multiple sources are possible. | Convert harvest behavior to explicit optional pending/flow selection. |
-| `C71_Slurry` / `C71_SlurrySpreader` | Canonical card is `C71_Slurry`; legacy wrong-name entry is not implemented. | Both names are present as physical TS files. | Duplicate registration can expose the legacy name in places that should only use canonical `Slurry`. | Remove or quarantine the legacy `C71_SlurrySpreader` implementation path. |
-| `C140_PackagingArtist` | Adds a Major Improvement action path to the replacement action pool. | Implements minor replacement / `isDoable`, but does not add Major Improvement to the replaceable action pool. | BGA lets the card extend the replacement action set. | Add the missing reusable action-pool extension. |
-| `D13_Trowel` | Renovating from wood can go directly to stone. | Wood house can still only renovate to clay through the current renovate-house path. | BGA passes `toStone=true` for the wood-to-stone option. | Teach renovate flow to expose the wood-to-stone option when this card is active. |
-| `D15_ClaySupports` | Offers an alternate clay trade that preserves the base renovation cost semantics. | Applies a mandatory cost delta. | BGA models this as an alternative cost trade, not a forced discount path. | Represent the BGA alternate-payment option explicitly. |
-| `D66_PotterCeramics` | Clay-to-grain conversion requires baking. | Converts clay to grain, then baking can be skipped. | BGA makes the bake step mandatory for this effect. | Mark the generated bake continuation as mandatory. |
-| `E5_NightLoot` | Player chooses the exact accumulation space/resource to steal. | Takes the first matching accumulation space for the selected resource. | BGA exposes explicit source selection. | Add source-space selection to the interaction. |
+| `A148_Woolgrower` | 已完成 feeding phase 会计入羊容量。 | 容量来自本卡 `completedHarvests`，只从打出后开始计数。 | BGA 读取全局 completed feeding phases，所以晚打出也应享受之前的收获容量。 | 改用全局 completed feeding / harvest 计数，而不是本卡 post-play 计数。 |
+| `B86_TruffleSearcher` | 已完成 feeding phase 会计入野猪容量。 | 和 `A148` 一样使用本卡 post-play counter。 | BGA 同样读取全局 completed feeding phases。 | 和 `A148` 共用同一套全局计数来源。 |
+| `B157_Salter` | 玩家可以腌制多种 / 多只动物，并按数量获得未来食物。 | 当前 flow 是 XOR，只能三选一且只能选 1 只动物。 | BGA 一次交互可选择 sheep / boar / cattle 的多个数量。 | 改成显式多类型计数选择，并按类型 / 数量发放 future food。 |
+| `C8_PlantFertilizer` | 支持 grain / vegetable / wood / stone 等逻辑田组。 | 只处理物理 grain / vegetable field。 | BGA 可作用于后续卡牌创建的 wood / stone field 逻辑组。 | 田地查找改成 group-aware，并纳入已激活的 wood / stone 可播种组。 |
+| `C57_Crudite` | 收获时可选触发，玩家选择移除哪个 vegetable 来源。 | harvest handler 直接移除第一个符合条件的 vegetable，效果上是强制触发。 | BGA 在多来源时给 optional choice。 | 改成显式 optional pending / flow，并让玩家选择来源。 |
+| `C71_Slurry` / `C71_SlurrySpreader` | canonical 卡是 `C71_Slurry`；legacy wrong-name 条目未实现。 | 两个名字都有 TS 实体文件。 | 重复注册可能把 legacy 名暴露到只应使用 canonical `Slurry` 的路径。 | 删除或隔离 legacy `C71_SlurrySpreader` 实现路径。 |
+| `C140_PackagingArtist` | 把 Major Improvement action 加入 replacement action pool。 | 实现了 minor replacement / `isDoable`，但没有把 Major Improvement 加进可替换 action pool。 | BGA 允许此卡扩展 replacement action 集合。 | 增加缺失的通用 action-pool 扩展点。 |
+| `D13_Trowel` | 木屋可直接翻修到 stone。 | 当前 renovate-house 路径仍只能 wood -> clay。 | BGA 传入 `toStone=true` 提供 wood -> stone 选项。 | 当此卡激活时，renovate flow 暴露 wood -> stone 选项。 |
+| `D15_ClaySupports` | 提供替代 clay trade，同时保留基础翻修费用语义。 | 当前实现成强制 cost delta。 | BGA 把它建模成可选替代支付，不是强制折扣路径。 | 显式建模 BGA 的 alternate-payment option。 |
+| `D66_PotterCeramics` | clay -> grain 后必须 bake。 | clay 转 grain 后仍可 skip bake。 | BGA 对这个效果强制 bake。 | 把生成的 bake continuation 标记为 mandatory。 |
+| `E5_NightLoot` | 玩家选择具体 accumulation space / resource 来偷取。 | 按所选资源自动取第一个匹配 accumulation space。 | BGA 暴露精确来源选择。 | 交互中加入 source-space 选择。 |
 
-## 3. Metadata Schema-Up Gaps
+## 3. Metadata Schema 上抬差异
 
-The mechanical BGA metadata audit finds four cards where BGA expresses
-buyability inside custom `isBuyable` logic instead of a plain prerequisite
-label. OA has an explicit prerequisite label/handler for UI clarity. Behavior is
-not currently known to be wrong.
+机械 metadata 审计发现 4 张卡：BGA 把 buyability 写在自定义 `isBuyable`
+逻辑里，没有 plain prerequisite 字段；OA 为了 UI 清晰度把条件上抬成显式
+prerequisite label / handler。当前没有证据表明运行时行为错误。
 
-| Card | OA metadata | BGA metadata gap | Current treatment |
+| 卡牌 | OA metadata | BGA metadata 差异 | 当前处理 |
 |---|---|---|---|
-| `A3_PaperKnife` | Explicit prerequisite label plus handler. | BGA has no plain prerequisite field; the logic lives in `isBuyable`. | Keep as schema-up metadata divergence. |
-| `B154_SheepKeeper` | Explicit prerequisite label plus handler. | Same BGA shape. | Keep as schema-up metadata divergence. |
-| `B56_Brook` | Explicit prerequisite label plus handler. | Same BGA shape. | Keep as schema-up metadata divergence. |
-| `B74_ThickForest` | Explicit prerequisite label plus handler. | Same BGA shape. | Keep as schema-up metadata divergence. |
+| `A3_PaperKnife` | 显式 prerequisite label + handler。 | BGA 没有 plain prerequisite 字段，逻辑在 `isBuyable`。 | 保留为 schema-up metadata 差异。 |
+| `B154_SheepKeeper` | 显式 prerequisite label + handler。 | 同上。 | 保留为 schema-up metadata 差异。 |
+| `B56_Brook` | 显式 prerequisite label + handler。 | 同上。 | 保留为 schema-up metadata 差异。 |
+| `B74_ThickForest` | 显式 prerequisite label + handler。 | 同上。 | 保留为 schema-up metadata 差异。 |
 
-## 4. BGA-Banned Cards Present In OA
+## 4. BGA-Banned 但 OA 保留
 
-These cards are intentionally present in OA even though BGA metadata marks them
-as banned or non-standard. They are policy differences, not BGA behavior gaps,
-unless a separate row also appears in section 2.
+这些卡牌在 BGA metadata 中标为 banned 或非标准，但 OA 当前按产品策略保留。它们不是 BGA 行为 gap，除非同一张卡也出现在第 2 节。
 
-| Cards |
+| 卡牌 |
 |---|
 | `A131_GuestRoom`, `A133_ClappingArea`, `A14_CarpentersHammer`, `A33_RecycledBrick`, `A39_Smallholding`, `A48_StableDeliveryman`, `A82_Wintercrafter`, `A97_BreadCarrier` |
 | `B10_ChickenCoop`, `B117_Mastermind`, `B132_FestivalManager`, `B151_Tradesperson`, `B15_Flail`, `B161_Trident`, `B21_FarmSchoolGraduate`, `B22_Punner` |
@@ -68,71 +63,69 @@ unless a separate row also appears in section 2.
 | `D137_Countryman`, `D19_DrinkerOfAbsinthe`, `D21_BrushwoodRoof`, `D33_MasterBreeder`, `D4_ChickenFeeder`, `D74_TenantFarmer`, `D92_SnackTime` |
 | `D97_AutonomousPicker`, `E22_FieldWatchman` |
 
-## 5. Accepted Simplifications
+## 5. 已接受简化
 
-These are known simplifications that are currently accepted. They should stay
-out of the fix queue unless the product decision changes.
+这些是当前已接受的简化实现。除非产品决策变化，否则不要把它们放回待修队列。
 
-| Card | Current simplification | BGA difference |
+| 卡牌 | 当前简化 | BGA 差异 |
 |---|---|---|
-| `B27_Toolbox` | Simplified current implementation retained. | BGA has richer handling. |
-| `B33_Mantlepiece` | Simplified current implementation retained. | BGA has richer handling. |
-| `B129_Seatmate` | Simplified current implementation retained. | BGA has richer handling. |
-| `C24_BedintheGrainField` | Simplified current implementation retained. | BGA has richer handling. |
-| `C25_SteamMachine` | Simplified current implementation retained. | BGA has richer handling. |
-| `C42_RavenousHunger` | Simplified current implementation retained. | BGA has richer handling. |
-| `C67_MineralFeeder` | Simplified current implementation retained. | BGA has richer handling. |
-| `C69_LandConsolidation` | Simplified current implementation retained. | BGA has richer handling. |
-| `C72_FestivalPlanning` | Simplified current implementation retained. | BGA has richer handling. |
-| `C93_InnerDistrictsDirector` | Simplified current implementation retained. | BGA has richer handling. |
-| `C120_AgriculturalLabourer` | Simplified current implementation retained. | BGA has richer handling. |
-| `C154_TwinResearcher` | Simplified current implementation retained. | BGA has richer handling. |
-| `D36_BreedRegistry` | Simplified current implementation retained. | BGA has richer handling. |
-| `D101_SugarBaker` | Simplified current implementation retained. | BGA has richer handling. |
-| `E112_GrainThief` | Simplified current implementation retained. | BGA has richer handling. |
-| `C27_Blueprint` | Source-documented simplification. | BGA has extra details not mirrored. |
-| `C52_HuntsmansHat` | Source-documented simplification. | BGA has extra details not mirrored. |
-| `C146_WorkshopAssistant` | Source-documented simplification. | BGA has extra details not mirrored. |
+| `B27_Toolbox` | 保留当前简化实现。 | BGA 处理更完整。 |
+| `B33_Mantlepiece` | 保留当前简化实现。 | BGA 处理更完整。 |
+| `B129_Seatmate` | 保留当前简化实现。 | BGA 处理更完整。 |
+| `C24_BedintheGrainField` | 保留当前简化实现。 | BGA 处理更完整。 |
+| `C25_SteamMachine` | 保留当前简化实现。 | BGA 处理更完整。 |
+| `C42_RavenousHunger` | 保留当前简化实现。 | BGA 处理更完整。 |
+| `C67_MineralFeeder` | 保留当前简化实现。 | BGA 处理更完整。 |
+| `C69_LandConsolidation` | 保留当前简化实现。 | BGA 处理更完整。 |
+| `C72_FestivalPlanning` | 保留当前简化实现。 | BGA 处理更完整。 |
+| `C93_InnerDistrictsDirector` | 保留当前简化实现。 | BGA 处理更完整。 |
+| `C120_AgriculturalLabourer` | 保留当前简化实现。 | BGA 处理更完整。 |
+| `C154_TwinResearcher` | 保留当前简化实现。 | BGA 处理更完整。 |
+| `D36_BreedRegistry` | 保留当前简化实现。 | BGA 处理更完整。 |
+| `D101_SugarBaker` | 保留当前简化实现。 | BGA 处理更完整。 |
+| `E112_GrainThief` | 保留当前简化实现。 | BGA 处理更完整。 |
+| `C27_Blueprint` | 源码已注明的简化。 | BGA 有额外细节，OA 未镜像。 |
+| `C52_HuntsmansHat` | 源码已注明的简化。 | BGA 有额外细节，OA 未镜像。 |
+| `C146_WorkshopAssistant` | 源码已注明的简化。 | BGA 有额外细节，OA 未镜像。 |
 
-## 6. Deliberate Behavior Differences
+## 6. 刻意行为差异
 
-These non-banned cards intentionally differ from BGA today.
+这些非 banned 卡牌当前刻意不完全跟随 BGA。
 
-| Card | Current OA behavior | BGA behavior | Current decision |
+| 卡牌 | 当前 OA 行为 | BGA 行为 | 当前决策 |
 |---|---|---|---|
-| `C22_BasketChair` | Simplified trigger/payment behavior. | BGA has fuller interactive handling. | Keep simplification. |
-| `D161_CabbageBuyer` | Simplified purchase/scoring behavior. | BGA has richer handling. | Keep simplification. |
-| `B85_FarmHand` | Simplified worker/action behavior. | BGA has richer handling. | Keep simplification. |
-| `A136_DrudgeryReeve` | Simplified scoring/condition handling. | BGA has richer handling. | Keep simplification. |
-| `C133_Soldier` | Simplified interaction. | BGA has richer handling. | Keep simplification. |
-| `D132_HideFarmer` | Simplified hide/farm behavior. | BGA has richer handling. | Keep simplification. |
-| `E149_MidnightFencer` | Simplified fencing behavior. | BGA has richer handling. | Keep simplification. |
-| `A22_Telegram` | Simplified timing/interaction behavior. | BGA has richer handling. | Keep simplification. |
-| `E72_ArtichokeField` | Simplified field behavior. | BGA has richer handling. | Keep simplification. |
-| `C1_Overhaul` | Uses OA min:n notation behavior. | BGA representation differs. | Keep current representation. |
-| `C1_noWoodPalisades` | OA blocks wood palisade interaction. | BGA representation differs. | Keep current representation. |
-| `D1_ZigzagHarrow` | Simplified harrow behavior. | BGA has richer handling. | Keep simplification. |
+| `C22_BasketChair` | 简化 trigger / payment 行为。 | BGA 交互更完整。 | 保留简化。 |
+| `D161_CabbageBuyer` | 简化购买 / 计分行为。 | BGA 处理更完整。 | 保留简化。 |
+| `B85_FarmHand` | 简化 worker / action 行为。 | BGA 处理更完整。 | 保留简化。 |
+| `A136_DrudgeryReeve` | 简化计分 / 条件处理。 | BGA 处理更完整。 | 保留简化。 |
+| `C133_Soldier` | 简化交互。 | BGA 处理更完整。 | 保留简化。 |
+| `D132_HideFarmer` | 简化 hide / farm 行为。 | BGA 处理更完整。 | 保留简化。 |
+| `E149_MidnightFencer` | 简化 fencing 行为。 | BGA 处理更完整。 | 保留简化。 |
+| `A22_Telegram` | 简化时序 / 交互行为。 | BGA 处理更完整。 | 保留简化。 |
+| `E72_ArtichokeField` | 简化 field 行为。 | BGA 处理更完整。 | 保留简化。 |
+| `C1_Overhaul` | 使用 OA 的 min:n 表示语义。 | BGA 表达方式不同。 | 保留当前表示。 |
+| `C1_noWoodPalisades` | OA 阻止 wood palisade 交互。 | BGA 表达方式不同。 | 保留当前表示。 |
+| `D1_ZigzagHarrow` | 简化 harrow 行为。 | BGA 处理更完整。 | 保留简化。 |
 
-## 7. Legacy Names And Non-Missing Cards
+## 7. Legacy 名称与非缺失卡
 
-| Item | Current conclusion |
+| 条目 | 当前结论 |
 |---|---|
-| `D159_ReedSeller` | Not missing. BGA marks it `implemented=false`; OA keeps it data-only. |
-| `E132_VeggieLover` | Implemented and aligned under the canonical OA/BGA name. The legacy BGA `E132_Shearer` name is not the active card. |
-| `C54_MarketBooth` | Canonical name; legacy BGA alias `MarketStall` should not be treated as a missing OA card. |
-| `C71_Slurry` | Canonical name; duplicate `SlurrySpreader` is tracked as a registration cleanup in section 2. |
-| `D11_LawnFertilizer` | Canonical name; BGA legacy typo `LawnFertilzer` should not be treated as a missing OA card. |
+| `D159_ReedSeller` | 不缺失。BGA 标记 `implemented=false`，OA 也只保留 data-only 定义。 |
+| `E132_VeggieLover` | canonical 名下已实现并对齐。BGA legacy `E132_Shearer` 不是当前 active card。 |
+| `C54_MarketBooth` | canonical 名；BGA legacy alias `MarketStall` 不应算作 OA 缺卡。 |
+| `C71_Slurry` | canonical 名；重复 `SlurrySpreader` 已作为第 2 节注册清理项追踪。 |
+| `D11_LawnFertilizer` | canonical 名；BGA legacy typo `LawnFertilzer` 不应算作 OA 缺卡。 |
 
-## 8. Required Checks
+## 8. 必跑检查
 
-Run the mechanical metadata audit after card metadata changes:
+改卡牌 metadata 后运行机械审计：
 
 ```bash
 pnpm exec tsx scripts/audit-bga-metadata-diff.ts
 ```
 
-For behavior fixes, run the smallest relevant slow/session test first, then the
-fast suite before opening or updating a PR:
+行为修复优先跑最小相关 slow / session case，再跑 fast suite：
 
 ```bash
 pnpm exec vitest run <targeted-test-file>

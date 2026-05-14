@@ -1,105 +1,94 @@
-# Master Plan
+# 总计划
 
-> Current execution plan only. Completed sprint notes are omitted.
+> 本文只记录当前执行计划；已完成批次说明不在本文保留。
 
-## 1. Objective
+## 1. 目标
 
-Converge Open Agricola card behavior and metadata with BGA where BGA is the
-chosen source of truth, while keeping explicit product-policy differences
-visible and out of the implementation queue.
+在 BGA 被选为规则来源的范围内，收敛 Open Agricola 的卡牌行为与 metadata；同时把明确的产品策略差异单独列出，避免它们混进实现待办。
 
-Current target state:
+当前目标状态：
 
-- Canonical BGA/OA card coverage remains `888 / 888`.
-- Literal metadata mismatches remain `0`.
-- The 11 behavior/registration gaps in `docs/card_progress.md` are closed or
-  explicitly moved to deliberate divergence.
-- BGA-banned cards that OA keeps available remain documented as policy
-  differences, not false-positive bugs.
+- canonical 覆盖维持 `888 / 888`。
+- literal metadata mismatch 维持 `0`。
+- `docs/card_progress.md` 中的 11 个行为 / 注册 gap 被修掉，或明确迁入刻意差异。
+- BGA-banned 但 OA 保留的卡继续作为策略差异记录，不当作 bug。
 
-## 2. Current Work Queue
+## 2. 当前工作队列
 
-| Priority | Cards | Why |
+| 优先级 | 卡牌 | 原因 |
 |---|---|---|
-| P0 | `C71_Slurry` / `C71_SlurrySpreader` | Duplicate registration/name cleanup can leak the wrong legacy card identity. |
-| P0 | `D13_Trowel`, `D15_ClaySupports`, `D66_PotterCeramics` | Renovation/baking payment paths differ from BGA and are core rule flows. |
-| P0 | `A148_Woolgrower`, `B86_TruffleSearcher` | Capacity calculation is wrong when the card is played after earlier harvests. |
-| P1 | `B157_Salter`, `C57_Crudite`, `E5_NightLoot` | Need explicit player choice modeling instead of first-match or single-option shortcuts. |
-| P1 | `C8_PlantFertilizer` | Needs logical field-group support now that relevant later field cards are active. |
-| P2 | `C140_PackagingArtist` | Needs a reusable action-pool extension point for replacement actions. |
+| P0 | `C71_Slurry` / `C71_SlurrySpreader` | 重复注册 / 名称清理可能暴露错误 legacy 卡牌身份。 |
+| P0 | `D13_Trowel`, `D15_ClaySupports`, `D66_PotterCeramics` | 翻修 / 烘焙支付路径和 BGA 不一致，属于核心规则流。 |
+| P0 | `A148_Woolgrower`, `B86_TruffleSearcher` | 晚打出后容量计算错误，会漏算之前的收获阶段。 |
+| P1 | `B157_Salter`, `C57_Crudite`, `E5_NightLoot` | 需要显式玩家选择，不能继续用 first-match 或单选 shortcut。 |
+| P1 | `C8_PlantFertilizer` | D75 / E80 等后续 field 卡已激活，需要支持逻辑 field group。 |
+| P2 | `C140_PackagingArtist` | 需要可复用的 replacement action-pool 扩展点。 |
 
-## 3. Suggested Waves
+## 3. 建议拆分
 
-### Wave A: Local Rule Fixes
+### Wave A：局部规则修复
 
-Scope:
+范围：
 
-- Fix `A148_Woolgrower` and `B86_TruffleSearcher` to use global completed
-  feeding/harvest count.
-- Remove or quarantine duplicate `C71_SlurrySpreader` registration.
-- Fix `D66_PotterCeramics` so the bake continuation is mandatory.
+- `A148_Woolgrower` 和 `B86_TruffleSearcher` 改用全局 completed feeding / harvest 计数。
+- 删除或隔离重复的 `C71_SlurrySpreader` 注册路径。
+- 修复 `D66_PotterCeramics`，让 bake continuation 必选。
 
-Verification:
+验证：
 
-- Targeted session tests for late-play capacity on `A148` and `B86`.
-- Targeted session or unit test proving only canonical `C71_Slurry` is exposed.
-- Targeted session test for mandatory bake after `D66` conversion.
+- `A148` / `B86` 晚打出容量的 targeted session tests。
+- `C71` 只暴露 canonical `Slurry` 的 targeted session 或 unit test。
+- `D66` 转换后必须 bake 的 targeted session test。
 - `pnpm test:fast`
 - `pnpm run lint`
 
-### Wave B: Payment And Renovation Flow
+### Wave B：支付与翻修 flow
 
-Scope:
+范围：
 
-- Model `D13_Trowel` wood-to-stone renovation.
-- Model `D15_ClaySupports` as an alternate payment/trade instead of a mandatory
-  cost delta.
+- 建模 `D13_Trowel` 的 wood -> stone 翻修。
+- 将 `D15_ClaySupports` 建模为 optional alternate payment / trade，而不是强制 cost delta。
 
-Verification:
+验证：
 
-- Targeted session tests for wood-to-stone renovation with `D13`.
-- Targeted payment tests for `D15` base cost plus optional clay trade.
-- Relevant existing renovation/payment tests.
+- `D13` wood -> stone 翻修 targeted session tests。
+- `D15` base cost + optional clay trade targeted payment tests。
+- 相关现有 renovate / payment tests。
 - `pnpm test:fast`
 - `pnpm run lint`
 
-### Wave C: Explicit Choice And Action-Pool Semantics
+### Wave C：显式选择与 Action-Pool 语义
 
-Scope:
+范围：
 
-- Replace `B157_Salter` single-choice flow with multi-type count selection.
-- Convert `C57_Crudite` harvest behavior to an optional explicit source choice.
-- Add exact source-space selection for `E5_NightLoot`.
-- Make `C8_PlantFertilizer` group-aware for grain/vegetable/wood/stone plantings.
-- Add the missing replacement action-pool extension needed by
-  `C140_PackagingArtist`.
+- `B157_Salter` 从单选 flow 改为多类型计数选择。
+- `C57_Crudite` harvest 行为改为 optional source choice。
+- `E5_NightLoot` 增加精确 source-space 选择。
+- `C8_PlantFertilizer` 支持 grain / vegetable / wood / stone 的 field group。
+- 增加 `C140_PackagingArtist` 所需的 replacement action-pool 扩展点。
 
-Verification:
+验证：
 
-- One targeted slow/session test per card first.
-- Add regression cases for multi-listener or multi-option pending where relevant.
-- Run broader slow tests only after targeted cases pass.
+- 每张卡先跑一个 targeted slow / session test。
+- 对涉及 multi-listener 或 multi-option pending 的路径补 regression case。
+- targeted case 通过后再考虑更大的 slow 范围。
 - `pnpm test:fast`
 - `pnpm run lint`
 
-## 4. Documentation Rules
+## 4. 文档规则
 
-For every card-related code change, update:
+每次改卡牌相关代码时，同步更新：
 
-- `docs/card_progress.md`: move fixed cards out of the current queue or adjust
-  accepted-divergence rows.
-- `docs/card_desc_audit.md`: update only when metadata, descriptions, canonical
-  names, or audit counts change.
-- `docs/master-plan.md`: update only when priorities, waves, or remaining scope
-  change.
-- `docs/ARCHITECTURE.md`: update when a reusable engine/action-flow/pending
-  mechanism changes.
+- `docs/card_progress.md`：修复后把卡从当前队列移出，或调整 accepted divergence 行。
+- `docs/card_desc_audit.md`：仅当 metadata、desc、canonical 名称或 audit 数字变化时更新。
+- `docs/master-plan.md`：仅当优先级、wave 拆分或剩余范围变化时更新。
+- `docs/ARCHITECTURE.md`：只有通用 engine / ActionFlow / pending 机制变化时更新。
 
-Do not commit `docs/superpowers/*` unless explicitly requested.
+除非明确要求，不要 commit `docs/superpowers/*`。
 
-## 5. Validation Policy
+## 5. 验证策略
 
-Prefer targeted validation before broad suites:
+优先用 targeted 验证，不先跑大范围 suite：
 
 ```bash
 pnpm exec vitest run <targeted-test-file>
@@ -107,27 +96,24 @@ pnpm test:fast
 pnpm run lint
 ```
 
-Use `pnpm test:slow` selectively for affected session/card flows. Full slow runs
-are useful before major merges, but they should not be the first diagnostic step
-for a single-card regression.
+`pnpm test:slow` 只对受影响的 session / card flow 选择性运行。全量 slow 可以放在大合并前，但不应作为单卡 regression 的第一步诊断。
 
-Run metadata audit after metadata or card registry changes:
+metadata 或 card registry 变化后运行：
 
 ```bash
 pnpm exec tsx scripts/audit-bga-metadata-diff.ts
 ```
 
-## 6. Done Definition
+## 6. 完成定义
 
-This BGA-alignment pass is done when:
+这一轮 BGA 对齐完成的条件：
 
-- `docs/card_progress.md` has zero behavior/registration gaps, or every
-  remaining row is explicitly moved to deliberate divergence.
-- `scripts/audit-bga-metadata-diff.ts` reports:
+- `docs/card_progress.md` 中行为 / 注册 gap 为 0，或所有剩余项都明确迁入刻意差异。
+- `scripts/audit-bga-metadata-diff.ts` 报告：
   - BGA scanned: `888`
   - TS scanned: `888`
   - literal mismatches: `0`
-  - complex/schema-up mismatches: accepted and documented
+  - complex / schema-up mismatches: 已接受并记录
   - BGA-only / TS-only canonical ids: `0 / 0`
-- Targeted tests for every fixed card pass.
-- `pnpm test:fast` and `pnpm run lint` pass before PR merge.
+- 每张修复卡的 targeted tests 通过。
+- PR 合并前 `pnpm test:fast` 和 `pnpm run lint` 通过。
