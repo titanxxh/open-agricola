@@ -21,19 +21,20 @@ const pushSyntheticInteraction = (
   session: GameSession,
   request: InteractionRequest,
   promptKey: string,
+  choices = [{ value: 'confirm', labelKey: 'ui.cursorTestConfirm' }],
 ): void => {
   // Mirror GameCore.startDevFenceSelect's pattern: push a synthetic
   // interaction-only frame whose engine hosts an injected InteractionNode
   // carrying the new-kind request.
   const node = new InteractionNode(
     `interaction:cursor-test-${request.kind}`,
-    [{ value: 'confirm', labelKey: 'ui.cursorTestConfirm' }],
+    choices,
     request,
   )
   // setChoice writes promptKey + choices on the node so snapshot.choiceData
   // captures both alongside the request.
   node.setChoice(promptKey as never, [
-    { value: 'confirm', labelKey: 'ui.cursorTestConfirm' },
+    ...choices,
   ])
 
   const flow: ActionFlow = { type: 'leaf', actionId: INTERACTION_ONLY_ACTION_ID }
@@ -62,6 +63,32 @@ const pushSyntheticInteraction = (
 }
 
 describe('serialization cursor — new InteractionRequest kinds', () => {
+  it('choice envelope choices override request options in session responses', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 5
+    state.roundPhase = 'work'
+    session.loadState(state)
+
+    pushSyntheticInteraction(
+      session,
+      {
+        kind: 'choice',
+        options: [{ value: 'request-only', labelKey: 'ui.requestOnly' }],
+      },
+      'ui.interactionOptionalAction',
+      [{ value: 'envelope-choice', labelKey: 'ui.envelopeChoice' }],
+    )
+
+    const interaction = session.getState().interaction
+    expect(interaction.stateId).toBe('wait')
+    if (interaction.stateId === 'wait') {
+      expect(interaction.options?.map((option) => option.value)).toEqual(['envelope-choice'])
+    }
+  })
+
   it('farm-select kind survives serialize/rehydrate', () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -207,5 +234,11 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
     expect(restoredEnvelope?.request.kind).toBe('card-draft')
     expect(restoredEnvelope?.hostNodeId).toBeTruthy()
+    const restoredInteraction = restored.getState().interaction
+    expect(restoredInteraction.stateId).toBe('wait')
+    if (restoredInteraction.stateId === 'wait') {
+      expect(restoredInteraction.allowedCommands).not.toContain('resolveChoice')
+    }
+    expect(restored.resolveChoice(0, 'confirm').ok).toBe(false)
   })
 })
