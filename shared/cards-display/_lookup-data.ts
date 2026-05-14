@@ -363,7 +363,6 @@ import { C63_CraftBrewery } from './C/C63_CraftBrewery'
 import { C64_CornSchnappsDistillery } from './C/C64_CornSchnappsDistillery'
 import { C67_MineralFeeder } from './C/C67_MineralFeeder'
 import { C71_Slurry } from './C/C71_Slurry'
-import { C71_SlurrySpreader } from './C/C71_SlurrySpreader'
 import { C75_Firewood } from './C/C75_Firewood'
 import { C81_MaterialHub } from './C/C81_MaterialHub'
 import { C8_PlantFertilizer } from './C/C8_PlantFertilizer'
@@ -1077,7 +1076,6 @@ export const minorImprovementCardsList: readonly (MinorImprovementCard | PlayerA
   C63_CraftBrewery,
   C67_MineralFeeder,
   C71_Slurry,
-  C71_SlurrySpreader,
   C72_FestivalPlanning,
   C74_PrivateForest,
   C75_Firewood,

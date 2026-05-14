@@ -11,7 +11,7 @@ import '../B/B94_StockProtector'
 import '../B/B103_FieldMerchant'
 import '../B/B34_SpecialFood'
 import '../C/C60_SmallPottersOven'
-import '../C/C71_SlurrySpreader'
+import '../C/C71_Slurry'
 import '../C/C88_CarpentersApprentice'
 import '../C/C120_AgriculturalLabourer'
 import '../D/D115_FodderPlanter'
@@ -546,13 +546,13 @@ describe('priority plan implementations', () => {
     expect(player.resources.food).toBe(0)
   })
 
-  it('C71 Slurry Spreader returns an optional sow flow after breeding two animal types', () => {
+  it('C71 Slurry returns an optional sow flow after breeding two animal types', () => {
     const player = createPlayer()
-    player.minorPlayed = ['C71_SlurrySpreader']
+    player.minorPlayed = ['C71_Slurry']
     player.resources.grain = 1
     player.fields = [{ row: 0, col: 0, stacks: [] }]
 
-    const result = getCardEffect('C71_SlurrySpreader')?.onEndHarvest?.(
+    const result = getCardEffect('C71_Slurry')?.onEndHarvest?.(
       {
         ...createState(player),
         harvestBreedSummary: {
@@ -570,18 +570,18 @@ describe('priority plan implementations', () => {
       type: 'leaf',
       actionId: 'sow',
       optional: true,
-      promptKey: 'ui.interactionSlurrySpreaderSow',
-      sourceCard: 'C71_SlurrySpreader',
+      promptKey: 'ui.interactionSlurrySow',
+      sourceCard: 'C71_Slurry',
     })
   })
 
-  it('C71 Slurry Spreader does not trigger after breeding only one animal type', () => {
+  it('C71 Slurry does not trigger after breeding only one animal type', () => {
     const player = createPlayer()
-    player.minorPlayed = ['C71_SlurrySpreader']
+    player.minorPlayed = ['C71_Slurry']
     player.resources.grain = 1
     player.fields = [{ row: 0, col: 0, stacks: [] }]
 
-    const result = getCardEffect('C71_SlurrySpreader')?.onEndHarvest?.(
+    const result = getCardEffect('C71_Slurry')?.onEndHarvest?.(
       {
         ...createState(player),
         harvestBreedSummary: {

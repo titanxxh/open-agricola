@@ -7,7 +7,7 @@ import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/B/B70_NewPurchase'
 import '../../shared/cards/A/A166_Haydryer'
 import '../../shared/cards/A/A64_BarleyMill'
-import '../../shared/cards/C/C71_SlurrySpreader'
+import '../../shared/cards/C/C71_Slurry'
 import '../../shared/cards/C/C120_AgriculturalLabourer'
 import '../../shared/cards/D/D99_EarthenwarePotter'
 import '../../shared/cards/D/D115_FodderPlanter'
@@ -218,7 +218,7 @@ describe('stage hook flows', () => {
     expect(gainLog?.params?.gain).toEqual({ clay: 2 })
   })
 
-  it('runs C71_SlurrySpreader through end-harvest sow flow after multi-animal breeding', () => {
+  it('runs C71_Slurry through end-harvest sow flow after multi-animal breeding', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -228,7 +228,7 @@ describe('stage hook flows', () => {
     })
 
     const player = state.players[0]!
-    player.minorPlayed.push('C71_SlurrySpreader')
+    player.minorPlayed.push('C71_Slurry')
     player.resources.food = 10
     player.resources.grain = 1
     player.resources.sheep = 2
@@ -263,7 +263,7 @@ describe('stage hook flows', () => {
     ])
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
-      .toBe('ui.interactionSlurrySpreaderSow')
+      .toBe('ui.interactionSlurrySow')
 
     resp = chooseFirstOption(session, 0)
     expect(resp.interaction.stateId).toBe('wait')

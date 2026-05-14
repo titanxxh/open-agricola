@@ -26,7 +26,7 @@ card desc / metadata 的 literal 层面当前没有差异。剩余工作分两�
 | Canonical 卡牌 | Legacy / alternate source 名称 | 当前处理 |
 |---|---|---|
 | `C54_MarketBooth` | `C54_MarketStall` | 以 `MarketBooth` 为 canonical。 |
-| `C71_Slurry` | `C71_SlurrySpreader` | 以 `Slurry` 为 canonical；TS 重复注册仍是待修项。 |
+| `C71_Slurry` | `C71_SlurrySpreader` | 以 `Slurry` 为 canonical；OA 已删除 legacy wrong-name 条目。 |
 | `D11_LawnFertilizer` | `D11_LawnFertilzer` | 以正确拼写 `LawnFertilizer` 为 canonical。 |
 | `E132_VeggieLover` | `E132_Shearer` | 以 `VeggieLover` 为 canonical。 |
 
@@ -64,8 +64,8 @@ BGA 将这些卡标为 banned / non-standard，但 OA 当前按产品策略保�
 本文件不裁定运行时等价性。当前行为 gap 以 `docs/card_progress.md` 第 2 节为准，目前队列是：
 
 `A148_Woolgrower`, `B86_TruffleSearcher`, `B157_Salter`,
-`C8_PlantFertilizer`, `C57_Crudite`, `C71_Slurry`, `C140_PackagingArtist`,
-`D13_Trowel`, `D15_ClaySupports`, `D66_PotterCeramics`, `E5_NightLoot`.
+`C8_PlantFertilizer`, `C57_Crudite`, `C140_PackagingArtist`, `D13_Trowel`,
+`D15_ClaySupports`, `D66_PotterCeramics`, `E5_NightLoot`.
 
 ## 6. 复现
 
