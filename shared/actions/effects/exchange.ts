@@ -503,7 +503,7 @@ export const anytimeExchangeAction: ActionDefinition = {
 
     return {
       type: 'request' as const,
-      request: { kind: 'choice' as const, options: filtered },
+      request: { kind: 'choice' as const, options: filtered, structuredChoicePrefixes: ['bulk:'] },
       promptKey: 'ui.interactionExchangeChoice',
     }
   },

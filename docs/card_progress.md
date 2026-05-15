@@ -11,13 +11,28 @@
 | canonical 层面 BGA-only / OA-only | 0 / 0 |
 | TypeScript 实体卡牌文件数 | 888 |
 | BGA active implemented 但 OA 缺失 | 0 |
-| 待修行为 / 注册差异 | 10 |
+| 待修行为 / 注册差异 | 9 |
 | metadata schema 上抬差异 | 4 |
 | BGA 标 banned 但 OA 按策略保留 | 33 |
 | 待 owner 确认队列 | 0 |
 
 `C71` 已只保留 canonical `C71_Slurry`。BGA 里的 `C71_SlurrySpreader`
 是 legacy wrong-name 且 `implemented=false`，OA 不再注册或展示该名称。
+`STUB_BeforeBakeGainClay` 是 dev/test stub，不计入 canonical 卡牌统计或普通发牌池。
+
+### 本轮变更记录（2026-05-15）
+
+- `bake-bread` 核心 action 改为默认非空：不再暴露 `cancel`，`cancel` / 空 `bulk:` / 无效 source / 非正 count / 超出 source 上限 / 超出 grain 总量都会在后端失败，且 `bulk:` 失败保持原子性。
+- `D66_PotterCeramics` 已按 BGA before-bake 语义对齐：以 `dispatchMode: 'select'` 暴露 1 clay -> 1 grain 的纯 flow；无 grain 但有 clay + baking source 时可进入 bake，trigger-select 中 D66 enabled、pass disabled，执行 D66 后进入非空 bake。
+- 新增 `STUB_BeforeBakeGainClay` dev/test stub：可通过 devmode `devPlayCard` 加入玩家小改良，before bake 时作为 `dispatchMode: 'select'` trigger 获得 1 clay，用于 UI 复现“同批 before trigger 先拿 clay 再解锁 D66”的路径。
+- `A24_ThreshingBoard` / `C25_SteamMachine` 的可选 bake 来源已迁到外层 `optional` flow，不再依赖 bake 内部 cancel 表达 skip。
+- `C25_SteamMachine` 卡牌实现已改用 display 定义导出的 `CARD_ID`，避免在 listener 与 flow 中重复硬编码卡牌 id 字符串。
+- `C60_SmallPottersOven` 已按 BGA 收敛：`isDoable` 只看玩家能否购买 `Major_ClayOven` / `Major_StoneOven`；before-bake 买炉子 flow 永远 optional，不再在卡牌文件中预演同批 before trigger 链路。
+- bake UI 的 source rate 不再只硬编码 major improvement；`cards-manifest` 暴露 `exchanges` 后，`A60_OrientalFireplace` / `D59_EarthOven` / `E63_IronOven` 等卡牌 bake source 也能显示计数器并提交 `bulk:`。
+- trigger-select 支持动态 enabled / disabled option：不可支付但结构适用的 trigger 仍展示为 disabled，服务器拒绝强行选择；同批 trigger 改变资源后会重新计算 option 状态。
+- trigger-select 的 pass gate 已支持通用 replacement continuation：先检查跳过 before trigger 后原 action 是否可直接继续；不行时检查 `computeReplace` 返回的 `alternativeFlow` 是否有可启动分支，避免 B26 + D66 这类 fencing fallback 被误判为必须触发 D66。
+- `computeReplace` decline 的替代 flow 若本身是 `xor`，引擎会把其 children 作为可选 replacement 分支展开，并给 replacement 分支 leaf 标记 `checkedReplaceAction`，防止 replacement 内部原 action 再次递归替换。
+- structured choice 允许列表从 interaction request metadata 读取；`bake-bread` / `exchange` 的 `bulk:` 不再靠 engine action-id 特判。
 
 ## 2. 待修行为 / 注册差异
 
@@ -33,7 +48,6 @@
 | `C140_PackagingArtist` | 把 Major Improvement action 加入 replacement action pool。 | 实现了 minor replacement / `isDoable`，但没有把 Major Improvement 加进可替换 action pool。 | BGA 允许此卡扩展 replacement action 集合。 | 增加缺失的通用 action-pool 扩展点。 |
 | `D13_Trowel` | 木屋可直接翻修到 stone。 | 当前 renovate-house 路径仍只能 wood -> clay。 | BGA 传入 `toStone=true` 提供 wood -> stone 选项。 | 当此卡激活时，renovate flow 暴露 wood -> stone 选项。 |
 | `D15_ClaySupports` | 提供替代 clay trade，同时保留基础翻修费用语义。 | 当前实现成强制 cost delta。 | BGA 把它建模成可选替代支付，不是强制折扣路径。 | 显式建模 BGA 的 alternate-payment option。 |
-| `D66_PotterCeramics` | clay -> grain 后必须 bake。 | clay 转 grain 后仍可 skip bake。 | BGA 对这个效果强制 bake。 | 把生成的 bake continuation 标记为 mandatory。 |
 | `E5_NightLoot` | 玩家选择具体 accumulation space / resource 来偷取。 | 按所选资源自动取第一个匹配 accumulation space。 | BGA 暴露精确来源选择。 | 交互中加入 source-space 选择。 |
 
 ## 3. Metadata Schema 上抬差异

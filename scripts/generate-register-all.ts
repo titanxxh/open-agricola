@@ -17,7 +17,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 const cardsRoot = path.resolve(process.cwd(), 'shared', 'cards')
-const decks = ['A', 'B', 'C', 'D', 'E', 'major', 'community']
+const decks = ['A', 'B', 'C', 'D', 'E', 'major', 'community', '__stubs__']
 
 const imports: string[] = []
 const entries: string[] = []

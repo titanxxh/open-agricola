@@ -15,7 +15,12 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || !TRIGGER_SPACES.has(context.space.id)) return
     return {
-      followUpActions: [{ actionId: 'bake-bread', sourceCard: CARD_ID }],
+      flow: {
+        type: 'leaf',
+        actionId: 'bake-bread',
+        optional: true,
+        sourceCard: CARD_ID,
+      },
       sourceCard: CARD_ID,
     }
   },
