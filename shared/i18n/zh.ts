@@ -548,10 +548,6 @@ export const zh = {
       description: '花费 1 名农夫',
           name: '花费农夫',
 },
-    'take-from-space': {
-      description: '从 {action_space} 拿取 {resources_desc}',
-          name: '从行动格拿取',
-},
 },
   improvements: {
     Major_Fireplace1: { name: '壁炉', description: '烤面包：1 谷物 → 2 食物' },
@@ -883,9 +879,8 @@ export const zh = {
     renovationFail: '翻修失败',
     reorganizeFail: '重组失败：缺少区域数据',
     specialEffectFail: '特殊效果失败',
-    takeFromSpaceInvalid: '从行动格拿取资源无效',
-    takeFromSpaceNoSpace: '没有可拿取资源的行动格',
-    takeFromSpaceNotEnough: '行动格资源不足',
+    collectNoSpace: '没有可拿取资源的行动格',
+    collectNotEnough: '行动格资源不足',
   },
   platform: {
     loading: '加载中...',

@@ -24,7 +24,6 @@ import { returnToSpaceAction } from './effects/internal/return-to-space'
 import { bonusVpAction } from './effects/bonus-vp'
 import { breedAction } from './effects/breed'
 import { takeFromCardAction } from './effects/internal/take-from-card'
-import { takeFromSpaceAction } from './effects/internal/take-from-space'
 import { emitChoiceAction } from './effects/internal/emit-choice'
 import { recallPlacedWorkerAction } from './effects/internal/recall-placed-worker'
 import { reserveFenceBonusAction } from './effects/internal/reserve-fence-bonus'
@@ -64,7 +63,6 @@ export const internalActionDefinitions: ActionDefinition[] = [
   bonusVpAction,
   breedAction,
   takeFromCardAction,
-  takeFromSpaceAction,
   emitChoiceAction,
   recallPlacedWorkerAction,
   reserveFenceBonusAction,
