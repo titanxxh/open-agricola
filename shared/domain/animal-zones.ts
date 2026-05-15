@@ -103,8 +103,10 @@ export const getAssignedAnimalCount = (player: PlayerState) => {
 }
 
 /** Total animal capacity across all zones. */
-export const getTotalAnimalCapacity = (player: PlayerState) =>
-  computeAnimalZones(player).reduce((sum, zone) => sum + zone.capacity, 0)
+export const getTotalAnimalCapacity = (
+  player: PlayerState,
+  state: GameState = {} as GameState,
+) => computeAnimalZones(player, state).reduce((sum, zone) => sum + zone.capacity, 0)
 
 const expandZoneToMeeples = (zone: AnimalZone): Meeple[] => {
   const type = zone.animalType
@@ -148,8 +150,11 @@ export const computeInvalidAnimalsForZone = (
  * **MUTATES** `player.pastures`, `player.houseAnimal*`,
  * `player.stableAnimals`, and the per-type counters in `player.resources`.
  */
-export const enforceAnimalCapacity = (player: PlayerState) => {
-  const zones = computeAnimalZones(player)
+export const enforceAnimalCapacity = (
+  player: PlayerState,
+  state: GameState = {} as GameState,
+) => {
+  const zones = computeAnimalZones(player, state)
   const zoneCapacity = (id: string) => zones.find((z) => z.id === id)?.capacity ?? 0
 
   const totals = {
@@ -285,11 +290,10 @@ export const enforceAnimalCapacity = (player: PlayerState) => {
   // animal type, C12 CattleFarm dynamic-cap = pasture count). Concrete
   // resource adjustment on hook violations is per-card; the helper only
   // surfaces the invalid list so cards can react in their own listeners.
-  const zonesForHook = computeAnimalZones(player)
-  const stateStub = {} as GameState
+  const zonesForHook = computeAnimalZones(player, state)
   for (const zone of zonesForHook) {
     if (zone.zoneType !== 'card') continue
-    computeInvalidAnimalsForZone(stateStub, player, zone)
+    computeInvalidAnimalsForZone(state, player, zone)
   }
 }
 
@@ -331,7 +335,7 @@ export class AnimalZones {
 
   /** Total capacity across all zones (used for room-for-X questions). */
   totalCapacity(): number {
-    return getTotalAnimalCapacity(this.player)
+    return getTotalAnimalCapacity(this.player, this.state)
   }
 
   /**
@@ -352,7 +356,7 @@ export class AnimalZones {
    * `player.stableAnimals`, and the per-type counters in `player.resources`.
    */
   enforceCapacity(): void {
-    enforceAnimalCapacity(this.player)
+    enforceAnimalCapacity(this.player, this.state)
   }
 
   /** Capacity of a specific pasture zone (0 if not a pasture). */
