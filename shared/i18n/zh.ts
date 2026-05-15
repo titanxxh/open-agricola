@@ -1191,7 +1191,7 @@ export const zh = {
       anytime: '曼陀林：付1食物 → 获1蔬菜',
     },
     C57_Crudite: {
-      anytime: '蔬菜拼盘：付1食物 → 获1食物',
+      anytime: '蔬菜拼盘：弃田中蔬菜 → 获4食物',
     },
     C64_CornSchnappsDistillery: {
       anytime: '玉米烧酒厂：付1谷物 → 获1食物',
