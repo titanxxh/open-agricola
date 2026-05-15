@@ -1,5 +1,21 @@
-import { defineConfig, defaultExclude, mergeConfig } from 'vitest/config'
+import { defineConfig, mergeConfig } from 'vitest/config'
 import viteConfig from './vite.config'
+import {
+  BASE_EXCLUDE,
+  FAST_CARD_RUNTIME_INCLUDE,
+  FAST_CARDS_INCLUDE,
+  FAST_CLIENT_INCLUDE,
+  FAST_EXCLUDE,
+  FAST_SCRIPTS_INCLUDE,
+  FAST_SERVER_INCLUDE,
+  FAST_SHARED_EXCLUDE,
+  FAST_SHARED_INCLUDE,
+  FAST_TESTS_EXCLUDE,
+  FAST_TESTS_INCLUDE,
+  LLM_INCLUDE,
+  SHARED_EXCLUDE,
+  SLOW_INCLUDE,
+} from './scripts/test-project-globs'
 
 // React component tests under client/ that touch the DOM (use @testing-library/react's
 // `render()`, expect `document`/`window`, etc.) MUST opt in to jsdom by adding this pragma
@@ -12,39 +28,6 @@ import viteConfig from './vite.config'
 // Static-render tests using `renderToStaticMarkup` from `react-dom/server` do NOT need
 // the pragma (e.g. client/components/common/__tests__/PlayerCard.test.tsx).
 
-// Per-card session tests (server/__tests__/<Deck><Number>_<Name>-session.test.ts)
-// are heavy and live in the `slow` project. The default CI runs `--project fast`;
-// the daily `CI Full` workflow runs everything. See
-// docs/superpowers/specs/2026-04-23-ci-test-tiering-design.md for the rationale.
-const SLOW_INCLUDE = ['server/__tests__/[A-E][0-9]*_*-session.test.ts']
-const FAST_INCLUDE = [
-  'shared/**/*.test.ts',
-  'shared/**/*.test.tsx',
-  'client/**/*.test.ts',
-  'client/**/*.test.tsx',
-  'tests/**/*.test.ts',
-  'scripts/**/__tests__/*.test.ts',
-  'server/__tests__/*.test.ts',
-  'server/game/**/__tests__/*.test.ts',
-  'server/connection/**/__tests__/*.test.ts',
-  'server/workshop-pr/__tests__/*.test.ts',
-]
-const BASE_EXCLUDE = [...defaultExclude, '**/.worktree/**']
-// LLM tests are manual-only via `pnpm test:llm` or the workflow_dispatch-only
-// LLM workflow. Excluded from fast + slow project includes so
-// `pnpm test:fast`, `pnpm test:slow` never trigger LLM calls. `pnpm test`
-// (no --project flag) iterates all projects — the llm project's
-// describe.skipIf detects no API key and skips quietly.
-const LLM_GLOB = 'tests/llm-card-gen/**'
-const SHARED_EXCLUDE = [...BASE_EXCLUDE, LLM_GLOB]
-const FAST_EXCLUDE = [...SHARED_EXCLUDE, ...SLOW_INCLUDE]
-const LLM_INCLUDE = ['tests/llm-card-gen/**/*.test.ts']
-const SHARED_SETUP = [
-  './shared/cards/__tests__/setup-register-all.ts',
-  './client/__tests__/setup-card-manifest.ts',
-  './client/__tests__/setup.ts',
-]
-
 export default mergeConfig(
   viteConfig,
   defineConfig({
@@ -54,15 +37,71 @@ export default mergeConfig(
       // can opt back in by setting its own exclude that doesn't drop LLM
       // tests. Per-project excludes below add LLM_GLOB where needed.
       exclude: BASE_EXCLUDE,
-      setupFiles: SHARED_SETUP,
       projects: [
         {
           extends: true,
           test: {
-            name: 'fast',
-            include: FAST_INCLUDE,
+            name: 'fast-shared',
+            include: FAST_SHARED_INCLUDE,
+            exclude: FAST_SHARED_EXCLUDE,
+            setupFiles: [],
+          },
+        },
+        {
+          extends: true,
+          test: {
+            name: 'fast-cards',
+            include: FAST_CARDS_INCLUDE,
             exclude: FAST_EXCLUDE,
-            setupFiles: SHARED_SETUP,
+            setupFiles: ['./shared/cards/__tests__/setup-register-all.ts'],
+          },
+        },
+        {
+          extends: true,
+          test: {
+            name: 'fast-card-runtime',
+            include: FAST_CARD_RUNTIME_INCLUDE,
+            exclude: FAST_EXCLUDE,
+            setupFiles: ['./shared/cards/__tests__/setup-register-all.ts'],
+          },
+        },
+        {
+          extends: true,
+          test: {
+            name: 'fast-client',
+            include: FAST_CLIENT_INCLUDE,
+            exclude: FAST_EXCLUDE,
+            setupFiles: [
+              './client/__tests__/setup.ts',
+              './client/__tests__/setup-card-manifest.ts',
+            ],
+          },
+        },
+        {
+          extends: true,
+          test: {
+            name: 'fast-server',
+            include: FAST_SERVER_INCLUDE,
+            exclude: FAST_EXCLUDE,
+            setupFiles: ['./shared/cards/__tests__/setup-register-all.ts'],
+          },
+        },
+        {
+          extends: true,
+          test: {
+            name: 'fast-scripts',
+            include: FAST_SCRIPTS_INCLUDE,
+            exclude: FAST_EXCLUDE,
+            setupFiles: [],
+          },
+        },
+        {
+          extends: true,
+          test: {
+            name: 'fast-tests',
+            include: FAST_TESTS_INCLUDE,
+            exclude: FAST_TESTS_EXCLUDE,
+            setupFiles: ['./shared/cards/__tests__/setup-register-all.ts'],
           },
         },
         {
@@ -71,7 +110,7 @@ export default mergeConfig(
             name: 'slow',
             include: SLOW_INCLUDE,
             exclude: SHARED_EXCLUDE,
-            setupFiles: SHARED_SETUP,
+            setupFiles: ['./shared/cards/__tests__/setup-register-all.ts'],
           },
         },
         {
@@ -80,7 +119,7 @@ export default mergeConfig(
             name: 'llm',
             include: LLM_INCLUDE,
             exclude: BASE_EXCLUDE,
-            setupFiles: SHARED_SETUP,
+            setupFiles: [],
           },
         },
       ],
