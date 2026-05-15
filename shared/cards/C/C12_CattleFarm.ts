@@ -6,7 +6,7 @@ const CARD_ID = C12_CattleFarm.id
 export const C12_CattleFarm_impl = {
   effect: {
     id: CARD_ID,
-    onComputeAnimalZones: (player, zones) => {
+    onComputeAnimalZones: (player, zones, _state) => {
       const pastureCount = player.pastures.length
       if (pastureCount === 0) return
       zones.push({

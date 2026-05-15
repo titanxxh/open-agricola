@@ -566,7 +566,6 @@ import { D154_ChimneySweep_impl } from './D/D154_ChimneySweep'
 import { D156_RetailDealer_impl } from './D/D156_RetailDealer'
 import { D157_PartyOrganizer_impl } from './D/D157_PartyOrganizer'
 import { D158_BeanCounter_impl } from './D/D158_BeanCounter'
-import { D15_ClaySupports_impl } from './D/D15_ClaySupports'
 import { D160_Midwife_impl } from './D/D160_Midwife'
 import { D161_CabbageBuyer_impl } from './D/D161_CabbageBuyer'
 import { D162_ClayFirer_impl } from './D/D162_ClayFirer'
@@ -837,6 +836,7 @@ import { E98_Prodigy_impl } from './E/E98_Prodigy'
 import { E99_UncaringParents_impl } from './E/E99_UncaringParents'
 import { E9_BarteringHut_impl } from './E/E9_BarteringHut'
 import { CUSTOM_FixtureHarvester_impl } from './community/CUSTOM_FixtureHarvester'
+import { STUB_BeforeBakeGainClay_impl } from './__stubs__/STUB_BeforeBakeGainClay'
 
 export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'A100_Curator': A100_Curator_impl,
@@ -1395,7 +1395,6 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'D156_RetailDealer': D156_RetailDealer_impl,
   'D157_PartyOrganizer': D157_PartyOrganizer_impl,
   'D158_BeanCounter': D158_BeanCounter_impl,
-  'D15_ClaySupports': D15_ClaySupports_impl,
   'D160_Midwife': D160_Midwife_impl,
   'D161_CabbageBuyer': D161_CabbageBuyer_impl,
   'D162_ClayFirer': D162_ClayFirer_impl,
@@ -1666,6 +1665,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'E99_UncaringParents': E99_UncaringParents_impl,
   'E9_BarteringHut': E9_BarteringHut_impl,
   'CUSTOM_FixtureHarvester': CUSTOM_FixtureHarvester_impl,
+  'STUB_BeforeBakeGainClay': STUB_BeforeBakeGainClay_impl,
 }
 
 export type AllCardImpls = typeof ALL_CARD_IMPLS

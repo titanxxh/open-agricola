@@ -41,7 +41,10 @@ const makePlayer = (override: Partial<PlayerState> = {}): PlayerState =>
     stables: 0,
     rooms: 2,
     houseType: 'wood',
-    workers: 2,
+    workers: [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '2', isActive: true, isNewborn: false },
+    ],
     ...override,
   } as unknown as PlayerState)
 
@@ -81,7 +84,7 @@ describe('applyImprovementAction', () => {
     const player = makePlayer()
     const state = makeState({ availableMajorImprovements: ['Major_Fireplace1', 'Major_StoneOven'] })
     const result = applyImprovementAction.execute(
-      ctx(player, state, { improvementId: 'Major_Fireplace1', kind: 'major', suppressOnBuyEffects: true }),
+      ctx(player, state, { improvementId: 'Major_Fireplace1', kind: 'major' }),
     )
     expect(result.type === 'ok' || result.type === 'flow').toBe(true)
     expect(player.improvements).toContain('Major_Fireplace1')
@@ -92,7 +95,7 @@ describe('applyImprovementAction', () => {
     const player = makePlayer({ minorHand: ['A4_Baseboards', 'OtherMinor'] })
     const state = makeState()
     const result = applyImprovementAction.execute(
-      ctx(player, state, { improvementId: 'A4_Baseboards', kind: 'minor', suppressOnBuyEffects: true }),
+      ctx(player, state, { improvementId: 'A4_Baseboards', kind: 'minor' }),
     )
     expect(result.type === 'ok' || result.type === 'flow').toBe(true)
     expect(player.minorHand).not.toContain('A4_Baseboards')

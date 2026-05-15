@@ -11,6 +11,7 @@ import '../B/B94_StockProtector'
 import '../B/B103_FieldMerchant'
 import '../B/B34_SpecialFood'
 import '../C/C60_SmallPottersOven'
+import { C60_SmallPottersOven } from '../../cards-display/C/C60_SmallPottersOven'
 import '../C/C71_Slurry'
 import '../C/C88_CarpentersApprentice'
 import '../C/C120_AgriculturalLabourer'
@@ -348,18 +349,17 @@ describe('priority plan implementations', () => {
     expect(state.availableMajorImprovements).toContain('Major_ClayOven')
     if (result.type !== 'flow') return
     expect(result.flow).toMatchObject({
-      type: 'seq',
-      children: [
-        {
-          type: 'leaf',
-          actionId: 'gain',
-          sourceCard: 'C60_SmallPottersOven',
-          params: { food: 5 },
-        },
-      ],
+      type: 'leaf',
+      actionId: 'gain',
+      sourceCard: 'C60_SmallPottersOven',
+      params: { food: 5 },
     })
     expect(player.resources.food).toBe(0)
     expect(player.resources.clay).toBe(0)
+  })
+
+  it('C60 Small Potter\'s Oven does not encode oven return as returnCards metadata', () => {
+    expect(C60_SmallPottersOven.returnCards).toBeUndefined()
   })
 
   it('C60 Small Potter\'s Oven asks which oven to return when both match', () => {
@@ -371,44 +371,31 @@ describe('priority plan implementations', () => {
 
     const result = playImprovement(state, player, 'C60_SmallPottersOven', 'minor')
 
-    expect(result.type).toBe('request')
-    if (result.type !== 'request') return
-    expect(result.request.kind).toBe('choice')
-    if (result.request.kind !== 'choice') return
-    expect(result.promptKey).toBe('prompt.selectPayment')
-    expect(result.request.options).toHaveLength(2)
-    expect(result.request.options.map((option) => option.value)).toEqual([
-      'pay:minor:C60_SmallPottersOven:0',
-      'pay:minor:C60_SmallPottersOven:1',
-    ])
-    expect(result.request.options.map((option) => option.labelParams)).toMatchObject([
-      { resourcesPaid: { clay: 2 }, cardUsed: 'Major_ClayOven' },
-      { resourcesPaid: { clay: 2 }, cardUsed: 'Major_StoneOven' },
-    ])
-  })
-
-  it('C60 Small Potter\'s Oven returns the specifically selected oven before onBuy gain flow', () => {
-    const player = createPlayer()
-    player.minorHand = ['C60_SmallPottersOven']
-    player.improvements = ['Major_ClayOven', 'Major_StoneOven']
-    player.resources.clay = 2
-    const state = createState(player)
-
-    const result = playImprovement(
-      state,
-      player,
-      'pay:minor:C60_SmallPottersOven:1',
-      'minor',
-    )
-
     expect(result.type).toBe('flow')
-    expect(player.improvements).toContain('Major_ClayOven')
-    expect(player.improvements).not.toContain('Major_StoneOven')
-    expect(state.availableMajorImprovements).toContain('Major_StoneOven')
     if (result.type !== 'flow') return
     expect(result.flow).toMatchObject({
       type: 'seq',
       children: [
+        {
+          type: 'xor',
+          promptKey: 'ui.interactionSmallPottersOvenReturn',
+          children: [
+            {
+              type: 'leaf',
+              actionId: 'special-effect',
+              sourceCard: 'C60_SmallPottersOven',
+              choiceLabelKey: 'improvements.Major_ClayOven.name',
+              params: { kind: 'return-card-to-board', cardId: 'Major_ClayOven' },
+            },
+            {
+              type: 'leaf',
+              actionId: 'special-effect',
+              sourceCard: 'C60_SmallPottersOven',
+              choiceLabelKey: 'improvements.Major_StoneOven.name',
+              params: { kind: 'return-card-to-board', cardId: 'Major_StoneOven' },
+            },
+          ],
+        },
         {
           type: 'leaf',
           actionId: 'gain',
@@ -439,9 +426,13 @@ describe('priority plan implementations', () => {
     expect(result?.flow).toMatchObject({
       type: 'leaf',
       actionId: 'improvement-any',
+      optional: true,
       params: {
         allowedPurchases: ['Major_ClayOven'],
-        suppressOnBuyEffects: true,
+        trueAction: false,
+      },
+      actionContext: {
+        trueAction: false,
       },
       sourceCard: 'C60_SmallPottersOven',
     })

@@ -211,6 +211,7 @@ export const zh = {
     interactionFlowDone: '完成',
     interactionSelectTrigger: '选择要先结算的卡牌效果',
     interactionSelectTriggerPass: '跳过剩余',
+    interactionTriggerUnavailable: '当前条件不足',
     interactionFarmExpansionSelect: '选择扩建动作',
     interactionPlowSelect: '选择要开垦的田地',
     interactionPlowConfirm: '确认开垦',
@@ -267,6 +268,7 @@ export const zh = {
     interactionWoodBartererSkip: '跳过',
     interactionAleBenches: '酒凳：支付 1 谷物获得 1 加分。若你这样做，每位其他玩家获得 1 食物？',
     interactionSmallPottersOvenBuild: '小陶工炉：在烤面包前建造黏土烤炉或石制烤炉？',
+    interactionSmallPottersOvenReturn: '小陶工炉：归还哪个烤炉？',
     interactionAgrarianFencesBakeAndFence: '烤面包并建造围栏',
     interactionAgrarianFencesSowAndFence: '播种并建造围栏',
     interactionBellfounder: '铸钟人：弃掉所有黏土换 3 食物或 1 奖励分？',
@@ -546,10 +548,6 @@ export const zh = {
     'spend-worker': {
       description: '花费 1 名农夫',
           name: '花费农夫',
-},
-    'take-from-space': {
-      description: '从 {action_space} 拿取 {resources_desc}',
-          name: '从行动格拿取',
 },
 },
   improvements: {
@@ -882,9 +880,9 @@ export const zh = {
     renovationFail: '翻修失败',
     reorganizeFail: '重组失败：缺少区域数据',
     specialEffectFail: '特殊效果失败',
-    takeFromSpaceInvalid: '从行动格拿取资源无效',
-    takeFromSpaceNoSpace: '没有可拿取资源的行动格',
-    takeFromSpaceNotEnough: '行动格资源不足',
+    collectNoSpace: '没有可拿取资源的行动格',
+    collectNotEnough: '行动格资源不足',
+    collectInvalidPartial: '部分拿取资源参数无效',
   },
   platform: {
     loading: '加载中...',
@@ -1136,6 +1134,7 @@ export const zh = {
     },
     A39_Chapel: { name: '教堂', desc: '获得 3 额外分。其他人需付 1 谷物给主人。' },
     A162_ForestTallyman: { name: '森林记录员', desc: '当森林+泥坑都被占用时：获得 2 黏土 + 3 木。' },
+    STUB_BeforeBakeGainClay: { name: '测试：烤面包前得黏土', desc: '测试 stub：烤面包前获得 1 黏土。' },
     D122_ClayCarrier: { anytime: '搬黏土工：付2食物 → 获2黏土' },
     E86_PenBuilder: { anytime: '围栏工：付1木材 → 动物容量+2' },
     A102_Grocer: { anytime: '杂货商：付1食物 → 购买顶部商品' },
@@ -1222,7 +1221,8 @@ export const zh = {
       anytime: '使者：付1食物 → 获1食物',
     },
     D13_Trowel: {
-      anytime: '泥刀：付1食物 → 获1黏土',
+      anytime: '泥刀：升级到石屋',
+      optionStone: '升级到石屋',
     },
     D46_PelletPress: {
       anytime: '颗粒压榨机：付1木材 → 获1食物',

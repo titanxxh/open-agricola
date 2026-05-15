@@ -1,16 +1,29 @@
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { Resource } from '../../contract/types'
+import type { ActionFlow } from '../../contract/types'
 import { getMajorCard } from '../major'
 import { PaymentSolver } from '../../actions/payment'
 import type { PaymentCtx } from '../../actions/payment'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { returnCardToBoard } from '../helpers/return-card'
 import type { CardImpl } from '../registry'
 import { C60_SmallPottersOven } from '../../cards-display/C/C60_SmallPottersOven'
 
 const CARD_ID = C60_SmallPottersOven.id
 
 const OVEN_IDS = ['Major_ClayOven', 'Major_StoneOven'] as const
+type OvenId = (typeof OVEN_IDS)[number]
+
+const getReturnableOvens = (player: CardListenerContext['player']) =>
+  OVEN_IDS.filter((id) => player.improvements.includes(id))
+
+const returnOvenLeaf = (id: OvenId): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: CARD_ID,
+  choiceLabelKey: `improvements.${id}.name`,
+  params: { kind: 'return-card-to-board', cardId: id },
+})
 
 const getAvailableOvenChoices = (context: CardListenerContext) => {
   const playerIdx = context.state.players.indexOf(context.player)
@@ -40,8 +53,9 @@ const beforeBakeListener: CardListenerRegistration = {
         sourceCard: CARD_ID,
         params: {
           allowedPurchases,
-          suppressOnBuyEffects: true,
-        } as unknown as Partial<Resource>,
+          trueAction: false,
+        },
+        actionContext: { trueAction: false },
       },
       sourceCard: CARD_ID,
     }
@@ -55,26 +69,36 @@ const isDoableListener: CardListenerRegistration = {
   actions: ['bake-bread'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
-    if (getAvailableOvenChoices(context).length > 0) {
-      return { doable: true }
-    }
+    const allowedPurchases = getAvailableOvenChoices(context)
+    if (allowedPurchases.length === 0) return
+    return { doable: true }
   },
 }
 
 export const C60_SmallPottersOven_impl = {
+  prerequisiteCheck: (player) => getReturnableOvens(player).length > 0,
   listeners: [beforeBakeListener, isDoableListener],
   effect: {
-  id: CARD_ID,
-  onBuy: (_state, _player, paymentInfo) => {
-    if (!paymentInfo?.returnedCardId) return
-    if (!OVEN_IDS.includes(paymentInfo.returnedCardId as (typeof OVEN_IDS)[number])) {
-      return
-    }
-    return {
-      type: 'seq',
-      children: [gainLeaf(CARD_ID, { food: 5 })],
-    }
+    id: CARD_ID,
+    onBuy: (state, player) => {
+      const ovens = getReturnableOvens(player)
+      if (ovens.length === 0) return
+      if (ovens.length === 1) {
+        returnCardToBoard(player, ovens[0]!, state)
+        return gainLeaf(CARD_ID, { food: 5 })
+      }
+      return {
+        type: 'seq',
+        children: [
+          {
+            type: 'xor',
+            promptKey: 'ui.interactionSmallPottersOvenReturn',
+            children: ovens.map(returnOvenLeaf),
+          },
+          gainLeaf(CARD_ID, { food: 5 }),
+        ],
+      }
+    },
   },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl

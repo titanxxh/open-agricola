@@ -2,7 +2,8 @@
 /**
  * Build cards manifest for lazy loading.
  *
- * Scans shared/cards/{A,B,C,D,E,major}/*.ts and extracts meta fields
+ * Scans shared/cards-display/{A,B,C,D,E,major}/*.ts plus dev/test stubs in
+ * shared/cards/__stubs__/*.ts and extracts meta fields
  * from each card's constructor call (Occupation / MinorImprovement /
  * MajorImprovement / PlayerActionCard) and from major-literal exports
  * (`export const x: MajorCardData = {...}`).
@@ -27,6 +28,12 @@ export type CardMeta = {
   desc?: string[]
   cost?: Record<string, number>
   altCosts?: Record<string, number>[]
+  exchanges?: Array<{
+    from: Record<string, number>
+    to: Record<string, number>
+    max?: number
+    triggers?: string[]
+  }>
   players?: string
   prerequisite?: unknown
   vp?: number
@@ -47,7 +54,7 @@ export type CardsManifest = Record<string, CardManifestEntry>
 
 const META_FIELDS = new Set([
   'id', 'name', 'deck', 'number', 'category', 'desc',
-  'cost', 'altCosts', 'players', 'prerequisite', 'vp',
+  'cost', 'altCosts', 'exchanges', 'players', 'prerequisite', 'vp',
   'isCookery', 'isBaking', 'passing', 'returnCards', 'alsoCountsAs',
 ])
 
@@ -274,9 +281,8 @@ export function buildCardsManifest(cardsRoot: string): CardsManifest {
   const manifest: CardsManifest = {}
   const decks = ['A', 'B', 'C', 'D', 'E', 'major']
   const repoRoot = path.resolve(cardsRoot, '..', '..')
-  for (const deck of decks) {
-    const deckDir = path.join(cardsRoot, deck)
-    if (!fs.existsSync(deckDir)) continue
+  const scanDir = (deckDir: string) => {
+    if (!fs.existsSync(deckDir)) return
     const files = fs.readdirSync(deckDir).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
     for (const file of files) {
       const filePath = path.join(deckDir, file)
@@ -294,6 +300,10 @@ export function buildCardsManifest(cardsRoot: string): CardsManifest {
       }
     }
   }
+  for (const deck of decks) {
+    scanDir(path.join(cardsRoot, deck))
+  }
+  scanDir(path.join(repoRoot, 'shared', 'cards', '__stubs__'))
   return manifest
 }
 

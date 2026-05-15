@@ -14,6 +14,7 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.trueAction === false) return
     const placements = getRoundPlacementDetails(context.player)
     if (placements.length !== 2) return
 

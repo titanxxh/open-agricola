@@ -102,9 +102,9 @@ e2e-tests/     Playwright 浏览器测试
 ```
 
 ESLint 三层强制（`eslint.config.js`）：
-- `client/{app,components,services,hooks,contexts,utils}/**` 禁 import `shared/{engine,session,actions,cards,custom-code,draft}/**`
+- `client/{app,components,services,hooks,contexts,utils}/**` 禁 import `shared/session`、`shared/engine`、card catalog/bootstrap/register-all 和 per-card impl modules；UI metadata 必须走 `shared/cards-display/**` 或 `client/services/card-meta`
 - `client/sandbox/**` 全开
-- 附加 `no-restricted-syntax` 禁动态 `import('shared/session/...')` 字面量绕过
+- 附加 `no-restricted-syntax` 禁动态 `import('shared/session/...')` / `import('shared/engine/...')` / card impl-bootstrap 字面量绕过
 - violation = CI error
 
 ---
@@ -139,10 +139,13 @@ ESLint 三层强制（`eslint.config.js`）：
   availableMajorImprovements: string[],
   futureMeeples, pendingFutureMeeples,
   workPhaseObtainedResources: Record<string, Partial<Resource>>,
+  completedFeedingPhases: number,    // 已完成的收获 feeding phase 数；A148/B86 等卡读取
 }
 ```
 
 `workPhaseObtainedResources` 服务于"前一工作阶段获得资源"类卡（A53 等），回家阶段结算后清空。
+
+`completedFeedingPhases` 在 `shared/session/phases/harvest.ts` 的 feeding phase 结束时 `+= 1`，等价于 BGA Globals 同款全局计数；A148/B86 等"按已完成收获 +1 容量"卡牌从此字段读取，避免再走 per-card post-play counter。
 
 `SerializedGameState` 是 `GameState` 的 JSON 网络/持久化形态，额外携带 `engineStack: EngineStackCursor` 便于跨进程恢复引擎光标。同步版本号 / 历史 / 房间连接 **不进** `GameState`。
 
@@ -478,6 +481,8 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 
 `shared/actions/index.ts` 硬编码导入 base + internal effect 文件，构建 `actionDefinitionLookup`。每个文件一个 action。**禁止在单 effect 文件里堆叠多卡逻辑**（CLAUDE.md 明令）。
 
+`collect` 是 accumulation-space partial-take 的统一入口，接受可选 `actionContext: { spaceId?, resource?, amount? }`。`spaceId` 用于指向非当前 action space（卡牌效果触发的偷取场景）；`resource` + `amount` 用于 partial-take（不全取空一格）。旧的 `take-from-space` internal action 已删除并迁移到 `collect`，相关 i18n key 一并清理。
+
 ### 7.4 payment/
 
 `shared/actions/payment/`：
@@ -489,6 +494,8 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 - `cache.ts` —— solution cache
 
 对外通过 `pay-helpers.ts` / `room-payment.ts` 暴露统一入口。卡牌购买费用走 `computeCosts` phase + `actions: ['improvement-any']` 区分行动空间费用 vs 卡牌购买费用。
+
+**Trade modifiers**：`TradeModifier` 描述"用 X 资源换 Y 资源（可选 max）"的 alternate payment。`buildTradeFees`（`room-payment.ts`）支持多键 `to`，把 base cost 的多个 key（例如 D15 `{5 clay, 2 reed}`）按比例展开成 PaymentSolver 期望的形状。`TradeModifier.conditions?: Record<string, number>` 用于按玩家状态 gating trade，支持 `houseTypeWood` / `houseTypeClay` / `houseTypeStone` / `minNumRooms`（在 `cost-modifiers.ts` 的 `evaluateConditions` 统一过滤）。典型用例：D15_ClaySupports clay→reed trade 仅当 `houseTypeClay > 0` 时生效。
 
 ### 7.5 Hook 系统：行动生命周期 phase（11 个）
 
@@ -509,7 +516,22 @@ anytime                  额外注册的 anytime 行动
 
 `sourceCard` 兜底：`ActionHookResult.flow` 顶层 `sourceCard` 递归补到缺失 child leaf；组合 pending / leaf request 写入 `PendingEnvelope.sourceCard`，`SessionCore` 透传到 `interaction`。
 
-作用域 scope：`player` / `opponent` / `any`。同 phase 内按 `order` → `id` 排序，同步、确定性。
+### 7.5.1 Public ActionNode 执行顺序
+
+普通 public action leaf 进入 engine 后按以下顺序处理：
+
+1. `computeReplace` 最先运行，早于 `isDoable` / `computeCosts` / `before`。`HookDispatcher.applyComputeReplace()` 先跑 action hook replacement，再跑匹配的 card listener `phase='computeReplace'`。
+2. 如果 `computeReplace` 只替换 `actionId`，后续所有阶段都使用替换后的 `actionId` 继续。
+3. 如果 `computeReplace` 返回 `decline + alternativeFlow`，当前 leaf 立即 resolve；engine 在其后插入一个 `xor(replacement branches..., original fallback)`，本轮返回。此时 original action 的 `before` listener 尚未运行。
+4. 玩家选择 replacement 分支后，分支中的每个 leaf 都作为普通 action 重新进入本流水线。replacement 分支 leaf 只携带 `skipComputeReplaceListenerIds` 跳过产生该 replacement 的 listener，不携带 `checkedReplaceAction`，因此真实替代行动仍会触发普通 `before` / `during` / `after` listener。original fallback leaf 携带 `checkedReplaceAction=true`，表示该 root action 已经检查过 replacement。
+5. 没有 decline replacement 后，engine 执行 `isDoable`：base `canBeExecutedByPlayer` → costPreview → action hook `isDoable` → card listener `isDoable`。
+6. 然后执行 `computeCosts`，把费用覆盖写入本次 `executionContext.costs`。
+7. 然后才执行 `before` card listener dispatch。匹配到的 listener 被编译成 internal `activate-card` leaf，并插入在原 action leaf 前面；`dispatchMode: 'select'` 的同组 listener 会包成 `ParallelNode(mode='trigger-select')` 让玩家选择顺序。no-op listener 在 trigger-select 评估时直接 resolve，不制造 pass-only pending；结构适用但当前不可支付的 listener 仍显示为 disabled。
+8. 所有 `before` leaf 完成后，原 action leaf 恢复执行；`beforePhaseResolved` 防止同一个 action leaf 第二次插入同一批 before listener。
+9. 随后执行 action 本体：`getBaseChoiceOptions` opt-in path 先走 `computeChoiceCandidates`，否则走 `ActionDefinition.execute()`。`execute()` 返回 request 时创建 pending；无 request 时继续 `during` / `immediatelyAfter` / `after`。
+10. `activate-card` 是 internal leaf，绕过上述 public action 流水线：只执行指定 listener body，并把 listener 返回的 `flow` / `followUpActions` 交回 engine 插入执行。
+
+作用域 scope：`player` / `opponent` / `any`。card listener 匹配层按 listener id 确定性枚举；phase trailing node 构建层再按 owner 分组（global → active player → 其他玩家），组内按 legacy `order` 降序、卡牌 play order、匹配序稳定排序。需要玩家决定同组 trigger 顺序时，用 `dispatchMode: 'select'` 进入 trigger-select，而不是依赖隐式排序表达规则选择。
 
 ### 7.6 阶段型 Hook（按触发顺序）
 
@@ -572,10 +594,14 @@ OA 对齐规则：
 **多 listener 同 phase 触发**采用 BGA-style PARALLEL trigger selection：
 
 - Phase 1 过渡期：handler 尚未全 pure，dispatch 不执行 handler 来判断 interactivity；使用显式静态 `dispatchMode: 'select'` 标出需要玩家选择触发顺序的 listener，其余保持 serial。
-- 不翻转 `mandatory` 默认值；`mandatory: true` 只影响 `ParallelNode(mode='trigger-select')`：任一未 resolved child mandatory 时隐藏 `__pass__`，避免 guaranteed effect 被静默跳过。
+- 不翻转 `mandatory` 默认值；`mandatory: true` 只影响 `ParallelNode(mode='trigger-select')`：当前结构适用且可执行的 mandatory child 会让 `__pass__` disabled，避免 guaranteed effect 被静默跳过。结构 no-op child 会在评估时直接 resolve，不制造只有 `__pass__` 的 pending；当前结构适用但暂时不可支付的 child 仍展示为 disabled，让玩家知道 trigger 存在。
 - 目标形态：同 owner、同 phase 下，mandatory 或纯自动 trigger 可按确定性顺序自动结算；多个 optional / interactive trigger 同时可用时，必须显式给卡主玩家选择触发顺序，并允许 pass 跳过剩余 optional trigger。
 - generic `ParallelNode` 负责 select/pass/mandatory/independent 语义；不再引入 listener-trigger 专用 runtime node。
 - 不为 `CardListenerRegistration` 引入 / 复活 `order` 排序字段；默认执行顺序来自 `playOrderIndex`（occupation < minor < improvement，数组 index）。需要玩家选择时用 parallel trigger selection 显式化。
+
+**2026-05-14 bake / trigger-select rule:** `bake-bread` is non-empty by default. Optional bake opportunities must be expressed by outer `optional` flow metadata. `ParallelNode(mode='trigger-select')` displays structurally applicable trigger options, including currently unaffordable options as disabled; disabled choices are server-rejected and remain unresolved. For before-action trigger-select, `__pass__` is disabled only when skipping remaining triggers would leave the action continuation impossible and at least one currently enabled trigger can make the action layer prove the continuation directly complete or reachable through the remaining select before-chain. The engine asks generic continuation guards and does not import bake-bread / D66 / oven rules; bake-specific direct continuation and before-chain reachability live in the action/card layer. Compact structured choice values such as `bulk:` are allowed through `InteractionRequest.kind === 'choice'` metadata (`structuredChoicePrefixes`), not by engine action-id special cases.
+
+**2026-05-15 replacement-aware trigger pass:** before-action trigger-select 的 pass gate 不能只看 base action `canBeExecutedByPlayer`，也不能套完整 `applyIsDoable`，否则会把同批 before unlocker 自己当成可跳过依据。当前规则是：先用 `skipBeforeTriggers=true` 检查原 action 是否能直接继续；失败时只允许通用 `computeReplace` fallback 参与 continuation 判断，并在可启动性预览里用 `checkedReplaceAction=true` 避免 replacement 递归。这覆盖 B26 Agrarian Fences 这类"跳过 D66 后仍可继续 fencing replacement"的路径，同时不在 engine 中硬编码卡牌 id。`computeReplace` decline 返回的 alternative flow 如果顶层是 `xor`，引擎会展开其 children 作为 replacement 分支，再追加 original action 分支；运行时 replacement 分支 leaf 不携带 `checkedReplaceAction`，只携带 `skipComputeReplaceListenerIds` 来跳过产生该 replacement 的 listener，因此真实替代分支里的 sow / bake 仍能触发普通 before / after listener。original fallback 分支继续携带 `checkedReplaceAction=true`，保持旧的"已检查 replacement"语义。
 
 ### 7.8 farm-type 提交
 
@@ -630,6 +656,8 @@ OA-vs-BGA design notes:
 | `shared/cards/{A..E,major,community}/` | hook 注册 + effect 函数 | sandbox + server（主 client bundle 禁止） |
 
 主 bundle 启动时 `GET /cards-manifest.json` 拉运行时元数据（`client/services/card-meta.ts`），切断对 `shared/cards/catalog` 的依赖链。
+
+Card lookup bootstrap：`shared/cards-display/types.ts` 的 registered lookup 默认可为空，client 不安装 catalog lookup；server/test runtime 通过 `shared/cards/install-catalog-lookups.ts` 显式安装。client 需要卡牌 metadata 时使用 `client/services/card-meta` 的 manifest-backed lookup。
 
 ### 8.2 注册表
 
@@ -686,6 +714,8 @@ shared/domain/
 `PlayerBoard(player, state)` 暴露：`countAnimals` / `pasturesWithCapacity` / `emptyFences` / `hasRoomFor` / `canPlow` / `canBuildFence` / `scoringBreakdown`，私有 `invariant_animalsInPastureOrStable`。
 
 域聚合可被三方共用（主 client + sandbox + server），属于 `[A]` 主 bundle 安全层。
+
+`onComputeAnimalZones` card-effect 签名：`(player: PlayerState, zones: AnimalZone[], state: GameState) => AnimalZone[] | void`。第三个 `state` 入参用于读取全局字段（典型场景：A148_Woolgrower / B86_TruffleSearcher 读 `state.completedFeedingPhases` 计入容量），避免每张卡再走 per-card post-play counter。新增 `onComputeAnimalZones` 卡牌可忽略 `state`（使用 `_state` 占位）。
 
 ---
 
@@ -828,9 +858,9 @@ Workshop / Sandbox 后端（自定义卡上传、编译、PR 集成）。沙盒�
 
 `eslint.config.js` 关键规则：
 
-- `client/{app,components,services,hooks,contexts,utils}/**` 禁 import `shared/{engine,session,actions,cards,custom-code,draft}/**`。
+- `client/{app,components,services,hooks,contexts,utils}/**` 禁 import `shared/session`、`shared/engine`、card catalog/bootstrap/register-all 和 per-card impl modules；UI metadata 必须走 `shared/cards-display/**` 或 `client/services/card-meta`。
 - `client/sandbox/**` 全开。
-- `no-restricted-syntax` 禁动态字符串 `import('shared/session/...')` 字面量绕过。
+- `no-restricted-syntax` 禁动态字符串 `import('shared/session/...')` / `import('shared/engine/...')` / card impl-bootstrap 字面量绕过。
 - `package.json` 已声明 `sideEffects` 给 bundler tree-shaking 基线。
 - violation = CI error。
 
@@ -846,7 +876,7 @@ Workshop / Sandbox 后端（自定义卡上传、编译、PR 集成）。沙盒�
 | Session | `server/__tests__/*.test.ts` | 直接实例化 `GameSession`，调 `takeAction` 等，断言 `resp.state` / `pending` / `interaction` / `ok` | ✅（slow 项目，按文件名 glob `[A-E][0-9]*-session.test.ts` 一卡一文件） |
 | E2E | `e2e-tests/*.spec.ts` | Playwright 双窗口浏览器，验证多人链路 | 手动 / Workflow |
 
-`vitest.config` 分 fast / slow / llm 三个 project。`pnpm test:fast` CI 默认；`pnpm test:slow` 单卡 session 测试；`pnpm run test:e2e` 需后端 + 前端在跑；`pnpm exec vitest run <file>` 单文件。
+`vitest.config` 分多个 fast 子 project（`fast-shared` / `fast-cards` / `fast-card-runtime` / `fast-client` / `fast-server` / `fast-scripts` / `fast-tests`）以及 `slow` / `llm`。`pnpm test:fast` 先运行 `check:test-project-coverage`，确保新 fast projects 覆盖旧 fast 文件集合且没有重复。`pnpm test:fast` CI 默认；`pnpm test:slow` 单卡 session 测试；`pnpm run test:e2e` 需后端 + 前端在跑；`pnpm exec vitest run <file>` 单文件。
 
 ### 13.2 后端边界测试驱动入口
 

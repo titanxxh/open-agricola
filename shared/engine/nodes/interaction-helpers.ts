@@ -23,6 +23,7 @@ import { SequenceNode } from './sequence-node'
 import { ParallelNode } from './parallel-node'
 import { OrNode } from './or-node'
 import { XorNode } from './xor-node'
+import { withSkippedComputeReplaceListeners } from '../replace-guard'
 
 export function getOptionsSourceCard(options: ActionChoiceOption[]): string | undefined {
   if (options.length === 0) return undefined
@@ -146,9 +147,10 @@ export function getFlowSourceCard(flow: ActionFlow): string | undefined {
 }
 
 /**
- * Mark the action context as having been processed by `computeReplace`,
- * preventing infinite re-entry when the alternative flow itself runs through
- * the same hook. Returns a fresh shallow copy.
+ * Mark the original declined action as having been processed by
+ * `computeReplace`. The original fallback keeps the broad legacy marker
+ * because card-local replacement listeners use it to avoid re-wrapping the
+ * declined root action.
  */
 function markCheckedReplaceAction(
   actionContext?: Record<string, unknown>,
@@ -156,6 +158,23 @@ function markCheckedReplaceAction(
   return {
     ...(actionContext ?? {}),
     checkedReplaceAction: true,
+  }
+}
+
+function markFlowSkippedComputeReplaceListeners(
+  flow: ActionFlow,
+  listenerIds: readonly string[],
+): ActionFlow {
+  if (flow.type === 'leaf') {
+    return {
+      ...flow,
+      actionContext: withSkippedComputeReplaceListeners(flow.actionContext, listenerIds),
+    }
+  }
+  return {
+    ...flow,
+    children: flow.children.map((child) =>
+      markFlowSkippedComputeReplaceListeners(child, listenerIds)),
   }
 }
 
@@ -171,11 +190,18 @@ export function buildReplaceChoiceFlow(
   >,
   alternativeFlow: ActionFlow,
   replacedActionId: string,
+  replacementListenerIds: readonly string[] = [],
 ): ActionFlow {
+  const guardedAlternativeFlow = markFlowSkippedComputeReplaceListeners(
+    alternativeFlow,
+    replacementListenerIds,
+  )
   return {
     type: 'xor',
     children: [
-      alternativeFlow,
+      ...(guardedAlternativeFlow.type === 'xor'
+        ? guardedAlternativeFlow.children
+        : [guardedAlternativeFlow]),
       {
         type: 'leaf',
         actionId: replacedActionId,

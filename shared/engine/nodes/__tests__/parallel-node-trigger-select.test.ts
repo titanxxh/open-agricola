@@ -1,17 +1,81 @@
-import { describe, it, expect } from 'vitest'
+import { beforeEach, describe, it, expect } from 'vitest'
+import { CardRegistry } from '../../../cards/registry'
+import { setActiveCardRegistry } from '../../../cards/active-registry'
 import { EngineTree } from '../../tree'
 import { ActionNode } from '../action-node'
 import { ParallelNode } from '../parallel-node'
+import {
+  evaluateTriggerSelect,
+  isPureResourceFlowCurrentlyPayable,
+} from '../../trigger-select'
 import {
   ACTIVATE_CARD_ACTION_ID,
   type ActivateCardActionNode,
   type ActivateCardActionParams,
 } from '../../activation-action'
 import type { EngineContext } from '../../types'
+import type { ActionExecutionContext, GameState, PlayerState, Resource } from '../../../contract/types'
 
 const stubCtx: EngineContext = { resolveSubtree: () => {}, emitChoice: () => {} }
 
-const makeActivate = (id: string, cardId: string, mandatory = true): ActivateCardActionNode => {
+const baseResources = (overrides: Partial<Resource> = {}): Resource => ({
+  wood: 0,
+  clay: 0,
+  reed: 0,
+  stone: 0,
+  food: 0,
+  grain: 0,
+  vegetable: 0,
+  sheep: 0,
+  boar: 0,
+  cattle: 0,
+  begging: 0,
+  ...overrides,
+})
+
+const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
+  id: 'p1',
+  name: 'P1',
+  color: 'red',
+  resources: baseResources(),
+  workers: [],
+  rooms: 2,
+  houseType: 'wood',
+  fields: [],
+  roomTiles: [],
+  stableTiles: [],
+  improvements: [],
+  minorHand: [],
+  minorPlayed: [],
+  occupationHand: [],
+  occupationPlayed: [],
+  extraOccupationsFromCards: [],
+  playedCards: [],
+  houseAnimalType: null,
+  houseAnimalCount: 0,
+  stableAnimals: {},
+  pastures: [],
+  fenceSegments: [],
+  majorEffects: { wellRounds: 0 },
+  startPlayer: false,
+  activeModifiers: [],
+  cardStates: {},
+  stats: {} as PlayerState['stats'],
+  ...overrides,
+})
+
+const makeContext = (player = makePlayer()): ActionExecutionContext => ({
+  state: { players: [player], currentPlayerIndex: 0 } as unknown as GameState,
+  player,
+  space: {} as ActionExecutionContext['space'],
+})
+
+const makeActivate = (
+  id: string,
+  cardId: string,
+  mandatory = true,
+  paramOverrides: Partial<ActivateCardActionParams> = {},
+): ActivateCardActionNode => {
   const params: ActivateCardActionParams = {
     listenerId: `listener-${id}`,
     cardId,
@@ -19,6 +83,7 @@ const makeActivate = (id: string, cardId: string, mandatory = true): ActivateCar
     actionId: 'place-farmer',
     event: {},
     mandatory,
+    ...paramOverrides,
   }
   return new ActionNode(id, ACTIVATE_CARD_ACTION_ID, cardId, params) as ActivateCardActionNode
 }
@@ -41,6 +106,10 @@ const makeTriggerSelect = (
 }
 
 describe('ParallelNode trigger-select mode', () => {
+  beforeEach(() => {
+    setActiveCardRegistry(new CardRegistry())
+  })
+
   it('emits select-trigger with one option per unresolved trigger child', () => {
     const node = makeTriggerSelect([
       makeActivate('a', 'C1', false),
@@ -129,5 +198,252 @@ describe('ParallelNode trigger-select mode', () => {
         { nodeId: 'b', cardId: 'C2', listenerId: 'listener-b', mandatory: true },
       ],
     })
+  })
+
+  it('disabled trigger option remains visible', () => {
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'listener-a',
+      cardIds: ['C1'],
+      dispatchMode: 'select',
+      handler: () => ({
+        flow: { type: 'leaf', actionId: 'pay', params: { cost: { wood: 1 } } },
+      }),
+    })
+    setActiveCardRegistry(cardRegistry)
+    const node = makeTriggerSelect([makeActivate('a', 'C1', false)])
+
+    const evaluation = evaluateTriggerSelect(node, makeContext())
+
+    expect(evaluation.options).toEqual([
+      {
+        value: 'C1',
+        labelKey: 'cards.C1.name',
+        sourceCard: 'C1',
+        disabled: true,
+        disabledReasonKey: 'ui.interactionTriggerUnavailable',
+      },
+      { value: '__pass__', labelKey: 'ui.interactionSelectTriggerPass' },
+    ])
+  })
+
+  it('no-op mandatory trigger resolves without a pass-only option list', () => {
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'listener-a',
+      cardIds: ['C1'],
+      mandatory: true,
+      dispatchMode: 'select',
+      handler: () => undefined,
+    })
+    setActiveCardRegistry(cardRegistry)
+    const child = makeActivate('a', 'C1', true)
+    const node = makeTriggerSelect([child])
+
+    const evaluation = evaluateTriggerSelect(node, makeContext())
+
+    expect(child.getState()).toBe('resolved')
+    expect(evaluation.options).toEqual([])
+  })
+
+  it('before-action pass is disabled while an enabled trigger can unlock continuation', () => {
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'listener-a',
+      cardIds: ['TestClayBeforeBake'],
+      actions: ['bake-bread'],
+      phases: ['before'],
+      dispatchMode: 'select',
+      handler: () => ({
+        flow: { type: 'leaf', actionId: 'gain', params: { clay: 1 } },
+      }),
+    })
+    setActiveCardRegistry(cardRegistry)
+    const player = makePlayer({
+      resources: baseResources({ grain: 0 }),
+      improvements: ['Major_Fireplace1'],
+    })
+    const child = makeActivate('a', 'TestClayBeforeBake', false, {
+      phase: 'before',
+      actionId: 'bake-bread',
+    })
+    const node = makeTriggerSelect([child])
+
+    const evaluation = evaluateTriggerSelect(node, makeContext(player), {
+      canContinueWithoutTriggers: () => false,
+      canReachContinuationThroughTriggers: () => true,
+    })
+
+    expect(evaluation.options).toEqual([
+      {
+        value: 'TestClayBeforeBake',
+        labelKey: 'cards.TestClayBeforeBake.name',
+        sourceCard: 'TestClayBeforeBake',
+      },
+      {
+        value: '__pass__',
+        labelKey: 'ui.interactionSelectTriggerPass',
+        disabled: true,
+      },
+    ])
+  })
+
+  it('before-action pass stays enabled when enabled trigger cannot unlock continuation', () => {
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'listener-a',
+      cardIds: ['TestWoodBeforeBake'],
+      actions: ['bake-bread'],
+      phases: ['before'],
+      dispatchMode: 'select',
+      handler: () => ({
+        flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 } },
+      }),
+    })
+    setActiveCardRegistry(cardRegistry)
+    const player = makePlayer({
+      resources: baseResources({ grain: 0 }),
+      improvements: ['Major_Fireplace1'],
+    })
+    const child = makeActivate('a', 'TestWoodBeforeBake', false, {
+      phase: 'before',
+      actionId: 'bake-bread',
+    })
+    const node = makeTriggerSelect([child])
+
+    const evaluation = evaluateTriggerSelect(node, makeContext(player), {
+      canContinueWithoutTriggers: () => false,
+      canReachContinuationThroughTriggers: () => false,
+    })
+
+    expect(evaluation.options).toEqual([
+      {
+        value: 'TestWoodBeforeBake',
+        labelKey: 'cards.TestWoodBeforeBake.name',
+        sourceCard: 'TestWoodBeforeBake',
+      },
+      { value: '__pass__', labelKey: 'ui.interactionSelectTriggerPass' },
+    ])
+  })
+
+  it('disabled-only trigger-select keeps pass enabled', () => {
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'listener-a',
+      cardIds: ['D66_PotterCeramics'],
+      actions: ['bake-bread'],
+      phases: ['before'],
+      dispatchMode: 'select',
+      handler: () => ({
+        flow: { type: 'leaf', actionId: 'pay', params: { cost: { clay: 1 } } },
+      }),
+    })
+    setActiveCardRegistry(cardRegistry)
+    const player = makePlayer({
+      resources: baseResources({ grain: 0, clay: 0 }),
+      improvements: ['Major_Fireplace1'],
+    })
+    const child = makeActivate('a', 'D66_PotterCeramics', false, {
+      phase: 'before',
+      actionId: 'bake-bread',
+    })
+    const node = makeTriggerSelect([child])
+
+    const evaluation = evaluateTriggerSelect(node, makeContext(player), {
+      canContinueWithoutTriggers: () => false,
+    })
+
+    expect(evaluation.options).toEqual([
+      {
+        value: 'D66_PotterCeramics',
+        labelKey: 'cards.D66_PotterCeramics.name',
+        sourceCard: 'D66_PotterCeramics',
+        disabled: true,
+        disabledReasonKey: 'ui.interactionTriggerUnavailable',
+      },
+      { value: '__pass__', labelKey: 'ui.interactionSelectTriggerPass' },
+    ])
+  })
+
+  it('applicable mandatory trigger with optional child remains enabled', () => {
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'listener-a',
+      cardIds: ['C126_Excavator'],
+      mandatory: true,
+      dispatchMode: 'select',
+      handler: () => ({
+        flow: {
+          type: 'seq',
+          children: [
+            { type: 'leaf', actionId: 'gain', params: { wood: 1 } },
+            {
+              type: 'seq',
+              optional: true,
+              children: [
+                { type: 'leaf', actionId: 'pay', params: { cost: { wood: 2 } } },
+                { type: 'leaf', actionId: 'gain', params: { food: 1 } },
+              ],
+            },
+          ],
+        },
+      }),
+    })
+    setActiveCardRegistry(cardRegistry)
+    const node = makeTriggerSelect([makeActivate('a', 'C126_Excavator', true)])
+
+    const evaluation = evaluateTriggerSelect(node, makeContext())
+
+    expect(evaluation.options).toEqual([
+      {
+        value: 'C126_Excavator',
+        labelKey: 'cards.C126_Excavator.name',
+        sourceCard: 'C126_Excavator',
+      },
+      {
+        value: '__pass__',
+        labelKey: 'ui.interactionSelectTriggerPass',
+        disabled: true,
+      },
+    ])
+  })
+})
+
+describe('isPureResourceFlowCurrentlyPayable', () => {
+  it('traverses parallel pure gain and pay children', () => {
+    expect(isPureResourceFlowCurrentlyPayable(
+      {
+        type: 'parallel',
+        children: [
+          { type: 'leaf', actionId: 'gain', params: { wood: 1 } },
+          { type: 'leaf', actionId: 'pay', params: { cost: { wood: 1 } } },
+        ],
+      },
+      baseResources(),
+    )).toBe(true)
+  })
+
+  it('treats or and xor flows as non-payable previews', () => {
+    expect(isPureResourceFlowCurrentlyPayable(
+      {
+        type: 'or',
+        children: [{ type: 'leaf', actionId: 'gain', params: { wood: 1 } }],
+      },
+      baseResources(),
+    )).toBe(false)
+    expect(isPureResourceFlowCurrentlyPayable(
+      {
+        type: 'xor',
+        children: [{ type: 'leaf', actionId: 'gain', params: { wood: 1 } }],
+      },
+      baseResources(),
+    )).toBe(false)
+  })
+
+  it('treats unknown leaf actions as non-payable previews', () => {
+    expect(isPureResourceFlowCurrentlyPayable(
+      { type: 'leaf', actionId: 'unknown-action' },
+      baseResources(),
+    )).toBe(false)
   })
 })

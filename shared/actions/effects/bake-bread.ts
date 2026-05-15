@@ -1,12 +1,114 @@
 import type {
   ActionChoiceOption,
   ActionDefinition,
+  ActionExecutionContext,
   ActionExecutionResult,
+  GameState,
   ImmediateLogEntry,
   PlayerState,
+  Resource,
 } from '../../contract/types'
-import { getPlayerBakeRates, hasAnyBakingImprovement } from '../../cards/helpers/exchange-registry'
+import { getPlayerBakeRates } from '../../cards/helpers/exchange-registry'
+import {
+  executeCardListener,
+  getMatchingListeners,
+  type CardListenerContext,
+} from '../../cards/card-listeners'
+import { applyPureResourceFlowPreview } from '../resource-flow-preview'
 import { addFoodFromConversion, incResourceConverted } from '../../session/stats'
+
+type BakeRate = ReturnType<typeof getPlayerBakeRates>[number]
+
+type BakePlanEntry = {
+  cardId: string
+  count: number
+}
+
+const failInvalidBake = (): ActionExecutionResult => ({
+  type: 'fail',
+  logKey: 'log.action',
+  recoverable: true,
+})
+
+const canBakeBreadDirectly = (player: PlayerState): boolean =>
+  player.resources.grain > 0 && getPlayerBakeRates(player).length > 0
+
+const previewStateWithResources = (
+  state: GameState,
+  player: PlayerState,
+  resources: Resource,
+): { state: GameState; player: PlayerState } => {
+  const previewPlayer: PlayerState = {
+    ...player,
+    resources: { ...resources },
+    cardStates: { ...(player.cardStates ?? {}) },
+  }
+  return {
+    state: {
+      ...state,
+      players: (state.players ?? []).map((entry) =>
+        entry.id === player.id ? previewPlayer : entry),
+    },
+    player: previewPlayer,
+  }
+}
+
+const beforeBakeContext = (
+  state: GameState,
+  player: PlayerState,
+  resources: Resource,
+  space: ActionExecutionContext['space'],
+): CardListenerContext => {
+  const preview = previewStateWithResources(state, player, resources)
+  return {
+    state: preview.state,
+    player: preview.player,
+    triggerPlayer: preview.player,
+    ownerPlayer: preview.player,
+    effectPlayer: preview.player,
+    space,
+    actionId: 'bake-bread',
+    phase: 'before',
+  }
+}
+
+export const canReachBakeBreadThroughBeforeChain = (
+  state: GameState,
+  player: PlayerState,
+  space: ActionExecutionContext['space'] = {} as ActionExecutionContext['space'],
+  resourcesOverride?: Resource,
+): boolean => {
+  const startingPlayer = resourcesOverride
+    ? { ...player, resources: { ...resourcesOverride } }
+    : player
+  if (canBakeBreadDirectly(startingPlayer)) return true
+  if (getPlayerBakeRates(player).length === 0) return false
+
+  let resources: Resource = { ...startingPlayer.resources }
+  const matched = getMatchingListeners(beforeBakeContext(state, player, resources, space))
+    .filter((entry) => entry.registration.dispatchMode === 'select')
+  const simulated = new Set<number>()
+
+  for (;;) {
+    let progressed = false
+    for (let index = 0; index < matched.length; index += 1) {
+      if (simulated.has(index)) continue
+      const entry = matched[index]!
+      const context = beforeBakeContext(state, player, resources, space)
+      const result = executeCardListener(entry.registration, context, {
+        ownerPlayerId: entry.ownerPlayerId,
+      })
+      if (!result?.flow) continue
+      const nextResources = applyPureResourceFlowPreview(result.flow, resources)
+      if (!nextResources) continue
+      resources = nextResources
+      simulated.add(index)
+      progressed = true
+      if (resources.grain > 0) return true
+    }
+    if (!progressed) return false
+  }
+}
 
 export const canBakeBread = (player: PlayerState, cardId: string): boolean => {
   const rates = getPlayerBakeRates(player)
@@ -41,53 +143,84 @@ export const bakeBread = (
 
 const buildBakeBreadOptions = (player: PlayerState): ActionChoiceOption[] => {
   const rates = getPlayerBakeRates(player)
-  const options: ActionChoiceOption[] = rates
+  return rates
     .filter(() => player.resources.grain > 0)
     .map((r) => ({ value: r.cardId, labelKey: r.labelKey }))
-  options.push({ value: 'cancel', labelKey: 'ui.interactionCancel' })
-  return options
+}
+
+const parseBulkBakePlan = (
+  player: PlayerState,
+  payload: string,
+  rateMap: Map<string, BakeRate>,
+): BakePlanEntry[] | null => {
+  if (!payload.trim()) return null
+
+  const countByCard = new Map<string, number>()
+  for (const rawEntry of payload.split(',')) {
+    const [cardId, countText, ...extra] = rawEntry.split('=')
+    if (!cardId || countText === undefined || extra.length > 0) return null
+    const count = Number(countText)
+    if (!Number.isInteger(count) || count <= 0) return null
+    countByCard.set(cardId, (countByCard.get(cardId) ?? 0) + count)
+  }
+
+  const plan: BakePlanEntry[] = []
+  let totalGrain = 0
+  for (const [cardId, count] of countByCard) {
+    const rate = rateMap.get(cardId)
+    if (!rate) return null
+    if (count > rate.max) return null
+    totalGrain += count
+    plan.push({ cardId, count })
+  }
+
+  if (plan.length === 0) return null
+  if (totalGrain <= 0 || totalGrain > player.resources.grain) return null
+  return plan
+}
+
+const applyBakePlan = (
+  player: PlayerState,
+  plan: BakePlanEntry[],
+): ActionExecutionResult => {
+  const immediateLogs: ImmediateLogEntry[] = []
+  for (const entry of plan) {
+    const result = bakeBread(player, entry.cardId, entry.count)
+    if (result.type !== 'ok') return failInvalidBake()
+    if (result.immediateLogs) immediateLogs.push(...result.immediateLogs)
+  }
+  return { type: 'ok', immediateLogs }
 }
 
 const resolveBakeBreadChoice = (
   player: PlayerState,
   choice: string,
 ): ActionExecutionResult => {
-  if (choice === 'cancel') return { type: 'ok' }
+  if (choice === 'cancel') return failInvalidBake()
   const rates = getPlayerBakeRates(player)
   const rateMap = new Map(rates.map((r) => [r.cardId, r]))
 
   if (choice.startsWith('bulk:')) {
     const payload = choice.replace('bulk:', '').trim()
-    if (!payload) return { type: 'ok' }
-    const immediateLogs: ImmediateLogEntry[] = []
-    payload.split(',').forEach((entry) => {
-      const [cardId, countText] = entry.split('=')
-      const rate = rateMap.get(cardId!)
-      if (!rate) return
-      const count = Number(countText)
-      if (!Number.isFinite(count) || count <= 0) return
-      const allowed = Math.min(count, rate.max)
-      if (allowed <= 0) return
-      const result = bakeBread(player, cardId!, allowed)
-      if (result.type === 'ok' && result.immediateLogs) {
-        immediateLogs.push(...result.immediateLogs)
-      }
-    })
-    return immediateLogs.length > 0 ? { type: 'ok', immediateLogs } : { type: 'ok' }
+    const plan = parseBulkBakePlan(player, payload, rateMap)
+    if (!plan) return failInvalidBake()
+    return applyBakePlan(player, plan)
   }
 
   if (choice.startsWith('count-')) {
     const [, cardId, countText] = choice.split('-')
-    if (rateMap.has(cardId!)) {
-      return bakeBread(player, cardId!, Number(countText))
-    }
-    return { type: 'ok' }
+    const rate = rateMap.get(cardId!)
+    const count = Number(countText)
+    if (!rate || !Number.isInteger(count) || count <= 0) return failInvalidBake()
+    if (count > rate.max || count > player.resources.grain) return failInvalidBake()
+    return bakeBread(player, cardId!, count)
   }
 
   const rate = rateMap.get(choice)
   if (rate) {
     const grain = player.resources.grain
     const maxCount = Math.max(0, Math.min(grain, rate.max))
+    if (maxCount <= 0) return failInvalidBake()
     if (maxCount <= 1) {
       return bakeBread(player, choice, maxCount)
     }
@@ -95,6 +228,7 @@ const resolveBakeBreadChoice = (
       type: 'request',
       request: {
         kind: 'choice',
+        structuredChoicePrefixes: ['bulk:'],
         options: Array.from({ length: maxCount }, (_, index) => ({
           value: `count-${choice}-${index + 1}`,
           labelKey: 'ui.interactionBakeBreadCountLabel',
@@ -104,7 +238,7 @@ const resolveBakeBreadChoice = (
       promptKey: 'ui.interactionBakeBreadCount',
     }
   }
-  return { type: 'ok' }
+  return failInvalidBake()
 }
 
 export const bakeBreadAction: ActionDefinition = {
@@ -113,12 +247,23 @@ export const bakeBreadAction: ActionDefinition = {
   descriptionKey: 'actions.bake-bread.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (_, player) =>
-    player.resources.grain > 0 && hasAnyBakingImprovement(player),
-  execute: ({ player }) => ({
-    type: 'request',
-    request: { kind: 'choice', options: buildBakeBreadOptions(player) },
-    promptKey: 'ui.interactionBakeBreadChoice',
-  }),
+  canBeExecutedByPlayer: (state, player, context) =>
+    canBakeBreadDirectly(player) ||
+    (context?.actionContext?.skipBeforeTriggers === true
+      ? false
+      : canReachBakeBreadThroughBeforeChain(state, player)),
+  execute: ({ player }) => {
+    const options = buildBakeBreadOptions(player)
+    if (options.length === 0) return { type: 'ok' }
+    return {
+      type: 'request',
+      request: {
+        kind: 'choice',
+        options,
+        structuredChoicePrefixes: ['bulk:'],
+      },
+      promptKey: 'ui.interactionBakeBreadChoice',
+    }
+  },
   resolveChoice: ({ player }, choice) => resolveBakeBreadChoice(player, choice),
 }

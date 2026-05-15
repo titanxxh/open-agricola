@@ -88,6 +88,15 @@ export type TradeModifier = {
   from: Partial<Resource>
   to: Partial<Resource>
   max?: number
+  /**
+   * Player-state conditions evaluated when the modifier is applied. Same
+   * supported keys as `Bonus.conditions` (`minNumRooms`, `houseTypeWood` /
+   * `houseTypeClay` / `houseTypeStone`). For the `construct` cost type,
+   * `room-payment.ts` evaluates these per build call (mirrors the existing
+   * BonusModifier path). Other cost types apply the same checks via
+   * `getModifiersForCostType` / `evaluateConditions`.
+   */
+  conditions?: Record<string, number>
 }
 
 export type BonusModifier = {
@@ -349,6 +358,13 @@ export type GameState = {
   workPhaseObtainedResources: Record<string, Partial<Resource>>
   harvestReapSummary?: Record<string, HarvestReapSummary>
   harvestBreedSummary?: Record<string, HarvestBreedSummary>
+  /**
+   * Number of feeding phases that have completed (incremented once at the
+   * start of each breeding phase, after all players have fed).
+   * Consumed by A148_Woolgrower / B86_TruffleSearcher animal capacity.
+   * Mirrors BGA `Globals::getCompletedFeedingPhases()`.
+   */
+  completedFeedingPhases: number
 }
 
 export type CanBeExecutedByPlayerContext = {
@@ -464,7 +480,7 @@ export type ActionChoiceOption = {
 export type ActionExecutionResult =
   | { type: 'ok'; logKey?: string; resourcesGained?: Partial<Resource>; resourcesPaid?: Partial<Resource>; logParams?: Record<string, unknown>; immediateLogs?: ImmediateLogEntry[]; extraData?: Record<string, unknown> }
   | { type: 'request'; request: InteractionRequest; promptKey?: PromptKey; promptParams?: Record<string, unknown>; sourceCard?: string; extraData?: Record<string, unknown> }
-  | { type: 'fail'; logKey: string }
+  | { type: 'fail'; logKey: string; recoverable?: boolean }
   | { type: 'flow'; flow: ActionFlow; logKey?: string; logParams?: Record<string, unknown>; immediateLogs?: ImmediateLogEntry[]; extraData?: Record<string, unknown> }
 export type ActionFlow =
   | {
@@ -600,7 +616,7 @@ export type FarmSelectType = 'plow' | 'sow' | 'fence' | 'room' | 'stable'
 export type SelectionKind = 'farm-position' | 'occupation-hand'
 
 export type InteractionRequest =
-  | { kind: 'choice'; options: ActionChoiceOption[] }
+  | { kind: 'choice'; options: ActionChoiceOption[]; structuredChoicePrefixes?: string[] }
   | { kind: 'animal-reorg'; zones: InteractionAnimalReorgZone[] }
   | { kind: 'confirm-next-player'; nextPlayerIndex: number }
   | { kind: 'confirm-player-switch'; fromPlayerIndex: number; toPlayerIndex: number }

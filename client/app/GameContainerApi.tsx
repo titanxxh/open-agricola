@@ -30,6 +30,20 @@ import { BrandMark } from '../components/common/BrandMark'
 import { ResourceLine } from '../components/common/ResourceLine'
 import { Section } from '../components/common/Section'
 import { DraftOverlay } from './draft/DraftOverlay'
+import {
+  buildBakeExchangeInfo,
+  buildBakeBulkChoice,
+  hasSelectedBakeGrain,
+} from './bake-exchange-ui'
+import { getCardMeta } from '../services/card-meta'
+import {
+  farmCommitErrorMessageKey,
+  getCurrentlySelectableRoomKeys,
+  isDevModeAllowedFromQuery,
+  playerIdFromWsStatus,
+  type FarmCommitType,
+  type WsStatus,
+} from './game-container-helpers'
 
 type RoundSlot = { round: number; action?: ActionSpace }
 
@@ -59,104 +73,9 @@ const toRequestedPlayerIndex = (playerParam: string | null) => {
 const isOffBoardSowTile = (tile: FarmTilePosition) =>
   tile.row < 0 || tile.row > 2 || tile.col < 0 || tile.col > 4
 
-type WsStatus =
-  | { phase: 'idle' }
-  | { phase: 'connecting' }
-  | { phase: 'creating' }
-  | { phase: 'joining'; roomId: string }
-  | { phase: 'waiting'; roomId: string; players: Array<{ playerIndex: number; name: string }>; maxPlayers: number }
-  | { phase: 'ready'; roomId: string; playerIndex: number }
-  | { phase: 'error'; message: string }
-
-export const playerIdFromWsStatus = (status: WsStatus): string | null =>
-  status.phase === 'ready' ? `p${status.playerIndex + 1}` : null
-
-type FarmCommitType = 'fence' | 'room' | 'stable' | 'plow' | 'sow'
-
-const farmErrorKeys = {
-  room: {
-    NO_SELECTION: 'ui.roomErrorNoSelection',
-    INVALID_POSITION: 'ui.roomErrorInvalid',
-    OCCUPIED: 'ui.roomErrorOccupied',
-    NOT_CONNECTED: 'ui.roomErrorNotConnected',
-    LOCKED: 'ui.roomErrorInvalid',
-    'unable to pay room cost': 'ui.roomErrorNoResources',
-    'too many rooms selected': 'ui.roomErrorInvalid',
-  },
-  stable: {
-    NO_SELECTION: 'ui.stableErrorNoSelection',
-    INVALID_POSITION: 'ui.stableErrorInvalid',
-    OCCUPIED: 'ui.stableErrorOccupied',
-    LOCKED: 'ui.stableErrorInvalid',
-    LIMIT_REACHED: 'ui.stableErrorLimit',
-    'unable to pay stable cost': 'ui.stableErrorNoResources',
-  },
-  plow: {
-    NO_SELECTION: 'ui.plowErrorNoSelection',
-    INVALID_POSITION: 'ui.plowErrorInvalid',
-    OCCUPIED: 'ui.plowErrorOccupied',
-    NOT_ADJACENT: 'ui.plowErrorNotAdjacent',
-    FENCED: 'ui.plowErrorFenced',
-    LOCKED: 'ui.plowErrorInvalid',
-    'unable to pay plow cost': 'ui.plowErrorUnknown',
-  },
-  sow: {
-    NO_SELECTION: 'ui.sowErrorNoSelection',
-    INVALID_POSITION: 'ui.sowErrorInvalid',
-    NOT_EMPTY: 'ui.sowErrorNotEmpty',
-    NO_SEEDS: 'ui.sowErrorNoSeeds',
-    INVALID_CROP: 'ui.sowErrorInvalidCrop',
-  },
-} as const
-
-export const farmCommitErrorMessageKey = (
-  farmType: FarmCommitType,
-  error?: string,
-): string => {
-  if (farmType === 'fence') return error ? `fence.error.${error}` : 'fence.error.UNKNOWN'
-  const typeMap = farmErrorKeys[farmType]
-  return (error && error in typeMap)
-    ? typeMap[error as keyof typeof typeMap]
-    : `ui.${farmType}ErrorUnknown`
-}
-
-const roomNeighborKeys = (key: string) => {
-  const tile = parsePositionKey(key)
-  if (!tile) return []
-  return [
-    `${tile.row - 1}-${tile.col}`,
-    `${tile.row + 1}-${tile.col}`,
-    `${tile.row}-${tile.col - 1}`,
-    `${tile.row}-${tile.col + 1}`,
-  ]
-}
-
-export const getCurrentlySelectableRoomKeys = (
-  baseTiles: FarmTilePosition[],
-  existingRoomKeys: Set<string>,
-  pendingRoomKeys: Set<string>,
-): Set<string> => {
-  const anchors = new Set([...existingRoomKeys, ...pendingRoomKeys])
-  return new Set(
-    baseTiles
-      .map((tile) => positionKey(tile))
-      .filter((key) => pendingRoomKeys.has(key) || roomNeighborKeys(key).some((neighbor) => anchors.has(neighbor))),
-  )
-}
-
-const FIXED_DEV_ROOM_IDS = new Set(['dev2', 'dev3', 'dev4'])
-
-export const isDevModeAllowedFromQuery = (search: string): boolean => {
-  const params = new URLSearchParams(search)
-  if (params.get('devMode') !== '1') return false
-  const roomId = params.get('room')
-  if (roomId && FIXED_DEV_ROOM_IDS.has(roomId)) return true
-  return params.get('embedded') === '1' && params.get('transport') !== 'ws'
-}
-
 const useTransportSetup = (playerParam: string | null, displayName?: string, isWsMode = false) => {
   const [wsStatus, setWsStatus] = useState<WsStatus>({ phase: 'idle' })
-  const wsRef = useRef<WsGameTransport | null>(null)
+  const [wsTransport, setWsTransport] = useState<WsGameTransport | null>(null)
   const [wsReady, setWsReady] = useState(false)
 
   const initRef = useRef(false)
@@ -176,12 +95,12 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
         return
       }
 
-      wsRef.current = ws
       const rawWs = (ws as unknown as { ws: WebSocket }).ws
       if (!rawWs) {
         setWsStatus({ phase: 'error', message: 'no WebSocket instance' })
         return
       }
+      setWsTransport(ws)
 
       const roomParam = new URLSearchParams(window.location.search).get('room')
       const isCreator = !roomParam && (!playerParam || playerParam === 'p1')
@@ -299,12 +218,17 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
     }
 
     init()
-  }, [playerParam])
+  }, [displayName, isWsMode, playerParam])
 
-  const transport: GameTransport = isWsMode && wsReady && wsRef.current ? wsRef.current : httpTransportSingleton
+  const transport: GameTransport = isWsMode && wsReady && wsTransport ? wsTransport : httpTransportSingleton
   const isReady = !isWsMode || wsReady
-  return { transport, wsStatus, isWs: isWsMode, isReady, wsTransport: wsRef.current }
+  return { transport, wsStatus, isWs: isWsMode, isReady, wsTransport }
 }
+
+const getIsMobileViewport = () =>
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(max-width: 900px)').matches
 
 export const GameContainerApi = () => {
   // Read URL params fresh on each render (navigated here from lobby — don't use module-level stale values)
@@ -332,15 +256,14 @@ export const GameContainerApi = () => {
   const [animalReorg, setAnimalReorg] = useState<AnimalReorgState | null>(null)
   const [bakeExchangeCounts, setBakeExchangeCounts] = useState<Record<string, number>>({})
   const [harvestFeedCounts, setHarvestFeedCounts] = useState<Record<string, number>>({})
-  const [devPlayerId, setDevPlayerId] = useState('')
+  const [devPlayerIdOverride, setDevPlayerIdOverride] = useState<string | null>(null)
   const [devResource, setDevResource] = useState<keyof Resource>('wood')
   const [devAmount, setDevAmount] = useState(1)
   const [devRound, setDevRound] = useState(1)
-  const [isMobile, setIsMobile] = useState(false)
+  const [isMobile, setIsMobile] = useState(getIsMobileViewport)
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
     const mq = window.matchMedia('(max-width: 900px)')
-    setIsMobile(mq.matches)
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
     if (typeof mq.addEventListener === 'function') {
       mq.addEventListener('change', handler)
@@ -353,14 +276,6 @@ export const GameContainerApi = () => {
   const [resetSeedInput, setResetSeedInput] = useState('')
   const headerRef = useRef<HTMLDivElement | null>(null)
   const [headerHeight, setHeaderHeight] = useState(0)
-
-  useEffect(() => {
-    if (state && viewPlayerId) {
-      setDevPlayerId(viewPlayerId)
-    } else if (state) {
-      setDevPlayerId(state.players[state.currentPlayerIndex]?.id ?? '')
-    }
-  }, [state?.currentPlayerIndex, viewPlayerId])
 
   const {
     pendingFenceEdges, setPendingFenceEdges, pendingPalisadeEdges,
@@ -414,6 +329,11 @@ export const GameContainerApi = () => {
   }, [transport, handleSnapshot, isReady])
 
   const currentPlayer = state?.players[state.currentPlayerIndex] ?? null
+  const fallbackDevPlayerId = viewPlayerId ?? currentPlayer?.id ?? ''
+  const devPlayerId = devPlayerIdOverride ?? fallbackDevPlayerId
+  const setDevPlayerId = useCallback((value: string) => {
+    setDevPlayerIdOverride(value)
+  }, [])
   const wsAssignedPlayerId = isWs ? playerIdFromWsStatus(wsStatus) : null
   const localPlayerId = lockedViewPlayerId ?? wsAssignedPlayerId
   // In WS mode, selfPlayer is locked to the URL ?player= param.
@@ -511,15 +431,6 @@ export const GameContainerApi = () => {
     }
     setSowError(error ?? 'UNKNOWN')
   }, [setFenceError, setPlowError, setRoomError, setSowError, setStableError])
-
-  const commitFarmWithError = useCallback((
-    _playerIndex: number,
-    _farmType: FarmCommitType,
-    _payload: Record<string, unknown>,
-  ) => {
-    // commitFarm transport removed; all farm submits now use resolveChoice with payload.
-    // This wrapper is retained as a stub until the few remaining callers are migrated.
-  }, [])
 
   const resolveChoice = useCallback((value: string) => {
     if (!isInteractive) return
@@ -641,15 +552,15 @@ export const GameContainerApi = () => {
     if (interaction.stateId !== 'wait') return
     if (interaction.request.kind !== 'choice' && interaction.request.kind !== 'select-trigger') return
     void transport.resolveChoice(interaction.playerIndex, value).catch((e) => console.error(e))
-  }, [interaction, currentPlayer, animalReorg, pendingFenceEdges, pendingPalisadeEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, setPlowError, setSowError, setStableError, isInteractive, commitFarmWithError, setFarmCommitError])
+  }, [interaction, currentPlayer, animalReorg, pendingFenceEdges, pendingPalisadeEdges, pendingRoomTiles, pendingStableTiles, pendingPlowTile, pendingPositionSelections, pendingSowSelections, transport, setPlowError, setSowError, setStableError, isInteractive, setFarmCommitError])
 
   const updateBakeExchangeCount = (id: string, delta: number) => {
     if (!bakeExchangePlayer) return
     setBakeExchangeCounts((prev) => {
       const current = prev[id] ?? 0
       const maxUse = bakeExchangeInfo[id]?.max ?? 0
-      const totalSelected = Object.values(prev).reduce(
-        (sum, value) => sum + value,
+      const totalSelected = bakeExchangeOptionIds.reduce(
+        (sum, optionId) => sum + (prev[optionId] ?? 0),
         0,
       )
       const availableGrain = bakeExchangePlayer.resources.grain
@@ -663,14 +574,9 @@ export const GameContainerApi = () => {
 
   const confirmBakeExchange = () => {
     if (!pendingChoice || !isBakeExchange) return
-    const entries = Object.entries(bakeExchangeCounts)
-      .filter(([, count]) => count > 0)
-      .map(([id, count]) => `${id}=${count}`)
-    if (entries.length === 0) {
-      resolveChoice('cancel')
-      return
-    }
-    resolveChoice(`bulk:${entries.join(',')}`)
+    const choice = buildBakeBulkChoice(activeBakeExchangeCounts)
+    if (!choice) return
+    resolveChoice(choice)
   }
 
   const confirmNextPlayer = useCallback(() => {
@@ -722,44 +628,53 @@ export const GameContainerApi = () => {
           toPlayerIndex: interaction.toPlayerIndex ?? 0,
         }
       : null
-  const pendingAnimalReorg =
-    interaction.stateId === 'wait' && interaction.request.kind === 'animal-reorg'
-      ? { playerIndex: interaction.playerIndex, spaceId: interaction.spaceId ?? '' }
-      : null
-  const harvestPending =
-    interaction.stateId === 'wait' && interaction.request.kind === 'feed' && state
-      ? {
-          playerIndex: interaction.playerIndex,
-          playerName: state.players[interaction.playerIndex]?.name ?? '',
-          remaining: interaction.remaining ?? 0,
-          foodUsed: interaction.foodUsed ?? 0,
-        }
-      : null
+  const pendingAnimalReorg = useMemo(
+    () =>
+      interaction.stateId === 'wait' && interaction.request.kind === 'animal-reorg'
+        ? { playerIndex: interaction.playerIndex, spaceId: interaction.spaceId ?? '' }
+        : null,
+    [interaction],
+  )
+  const harvestPending = useMemo(
+    () =>
+      interaction.stateId === 'wait' && interaction.request.kind === 'feed' && state
+        ? {
+            playerIndex: interaction.playerIndex,
+            playerName: state.players[interaction.playerIndex]?.name ?? '',
+            remaining: interaction.remaining ?? 0,
+            foodUsed: interaction.foodUsed ?? 0,
+          }
+        : null,
+    [interaction, state],
+  )
   const canTakeActionForBoard = useCallback((space: ActionSpace, _player: PlayerState) => {
     if (!state || !currentPlayer || !isInteractive) return false
     if (interaction.stateId !== 'idle') return false
     return actionAvailability[space.id] === true
   }, [state, currentPlayer, interaction.stateId, isInteractive, actionAvailability])
 
+  const actionSpaces = state?.actionSpaces
+  const roundActionOrder = state?.roundActionOrder
+  const availableMajorImprovements = state?.availableMajorImprovements
   const actionMap = useMemo(() => {
-    if (!state) return new Map<string, ActionSpace>()
-    return new Map(state.actionSpaces.map((s) => [s.id, s]))
-  }, [state?.actionSpaces])
+    if (!actionSpaces) return new Map<string, ActionSpace>()
+    return new Map(actionSpaces.map((s) => [s.id, s]))
+  }, [actionSpaces])
   const roundSlots: RoundSlot[] = useMemo(() => {
-    if (!state) return []
-    return state.roundActionOrder.map((id, index) => {
+    if (!roundActionOrder) return []
+    return roundActionOrder.map((id, index) => {
       const action = id ? actionMap.get(id) : undefined
       return {
         round: index + 1,
         action: action ?? undefined,
       }
     })
-  }, [state?.roundActionOrder, actionMap])
+  }, [roundActionOrder, actionMap])
   const baseActions = useMemo(() => {
-    if (!state) return []
-    const roundIds = new Set(state.roundActionOrder.filter(Boolean))
-    return state.actionSpaces.filter((space) => !roundIds.has(space.id))
-  }, [state])
+    if (!actionSpaces || !roundActionOrder) return []
+    const roundIds = new Set(roundActionOrder.filter(Boolean))
+    return actionSpaces.filter((space) => !roundIds.has(space.id))
+  }, [actionSpaces, roundActionOrder])
 
   const playedCards = displayPlayer ? getPlayedCardKeys(displayPlayer) : []
 
@@ -771,101 +686,74 @@ export const GameContainerApi = () => {
   const isSelectingMinor = pendingChoice?.promptKey === 'ui.interactionChooseMinorImprovement' || pendingChoice?.promptKey === 'ui.interactionChooseImprovement'
   const isSelectingOccupation = pendingChoice?.promptKey === 'ui.interactionChooseOccupation'
   const isSelectingImprovementAny = pendingChoice?.promptKey === 'ui.interactionChooseImprovement'
-  const selectableMinorIds = useMemo(() => {
-    if (!pendingChoice || !isSelectingMinor) return new Set<string>()
-    return new Set(
-      pendingChoice.options
-        .map((option) =>
-          option.value.startsWith('minor:') ? option.value.slice('minor:'.length) : option.value,
+  const pendingChoiceOptions = pendingChoice?.options
+  const selectableMinorIds =
+    pendingChoiceOptions && isSelectingMinor
+      ? new Set(
+          pendingChoiceOptions
+            .map((option) =>
+              option.value.startsWith('minor:') ? option.value.slice('minor:'.length) : option.value,
+            )
+            .filter((value) => !value.startsWith('major:')),
         )
-        .filter((value) => !value.startsWith('major:')),
-    )
-  }, [pendingChoice, isSelectingMinor])
-  const selectableOccupationIds = useMemo(() => {
-    if (!pendingChoice || !isSelectingOccupation) return new Set<string>()
-    return new Set(pendingChoice.options.map((option) => option.value))
-  }, [pendingChoice, isSelectingOccupation])
-  const selectableMajorIds = useMemo(() => {
-    if (!pendingChoice || !isSelectingImprovementAny) return new Set<string>()
-    return new Set(
-      pendingChoice.options
-        .map((option) =>
-          option.value.startsWith('major:') ? option.value.slice('major:'.length) : option.value,
+      : new Set<string>()
+  const selectableOccupationIds =
+    pendingChoiceOptions && isSelectingOccupation
+      ? new Set(pendingChoiceOptions.map((option) => option.value))
+      : new Set<string>()
+  const selectableMajorIds =
+    pendingChoiceOptions && isSelectingImprovementAny
+      ? new Set(
+          pendingChoiceOptions
+            .map((option) =>
+              option.value.startsWith('major:') ? option.value.slice('major:'.length) : option.value,
+            )
+            .filter((value) => availableMajorImprovements?.includes(value)),
         )
-        .filter((value) => state?.availableMajorImprovements.includes(value)),
-    )
-  }, [pendingChoice, isSelectingImprovementAny, state?.availableMajorImprovements])
-
-  const bakeExchangeInfo = useMemo<Record<string, { food: number; max: number }>>(
-    () => ({
-      Major_Fireplace1: { food: 2, max: Number.POSITIVE_INFINITY },
-      Major_Fireplace2: { food: 2, max: Number.POSITIVE_INFINITY },
-      Major_CookingHearth1: { food: 3, max: Number.POSITIVE_INFINITY },
-      Major_CookingHearth2: { food: 3, max: Number.POSITIVE_INFINITY },
-      Major_ClayOven: { food: 5, max: 1 },
-      Major_StoneOven: { food: 4, max: 2 },
-    }),
-    [],
-  )
-  const cardLabel = (id: string) =>
-    t(locale, `improvements.${id}.name`).replace(/\s*[（(].*$/, '')
+      : new Set<string>()
 
   const isBakeExchange =
     pendingChoice?.promptKey === 'ui.interactionBakeBreadChoice'
+  const bakeExchangeSourceIds = isBakeExchange
+    ? (pendingChoiceOptions ?? []).map((option) => option.value)
+    : []
+  const bakeExchangeInfo = buildBakeExchangeInfo(bakeExchangeSourceIds, getCardMeta)
+  const cardLabel = useCallback((id: string) => {
+    const improvementName = t(locale, `improvements.${id}.name`)
+    if (improvementName !== `improvements.${id}.name`) {
+      return improvementName.replace(/\s*[（(].*$/, '')
+    }
+    return getCardMeta(id)?.name ?? id
+  }, [locale])
+
   const bakeExchangePlayer =
     isBakeExchange && pendingChoice && state
       ? state.players[pendingChoice.playerIndex]
       : null
-  const bakeExchangeOptions = useMemo(
-    () =>
-      isBakeExchange
-        ? (pendingChoice?.options ?? []).filter(
-            (option) => !!bakeExchangeInfo[option.value],
-          )
-        : [],
-    [isBakeExchange, pendingChoice?.options, bakeExchangeInfo],
-  )
-  const bakeExchangeOptionIds = useMemo(
-    () => bakeExchangeOptions.map((option) => option.value),
-    [bakeExchangeOptions],
-  )
-  const bakeExchangeKey = useMemo(
-    () => bakeExchangeOptionIds.join('|'),
-    [bakeExchangeOptionIds],
-  )
-  const bakeExchangeKeyRef = useRef('')
-
-  useEffect(() => {
-    if (!isBakeExchange || bakeExchangeOptionIds.length === 0) {
-      if (Object.keys(bakeExchangeCounts).length > 0) {
-        setBakeExchangeCounts({})
-      }
-      bakeExchangeKeyRef.current = ''
-      return
-    }
-    if (bakeExchangeKeyRef.current === bakeExchangeKey) return
-    const nextCounts: Record<string, number> = {}
+  const bakeExchangeOptions = isBakeExchange
+    ? (pendingChoiceOptions ?? []).filter(
+        (option) => !!bakeExchangeInfo[option.value],
+      )
+    : []
+  const bakeExchangeOptionIds = bakeExchangeOptions.map((option) => option.value)
+  const activeBakeExchangeCounts = (() => {
+    const counts: Record<string, number> = {}
     bakeExchangeOptionIds.forEach((value) => {
-      nextCounts[value] = 0
+      counts[value] = bakeExchangeCounts[value] ?? 0
     })
-    bakeExchangeKeyRef.current = bakeExchangeKey
-    setBakeExchangeCounts(nextCounts)
-  }, [
-    isBakeExchange,
-    bakeExchangeKey,
-    bakeExchangeOptionIds,
-    bakeExchangeCounts,
-  ])
+    return counts
+  })()
 
-  const bakeTotalGrain = Object.values(bakeExchangeCounts).reduce(
+  const bakeTotalGrain = Object.values(activeBakeExchangeCounts).reduce(
     (sum, value) => sum + value,
     0,
   )
-  const bakeTotalFood = Object.entries(bakeExchangeCounts).reduce(
+  const bakeTotalFood = Object.entries(activeBakeExchangeCounts).reduce(
     (sum, [id, count]) =>
       sum + (bakeExchangeInfo[id]?.food ?? 0) * count,
     0,
   )
+  const hasBakeSelection = hasSelectedBakeGrain(activeBakeExchangeCounts)
   const baseFood = bakeExchangePlayer?.resources.food ?? 0
   const baseGrain = bakeExchangePlayer?.resources.grain ?? 0
   const summaryResources = {
@@ -887,56 +775,40 @@ export const GameContainerApi = () => {
       harvestFeedPlayer
         ? buildHarvestFeedOptions(harvestFeedPlayer, locale, cardLabel)
         : [],
-    [harvestFeedPlayer, locale],
+    [harvestFeedPlayer, locale, cardLabel],
   )
   const harvestFeedOptionIds = useMemo(
     () => harvestFeedOptions.map((option) => option.id),
     [harvestFeedOptions],
   )
-  const harvestFeedKey = useMemo(
-    () => harvestFeedOptionIds.join('|'),
-    [harvestFeedOptionIds],
-  )
-  const harvestFeedKeyRef = useRef('')
-
-  useEffect(() => {
-    if (!isHarvestFeedExchange || harvestFeedOptionIds.length === 0) {
-      if (Object.keys(harvestFeedCounts).length > 0) {
-        setHarvestFeedCounts({})
-      }
-      harvestFeedKeyRef.current = ''
-      return
-    }
-    if (harvestFeedKeyRef.current === harvestFeedKey) return
-    const nextCounts: Record<string, number> = {}
+  const activeHarvestFeedCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
     harvestFeedOptionIds.forEach((id) => {
-      nextCounts[id] = 0
+      counts[id] = harvestFeedCounts[id] ?? 0
     })
-    harvestFeedKeyRef.current = harvestFeedKey
-    setHarvestFeedCounts(nextCounts)
-  }, [
-    harvestFeedCounts,
-    harvestFeedKey,
-    harvestFeedOptionIds,
-    isHarvestFeedExchange,
-  ])
+    return counts
+  }, [harvestFeedCounts, harvestFeedOptionIds])
 
   const updateHarvestFeedCount = useCallback((id: string, delta: number) => {
     setHarvestFeedCounts((prev) => {
-      const current = prev[id] ?? 0
+      const currentCounts: Record<string, number> = {}
+      harvestFeedOptionIds.forEach((optionId) => {
+        currentCounts[optionId] = prev[optionId] ?? 0
+      })
+      const current = currentCounts[id] ?? 0
       const option = harvestFeedOptions.find((entry) => entry.id === id)
       if (!option || !harvestFeedPlayer) return prev
       const max = computeHarvestFeedCounterMax(
         option,
         harvestFeedOptions,
-        prev,
+        currentCounts,
         harvestFeedPlayer.resources,
       )
       const nextValue = Math.max(0, Math.min(current + delta, max))
       if (nextValue === current) return prev
       return { ...prev, [id]: nextValue }
     })
-  }, [harvestFeedOptions, harvestFeedPlayer])
+  }, [harvestFeedOptionIds, harvestFeedOptions, harvestFeedPlayer])
 
   const resetHarvestFeedCounts = useCallback(() => {
     const nextCounts: Record<string, number> = {}
@@ -950,7 +822,7 @@ export const GameContainerApi = () => {
     () =>
       harvestFeedOptions
         .map((option) => ({
-          count: harvestFeedCounts[option.id] ?? 0,
+          count: activeHarvestFeedCounts[option.id] ?? 0,
           sourceName: option.sourceName,
           sourceId: option.sourceId,
           exchangeIndex: option.exchangeIndex,
@@ -958,7 +830,7 @@ export const GameContainerApi = () => {
           to: option.to,
         }))
         .filter((entry) => entry.count > 0),
-    [harvestFeedCounts, harvestFeedOptions],
+    [activeHarvestFeedCounts, harvestFeedOptions],
   )
   const harvestFeedConvertedFood = useMemo(
     () =>
@@ -1597,12 +1469,12 @@ export const GameContainerApi = () => {
             <div className="exchange-content">
               <div className="exchange-options">
                 {harvestFeedOptions.map((option) => {
-                  const current = harvestFeedCounts[option.id] ?? 0
+                  const current = activeHarvestFeedCounts[option.id] ?? 0
                   const limit = harvestFeedPlayer
                     ? computeHarvestFeedCounterMax(
                         option,
                         harvestFeedOptions,
-                        harvestFeedCounts,
+                        activeHarvestFeedCounts,
                         harvestFeedPlayer.resources,
                       )
                     : 0
@@ -1715,7 +1587,7 @@ export const GameContainerApi = () => {
                     food: 0,
                     max: 0,
                   }
-                  const current = bakeExchangeCounts[option.value] ?? 0
+                  const current = activeBakeExchangeCounts[option.value] ?? 0
                   const availableGrain = bakeExchangePlayer?.resources.grain ?? 0
                   const remaining = Math.max(0, availableGrain - bakeTotalGrain)
                   const limit = Math.min(info.max, current + remaining)
@@ -1781,6 +1653,7 @@ export const GameContainerApi = () => {
                     type="button"
                     className="exchange-confirm"
                     onClick={confirmBakeExchange}
+                    disabled={!hasBakeSelection}
                   >
                     {t(locale, 'ui.interactionConfirmButton')}
                   </button>

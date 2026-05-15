@@ -179,25 +179,18 @@ describe('improvement logging', () => {
         params: {
           improvements: 'C60_SmallPottersOven',
           costResources: { clay: 2 },
-          returnedCards: ['Major_ClayOven'],
         },
       },
     ])
     expect(result.extraData?.improvementPayment).toEqual({
       improvementId: 'C60_SmallPottersOven',
       resourcesPaid: { clay: 2 },
-      returnedCardId: 'Major_ClayOven',
     })
     expect(result.flow).toMatchObject({
-      type: 'seq',
-      children: [
-        {
-          type: 'leaf',
-          actionId: 'gain',
-          sourceCard: 'C60_SmallPottersOven',
-          params: { food: 5 },
-        },
-      ],
+      type: 'leaf',
+      actionId: 'gain',
+      sourceCard: 'C60_SmallPottersOven',
+      params: { food: 5 },
     })
     expect(player.resources.clay).toBe(0)
     expect(player.resources.food).toBe(0)
@@ -223,4 +216,3 @@ describe('improvement logging', () => {
     expect(player.minorPlayed).toContain('A53_Claypipe')
   })
 })
-

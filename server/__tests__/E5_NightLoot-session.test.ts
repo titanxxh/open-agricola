@@ -68,11 +68,24 @@ describe('E5_NightLoot session', () => {
 
     if (woodSpace) {
       expect(flow).toBeDefined()
-      expect(flow!.type).toBe('leaf')
-      const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
-      expect(leaf.actionId).toBe('take-from-space')
-      expect(leaf.actionContext?.resource).toBe('wood')
-      expect(leaf.actionContext?.amount).toBe(1)
+      // Multiple wood-bearing spaces may exist; impl emits leaf when only one
+      // (space,resource) option is available, else XOR of single leaves.
+      if (flow!.type === 'leaf') {
+        const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
+        expect(leaf.actionId).toBe('collect')
+        expect(leaf.actionContext?.resource).toBe('wood')
+        expect(leaf.actionContext?.amount).toBe(1)
+      } else {
+        expect(flow!.type).toBe('xor')
+        const children = (flow as Extract<ActionFlow, { type: 'xor' }>).children
+        for (const child of children) {
+          expect(child.type).toBe('leaf')
+          const leaf = child as Extract<ActionFlow, { type: 'leaf' }>
+          expect(leaf.actionId).toBe('collect')
+          expect(leaf.actionContext?.resource).toBe('wood')
+          expect(leaf.actionContext?.amount).toBe(1)
+        }
+      }
     }
   })
 
@@ -135,11 +148,14 @@ describe('E5_NightLoot session', () => {
     expect((E5_NightLoot as { passing?: boolean }).passing).toBeFalsy()
   })
 
-  it('onBuy uses take-from-space leaves that decrement accumulation spaces', () => {
+  it('onBuy uses collect leaves with actionContext that decrement accumulation spaces', () => {
     // BGA `E5_NightLoot::actSelectResources` decrements the chosen
     // accumulation space's resources. Our previous impl used gain leaves
     // pulling from the general supply, so the accumulation space was left
-    // untouched (the player effectively double-banked the resource).
+    // untouched (the player effectively double-banked the resource). After
+    // T5e the leaf uses `collect` + actionContext partial-take semantics so
+    // the source accumulation space is decremented (and downstream listeners
+    // such as E33 can react via the `collect` action hook).
     const { session, state } = setupSession()
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
@@ -162,8 +178,8 @@ describe('E5_NightLoot session', () => {
     if (!woodSpace || !stoneSpace) return
     expect(flow.type).toBe('xor')
     const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
-    // Exactly 1 (wood+stone) pair candidate; must be a SEQ of 2
-    // take-from-space leaves, not a single gain leaf.
+    // Exactly 1 (wood+stone) pair candidate; must be a SEQ of 2 collect
+    // leaves carrying actionContext, not a single gain leaf.
     expect(children.length).toBe(1)
     const child = children[0]
     expect(child.type).toBe('seq')
@@ -171,7 +187,10 @@ describe('E5_NightLoot session', () => {
     expect(inner.length).toBe(2)
     inner.forEach((leaf) => {
       expect(leaf.type).toBe('leaf')
-      expect((leaf as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('take-from-space')
+      const l = leaf as Extract<ActionFlow, { type: 'leaf' }>
+      expect(l.actionId).toBe('collect')
+      expect(l.actionContext?.amount).toBe(1)
+      expect(['wood', 'stone']).toContain(l.actionContext?.resource as string)
     })
   })
 

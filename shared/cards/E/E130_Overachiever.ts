@@ -17,7 +17,15 @@ const beforeWishChildrenListener: CardListenerRegistration = {
   actions: ['family-growth'],
   handler: (_context: CardListenerContext): ActionHookResult | void => {
     return {
-      flow: { type: 'leaf', actionId: 'improvement-any', optional: true, promptKey: 'ui.interactionOverachieverImprovement', sourceCard: CARD_ID },
+      flow: {
+        type: 'leaf',
+        actionId: 'improvement-any',
+        optional: true,
+        promptKey: 'ui.interactionOverachieverImprovement',
+        sourceCard: CARD_ID,
+        params: { trueAction: false },
+        actionContext: { trueAction: false },
+      },
       logKey: 'log.cardGrantedAction',
       logParams: { cardId: CARD_ID, actionId: 'improvement-any' },
       sourceCard: CARD_ID,

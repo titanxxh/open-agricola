@@ -13,6 +13,7 @@ import {
 import { getMatchingListeners, executeCardListener, type MatchedCardListener, type CardListenerContext } from '../cards/card-listeners'
 import { resolveActionPreviewCost } from '../actions/helpers/cost-preview'
 import { canPayResources } from '../actions/payment/internal'
+import { getSkipComputeReplaceListenerIds } from './replace-guard'
 
 export type EffectPhaseResult = {
   actionHookResults: ActionHookResult[]
@@ -24,6 +25,7 @@ export type ComputeReplaceResult = {
   declined: boolean
   alternativeFlow?: ActionFlow
   sourceCard?: string
+  replacementListenerIds: string[]
 }
 
 const cloneValue = <T>(value: T): T => {
@@ -86,9 +88,12 @@ export class HookDispatcher {
     let declined = false
     let alternativeFlow: ActionFlow | undefined
     let sourceCard = context.sourceCard
+    let replacementListenerIds = getSkipComputeReplaceListenerIds(context.actionContext)
+    const skippedListenerIds = new Set(replacementListenerIds)
     const listenerContext: CardListenerContext = { ...context, phase: 'computeReplace' }
     const matched = getMatchingListeners(listenerContext)
     for (const entry of matched) {
+      if (skippedListenerIds.has(entry.registration.id)) continue
       const result = executeCardListener(entry.registration, listenerContext, {
         ownerPlayerId: entry.ownerPlayerId,
       })
@@ -102,10 +107,12 @@ export class HookDispatcher {
         if (result.decline) {
           declined = true
           alternativeFlow = result.alternativeFlow
+          skippedListenerIds.add(entry.registration.id)
+          replacementListenerIds = [...new Set([...replacementListenerIds, entry.registration.id])]
         }
       }
     }
-    return { actionId, declined, alternativeFlow, sourceCard }
+    return { actionId, declined, alternativeFlow, sourceCard, replacementListenerIds }
   }
 
   applyIsDoable(

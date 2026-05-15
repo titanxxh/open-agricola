@@ -72,6 +72,7 @@ import {
 import { type CustomCardData, SessionCardContext, withSessionContext } from '../cards/session-card-context.ts'
 import { CardRegistry, type CardImpl } from '../cards/registry.ts'
 import { getActiveCardRegistry, setActiveCardRegistry } from '../cards/active-registry.ts'
+import { ensureCatalogLookupsInstalled } from '../cards/install-catalog-lookups.ts'
 import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { allOccupationCards, allMinorImprovementCards } from '../cards/catalog.ts'
 import { majorCardDefinitions } from '../cards/major/index.ts'
@@ -551,6 +552,7 @@ export class GameCore {
   readonly cardWarnings: string[] = []
 
   constructor(options: GameCoreOptions = {}) {
+    ensureCatalogLookupsInstalled()
     const { stateOrSeed, customCards, initialStateOptions, registerCustomCardImpl } = options
     this.registerCustomCardImpl = registerCustomCardImpl ?? (() => {
       // No-op default: used in sandbox mode (browser) or tests that don't need
@@ -2420,6 +2422,7 @@ export class GameCore {
           let autoOptions = step.choice.options
           while (autoOptions.length === 1) {
             const auto = autoOptions[0]
+            if (auto?.disabled === true) return
             const resolvedActionId = this.peekHostPendingActionId()
             const result = frame.engine.resolveChoice(auto.value, { state: this.state, player, space })
             this.flushEngineLog()
@@ -2429,6 +2432,7 @@ export class GameCore {
             if (result.type === 'request' && result.request.kind === 'choice') {
               const requestOptions = result.request.options
               if (requestOptions.length === 1) {
+                if (requestOptions[0]?.disabled === true) return
                 autoOptions = requestOptions
                 continue
               }
@@ -2775,6 +2779,9 @@ export class GameCore {
       return this.respond()
     }
     if (result.type === 'fail') {
+      if (result.recoverable === true) {
+        return this.respond(false, result.logKey ?? 'action failed')
+      }
       this.engineStack.pop()
       this.actionStartIndex = null
       this.actionStartPlayerSnapshot = null

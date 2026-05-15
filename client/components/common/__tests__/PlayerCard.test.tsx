@@ -3,9 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { PlayerCard } from '../PlayerCard'
 import { clearCustomCards, registerCustomCard } from '../../../../shared/cards/custom-registry'
-// Cards-manifest is preloaded by `shared/cards/__tests__/setup-register-all.ts`
-// (listed in `vitest.config.ts` -> `setupFiles`), so `getCardMeta()` resolves
-// synchronously during render.
+// Cards-manifest is preloaded by `client/__tests__/setup-card-manifest.ts`.
 
 describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
   beforeEach(() => {
@@ -43,6 +41,15 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).toContain('card-res-icon stone')
   })
 
+  it('renders C60 prerequisite separately and keeps the cost area resource-only', () => {
+    const html = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId="C60_SmallPottersOven" cardType="minor" />,
+    )
+    expect(html).toContain('Return the Clay / Stone Oven')
+    expect(html).not.toContain('card-cost-return')
+    expect(html).toContain('card-res-icon clay')
+  })
+
   it('does not emit data-also-counts-as on plain (non-dual) minors', () => {
     const html = renderToStaticMarkup(
       // D34 is a plain minor with no alsoCountsAs; picking it keeps this
@@ -54,8 +61,6 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
 
   it('renders desc placeholders as inline icons (no literal <WOOD> text)', () => {
     // E76_LumberPile description contains <WOOD> and <STABLE> placeholders.
-    // The cards-manifest is preloaded by setup-register-all.ts so getCardMeta
-    // returns a real card definition synchronously.
     const html = renderToStaticMarkup(
       <PlayerCard locale="zh" cardId="E76_LumberPile" cardType="minor" />,
     )

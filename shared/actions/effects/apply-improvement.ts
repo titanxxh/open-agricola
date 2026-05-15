@@ -42,7 +42,6 @@ const readActionBonusSources = (player: PlayerState): string[] | undefined => {
 export type ApplyImprovementParams = {
   improvementId: string
   kind: 'major' | 'minor'
-  suppressOnBuyEffects?: boolean
 }
 
 const isApplyImprovementParams = (raw: unknown): raw is ApplyImprovementParams => {
@@ -97,12 +96,12 @@ export const applyImprovementAction: ActionDefinition = {
     if (!isApplyImprovementParams(params)) {
       return { type: 'fail', logKey: 'log.improvementFail' }
     }
-    const { improvementId, kind, suppressOnBuyEffects } = params
-    // Pop the seq-shared paymentInfo so onBuy effects (e.g. C60 keying its
-    // 5-food gain on returnedCardId) match legacy finalize behaviour. Bonus
-    // sources are read while the per-action scratchpad is still live so the
-    // emitted log.playImprovement / log.playMinorImprovement entry attributes
-    // any discount cards (D95 etc.) just like the old mutate-in-place flow.
+    const { improvementId, kind } = params
+    // Pop the seq-shared paymentInfo so onBuy effects match legacy finalize
+    // behaviour. Bonus sources are read while the per-action scratchpad is
+    // still live so the emitted log.playImprovement / log.playMinorImprovement
+    // entry attributes any discount cards (D95 etc.) just like the old
+    // mutate-in-place flow.
     const paymentInfo = player._pendingImprovementPaymentInfo
     delete player._pendingImprovementPaymentInfo
     const bonusSources = readActionBonusSources(player)
@@ -117,14 +116,6 @@ export const applyImprovementAction: ActionDefinition = {
       bonusSources,
     })
     const immediateLogs = [{ key: logKey, params: logParams }]
-    if (suppressOnBuyEffects) {
-      return {
-        type: 'ok',
-        immediateLogs,
-        logKey,
-        logParams,
-      }
-    }
     const activation = activateCard(state, player, improvementId, 'onBuy', paymentInfo)
     if (activation.type === 'flow') {
       activation.immediateLogs = [...immediateLogs, ...(activation.immediateLogs ?? [])]

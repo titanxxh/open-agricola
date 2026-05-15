@@ -327,6 +327,7 @@ export const normalizeState = (raw: GameState): GameState => {
     futureMeeples: raw.futureMeeples ?? [],
     pendingFutureMeeples: raw.pendingFutureMeeples ?? [],
     enableCommunityDeck: raw.enableCommunityDeck ?? false,
+    completedFeedingPhases: raw.completedFeedingPhases ?? 0,
   }
 }
 
@@ -486,6 +487,7 @@ export const createInitialState = (
     gameOver: false,
     enableCommunityDeck: options.enableCommunityDeck ?? false,
     workPhaseObtainedResources: {},
+    completedFeedingPhases: 0,
   }
   applyRoundGrowth(initialState)
   initialState.roundStartSnapshot = createRoundSnapshot(initialState)

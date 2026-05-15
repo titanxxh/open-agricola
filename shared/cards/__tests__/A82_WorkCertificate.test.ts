@@ -56,7 +56,7 @@ describe('A82_WorkCertificate', () => {
       (l) => l.id === 'A82-work-certificate-after-place-farmer',
     )
 
-  it('emits take-from-space leaves (not gain) so the source space is decremented', () => {
+  it('emits collect leaves with actionContext (not gain) so the source space is decremented', () => {
     const listener = findListener()
     expect(listener).toBeDefined()
     const player = createPlayer()
@@ -72,12 +72,12 @@ describe('A82_WorkCertificate', () => {
     const flow = result!.flow as Extract<ActionFlow, { type: 'xor' }>
     expect(flow.type).toBe('xor')
     expect(flow.children.length).toBeGreaterThan(0)
-    // All children must be `take-from-space` leaves (not `gain`).
+    // All children must be `collect` leaves with actionContext (not `gain`).
     for (const child of flow.children) {
       expect(child.type).toBe('leaf')
       // narrow
       if (child.type === 'leaf') {
-        expect(child.actionId).toBe('take-from-space')
+        expect(child.actionId).toBe('collect')
         expect(child.actionContext?.spaceId).toBe('forest')
         expect(child.actionContext?.resource).toBe('wood')
         expect(child.actionContext?.amount).toBe(1)

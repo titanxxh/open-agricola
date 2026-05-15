@@ -6,6 +6,7 @@ import type {
   ImmediateLogEntry,
   InteractionRequest,
   LogEntry,
+  Resource,
 } from '../contract/types'
 import {
   ActionNode,
@@ -38,6 +39,7 @@ import {
   buildFollowUpNodes,
   buildListenerEvent,
   buildOwnedFlowNode,
+  canActionContinueWithoutBeforeTriggers,
   collectNodeIds,
   findActionNode,
   getNodeDescriptionPreview,
@@ -49,11 +51,53 @@ import {
 } from './engine-utils'
 import type { PendingEnvelope } from './types'
 import { isActivateCardActionNode, type ActivateCardActionNode } from './activation-action'
+import { evaluateTriggerSelect, type TriggerSelectEvaluationOptions } from './trigger-select'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
   player: ActionExecutionContext['player']
   space: ActionExecutionContext['space']
+}
+
+const triggerSelectEvaluationOptions = (
+  int: EngineInternals,
+  context: ActionExecutionContext,
+): TriggerSelectEvaluationOptions => ({
+  canContinueWithoutTriggers: (actionId, resources) =>
+    canActionContinueWithoutBeforeTriggers(int, context, actionId, resources),
+  canReachContinuationThroughTriggers: (actionId, resources) => {
+    const action = int.registry.get(actionId)
+    if (!action) return false
+    const scopedContext = withResourcePreview(context, resources)
+    return action.canBeExecutedByPlayer(
+      scopedContext.state,
+      scopedContext.player,
+      {
+        sourceCard: scopedContext.sourceCard,
+        actionContext: scopedContext.actionContext,
+      },
+    )
+  },
+})
+
+const withResourcePreview = (
+  context: ActionExecutionContext,
+  resources?: Resource,
+): ActionExecutionContext => {
+  if (!resources) return context
+  const player = {
+    ...context.player,
+    resources: { ...resources },
+  }
+  return {
+    ...context,
+    player,
+    state: {
+      ...context.state,
+      players: (context.state.players ?? []).map((entry) =>
+        entry.id === player.id ? player : entry),
+    },
+  }
 }
 
 type ImmediateLogCarrier = {
@@ -439,23 +483,31 @@ export function engineProceed(
       return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
     }
     if (stepResult.kind === 'request') {
-      const options = node.buildSelectOptions()
+      const evaluation = evaluateTriggerSelect(node, context, triggerSelectEvaluationOptions(int, context))
+      const options = evaluation.options
+      if (options.length === 0) {
+        node.resolve()
+        return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+      }
       const promptKey = 'ui.interactionSelectTrigger' as import('../contract/prompt-keys').PromptKey
+      const request: InteractionRequest = stepResult.request.kind === 'select-trigger'
+        ? { ...stepResult.request, options }
+        : stepResult.request
       node.setPending({
         hostNodeId: node.id,
-        request: stepResult.request,
+        request,
         choices: options,
         promptKey,
         promptParams: undefined,
         ownerNodeId: null,
-        effectiveOwnerPlayerId: stepResult.request.kind === 'select-trigger'
-          ? stepResult.request.ownerPlayerId || node.ownerPlayerId
+        effectiveOwnerPlayerId: request.kind === 'select-trigger'
+          ? request.ownerPlayerId || node.ownerPlayerId
           : node.ownerPlayerId,
       })
       node.emittedChoices = options
       node.emittedPromptKey = promptKey
       node.emittedPromptParams = undefined
-      node.emittedRequest = stepResult.request
+      node.emittedRequest = request
       int.pendingNodeIdRef.value = node.id
       return {
         type: 'choice',
@@ -495,6 +547,7 @@ export function engineProceed(
             replaceResult.sourceCard,
           ),
           replacedActionId,
+          replaceResult.replacementListenerIds,
         ),
         context.player.id,
       )

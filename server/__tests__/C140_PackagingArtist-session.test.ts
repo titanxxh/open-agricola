@@ -53,6 +53,26 @@ describe('C140_PackagingArtist session', () => {
     expect(leaf.sourceCard).toBe(CARD_ID)
   })
 
+  it('computeReplace is silent when trueAction=false', () => {
+    const listener = findListener('C140-packaging-artist-replace-minor-improvement')
+    expect(listener).toBeDefined()
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    const player = state.players[0]!
+    player.occupationPlayed.push(CARD_ID)
+    session.loadState(state)
+
+    const result = executeCardListener(listener!, {
+      state,
+      player,
+      actionId: 'minor-improvement',
+      phase: 'computeReplace',
+      trueAction: false,
+    } as unknown as CardListenerContext)
+    expect(result).toBeUndefined()
+  })
+
   // BGA: onPlayerIsDoable forces minor-improvement to be doable when player
   // has any "real" minor action context (the card replaces it with bake-bread,
   // which is always doable as long as the player can bake — the listener
@@ -77,6 +97,28 @@ describe('C140_PackagingArtist session', () => {
       doable: false,
     } as unknown as CardListenerContext)
     expect(result?.doable).toBe(true)
+  })
+
+  it('isDoable is silent when trueAction=false', () => {
+    const listener = findListener('C140-packaging-artist-isdoable-minor-improvement')
+    expect(listener).toBeDefined()
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    const player = state.players[0]!
+    player.occupationPlayed.push(CARD_ID)
+    player.minorHand = []
+    session.loadState(state)
+
+    const result = executeCardListener(listener!, {
+      state,
+      player,
+      actionId: 'minor-improvement',
+      phase: 'isDoable',
+      doable: false,
+      trueAction: false,
+    } as unknown as CardListenerContext)
+    expect(result).toBeUndefined()
   })
 
   it('isDoable: keeps doable=true unchanged when already doable', () => {

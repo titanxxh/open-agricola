@@ -1,6 +1,5 @@
 import { getCustomMinorImprovement, getCustomOccupation } from './custom-registry'
 import { MinorImprovement, Occupation, PlayerActionCard } from '../cards-display/types'
-import { registerCardLookups } from './registry-runtime'
 import type { CardDefinition } from '../contract/cards'
 import { majorCardDefinitions } from './major'
 import { allCommunityCards } from './community/auto-catalog'
@@ -76,28 +75,3 @@ export const getCardDefinition = (id: string): CardDefinition | undefined => {
 export const isFieldCard = (id: string): boolean => {
   return getCardDefinition(id)?.isField === true
 }
-
-// Install the lookups on `types.ts` so `getRegisteredMinorImprovement` /
-// `getRegisteredOccupation` work without module-level side effects in the card
-// constructors. This runs once when catalog.ts is first imported.
-//
-// Class-type filters replicate the previous `CardBase` constructor side effect
-// (which keyed by `this instanceof MinorImprovement | Occupation | PlayerActionCard`).
-// All cards now live in the correct array (issue #10). The dual-array scan
-// below is kept as a defensive belt-and-suspenders; `scripts/check-catalog-types.ts`
-// is the authoritative regression guard.
-const cardMatchesMinor = (c: unknown): c is MinorImprovement =>
-  c instanceof MinorImprovement || c instanceof PlayerActionCard
-const cardMatchesOccupation = (c: unknown): c is Occupation =>
-  c instanceof Occupation
-const allCards = [...allMinorImprovementCards, ...allOccupationCards]
-registerCardLookups({
-  minor: (id) =>
-    allCards.find((c) => c.id === id && cardMatchesMinor(c))
-    ?? getCustomMinorImprovement(id)
-    ?? undefined,
-  occupation: (id) =>
-    allCards.find((c) => c.id === id && cardMatchesOccupation(c))
-    ?? getCustomOccupation(id)
-    ?? undefined,
-})

@@ -217,6 +217,7 @@ export const en = {
     interactionFlowDone: 'Done',
     interactionSelectTrigger: 'Choose which card effect to resolve first',
     interactionSelectTriggerPass: 'Pass (skip remaining)',
+    interactionTriggerUnavailable: 'Current conditions are not met',
     interactionFarmExpansionSelect: 'Choose expansion actions',
     interactionPlowSelect: 'Select a tile to plow',
     interactionPlowConfirm: 'Confirm plow',
@@ -274,6 +275,7 @@ export const en = {
     interactionAleBenches:
       'Ale-Benches: Pay 1 grain for 1 bonus VP. If you do, each other player gets 1 food?',
     interactionSmallPottersOvenBuild: "Small Potter's Oven: Build the Clay Oven or Stone Oven before baking?",
+    interactionSmallPottersOvenReturn: "Small Potter's Oven: Return which oven?",
     interactionAgrarianFencesBakeAndFence: 'Bake bread and build fences',
     interactionAgrarianFencesSowAndFence: 'Sow and build fences',
     interactionBellfounder: 'Bellfounder: Discard all clay for 3 food or 1 bonus VP?',
@@ -565,10 +567,6 @@ export const en = {
     'spend-worker': {
       description: 'Spend 1 worker',
           name: 'Spend Worker',
-},
-    'take-from-space': {
-      description: 'Take {resources_desc} from {action_space}',
-          name: 'Take from Space',
 },
 },
   improvements: {
@@ -902,9 +900,9 @@ export const en = {
     renovationFail: 'Renovation failed',
     reorganizeFail: 'Reorganize failed: missing zones payload',
     specialEffectFail: 'Special effect failed',
-    takeFromSpaceInvalid: 'Invalid take from space',
-    takeFromSpaceNoSpace: 'No space to take from',
-    takeFromSpaceNotEnough: 'Not enough resources on space',
+    collectNoSpace: 'No space to collect from',
+    collectNotEnough: 'Not enough resources on space',
+    collectInvalidPartial: 'Invalid partial collect payload',
   },
   platform: {
     loading: 'Loading...',
@@ -1156,6 +1154,7 @@ export const en = {
     },
     A39_Chapel: { name: 'Chapel', desc: 'Get 3 bonus VP. Others pay 1 grain to owner.' },
     A162_ForestTallyman: { name: 'Forest Tallyman', desc: 'When Forest + Clay Pit occupied: get 2 clay + 3 wood.' },
+    STUB_BeforeBakeGainClay: { name: 'STUB Before Bake Clay', desc: 'Test stub: before baking bread, gain 1 clay.' },
     D122_ClayCarrier: { anytime: 'Clay Carrier: Pay 2 Food → 2 Clay' },
     E86_PenBuilder: { anytime: 'Pen Builder: Pay 1 Wood → +2 Animal Capacity' },
     A102_Grocer: { anytime: 'Grocer: Pay 1 Food → Buy top good' },
@@ -1224,7 +1223,8 @@ export const en = {
       anytime: 'Seed Trader: Pay 1 Food → 1 Grain',
     },
     D13_Trowel: {
-      anytime: 'Trowel: Pay 1 Food → 1 Clay',
+      anytime: 'Trowel: Renovate to Stone',
+      optionStone: 'Renovate to Stone',
     },
     D53_TeaHouse: {
       anytime: 'Tea House: Pay 1 Food → 1 Food',

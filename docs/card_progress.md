@@ -11,13 +11,34 @@
 | canonical 层面 BGA-only / OA-only | 0 / 0 |
 | TypeScript 实体卡牌文件数 | 888 |
 | BGA active implemented 但 OA 缺失 | 0 |
-| 待修行为 / 注册差异 | 10 |
+| 待修行为 / 注册差异 | 4 |
 | metadata schema 上抬差异 | 4 |
 | BGA 标 banned 但 OA 按策略保留 | 33 |
 | 待 owner 确认队列 | 0 |
 
 `C71` 已只保留 canonical `C71_Slurry`。BGA 里的 `C71_SlurrySpreader`
 是 legacy wrong-name 且 `implemented=false`，OA 不再注册或展示该名称。
+`STUB_BeforeBakeGainClay` 是 dev/test stub，不计入 canonical 卡牌统计或普通发牌池。
+
+### 本轮变更记录（2026-05-15）
+
+- `bake-bread` 核心 action 改为默认非空：不再暴露 `cancel`，`cancel` / 空 `bulk:` / 无效 source / 非正 count / 超出 source 上限 / 超出 grain 总量都会在后端失败，且 `bulk:` 失败保持原子性。
+- `D66_PotterCeramics` 已按 BGA before-bake 语义对齐：以 `dispatchMode: 'select'` 暴露 1 clay -> 1 grain 的纯 flow；无 grain 但有 clay + baking source 时可进入 bake，trigger-select 中 D66 enabled、pass disabled，执行 D66 后进入非空 bake。
+- 新增 `STUB_BeforeBakeGainClay` dev/test stub：可通过 devmode `devPlayCard` 加入玩家小改良，before bake 时作为 `dispatchMode: 'select'` trigger 获得 1 clay，用于 UI 复现“同批 before trigger 先拿 clay 再解锁 D66”的路径。
+- `A24_ThreshingBoard` / `C25_SteamMachine` 的可选 bake 来源已迁到外层 `optional` flow，不再依赖 bake 内部 cancel 表达 skip。
+- `C25_SteamMachine` 卡牌实现已改用 display 定义导出的 `CARD_ID`，避免在 listener 与 flow 中重复硬编码卡牌 id 字符串。
+- `C60_SmallPottersOven` 已按 BGA 收敛：`isDoable` 只看玩家能否购买 `Major_ClayOven` / `Major_StoneOven`；before-bake 买炉子 flow 永远 optional，不再在卡牌文件中预演同批 before trigger 链路。
+- `C60_SmallPottersOven` UI 成本区已对齐为只显示 `2 clay`；不再用 `returnCards` 表达返还炉子，改由卡牌 `onBuy` 归还 Clay / Stone Oven。
+- `C60_SmallPottersOven` before-bake 建炉已改用 BGA-style `trueAction=false` 标记；不再跳过 Clay / Stone Oven 自身的 `onBuy` optional bake。
+- `B27_Toolbox` / `E130_Overachiever` / `E97_Beneficiary` 的附带 improvement flow 已补 `trueAction=false` 传播，避免触发真实 improvement action 专属监听 / 替换。
+- `C140_PackagingArtist` / `D94_HenpeckedHusband` 已补 `trueAction=false` 过滤；`B87_Cottager` 只在 construct 子节点保留非真实 action 标记，renovation 子节点对齐 BGA。
+- bake UI 的 source rate 不再只硬编码 major improvement；`cards-manifest` 暴露 `exchanges` 后，`A60_OrientalFireplace` / `D59_EarthOven` / `E63_IronOven` 等卡牌 bake source 也能显示计数器并提交 `bulk:`。
+- trigger-select 支持动态 enabled / disabled option：不可支付但结构适用的 trigger 仍展示为 disabled，服务器拒绝强行选择；同批 trigger 改变资源后会重新计算 option 状态。
+- trigger-select 的 pass gate 已支持通用 replacement continuation：先检查跳过 before trigger 后原 action 是否可直接继续；不行时检查 `computeReplace` 返回的 `alternativeFlow` 是否有可启动分支，避免 B26 + D66 这类 fencing fallback 被误判为必须触发 D66。
+- `computeReplace` decline 的替代 flow 若本身是 `xor`，引擎会把其 children 作为可选 replacement 分支展开；replacement 分支 leaf 只携带 `skipComputeReplaceListenerIds` 跳过来源 listener，不再携带 `checkedReplaceAction`，避免误伤真实替代分支里的普通 before / after listener。original fallback 分支仍携带 `checkedReplaceAction=true`。
+- structured choice 允许列表从 interaction request metadata 读取；`bake-bread` / `exchange` 的 `bulk:` 不再靠 engine action-id 特判。
+- `A148_Woolgrower` / `B86_TruffleSearcher` 改用全局 `state.completedFeedingPhases` 计入容量；`D13_Trowel` 暴露 wood->stone 翻修；`D15_ClaySupports` 改为可选 multi-key trade；`E5_NightLoot` 列出全部 `(space,type)` 选项、复用 `collect` partial-take，并补可区分的来源展示元数据。
+- `collect` partial-take 在带 `spaceId` 时拒绝缺失 / 非正 `amount` 或缺失 `resource` 的 payload，避免错误回落到 full collect。
 
 ## 2. 待修行为 / 注册差异
 
@@ -25,16 +46,10 @@
 
 | 卡牌 | 原始行为 | 当前 OA 行为 | BGA 差距 | 需要修复 |
 |---|---|---|---|---|
-| `A148_Woolgrower` | 已完成 feeding phase 会计入羊容量。 | 容量来自本卡 `completedHarvests`，只从打出后开始计数。 | BGA 读取全局 completed feeding phases，所以晚打出也应享受之前的收获容量。 | 改用全局 completed feeding / harvest 计数，而不是本卡 post-play 计数。 |
-| `B86_TruffleSearcher` | 已完成 feeding phase 会计入野猪容量。 | 和 `A148` 一样使用本卡 post-play counter。 | BGA 同样读取全局 completed feeding phases。 | 和 `A148` 共用同一套全局计数来源。 |
 | `B157_Salter` | 玩家可以腌制多种 / 多只动物，并按数量获得未来食物。 | 当前 flow 是 XOR，只能三选一且只能选 1 只动物。 | BGA 一次交互可选择 sheep / boar / cattle 的多个数量。 | 改成显式多类型计数选择，并按类型 / 数量发放 future food。 |
 | `C8_PlantFertilizer` | 支持 grain / vegetable / wood / stone 等逻辑田组。 | 只处理物理 grain / vegetable field。 | BGA 可作用于后续卡牌创建的 wood / stone field 逻辑组。 | 田地查找改成 group-aware，并纳入已激活的 wood / stone 可播种组。 |
 | `C57_Crudite` | 收获时可选触发，玩家选择移除哪个 vegetable 来源。 | harvest handler 直接移除第一个符合条件的 vegetable，效果上是强制触发。 | BGA 在多来源时给 optional choice。 | 改成显式 optional pending / flow，并让玩家选择来源。 |
 | `C140_PackagingArtist` | 把 Major Improvement action 加入 replacement action pool。 | 实现了 minor replacement / `isDoable`，但没有把 Major Improvement 加进可替换 action pool。 | BGA 允许此卡扩展 replacement action 集合。 | 增加缺失的通用 action-pool 扩展点。 |
-| `D13_Trowel` | 木屋可直接翻修到 stone。 | 当前 renovate-house 路径仍只能 wood -> clay。 | BGA 传入 `toStone=true` 提供 wood -> stone 选项。 | 当此卡激活时，renovate flow 暴露 wood -> stone 选项。 |
-| `D15_ClaySupports` | 提供替代 clay trade，同时保留基础翻修费用语义。 | 当前实现成强制 cost delta。 | BGA 把它建模成可选替代支付，不是强制折扣路径。 | 显式建模 BGA 的 alternate-payment option。 |
-| `D66_PotterCeramics` | clay -> grain 后必须 bake。 | clay 转 grain 后仍可 skip bake。 | BGA 对这个效果强制 bake。 | 把生成的 bake continuation 标记为 mandatory。 |
-| `E5_NightLoot` | 玩家选择具体 accumulation space / resource 来偷取。 | 按所选资源自动取第一个匹配 accumulation space。 | BGA 暴露精确来源选择。 | 交互中加入 source-space 选择。 |
 
 ## 3. Metadata Schema 上抬差异
 
@@ -130,3 +145,26 @@ pnpm exec vitest run <targeted-test-file>
 pnpm test:fast
 pnpm run lint
 ```
+
+## 9. 当前轮次
+
+- 2026-05-15 — Wave 1 cards (A148/B86/D15/D13/E5) aligned to BGA; 4 infra extensions
+- 2026-05-15 — C60/B27/E130/E97 side improvement flows aligned to BGA `trueAction=false`; removed synthetic onBuy suppression from improvement/occupation apply leaves
+
+## 10. 基础设施
+
+通用扩展点（卡牌之间共享、登记在此以避免重复造轮子）：
+
+- `GameState.completedFeedingPhases` — 全局收获计数（A148/B86 共用，BGA Globals 同款）。
+- `collect` action 统一 partial-take（接受 `actionContext: {spaceId, resource, amount}`），删除 `take-from-space`。
+- `buildTradeFees` 支持多键 trade（D15 即时 clay trade 复用），把多 `to` key 编译到 PaymentSolver 期望的 cost 形状。
+- `TradeModifier.conditions?: Record<string, number>` — D15 trade gated by `houseTypeClay`；其余 `houseTypeWood` / `houseTypeStone` / `minNumRooms` 同套机制。
+- `onComputeAnimalZones` 签名加 `state: GameState` 入参（A148 / B86 读全局 feeding counter，避免再走玩家局部 state）。
+- `improvement-any` 的 `params.trueAction=false` 会传播到生成的 `pay` / `apply-improvement` leaf `actionContext`，用于 BGA-style 非真实 action 过滤，但不抑制所购卡牌 `onBuy`。
+
+## 11. 时间线
+
+| 日期 | 批次 | 涉及卡牌 / 基建 |
+|---|---|---|
+| 2026-05-15 | trueAction follow-up | C60_SmallPottersOven / B27_Toolbox / E130_Overachiever / E97_Beneficiary + improvement-any/minor-improvement `trueAction=false` propagation |
+| 2026-05-15 | Wave 1 | A148_Woolgrower / B86_TruffleSearcher / D15_ClaySupports / D13_Trowel / E5_NightLoot + 4 项基建（§10） |

@@ -227,6 +227,108 @@ describe('Engine flow nodes', () => {
     })
   })
 
+  it('single select listener is wrapped in trigger-select', () => {
+    const p1 = createPlayer()
+    const state = createState()
+    state.players = [p1]
+
+    const registry = new ActionRegistry()
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('trigger', 'gain')),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const matched: MatchedCardListener[] = [
+      {
+        registration: {
+          id: 'listener-1',
+          cardIds: ['C1'],
+          dispatchMode: 'select',
+          handler: () => undefined,
+        },
+        cardId: 'C1',
+        ownerPlayerId: p1.id,
+      },
+    ]
+
+    const nodes = buildPhaseTrailingNodes(
+      engine._internals(),
+      matched,
+      'after',
+      'gain',
+      state,
+      {},
+      p1.id,
+    )
+
+    expect(nodes).toHaveLength(1)
+    const node = nodes[0]
+    expect(node).toBeInstanceOf(ParallelNode)
+    const parallel = node as ParallelNode
+    expect(parallel.mode).toBe('trigger-select')
+    expect(parallel.children).toHaveLength(1)
+    expect(parallel.children[0]).toBeInstanceOf(ActionNode)
+    const child = parallel.children[0] as ActionNode
+    expect(child.actionId).toBe('activate-card')
+    expect(child.sourceCard).toBe('C1')
+  })
+
+  it('disabled trigger-select choice is rejected without resolving the child', () => {
+    const p1 = createPlayer()
+    p1.minorPlayed = ['C1']
+    const state = createState()
+    state.players = [p1]
+
+    const cardRegistry = new CardRegistry()
+    const listener = {
+      id: 'listener-1',
+      cardIds: ['C1'],
+      dispatchMode: 'select' as const,
+      handler: () => ({
+        flow: { type: 'leaf' as const, actionId: 'pay', params: { cost: { wood: 1 } } },
+      }),
+    }
+    cardRegistry.registerListener(listener)
+    setActiveCardRegistry(cardRegistry)
+
+    const registry = new ActionRegistry()
+    const engineForNodes = new Engine({
+      tree: new EngineTree(new ActionNode('trigger', 'gain')),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const nodes = buildPhaseTrailingNodes(
+      engineForNodes._internals(),
+      [{ registration: listener, cardId: 'C1', ownerPlayerId: p1.id }],
+      'after',
+      'gain',
+      state,
+      {},
+      p1.id,
+    )
+    const triggerSelect = nodes[0] as ParallelNode
+    const child = triggerSelect.children[0]!
+    const engine = new Engine({
+      tree: new EngineTree(triggerSelect),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const context = { state, player: p1, space: createSpace(gainAction) }
+
+    const prompt = engine.proceed(context)
+    expect(prompt.type).toBe('choice')
+    if (prompt.type !== 'choice') throw new Error('expected trigger-select choice')
+    expect(prompt.choice.options.find((option) => option.value === 'C1')?.disabled).toBe(true)
+
+    const rejected = engine.resolveChoice('C1', context)
+
+    expect(rejected.type).toBe('fail')
+    expect(child.getState()).toBe('ready')
+  })
+
   it('during listener activation preserves original trigger player for cross-owner listeners', () => {
     const p1 = createPlayer()
     const p2 = { ...createPlayer(), id: 'p2', name: 'P2', color: 'blue' as const }
@@ -1033,6 +1135,100 @@ describe('Engine flow nodes', () => {
     const result = engine.resolveChoice(originalOption!.value, { state, player, space })
     expect(result.type).toBe('ok')
     expect(events).toEqual(['original'])
+  })
+
+  it('replacement alternatives keep normal hook context while suppressing source replace recursion', () => {
+    const events: string[] = []
+    const sow: ActionDefinition = {
+      id: 'sow',
+      nameKey: 'actions.sow.name',
+      descriptionKey: 'actions.sow.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: ({ actionContext }) => {
+        events.push(actionContext?.checkedReplaceAction === true ? 'sow:checked' : 'sow:normal')
+        return { type: 'ok' }
+      },
+    }
+    const fence: ActionDefinition = {
+      id: 'fence',
+      nameKey: 'actions.fencing.name',
+      descriptionKey: 'actions.fencing.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('fence')
+        return { type: 'ok' }
+      },
+    }
+    requireActiveCardRegistry('engine-flow').registerListener({
+      id: 'offer-sow-fence-replacement',
+      actions: ['sow'],
+      phases: ['computeReplace'],
+      handler: (hookContext) => {
+        events.push(hookContext.actionContext?.checkedReplaceAction === true
+          ? 'replace:checked'
+          : 'replace:normal')
+        if (hookContext.actionContext?.checkedReplaceAction === true) return
+        return {
+          decline: true,
+          alternativeFlow: {
+            type: 'seq',
+            choiceLabelKey: 'test.sowAndFence',
+            children: [
+              { type: 'leaf', actionId: 'sow' },
+              { type: 'leaf', actionId: 'fence' },
+            ],
+          },
+        }
+      },
+    })
+    requireActiveCardRegistry('engine-flow').registerListener({
+      id: 'before-unconditional-sow',
+      actions: ['sow'],
+      phases: ['before'],
+      handler: (hookContext) => {
+        events.push(hookContext.actionContext?.checkedReplaceAction === true
+          ? 'before:checked'
+          : 'before:normal')
+        return undefined
+      },
+    })
+    const registry = new ActionRegistry()
+    registry.register(sow)
+    registry.register(fence)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('action-sow', 'sow')),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(sow)
+
+    expect(engine.proceed({ state, player, space }).type).toBe('ok')
+    const choiceStep = engine.proceed({ state, player, space })
+    expect(choiceStep.type).toBe('choice')
+    if (choiceStep.type !== 'choice') return
+    const sowAndFence = choiceStep.choice.options.find((option) => option.labelKey === 'test.sowAndFence')
+    expect(sowAndFence).toBeDefined()
+
+    expect(engine.resolveChoice(sowAndFence!.value, { state, player, space }).type).toBe('ok')
+    let step = engine.proceed({ state, player, space })
+    let safety = 20
+    while (safety-- > 0 && step.type === 'ok') {
+      step = engine.proceed({ state, player, space })
+    }
+
+    expect(step.type).toBe('done')
+    expect(events).toContain('before:normal')
+    expect(events).toContain('sow:normal')
+    expect(events).toContain('fence')
+    expect(events).not.toContain('before:checked')
+    expect(events).not.toContain('sow:checked')
   })
 
   it('or choices show action-or-replace when computeReplace is available', () => {

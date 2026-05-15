@@ -31,7 +31,8 @@ const computeReplaceListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['computeReplace' as ActionHookPhase],
   actions: ['minor-improvement'],
-  handler: (_context: CardListenerContext): ActionHookResult | void => {
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.trueAction === false) return
     return {
       decline: true,
       alternativeFlow: {
@@ -50,6 +51,7 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['minor-improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.trueAction === false) return
     if (context.doable) return
     return { doable: true }
   },

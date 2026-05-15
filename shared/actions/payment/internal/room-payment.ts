@@ -77,7 +77,7 @@ const expandBonusChoicesToFees = (
   return bonus.choices.map((choice) => applyDiscountToFee(fee, choice.discount))
 }
 
-const bonusAppliesToRoomCount = (
+const modifierAppliesToRoomCount = (
   player: PlayerState,
   conditions: Record<string, number> | undefined,
   roomCount: number,
@@ -147,29 +147,28 @@ const dedupeFees = (fees: Partial<Resource>[]) => {
 
 const buildTradeFees = (
   fee: Partial<Resource>,
-  fromKey: keyof Resource,
-  fromAmount: number,
-  toKey: keyof Resource,
-  toAmount: number,
+  from: Partial<Resource>,
+  to: Partial<Resource>,
   maxAmount?: number,
 ) => {
-  if (toAmount <= 0 || fromAmount <= 0 || (fee[toKey] ?? 0) < toAmount) {
-    return []
-  }
-  const perUseLimit = Math.floor((fee[toKey] ?? 0) / toAmount)
+  const toEntries = Object.entries(to) as [keyof Resource, number][]
+  const fromEntries = Object.entries(from) as [keyof Resource, number][]
+  if (toEntries.length === 0 || fromEntries.length === 0) return []
+  if (toEntries.some(([, amt]) => amt <= 0) || fromEntries.some(([, amt]) => amt <= 0)) return []
+  const perUseLimit = Math.min(
+    ...toEntries.map(([k, amt]) => Math.floor((fee[k] ?? 0) / amt))
+  )
+  if (perUseLimit <= 0) return []
   const modifierLimit = Number.isFinite(maxAmount)
     ? Math.floor(maxAmount ?? 0)
     : perUseLimit
   const limit = Math.max(0, Math.min(perUseLimit, modifierLimit))
   const nextFees: Partial<Resource>[] = []
   for (let count = 1; count <= limit; count += 1) {
-    nextFees.push(
-      sanitizeCost({
-        ...fee,
-        [toKey]: Math.max(0, (fee[toKey] ?? 0) - toAmount * count),
-        [fromKey]: (fee[fromKey] ?? 0) + fromAmount * count,
-      }),
-    )
+    const next = { ...fee }
+    toEntries.forEach(([k, amt]) => { next[k] = Math.max(0, (next[k] ?? 0) - amt * count) })
+    fromEntries.forEach(([k, amt]) => { next[k] = (next[k] ?? 0) + amt * count })
+    nextFees.push(sanitizeCost(next))
   }
   return nextFees
 }
@@ -236,15 +235,18 @@ export const buildRoomCostPerUnit = (
         return
       }
 
-      const toEntries = Object.entries(modifier.to)
-      const fromEntries = Object.entries(modifier.from)
-      if (toEntries.length !== 1 || fromEntries.length !== 1) {
+      // Trade modifiers may carry the same player-state `conditions` as
+      // BonusModifier (e.g. D15_ClaySupports applies only when
+      // `player.houseType === 'clay'`). The construct path runs trades
+      // per-unit, so only `houseType*` checks are meaningful here;
+      // `minNumRooms` on a per-unit trade has no useful meaning and is
+      // ignored. `applyRoomCountBonuses` already enforces `minNumRooms`
+      // for BonusModifiers on the multi-room total.
+      if (!modifierAppliesToRoomCount(player, modifier.conditions, Number.POSITIVE_INFINITY)) {
         return
       }
-      const [toKey, toAmount] = toEntries[0] as [keyof Resource, number]
-      const [fromKey, fromAmount] = fromEntries[0] as [keyof Resource, number]
       const transformed = fees.flatMap((fee) =>
-        buildTradeFees(fee, fromKey, fromAmount, toKey, toAmount, modifier.max),
+        buildTradeFees(fee, modifier.from, modifier.to, modifier.max),
       )
       cardAlternatives.push(...transformed)
     })
@@ -265,7 +267,7 @@ const applyRoomCountBonuses = (
     .filter((modifier): modifier is Extract<typeof modifier, { type: 'bonus' }> => modifier.type === 'bonus')
   bonusModifiers.forEach(validateBonusModifier)
   const bonuses = bonusModifiers
-    .filter((modifier) => bonusAppliesToRoomCount(player, modifier.conditions, roomCount))
+    .filter((modifier) => modifierAppliesToRoomCount(player, modifier.conditions, roomCount))
     .map((modifier) => ({
       discount: modifier.discount,
       choices: modifier.choices,
