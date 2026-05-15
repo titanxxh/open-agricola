@@ -1221,7 +1221,8 @@ export const en = {
       anytime: 'Seed Trader: Pay 1 Food → 1 Grain',
     },
     D13_Trowel: {
-      anytime: 'Trowel: Pay 1 Food → 1 Clay',
+      anytime: 'Trowel: Renovate to Stone',
+      optionStone: 'Renovate to Stone',
     },
     D53_TeaHouse: {
       anytime: 'Tea House: Pay 1 Food → 1 Food',

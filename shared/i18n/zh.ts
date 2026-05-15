@@ -1219,7 +1219,8 @@ export const zh = {
       anytime: '使者：付1食物 → 获1食物',
     },
     D13_Trowel: {
-      anytime: '泥刀：付1食物 → 获1黏土',
+      anytime: '泥刀：升级到石屋',
+      optionStone: '升级到石屋',
     },
     D46_PelletPress: {
       anytime: '颗粒压榨机：付1木材 → 获1食物',
