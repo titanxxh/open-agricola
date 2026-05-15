@@ -259,6 +259,32 @@ describe('C57_Crudite', () => {
     expect(player.resources.food).toBe(20)
   })
 
+  it('empty or duplicate source selection fails and preserves C57 pending', () => {
+    const session = setupAnytimeSession()
+    let resp = session.takeAnytimeAction(0, ANYTIME_ID)
+    expect(resp.ok).toBe(true)
+    expectC57Selection(resp)
+
+    resp = selectPositions(session, [])
+    expect(resp.ok).toBe(false)
+    expect(resp.error).toBe('not enough selection positions')
+    expectC57Selection(resp)
+
+    resp = selectPositions(session, [{ row: 0, col: 0 }, { row: 0, col: 0 }])
+    expect(resp.ok).toBe(false)
+    expect(resp.error).toBe('duplicate selection position')
+    expectC57Selection(resp)
+
+    resp = session.resolveChoice(0, 'cancel')
+    expect(resp.ok).toBe(false)
+    expect(resp.error).toBe('not enough selection positions')
+    expectC57Selection(resp)
+
+    const player = resp.state.players[0]!
+    expect(fieldCountsOf(player)).toEqual([3, 2, 1])
+    expect(player.resources.food).toBe(20)
+  })
+
   it('no eligible fields offers no harvest C57 selection and no anytime action', () => {
     const harvestSession = setupSession([1, 1])
     const harvestResp = harvestSession.performRoundEnd()

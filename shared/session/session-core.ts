@@ -3257,6 +3257,7 @@ export class GameCore {
     const interactionContext = this.peekHostContextSnapshot()?.actionContext
     const selectionKind = (interactionContext?.selectionKind as string | undefined) ?? 'farm-position'
     const maxSelections = (interactionContext?.maxSelections as number) ?? 1
+    const minSelections = (interactionContext?.minSelections as number) ?? 0
 
     // occupation-hand: validate card IDs
     if (selectionKind === 'occupation-hand') {
@@ -3288,10 +3289,17 @@ export class GameCore {
 
     // farm-position (default)
     const positions = payload.positions ?? []
+    if (positions.length < minSelections) {
+      return this.respond(false, 'not enough selection positions')
+    }
     if (positions.length > maxSelections) {
       return this.respond(false, 'too many selection positions')
     }
+    const selectedKeys = new Set<string>()
     for (const pos of positions) {
+      const key = `${pos.row}-${pos.col}`
+      if (selectedKeys.has(key)) return this.respond(false, 'duplicate selection position')
+      selectedKeys.add(key)
       const exists = player.fields.some((f) => f.row === pos.row && f.col === pos.col)
       if (!exists) return this.respond(false, 'invalid field position')
     }
