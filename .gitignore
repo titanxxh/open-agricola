@@ -40,3 +40,6 @@ __pycache__/
 
 # Build product from scripts/build-cards-manifest.ts
 public/cards-manifest.json
+
+# superpowers skill artifacts (spec/plan/notes) — never commit
+docs/superpowers/
