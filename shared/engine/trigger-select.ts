@@ -216,6 +216,10 @@ export const evaluateTriggerSelect = (
     })
   }
 
+  if (options.length === 0) {
+    return { options, optionStates }
+  }
+
   const pass: ActionChoiceOption = {
     value: '__pass__',
     labelKey: 'ui.interactionSelectTriggerPass',

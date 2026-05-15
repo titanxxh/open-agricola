@@ -227,7 +227,7 @@ describe('ParallelNode trigger-select mode', () => {
     ])
   })
 
-  it('no-op mandatory trigger does not block pass', () => {
+  it('no-op mandatory trigger resolves without a pass-only option list', () => {
     const cardRegistry = new CardRegistry()
     cardRegistry.registerListener({
       id: 'listener-a',
@@ -243,9 +243,7 @@ describe('ParallelNode trigger-select mode', () => {
     const evaluation = evaluateTriggerSelect(node, makeContext())
 
     expect(child.getState()).toBe('resolved')
-    expect(evaluation.options).toEqual([
-      { value: '__pass__', labelKey: 'ui.interactionSelectTriggerPass' },
-    ])
+    expect(evaluation.options).toEqual([])
   })
 
   it('before-action pass is disabled while an enabled trigger can unlock continuation', () => {
