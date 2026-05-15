@@ -99,6 +99,7 @@ pnpm run build              # tsc + vite build
 - 卡牌相关能力尽可能在卡牌文件内部闭环，不要把单卡逻辑扩散到主路径。
 - **后端权威**：规则在 `shared/` + `server/`；不在前端 UI 加规则。
 - 不为单卡改动主路径（`pay.ts`、`improvement.ts`、`game-session.ts`）。用现有扩展点（hooks、modifiers、卡牌定义字段）。
+- 项目仍处于开发阶段，不需要维护旧存档、旧 `engineStack` / pending cursor、旧 action id 的向后兼容；除非用户明确要求，不要把缺少兼容迁移作为 PR review blocker。
 - 测试时**默认 2 人游戏**。
 
 ## Verification After Changes
