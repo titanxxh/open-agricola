@@ -611,6 +611,7 @@ export type SubFlowKind =
   | 'farm-select'
   | 'selection'
   | 'card-draft'
+  | 'engine-blocked'
 
 export type FarmSelectType = 'plow' | 'sow' | 'fence' | 'room' | 'stable'
 export type SelectionKind = 'farm-position' | 'occupation-hand'
@@ -681,6 +682,11 @@ export type InteractionRequest =
         labelParams?: Record<string, unknown>
         sourceCard?: string
       }>
+    }
+  | {
+      kind: 'engine-blocked'
+      actionId: string
+      reasonKey?: PromptKey
     }
 
 export type InteractionCommand =

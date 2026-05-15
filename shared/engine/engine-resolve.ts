@@ -33,6 +33,8 @@ import {
   buildListenerEvent,
   canActionContinueWithoutBeforeTriggers,
   cloneNode,
+  enforceCompositeContinuationMandatory,
+  enforceSelectedTargetMandatory,
   findActionNode,
   normalizeFollowUpAction,
   pendingEnvelopeFromHostNode,
@@ -55,13 +57,18 @@ const triggerSelectEvaluationOptions = (
     const action = int.registry.get(actionId)
     if (!action) return false
     const scopedContext = withResourcePreview(context, resources)
-    return action.canBeExecutedByPlayer(
+    const directDoable = action.canBeExecutedByPlayer(
       scopedContext.state,
       scopedContext.player,
       {
         sourceCard: scopedContext.sourceCard,
         actionContext: scopedContext.actionContext,
       },
+    )
+    return int.hooks.applyIsDoable(
+      { ...scopedContext, actionId },
+      action,
+      directDoable,
     )
   },
 })
@@ -168,6 +175,7 @@ export function engineResolveChoice(
           resolveSubtree(node)
         } else {
           node.optionalActive = true
+          enforceSelectedTargetMandatory(node)
         }
         return { type: 'ok' }
       }
@@ -278,12 +286,14 @@ export function engineResolveChoice(
           ),
           context.player.id,
         )
+        enforceCompositeContinuationMandatory(flowNode)
         int.tree.insertAfter(node.id, [flowNode])
         targetNode!.resolve(choice)
         node.resolve(choice)
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
+      enforceSelectedTargetMandatory(targetNode!)
       const action = int.registry.get(actionId)
       if (!action) {
         int.pendingNodeIdRef.value = null
