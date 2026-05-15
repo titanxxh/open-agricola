@@ -16,9 +16,10 @@ const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
  * BGA `A82_WorkCertificate::onPlayerAfterPlaceFarmer` collects all building
  * resource accumulation spaces with >= 4 resources and presents an XOR. The
  * `takeFromSpace` SE pulls one off the chosen space (decrementing the space's
- * resource count) and gives it to the player. We use the canonical
- * `take-from-space` leaf so the source space is properly decremented (BGA
- * parity) instead of just gaining a resource from the supply.
+ * resource count) and gives it to the player. We use `collect` with
+ * `actionContext: { spaceId, resource, amount: 1 }` (partial-take mode) so the
+ * source space is properly decremented (BGA parity) instead of just gaining a
+ * resource from the supply.
  */
 const findChoices = (context: CardListenerContext): ActionFlow[] => {
   const choices: ActionFlow[] = []
@@ -36,7 +37,7 @@ const findChoices = (context: CardListenerContext): ActionFlow[] => {
       if ((space.resources[r] ?? 0) <= 0) continue
       choices.push({
         type: 'leaf',
-        actionId: 'take-from-space',
+        actionId: 'collect',
         sourceCard: CARD_ID,
         actionContext: { spaceId: space.id, resource: r, amount: 1 },
         choiceLabelKey: 'ui.interactionTakeFromSpace',

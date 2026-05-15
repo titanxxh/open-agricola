@@ -567,10 +567,6 @@ export const en = {
       description: 'Spend 1 worker',
           name: 'Spend Worker',
 },
-    'take-from-space': {
-      description: 'Take {resources_desc} from {action_space}',
-          name: 'Take from Space',
-},
 },
   improvements: {
     Major_Fireplace1: { name: 'Fireplace', description: 'Bake bread: 1 grain → 2 food' },
@@ -903,9 +899,8 @@ export const en = {
     renovationFail: 'Renovation failed',
     reorganizeFail: 'Reorganize failed: missing zones payload',
     specialEffectFail: 'Special effect failed',
-    takeFromSpaceInvalid: 'Invalid take from space',
-    takeFromSpaceNoSpace: 'No space to take from',
-    takeFromSpaceNotEnough: 'Not enough resources on space',
+    collectNoSpace: 'No space to collect from',
+    collectNotEnough: 'Not enough resources on space',
   },
   platform: {
     loading: 'Loading...',
