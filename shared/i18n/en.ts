@@ -88,6 +88,7 @@ export const en = {
     interactionConfirmButton: 'Confirm',
     interactionFarmSelectConfirm: 'Confirm',
     interactionFarmSelectCancel: 'Cancel',
+    interactionEngineBlocked: 'This required action cannot continue. Undo to choose a different path.',
     interactionConfirmSwitch: 'Confirm switch',
     interactionPlayerSwitchPrompt: 'Card effect triggers for {player}. Confirm player switch.',
     interactionPlayerSwitchConfirm: 'Confirm switch',

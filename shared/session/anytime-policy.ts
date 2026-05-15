@@ -8,6 +8,7 @@ export type AnytimeBlockReason =
   | 'no-active-interaction'
   | 'feed-window-locked'
   | 'confirm-window'
+  | 'engine-blocked'
   | 'stage-hook-chain'
 
 export type AnytimePolicy =
@@ -30,6 +31,9 @@ export function computeAnytimePolicy(input: AnytimePolicyInput): AnytimePolicy {
   }
   if (input.interactionKind === 'feed') {
     return { allowed: false, reason: 'feed-window-locked' }
+  }
+  if (input.interactionKind === 'engine-blocked') {
+    return { allowed: false, reason: 'engine-blocked' }
   }
   if (input.interactionKind === 'confirm-next-player') {
     return { allowed: true, blockedIds: ['exchange'] }

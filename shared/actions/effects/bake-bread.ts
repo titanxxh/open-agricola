@@ -1,20 +1,11 @@
 import type {
   ActionChoiceOption,
   ActionDefinition,
-  ActionExecutionContext,
   ActionExecutionResult,
-  GameState,
   ImmediateLogEntry,
   PlayerState,
-  Resource,
 } from '../../contract/types'
 import { getPlayerBakeRates } from '../../cards/helpers/exchange-registry'
-import {
-  executeCardListener,
-  getMatchingListeners,
-  type CardListenerContext,
-} from '../../cards/card-listeners'
-import { applyPureResourceFlowPreview } from '../resource-flow-preview'
 import { addFoodFromConversion, incResourceConverted } from '../../session/stats'
 
 type BakeRate = ReturnType<typeof getPlayerBakeRates>[number]
@@ -32,83 +23,6 @@ const failInvalidBake = (): ActionExecutionResult => ({
 
 const canBakeBreadDirectly = (player: PlayerState): boolean =>
   player.resources.grain > 0 && getPlayerBakeRates(player).length > 0
-
-const previewStateWithResources = (
-  state: GameState,
-  player: PlayerState,
-  resources: Resource,
-): { state: GameState; player: PlayerState } => {
-  const previewPlayer: PlayerState = {
-    ...player,
-    resources: { ...resources },
-    cardStates: { ...(player.cardStates ?? {}) },
-  }
-  return {
-    state: {
-      ...state,
-      players: (state.players ?? []).map((entry) =>
-        entry.id === player.id ? previewPlayer : entry),
-    },
-    player: previewPlayer,
-  }
-}
-
-const beforeBakeContext = (
-  state: GameState,
-  player: PlayerState,
-  resources: Resource,
-  space: ActionExecutionContext['space'],
-): CardListenerContext => {
-  const preview = previewStateWithResources(state, player, resources)
-  return {
-    state: preview.state,
-    player: preview.player,
-    triggerPlayer: preview.player,
-    ownerPlayer: preview.player,
-    effectPlayer: preview.player,
-    space,
-    actionId: 'bake-bread',
-    phase: 'before',
-  }
-}
-
-export const canReachBakeBreadThroughBeforeChain = (
-  state: GameState,
-  player: PlayerState,
-  space: ActionExecutionContext['space'] = {} as ActionExecutionContext['space'],
-  resourcesOverride?: Resource,
-): boolean => {
-  const startingPlayer = resourcesOverride
-    ? { ...player, resources: { ...resourcesOverride } }
-    : player
-  if (canBakeBreadDirectly(startingPlayer)) return true
-  if (getPlayerBakeRates(player).length === 0) return false
-
-  let resources: Resource = { ...startingPlayer.resources }
-  const matched = getMatchingListeners(beforeBakeContext(state, player, resources, space))
-    .filter((entry) => entry.registration.dispatchMode === 'select')
-  const simulated = new Set<number>()
-
-  for (;;) {
-    let progressed = false
-    for (let index = 0; index < matched.length; index += 1) {
-      if (simulated.has(index)) continue
-      const entry = matched[index]!
-      const context = beforeBakeContext(state, player, resources, space)
-      const result = executeCardListener(entry.registration, context, {
-        ownerPlayerId: entry.ownerPlayerId,
-      })
-      if (!result?.flow) continue
-      const nextResources = applyPureResourceFlowPreview(result.flow, resources)
-      if (!nextResources) continue
-      resources = nextResources
-      simulated.add(index)
-      progressed = true
-      if (resources.grain > 0) return true
-    }
-    if (!progressed) return false
-  }
-}
 
 export const canBakeBread = (player: PlayerState, cardId: string): boolean => {
   const rates = getPlayerBakeRates(player)
@@ -247,11 +161,7 @@ export const bakeBreadAction: ActionDefinition = {
   descriptionKey: 'actions.bake-bread.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (state, player, context) =>
-    canBakeBreadDirectly(player) ||
-    (context?.actionContext?.skipBeforeTriggers === true
-      ? false
-      : canReachBakeBreadThroughBeforeChain(state, player)),
+  canBeExecutedByPlayer: (_state, player) => canBakeBreadDirectly(player),
   execute: ({ player }) => {
     const options = buildBakeBreadOptions(player)
     if (options.length === 0) return { type: 'ok' }

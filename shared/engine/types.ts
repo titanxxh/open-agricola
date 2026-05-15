@@ -22,6 +22,7 @@ export type EngineNode = {
   optional?: boolean
   optionalActive?: boolean
   optionalPromptKey?: PromptKey
+  mandatory?: boolean
   pending?: PendingEnvelope | null
   getState(): NodeState
   getArgs(): Record<string, unknown>
@@ -72,7 +73,7 @@ export type InteractionContextSnapshot = Pick<
 
 export type EngineStepResult =
   | { type: 'done' }
-  | { type: 'blocked'; nodeId: string }
+  | { type: 'blocked'; nodeId: string; actionId?: string; mandatory?: boolean }
   | { type: 'choice'; nodeId: string; choice: EngineChoice }
   | { type: 'ok'; nodeId: string; actionId?: string; result: ActionExecutionResult }
 

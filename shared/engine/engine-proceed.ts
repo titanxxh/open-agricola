@@ -41,6 +41,7 @@ import {
   buildOwnedFlowNode,
   canActionContinueWithoutBeforeTriggers,
   collectNodeIds,
+  enforceCompositeContinuationMandatory,
   findActionNode,
   getNodeDescriptionPreview,
   getNodeEffectPreview,
@@ -69,13 +70,18 @@ const triggerSelectEvaluationOptions = (
     const action = int.registry.get(actionId)
     if (!action) return false
     const scopedContext = withResourcePreview(context, resources)
-    return action.canBeExecutedByPlayer(
+    const directDoable = action.canBeExecutedByPlayer(
       scopedContext.state,
       scopedContext.player,
       {
         sourceCard: scopedContext.sourceCard,
         actionContext: scopedContext.actionContext,
       },
+    )
+    return int.hooks.applyIsDoable(
+      { ...scopedContext, actionId },
+      action,
+      directDoable,
     )
   },
 })
@@ -551,6 +557,7 @@ export function engineProceed(
         ),
         context.player.id,
       )
+      enforceCompositeContinuationMandatory(flowNode)
       int.tree.insertAfter(node.id, [flowNode])
       node.resolve({ type: 'ok' })
       return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
@@ -580,7 +587,14 @@ export function engineProceed(
       ),
     )
     if (!doable) {
-      return { type: 'blocked', nodeId: node.id }
+      return node.mandatory === true
+        ? {
+            type: 'blocked',
+            nodeId: node.id,
+            actionId: replacedActionId,
+            mandatory: true,
+          }
+        : { type: 'blocked', nodeId: node.id, actionId: replacedActionId }
     }
     const costResults = int.hooks.computeCosts({
       ...executionContext,
@@ -709,7 +723,8 @@ export function engineProceed(
         result.request.kind === 'feed' ||
         result.request.kind === 'selection' ||
         result.request.kind === 'card-draft' ||
-        result.request.kind === 'select-trigger'
+        result.request.kind === 'select-trigger' ||
+        result.request.kind === 'engine-blocked'
       ) {
         // Task 9 will add explicit emitters for these kinds. Until then no
         // current effect emits them, so they fall through to empty choices

@@ -166,4 +166,14 @@ describe('cursor round-trip', () => {
     rebuilt.setState(c1.state)
     expect(rebuilt.toCursor()).toEqual(c1)
   })
+
+  it('ActionNode preserves mandatory metadata through toCursor', () => {
+    const original = new ActionNode('mandatory-action', 'gain-wood')
+    original.mandatory = true
+    const c1 = original.toCursor()
+    const rebuilt = new ActionNode(c1.id, c1.data.actionId as string)
+    rebuilt.mandatory = c1.data.mandatory as boolean
+    rebuilt.setState(c1.state)
+    expect(rebuilt.toCursor()).toEqual(c1)
+  })
 })
