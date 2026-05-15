@@ -1,16 +1,13 @@
 import type { PlayerState, Resource } from '../../../shared/contract/types'
 import type { Locale } from '../../../shared/i18n'
 import type { HarvestSummary } from '../../../shared/session/round'
-import {
-  getRegisteredMinorImprovement,
-  getRegisteredOccupation,
-} from '../../../shared/cards-display/types'
 import { getMajorCardDisplay } from '../../../shared/cards-display/major'
 import {
   BASIC_CONVERSION_SOURCE_ID,
   basicConversionExchanges,
 } from '../../../shared/cards/basic-conversion'
 import type { CardExchange } from '../../../shared/contract/cards'
+import { getCardMeta } from '../../services/card-meta'
 
 export type HarvestFeedPending = {
   playerIndex: number
@@ -92,13 +89,13 @@ export const buildHarvestFeedOptions = (
 
   // 3. Minors
   for (const cardId of player.minorPlayed) {
-    const card = getRegisteredMinorImprovement(cardId)
+    const card = getCardMeta(cardId)
     pushFromExchanges(cardId, cardLabel(cardId), card?.exchanges)
   }
 
   // 4. Occupations
   for (const cardId of player.occupationPlayed) {
-    const card = getRegisteredOccupation(cardId)
+    const card = getCardMeta(cardId)
     pushFromExchanges(cardId, cardLabel(cardId), card?.exchanges)
   }
 

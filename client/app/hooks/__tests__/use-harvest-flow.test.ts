@@ -1,9 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('../../../../shared/cards-display/types', () => ({
+  getRegisteredMinorImprovement: () => undefined,
+  getRegisteredOccupation: () => undefined,
+}))
+
 import { buildHarvestFeedOptions } from '../use-harvest-flow'
 import { emptyResources } from '../../../../shared/contract/state-constants'
 import type { PlayerState } from '../../../../shared/contract/types'
-import '../../../../shared/cards/C/C59_SchnappsDistillery'
-import '../../../../shared/cards/B/B104_SheepWalker'
 
 const mkPlayer = (overrides: Partial<PlayerState> = {}): PlayerState =>
   ({
