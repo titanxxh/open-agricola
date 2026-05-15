@@ -40,6 +40,7 @@ export const startHarvest = (core: GameCore): SessionResponse => {
  * trampoline into the breed-phase continuation chain on GameCore.
  */
 export const startBreedPhase = (core: GameCore): SessionResponse => {
+  core.state.completedFeedingPhases += 1
   core.state.roundPhase = 'breeding'
   return core.invokeAfterFeedingPhase()
 }
