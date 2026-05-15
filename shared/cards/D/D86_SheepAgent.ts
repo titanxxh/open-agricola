@@ -20,7 +20,7 @@ const OTHER_ANIMAL_HOLDER_OCCUPATIONS = [
 export const D86_SheepAgent_impl = {
   effect: {
   id: CARD_ID,
-  onComputeAnimalZones: (player, zones) => {
+  onComputeAnimalZones: (player, zones, _state) => {
     let capacity = player.occupationPlayed.length
     for (const otherId of OTHER_ANIMAL_HOLDER_OCCUPATIONS) {
       if (player.occupationPlayed.includes(otherId)) {

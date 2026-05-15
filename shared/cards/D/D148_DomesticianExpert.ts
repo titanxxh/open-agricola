@@ -17,7 +17,7 @@ const countAdjacentRoomPairs = (roomTiles: Array<{row: number, col: number}>): n
 export const D148_DomesticianExpert_impl = {
   effect: {
   id: CARD_ID,
-  onComputeAnimalZones: (player, zones) => {
+  onComputeAnimalZones: (player, zones, _state) => {
     // BGA: NEGATED_BY_MILKING_PLACE — if D12_MilkingPlace is played, this card
     // adds no zone. (D12's filter also strips D148_special on its end.)
     if ((player.minorPlayed ?? []).includes('D12_MilkingPlace')) return

@@ -9,7 +9,7 @@ const isAdjacent = (a: { row: number; col: number }, b: { row: number; col: numb
 export const E11_PettingZoo_impl = {
   effect: {
   id: CARD_ID,
-  onComputeAnimalZones: (player, zones) => {
+  onComputeAnimalZones: (player, zones, _state) => {
     const roomTiles = player.roomTiles ?? []
     const hasAdjacentPasture = player.pastures.some(p =>
       (p.tiles ?? []).some(pt =>

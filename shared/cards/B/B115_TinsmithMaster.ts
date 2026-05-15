@@ -49,7 +49,7 @@ export const B115_TinsmithMaster_impl = {
   listeners: [afterSowListener],
   effect: {
   id: CARD_ID,
-  onComputeAnimalZones: (player: PlayerState, zones: AnimalZone[]) => {
+  onComputeAnimalZones: (player: PlayerState, zones: AnimalZone[], _state) => {
     for (const zone of zones) {
       if (zone.zoneType !== 'pasture') continue
       const pastureIndex = zone.pastureIndex

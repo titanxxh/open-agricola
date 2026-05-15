@@ -35,7 +35,7 @@ export const E86_PenBuilder_impl = {
   listeners: [anytimeListener],
   effect: {
   id: CARD_ID,
-  onComputeAnimalZones: (player, zones) => {
+  onComputeAnimalZones: (player, zones, _state) => {
     const discards = player.cardStates?.[CARD_ID]?.counters?.discards ?? 0
     if (discards <= 0) return
     zones.push({

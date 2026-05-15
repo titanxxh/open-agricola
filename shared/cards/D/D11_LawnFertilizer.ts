@@ -6,7 +6,7 @@ const CARD_ID = D11_LawnFertilizer.id
 export const D11_LawnFertilizer_impl = {
   effect: {
   id: CARD_ID,
-  onComputeAnimalZones: (player, zones) => {
+  onComputeAnimalZones: (player, zones, _state) => {
     const hasA12 = player.minorPlayed.includes('A12_DrinkingTrough')
     for (const zone of zones) {
       if (zone.zoneType !== 'pasture' || zone.pastureIndex === undefined) continue

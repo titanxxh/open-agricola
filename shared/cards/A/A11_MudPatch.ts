@@ -9,7 +9,7 @@ export const A11_MudPatch_impl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, _player) => gainLeaf(CARD_ID, { boar: 1 }),
-  onComputeAnimalZones: (player, zones) => {
+  onComputeAnimalZones: (player, zones, _state) => {
     const emptyFields = player.fields.filter(f => fieldIsEmpty(f)).length
     if (emptyFields === 0) return
     zones.push({

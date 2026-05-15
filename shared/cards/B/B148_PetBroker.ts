@@ -8,7 +8,7 @@ export const B148_PetBroker_impl = {
   effect: {
   id: CARD_ID,
   onBuy: () => gainLeaf(CARD_ID, { sheep: 1 }),
-  onComputeAnimalZones: (player, zones) => {
+  onComputeAnimalZones: (player, zones, _state) => {
     const occCount = player.occupationPlayed.length
     if (occCount === 0) return
     zones.push({
