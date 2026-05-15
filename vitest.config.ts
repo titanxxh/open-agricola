@@ -41,6 +41,7 @@ const FAST_EXCLUDE = [...SHARED_EXCLUDE, ...SLOW_INCLUDE]
 const LLM_INCLUDE = ['tests/llm-card-gen/**/*.test.ts']
 const SHARED_SETUP = [
   './shared/cards/__tests__/setup-register-all.ts',
+  './client/__tests__/setup-card-manifest.ts',
   './client/__tests__/setup.ts',
 ]
 

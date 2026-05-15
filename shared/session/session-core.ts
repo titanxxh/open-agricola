@@ -72,6 +72,7 @@ import {
 import { type CustomCardData, SessionCardContext, withSessionContext } from '../cards/session-card-context.ts'
 import { CardRegistry, type CardImpl } from '../cards/registry.ts'
 import { getActiveCardRegistry, setActiveCardRegistry } from '../cards/active-registry.ts'
+import { ensureCatalogLookupsInstalled } from '../cards/install-catalog-lookups.ts'
 import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { allOccupationCards, allMinorImprovementCards } from '../cards/catalog.ts'
 import { majorCardDefinitions } from '../cards/major/index.ts'
@@ -551,6 +552,7 @@ export class GameCore {
   readonly cardWarnings: string[] = []
 
   constructor(options: GameCoreOptions = {}) {
+    ensureCatalogLookupsInstalled()
     const { stateOrSeed, customCards, initialStateOptions, registerCustomCardImpl } = options
     this.registerCustomCardImpl = registerCustomCardImpl ?? (() => {
       // No-op default: used in sandbox mode (browser) or tests that don't need
