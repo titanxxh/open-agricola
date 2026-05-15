@@ -15,7 +15,7 @@ const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
  *
  * BGA `A82_WorkCertificate::onPlayerAfterPlaceFarmer` collects all building
  * resource accumulation spaces with >= 4 resources and presents an XOR. The
- * `takeFromSpace` SE pulls one off the chosen space (decrementing the space's
+ * BGA SE pulls one off the chosen space (decrementing the space's
  * resource count) and gives it to the player. We use `collect` with
  * `actionContext: { spaceId, resource, amount: 1 }` (partial-take mode) so the
  * source space is properly decremented (BGA parity) instead of just gaining a
