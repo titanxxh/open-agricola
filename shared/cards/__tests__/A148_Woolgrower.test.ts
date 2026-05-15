@@ -46,7 +46,7 @@ describe('A148_Woolgrower', () => {
     expect(z!.capacity).toBe(2)
   })
 
-  it.skip('synced with B86: both cards read the same global counter', () => {
+  it('synced with B86: both cards read the same global counter', () => {
     const { core } = setupGame()
     core.state.completedFeedingPhases = 4
     core.state.players[0].occupationPlayed = ['A148_Woolgrower', 'B86_TruffleSearcher']
