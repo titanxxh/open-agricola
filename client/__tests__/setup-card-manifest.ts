@@ -4,11 +4,15 @@ import {
 } from '../services/card-meta'
 
 const nodeFs = 'node:fs'
+const nodePath = 'node:path'
 const fs = await import(nodeFs) as {
   existsSync(path: string | URL): boolean
   readFileSync(path: string | URL, encoding: 'utf8'): string
 }
-const manifestPath = new URL('../../public/cards-manifest.json', import.meta.url)
+const path = await import(nodePath) as {
+  resolve(...paths: string[]): string
+}
+const manifestPath = path.resolve('public/cards-manifest.json')
 
 if (fs.existsSync(manifestPath)) {
   const raw = fs.readFileSync(manifestPath, 'utf8')
