@@ -1,6 +1,6 @@
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionFlow, Resource } from '../../contract/types'
+import type { ActionFlow } from '../../contract/types'
 import { getMajorCard } from '../major'
 import { PaymentSolver } from '../../actions/payment'
 import type { PaymentCtx } from '../../actions/payment'
@@ -53,8 +53,9 @@ const beforeBakeListener: CardListenerRegistration = {
         sourceCard: CARD_ID,
         params: {
           allowedPurchases,
-          suppressOnBuyEffects: true,
-        } as unknown as Partial<Resource>,
+          trueAction: false,
+        },
+        actionContext: { trueAction: false },
       },
       sourceCard: CARD_ID,
     }

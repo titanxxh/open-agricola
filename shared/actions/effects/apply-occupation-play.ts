@@ -50,7 +50,6 @@ const buildOccupationLogParams = (
 
 export type ApplyOccupationPlayParams = {
   occupationId: string
-  suppressOnBuyEffects?: boolean
 }
 
 const isApplyOccupationPlayParams = (
@@ -104,7 +103,7 @@ export const applyOccupationPlayAction: ActionDefinition = {
     if (!isApplyOccupationPlayParams(params)) {
       return { type: 'fail', logKey: 'log.occupationFail' }
     }
-    const { occupationId, suppressOnBuyEffects } = params
+    const { occupationId } = params
     const occupation = getOccupation(occupationId)
     if (!occupation) {
       return { type: 'fail', logKey: 'log.occupationFail' }
@@ -126,14 +125,6 @@ export const applyOccupationPlayAction: ActionDefinition = {
     )
     const immediateLogs = [{ key: 'log.playOccupation', params: logParams }]
 
-    if (suppressOnBuyEffects) {
-      return {
-        type: 'ok',
-        immediateLogs,
-        logKey: 'log.playOccupation',
-        logParams,
-      }
-    }
     // Combine effect.onBuy (from card definitions) with the just-played
     // card's own 'after play-occupation' listener. The outer engine collects
     // 'after' listeners BEFORE the seq flow runs, so its scope check sees

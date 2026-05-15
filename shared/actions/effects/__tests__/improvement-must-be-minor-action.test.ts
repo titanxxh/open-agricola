@@ -71,7 +71,6 @@ describe('playMinorImprovement — mustBePlayedViaMinorAction', () => {
       'D25_WitchesDanceFloor',
       undefined,
       undefined,
-      false,
       'cardEffect',
     )
 
@@ -90,7 +89,6 @@ describe('playMinorImprovement — mustBePlayedViaMinorAction', () => {
       'D25_WitchesDanceFloor',
       undefined,
       undefined,
-      false,
       'setup',
     )
 
@@ -110,7 +108,6 @@ describe('playMinorImprovement — mustBePlayedViaMinorAction', () => {
       'D25_WitchesDanceFloor',
       undefined,
       undefined,
-      false,
       'minorAction',
     )
 

@@ -429,7 +429,10 @@ describe('priority plan implementations', () => {
       optional: true,
       params: {
         allowedPurchases: ['Major_ClayOven'],
-        suppressOnBuyEffects: true,
+        trueAction: false,
+      },
+      actionContext: {
+        trueAction: false,
       },
       sourceCard: 'C60_SmallPottersOven',
     })

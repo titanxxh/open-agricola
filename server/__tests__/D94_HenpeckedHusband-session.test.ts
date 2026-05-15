@@ -45,6 +45,22 @@ describe('D94 HenpeckedHusband — listener', () => {
     expect(flow?.params?.logCardTrigger).toBe(true)
   })
 
+  it('does NOT trigger when trueAction=false', () => {
+    const { state, player } = setup()
+    recordRoundPlacement(player, 'forest', '1')
+    recordRoundPlacement(player, 'farm-expansion', '2')
+
+    const handler = D94_HenpeckedHusband_impl.listeners[0]!.handler
+    const ctx = {
+      state,
+      player,
+      actionId: 'construct',
+      phase: 'after' as ActionHookPhase,
+      trueAction: false,
+    } as unknown as CardListenerContext
+    expect(handler(ctx)).toBeUndefined()
+  })
+
   it('does NOT trigger when only one placement (length === 1)', () => {
     const { state, player } = setup()
     recordRoundPlacement(player, 'farm-expansion', '1')

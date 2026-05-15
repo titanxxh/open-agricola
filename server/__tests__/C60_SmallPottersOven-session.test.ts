@@ -179,7 +179,16 @@ describe('C60_SmallPottersOven server session', () => {
     resp = session.resolveChoice(0, buildOption!.value)
 
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.promptKey).not.toBe('ui.interactionBakeBreadChoice')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
+    expect(resp.interaction.sourceCard).toBe('Major_ClayOven')
+    const ovenBakeOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    expect(ovenBakeOption).toBeDefined()
+
+    resp = session.resolveChoice(0, ovenBakeOption!.value)
+
+    expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.grain).toBe(0)
     expect(resp.state.players[0]!.resources.food).toBe(5)
     expect(resp.state.players[0]!.resources.clay).toBe(0)
@@ -234,6 +243,16 @@ describe('C60_SmallPottersOven server session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.improvements).toContain('Major_ClayOven')
     expect(resp.state.players[0]!.resources.clay).toBe(3)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
+    expect(resp.interaction.sourceCard).toBe('Major_ClayOven')
+    const ovenBakeOption = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    expect(ovenBakeOption).toBeDefined()
+
+    resp = session.resolveChoice(0, ovenBakeOption!.value)
+
+    expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')

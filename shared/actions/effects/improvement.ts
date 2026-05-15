@@ -45,6 +45,15 @@ type SuccessfulImprovementResult = Extract<ActionExecutionResult, { type: 'ok' |
 const resolveImprovementActionCardId = (mode: ImprovementPlayMode) =>
   mode === 'minor' ? 'minor-improvement' : 'improvement-any'
 
+const readTrueAction = (
+  params?: unknown,
+  actionContext?: Record<string, unknown>,
+) =>
+  ((params as { trueAction?: boolean } | undefined)?.trueAction === false ||
+    actionContext?.trueAction === false)
+    ? false
+    : undefined
+
 const attachImprovementPayment = (
   result: SuccessfulImprovementResult,
   improvementId: string,
@@ -69,7 +78,6 @@ const finalizeMajorImprovementPurchase = (
   paymentInfo: PaymentInfo,
   costResources: NonNullable<PaymentInfo['resourcesPaid']>,
   returnedMajorId?: string,
-  suppressOnBuyEffects = false,
 ): ActionExecutionResult => {
   const immediateLogs = buildImprovementImmediateLogs(
     'major',
@@ -91,15 +99,6 @@ const finalizeMajorImprovementPurchase = (
     (id) => id !== improvementId,
   )
 
-  if (suppressOnBuyEffects) {
-    return attachImprovementPayment({
-      type: 'ok',
-      immediateLogs,
-      logKey: 'log.playImprovement',
-      logParams: immediateLogs[0]?.params as Record<string, unknown>,
-    }, improvementId, costResources, returnedMajorId)
-  }
-
   const activation = activateCard(state, player, improvementId, 'onBuy', paymentInfo)
   const result: SuccessfulImprovementResult =
     activation.type === 'flow' ? activation : { type: 'ok' }
@@ -120,7 +119,6 @@ const finalizeMinorImprovementPurchase = (
   paymentInfo: PaymentInfo,
   costResources: NonNullable<PaymentInfo['resourcesPaid']>,
   returnedCardId?: string,
-  suppressOnBuyEffects = false,
 ): ActionExecutionResult => {
   const immediateLogs = buildImprovementImmediateLogs(
     'minor',
@@ -155,15 +153,6 @@ const finalizeMinorImprovementPurchase = (
       player.activeModifiers.push(modifier)
     }
   })
-
-  if (suppressOnBuyEffects) {
-    return attachImprovementPayment({
-      type: 'ok',
-      immediateLogs,
-      logKey: 'log.playMinorImprovement',
-      logParams: immediateLogs[0]?.params as Record<string, unknown>,
-    }, improvement.id, costResources, returnedCardId)
-  }
 
   const activation = activateCard(state, player, improvement.id, 'onBuy', paymentInfo)
   if (activation.type === 'flow') {
@@ -247,7 +236,6 @@ const playMajorImprovement = (
   improvementId: string,
   actionCardId?: string,
   paymentChoice?: string,
-  suppressOnBuyEffects = false,
 ): ActionExecutionResult => {
   const improvement = getMajorCard(improvementId)
   if (!improvement) {
@@ -286,7 +274,6 @@ const playMajorImprovement = (
     paymentInfo,
     resolvedPayment.resourcesPaid,
     resolvedPayment.returnedCardId,
-    suppressOnBuyEffects,
   )
 }
 
@@ -296,7 +283,6 @@ export const playMinorImprovement = (
   improvementId: string,
   actionCardId?: string,
   paymentChoice?: string,
-  suppressOnBuyEffects = false,
   playContext: 'minorAction' | 'cardEffect' | 'setup' = 'minorAction',
 ): ActionExecutionResult => {
   const improvement = getMinorImprovement(improvementId)
@@ -349,7 +335,6 @@ export const playMinorImprovement = (
     paymentInfo,
     resolvedPayment.resourcesPaid,
     resolvedPayment.returnedCardId,
-    suppressOnBuyEffects,
   )
 }
 
@@ -360,7 +345,6 @@ export const playImprovement = (
   mode: ImprovementPlayMode = 'major',
   paymentChoice?: string,
   sourceCard?: string,
-  suppressOnBuyEffects = false,
 ): ActionExecutionResult => {
   // Payment choice can arrive as either paymentChoice param (direct call)
   // or as improvementId (via resolveChoice which passes choice as first arg)
@@ -374,7 +358,7 @@ export const playImprovement = (
       const minorId = parts[2]
       const choiceIdx = parts[3]
       if (minorId && choiceIdx !== undefined) {
-        return playMinorImprovement(state, player, minorId, actionCardId, choiceIdx, suppressOnBuyEffects)
+        return playMinorImprovement(state, player, minorId, actionCardId, choiceIdx)
       }
     }
     const targetId = parts[1]
@@ -382,7 +366,7 @@ export const playImprovement = (
     if (targetId && choiceIdx !== undefined) {
       const parsed = parseImprovementChoice(targetId)
       if (parsed.kind === 'major') {
-        return playMajorImprovement(state, player, parsed.id, actionCardId, choiceIdx, suppressOnBuyEffects)
+        return playMajorImprovement(state, player, parsed.id, actionCardId, choiceIdx)
       }
     }
   }
@@ -394,21 +378,21 @@ export const playImprovement = (
 
   if (parsed.kind === 'major') {
     if (!allowMajor) return { type: 'fail', logKey: 'log.improvementFail' }
-    return playMajorImprovement(state, player, parsed.id, effectiveActionCardId, undefined, suppressOnBuyEffects)
+    return playMajorImprovement(state, player, parsed.id, effectiveActionCardId)
   }
   if (parsed.kind === 'minor') {
     if (!allowMinor) return { type: 'fail', logKey: 'log.minorImprovementFail' }
-    return playMinorImprovement(state, player, parsed.id, effectiveActionCardId, undefined, suppressOnBuyEffects)
+    return playMinorImprovement(state, player, parsed.id, effectiveActionCardId)
   }
 
   const majorImprovement = allowMajor && isMajorCardId(parsed.id)
     ? getMajorCard(parsed.id)
     : undefined
   if (majorImprovement) {
-    return playMajorImprovement(state, player, parsed.id, effectiveActionCardId, undefined, suppressOnBuyEffects)
+    return playMajorImprovement(state, player, parsed.id, effectiveActionCardId)
   }
   if (allowMinor) {
-    return playMinorImprovement(state, player, parsed.id, effectiveActionCardId, undefined, suppressOnBuyEffects)
+    return playMinorImprovement(state, player, parsed.id, effectiveActionCardId)
   }
   return { type: 'fail', logKey: 'log.improvementFail' }
 }
@@ -443,9 +427,15 @@ export const minorImprovementAction: ActionDefinition = {
       promptKey: 'ui.interactionChooseMinorImprovement',
     }
   },
-  resolveChoice: ({ state, player, sourceCard }, choice) => {
+  resolveChoice: ({ state, player, sourceCard, params, actionContext }, choice) => {
     const actionCardId = sourceCard ?? 'minor-improvement'
-    const flow = buildImprovementFlow(state, player, choice, actionCardId, false)
+    const flow = buildImprovementFlow(
+      state,
+      player,
+      choice,
+      actionCardId,
+      readTrueAction(params, actionContext),
+    )
     if (!flow) return { type: 'fail', logKey: 'log.minorImprovementFail' }
     return { type: 'flow', flow }
   },
@@ -461,7 +451,7 @@ const buildImprovementFlow = (
   player: PlayerState,
   choice: string,
   actionCardId: string,
-  suppressOnBuyEffects: boolean,
+  trueAction?: boolean,
 ): ActionFlow | null => {
   const parsed = parseImprovementChoice(choice)
   let kind: 'major' | 'minor'
@@ -502,6 +492,10 @@ const buildImprovementFlow = (
     costType,
     improvementKind: kind,
   }
+  const actionContext = trueAction === false ? { trueAction: false } : undefined
+  if (actionContext) {
+    Object.assign(payActionContext, actionContext)
+  }
   return {
     type: 'seq',
     children: [
@@ -516,7 +510,8 @@ const buildImprovementFlow = (
         type: 'leaf',
         actionId: 'apply-improvement',
         sourceCard: id,
-        params: { improvementId: id, kind, suppressOnBuyEffects },
+        params: { improvementId: id, kind },
+        actionContext,
       },
     ],
   }
@@ -564,11 +559,15 @@ export const improvementAnyAction: ActionDefinition = {
       promptKey: 'ui.interactionChooseImprovement',
     }
   },
-  resolveChoice: ({ state, player, sourceCard, params }, choice) => {
+  resolveChoice: ({ state, player, sourceCard, params, actionContext }, choice) => {
     const actionCardId = sourceCard ?? resolveImprovementActionCardId('any')
-    const suppressOnBuyEffects =
-      (params as { suppressOnBuyEffects?: boolean } | undefined)?.suppressOnBuyEffects === true
-    const flow = buildImprovementFlow(state, player, choice, actionCardId, suppressOnBuyEffects)
+    const flow = buildImprovementFlow(
+      state,
+      player,
+      choice,
+      actionCardId,
+      readTrueAction(params, actionContext),
+    )
     if (!flow) return { type: 'fail', logKey: 'log.improvementFail' }
     return { type: 'flow', flow }
   },

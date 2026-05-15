@@ -87,7 +87,6 @@ describe('D25 stats: multi-identity counting', () => {
       'D25_WitchesDanceFloor',
       undefined,
       undefined,
-      false,
       'minorAction',
     )
 

@@ -36,7 +36,8 @@ const makeToolboxFlow = (): ActionFlow => ({
   optional: true,
   promptKey: 'ui.interactionToolboxImprovement',
   sourceCard: CARD_ID,
-  actionContext: { allowedPurchases: ALLOWED_MAJORS },
+  params: { allowedPurchases: ALLOWED_MAJORS, trueAction: false },
+  actionContext: { trueAction: false },
 })
 
 export const B27_Toolbox_impl = {
