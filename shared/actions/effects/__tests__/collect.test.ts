@@ -47,7 +47,7 @@ describe('collect.execute', () => {
   })
 
   it('partial-take: returns resourcesGained for the requested resource (so E33 listener can read reed)', () => {
-    const ctx = makeCtx({ spaceId: 'reed-bank', resource: 'reed', amount: 1 })
+    const ctx = makeCtx({ spaceId: 'wood-cutter', resource: 'reed', amount: 1 })
     ctx.space.resources.reed = 2
     ctx.space.resources.wood = 0
     const result = collectAction.execute(ctx)
@@ -55,5 +55,13 @@ describe('collect.execute', () => {
     if (result.type === 'ok') {
       expect(result.resourcesGained).toEqual({ reed: 1 })
     }
+  })
+
+  it('partial-take: fails when hinted spaceId cannot be resolved (no silent fallback)', () => {
+    const ctx = makeCtx({ spaceId: 'nonexistent-space', resource: 'wood', amount: 1 })
+    const result = collectAction.execute(ctx)
+    expect(result.type).toBe('fail')
+    // ctx.space.resources.wood must NOT have been drained by the wrong space
+    expect(ctx.space.resources.wood).toBe(5)
   })
 })
