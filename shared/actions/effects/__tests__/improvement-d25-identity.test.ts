@@ -91,7 +91,6 @@ describe('D25 play side-effects', () => {
       'D25_WitchesDanceFloor',
       undefined,
       undefined,
-      false,
       'minorAction',
     )
 

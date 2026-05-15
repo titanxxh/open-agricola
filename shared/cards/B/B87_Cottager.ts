@@ -15,7 +15,7 @@ const listener: CardListenerRegistration = {
     if (context.space?.id !== 'day-laborer') return
     const children: ActionFlow[] = [
       { type: 'leaf', actionId: 'construct', optional: false, sourceCard: CARD_ID, actionContext: { max: 1, trueAction: false } },
-      { type: 'leaf', actionId: 'renovate-house', sourceCard: CARD_ID, actionContext: { trueAction: false } },
+      { type: 'leaf', actionId: 'renovate-house', sourceCard: CARD_ID },
     ]
     return {
       flow: {

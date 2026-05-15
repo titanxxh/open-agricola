@@ -29,6 +29,9 @@
 - `C25_SteamMachine` 卡牌实现已改用 display 定义导出的 `CARD_ID`，避免在 listener 与 flow 中重复硬编码卡牌 id 字符串。
 - `C60_SmallPottersOven` 已按 BGA 收敛：`isDoable` 只看玩家能否购买 `Major_ClayOven` / `Major_StoneOven`；before-bake 买炉子 flow 永远 optional，不再在卡牌文件中预演同批 before trigger 链路。
 - `C60_SmallPottersOven` UI 成本区已对齐为只显示 `2 clay`；不再用 `returnCards` 表达返还炉子，改由卡牌 `onBuy` 归还 Clay / Stone Oven。
+- `C60_SmallPottersOven` before-bake 建炉已改用 BGA-style `trueAction=false` 标记；不再跳过 Clay / Stone Oven 自身的 `onBuy` optional bake。
+- `B27_Toolbox` / `E130_Overachiever` / `E97_Beneficiary` 的附带 improvement flow 已补 `trueAction=false` 传播，避免触发真实 improvement action 专属监听 / 替换。
+- `C140_PackagingArtist` / `D94_HenpeckedHusband` 已补 `trueAction=false` 过滤；`B87_Cottager` 只在 construct 子节点保留非真实 action 标记，renovation 子节点对齐 BGA。
 - bake UI 的 source rate 不再只硬编码 major improvement；`cards-manifest` 暴露 `exchanges` 后，`A60_OrientalFireplace` / `D59_EarthOven` / `E63_IronOven` 等卡牌 bake source 也能显示计数器并提交 `bulk:`。
 - trigger-select 支持动态 enabled / disabled option：不可支付但结构适用的 trigger 仍展示为 disabled，服务器拒绝强行选择；同批 trigger 改变资源后会重新计算 option 状态。
 - trigger-select 的 pass gate 已支持通用 replacement continuation：先检查跳过 before trigger 后原 action 是否可直接继续；不行时检查 `computeReplace` 返回的 `alternativeFlow` 是否有可启动分支，避免 B26 + D66 这类 fencing fallback 被误判为必须触发 D66。
@@ -146,6 +149,7 @@ pnpm run lint
 ## 9. 当前轮次
 
 - 2026-05-15 — Wave 1 cards (A148/B86/D15/D13/E5) aligned to BGA; 4 infra extensions
+- 2026-05-15 — C60/B27/E130/E97 side improvement flows aligned to BGA `trueAction=false`; removed synthetic onBuy suppression from improvement/occupation apply leaves
 
 ## 10. 基础设施
 
@@ -156,9 +160,11 @@ pnpm run lint
 - `buildTradeFees` 支持多键 trade（D15 即时 clay trade 复用），把多 `to` key 编译到 PaymentSolver 期望的 cost 形状。
 - `TradeModifier.conditions?: Record<string, number>` — D15 trade gated by `houseTypeClay`；其余 `houseTypeWood` / `houseTypeStone` / `minNumRooms` 同套机制。
 - `onComputeAnimalZones` 签名加 `state: GameState` 入参（A148 / B86 读全局 feeding counter，避免再走玩家局部 state）。
+- `improvement-any` 的 `params.trueAction=false` 会传播到生成的 `pay` / `apply-improvement` leaf `actionContext`，用于 BGA-style 非真实 action 过滤，但不抑制所购卡牌 `onBuy`。
 
 ## 11. 时间线
 
 | 日期 | 批次 | 涉及卡牌 / 基建 |
 |---|---|---|
+| 2026-05-15 | trueAction follow-up | C60_SmallPottersOven / B27_Toolbox / E130_Overachiever / E97_Beneficiary + improvement-any/minor-improvement `trueAction=false` propagation |
 | 2026-05-15 | Wave 1 | A148_Woolgrower / B86_TruffleSearcher / D15_ClaySupports / D13_Trowel / E5_NightLoot + 4 项基建（§10） |

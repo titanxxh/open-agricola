@@ -42,7 +42,10 @@ const makePlayer = (override: Partial<PlayerState> = {}): PlayerState =>
     stables: 0,
     rooms: 2,
     houseType: 'wood',
-    workers: 2,
+    workers: [
+      { id: '1', isActive: true, isNewborn: false },
+      { id: '2', isActive: true, isNewborn: false },
+    ],
     ...override,
   } as unknown as PlayerState)
 
@@ -89,24 +92,10 @@ describe('applyOccupationPlayAction', () => {
     const result = applyOccupationPlayAction.execute(
       ctx(player, state, {
         occupationId: 'A100_Curator',
-        suppressOnBuyEffects: true,
       }),
     )
     expect(result.type === 'ok' || result.type === 'flow').toBe(true)
     expect(player.occupationHand).not.toContain('A100_Curator')
-    expect(player.occupationPlayed).toContain('A100_Curator')
-  })
-
-  it('suppressOnBuyEffects=true skips card activation but still pushes the card', () => {
-    const player = makePlayer({ occupationHand: ['A100_Curator'] })
-    const state = makeState()
-    const result = applyOccupationPlayAction.execute(
-      ctx(player, state, {
-        occupationId: 'A100_Curator',
-        suppressOnBuyEffects: true,
-      }),
-    )
-    expect(result.type).toBe('ok')
     expect(player.occupationPlayed).toContain('A100_Curator')
   })
 
@@ -121,7 +110,7 @@ describe('applyOccupationPlayAction', () => {
   it('returns fail when occupationId missing', () => {
     const player = makePlayer({ occupationHand: ['A100_Curator'] })
     const state = makeState()
-    const result = applyOccupationPlayAction.execute(ctx(player, state, { suppressOnBuyEffects: true }))
+    const result = applyOccupationPlayAction.execute(ctx(player, state, {}))
     expect(result.type).toBe('fail')
   })
 })
