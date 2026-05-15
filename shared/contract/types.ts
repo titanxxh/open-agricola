@@ -464,7 +464,7 @@ export type ActionChoiceOption = {
 export type ActionExecutionResult =
   | { type: 'ok'; logKey?: string; resourcesGained?: Partial<Resource>; resourcesPaid?: Partial<Resource>; logParams?: Record<string, unknown>; immediateLogs?: ImmediateLogEntry[]; extraData?: Record<string, unknown> }
   | { type: 'request'; request: InteractionRequest; promptKey?: PromptKey; promptParams?: Record<string, unknown>; sourceCard?: string; extraData?: Record<string, unknown> }
-  | { type: 'fail'; logKey: string }
+  | { type: 'fail'; logKey: string; recoverable?: boolean }
   | { type: 'flow'; flow: ActionFlow; logKey?: string; logParams?: Record<string, unknown>; immediateLogs?: ImmediateLogEntry[]; extraData?: Record<string, unknown> }
 export type ActionFlow =
   | {
@@ -600,7 +600,7 @@ export type FarmSelectType = 'plow' | 'sow' | 'fence' | 'room' | 'stable'
 export type SelectionKind = 'farm-position' | 'occupation-hand'
 
 export type InteractionRequest =
-  | { kind: 'choice'; options: ActionChoiceOption[] }
+  | { kind: 'choice'; options: ActionChoiceOption[]; structuredChoicePrefixes?: string[] }
   | { kind: 'animal-reorg'; zones: InteractionAnimalReorgZone[] }
   | { kind: 'confirm-next-player'; nextPlayerIndex: number }
   | { kind: 'confirm-player-switch'; fromPlayerIndex: number; toPlayerIndex: number }

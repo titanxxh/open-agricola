@@ -25,7 +25,7 @@ describe('PARALLEL trigger — multi-listener select-trigger loop', () => {
     return session
   }
 
-  it('emits select-trigger listing both cards (no PASS — C126 is mandatory)', () => {
+  it('emits select-trigger listing both cards with disabled PASS because C126 is mandatory', () => {
     const session = setupWorkPhase()
     const resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
@@ -37,9 +37,10 @@ describe('PARALLEL trigger — multi-listener select-trigger loop', () => {
     const values = resp.interaction.request.options.map((o) => o.value).sort()
     expect(values).toContain('C82_HardwareStore')
     expect(values).toContain('C126_Excavator')
-    // C126 is mandatory (BGA: wood+clay must fire) → PASS is hidden so the
-    // player can't silently skip the guaranteed effect.
-    expect(values).not.toContain('__pass__')
+    // C126 is mandatory (BGA: wood+clay must fire) → PASS remains visible but
+    // disabled so the player can see why the trigger cannot be skipped.
+    expect(values).toContain('__pass__')
+    expect(resp.interaction.request.options.find((option) => option.value === '__pass__')?.disabled).toBe(true)
   })
 
   it('after picking C82 + skipping its optional, only C126 remains and it is mandatory', () => {
@@ -64,7 +65,8 @@ describe('PARALLEL trigger — multi-listener select-trigger loop', () => {
       const remaining = resp.interaction.request.options.map((o) => o.value)
       expect(remaining).toContain('C126_Excavator')
       expect(remaining).not.toContain('C82_HardwareStore')
-      expect(remaining).not.toContain('__pass__')
+      expect(remaining).toContain('__pass__')
+      expect(resp.interaction.request.options.find((option) => option.value === '__pass__')?.disabled).toBe(true)
     } else {
       // Auto-advanced into C126's inner optional pay-for-stone choice.
       expect(resp.interaction.request.kind).toBe('choice')
@@ -77,8 +79,8 @@ describe('PARALLEL trigger — multi-listener select-trigger loop', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.request.kind).toBe('select-trigger')
 
-    // PASS is not offered (C126 mandatory) — resolving it must fail at the
-    // session layer (option not in the engine's offered list).
+    // PASS is offered disabled (C126 mandatory) — resolving it must fail at
+    // the session layer.
     const r2 = session.resolveChoice(0, '__pass__')
     expect(r2.ok).toBe(false)
   })

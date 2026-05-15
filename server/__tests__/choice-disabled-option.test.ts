@@ -2,7 +2,7 @@
  * Test for rejecting resolveChoice calls with disabled options.
  *
  * Verifies that resolvePendingChoice guards against choosing an option
- * marked disabled: true, returning { ok: false, reason: 'option disabled' }.
+ * marked disabled: true.
  *
  * Strategy:
  *  1. Set up a session with a pending choice that has multiple options.
@@ -91,10 +91,10 @@ describe('disabled option in pending choice', () => {
     const composite = session.getEngineStack().peekPendingChoiceFromComposite()!
     composite.options[0]!.disabled = true
 
-    // Attempt to resolve with the disabled option → should be rejected
+    // Attempt to resolve with the disabled option → should be rejected before dispatch.
     resp = session.resolveChoice(0, firstOption.value)
     expect(resp.ok).toBe(false)
-    expect(resp.error).toBe('option disabled')
+    expect(resp.error).toBe('invalid choice value')
   })
 
   it('still allows resolveChoice on a non-disabled option when another is disabled', () => {

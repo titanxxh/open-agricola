@@ -7,7 +7,9 @@ import type {
   ImmediateLogEntry,
   InteractionRequest,
   LogEntry,
+  Resource,
 } from '../contract/types'
+import type { InteractionContextSnapshot } from './types'
 import {
   ActionNode,
   OrNode,
@@ -18,7 +20,9 @@ import { buildReplaceChoiceFlow } from './nodes/interaction-helpers'
 import type { EngineInternals } from './engine-internals'
 import {
   isPendingChoiceValueAllowed,
+  pendingEnvelopeChoices,
 } from './pending-validation'
+import { evaluateTriggerSelect, type TriggerSelectEvaluationOptions } from './trigger-select'
 import {
   applyFallbackSourceCardToFlow,
   applyInteractionRequest,
@@ -27,6 +31,7 @@ import {
   buildOwnedFlowNode,
   buildFollowUpNodes,
   buildListenerEvent,
+  canActionContinueWithoutBeforeTriggers,
   cloneNode,
   findActionNode,
   normalizeFollowUpAction,
@@ -38,6 +43,47 @@ type EngineContext = {
   state: ActionExecutionContext['state']
   player: ActionExecutionContext['player']
   space: ActionExecutionContext['space']
+}
+
+const triggerSelectEvaluationOptions = (
+  int: EngineInternals,
+  context: ActionExecutionContext,
+): TriggerSelectEvaluationOptions => ({
+  canContinueWithoutTriggers: (actionId, resources) =>
+    canActionContinueWithoutBeforeTriggers(int, context, actionId, resources),
+  canReachContinuationThroughTriggers: (actionId, resources) => {
+    const action = int.registry.get(actionId)
+    if (!action) return false
+    const scopedContext = withResourcePreview(context, resources)
+    return action.canBeExecutedByPlayer(
+      scopedContext.state,
+      scopedContext.player,
+      {
+        sourceCard: scopedContext.sourceCard,
+        actionContext: scopedContext.actionContext,
+      },
+    )
+  },
+})
+
+const withResourcePreview = (
+  context: ActionExecutionContext,
+  resources?: Resource,
+): ActionExecutionContext => {
+  if (!resources) return context
+  const player = {
+    ...context.player,
+    resources: { ...resources },
+  }
+  return {
+    ...context,
+    player,
+    state: {
+      ...context.state,
+      players: (context.state.players ?? []).map((entry) =>
+        entry.id === player.id ? player : entry),
+    },
+  }
 }
 
 type ImmediateLogCarrier = {
@@ -127,16 +173,14 @@ export function engineResolveChoice(
       }
       if (node instanceof ParallelNode && node.mode === 'trigger-select') {
         node.clearPending()
-        const offered = node.buildSelectOptions()
-        if (!offered.some((opt) => opt.value === choice)) {
+        const offered = evaluateTriggerSelect(node, context, triggerSelectEvaluationOptions(int, context)).options
+        const selected = offered.find((opt) => opt.value === choice)
+        if (!selected || selected.disabled) {
           int.pendingNodeIdRef.value = null
           return { type: 'fail', logKey: 'log.buildRoomFail' }
         }
         if (choice === '__pass__') {
-          if (!node.passAll()) {
-            int.pendingNodeIdRef.value = null
-            return { type: 'fail', logKey: 'log.buildRoomFail' }
-          }
+          node.resolveRemainingTriggerChildrenForPass()
           int.pendingNodeIdRef.value = null
           return { type: 'ok' }
         }
@@ -157,18 +201,13 @@ export function engineResolveChoice(
       }
     }
     if (node instanceof ParallelNode && node.mode === 'trigger-select') {
-      // Validate against currently-offered options (e.g. PASS only appears
-      // when every unresolved trigger is mandatory: false). Rejecting an
-      // unlisted choice keeps mandatory triggers un-skippable.
-      const offered = node.buildSelectOptions()
-      if (!offered.some((opt) => opt.value === choice)) {
+      const offered = evaluateTriggerSelect(node, context, triggerSelectEvaluationOptions(int, context)).options
+      const selected = offered.find((opt) => opt.value === choice)
+      if (!selected || selected.disabled) {
         return { type: 'fail', logKey: 'log.buildRoomFail' }
       }
       if (choice === '__pass__') {
-        if (!node.passAll()) {
-          int.pendingNodeIdRef.value = null
-          return { type: 'fail', logKey: 'log.buildRoomFail' }
-        }
+        node.resolveRemainingTriggerChildrenForPass()
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
@@ -460,6 +499,25 @@ export function engineResolveChoice(
     return { type: 'ok' }
   }
   int.hooks.during({ ...executionContext, actionId }, result)
+  if (result.type === 'fail' && result.recoverable === true && pendingHost && pendingEnvelope) {
+    const contextSnapshot = pendingEnvelope.contextSnapshot as InteractionContextSnapshot | undefined
+    applyInteractionRequest(int, {
+      targetNode: pendingHost,
+      fallbackNodeId: pendingEnvelope.hostNodeId,
+      request: pendingEnvelope.request,
+      promptKey: pendingEnvelope.promptKey,
+      promptParams: pendingEnvelope.promptParams,
+      choiceOptions: pendingEnvelopeChoices(pendingEnvelope),
+      actionId,
+      ownerNodeId: pendingEnvelope.ownerNodeId ?? null,
+      preserveOwner: true,
+      params: contextSnapshot?.params,
+      costs: contextSnapshot?.costs,
+      sourceCard: pendingEnvelope.sourceCard ?? contextSnapshot?.sourceCard,
+      actionContext: contextSnapshot?.actionContext,
+    })
+    return result
+  }
   if (result.type === 'request' && result.request.kind === 'choice') {
     // Merge ActionDef-declared actionContext patches into the pending context.
     // Used by farm ActionDefs to persist payload (e.g. fence geometry) across

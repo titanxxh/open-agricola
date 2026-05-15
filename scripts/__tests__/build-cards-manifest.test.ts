@@ -39,6 +39,34 @@ describe('buildCardsManifest', () => {
       expect(manifest[id].reaches).toEqual([])
     }
   })
+
+  it('extracts dev stub cards from shared/cards/__stubs__', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cards-manifest-stub-test-'))
+    const cardsRoot = path.join(tmp, 'shared', 'cards-display')
+    const stubDir = path.join(tmp, 'shared', 'cards', '__stubs__')
+    fs.mkdirSync(path.join(cardsRoot, 'A'), { recursive: true })
+    fs.mkdirSync(stubDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(stubDir, 'STUB_TestCard.ts'),
+      `import { MinorImprovement } from '../../cards-display/types'\nexport const STUB_TestCard = new MinorImprovement({ id: 'STUB_TestCard', name: 'STUB Test Card', deck: 'STUB', number: 1, desc: ['A test stub.'], cost: {} })\n`,
+      'utf8',
+    )
+
+    const manifest = buildCardsManifest(cardsRoot)
+
+    expect(manifest['STUB_TestCard']?.meta).toMatchObject({
+      id: 'STUB_TestCard',
+      name: 'STUB Test Card',
+      deck: 'STUB',
+      number: 1,
+      type: 'minor',
+      desc: ['A test stub.'],
+      cost: {},
+    })
+    expect(manifest['STUB_TestCard']?.module).toMatch(/shared\/cards\/__stubs__\/STUB_TestCard$/)
+
+    fs.rmSync(tmp, { recursive: true, force: true })
+  })
 })
 
 describe('buildCardsManifest — extended patterns', () => {

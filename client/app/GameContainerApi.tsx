@@ -30,6 +30,12 @@ import { BrandMark } from '../components/common/BrandMark'
 import { ResourceLine } from '../components/common/ResourceLine'
 import { Section } from '../components/common/Section'
 import { DraftOverlay } from './draft/DraftOverlay'
+import {
+  buildBakeExchangeInfo,
+  buildBakeBulkChoice,
+  hasSelectedBakeGrain,
+} from './bake-exchange-ui'
+import { getCardMeta } from '../services/card-meta'
 
 type RoundSlot = { round: number; action?: ActionSpace }
 
@@ -663,14 +669,9 @@ export const GameContainerApi = () => {
 
   const confirmBakeExchange = () => {
     if (!pendingChoice || !isBakeExchange) return
-    const entries = Object.entries(bakeExchangeCounts)
-      .filter(([, count]) => count > 0)
-      .map(([id, count]) => `${id}=${count}`)
-    if (entries.length === 0) {
-      resolveChoice('cancel')
-      return
-    }
-    resolveChoice(`bulk:${entries.join(',')}`)
+    const choice = buildBakeBulkChoice(bakeExchangeCounts)
+    if (!choice) return
+    resolveChoice(choice)
   }
 
   const confirmNextPlayer = useCallback(() => {
@@ -796,22 +797,27 @@ export const GameContainerApi = () => {
     )
   }, [pendingChoice, isSelectingImprovementAny, state?.availableMajorImprovements])
 
-  const bakeExchangeInfo = useMemo<Record<string, { food: number; max: number }>>(
-    () => ({
-      Major_Fireplace1: { food: 2, max: Number.POSITIVE_INFINITY },
-      Major_Fireplace2: { food: 2, max: Number.POSITIVE_INFINITY },
-      Major_CookingHearth1: { food: 3, max: Number.POSITIVE_INFINITY },
-      Major_CookingHearth2: { food: 3, max: Number.POSITIVE_INFINITY },
-      Major_ClayOven: { food: 5, max: 1 },
-      Major_StoneOven: { food: 4, max: 2 },
-    }),
-    [],
-  )
-  const cardLabel = (id: string) =>
-    t(locale, `improvements.${id}.name`).replace(/\s*[（(].*$/, '')
-
   const isBakeExchange =
     pendingChoice?.promptKey === 'ui.interactionBakeBreadChoice'
+  const bakeExchangeSourceIds = useMemo(
+    () =>
+      isBakeExchange
+        ? (pendingChoice?.options ?? []).map((option) => option.value)
+        : [],
+    [isBakeExchange, pendingChoice?.options],
+  )
+  const bakeExchangeInfo = useMemo(
+    () => buildBakeExchangeInfo(bakeExchangeSourceIds, getCardMeta),
+    [bakeExchangeSourceIds],
+  )
+  const cardLabel = (id: string) => {
+    const improvementName = t(locale, `improvements.${id}.name`)
+    if (improvementName !== `improvements.${id}.name`) {
+      return improvementName.replace(/\s*[（(].*$/, '')
+    }
+    return getCardMeta(id)?.name ?? id
+  }
+
   const bakeExchangePlayer =
     isBakeExchange && pendingChoice && state
       ? state.players[pendingChoice.playerIndex]
@@ -866,6 +872,7 @@ export const GameContainerApi = () => {
       sum + (bakeExchangeInfo[id]?.food ?? 0) * count,
     0,
   )
+  const hasBakeSelection = hasSelectedBakeGrain(bakeExchangeCounts)
   const baseFood = bakeExchangePlayer?.resources.food ?? 0
   const baseGrain = bakeExchangePlayer?.resources.grain ?? 0
   const summaryResources = {
@@ -1781,6 +1788,7 @@ export const GameContainerApi = () => {
                     type="button"
                     className="exchange-confirm"
                     onClick={confirmBakeExchange}
+                    disabled={!hasBakeSelection}
                   >
                     {t(locale, 'ui.interactionConfirmButton')}
                   </button>

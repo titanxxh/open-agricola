@@ -159,6 +159,19 @@ function markCheckedReplaceAction(
   }
 }
 
+function markFlowCheckedReplaceAction(flow: ActionFlow): ActionFlow {
+  if (flow.type === 'leaf') {
+    return {
+      ...flow,
+      actionContext: markCheckedReplaceAction(flow.actionContext),
+    }
+  }
+  return {
+    ...flow,
+    children: flow.children.map((child) => markFlowCheckedReplaceAction(child)),
+  }
+}
+
 /**
  * Wrap an alternative flow + the original (now declined) action into a `xor`
  * flow node so the engine can present "do alternative / take original" as
@@ -172,10 +185,13 @@ export function buildReplaceChoiceFlow(
   alternativeFlow: ActionFlow,
   replacedActionId: string,
 ): ActionFlow {
+  const checkedAlternativeFlow = markFlowCheckedReplaceAction(alternativeFlow)
   return {
     type: 'xor',
     children: [
-      alternativeFlow,
+      ...(checkedAlternativeFlow.type === 'xor'
+        ? checkedAlternativeFlow.children
+        : [checkedAlternativeFlow]),
       {
         type: 'leaf',
         actionId: replacedActionId,

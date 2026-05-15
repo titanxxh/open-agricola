@@ -13,6 +13,7 @@ import {
   getCustomMinorImprovement,
   getCustomOccupation,
 } from '../../shared/cards/custom-registry'
+import type { CardExchange } from '../../shared/contract/cards'
 import type { CardBase } from '../../shared/cards-display/types'
 
 export type CardMeta = {
@@ -26,6 +27,7 @@ export type CardMeta = {
   desc?: string[]
   cost?: Record<string, number>
   altCosts?: Record<string, number>[]
+  exchanges?: CardExchange[]
   players?: string
   prerequisite?: unknown
   vp?: number
@@ -95,6 +97,7 @@ const customCardToMeta = (card: CardBase, type: 'minor' | 'occupation'): CardMet
   // Custom cards use simple Partial<Resource> costs (ComplexCost is majors-only).
   cost: card.cost as Record<string, number> | undefined,
   altCosts: card.altCosts,
+  exchanges: card.exchanges,
   players: card.players,
   prerequisite: card.prerequisite,
   vp: card.vp,

@@ -227,6 +227,108 @@ describe('Engine flow nodes', () => {
     })
   })
 
+  it('single select listener is wrapped in trigger-select', () => {
+    const p1 = createPlayer()
+    const state = createState()
+    state.players = [p1]
+
+    const registry = new ActionRegistry()
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('trigger', 'gain')),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const matched: MatchedCardListener[] = [
+      {
+        registration: {
+          id: 'listener-1',
+          cardIds: ['C1'],
+          dispatchMode: 'select',
+          handler: () => undefined,
+        },
+        cardId: 'C1',
+        ownerPlayerId: p1.id,
+      },
+    ]
+
+    const nodes = buildPhaseTrailingNodes(
+      engine._internals(),
+      matched,
+      'after',
+      'gain',
+      state,
+      {},
+      p1.id,
+    )
+
+    expect(nodes).toHaveLength(1)
+    const node = nodes[0]
+    expect(node).toBeInstanceOf(ParallelNode)
+    const parallel = node as ParallelNode
+    expect(parallel.mode).toBe('trigger-select')
+    expect(parallel.children).toHaveLength(1)
+    expect(parallel.children[0]).toBeInstanceOf(ActionNode)
+    const child = parallel.children[0] as ActionNode
+    expect(child.actionId).toBe('activate-card')
+    expect(child.sourceCard).toBe('C1')
+  })
+
+  it('disabled trigger-select choice is rejected without resolving the child', () => {
+    const p1 = createPlayer()
+    p1.minorPlayed = ['C1']
+    const state = createState()
+    state.players = [p1]
+
+    const cardRegistry = new CardRegistry()
+    const listener = {
+      id: 'listener-1',
+      cardIds: ['C1'],
+      dispatchMode: 'select' as const,
+      handler: () => ({
+        flow: { type: 'leaf' as const, actionId: 'pay', params: { cost: { wood: 1 } } },
+      }),
+    }
+    cardRegistry.registerListener(listener)
+    setActiveCardRegistry(cardRegistry)
+
+    const registry = new ActionRegistry()
+    const engineForNodes = new Engine({
+      tree: new EngineTree(new ActionNode('trigger', 'gain')),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const nodes = buildPhaseTrailingNodes(
+      engineForNodes._internals(),
+      [{ registration: listener, cardId: 'C1', ownerPlayerId: p1.id }],
+      'after',
+      'gain',
+      state,
+      {},
+      p1.id,
+    )
+    const triggerSelect = nodes[0] as ParallelNode
+    const child = triggerSelect.children[0]!
+    const engine = new Engine({
+      tree: new EngineTree(triggerSelect),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const context = { state, player: p1, space: createSpace(gainAction) }
+
+    const prompt = engine.proceed(context)
+    expect(prompt.type).toBe('choice')
+    if (prompt.type !== 'choice') throw new Error('expected trigger-select choice')
+    expect(prompt.choice.options.find((option) => option.value === 'C1')?.disabled).toBe(true)
+
+    const rejected = engine.resolveChoice('C1', context)
+
+    expect(rejected.type).toBe('fail')
+    expect(child.getState()).toBe('ready')
+  })
+
   it('during listener activation preserves original trigger player for cross-owner listeners', () => {
     const p1 = createPlayer()
     const p2 = { ...createPlayer(), id: 'p2', name: 'P2', color: 'blue' as const }

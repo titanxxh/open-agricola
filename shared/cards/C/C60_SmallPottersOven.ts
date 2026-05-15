@@ -55,26 +55,26 @@ const isDoableListener: CardListenerRegistration = {
   actions: ['bake-bread'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
-    if (getAvailableOvenChoices(context).length > 0) {
-      return { doable: true }
-    }
+    const allowedPurchases = getAvailableOvenChoices(context)
+    if (allowedPurchases.length === 0) return
+    return { doable: true }
   },
 }
 
 export const C60_SmallPottersOven_impl = {
   listeners: [beforeBakeListener, isDoableListener],
   effect: {
-  id: CARD_ID,
-  onBuy: (_state, _player, paymentInfo) => {
-    if (!paymentInfo?.returnedCardId) return
-    if (!OVEN_IDS.includes(paymentInfo.returnedCardId as (typeof OVEN_IDS)[number])) {
-      return
-    }
-    return {
-      type: 'seq',
-      children: [gainLeaf(CARD_ID, { food: 5 })],
-    }
+    id: CARD_ID,
+    onBuy: (_state, _player, paymentInfo) => {
+      if (!paymentInfo?.returnedCardId) return
+      if (!OVEN_IDS.includes(paymentInfo.returnedCardId as (typeof OVEN_IDS)[number])) {
+        return
+      }
+      return {
+        type: 'seq',
+        children: [gainLeaf(CARD_ID, { food: 5 })],
+      }
+    },
   },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl

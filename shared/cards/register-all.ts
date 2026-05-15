@@ -837,6 +837,7 @@ import { E98_Prodigy_impl } from './E/E98_Prodigy'
 import { E99_UncaringParents_impl } from './E/E99_UncaringParents'
 import { E9_BarteringHut_impl } from './E/E9_BarteringHut'
 import { CUSTOM_FixtureHarvester_impl } from './community/CUSTOM_FixtureHarvester'
+import { STUB_BeforeBakeGainClay_impl } from './__stubs__/STUB_BeforeBakeGainClay'
 
 export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'A100_Curator': A100_Curator_impl,
@@ -1666,6 +1667,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'E99_UncaringParents': E99_UncaringParents_impl,
   'E9_BarteringHut': E9_BarteringHut_impl,
   'CUSTOM_FixtureHarvester': CUSTOM_FixtureHarvester_impl,
+  'STUB_BeforeBakeGainClay': STUB_BeforeBakeGainClay_impl,
 }
 
 export type AllCardImpls = typeof ALL_CARD_IMPLS
