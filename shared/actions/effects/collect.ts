@@ -2,6 +2,12 @@ import type { ActionDefinition, ActionSpace, PlayerState, Resource } from '../..
 import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resources'
 import { addResourcesFromBoard } from '../../session/stats'
 
+const COLLECTABLE_RESOURCES = ['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep', 'boar', 'cattle'] as const
+type CollectableResource = (typeof COLLECTABLE_RESOURCES)[number]
+
+const isCollectableResource = (value: unknown): value is CollectableResource =>
+  typeof value === 'string' && COLLECTABLE_RESOURCES.includes(value as CollectableResource)
+
 export const collectAccumulatedResources = (
   player: PlayerState,
   space: ActionSpace,
@@ -39,10 +45,13 @@ export const collectAction: ActionDefinition = {
         return { type: 'fail' as const, logKey: 'log.collectNoSpace' }
       }
     }
-    const resource = actionContext?.resource as keyof Resource | undefined
-    const amount = actionContext?.amount as number | undefined
+    const resource = actionContext?.resource
+    const amount = actionContext?.amount
 
-    if (resource && amount !== undefined && amount > 0) {
+    if (spaceIdHint) {
+      if (!isCollectableResource(resource) || typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+        return { type: 'fail' as const, logKey: 'log.collectInvalidPartial' }
+      }
       const have = targetSpace.resources[resource] ?? 0
       if (have < amount) return { type: 'fail' as const, logKey: 'log.collectNotEnough' }
       ;(targetSpace.resources as Record<keyof Resource, number>)[resource] = have - amount
@@ -55,7 +64,7 @@ export const collectAction: ActionDefinition = {
 
     const gained: Record<string, number> = {}
     const resources = targetSpace.resources
-    ;(['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep', 'boar', 'cattle'] as const).forEach((key) => {
+    COLLECTABLE_RESOURCES.forEach((key) => {
       if (resources[key] > 0) gained[key] = resources[key]
     })
     collectAccumulatedResources(player, targetSpace)

@@ -901,6 +901,7 @@ export const en = {
     specialEffectFail: 'Special effect failed',
     collectNoSpace: 'No space to collect from',
     collectNotEnough: 'Not enough resources on space',
+    collectInvalidPartial: 'Invalid partial collect payload',
   },
   platform: {
     loading: 'Loading...',
