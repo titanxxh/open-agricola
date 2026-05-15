@@ -1,6 +1,5 @@
-import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { getRenovation } from '../../actions/effects/renovation'
 import type { CardImpl } from '../registry'
 import { D13_Trowel } from '../../cards-display/D/D13_Trowel'
 
@@ -8,48 +7,65 @@ const CARD_ID = D13_Trowel.id
 
 /**
  * D13 Trowel — MinorImprovement (cost: 1 wood).
- * At any time, you can renovate your house to stone.
- * From a wooden house: costs 1 stone, 1 reed, and 1 food per room.
- * From a clay house: costs 1 stone per room.
+ * At any time, you can renovate your house to stone in a single step:
+ *  - From a wooden house: 1 stone + 1 reed + 1 food per room.
+ *  - From a clay house:   1 stone per room (reed waived).
  *
- * BGA: isListeningTo → anytime. onPlayerAtAnytime → renovation with toStone=true.
- * onPlayerComputeCostsRenovation → if actionCardId === D13_Trowel, apply custom costs:
- *   wood house: stone=1, food=1, reed=rooms per room (overrides base cost entirely).
- *   clay house: stone=1 per room, no reed (removes reed from fee).
+ * BGA (D13_Trowel.php):
+ *  - isListeningTo → anytime, onPlayerAtAnytime returns RENOVATION with
+ *    `toStone: true` and `actionCardId: D13_Trowel`.
+ *  - onPlayerComputeCostsRenovation injects the wood→stone trade pattern
+ *    (stone:1/food:1 per room) and the reed fee (rooms reeds from wood,
+ *    0 from clay).
  *
- * Simplified implementation:
- * - For clay house: anytime renovate-house with -1 reed discount (removes reed cost,
- *   since clay→stone base is { stone: rooms, reed: 1 }, Trowel makes it { stone: rooms }).
- * - For wood house: anytime renovate-house with sourceCard=D13 (goes wood→clay normally,
- *   with costs: { stone: 1 per room, food: 1 per room, reed: rooms } which replaces
- *   base cost { clay: rooms, reed: 1 } via computeCosts override).
- *
- * NOTE: The BGA toStone mechanic (wood→stone in one step) cannot be fully replicated
- * without engine changes. This simplified version offers the anytime renovation
- * with appropriate cost adjustments for each house type.
- *
- * DONE_WITH_CONCERNS: Wood house renovation goes clay (not stone) because the engine
- * only supports sequential upgrades. Clay house renovation correctly goes to stone
- * with no reed cost.
+ * Local implementation strategy:
+ *  - `anytime` listener returns a renovate-house leaf with
+ *    `sourceCard: D13_Trowel` and `params.selectedOption: 'stone'` so the
+ *    engine's renovation `planForContext` resolves directly to
+ *    `buildRenovationPlan(player, 'stone')` (base cost {stone: rooms, reed: 1}).
+ *  - `computeChoiceCandidates` listener (sourceCard scoped) injects the
+ *    `stone` candidate when the owner is on a wooden house — base options
+ *    for wood-house only include `clay`.
+ *  - `computeCosts` listener (sourceCard scoped) adds the BGA wood→stone
+ *    food/reed delta on the stone path. The wood→clay sibling option still
+ *    surfaces during the affordability probe; we publish a prohibitive
+ *    cost on the `clay` probe so the engine filters it out and `stone`
+ *    remains the sole affordable target (single-option auto-resolve).
  */
 
-// Anytime listener: offer renovation when not already stone
 const anytimeListener: CardListenerRegistration = {
   id: 'D13-trowel-anytime',
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.player.houseType === 'stone') return
-    const renovation = getRenovation(context.player)
-    if (!renovation) return
     return {
       flow: {
         type: 'leaf',
         actionId: 'renovate-house',
         sourceCard: CARD_ID,
+        params: { selectedOption: 'stone' },
+        choiceLabelKey: 'cards.D13_Trowel.anytime',
       },
       sourceCard: CARD_ID,
       labelKey: 'cards.D13_Trowel.anytime',
+    }
+  },
+}
+
+const choiceCandidateListener: CardListenerRegistration = {
+  id: 'D13-trowel-add-stone-renovation-target',
+  cardIds: [CARD_ID],
+  phases: ['computeChoiceCandidates' as ActionHookPhase],
+  actions: ['renovate-house'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.sourceCard !== CARD_ID) return
+    if (context.player.houseType !== 'wood') return
+    return {
+      extraOptions: [
+        { value: 'stone', labelKey: 'cards.D13_Trowel.optionStone', sourceCard: CARD_ID },
+      ],
+      sourceCard: CARD_ID,
     }
   },
 }
@@ -61,32 +77,35 @@ const computeCostsListener: CardListenerRegistration = {
   actions: ['renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.sourceCard !== CARD_ID) return
+    const selected = (context.params as { selectedOption?: unknown } | undefined)?.selectedOption
     const houseType = context.player.houseType
     const rooms = context.player.rooms
-    if (houseType === 'clay') {
-      // Clay→Stone: BGA cost = 1 stone per room, no reed.
-      // Base: { stone: rooms, reed: 1 }
-      // Apply: { reed: -1 } to remove reed cost (stone stays).
-      return { costs: { reed: -1 } }
-    }
-    if (houseType === 'wood') {
-      // Wood→Clay: BGA intends wood→stone in one step: cost = 1 stone+food+reed per room.
-      // Base: { clay: rooms, reed: 1 }
-      // Override: remove clay entirely, add stone=rooms, food=rooms, reed=rooms.
-      // Simplification: { clay: -rooms, stone: rooms, food: rooms, reed: rooms - 1 }
+    if (selected === 'clay') {
+      // Trowel never resolves via wood→clay; publish a prohibitive delta so
+      // the affordability probe drops this option and leaves `stone` alone.
       return {
-        costs: {
-          clay: -rooms,
-          stone: rooms,
-          food: rooms,
-          reed: rooms - 1, // base has reed:1, we want reed:rooms → delta = rooms-1
-        },
+        costs: { clay: 999, reed: 999 },
+        sourceCard: CARD_ID,
+      }
+    }
+    if (selected === 'stone' && houseType === 'wood') {
+      // base plan {stone: rooms, reed: 1} → target {stone: rooms, reed: rooms, food: rooms}
+      return {
+        costs: { food: rooms, reed: rooms - 1 },
+        sourceCard: CARD_ID,
+      }
+    }
+    if (selected === 'stone' && houseType === 'clay') {
+      // base plan {stone: rooms, reed: 1} → target {stone: rooms} (waive reed)
+      return {
+        costs: { reed: -1 },
+        sourceCard: CARD_ID,
       }
     }
   },
 }
 
 export const D13_Trowel_impl = {
-  listeners: [anytimeListener, computeCostsListener],
+  listeners: [anytimeListener, choiceCandidateListener, computeCostsListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
