@@ -73,6 +73,63 @@ describe('selectionAction', () => {
       readCardExtraData<string[]>(player, 'Test_Card', 'selectedPositions'),
     ).toEqual(['0-0', '1-1'])
   })
+
+  it('rejects cancel when farm-position selection requires at least one position', () => {
+    const player = createMockPlayer()
+
+    const result = selectionAction.resolveChoice!(
+      {
+        player,
+        sourceCard: 'Test_Card',
+        actionContext: {
+          selectionKind: 'farm-position',
+          minSelections: 1,
+          maxSelections: 2,
+          selectableTiles: [{ row: 0, col: 0 }],
+        },
+      } as never,
+      'cancel',
+    )
+
+    expect(result).toEqual({
+      type: 'fail',
+      logKey: 'not enough selection positions',
+      recoverable: true,
+    })
+  })
+
+  it('rejects duplicate or unselectable farm-position submissions before effects run', () => {
+    const player = createMockPlayer()
+    let received: string[] | null = null
+
+    registerSelectionEffect('test-selection-validation', ({ positions }) => {
+      received = positions
+    })
+
+    const context = {
+      player,
+      sourceCard: 'Test_Card',
+      actionContext: {
+        selectionKind: 'farm-position',
+        minSelections: 1,
+        maxSelections: 2,
+        selectableTiles: [{ row: 0, col: 0 }],
+        selectionEffect: 'test-selection-validation',
+      },
+    } as never
+
+    expect(selectionAction.resolveChoice!(context, '0-0,0-0')).toEqual({
+      type: 'fail',
+      logKey: 'duplicate selection position',
+      recoverable: true,
+    })
+    expect(selectionAction.resolveChoice!(context, '0-1')).toEqual({
+      type: 'fail',
+      logKey: 'invalid selection position',
+      recoverable: true,
+    })
+    expect(received).toBeNull()
+  })
 })
 
 describe('selection action with occupation-hand kind', () => {
