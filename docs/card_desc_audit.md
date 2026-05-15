@@ -64,7 +64,7 @@ BGA 将这些卡标为 banned / non-standard，但 OA 当前按产品策略保�
 本文件不裁定运行时等价性。当前行为 gap 以 `docs/card_progress.md` 第 2 节为准，目前队列是：
 
 `A148_Woolgrower`, `B86_TruffleSearcher`, `B157_Salter`,
-`C8_PlantFertilizer`, `C57_Crudite`, `C140_PackagingArtist`, `D13_Trowel`,
+`C8_PlantFertilizer`, `C140_PackagingArtist`, `D13_Trowel`,
 `D15_ClaySupports`, `D66_PotterCeramics`, `E5_NightLoot`.
 
 ## 6. 复现

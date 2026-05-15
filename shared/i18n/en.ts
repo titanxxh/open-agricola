@@ -1208,7 +1208,7 @@ export const en = {
           name: 'Studio Boat',
 },
     C57_Crudite: {
-      anytime: 'Crudite: Pay 1 Food → 1 Food',
+      anytime: 'Crudité: Discard field Vegetable → 4 Food',
     },
     C69_LandConsolidation: {
       anytime: 'Land Consolidation: Pay 1 Food → 1 Field',
