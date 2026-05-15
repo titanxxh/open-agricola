@@ -6,8 +6,7 @@
   "sideEffects": [
     "**/*.css",
     "client/main.tsx",
-    "shared/cards/register-all.ts",
-    "shared/cards/catalog.ts"
+    "shared/cards/register-all.ts"
   ],
   "packageManager": "pnpm@10.33.0",
   "scripts": {

@@ -5,6 +5,29 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
+const mainClientForbiddenCardBootstrapModules = [
+  'catalog',
+  'install-catalog-lookups',
+  'register-all',
+  'registry-runtime',
+]
+
+const mainClientForbiddenImportGroups = [
+  '**/shared/session/**',
+  '**/shared/engine/**',
+  ...mainClientForbiddenCardBootstrapModules.flatMap((moduleName) => [
+    `**/shared/cards/${moduleName}`,
+    `**/shared/cards/${moduleName}.ts`,
+    `**/shared/cards/${moduleName}.js`,
+  ]),
+  '**/shared/cards/[A-E]/**',
+  '**/shared/cards/community/**',
+  '**/shared/cards/major/**',
+  '**/shared/cards/__stubs__/**',
+]
+
+const mainClientForbiddenDynamicImportPattern = String.raw`(?:^|\/)shared\/(?:session|engine)\/|(?:^|\/)shared\/cards\/(?:catalog|install-catalog-lookups|register-all|registry-runtime)(?:\.(?:ts|js))?$|(?:^|\/)shared\/cards\/(?:[A-E]|community|major|__stubs__)\/`
+
 export default defineConfig([
   globalIgnores(['dist', '.worktree/**', 'scripts/__tests__/fixtures/**', 'public/**']),
   {
@@ -207,7 +230,7 @@ export default defineConfig([
       }],
     },
   },
-  // S6c: main client may not import session/engine. Use client/sandbox/ for hot-seat.
+  // S6c: main client may not import session/engine or card impl/bootstrap modules. Use client/sandbox/ for hot-seat.
   {
     files: ['client/**/*.{ts,tsx}'],
     ignores: ['client/sandbox/**', 'client/**/__tests__/**'],
@@ -215,11 +238,17 @@ export default defineConfig([
       '@typescript-eslint/no-restricted-imports': ['error', {
         patterns: [
           {
-            group: ['**/shared/session/**', '**/shared/engine/**'],
-            message: 'Main client cannot import shared/session/** or shared/engine/**. Use client/sandbox/ for workshop hot-seat.',
+            group: [
+              ...mainClientForbiddenImportGroups,
+            ],
+            message: 'Main client cannot import shared/session, shared/engine, card catalog/bootstrap/register-all, or per-card impl modules. Use shared/cards-display or manifest-backed client/services/card-meta for UI metadata.',
             allowTypeImports: true,
           },
         ],
+      }],
+      'no-restricted-syntax': ['error', {
+        selector: `ImportExpression[source.value=/${mainClientForbiddenDynamicImportPattern}/]`,
+        message: 'Main client cannot dynamically import shared/session, shared/engine, card catalog/bootstrap/register-all, or per-card impl modules. Use shared/cards-display or manifest-backed client/services/card-meta for UI metadata.',
       }],
     },
   },
