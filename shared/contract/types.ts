@@ -88,6 +88,15 @@ export type TradeModifier = {
   from: Partial<Resource>
   to: Partial<Resource>
   max?: number
+  /**
+   * Player-state conditions evaluated when the modifier is applied. Same
+   * supported keys as `Bonus.conditions` (`minNumRooms`, `houseTypeWood` /
+   * `houseTypeClay` / `houseTypeStone`). For the `construct` cost type,
+   * `room-payment.ts` evaluates these per build call (mirrors the existing
+   * BonusModifier path). Other cost types apply the same checks via
+   * `getModifiersForCostType` / `evaluateConditions`.
+   */
+  conditions?: Record<string, number>
 }
 
 export type BonusModifier = {

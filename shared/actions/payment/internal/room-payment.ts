@@ -77,7 +77,7 @@ const expandBonusChoicesToFees = (
   return bonus.choices.map((choice) => applyDiscountToFee(fee, choice.discount))
 }
 
-const bonusAppliesToRoomCount = (
+const modifierAppliesToRoomCount = (
   player: PlayerState,
   conditions: Record<string, number> | undefined,
   roomCount: number,
@@ -235,6 +235,16 @@ export const buildRoomCostPerUnit = (
         return
       }
 
+      // Trade modifiers may carry the same player-state `conditions` as
+      // BonusModifier (e.g. D15_ClaySupports applies only when
+      // `player.houseType === 'clay'`). The construct path runs trades
+      // per-unit, so only `houseType*` checks are meaningful here;
+      // `minNumRooms` on a per-unit trade has no useful meaning and is
+      // ignored. `applyRoomCountBonuses` already enforces `minNumRooms`
+      // for BonusModifiers on the multi-room total.
+      if (!modifierAppliesToRoomCount(player, modifier.conditions, Number.POSITIVE_INFINITY)) {
+        return
+      }
       const transformed = fees.flatMap((fee) =>
         buildTradeFees(fee, modifier.from, modifier.to, modifier.max),
       )
@@ -257,7 +267,7 @@ const applyRoomCountBonuses = (
     .filter((modifier): modifier is Extract<typeof modifier, { type: 'bonus' }> => modifier.type === 'bonus')
   bonusModifiers.forEach(validateBonusModifier)
   const bonuses = bonusModifiers
-    .filter((modifier) => bonusAppliesToRoomCount(player, modifier.conditions, roomCount))
+    .filter((modifier) => modifierAppliesToRoomCount(player, modifier.conditions, roomCount))
     .map((modifier) => ({
       discount: modifier.discount,
       choices: modifier.choices,
