@@ -106,4 +106,31 @@ describe('E5_NightLoot', () => {
     expect(spaceIds).toContain('forest')
     expect(spaceIds).toContain('forest-extra')
   })
+
+  it('adds display metadata for each collect leaf so same-resource choices remain distinguishable', () => {
+    const state: any = {
+      actionSpaces: [
+        { id: 'forest', nameKey: 'actions.forest.name', gainPerRound: { wood: 3 }, resources: { wood: 1, clay: 0, reed: 0, stone: 0 } },
+        { id: 'forest-extra', nameKey: 'actions.forest-extra.name', gainPerRound: { wood: 1 }, resources: { wood: 1, clay: 0, reed: 0, stone: 0 } },
+        { id: 'reed-bank', nameKey: 'actions.reed-bank.name', gainPerRound: { reed: 1 }, resources: { wood: 0, clay: 0, reed: 1, stone: 0 } },
+      ],
+    }
+    const flow = E5_NightLoot_impl.effect.onBuy(state, { id: 'p1' } as any)
+    expect(flow?.type).toBe('xor')
+
+    const leaves = flow!.children.flatMap((seq: any) => seq.children)
+    for (const leaf of leaves) {
+      const { resource, spaceId } = leaf.actionContext
+      expect(leaf.choiceLabelKey).toBe('ui.interactionTakeFromSpace')
+      expect(leaf.choiceLabelParams).toEqual({
+        resource,
+        spaceId,
+        spaceName: `actions.${spaceId}.name`,
+      })
+      expect(leaf.effectPreview).toEqual({
+        kind: 'resourceExchange',
+        resourcesGained: { [resource]: 1 },
+      })
+    }
+  })
 })
