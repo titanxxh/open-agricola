@@ -308,6 +308,20 @@ state.players[0].resources = {
 - 预置 `cardStates`：`state.players[X].cardStates[CARD_ID] = { flags: {...}, counts: {...}, extraData: {...} }`
 - 预设回合 / 阶段：`state.round = R` + `performRoundEnd()`
 
+#### C.6 Reading global `completedFeedingPhases` in tests
+
+`state.completedFeedingPhases` 是全局收获计数（A148_Woolgrower / B86_TruffleSearcher 等"按已完成 feeding +1 容量"卡牌从此字段读取）。Session 测试无需跑完整收获 phase；直接在 setup 阶段覆盖即可：
+
+```ts
+const session = new GameSession(SEED)
+const core = (session as unknown as { core: { state: GameState } }).core
+core.state.completedFeedingPhases = 3   // 模拟玩家已经经历 3 次收获
+core.state.players[0].minorPlayed.push('A148_Woolgrower')
+// 之后 onComputeAnimalZones(player, zones, state) 读到 cap = 3
+```
+
+如果测试要验证"feeding phase 真正 +1"，跑完整收获 phase（`runHarvestPhase` 或多次 `confirmHarvestFeed`）后断言 `core.state.completedFeedingPhases` 单调递增。
+
 ### D. 测试步骤
 
 #### D.1 步骤 1：触发主动作

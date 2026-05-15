@@ -11,7 +11,7 @@
 | canonical 层面 BGA-only / OA-only | 0 / 0 |
 | TypeScript 实体卡牌文件数 | 888 |
 | BGA active implemented 但 OA 缺失 | 0 |
-| 待修行为 / 注册差异 | 9 |
+| 待修行为 / 注册差异 | 4 |
 | metadata schema 上抬差异 | 4 |
 | BGA 标 banned 但 OA 按策略保留 | 33 |
 | 待 owner 确认队列 | 0 |
@@ -33,6 +33,7 @@
 - trigger-select 的 pass gate 已支持通用 replacement continuation：先检查跳过 before trigger 后原 action 是否可直接继续；不行时检查 `computeReplace` 返回的 `alternativeFlow` 是否有可启动分支，避免 B26 + D66 这类 fencing fallback 被误判为必须触发 D66。
 - `computeReplace` decline 的替代 flow 若本身是 `xor`，引擎会把其 children 作为可选 replacement 分支展开；replacement 分支 leaf 只携带 `skipComputeReplaceListenerIds` 跳过来源 listener，不再携带 `checkedReplaceAction`，避免误伤真实替代分支里的普通 before / after listener。original fallback 分支仍携带 `checkedReplaceAction=true`。
 - structured choice 允许列表从 interaction request metadata 读取；`bake-bread` / `exchange` 的 `bulk:` 不再靠 engine action-id 特判。
+- `A148_Woolgrower` / `B86_TruffleSearcher` 改用全局 `state.completedFeedingPhases` 计入容量；`D13_Trowel` 暴露 wood->stone 翻修；`D15_ClaySupports` 改为可选 multi-key trade；`E5_NightLoot` 列出全部 `(space,type)` 选项并复用 `collect` partial-take。
 
 ## 2. 待修行为 / 注册差异
 
@@ -40,15 +41,10 @@
 
 | 卡牌 | 原始行为 | 当前 OA 行为 | BGA 差距 | 需要修复 |
 |---|---|---|---|---|
-| `A148_Woolgrower` | 已完成 feeding phase 会计入羊容量。 | 容量来自本卡 `completedHarvests`，只从打出后开始计数。 | BGA 读取全局 completed feeding phases，所以晚打出也应享受之前的收获容量。 | 改用全局 completed feeding / harvest 计数，而不是本卡 post-play 计数。 |
-| `B86_TruffleSearcher` | 已完成 feeding phase 会计入野猪容量。 | 和 `A148` 一样使用本卡 post-play counter。 | BGA 同样读取全局 completed feeding phases。 | 和 `A148` 共用同一套全局计数来源。 |
 | `B157_Salter` | 玩家可以腌制多种 / 多只动物，并按数量获得未来食物。 | 当前 flow 是 XOR，只能三选一且只能选 1 只动物。 | BGA 一次交互可选择 sheep / boar / cattle 的多个数量。 | 改成显式多类型计数选择，并按类型 / 数量发放 future food。 |
 | `C8_PlantFertilizer` | 支持 grain / vegetable / wood / stone 等逻辑田组。 | 只处理物理 grain / vegetable field。 | BGA 可作用于后续卡牌创建的 wood / stone field 逻辑组。 | 田地查找改成 group-aware，并纳入已激活的 wood / stone 可播种组。 |
 | `C57_Crudite` | 收获时可选触发，玩家选择移除哪个 vegetable 来源。 | harvest handler 直接移除第一个符合条件的 vegetable，效果上是强制触发。 | BGA 在多来源时给 optional choice。 | 改成显式 optional pending / flow，并让玩家选择来源。 |
 | `C140_PackagingArtist` | 把 Major Improvement action 加入 replacement action pool。 | 实现了 minor replacement / `isDoable`，但没有把 Major Improvement 加进可替换 action pool。 | BGA 允许此卡扩展 replacement action 集合。 | 增加缺失的通用 action-pool 扩展点。 |
-| `D13_Trowel` | 木屋可直接翻修到 stone。 | 当前 renovate-house 路径仍只能 wood -> clay。 | BGA 传入 `toStone=true` 提供 wood -> stone 选项。 | 当此卡激活时，renovate flow 暴露 wood -> stone 选项。 |
-| `D15_ClaySupports` | 提供替代 clay trade，同时保留基础翻修费用语义。 | 当前实现成强制 cost delta。 | BGA 把它建模成可选替代支付，不是强制折扣路径。 | 显式建模 BGA 的 alternate-payment option。 |
-| `E5_NightLoot` | 玩家选择具体 accumulation space / resource 来偷取。 | 按所选资源自动取第一个匹配 accumulation space。 | BGA 暴露精确来源选择。 | 交互中加入 source-space 选择。 |
 
 ## 3. Metadata Schema 上抬差异
 
@@ -144,3 +140,23 @@ pnpm exec vitest run <targeted-test-file>
 pnpm test:fast
 pnpm run lint
 ```
+
+## 9. 当前轮次
+
+- 2026-05-15 — Wave 1 cards (A148/B86/D15/D13/E5) aligned to BGA; 4 infra extensions
+
+## 10. 基础设施
+
+通用扩展点（卡牌之间共享、登记在此以避免重复造轮子）：
+
+- `GameState.completedFeedingPhases` — 全局收获计数（A148/B86 共用，BGA Globals 同款）。
+- `collect` action 统一 partial-take（接受 `actionContext: {spaceId, resource, amount}`），删除 `take-from-space`。
+- `buildTradeFees` 支持多键 trade（D15 即时 clay trade 复用），把多 `to` key 编译到 PaymentSolver 期望的 cost 形状。
+- `TradeModifier.conditions?: Record<string, number>` — D15 trade gated by `houseTypeClay`；其余 `houseTypeWood` / `houseTypeStone` / `minNumRooms` 同套机制。
+- `onComputeAnimalZones` 签名加 `state: GameState` 入参（A148 / B86 读全局 feeding counter，避免再走玩家局部 state）。
+
+## 11. 时间线
+
+| 日期 | 批次 | 涉及卡牌 / 基建 |
+|---|---|---|
+| 2026-05-15 | Wave 1 | A148_Woolgrower / B86_TruffleSearcher / D15_ClaySupports / D13_Trowel / E5_NightLoot + 4 项基建（§10） |
