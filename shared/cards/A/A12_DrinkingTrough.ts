@@ -6,7 +6,7 @@ const CARD_ID = A12_DrinkingTrough.id
 export const A12_DrinkingTrough_impl = {
   effect: {
   id: CARD_ID,
-  onComputeAnimalZones: (_player, zones) => {
+  onComputeAnimalZones: (_player, zones, _state) => {
     for (const zone of zones) {
       if (zone.zoneType === 'pasture') {
         // D11_LawnFertilizer already computed the combined capacity for size-1

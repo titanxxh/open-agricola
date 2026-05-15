@@ -11,7 +11,7 @@ export const B86_TruffleSearcher_impl = {
     const counters = initCardState(player, CARD_ID)
     counters.completedHarvests = (counters.completedHarvests ?? 0) + 1
   },
-  onComputeAnimalZones: (player, zones) => {
+  onComputeAnimalZones: (player, zones, _state) => {
     const capacity = player.cardStates?.[CARD_ID]?.counters?.completedHarvests ?? 0
     if (capacity <= 0) return
     zones.push({

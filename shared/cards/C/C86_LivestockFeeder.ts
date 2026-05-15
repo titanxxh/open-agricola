@@ -7,7 +7,7 @@ export const C86_LivestockFeeder_impl = {
   effect: {
   id: CARD_ID,
   onBuy: () => gainLeaf(CARD_ID, { grain: 1 }),
-  onComputeAnimalZones: (player, zones) => {
+  onComputeAnimalZones: (player, zones, _state) => {
     const grain = player.resources.grain ?? 0
     if (grain <= 0) return
     zones.push({

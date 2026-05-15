@@ -6,7 +6,7 @@ const CARD_ID = E12_AnimalBedding.id
 export const E12_AnimalBedding_impl = {
   effect: {
   id: CARD_ID,
-  onComputeAnimalZones: (player, zones) => {
+  onComputeAnimalZones: (player, zones, _state) => {
     // Collect pasture IDs that have stables
     const stabledPastureIndices = new Set<number>(
       player.pastures

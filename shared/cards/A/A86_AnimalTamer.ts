@@ -14,7 +14,7 @@ export const A86_AnimalTamer_impl = {
       gainLeaf(CARD_ID, { grain: 1 }),
     ],
   }),
-  onComputeAnimalZones: (player, zones) => {
+  onComputeAnimalZones: (player, zones, _state) => {
     const houseZone = zones.find(z => z.zoneType === 'house')
     if (houseZone) {
       houseZone.capacity = player.rooms
