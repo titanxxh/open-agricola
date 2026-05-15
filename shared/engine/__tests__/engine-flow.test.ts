@@ -1137,6 +1137,100 @@ describe('Engine flow nodes', () => {
     expect(events).toEqual(['original'])
   })
 
+  it('replacement alternatives keep normal hook context while suppressing source replace recursion', () => {
+    const events: string[] = []
+    const sow: ActionDefinition = {
+      id: 'sow',
+      nameKey: 'actions.sow.name',
+      descriptionKey: 'actions.sow.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: ({ actionContext }) => {
+        events.push(actionContext?.checkedReplaceAction === true ? 'sow:checked' : 'sow:normal')
+        return { type: 'ok' }
+      },
+    }
+    const fence: ActionDefinition = {
+      id: 'fence',
+      nameKey: 'actions.fencing.name',
+      descriptionKey: 'actions.fencing.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('fence')
+        return { type: 'ok' }
+      },
+    }
+    requireActiveCardRegistry('engine-flow').registerListener({
+      id: 'offer-sow-fence-replacement',
+      actions: ['sow'],
+      phases: ['computeReplace'],
+      handler: (hookContext) => {
+        events.push(hookContext.actionContext?.checkedReplaceAction === true
+          ? 'replace:checked'
+          : 'replace:normal')
+        if (hookContext.actionContext?.checkedReplaceAction === true) return
+        return {
+          decline: true,
+          alternativeFlow: {
+            type: 'seq',
+            choiceLabelKey: 'test.sowAndFence',
+            children: [
+              { type: 'leaf', actionId: 'sow' },
+              { type: 'leaf', actionId: 'fence' },
+            ],
+          },
+        }
+      },
+    })
+    requireActiveCardRegistry('engine-flow').registerListener({
+      id: 'before-unconditional-sow',
+      actions: ['sow'],
+      phases: ['before'],
+      handler: (hookContext) => {
+        events.push(hookContext.actionContext?.checkedReplaceAction === true
+          ? 'before:checked'
+          : 'before:normal')
+        return undefined
+      },
+    })
+    const registry = new ActionRegistry()
+    registry.register(sow)
+    registry.register(fence)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('action-sow', 'sow')),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(sow)
+
+    expect(engine.proceed({ state, player, space }).type).toBe('ok')
+    const choiceStep = engine.proceed({ state, player, space })
+    expect(choiceStep.type).toBe('choice')
+    if (choiceStep.type !== 'choice') return
+    const sowAndFence = choiceStep.choice.options.find((option) => option.labelKey === 'test.sowAndFence')
+    expect(sowAndFence).toBeDefined()
+
+    expect(engine.resolveChoice(sowAndFence!.value, { state, player, space }).type).toBe('ok')
+    let step = engine.proceed({ state, player, space })
+    let safety = 20
+    while (safety-- > 0 && step.type === 'ok') {
+      step = engine.proceed({ state, player, space })
+    }
+
+    expect(step.type).toBe('done')
+    expect(events).toContain('before:normal')
+    expect(events).toContain('sow:normal')
+    expect(events).toContain('fence')
+    expect(events).not.toContain('before:checked')
+    expect(events).not.toContain('sow:checked')
+  })
+
   it('or choices show action-or-replace when computeReplace is available', () => {
     const plow: ActionDefinition = {
       id: 'plow',

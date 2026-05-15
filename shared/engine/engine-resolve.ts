@@ -174,6 +174,11 @@ export function engineResolveChoice(
       if (node instanceof ParallelNode && node.mode === 'trigger-select') {
         node.clearPending()
         const offered = evaluateTriggerSelect(node, context, triggerSelectEvaluationOptions(int, context)).options
+        if (offered.length === 0) {
+          node.resolve()
+          int.pendingNodeIdRef.value = null
+          return { type: 'ok' }
+        }
         const selected = offered.find((opt) => opt.value === choice)
         if (!selected || selected.disabled) {
           int.pendingNodeIdRef.value = null
@@ -202,6 +207,11 @@ export function engineResolveChoice(
     }
     if (node instanceof ParallelNode && node.mode === 'trigger-select') {
       const offered = evaluateTriggerSelect(node, context, triggerSelectEvaluationOptions(int, context)).options
+      if (offered.length === 0) {
+        node.resolve()
+        int.pendingNodeIdRef.value = null
+        return { type: 'ok' }
+      }
       const selected = offered.find((opt) => opt.value === choice)
       if (!selected || selected.disabled) {
         return { type: 'fail', logKey: 'log.buildRoomFail' }
@@ -264,6 +274,7 @@ export function engineResolveChoice(
               replaceResult.sourceCard,
             ),
             actionId,
+            replaceResult.replacementListenerIds,
           ),
           context.player.id,
         )
