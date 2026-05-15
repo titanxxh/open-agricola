@@ -1611,4 +1611,154 @@ describe('Engine flow nodes', () => {
       'actions.bonus-vp.name',
     ])
   })
+
+  it('marks selected OR leaf action mandatory', () => {
+    const action: ActionDefinition = {
+      id: 'mandatory-or-leaf',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(action)
+    const leaf = new ActionNode('action-or-leaf', action.id)
+    const or = new OrNode('or-mandatory', [leaf], 'ui.interactionFlowSelect')
+    const engine = new Engine({
+      tree: new EngineTree(or),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(action)
+
+    const choiceStep = engine.proceed({ state, player, space })
+    expect(choiceStep.type).toBe('choice')
+    engine.resolveChoice('action-or-leaf', { state, player, space })
+
+    expect(leaf.mandatory).toBe(true)
+  })
+
+  it('marks selected composite continuation without forcing first descendant action', () => {
+    const bake: ActionDefinition = {
+      id: 'test-bake-in-composite',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const fence: ActionDefinition = {
+      id: 'test-fence-in-composite',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(bake)
+    registry.register(fence)
+    const bakeNode = new ActionNode('action-composite-bake', bake.id)
+    const fenceNode = new ActionNode('action-composite-fence', fence.id)
+    const sequence = new SequenceNode('seq-bake-fence', [bakeNode, fenceNode])
+    const xor = new XorNode('xor-bake-fence', [sequence], 'ui.interactionFlowSelect')
+    const engine = new Engine({
+      tree: new EngineTree(xor),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(bake)
+
+    const choiceStep = engine.proceed({ state, player, space })
+    expect(choiceStep.type).toBe('choice')
+    engine.resolveChoice('seq-bake-fence', { state, player, space })
+
+    expect(sequence.mandatory).toBe(true)
+    expect(bakeNode.mandatory).toBeUndefined()
+    expect(fenceNode.mandatory).toBeUndefined()
+  })
+
+  it('marks accepted optional single-action wrapper action mandatory', () => {
+    const action: ActionDefinition = {
+      id: 'optional-wrapped-mandatory',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(action)
+    const wrapped = new ActionNode('action-wrapped-optional', action.id)
+    const sequence = new SequenceNode('seq-wrapped-optional', [wrapped])
+    sequence.optional = true
+    sequence.optionalActive = false
+    sequence.optionalPromptKey = 'ui.interactionOptionalAction'
+    const engine = new Engine({
+      tree: new EngineTree(sequence),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(action)
+
+    const choiceStep = engine.proceed({ state, player, space })
+    expect(choiceStep.type).toBe('choice')
+    const option = choiceStep.type === 'choice'
+      ? choiceStep.choice.options.find((entry) => entry.value !== '__skip__')
+      : undefined
+    expect(option).toBeDefined()
+    engine.resolveChoice(option!.value, { state, player, space })
+
+    expect(sequence.optionalActive).toBe(true)
+    expect(wrapped.mandatory).toBe(true)
+  })
+
+  it('returns mandatory blocked when a directly mandatory action is not doable', () => {
+    const action: ActionDefinition = {
+      id: 'mandatory-blocked-action',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => false,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(action)
+    const node = new ActionNode('action-mandatory-blocked', action.id)
+    node.mandatory = true
+    const engine = new Engine({
+      tree: new EngineTree(node),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(action)
+
+    const step = engine.proceed({ state, player, space })
+
+    expect(step).toMatchObject({
+      type: 'blocked',
+      nodeId: 'action-mandatory-blocked',
+      actionId: 'mandatory-blocked-action',
+      mandatory: true,
+    })
+    expect(node.getState()).toBe('ready')
+  })
 })

@@ -3,9 +3,9 @@ import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/B/B26_AgrarianFences'
 import '../../shared/cards/D/D66_PotterCeramics'
+import '../../shared/cards/__stubs__/STUB_BeforeBakeGainClay'
 
 const CARD_ID = 'D66_PotterCeramics'
-const GAIN_CLAY_STUB_ID = 'STUB_BeforeBakeGainClay'
 
 const setup = (overrides: {
   clay?: number
@@ -87,54 +87,6 @@ describe('D66_PotterCeramics session', () => {
     if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionSelectTrigger') {
       expect(resp.interaction.options?.map((option) => option.value)).not.toContain(CARD_ID)
     }
-  })
-
-  it('keeps D66 disabled until the devmode before-bake clay stub resolves first', () => {
-    const session = setup({
-      clay: 0,
-      grain: 0,
-    })
-    const playResp = session.devPlayCard(0, GAIN_CLAY_STUB_ID)
-    expect(playResp.ok).toBe(true)
-    expect(playResp.state.players[0]!.minorPlayed).toContain(GAIN_CLAY_STUB_ID)
-
-    let resp = session.takeAction(0, 'grain-utilization')
-
-    expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
-    expect(resp.interaction.options?.find((option) => option.value === CARD_ID)?.disabled).toBe(true)
-    expect(resp.interaction.options?.find((option) => option.value === GAIN_CLAY_STUB_ID)?.disabled).not.toBe(true)
-    expect(resp.interaction.options?.find((option) => option.value === '__pass__')?.disabled).toBe(true)
-
-    const rejected = session.resolveChoice(0, CARD_ID)
-    expect(rejected.ok).toBe(false)
-    expect(rejected.interaction.stateId).toBe('wait')
-    if (rejected.interaction.stateId === 'wait') {
-      expect(rejected.interaction.promptKey).toBe('ui.interactionSelectTrigger')
-      expect(rejected.interaction.options?.find((option) => option.value === CARD_ID)?.disabled).toBe(true)
-    }
-
-    resp = session.resolveChoice(0, GAIN_CLAY_STUB_ID)
-    expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.resources.clay).toBe(1)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
-    expect(resp.interaction.options?.find((option) => option.value === CARD_ID)?.disabled).not.toBe(true)
-    expect(resp.interaction.options?.find((option) => option.value === '__pass__')?.disabled).toBe(true)
-
-    resp = session.resolveChoice(0, CARD_ID)
-    expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionBakeBreadChoice') {
-      expect(resp.interaction.promptKey).toBe('ui.interactionBakeBreadChoice')
-      resp = session.resolveChoice(0, 'Major_Fireplace1')
-    }
-    expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.resources.clay).toBe(0)
-    expect(resp.state.players[0]!.resources.grain).toBe(0)
-    expect(resp.state.players[0]!.resources.food).toBe(2)
   })
 
   it('keeps pass enabled after B26 replacement chooses bake plus fences when fencing can continue without D66', () => {

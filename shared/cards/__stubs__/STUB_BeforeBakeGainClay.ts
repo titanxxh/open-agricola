@@ -2,6 +2,7 @@ import { MinorImprovement } from '../../cards-display/types'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { CardImpl } from '../registry'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { getPlayerBakeRates } from '../helpers/exchange-registry'
 
 const CARD_ID = 'STUB_BeforeBakeGainClay'
 
@@ -27,7 +28,19 @@ const beforeBakeListener: CardListenerRegistration = {
   }),
 }
 
+const isDoableListener: CardListenerRegistration = {
+  id: 'STUB-before-bake-gain-clay-isdoable',
+  cardIds: [CARD_ID],
+  phases: ['isDoable'],
+  actions: ['bake-bread'],
+  handler: (context) => {
+    if (context.doable) return
+    if (getPlayerBakeRates(context.player).length === 0) return
+    return { doable: true }
+  },
+}
+
 export const STUB_BeforeBakeGainClay_impl = {
-  listeners: [beforeBakeListener],
+  listeners: [beforeBakeListener, isDoableListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl

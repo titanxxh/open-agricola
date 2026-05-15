@@ -71,6 +71,7 @@ describe('shared protocol types', () => {
         kind: 'farm-select',
         farm: { farmType: 'plow', selectableTiles: [] },
       },
+      { kind: 'select-trigger', ownerPlayerId: 'p1', options: [] },
       {
         kind: 'selection',
         selection: {
@@ -88,10 +89,11 @@ describe('shared protocol types', () => {
         seatOrder: [],
         pools: {},
         pendingPicks: [],
-        kept: {},
+          kept: {},
       },
+      { kind: 'engine-blocked', actionId: 'bake-bread' },
     ]
-    expect(variants.length).toBe(9)
+    expect(variants.length).toBe(11)
     variants.forEach((v) => expect(v.kind).toBeDefined())
   })
 

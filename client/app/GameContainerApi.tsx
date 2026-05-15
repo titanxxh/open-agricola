@@ -596,12 +596,23 @@ export const GameContainerApi = () => {
     void transport.newGame(Number.isFinite(seed) ? seed : undefined).catch((e) => console.error(e))
   }, [transport, isInteractive, resetSeedInput])
 
+  const interactionRequestKind =
+    interaction.stateId === 'wait'
+      ? (interaction.request as { kind?: string }).kind
+      : null
+  const pendingEngineBlocked =
+    interaction.stateId === 'wait' && interactionRequestKind === 'engine-blocked'
+      ? {
+          promptKey: interaction.promptKey,
+          promptParams: interaction.promptParams,
+        }
+      : null
   const pendingChoice =
     interaction.stateId === 'wait' &&
-    (interaction.request.kind === 'choice' ||
-      interaction.request.kind === 'select-trigger' ||
-      interaction.request.kind === 'farm-select' ||
-      interaction.request.kind === 'selection' ||
+    (interactionRequestKind === 'choice' ||
+      interactionRequestKind === 'select-trigger' ||
+      interactionRequestKind === 'farm-select' ||
+      interactionRequestKind === 'selection' ||
       interaction.farm !== undefined ||
       interaction.selection !== undefined)
       ? {
@@ -1775,6 +1786,7 @@ export const GameContainerApi = () => {
 
       <InteractionBar
         pendingAnimalReorg={pendingAnimalReorg} pendingChoice={pendingChoice}
+        pendingEngineBlocked={pendingEngineBlocked}
         pendingNextPlayerIndex={pendingNextPlayerIndex} locale={locale}
         pendingPlayerSwitch={pendingPlayerSwitch}
         confirmPlayerSwitch={confirmPlayerSwitch}
@@ -1796,7 +1808,7 @@ export const GameContainerApi = () => {
         onShowScoring={() => setShowScoringPad(true)}
         historyLength={historyLength}
         hasActionStartSnapshot={hasActionStartSnapshot}
-        anytimeActions={interaction.anytimeActions}
+        anytimeActions={pendingEngineBlocked ? [] : interaction.anytimeActions}
         takeAnytimeAction={takeAnytimeAction}
         canBuildPalisades={!!currentPlayer && playerCanBuildPalisades(currentPlayer)}
         fencePlacementMode={fencePlacementMode}

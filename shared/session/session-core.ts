@@ -1439,6 +1439,19 @@ export class GameCore {
           allowedCommands: buildCmds(['undoStep', 'undoAction']),
           anytimeActions: anytimeDescriptors,
         }
+      case 'engine-blocked':
+        return {
+          stateId: 'wait',
+          playerIndex,
+          spaceId,
+          promptKey: request.reasonKey ?? promptKey ?? 'ui.interactionEngineBlocked',
+          promptParams,
+          sourceCard,
+          request,
+          options: [],
+          allowedCommands: ['undoStep', 'undoAction'],
+          anytimeActions: [],
+        }
       case 'choice':
       default: {
         const selectionKind = this.isSelectionPromptKey(promptKey)
@@ -2310,6 +2323,13 @@ export class GameCore {
       const step = frame.engine.proceed({ state: this.state, player, space })
       this.flushEngineLog()
 
+      if (step.type === 'blocked' && step.mandatory === true && step.actionId) {
+        frame.deferredPlayerSwitch = null
+        const pendingSet = frame.engine.setEngineBlockedPending(step.nodeId, step.actionId)
+        if (!pendingSet) throw new Error(`missing mandatory blocked engine node: ${step.nodeId}`)
+        return
+      }
+
       if (step.type === 'blocked' || step.type === 'done') {
         // Snapshot the relevant fields from the current frame BEFORE deciding
         // whether to pop. runPlaceFarmerAfterHooks mutates the same frame's
@@ -2839,6 +2859,8 @@ export class GameCore {
           return this.resolvePendingChoice(playerIndex, value, true, payload)
         case 'card-draft':
           return this.respond(false, 'card-draft resolveChoice not supported')
+        case 'engine-blocked':
+          return this.respond(false, 'engine-blocked cannot resolve')
         default: {
           const _exhaustive: never = request
           return this.respond(false, `unhandled interaction kind: ${JSON.stringify(_exhaustive)}`)

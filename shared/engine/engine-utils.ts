@@ -115,6 +115,32 @@ export function getNodeChildren(node: EngineNode): EngineNode[] {
   return []
 }
 
+const collectActionNodes = (node: EngineNode): ActionNode[] => {
+  if (node instanceof ActionNode) return [node]
+  return getNodeChildren(node).flatMap((child) => collectActionNodes(child))
+}
+
+export function enforceSelectedTargetMandatory(node: EngineNode): void {
+  if (node instanceof ActionNode) {
+    node.mandatory = true
+    return
+  }
+  const actionNodes = collectActionNodes(node)
+  if (actionNodes.length === 1) {
+    actionNodes[0]!.mandatory = true
+    return
+  }
+  node.mandatory = true
+}
+
+export function enforceCompositeContinuationMandatory(node: EngineNode): void {
+  if (node instanceof ActionNode) {
+    node.mandatory = true
+    return
+  }
+  node.mandatory = true
+}
+
 export function stampOwner(node: EngineNode, ownerPlayerId: string): EngineNode {
   node.ownerPlayerId ??= ownerPlayerId
   for (const child of getNodeChildren(node)) {
@@ -155,6 +181,7 @@ function copySharedNodeMetadata(source: EngineNode, target: EngineNode): EngineN
   target.optional = source.optional
   target.optionalActive = source.optionalActive
   target.optionalPromptKey = source.optionalPromptKey
+  target.mandatory = source.mandatory
   const pending = source.getPending()
   if (pending) target.setPending(pending)
   return target

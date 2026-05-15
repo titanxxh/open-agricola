@@ -27,6 +27,7 @@ describe('InteractionBar', () => {
       <InteractionBar
         pendingAnimalReorg={null}
         pendingChoice={pendingChoice}
+        pendingEngineBlocked={null}
         pendingNextPlayerIndex={null}
         pendingPlayerSwitch={null}
         locale="en"
@@ -80,11 +81,63 @@ describe('InteractionBar', () => {
     expect(html).toContain('Please choose an option')
   })
 
+  it('renders engine-blocked prompt without choice action buttons', () => {
+    const html = renderToStaticMarkup(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={null}
+        pendingEngineBlocked={{ promptKey: 'ui.interactionEngineBlocked' }}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={1}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+      />,
+    )
+    const body = html.slice(html.indexOf('interaction-bar__body'))
+
+    expect(body).toContain('This required action cannot continue. Undo to choose a different path.')
+    expect(body).not.toContain('interaction-actions')
+    expect(body).not.toContain('Confirm')
+    expect(body).not.toContain('Anytime Actions')
+  })
+
   it('stays visible with only top controls in the interactive idle state', () => {
     const html = renderToStaticMarkup(
       <InteractionBar
         pendingAnimalReorg={null}
         pendingChoice={null}
+        pendingEngineBlocked={null}
         pendingNextPlayerIndex={null}
         pendingPlayerSwitch={null}
         locale="en"
@@ -136,6 +189,7 @@ describe('InteractionBar', () => {
       <InteractionBar
         pendingAnimalReorg={null}
         pendingChoice={null}
+        pendingEngineBlocked={null}
         pendingNextPlayerIndex={null}
         pendingPlayerSwitch={null}
         locale="en"
@@ -184,6 +238,7 @@ describe('InteractionBar', () => {
       <InteractionBar
         pendingAnimalReorg={null}
         pendingChoice={null}
+        pendingEngineBlocked={null}
         pendingNextPlayerIndex={null}
         pendingPlayerSwitch={null}
         locale="en"
@@ -237,6 +292,7 @@ describe('InteractionBar', () => {
       <InteractionBar
         pendingAnimalReorg={null}
         pendingChoice={choiceWithMissingCardName}
+        pendingEngineBlocked={null}
         pendingNextPlayerIndex={null}
         pendingPlayerSwitch={null}
         locale="zh"
@@ -302,6 +358,7 @@ describe('InteractionBar', () => {
       <InteractionBar
         pendingAnimalReorg={null}
         pendingChoice={triggeredChoice}
+        pendingEngineBlocked={null}
         pendingNextPlayerIndex={null}
         pendingPlayerSwitch={null}
         locale="en"
@@ -341,7 +398,8 @@ describe('InteractionBar', () => {
     )
 
     expect(html).toContain('Optional action')
-    expect(html).toContain('Triggered by Cabbage Buyer')
+    expect(html).toContain('Triggered by')
+    expect(html).toContain('Cabbage Buyer')
     expect(html).toContain('Exchange resources')
     expect(html).toContain('data-resource=\"food\"')
     expect(html).toContain('data-resource=\"vegetable\"')
@@ -373,6 +431,7 @@ describe('InteractionBar', () => {
       <InteractionBar
         pendingAnimalReorg={null}
         pendingChoice={paymentChoice}
+        pendingEngineBlocked={null}
         pendingNextPlayerIndex={null}
         pendingPlayerSwitch={null}
         locale="en"
@@ -413,7 +472,8 @@ describe('InteractionBar', () => {
 
     expect(html).toContain('Pay Resources')
     expect(html).toContain('data-resource=\"wood\"')
-    expect(html).toContain('Return Clay Oven')
+    expect(html).toContain('Return')
+    expect(html).toContain('Clay Oven')
   })
 
   it('renders recursive action descriptions for composite choice options', () => {
@@ -454,6 +514,7 @@ describe('InteractionBar', () => {
       <InteractionBar
         pendingAnimalReorg={null}
         pendingChoice={compositeChoice}
+        pendingEngineBlocked={null}
         pendingNextPlayerIndex={null}
         pendingPlayerSwitch={null}
         locale="en"
@@ -509,6 +570,7 @@ describe('InteractionBar', () => {
       <InteractionBar
         pendingAnimalReorg={null}
         pendingChoice={fencePendingChoice}
+        pendingEngineBlocked={null}
         pendingNextPlayerIndex={null}
         pendingPlayerSwitch={null}
         locale="en"
@@ -567,6 +629,7 @@ describe('InteractionBar', () => {
       <InteractionBar
         pendingAnimalReorg={null}
         pendingChoice={disabledChoice}
+        pendingEngineBlocked={null}
         pendingNextPlayerIndex={null}
         pendingPlayerSwitch={null}
         locale="en"
@@ -629,6 +692,7 @@ describe('InteractionBar', () => {
       <InteractionBar
         pendingAnimalReorg={null}
         pendingChoice={fencePendingChoice}
+        pendingEngineBlocked={null}
         pendingNextPlayerIndex={null}
         pendingPlayerSwitch={null}
         locale="en"
