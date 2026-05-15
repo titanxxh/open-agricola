@@ -102,9 +102,9 @@ e2e-tests/     Playwright 浏览器测试
 ```
 
 ESLint 三层强制（`eslint.config.js`）：
-- `client/{app,components,services,hooks,contexts,utils}/**` 禁 import `shared/{engine,session,actions,cards,custom-code,draft}/**`
+- `client/{app,components,services,hooks,contexts,utils}/**` 禁 import `shared/session`、`shared/engine`、card catalog/bootstrap/register-all 和 per-card impl modules；UI metadata 必须走 `shared/cards-display/**` 或 `client/services/card-meta`
 - `client/sandbox/**` 全开
-- 附加 `no-restricted-syntax` 禁动态 `import('shared/session/...')` 字面量绕过
+- 附加 `no-restricted-syntax` 禁动态 `import('shared/session/...')` / `import('shared/engine/...')` / card impl-bootstrap 字面量绕过
 - violation = CI error
 
 ---
@@ -657,6 +657,8 @@ OA-vs-BGA design notes:
 
 主 bundle 启动时 `GET /cards-manifest.json` 拉运行时元数据（`client/services/card-meta.ts`），切断对 `shared/cards/catalog` 的依赖链。
 
+Card lookup bootstrap：`shared/cards-display/types.ts` 的 registered lookup 默认可为空，client 不安装 catalog lookup；server/test runtime 通过 `shared/cards/install-catalog-lookups.ts` 显式安装。client 需要卡牌 metadata 时使用 `client/services/card-meta` 的 manifest-backed lookup。
+
 ### 8.2 注册表
 
 | 文件 | 作用 |
@@ -856,9 +858,9 @@ Workshop / Sandbox 后端（自定义卡上传、编译、PR 集成）。沙盒�
 
 `eslint.config.js` 关键规则：
 
-- `client/{app,components,services,hooks,contexts,utils}/**` 禁 import `shared/{engine,session,actions,cards,custom-code,draft}/**`。
+- `client/{app,components,services,hooks,contexts,utils}/**` 禁 import `shared/session`、`shared/engine`、card catalog/bootstrap/register-all 和 per-card impl modules；UI metadata 必须走 `shared/cards-display/**` 或 `client/services/card-meta`。
 - `client/sandbox/**` 全开。
-- `no-restricted-syntax` 禁动态字符串 `import('shared/session/...')` 字面量绕过。
+- `no-restricted-syntax` 禁动态字符串 `import('shared/session/...')` / `import('shared/engine/...')` / card impl-bootstrap 字面量绕过。
 - `package.json` 已声明 `sideEffects` 给 bundler tree-shaking 基线。
 - violation = CI error。
 
@@ -874,7 +876,7 @@ Workshop / Sandbox 后端（自定义卡上传、编译、PR 集成）。沙盒�
 | Session | `server/__tests__/*.test.ts` | 直接实例化 `GameSession`，调 `takeAction` 等，断言 `resp.state` / `pending` / `interaction` / `ok` | ✅（slow 项目，按文件名 glob `[A-E][0-9]*-session.test.ts` 一卡一文件） |
 | E2E | `e2e-tests/*.spec.ts` | Playwright 双窗口浏览器，验证多人链路 | 手动 / Workflow |
 
-`vitest.config` 分 fast / slow / llm 三个 project。`pnpm test:fast` CI 默认；`pnpm test:slow` 单卡 session 测试；`pnpm run test:e2e` 需后端 + 前端在跑；`pnpm exec vitest run <file>` 单文件。
+`vitest.config` 分多个 fast 子 project（`fast-shared` / `fast-cards` / `fast-card-runtime` / `fast-client` / `fast-server` / `fast-scripts` / `fast-tests`）以及 `slow` / `llm`。`pnpm test:fast` 先运行 `check:test-project-coverage`，确保新 fast projects 覆盖旧 fast 文件集合且没有重复。`pnpm test:fast` CI 默认；`pnpm test:slow` 单卡 session 测试；`pnpm run test:e2e` 需后端 + 前端在跑；`pnpm exec vitest run <file>` 单文件。
 
 ### 13.2 后端边界测试驱动入口
 
