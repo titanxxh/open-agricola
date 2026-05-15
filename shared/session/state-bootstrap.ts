@@ -327,6 +327,7 @@ export const normalizeState = (raw: GameState): GameState => {
     futureMeeples: raw.futureMeeples ?? [],
     pendingFutureMeeples: raw.pendingFutureMeeples ?? [],
     enableCommunityDeck: raw.enableCommunityDeck ?? false,
+    completedFeedingPhases: raw.completedFeedingPhases ?? 0,
   }
 }
 
