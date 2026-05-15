@@ -64,4 +64,19 @@ describe('collect.execute', () => {
     // ctx.space.resources.wood must NOT have been drained by the wrong space
     expect(ctx.space.resources.wood).toBe(5)
   })
+
+  it.each([
+    ['missing amount', { spaceId: 'wood-cutter', resource: 'wood' }],
+    ['zero amount', { spaceId: 'wood-cutter', resource: 'wood', amount: 0 }],
+    ['missing resource', { spaceId: 'wood-cutter', amount: 1 }],
+  ])('partial-take: fails on incomplete payload (%s)', (_name, actionContext) => {
+    const ctx = makeCtx(actionContext)
+    const result = collectAction.execute(ctx)
+    expect(result.type).toBe('fail')
+    if (result.type === 'fail') {
+      expect(result.logKey).toBe('log.collectInvalidPartial')
+    }
+    expect(ctx.space.resources.wood).toBe(5)
+    expect(ctx.player.resources.wood).toBe(0)
+  })
 })

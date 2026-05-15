@@ -881,6 +881,7 @@ export const zh = {
     specialEffectFail: '特殊效果失败',
     collectNoSpace: '没有可拿取资源的行动格',
     collectNotEnough: '行动格资源不足',
+    collectInvalidPartial: '部分拿取资源参数无效',
   },
   platform: {
     loading: '加载中...',
