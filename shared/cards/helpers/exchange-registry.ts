@@ -1,5 +1,5 @@
 import type { PlayerState } from '../../contract/types'
-import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../../cards-display/types'
+import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../catalog'
 
 export type BakeRate = {
   cardId: string

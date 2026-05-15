@@ -1,6 +1,11 @@
 import { getCustomMinorImprovement, getCustomOccupation } from './custom-registry'
-import { MinorImprovement, Occupation, PlayerActionCard } from '../cards-display/types'
-import { registerCardLookups } from './registry-runtime'
+import {
+  MinorImprovement,
+  Occupation,
+  PlayerActionCard,
+  __getAdHocMinors,
+  __getAdHocOccupations,
+} from '../cards-display/types'
 import type { CardDefinition } from '../contract/cards'
 import { majorCardDefinitions } from './major'
 import { allCommunityCards } from './community/auto-catalog'
@@ -77,27 +82,37 @@ export const isFieldCard = (id: string): boolean => {
   return getCardDefinition(id)?.isField === true
 }
 
-// Install the lookups on `types.ts` so `getRegisteredMinorImprovement` /
-// `getRegisteredOccupation` work without module-level side effects in the card
-// constructors. This runs once when catalog.ts is first imported.
+// Direct exports for the registered card lookup, replacing the previous
+// `registerCardLookups({...})` late-bind into `cards-display/types.ts`. Living
+// here means the lookup is initialized synchronously alongside the underlying
+// card arrays — no TDZ window where a card-impl import sees an undefined
+// lookup.
 //
 // Class-type filters replicate the previous `CardBase` constructor side effect
 // (which keyed by `this instanceof MinorImprovement | Occupation | PlayerActionCard`).
-// All cards now live in the correct array (issue #10). The dual-array scan
-// below is kept as a defensive belt-and-suspenders; `scripts/check-catalog-types.ts`
+// All cards now live in the correct array (issue #10); the dual-array scan
+// below is kept as a defensive belt-and-suspenders. `scripts/check-catalog-types.ts`
 // is the authoritative regression guard.
 const cardMatchesMinor = (c: unknown): c is MinorImprovement =>
   c instanceof MinorImprovement || c instanceof PlayerActionCard
 const cardMatchesOccupation = (c: unknown): c is Occupation =>
   c instanceof Occupation
 const allCards = [...allMinorImprovementCards, ...allOccupationCards]
-registerCardLookups({
-  minor: (id) =>
-    allCards.find((c) => c.id === id && cardMatchesMinor(c))
-    ?? getCustomMinorImprovement(id)
-    ?? undefined,
-  occupation: (id) =>
-    allCards.find((c) => c.id === id && cardMatchesOccupation(c))
-    ?? getCustomOccupation(id)
-    ?? undefined,
-})
+
+export const getRegisteredMinorImprovement = (
+  id: string,
+): MinorImprovement | undefined =>
+  ((allCards.find((c) => c.id === id && cardMatchesMinor(c)) as
+    | MinorImprovement
+    | undefined)
+    ?? (getCustomMinorImprovement(id) as MinorImprovement | undefined)
+    ?? (__getAdHocMinors().get(id) as MinorImprovement | undefined))
+
+export const getRegisteredOccupation = (
+  id: string,
+): Occupation | undefined =>
+  ((allCards.find((c) => c.id === id && cardMatchesOccupation(c)) as
+    | Occupation
+    | undefined)
+    ?? (getCustomOccupation(id) as Occupation | undefined)
+    ?? (__getAdHocOccupations().get(id) as Occupation | undefined))

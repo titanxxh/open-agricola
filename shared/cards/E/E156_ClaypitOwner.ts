@@ -1,4 +1,4 @@
-import { getRegisteredMinorImprovement } from '../../cards-display/types'
+import { getRegisteredMinorImprovement } from '../catalog'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'

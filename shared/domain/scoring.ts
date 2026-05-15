@@ -5,7 +5,7 @@ import { getMajorCard } from '../cards/major/index.ts'
 import {
   getRegisteredMinorImprovement,
   getRegisteredOccupation,
-} from '../cards-display/types'
+} from '../cards/catalog'
 import { isMajorCardId } from '../cards/helpers/card-type.ts'
 import { getCardEffect } from '../cards/card-effects.ts'
 import type {

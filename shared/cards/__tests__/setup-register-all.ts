@@ -1,29 +1,24 @@
 /**
  * Vitest setup file — runs once per worker before any test module executes.
  *
- * Two responsibilities:
+ * Responsibility: publish a default active `CardRegistry` so tests that don't
+ * construct a `GameSession` still see every card's listeners / effects via
+ * `getRegisteredCardListeners()` / `getCardEffect()`. Tests that want an
+ * isolated slate call `setActiveCardRegistry(new CardRegistry())`; tests that
+ * construct a `GameSession` get their own fresh registry (GameCore publishes
+ * one in its constructor).
  *
- * 1. **Module load order**: there is a pre-existing TDZ cycle between
- *    `shared/cards/catalog.ts` and `shared/cards/D/D95_SiteManager.ts` (via
- *    `shared/cards-display/_lookup.ts`). The cycle resolves correctly only
- *    when `minor-improvements.ts` is loaded before `catalog.ts` reaches its
- *    first card import. Importing `GameSession` here forces the same load
- *    order the server uses at runtime.
+ * Also stubs `fetch` for `cards-manifest.json` so client components that
+ * synchronously read `getCardMeta()` work under test.
  *
- * 2. **Default active `CardRegistry`**: tests that don't construct a
- *    `GameSession` still need every card's listeners / effects reachable via
- *    `getRegisteredCardListeners()` / `getCardEffect()`. We build one
- *    registry, load every card's impl, and publish it as the active
- *    registry. Tests that want an isolated slate publish a fresh registry
- *    via `setActiveCardRegistry(new CardRegistry())`; tests that construct
- *    a `GameSession` get their own fresh registry (GameCore publishes one
- *    in its constructor).
+ * Historical note: this file also used to import `GameSession` first to
+ * force a specific module load order, working around a TDZ-prone late-bind
+ * between `shared/cards/catalog.ts` and `shared/cards-display/types.ts`.
+ * That workaround is no longer needed — `catalog.ts` now directly exports
+ * the registered-card lookups synchronously, with no late-bound setter.
  *
  * Consumed via `vitest.config.ts` -> `test.setupFiles`.
  */
-// Pull in GameSession first — walks the real game-core import graph so
-// minor-improvements.ts loads before catalog.ts.
-import '../../../server/game/authoritative-session'
 import { CardRegistry } from '../registry'
 import { setActiveCardRegistry } from '../active-registry'
 import { ALL_CARD_IMPLS } from '../register-all'

@@ -5,7 +5,7 @@ import {
 } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getMajorCard } from '../major'
-import { getRegisteredMinorImprovement } from '../../cards-display/types'
+import { getRegisteredMinorImprovement } from '../catalog'
 import type { CardImpl } from '../registry'
 import { C53_GypsysCrock } from '../../cards-display/C/C53_GypsysCrock'
 

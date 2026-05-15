@@ -1,7 +1,7 @@
 // Card display class hierarchy. Sourced from S6a split of shared/cards/types.ts.
-// Owns: CardBase + 3 subclass markers + ad-hoc lookup state.
-// Production lookup is wired by `shared/cards/registry-runtime.ts` via
-// __setMinorLookup / __setOccupationLookup.
+// Owns: CardBase + 3 subclass markers + ad-hoc test-only lookup state.
+// Production registered-card lookup lives in `shared/cards/catalog.ts`
+// (`getRegisteredMinorImprovement` / `getRegisteredOccupation`).
 
 import type { Resource, CostModifier, ComplexCost } from '../contract/types'
 import type {
@@ -11,27 +11,12 @@ import type {
   CardDefinition,
 } from '../contract/cards'
 
-// Late-bound lookup hooks installed by registry-runtime.ts. Constructors stay
-// side-effect-free (no module-level mutation).
-let minorLookup: ((id: string) => CardBase | undefined) | undefined
-let occupationLookup: ((id: string) => CardBase | undefined) | undefined
-
-export const __setMinorLookup = (
-  fn: ((id: string) => CardBase | undefined) | undefined,
-): void => {
-  minorLookup = fn
-}
-
-export const __setOccupationLookup = (
-  fn: ((id: string) => CardBase | undefined) | undefined,
-): void => {
-  occupationLookup = fn
-}
-
 // Ad-hoc test-only registration: tests that construct `new MinorImprovement(...)`
 // or `new Occupation(...)` with fabricated fixture ids (e.g. `TEST_FieldProvider`,
-// `__TEST_OCC_VP__`) can push them here so lookups resolve without depending on
-// the catalog arrays. Not used by production code paths.
+// `__TEST_OCC_VP__`) can push them here via
+// `shared/cards/registry-runtime.ts#registerAdHoc{Minor,Occupation}` so the
+// catalog lookups resolve without depending on the catalog arrays. Not used
+// by production code paths.
 const adHocMinors = new Map<string, CardBase>()
 const adHocOccupations = new Map<string, CardBase>()
 
@@ -127,9 +112,3 @@ export class MinorImprovement extends CardBase {}
 export class Occupation extends CardBase {}
 
 export class PlayerActionCard extends CardBase {}
-
-export const getRegisteredMinorImprovement = (id: string): CardBase | undefined =>
-  minorLookup?.(id) ?? adHocMinors.get(id)
-
-export const getRegisteredOccupation = (id: string): CardBase | undefined =>
-  occupationLookup?.(id) ?? adHocOccupations.get(id)

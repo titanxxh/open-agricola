@@ -1,6 +1,6 @@
 import type { PlayerState } from '../../contract/types'
 import type { CardExchange } from '../../contract/cards'
-import { getRegisteredMinorImprovement } from '../../cards-display/types'
+import { getRegisteredMinorImprovement } from '../catalog'
 import { getMajorCard } from '../major'
 
 export type CookeryCardSummary = {

@@ -4,7 +4,7 @@ import type { HarvestSummary } from '../../../shared/session/round'
 import {
   getRegisteredMinorImprovement,
   getRegisteredOccupation,
-} from '../../../shared/cards-display/types'
+} from '../../../shared/cards/catalog'
 import { getMajorCardDisplay } from '../../../shared/cards-display/major'
 import {
   BASIC_CONVERSION_SOURCE_ID,

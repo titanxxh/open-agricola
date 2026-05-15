@@ -1,28 +1,20 @@
 // Runtime registration helpers. Sourced from S6a split of shared/cards/types.ts.
-// Provides registerCardLookups() and registerAdHoc{Minor,Occupation} that
-// install lookup functions into shared/cards-display/types.ts.
+// Provides registerAdHoc{Minor,Occupation} which push fixture cards into
+// `shared/cards-display/types.ts`'s ad-hoc maps. Catalog lookups
+// (`getRegisteredMinorImprovement` / `getRegisteredOccupation`) merge those
+// maps with the real catalog arrays — see `shared/cards/catalog.ts`.
 //
 // Read-side metadata getters (getMinorImprovement / getOccupation /
 // getRegisteredMinorImprovement / getRegisteredOccupation /
 // majorImprovementIds / MinorImprovement class) live in
-// `./registry-display.ts` so consumers that only register (e.g. `catalog.ts`
-// at module init) don't pull `cards-display/_lookup` and induce a cycle.
+// `./registry-display.ts` so consumers that only register (e.g. ad-hoc fixture
+// tests) don't pull `cards-display/_lookup` and induce a cycle.
 
 import type { CardBase } from '../cards-display/types'
 import {
-  __setMinorLookup,
-  __setOccupationLookup,
   __getAdHocMinors,
   __getAdHocOccupations,
 } from '../cards-display/types'
-
-export const registerCardLookups = (lookups: {
-  minor: (id: string) => CardBase | undefined
-  occupation: (id: string) => CardBase | undefined
-}): void => {
-  __setMinorLookup(lookups.minor)
-  __setOccupationLookup(lookups.occupation)
-}
 
 export const registerAdHocMinorImprovement = (card: CardBase): void => {
   __getAdHocMinors().set(card.id, card)
