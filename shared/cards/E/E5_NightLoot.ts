@@ -6,14 +6,20 @@ const CARD_ID = E5_NightLoot.id
 
 const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 
-type Option = { spaceId: string; type: keyof Resource }
+type Option = { spaceId: string; spaceName: string; type: keyof Resource }
 
-const collectLeaf = (opt: Option): ActionFlow => ({
-  type: 'leaf',
-  actionId: 'collect',
-  sourceCard: CARD_ID,
-  actionContext: { spaceId: opt.spaceId, resource: opt.type, amount: 1 },
-})
+const collectLeaf = (opt: Option): ActionFlow => {
+  const resourcesGained: Partial<Resource> = { [opt.type]: 1 }
+  return {
+    type: 'leaf',
+    actionId: 'collect',
+    sourceCard: CARD_ID,
+    actionContext: { spaceId: opt.spaceId, resource: opt.type, amount: 1 },
+    choiceLabelKey: 'ui.interactionTakeFromSpace',
+    choiceLabelParams: { resource: opt.type, spaceId: opt.spaceId, spaceName: opt.spaceName },
+    effectPreview: { kind: 'resourceExchange', resourcesGained },
+  }
+}
 
 export const E5_NightLoot_impl = {
   effect: {
@@ -25,7 +31,7 @@ export const E5_NightLoot_impl = {
           const isAccumulation = (space.gainPerRound?.[type] ?? 0) > 0
           if (!isAccumulation) continue
           if ((space.resources[type] ?? 0) >= 1) {
-            options.push({ spaceId: space.id, type })
+            options.push({ spaceId: space.id, spaceName: space.nameKey ?? space.id, type })
           }
         }
       }
