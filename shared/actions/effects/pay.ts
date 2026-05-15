@@ -121,8 +121,7 @@ const buildSelectedResult = (
   }
   // Hand the wrapper-flow context to the next leaf (apply-improvement /
   // apply-occupation-play) so its onBuy listener can still receive a real
-  // `PaymentInfo` (returned card id is what C60_SmallPottersOven keys its
-  // 5-food gain on, etc.) and so apply-* can echo `resourcesPaid` back into
+  // `PaymentInfo` and so apply-* can echo `resourcesPaid` back into
   // the canonical `log.playOccupation` / `log.playImprovement` log entries
   // (D95 SiteManager scoping, log-cost attribution tests).
   if (

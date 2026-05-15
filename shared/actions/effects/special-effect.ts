@@ -17,6 +17,7 @@ import { removeFutureMeeples } from './internal/future-meeples'
 import { findFirstNewborn } from '../../domain/player'
 import { removeWorkerRef } from '../../domain/space'
 import { getNextEmptyTileForPlayer } from '../../domain/farm'
+import { returnCardToBoard } from '../../cards/helpers/return-card'
 
 export type SpecialEffectParams =
   | { kind: 'increment-extra-data'; key: string; amount: number }
@@ -25,6 +26,7 @@ export type SpecialEffectParams =
   | { kind: 'set-counter'; key: string; value: number }
   | { kind: 'pop-card-stack-top' }
   | { kind: 'swap-improvement-with-board'; from: string; to: string }
+  | { kind: 'return-card-to-board'; cardId: string }
   | { kind: 'set-flag'; flag: boolean }
   | { kind: 'set-infobox'; text: string }
   | { kind: 'clear-pending-fence-bonus' }
@@ -110,6 +112,10 @@ export const specialEffectAction: ActionDefinition = {
         }
         return { type: 'ok' }
       }
+      case 'return-card-to-board':
+        if (!state) return { type: 'fail', logKey: 'log.specialEffectFail' }
+        returnCardToBoard(target, p.cardId, state)
+        return { type: 'ok' }
       case 'set-flag':
         setCardFlag(target, sourceCard, p.flag)
         return { type: 'ok' }

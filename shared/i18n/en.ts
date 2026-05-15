@@ -275,6 +275,7 @@ export const en = {
     interactionAleBenches:
       'Ale-Benches: Pay 1 grain for 1 bonus VP. If you do, each other player gets 1 food?',
     interactionSmallPottersOvenBuild: "Small Potter's Oven: Build the Clay Oven or Stone Oven before baking?",
+    interactionSmallPottersOvenReturn: "Small Potter's Oven: Return which oven?",
     interactionAgrarianFencesBakeAndFence: 'Bake bread and build fences',
     interactionAgrarianFencesSowAndFence: 'Sow and build fences',
     interactionBellfounder: 'Bellfounder: Discard all clay for 3 food or 1 bonus VP?',
