@@ -8,9 +8,11 @@ import {
 } from '../../cards/helpers/card-state'
 import { incCounter, initCardState } from '../../cards/__stubs__/helpers'
 import {
+  fieldDecrementTop,
   fieldFindStackOfKind,
   fieldHasCrop,
   fieldPopIfDepleted,
+  fieldTopStack,
 } from '../../domain/field'
 import { clearPendingFenceBonus } from '../../cards/helpers/pending-fence-bonus'
 import { removeFutureMeeples } from './internal/future-meeples'
@@ -33,6 +35,12 @@ export type SpecialEffectParams =
   | { kind: 'remove-future-meeples'; rounds?: number[] }
   | { kind: 'promote-first-newborn' }
   | { kind: 'remove-field-crop'; crop: 'grain' | 'vegetable'; minRemaining?: number }
+  | {
+      kind: 'remove-field-crops'
+      crop: 'grain' | 'vegetable'
+      minRemaining?: number
+      positions: Array<{ row: number; col: number }>
+    }
   | { kind: 'consume-fence'; count?: number }
   | { kind: 'add-resource-to-space'; spaceId: string; resource: keyof Resource; amount: number }
   | { kind: 'build-stable-on-first-empty-tile' }
@@ -160,6 +168,38 @@ export const specialEffectAction: ActionDefinition = {
         if (!stack) return { type: 'ok' }
         stack.remaining -= 1
         fieldPopIfDepleted(field)
+        return { type: 'ok' }
+      }
+      case 'remove-field-crops': {
+        if (!Array.isArray(p.positions) || p.positions.length === 0) {
+          return { type: 'fail', logKey: 'log.specialEffectFail' }
+        }
+        const minRem = p.minRemaining ?? 1
+        const seen = new Set<string>()
+        const fields = []
+        for (const pos of p.positions) {
+          if (!pos || typeof pos !== 'object') {
+            return { type: 'fail', logKey: 'log.specialEffectFail' }
+          }
+          const { row, col } = pos
+          if (!Number.isFinite(row) || !Number.isFinite(col)) {
+            return { type: 'fail', logKey: 'log.specialEffectFail' }
+          }
+          const key = `${row}:${col}`
+          if (seen.has(key)) {
+            return { type: 'fail', logKey: 'log.specialEffectFail' }
+          }
+          seen.add(key)
+          const field = target.fields.find((f) => f.row === row && f.col === col)
+          const top = field ? fieldTopStack(field) : undefined
+          if (!field || top?.kind !== p.crop || top.remaining < minRem) {
+            return { type: 'fail', logKey: 'log.specialEffectFail' }
+          }
+          fields.push(field)
+        }
+        for (const field of fields) {
+          fieldDecrementTop(field)
+        }
         return { type: 'ok' }
       }
       case 'consume-fence': {
