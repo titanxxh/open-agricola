@@ -6,7 +6,7 @@ import {
   getCurrentlySelectableRoomKeys,
   isDevModeAllowedFromQuery,
   playerIdFromWsStatus,
-} from '../GameContainerApi'
+} from '../game-container-helpers'
 
 describe('GameContainerApi WS player identity', () => {
   it('uses the joined websocket seat as the local player when URL has no player param', () => {
