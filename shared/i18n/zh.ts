@@ -268,6 +268,7 @@ export const zh = {
     interactionWoodBartererSkip: '跳过',
     interactionAleBenches: '酒凳：支付 1 谷物获得 1 加分。若你这样做，每位其他玩家获得 1 食物？',
     interactionSmallPottersOvenBuild: '小陶工炉：在烤面包前建造黏土烤炉或石制烤炉？',
+    interactionSmallPottersOvenReturn: '小陶工炉：归还哪个烤炉？',
     interactionAgrarianFencesBakeAndFence: '烤面包并建造围栏',
     interactionAgrarianFencesSowAndFence: '播种并建造围栏',
     interactionBellfounder: '铸钟人：弃掉所有黏土换 3 食物或 1 奖励分？',

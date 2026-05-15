@@ -67,6 +67,7 @@ export type PromptKey =
   | 'ui.interactionSilage'
   | 'ui.interactionSlurrySow'
   | 'ui.interactionSmallPottersOvenBuild'
+  | 'ui.interactionSmallPottersOvenReturn'
   | 'ui.interactionStockProtectorPlace'
   | 'ui.interactionToolboxImprovement'
   | 'ui.interactionWoodBartererPrompt'

@@ -15,5 +15,4 @@ export const C60_SmallPottersOven = new MinorImprovement({
   cost: { clay: 2 },
   prerequisite: "Return the Clay / Stone Oven",
   alsoCountsAs: ['major'],
-  returnCards: ['Major_ClayOven', 'Major_StoneOven'],
 })

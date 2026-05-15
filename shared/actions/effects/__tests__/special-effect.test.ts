@@ -237,6 +237,28 @@ describe('specialEffectAction — mutation dispatcher', () => {
     expect(result.type).toBe('fail')
   })
 
+  it('return-card-to-board: removes a played improvement and returns major cards to the board', () => {
+    const player = makePlayer()
+    player.improvements = ['Major_ClayOven', 'Major_StoneOven']
+    const state = {
+      players: [player],
+      availableMajorImprovements: [],
+    } as unknown as GameState
+
+    const result = specialEffectAction.execute(
+      makeCtx(
+        player,
+        { kind: 'return-card-to-board', cardId: 'Major_StoneOven' },
+        CARD_ID,
+        state,
+      ),
+    )
+
+    expect(result.type).toBe('ok')
+    expect(player.improvements).toEqual(['Major_ClayOven'])
+    expect(state.availableMajorImprovements).toEqual(['Major_StoneOven'])
+  })
+
   it('fails when sourceCard missing', () => {
     const player = makePlayer()
     const result = specialEffectAction.execute(

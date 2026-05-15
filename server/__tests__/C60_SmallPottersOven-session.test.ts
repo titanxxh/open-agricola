@@ -43,7 +43,7 @@ const setupBakeViaC60 = (
 }
 
 describe('C60_SmallPottersOven server session', () => {
-  it('logs returned oven and separate cardEffectGain on play', () => {
+  it('returns the only oven from onBuy and logs separate cardEffectGain on play', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -79,7 +79,7 @@ describe('C60_SmallPottersOven server session', () => {
       (entry) => entry.key === 'log.playMinorImprovement',
     )
     expect(playLog?.params?.improvements).toBe('C60_SmallPottersOven')
-    expect(playLog?.params?.returnedCards).toEqual(['Major_ClayOven'])
+    expect(playLog?.params?.returnedCards).toBeUndefined()
     expect(playLog?.params?.costResources).toEqual({ clay: 2 })
 
     const gainLog = resp.state.log.find(
@@ -88,6 +88,55 @@ describe('C60_SmallPottersOven server session', () => {
         entry.params?.cardId === 'C60_SmallPottersOven',
     )
     expect(gainLog?.params?.gain).toEqual({ food: 5 })
+  })
+
+  it('asks which oven to return from onBuy when both ovens are owned', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+
+    const player = state.players[0]!
+    player.resources.clay = 2
+    player.resources.food = 0
+    player.minorHand = ['C60_SmallPottersOven']
+    player.improvements = ['Major_ClayOven', 'Major_StoneOven']
+
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'major-improvement')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+
+    const c60Option = resp.interaction.options?.find(
+      (option) => option.value === 'minor:C60_SmallPottersOven',
+    )
+    expect(c60Option).toBeDefined()
+
+    resp = session.resolveChoice(0, c60Option!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('ui.interactionSmallPottersOvenReturn')
+    expect(resp.interaction.options?.map((option) => option.labelKey)).toEqual([
+      'improvements.Major_ClayOven.name',
+      'improvements.Major_StoneOven.name',
+    ])
+
+    const returnStone = resp.interaction.options?.find(
+      (option) => option.labelKey === 'improvements.Major_StoneOven.name',
+    )
+    expect(returnStone).toBeDefined()
+
+    resp = session.resolveChoice(0, returnStone!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.minorPlayed).toContain('C60_SmallPottersOven')
+    expect(resp.state.players[0]!.improvements).toContain('Major_ClayOven')
+    expect(resp.state.players[0]!.improvements).not.toContain('Major_StoneOven')
+    expect(resp.state.availableMajorImprovements).toContain('Major_StoneOven')
+    expect(resp.state.players[0]!.resources.clay).toBe(0)
+    expect(resp.state.players[0]!.resources.food).toBe(5)
   })
 
   it('offers optional C60 oven build before bake even without grain and skip does not create empty bake pending', () => {

@@ -43,6 +43,15 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).toContain('card-res-icon stone')
   })
 
+  it('renders C60 prerequisite separately and keeps the cost area resource-only', () => {
+    const html = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId="C60_SmallPottersOven" cardType="minor" />,
+    )
+    expect(html).toContain('Return the Clay / Stone Oven')
+    expect(html).not.toContain('card-cost-return')
+    expect(html).toContain('card-res-icon clay')
+  })
+
   it('does not emit data-also-counts-as on plain (non-dual) minors', () => {
     const html = renderToStaticMarkup(
       // D34 is a plain minor with no alsoCountsAs; picking it keeps this
