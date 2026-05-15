@@ -349,6 +349,13 @@ export type GameState = {
   workPhaseObtainedResources: Record<string, Partial<Resource>>
   harvestReapSummary?: Record<string, HarvestReapSummary>
   harvestBreedSummary?: Record<string, HarvestBreedSummary>
+  /**
+   * Number of feeding phases that have completed (incremented once at the
+   * start of each breeding phase, after all players have fed).
+   * Consumed by A148_Woolgrower / B86_TruffleSearcher animal capacity.
+   * Mirrors BGA `Globals::getCompletedFeedingPhases()`.
+   */
+  completedFeedingPhases: number
 }
 
 export type CanBeExecutedByPlayerContext = {
