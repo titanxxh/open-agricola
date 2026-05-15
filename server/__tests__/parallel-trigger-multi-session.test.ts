@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 describe('PARALLEL trigger — multi-listener select-trigger loop', () => {
-  const setupWorkPhase = () => {
+  const setupWorkPhase = (playedCards = ['C82_HardwareStore', 'C126_Excavator']) => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -14,7 +14,7 @@ describe('PARALLEL trigger — multi-listener select-trigger loop', () => {
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
     player.resources = { ...player.resources, food: 5, wood: 0, clay: 0, reed: 0, stone: 0 }
-    player.occupationPlayed = ['C82_HardwareStore', 'C126_Excavator']
+    player.occupationPlayed = playedCards
 
     state.players.forEach((p) => {
       p.minorHand = ['__test_placeholder__']
@@ -24,6 +24,24 @@ describe('PARALLEL trigger — multi-listener select-trigger loop', () => {
     session.loadState(state)
     return session
   }
+
+  it('skips a lone no-op select trigger without surfacing a pass-only prompt', () => {
+    const session = setupWorkPhase(['C82_HardwareStore'])
+    const resp = session.takeAction(0, 'forest')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
+      .not.toBe('ui.interactionSelectTrigger')
+  })
+
+  it('skips multiple no-op select triggers without surfacing a pass-only prompt', () => {
+    const session = setupWorkPhase()
+    const resp = session.takeAction(0, 'forest')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
+      .not.toBe('ui.interactionSelectTrigger')
+  })
 
   it('emits select-trigger listing both cards with disabled PASS because C126 is mandatory', () => {
     const session = setupWorkPhase()

@@ -485,6 +485,10 @@ export function engineProceed(
     if (stepResult.kind === 'request') {
       const evaluation = evaluateTriggerSelect(node, context, triggerSelectEvaluationOptions(int, context))
       const options = evaluation.options
+      if (options.length === 0) {
+        node.resolve()
+        return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+      }
       const promptKey = 'ui.interactionSelectTrigger' as import('../contract/prompt-keys').PromptKey
       const request: InteractionRequest = stepResult.request.kind === 'select-trigger'
         ? { ...stepResult.request, options }
@@ -543,6 +547,7 @@ export function engineProceed(
             replaceResult.sourceCard,
           ),
           replacedActionId,
+          replaceResult.replacementListenerIds,
         ),
         context.player.id,
       )
