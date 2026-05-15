@@ -139,10 +139,13 @@ ESLint 三层强制（`eslint.config.js`）：
   availableMajorImprovements: string[],
   futureMeeples, pendingFutureMeeples,
   workPhaseObtainedResources: Record<string, Partial<Resource>>,
+  completedFeedingPhases: number,    // 已完成的收获 feeding phase 数；A148/B86 等卡读取
 }
 ```
 
 `workPhaseObtainedResources` 服务于"前一工作阶段获得资源"类卡（A53 等），回家阶段结算后清空。
+
+`completedFeedingPhases` 在 `shared/session/phases/harvest.ts` 的 feeding phase 结束时 `+= 1`，等价于 BGA Globals 同款全局计数；A148/B86 等"按已完成收获 +1 容量"卡牌从此字段读取，避免再走 per-card post-play counter。
 
 `SerializedGameState` 是 `GameState` 的 JSON 网络/持久化形态，额外携带 `engineStack: EngineStackCursor` 便于跨进程恢复引擎光标。同步版本号 / 历史 / 房间连接 **不进** `GameState`。
 
@@ -478,6 +481,8 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 
 `shared/actions/index.ts` 硬编码导入 base + internal effect 文件，构建 `actionDefinitionLookup`。每个文件一个 action。**禁止在单 effect 文件里堆叠多卡逻辑**（CLAUDE.md 明令）。
 
+`collect` 是 accumulation-space partial-take 的统一入口，接受可选 `actionContext: { spaceId?, resource?, amount? }`。`spaceId` 用于指向非当前 action space（卡牌效果触发的偷取场景）；`resource` + `amount` 用于 partial-take（不全取空一格）。旧的 `take-from-space` internal action 已删除并迁移到 `collect`，相关 i18n key 一并清理。
+
 ### 7.4 payment/
 
 `shared/actions/payment/`：
@@ -489,6 +494,8 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 - `cache.ts` —— solution cache
 
 对外通过 `pay-helpers.ts` / `room-payment.ts` 暴露统一入口。卡牌购买费用走 `computeCosts` phase + `actions: ['improvement-any']` 区分行动空间费用 vs 卡牌购买费用。
+
+**Trade modifiers**：`TradeModifier` 描述"用 X 资源换 Y 资源（可选 max）"的 alternate payment。`buildTradeFees`（`room-payment.ts`）支持多键 `to`，把 base cost 的多个 key（例如 D15 `{5 clay, 2 reed}`）按比例展开成 PaymentSolver 期望的形状。`TradeModifier.conditions?: Record<string, number>` 用于按玩家状态 gating trade，支持 `houseTypeWood` / `houseTypeClay` / `houseTypeStone` / `minNumRooms`（在 `cost-modifiers.ts` 的 `evaluateConditions` 统一过滤）。典型用例：D15_ClaySupports clay→reed trade 仅当 `houseTypeClay > 0` 时生效。
 
 ### 7.5 Hook 系统：行动生命周期 phase（11 个）
 
@@ -705,6 +712,8 @@ shared/domain/
 `PlayerBoard(player, state)` 暴露：`countAnimals` / `pasturesWithCapacity` / `emptyFences` / `hasRoomFor` / `canPlow` / `canBuildFence` / `scoringBreakdown`，私有 `invariant_animalsInPastureOrStable`。
 
 域聚合可被三方共用（主 client + sandbox + server），属于 `[A]` 主 bundle 安全层。
+
+`onComputeAnimalZones` card-effect 签名：`(player: PlayerState, zones: AnimalZone[], state: GameState) => AnimalZone[] | void`。第三个 `state` 入参用于读取全局字段（典型场景：A148_Woolgrower / B86_TruffleSearcher 读 `state.completedFeedingPhases` 计入容量），避免每张卡再走 per-card post-play counter。新增 `onComputeAnimalZones` 卡牌可忽略 `state`（使用 `_state` 占位）。
 
 ---
 
