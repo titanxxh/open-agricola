@@ -173,6 +173,111 @@ describe('serialization cursor round-trip', () => {
     expect(restored.getEngineStack().peekPendingEnvelope()?.request.kind).toBe('select-trigger')
   })
 
+  it('restored disabled select-trigger option with pass remains pending', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    state.roundPhase = 'work'
+
+    const ownerPlayerId = state.players[0]!.id
+    const flow = { type: 'leaf' as const, actionId: 'bake-bread' }
+    const nodeId = 'action-bake-bread-0'
+    const options = [
+      { value: 'C1', labelKey: 'cards.C1.name', sourceCard: 'C1', disabled: true },
+      { value: '__pass__', labelKey: 'ui.interactionSelectTriggerPass' },
+    ]
+    const serialized = serializeState(state, { engineStack: new EngineStack() })
+    serialized.engineStack = {
+      frames: [{
+        source: { kind: 'flow', flow },
+        engineSnapshot: {
+          nodeStates: [{ id: nodeId, state: 'ready' }],
+          choiceData: null,
+          pendingData: [{
+            nodeId,
+            pending: {
+              hostNodeId: nodeId,
+              request: { kind: 'select-trigger', ownerPlayerId, options },
+              choices: options,
+              promptKey: 'ui.interactionSelectTrigger',
+              pendingActionId: 'bake-bread',
+              effectiveOwnerPlayerId: ownerPlayerId,
+            },
+          }],
+          compositeEmit: null,
+        },
+        ownerPlayerIndex: 0,
+        spaceId: 'day-laborer',
+        stageResume: null,
+        deferredPlayerSwitch: null,
+        reason: 'top-level',
+      }],
+    }
+
+    const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serialized))))
+    const interaction = restored.getState().interaction
+
+    expect(restored.getEngineStack().depth()).toBe(1)
+    expect(restored.getEngineStack().peekPendingEnvelope()?.request.kind).toBe('select-trigger')
+    expect(interaction.stateId).toBe('wait')
+    if (interaction.stateId === 'wait') {
+      expect(interaction.options).toEqual(options)
+    }
+  })
+
+  it('rejects disabled select-trigger values before dispatch', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    state.roundPhase = 'work'
+
+    const ownerPlayerId = state.players[0]!.id
+    const flow = { type: 'leaf' as const, actionId: '__interaction_only__' }
+    const nodeId = 'action-__interaction_only__-0'
+    const options = [
+      { value: 'C1', labelKey: 'cards.C1.name', sourceCard: 'C1', disabled: true },
+    ]
+    const serialized = serializeState(state, { engineStack: new EngineStack() })
+    serialized.engineStack = {
+      frames: [{
+        source: { kind: 'flow', flow },
+        engineSnapshot: {
+          nodeStates: [{ id: nodeId, state: 'ready' }],
+          choiceData: null,
+          pendingData: [{
+            nodeId,
+            pending: {
+              hostNodeId: nodeId,
+              request: { kind: 'select-trigger', ownerPlayerId, options },
+              choices: options,
+              promptKey: 'ui.interactionSelectTrigger',
+              pendingActionId: '__interaction_only__',
+              effectiveOwnerPlayerId: ownerPlayerId,
+              syntheticKind: 'interaction-only',
+            },
+          }],
+          compositeEmit: null,
+        },
+        ownerPlayerIndex: 0,
+        spaceId: '__subflow:top-level',
+        stageResume: null,
+        deferredPlayerSwitch: null,
+        reason: 'top-level',
+      }],
+    }
+
+    const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serialized))))
+    const rejected = restored.resolveChoice(0, 'C1')
+
+    expect(rejected.ok).toBe(false)
+    expect(rejected.error).toBe('invalid choice value')
+    expect(restored.getEngineStack().peekPendingEnvelope()?.request.kind).toBe('select-trigger')
+  })
+
   // ── reorganize sub-flow ────────────────────────────────────────────────
   // Mirrors server/__tests__/reorganize-engine-session.test.ts setup so we
   // drive the session into a real animal-reorg pending interaction, then

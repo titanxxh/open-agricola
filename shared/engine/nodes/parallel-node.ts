@@ -61,6 +61,14 @@ export class ParallelNode extends BaseNode {
     return true
   }
 
+  resolveRemainingTriggerChildrenForPass(): void {
+    if (this.mode !== 'trigger-select') return
+    for (const child of this.cardChildren()) {
+      if (child.getState() !== 'resolved') child.resolve()
+    }
+    this.checkResolved()
+  }
+
   checkResolved(): void {
     if (this.children.every((c) => c.getState() === 'resolved')) {
       this.nodeState = 'resolved'

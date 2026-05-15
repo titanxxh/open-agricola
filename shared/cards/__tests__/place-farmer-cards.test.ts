@@ -27,7 +27,13 @@ describe('PlaceFarmer card listeners', () => {
       }
 
       return {
-        followUpActions: ['bake-bread'],
+        flow: {
+          type: 'leaf',
+          actionId: 'bake-bread',
+          optional: true,
+          sourceCard: 'C25_SteamMachine',
+        },
+        sourceCard: 'C25_SteamMachine',
       }
     },
   }
@@ -169,7 +175,12 @@ describe('PlaceFarmer card listeners', () => {
 
       const result = listener?.handler(context as unknown as ActionHookContext)
       expect(result).toBeDefined()
-      expect(result?.followUpActions).toContain('bake-bread')
+      expect(result?.flow).toMatchObject({
+        type: 'leaf',
+        actionId: 'bake-bread',
+        optional: true,
+        sourceCard: 'C25_SteamMachine',
+      })
     })
 
     it('does not allow bake-bread when workers available', () => {

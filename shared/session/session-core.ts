@@ -2420,6 +2420,7 @@ export class GameCore {
           let autoOptions = step.choice.options
           while (autoOptions.length === 1) {
             const auto = autoOptions[0]
+            if (auto?.disabled === true) return
             const resolvedActionId = this.peekHostPendingActionId()
             const result = frame.engine.resolveChoice(auto.value, { state: this.state, player, space })
             this.flushEngineLog()
@@ -2429,6 +2430,7 @@ export class GameCore {
             if (result.type === 'request' && result.request.kind === 'choice') {
               const requestOptions = result.request.options
               if (requestOptions.length === 1) {
+                if (requestOptions[0]?.disabled === true) return
                 autoOptions = requestOptions
                 continue
               }
@@ -2775,6 +2777,9 @@ export class GameCore {
       return this.respond()
     }
     if (result.type === 'fail') {
+      if (result.recoverable === true) {
+        return this.respond(false, result.logKey ?? 'action failed')
+      }
       this.engineStack.pop()
       this.actionStartIndex = null
       this.actionStartPlayerSnapshot = null

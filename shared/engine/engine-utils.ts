@@ -298,9 +298,7 @@ export function buildPhaseTrailingNodes(
     for (const p of serialOnes) ownerGroupNodes.push(buildNode(p))
 
     const selectOnes = group.filter((p) => p.ml.registration.dispatchMode === 'select')
-    if (selectOnes.length === 1) {
-      ownerGroupNodes.push(buildNode(selectOnes[0]!))
-    } else if (selectOnes.length > 1) {
+    if (selectOnes.length > 0) {
       const children = selectOnes.map(buildNode)
       const ptn = new ParallelNode(
         `parallel-trigger-${phase}-${actionId}-${ownerId}-${int.counterRef.value++}`,
@@ -758,6 +756,97 @@ export function buildChoiceExecutionContext(
     sourceCard: base?.sourceCard,
     actionContext: base?.actionContext,
   }
+}
+
+const withResourcePreviewForContinuation = (
+  context: ActionExecutionContext,
+  resources?: Resource,
+): ActionExecutionContext => {
+  if (!resources) return context
+  const player = {
+    ...context.player,
+    resources: { ...resources },
+  }
+  return {
+    ...context,
+    player,
+    state: {
+      ...context.state,
+      players: (context.state.players ?? []).map((entry) =>
+        entry.id === player.id ? player : entry),
+    },
+  }
+}
+
+const canStartFlowWithoutBeforeTriggers = (
+  int: EngineInternals,
+  context: ActionExecutionContext,
+  flow: ActionFlow,
+): boolean => {
+  if (flow.optional === true) return true
+
+  if (flow.type === 'leaf') {
+    const action = int.registry.get(flow.actionId)
+    if (!action) return false
+    const actionContext = {
+      ...(context.actionContext ?? {}),
+      ...(flow.actionContext ?? {}),
+      skipBeforeTriggers: true,
+      checkedReplaceAction: true,
+    }
+    return action.canBeExecutedByPlayer(
+      context.state,
+      context.player,
+      {
+        sourceCard: flow.sourceCard ?? context.sourceCard,
+        actionContext,
+      },
+    )
+  }
+
+  if (flow.children.length === 0) return true
+  if (flow.type === 'seq') {
+    return canStartFlowWithoutBeforeTriggers(int, context, flow.children[0]!)
+  }
+  return flow.children.some((child) =>
+    canStartFlowWithoutBeforeTriggers(int, context, child),
+  )
+}
+
+export const canActionContinueWithoutBeforeTriggers = (
+  int: EngineInternals,
+  context: ActionExecutionContext,
+  actionId: string,
+  resources?: Resource,
+): boolean => {
+  const action = int.registry.get(actionId)
+  if (!action) return false
+  const scopedContext = withResourcePreviewForContinuation(context, resources)
+  const actionContext = {
+    ...(scopedContext.actionContext ?? {}),
+    skipBeforeTriggers: true,
+  }
+  const direct = action.canBeExecutedByPlayer(
+    scopedContext.state,
+    scopedContext.player,
+    {
+      sourceCard: scopedContext.sourceCard,
+      actionContext,
+    },
+  )
+  if (direct) return true
+
+  const replaceResult = int.hooks.applyComputeReplace({
+    ...scopedContext,
+    actionId,
+    actionContext,
+  })
+  if (!replaceResult.declined || !replaceResult.alternativeFlow) return false
+  return canStartFlowWithoutBeforeTriggers(
+    int,
+    scopedContext,
+    applyFallbackSourceCardToFlow(replaceResult.alternativeFlow, replaceResult.sourceCard),
+  )
 }
 
 /**
