@@ -2,6 +2,41 @@ import type { ActionDefinition } from '../../../contract/types'
 import { writeCardExtraData } from '../../../cards/helpers/card-state'
 import { runSelectionEffect } from '../../helpers/selection-effect-registry'
 
+const validateFarmPositions = (
+  positions: string[],
+  actionContext: Record<string, unknown> | undefined,
+) => {
+  const hasSelectionBounds = actionContext?.minSelections !== undefined
+    || actionContext?.maxSelections !== undefined
+    || Array.isArray(actionContext?.selectableTiles)
+  if (!hasSelectionBounds) return null
+
+  const minSelections = (actionContext?.minSelections as number | undefined) ?? 0
+  const maxSelections = actionContext?.maxSelections as number | undefined
+  if (positions.length < minSelections) return 'not enough selection positions'
+  if (maxSelections !== undefined && positions.length > maxSelections) {
+    return 'too many selection positions'
+  }
+
+  const selected = new Set<string>()
+  for (const position of positions) {
+    if (selected.has(position)) return 'duplicate selection position'
+    selected.add(position)
+  }
+
+  const selectableTiles = Array.isArray(actionContext?.selectableTiles)
+    ? actionContext.selectableTiles as Array<{ row: number; col: number }>
+    : null
+  if (selectableTiles) {
+    const selectable = new Set(selectableTiles.map((pos) => `${pos.row}-${pos.col}`))
+    for (const position of positions) {
+      if (!selectable.has(position)) return 'invalid selection position'
+    }
+  }
+
+  return null
+}
+
 export const selectionAction: ActionDefinition = {
   id: 'selection',
   nameKey: 'actions.selection.name',
@@ -30,16 +65,22 @@ export const selectionAction: ActionDefinition = {
     }
   },
   resolveChoice: ({ player, sourceCard, actionContext, state }, choice, payload) => {
-    if (choice === 'cancel') return { type: 'ok' }
-
     // Prefer structured payload (S2 Task 7); fall back to legacy split-comma
     // string encoding from `commitSelectionChoice` for unmigrated callsites.
     const payloadPositions = (payload as { positions?: string[] } | undefined)?.positions
     const payloadCards = (payload as { cards?: string[] } | undefined)?.cards
-    const positions = Array.isArray(payloadPositions)
+    const positions = choice === 'cancel'
+      ? []
+      : Array.isArray(payloadPositions)
       ? payloadPositions
       : choice.split(',').filter(Boolean)
     const cards = Array.isArray(payloadCards) ? payloadCards : []
+    const kind = (actionContext?.selectionKind as string | undefined) ?? 'farm-position'
+    if (kind === 'farm-position') {
+      const validationError = validateFarmPositions(positions, actionContext)
+      if (validationError) return { type: 'fail', logKey: validationError, recoverable: true }
+    }
+    if (choice === 'cancel') return { type: 'ok' }
 
     if (sourceCard) {
       // farm-position selectedPositions stored as "r-c" strings (legacy);
