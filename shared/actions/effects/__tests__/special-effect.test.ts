@@ -317,6 +317,127 @@ describe('specialEffectAction — mutation dispatcher', () => {
     expect(isCardFlagged(p1, CARD_ID)).toBe(true)
   })
 
+  describe('remove-field-crops', () => {
+    it('decrements two selected crop fields', () => {
+      const player = makePlayer()
+      player.fields = [
+        { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
+        { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] },
+        { row: 1, col: 0, stacks: [{ kind: 'vegetable', remaining: 2 }] },
+      ]
+
+      const result = specialEffectAction.execute(
+        makeCtx(
+          player,
+          {
+            kind: 'remove-field-crops',
+            crop: 'grain',
+            positions: [
+              { row: 0, col: 0 },
+              { row: 0, col: 1 },
+            ],
+          },
+          CARD_ID,
+        ),
+      )
+
+      expect(result.type).toBe('ok')
+      expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 1 }])
+      expect(player.fields[1]!.stacks).toEqual([])
+      expect(player.fields[2]!.stacks).toEqual([{ kind: 'vegetable', remaining: 2 }])
+    })
+
+    it('fails atomically when any selected field is not a valid source', () => {
+      const player = makePlayer()
+      player.fields = [
+        { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
+        {
+          row: 0,
+          col: 1,
+          stacks: [
+            { kind: 'grain', remaining: 3 },
+            { kind: 'vegetable', remaining: 2 },
+          ],
+        },
+      ]
+
+      const result = specialEffectAction.execute(
+        makeCtx(
+          player,
+          {
+            kind: 'remove-field-crops',
+            crop: 'grain',
+            positions: [
+              { row: 0, col: 0 },
+              { row: 0, col: 1 },
+            ],
+          },
+          CARD_ID,
+        ),
+      )
+
+      expect(result).toEqual({ type: 'fail', logKey: 'log.specialEffectFail' })
+      expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
+      expect(player.fields[1]!.stacks).toEqual([
+        { kind: 'grain', remaining: 3 },
+        { kind: 'vegetable', remaining: 2 },
+      ])
+    })
+
+    it('fails atomically when positions include a duplicate coordinate', () => {
+      const player = makePlayer()
+      player.fields = [
+        { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
+        { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 2 }] },
+      ]
+
+      const result = specialEffectAction.execute(
+        makeCtx(
+          player,
+          {
+            kind: 'remove-field-crops',
+            crop: 'grain',
+            positions: [
+              { row: 0, col: 0 },
+              { row: 0, col: 0 },
+            ],
+          },
+          CARD_ID,
+        ),
+      )
+
+      expect(result).toEqual({ type: 'fail', logKey: 'log.specialEffectFail' })
+      expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
+      expect(player.fields[1]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
+    })
+
+    it('fails atomically when positions include null or malformed entries', () => {
+      for (const invalidPosition of [null, { row: 0 }]) {
+        const player = makePlayer()
+        player.fields = [
+          { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
+          { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 2 }] },
+        ]
+
+        const result = specialEffectAction.execute(
+          makeCtx(
+            player,
+            {
+              kind: 'remove-field-crops',
+              crop: 'grain',
+              positions: [invalidPosition, { row: 0, col: 1 }],
+            },
+            CARD_ID,
+          ),
+        )
+
+        expect(result).toEqual({ type: 'fail', logKey: 'log.specialEffectFail' })
+        expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
+        expect(player.fields[1]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
+      }
+    })
+  })
+
   // E166 Roastmaster relies on this SE kind. The plan (Task 9, F9) calls out
   // BGA's "actually move the food meeple" semantic — verify the source space
   // truly decrements and the destination truly increments.
