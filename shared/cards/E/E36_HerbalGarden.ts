@@ -6,7 +6,7 @@ const CARD_ID = E36_HerbalGarden.id
 export const E36_HerbalGarden_impl = {
   effect: {
     id: CARD_ID,
-    onComputeAnimalZones: (_player, zones) => {
+    onComputeAnimalZones: (_player, zones, _state) => {
       // At least one pasture must contain no animals.
       // Find the best pasture to block: prefer one that's already empty,
       // otherwise pick the one with the smallest capacity.

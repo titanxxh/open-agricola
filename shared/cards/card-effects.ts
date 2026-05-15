@@ -187,7 +187,11 @@ export type CardEffect = {
   computeCostedBonus?: CostedBonusHandler
   computeSharedPostScore?: SharedPostScoreHandler
   computeExtraRoomCapacity?: (player: PlayerState) => number
-  onComputeAnimalZones?: (player: PlayerState, zones: AnimalZone[]) => void | AnimalZone[]
+  onComputeAnimalZones?: (
+    player: PlayerState,
+    zones: AnimalZone[],
+    state: GameState,
+  ) => void | AnimalZone[]
   /**
    * Per-card zone validation. Mirrors BGA `getInvalidAnimals($zone, $raise)`.
    * Given the meeples currently in a card-owned zone, return the subset that

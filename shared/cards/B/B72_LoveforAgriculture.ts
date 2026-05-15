@@ -159,7 +159,7 @@ export const B72_LoveforAgriculture_impl = {
   },
 
   // Reduce animal capacity of sown pastures
-  onComputeAnimalZones: (player, zones) => {
+  onComputeAnimalZones: (player, zones, _state) => {
     const crops = getPastureCrops(player)
     if (crops.length === 0) return
     for (const zone of zones) {

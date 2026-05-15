@@ -6,7 +6,7 @@ const CARD_ID = B12_Stockyard.id
 export const B12_Stockyard_impl = {
   effect: {
   id: CARD_ID,
-  onComputeAnimalZones: (_player, zones) => {
+  onComputeAnimalZones: (_player, zones, _state) => {
     zones.push({
       id: `card:${CARD_ID}`,
       zoneType: 'card',

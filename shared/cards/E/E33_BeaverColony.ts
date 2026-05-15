@@ -47,7 +47,7 @@ export const E33_BeaverColony_impl = {
     const idx = state.players.indexOf(player)
     playerBoard(state, idx).animals.enforceCapacity()
   },
-  onComputeAnimalZones: (player, zones) => {
+  onComputeAnimalZones: (player, zones, _state) => {
     const stabledPastures = zones.filter(
       (zone): zone is AnimalZone & { zoneType: 'pasture'; pastureIndex: number } =>
         zone.zoneType === 'pasture' &&

@@ -6,7 +6,7 @@ const CARD_ID = C11_WildlifeReserve.id
 export const C11_WildlifeReserve_impl = {
   effect: {
     id: CARD_ID,
-    onComputeAnimalZones: (_player, zones) => {
+    onComputeAnimalZones: (_player, zones, _state) => {
       zones.push({
         id: `card:${CARD_ID}`,
         zoneType: 'card',

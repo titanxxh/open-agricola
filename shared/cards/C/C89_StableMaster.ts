@@ -22,7 +22,7 @@ export const C89_StableMaster_impl = {
         actionContext: { max: 1, costOverride: { wood: -1 }, trueAction: false },
       }
     },
-    onComputeAnimalZones: (_player, zones) => {
+    onComputeAnimalZones: (_player, zones, _state) => {
       const stableZone = zones.find(z => z.zoneType === 'stable')
       if (stableZone) {
         stableZone.capacity += 2 // 1 → 3

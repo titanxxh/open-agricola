@@ -10,7 +10,7 @@ export const D12_MilkingPlace_impl = {
   onHarvestFeedingPhase: (_state, _player) => {
     return gainLeaf(CARD_ID, { food: 1 })
   },
-  onComputeAnimalZones: (_player, zones) => {
+  onComputeAnimalZones: (_player, zones, _state) => {
     // BGA: filter house and D148_special — the player can no longer hold animals
     // in the house, even via another card (D148 DomesticianExpert).
     const houseIdx = zones.findIndex(z => z.zoneType === 'house')

@@ -38,7 +38,10 @@ export const getLooseStableKeys = (player: PlayerState) => {
 }
 
 /** Compute the full list of animal zones (pastures + house + loose stables + card zones). */
-export const computeAnimalZones = (player: PlayerState): AnimalZone[] => {
+export const computeAnimalZones = (
+  player: PlayerState,
+  state: GameState = {} as GameState,
+): AnimalZone[] => {
   const zones: AnimalZone[] = [
     ...player.pastures.map((pasture, index) => ({
       id: pasture.id,
@@ -71,7 +74,7 @@ export const computeAnimalZones = (player: PlayerState): AnimalZone[] => {
   for (const cardId of allCards) {
     const effect = getCardEffect(cardId)
     if (effect?.onComputeAnimalZones) {
-      const result = effect.onComputeAnimalZones(player, zones)
+      const result = effect.onComputeAnimalZones(player, zones, state)
       if (Array.isArray(result)) {
         zones.push(...result)
       }
@@ -313,7 +316,7 @@ export class AnimalZones {
 
   /** All zones (pastures, house, loose stables, card zones) the player has. */
   zones(): AnimalZone[] {
-    return computeAnimalZones(this.player)
+    return computeAnimalZones(this.player, this.state)
   }
 
   /**
