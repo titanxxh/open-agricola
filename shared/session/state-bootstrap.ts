@@ -486,6 +486,7 @@ export const createInitialState = (
     gameOver: false,
     enableCommunityDeck: options.enableCommunityDeck ?? false,
     workPhaseObtainedResources: {},
+    completedFeedingPhases: 0,
   }
   applyRoundGrowth(initialState)
   initialState.roundStartSnapshot = createRoundSnapshot(initialState)
