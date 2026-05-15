@@ -40,7 +40,7 @@ export const getLooseStableKeys = (player: PlayerState) => {
 /** Compute the full list of animal zones (pastures + house + loose stables + card zones). */
 export const computeAnimalZones = (
   player: PlayerState,
-  state: GameState = {} as GameState,
+  state: GameState = { completedFeedingPhases: 0 } as GameState,
 ): AnimalZone[] => {
   const zones: AnimalZone[] = [
     ...player.pastures.map((pasture, index) => ({
@@ -105,7 +105,7 @@ export const getAssignedAnimalCount = (player: PlayerState) => {
 /** Total animal capacity across all zones. */
 export const getTotalAnimalCapacity = (
   player: PlayerState,
-  state: GameState = {} as GameState,
+  state: GameState = { completedFeedingPhases: 0 } as GameState,
 ) => computeAnimalZones(player, state).reduce((sum, zone) => sum + zone.capacity, 0)
 
 const expandZoneToMeeples = (zone: AnimalZone): Meeple[] => {
@@ -152,7 +152,7 @@ export const computeInvalidAnimalsForZone = (
  */
 export const enforceAnimalCapacity = (
   player: PlayerState,
-  state: GameState = {} as GameState,
+  state: GameState = { completedFeedingPhases: 0 } as GameState,
 ) => {
   const zones = computeAnimalZones(player, state)
   const zoneCapacity = (id: string) => zones.find((z) => z.id === id)?.capacity ?? 0

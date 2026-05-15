@@ -25,13 +25,19 @@ export const collectAction: ActionDefinition = {
   canBeExecutedByPlayer: () => true,
   execute: ({ state, player, space, actionContext }) => {
     const spaceIdHint = actionContext?.spaceId as string | undefined
-    const resolvedFromHint =
-      spaceIdHint && spaceIdHint !== space?.id
-        ? state.actionSpaces.find((s) => s.id === spaceIdHint)
-        : undefined
-    const targetSpace: ActionSpace | undefined = resolvedFromHint ?? space
-    if (!targetSpace) {
-      return { type: 'fail' as const, logKey: 'log.collectNoSpace' }
+    let targetSpace: ActionSpace | undefined
+    if (spaceIdHint) {
+      targetSpace = spaceIdHint === space?.id
+        ? space
+        : state.actionSpaces.find((s) => s.id === spaceIdHint)
+      if (!targetSpace) {
+        return { type: 'fail' as const, logKey: 'log.collectNoSpace' }
+      }
+    } else {
+      targetSpace = space
+      if (!targetSpace) {
+        return { type: 'fail' as const, logKey: 'log.collectNoSpace' }
+      }
     }
     const resource = actionContext?.resource as keyof Resource | undefined
     const amount = actionContext?.amount as number | undefined
