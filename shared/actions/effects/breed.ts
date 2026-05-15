@@ -30,12 +30,12 @@ const DEFAULT_TYPES: ReadonlyArray<BreedAnimalType> = ['sheep', 'boar', 'cattle'
  * such as A165 PigBreeder (sourceCard='A165_PigBreeder').
  */
 export const breed = (
-  _state: GameState | null,
+  state: GameState,
   player: PlayerState,
   opts: BreedOptions,
 ): { breedSummary: HarvestBreedSummary } => {
   const types = opts.animalTypes ?? DEFAULT_TYPES
-  let freeCapacity = getTotalAnimalCapacity(player)
+  let freeCapacity = getTotalAnimalCapacity(player, state)
   const summary: HarvestBreedSummary = { resources: {}, animalTypes: 0, animalCount: 0 }
   for (const type of types) {
     if (freeCapacity <= 0) break
