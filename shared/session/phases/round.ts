@@ -20,6 +20,7 @@ import { recordActionSnapshot } from '../../cards/helpers/action-snapshot.ts'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement.ts'
 import { executeCardListener, getMatchingListeners } from '../../cards/card-listeners.ts'
 import { runRoundEndHooks, shouldSkipPlayerTurn } from '../../cards/card-effects.ts'
+import { tagInjectedAnytimeFlow } from '../../engine/action-context-flags.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
 import type { FeedQueueEntry } from '../../contract/types.ts'
 import type { PendingEnvelope } from '../../engine/types.ts'
@@ -372,7 +373,7 @@ export const takeAnytimeAction = (
   core.appendHistory()
   if (engine) {
     const owner = core.state.players[playerIndex]
-    engine.injectBeforeFlows([entry.flow], undefined, owner?.id)
+    engine.injectBeforeFlows([tagInjectedAnytimeFlow(entry.flow)], undefined, owner?.id)
   } else {
     const frame = core.buildAdhocEngineFrame(actionId, entry.descriptor.sourceCard, entry.flow)
     core.pushEngineFrame({

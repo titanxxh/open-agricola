@@ -53,6 +53,7 @@ import {
 import type { PendingEnvelope } from './types'
 import { isActivateCardActionNode, type ActivateCardActionNode } from './activation-action'
 import { evaluateTriggerSelect, type TriggerSelectEvaluationOptions } from './trigger-select'
+import { withInjectedAnytimeResultFlag } from './action-context-flags'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
@@ -644,7 +645,8 @@ export function engineProceed(
       action,
       replacedActionId,
     )
-    const result = optInChoice ?? action.execute(executionContext)
+    const rawResult = optInChoice ?? action.execute(executionContext)
+    const result = withInjectedAnytimeResultFlag(rawResult, executionContext.actionContext)
     const duringPhase = int.hooks.during({ ...executionContext, actionId: replacedActionId }, result)
     const duringActivateNodes = buildActivationActionNodes(int,
       duringPhase.matchedListeners, 'during', replacedActionId,
