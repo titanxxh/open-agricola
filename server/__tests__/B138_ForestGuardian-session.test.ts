@@ -5,8 +5,11 @@ import {
   getRegisteredCardListeners,
   type CardListenerContext,
 } from '../../shared/cards/card-listeners'
+import type { ActionDetailParts } from '../../shared/contract/protocol/game'
 import { mkActionSpace } from '../../shared/cards/__tests__/fixtures'
 import { gainAction } from '../../shared/actions/effects/gain'
+import { setWorkersAtHome } from '../../shared/domain/player'
+import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 import '../../shared/cards/B/B138_ForestGuardian'
 
@@ -14,6 +17,24 @@ const CARD_ID = 'B138_ForestGuardian'
 
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
+
+const resolveConfirms = (session: GameSession) => {
+  let resp = session.getState()
+  let safety = 20
+  while (
+    resp.interaction.stateId === 'wait'
+    && (
+      resp.interaction.request.kind === 'confirm-player-switch'
+      || resp.interaction.request.kind === 'confirm-next-player'
+    )
+  ) {
+    if (--safety <= 0) throw new Error('confirm loop did not settle')
+    resp = resp.interaction.request.kind === 'confirm-player-switch'
+      ? confirmPlayerSwitch(session)
+      : confirmNextPlayer(session)
+  }
+  return resp
+}
 
 describe('B138_ForestGuardian session — opponent pays food on 5+ wood collect', () => {
   const setup = () => {
@@ -108,7 +129,7 @@ describe('B138_ForestGuardian session — opponent pays food on 5+ wood collect'
     const opponentFoodBefore = opponent.resources.food
 
     // Simulate the leaf executing under owner context (PlayerSwitch upstream).
-    gainAction.execute({
+    const result = gainAction.execute({
       state,
       player: owner,
       space,
@@ -120,6 +141,12 @@ describe('B138_ForestGuardian session — opponent pays food on 5+ wood collect'
       sourceCard: CARD_ID,
     })
 
+    expect(result.type).toBe('ok')
+    if (result.type === 'ok') {
+      expect(result.extraData?.actionDetailDeltas).toEqual([
+        { playerId: opponent.id, costs: { food: 1 } },
+      ])
+    }
     expect(owner.resources.food).toBe(ownerFoodBefore + 1)
     expect(opponent.resources.food).toBe(opponentFoodBefore - 1)
   })
@@ -143,5 +170,35 @@ describe('B138_ForestGuardian session — opponent pays food on 5+ wood collect'
 
     expect(opponent.resources.food).toBe(0)
     expect(owner.resources.food).toBe(6) // owner still credited
+  })
+
+  it('logs opponent payment cost on the forest action detail', () => {
+    const { session, state, owner, opponent } = setup()
+    state.currentPlayerIndex = 1
+    state.round = 1
+    setWorkersAtHome(state, owner, 2)
+    setWorkersAtHome(state, opponent, 2)
+    const forest = state.actionSpaces.find((s) => s.id === 'forest')!
+    forest.resources.wood = 5
+    session.loadState(state)
+
+    const resp = session.takeAction(1, 'forest')
+    expect(resp.ok).toBe(true)
+    resolveConfirms(session)
+
+    const after = session.getState().state
+    expect(after.players[1]!.resources.food).toBe(2)
+    expect(after.players[1]!.resources.wood).toBe(5)
+
+    const actionDetail = after.log.find((entry) =>
+      entry.key === 'log.actionDetail'
+      && entry.params?.player === opponent.name
+      && entry.params?.action === 'actions.forest.name',
+    )
+    expect(actionDetail).toBeDefined()
+    const detailParts = actionDetail?.params?.detailParts as ActionDetailParts | undefined
+    expect(detailParts?.gains?.wood).toBe(5)
+    expect(detailParts?.costs?.food).toBe(1)
+    expect(detailParts?.gains?.food ?? 0).toBe(0)
   })
 })
