@@ -1983,12 +1983,19 @@ export class GameCore {
       if (!player) return
       // E58 LunchtimeBeer (and any future card) may flag a player to skip
       // the field phase of the current harvest. Flagged players are not reaped.
-      if (this.hasPassFieldAndBreed(player)) return
+      if (this.hasPassFieldAndBreed(player)) {
+        this.state.log.unshift({ key: 'log.harvestReapSkipped', params: { player: player.name } })
+        return
+      }
       const result = reap(this.state, player)
       this.state.harvestReapSummary![player.id] = result.reapSummary
       incHarvestedGrain(player, result.reapSummary.resources.grain ?? 0)
       incHarvestedVegetable(player, result.reapSummary.resources.vegetable ?? 0)
-      this.logHarvestResourceEntry('log.harvestReapDetail', player, result.reapSummary.resources)
+      if (this.hasPositiveResources(result.reapSummary.resources)) {
+        this.logHarvestResourceEntry('log.harvestReapDetail', player, result.reapSummary.resources)
+      } else {
+        this.state.log.unshift({ key: 'log.harvestReapNothing', params: { player: player.name } })
+      }
     })
     return this.continueAfterReapEffects()
   }

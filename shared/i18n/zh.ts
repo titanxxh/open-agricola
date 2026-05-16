@@ -792,6 +792,8 @@ export const zh = {
     harvestPhaseFeed: '喂养',
     harvestPhaseBreed: '繁殖',
     harvestReapDetail: '{player} 收获 {resources}',
+    harvestReapNothing: '{player} 没有可收割的田地',
+    harvestReapSkipped: '{player} 本轮跳过收割',
     harvestFeedConvert: '{player} 使用 {source}：{cost} → {food}',
     harvestFeedDetail: '{player} 喂养 {resources}',
     harvestBreedDetail: '{player} 繁殖 {resources}',

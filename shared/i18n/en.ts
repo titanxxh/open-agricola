@@ -811,6 +811,8 @@ export const en = {
     harvestPhaseFeed: 'Feed',
     harvestPhaseBreed: 'Breed',
     harvestReapDetail: '{player} reaps {resources}',
+    harvestReapNothing: '{player} has nothing to reap',
+    harvestReapSkipped: '{player} skips reap this round',
     harvestFeedConvert: '{player} uses {source}: {cost} → {food}',
     harvestFeedDetail: '{player} feeds {resources}',
     harvestBreedDetail: '{player} breeds {resources}',
