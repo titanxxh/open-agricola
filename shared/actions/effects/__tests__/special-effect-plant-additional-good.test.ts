@@ -63,6 +63,25 @@ describe('special-effect: plant-additional-good — card-stacks location', () =>
   })
 })
 
+describe('special-effect: plant-additional-good — card-crop location', () => {
+  it('grows the crop stored under cardStates extraData.cardCrop by 1', () => {
+    const player = makePlayer({
+      cardStates: {
+        B68_Beanfield: {
+          extraData: { cardCrop: { crop: 'vegetable', remaining: 1 } },
+        },
+      },
+    })
+    const result = exec(player, {
+      kind: 'plant-additional-good',
+      locations: [{ kind: 'card-crop', cardId: 'B68_Beanfield' }],
+    })
+    expect(result.type).toBe('ok')
+    expect(readCardExtraData(player, 'B68_Beanfield', 'cardCrop'))
+      .toEqual({ crop: 'vegetable', remaining: 2 })
+  })
+})
+
 describe('special-effect: plant-additional-good — invariant violations', () => {
   it('throws when target field is missing', () => {
     const player = makePlayer({ fields: [] })
@@ -96,5 +115,21 @@ describe('special-effect: plant-additional-good — invariant violations', () =>
         locations: [{ kind: 'card-stacks', cardId: 'D75_WoodField' }],
       }),
     ).toThrow(/no stack with remaining.*D75_WoodField/)
+  })
+
+  it('does not mutate earlier locations when a later location is invalid', () => {
+    const player = makePlayer({
+      fields: [{ row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] }],
+    })
+    expect(() =>
+      exec(player, {
+        kind: 'plant-additional-good',
+        locations: [
+          { kind: 'field', row: 0, col: 1 },
+          { kind: 'field', row: 9, col: 9 },
+        ],
+      }),
+    ).toThrow(/missing field/)
+    expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 1 }])
   })
 })

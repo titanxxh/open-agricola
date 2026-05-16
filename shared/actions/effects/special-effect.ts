@@ -30,6 +30,7 @@ import { returnCardToBoard } from '../../cards/helpers/return-card'
 export type PlantAdditionalGoodLocation =
   | { kind: 'field'; row: number; col: number }
   | { kind: 'card-stacks'; cardId: string }
+  | { kind: 'card-crop'; cardId: string }
 
 export type SpecialEffectParams =
   | { kind: 'increment-extra-data'; key: string; amount: number }
@@ -77,12 +78,17 @@ const resolveTargetPlayer = (
   return target ?? actor
 }
 
-const growFirstAvailableStack = (stacks: CropStack[], errCtx: string): void => {
+type CardCrop = {
+  crop: CropStack['kind']
+  remaining: number
+}
+
+const readGrowableStack = (stacks: CropStack[], errCtx: string): CropStack => {
   const stack = stacks.find((s) => s.remaining >= 1)
   if (!stack) {
     throw new Error(`plant-additional-good: no stack with remaining>=1 on ${errCtx}`)
   }
-  stack.remaining += 1
+  return stack
 }
 
 /**
@@ -273,6 +279,7 @@ export const specialEffectAction: ActionDefinition = {
         return { type: 'ok' }
       }
       case 'plant-additional-good': {
+        const mutations: Array<() => void> = []
         for (const loc of p.locations) {
           if (loc.kind === 'field') {
             const field = target.fields.find(
@@ -283,18 +290,34 @@ export const specialEffectAction: ActionDefinition = {
                 `plant-additional-good: missing field at row=${loc.row} col=${loc.col}`,
               )
             }
-            // Note: we ignore kind here; eligibility guarantees field has exactly one
-            // stack with remaining===1 (see C8_PlantFertilizer onBuy). Not using
-            // fieldFindStackOfKind because the kind is decided by what's already
-            // planted, not requested by the caller.
-            growFirstAvailableStack(field.stacks, `field row=${loc.row} col=${loc.col}`)
-          } else {
+            const stack = readGrowableStack(field.stacks, `field row=${loc.row} col=${loc.col}`)
+            mutations.push(() => {
+              stack.remaining += 1
+            })
+          } else if (loc.kind === 'card-stacks') {
             const stacks =
               readCardExtraData<CropStack[]>(target, loc.cardId, 'stacks') ?? []
-            growFirstAvailableStack(stacks, `card ${loc.cardId}`)
-            writeCardExtraData(target, loc.cardId, 'stacks', stacks)
+            const stack = readGrowableStack(stacks, `card ${loc.cardId}`)
+            mutations.push(() => {
+              stack.remaining += 1
+              writeCardExtraData(target, loc.cardId, 'stacks', stacks)
+            })
+          } else {
+            const cardCrop = readCardExtraData<CardCrop>(target, loc.cardId, 'cardCrop')
+            if (!cardCrop || cardCrop.remaining < 1) {
+              throw new Error(
+                `plant-additional-good: no cardCrop with remaining>=1 on card ${loc.cardId}`,
+              )
+            }
+            mutations.push(() => {
+              writeCardExtraData(target, loc.cardId, 'cardCrop', {
+                ...cardCrop,
+                remaining: cardCrop.remaining + 1,
+              })
+            })
           }
         }
+        for (const mutate of mutations) mutate()
         return { type: 'ok' }
       }
     }
