@@ -93,6 +93,13 @@ const withResourcePreview = (
   }
 }
 
+const actionContextForNode = (
+  node: ActionNode,
+): ActionExecutionContext['actionContext'] =>
+  node.beforePhaseResolved
+    ? { ...(node.actionContext ?? {}), skipBeforeTriggers: true }
+    : node.actionContext
+
 type ImmediateLogCarrier = {
   logKey?: string
   logParams?: Record<string, unknown>
@@ -265,7 +272,7 @@ export function engineResolveChoice(
         space: context.space,
         params: child.params,
         sourceCard: child.sourceCard,
-        actionContext: child.actionContext,
+        actionContext: actionContextForNode(child),
       }
       const replaceResult = int.hooks.applyComputeReplace({
         ...executionContext,

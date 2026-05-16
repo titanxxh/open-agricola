@@ -15,10 +15,26 @@ type BakePlanEntry = {
   count: number
 }
 
+type BakeLogSource = {
+  sourceActionId?: string
+  sourceCard?: string
+}
+
 const failInvalidBake = (): ActionExecutionResult => ({
   type: 'fail',
   logKey: 'log.action',
   recoverable: true,
+})
+
+const bakeLogParams = (
+  count: number,
+  food: number,
+  source?: BakeLogSource,
+): Record<string, unknown> => ({
+  count,
+  food,
+  ...(source?.sourceActionId ? { sourceActionId: source.sourceActionId } : {}),
+  ...(source?.sourceCard ? { sourceCard: source.sourceCard } : {}),
 })
 
 const canBakeBreadDirectly = (player: PlayerState): boolean =>
@@ -33,6 +49,7 @@ export const bakeBread = (
   player: PlayerState,
   cardId: string,
   times = 1,
+  source?: BakeLogSource,
 ): ActionExecutionResult => {
   const rates = getPlayerBakeRates(player)
   const rate = rates.find((r) => r.cardId === cardId)
@@ -49,7 +66,7 @@ export const bakeBread = (
     immediateLogs: [
       {
         key: 'log.bakeBread',
-        params: { count: bakeTimes, food: foodGained },
+        params: bakeLogParams(bakeTimes, foodGained, source),
       },
     ],
   }
@@ -96,10 +113,11 @@ const parseBulkBakePlan = (
 const applyBakePlan = (
   player: PlayerState,
   plan: BakePlanEntry[],
+  source?: BakeLogSource,
 ): ActionExecutionResult => {
   const immediateLogs: ImmediateLogEntry[] = []
   for (const entry of plan) {
-    const result = bakeBread(player, entry.cardId, entry.count)
+    const result = bakeBread(player, entry.cardId, entry.count, source)
     if (result.type !== 'ok') return failInvalidBake()
     if (result.immediateLogs) immediateLogs.push(...result.immediateLogs)
   }
@@ -109,6 +127,7 @@ const applyBakePlan = (
 const resolveBakeBreadChoice = (
   player: PlayerState,
   choice: string,
+  source?: BakeLogSource,
 ): ActionExecutionResult => {
   if (choice === 'cancel') return failInvalidBake()
   const rates = getPlayerBakeRates(player)
@@ -118,7 +137,7 @@ const resolveBakeBreadChoice = (
     const payload = choice.replace('bulk:', '').trim()
     const plan = parseBulkBakePlan(player, payload, rateMap)
     if (!plan) return failInvalidBake()
-    return applyBakePlan(player, plan)
+    return applyBakePlan(player, plan, source)
   }
 
   if (choice.startsWith('count-')) {
@@ -127,7 +146,7 @@ const resolveBakeBreadChoice = (
     const count = Number(countText)
     if (!rate || !Number.isInteger(count) || count <= 0) return failInvalidBake()
     if (count > rate.max || count > player.resources.grain) return failInvalidBake()
-    return bakeBread(player, cardId!, count)
+    return bakeBread(player, cardId!, count, source)
   }
 
   const rate = rateMap.get(choice)
@@ -136,7 +155,7 @@ const resolveBakeBreadChoice = (
     const maxCount = Math.max(0, Math.min(grain, rate.max))
     if (maxCount <= 0) return failInvalidBake()
     if (maxCount <= 1) {
-      return bakeBread(player, choice, maxCount)
+      return bakeBread(player, choice, maxCount, source)
     }
     return {
       type: 'request',
@@ -175,5 +194,9 @@ export const bakeBreadAction: ActionDefinition = {
       promptKey: 'ui.interactionBakeBreadChoice',
     }
   },
-  resolveChoice: ({ player }, choice) => resolveBakeBreadChoice(player, choice),
+  resolveChoice: ({ player, space, sourceCard }, choice) =>
+    resolveBakeBreadChoice(player, choice, {
+      sourceActionId: space.id,
+      sourceCard,
+    }),
 }

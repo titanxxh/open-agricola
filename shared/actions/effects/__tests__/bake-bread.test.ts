@@ -39,10 +39,14 @@ const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
   ...overrides,
 } as unknown as PlayerState)
 
-const makeCtx = (player = makePlayer()): ActionExecutionContext => ({
+const makeCtx = (
+  player = makePlayer(),
+  overrides: Partial<ActionExecutionContext> = {},
+): ActionExecutionContext => ({
   state: { players: [player] } as unknown as GameState,
   player,
-  space: {} as ActionExecutionContext['space'],
+  space: { id: 'grain-utilization' } as ActionExecutionContext['space'],
+  ...overrides,
 })
 
 const expectNoBakeMutation = (
@@ -167,8 +171,30 @@ describe('bakeBreadAction non-empty semantics', () => {
       foodFromConversion: { grain: 7 },
     })
     expect(result.immediateLogs).toEqual([
-      { key: 'log.bakeBread', params: { count: 1, food: 2 } },
-      { key: 'log.bakeBread', params: { count: 1, food: 5 } },
+      { key: 'log.bakeBread', params: { count: 1, food: 2, sourceActionId: 'grain-utilization' } },
+      { key: 'log.bakeBread', params: { count: 1, food: 5, sourceActionId: 'grain-utilization' } },
+    ])
+  })
+
+  it('records the source card when bake bread comes from an oven onBuy flow', () => {
+    const player = makePlayer()
+    const result = bakeBreadAction.resolveChoice!(
+      makeCtx(player, { sourceCard: 'Major_ClayOven' }),
+      'Major_ClayOven',
+    )
+
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.immediateLogs).toEqual([
+      {
+        key: 'log.bakeBread',
+        params: {
+          count: 1,
+          food: 5,
+          sourceActionId: 'grain-utilization',
+          sourceCard: 'Major_ClayOven',
+        },
+      },
     ])
   })
 })

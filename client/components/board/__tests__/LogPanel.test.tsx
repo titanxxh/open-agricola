@@ -85,6 +85,37 @@ describe('LogPanel', () => {
     expect(html).toContain('data-amount="1"')
   })
 
+  it('renders bake bread source from action or card context', () => {
+    const log: GameState['log'] = [
+      {
+        key: 'log.bakeBread',
+        params: {
+          player: 'Player A',
+          count: 1,
+          food: 5,
+          sourceActionId: 'grain-utilization',
+        },
+      },
+      {
+        key: 'log.bakeBread',
+        params: {
+          player: 'Player A',
+          count: 1,
+          food: 5,
+          sourceActionId: 'major-improvement',
+          sourceCard: 'Major_ClayOven',
+        },
+      },
+    ]
+
+    const html = renderToStaticMarkup(<LogPanel locale="en" log={log} />)
+    const text = stripHtml(html)
+
+    expect(text).toContain('Player A bakes bread: 1 grain → 5 food via Grain Utilization')
+    expect(text).toContain('Player A bakes bread: 1 grain → 5 food via Clay Oven')
+    expect(html).toContain('log-card-link')
+  })
+
   it('linkifies action detail cards from nested effect payload', () => {
     const log: GameState['log'] = [
       {

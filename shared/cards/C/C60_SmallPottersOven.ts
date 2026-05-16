@@ -36,12 +36,16 @@ const getAvailableOvenChoices = (context: CardListenerContext) => {
   })
 }
 
+const shouldSkipBeforeReachability = (context: CardListenerContext) =>
+  context.actionContext?.skipBeforeTriggers === true
+
 const beforeBakeListener: CardListenerRegistration = {
   id: 'C60-small-potters-oven-before-bake',
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
   actions: ['bake-bread'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (shouldSkipBeforeReachability(context)) return
     const allowedPurchases = getAvailableOvenChoices(context)
     if (allowedPurchases.length === 0) return
     return {
@@ -69,6 +73,7 @@ const isDoableListener: CardListenerRegistration = {
   actions: ['bake-bread'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
+    if (shouldSkipBeforeReachability(context)) return
     const allowedPurchases = getAvailableOvenChoices(context)
     if (allowedPurchases.length === 0) return
     return { doable: true }
