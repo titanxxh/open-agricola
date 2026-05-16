@@ -40,8 +40,8 @@
 - `A148_Woolgrower` / `B86_TruffleSearcher` 改用全局 `state.completedFeedingPhases` 计入容量；`D13_Trowel` 暴露 wood->stone 翻修；`D15_ClaySupports` 改为可选 multi-key trade；`E5_NightLoot` 列出全部 `(space,type)` 选项、复用 `collect` partial-take，并补可区分的来源展示元数据。
 - `collect` partial-take 在带 `spaceId` 时拒绝缺失 / 非正 `amount` 或缺失 `resource` 的 payload，避免错误回落到 full collect。
 - `C57_Crudite` 已按 BGA 对齐：anytime 多来源进入田地选择、单来源自动结算；收获田地阶段提供 optional 选择；非法来源选择在提交时失败并保留 pending。
-- `C8_PlantFertilizer` 已按 BGA 对齐：onBuy 现在产出 NODE_SEQ + optional + SPECIAL_EFFECT 等效形状（`wrapOptional({type:'leaf', actionId:'special-effect', ...})`），在符合条件的 field 上加 1 个同类型 good（不再 `gain` 进资源池）。支持普通 field（grain/vegetable）以及 D75 Wood Field / E80 Rock Garden 的 logical group（按 `extraData.stacks` 的 sum-of-remaining===1 判定）。
-- 新增可复用 `special-effect` kind `plant-additional-good`：接收 `locations: PlantAdditionalGoodLocation[]`，每个 location 是 `{kind:'field', row, col}` 或 `{kind:'card-stacks', cardId}`。Invariant 违反（field/stack 缺失）throw，不静默 no-op。
+- `C8_PlantFertilizer` 已按 BGA 对齐：onBuy 现在产出 NODE_SEQ + optional + SPECIAL_EFFECT 等效形状（`wrapOptional({type:'leaf', actionId:'special-effect', ...})`），在符合条件的 field 上加 1 个同类型 good（不再 `gain` 进资源池）。支持普通 field（grain/vegetable）、D75 Wood Field / E80 Rock Garden 的 logical group（按 `extraData.stacks` 的 sum-of-remaining===1 判定），以及 B68/C70/D25/E68/E69/E70/E72 这类 `extraData.cardCrop` 单格卡牌田。
+- 新增可复用 `special-effect` kind `plant-additional-good`：接收 `locations: PlantAdditionalGoodLocation[]`，每个 location 是 `{kind:'field', row, col}`、`{kind:'card-stacks', cardId}` 或 `{kind:'card-crop', cardId}`。Invariant 违反（field/stack/cardCrop 缺失）throw，不静默 no-op；多 location 先整体校验再写入，避免半更新。
 
 ## 2. 待修行为 / 注册差异
 
@@ -169,7 +169,7 @@ pnpm run lint
 - 已执行过 before phase 的 continuation node 在后续 `isDoable` 判定中携带 `skipBeforeTriggers`，避免 C60 这类 before-reachability listener 把原始 mandatory bake 再次判成可执行。
 - `special-effect.remove-field-crops` — 按坐标严格校验多块田顶层作物后原子扣除，供 C57 这类多来源 field crop 选择复用。
 - `commitSelectionChoice` 会拒绝不在 `actionContext.selectableTiles` 内的 farm-position 提交，避免非法选择消费 pending flow。
-- `special-effect` 新增 `plant-additional-good` kind — 在玩家 field 或 cardStates 的 `extraData.stacks` 上把 lone-stack remaining +1。当前 C8_PlantFertilizer 使用；任何 stack-based logical field 卡都可复用。
+- `special-effect` 新增 `plant-additional-good` kind — 在玩家 field、cardStates 的 `extraData.stacks` 或 `extraData.cardCrop` 上把 lone good remaining +1。当前 C8_PlantFertilizer 使用；写入前先整体校验所有 location。
 
 ## 11. 时间线
 

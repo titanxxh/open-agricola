@@ -9,6 +9,20 @@ import { C8_PlantFertilizer } from '../../cards-display/C/C8_PlantFertilizer'
 const CARD_ID = C8_PlantFertilizer.id
 
 const ALT_FIELD_CARDS = ['D75_WoodField', 'E80_RockGarden'] as const
+const CARD_CROP_FIELD_CARDS = [
+  'B68_Beanfield',
+  'C70_LettucePatch',
+  'D25_WitchesDanceFloor',
+  'E68_CherryOrchard',
+  'E69_MelonPatch',
+  'E70_CropRotationField',
+  'E72_ArtichokeField',
+] as const
+
+type CardCrop = {
+  crop: CropStack['kind']
+  remaining: number
+}
 
 export const C8_PlantFertilizer_impl = {
   effect: {
@@ -28,6 +42,13 @@ export const C8_PlantFertilizer_impl = {
         const total = stacks.reduce((acc, s) => acc + s.remaining, 0)
         if (total !== 1) continue
         locations.push({ kind: 'card-stacks', cardId: altId })
+      }
+
+      for (const cardId of CARD_CROP_FIELD_CARDS) {
+        if (!player.minorPlayed.includes(cardId)) continue
+        const cardCrop = readCardExtraData<CardCrop>(player, cardId, 'cardCrop')
+        if (!cardCrop || cardCrop.remaining !== 1) continue
+        locations.push({ kind: 'card-crop', cardId })
       }
 
       if (locations.length === 0) return undefined
