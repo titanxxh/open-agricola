@@ -426,7 +426,8 @@ export const prepareLogEntry = (
     params &&
     (entry.key === 'log.harvestReapDetail' ||
       entry.key === 'log.harvestFeedDetail' ||
-      entry.key === 'log.harvestBreedDetail') &&
+      entry.key === 'log.harvestBreedDetail' ||
+      entry.key === 'log.reorganizeDiscard') &&
     typeof params.resources === 'object'
   ) {
     richParams.resources = (
