@@ -1,4 +1,10 @@
-import type { ActionDefinition, GameState, PlayerState, Resource } from '../../contract/types'
+import type {
+  ActionDefinition,
+  CropStack,
+  GameState,
+  PlayerState,
+  Resource,
+} from '../../contract/types'
 import {
   setCardFlag,
   writeCardInfobox,
@@ -20,6 +26,10 @@ import { findFirstNewborn } from '../../domain/player'
 import { removeWorkerRef } from '../../domain/space'
 import { getNextEmptyTileForPlayer } from '../../domain/farm'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
+
+export type PlantAdditionalGoodLocation =
+  | { kind: 'field'; row: number; col: number }
+  | { kind: 'card-stacks'; cardId: string }
 
 export type SpecialEffectParams =
   | { kind: 'increment-extra-data'; key: string; amount: number }
@@ -51,6 +61,10 @@ export type SpecialEffectParams =
       resource: keyof Resource
       amount: number
     }
+  | {
+      kind: 'plant-additional-good'
+      locations: PlantAdditionalGoodLocation[]
+    }
 
 const resolveTargetPlayer = (
   state: GameState | undefined,
@@ -61,6 +75,14 @@ const resolveTargetPlayer = (
   if (typeof targetId !== 'string' || !targetId) return actor
   const target = state?.players?.find((p) => p.id === targetId)
   return target ?? actor
+}
+
+const growFirstAvailableStack = (stacks: CropStack[], errCtx: string): void => {
+  const stack = stacks.find((s) => s.remaining >= 1)
+  if (!stack) {
+    throw new Error(`plant-additional-good: no stack with remaining>=1 on ${errCtx}`)
+  }
+  stack.remaining += 1
 }
 
 /**
@@ -248,6 +270,31 @@ export const specialEffectAction: ActionDefinition = {
         ;(from.resources as Record<keyof Resource, number>)[p.resource] = have - p.amount
         const dest = (to.resources as Partial<Record<keyof Resource, number>>)[p.resource] ?? 0
         ;(to.resources as Record<keyof Resource, number>)[p.resource] = dest + p.amount
+        return { type: 'ok' }
+      }
+      case 'plant-additional-good': {
+        for (const loc of p.locations) {
+          if (loc.kind === 'field') {
+            const field = target.fields.find(
+              (f) => f.row === loc.row && f.col === loc.col,
+            )
+            if (!field) {
+              throw new Error(
+                `plant-additional-good: missing field at row=${loc.row} col=${loc.col}`,
+              )
+            }
+            // Note: we ignore kind here; eligibility guarantees field has exactly one
+            // stack with remaining===1 (see C8_PlantFertilizer onBuy). Not using
+            // fieldFindStackOfKind because the kind is decided by what's already
+            // planted, not requested by the caller.
+            growFirstAvailableStack(field.stacks, `field row=${loc.row} col=${loc.col}`)
+          } else {
+            const stacks =
+              readCardExtraData<CropStack[]>(target, loc.cardId, 'stacks') ?? []
+            growFirstAvailableStack(stacks, `card ${loc.cardId}`)
+            writeCardExtraData(target, loc.cardId, 'stacks', stacks)
+          }
+        }
         return { type: 'ok' }
       }
     }
