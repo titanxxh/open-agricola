@@ -20,9 +20,11 @@ describe('PlayerStats harvest tracking', () => {
     session.loadState(state)
     expect(session.getState().state.players[0]!.stats.harvestedGrain).toBe(0)
 
-    // call the private reap routine directly via cast
-    const core = session as unknown as { continueHarvestReap: () => void }
-    core.continueHarvestReap()
+    // call the private reap routine directly via cast.
+    // Enter from continueHarvestFieldStart so harvestReapSummary is initialized
+    // (continueHarvestReap now relies on entries pre-allocated in field-start).
+    const core = session as unknown as { continueHarvestFieldStart: () => void }
+    core.continueHarvestFieldStart()
 
     const after = session.getState().state.players[0]!
     expect(after.stats.harvestedGrain).toBe(2)
@@ -40,8 +42,8 @@ describe('PlayerStats harvest tracking', () => {
     ]
     session.loadState(state)
 
-    const core = session as unknown as { continueHarvestReap: () => void }
-    core.continueHarvestReap()
+    const core = session as unknown as { continueHarvestFieldStart: () => void }
+    core.continueHarvestFieldStart()
 
     const after = session.getState().state.players[0]!
     expect(after.stats.harvestedVegetable).toBe(1)
