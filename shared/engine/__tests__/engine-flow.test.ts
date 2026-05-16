@@ -1231,6 +1231,93 @@ describe('Engine flow nodes', () => {
     expect(events).not.toContain('sow:checked')
   })
 
+  it('marks replacement continuation descendant actions mandatory', () => {
+    const original: ActionDefinition = {
+      id: 'replacement-continuation-original',
+      nameKey: 'actions.sow.name',
+      descriptionKey: 'actions.sow.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const first: ActionDefinition = {
+      id: 'replacement-continuation-first',
+      nameKey: 'actions.gain.name',
+      descriptionKey: 'actions.gain.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const blocked: ActionDefinition = {
+      id: 'replacement-continuation-blocked',
+      nameKey: 'actions.bake-bread.name',
+      descriptionKey: 'actions.bake-bread.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => false,
+      execute: () => ({ type: 'ok' }),
+    }
+    requireActiveCardRegistry('engine-flow').registerListener({
+      id: 'offer-blocking-replacement-continuation',
+      actions: ['replacement-continuation-original'],
+      phases: ['computeReplace'],
+      handler: (hookContext) => {
+        if (hookContext.actionContext?.checkedReplaceAction === true) return
+        return {
+          decline: true,
+          alternativeFlow: {
+            type: 'seq',
+            choiceLabelKey: 'test.replacementContinuation',
+            children: [
+              { type: 'leaf', actionId: first.id },
+              { type: 'leaf', actionId: blocked.id },
+            ],
+          },
+        }
+      },
+    })
+    const registry = new ActionRegistry()
+    registry.register(original)
+    registry.register(first)
+    registry.register(blocked)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('action-replacement-continuation-original', original.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(original)
+
+    expect(engine.proceed({ state, player, space }).type).toBe('ok')
+    const insertedFirst = engine._internals().tree.allNodes()
+      .find((node): node is ActionNode => node instanceof ActionNode && node.actionId === first.id)
+    const insertedBlocked = engine._internals().tree.allNodes()
+      .find((node): node is ActionNode => node instanceof ActionNode && node.actionId === blocked.id)
+
+    expect(insertedFirst?.mandatory).toBe(true)
+    expect(insertedBlocked?.mandatory).toBe(true)
+
+    const choiceStep = engine.proceed({ state, player, space })
+    expect(choiceStep.type).toBe('choice')
+    if (choiceStep.type !== 'choice') return
+    const replacementOption = choiceStep.choice.options.find(
+      (option) => option.labelKey === 'test.replacementContinuation',
+    )
+    expect(replacementOption).toBeDefined()
+    expect(engine.resolveChoice(replacementOption!.value, { state, player, space }).type).toBe('ok')
+    const blockedStep = engine.proceed({ state, player, space })
+
+    expect(blockedStep).toMatchObject({
+      type: 'blocked',
+      actionId: blocked.id,
+      mandatory: true,
+    })
+  })
+
   it('or choices show action-or-replace when computeReplace is available', () => {
     const plow: ActionDefinition = {
       id: 'plow',
@@ -1643,7 +1730,7 @@ describe('Engine flow nodes', () => {
     expect(leaf.mandatory).toBe(true)
   })
 
-  it('marks selected composite continuation without forcing first descendant action', () => {
+  it('marks selected composite continuation and descendant actions mandatory', () => {
     const bake: ActionDefinition = {
       id: 'test-bake-in-composite',
       nameKey: 'test',
@@ -1684,8 +1771,63 @@ describe('Engine flow nodes', () => {
     engine.resolveChoice('seq-bake-fence', { state, player, space })
 
     expect(sequence.mandatory).toBe(true)
-    expect(bakeNode.mandatory).toBeUndefined()
-    expect(fenceNode.mandatory).toBeUndefined()
+    expect(bakeNode.mandatory).toBe(true)
+    expect(fenceNode.mandatory).toBe(true)
+  })
+
+  it('returns mandatory blocked when a selected composite later action is not doable', () => {
+    const events: string[] = []
+    const first: ActionDefinition = {
+      id: 'selected-composite-first',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('first')
+        return { type: 'ok' }
+      },
+    }
+    const blocked: ActionDefinition = {
+      id: 'selected-composite-blocked',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => false,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(first)
+    registry.register(blocked)
+    const sequence = new SequenceNode('seq-selected-composite-blocked', [
+      new ActionNode('action-selected-composite-first', first.id),
+      new ActionNode('action-selected-composite-blocked', blocked.id),
+    ])
+    const xor = new XorNode('xor-selected-composite-blocked', [sequence], 'ui.interactionFlowSelect')
+    const engine = new Engine({
+      tree: new EngineTree(xor),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(first)
+
+    const choiceStep = engine.proceed({ state, player, space })
+    expect(choiceStep.type).toBe('choice')
+    expect(engine.resolveChoice(sequence.id, { state, player, space }).type).toBe('ok')
+    const blockedStep = engine.proceed({ state, player, space })
+
+    expect(events).toEqual(['first'])
+    expect(blockedStep).toMatchObject({
+      type: 'blocked',
+      nodeId: 'action-selected-composite-blocked',
+      actionId: blocked.id,
+      mandatory: true,
+    })
   })
 
   it('marks accepted optional single-action wrapper action mandatory', () => {

@@ -121,24 +121,17 @@ const collectActionNodes = (node: EngineNode): ActionNode[] => {
 }
 
 export function enforceSelectedTargetMandatory(node: EngineNode): void {
-  if (node instanceof ActionNode) {
-    node.mandatory = true
-    return
-  }
-  const actionNodes = collectActionNodes(node)
-  if (actionNodes.length === 1) {
-    actionNodes[0]!.mandatory = true
-    return
-  }
   node.mandatory = true
+  collectActionNodes(node).forEach((actionNode) => {
+    actionNode.mandatory = true
+  })
 }
 
 export function enforceCompositeContinuationMandatory(node: EngineNode): void {
-  if (node instanceof ActionNode) {
-    node.mandatory = true
-    return
-  }
   node.mandatory = true
+  collectActionNodes(node).forEach((actionNode) => {
+    actionNode.mandatory = true
+  })
 }
 
 export function stampOwner(node: EngineNode, ownerPlayerId: string): EngineNode {
