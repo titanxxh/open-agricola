@@ -11,7 +11,7 @@
 | canonical 层面 BGA-only / OA-only | 0 / 0 |
 | TypeScript 实体卡牌文件数 | 888 |
 | BGA active implemented 但 OA 缺失 | 0 |
-| 待修行为 / 注册差异 | 3 |
+| 待修行为 / 注册差异 | 2 |
 | metadata schema 上抬差异 | 4 |
 | BGA 标 banned 但 OA 按策略保留 | 33 |
 | 待 owner 确认队列 | 0 |
@@ -20,7 +20,7 @@
 是 legacy wrong-name 且 `implemented=false`，OA 不再注册或展示该名称。
 `STUB_BeforeBakeGainClay` 是 dev/test stub，不计入 canonical 卡牌统计或普通发牌池。
 
-### 本轮变更记录（2026-05-15）
+### 本轮变更记录（2026-05-15 ~ 2026-05-16）
 
 - `bake-bread` 核心 action 改为默认非空：不再暴露 `cancel`，`cancel` / 空 `bulk:` / 无效 source / 非正 count / 超出 source 上限 / 超出 grain 总量都会在后端失败，且 `bulk:` 失败保持原子性。
 - `D66_PotterCeramics` 已按 BGA before-bake 语义对齐：以 `dispatchMode: 'select'` 暴露 1 clay -> 1 grain 的纯 flow；无 grain 但有 clay + baking source 时可进入 bake，trigger-select 中 D66 enabled、pass disabled，执行 D66 后进入非空 bake。
@@ -40,6 +40,8 @@
 - `A148_Woolgrower` / `B86_TruffleSearcher` 改用全局 `state.completedFeedingPhases` 计入容量；`D13_Trowel` 暴露 wood->stone 翻修；`D15_ClaySupports` 改为可选 multi-key trade；`E5_NightLoot` 列出全部 `(space,type)` 选项、复用 `collect` partial-take，并补可区分的来源展示元数据。
 - `collect` partial-take 在带 `spaceId` 时拒绝缺失 / 非正 `amount` 或缺失 `resource` 的 payload，避免错误回落到 full collect。
 - `C57_Crudite` 已按 BGA 对齐：anytime 多来源进入田地选择、单来源自动结算；收获田地阶段提供 optional 选择；非法来源选择在提交时失败并保留 pending。
+- `C8_PlantFertilizer` 已按 BGA 对齐：onBuy 现在产出 NODE_SEQ + optional + SPECIAL_EFFECT 等效形状（`wrapOptional({type:'leaf', actionId:'special-effect', ...})`），在符合条件的 field 上加 1 个同类型 good（不再 `gain` 进资源池）。支持普通 field（grain/vegetable）以及 D75 Wood Field / E80 Rock Garden 的 logical group（按 `extraData.stacks` 的 sum-of-remaining===1 判定）。
+- 新增可复用 `special-effect` kind `plant-additional-good`：接收 `locations: PlantAdditionalGoodLocation[]`，每个 location 是 `{kind:'field', row, col}` 或 `{kind:'card-stacks', cardId}`。Invariant 违反（field/stack 缺失）throw，不静默 no-op。
 
 ## 2. 待修行为 / 注册差异
 
@@ -48,7 +50,6 @@
 | 卡牌 | 原始行为 | 当前 OA 行为 | BGA 差距 | 需要修复 |
 |---|---|---|---|---|
 | `B157_Salter` | 玩家可以腌制多种 / 多只动物，并按数量获得未来食物。 | 当前 flow 是 XOR，只能三选一且只能选 1 只动物。 | BGA 一次交互可选择 sheep / boar / cattle 的多个数量。 | 改成显式多类型计数选择，并按类型 / 数量发放 future food。 |
-| `C8_PlantFertilizer` | 支持 grain / vegetable / wood / stone 等逻辑田组。 | 只处理物理 grain / vegetable field。 | BGA 可作用于后续卡牌创建的 wood / stone field 逻辑组。 | 田地查找改成 group-aware，并纳入已激活的 wood / stone 可播种组。 |
 | `C140_PackagingArtist` | 把 Major Improvement action 加入 replacement action pool。 | 实现了 minor replacement / `isDoable`，但没有把 Major Improvement 加进可替换 action pool。 | BGA 允许此卡扩展 replacement action 集合。 | 增加缺失的通用 action-pool 扩展点。 |
 
 ## 3. Metadata Schema 上抬差异
@@ -153,6 +154,7 @@ pnpm run lint
 - 2026-05-15 — Wave 1 cards (A148/B86/D15/D13/E5) aligned to BGA; 4 infra extensions
 - 2026-05-15 — C60/B27/E130/E97 side improvement flows aligned to BGA `trueAction=false`; removed synthetic onBuy suppression from improvement/occupation apply leaves
 - 2026-05-15 — C57_Crudite aligned to BGA field-vegetable selection semantics; added strict multi-field crop removal and selection bound validation.
+- 2026-05-16 — C8_PlantFertilizer 对齐 BGA（NODE_SEQ + optional + SPECIAL_EFFECT 等效形状）；新增 `plant-additional-good` special-effect kind
 
 ## 10. 基础设施
 
@@ -167,6 +169,7 @@ pnpm run lint
 - 已执行过 before phase 的 continuation node 在后续 `isDoable` 判定中携带 `skipBeforeTriggers`，避免 C60 这类 before-reachability listener 把原始 mandatory bake 再次判成可执行。
 - `special-effect.remove-field-crops` — 按坐标严格校验多块田顶层作物后原子扣除，供 C57 这类多来源 field crop 选择复用。
 - `commitSelectionChoice` 会拒绝不在 `actionContext.selectableTiles` 内的 farm-position 提交，避免非法选择消费 pending flow。
+- `special-effect` 新增 `plant-additional-good` kind — 在玩家 field 或 cardStates 的 `extraData.stacks` 上把 lone-stack remaining +1。当前 C8_PlantFertilizer 使用；任何 stack-based logical field 卡都可复用。
 
 ## 11. 时间线
 
@@ -176,3 +179,4 @@ pnpm run lint
 | 2026-05-15 | C57 selection alignment | C57_Crudite + `remove-field-crops` / farm-position selectableTiles validation |
 | 2026-05-15 | trueAction follow-up | C60_SmallPottersOven / B27_Toolbox / E130_Overachiever / E97_Beneficiary + improvement-any/minor-improvement `trueAction=false` propagation |
 | 2026-05-15 | Wave 1 | A148_Woolgrower / B86_TruffleSearcher / D15_ClaySupports / D13_Trowel / E5_NightLoot + 4 项基建（§10） |
+| 2026-05-16 | C8 alignment | C8_PlantFertilizer + `plant-additional-good` special-effect kind |
