@@ -1,6 +1,3 @@
-// Minimal Player/State 工厂：故意只填 helper 用到的字段（cardStates / resources / minorPlayed
-// / occupationPlayed），通过 `as PlayerState`/`as GameState` 强转规避完整 structural 校验。
-// 如果 helper 后续读到其他字段（如 player.fields），需要相应补充。
 import { describe, expect, it } from 'vitest'
 import type { GameState, HarvestReapSummary, PlayerState } from '../../../contract/types'
 import { makeCardFieldImpl, deriveVirtualTileCol } from '../card-field'
@@ -78,7 +75,7 @@ describe('makeCardFieldImpl', () => {
       const impl = makeCardFieldImpl('B68_Beanfield', { allowedCrops: ['vegetable'], capacity: 1 })
       const player = createPlayer({
         cardStates: { B68_Beanfield: { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] } } },
-      } as Partial<PlayerState>)
+      })
       expect(impl.effect.onComputeSowableFields!(player)).toEqual([])
     })
     it('returns one slot when empty (capacity=1)', () => {
@@ -114,7 +111,7 @@ describe('makeCardFieldImpl', () => {
       const impl = makeCardFieldImpl('D75_WoodField', { allowedCrops: ['wood'], capacity: 2 })
       const player = createPlayer({
         cardStates: { D75_WoodField: { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 3 }, { crop: 'wood', remaining: 1 }] } } },
-      } as Partial<PlayerState>)
+      })
       const state = createState(player)
       initSummary(state, player.id)
       impl.effect.onHarvestFieldPhase!(state, player)
@@ -131,7 +128,7 @@ describe('makeCardFieldImpl', () => {
       })
       const player = createPlayer({
         cardStates: { D75_WoodField: { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 3 }, { crop: 'wood', remaining: 1 }] } } },
-      } as Partial<PlayerState>)
+      })
       const state = createState(player)
       initSummary(state, player.id)
       impl.effect.onHarvestFieldPhase!(state, player)
@@ -144,7 +141,7 @@ describe('makeCardFieldImpl', () => {
       })
       const player = createPlayer({
         cardStates: { E68_CherryOrchard: { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }] } } },
-      } as Partial<PlayerState>)
+      })
       const state = createState(player)
       initSummary(state, player.id)
       impl.effect.onHarvestFieldPhase!(state, player)
@@ -158,11 +155,11 @@ describe('makeCardFieldImpl', () => {
       })
       const player = createPlayer({
         cardStates: { E70_CropRotationField: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }, { crop: 'vegetable', remaining: 1 }] } } },
-      } as Partial<PlayerState>)
+      })
       const state = createState(player)
       initSummary(state, player.id)
       impl.effect.onHarvestFieldPhase!(state, player)
-      expect(received).toHaveLength(2)  // 严格 2 次：每 crop 一次
+      expect(received).toHaveLength(2)
       expect(received).toEqual(expect.arrayContaining([
         { crop: 'grain', isLast: true },
         { crop: 'vegetable', isLast: true },
@@ -177,7 +174,7 @@ describe('makeCardFieldImpl', () => {
       })
       const player = createPlayer({
         cardStates: { E68_CherryOrchard: { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }] } } },
-      } as Partial<PlayerState>)
+      })
       const state = createState(player)
       initSummary(state, player.id)
       const flow = impl.effect.onHarvestFieldPhase!(state, player)
@@ -189,7 +186,7 @@ describe('makeCardFieldImpl', () => {
       })
       const player = createPlayer({
         cardStates: { E70_CropRotationField: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }, { crop: 'vegetable', remaining: 1 }] } } },
-      } as Partial<PlayerState>)
+      })
       const state = createState(player)
       initSummary(state, player.id)
       const flow = impl.effect.onHarvestFieldPhase!(state, player) as { type: 'seq'; children: any[] }

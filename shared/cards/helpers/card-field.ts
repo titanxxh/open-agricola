@@ -36,15 +36,16 @@ const RHYTHM: Record<Crop, number> = {
 
 const DECK_ORDINAL: Record<string, number> = { A: 1, B: 2, C: 3, D: 4, E: 5 }
 
-export const deriveVirtualTileCol = (cardId: string, slotIdx: number): number => {
+const parseCardBaseCol = (cardId: string): number => {
   const match = cardId.match(/^([A-E])(\d+)_/)
   if (!match) throw new Error(`[card-field] cardId "${cardId}" not in <Deck><Number>_ format`)
-  const deckLetter = match[1]
-  const cardNumber = Number(match[2])
-  const ord = DECK_ORDINAL[deckLetter]
-  if (ord === undefined) throw new Error(`[card-field] unknown deck letter "${deckLetter}" in ${cardId}`)
-  return ord * 1000 + cardNumber + slotIdx
+  const ord = DECK_ORDINAL[match[1]]
+  if (ord === undefined) throw new Error(`[card-field] unknown deck letter "${match[1]}" in ${cardId}`)
+  return ord * 1000 + Number(match[2])
 }
+
+export const deriveVirtualTileCol = (cardId: string, slotIdx: number): number =>
+  parseCardBaseCol(cardId) + slotIdx
 
 const readStacks = (player: PlayerState, cardId: string): CardFieldStack[] =>
   readCardExtraData<CardFieldStack[]>(player, cardId, 'cardFieldStacks') ?? []
@@ -52,19 +53,20 @@ const readStacks = (player: PlayerState, cardId: string): CardFieldStack[] =>
 const writeStacks = (player: PlayerState, cardId: string, stacks: CardFieldStack[]) =>
   writeCardExtraData(player, cardId, 'cardFieldStacks', stacks)
 
-const tileMatchesCard = (cardId: string, capacity: number, tile: FarmTilePosition): number | null => {
-  if (tile.row !== -1) return null
-  for (let i = 0; i < capacity; i += 1) {
-    if (deriveVirtualTileCol(cardId, i) === tile.col) return i
-  }
-  return null
-}
-
 export const makeCardFieldImpl = (
   cardId: string,
   def: CardFieldDef,
   options?: CardFieldOptions,
 ): CardImpl => {
+  const baseCol = parseCardBaseCol(cardId)
+
+  const tileMatchesCard = (tile: FarmTilePosition): number | null => {
+    if (tile.row !== -1) return null
+    const i = tile.col - baseCol
+    if (i < 0 || i >= def.capacity) return null
+    return i
+  }
+
   const isDoableListener: CardListenerRegistration = {
     id: `${cardId}-cardfield-isdoable-sow`,
     cardIds: [cardId],
@@ -92,8 +94,8 @@ export const makeCardFieldImpl = (
         const entries: ExtraSowableField[] = []
         for (let i = stacks.length; i < def.capacity; i += 1) {
           entries.push({
-            tile: { row: -1, col: deriveVirtualTileCol(cardId, i) },
-            allowedCrops: def.allowedCrops as ExtraSowableCrop[],
+            tile: { row: -1, col: baseCol + i },
+            allowedCrops: [...def.allowedCrops],
             sourceCard: cardId,
             groupKey: def.capacity > 1 ? cardId : undefined,
           })
@@ -102,7 +104,7 @@ export const makeCardFieldImpl = (
       },
 
       onSowExtraField: (player, tile, crop) => {
-        if (tileMatchesCard(cardId, def.capacity, tile) === null) return false
+        if (tileMatchesCard(tile) === null) return false
         if (!def.allowedCrops.includes(crop)) return false
         const stacks = readStacks(player, cardId)
         if (stacks.length >= def.capacity) return false
@@ -147,6 +149,6 @@ export const makeCardFieldImpl = (
         return { type: 'seq', children: flows }
       },
     },
-    reaches: [] as readonly string[],
+    reaches: [],
   } satisfies CardImpl
 }
