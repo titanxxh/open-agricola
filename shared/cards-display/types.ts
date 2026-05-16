@@ -66,6 +66,7 @@ export class CardBase {
   providesField?: boolean
   providesOccupation?: boolean
   isField?: boolean
+  cardField?: { allowedCrops: readonly ('grain' | 'vegetable' | 'wood' | 'stone')[]; capacity: number }
   fireplaceIdentity?: boolean
   mustBePlayedViaMinorAction?: boolean
   mustBePlayedViaMajorImprovementAction?: boolean
@@ -112,6 +113,7 @@ export class CardBase {
     if (this.providesField) def.providesField = this.providesField
     if (this.providesOccupation) def.providesOccupation = this.providesOccupation
     if (this.isField) def.isField = this.isField
+    if (this.cardField) def.cardField = this.cardField
     if (this.fireplaceIdentity) def.fireplaceIdentity = this.fireplaceIdentity
     if (this.mustBePlayedViaMinorAction) def.mustBePlayedViaMinorAction = this.mustBePlayedViaMinorAction
     if (this.mustBePlayedViaMajorImprovementAction) def.mustBePlayedViaMajorImprovementAction = this.mustBePlayedViaMajorImprovementAction
