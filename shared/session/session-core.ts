@@ -1983,6 +1983,19 @@ export class GameCore {
     if (playerIndex === 0 && cardIndex === 0) {
       this.state.roundPhase = 'field'
       this.state.log.unshift({ key: 'log.harvestPhaseReap' })
+      this.state.harvestReapSummary = {}
+      const harvestOrder = this.getHarvestPlayerIndices()
+      harvestOrder.forEach((index) => {
+        const player = this.state.players[index]
+        if (!player) return
+        if (this.hasPassFieldAndBreed(player)) return
+        this.state.harvestReapSummary![player.id] = {
+          resources: {},
+          grainFields: 0,
+          vegetableFields: 0,
+          harvestedPositions: [],
+        }
+      })
     }
     if (this.continueStageHook('onStartHarvestFieldPhase', playerIndex, cardIndex)) {
       return this.respond()
@@ -1998,7 +2011,6 @@ export class GameCore {
   }
 
   private continueHarvestReap(): SessionResponse {
-    this.state.harvestReapSummary = {}
     const harvestOrder = this.getHarvestPlayerIndices()
     harvestOrder.forEach((index) => {
       const player = this.state.players[index]
@@ -2010,11 +2022,23 @@ export class GameCore {
         return
       }
       const result = reap(this.state, player)
-      this.state.harvestReapSummary![player.id] = result.reapSummary
+      const entry = this.state.harvestReapSummary![player.id]!
+      entry.grainFields += result.reapSummary.grainFields
+      entry.vegetableFields += result.reapSummary.vegetableFields
+      for (const [crop, amount] of Object.entries(result.reapSummary.resources)) {
+        const cropKey = crop as keyof typeof entry.resources
+        entry.resources[cropKey] = (entry.resources[cropKey] ?? 0) + (amount ?? 0)
+      }
+      if (result.reapSummary.harvestedPositions?.length) {
+        entry.harvestedPositions = [
+          ...(entry.harvestedPositions ?? []),
+          ...result.reapSummary.harvestedPositions,
+        ]
+      }
       incHarvestedGrain(player, result.reapSummary.resources.grain ?? 0)
       incHarvestedVegetable(player, result.reapSummary.resources.vegetable ?? 0)
-      if (this.hasPositiveResources(result.reapSummary.resources)) {
-        this.logHarvestResourceEntry('log.harvestReapDetail', player, result.reapSummary.resources)
+      if (this.hasPositiveResources(entry.resources)) {
+        this.logHarvestResourceEntry('log.harvestReapDetail', player, entry.resources)
       } else {
         this.state.log.unshift({ key: 'log.harvestReapNothing', params: { player: player.name } })
       }
