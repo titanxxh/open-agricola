@@ -164,6 +164,22 @@ const choicesSourceCard = (choices: ActionChoiceOption[]): string | undefined =>
   return unique.length === 1 && sourceCards.length === choices.length ? unique[0] : undefined
 }
 
+type ActionDetailResourceDelta = {
+  playerId?: string
+  gains?: Partial<Resource>
+  costs?: Partial<Resource>
+}
+
+const actionDetailResourceDeltas = (
+  result: ActionExecutionResult,
+): ActionDetailResourceDelta[] => {
+  const raw = 'extraData' in result ? result.extraData?.actionDetailDeltas : undefined
+  if (!Array.isArray(raw)) return []
+  return raw.filter((entry): entry is ActionDetailResourceDelta =>
+    typeof entry === 'object' && entry !== null,
+  )
+}
+
 /**
  * Selection payload sent by the client to resolve a pending `harvestFeed`
  * interaction. Each entry references one row of `card.exchanges[]` via
@@ -1745,10 +1761,24 @@ export class GameCore {
     }
   }
 
-  private recordActionResultDetails(result: ActionExecutionResult) {
+  private recordActionResultDetails(
+    result: ActionExecutionResult,
+    detailPlayerId?: string,
+    defaultPlayerId?: string,
+  ) {
     if (result.type !== 'ok') return
     if (isInjectedAnytimeResult(result)) return
+    const deltas = actionDetailResourceDeltas(result)
+    if (deltas.length > 0) {
+      for (const delta of deltas) {
+        if (!detailPlayerId || delta.playerId !== detailPlayerId) continue
+        this.addPositiveResourceDetails('gains', delta.gains)
+        this.addPositiveResourceDetails('costs', delta.costs)
+      }
+      return
+    }
     if (result.logKey) return
+    if (detailPlayerId && defaultPlayerId && detailPlayerId !== defaultPlayerId) return
     this.addPositiveResourceDetails('gains', result.resourcesGained)
     this.addPositiveResourceDetails('costs', result.resourcesPaid)
   }
@@ -2283,6 +2313,12 @@ export class GameCore {
     return ownerIndex === -1 ? frame.ownerPlayerIndex : ownerIndex
   }
 
+  private currentFrameOwnerPlayerId(defaultPlayerId?: string): string | undefined {
+    const frame = this.engineStack.current()
+    if (!frame) return defaultPlayerId
+    return this.state.players[frame.ownerPlayerIndex]?.id ?? defaultPlayerId
+  }
+
   private acknowledgeCurrentActionAnimalReorgRequest(): void {
     const pendingHost = this.engineStack.peekPendingHost()
     if (!(pendingHost instanceof ActionNode)) return
@@ -2446,7 +2482,7 @@ export class GameCore {
             const result = frame.engine.resolveChoice(auto.value, { state: this.state, player, space })
             this.flushEngineLog()
             if (result.type === 'ok' && resolvedActionId && !isInjectedAnytimeResult(result)) {
-              this.recordActionResultDetails(result)
+              this.recordActionResultDetails(result, frameOwnerPlayer.id, player.id)
               this.flushLeafActionDetail(resolvedActionId, Boolean(result.logKey))
             }
             if (result.type === 'request' && result.request.kind === 'choice') {
@@ -2504,7 +2540,7 @@ export class GameCore {
         step.result.type === 'ok' &&
         !isInjectedAnytimeResult(step.result)
       ) {
-        this.recordActionResultDetails(step.result)
+        this.recordActionResultDetails(step.result, frameOwnerPlayer.id, player.id)
         this.flushLeafActionDetail(step.actionId, Boolean(step.result.logKey))
       }
 
@@ -2795,7 +2831,11 @@ export class GameCore {
     const result = this.engine.resolveChoice(value, { state: this.state, player, space }, payload)
     this.flushEngineLog()
     if (result.type === 'ok' && resolvedActionId && !isInjectedAnytimeResult(result)) {
-      this.recordActionResultDetails(result)
+      this.recordActionResultDetails(
+        result,
+        this.currentFrameOwnerPlayerId(player.id),
+        player.id,
+      )
       this.flushLeafActionDetail(resolvedActionId, Boolean(result.logKey))
     }
     if (result.type === 'request' && result.request.kind === 'choice') {
@@ -3251,7 +3291,11 @@ export class GameCore {
     )
     this.flushEngineLog()
     if (result.type === 'ok') {
-      this.recordActionResultDetails(result)
+      this.recordActionResultDetails(
+        result,
+        this.currentFrameOwnerPlayerId(updatedPlayer.id),
+        updatedPlayer.id,
+      )
     }
 
     if (result.type === 'request' && result.request.kind === 'choice') {
@@ -3314,7 +3358,11 @@ export class GameCore {
         space,
       }, { cards: cardIds })
       if (result?.type === 'ok') {
-        this.recordActionResultDetails(result)
+        this.recordActionResultDetails(
+          result,
+          this.currentFrameOwnerPlayerId(player.id),
+          player.id,
+        )
       }
       this.flushEngineLog()
       this.runEngineSteps()
@@ -3359,7 +3407,11 @@ export class GameCore {
       space,
     }, { positions: positionStrings })
     if (result?.type === 'ok') {
-      this.recordActionResultDetails(result)
+      this.recordActionResultDetails(
+        result,
+        this.currentFrameOwnerPlayerId(player.id),
+        player.id,
+      )
     }
     this.flushEngineLog()
     this.runEngineSteps()
