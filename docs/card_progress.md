@@ -149,6 +149,7 @@ pnpm run lint
 
 ## 9. 当前轮次
 
+- 2026-05-16 — `B42_ForestInn` 对齐 BGA activate flow：非主人先支付 owner 1 food，随后进入 5/7/9 wood 的 XOR pay-gain 分支。
 - 2026-05-16 — C60_SmallPottersOven mandatory bake continuation fixed: skipping Stone Oven onBuy bake after C60 before-bake build now reaches engine-blocked instead of ending the turn.
 - 2026-05-15 — Engine-level mandatory bake alignment: client treats `engine-blocked` as a dedicated prompt-only pending state and hides choice/anytime actions while blocked.
 - 2026-05-15 — Wave 1 cards (A148/B86/D15/D13/E5) aligned to BGA; 4 infra extensions
@@ -175,6 +176,7 @@ pnpm run lint
 
 | 日期 | 批次 | 涉及卡牌 / 基建 |
 |---|---|---|
+| 2026-05-16 | B42 flow alignment | B42_ForestInn |
 | 2026-05-16 | C60 mandatory bake continuation | C60_SmallPottersOven + before-resolved continuation `skipBeforeTriggers` |
 | 2026-05-15 | C57 selection alignment | C57_Crudite + `remove-field-crops` / farm-position selectableTiles validation |
 | 2026-05-15 | trueAction follow-up | C60_SmallPottersOven / B27_Toolbox / E130_Overachiever / E97_Beneficiary + improvement-any/minor-improvement `trueAction=false` propagation |
