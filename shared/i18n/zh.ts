@@ -813,6 +813,7 @@ export const zh = {
     placeFarmer: '{player} 放置工人：{action}',
     action: '{player} 执行 {action}',
     actionDetail: '{player} 选择 {action}{detail}',
+    reorganizeDiscard: '{player} 丢弃 {resources}',
     gains: '获得 {resources}',
     costs: '支付 {resources}',
     effects: '效果：{effects}',

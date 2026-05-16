@@ -3,6 +3,7 @@ import type {
   ActionExecutionResult,
   GameState,
   PlayerState,
+  Resource,
 } from '../../contract/types'
 import { playerBoard } from '../../domain'
 
@@ -61,6 +62,26 @@ export const applyReorganizeMutate = (
   player.resources.cattle = totals.cattle
 }
 
+const ANIMAL_TYPES = ['sheep', 'boar', 'cattle'] as const
+
+const animalTotals = (player: PlayerState): Pick<Resource, (typeof ANIMAL_TYPES)[number]> => ({
+  sheep: player.resources.sheep ?? 0,
+  boar: player.resources.boar ?? 0,
+  cattle: player.resources.cattle ?? 0,
+})
+
+const discardedAnimals = (
+  before: Pick<Resource, (typeof ANIMAL_TYPES)[number]>,
+  after: Pick<Resource, (typeof ANIMAL_TYPES)[number]>,
+): Partial<Resource> => {
+  const discarded: Partial<Resource> = {}
+  for (const type of ANIMAL_TYPES) {
+    const amount = before[type] - after[type]
+    if (amount > 0) discarded[type] = amount
+  }
+  return discarded
+}
+
 export const reorganizeAction: ActionDefinition = {
   id: 'reorganize',
   nameKey: 'actions.reorganize.name',
@@ -96,10 +117,22 @@ export const reorganizeAction: ActionDefinition = {
   },
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
     if (choice === 'cancel') return { type: 'ok' }
-    const zones = payload as unknown as ZoneAssignment[] | undefined
-    if (!zones || !Array.isArray(zones)) return { type: 'fail', logKey: 'log.reorganizeFail' }
+    const rawPayload = payload as unknown
+    const zones = Array.isArray(rawPayload)
+      ? rawPayload as ZoneAssignment[]
+      : typeof rawPayload === 'object' && rawPayload !== null && Array.isArray((rawPayload as { zones?: unknown }).zones)
+        ? (rawPayload as { zones: ZoneAssignment[] }).zones
+        : undefined
+    if (!zones) return { type: 'fail', logKey: 'log.reorganizeFail' }
+    const before = animalTotals(ctx.player)
     applyReorganizeMutate(ctx.state, ctx.player, zones)
+    const discarded = discardedAnimals(before, animalTotals(ctx.player))
+    if (Object.keys(discarded).length > 0 && Array.isArray(ctx.state.log)) {
+      ctx.state.log.unshift({
+        key: 'log.reorganizeDiscard',
+        params: { player: ctx.player.name, resources: discarded },
+      })
+    }
     return { type: 'ok' }
   },
 }
-
