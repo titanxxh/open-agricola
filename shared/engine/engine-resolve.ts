@@ -40,6 +40,7 @@ import {
   pendingEnvelopeFromHostNode,
   resolveSubtree,
 } from './engine-utils'
+import { withInjectedAnytimeResultFlag } from './action-context-flags'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
@@ -522,7 +523,10 @@ export function engineResolveChoice(
   pendingHost?.clearPending()
   let result: ActionExecutionResult
   if (action.resolveChoice) {
-    result = action.resolveChoice(executionContext, choice, payload)
+    result = withInjectedAnytimeResultFlag(
+      action.resolveChoice(executionContext, choice, payload),
+      executionContext.actionContext,
+    )
   } else {
     return { type: 'ok' }
   }
