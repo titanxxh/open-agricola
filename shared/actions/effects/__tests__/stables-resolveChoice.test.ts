@@ -72,6 +72,8 @@ describe('stablesAction.resolveChoice', () => {
     const ctx = makeCtx()
     const result = stablesAction.resolveChoice!(ctx, 'confirm', { stables: [tile] })
     expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.resourcesPaid).toEqual({ wood: 2 })
     expect(ctx.player.stableTiles.some((t) => t.row === 0 && t.col === 0)).toBe(true)
     // 2 wood paid (default cost) out of 4 wood available.
     expect(ctx.player.resources.wood).toBe(2)
@@ -127,6 +129,8 @@ describe('stablesAction.resolveChoice', () => {
     })
     const result = stablesAction.resolveChoice!(ctx, 'pay:stable:0')
     expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.resourcesPaid).toEqual({ wood: 2 })
     expect(ctx.player.stableTiles.some((t) => t.row === 0 && t.col === 0)).toBe(true)
   })
 

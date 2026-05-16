@@ -122,7 +122,7 @@ const createBonusAction = (
     gainResources(player, gain)
     trackWorkPhaseBuildingResources(state, player.id, gain)
     addResourcesFromBoard(player, gain)
-    return { type: 'ok' }
+    return { type: 'ok', resourcesGained: gain }
   },
 })
 

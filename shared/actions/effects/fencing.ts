@@ -73,6 +73,15 @@ const applyPlayerMutation = (target: PlayerState, source: PlayerState) => {
   Object.assign(target, source)
 }
 
+const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
+  const result: Partial<Resource> = {}
+  Object.entries(resources).forEach(([key, value]) => {
+    if (typeof value !== 'number' || value <= 0) return
+    result[key as keyof Resource] = value
+  })
+  return result
+}
+
 const computeFreeFenceTotal = (
   state: GameState,
   player: PlayerState,
@@ -156,7 +165,11 @@ const finalizeFence = (
     extraData.usedFreeFences = consumed.usedFreeFences
     extraData.sourceCard = consumed.sourceCard
   }
-  return { type: 'ok', extraData }
+  return {
+    type: 'ok',
+    resourcesPaid: positiveResources(payment.solution.resourcesPaid),
+    extraData,
+  }
 }
 
 export const fenceAction: ActionDefinition = {

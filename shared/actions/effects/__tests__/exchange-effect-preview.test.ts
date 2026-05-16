@@ -120,4 +120,40 @@ describe('anytimeExchangeAction effectPreview', () => {
       },
     })
   })
+
+  it('returns explicit paid and gained resources for a selected trade', () => {
+    const player = createPlayer()
+    player.resources.sheep = 2
+    const state = createState(player)
+
+    const result = anytimeExchangeAction.resolveChoice!({
+      state,
+      player,
+      space: createSpace(),
+    } as unknown as ActionExecutionContext, 'trade:0:2')
+
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.resourcesPaid).toEqual({ sheep: 2 })
+    expect(result.resourcesGained).toEqual({ food: 4 })
+    expect(player.resources.sheep).toBe(0)
+    expect(player.resources.food).toBe(4)
+  })
+
+  it('returns explicit paid and gained resources for bulk trades', () => {
+    const player = createPlayer()
+    player.resources.sheep = 2
+    const state = createState(player)
+
+    const result = anytimeExchangeAction.resolveChoice!({
+      state,
+      player,
+      space: createSpace(),
+    } as unknown as ActionExecutionContext, 'bulk:0=2')
+
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.resourcesPaid).toEqual({ sheep: 2 })
+    expect(result.resourcesGained).toEqual({ food: 4 })
+  })
 })
