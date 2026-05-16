@@ -142,6 +142,36 @@ describe('C8 PlantFertilizer onBuy — eligibility & shape', () => {
     })
   })
 
+  it('includes single-slot field cards with exactly 1 remaining good', () => {
+    const player = blankPlayer({
+      minorPlayed: ['B68_Beanfield'],
+      cardStates: {
+        B68_Beanfield: {
+          extraData: { cardCrop: { crop: 'vegetable', remaining: 1 } },
+        },
+      },
+    })
+    const flow = runOnBuy(player)!
+    const seq = flow as Extract<ActionFlow, { type: 'seq' }>
+    const leaf = seq.children![0]! as Extract<ActionFlow, { type: 'leaf' }>
+    expect(leaf.params).toEqual({
+      kind: 'plant-additional-good',
+      locations: [{ kind: 'card-crop', cardId: 'B68_Beanfield' }],
+    })
+  })
+
+  it('excludes single-slot field cards unless exactly 1 good remains', () => {
+    const player = blankPlayer({
+      minorPlayed: ['B68_Beanfield'],
+      cardStates: {
+        B68_Beanfield: {
+          extraData: { cardCrop: { crop: 'vegetable', remaining: 2 } },
+        },
+      },
+    })
+    expect(runOnBuy(player)).toBeUndefined()
+  })
+
   it('lists normal field BEFORE D75 in locations when both eligible', () => {
     const player = blankPlayer({
       fields: [{ row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] }],
