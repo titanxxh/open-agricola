@@ -5,6 +5,7 @@ import type {
   ActionExecutionResult,
   FarmTilePosition,
   PlayerState,
+  Resource,
 } from '../../contract/types'
 // PaymentSolver namespace (S3 Task 7a): core payment APIs migrated to
 // the new payment module. Other helpers (preview-cost / typed-flat /
@@ -36,6 +37,15 @@ const applyPlayerMutation = (target: PlayerState, source: PlayerState) => {
     }
   }
   Object.assign(target, source)
+}
+
+const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
+  const result: Partial<Resource> = {}
+  Object.entries(resources).forEach(([key, value]) => {
+    if (typeof value !== 'number' || value <= 0) return
+    result[key as keyof Resource] = value
+  })
+  return result
 }
 
 const finalizeRoom = (
@@ -86,7 +96,11 @@ const finalizeRoom = (
   }
   incRoomsBuilt(ctx.player, rooms.length)
 
-  return { type: 'ok', extraData: { builtRooms: rooms } }
+  return {
+    type: 'ok',
+    resourcesPaid: positiveResources(payment.solution.resourcesPaid),
+    extraData: { builtRooms: rooms },
+  }
 }
 
 export const constructAction: ActionDefinition = {

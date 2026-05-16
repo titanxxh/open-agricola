@@ -91,7 +91,7 @@ export const takeAction = (
   core.setTurnOwner(playerIndex)
   player._activeActionBonusSources = []
   core.setActionStartPlayerSnapshot(core.cloneSessionPlayer(player))
-  core.resetCardEffectDeltas()
+  core.resetActionResultDetails()
   recordActionSnapshot(player, core.allocActionToken())
   const worker = smallestAvailableWorker(state, player)
   if (worker) {
@@ -133,6 +133,7 @@ export const takeAction = (
     core.flushEngineLogPublic()
     player._activeActionBonusSources = []
     core.setActionStartPlayerSnapshot(core.cloneSessionPlayer(player))
+    core.resetActionResultDetails()
   }
 
   core.driveEngineSteps()
@@ -258,9 +259,8 @@ export const continueAfterReorganizeRoundEnd = (
 }
 
 /**
- * Wrap up a single action's per-leaf log: emit the diff entry against
- * the captured pre-action snapshot, then clear the snapshot + the
- * player's _activeActionBonusSources field. Migrated from
+ * Wrap up a single action's per-leaf log: emit the action detail, then clear
+ * the snapshot + the player's _activeActionBonusSources field. Migrated from
  * GameCore.finalizeActionLog (S2 Task 10 part 6).
  */
 export const finalizeActionLog = (core: GameCore, player: PlayerState): void => {

@@ -73,6 +73,8 @@ describe('constructAction.resolveChoice', () => {
     const ctx = makeCtx()
     const result = constructAction.resolveChoice!(ctx, 'confirm', { rooms: [room] })
     expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.resourcesPaid).toEqual({ wood: 5, reed: 2 })
     expect(ctx.player.rooms).toBe(3)
     expect(ctx.player.roomTiles.some((t) => t.row === 0 && t.col === 0)).toBe(true)
     expect(ctx.player.resources.wood).toBe(5)
@@ -92,6 +94,8 @@ describe('constructAction.resolveChoice', () => {
     })
     const result = constructAction.resolveChoice!(ctx, 'pay:room:0')
     expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.resourcesPaid).toEqual({ wood: 5, reed: 2 })
     expect(ctx.player.rooms).toBe(3)
     expect(ctx.player.roomTiles.some((t) => t.row === 0 && t.col === 0)).toBe(true)
   })

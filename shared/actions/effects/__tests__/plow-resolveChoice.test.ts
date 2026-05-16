@@ -72,6 +72,33 @@ describe('plowAction.resolveChoice', () => {
     expect(ctx.player.fields.some((f) => f.row === 0 && f.col === 0)).toBe(true)
   })
 
+  it('first call with payload + payment cost returns paid resources', () => {
+    const tile: FarmTilePosition = { row: 0, col: 0 }
+    const ctx = makeCtx({
+      player: {
+        resources: {
+          wood: 1,
+          clay: 0,
+          stone: 0,
+          reed: 0,
+          grain: 0,
+          vegetable: 0,
+          food: 0,
+          sheep: 0,
+          boar: 0,
+          cattle: 0,
+        },
+      },
+      costs: { wood: 1 },
+    })
+    const result = plowAction.resolveChoice!(ctx, 'confirm', { tile })
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.resourcesPaid).toEqual({ wood: 1 })
+    expect(ctx.player.resources.wood).toBe(0)
+    expect(ctx.player.fields.some((f) => f.row === 0 && f.col === 0)).toBe(true)
+  })
+
   it('first call with payload + multi-combo cost returns choice + actionContextWrite', () => {
     const tile: FarmTilePosition = { row: 0, col: 0 }
     // No cost override -> finalize immediately (single zero-cost combo).

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import type { ActionDetailParts } from '../../shared/contract/protocol/game'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A116_WoodCutter'
@@ -39,6 +40,9 @@ describe('A116_WoodCutter session', () => {
     const after = session.getState().state
     // 3 accumulated wood + 1 bonus from WoodCutter = 4
     expect(after.players[0]!.resources.wood).toBe(3 + 1)
+    const actionDetail = after.log.find((entry) => entry.key === 'log.actionDetail')!
+    const detailParts = actionDetail.params?.detailParts as ActionDetailParts | undefined
+    expect(detailParts?.gains?.wood).toBe(3)
   })
 
   it('gains 1 extra wood when using copse', () => {
