@@ -37,6 +37,7 @@ import {
   XorNode,
   isSyntheticInteractionFrame,
 } from '../engine/index.ts'
+import { isInjectedAnytimeResult } from '../engine/action-context-flags.ts'
 import type { EngineFrame, EngineNode, EngineSource, EngineStackCursor, SubFlowReason } from '../engine/index.ts'
 import {
   isPendingChoiceValueAllowed,
@@ -1746,6 +1747,7 @@ export class GameCore {
 
   private recordActionResultDetails(result: ActionExecutionResult) {
     if (result.type !== 'ok') return
+    if (isInjectedAnytimeResult(result)) return
     if (result.logKey) return
     this.addPositiveResourceDetails('gains', result.resourcesGained)
     this.addPositiveResourceDetails('costs', result.resourcesPaid)
@@ -2443,7 +2445,7 @@ export class GameCore {
             const resolvedActionId = this.peekHostPendingActionId()
             const result = frame.engine.resolveChoice(auto.value, { state: this.state, player, space })
             this.flushEngineLog()
-            if (result.type === 'ok' && resolvedActionId) {
+            if (result.type === 'ok' && resolvedActionId && !isInjectedAnytimeResult(result)) {
               this.recordActionResultDetails(result)
               this.flushLeafActionDetail(resolvedActionId, Boolean(result.logKey))
             }
@@ -2497,7 +2499,11 @@ export class GameCore {
         return
       }
 
-      if (step.type === 'ok' && step.result.type === 'ok') {
+      if (
+        step.type === 'ok' &&
+        step.result.type === 'ok' &&
+        !isInjectedAnytimeResult(step.result)
+      ) {
         this.recordActionResultDetails(step.result)
         this.flushLeafActionDetail(step.actionId, Boolean(step.result.logKey))
       }
@@ -2788,7 +2794,7 @@ export class GameCore {
     const resolvedActionId = this.peekHostPendingActionId()
     const result = this.engine.resolveChoice(value, { state: this.state, player, space }, payload)
     this.flushEngineLog()
-    if (result.type === 'ok' && resolvedActionId) {
+    if (result.type === 'ok' && resolvedActionId && !isInjectedAnytimeResult(result)) {
       this.recordActionResultDetails(result)
       this.flushLeafActionDetail(resolvedActionId, Boolean(result.logKey))
     }

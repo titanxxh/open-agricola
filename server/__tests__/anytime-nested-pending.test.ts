@@ -98,4 +98,58 @@ describe('anytime nesting — sync card listener inside pending', () => {
     const finalDone = session.resolveChoice(0, 'bulk:0=1')
     expect(finalDone.ok).toBe(true)
   })
+
+  it('does not attribute injected anytime exchange resources to the parent action log', () => {
+    const session = setupExchangeReady()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.resources = { ...player.resources, wood: 5, reed: 2, grain: 10, food: 0 }
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'farm-expansion')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+
+    resp = session.takeAnytimeAction(0, 'exchange')
+    expect(resp.ok).toBe(true)
+
+    resp = session.resolveChoice(0, 'bulk:0=1')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected farm-expansion prompt')
+
+    const stableOption = resp.interaction.options?.find(
+      (option) => option.labelKey === 'actions.stables.name',
+    )
+    expect(stableOption).toBeDefined()
+
+    resp = session.resolveChoice(0, stableOption!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected stable prompt')
+    expect(resp.interaction.farm.farmType).toBe('stable')
+    if (resp.interaction.farm.farmType !== 'stable') throw new Error('expected stable prompt')
+
+    const stable = resp.interaction.farm.selectableTiles[0]!
+    resp = session.resolveChoice(0, 'confirm', { stables: [stable] })
+    expect(resp.ok).toBe(true)
+
+    const actionDetail = resp.state.log.find((entry) =>
+      entry.key === 'log.actionDetail' &&
+      entry.params?.action === 'actions.farm-expansion.name',
+    )
+    expect(actionDetail).toBeDefined()
+    const detailParts = actionDetail?.params?.detailParts as
+      | {
+        gains?: { food?: number }
+        costs?: { grain?: number; wood?: number }
+        effects?: { buildStables?: number }
+      }
+      | undefined
+
+    expect(detailParts?.gains?.food ?? 0).toBe(0)
+    expect(detailParts?.costs?.grain ?? 0).toBe(0)
+    expect(detailParts?.costs?.wood).toBe(2)
+    expect(detailParts?.effects?.buildStables).toBe(1)
+  })
 })
