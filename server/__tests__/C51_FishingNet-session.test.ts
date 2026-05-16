@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import type { ActionDetailParts } from '../../shared/contract/protocol/game'
 
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/legacy-confirms'
@@ -176,6 +177,15 @@ describe('C51_FishingNet session', () => {
     // Opponent gains 2 from fishing accumulation but pays 1 to FishingNet owner via payerId.
     // Net: +2 - 1 = +1
     expect(after.players[1]!.resources.food).toBe(opponentFoodBefore + 2 - 1)
+    const actionDetail = after.log.find((entry) =>
+      entry.key === 'log.actionDetail'
+      && entry.params?.player === after.players[1]!.name
+      && entry.params?.action === 'actions.fishing.name',
+    )
+    expect(actionDetail).toBeDefined()
+    const detailParts = actionDetail?.params?.detailParts as ActionDetailParts | undefined
+    expect(detailParts?.gains?.food).toBe(2)
+    expect(detailParts?.costs?.food).toBe(1)
   })
 
   it('opponent without food cannot use fishing while owner has C51 (BGA transferOrLose)', () => {

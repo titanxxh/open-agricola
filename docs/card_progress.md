@@ -42,6 +42,7 @@
 - `C57_Crudite` 已按 BGA 对齐：anytime 多来源进入田地选择、单来源自动结算；收获田地阶段提供 optional 选择；非法来源选择在提交时失败并保留 pending。
 - `C8_PlantFertilizer` 已按 BGA 对齐：onBuy 现在产出 NODE_SEQ + optional + SPECIAL_EFFECT 等效形状（`wrapOptional({type:'leaf', actionId:'special-effect', ...})`），在符合条件的 field 上加 1 个同类型 good（不再 `gain` 进资源池）。支持普通 field（grain/vegetable）、D75 Wood Field / E80 Rock Garden 的 logical group（按 `extraData.stacks` 的 sum-of-remaining===1 判定），以及 B68/C70/D25/E68/E69/E70/E72 这类 `extraData.cardCrop` 单格卡牌田。
 - 新增可复用 `special-effect` kind `plant-additional-good`：接收 `locations: PlantAdditionalGoodLocation[]`，每个 location 是 `{kind:'field', row, col}`、`{kind:'card-stacks', cardId}` 或 `{kind:'card-crop', cardId}`。Invariant 违反（field/stack/cardCrop 缺失）throw，不静默 no-op；多 location 先整体校验再写入，避免半更新。
+- `B138_ForestGuardian` / `C51_FishingNet` 这类 opponent-pays-owner 的 `gain` flow 已补行动者维度的 action-detail delta：卡牌效果收益仍由专属日志记录，行动日志只记录行动者实际支付的成本和行动格收益。
 
 ## 2. 待修行为 / 注册差异
 
