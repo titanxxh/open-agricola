@@ -415,6 +415,7 @@ const resolveExchangeChoice = (
     const payload = choice.replace('bulk:', '').trim()
     if (!payload) return { type: 'ok' }
     let gained: Partial<Resource> = {}
+    let paid: Partial<Resource> = {}
     payload.split(',').forEach((entry) => {
       const [indexStr, countStr] = entry.split('=')
       const index = Number(indexStr)
@@ -437,11 +438,12 @@ const resolveExchangeChoice = (
           )
         }
         dispatchTradeAppliedListener(state, player, trade, times)
+        paid = mergePositiveResources(paid, scaleResources(trade.from, times))
         gained = mergePositiveResources(gained, scaleResources(trade.to, times))
       }
     })
     trackWorkPhaseBuildingResources(state, player.id, gained)
-    return { type: 'ok', resourcesGained: gained }
+    return { type: 'ok', resourcesGained: gained, resourcesPaid: paid }
   }
   if (choice.startsWith('trade:')) {
     const parts = choice.split(':')
@@ -466,8 +468,9 @@ const resolveExchangeChoice = (
       dispatchTradeAppliedListener(state, player, trade, times)
     }
     const gained = times > 0 ? scaleResources(trade.to, times) : {}
+    const paid = times > 0 ? scaleResources(trade.from, times) : {}
     trackWorkPhaseBuildingResources(state, player.id, gained)
-    return { type: 'ok', resourcesGained: gained }
+    return { type: 'ok', resourcesGained: gained, resourcesPaid: paid }
   }
   return { type: 'ok' }
 }

@@ -122,7 +122,11 @@ const finalizePlow = (
   if (ctx.sourceCard) {
     addCardResourceGained(ctx.player, ctx.sourceCard, { field: 1 })
   }
-  return { type: 'ok', extraData: { plowedTile: tile } }
+  return {
+    type: 'ok',
+    resourcesPaid: sanitizePayableCost(payment.solution.resourcesPaid),
+    extraData: { plowedTile: tile },
+  }
 }
 
 export const plowAction: ActionDefinition = {
