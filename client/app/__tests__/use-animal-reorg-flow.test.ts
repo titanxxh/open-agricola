@@ -6,6 +6,8 @@ import {
   buildPostReorgPlan,
   buildPendingChoiceFromReorgProgress,
   buildReorgEngineProgressPlan,
+  hasUnassignedAnimals,
+  shouldShowAnimalDiscardPrompt,
 } from '../hooks/use-animal-reorg-flow'
 
 const resources = (): Resource => ({
@@ -142,6 +144,22 @@ describe('use-animal-reorg-flow helpers', () => {
     )
     expect(choice.playerIndex).toBe(1)
     expect(choice.fenceExtraWood).toBe(1)
+  })
+
+  it('requires discard confirmation when animals remain unassigned', () => {
+    expect(hasUnassignedAnimals({ sheep: 2, boar: 0, cattle: 0 })).toBe(true)
+    expect(shouldShowAnimalDiscardPrompt(
+      { zones: [], confirmDiscard: false },
+      { sheep: 2, boar: 0, cattle: 0 },
+    )).toBe(true)
+    expect(shouldShowAnimalDiscardPrompt(
+      { zones: [], confirmDiscard: true },
+      { sheep: 2, boar: 0, cattle: 0 },
+    )).toBe(false)
+    expect(shouldShowAnimalDiscardPrompt(
+      { zones: [], confirmDiscard: false },
+      { sheep: 0, boar: 0, cattle: 0 },
+    )).toBe(false)
   })
 
   it('plans harvest reorg handoff when pending animals remain', () => {

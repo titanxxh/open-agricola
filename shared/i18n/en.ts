@@ -832,6 +832,7 @@ export const en = {
     placeFarmer: '{player} places a farmer: {action}',
     action: '{player} performs {action}',
     actionDetail: '{player} takes {action}{detail}',
+    reorganizeDiscard: '{player} discards {resources}',
     gains: 'Gains {resources}',
     costs: 'Pays {resources}',
     effects: 'Effect: {effects}',
