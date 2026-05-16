@@ -148,6 +148,7 @@ pnpm run lint
 
 ## 9. 当前轮次
 
+- 2026-05-16 — C60_SmallPottersOven mandatory bake continuation fixed: skipping Stone Oven onBuy bake after C60 before-bake build now reaches engine-blocked instead of ending the turn.
 - 2026-05-15 — Engine-level mandatory bake alignment: client treats `engine-blocked` as a dedicated prompt-only pending state and hides choice/anytime actions while blocked.
 - 2026-05-15 — Wave 1 cards (A148/B86/D15/D13/E5) aligned to BGA; 4 infra extensions
 - 2026-05-15 — C60/B27/E130/E97 side improvement flows aligned to BGA `trueAction=false`; removed synthetic onBuy suppression from improvement/occupation apply leaves
@@ -163,6 +164,7 @@ pnpm run lint
 - `TradeModifier.conditions?: Record<string, number>` — D15 trade gated by `houseTypeClay`；其余 `houseTypeWood` / `houseTypeStone` / `minNumRooms` 同套机制。
 - `onComputeAnimalZones` 签名加 `state: GameState` 入参（A148 / B86 读全局 feeding counter，避免再走玩家局部 state）。
 - `improvement-any` 的 `params.trueAction=false` 会传播到生成的 `pay` / `apply-improvement` leaf `actionContext`，用于 BGA-style 非真实 action 过滤，但不抑制所购卡牌 `onBuy`。
+- 已执行过 before phase 的 continuation node 在后续 `isDoable` 判定中携带 `skipBeforeTriggers`，避免 C60 这类 before-reachability listener 把原始 mandatory bake 再次判成可执行。
 - `special-effect.remove-field-crops` — 按坐标严格校验多块田顶层作物后原子扣除，供 C57 这类多来源 field crop 选择复用。
 - `commitSelectionChoice` 会拒绝不在 `actionContext.selectableTiles` 内的 farm-position 提交，避免非法选择消费 pending flow。
 
@@ -170,6 +172,7 @@ pnpm run lint
 
 | 日期 | 批次 | 涉及卡牌 / 基建 |
 |---|---|---|
+| 2026-05-16 | C60 mandatory bake continuation | C60_SmallPottersOven + before-resolved continuation `skipBeforeTriggers` |
 | 2026-05-15 | C57 selection alignment | C57_Crudite + `remove-field-crops` / farm-position selectableTiles validation |
 | 2026-05-15 | trueAction follow-up | C60_SmallPottersOven / B27_Toolbox / E130_Overachiever / E97_Beneficiary + improvement-any/minor-improvement `trueAction=false` propagation |
 | 2026-05-15 | Wave 1 | A148_Woolgrower / B86_TruffleSearcher / D15_ClaySupports / D13_Trowel / E5_NightLoot + 4 项基建（§10） |

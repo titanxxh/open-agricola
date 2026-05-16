@@ -106,6 +106,13 @@ const withResourcePreview = (
   }
 }
 
+const actionContextForNode = (
+  node: ActionNode,
+): ActionExecutionContext['actionContext'] =>
+  node.beforePhaseResolved
+    ? { ...(node.actionContext ?? {}), skipBeforeTriggers: true }
+    : node.actionContext
+
 type ImmediateLogCarrier = {
   logKey?: string
   logParams?: Record<string, unknown>
@@ -188,7 +195,7 @@ const buildOptionalPrompt = (
     space: context.space,
     params: actionNode.params,
     sourceCard: actionNode.sourceCard,
-    actionContext: actionNode.actionContext,
+    actionContext: actionContextForNode(actionNode),
   }
   const doable = int.hooks.applyIsDoable(
     { ...executionContext, actionId: actionNode.actionId },
@@ -236,7 +243,7 @@ const buildOptionalPrompt = (
       params: actionNode.params,
       costs: undefined,
       sourceCard: actionNode.sourceCard,
-      actionContext: actionNode.actionContext,
+      actionContext: actionContextForNode(actionNode),
     },
     effectiveOwnerPlayerId: node.ownerPlayerId,
   })
@@ -385,7 +392,7 @@ export function engineProceed(
           space: context.space,
           params: entry.actionNode.params,
           sourceCard: entry.actionNode.sourceCard,
-          actionContext: entry.actionNode.actionContext,
+          actionContext: actionContextForNode(entry.actionNode),
         }
         const action = int.registry.get(entry.actionNode.actionId)
         if (!action) return null
@@ -572,7 +579,7 @@ export function engineProceed(
       space: context.space,
       params: node.params,
       sourceCard: replaceSourceCard,
-      actionContext: node.actionContext,
+      actionContext: actionContextForNode(node),
     }
     const doable = int.hooks.applyIsDoable(
       { ...executionContext, actionId: replacedActionId },
