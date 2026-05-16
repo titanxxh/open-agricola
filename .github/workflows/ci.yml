@@ -9,7 +9,7 @@ on:
 
 jobs:
   check-prompt-sync:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v6
 
@@ -27,7 +27,7 @@ jobs:
         run: pnpm run check:prompt-sync -- --strict
 
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6

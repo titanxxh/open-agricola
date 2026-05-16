@@ -253,7 +253,7 @@ describe('sourceCard card production contract', () => {
     expect(retry.request.options.every((option) => option.sourceCard === 'C104_Collector')).toBe(true)
   })
 
-  it('B42 Forest Inn tags its direct exchange choices with sourceCard', () => {
+  it('B42 Forest Inn tags its xor exchange leaves with sourceCard', () => {
     const config = getPlayerActionSpaceConfig('B42_ForestInn')
     expect(config).toBeDefined()
     const player = createPlayer()
@@ -267,14 +267,20 @@ describe('sourceCard card production contract', () => {
       space: createSpace('B42_ForestInn'),
     } as unknown as ActionExecutionContext)
 
-    expect(result.type).toBe('request')
-    if (result.type !== 'request') return
-    expect(result.request.kind).toBe('choice')
-    if (result.request.kind !== 'choice') return
-    expect(result.request.options.map((option) => option.sourceCard)).toEqual([
-      'B42_ForestInn',
-      'B42_ForestInn',
-      'B42_ForestInn',
-    ])
+    expect(result.type).toBe('flow')
+    if (result.type !== 'flow') return
+    expect(result.flow.type).toBe('xor')
+    if (result.flow.type !== 'xor') return
+    expect(result.flow.children).toHaveLength(3)
+    for (const child of result.flow.children) {
+      expect(child.type).toBe('seq')
+      if (child.type !== 'seq') return
+      const [pay, gain] = child.children
+      expect(pay?.type).toBe('leaf')
+      expect(gain?.type).toBe('leaf')
+      if (pay?.type !== 'leaf' || gain?.type !== 'leaf') return
+      expect(pay.sourceCard).toBe('B42_ForestInn')
+      expect(gain.sourceCard).toBe('B42_ForestInn')
+    }
   })
 })

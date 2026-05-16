@@ -267,6 +267,7 @@ const collectReferencedCardIds = (params: Record<string, unknown> | undefined): 
 
   const cardIds: string[] = []
   if (typeof params.cardId === 'string') cardIds.push(params.cardId)
+  if (typeof params.sourceCard === 'string') cardIds.push(params.sourceCard)
   if (params.improvements) {
     const ids = Array.isArray(params.improvements)
       ? params.improvements
@@ -406,6 +407,18 @@ export const prepareLogEntry = (
       <ResourceLine locale={locale} resources={params.cost as Partial<Resource>} />
     )
   }
+  if (params && entry.key === 'log.bakeBread') {
+    params.source = ''
+    if (typeof params.sourceCard === 'string') {
+      const card = resolveCardDisplayName(locale, params.sourceCard)
+      params.source = ` ${t(locale, 'log.bakeBreadSourceCard', { card })}`
+    } else if (typeof params.sourceActionId === 'string') {
+      const actionKey = `actions.${params.sourceActionId}.name`
+      const translated = t(locale, actionKey)
+      const action = translated === actionKey ? String(params.sourceActionId) : translated
+      params.source = ` ${t(locale, 'log.bakeBreadSourceAction', { action })}`
+    }
+  }
   if (params && entry.key === 'log.cardEffectBonusVp') {
     richParams.bonusVp = <ResourceLine locale={locale} resources={{}} bonusVp={1} />
   }
@@ -413,7 +426,8 @@ export const prepareLogEntry = (
     params &&
     (entry.key === 'log.harvestReapDetail' ||
       entry.key === 'log.harvestFeedDetail' ||
-      entry.key === 'log.harvestBreedDetail') &&
+      entry.key === 'log.harvestBreedDetail' ||
+      entry.key === 'log.reorganizeDiscard') &&
     typeof params.resources === 'object'
   ) {
     richParams.resources = (

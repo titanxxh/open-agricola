@@ -1231,6 +1231,93 @@ describe('Engine flow nodes', () => {
     expect(events).not.toContain('sow:checked')
   })
 
+  it('marks replacement continuation descendant actions mandatory', () => {
+    const original: ActionDefinition = {
+      id: 'replacement-continuation-original',
+      nameKey: 'actions.sow.name',
+      descriptionKey: 'actions.sow.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const first: ActionDefinition = {
+      id: 'replacement-continuation-first',
+      nameKey: 'actions.gain.name',
+      descriptionKey: 'actions.gain.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const blocked: ActionDefinition = {
+      id: 'replacement-continuation-blocked',
+      nameKey: 'actions.bake-bread.name',
+      descriptionKey: 'actions.bake-bread.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => false,
+      execute: () => ({ type: 'ok' }),
+    }
+    requireActiveCardRegistry('engine-flow').registerListener({
+      id: 'offer-blocking-replacement-continuation',
+      actions: ['replacement-continuation-original'],
+      phases: ['computeReplace'],
+      handler: (hookContext) => {
+        if (hookContext.actionContext?.checkedReplaceAction === true) return
+        return {
+          decline: true,
+          alternativeFlow: {
+            type: 'seq',
+            choiceLabelKey: 'test.replacementContinuation',
+            children: [
+              { type: 'leaf', actionId: first.id },
+              { type: 'leaf', actionId: blocked.id },
+            ],
+          },
+        }
+      },
+    })
+    const registry = new ActionRegistry()
+    registry.register(original)
+    registry.register(first)
+    registry.register(blocked)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('action-replacement-continuation-original', original.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(original)
+
+    expect(engine.proceed({ state, player, space }).type).toBe('ok')
+    const insertedFirst = engine._internals().tree.allNodes()
+      .find((node): node is ActionNode => node instanceof ActionNode && node.actionId === first.id)
+    const insertedBlocked = engine._internals().tree.allNodes()
+      .find((node): node is ActionNode => node instanceof ActionNode && node.actionId === blocked.id)
+
+    expect(insertedFirst?.mandatory).toBe(true)
+    expect(insertedBlocked?.mandatory).toBe(true)
+
+    const choiceStep = engine.proceed({ state, player, space })
+    expect(choiceStep.type).toBe('choice')
+    if (choiceStep.type !== 'choice') return
+    const replacementOption = choiceStep.choice.options.find(
+      (option) => option.labelKey === 'test.replacementContinuation',
+    )
+    expect(replacementOption).toBeDefined()
+    expect(engine.resolveChoice(replacementOption!.value, { state, player, space }).type).toBe('ok')
+    const blockedStep = engine.proceed({ state, player, space })
+
+    expect(blockedStep).toMatchObject({
+      type: 'blocked',
+      actionId: blocked.id,
+      mandatory: true,
+    })
+  })
+
   it('or choices show action-or-replace when computeReplace is available', () => {
     const plow: ActionDefinition = {
       id: 'plow',
@@ -1610,5 +1697,210 @@ describe('Engine flow nodes', () => {
       'actions.pay.name',
       'actions.bonus-vp.name',
     ])
+  })
+
+  it('marks selected OR leaf action mandatory', () => {
+    const action: ActionDefinition = {
+      id: 'mandatory-or-leaf',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(action)
+    const leaf = new ActionNode('action-or-leaf', action.id)
+    const or = new OrNode('or-mandatory', [leaf], 'ui.interactionFlowSelect')
+    const engine = new Engine({
+      tree: new EngineTree(or),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(action)
+
+    const choiceStep = engine.proceed({ state, player, space })
+    expect(choiceStep.type).toBe('choice')
+    engine.resolveChoice('action-or-leaf', { state, player, space })
+
+    expect(leaf.mandatory).toBe(true)
+  })
+
+  it('marks selected composite continuation and descendant actions mandatory', () => {
+    const bake: ActionDefinition = {
+      id: 'test-bake-in-composite',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const fence: ActionDefinition = {
+      id: 'test-fence-in-composite',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(bake)
+    registry.register(fence)
+    const bakeNode = new ActionNode('action-composite-bake', bake.id)
+    const fenceNode = new ActionNode('action-composite-fence', fence.id)
+    const sequence = new SequenceNode('seq-bake-fence', [bakeNode, fenceNode])
+    const xor = new XorNode('xor-bake-fence', [sequence], 'ui.interactionFlowSelect')
+    const engine = new Engine({
+      tree: new EngineTree(xor),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(bake)
+
+    const choiceStep = engine.proceed({ state, player, space })
+    expect(choiceStep.type).toBe('choice')
+    engine.resolveChoice('seq-bake-fence', { state, player, space })
+
+    expect(sequence.mandatory).toBe(true)
+    expect(bakeNode.mandatory).toBe(true)
+    expect(fenceNode.mandatory).toBe(true)
+  })
+
+  it('returns mandatory blocked when a selected composite later action is not doable', () => {
+    const events: string[] = []
+    const first: ActionDefinition = {
+      id: 'selected-composite-first',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('first')
+        return { type: 'ok' }
+      },
+    }
+    const blocked: ActionDefinition = {
+      id: 'selected-composite-blocked',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => false,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(first)
+    registry.register(blocked)
+    const sequence = new SequenceNode('seq-selected-composite-blocked', [
+      new ActionNode('action-selected-composite-first', first.id),
+      new ActionNode('action-selected-composite-blocked', blocked.id),
+    ])
+    const xor = new XorNode('xor-selected-composite-blocked', [sequence], 'ui.interactionFlowSelect')
+    const engine = new Engine({
+      tree: new EngineTree(xor),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(first)
+
+    const choiceStep = engine.proceed({ state, player, space })
+    expect(choiceStep.type).toBe('choice')
+    expect(engine.resolveChoice(sequence.id, { state, player, space }).type).toBe('ok')
+    const blockedStep = engine.proceed({ state, player, space })
+
+    expect(events).toEqual(['first'])
+    expect(blockedStep).toMatchObject({
+      type: 'blocked',
+      nodeId: 'action-selected-composite-blocked',
+      actionId: blocked.id,
+      mandatory: true,
+    })
+  })
+
+  it('marks accepted optional single-action wrapper action mandatory', () => {
+    const action: ActionDefinition = {
+      id: 'optional-wrapped-mandatory',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(action)
+    const wrapped = new ActionNode('action-wrapped-optional', action.id)
+    const sequence = new SequenceNode('seq-wrapped-optional', [wrapped])
+    sequence.optional = true
+    sequence.optionalActive = false
+    sequence.optionalPromptKey = 'ui.interactionOptionalAction'
+    const engine = new Engine({
+      tree: new EngineTree(sequence),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(action)
+
+    const choiceStep = engine.proceed({ state, player, space })
+    expect(choiceStep.type).toBe('choice')
+    const option = choiceStep.type === 'choice'
+      ? choiceStep.choice.options.find((entry) => entry.value !== '__skip__')
+      : undefined
+    expect(option).toBeDefined()
+    engine.resolveChoice(option!.value, { state, player, space })
+
+    expect(sequence.optionalActive).toBe(true)
+    expect(wrapped.mandatory).toBe(true)
+  })
+
+  it('returns mandatory blocked when a directly mandatory action is not doable', () => {
+    const action: ActionDefinition = {
+      id: 'mandatory-blocked-action',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => false,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(action)
+    const node = new ActionNode('action-mandatory-blocked', action.id)
+    node.mandatory = true
+    const engine = new Engine({
+      tree: new EngineTree(node),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(action)
+
+    const step = engine.proceed({ state, player, space })
+
+    expect(step).toMatchObject({
+      type: 'blocked',
+      nodeId: 'action-mandatory-blocked',
+      actionId: 'mandatory-blocked-action',
+      mandatory: true,
+    })
+    expect(node.getState()).toBe('ready')
   })
 })

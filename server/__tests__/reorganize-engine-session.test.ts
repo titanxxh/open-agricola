@@ -56,6 +56,35 @@ describe('reorganizeAction engine sub-flow integration', () => {
     expect(resp.state.players[0]!.pastures[0]!.animalCount).toBe(1)
   })
 
+  it('logs animals discarded by reorganize after collection', () => {
+    const session = setupWorkPhase()
+    const state = session.getState().state
+    const sheepMarket = state.actionSpaces.find((s) => s.id === 'sheep-market')
+    if (!sheepMarket) throw new Error('missing sheep market')
+    sheepMarket.resources.sheep = 3
+    session.loadState(state)
+
+    const pending = session.takeAction(0, 'sheep-market')
+    expect(pending.interaction.stateId).toBe('wait')
+    if (pending.interaction.stateId !== 'wait') throw new Error('expected wait')
+    expect(pending.interaction.request.kind).toBe('animal-reorg')
+
+    const resp = session.resolveChoice(0, 'confirm', {
+      zones: [
+        { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      ],
+    })
+
+    expect(resp.state.players[0]!.resources.sheep).toBe(1)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId)
+      .toBe('confirm-next-player')
+    const discardLog = resp.state.log.find((entry) => entry.key === 'log.reorganizeDiscard')
+    expect(discardLog?.params).toMatchObject({
+      player: resp.state.players[0]!.name,
+      resources: { sheep: 2 },
+    })
+  })
+
   it('cancel dismisses reorg prompt and re-presents it (boar still unassigned)', () => {
     // cancel = player declines to reorganize *this time*, but boar remains in
     // player.resources and the engine re-triggers the animalReorg check

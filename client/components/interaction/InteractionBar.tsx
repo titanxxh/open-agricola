@@ -312,6 +312,10 @@ function CollectorMultiSelect({ locale, options, needed, resolveChoice, isIntera
 type Props = {
   pendingAnimalReorg: PendingAnimalReorg | null
   pendingChoice: PendingChoice | null
+  pendingEngineBlocked: {
+    promptKey?: string
+    promptParams?: Record<string, unknown>
+  } | null
   pendingNextPlayerIndex: number | null
   pendingPlayerSwitch: { fromPlayerIndex: number; toPlayerIndex: number } | null
   locale: Locale
@@ -355,6 +359,7 @@ type Props = {
 export const InteractionBar = ({
   pendingAnimalReorg,
   pendingChoice,
+  pendingEngineBlocked,
   pendingNextPlayerIndex,
   pendingPlayerSwitch,
   locale,
@@ -419,6 +424,7 @@ export const InteractionBar = ({
   const hasBodyContent = !!(
     pendingAnimalReorg ||
     harvestFeedPlayerName ||
+    (pendingEngineBlocked && isInteractive) ||
     (pendingChoice && isInteractive) ||
     (pendingPlayerSwitch && isInteractive) ||
     (pendingNextPlayerIndex !== null && isInteractive) ||
@@ -476,6 +482,14 @@ export const InteractionBar = ({
                 </button>
               </div>
             </>
+          ) : pendingEngineBlocked && isInteractive ? (
+            <div className="interaction-title">
+              {t(
+                locale,
+                pendingEngineBlocked.promptKey ?? 'ui.interactionChooseOne',
+                pendingEngineBlocked.promptParams as Record<string, string | number> | undefined,
+              )}
+            </div>
           ) : pendingChoice && isInteractive ? (
             <>
               <div className="interaction-title">

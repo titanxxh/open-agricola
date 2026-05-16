@@ -2,6 +2,7 @@ import type {
   ActionChoiceOption,
   ActionFlow,
   ActionSpace,
+  ActionExecutionResult,
   AnytimeAction,
   FarmTilePosition,
   FeedQueueEntry,
@@ -36,6 +37,7 @@ import {
   XorNode,
   isSyntheticInteractionFrame,
 } from '../engine/index.ts'
+import { isInjectedAnytimeResult } from '../engine/action-context-flags.ts'
 import type { EngineFrame, EngineNode, EngineSource, EngineStackCursor, SubFlowReason } from '../engine/index.ts'
 import {
   isPendingChoiceValueAllowed,
@@ -160,6 +162,22 @@ const choicesSourceCard = (choices: ActionChoiceOption[]): string | undefined =>
     .filter((sourceCard): sourceCard is string => typeof sourceCard === 'string' && sourceCard.length > 0)
   const unique = [...new Set(sourceCards)]
   return unique.length === 1 && sourceCards.length === choices.length ? unique[0] : undefined
+}
+
+type ActionDetailResourceDelta = {
+  playerId?: string
+  gains?: Partial<Resource>
+  costs?: Partial<Resource>
+}
+
+const actionDetailResourceDeltas = (
+  result: ActionExecutionResult,
+): ActionDetailResourceDelta[] => {
+  const raw = 'extraData' in result ? result.extraData?.actionDetailDeltas : undefined
+  if (!Array.isArray(raw)) return []
+  return raw.filter((entry): entry is ActionDetailResourceDelta =>
+    typeof entry === 'object' && entry !== null,
+  )
 }
 
 /**
@@ -340,13 +358,7 @@ export class GameCore {
   private history: HistoryEntry[] = []
   private actionStartIndex: number | null = null
   private actionStartPlayerSnapshot: PlayerState | null = null
-  /**
-   * Accumulates resource gains/costs already attributed to specific cards via
-   * `log.cardEffectGain` / `log.cardEffectPay` since the last leaf-flush.
-   * `flushLeafActionDetail` subtracts these from the leaf's delta so card
-   * effects don't get double-counted in the action's `log.actionDetail`.
-   */
-  private cardEffectDeltasSinceFlush: { gains: Partial<Resource>; costs: Partial<Resource> } = {
+  private actionResultDetailsSinceFlush: { gains: Partial<Resource>; costs: Partial<Resource> } = {
     gains: {},
     costs: {},
   }
@@ -431,8 +443,8 @@ export class GameCore {
   /** @internal phase access — allocate next monotonic action token. */
   allocActionToken(): number { return this.nextActionToken++ }
 
-  /** @internal phase access — reset per-leaf card-effect resource deltas. */
-  resetCardEffectDeltas(): void { this.cardEffectDeltasSinceFlush = { gains: {}, costs: {} } }
+  /** @internal phase access — reset per-action resource details from leaf results. */
+  resetActionResultDetails(): void { this.actionResultDetailsSinceFlush = { gains: {}, costs: {} } }
 
   /** @internal phase access — emit a SessionResponse with the current state. */
   emitResponse(ok = true, error?: string): SessionResponse { return this.respond(ok, error) }
@@ -530,7 +542,7 @@ export class GameCore {
   }
   /** @internal Round phase — read the captured pre-action player snapshot. */
   getActionStartPlayerSnapshot(): PlayerState | null { return this.actionStartPlayerSnapshot }
-  /** @internal Round phase — emit `log.actionDetail` diff entry. */
+  /** @internal Round phase — emit `log.actionDetail`. */
   invokeLogActionDetail(before: PlayerState, after: PlayerState): void { this.logActionDetail(before, after) }
   /** @internal Round phase — onBeforeReturnHome stage hook chain trampoline. */
   invokeBeforeReturnHomeHooks(): SessionResponse { return this.continueBeforeReturnHomeHooks() }
@@ -1439,6 +1451,19 @@ export class GameCore {
           allowedCommands: buildCmds(['undoStep', 'undoAction']),
           anytimeActions: anytimeDescriptors,
         }
+      case 'engine-blocked':
+        return {
+          stateId: 'wait',
+          playerIndex,
+          spaceId,
+          promptKey: request.reasonKey ?? promptKey ?? 'ui.interactionEngineBlocked',
+          promptParams,
+          sourceCard,
+          request,
+          options: [],
+          allowedCommands: ['undoStep', 'undoAction'],
+          anytimeActions: [],
+        }
       case 'choice':
       default: {
         const selectionKind = this.isSelectionPromptKey(promptKey)
@@ -1650,11 +1675,6 @@ export class GameCore {
   private buildActionDetailParts(before: PlayerState, player: PlayerState) {
     const gains: Resource = { ...emptyResources }
     const costs: Resource = { ...emptyResources }
-    resourceKeyList.forEach((key) => {
-      const delta = player.resources[key] - before.resources[key]
-      if (delta > 0) gains[key] = delta
-      if (delta < 0) costs[key] = Math.abs(delta)
-    })
     const effects: NonNullable<ActionDetailParts['effects']> = {}
     const bonusSources = player._activeActionBonusSources
       ? [...player._activeActionBonusSources]
@@ -1729,11 +1749,57 @@ export class GameCore {
     return result
   }
 
+  private addPositiveResourceDetails(
+    bucket: 'gains' | 'costs',
+    resources: Partial<Resource> | undefined,
+  ) {
+    if (!resources) return
+    const target = this.actionResultDetailsSinceFlush[bucket]
+    for (const key of resourceKeyList) {
+      const amount = resources[key] ?? 0
+      if (amount > 0) target[key] = (target[key] ?? 0) + amount
+    }
+  }
+
+  private recordActionResultDetails(
+    result: ActionExecutionResult,
+    detailPlayerId?: string,
+    defaultPlayerId?: string,
+  ) {
+    if (result.type !== 'ok') return
+    if (isInjectedAnytimeResult(result)) return
+    const deltas = actionDetailResourceDeltas(result)
+    if (deltas.length > 0) {
+      for (const delta of deltas) {
+        if (!detailPlayerId || delta.playerId !== detailPlayerId) continue
+        this.addPositiveResourceDetails('gains', delta.gains)
+        this.addPositiveResourceDetails('costs', delta.costs)
+      }
+      return
+    }
+    if (result.logKey) return
+    if (detailPlayerId && defaultPlayerId && detailPlayerId !== defaultPlayerId) return
+    this.addPositiveResourceDetails('gains', result.resourcesGained)
+    this.addPositiveResourceDetails('costs', result.resourcesPaid)
+  }
+
+  private consumeActionResultDetails(detailParts: ActionDetailParts & {
+    gains: Resource
+    costs: Resource
+  }) {
+    for (const key of resourceKeyList) {
+      detailParts.gains[key] = this.actionResultDetailsSinceFlush.gains[key] ?? 0
+      detailParts.costs[key] = this.actionResultDetailsSinceFlush.costs[key] ?? 0
+    }
+    this.resetActionResultDetails()
+  }
+
   private logActionDetail(before: PlayerState, player: PlayerState) {
     if (!this.activeSpaceId) return
     const space = this.getSpaceById(this.activeSpaceId)
     if (!space) return
     const detailParts = this.buildActionDetailParts(before, player)
+    this.consumeActionResultDetails(detailParts)
     const hasGains = resourceKeyList.some((key) => (detailParts.gains[key] ?? 0) > 0)
     const hasCosts = resourceKeyList.some((key) => (detailParts.costs[key] ?? 0) > 0)
     const hasEffects = Object.keys(detailParts.effects ?? {}).length > 0
@@ -1757,13 +1823,13 @@ export class GameCore {
    * Mid-flow flush: when a leaf ActionNode inside a SEQ/optional flow finishes,
    * emit a partial `log.actionDetail` for that sub-action and advance the
    * baseline snapshot. Subsequent leaves and the final aggregate then only see
-   * the residual delta, avoiding duplicate logs.
+   * the remaining state changes, avoiding duplicate logs.
    *
    * Skipped when:
    *   - no active snapshot (no in-flight action),
    *   - leaf actionId equals the top-level activeSpaceId (the wrapper itself),
    *   - the action wrote its own logKey (e.g. `log.sow`, `log.buildStable`),
-   *   - the resulting delta is already covered by a dedicated immediate log
+   *   - the resulting change is already covered by a dedicated immediate log
    *     (for example improvement / bake-bread).
    */
   private flushLeafActionDetail(
@@ -1781,17 +1847,7 @@ export class GameCore {
     if (!player) return
     const before = this.actionStartPlayerSnapshot
     const detailParts = this.buildActionDetailParts(before, player)
-    for (const key of resourceKeyList) {
-      const cardGain = this.cardEffectDeltasSinceFlush.gains[key] ?? 0
-      const cardCost = this.cardEffectDeltasSinceFlush.costs[key] ?? 0
-      if (cardGain > 0) {
-        detailParts.gains[key] = Math.max(0, (detailParts.gains[key] ?? 0) - cardGain)
-      }
-      if (cardCost > 0) {
-        detailParts.costs[key] = Math.max(0, (detailParts.costs[key] ?? 0) - cardCost)
-      }
-    }
-    this.cardEffectDeltasSinceFlush = { gains: {}, costs: {} }
+    this.consumeActionResultDetails(detailParts)
     const hasGains = resourceKeyList.some((key) => (detailParts.gains[key] ?? 0) > 0)
     const hasCosts = resourceKeyList.some((key) => (detailParts.costs[key] ?? 0) > 0)
     const hasEffects = Object.keys(detailParts.effects ?? {}).length > 0
@@ -1825,31 +1881,10 @@ export class GameCore {
     const entries = this.engineLog.all()
     if (entries.length > 0) {
       const toAdd = entries.filter((e) => e.key !== 'log.action')
-      for (const entry of toAdd) {
-        if (entry.key === 'log.cardEffectGain') {
-          const gain = (entry.params as { gain?: Partial<Resource> } | undefined)?.gain
-          if (gain) this.accumulateCardEffectDelta('gains', gain)
-        } else if (entry.key === 'log.cardEffectPay') {
-          const cost = (entry.params as { cost?: Partial<Resource> } | undefined)?.cost
-          if (cost) this.accumulateCardEffectDelta('costs', cost)
-        }
-      }
       for (let i = toAdd.length - 1; i >= 0; i--) {
         this.state.log.unshift(toAdd[i])
       }
       this.engineLog.clear()
-    }
-  }
-
-  private accumulateCardEffectDelta(
-    bucket: 'gains' | 'costs',
-    delta: Partial<Resource>,
-  ) {
-    const target = this.cardEffectDeltasSinceFlush[bucket]
-    for (const [key, value] of Object.entries(delta)) {
-      if (typeof value !== 'number' || value <= 0) continue
-      const k = key as keyof Resource
-      target[k] = (target[k] ?? 0) + value
     }
   }
 
@@ -1948,6 +1983,19 @@ export class GameCore {
     if (playerIndex === 0 && cardIndex === 0) {
       this.state.roundPhase = 'field'
       this.state.log.unshift({ key: 'log.harvestPhaseReap' })
+      this.state.harvestReapSummary = {}
+      const harvestOrder = this.getHarvestPlayerIndices()
+      harvestOrder.forEach((index) => {
+        const player = this.state.players[index]
+        if (!player) return
+        if (this.hasPassFieldAndBreed(player)) return
+        this.state.harvestReapSummary![player.id] = {
+          resources: {},
+          grainFields: 0,
+          vegetableFields: 0,
+          harvestedPositions: [],
+        }
+      })
     }
     if (this.continueStageHook('onStartHarvestFieldPhase', playerIndex, cardIndex)) {
       return this.respond()
@@ -1963,19 +2011,37 @@ export class GameCore {
   }
 
   private continueHarvestReap(): SessionResponse {
-    this.state.harvestReapSummary = {}
     const harvestOrder = this.getHarvestPlayerIndices()
     harvestOrder.forEach((index) => {
       const player = this.state.players[index]
       if (!player) return
       // E58 LunchtimeBeer (and any future card) may flag a player to skip
       // the field phase of the current harvest. Flagged players are not reaped.
-      if (this.hasPassFieldAndBreed(player)) return
+      if (this.hasPassFieldAndBreed(player)) {
+        this.state.log.unshift({ key: 'log.harvestReapSkipped', params: { player: player.name } })
+        return
+      }
       const result = reap(this.state, player)
-      this.state.harvestReapSummary![player.id] = result.reapSummary
+      const entry = this.state.harvestReapSummary![player.id]!
+      entry.grainFields += result.reapSummary.grainFields
+      entry.vegetableFields += result.reapSummary.vegetableFields
+      for (const [crop, amount] of Object.entries(result.reapSummary.resources)) {
+        const cropKey = crop as keyof typeof entry.resources
+        entry.resources[cropKey] = (entry.resources[cropKey] ?? 0) + (amount ?? 0)
+      }
+      if (result.reapSummary.harvestedPositions?.length) {
+        entry.harvestedPositions = [
+          ...(entry.harvestedPositions ?? []),
+          ...result.reapSummary.harvestedPositions,
+        ]
+      }
       incHarvestedGrain(player, result.reapSummary.resources.grain ?? 0)
       incHarvestedVegetable(player, result.reapSummary.resources.vegetable ?? 0)
-      this.logHarvestResourceEntry('log.harvestReapDetail', player, result.reapSummary.resources)
+      if (this.hasPositiveResources(entry.resources)) {
+        this.logHarvestResourceEntry('log.harvestReapDetail', player, entry.resources)
+      } else {
+        this.state.log.unshift({ key: 'log.harvestReapNothing', params: { player: player.name } })
+      }
     })
     return this.continueAfterReapEffects()
   }
@@ -2271,6 +2337,12 @@ export class GameCore {
     return ownerIndex === -1 ? frame.ownerPlayerIndex : ownerIndex
   }
 
+  private currentFrameOwnerPlayerId(defaultPlayerId?: string): string | undefined {
+    const frame = this.engineStack.current()
+    if (!frame) return defaultPlayerId
+    return this.state.players[frame.ownerPlayerIndex]?.id ?? defaultPlayerId
+  }
+
   private acknowledgeCurrentActionAnimalReorgRequest(): void {
     const pendingHost = this.engineStack.peekPendingHost()
     if (!(pendingHost instanceof ActionNode)) return
@@ -2309,6 +2381,13 @@ export class GameCore {
       const before = this.clonePlayer(player)
       const step = frame.engine.proceed({ state: this.state, player, space })
       this.flushEngineLog()
+
+      if (step.type === 'blocked' && step.mandatory === true && step.actionId) {
+        frame.deferredPlayerSwitch = null
+        const pendingSet = frame.engine.setEngineBlockedPending(step.nodeId, step.actionId)
+        if (!pendingSet) throw new Error(`missing mandatory blocked engine node: ${step.nodeId}`)
+        return
+      }
 
       if (step.type === 'blocked' || step.type === 'done') {
         // Snapshot the relevant fields from the current frame BEFORE deciding
@@ -2426,7 +2505,8 @@ export class GameCore {
             const resolvedActionId = this.peekHostPendingActionId()
             const result = frame.engine.resolveChoice(auto.value, { state: this.state, player, space })
             this.flushEngineLog()
-            if (result.type === 'ok' && resolvedActionId) {
+            if (result.type === 'ok' && resolvedActionId && !isInjectedAnytimeResult(result)) {
+              this.recordActionResultDetails(result, frameOwnerPlayer.id, player.id)
               this.flushLeafActionDetail(resolvedActionId, Boolean(result.logKey))
             }
             if (result.type === 'request' && result.request.kind === 'choice') {
@@ -2479,7 +2559,12 @@ export class GameCore {
         return
       }
 
-      if (step.type === 'ok' && step.result.type === 'ok') {
+      if (
+        step.type === 'ok' &&
+        step.result.type === 'ok' &&
+        !isInjectedAnytimeResult(step.result)
+      ) {
+        this.recordActionResultDetails(step.result, frameOwnerPlayer.id, player.id)
         this.flushLeafActionDetail(step.actionId, Boolean(step.result.logKey))
       }
 
@@ -2769,7 +2854,12 @@ export class GameCore {
     const resolvedActionId = this.peekHostPendingActionId()
     const result = this.engine.resolveChoice(value, { state: this.state, player, space }, payload)
     this.flushEngineLog()
-    if (result.type === 'ok' && resolvedActionId) {
+    if (result.type === 'ok' && resolvedActionId && !isInjectedAnytimeResult(result)) {
+      this.recordActionResultDetails(
+        result,
+        this.currentFrameOwnerPlayerId(player.id),
+        player.id,
+      )
       this.flushLeafActionDetail(resolvedActionId, Boolean(result.logKey))
     }
     if (result.type === 'request' && result.request.kind === 'choice') {
@@ -2839,6 +2929,8 @@ export class GameCore {
           return this.resolvePendingChoice(playerIndex, value, true, payload)
         case 'card-draft':
           return this.respond(false, 'card-draft resolveChoice not supported')
+        case 'engine-blocked':
+          return this.respond(false, 'engine-blocked cannot resolve')
         default: {
           const _exhaustive: never = request
           return this.respond(false, `unhandled interaction kind: ${JSON.stringify(_exhaustive)}`)
@@ -3222,6 +3314,13 @@ export class GameCore {
       { state: this.state, player: updatedPlayer, space },
     )
     this.flushEngineLog()
+    if (result.type === 'ok') {
+      this.recordActionResultDetails(
+        result,
+        this.currentFrameOwnerPlayerId(updatedPlayer.id),
+        updatedPlayer.id,
+      )
+    }
 
     if (result.type === 'request' && result.request.kind === 'choice') {
       // Engine wired the new pending envelope (with promptKey + promptParams);
@@ -3257,6 +3356,7 @@ export class GameCore {
     const interactionContext = this.peekHostContextSnapshot()?.actionContext
     const selectionKind = (interactionContext?.selectionKind as string | undefined) ?? 'farm-position'
     const maxSelections = (interactionContext?.maxSelections as number) ?? 1
+    const minSelections = (interactionContext?.minSelections as number) ?? 0
 
     // occupation-hand: validate card IDs
     if (selectionKind === 'occupation-hand') {
@@ -3276,11 +3376,18 @@ export class GameCore {
       // string only when payload is absent.
       const choiceValue = cardIds.length > 0 ? 'confirm' : 'cancel'
       const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('selection')
-      this.engine?.resolveChoice(choiceValue, {
+      const result = this.engine?.resolveChoice(choiceValue, {
         state: this.state,
         player: this.state.players[playerIndex]!,
         space,
       }, { cards: cardIds })
+      if (result?.type === 'ok') {
+        this.recordActionResultDetails(
+          result,
+          this.currentFrameOwnerPlayerId(player.id),
+          player.id,
+        )
+      }
       this.flushEngineLog()
       this.runEngineSteps()
       return this.continueAfterResolvedFarmChoice(playerIndex)
@@ -3288,23 +3395,48 @@ export class GameCore {
 
     // farm-position (default)
     const positions = payload.positions ?? []
+    if (positions.length < minSelections) {
+      return this.respond(false, 'not enough selection positions')
+    }
     if (positions.length > maxSelections) {
       return this.respond(false, 'too many selection positions')
     }
+    const selectedKeys = new Set<string>()
     for (const pos of positions) {
+      const key = `${pos.row}-${pos.col}`
+      if (selectedKeys.has(key)) return this.respond(false, 'duplicate selection position')
+      selectedKeys.add(key)
       const exists = player.fields.some((f) => f.row === pos.row && f.col === pos.col)
       if (!exists) return this.respond(false, 'invalid field position')
+    }
+    const selectableTiles = Array.isArray(interactionContext?.selectableTiles)
+      ? interactionContext.selectableTiles as FarmTilePosition[]
+      : null
+    if (selectableTiles) {
+      const selectableKeys = new Set(selectableTiles.map((pos) => `${pos.row}-${pos.col}`))
+      for (const pos of positions) {
+        if (!selectableKeys.has(`${pos.row}-${pos.col}`)) {
+          return this.respond(false, 'invalid selection position')
+        }
+      }
     }
 
     this.pushHistory()
     const positionStrings = positions.map((p) => `${p.row}-${p.col}`)
     const choiceValue = positions.length > 0 ? 'confirm' : 'cancel'
     const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('selection')
-    this.engine?.resolveChoice(choiceValue, {
+    const result = this.engine?.resolveChoice(choiceValue, {
       state: this.state,
       player: this.state.players[playerIndex]!,
       space,
     }, { positions: positionStrings })
+    if (result?.type === 'ok') {
+      this.recordActionResultDetails(
+        result,
+        this.currentFrameOwnerPlayerId(player.id),
+        player.id,
+      )
+    }
     this.flushEngineLog()
     this.runEngineSteps()
     return this.continueAfterResolvedFarmChoice(playerIndex)

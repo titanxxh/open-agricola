@@ -86,5 +86,18 @@ export type CardDefinition = {
     resource: keyof Resource
     map: Record<string, number>
   }
+  /**
+   * BGA `$this->field = true` + `getFieldDetails()`. Declarative card-field config.
+   * When set, `shared/cards/helpers/card-field.ts` derives sow / harvest / isDoable
+   * behavior automatically (see docs/ARCHITECTURE.md → cardField).
+   * `allowedCrops` mirrors BGA constraints (`null` = all 4 crops);
+   * `capacity` is the number of independent stacks the card can hold.
+   * Side-effects (e.g. E68 last-wood bonus) are wired via `makeCardFieldImpl`'s
+   * `onReap` callback, not via this metadata.
+   */
+  cardField?: {
+    allowedCrops: readonly ('grain' | 'vegetable' | 'wood' | 'stone')[]
+    capacity: number
+  }
   locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
 }

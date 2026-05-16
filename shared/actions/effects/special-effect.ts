@@ -1,4 +1,10 @@
-import type { ActionDefinition, GameState, PlayerState, Resource } from '../../contract/types'
+import type {
+  ActionDefinition,
+  CropStack,
+  GameState,
+  PlayerState,
+  Resource,
+} from '../../contract/types'
 import {
   setCardFlag,
   writeCardInfobox,
@@ -8,9 +14,11 @@ import {
 } from '../../cards/helpers/card-state'
 import { incCounter, initCardState } from '../../cards/__stubs__/helpers'
 import {
+  fieldDecrementTop,
   fieldFindStackOfKind,
   fieldHasCrop,
   fieldPopIfDepleted,
+  fieldTopStack,
 } from '../../domain/field'
 import { clearPendingFenceBonus } from '../../cards/helpers/pending-fence-bonus'
 import { removeFutureMeeples } from './internal/future-meeples'
@@ -18,6 +26,11 @@ import { findFirstNewborn } from '../../domain/player'
 import { removeWorkerRef } from '../../domain/space'
 import { getNextEmptyTileForPlayer } from '../../domain/farm'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
+
+export type PlantAdditionalGoodLocation =
+  | { kind: 'field'; row: number; col: number }
+  | { kind: 'card-stacks'; cardId: string }
+  | { kind: 'card-crop'; cardId: string }
 
 export type SpecialEffectParams =
   | { kind: 'increment-extra-data'; key: string; amount: number }
@@ -33,6 +46,12 @@ export type SpecialEffectParams =
   | { kind: 'remove-future-meeples'; rounds?: number[] }
   | { kind: 'promote-first-newborn' }
   | { kind: 'remove-field-crop'; crop: 'grain' | 'vegetable'; minRemaining?: number }
+  | {
+      kind: 'remove-field-crops'
+      crop: 'grain' | 'vegetable'
+      minRemaining?: number
+      positions: Array<{ row: number; col: number }>
+    }
   | { kind: 'consume-fence'; count?: number }
   | { kind: 'add-resource-to-space'; spaceId: string; resource: keyof Resource; amount: number }
   | { kind: 'build-stable-on-first-empty-tile' }
@@ -42,6 +61,10 @@ export type SpecialEffectParams =
       toSpaceId: string
       resource: keyof Resource
       amount: number
+    }
+  | {
+      kind: 'plant-additional-good'
+      locations: PlantAdditionalGoodLocation[]
     }
 
 const resolveTargetPlayer = (
@@ -53,6 +76,19 @@ const resolveTargetPlayer = (
   if (typeof targetId !== 'string' || !targetId) return actor
   const target = state?.players?.find((p) => p.id === targetId)
   return target ?? actor
+}
+
+type CardCrop = {
+  crop: CropStack['kind']
+  remaining: number
+}
+
+const readGrowableStack = (stacks: CropStack[], errCtx: string): CropStack => {
+  const stack = stacks.find((s) => s.remaining >= 1)
+  if (!stack) {
+    throw new Error(`plant-additional-good: no stack with remaining>=1 on ${errCtx}`)
+  }
+  return stack
 }
 
 /**
@@ -162,6 +198,38 @@ export const specialEffectAction: ActionDefinition = {
         fieldPopIfDepleted(field)
         return { type: 'ok' }
       }
+      case 'remove-field-crops': {
+        if (!Array.isArray(p.positions) || p.positions.length === 0) {
+          return { type: 'fail', logKey: 'log.specialEffectFail' }
+        }
+        const minRem = p.minRemaining ?? 1
+        const seen = new Set<string>()
+        const fields = []
+        for (const pos of p.positions) {
+          if (!pos || typeof pos !== 'object') {
+            return { type: 'fail', logKey: 'log.specialEffectFail' }
+          }
+          const { row, col } = pos
+          if (!Number.isFinite(row) || !Number.isFinite(col)) {
+            return { type: 'fail', logKey: 'log.specialEffectFail' }
+          }
+          const key = `${row}:${col}`
+          if (seen.has(key)) {
+            return { type: 'fail', logKey: 'log.specialEffectFail' }
+          }
+          seen.add(key)
+          const field = target.fields.find((f) => f.row === row && f.col === col)
+          const top = field ? fieldTopStack(field) : undefined
+          if (!field || top?.kind !== p.crop || top.remaining < minRem) {
+            return { type: 'fail', logKey: 'log.specialEffectFail' }
+          }
+          fields.push(field)
+        }
+        for (const field of fields) {
+          fieldDecrementTop(field)
+        }
+        return { type: 'ok' }
+      }
       case 'consume-fence': {
         const count = p.count ?? 1
         let removed = 0
@@ -208,6 +276,48 @@ export const specialEffectAction: ActionDefinition = {
         ;(from.resources as Record<keyof Resource, number>)[p.resource] = have - p.amount
         const dest = (to.resources as Partial<Record<keyof Resource, number>>)[p.resource] ?? 0
         ;(to.resources as Record<keyof Resource, number>)[p.resource] = dest + p.amount
+        return { type: 'ok' }
+      }
+      case 'plant-additional-good': {
+        const mutations: Array<() => void> = []
+        for (const loc of p.locations) {
+          if (loc.kind === 'field') {
+            const field = target.fields.find(
+              (f) => f.row === loc.row && f.col === loc.col,
+            )
+            if (!field) {
+              throw new Error(
+                `plant-additional-good: missing field at row=${loc.row} col=${loc.col}`,
+              )
+            }
+            const stack = readGrowableStack(field.stacks, `field row=${loc.row} col=${loc.col}`)
+            mutations.push(() => {
+              stack.remaining += 1
+            })
+          } else if (loc.kind === 'card-stacks') {
+            const stacks =
+              readCardExtraData<CropStack[]>(target, loc.cardId, 'stacks') ?? []
+            const stack = readGrowableStack(stacks, `card ${loc.cardId}`)
+            mutations.push(() => {
+              stack.remaining += 1
+              writeCardExtraData(target, loc.cardId, 'stacks', stacks)
+            })
+          } else {
+            const cardCrop = readCardExtraData<CardCrop>(target, loc.cardId, 'cardCrop')
+            if (!cardCrop || cardCrop.remaining < 1) {
+              throw new Error(
+                `plant-additional-good: no cardCrop with remaining>=1 on card ${loc.cardId}`,
+              )
+            }
+            mutations.push(() => {
+              writeCardExtraData(target, loc.cardId, 'cardCrop', {
+                ...cardCrop,
+                remaining: cardCrop.remaining + 1,
+              })
+            })
+          }
+        }
+        for (const mutate of mutations) mutate()
         return { type: 'ok' }
       }
     }

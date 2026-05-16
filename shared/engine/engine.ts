@@ -108,6 +108,7 @@ const restoreSharedCursorData = (node: EngineNode, data: Record<string, unknown>
   if (typeof data.optionalPromptKey === 'string') {
     node.optionalPromptKey = data.optionalPromptKey as PromptKey
   }
+  if (typeof data.mandatory === 'boolean') node.mandatory = data.mandatory
   if (data.pending && typeof data.pending === 'object') {
     node.setPending(data.pending as PendingEnvelope)
   }
@@ -439,6 +440,21 @@ export class Engine {
       parent = this.tree.findParent(parent.id)
     }
     return false
+  }
+
+  setEngineBlockedPending(nodeId: string, actionId: string): boolean {
+    const node = this.tree.findNodeById(nodeId)
+    if (!node) return false
+    node.setPending({
+      hostNodeId: node.id,
+      request: { kind: 'engine-blocked', actionId },
+      choices: [],
+      promptKey: 'ui.interactionEngineBlocked',
+      pendingActionId: actionId,
+      ownerNodeId: null,
+    })
+    this._pendingNodeIdRef.value = node.id
+    return true
   }
 
   restore(snapshot: {

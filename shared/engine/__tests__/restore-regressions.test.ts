@@ -14,6 +14,17 @@ const buildEngine = (root = new ActionNode('initial-root', 'noop')) => new Engin
 })
 
 describe('Engine.restore regressions', () => {
+  it('restores mandatory metadata from a real engine snapshot', () => {
+    const root = new ActionNode('mandatory-restore-root', 'gain')
+    root.mandatory = true
+    const original = buildEngine(root)
+    const restored = buildEngine()
+
+    restored.restore(original.snapshot())
+
+    expect(restored._internals().tree.findNodeById('mandatory-restore-root')?.mandatory).toBe(true)
+  })
+
   it('rehydrates legacy choiceData onto a live pending host when the stored host id is gone', () => {
     const restoredHost = new ActionNode('flow-0', 'gain')
     const snapshot: ReturnType<Engine['snapshot']> = {

@@ -41,6 +41,7 @@ import {
   buildOwnedFlowNode,
   canActionContinueWithoutBeforeTriggers,
   collectNodeIds,
+  enforceCompositeContinuationMandatory,
   findActionNode,
   getNodeDescriptionPreview,
   getNodeEffectPreview,
@@ -52,6 +53,7 @@ import {
 import type { PendingEnvelope } from './types'
 import { isActivateCardActionNode, type ActivateCardActionNode } from './activation-action'
 import { evaluateTriggerSelect, type TriggerSelectEvaluationOptions } from './trigger-select'
+import { withInjectedAnytimeResultFlag } from './action-context-flags'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
@@ -69,13 +71,18 @@ const triggerSelectEvaluationOptions = (
     const action = int.registry.get(actionId)
     if (!action) return false
     const scopedContext = withResourcePreview(context, resources)
-    return action.canBeExecutedByPlayer(
+    const directDoable = action.canBeExecutedByPlayer(
       scopedContext.state,
       scopedContext.player,
       {
         sourceCard: scopedContext.sourceCard,
         actionContext: scopedContext.actionContext,
       },
+    )
+    return int.hooks.applyIsDoable(
+      { ...scopedContext, actionId },
+      action,
+      directDoable,
     )
   },
 })
@@ -99,6 +106,13 @@ const withResourcePreview = (
     },
   }
 }
+
+const actionContextForNode = (
+  node: ActionNode,
+): ActionExecutionContext['actionContext'] =>
+  node.beforePhaseResolved
+    ? { ...(node.actionContext ?? {}), skipBeforeTriggers: true }
+    : node.actionContext
 
 type ImmediateLogCarrier = {
   logKey?: string
@@ -182,7 +196,7 @@ const buildOptionalPrompt = (
     space: context.space,
     params: actionNode.params,
     sourceCard: actionNode.sourceCard,
-    actionContext: actionNode.actionContext,
+    actionContext: actionContextForNode(actionNode),
   }
   const doable = int.hooks.applyIsDoable(
     { ...executionContext, actionId: actionNode.actionId },
@@ -230,7 +244,7 @@ const buildOptionalPrompt = (
       params: actionNode.params,
       costs: undefined,
       sourceCard: actionNode.sourceCard,
-      actionContext: actionNode.actionContext,
+      actionContext: actionContextForNode(actionNode),
     },
     effectiveOwnerPlayerId: node.ownerPlayerId,
   })
@@ -379,7 +393,7 @@ export function engineProceed(
           space: context.space,
           params: entry.actionNode.params,
           sourceCard: entry.actionNode.sourceCard,
-          actionContext: entry.actionNode.actionContext,
+          actionContext: actionContextForNode(entry.actionNode),
         }
         const action = int.registry.get(entry.actionNode.actionId)
         if (!action) return null
@@ -551,6 +565,7 @@ export function engineProceed(
         ),
         context.player.id,
       )
+      enforceCompositeContinuationMandatory(flowNode)
       int.tree.insertAfter(node.id, [flowNode])
       node.resolve({ type: 'ok' })
       return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
@@ -565,7 +580,7 @@ export function engineProceed(
       space: context.space,
       params: node.params,
       sourceCard: replaceSourceCard,
-      actionContext: node.actionContext,
+      actionContext: actionContextForNode(node),
     }
     const doable = int.hooks.applyIsDoable(
       { ...executionContext, actionId: replacedActionId },
@@ -580,7 +595,14 @@ export function engineProceed(
       ),
     )
     if (!doable) {
-      return { type: 'blocked', nodeId: node.id }
+      return node.mandatory === true
+        ? {
+            type: 'blocked',
+            nodeId: node.id,
+            actionId: replacedActionId,
+            mandatory: true,
+          }
+        : { type: 'blocked', nodeId: node.id, actionId: replacedActionId }
     }
     const costResults = int.hooks.computeCosts({
       ...executionContext,
@@ -623,7 +645,8 @@ export function engineProceed(
       action,
       replacedActionId,
     )
-    const result = optInChoice ?? action.execute(executionContext)
+    const rawResult = optInChoice ?? action.execute(executionContext)
+    const result = withInjectedAnytimeResultFlag(rawResult, executionContext.actionContext)
     const duringPhase = int.hooks.during({ ...executionContext, actionId: replacedActionId }, result)
     const duringActivateNodes = buildActivationActionNodes(int,
       duringPhase.matchedListeners, 'during', replacedActionId,
@@ -709,7 +732,8 @@ export function engineProceed(
         result.request.kind === 'feed' ||
         result.request.kind === 'selection' ||
         result.request.kind === 'card-draft' ||
-        result.request.kind === 'select-trigger'
+        result.request.kind === 'select-trigger' ||
+        result.request.kind === 'engine-blocked'
       ) {
         // Task 9 will add explicit emitters for these kinds. Until then no
         // current effect emits them, so they fall through to empty choices

@@ -33,11 +33,14 @@ import {
   buildListenerEvent,
   canActionContinueWithoutBeforeTriggers,
   cloneNode,
+  enforceCompositeContinuationMandatory,
+  enforceSelectedTargetMandatory,
   findActionNode,
   normalizeFollowUpAction,
   pendingEnvelopeFromHostNode,
   resolveSubtree,
 } from './engine-utils'
+import { withInjectedAnytimeResultFlag } from './action-context-flags'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
@@ -55,13 +58,18 @@ const triggerSelectEvaluationOptions = (
     const action = int.registry.get(actionId)
     if (!action) return false
     const scopedContext = withResourcePreview(context, resources)
-    return action.canBeExecutedByPlayer(
+    const directDoable = action.canBeExecutedByPlayer(
       scopedContext.state,
       scopedContext.player,
       {
         sourceCard: scopedContext.sourceCard,
         actionContext: scopedContext.actionContext,
       },
+    )
+    return int.hooks.applyIsDoable(
+      { ...scopedContext, actionId },
+      action,
+      directDoable,
     )
   },
 })
@@ -85,6 +93,13 @@ const withResourcePreview = (
     },
   }
 }
+
+const actionContextForNode = (
+  node: ActionNode,
+): ActionExecutionContext['actionContext'] =>
+  node.beforePhaseResolved
+    ? { ...(node.actionContext ?? {}), skipBeforeTriggers: true }
+    : node.actionContext
 
 type ImmediateLogCarrier = {
   logKey?: string
@@ -168,6 +183,7 @@ export function engineResolveChoice(
           resolveSubtree(node)
         } else {
           node.optionalActive = true
+          enforceSelectedTargetMandatory(node)
         }
         return { type: 'ok' }
       }
@@ -257,7 +273,7 @@ export function engineResolveChoice(
         space: context.space,
         params: child.params,
         sourceCard: child.sourceCard,
-        actionContext: child.actionContext,
+        actionContext: actionContextForNode(child),
       }
       const replaceResult = int.hooks.applyComputeReplace({
         ...executionContext,
@@ -278,12 +294,14 @@ export function engineResolveChoice(
           ),
           context.player.id,
         )
+        enforceCompositeContinuationMandatory(flowNode)
         int.tree.insertAfter(node.id, [flowNode])
         targetNode!.resolve(choice)
         node.resolve(choice)
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
+      enforceSelectedTargetMandatory(targetNode!)
       const action = int.registry.get(actionId)
       if (!action) {
         int.pendingNodeIdRef.value = null
@@ -505,7 +523,10 @@ export function engineResolveChoice(
   pendingHost?.clearPending()
   let result: ActionExecutionResult
   if (action.resolveChoice) {
-    result = action.resolveChoice(executionContext, choice, payload)
+    result = withInjectedAnytimeResultFlag(
+      action.resolveChoice(executionContext, choice, payload),
+      executionContext.actionContext,
+    )
   } else {
     return { type: 'ok' }
   }

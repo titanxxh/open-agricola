@@ -39,10 +39,14 @@ const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
   ...overrides,
 } as unknown as PlayerState)
 
-const makeCtx = (player = makePlayer()): ActionExecutionContext => ({
+const makeCtx = (
+  player = makePlayer(),
+  overrides: Partial<ActionExecutionContext> = {},
+): ActionExecutionContext => ({
   state: { players: [player] } as unknown as GameState,
   player,
-  space: {} as ActionExecutionContext['space'],
+  space: { id: 'grain-utilization' } as ActionExecutionContext['space'],
+  ...overrides,
 })
 
 const expectNoBakeMutation = (
@@ -167,125 +171,30 @@ describe('bakeBreadAction non-empty semantics', () => {
       foodFromConversion: { grain: 7 },
     })
     expect(result.immediateLogs).toEqual([
-      { key: 'log.bakeBread', params: { count: 1, food: 2 } },
-      { key: 'log.bakeBread', params: { count: 1, food: 5 } },
+      { key: 'log.bakeBread', params: { count: 1, food: 2, sourceActionId: 'grain-utilization' } },
+      { key: 'log.bakeBread', params: { count: 1, food: 5, sourceActionId: 'grain-utilization' } },
     ])
   })
 
-  it('can be executed through a pure before-bake resource chain', () => {
-    const registry = new CardRegistry()
-    registry.registerListener({
-      id: 'test-gain-clay-before-bake',
-      cardIds: ['TestClayBeforeBake'],
-      phases: ['before'],
-      actions: ['bake-bread'],
-      dispatchMode: 'select',
-      handler: () => ({
-        flow: { type: 'leaf', actionId: 'gain', params: { clay: 1 } },
-      }),
-    })
-    registry.registerListener({
-      id: 'test-d66-before-bake',
-      cardIds: ['TestD66'],
-      phases: ['before'],
-      actions: ['bake-bread'],
-      dispatchMode: 'select',
-      handler: () => ({
-        flow: {
-          type: 'seq',
-          children: [
-            { type: 'leaf', actionId: 'pay', params: { cost: { clay: 1 } } },
-            { type: 'leaf', actionId: 'gain', params: { grain: 1 } },
-          ],
+  it('records the source card when bake bread comes from an oven onBuy flow', () => {
+    const player = makePlayer()
+    const result = bakeBreadAction.resolveChoice!(
+      makeCtx(player, { sourceCard: 'Major_ClayOven' }),
+      'Major_ClayOven',
+    )
+
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.immediateLogs).toEqual([
+      {
+        key: 'log.bakeBread',
+        params: {
+          count: 1,
+          food: 5,
+          sourceActionId: 'grain-utilization',
+          sourceCard: 'Major_ClayOven',
         },
-      }),
-    })
-    setActiveCardRegistry(registry)
-    const player = makePlayer({
-      resources: { ...baseResources, grain: 0, clay: 0 },
-      minorPlayed: ['TestClayBeforeBake', 'TestD66'],
-    })
-    const state = makeCtx(player).state
-
-    expect(bakeBreadAction.canBeExecutedByPlayer(state, player)).toBe(true)
-    expect(bakeBreadAction.canBeExecutedByPlayer(state, player, {
-      actionContext: { skipBeforeTriggers: true },
-    })).toBe(false)
-    expect(player.resources).toMatchObject({ grain: 0, clay: 0 })
-  })
-
-  it('does not prove bake reachability with non-pure before listeners', () => {
-    const registry = new CardRegistry()
-    registry.registerListener({
-      id: 'test-xor-before-bake',
-      cardIds: ['TestXorBeforeBake'],
-      phases: ['before'],
-      actions: ['bake-bread'],
-      dispatchMode: 'select',
-      handler: () => ({
-        flow: {
-          type: 'xor',
-          children: [
-            { type: 'leaf', actionId: 'gain', params: { grain: 1 } },
-          ],
-        },
-      }),
-    })
-    setActiveCardRegistry(registry)
-    const player = makePlayer({
-      resources: { ...baseResources, grain: 0, clay: 0 },
-      minorPlayed: ['TestXorBeforeBake'],
-    })
-    const state = makeCtx(player).state
-
-    expect(bakeBreadAction.canBeExecutedByPlayer(state, player)).toBe(false)
-  })
-
-  it('does not prove bake reachability through optional before listener gains', () => {
-    const registry = new CardRegistry()
-    registry.registerListener({
-      id: 'test-optional-grain-before-bake',
-      cardIds: ['TestOptionalGrainBeforeBake'],
-      phases: ['before'],
-      actions: ['bake-bread'],
-      dispatchMode: 'select',
-      handler: () => ({
-        flow: {
-          type: 'leaf',
-          actionId: 'gain',
-          optional: true,
-          params: { grain: 1 },
-        },
-      }),
-    })
-    setActiveCardRegistry(registry)
-    const player = makePlayer({
-      resources: { ...baseResources, grain: 0, clay: 0 },
-      minorPlayed: ['TestOptionalGrainBeforeBake'],
-    })
-    const state = makeCtx(player).state
-
-    expect(bakeBreadAction.canBeExecutedByPlayer(state, player)).toBe(false)
-  })
-
-  it('does not prove bake reachability through serial before listeners', () => {
-    const registry = new CardRegistry()
-    registry.registerListener({
-      id: 'test-serial-grain-before-bake',
-      cardIds: ['TestSerialGrainBeforeBake'],
-      phases: ['before'],
-      actions: ['bake-bread'],
-      handler: () => ({
-        flow: { type: 'leaf', actionId: 'gain', params: { grain: 1 } },
-      }),
-    })
-    setActiveCardRegistry(registry)
-    const player = makePlayer({
-      resources: { ...baseResources, grain: 0, clay: 0 },
-      minorPlayed: ['TestSerialGrainBeforeBake'],
-    })
-    const state = makeCtx(player).state
-
-    expect(bakeBreadAction.canBeExecutedByPlayer(state, player)).toBe(false)
+      },
+    ])
   })
 })

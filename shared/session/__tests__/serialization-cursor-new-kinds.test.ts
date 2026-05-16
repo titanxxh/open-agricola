@@ -220,4 +220,38 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     }
     expect(restored.resolveChoice(0, 'confirm').ok).toBe(false)
   })
+
+  it('engine-blocked kind survives serialize/rehydrate and exposes only undo commands', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 5
+    state.roundPhase = 'work'
+    session.loadState(state)
+
+    const request: InteractionRequest = {
+      kind: 'engine-blocked',
+      actionId: 'bake-bread',
+    }
+    pushSyntheticInteraction(session, request, 'ui.interactionEngineBlocked', [])
+
+    const serialized = serializeState(session.getState().state, {
+      engineStack: session.getEngineStack(),
+    })
+    const wireSafe = JSON.parse(JSON.stringify(serialized))
+    const rehydrated = rehydrateState(wireSafe)
+    const restored = new GameSession(rehydrated)
+    const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
+    expect(restoredEnvelope?.request).toEqual(request)
+
+    const restoredInteraction = restored.getState().interaction
+    expect(restoredInteraction.stateId).toBe('wait')
+    if (restoredInteraction.stateId === 'wait') {
+      expect(restoredInteraction.allowedCommands).toEqual(['undoStep', 'undoAction'])
+      expect(restoredInteraction.anytimeActions).toEqual([])
+      expect(restoredInteraction.options).toEqual([])
+      expect(restored.resolveChoice(0, 'confirm').ok).toBe(false)
+    }
+  })
 })

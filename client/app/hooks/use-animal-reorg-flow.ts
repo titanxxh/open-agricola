@@ -4,11 +4,19 @@ import type { GameState } from '../../../shared/contract/types'
 import type { AnimalReorgState, PendingAnimalReorg, PendingChoice } from '../../types/ui'
 import type { EngineProgress } from './use-engine-flow'
 
-type AnimalTotals = {
+export type AnimalTotals = {
   sheep: number
   boar: number
   cattle: number
 }
+
+export const hasUnassignedAnimals = (remaining: AnimalTotals | null | undefined) =>
+  Boolean(remaining && (remaining.sheep > 0 || remaining.boar > 0 || remaining.cattle > 0))
+
+export const shouldShowAnimalDiscardPrompt = (
+  animalReorg: AnimalReorgState | null,
+  remaining: AnimalTotals | null | undefined,
+) => Boolean(animalReorg && !animalReorg.confirmDiscard && hasUnassignedAnimals(remaining))
 
 export const applyAnimalReorgToPlayer = (params: {
   player: PlayerState

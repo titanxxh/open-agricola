@@ -29,6 +29,7 @@ describe('Engine surface guard', () => {
     'peekPendingEnvelope',
     'peekPendingChoiceFromComposite',
     'peekPendingHost',
+    'setEngineBlockedPending',
   ]
 
   it('public API matches the S4c target surface (5 methods)', () => {

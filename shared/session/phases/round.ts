@@ -20,6 +20,7 @@ import { recordActionSnapshot } from '../../cards/helpers/action-snapshot.ts'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement.ts'
 import { executeCardListener, getMatchingListeners } from '../../cards/card-listeners.ts'
 import { runRoundEndHooks, shouldSkipPlayerTurn } from '../../cards/card-effects.ts'
+import { tagInjectedAnytimeFlow } from '../../engine/action-context-flags.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
 import type { FeedQueueEntry } from '../../contract/types.ts'
 import type { PendingEnvelope } from '../../engine/types.ts'
@@ -91,7 +92,7 @@ export const takeAction = (
   core.setTurnOwner(playerIndex)
   player._activeActionBonusSources = []
   core.setActionStartPlayerSnapshot(core.cloneSessionPlayer(player))
-  core.resetCardEffectDeltas()
+  core.resetActionResultDetails()
   recordActionSnapshot(player, core.allocActionToken())
   const worker = smallestAvailableWorker(state, player)
   if (worker) {
@@ -133,6 +134,7 @@ export const takeAction = (
     core.flushEngineLogPublic()
     player._activeActionBonusSources = []
     core.setActionStartPlayerSnapshot(core.cloneSessionPlayer(player))
+    core.resetActionResultDetails()
   }
 
   core.driveEngineSteps()
@@ -258,9 +260,8 @@ export const continueAfterReorganizeRoundEnd = (
 }
 
 /**
- * Wrap up a single action's per-leaf log: emit the diff entry against
- * the captured pre-action snapshot, then clear the snapshot + the
- * player's _activeActionBonusSources field. Migrated from
+ * Wrap up a single action's per-leaf log: emit the action detail, then clear
+ * the snapshot + the player's _activeActionBonusSources field. Migrated from
  * GameCore.finalizeActionLog (S2 Task 10 part 6).
  */
 export const finalizeActionLog = (core: GameCore, player: PlayerState): void => {
@@ -372,7 +373,7 @@ export const takeAnytimeAction = (
   core.appendHistory()
   if (engine) {
     const owner = core.state.players[playerIndex]
-    engine.injectBeforeFlows([entry.flow], undefined, owner?.id)
+    engine.injectBeforeFlows([tagInjectedAnytimeFlow(entry.flow)], undefined, owner?.id)
   } else {
     const frame = core.buildAdhocEngineFrame(actionId, entry.descriptor.sourceCard, entry.flow)
     core.pushEngineFrame({

@@ -64,12 +64,18 @@ export const gainAction: ActionDefinition = {
       recipients = [player]
     }
 
+    const paid: Partial<Resource> = {}
     if (payerId) {
       const payer = state.players.find((p) => p.id === payerId)
       if (payer) {
         Object.entries(gained).forEach(([key, amount]) => {
           const k = key as keyof Resource
-          payer.resources[k] = Math.max(0, payer.resources[k] - amount)
+          const before = payer.resources[k] ?? 0
+          const paidAmount = Math.min(before, amount)
+          if (paidAmount > 0) {
+            paid[k] = (paid[k] ?? 0) + paidAmount
+          }
+          payer.resources[k] = Math.max(0, before - amount)
         })
       }
     }
@@ -93,6 +99,11 @@ export const gainAction: ActionDefinition = {
       addCardResourceGained(player, sourceCard, totalGain)
     }
 
+    const extraData: Record<string, unknown> = {}
+    if (payerId && Object.values(paid).some((amount) => (amount ?? 0) > 0)) {
+      extraData.actionDetailDeltas = [{ playerId: payerId, costs: paid }]
+    }
+
     if (sourceCard) {
       const logKey = recipientMode === 'others'
         ? 'log.cardEffectOtherPlayersGain'
@@ -102,9 +113,14 @@ export const gainAction: ActionDefinition = {
         resourcesGained: gained,
         logKey,
         logParams: { gain: gained, cardId: sourceCard },
+        ...(Object.keys(extraData).length > 0 ? { extraData } : {}),
       }
     }
-    return { type: 'ok' as const, resourcesGained: gained }
+    return {
+      type: 'ok' as const,
+      resourcesGained: gained,
+      ...(Object.keys(extraData).length > 0 ? { extraData } : {}),
+    }
   },
 }
 
@@ -122,7 +138,7 @@ const createBonusAction = (
     gainResources(player, gain)
     trackWorkPhaseBuildingResources(state, player.id, gain)
     addResourcesFromBoard(player, gain)
-    return { type: 'ok' }
+    return { type: 'ok', resourcesGained: gain }
   },
 })
 

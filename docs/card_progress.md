@@ -11,7 +11,7 @@
 | canonical 层面 BGA-only / OA-only | 0 / 0 |
 | TypeScript 实体卡牌文件数 | 888 |
 | BGA active implemented 但 OA 缺失 | 0 |
-| 待修行为 / 注册差异 | 4 |
+| 待修行为 / 注册差异 | 2 |
 | metadata schema 上抬差异 | 4 |
 | BGA 标 banned 但 OA 按策略保留 | 33 |
 | 待 owner 确认队列 | 0 |
@@ -20,7 +20,7 @@
 是 legacy wrong-name 且 `implemented=false`，OA 不再注册或展示该名称。
 `STUB_BeforeBakeGainClay` 是 dev/test stub，不计入 canonical 卡牌统计或普通发牌池。
 
-### 本轮变更记录（2026-05-15）
+### 本轮变更记录（2026-05-15 ~ 2026-05-16）
 
 - `bake-bread` 核心 action 改为默认非空：不再暴露 `cancel`，`cancel` / 空 `bulk:` / 无效 source / 非正 count / 超出 source 上限 / 超出 grain 总量都会在后端失败，且 `bulk:` 失败保持原子性。
 - `D66_PotterCeramics` 已按 BGA before-bake 语义对齐：以 `dispatchMode: 'select'` 暴露 1 clay -> 1 grain 的纯 flow；无 grain 但有 clay + baking source 时可进入 bake，trigger-select 中 D66 enabled、pass disabled，执行 D66 后进入非空 bake。
@@ -39,6 +39,10 @@
 - structured choice 允许列表从 interaction request metadata 读取；`bake-bread` / `exchange` 的 `bulk:` 不再靠 engine action-id 特判。
 - `A148_Woolgrower` / `B86_TruffleSearcher` 改用全局 `state.completedFeedingPhases` 计入容量；`D13_Trowel` 暴露 wood->stone 翻修；`D15_ClaySupports` 改为可选 multi-key trade；`E5_NightLoot` 列出全部 `(space,type)` 选项、复用 `collect` partial-take，并补可区分的来源展示元数据。
 - `collect` partial-take 在带 `spaceId` 时拒绝缺失 / 非正 `amount` 或缺失 `resource` 的 payload，避免错误回落到 full collect。
+- `C57_Crudite` 已按 BGA 对齐：anytime 多来源进入田地选择、单来源自动结算；收获田地阶段提供 optional 选择；非法来源选择在提交时失败并保留 pending。
+- `C8_PlantFertilizer` 已按 BGA 对齐：onBuy 现在产出 NODE_SEQ + optional + SPECIAL_EFFECT 等效形状（`wrapOptional({type:'leaf', actionId:'special-effect', ...})`），在符合条件的 field 上加 1 个同类型 good（不再 `gain` 进资源池）。支持普通 field（grain/vegetable）、D75 Wood Field / E80 Rock Garden 的 logical group（按 `extraData.stacks` 的 sum-of-remaining===1 判定），以及 B68/C70/D25/E68/E69/E70/E72 这类 `extraData.cardCrop` 单格卡牌田。
+- 新增可复用 `special-effect` kind `plant-additional-good`：接收 `locations: PlantAdditionalGoodLocation[]`，每个 location 是 `{kind:'field', row, col}`、`{kind:'card-stacks', cardId}` 或 `{kind:'card-crop', cardId}`。Invariant 违反（field/stack/cardCrop 缺失）throw，不静默 no-op；多 location 先整体校验再写入，避免半更新。
+- `B138_ForestGuardian` / `C51_FishingNet` 这类 opponent-pays-owner 的 `gain` flow 已补行动者维度的 action-detail delta：卡牌效果收益仍由专属日志记录，行动日志只记录行动者实际支付的成本和行动格收益。
 
 ## 2. 待修行为 / 注册差异
 
@@ -47,8 +51,6 @@
 | 卡牌 | 原始行为 | 当前 OA 行为 | BGA 差距 | 需要修复 |
 |---|---|---|---|---|
 | `B157_Salter` | 玩家可以腌制多种 / 多只动物，并按数量获得未来食物。 | 当前 flow 是 XOR，只能三选一且只能选 1 只动物。 | BGA 一次交互可选择 sheep / boar / cattle 的多个数量。 | 改成显式多类型计数选择，并按类型 / 数量发放 future food。 |
-| `C8_PlantFertilizer` | 支持 grain / vegetable / wood / stone 等逻辑田组。 | 只处理物理 grain / vegetable field。 | BGA 可作用于后续卡牌创建的 wood / stone field 逻辑组。 | 田地查找改成 group-aware，并纳入已激活的 wood / stone 可播种组。 |
-| `C57_Crudite` | 收获时可选触发，玩家选择移除哪个 vegetable 来源。 | harvest handler 直接移除第一个符合条件的 vegetable，效果上是强制触发。 | BGA 在多来源时给 optional choice。 | 改成显式 optional pending / flow，并让玩家选择来源。 |
 | `C140_PackagingArtist` | 把 Major Improvement action 加入 replacement action pool。 | 实现了 minor replacement / `isDoable`，但没有把 Major Improvement 加进可替换 action pool。 | BGA 允许此卡扩展 replacement action 集合。 | 增加缺失的通用 action-pool 扩展点。 |
 
 ## 3. Metadata Schema 上抬差异
@@ -148,8 +150,13 @@ pnpm run lint
 
 ## 9. 当前轮次
 
+- 2026-05-16 — `B42_ForestInn` 对齐 BGA activate flow：非主人先支付 owner 1 food，随后进入 5/7/9 wood 的 XOR pay-gain 分支。
+- 2026-05-16 — C60_SmallPottersOven mandatory bake continuation fixed: skipping Stone Oven onBuy bake after C60 before-bake build now reaches engine-blocked instead of ending the turn.
+- 2026-05-15 — Engine-level mandatory bake alignment: client treats `engine-blocked` as a dedicated prompt-only pending state and hides choice/anytime actions while blocked.
 - 2026-05-15 — Wave 1 cards (A148/B86/D15/D13/E5) aligned to BGA; 4 infra extensions
 - 2026-05-15 — C60/B27/E130/E97 side improvement flows aligned to BGA `trueAction=false`; removed synthetic onBuy suppression from improvement/occupation apply leaves
+- 2026-05-15 — C57_Crudite aligned to BGA field-vegetable selection semantics; added strict multi-field crop removal and selection bound validation.
+- 2026-05-16 — C8_PlantFertilizer 对齐 BGA（NODE_SEQ + optional + SPECIAL_EFFECT 等效形状）；新增 `plant-additional-good` special-effect kind
 
 ## 10. 基础设施
 
@@ -161,10 +168,18 @@ pnpm run lint
 - `TradeModifier.conditions?: Record<string, number>` — D15 trade gated by `houseTypeClay`；其余 `houseTypeWood` / `houseTypeStone` / `minNumRooms` 同套机制。
 - `onComputeAnimalZones` 签名加 `state: GameState` 入参（A148 / B86 读全局 feeding counter，避免再走玩家局部 state）。
 - `improvement-any` 的 `params.trueAction=false` 会传播到生成的 `pay` / `apply-improvement` leaf `actionContext`，用于 BGA-style 非真实 action 过滤，但不抑制所购卡牌 `onBuy`。
+- 已执行过 before phase 的 continuation node 在后续 `isDoable` 判定中携带 `skipBeforeTriggers`，避免 C60 这类 before-reachability listener 把原始 mandatory bake 再次判成可执行。
+- `special-effect.remove-field-crops` — 按坐标严格校验多块田顶层作物后原子扣除，供 C57 这类多来源 field crop 选择复用。
+- `commitSelectionChoice` 会拒绝不在 `actionContext.selectableTiles` 内的 farm-position 提交，避免非法选择消费 pending flow。
+- `special-effect` 新增 `plant-additional-good` kind — 在玩家 field、cardStates 的 `extraData.stacks` 或 `extraData.cardCrop` 上把 lone good remaining +1。当前 C8_PlantFertilizer 使用；写入前先整体校验所有 location。
 
 ## 11. 时间线
 
 | 日期 | 批次 | 涉及卡牌 / 基建 |
 |---|---|---|
+| 2026-05-16 | B42 flow alignment | B42_ForestInn |
+| 2026-05-16 | C60 mandatory bake continuation | C60_SmallPottersOven + before-resolved continuation `skipBeforeTriggers` |
+| 2026-05-15 | C57 selection alignment | C57_Crudite + `remove-field-crops` / farm-position selectableTiles validation |
 | 2026-05-15 | trueAction follow-up | C60_SmallPottersOven / B27_Toolbox / E130_Overachiever / E97_Beneficiary + improvement-any/minor-improvement `trueAction=false` propagation |
 | 2026-05-15 | Wave 1 | A148_Woolgrower / B86_TruffleSearcher / D15_ClaySupports / D13_Trowel / E5_NightLoot + 4 项基建（§10） |
+| 2026-05-16 | C8 alignment | C8_PlantFertilizer + `plant-additional-good` special-effect kind |

@@ -123,7 +123,11 @@ const finalizeStables = (
   if (ctx.sourceCard) {
     addCardResourceGained(ctx.player, ctx.sourceCard, { stable: stables.length })
   }
-  return { type: 'ok', extraData: { builtStables: stables } }
+  return {
+    type: 'ok',
+    resourcesPaid: sanitizePayableCost(payment.solution.resourcesPaid),
+    extraData: { builtStables: stables },
+  }
 }
 
 export const stablesAction: ActionDefinition = {

@@ -44,6 +44,7 @@ import {
   type FarmCommitType,
   type WsStatus,
 } from './game-container-helpers'
+import { shouldShowAnimalDiscardPrompt } from './hooks/use-animal-reorg-flow'
 
 type RoundSlot = { round: number; action?: ActionSpace }
 
@@ -587,21 +588,29 @@ export const GameContainerApi = () => {
     if (!isInteractive) return
     void transport.confirmPlayerSwitch().catch((e) => console.error(e))
   }, [transport, isInteractive])
-  const confirmAnimalReorg = useCallback(() => {
-    resolveChoice('confirm')
-  }, [resolveChoice])
   const resetGame = useCallback(() => {
     if (!isInteractive) return
     const seed = resetSeedInput ? Number(resetSeedInput) : undefined
     void transport.newGame(Number.isFinite(seed) ? seed : undefined).catch((e) => console.error(e))
   }, [transport, isInteractive, resetSeedInput])
 
+  const interactionRequestKind =
+    interaction.stateId === 'wait'
+      ? (interaction.request as { kind?: string }).kind
+      : null
+  const pendingEngineBlocked =
+    interaction.stateId === 'wait' && interactionRequestKind === 'engine-blocked'
+      ? {
+          promptKey: interaction.promptKey,
+          promptParams: interaction.promptParams,
+        }
+      : null
   const pendingChoice =
     interaction.stateId === 'wait' &&
-    (interaction.request.kind === 'choice' ||
-      interaction.request.kind === 'select-trigger' ||
-      interaction.request.kind === 'farm-select' ||
-      interaction.request.kind === 'selection' ||
+    (interactionRequestKind === 'choice' ||
+      interactionRequestKind === 'select-trigger' ||
+      interactionRequestKind === 'farm-select' ||
+      interactionRequestKind === 'selection' ||
       interaction.farm !== undefined ||
       interaction.selection !== undefined)
       ? {
@@ -1015,11 +1024,18 @@ export const GameContainerApi = () => {
     if (!reorgAvailable) return false
     return reorgTotals.sheep > reorgAvailable.sheep || reorgTotals.boar > reorgAvailable.boar || reorgTotals.cattle > reorgAvailable.cattle
   }, [reorgAvailable, reorgTotals])
-  const reorgRemaining = reorgAvailable ? {
+  const reorgRemaining = useMemo(() => reorgAvailable ? {
     sheep: Math.max(0, reorgAvailable.sheep - reorgTotals.sheep),
     boar: Math.max(0, reorgAvailable.boar - reorgTotals.boar),
     cattle: Math.max(0, reorgAvailable.cattle - reorgTotals.cattle),
-  } : null
+  } : null, [reorgAvailable, reorgTotals])
+  const confirmAnimalReorg = useCallback(() => {
+    if (shouldShowAnimalDiscardPrompt(animalReorg, reorgRemaining)) {
+      setAnimalReorg((prev) => prev ? { ...prev, confirmDiscard: true } : prev)
+      return
+    }
+    resolveChoice('confirm')
+  }, [animalReorg, reorgRemaining, resolveChoice])
   const roomSelectableSet = useMemo(
     () => {
       if (farmInteraction?.farmType !== 'room') return new Set<string>()
@@ -1775,6 +1791,7 @@ export const GameContainerApi = () => {
 
       <InteractionBar
         pendingAnimalReorg={pendingAnimalReorg} pendingChoice={pendingChoice}
+        pendingEngineBlocked={pendingEngineBlocked}
         pendingNextPlayerIndex={pendingNextPlayerIndex} locale={locale}
         pendingPlayerSwitch={pendingPlayerSwitch}
         confirmPlayerSwitch={confirmPlayerSwitch}
@@ -1796,7 +1813,7 @@ export const GameContainerApi = () => {
         onShowScoring={() => setShowScoringPad(true)}
         historyLength={historyLength}
         hasActionStartSnapshot={hasActionStartSnapshot}
-        anytimeActions={interaction.anytimeActions}
+        anytimeActions={pendingEngineBlocked ? [] : interaction.anytimeActions}
         takeAnytimeAction={takeAnytimeAction}
         canBuildPalisades={!!currentPlayer && playerCanBuildPalisades(currentPlayer)}
         fencePlacementMode={fencePlacementMode}
