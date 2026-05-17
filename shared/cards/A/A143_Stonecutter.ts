@@ -19,7 +19,7 @@ const improvementCostListener: CardListenerRegistration = {
   id: 'A143-stonecutter-costs-improvement',
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
-  actions: ['improvement-any', 'minor-improvement'],
+  actions: ['improvement'],
   handler: (_context: CardListenerContext): ActionHookResult | void => {
     return { costs: { stone: -1 } }
   },

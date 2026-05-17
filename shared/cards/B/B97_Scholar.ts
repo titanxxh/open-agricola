@@ -20,7 +20,8 @@ export const B97_Scholar_impl = {
         },
         {
           type: 'leaf',
-          actionId: 'minor-improvement',
+          actionId: 'improvement',
+          params: { types: ['minor'] },
           sourceCard: CARD_ID,
           actionContext: { trueAction: false },
         },

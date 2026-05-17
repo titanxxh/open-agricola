@@ -10,7 +10,7 @@ const listener: CardListenerRegistration = {
   id: 'A109-small-trader-after-improvement',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['improvement-any'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const choice = context.choice
     if (!choice || !choice.startsWith('minor:')) return

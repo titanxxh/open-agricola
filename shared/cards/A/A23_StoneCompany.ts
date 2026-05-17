@@ -21,7 +21,7 @@ const listener: CardListenerRegistration = {
         children: [
           {
             type: 'leaf',
-            actionId: 'improvement-any',
+            actionId: 'improvement',
             sourceCard: CARD_ID,
             actionContext: { purchaseCondition: CARD_ID },
           },
