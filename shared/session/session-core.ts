@@ -87,6 +87,7 @@ import { getCardEffect } from '../cards/card-effects.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
 import { runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks } from '../cards/card-effects.ts'
 import { positionKey } from '../domain/farm.ts'
+import { getAssignedAnimalsByType } from '../domain/animals.ts'
 import { getMatchingListeners, executeCardListener } from '../cards/card-listeners.ts'
 import { buildPhaseTrailingNodes, markOptional, stampOwner } from '../engine/engine-utils.ts'
 import { Scoring, playerBoard, type PlayerScoreSummary } from '../domain'
@@ -3396,6 +3397,16 @@ export class GameCore {
       }
       if (total < 1) {
         return this.respond(false, 'salter-pick.error.must-pick-at-least-one')
+      }
+      // Pre-validate over-board BEFORE pushHistory / resolveChoice. Otherwise engine
+      // returns {type:'fail'} on bound violation, which already clears the pending
+      // envelope and drops the player to idle — a malformed submit would lock the
+      // interaction. Effect-layer bounds remain enforced as defense-in-depth.
+      const onBoard = getAssignedAnimalsByType(player)
+      for (const t of ['sheep', 'boar', 'cattle'] as const) {
+        if (counts[t] > onBoard[t]) {
+          return this.respond(false, `salter-pick.error.invalid-count-${t}`)
+        }
       }
       this.pushHistory()
       const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('animal-quantity')

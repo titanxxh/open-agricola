@@ -125,6 +125,31 @@ describe('B157_Salter session', () => {
     expect(resp.ok).toBe(false)
   })
 
+  it('commit over-board: pre-validate fail 后 pending 保留, 可重试合法 counts', () => {
+    const session = setup({
+      resources: { sheep: 2 },
+      pastures: [{ id:'p1',size:2,tiles:[{row:2,col:0}],stables:0,animalType:'sheep',animalCount:2 }],
+      round: 3,
+    })
+    const open = session.takeAnytimeAction(0, 'B157-salter-anytime')
+    expect(open.ok).toBe(true)
+    expect(open.interaction.stateId).toBe('wait')
+    // over-board commit: counts.sheep=99 > onBoard.sheep=2
+    const bad = session.commitSelectionChoice(0, { animalCounts: { sheep:99, boar:0, cattle:0 } })
+    expect(bad.ok).toBe(false)
+    // pending envelope 仍保留（玩家可以再次提交）
+    expect(bad.interaction.stateId).toBe('wait')
+    if (bad.interaction.stateId === 'wait') {
+      expect(bad.interaction.request.kind).toBe('animal-quantity-select')
+    }
+    // 重试合法 counts → success
+    const good = session.commitSelectionChoice(0, { animalCounts: { sheep:2, boar:0, cattle:0 } })
+    expect(good.ok).toBe(true)
+    const p = good.state.players[0]!
+    expect(p.resources.sheep).toBe(0)
+    expect(p.pastures[0].animalCount).toBe(0)
+  })
+
   it('clampRound: round=13 sheep → futureMeeples 只剩 round 14 一条', () => {
     const session = setup({
       resources: { sheep: 1 },
