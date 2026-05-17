@@ -24,7 +24,8 @@ const buildTaskArtisanFlow = () => ({
     gainLeaf(CARD_ID, { wood: 1 }),
     {
       type: 'leaf' as const,
-      actionId: 'minor-improvement',
+      actionId: 'improvement',
+      params: { types: ['minor'] },
       optional: true,
       sourceCard: CARD_ID,
     },

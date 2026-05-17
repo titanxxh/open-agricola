@@ -16,7 +16,7 @@ const computeCostsListener: CardListenerRegistration = {
   id: 'B95-master-bricklayer-compute-costs',
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
-  actions: ['improvement-any'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     // Only applies to major improvements
     const cardId = context.cardId

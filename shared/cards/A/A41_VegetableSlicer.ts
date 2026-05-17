@@ -13,7 +13,7 @@ const FIREPLACE_IDS = new Set(['Major_Fireplace1', 'Major_Fireplace2'])
 const listener: CardListenerRegistration = {
   id: 'A41-vegetable-slicer-after-improvement',
   cardIds: [CARD_ID],
-  actions: ['improvement-any'],
+  actions: ['improvement'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const result = context.result

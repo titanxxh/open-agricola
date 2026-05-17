@@ -1,5 +1,6 @@
 import { getRegisteredMinorImprovement } from '../../cards-display/types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import { readImprovementTypes } from '../../actions/effects/improvement'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ComplexCost, GameState, PlayerState } from '../../contract/types'
 import { getMajorCard } from '../major'
@@ -56,7 +57,7 @@ const canPlayAnyMajorImprovement = (context: CardListenerContext, player: Player
     canAffordCardPreviewCostByProvider(
       context.state,
       player,
-      'improvement-any',
+      'improvement',
       improvementId,
       () => getMajorCard(improvementId)?.cost ?? null,
       context.actionId,
@@ -72,7 +73,7 @@ const canPlayAnyMinorImprovement = (context: CardListenerContext, player: Player
       resolveCardPreviewCostByProvider(
         context.state,
         player,
-        'improvement-any',
+        'improvement',
         improvement.id,
         () =>
           improvement.altCosts && improvement.altCosts.length > 0
@@ -100,7 +101,7 @@ const beforeListener: CardListenerRegistration = {
   id: 'B75-wood-workshop-before-improvement',
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
-  actions: ['improvement-any', 'minor-improvement'],
+  actions: ['improvement'],
   handler: (_context: CardListenerContext): ActionHookResult | void => {
     return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }
   },
@@ -110,11 +111,13 @@ const isDoableListener: CardListenerRegistration = {
   id: 'B75-wood-workshop-isdoable-improvement',
   cardIds: [CARD_ID],
   phases: ['isDoable' as ActionHookPhase],
-  actions: ['improvement-any', 'minor-improvement'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
     const previewPlayer = createPreviewPlayer(context.player)
-    const doable = context.actionId === 'minor-improvement'
+    const types = readImprovementTypes(context)
+    const onlyMinor = types.length === 1 && types[0] === 'minor'
+    const doable = onlyMinor
       ? canPlayAnyMinorImprovement(context, previewPlayer)
       : canPlayAnyMajorImprovement(context, previewPlayer) ||
         canPlayAnyMinorImprovement(context, previewPlayer)

@@ -16,7 +16,7 @@ const listener: CardListenerRegistration = {
   id: 'A131-craft-teacher-after-improvement',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['improvement-any'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const builtCardId = getBuiltCardId(context.choice)
     if (!builtCardId || !TRIGGER_MAJORS.has(builtCardId)) return

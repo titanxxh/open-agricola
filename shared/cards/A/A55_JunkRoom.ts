@@ -10,7 +10,7 @@ const listener: CardListenerRegistration = {
   id: 'A55-junk-room-during-improvement',
   cardIds: [CARD_ID],
   phases: ['during' as ActionHookPhase],
-  actions: ['improvement-any', 'minor-improvement'],
+  actions: ['improvement'],
   handler: (_context: CardListenerContext): ActionHookResult | void => {
     return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
   },

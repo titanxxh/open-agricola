@@ -21,7 +21,7 @@ const computeCostsListener: CardListenerRegistration = {
   id: 'B36-bottles-compute-costs',
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
-  actions: ['minor-improvement', 'improvement-any'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.cardId !== CARD_ID) return
     const farmers = familySize(context.player)

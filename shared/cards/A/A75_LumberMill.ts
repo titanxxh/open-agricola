@@ -13,7 +13,7 @@ const computeCostsListener: CardListenerRegistration = {
   id: 'A75-lumber-mill-compute-costs',
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
-  actions: ['improvement-any', 'minor-improvement'],
+  actions: ['improvement'],
   handler: (_context: CardListenerContext): ActionHookResult | void => {
     return { costs: { wood: -1 } }
   },

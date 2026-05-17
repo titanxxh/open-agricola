@@ -18,7 +18,8 @@ const listener: CardListenerRegistration = {
     return {
       flow: {
         type: 'leaf',
-        actionId: 'minor-improvement',
+        actionId: 'improvement',
+        params: { types: ['minor'] },
         optional: true,
         sourceCard: CARD_ID,
         actionContext: { trueAction: false },

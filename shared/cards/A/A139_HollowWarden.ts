@@ -30,7 +30,7 @@ const onBuyListener: CardListenerRegistration = {
     return {
       flow: {
         type: 'leaf',
-        actionId: 'improvement-any',
+        actionId: 'improvement',
         optional: true,
         sourceCard: CARD_ID,
         actionContext: { trueAction: false },
