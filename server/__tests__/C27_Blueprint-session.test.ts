@@ -46,7 +46,7 @@ describe('C27_Blueprint session — verify chooseOne aligned to BGA majors', () 
     const resolved = resolveCardCostWithModifiers(
       state,
       player,
-      'improvement-any',
+      'improvement',
       majorId,
       baseCost,
     )
@@ -62,7 +62,7 @@ describe('C27_Blueprint session — verify chooseOne aligned to BGA majors', () 
     const resolved = resolveCardCostWithModifiers(
       state,
       player,
-      'improvement-any',
+      'improvement',
       'Major_Fireplace',
       baseCost,
     )
@@ -78,7 +78,7 @@ describe('C27_Blueprint session — verify chooseOne aligned to BGA majors', () 
     const resolved = resolveCardCostWithModifiers(
       state,
       other,
-      'improvement-any',
+      'improvement',
       'Major_Joinery',
       baseCost,
     )
@@ -130,7 +130,8 @@ describe('C27_Blueprint session — minor-improvement routing for 3 majors', () 
     const result = executeCardListener(listener!, {
       state,
       player,
-      actionId: 'minor-improvement',
+      actionId: 'improvement',
+      params: { types: ['minor'] },
       phase: 'computeChoiceCandidates',
     } as unknown as CardListenerContext)
 
@@ -151,7 +152,8 @@ describe('C27_Blueprint session — minor-improvement routing for 3 majors', () 
     const result = executeCardListener(listener, {
       state,
       player,
-      actionId: 'minor-improvement',
+      actionId: 'improvement',
+      params: { types: ['minor'] },
       phase: 'computeChoiceCandidates',
     } as unknown as CardListenerContext)
 
@@ -166,7 +168,8 @@ describe('C27_Blueprint session — minor-improvement routing for 3 majors', () 
     const result = executeCardListener(listener, {
       state,
       player,
-      actionId: 'minor-improvement',
+      actionId: 'improvement',
+      params: { types: ['minor'] },
       phase: 'computeChoiceCandidates',
     } as unknown as CardListenerContext)
 

@@ -85,7 +85,7 @@ describe('D96_Furnisher', () => {
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
     expect(flow.children).toHaveLength(1)
-    expect(flow.children[0].children[0].actionId).toBe('improvement-any')
+    expect(flow.children[0].children[0].actionId).toBe('improvement')
     expect(flow.children[0].children[0].sourceCard).toBe(CARD_ID)
   })
 

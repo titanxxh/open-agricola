@@ -87,7 +87,8 @@ describe('D131_CraftsmanshipPromoter listener (unit)', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      actionId: 'minor-improvement',
+      actionId: 'improvement',
+      params: { types: ['minor'] },
       phase: 'computeChoiceCandidates',
     } as unknown as CardListenerContext)
 
@@ -112,7 +113,8 @@ describe('D131_CraftsmanshipPromoter listener (unit)', () => {
     const result = executeCardListener(listener, {
       state,
       player,
-      actionId: 'minor-improvement',
+      actionId: 'improvement',
+      params: { types: ['minor'] },
       phase: 'computeChoiceCandidates',
     } as unknown as CardListenerContext)
 
@@ -130,7 +132,8 @@ describe('D131_CraftsmanshipPromoter listener (unit)', () => {
     const result = executeCardListener(listener, {
       state,
       player,
-      actionId: 'minor-improvement',
+      actionId: 'improvement',
+      params: { types: ['minor'] },
       phase: 'computeChoiceCandidates',
     } as unknown as CardListenerContext)
 

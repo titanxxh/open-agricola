@@ -1,5 +1,6 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardListenerRegistration } from '../card-listeners'
+import { readImprovementTypes } from '../../actions/effects/improvement'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../contract/types'
 import type { CardImpl } from '../registry'
@@ -23,9 +24,11 @@ const D131_BOTTOM_ROW_MAJORS = [
 const choiceCandidateListener: CardListenerRegistration = {
   id: 'D131-craftsmanship-promoter-compute-choice-candidates',
   cardIds: [CARD_ID],
-  actions: ['minor-improvement'],
+  actions: ['improvement'],
   phases: ['computeChoiceCandidates' as ActionHookPhase],
   handler: (ctx) => {
+    const types = readImprovementTypes(ctx)
+    if (types.length !== 1 || types[0] !== 'minor') return
     if (!ctx.player.occupationPlayed.includes(CARD_ID)) return
     const available = ctx.state.availableMajorImprovements ?? []
     const extraOptions: ActionChoiceOption[] = D131_BOTTOM_ROW_MAJORS

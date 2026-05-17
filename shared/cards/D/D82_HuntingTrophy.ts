@@ -60,7 +60,7 @@ const improvementCostListener: CardListenerRegistration = {
   id: 'D82-hunting-trophy-improvement-compute-costs',
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
-  actions: ['improvement-any', 'minor-improvement'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isHouseRedev(context)) return
     const bonus: Bonus = {

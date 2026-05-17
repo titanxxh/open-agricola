@@ -195,8 +195,8 @@ describe('C140_PackagingArtist session', () => {
   it('computeReplace fires on improvement-any too (Major Improvement space)', () => {
     const listener = findListener('C140-packaging-artist-replace-minor-improvement')
     expect(listener).toBeDefined()
-    // Registration shape: listener must be registered on improvement-any.
-    expect(listener!.actions).toContain('improvement-any')
+    // Registration shape: listener must be registered on unified 'improvement'.
+    expect(listener!.actions).toContain('improvement')
 
     const session = new GameSession()
     const state = session.getState().state
@@ -208,7 +208,7 @@ describe('C140_PackagingArtist session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      actionId: 'improvement-any',
+      actionId: 'improvement',
       phase: 'computeReplace',
     } as unknown as CardListenerContext)
     expect(result).toBeDefined()
@@ -222,7 +222,7 @@ describe('C140_PackagingArtist session', () => {
   it('isDoable forces doable=true on improvement-any when not doable', () => {
     const listener = findListener('C140-packaging-artist-isdoable-minor-improvement')
     expect(listener).toBeDefined()
-    expect(listener!.actions).toContain('improvement-any')
+    expect(listener!.actions).toContain('improvement')
 
     const session = new GameSession()
     const state = session.getState().state
@@ -234,7 +234,7 @@ describe('C140_PackagingArtist session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      actionId: 'improvement-any',
+      actionId: 'improvement',
       phase: 'isDoable',
       doable: false,
     } as unknown as CardListenerContext)

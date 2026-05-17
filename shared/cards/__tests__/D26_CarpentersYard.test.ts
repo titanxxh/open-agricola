@@ -63,7 +63,7 @@ describe('D26_CarpentersYard', () => {
       state,
       player,
       space: createSpace('major-improvement'),
-      actionId: 'improvement-any',
+      actionId: 'improvement',
       phase: 'immediatelyAfter',
       cardId: 'Major_Well',
       trueAction: true,
@@ -72,7 +72,7 @@ describe('D26_CarpentersYard', () => {
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
-    expect(flow.children[0].actionId).toBe('improvement-any')
+    expect(flow.children[0].actionId).toBe('improvement')
     expect(flow.children[0].params.allowedPurchases).toEqual(['Major_Joinery'])
   })
 
@@ -84,7 +84,7 @@ describe('D26_CarpentersYard', () => {
       state,
       player,
       space: createSpace('major-improvement'),
-      actionId: 'improvement-any',
+      actionId: 'improvement',
       phase: 'immediatelyAfter',
       cardId: 'Major_Joinery',
       trueAction: true,
@@ -102,7 +102,7 @@ describe('D26_CarpentersYard', () => {
       state,
       player,
       space: createSpace('major-improvement'),
-      actionId: 'improvement-any',
+      actionId: 'improvement',
       phase: 'immediatelyAfter',
       cardId: 'Major_ClayOven',
       trueAction: true,
@@ -119,7 +119,7 @@ describe('D26_CarpentersYard', () => {
       state,
       player,
       space: createSpace('major-improvement'),
-      actionId: 'improvement-any',
+      actionId: 'improvement',
       phase: 'immediatelyAfter',
       cardId: 'Major_Well',
       trueAction: true,
@@ -135,7 +135,7 @@ describe('D26_CarpentersYard', () => {
       state,
       player,
       space: createSpace('major-improvement'),
-      actionId: 'improvement-any',
+      actionId: 'improvement',
       phase: 'immediatelyAfter',
       cardId: 'Major_Well',
       trueAction: false,

@@ -421,7 +421,7 @@ describe('priority plan implementations', () => {
 
     expect(result?.flow).toMatchObject({
       type: 'leaf',
-      actionId: 'improvement-any',
+      actionId: 'improvement',
       optional: true,
       params: {
         allowedPurchases: ['Major_ClayOven'],

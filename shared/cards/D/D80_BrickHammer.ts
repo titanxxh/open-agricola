@@ -1,5 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { readImprovementTypes } from '../../actions/effects/improvement'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getMinorImprovementCard } from '../catalog'
 import { getMajorCard } from '../major'
@@ -29,8 +30,9 @@ const listener: CardListenerRegistration = {
   id: 'D80-brick-hammer-after-improvement',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['improvement-any'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!readImprovementTypes(context).includes('major')) return
     const choice = context.choice ?? ''
     const builtId = choice.replace(/^major:/, '').replace(/^minor:/, '')
     if (!builtId) return

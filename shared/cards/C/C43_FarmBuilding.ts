@@ -10,7 +10,7 @@ const listener: CardListenerRegistration = {
   id: 'C43-farm-building-after-improvement',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['improvement-any'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const choice = context.choice ?? ''
     if (!choice.startsWith('major:')) return
