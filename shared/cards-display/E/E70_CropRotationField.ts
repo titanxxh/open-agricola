@@ -15,4 +15,5 @@ export const E70_CropRotationField = new MinorImprovement({
   prerequisite: '1 Occupation',
   occupationPrerequisites: { min: 1 },
   isField: true,
+  cardField: { allowedCrops: ['grain', 'vegetable'], capacity: 1 },
 })
