@@ -30,7 +30,7 @@ const computeCostsListener: CardListenerRegistration = {
   id: 'E109-braid-maker-compute-costs-basket',
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
-  actions: ['improvement-any', 'minor-improvement'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.cardId !== 'Major_Basket') return
     // Base cost is { reed: 2, stone: 2 } → reduce to { reed: 1, stone: 1 }.

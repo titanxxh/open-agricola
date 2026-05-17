@@ -117,7 +117,7 @@ const makeListener = (
 
 export const E144_WaresSalesman_impl = {
   listeners: [makeListener(
-    ['improvement-any', 'minor-improvement'],
+    ['improvement'],
     'E144-wares-salesman-after-improvement',
   ), makeListener(['play-occupation'], 'E144-wares-salesman-after-occupation')],
   reaches: [] as readonly string[],

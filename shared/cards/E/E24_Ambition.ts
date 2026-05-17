@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { E24_Ambition } from '../../cards-display/E/E24_Ambition'
+import { readImprovementTypes } from '../../actions/effects/improvement'
 
 const CARD_ID = E24_Ambition.id
 
@@ -12,10 +13,11 @@ const CARD_ID = E24_Ambition.id
  * BGA: onPlayerComputePlaceFarmerFlow — modifies the flow on MeetingPlace and
  * WishChildren action spaces to allow MAJOR in addition to MINOR improvements.
  *
- * Implementation: Use a computeReplace listener on 'minor-improvement' that
- * substitutes 'improvement-any' when this card is played.
- * The BGA description says this only applies to literal Minor Improvement action
- * spaces (meeting-place, wish-children, and the dedicated minor-improvement space).
+ * Implementation: Use a computeReplace listener on the unified 'improvement'
+ * action (gated to minor-only sub-flows via readImprovementTypes) and re-emit
+ * with params.types: ['major','minor'] so the player can now also build major.
+ * The BGA description says this only applies to literal Minor Improvement
+ * action spaces (meeting-place, wish-children, urgent-wish-children).
  *
  * Prerequisite: 2 Occupations.
  */
@@ -23,13 +25,21 @@ const computeReplaceListener: CardListenerRegistration = {
   id: 'E24-ambition-replace-minor-improvement',
   cardIds: [CARD_ID],
   phases: ['computeReplace' as ActionHookPhase],
-  actions: ['minor-improvement'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    // Only replace when on meeting-place or wish-children action spaces
+    if (context.actionContext?.checkedReplaceAction) return
+    const types = readImprovementTypes(context)
+    if (types.length !== 1 || types[0] !== 'minor') return
     const spaceId = context.space?.id
     if (spaceId !== 'meeting-place' && spaceId !== 'wish-children' && spaceId !== 'urgent-wish-children') return
     return {
-      actionId: 'improvement-any',
+      decline: true,
+      alternativeFlow: {
+        type: 'leaf',
+        actionId: 'improvement',
+        params: { types: ['major', 'minor'] },
+        sourceCard: CARD_ID,
+      },
       sourceCard: CARD_ID,
     }
   },
