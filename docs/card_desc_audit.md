@@ -43,6 +43,22 @@ BGA 将这些 buyability 规则写在自定义代码里，而不是普通 metada
 | `B56_Brook` | 显式 `prerequisite` label / handler。 | 自定义 `isBuyable`，没有 plain prerequisite 字段。 | 接受为 schema-up 差异。 |
 | `B74_ThickForest` | 显式 `prerequisite` label / handler。 | 自定义 `isBuyable`，没有 plain prerequisite 字段。 | 接受为 schema-up 差异。 |
 
+## 3.1 cardField 重对齐 / 偏离记录（2026-05-17）
+
+11 张"卡牌即田"统一迁移到 `cardField` 声明式 helper 后，desc 与行为的对齐状态：
+
+| 卡牌 | desc 状态 | 行为变更 |
+|---|---|---|
+| `B113_PatchCaregiver` | desc "This card is a field" 现已名副其实。 | 之前只保留 `onBuy` 缺 sow/harvest path；现按 BGA `constraints=null` 启用 4 crop 全允许 + cardField sow/harvest，保留 `onBuy`。 |
+| `B141_FieldCaretaker` | desc "This card is a field" 现已名副其实。 | 同上：4 crop 全允许 + cardField sow/harvest + 保留 `onBuy`。 |
+
+已知偏离（保留现状，不阻塞 cardField 迁移）：
+
+| 卡牌 | OA `allowedCrops` | BGA `constraints` | 当前处理 |
+|---|---|---|---|
+| `E70_CropRotationField` | `['grain','vegetable']` | `null`（4 crop） | 保留 grain/vegetable，后续独立 audit 决定是否对齐。 |
+| `E72_ArtichokeField` | `['grain','vegetable']` | `null`（4 crop） | 同上。 |
+
 ## 4. BGA-Banned 但 OA 保留
 
 BGA 将这些卡标为 banned / non-standard，但 OA 当前按产品策略保留。它们不应计入 metadata mismatch。
