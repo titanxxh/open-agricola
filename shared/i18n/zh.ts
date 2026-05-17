@@ -462,6 +462,7 @@ export const zh = {
     'family-growth': { name: '家庭增长', description: '增加 1 家庭成员' },
     'minor-improvement': { name: '小改良', description: '打出 1 张小改良' },
     'major-improvement': { name: '大型改良', description: '建造一张大型改良' },
+    'improvement': { name: '改良', description: '建造大型改良或打出小改良' },
     fencing: { name: '围栏', description: '建造围栏圈地' },
     stables: { name: '畜栏', description: '建造 1 个畜栏' },
     construct: { name: '扩建房屋', description: '扩建房屋' },

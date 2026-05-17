@@ -481,6 +481,7 @@ export const en = {
     'family-growth': { name: 'Family Growth', description: 'Grow family' },
     'minor-improvement': { name: 'Minor Improvement', description: 'Play a minor improvement' },
     'major-improvement': { name: 'Improvements', description: 'Build a major improvement' },
+    'improvement': { name: 'Improvement', description: 'Build a major improvement or play a minor improvement' },
     fencing: { name: 'Fencing', description: 'Build fences to form a pasture' },
     stables: { name: 'Stables', description: 'Build 1 stable' },
     construct: { name: 'Build Rooms', description: 'Build rooms' },
