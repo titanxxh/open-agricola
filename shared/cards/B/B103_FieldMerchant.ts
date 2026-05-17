@@ -10,7 +10,7 @@ const computeReplaceListener: CardListenerRegistration = {
   id: 'B103-field-merchant-replace-improvement',
   cardIds: [CARD_ID],
   phases: ['computeReplace' as ActionHookPhase],
-  actions: ['improvement-any'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.trueAction === false) return
     if (context.actionContext?.checkedReplaceAction) return
@@ -49,7 +49,7 @@ const isDoableListener: CardListenerRegistration = {
   id: 'B103-field-merchant-isdoable-improvement',
   cardIds: [CARD_ID],
   phases: ['isDoable' as ActionHookPhase],
-  actions: ['improvement-any'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
     return { doable: true }

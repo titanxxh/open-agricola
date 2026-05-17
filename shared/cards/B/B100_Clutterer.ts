@@ -28,7 +28,7 @@ const afterImprovementListener: CardListenerRegistration = {
   id: 'B100-clutterer-after-improvement',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['improvement-any', 'minor-improvement'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const desc = getPlayedCardDesc(context.choice)
     if (!desc || !hasAccumulationText(desc)) return
