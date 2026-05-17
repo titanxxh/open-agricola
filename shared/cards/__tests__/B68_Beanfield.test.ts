@@ -68,13 +68,13 @@ describe('B68_Beanfield', () => {
       expect(fields).toHaveLength(1)
       expect(fields[0].allowedCrops).toEqual(['vegetable'])
       expect(fields[0].sourceCard).toBe(CARD_ID)
-      expect(fields[0].tile).toEqual({ row: -1, col: 68 })
+      expect(fields[0].tile).toEqual({ row: -1, col: 2068 })
     })
 
     it('returns empty when card already has a crop', () => {
       const effect = getCardEffect(CARD_ID)!
       const player = createPlayer()
-      player.cardStates = { [CARD_ID]: { extraData: { cardCrop: { crop: 'vegetable', remaining: 2 } } } } as any
+      player.cardStates = { [CARD_ID]: { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] } } } as any
       const fields = effect.onComputeSowableFields!(player)
       expect(fields).toHaveLength(0)
     })
@@ -86,17 +86,17 @@ describe('B68_Beanfield', () => {
       const effect = getCardEffect(CARD_ID)!
       const player = createPlayer()
       player.resources.vegetable = 3
-      const result = effect.onSowExtraField!(player, { row: -1, col: 68 }, 'vegetable')
+      const result = effect.onSowExtraField!(player, { row: -1, col: 2068 }, 'vegetable')
       expect(result).toBe(true)
       expect(player.resources.vegetable).toBe(2)
-      expect(player.cardStates![CARD_ID]!.extraData!.cardCrop).toEqual({ crop: 'vegetable', remaining: 2 })
+      expect(player.cardStates![CARD_ID]!.extraData!.cardFieldStacks).toEqual([{ crop: 'vegetable', remaining: 2 }])
     })
 
     it('rejects grain on beanfield', () => {
       const effect = getCardEffect(CARD_ID)!
       const player = createPlayer()
       player.resources.grain = 3
-      const result = effect.onSowExtraField!(player, { row: -1, col: 68 }, 'grain')
+      const result = effect.onSowExtraField!(player, { row: -1, col: 2068 }, 'grain')
       expect(result).toBe(false)
     })
 
@@ -112,8 +112,8 @@ describe('B68_Beanfield', () => {
       const effect = getCardEffect(CARD_ID)!
       const player = createPlayer()
       player.resources.vegetable = 3
-      player.cardStates = { [CARD_ID]: { extraData: { cardCrop: { crop: 'vegetable', remaining: 1 } } } } as any
-      const result = effect.onSowExtraField!(player, { row: -1, col: 68 }, 'vegetable')
+      player.cardStates = { [CARD_ID]: { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 1 }] } } } as any
+      const result = effect.onSowExtraField!(player, { row: -1, col: 2068 }, 'vegetable')
       expect(result).toBe(false)
     })
 
@@ -121,7 +121,7 @@ describe('B68_Beanfield', () => {
       const effect = getCardEffect(CARD_ID)!
       const player = createPlayer()
       player.resources.vegetable = 0
-      const result = effect.onSowExtraField!(player, { row: -1, col: 68 }, 'vegetable')
+      const result = effect.onSowExtraField!(player, { row: -1, col: 2068 }, 'vegetable')
       expect(result).toBe(false)
     })
   })
@@ -130,21 +130,21 @@ describe('B68_Beanfield', () => {
     it('harvests 1 vegetable and decrements remaining', () => {
       const effect = getCardEffect(CARD_ID)!
       const player = createPlayer()
-      player.cardStates = { [CARD_ID]: { extraData: { cardCrop: { crop: 'vegetable', remaining: 2 } } } } as any
+      player.cardStates = { [CARD_ID]: { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] } } } as any
       const state = createState(player)
       effect.onHarvestFieldPhase!(state, player)
       expect(player.resources.vegetable).toBe(1)
-      expect(player.cardStates![CARD_ID]!.extraData!.cardCrop).toEqual({ crop: 'vegetable', remaining: 1 })
+      expect(player.cardStates![CARD_ID]!.extraData!.cardFieldStacks).toEqual([{ crop: 'vegetable', remaining: 1 }])
     })
 
     it('clears card crop when last vegetable is harvested', () => {
       const effect = getCardEffect(CARD_ID)!
       const player = createPlayer()
-      player.cardStates = { [CARD_ID]: { extraData: { cardCrop: { crop: 'vegetable', remaining: 1 } } } } as any
+      player.cardStates = { [CARD_ID]: { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 1 }] } } } as any
       const state = createState(player)
       effect.onHarvestFieldPhase!(state, player)
       expect(player.resources.vegetable).toBe(1)
-      expect(player.cardStates![CARD_ID]!.extraData!.cardCrop).toBeNull()
+      expect(player.cardStates![CARD_ID]!.extraData!.cardFieldStacks).toEqual([])
     })
 
     it('does nothing when card has no crop', () => {
@@ -157,8 +157,10 @@ describe('B68_Beanfield', () => {
   })
 
   describe('isDoable listener', () => {
+    const LISTENER_ID = `${CARD_ID}-cardfield-isdoable-sow`
+
     it('makes sow doable when card is empty and player has vegetable', () => {
-      const listener = findListener('B68-beanfield-isdoable-sow')!
+      const listener = findListener(LISTENER_ID)!
       expect(listener).toBeDefined()
       const player = createPlayer()
       player.resources.vegetable = 1
@@ -172,7 +174,7 @@ describe('B68_Beanfield', () => {
     })
 
     it('does not make sow doable when player has no vegetable', () => {
-      const listener = findListener('B68-beanfield-isdoable-sow')!
+      const listener = findListener(LISTENER_ID)!
       const player = createPlayer()
       player.resources.vegetable = 0
       const result = executeCardListener(listener, {
@@ -183,7 +185,7 @@ describe('B68_Beanfield', () => {
     })
 
     it('does not intervene when normal sow is already doable', () => {
-      const listener = findListener('B68-beanfield-isdoable-sow')!
+      const listener = findListener(LISTENER_ID)!
       const player = createPlayer()
       player.resources.vegetable = 1
       // Add a normal empty field so canSow() returns true
