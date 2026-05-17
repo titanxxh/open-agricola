@@ -3376,6 +3376,12 @@ export class GameCore {
         player,
         space,
       }, { animalCounts: counts })
+      // Effect 校验失败（如 {0,0,0} 或 count 超过 board）应直接 respond(false)，
+      // pending envelope 保留，让前端再次提交合法选择。
+      if (result?.type === 'fail') {
+        this.flushEngineLog()
+        return this.respond(false, result.logKey ?? 'invalid animal-quantity selection')
+      }
       // 与 occupation-hand 分支保持一致（line 3384）：只 record ok 结果。
       if (result?.type === 'ok') {
         this.recordActionResultDetails(
