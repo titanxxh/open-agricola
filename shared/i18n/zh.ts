@@ -192,6 +192,9 @@ export const zh = {
     interactionAnimalReorg: '在农场重新分配动物',
     interactionAnimalReorgConfirm: '确认',
     interactionAnimalReorgCancel: '取消',
+    interactionAnimalQuantitySelect: '选择数量',
+    interactionAnimalQuantityConfirm: '确认',
+    interactionAnimalQuantityCancel: '取消',
     interactionCancel: '取消',
     interactionRoomSelect: '选择扩建房屋位置',
     interactionRoomConfirm: '确认扩建',
@@ -470,6 +473,10 @@ export const zh = {
     'anytime-reorg': { name: '重整动物', description: '随时调整动物摆放' },
     reorganize: { name: '动物重组', description: '在牧场/房屋/畜栏间重新分配动物。' },
     'pay': { name: '支付资源', description: '从自己供给区支付资源' },
+    'salter-pick': {
+      name: '盐渍动物',
+      description: '将 board 上的羊/野猪/牛转成未来回合食物',
+    },
     'return-to-space': { name: '放回资源', description: '将自己供给区中的资源放回当前行动格' },
     'bonus-vp': { name: '获得加分', description: '为来源卡牌获得 1 点额外分数' },
     breed: { name: '繁殖', description: '繁殖动物（收获 + 繁殖类卡共用的内部行动）' },
@@ -1152,7 +1159,13 @@ export const zh = {
       anytime: '清地铲：付1食物 → 获1田地',
     },
     B157_Salter: {
-      anytime: '腌肉工：付1食物 → 获1食物',
+      anytime: '盐渍动物（换食物）',
+      pickAnimals: '选择要盐渍的动物（手上动物需先安置）',
+      single: {
+        sheep: '盐渍 1 只羊（→ 接下来 3 回合每回合 +1 食物）',
+        boar: '盐渍 1 只野猪（→ 接下来 5 回合每回合 +1 食物）',
+        cattle: '盐渍 1 只牛（→ 接下来 7 回合每回合 +1 食物）',
+      },
     },
     B35_HookKnife: {
       anytime: '钩刀：付1食物 → 获1木材',
