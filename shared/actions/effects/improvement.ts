@@ -417,56 +417,6 @@ export const playImprovement = (
   return { type: 'fail', logKey: 'log.improvementFail' }
 }
 
-export const minorImprovementAction: ActionDefinition = {
-  id: 'minor-improvement',
-  nameKey: 'actions.minor-improvement.name',
-  descriptionKey: 'actions.minor-improvement.description',
-  roundAvailable: 1,
-  gainPerRound: {},
-  canBeExecutedByPlayer: (state, player, context) => {
-    if (buildPlayableMinorOptions(state, player, context?.sourceCard).length > 0) {
-      return true
-    }
-    const extras = collectComputeChoiceCandidates(state, player, 'minor-improvement')
-    return extras.some((opt) => canAffordInjectedImprovement(state, player, opt.value))
-  },
-  execute: ({ state, player }) => {
-    const baseOptions = buildPlayableMinorOptions(state, player)
-    const extras = collectComputeChoiceCandidates(state, player, 'minor-improvement')
-    const seen = new Set(baseOptions.map((o) => o.value))
-    const extraOptions = extras
-      .filter((opt) => !seen.has(opt.value))
-      .filter((opt) => canAffordInjectedImprovement(state, player, opt.value))
-    const options = [...baseOptions, ...extraOptions]
-    if (options.length === 0) {
-      return { type: 'ok' }
-    }
-    return {
-      type: 'request',
-      request: { kind: 'choice', options },
-      promptKey: 'ui.interactionChooseMinorImprovement',
-    }
-  },
-  resolveChoice: ({ state, player, sourceCard, params, actionContext }, choice) => {
-    const actionCardId = sourceCard ?? 'minor-improvement'
-    const flow = buildImprovementFlow(
-      state,
-      player,
-      choice,
-      actionCardId,
-      readTrueAction(params, actionContext),
-      ['minor'] as const,
-    )
-    if (!flow) return { type: 'fail', logKey: 'log.minorImprovementFail' }
-    return { type: 'flow', flow }
-  },
-}
-
-/**
- * Resolve the player's improvement-any choice (e.g. `major:Major_Fireplace1`)
- * into an engine flow `seq:[pay, apply-improvement]`. Returns `null` when the
- * preview cost cannot be derived.
- */
 const buildImprovementFlow = (
   state: GameState,
   player: PlayerState,
@@ -537,63 +487,6 @@ const buildImprovementFlow = (
       },
     ],
   }
-}
-
-export const improvementAnyAction: ActionDefinition = {
-  id: 'improvement-any',
-  nameKey: 'actions.major-improvement.name',
-  descriptionKey: 'actions.major-improvement.description',
-  roundAvailable: 1,
-  gainPerRound: {},
-  canBeExecutedByPlayer: (state, player, context) => {
-    const actionCardId = context?.sourceCard
-    return (
-      buildMajorImprovementOptions(
-        state.availableMajorImprovements,
-        state,
-        player,
-        actionCardId,
-      ).length > 0 ||
-      buildMinorImprovementOptions(state, player, actionCardId).length > 0
-    )
-  },
-  execute: ({ state, player, sourceCard, params }) => {
-    const actionCardId = sourceCard ?? resolveImprovementActionCardId('any')
-    const allowedPurchases = Array.isArray((params as { allowedPurchases?: string[] } | undefined)?.allowedPurchases)
-      ? (params as { allowedPurchases?: string[] }).allowedPurchases
-      : undefined
-    const options = [
-      ...buildMajorImprovementOptions(
-        state.availableMajorImprovements,
-        state,
-        player,
-        actionCardId,
-        allowedPurchases,
-      ),
-      ...buildMinorImprovementOptions(state, player, actionCardId, allowedPurchases),
-    ]
-    if (options.length === 0) {
-      return { type: 'fail', logKey: 'log.improvementFail' }
-    }
-    return {
-      type: 'request',
-      request: { kind: 'choice', options },
-      promptKey: 'ui.interactionChooseImprovement',
-    }
-  },
-  resolveChoice: ({ state, player, sourceCard, params, actionContext }, choice) => {
-    const actionCardId = sourceCard ?? resolveImprovementActionCardId('any')
-    const flow = buildImprovementFlow(
-      state,
-      player,
-      choice,
-      actionCardId,
-      readTrueAction(params, actionContext),
-      ['major', 'minor'] as const,
-    )
-    if (!flow) return { type: 'fail', logKey: 'log.improvementFail' }
-    return { type: 'flow', flow }
-  },
 }
 
 export const improvementAction: ActionDefinition = {

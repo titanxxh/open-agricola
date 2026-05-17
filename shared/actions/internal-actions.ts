@@ -3,7 +3,7 @@ import { futureMeeplesAction } from './effects/internal/future-meeples'
 import { collectAction } from './effects/collect'
 import { gainAction, bonusWoodAction, bonusFoodAction, bonusGrainAction } from './effects/gain'
 import { familyGrowthAction } from './effects/family-growth'
-import { minorImprovementAction, improvementAnyAction, improvementAction } from './effects/improvement'
+import { improvementAction } from './effects/improvement'
 import { playOccupationAction } from './effects/occupation'
 import { renovateHouseAction } from './effects/renovation'
 import { constructAction } from './effects/construct'
@@ -44,8 +44,6 @@ export const internalActionDefinitions: ActionDefinition[] = [
   bonusFoodAction,
   bonusGrainAction,
   familyGrowthAction,
-  minorImprovementAction,
-  improvementAnyAction,
   improvementAction,
   playOccupationAction,
   renovateHouseAction,
