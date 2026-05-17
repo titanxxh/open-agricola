@@ -1261,6 +1261,15 @@ export const en = {
       PALISADES_NOT_UNLOCKED: 'Wood Palisades card not played',
     },
   },
+  'salter-pick': {
+    error: {
+      'must-pick-at-least-one': 'You must pick at least one animal to salt',
+      'no-animals-on-board': 'No animals available on your farm to salt',
+      'invalid-count-sheep': 'Invalid sheep count',
+      'invalid-count-boar': 'Invalid boar count',
+      'invalid-count-cattle': 'Invalid cattle count',
+    },
+  },
   'invalid extra sow field': 'Invalid extra sow field',
   NO_SELECTION: 'No selection',
   test: {
