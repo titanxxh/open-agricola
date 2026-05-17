@@ -1,25 +1,27 @@
 import type { GameState, PlayerState } from '../../contract/types'
 import { getMinorImprovement } from '../../cards/registry-display'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
+import type { ImprovementType } from './improvement'
 
 type ResolvedMinorImprovement = NonNullable<ReturnType<typeof getMinorImprovement>>
 
 /**
  * BGA `isBuyable` actionType gate: cards flagged
  * `mustBePlayedViaMajorImprovementAction` (e.g. A10 Wooden Shed) cannot be
- * bought through the Minor-Improvement action space. Returns false when the
- * caller's `actionCardId` is `'minor-improvement'` (BGA `actionType=Minor`).
+ * bought through the Minor-Improvement action space (types=['minor']).
+ * Returns true when `types` is exactly `['minor']` (minor-only sub-flow).
  *
- * `improvement-any` (Major Improvement space) always allows it; card-effect
- * plays without an actionCardId pass through (some listeners replay onBuy
- * paths without the action context — those should not be blocked).
+ * When `types` is `['major', 'minor']` or undefined (card-effect plays
+ * without action context), the gate is open.
  */
 export const isBlockedByMajorImprovementActionGate = (
-  improvement: ResolvedMinorImprovement,
-  actionCardId: string | undefined,
-): boolean =>
-  !!improvement.mustBePlayedViaMajorImprovementAction
-    && actionCardId === 'minor-improvement'
+  improvement: ResolvedMinorImprovement | undefined,
+  types?: readonly ImprovementType[],
+): boolean => {
+  if (!improvement?.mustBePlayedViaMajorImprovementAction) return false
+  // BGA actionType === 'Minor' (i.e. minor-only sub-flow): types is exactly ['minor'].
+  return types !== undefined && types.length === 1 && types[0] === 'minor'
+}
 
 /**
  * Pool-side eligibility: is this major present in the current pool and
@@ -43,7 +45,7 @@ export const canPlayMinor = (
   state: GameState,
   player: PlayerState,
   improvementId: string,
-  actionCardId: string | undefined,
+  types?: readonly ImprovementType[],
   allowedPurchases?: string[],
 ): boolean => {
   const improvement = getMinorImprovement(improvementId)
@@ -51,7 +53,7 @@ export const canPlayMinor = (
   if (!player.minorHand.includes(improvement.id)) return false
   if (allowedPurchases && !allowedPurchases.includes(improvement.id)) return false
   if (!meetsCardPrerequisites(player, improvement, state.round, state)) return false
-  if (isBlockedByMajorImprovementActionGate(improvement, actionCardId)) return false
+  if (isBlockedByMajorImprovementActionGate(improvement, types)) return false
   return true
 }
 

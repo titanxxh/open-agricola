@@ -111,6 +111,7 @@ import {
   isMajorImprovementPlayable,
   isMinorImprovementPlayable,
 } from '../actions/effects/improvement.ts'
+import { isBlockedByMajorImprovementActionGate } from '../actions/effects/improvement-pool.ts'
 import {
   getOccupationActionCost,
   isOccupationPlayable,
@@ -2744,21 +2745,15 @@ export class GameCore {
     })
 
     player.minorHand.forEach((improvementId) => {
+      const basePlayable = isMinorImprovementPlayable(this.state, player, improvementId)
+      const improvement = getMinorImprovement(improvementId) ?? undefined
       result[`minor:${improvementId}`] =
         (canUseMinorImprovement &&
-          isMinorImprovementPlayable(
-            this.state,
-            player,
-            improvementId,
-            'minor-improvement',
-          )) ||
+          basePlayable &&
+          !isBlockedByMajorImprovementActionGate(improvement, ['minor'])) ||
         (canUseImprovementAny &&
-          isMinorImprovementPlayable(
-            this.state,
-            player,
-            improvementId,
-            'improvement-any',
-          ))
+          basePlayable &&
+          !isBlockedByMajorImprovementActionGate(improvement, ['major', 'minor']))
     })
 
     this.state.availableMajorImprovements.forEach((improvementId) => {

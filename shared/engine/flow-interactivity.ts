@@ -3,7 +3,7 @@ import type { ActionFlow } from '../contract/types'
 const INTERACTIVE_LEAF_ACTION_PREFIXES = ['farm-select', 'animal-reorg', 'card-draft', 'feed']
 const INTERACTIVE_LEAF_ACTION_EXACT = new Set([
   'plow', 'sow', 'fence', 'build-room', 'build-stable',
-  'renovate-house', 'occupation', 'improvement-any', 'minor-improvement',
+  'renovate-house', 'occupation', 'improvement',
 ])
 
 function leafHasAltCosts(params: Record<string, unknown> | undefined): boolean {
