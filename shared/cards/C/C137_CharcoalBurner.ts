@@ -34,7 +34,7 @@ const getBuiltCardId = (choice: string | undefined): string | undefined => {
 const listener: CardListenerRegistration = {
   id: 'C137-charcoal-burner-any-bake-improvement',
   cardIds: [CARD_ID],
-  actions: ['improvement-any', 'minor-improvement'],
+  actions: ['improvement'],
   phases: ['after' as ActionHookPhase],
   scope: 'any',
   handler: (context: CardListenerContext): ActionHookResult | void => {

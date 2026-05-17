@@ -51,7 +51,7 @@ const beforeBakeListener: CardListenerRegistration = {
     return {
       flow: {
         type: 'leaf',
-        actionId: 'improvement-any',
+        actionId: 'improvement',
         optional: true,
         promptKey: 'ui.interactionSmallPottersOvenBuild',
         sourceCard: CARD_ID,

@@ -64,7 +64,7 @@ const openTrackerListener: CardListenerRegistration = {
 const tagImprovementListener: CardListenerRegistration = {
   id: 'D161-cabbage-buyer-tag-improvement',
   cardIds: [CARD_ID],
-  actions: ['improvement-any', 'minor-improvement'],
+  actions: ['improvement'],
   phases: ['after' as ActionHookPhase],
   scope: 'any',
   handler: (context: CardListenerContext): ActionHookResult | void => {

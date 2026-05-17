@@ -11,7 +11,7 @@ const afterImprovementListener: CardListenerRegistration = {
   id: 'D26-carpenters-yard-immediately-after-improvement',
   cardIds: [CARD_ID],
   phases: ['immediatelyAfter' as ActionHookPhase],
-  actions: ['improvement-any', 'minor-improvement'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.trueAction === false) return
     const playedCardId = context.cardId
@@ -27,7 +27,7 @@ const afterImprovementListener: CardListenerRegistration = {
         children: [
           {
             type: 'leaf',
-            actionId: 'improvement-any',
+            actionId: 'improvement',
             sourceCard: CARD_ID,
             actionContext: { trueAction: false },
             params: {

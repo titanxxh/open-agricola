@@ -42,7 +42,7 @@ const onBuyListener: CardListenerRegistration = {
     return {
       flow: {
         type: 'leaf',
-        actionId: 'improvement-any',
+        actionId: 'improvement',
         optional: true,
         sourceCard: CARD_ID,
         actionContext: { trueAction: false },
@@ -59,7 +59,7 @@ const computeCostsListener: CardListenerRegistration = {
   id: 'C95-basket-weaver-compute-costs',
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
-  actions: ['improvement-any', 'minor-improvement'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.actionCardId !== CARD_ID) return
     if (context.cardId !== TARGET_MAJOR) return
