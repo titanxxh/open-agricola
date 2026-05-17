@@ -78,24 +78,13 @@ const scopeMatches = (
   return (state.players ?? []).some((entry) => playerHasAnyCard(entry, cardIds))
 }
 
-const LEGACY_IMPROVEMENT_ALIASES = new Set(['minor-improvement', 'improvement-any'])
-
 const matchesListenerAction = (
   registration: CardListenerRegistration,
   contextActionId: string,
 ): boolean => {
   const actions = registration.actions
   if (!actions) return true
-  if (actions.includes(contextActionId)) return true
-  // Migration alias: 'improvement' context matches legacy 'minor-improvement' /
-  // 'improvement-any' listener registrations. Removed atomically with legacy
-  // ActionDefinition deletion (see improvement unification spec, commit 7).
-  if (contextActionId === 'improvement') {
-    for (const a of actions) {
-      if (LEGACY_IMPROVEMENT_ALIASES.has(a)) return true
-    }
-  }
-  return false
+  return actions.includes(contextActionId)
 }
 
 const matchesListener = (
