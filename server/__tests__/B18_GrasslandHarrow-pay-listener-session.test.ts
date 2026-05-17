@@ -103,7 +103,7 @@ describe('B18 GrasslandHarrow — after-pay listener', () => {
     // Post-pay: zero building resources left in supply
     const state = createState(3, player)
     const result = executeCardListener(listener, {
-      state, player, space: createSpace('improvement-any'),
+      state, player, space: createSpace('improvement'),
       actionId: 'pay', phase: 'after',
       sourceCard: CARD_ID,
       result: { type: 'ok', resourcesPaid: { wood: 2 } },
@@ -119,7 +119,7 @@ describe('B18 GrasslandHarrow — after-pay listener', () => {
     player.resources = { ...player.resources, wood: 1, clay: 1, stone: 1, reed: 1 }
     const state = createState(3, player)
     const result = executeCardListener(listener, {
-      state, player, space: createSpace('improvement-any'),
+      state, player, space: createSpace('improvement'),
       actionId: 'pay', phase: 'after',
       sourceCard: CARD_ID,
       result: { type: 'ok', resourcesPaid: { wood: 2 } },
@@ -156,7 +156,7 @@ describe('B18 GrasslandHarrow — after-pay listener', () => {
     player.resources = { ...player.resources, wood: 5, clay: 5, stone: 5, reed: 5 }
     const state = createState(12, player)
     const result = executeCardListener(listener, {
-      state, player, space: createSpace('improvement-any'),
+      state, player, space: createSpace('improvement'),
       actionId: 'pay', phase: 'after',
       sourceCard: CARD_ID,
       result: { type: 'ok', resourcesPaid: {} },
@@ -177,7 +177,7 @@ describe('B18 GrasslandHarrow — after-pay listener', () => {
     player.resources = { ...player.resources, wood: 2, clay: 2, stone: 2, reed: 2 }
     const state = createState(3, player)
     const result = executeCardListener(listener, {
-      state, player, space: createSpace('improvement-any'),
+      state, player, space: createSpace('improvement'),
       actionId: 'pay', phase: 'after',
       sourceCard: 'OtherCard',
       result: { type: 'ok', resourcesPaid: { wood: 1 } },
@@ -192,7 +192,7 @@ describe('B18 GrasslandHarrow — after-pay listener', () => {
     player.resources = { ...player.resources, wood: 2, clay: 2, stone: 2, reed: 2 }
     const state = createState(3, player)
     const result = executeCardListener(listener, {
-      state, player, space: createSpace('improvement-any'),
+      state, player, space: createSpace('improvement'),
       actionId: 'pay', phase: 'after',
       sourceCard: CARD_ID,
       result: { type: 'fail', logKey: 'log.payFail' },

@@ -67,8 +67,8 @@ describe('B36_Bottles', () => {
     const state = createState(player)
 
     const result = executeCardListener(listener, {
-      state, player, space: createSpace('minor-improvement'),
-      actionId: 'minor-improvement', phase: 'computeCosts',
+      state, player, space: createSpace('improvement'),
+      actionId: 'improvement', phase: 'computeCosts',
       cardId: CARD_ID,
     } as unknown as CardListenerContext)
 
@@ -83,8 +83,8 @@ describe('B36_Bottles', () => {
     const state = createState(player)
 
     const result = executeCardListener(listener, {
-      state, player, space: createSpace('minor-improvement'),
-      actionId: 'minor-improvement', phase: 'computeCosts',
+      state, player, space: createSpace('improvement'),
+      actionId: 'improvement', phase: 'computeCosts',
       cardId: CARD_ID,
     } as unknown as CardListenerContext)
 
@@ -99,8 +99,8 @@ describe('B36_Bottles', () => {
     const state = createState(player)
 
     const result = executeCardListener(listener, {
-      state, player, space: createSpace('minor-improvement'),
-      actionId: 'minor-improvement', phase: 'computeCosts',
+      state, player, space: createSpace('improvement'),
+      actionId: 'improvement', phase: 'computeCosts',
       cardId: CARD_ID,
     } as unknown as CardListenerContext)
 
@@ -114,8 +114,8 @@ describe('B36_Bottles', () => {
     const state = createState(player)
 
     const result = executeCardListener(listener, {
-      state, player, space: createSpace('minor-improvement'),
-      actionId: 'minor-improvement', phase: 'computeCosts',
+      state, player, space: createSpace('improvement'),
+      actionId: 'improvement', phase: 'computeCosts',
       cardId: 'SomeOtherCard',
     } as unknown as CardListenerContext)
 

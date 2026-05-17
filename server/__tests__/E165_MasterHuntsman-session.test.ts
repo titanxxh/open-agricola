@@ -75,8 +75,8 @@ describe('E165_MasterHuntsman session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      space: mkActionSpace({ id: 'improvement-any' }),
-      actionId: 'improvement-any',
+      space: mkActionSpace({ id: 'improvement' }),
+      actionId: 'improvement',
       phase: 'after',
       choice: 'major:Major_Well',
       result: { type: 'ok' },
@@ -102,8 +102,8 @@ describe('E165_MasterHuntsman session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      space: mkActionSpace({ id: 'improvement-any' }),
-      actionId: 'improvement-any',
+      space: mkActionSpace({ id: 'improvement' }),
+      actionId: 'improvement',
       phase: 'after',
       choice: 'minor:A55_JunkRoom',
       result: { type: 'ok' },

@@ -126,8 +126,8 @@ describe('D96_Furnisher', () => {
     const player = createPlayer()
 
     const result = executeCardListener(listener, {
-      state: createState(player), player, space: createSpace('improvement-any'),
-      actionId: 'improvement-any', phase: 'computeCosts',
+      state: createState(player), player, space: createSpace('improvement'),
+      actionId: 'improvement', phase: 'computeCosts',
       actionCardId: CARD_ID,
     } as unknown as CardListenerContext)
 
@@ -140,9 +140,9 @@ describe('D96_Furnisher', () => {
     const player = createPlayer()
 
     const result = executeCardListener(listener, {
-      state: createState(player), player, space: createSpace('improvement-any'),
-      actionId: 'improvement-any', phase: 'computeCosts',
-      actionCardId: 'improvement-any',
+      state: createState(player), player, space: createSpace('improvement'),
+      actionId: 'improvement', phase: 'computeCosts',
+      actionCardId: 'improvement',
     } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()

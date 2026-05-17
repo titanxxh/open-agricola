@@ -114,8 +114,8 @@ describe('C80_RockyTerrain', () => {
       const state = createState(player)
 
       const result = executeCardListener(listener!, {
-        state, player, space: createSpace('minor-improvement'),
-        actionId: 'improvement-any', phase: 'after',
+        state, player, space: createSpace('improvement'),
+        actionId: 'improvement', phase: 'after',
         choice: 'minor:B68_Beanfield',
       } as unknown as CardListenerContext)
 
@@ -129,8 +129,8 @@ describe('C80_RockyTerrain', () => {
       const state = createState(player)
 
       const result = executeCardListener(listener!, {
-        state, player, space: createSpace('minor-improvement'),
-        actionId: 'improvement-any', phase: 'after',
+        state, player, space: createSpace('improvement'),
+        actionId: 'improvement', phase: 'after',
         choice: 'minor:E70_CropRotationField',
       } as unknown as CardListenerContext)
 
@@ -144,8 +144,8 @@ describe('C80_RockyTerrain', () => {
       const state = createState(player)
 
       const result = executeCardListener(listener!, {
-        state, player, space: createSpace('minor-improvement'),
-        actionId: 'improvement-any', phase: 'after',
+        state, player, space: createSpace('improvement'),
+        actionId: 'improvement', phase: 'after',
         choice: 'minor:E54_Contraband',
       } as unknown as CardListenerContext)
 
@@ -159,8 +159,8 @@ describe('C80_RockyTerrain', () => {
       const state = createState(player)
 
       const result = executeCardListener(listener!, {
-        state, player, space: createSpace('minor-improvement'),
-        actionId: 'improvement-any', phase: 'after',
+        state, player, space: createSpace('improvement'),
+        actionId: 'improvement', phase: 'after',
         choice: 'minor:B68_Beanfield',
       } as unknown as CardListenerContext)
 
@@ -174,8 +174,8 @@ describe('C80_RockyTerrain', () => {
       const state = createState(player)
 
       const result = executeCardListener(listener!, {
-        state, player, space: createSpace('minor-improvement'),
-        actionId: 'improvement-any', phase: 'after',
+        state, player, space: createSpace('improvement'),
+        actionId: 'improvement', phase: 'after',
         choice: 'minor:D75_WoodField',
       } as unknown as CardListenerContext)
 

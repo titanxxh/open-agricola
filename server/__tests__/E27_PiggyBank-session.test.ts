@@ -163,8 +163,8 @@ describe('E27_PiggyBank session', () => {
     } as GameState
 
     const context: CardListenerContext = {
-      state, player, space: createSpace('improvement-any'),
-      actionId: 'improvement-any', phase: 'computeCosts',
+      state, player, space: createSpace('improvement'),
+      actionId: 'improvement', phase: 'computeCosts',
     } as CardListenerContext
 
     const result = executeCardListener(costListener!, context)
@@ -191,8 +191,8 @@ describe('E27_PiggyBank session', () => {
     } as GameState
 
     const context: CardListenerContext = {
-      state, player, space: createSpace('improvement-any'),
-      actionId: 'improvement-any', phase: 'computeCosts',
+      state, player, space: createSpace('improvement'),
+      actionId: 'improvement', phase: 'computeCosts',
     } as CardListenerContext
 
     const result = executeCardListener(costListener!, context)

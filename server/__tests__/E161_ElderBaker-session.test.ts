@@ -70,7 +70,7 @@ describe('E161_ElderBaker computeChoiceCandidates listener (unit)', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      actionId: 'minor-improvement',
+      actionId: 'improvement',
       phase: 'computeChoiceCandidates',
     } as unknown as CardListenerContext)
 
@@ -89,7 +89,7 @@ describe('E161_ElderBaker computeChoiceCandidates listener (unit)', () => {
     const result = executeCardListener(listener, {
       state,
       player,
-      actionId: 'minor-improvement',
+      actionId: 'improvement',
       phase: 'computeChoiceCandidates',
     } as unknown as CardListenerContext)
 
@@ -107,7 +107,7 @@ describe('E161_ElderBaker computeChoiceCandidates listener (unit)', () => {
     const result = executeCardListener(listener, {
       state,
       player,
-      actionId: 'minor-improvement',
+      actionId: 'improvement',
       phase: 'computeChoiceCandidates',
     } as unknown as CardListenerContext)
 
