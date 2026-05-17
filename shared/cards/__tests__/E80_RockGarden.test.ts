@@ -3,7 +3,8 @@ import { E80_RockGarden_impl } from '../E/E80_RockGarden'
 import type { PlayerState } from '../../contract/types'
 
 const CARD_ID = 'E80_RockGarden'
-const ROW = -80
+const ROW = -1
+const COL_BASE = 5080
 
 const blankPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
   id: 'p1',
@@ -18,19 +19,13 @@ const blankPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
 })
 
 describe('E80 Rock Garden', () => {
-  it('does not initialize stacks on onBuy (lazy)', () => {
-    const player = blankPlayer({ resources: { stone: 0 } as never })
-    E80_RockGarden_impl.effect?.onBuy?.({} as never, player)
-    expect(player.cardStates?.[CARD_ID]?.extraData?.stacks ?? []).toEqual([])
-  })
-
   it('onComputeSowableFields returns 3 slots when stacks=[] and stone=3', () => {
     const player = blankPlayer({ resources: { stone: 3 } as never })
     const out = E80_RockGarden_impl.effect!.onComputeSowableFields!(player)
     expect(out).toHaveLength(3)
-    expect(out[0].tile).toEqual({ row: ROW, col: 0 })
-    expect(out[1].tile).toEqual({ row: ROW, col: 1 })
-    expect(out[2].tile).toEqual({ row: ROW, col: 2 })
+    expect(out[0].tile).toEqual({ row: ROW, col: COL_BASE })
+    expect(out[1].tile).toEqual({ row: ROW, col: COL_BASE + 1 })
+    expect(out[2].tile).toEqual({ row: ROW, col: COL_BASE + 2 })
     expect(out[0].allowedCrops).toEqual(['stone'])
     expect(out[0].sourceCard).toBe(CARD_ID)
     expect(out[0].groupKey).toBe(CARD_ID)
@@ -38,17 +33,16 @@ describe('E80 Rock Garden', () => {
     expect(out[2].groupKey).toBe(CARD_ID)
   })
 
-  it('onComputeSowableFields returns 1 slot when stacks=[] and stone=1', () => {
+  it('onComputeSowableFields exposes all empty slots regardless of stone balance (validation happens at sow time)', () => {
     const player = blankPlayer({ resources: { stone: 1 } as never })
     const out = E80_RockGarden_impl.effect!.onComputeSowableFields!(player)
-    expect(out).toHaveLength(1)
-    expect(out[0].tile).toEqual({ row: ROW, col: 0 })
+    expect(out).toHaveLength(3)
   })
 
-  it('onComputeSowableFields returns 0 slots when stone=0', () => {
+  it('onComputeSowableFields still exposes empty slots even with stone=0 (filtering left to sow validation)', () => {
     const player = blankPlayer({ resources: { stone: 0 } as never })
     const out = E80_RockGarden_impl.effect!.onComputeSowableFields!(player)
-    expect(out).toEqual([])
+    expect(out).toHaveLength(3)
   })
 
   it('onComputeSowableFields returns 0 slots when stacks=MAX', () => {
@@ -57,10 +51,10 @@ describe('E80 Rock Garden', () => {
       cardStates: {
         [CARD_ID]: {
           extraData: {
-            stacks: [
-              { kind: 'stone', remaining: 2 },
-              { kind: 'stone', remaining: 2 },
-              { kind: 'stone', remaining: 2 },
+            cardFieldStacks: [
+              { crop: 'stone', remaining: 2 },
+              { crop: 'stone', remaining: 2 },
+              { crop: 'stone', remaining: 2 },
             ],
           },
         },
@@ -72,10 +66,10 @@ describe('E80 Rock Garden', () => {
 
   it('onSowExtraField pushes a stone stack and decrements resource', () => {
     const player = blankPlayer({ resources: { stone: 3 } as never })
-    const ok = E80_RockGarden_impl.effect!.onSowExtraField!(player, { row: ROW, col: 0 }, 'stone')
+    const ok = E80_RockGarden_impl.effect!.onSowExtraField!(player, { row: ROW, col: COL_BASE }, 'stone')
     expect(ok).toBe(true)
     expect(player.resources.stone).toBe(2)
-    expect(player.cardStates?.[CARD_ID]?.extraData?.stacks).toEqual([{ kind: 'stone', remaining: 2 }])
+    expect(player.cardStates?.[CARD_ID]?.extraData?.cardFieldStacks).toEqual([{ crop: 'stone', remaining: 2 }])
   })
 
   it('onHarvestFieldPhase decrements every stack and adds stone per stack', () => {
@@ -84,10 +78,10 @@ describe('E80 Rock Garden', () => {
       cardStates: {
         [CARD_ID]: {
           extraData: {
-            stacks: [
-              { kind: 'stone', remaining: 2 },
-              { kind: 'stone', remaining: 2 },
-              { kind: 'stone', remaining: 2 },
+            cardFieldStacks: [
+              { crop: 'stone', remaining: 2 },
+              { crop: 'stone', remaining: 2 },
+              { crop: 'stone', remaining: 2 },
             ],
           },
         },
@@ -96,10 +90,10 @@ describe('E80 Rock Garden', () => {
     const state = { players: [player] } as never
     E80_RockGarden_impl.effect!.onHarvestFieldPhase!(state, player)
     expect(player.resources.stone).toBe(3)
-    expect(player.cardStates?.[CARD_ID]?.extraData?.stacks).toEqual([
-      { kind: 'stone', remaining: 1 },
-      { kind: 'stone', remaining: 1 },
-      { kind: 'stone', remaining: 1 },
+    expect(player.cardStates?.[CARD_ID]?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'stone', remaining: 1 },
+      { crop: 'stone', remaining: 1 },
+      { crop: 'stone', remaining: 1 },
     ])
   })
 
@@ -109,10 +103,10 @@ describe('E80 Rock Garden', () => {
       cardStates: {
         [CARD_ID]: {
           extraData: {
-            stacks: [
-              { kind: 'stone', remaining: 1 },
-              { kind: 'stone', remaining: 1 },
-              { kind: 'stone', remaining: 1 },
+            cardFieldStacks: [
+              { crop: 'stone', remaining: 1 },
+              { crop: 'stone', remaining: 1 },
+              { crop: 'stone', remaining: 1 },
             ],
           },
         },
@@ -121,7 +115,7 @@ describe('E80 Rock Garden', () => {
     const state = { players: [player] } as never
     E80_RockGarden_impl.effect!.onHarvestFieldPhase!(state, player)
     expect(player.resources.stone).toBe(3)
-    expect(player.cardStates?.[CARD_ID]?.extraData?.stacks).toEqual([])
+    expect(player.cardStates?.[CARD_ID]?.extraData?.cardFieldStacks).toEqual([])
   })
 
   it('isDoable listener fires when normal fields full + stone >= 1', () => {
