@@ -195,6 +195,8 @@ export const zh = {
     interactionAnimalQuantitySelect: '选择数量',
     interactionAnimalQuantityConfirm: '确认',
     interactionAnimalQuantityCancel: '取消',
+    interactionAnimalQuantityRow: '{type}（最多 {max}）',
+    interactionAnimalQuantityTotalFood: '合计食物（跨回合）：{n}',
     interactionCancel: '取消',
     interactionRoomSelect: '选择扩建房屋位置',
     interactionRoomConfirm: '确认扩建',
