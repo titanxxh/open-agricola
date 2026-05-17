@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
+import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/C/C140_PackagingArtist'
 import type { ActionFlow } from '../../shared/contract/types'
@@ -10,6 +11,29 @@ const CARD_ID = 'C140_PackagingArtist'
 
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
+
+const setupMajorImprovementWithBakeProvider = () => {
+  const session = new GameSession()
+  const state = session.getState().state
+  state.players = state.players.slice(0, 2)
+  state.currentPlayerIndex = 0
+  state.round = 1
+
+  const p1 = state.players[0]!
+  setWorkersAtHome(state, p1, 2)
+  p1.occupationPlayed = [CARD_ID]
+  p1.improvements = [...(p1.improvements ?? []), 'Major_Fireplace1']
+  p1.resources = {
+    ...p1.resources,
+    grain: 1, wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
+  }
+  p1.minorHand = ['__test_placeholder__']
+  p1.occupationHand = ['__test_placeholder__']
+  state.players[1]!.minorHand = ['__test_placeholder__']
+  state.players[1]!.occupationHand = ['__test_placeholder__']
+  session.loadState(state)
+  return session
+}
 
 describe('C140_PackagingArtist session', () => {
   it('onBuy grants 1 grain', () => {
@@ -211,6 +235,46 @@ describe('C140_PackagingArtist session', () => {
       } as unknown as CardListenerContext)
       expect(result).toBeUndefined()
     }
+  })
+
+  it('session: Major Improvement space inserts a C140 bake-bread XOR alternative', () => {
+    const session = setupMajorImprovementWithBakeProvider()
+    const resp = session.takeAction(0, 'major-improvement')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+
+    const options = resp.interaction.options ?? []
+    const bakeAlternative = options.find((o) => o.sourceCard === CARD_ID)
+    expect(bakeAlternative).toBeDefined()
+    expect(bakeAlternative!.labelKey).toBe('actions.bake-bread.name')
+    // The XOR should also still expose the original improvement-any branch (no C140 sourceCard).
+    expect(options.some((o) => o.sourceCard !== CARD_ID)).toBe(true)
+  })
+
+  it('session: choosing bake-bread alternative converts 1 grain to 2 food via Fireplace1', () => {
+    const session = setupMajorImprovementWithBakeProvider()
+    const resp1 = session.takeAction(0, 'major-improvement')
+    expect(resp1.interaction.stateId).toBe('wait')
+    if (resp1.interaction.stateId !== 'wait') return
+
+    const bake = resp1.interaction.options?.find((o) => o.sourceCard === CARD_ID)
+    expect(bake).toBeDefined()
+    const resp2 = session.resolveChoice(0, bake!.value)
+    expect(resp2.ok).toBe(true)
+    expect(resp2.interaction.stateId).toBe('wait')
+    if (resp2.interaction.stateId !== 'wait') return
+
+    // bake-bread pending exposes Fireplace1 rate option.
+    const rateOpt = resp2.interaction.options?.find((o) => o.value === 'Major_Fireplace1')
+    expect(rateOpt).toBeDefined()
+    const resp3 = session.resolveChoice(0, rateOpt!.value)
+    expect(resp3.ok).toBe(true)
+
+    // grain=1 → auto-resolves count=1; final state has grain 0 / food 2.
+    const p1 = resp3.state.players[0]!
+    expect(p1.resources.grain).toBe(0)
+    expect(p1.resources.food).toBe(2)
   })
 
   it('isDoable bails out on re-entry (checkedReplaceAction guard, both action IDs)', () => {
