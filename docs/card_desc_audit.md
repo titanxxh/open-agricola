@@ -59,6 +59,10 @@ BGA 将这些 buyability 规则写在自定义代码里，而不是普通 metada
 | `E70_CropRotationField` | `['grain','vegetable']` | `null`（4 crop） | 保留 grain/vegetable，后续独立 audit 决定是否对齐。 |
 | `E72_ArtichokeField` | `['grain','vegetable']` | `null`（4 crop） | 同上。 |
 
+## 3.2 B157_Salter 行为重对齐 desc 审计（2026-05-17）
+
+- `B157_Salter` — 2026-05-17 重写对齐 BGA：reserve=0 触发 + 多只混合 panel + futureMeeples 投递。desc 文案与 BGA 一致，无需改动。
+
 ## 4. BGA-Banned 但 OA 保留
 
 BGA 将这些卡标为 banned / non-standard，但 OA 当前按产品策略保留。它们不应计入 metadata mismatch。
@@ -79,7 +83,7 @@ BGA 将这些卡标为 banned / non-standard，但 OA 当前按产品策略保�
 
 本文件不裁定运行时等价性。当前行为 gap 以 `docs/card_progress.md` 第 2 节为准，目前队列是：
 
-`A148_Woolgrower`, `B86_TruffleSearcher`, `B157_Salter`,
+`A148_Woolgrower`, `B86_TruffleSearcher`,
 `C8_PlantFertilizer`, `C140_PackagingArtist`, `D13_Trowel`,
 `D15_ClaySupports`, `D66_PotterCeramics`, `E5_NightLoot`.
 
