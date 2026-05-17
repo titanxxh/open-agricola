@@ -12,6 +12,32 @@ const CARD_ID = 'C140_PackagingArtist'
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
 
+const setupMajorImprovementAffordable = () => {
+  const session = new GameSession()
+  const state = session.getState().state
+  state.players = state.players.slice(0, 2)
+  state.currentPlayerIndex = 0
+  state.round = 1
+
+  const p1 = state.players[0]!
+  setWorkersAtHome(state, p1, 2)
+  p1.occupationPlayed = [CARD_ID]
+  // Major_Basket cost: 2 reed + 2 stone (mirrors A143_Stonecutter-session.test.ts pattern).
+  p1.resources = {
+    ...p1.resources,
+    grain: 0, food: 0, wood: 0, clay: 0, reed: 2, stone: 2,
+  }
+  if (!state.availableMajorImprovements.includes('Major_Basket')) {
+    state.availableMajorImprovements.push('Major_Basket')
+  }
+  p1.minorHand = ['__test_placeholder__']
+  p1.occupationHand = ['__test_placeholder__']
+  state.players[1]!.minorHand = ['__test_placeholder__']
+  state.players[1]!.occupationHand = ['__test_placeholder__']
+  session.loadState(state)
+  return session
+}
+
 const setupMajorImprovementWithBakeProvider = () => {
   const session = new GameSession()
   const state = session.getState().state
@@ -302,5 +328,28 @@ describe('C140_PackagingArtist session', () => {
       } as unknown as CardListenerContext)
       expect(result).toBeUndefined()
     }
+  })
+
+  it('session: original major-improvement branch resolves without infinite C140 XOR re-entry', () => {
+    // When the player has no grain, C140's bake-bread alternative is structurally
+    // infeasible. The XOR auto-resolves to the original improvement-any branch.
+    // If the `checkedReplaceAction` guard were missing, the engine would re-fire
+    // C140's computeReplace on the original leaf (which is marked
+    // `checkedReplaceAction: true`) and infinitely insert XOR layers — the
+    // single `takeAction` call would never settle. With the guard, the action
+    // completes cleanly to `confirm-next-player`.
+    const session = setupMajorImprovementAffordable()
+    const resp = session.takeAction(0, 'major-improvement')
+    expect(resp.ok).toBe(true)
+
+    // Action settled to the next-player confirmation, not stuck in a C140 loop.
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.spaceId).toBe('__subflow:confirm-next-player')
+
+    const p1 = resp.state.players[0]!
+    expect(p1.improvements).toContain('Major_Basket')
+    expect(p1.resources.reed).toBe(0)
+    expect(p1.resources.stone).toBe(0)
   })
 })
