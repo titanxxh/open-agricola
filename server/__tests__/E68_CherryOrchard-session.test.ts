@@ -6,7 +6,7 @@ import { validateSowSelection } from '../../shared/domain/farmyard'
 
 import { markAllWorkersUsed } from '../../shared/domain/player'
 const CARD_ID = 'E68_CherryOrchard'
-const VIRTUAL_TILE = { row: -1, col: 68 }
+const VIRTUAL_TILE = { row: -1, col: 5068 }
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 
 const loadCard = () => import('../../shared/cards/E/E68_CherryOrchard')
@@ -45,7 +45,8 @@ const setup = (options?: {
   }
 
   if (options?.cardCrop !== undefined) {
-    writeCardExtraData(player, CARD_ID, 'cardCrop', options.cardCrop)
+    const stacks = options.cardCrop === null ? [] : [options.cardCrop]
+    writeCardExtraData(player, CARD_ID, 'cardFieldStacks', stacks)
   }
 
   if (options?.round && harvestRounds.includes(options.round)) {
@@ -110,6 +111,7 @@ describe('E68_CherryOrchard session', () => {
         tile: VIRTUAL_TILE,
         allowedCrops: ['wood'],
         sourceCard: CARD_ID,
+        groupKey: undefined,
       },
     ])
 
@@ -125,10 +127,9 @@ describe('E68_CherryOrchard session', () => {
 
     const playerAfter = resp.state.players[0]!
     expect(playerAfter.resources.wood).toBe(1)
-    expect(readCardExtraData<CardCrop>(playerAfter, CARD_ID, 'cardCrop')).toEqual({
-      crop: 'wood',
-      remaining: 3,
-    })
+    expect(readCardExtraData<CardCrop[]>(playerAfter, CARD_ID, 'cardFieldStacks')).toEqual([
+      { crop: 'wood', remaining: 3 },
+    ])
   })
 
   it('exposes sourceCard on the sow interaction for the orchard virtual tile', async () => {
@@ -153,6 +154,7 @@ describe('E68_CherryOrchard session', () => {
       tile: VIRTUAL_TILE,
       allowedCrops: ['wood'],
       sourceCard: CARD_ID,
+      groupKey: undefined,
     })
   })
 
@@ -174,7 +176,7 @@ describe('E68_CherryOrchard session', () => {
       crops: [{ row: VIRTUAL_TILE.row, col: VIRTUAL_TILE.col, crop: 'grain' }],
     })
     expect(resp.ok).toBe(false)
-    expect(readCardExtraData<CardCrop | null>(session.getState().state.players[0]!, CARD_ID, 'cardCrop')).toBeUndefined()
+    expect(readCardExtraData<CardCrop[]>(session.getState().state.players[0]!, CARD_ID, 'cardFieldStacks')).toBeUndefined()
     expect(session.getState().state.players[0]!.resources.wood).toBe(1)
   })
 
@@ -193,6 +195,6 @@ describe('E68_CherryOrchard session', () => {
 
     expect(playerAfter.resources.wood).toBe(1)
     expect(playerAfter.resources.vegetable).toBe(1)
-    expect(readCardExtraData<CardCrop | null>(playerAfter, CARD_ID, 'cardCrop')).toBeNull()
+    expect(readCardExtraData<CardCrop[]>(playerAfter, CARD_ID, 'cardFieldStacks') ?? []).toEqual([])
   })
 })
