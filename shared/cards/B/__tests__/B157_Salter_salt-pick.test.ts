@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState, PlayerState } from '../../../contract/types'
-import { salterPickAction } from '../salter-pick'
+import { salterPickAction } from '../B157_Salter'
 
 const emptyResources = () => ({
   wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
@@ -25,7 +25,6 @@ const createState = (player: PlayerState, round = 3): GameState => ({
 const space = { id: 'card-anytime:B157_Salter', resources: {}, takenBy: [] } as any
 
 describe('salterPickAction', () => {
-  // resolveChoice 3 位参签名 (ctx, choice, payload?) — types.ts:539-543
   const callResolve = (s: GameState, p: PlayerState, payload: Record<string, unknown>) =>
     salterPickAction.resolveChoice!(
       { state: s, player: p, space } as any,
@@ -69,7 +68,6 @@ describe('salterPickAction', () => {
     expect(r.type).toBe('flow')
     expect(p.resources.sheep).toBe(0)
     expect(p.pastures[0].animalCount).toBe(0)
-    // queueFutureMeeplesFlow pushed → pendingFutureMeeples 应有 1 条
     expect(s.pendingFutureMeeples.length).toBe(1)
     expect(s.pendingFutureMeeples[0]).toMatchObject({
       cardId: 'B157_Salter', startRound: 4, count: 3, resources: { food: 1 },
@@ -147,7 +145,6 @@ describe('salterPickAction', () => {
     const s = createState(p)
     const r = callResolve(s, p, { sheep: Number.NaN })
     expect(r.type).toBe('fail')
-    // 未 subtract
     expect(p.resources.sheep).toBe(1)
     expect(p.pastures[0].animalCount).toBe(1)
   })
@@ -175,7 +172,6 @@ describe('salterPickAction', () => {
   })
 
   it('resolveChoice clampRound: round=13 sheep → futureMeeples 入队 startRound=14 count=3', () => {
-    // pending 入队 startRound=14 count=3；clampRound 由后续 resolveFutureMeepleRequests 处理（实际 future entries 只剩 round 14 一条，session 测试覆盖）
     const p = createPlayer({
       resources: { ...emptyResources(), sheep: 1 },
       pastures: [{ id: 'p1', size: 1, tiles: [{ row: 2, col: 0 }], stables: 0, animalType: 'sheep', animalCount: 1 }],
