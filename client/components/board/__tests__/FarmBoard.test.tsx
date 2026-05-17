@@ -375,7 +375,7 @@ describe('FarmBoard', () => {
     expect(html).toContain('-80-0-sow-choice')
   })
 
-  it('renders 2 wood stacks on D75 card when extraData.stacks has 2 entries', () => {
+  it('renders 2 wood stacks on D75 card when cardFieldStacks has 2 entries', () => {
     const player: PlayerState = {
       ...createPlayer('p1', 'Player A', 'red'),
       minorPlayed: ['D75_WoodField'],
@@ -385,9 +385,9 @@ describe('FarmBoard', () => {
           infobox: undefined,
           stack: [],
           extraData: {
-            stacks: [
-              { kind: 'wood', remaining: 3 },
-              { kind: 'wood', remaining: 2 },
+            cardFieldStacks: [
+              { crop: 'wood', remaining: 3 },
+              { crop: 'wood', remaining: 2 },
             ],
           },
         },
