@@ -11,11 +11,12 @@ import {
 import '../../shared/cards/D/D75_WoodField'
 
 const CARD_ID = 'D75_WoodField'
-const ROW = -75
+const ROW = -1
+const COL_BASE = 4075
 
 const setup = (options?: {
   wood?: number
-  stacks?: { kind: 'wood'; remaining: number }[]
+  stacks?: { crop: 'wood'; remaining: number }[]
 }) => {
   const session = new GameSession()
   const state = session.getState().state
@@ -37,7 +38,7 @@ const setup = (options?: {
 
   if (options?.stacks !== undefined) {
     player.cardStates = player.cardStates ?? {}
-    player.cardStates[CARD_ID] = { extraData: { stacks: options.stacks } }
+    player.cardStates[CARD_ID] = { extraData: { cardFieldStacks: options.stacks } }
   }
 
   session.loadState(state)
@@ -77,28 +78,28 @@ describe('D75_WoodField session', () => {
     }
     if (resp.interaction.farm.farmType !== 'sow') throw new Error('expected sow farm')
     expect(resp.interaction.farm.selectableFields).toContainEqual({
-      tile: { row: ROW, col: 0 },
+      tile: { row: ROW, col: COL_BASE },
       allowedCrops: ['wood'],
       sourceCard: CARD_ID,
       groupKey: CARD_ID,
     })
 
     resp = session.resolveChoice(0, 'confirm', {
-      crops: [{ row: ROW, col: 0, crop: 'wood' }],
+      crops: [{ row: ROW, col: COL_BASE, crop: 'wood' }],
     })
     expect(resp.ok).toBe(true)
     const playerAfter = resp.state.players[0]!
     expect(playerAfter.resources.wood).toBe(0)
-    expect(readCardExtraData(playerAfter, CARD_ID, 'stacks')).toEqual([
-      { kind: 'wood', remaining: 3 },
+    expect(readCardExtraData(playerAfter, CARD_ID, 'cardFieldStacks')).toEqual([
+      { crop: 'wood', remaining: 3 },
     ])
 
     // Drive a single harvest tick directly: onHarvestFieldPhase is the unit
     // of work — running it on the post-sow state must hand back 1 wood.
     runCardEffectHook(resp.state, playerAfter, CARD_ID, 'onHarvestFieldPhase')
     expect(playerAfter.resources.wood).toBe(1)
-    expect(readCardExtraData(playerAfter, CARD_ID, 'stacks')).toEqual([
-      { kind: 'wood', remaining: 2 },
+    expect(readCardExtraData(playerAfter, CARD_ID, 'cardFieldStacks')).toEqual([
+      { crop: 'wood', remaining: 2 },
     ])
   })
 
@@ -112,10 +113,10 @@ describe('D75_WoodField session', () => {
     }
     if (resp.interaction.farm.farmType !== 'sow') throw new Error('expected sow farm')
     const slot0 = resp.interaction.farm.selectableFields.find(
-      (f) => f.tile.row === ROW && f.tile.col === 0,
+      (f) => f.tile.row === ROW && f.tile.col === COL_BASE,
     )
     const slot1 = resp.interaction.farm.selectableFields.find(
-      (f) => f.tile.row === ROW && f.tile.col === 1,
+      (f) => f.tile.row === ROW && f.tile.col === COL_BASE + 1,
     )
     expect(slot0).toBeDefined()
     expect(slot1).toBeDefined()
@@ -126,23 +127,23 @@ describe('D75_WoodField session', () => {
 
     resp = session.resolveChoice(0, 'confirm', {
       crops: [
-        { row: ROW, col: 0, crop: 'wood' },
-        { row: ROW, col: 1, crop: 'wood' },
+        { row: ROW, col: COL_BASE, crop: 'wood' },
+        { row: ROW, col: COL_BASE + 1, crop: 'wood' },
       ],
     })
     expect(resp.ok).toBe(true)
     const playerAfter = resp.state.players[0]!
     expect(playerAfter.resources.wood).toBe(0)
-    expect(readCardExtraData(playerAfter, CARD_ID, 'stacks')).toEqual([
-      { kind: 'wood', remaining: 3 },
-      { kind: 'wood', remaining: 3 },
+    expect(readCardExtraData(playerAfter, CARD_ID, 'cardFieldStacks')).toEqual([
+      { crop: 'wood', remaining: 3 },
+      { crop: 'wood', remaining: 3 },
     ])
 
     runCardEffectHook(resp.state, playerAfter, CARD_ID, 'onHarvestFieldPhase')
     expect(playerAfter.resources.wood).toBe(2)
-    expect(readCardExtraData(playerAfter, CARD_ID, 'stacks')).toEqual([
-      { kind: 'wood', remaining: 2 },
-      { kind: 'wood', remaining: 2 },
+    expect(readCardExtraData(playerAfter, CARD_ID, 'cardFieldStacks')).toEqual([
+      { crop: 'wood', remaining: 2 },
+      { crop: 'wood', remaining: 2 },
     ])
   })
 
@@ -150,8 +151,8 @@ describe('D75_WoodField session', () => {
     const session = setup({
       wood: 0,
       stacks: [
-        { kind: 'wood', remaining: 3 },
-        { kind: 'wood', remaining: 3 },
+        { crop: 'wood', remaining: 3 },
+        { crop: 'wood', remaining: 3 },
       ],
     })
     const state = session.getState().state
@@ -164,6 +165,6 @@ describe('D75_WoodField session', () => {
       total += player.resources.wood - before
     }
     expect(total).toBe(6)
-    expect(readCardExtraData(player, CARD_ID, 'stacks')).toEqual([])
+    expect(readCardExtraData(player, CARD_ID, 'cardFieldStacks')).toEqual([])
   })
 })
