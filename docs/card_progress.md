@@ -11,7 +11,7 @@
 | canonical 层面 BGA-only / OA-only | 0 / 0 |
 | TypeScript 实体卡牌文件数 | 888 |
 | BGA active implemented 但 OA 缺失 | 0 |
-| 待修行为 / 注册差异 | 2 |
+| 待修行为 / 注册差异 | 1 |
 | metadata schema 上抬差异 | 4 |
 | BGA 标 banned 但 OA 按策略保留 | 33 |
 | 待 owner 确认队列 | 0 |
@@ -154,6 +154,7 @@ pnpm run lint
 
 ## 9. 当前轮次
 
+- 2026-05-17 — `B157_Salter` 对齐 BGA — 多只混合 panel + futureMeeples：reserve=0 + on-board≥1 触发 anytime，新 `animal-quantity-select` interaction kind 允许一次提交 sheep/boar/cattle 任意计数；单只时 fast path 自动结算无需 panel；按动物类型走 3/5/7 turn `futureMeeples` 投递 food。
 - 2026-05-17 — `B42_ForestInn` / `D119_WoodBarterer` 纯 gain / pay-gain 选项去除重复 `choiceLabelKey`，改由 `descriptionPreview` 自动渲染资源变化。
 - 2026-05-16 — `B42_ForestInn` 对齐 BGA activate flow：非主人先支付 owner 1 food，随后进入 5/7/9 wood 的 XOR pay-gain 分支。
 - 2026-05-16 — C60_SmallPottersOven mandatory bake continuation fixed: skipping Stone Oven onBuy bake after C60 before-bake build now reaches engine-blocked instead of ending the turn.
@@ -183,11 +184,13 @@ pnpm run lint
 - `harvestReapSummary` 初始化时机：从 `continueHarvestReap` 提前到 `continueHarvestFieldStart`，让 `onHarvestFieldPhase` 内的 cardField 累加能进入同一份 summary，最终 `log.harvestReapDetail` 完整覆盖普通田 + cardField。
 - `payGainActionFlow` / `payThenGainActionFlow` 不再把完整 resource-exchange preview 挂到 pay leaf；pay leaf 交给引擎生成 payment preview，gain leaf 生成 gain preview，避免描述重复。
 - Replace-listener 重入防护当前为 listener 端责任：`buildReplaceChoiceFlow` 只对 alternative 分支标 `skipComputeReplaceListenerIds`，原 leaf 仅得 `checkedReplaceAction: true`。每张 replace-style 卡 handler 必须自检 `actionContext.checkedReplaceAction`（参考 B103 / C140）。未来重构可考虑由引擎统一兜底。
+- `animal-quantity-select` interaction kind（`shared/protocol`）+ `subtractAnimalsFromBoard` helper（`shared/domain/animals.ts`）：通用多动物计数选择 + 按 pasture → house → stable → resource pool 顺序从场上扣除给定数量动物，供 B157_Salter 这类"按 on-board 数量结算"的卡牌复用。前端 `AnimalQuantitySelectPanel` 配套展示 sheep/boar/cattle 计数器并提交 `{ animalCounts }`。
 
 ## 11. 时间线
 
 | 日期 | 批次 | 涉及卡牌 / 基建 |
 |---|---|---|
+| 2026-05-17 | B157 BGA alignment | B157_Salter + `animal-quantity-select` interaction kind + `subtractAnimalsFromBoard` helper + `AnimalQuantitySelectPanel` |
 | 2026-05-17 | pay-gain option rendering | B42_ForestInn / D119_WoodBarterer + pay-gain helper preview |
 | 2026-05-16 | B42 flow alignment | B42_ForestInn |
 | 2026-05-16 | C60 mandatory bake continuation | C60_SmallPottersOven + before-resolved continuation `skipBeforeTriggers` |
