@@ -16,4 +16,5 @@ export const E72_ArtichokeField = new MinorImprovement({
   prerequisite: '2 Occupations',
   occupationPrerequisites: { min: 2 },
   isField: true,
+  cardField: { allowedCrops: ['grain', 'vegetable'], capacity: 1 },
 })
