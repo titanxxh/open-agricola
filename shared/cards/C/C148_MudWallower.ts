@@ -164,8 +164,6 @@ export const C148_MudWallower_impl = {
     const counters = initCardState(player, CARD_ID)
     counters.counter = 0
     counters.held = 0
-    const cardState = player.cardStates![CARD_ID]
-    cardState.extraData = { ...(cardState.extraData ?? {}), animalType: 'boar' }
     writeCardInfobox(player, CARD_ID, '0 / 4')
   },
   onComputeAnimalZones: (player, zones, _state) => {
