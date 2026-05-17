@@ -10,7 +10,7 @@ const listener: CardListenerRegistration = {
   id: 'E18-seed-almanac-after-improvement',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['improvement-any', 'minor-improvement'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const choice = context.choice ?? ''
     // Only trigger for minor improvements, not this card itself

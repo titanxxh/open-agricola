@@ -12,7 +12,7 @@ const listener: CardListenerRegistration = {
   id: 'E146-reseller-immediately-after-improvement',
   cardIds: [CARD_ID],
   phases: ['immediatelyAfter' as ActionHookPhase],
-  actions: ['improvement-any'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
     const choice = context.choice ?? ''

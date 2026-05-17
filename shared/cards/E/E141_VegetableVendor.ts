@@ -26,6 +26,7 @@ const listener: CardListenerRegistration = {
               type: 'leaf',
               actionId: 'improvement',
               optional: true,
+              params: { types: ['major', 'minor'] },
               sourceCard: CARD_ID,
             },
           ],
