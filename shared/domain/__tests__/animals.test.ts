@@ -72,16 +72,18 @@ describe('getAssignedAnimalsByType', () => {
     expect(getAssignedAnimalsByType(p)).toEqual({ sheep: 0, boar: 2, cattle: 0 })
   })
 
-  it('counts animal-holder card zones (counters.held + extraData.animalType — C148 actual schema)', () => {
+  it('ignores cardStates.counters.held (C148-style permanent capacity counter)', () => {
+    // C148_MudWallower uses counters.held as permanent capacity, not current
+    // count, so we intentionally do NOT sum it here. See animals.ts JSDoc.
     const p = mkPlayer({
       cardStates: {
         C148_MudWallower: {
           counters: { held: 3, counter: 1 },
-          extraData: { animalType: 'boar' },
+          extraData: {},
         },
       } as unknown as PlayerState['cardStates'],
     })
-    expect(getAssignedAnimalsByType(p)).toEqual({ sheep: 0, boar: 3, cattle: 0 })
+    expect(getAssignedAnimalsByType(p)).toEqual({ sheep: 0, boar: 0, cattle: 0 })
   })
 
   it('ignores card states without valid animal-holder extraData', () => {

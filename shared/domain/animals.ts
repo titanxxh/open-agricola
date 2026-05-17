@@ -8,43 +8,21 @@ const isAnimalKey = (s: unknown): s is AnimalKey =>
   s === 'sheep' || s === 'boar' || s === 'cattle'
 
 /**
- * Read holder-card held count + animal type from a single cardState.
- * Supports two storage schemas:
- *   - extraData.held + extraData.animalType (legacy/explicit holder cards)
- *   - counters.held  + extraData.animalType (e.g. C148 MudWallower uses
- *     `counters.held` for the held count; the animal type is declared on
- *     `extraData.animalType` by the card's onBuy hook)
- * Returns null if this cardState is not an animal holder.
- */
-const readHolderHeld = (
-  state: { counters?: Record<string, number>; extraData?: Record<string, unknown> } | undefined,
-): { animal: AnimalKey; held: number } | null => {
-  if (!state) return null
-  const extra = state.extraData as { held?: unknown; animalType?: unknown } | undefined
-  const counters = state.counters as { held?: unknown } | undefined
-  const animalType = extra?.animalType
-  if (!isAnimalKey(animalType)) return null
-  const rawHeld =
-    typeof extra?.held === 'number'
-      ? extra.held
-      : typeof counters?.held === 'number'
-        ? counters.held
-        : 0
-  if (!Number.isFinite(rawHeld) || rawHeld <= 0) return null
-  return { animal: animalType, held: rawHeld }
-}
-
-/**
  * Count animals placed on a player's board (pasture + house + stable + animal-holder cards).
  * Does NOT include reserve / unassigned animals — for total persisted count use
  * `player.resources.{sheep,boar,cattle}` directly.
  *
  * Equivalent to BGA `countAnimalsOnBoard()` semantically.
  *
- * Animal-holder cards report their held animals via either:
- *   - `cardStates[cardId].extraData = { held: number, animalType: AnimalKey }`, or
- *   - `cardStates[cardId].counters.held` + `cardStates[cardId].extraData.animalType`
- *     (e.g. C148 MudWallower).
+ * Animal-holder cards report their held animals via
+ *   `cardStates[cardId].extraData = { held: number, animalType: AnimalKey }`.
+ *
+ * Note: cards using `cardStates[cardId].counters.held` (e.g. C148_MudWallower)
+ * are intentionally NOT counted here — that counter encodes permanent capacity,
+ * not the current on-card population, so summing it would over-count animals
+ * still tracked in `player.resources`. See spec
+ * `docs/superpowers/specs/2026-05-17-B157_Salter-design.md` §7 for the known
+ * B157 deviation this causes.
  */
 export const getAssignedAnimalsByType = (player: PlayerState): Record<AnimalKey, number> => {
   const result: Record<AnimalKey, number> = { ...ZERO }
@@ -60,9 +38,13 @@ export const getAssignedAnimalsByType = (player: PlayerState): Record<AnimalKey,
     if (animal && isAnimalKey(animal)) result[animal] += 1
   }
   for (const state of Object.values(player.cardStates ?? {})) {
-    const holder = readHolderHeld(state as never)
-    if (!holder) continue
-    result[holder.animal] += holder.held
+    const extra = state?.extraData as { held?: unknown; animalType?: unknown } | undefined
+    if (!extra) continue
+    const animalType = extra.animalType
+    if (!isAnimalKey(animalType)) continue
+    const held = extra.held
+    if (typeof held !== 'number' || !Number.isFinite(held) || held <= 0) continue
+    result[animalType] += held
   }
   return result
 }
@@ -116,24 +98,15 @@ export const subtractAnimalsFromBoard = (
         remaining -= 1
       }
     }
-    // 4. animal-holder cards (cardStates.counters.held or extraData.held)
+    // 4. animal-holder cards (cardStates extraData.held)
     if (remaining > 0) {
       for (const state of Object.values(player.cardStates ?? {})) {
         if (remaining <= 0) break
-        const extra = state?.extraData as { held?: unknown; animalType?: unknown } | undefined
+        const extra = state?.extraData as { held?: number; animalType?: string } | undefined
         if (!extra || extra.animalType !== type) continue
-        if (typeof extra.held === 'number' && extra.held > 0) {
-          const take = Math.min(extra.held, remaining)
-          extra.held = extra.held - take
-          remaining -= take
-          continue
-        }
-        const counters = state?.counters as { held?: number } | undefined
-        if (counters && typeof counters.held === 'number' && counters.held > 0) {
-          const take = Math.min(counters.held, remaining)
-          counters.held = counters.held - take
-          remaining -= take
-        }
+        const take = Math.min(extra.held ?? 0, remaining)
+        extra.held = (extra.held ?? 0) - take
+        remaining -= take
       }
     }
     // 5. player.resources total
