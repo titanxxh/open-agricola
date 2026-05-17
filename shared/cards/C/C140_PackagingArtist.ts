@@ -49,7 +49,7 @@ const isDoableListener: CardListenerRegistration = {
   id: 'C140-packaging-artist-isdoable-minor-improvement',
   cardIds: [CARD_ID],
   phases: ['isDoable' as ActionHookPhase],
-  actions: ['minor-improvement'],
+  actions: ['minor-improvement', 'improvement-any'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.trueAction === false) return
     if (context.doable) return
