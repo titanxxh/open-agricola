@@ -1,7 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
-import { initCardState } from '../__stubs__/helpers'
+import { getAssignedAnimalsByType } from '../../domain/animals'
 import type { CardImpl } from '../registry'
 import { B157_Salter } from '../../cards-display/B/B157_Salter'
 
@@ -12,49 +11,36 @@ const anytimeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const { sheep, boar, cattle } = context.player.resources
-    const hasSheep = (sheep ?? 0) >= 1
-    const hasBoar = (boar ?? 0) >= 1
-    const hasCattle = (cattle ?? 0) >= 1
-    if (!hasSheep && !hasBoar && !hasCattle) return
-    if (context.state.round >= 14) return // no future rounds
-    const options = []
-    if (hasSheep) {
-      options.push({
-        type: 'seq' as const,
-        children: [
-          payLeaf({ cardId: CARD_ID, cost: { sheep: 1 } }),
-          { type: 'leaf' as const, actionId: 'store-on-card', params: { pending: 3 }, sourceCard: CARD_ID },
-        ],
-        choiceLabelKey: 'ui.interactionSalterSheep',
-      })
+    const { state, player } = context
+    const onBoard = getAssignedAnimalsByType(player)
+    const totalOnBoard = onBoard.sheep + onBoard.boar + onBoard.cattle
+    if (totalOnBoard < 1) return
+    const reserveSum =
+      (player.resources.sheep ?? 0) - onBoard.sheep +
+      (player.resources.boar ?? 0) - onBoard.boar +
+      (player.resources.cattle ?? 0) - onBoard.cattle
+    if (reserveSum > 0) return
+    if (state.round + 1 > 14) return
+
+    let singleOnly: 'sheep' | 'boar' | 'cattle' | null = null
+    if (onBoard.sheep === 1 && onBoard.boar === 0 && onBoard.cattle === 0) singleOnly = 'sheep'
+    else if (onBoard.boar === 1 && onBoard.sheep === 0 && onBoard.cattle === 0) singleOnly = 'boar'
+    else if (onBoard.cattle === 1 && onBoard.sheep === 0 && onBoard.boar === 0) singleOnly = 'cattle'
+
+    if (singleOnly) {
+      return {
+        flow: {
+          type: 'leaf',
+          actionId: 'salter-pick',
+          sourceCard: CARD_ID,
+          params: { presetCounts: { [singleOnly]: 1 } },
+        },
+        sourceCard: CARD_ID,
+        labelKey: `cards.B157_Salter.single.${singleOnly}`,
+      }
     }
-    if (hasBoar) {
-      options.push({
-        type: 'seq' as const,
-        children: [
-          payLeaf({ cardId: CARD_ID, cost: { boar: 1 } }),
-          { type: 'leaf' as const, actionId: 'store-on-card', params: { pending: 5 }, sourceCard: CARD_ID },
-        ],
-        choiceLabelKey: 'ui.interactionSalterBoar',
-      })
-    }
-    if (hasCattle) {
-      options.push({
-        type: 'seq' as const,
-        children: [
-          payLeaf({ cardId: CARD_ID, cost: { cattle: 1 } }),
-          { type: 'leaf' as const, actionId: 'store-on-card', params: { pending: 7 }, sourceCard: CARD_ID },
-        ],
-        choiceLabelKey: 'ui.interactionSalterCattle',
-      })
-    }
-    if (options.length === 0) return
     return {
-      flow: {
-        type: 'xor',
-        children: options,
-      },
+      flow: { type: 'leaf', actionId: 'salter-pick', sourceCard: CARD_ID },
       sourceCard: CARD_ID,
       labelKey: 'cards.B157_Salter.anytime',
     }
@@ -63,15 +49,6 @@ const anytimeListener: CardListenerRegistration = {
 
 export const B157_Salter_impl = {
   listeners: [anytimeListener],
-  effect: {
-  id: CARD_ID,
-  onRoundStart: (_state, player) => {
-    const pending = player.cardStates?.[CARD_ID]?.counters?.pending ?? 0
-    if (pending <= 0) return
-    const counters = initCardState(player, CARD_ID)
-    counters.pending = pending - 1
-    return gainLeaf(CARD_ID, { food: 1 })
-  },
-},
+  effect: { id: CARD_ID },
   reaches: [] as readonly string[],
 } satisfies CardImpl
