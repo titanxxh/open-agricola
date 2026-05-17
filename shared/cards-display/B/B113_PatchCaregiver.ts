@@ -12,4 +12,5 @@ export const B113_PatchCaregiver = new Occupation({
   cost: {},
   players: '1+',
   isField: true,
+  cardField: { allowedCrops: ['grain', 'vegetable', 'wood', 'stone'], capacity: 1 },
 })
