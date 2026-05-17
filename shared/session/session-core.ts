@@ -1425,6 +1425,20 @@ export class GameCore {
           allowedCommands: buildCmds(['resolveChoice', 'commitFarm', 'undoStep', 'undoAction']),
           anytimeActions: anytimeDescriptors,
         }
+      case 'animal-quantity-select':
+        return {
+          stateId: 'wait',
+          playerIndex,
+          spaceId,
+          promptKey,
+          promptParams,
+          sourceCard,
+          request,
+          options: choiceOptions,
+          costOverride,
+          allowedCommands: buildCmds(['commitSelection', 'undoStep', 'undoAction']),
+          anytimeActions: anytimeDescriptors,
+        }
       case 'select-trigger':
         return {
           stateId: 'wait',
@@ -2929,10 +2943,10 @@ export class GameCore {
           return this.resolvePendingChoice(playerIndex, value, true, payload)
         case 'animal-quantity-select':
           // B157_Salter-style mixed animal panel. The dedicated commit pathway
-          // is commitSelectionChoice (see Task C1); resolveChoice falls back to
-          // the legacy pending-options path so the envelope's choice validator
-          // stays happy if a caller routes here.
-          return this.resolvePendingChoice(playerIndex, value, true, payload)
+          // is commitSelectionChoice (see Task C1); resolveChoice is rejected
+          // explicitly so future callers cannot silently route through the
+          // legacy pending-options path.
+          return this.respond(false, 'use commitSelectionChoice for animal-quantity-select')
         case 'card-draft':
           return this.respond(false, 'card-draft resolveChoice not supported')
         case 'engine-blocked':

@@ -28,7 +28,10 @@ export const AnimalQuantitySelectPanel = ({
       <div className="prompt">{t(locale, 'ui.interactionAnimalQuantitySelect')}</div>
       {(['sheep', 'boar', 'cattle'] as const).map((type) => (
         <div key={type} className="row">
-          <label>{type} (max {availableByType[type]})</label>
+          <label>{t(locale, 'ui.interactionAnimalQuantityRow', {
+            type: t(locale, `resources.${type}`),
+            max: availableByType[type],
+          })}</label>
           <input
             type="number"
             min={0}
@@ -39,7 +42,7 @@ export const AnimalQuantitySelectPanel = ({
           />
         </div>
       ))}
-      <div className="preview">Total food (across rounds): {foodPreview}</div>
+      <div className="preview">{t(locale, 'ui.interactionAnimalQuantityTotalFood', { n: foodPreview })}</div>
       <div className="actions">
         <button disabled={total < 1} onClick={() => onConfirm(counts)}>
           {t(locale, 'ui.interactionAnimalQuantityConfirm')}
