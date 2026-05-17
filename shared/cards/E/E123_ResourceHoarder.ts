@@ -47,7 +47,7 @@ const computeCostsListener: CardListenerRegistration = {
   id: 'E123-resource-hoarder-compute-costs',
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
-  actions: ['construct', 'improvement-any', 'minor-improvement', 'renovate-house'],
+  actions: ['construct', 'improvement', 'renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const stack = getStack(context.player)
     const N = stack.length
