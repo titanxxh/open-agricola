@@ -3383,6 +3383,20 @@ export class GameCore {
     // 与现有 occupation-hand path (line 3383) `{cards: cardIds}` / farm-position path (line 3432) `{positions: positionStrings}` 风格一致
     if (isAnimalQuantity) {
       const counts = payload.animalCounts ?? { sheep: 0, boar: 0, cattle: 0 }
+      // Pre-validate shape (finite non-negative int + at least one) BEFORE pushHistory,
+      // so a malformed submission does not pollute history with a no-op snapshot.
+      // Effect-layer bounds (count <= on-board) remain enforced inside resolveChoice.
+      let total = 0
+      for (const t of ['sheep', 'boar', 'cattle'] as const) {
+        const v = counts[t]
+        if (!Number.isInteger(v) || v < 0) {
+          return this.respond(false, `salter-pick.error.invalid-count-${t}`)
+        }
+        total += v
+      }
+      if (total < 1) {
+        return this.respond(false, 'salter-pick.error.must-pick-at-least-one')
+      }
       this.pushHistory()
       const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('animal-quantity')
       const result = this.engine?.resolveChoice('confirm', {
