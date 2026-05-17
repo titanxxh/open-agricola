@@ -88,7 +88,7 @@ describe('C75_Firewood', () => {
         state: createState(player),
         player,
         space: {} as ActionSpace,
-        actionId: 'improvement-any',
+        actionId: 'improvement',
         phase: 'after',
         choice: 'major:Major_Fireplace1',
       } as unknown as CardListenerContext)
@@ -116,7 +116,7 @@ describe('C75_Firewood', () => {
         state: createState(player),
         player,
         space: {} as ActionSpace,
-        actionId: 'improvement-any',
+        actionId: 'improvement',
         phase: 'after',
         choice: 'major:Major_Fireplace1',
       } as unknown as CardListenerContext)
@@ -138,7 +138,7 @@ describe('C75_Firewood', () => {
         state: createState(player),
         player,
         space: {} as ActionSpace,
-        actionId: 'improvement-any',
+        actionId: 'improvement',
         phase: 'after',
         choice: 'major:Major_Well',
       } as unknown as CardListenerContext)
@@ -158,7 +158,7 @@ describe('C75_Firewood', () => {
         state: createState(player),
         player,
         space: {} as ActionSpace,
-        actionId: 'improvement-any',
+        actionId: 'improvement',
         phase: 'after',
         choice: 'major:Major_Fireplace1',
       } as unknown as CardListenerContext)

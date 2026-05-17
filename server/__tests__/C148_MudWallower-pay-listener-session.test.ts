@@ -111,7 +111,7 @@ describe('C148 MudWallower — after-pay sync listener', () => {
     const state = createState(player)
     executeCardListener(listener, {
       state, player,
-      space: createSpace('improvement-any'),
+      space: createSpace('improvement'),
       actionId: 'pay', phase: 'after',
       sourceCard: undefined,
       result: { type: 'ok', resourcesPaid: { wood: 2, clay: 1 } },

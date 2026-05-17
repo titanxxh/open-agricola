@@ -87,8 +87,8 @@ describe('A20_DoubleTurnPlow', () => {
     state.round = 4
 
     const result = executeCardListener(listener, {
-      state, player, space: createSpace('minor-improvement'),
-      actionId: 'minor-improvement', phase: 'computeCosts',
+      state, player, space: createSpace('improvement'),
+      actionId: 'improvement', phase: 'computeCosts',
       cardId: CARD_ID,
     } as unknown as CardListenerContext)
 
@@ -103,8 +103,8 @@ describe('A20_DoubleTurnPlow', () => {
     state.round = 3
 
     const result = executeCardListener(listener, {
-      state, player, space: createSpace('minor-improvement'),
-      actionId: 'minor-improvement', phase: 'computeCosts',
+      state, player, space: createSpace('improvement'),
+      actionId: 'improvement', phase: 'computeCosts',
       cardId: CARD_ID,
     } as unknown as CardListenerContext)
 
@@ -118,8 +118,8 @@ describe('A20_DoubleTurnPlow', () => {
     state.round = 5
 
     const result = executeCardListener(listener, {
-      state, player, space: createSpace('minor-improvement'),
-      actionId: 'minor-improvement', phase: 'computeCosts',
+      state, player, space: createSpace('improvement'),
+      actionId: 'improvement', phase: 'computeCosts',
       cardId: 'SomeOtherCard',
     } as unknown as CardListenerContext)
 

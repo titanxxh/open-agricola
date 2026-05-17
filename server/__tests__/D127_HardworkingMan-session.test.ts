@@ -88,7 +88,7 @@ describe('D127_HardworkingMan session', () => {
     expect(result.flow.type).toBe('or')
     if (result.flow.type !== 'or') return
     const ids = result.flow.children.map((c) => (c as { actionId: string }).actionId)
-    expect(ids).toEqual(['day-laborer', 'construct', 'improvement-any'])
+    expect(ids).toEqual(['day-laborer', 'construct', 'improvement'])
   })
 
   it('only day-laborer leaf: gain 2 food then __done__ resolves OR', () => {

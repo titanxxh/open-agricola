@@ -68,7 +68,7 @@ describe('resolveCardCostWithModifiers', () => {
     const player = createPlayer()
     const state = createState(player)
     const result = resolveCardCostWithModifiers(
-      state, player, 'improvement-any', 'Major_Basket', { reed: 2, stone: 2 },
+      state, player, 'improvement', 'Major_Basket', { reed: 2, stone: 2 },
     )
     expect(result).toEqual({ reed: 2, stone: 2 })
   })
@@ -80,17 +80,17 @@ describe('resolveCardCostWithModifiers', () => {
 
     requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
       id: 'hook-a', cardIds: ['HookA'], phases: ['computeCosts'],
-      actions: ['improvement-any'],
+      actions: ['improvement'],
       handler: () => ({ costs: { stone: -1 } }),
     })
     requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
       id: 'hook-b', cardIds: ['HookB'], phases: ['computeCosts'],
-      actions: ['improvement-any'],
+      actions: ['improvement'],
       handler: () => ({ costs: { reed: -1 } }),
     })
 
     const result = resolveCardCostWithModifiers(
-      state, player, 'improvement-any', 'Major_Basket', { reed: 2, stone: 2 },
+      state, player, 'improvement', 'Major_Basket', { reed: 2, stone: 2 },
     )
     expect(result).toEqual({ reed: 1, stone: 1 })
   })
@@ -102,12 +102,12 @@ describe('resolveCardCostWithModifiers', () => {
 
     requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
       id: 'hook-trade', cardIds: ['HookTrade'], phases: ['computeCosts'],
-      actions: ['improvement-any'],
+      actions: ['improvement'],
       handler: () => ({ trades: [{ from: { wood: 1 }, to: { clay: 2 }, max: 1 }] }),
     })
 
     const result = resolveCardCostWithModifiers(
-      state, player, 'improvement-any', 'Major_Test', { clay: 2 },
+      state, player, 'improvement', 'Major_Test', { clay: 2 },
     ) as ComplexCost
     expect(result.fee).toEqual({ clay: 2 })
     expect(result.trades).toHaveLength(1)
@@ -121,12 +121,12 @@ describe('resolveCardCostWithModifiers', () => {
 
     requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
       id: 'hook-bonus', cardIds: ['HookBonus'], phases: ['computeCosts'],
-      actions: ['improvement-any'],
+      actions: ['improvement'],
       handler: () => ({ bonuses: [{ discount: { stone: 1 }, sources: ['HookBonus'] }] }),
     })
 
     const result = resolveCardCostWithModifiers(
-      state, player, 'improvement-any', 'Major_Test', { stone: 2 },
+      state, player, 'improvement', 'Major_Test', { stone: 2 },
     ) as ComplexCost
     expect(result.bonuses).toHaveLength(1)
     expect(result.bonuses![0]!.discount).toEqual({ stone: 1 })
@@ -139,7 +139,7 @@ describe('resolveCardCostWithModifiers', () => {
 
     requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
       id: 'hook-choices', cardIds: ['HookChoices'], phases: ['computeCosts'],
-      actions: ['improvement-any'],
+      actions: ['improvement'],
       handler: () => ({
         bonuses: [{
           choices: [
@@ -153,7 +153,7 @@ describe('resolveCardCostWithModifiers', () => {
     })
 
     const result = resolveCardCostWithModifiers(
-      state, player, 'improvement-any', 'Major_Test', { clay: 2, stone: 2 },
+      state, player, 'improvement', 'Major_Test', { clay: 2, stone: 2 },
     ) as ComplexCost
     expect(result.bonuses).toHaveLength(1)
     expect(result.bonuses![0]!.choices).toHaveLength(2)
@@ -167,7 +167,7 @@ describe('resolveCardCostWithModifiers', () => {
 
     requireActiveCardRegistry('resolveCardCostWithModifiers').registerListener({
       id: 'hook-multi', cardIds: ['HookMulti'], phases: ['computeCosts'],
-      actions: ['improvement-any'],
+      actions: ['improvement'],
       handler: () => ({
         costs: { reed: -1 },
         trades: [{ from: { wood: 1 }, to: { clay: 1 } }],
@@ -176,7 +176,7 @@ describe('resolveCardCostWithModifiers', () => {
     })
 
     const result = resolveCardCostWithModifiers(
-      state, player, 'improvement-any', 'Major_Test', { reed: 2, clay: 1, stone: 1 },
+      state, player, 'improvement', 'Major_Test', { reed: 2, clay: 1, stone: 1 },
     ) as ComplexCost
     expect(result.fee).toEqual({ reed: 1, clay: 1, stone: 1 })
     expect(result.trades).toHaveLength(1)

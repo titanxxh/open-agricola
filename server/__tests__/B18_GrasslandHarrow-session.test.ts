@@ -53,7 +53,7 @@ describe('B18_GrasslandHarrow onRoundStart (post 7b1 listener migration)', () =>
     const listener = findListener('B18-grassland-harrow-after-pay')!
     const result = executeCardListener(listener, {
       state, player,
-      space: { id: 'improvement-any' } as never,
+      space: { id: 'improvement' } as never,
       actionId: 'pay', phase: 'after',
       sourceCard: CARD_ID,
       result: { type: 'ok', resourcesPaid: { wood: 2 } },
