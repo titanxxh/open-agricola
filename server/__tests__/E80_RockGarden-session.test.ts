@@ -11,11 +11,12 @@ import {
 import '../../shared/cards/E/E80_RockGarden'
 
 const CARD_ID = 'E80_RockGarden'
-const ROW = -80
+const ROW = -1
+const COL_BASE = 5080
 
 const setup = (options?: {
   stone?: number
-  stacks?: { kind: 'stone'; remaining: number }[]
+  stacks?: { crop: 'stone'; remaining: number }[]
 }) => {
   const session = new GameSession()
   const state = session.getState().state
@@ -36,7 +37,7 @@ const setup = (options?: {
 
   if (options?.stacks !== undefined) {
     player.cardStates = player.cardStates ?? {}
-    player.cardStates[CARD_ID] = { extraData: { stacks: options.stacks } }
+    player.cardStates[CARD_ID] = { extraData: { cardFieldStacks: options.stacks } }
   }
 
   session.loadState(state)
@@ -74,26 +75,26 @@ describe('E80_RockGarden session', () => {
     }
     if (resp.interaction.farm.farmType !== 'sow') throw new Error('expected sow farm')
     expect(resp.interaction.farm.selectableFields).toContainEqual({
-      tile: { row: ROW, col: 0 },
+      tile: { row: ROW, col: COL_BASE },
       allowedCrops: ['stone'],
       sourceCard: CARD_ID,
       groupKey: CARD_ID,
     })
 
     resp = session.resolveChoice(0, 'confirm', {
-      crops: [{ row: ROW, col: 0, crop: 'stone' }],
+      crops: [{ row: ROW, col: COL_BASE, crop: 'stone' }],
     })
     expect(resp.ok).toBe(true)
     const playerAfter = resp.state.players[0]!
     expect(playerAfter.resources.stone).toBe(0)
-    expect(readCardExtraData(playerAfter, CARD_ID, 'stacks')).toEqual([
-      { kind: 'stone', remaining: 2 },
+    expect(readCardExtraData(playerAfter, CARD_ID, 'cardFieldStacks')).toEqual([
+      { crop: 'stone', remaining: 2 },
     ])
 
     runCardEffectHook(resp.state, playerAfter, CARD_ID, 'onHarvestFieldPhase')
     expect(playerAfter.resources.stone).toBe(1)
-    expect(readCardExtraData(playerAfter, CARD_ID, 'stacks')).toEqual([
-      { kind: 'stone', remaining: 1 },
+    expect(readCardExtraData(playerAfter, CARD_ID, 'cardFieldStacks')).toEqual([
+      { crop: 'stone', remaining: 1 },
     ])
   })
 
@@ -106,10 +107,10 @@ describe('E80_RockGarden session', () => {
       throw new Error('expected sow interaction')
     }
     if (resp.interaction.farm.farmType !== 'sow') throw new Error('expected sow farm')
-    const slots = [0, 1, 2].map((col) =>
+    const slots = [0, 1, 2].map((slotIdx) =>
       resp.interaction.farm.farmType === 'sow'
         ? resp.interaction.farm.selectableFields.find(
-            (f) => f.tile.row === ROW && f.tile.col === col,
+            (f) => f.tile.row === ROW && f.tile.col === COL_BASE + slotIdx,
           )
         : undefined,
     )
@@ -122,26 +123,26 @@ describe('E80_RockGarden session', () => {
 
     resp = session.resolveChoice(0, 'confirm', {
       crops: [
-        { row: ROW, col: 0, crop: 'stone' },
-        { row: ROW, col: 1, crop: 'stone' },
-        { row: ROW, col: 2, crop: 'stone' },
+        { row: ROW, col: COL_BASE, crop: 'stone' },
+        { row: ROW, col: COL_BASE + 1, crop: 'stone' },
+        { row: ROW, col: COL_BASE + 2, crop: 'stone' },
       ],
     })
     expect(resp.ok).toBe(true)
     const playerAfter = resp.state.players[0]!
     expect(playerAfter.resources.stone).toBe(0)
-    expect(readCardExtraData(playerAfter, CARD_ID, 'stacks')).toEqual([
-      { kind: 'stone', remaining: 2 },
-      { kind: 'stone', remaining: 2 },
-      { kind: 'stone', remaining: 2 },
+    expect(readCardExtraData(playerAfter, CARD_ID, 'cardFieldStacks')).toEqual([
+      { crop: 'stone', remaining: 2 },
+      { crop: 'stone', remaining: 2 },
+      { crop: 'stone', remaining: 2 },
     ])
 
     runCardEffectHook(resp.state, playerAfter, CARD_ID, 'onHarvestFieldPhase')
     expect(playerAfter.resources.stone).toBe(3)
-    expect(readCardExtraData(playerAfter, CARD_ID, 'stacks')).toEqual([
-      { kind: 'stone', remaining: 1 },
-      { kind: 'stone', remaining: 1 },
-      { kind: 'stone', remaining: 1 },
+    expect(readCardExtraData(playerAfter, CARD_ID, 'cardFieldStacks')).toEqual([
+      { crop: 'stone', remaining: 1 },
+      { crop: 'stone', remaining: 1 },
+      { crop: 'stone', remaining: 1 },
     ])
   })
 
@@ -149,9 +150,9 @@ describe('E80_RockGarden session', () => {
     const session = setup({
       stone: 0,
       stacks: [
-        { kind: 'stone', remaining: 2 },
-        { kind: 'stone', remaining: 2 },
-        { kind: 'stone', remaining: 2 },
+        { crop: 'stone', remaining: 2 },
+        { crop: 'stone', remaining: 2 },
+        { crop: 'stone', remaining: 2 },
       ],
     })
     const state = session.getState().state
@@ -164,6 +165,6 @@ describe('E80_RockGarden session', () => {
       total += player.resources.stone - before
     }
     expect(total).toBe(6)
-    expect(readCardExtraData(player, CARD_ID, 'stacks')).toEqual([])
+    expect(readCardExtraData(player, CARD_ID, 'cardFieldStacks')).toEqual([])
   })
 })
