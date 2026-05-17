@@ -35,7 +35,6 @@ import { buildFarmhandRoomAction } from './effects/internal/build-farmhand-room'
 import { selectionAction } from './effects/internal/selection'
 import { spendWorkerAction } from './effects/internal/spend-worker'
 import { specialEffectAction } from './effects/special-effect'
-import { salterPickAction } from './effects/salter-pick'
 
 export const internalActionDefinitions: ActionDefinition[] = [
   futureMeeplesAction,
@@ -78,5 +77,4 @@ export const internalActionDefinitions: ActionDefinition[] = [
   buildFarmhandRoomAction,
   selectionAction,
   specialEffectAction,
-  salterPickAction,
 ]
