@@ -43,6 +43,8 @@
 - `C8_PlantFertilizer` 已按 BGA 对齐：onBuy 现在产出 NODE_SEQ + optional + SPECIAL_EFFECT 等效形状（`wrapOptional({type:'leaf', actionId:'special-effect', ...})`），在符合条件的 field 上加 1 个同类型 good（不再 `gain` 进资源池）。支持普通 field（grain/vegetable）、D75 Wood Field / E80 Rock Garden 的 logical group（按 `extraData.stacks` 的 sum-of-remaining===1 判定），以及 B68/C70/D25/E68/E69/E70/E72 这类 `extraData.cardCrop` 单格卡牌田。
 - 新增可复用 `special-effect` kind `plant-additional-good`：接收 `locations: PlantAdditionalGoodLocation[]`，每个 location 是 `{kind:'field', row, col}`、`{kind:'card-stacks', cardId}` 或 `{kind:'card-crop', cardId}`。Invariant 违反（field/stack/cardCrop 缺失）throw，不静默 no-op；多 location 先整体校验再写入，避免半更新。
 - `B138_ForestGuardian` / `C51_FishingNet` 这类 opponent-pays-owner 的 `gain` flow 已补行动者维度的 action-detail delta：卡牌效果收益仍由专属日志记录，行动日志只记录行动者实际支付的成本和行动格收益。
+- `cardField` 通用扩展点（`shared/cards/helpers/card-field.ts`）完成：声明式 `CardDefinition.cardField = { allowedCrops, capacity }` + 可选 `onReap` 回调；自动派生 `onComputeSowableFields` / `onSowExtraField` / `onHarvestFieldPhase` / `sow-isDoable` listener；虚拟 tile col 由 `deriveVirtualTileCol(cardId, slot) = deckOrdinal*1000 + cardNumber + slot` 派生跨 deck 不冲突。B68/D75/E80/C70/D25/E68/E69/E70/E72/B113/B141 共 11 张卡迁移到该 helper；B113/B141 顺带修复"4 crop 全允许 + 保留 onBuy"长期 bug。
+- harvest reap log 修复：`harvestReapSummary` 初始化从 `continueHarvestReap` 提前到 `continueHarvestFieldStart`，让 `cardField` 在 `onHarvestFieldPhase` 内累加进 `summary.resources[crop]`，`log.harvestReapDetail` 现在包含 cardField 产出。
 
 ## 2. 待修行为 / 注册差异
 
@@ -117,7 +119,8 @@ prerequisite label / handler。当前没有证据表明运行时行为错误。
 | `D132_HideFarmer` | 简化 hide / farm 行为。 | BGA 处理更完整。 | 保留简化。 |
 | `E149_MidnightFencer` | 简化 fencing 行为。 | BGA 处理更完整。 | 保留简化。 |
 | `A22_Telegram` | 简化时序 / 交互行为。 | BGA 处理更完整。 | 保留简化。 |
-| `E72_ArtichokeField` | 简化 field 行为。 | BGA 处理更完整。 | 保留简化。 |
+| `E72_ArtichokeField` | `cardField.allowedCrops=['grain','vegetable']`，每次 harvest +1 food（无 isLast 副作用）。 | BGA `constraints=null` 含 wood/stone。 | 保留 grain/vegetable，待独立 audit。 |
+| `E70_CropRotationField` | `cardField.allowedCrops=['grain','vegetable']`，最后一颗触发 optional sow opposite。 | BGA `constraints=null` 含 wood/stone。 | 保留 grain/vegetable，待独立 audit。 |
 | `C1_Overhaul` | 使用 OA 的 min:n 表示语义。 | BGA 表达方式不同。 | 保留当前表示。 |
 | `C1_noWoodPalisades` | OA 阻止 wood palisade 交互。 | BGA 表达方式不同。 | 保留当前表示。 |
 | `D1_ZigzagHarrow` | 简化 harrow 行为。 | BGA 处理更完整。 | 保留简化。 |
@@ -157,6 +160,7 @@ pnpm run lint
 - 2026-05-15 — C60/B27/E130/E97 side improvement flows aligned to BGA `trueAction=false`; removed synthetic onBuy suppression from improvement/occupation apply leaves
 - 2026-05-15 — C57_Crudite aligned to BGA field-vegetable selection semantics; added strict multi-field crop removal and selection bound validation.
 - 2026-05-16 — C8_PlantFertilizer 对齐 BGA（NODE_SEQ + optional + SPECIAL_EFFECT 等效形状）；新增 `plant-additional-good` special-effect kind
+- 2026-05-17 — `cardField` 基建落地 + 11 张"卡牌即田"卡（B68/D75/E80/D25/E72/C70/E68/E69/E70/B113/B141）统一迁移到声明式 helper；harvest reap log 时序修复使 cardField 产出进入 `log.harvestReapDetail`；B113/B141 顺带补完 4 crop 全允许的 sow/harvest 路径。
 
 ## 10. 基础设施
 
@@ -172,6 +176,8 @@ pnpm run lint
 - `special-effect.remove-field-crops` — 按坐标严格校验多块田顶层作物后原子扣除，供 C57 这类多来源 field crop 选择复用。
 - `commitSelectionChoice` 会拒绝不在 `actionContext.selectableTiles` 内的 farm-position 提交，避免非法选择消费 pending flow。
 - `special-effect` 新增 `plant-additional-good` kind — 在玩家 field、cardStates 的 `extraData.stacks` 或 `extraData.cardCrop` 上把 lone good remaining +1。当前 C8_PlantFertilizer 使用；写入前先整体校验所有 location。
+- `cardField` 通用机制（`shared/cards/helpers/card-field.ts:makeCardFieldImpl`）— 声明 `CardDefinition.cardField = { allowedCrops, capacity }` + 可选 `onReap(ctx: { state, player, crop, isLast })`，工厂派生 sow / harvest / isDoable listener。`isLast` 语义 = 该卡上该 crop 经本次扣减后总 remaining === 0；多 crop 各调一次。虚拟 tile col：`deriveVirtualTileCol(cardId, slot) = deckOrdinal*1000 + cardNumber + slot`，跨 deck 不冲突。对齐 BGA `$this->field = true` + `getFieldDetails()` + `onPlayerAfterReap`。
+- `harvestReapSummary` 初始化时机：从 `continueHarvestReap` 提前到 `continueHarvestFieldStart`，让 `onHarvestFieldPhase` 内的 cardField 累加能进入同一份 summary，最终 `log.harvestReapDetail` 完整覆盖普通田 + cardField。
 
 ## 11. 时间线
 
@@ -183,3 +189,4 @@ pnpm run lint
 | 2026-05-15 | trueAction follow-up | C60_SmallPottersOven / B27_Toolbox / E130_Overachiever / E97_Beneficiary + improvement-any/minor-improvement `trueAction=false` propagation |
 | 2026-05-15 | Wave 1 | A148_Woolgrower / B86_TruffleSearcher / D15_ClaySupports / D13_Trowel / E5_NightLoot + 4 项基建（§10） |
 | 2026-05-16 | C8 alignment | C8_PlantFertilizer + `plant-additional-good` special-effect kind |
+| 2026-05-17 | cardField infra + 11-card migration | `card-field.ts` helper + B68/D75/E80/D25/E72/C70/E68/E69/E70/B113/B141 + harvestReapSummary 时序修复 |
