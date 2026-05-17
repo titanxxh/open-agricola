@@ -111,7 +111,7 @@ import {
   isMajorImprovementPlayable,
   isMinorImprovementPlayable,
 } from '../actions/effects/improvement.ts'
-import { isBlockedByMajorImprovementActionGate } from '../actions/effects/improvement-pool.ts'
+import { isBlockedByMajorImprovementActionGate } from '../actions/helpers/improvement-helpers'
 import {
   getOccupationActionCost,
   isOccupationPlayable,
