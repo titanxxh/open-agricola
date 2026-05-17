@@ -201,6 +201,8 @@ export const en = {
     interactionAnimalQuantitySelect: 'Select quantity',
     interactionAnimalQuantityConfirm: 'Confirm',
     interactionAnimalQuantityCancel: 'Cancel',
+    interactionAnimalQuantityRow: '{type} (max {max})',
+    interactionAnimalQuantityTotalFood: 'Total food (across rounds): {n}',
     interactionCancel: 'Cancel',
     interactionRoomSelect: 'Select room expansion tiles',
     interactionRoomConfirm: 'Confirm expansion',
