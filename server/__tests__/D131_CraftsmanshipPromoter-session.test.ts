@@ -66,13 +66,13 @@ const setup = (
 const enterMinorChoice = (session: GameSession) => {
   // meeting-place is a deterministic 2-step entry: set-first-player
   // resolves silently, then wrapOptional offers
-  // ['action-minor-improvement-1', '__skip__']. We always pick the
-  // action-minor-improvement-1 entry to get into the minor-improvement
+  // ['action-improvement-1', '__skip__']. We always pick the
+  // action-improvement-1 entry to get into the minor-improvement
   // choice list.
   let resp = session.takeAction(0, 'meeting-place')
   expect(resp.ok).toBe(true)
   expect(resp.interaction.stateId).toBe('wait')
-  resp = session.resolveChoice(0, 'action-minor-improvement-1')
+  resp = session.resolveChoice(0, 'action-improvement-1')
   return resp
 }
 

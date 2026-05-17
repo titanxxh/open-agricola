@@ -13,7 +13,7 @@ export const houseRedevelopment: ActionDefinition = {
     type: 'seq',
     children: [
       { type: 'leaf', actionId: 'renovate-house' },
-      wrapOptional({ type: 'leaf', actionId: 'improvement-any' }),
+      wrapOptional({ type: 'leaf', actionId: 'improvement', params: { types: ['major', 'minor'] } }),
     ],
   },
 }

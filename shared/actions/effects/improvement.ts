@@ -61,8 +61,7 @@ export function readImprovementTypes(ctx?: {
 type ImprovementPlayMode = 'major' | 'minor' | 'any'
 type SuccessfulImprovementResult = Extract<ActionExecutionResult, { type: 'ok' | 'flow' }>
 
-const resolveImprovementActionCardId = (mode: ImprovementPlayMode) =>
-  mode === 'minor' ? 'minor-improvement' : 'improvement-any'
+const resolveImprovementActionCardId = (_mode: ImprovementPlayMode) => 'improvement'
 
 const readTrueAction = (
   params?: unknown,
@@ -303,6 +302,7 @@ export const playMinorImprovement = (
   actionCardId?: string,
   paymentChoice?: string,
   playContext: 'minorAction' | 'cardEffect' | 'setup' = 'minorAction',
+  types?: readonly ImprovementType[],
 ): ActionExecutionResult => {
   const improvement = getMinorImprovement(improvementId)
   if (!improvement) {
@@ -311,7 +311,8 @@ export const playMinorImprovement = (
   if (improvement.mustBePlayedViaMinorAction && playContext !== 'minorAction') {
     return { type: 'fail', logKey: 'log.minorImprovementRequiresMinorAction' }
   }
-  if (isBlockedByMajorImprovementActionGate(improvement, actionCardId)) {
+  const effectiveTypes = types ?? (actionCardId === 'minor-improvement' ? (['minor'] as const) : undefined)
+  if (isBlockedByMajorImprovementActionGate(improvement, effectiveTypes)) {
     return { type: 'fail', logKey: 'log.minorImprovementFail' }
   }
   if (!player.minorHand.includes(improvement.id)) {
@@ -454,6 +455,7 @@ export const minorImprovementAction: ActionDefinition = {
       choice,
       actionCardId,
       readTrueAction(params, actionContext),
+      ['minor'] as const,
     )
     if (!flow) return { type: 'fail', logKey: 'log.minorImprovementFail' }
     return { type: 'flow', flow }
@@ -471,6 +473,7 @@ const buildImprovementFlow = (
   choice: string,
   actionCardId: string,
   trueAction?: boolean,
+  _types?: readonly ImprovementType[],
 ): ActionFlow | null => {
   const parsed = parseImprovementChoice(choice)
   let kind: 'major' | 'minor'
@@ -586,6 +589,7 @@ export const improvementAnyAction: ActionDefinition = {
       choice,
       actionCardId,
       readTrueAction(params, actionContext),
+      ['major', 'minor'] as const,
     )
     if (!flow) return { type: 'fail', logKey: 'log.improvementFail' }
     return { type: 'flow', flow }
@@ -661,6 +665,7 @@ export const improvementAction: ActionDefinition = {
       choice,
       actionCardId,
       readTrueAction(params, actionContext),
+      readImprovementTypes({ params, actionContext }),
     )
     if (!flow) return { type: 'fail', logKey: 'log.improvementFail' }
     return { type: 'flow', flow }

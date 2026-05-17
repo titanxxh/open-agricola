@@ -78,11 +78,31 @@ const scopeMatches = (
   return (state.players ?? []).some((entry) => playerHasAnyCard(entry, cardIds))
 }
 
+const LEGACY_IMPROVEMENT_ALIASES = new Set(['minor-improvement', 'improvement-any'])
+
+const matchesListenerAction = (
+  registration: CardListenerRegistration,
+  contextActionId: string,
+): boolean => {
+  const actions = registration.actions
+  if (!actions) return true
+  if (actions.includes(contextActionId)) return true
+  // Migration alias: 'improvement' context matches legacy 'minor-improvement' /
+  // 'improvement-any' listener registrations. Removed atomically with legacy
+  // ActionDefinition deletion (see improvement unification spec, commit 7).
+  if (contextActionId === 'improvement') {
+    for (const a of actions) {
+      if (LEGACY_IMPROVEMENT_ALIASES.has(a)) return true
+    }
+  }
+  return false
+}
+
 const matchesListener = (
   registration: CardListenerRegistration,
   context: CardListenerContext,
 ) => {
-  if (registration.actions && !registration.actions.includes(context.actionId)) {
+  if (registration.actions && !matchesListenerAction(registration, context.actionId)) {
     return false
   }
   if (registration.phases && !registration.phases.includes(context.phase)) {
@@ -262,12 +282,14 @@ export const collectComputeChoiceCandidates = (
   state: GameState,
   player: PlayerState,
   actionId: string,
+  actionContext?: Record<string, unknown>,
 ): import('../contract/types').ActionChoiceOption[] => {
   const baseCtx: CardListenerContext = {
     state,
     player,
     actionId,
     phase: 'computeChoiceCandidates' as ActionHookPhase,
+    actionContext,
   } as CardListenerContext
   const out: import('../contract/types').ActionChoiceOption[] = []
   for (const matched of getMatchingListeners(baseCtx)) {

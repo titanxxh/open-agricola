@@ -8,6 +8,10 @@ import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
 import { resolveCardPreviewCostByProvider } from '../payment/internal'
 import { isMajorCardId, isFireplaceIdentityCard } from '../../cards/helpers/card-type'
 import { isBlockedByMajorImprovementActionGate } from './improvement-pool'
+import type { ImprovementType } from './improvement'
+
+const actionCardIdToTypes = (actionCardId: string | undefined): readonly ImprovementType[] | undefined =>
+  actionCardId === 'minor-improvement' ? ['minor'] : undefined
 
 export type ResolvedMinorImprovement = NonNullable<ReturnType<typeof getMinorImprovement>>
 
@@ -167,7 +171,7 @@ export const getMajorImprovementPreviewCost = (
   return resolveCardPreviewCostByProvider(
     state,
     player,
-    'improvement-any',
+    'improvement',
     improvementId,
     () => getMajorCard(improvementId)?.cost ?? null,
     actionCardId,
@@ -185,7 +189,7 @@ export const getMinorImprovementPreviewCost = (
   const previewCost = resolveCardPreviewCostByProvider(
     state,
     player,
-    'improvement-any',
+    'improvement',
     improvementId,
     () => getMinorImprovementEffectiveCost(player, improvement),
     actionCardId,
@@ -217,7 +221,7 @@ export const isMajorImprovementPlayable = (
   state: GameState,
   player: PlayerState,
   improvementId: string,
-  actionCardId = 'improvement-any',
+  actionCardId = 'improvement',
   allowedPurchases?: string[],
 ) => {
   if (allowedPurchases && !allowedPurchases.includes(improvementId)) {
@@ -255,7 +259,7 @@ export const isMinorImprovementPlayable = (
   state: GameState,
   player: PlayerState,
   improvementId: string,
-  actionCardId = 'minor-improvement',
+  actionCardId = 'improvement',
   allowedPurchases?: string[],
 ) => {
   const improvement = getMinorImprovement(improvementId)
@@ -264,14 +268,14 @@ export const isMinorImprovementPlayable = (
     return false
   }
   if (!meetsCardPrerequisites(player, improvement, state.round, state)) return false
-  if (isBlockedByMajorImprovementActionGate(improvement, actionCardId)) return false
+  if (isBlockedByMajorImprovementActionGate(improvement, actionCardIdToTypes(actionCardId))) return false
   return canAffordMinorImprovement(state, player, improvement, actionCardId)
 }
 
 export const buildPlayableMinorOptions = (
   state: GameState,
   player: PlayerState,
-  actionCardId = 'minor-improvement',
+  actionCardId = 'improvement',
 ) =>
   player.minorHand
     .map((id) => getMinorImprovement(id))
@@ -280,7 +284,7 @@ export const buildPlayableMinorOptions = (
         !!improvement,
     )
     .filter((improvement) => meetsCardPrerequisites(player, improvement, state.round, state))
-    .filter((improvement) => !isBlockedByMajorImprovementActionGate(improvement, actionCardId))
+    .filter((improvement) => !isBlockedByMajorImprovementActionGate(improvement, actionCardIdToTypes(actionCardId)))
     .filter((improvement) =>
       canAffordMinorImprovement(state, player, improvement, actionCardId),
     )
@@ -293,7 +297,7 @@ export const buildMajorImprovementOptions = (
   available: string[],
   state: GameState,
   player: PlayerState,
-  actionCardId = 'improvement-any',
+  actionCardId = 'improvement',
   allowedPurchases?: string[],
 ) =>
   majorCardDefinitions
@@ -312,7 +316,7 @@ export const buildMajorImprovementOptions = (
 export const buildMinorImprovementOptions = (
   state: GameState,
   player: PlayerState,
-  actionCardId = 'improvement-any',
+  actionCardId = 'improvement',
   allowedPurchases?: string[],
 ) =>
   player.minorHand
@@ -325,7 +329,7 @@ export const buildMinorImprovementOptions = (
     .filter((improvement) =>
       !allowedPurchases || allowedPurchases.includes(improvement.id),
     )
-    .filter((improvement) => !isBlockedByMajorImprovementActionGate(improvement, actionCardId))
+    .filter((improvement) => !isBlockedByMajorImprovementActionGate(improvement, actionCardIdToTypes(actionCardId)))
     .filter((improvement) =>
       canAffordMinorImprovement(state, player, improvement, actionCardId),
     )
