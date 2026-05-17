@@ -64,7 +64,7 @@ describe('C70_LettucePatch session', () => {
       // The interaction should include the virtual tile as sowable
       if (resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'sow') {
         const cardField = resp.interaction.farm.selectableFields.find(
-          (f) => f.tile.row === -1 && f.tile.col === 70,
+          (f) => f.tile.row === -1 && f.tile.col === 3070,
         )
         expect(cardField).toBeDefined()
         expect(cardField?.allowedCrops).toEqual(['vegetable'])
@@ -74,7 +74,7 @@ describe('C70_LettucePatch session', () => {
 
       // Sow vegetable in the card's field
       resp = session.resolveChoice(0, 'confirm', {
-        crops: [{ row: -1, col: 70, crop: 'vegetable' }],
+        crops: [{ row: -1, col: 3070, crop: 'vegetable' }],
       })
       expect(resp.ok).toBe(true)
 
@@ -102,15 +102,15 @@ describe('C70_LettucePatch session', () => {
       expect(resp.ok).toBe(true)
 
       resp = session.resolveChoice(0, 'confirm', {
-        crops: [{ row: -1, col: 70, crop: 'vegetable' }],
+        crops: [{ row: -1, col: 3070, crop: 'vegetable' }],
       })
       expect(resp.ok).toBe(true)
 
       const cardState = resp.state.players[0]!.cardStates[CARD_ID]
-      expect(cardState?.extraData?.cardCrop).toBeDefined()
-      const crop = cardState?.extraData?.cardCrop as any
-      expect(crop.crop).toBe('vegetable')
-      expect(crop.remaining).toBe(2)
+      const stacks = cardState?.extraData?.cardFieldStacks as any[]
+      expect(stacks).toBeDefined()
+      expect(stacks[0].crop).toBe('vegetable')
+      expect(stacks[0].remaining).toBe(2)
     })
   })
 
@@ -126,7 +126,7 @@ describe('C70_LettucePatch session', () => {
       player.resources.vegetable = 0
       player.cardStates[CARD_ID] = {
         extraData: {
-          cardCrop: { crop: 'vegetable', remaining: 2 },
+          cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }],
         },
       }
 
@@ -140,8 +140,8 @@ describe('C70_LettucePatch session', () => {
       expect(player.resources.vegetable).toBe(1)
 
       // Remaining should be decremented
-      const cardCrop = player.cardStates[CARD_ID]?.extraData?.cardCrop as any
-      expect(cardCrop.remaining).toBe(1)
+      const stacks = player.cardStates[CARD_ID]?.extraData?.cardFieldStacks as any[]
+      expect(stacks[0].remaining).toBe(1)
 
       // Flow should be optional seq with pay+gain
       expect(flow).toBeDefined()
@@ -166,7 +166,7 @@ describe('C70_LettucePatch session', () => {
       const player = state.players[0]!
       player.cardStates[CARD_ID] = {
         extraData: {
-          cardCrop: { crop: 'vegetable', remaining: 2 },
+          cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }],
         },
       }
       for (const p of state.players) {
@@ -184,8 +184,8 @@ describe('C70_LettucePatch session', () => {
       // If optional was taken, player has 0 veg + 4 extra food
       // The engine auto-skips optional flows, so player should have 1 veg
       expect(playerAfter.resources.vegetable).toBe(1)
-      const cardCrop = playerAfter.cardStates[CARD_ID]?.extraData?.cardCrop as any
-      expect(cardCrop.remaining).toBe(1)
+      const stacks = playerAfter.cardStates[CARD_ID]?.extraData?.cardFieldStacks as any[]
+      expect(stacks[0].remaining).toBe(1)
     })
   })
 
@@ -198,7 +198,7 @@ describe('C70_LettucePatch session', () => {
       const player = state.players[0]!
       player.cardStates[CARD_ID] = {
         extraData: {
-          cardCrop: { crop: 'vegetable', remaining: 2 },
+          cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }],
         },
       }
       session.loadState(state)
@@ -223,7 +223,7 @@ describe('C70_LettucePatch session', () => {
       player.resources.vegetable = 0
       player.cardStates[CARD_ID] = {
         extraData: {
-          cardCrop: { crop: 'vegetable', remaining: 1 }, // Last remaining
+          cardFieldStacks: [{ crop: 'vegetable', remaining: 1 }], // Last remaining
         },
       }
 
@@ -235,9 +235,9 @@ describe('C70_LettucePatch session', () => {
       // Vegetable should have been harvested
       expect(player.resources.vegetable).toBe(1)
 
-      // Crop should be cleared (null)
-      const cardCrop = player.cardStates[CARD_ID]?.extraData?.cardCrop
-      expect(cardCrop).toBeNull()
+      // Stack should be cleared
+      const stacks = player.cardStates[CARD_ID]?.extraData?.cardFieldStacks as any[]
+      expect(stacks ?? []).toEqual([])
     })
 
     it('crop cleared - full integration with performRoundEnd', () => {
@@ -247,7 +247,7 @@ describe('C70_LettucePatch session', () => {
       const player = state.players[0]!
       player.cardStates[CARD_ID] = {
         extraData: {
-          cardCrop: { crop: 'vegetable', remaining: 1 },
+          cardFieldStacks: [{ crop: 'vegetable', remaining: 1 }],
         },
       }
       for (const p of state.players) {
@@ -259,8 +259,8 @@ describe('C70_LettucePatch session', () => {
 
       const playerAfter = resp.state.players[0]!
       expect(playerAfter.resources.vegetable).toBe(1)
-      const cardCrop = playerAfter.cardStates[CARD_ID]?.extraData?.cardCrop
-      expect(cardCrop).toBeNull()
+      const stacks = playerAfter.cardStates[CARD_ID]?.extraData?.cardFieldStacks as any[]
+      expect(stacks ?? []).toEqual([])
     })
   })
 
