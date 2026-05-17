@@ -141,4 +141,31 @@ describe('C140_PackagingArtist session', () => {
     // No-op when already doable (don't override true with anything)
     expect(result === undefined || result.doable === true).toBe(true)
   })
+
+  it('computeReplace fires on improvement-any too (Major Improvement space)', () => {
+    const listener = findListener('C140-packaging-artist-replace-minor-improvement')
+    expect(listener).toBeDefined()
+    // Registration shape: listener must be registered on improvement-any.
+    expect(listener!.actions).toContain('improvement-any')
+
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    const player = state.players[0]!
+    player.occupationPlayed.push(CARD_ID)
+    session.loadState(state)
+
+    const result = executeCardListener(listener!, {
+      state,
+      player,
+      actionId: 'improvement-any',
+      phase: 'computeReplace',
+    } as unknown as CardListenerContext)
+    expect(result).toBeDefined()
+    expect(result!.decline).toBe(true)
+    const leaf = result!.alternativeFlow as Extract<ActionFlow, { type: 'leaf' }>
+    expect(leaf.type).toBe('leaf')
+    expect(leaf.actionId).toBe('bake-bread')
+    expect(leaf.sourceCard).toBe(CARD_ID)
+  })
 })
