@@ -4,8 +4,8 @@ import type { PlayerState, ActionFlow } from '../../contract/types'
 
 const CARD_ID = 'C8_PlantFertilizer'
 
-// C8 onBuy only reads {fields, minorPlayed, cardStates}; remaining
-// PlayerState fields are cast away intentionally.
+// C8 onBuy only reads {fields, minorPlayed, occupationPlayed, cardStates};
+// remaining PlayerState fields are cast away intentionally.
 const blankPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
   id: 'p1',
   resources: {
@@ -87,7 +87,7 @@ describe('C8 PlantFertilizer onBuy — eligibility & shape', () => {
     const player = blankPlayer({
       minorPlayed: ['D75_WoodField'],
       cardStates: {
-        D75_WoodField: { extraData: { stacks: [{ kind: 'wood', remaining: 1 }] } },
+        D75_WoodField: { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }] } },
       },
     })
     const flow = runOnBuy(player)!
@@ -95,7 +95,7 @@ describe('C8 PlantFertilizer onBuy — eligibility & shape', () => {
     const leaf = seq.children![0]! as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.params).toEqual({
       kind: 'plant-additional-good',
-      locations: [{ kind: 'card-stacks', cardId: 'D75_WoodField' }],
+      locations: [{ kind: 'card-field', cardId: 'D75_WoodField' }],
     })
   })
 
@@ -105,9 +105,9 @@ describe('C8 PlantFertilizer onBuy — eligibility & shape', () => {
       cardStates: {
         D75_WoodField: {
           extraData: {
-            stacks: [
-              { kind: 'wood', remaining: 1 },
-              { kind: 'wood', remaining: 1 },
+            cardFieldStacks: [
+              { crop: 'wood', remaining: 1 },
+              { crop: 'wood', remaining: 1 },
             ],
           },
         },
@@ -120,7 +120,7 @@ describe('C8 PlantFertilizer onBuy — eligibility & shape', () => {
     const player = blankPlayer({
       minorPlayed: [],
       cardStates: {
-        D75_WoodField: { extraData: { stacks: [{ kind: 'wood', remaining: 1 }] } },
+        D75_WoodField: { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }] } },
       },
     })
     expect(runOnBuy(player)).toBeUndefined()
@@ -130,7 +130,7 @@ describe('C8 PlantFertilizer onBuy — eligibility & shape', () => {
     const player = blankPlayer({
       minorPlayed: ['E80_RockGarden'],
       cardStates: {
-        E80_RockGarden: { extraData: { stacks: [{ kind: 'stone', remaining: 1 }] } },
+        E80_RockGarden: { extraData: { cardFieldStacks: [{ crop: 'stone', remaining: 1 }] } },
       },
     })
     const flow = runOnBuy(player)!
@@ -138,7 +138,7 @@ describe('C8 PlantFertilizer onBuy — eligibility & shape', () => {
     const leaf = seq.children![0]! as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.params).toEqual({
       kind: 'plant-additional-good',
-      locations: [{ kind: 'card-stacks', cardId: 'E80_RockGarden' }],
+      locations: [{ kind: 'card-field', cardId: 'E80_RockGarden' }],
     })
   })
 
@@ -147,7 +147,7 @@ describe('C8 PlantFertilizer onBuy — eligibility & shape', () => {
       minorPlayed: ['B68_Beanfield'],
       cardStates: {
         B68_Beanfield: {
-          extraData: { cardCrop: { crop: 'vegetable', remaining: 1 } },
+          extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 1 }] },
         },
       },
     })
@@ -156,7 +156,7 @@ describe('C8 PlantFertilizer onBuy — eligibility & shape', () => {
     const leaf = seq.children![0]! as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.params).toEqual({
       kind: 'plant-additional-good',
-      locations: [{ kind: 'card-crop', cardId: 'B68_Beanfield' }],
+      locations: [{ kind: 'card-field', cardId: 'B68_Beanfield' }],
     })
   })
 
@@ -165,11 +165,27 @@ describe('C8 PlantFertilizer onBuy — eligibility & shape', () => {
       minorPlayed: ['B68_Beanfield'],
       cardStates: {
         B68_Beanfield: {
-          extraData: { cardCrop: { crop: 'vegetable', remaining: 2 } },
+          extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] },
         },
       },
     })
     expect(runOnBuy(player)).toBeUndefined()
+  })
+
+  it('includes occupation card-field holders (e.g. B113/B141) when sum-of-remaining===1', () => {
+    const player = blankPlayer({
+      occupationPlayed: ['B113_PlantBreeder'],
+      cardStates: {
+        B113_PlantBreeder: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
+      },
+    })
+    const flow = runOnBuy(player)!
+    const seq = flow as Extract<ActionFlow, { type: 'seq' }>
+    const leaf = seq.children![0]! as Extract<ActionFlow, { type: 'leaf' }>
+    expect(leaf.params).toEqual({
+      kind: 'plant-additional-good',
+      locations: [{ kind: 'card-field', cardId: 'B113_PlantBreeder' }],
+    })
   })
 
   it('lists normal field BEFORE D75 in locations when both eligible', () => {
@@ -177,7 +193,7 @@ describe('C8 PlantFertilizer onBuy — eligibility & shape', () => {
       fields: [{ row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] }],
       minorPlayed: ['D75_WoodField'],
       cardStates: {
-        D75_WoodField: { extraData: { stacks: [{ kind: 'wood', remaining: 1 }] } },
+        D75_WoodField: { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }] } },
       },
     })
     const flow = runOnBuy(player)!
@@ -186,7 +202,7 @@ describe('C8 PlantFertilizer onBuy — eligibility & shape', () => {
     const locs = (leaf.params as { locations: unknown[] }).locations
     expect(locs).toEqual([
       { kind: 'field', row: 0, col: 1 },
-      { kind: 'card-stacks', cardId: 'D75_WoodField' },
+      { kind: 'card-field', cardId: 'D75_WoodField' },
     ])
   })
 })
