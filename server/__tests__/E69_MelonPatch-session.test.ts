@@ -54,7 +54,7 @@ describe('E69_MelonPatch session', () => {
       const player = state.players[0]!
       const extras = computeExtraSowableFields(player)
       expect(extras.length).toBe(1)
-      expect(extras[0].tile).toEqual({ row: -1, col: 69 })
+      expect(extras[0].tile).toEqual({ row: -1, col: 5069 })
       expect(extras[0].allowedCrops).toEqual(['vegetable'])
       expect(extras[0].sourceCard).toBe(CARD_ID)
     })
@@ -65,7 +65,7 @@ describe('E69_MelonPatch session', () => {
       const player = state.players[0]!
       const effect = getCardEffect(CARD_ID)
       expect(effect).toBeDefined()
-      const result = effect!.onSowExtraField!(player, { row: -1, col: 69 }, 'grain')
+      const result = effect!.onSowExtraField!(player, { row: -1, col: 5069 }, 'grain')
       expect(result).toBe(false)
     })
 
@@ -74,7 +74,7 @@ describe('E69_MelonPatch session', () => {
       const state = session.getState().state
       const player = state.players[0]!
       player.cardStates[CARD_ID] = {
-        extraData: { cardCrop: { crop: 'vegetable', remaining: 2 } },
+        extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] },
       }
       const extras = computeExtraSowableFields(player)
       expect(extras.length).toBe(0)
@@ -91,14 +91,14 @@ describe('E69_MelonPatch session', () => {
       expect(resp.interaction.stateId).toBe('wait')
 
       resp = session.resolveChoice(0, 'confirm', {
-        crops: [{ row: -1, col: 69, crop: 'vegetable' }],
+        crops: [{ row: -1, col: 5069, crop: 'vegetable' }],
       })
       expect(resp.ok).toBe(true)
       expect(resp.state.players[0]!.resources.vegetable).toBe(1)
 
-      const cardCrop = resp.state.players[0]!.cardStates[CARD_ID]?.extraData?.cardCrop as any
-      expect(cardCrop.crop).toBe('vegetable')
-      expect(cardCrop.remaining).toBe(2)
+      const stacks = resp.state.players[0]!.cardStates[CARD_ID]?.extraData?.cardFieldStacks as any[]
+      expect(stacks[0].crop).toBe('vegetable')
+      expect(stacks[0].remaining).toBe(2)
     })
   })
 
@@ -108,7 +108,7 @@ describe('E69_MelonPatch session', () => {
       const state = session.getState().state
       const player = state.players[0]!
       player.cardStates[CARD_ID] = {
-        extraData: { cardCrop: { crop: 'vegetable', remaining: 2 } },
+        extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] },
       }
       session.loadState(state)
 
@@ -119,8 +119,8 @@ describe('E69_MelonPatch session', () => {
       expect(player.resources.vegetable).toBe(vegBefore + 1)
       // remaining was 2, now 1 — no plow since not last
       expect(flow).toBeUndefined()
-      const cardCrop = player.cardStates[CARD_ID]?.extraData?.cardCrop as any
-      expect(cardCrop.remaining).toBe(1)
+      const stacks = player.cardStates[CARD_ID]?.extraData?.cardFieldStacks as any[]
+      expect(stacks[0].remaining).toBe(1)
     })
 
     it('non-last veg harvest returns no plow', () => {
@@ -128,7 +128,7 @@ describe('E69_MelonPatch session', () => {
       const state = session.getState().state
       const player = state.players[0]!
       player.cardStates[CARD_ID] = {
-        extraData: { cardCrop: { crop: 'vegetable', remaining: 2 } },
+        extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] },
       }
       session.loadState(state)
 
@@ -142,7 +142,7 @@ describe('E69_MelonPatch session', () => {
       const state = session.getState().state
       const player = state.players[0]!
       player.cardStates[CARD_ID] = {
-        extraData: { cardCrop: { crop: 'vegetable', remaining: 1 } },
+        extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 1 }] },
       }
       session.loadState(state)
 
@@ -150,9 +150,9 @@ describe('E69_MelonPatch session', () => {
       const vegBefore = player.resources.vegetable
       const flow = effect!.onHarvestFieldPhase!(state, player)
       expect(player.resources.vegetable).toBe(vegBefore + 1)
-      // Crop should be cleared
-      const cardCrop = player.cardStates[CARD_ID]?.extraData?.cardCrop
-      expect(cardCrop).toBeNull()
+      // Stack should be cleared
+      const stacks = player.cardStates[CARD_ID]?.extraData?.cardFieldStacks as any[]
+      expect(stacks ?? []).toEqual([])
       // Should return optional plow
       expect(flow).toBeDefined()
       expect(flow!.type).toBe('leaf')
