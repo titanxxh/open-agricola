@@ -39,6 +39,25 @@ import { isBlockedByMajorImprovementActionGate } from './improvement-pool'
 // session tests) keep importing from `actions/effects/improvement`.
 export { isMajorImprovementPlayable, isMinorImprovementPlayable }
 
+export type ImprovementType = 'major' | 'minor'
+const KNOWN_IMPROVEMENT_TYPES: readonly ImprovementType[] = ['major', 'minor']
+
+export function readImprovementTypes(ctx?: {
+  params?: unknown
+  actionContext?: Record<string, unknown>
+}): ImprovementType[] {
+  const raw =
+    (ctx?.params as { types?: unknown } | undefined)?.types ??
+    (ctx?.actionContext?.types as unknown)
+  if (!Array.isArray(raw)) return ['major', 'minor']
+  const filtered = raw.filter(
+    (v): v is ImprovementType =>
+      typeof v === 'string' && (KNOWN_IMPROVEMENT_TYPES as readonly string[]).includes(v),
+  )
+  if (filtered.length === 0) return ['major', 'minor']
+  return Array.from(new Set(filtered))
+}
+
 type ImprovementPlayMode = 'major' | 'minor' | 'any'
 type SuccessfulImprovementResult = Extract<ActionExecutionResult, { type: 'ok' | 'flow' }>
 
@@ -561,6 +580,81 @@ export const improvementAnyAction: ActionDefinition = {
   },
   resolveChoice: ({ state, player, sourceCard, params, actionContext }, choice) => {
     const actionCardId = sourceCard ?? resolveImprovementActionCardId('any')
+    const flow = buildImprovementFlow(
+      state,
+      player,
+      choice,
+      actionCardId,
+      readTrueAction(params, actionContext),
+    )
+    if (!flow) return { type: 'fail', logKey: 'log.improvementFail' }
+    return { type: 'flow', flow }
+  },
+}
+
+export const improvementAction: ActionDefinition = {
+  id: 'improvement',
+  nameKey: 'actions.improvement.name',
+  descriptionKey: 'actions.improvement.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: (state, player, context) => {
+    const types = readImprovementTypes(context)
+    const allowedMajor = types.includes('major')
+    const allowedMinor = types.includes('minor')
+    const isMinorOnly = types.length === 1 && types[0] === 'minor'
+    if (allowedMajor &&
+      buildMajorImprovementOptions(state.availableMajorImprovements, state, player, context?.sourceCard).length > 0) {
+      return true
+    }
+    if (allowedMinor) {
+      const minorOpts = isMinorOnly
+        ? buildPlayableMinorOptions(state, player, context?.sourceCard)
+        : buildMinorImprovementOptions(state, player, context?.sourceCard)
+      if (minorOpts.length > 0) return true
+      const extras = collectComputeChoiceCandidates(state, player, 'improvement', { types })
+      if (extras.some((opt) => canAffordInjectedImprovement(state, player, opt.value))) {
+        return true
+      }
+    }
+    return false
+  },
+  execute: ({ state, player, sourceCard, params, actionContext }) => {
+    const types = readImprovementTypes({ params, actionContext })
+    const actionCardId = sourceCard ?? 'improvement'
+    const isMinorOnly = types.length === 1 && types[0] === 'minor'
+    const allowedPurchases = Array.isArray((params as { allowedPurchases?: string[] } | undefined)?.allowedPurchases)
+      ? (params as { allowedPurchases?: string[] }).allowedPurchases
+      : undefined
+    const majorOpts = types.includes('major')
+      ? buildMajorImprovementOptions(state.availableMajorImprovements, state, player, actionCardId, allowedPurchases)
+      : []
+    const baseMinor = types.includes('minor')
+      ? (isMinorOnly
+          ? buildPlayableMinorOptions(state, player, actionCardId)
+          : buildMinorImprovementOptions(state, player, actionCardId, allowedPurchases))
+      : []
+    const extras = types.includes('minor')
+      ? collectComputeChoiceCandidates(state, player, 'improvement', { types })
+      : []
+    const seen = new Set(baseMinor.map((o) => o.value))
+    const extraMinor = extras
+      .filter((o) => !seen.has(o.value))
+      .filter((o) => canAffordInjectedImprovement(state, player, o.value))
+    const options = [...majorOpts, ...baseMinor, ...extraMinor]
+    if (options.length === 0) {
+      return types.includes('major')
+        ? { type: 'fail', logKey: 'log.improvementFail' }
+        : { type: 'ok' }
+    }
+    return {
+      type: 'request',
+      request: { kind: 'choice', options },
+      promptKey: 'ui.interactionChooseImprovement',
+    }
+  },
+  resolveChoice: ({ state, player, sourceCard, params, actionContext }, choice) => {
+    const actionCardId = sourceCard ?? 'improvement'
     const flow = buildImprovementFlow(
       state,
       player,
