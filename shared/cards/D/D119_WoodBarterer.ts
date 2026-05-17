@@ -19,18 +19,16 @@ const beforeListener: CardListenerRegistration = {
         optional: true,
         promptKey: 'ui.interactionWoodBartererPrompt',
         children: [
-          gainLeaf(CARD_ID, { wood: 2 }, 'ui.interactionWoodBarterer2Wood'),
+          gainLeaf(CARD_ID, { wood: 2 }),
           payThenGainActionFlow({
             cardId: CARD_ID,
             cost: { wood: 1 },
             gain: { reed: 1 },
-            choiceLabelKey: 'ui.interactionWoodBartererTrade1',
           }),
           payThenGainActionFlow({
             cardId: CARD_ID,
             cost: { wood: 2 },
             gain: { reed: 2 },
-            choiceLabelKey: 'ui.interactionWoodBartererTrade2',
           }),
         ],
       },

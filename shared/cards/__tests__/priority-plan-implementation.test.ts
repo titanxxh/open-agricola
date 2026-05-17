@@ -162,12 +162,8 @@ describe('priority plan implementations', () => {
       type: 'leaf',
       actionId: 'pay',
       params: { grain: 1 },
-      effectPreview: {
-        kind: 'resourceExchange',
-        resourcesPaid: { grain: 1 },
-        bonusVp: 1,
-      },
     })
+    expect((flow.children[0] as { effectPreview?: unknown } | undefined)?.effectPreview).toBeUndefined()
     expect(flow.children[1]).toMatchObject({ type: 'leaf', actionId: 'bonus-vp' })
     expect(flow.children[2]).toMatchObject({
       type: 'leaf',

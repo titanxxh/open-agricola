@@ -14,19 +14,16 @@ const exchangeFlow = (): ActionFlow => ({
       cardId: CARD_ID,
       cost: { wood: 5 },
       gain: { wood: 8, food: 2 },
-      choiceLabelKey: 'ui.interactionForestInn5',
     }),
     payThenGainActionFlow({
       cardId: CARD_ID,
       cost: { wood: 7 },
       gain: { wood: 8, food: 4 },
-      choiceLabelKey: 'ui.interactionForestInn7',
     }),
     payThenGainActionFlow({
       cardId: CARD_ID,
       cost: { wood: 9 },
       gain: { wood: 8, food: 7 },
-      choiceLabelKey: 'ui.interactionForestInn9',
     }),
   ],
 })
