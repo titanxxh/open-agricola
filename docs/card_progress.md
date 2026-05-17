@@ -20,7 +20,7 @@
 是 legacy wrong-name 且 `implemented=false`，OA 不再注册或展示该名称。
 `STUB_BeforeBakeGainClay` 是 dev/test stub，不计入 canonical 卡牌统计或普通发牌池。
 
-### 本轮变更记录（2026-05-15 ~ 2026-05-16）
+### 本轮变更记录（2026-05-15 ~ 2026-05-17）
 
 - `bake-bread` 核心 action 改为默认非空：不再暴露 `cancel`，`cancel` / 空 `bulk:` / 无效 source / 非正 count / 超出 source 上限 / 超出 grain 总量都会在后端失败，且 `bulk:` 失败保持原子性。
 - `D66_PotterCeramics` 已按 BGA before-bake 语义对齐：以 `dispatchMode: 'select'` 暴露 1 clay -> 1 grain 的纯 flow；无 grain 但有 clay + baking source 时可进入 bake，trigger-select 中 D66 enabled、pass disabled，执行 D66 后进入非空 bake。
@@ -40,11 +40,12 @@
 - `A148_Woolgrower` / `B86_TruffleSearcher` 改用全局 `state.completedFeedingPhases` 计入容量；`D13_Trowel` 暴露 wood->stone 翻修；`D15_ClaySupports` 改为可选 multi-key trade；`E5_NightLoot` 列出全部 `(space,type)` 选项、复用 `collect` partial-take，并补可区分的来源展示元数据。
 - `collect` partial-take 在带 `spaceId` 时拒绝缺失 / 非正 `amount` 或缺失 `resource` 的 payload，避免错误回落到 full collect。
 - `C57_Crudite` 已按 BGA 对齐：anytime 多来源进入田地选择、单来源自动结算；收获田地阶段提供 optional 选择；非法来源选择在提交时失败并保留 pending。
-- `C8_PlantFertilizer` 已按 BGA 对齐：onBuy 现在产出 NODE_SEQ + optional + SPECIAL_EFFECT 等效形状（`wrapOptional({type:'leaf', actionId:'special-effect', ...})`），在符合条件的 field 上加 1 个同类型 good（不再 `gain` 进资源池）。支持普通 field（grain/vegetable）、D75 Wood Field / E80 Rock Garden 的 logical group（按 `extraData.stacks` 的 sum-of-remaining===1 判定），以及 B68/C70/D25/E68/E69/E70/E72 这类 `extraData.cardCrop` 单格卡牌田。
+- `C8_PlantFertilizer` 已按 BGA 对齐：onBuy 现在产出 NODE_SEQ + optional + SPECIAL_EFFECT 等效形状（`wrapOptional({type:'leaf', actionId:'special-effect', ...})`），在符合条件的 field 上加 1 个同类型 good（不再 `gain` 进资源池）。支持普通 field（grain/vegetable）、D75 Wood Field / E80 Rock Garden 的 logical group（按 `extraData.cardFieldStacks` 的 sum-of-remaining===1 判定），以及 B68/C70/D25/E68/E69/E70/E72 这类 `extraData.cardCrop` 单格卡牌田。
 - 新增可复用 `special-effect` kind `plant-additional-good`：接收 `locations: PlantAdditionalGoodLocation[]`，每个 location 是 `{kind:'field', row, col}`、`{kind:'card-stacks', cardId}` 或 `{kind:'card-crop', cardId}`。Invariant 违反（field/stack/cardCrop 缺失）throw，不静默 no-op；多 location 先整体校验再写入，避免半更新。
 - `B138_ForestGuardian` / `C51_FishingNet` 这类 opponent-pays-owner 的 `gain` flow 已补行动者维度的 action-detail delta：卡牌效果收益仍由专属日志记录，行动日志只记录行动者实际支付的成本和行动格收益。
 - `cardField` 通用扩展点（`shared/cards/helpers/card-field.ts`）完成：声明式 `CardDefinition.cardField = { allowedCrops, capacity }` + 可选 `onReap` 回调；自动派生 `onComputeSowableFields` / `onSowExtraField` / `onHarvestFieldPhase` / `sow-isDoable` listener；虚拟 tile col 由 `deriveVirtualTileCol(cardId, slot) = deckOrdinal*1000 + cardNumber + slot` 派生跨 deck 不冲突。B68/D75/E80/C70/D25/E68/E69/E70/E72/B113/B141 共 11 张卡迁移到该 helper；B113/B141 顺带修复"4 crop 全允许 + 保留 onBuy"长期 bug。
 - harvest reap log 修复：`harvestReapSummary` 初始化从 `continueHarvestReap` 提前到 `continueHarvestFieldStart`，让 `cardField` 在 `onHarvestFieldPhase` 内累加进 `summary.resources[crop]`，`log.harvestReapDetail` 现在包含 cardField 产出。
+- `FarmBoard` 卡牌叠放显示已同步读取 `extraData.cardFieldStacks`，修复 D75 Wood Field / E80 Rock Garden 等 cardField 迁移后播种堆叠不显示的问题；旧 `extraData.stacks` 仍作为渲染兼容 fallback。
 
 ## 2. 待修行为 / 注册差异
 
