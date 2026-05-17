@@ -168,4 +168,26 @@ describe('C140_PackagingArtist session', () => {
     expect(leaf.actionId).toBe('bake-bread')
     expect(leaf.sourceCard).toBe(CARD_ID)
   })
+
+  it('isDoable forces doable=true on improvement-any when not doable', () => {
+    const listener = findListener('C140-packaging-artist-isdoable-minor-improvement')
+    expect(listener).toBeDefined()
+    expect(listener!.actions).toContain('improvement-any')
+
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    const player = state.players[0]!
+    player.occupationPlayed.push(CARD_ID)
+    session.loadState(state)
+
+    const result = executeCardListener(listener!, {
+      state,
+      player,
+      actionId: 'improvement-any',
+      phase: 'isDoable',
+      doable: false,
+    } as unknown as CardListenerContext)
+    expect(result?.doable).toBe(true)
+  })
 })
