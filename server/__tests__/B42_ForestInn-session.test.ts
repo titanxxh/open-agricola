@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/B/B42_ForestInn'
 import { setActiveWorkerCount } from '../../shared/domain/player'
+import type { ChoiceDescriptionPreview } from '../../shared/contract/types'
 
 const CARD_ID = 'B42_ForestInn'
 
@@ -21,6 +22,26 @@ const resetResources = (resources: Record<string, number>) => ({
   ...resources,
 })
 
+const collectDescriptionLabelKeys = (
+  preview: ChoiceDescriptionPreview | undefined,
+): string[] => {
+  if (!preview) return []
+  if (preview.kind === 'action') return [preview.labelKey]
+  return preview.parts.flatMap(collectDescriptionLabelKeys)
+}
+
+const descriptionPaysWood = (
+  preview: ChoiceDescriptionPreview | undefined,
+  amount: number,
+): boolean => {
+  if (!preview) return false
+  if (preview.kind === 'action') {
+    return preview.effectPreview?.kind === 'payment' &&
+      preview.effectPreview.resourcesPaid?.wood === amount
+  }
+  return preview.parts.some((part) => descriptionPaysWood(part, amount))
+}
+
 const setup = (currentPlayerIndex: 0 | 1) => {
   const session = new GameSession(42)
   const state = session.getState().state
@@ -36,6 +57,9 @@ const setup = (currentPlayerIndex: 0 | 1) => {
   owner.resources = resetResources({})
   guest.resources = resetResources({})
   owner.minorHand = [CARD_ID]
+  owner.occupationHand = ['__test_placeholder__']
+  guest.minorHand = ['__test_placeholder__']
+  guest.occupationHand = ['__test_placeholder__']
 
   session.loadState(state)
   session.devPlayCard(0, CARD_ID)
@@ -48,15 +72,20 @@ const setup = (currentPlayerIndex: 0 | 1) => {
   return session
 }
 
-const choiceByLabel = (
+const choiceByPaidWood = (
   resp: ReturnType<GameSession['takeAction']>,
-  labelKey: string,
+  woodPaid: number,
 ) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected wait interaction')
-  const option = resp.interaction.options.find((entry) => entry.labelKey === labelKey)
+  const option = resp.interaction.options.find((entry) =>
+    descriptionPaysWood(entry.descriptionPreview, woodPaid))
   expect(option).toBeDefined()
-  if (!option) throw new Error(`missing option ${labelKey}`)
+  if (!option) throw new Error(`missing option paying ${woodPaid} wood`)
+  expect(collectDescriptionLabelKeys(option.descriptionPreview)).toEqual([
+    'actions.pay.name',
+    'actions.gain.name',
+  ])
   return option
 }
 
@@ -69,7 +98,7 @@ describe('B42_ForestInn session', () => {
 
     let resp = session.takeAction(0, CARD_ID)
     expect(resp.ok).toBe(true)
-    const option = choiceByLabel(resp, 'ui.interactionForestInn5')
+    const option = choiceByPaidWood(resp, 5)
     expect(session.getState().state.players[0]!.resources.food).toBe(0)
 
     resp = session.resolveChoice(0, option.value)
@@ -93,11 +122,11 @@ describe('B42_ForestInn session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.options.map((option) => option.labelKey)).toEqual([
-      'ui.interactionForestInn5',
-      'ui.interactionForestInn7',
+      'actions.pay.name',
+      'actions.pay.name',
     ])
 
-    const option = choiceByLabel(resp, 'ui.interactionForestInn7')
+    const option = choiceByPaidWood(resp, 7)
     resp = session.resolveChoice(resp.interaction.playerIndex, option.value)
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.food).toBe(1)
