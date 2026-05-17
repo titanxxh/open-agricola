@@ -5,6 +5,7 @@ import type {
   ActionFlow,
   GameState,
   PlayerState,
+  Resource,
 } from '../../contract/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getAssignedAnimalsByType, subtractAnimalsFromBoard } from '../../domain/animals'
@@ -23,7 +24,7 @@ const TURNS = { sheep: 3, boar: 5, cattle: 7 } as const
 const resolveSalterCounts = (
   state: GameState,
   player: PlayerState,
-  raw: { sheep?: number; boar?: number; cattle?: number },
+  raw: Partial<Record<keyof Resource, number>>,
 ): ActionExecutionResult => {
   const counts = {
     sheep: raw.sheep ?? 0,
@@ -72,28 +73,32 @@ export const salterPickAction: ActionDefinition = {
   execute: (ctx: ActionExecutionContext): ActionExecutionResult => {
     const { state, player } = ctx
     const preset = ctx.params?.presetCounts as
-      | { sheep?: number; boar?: number; cattle?: number }
+      | Partial<Record<keyof Resource, number>>
       | undefined
     if (preset) {
       return resolveSalterCounts(state, player, preset)
     }
-    const availableByType = getAssignedAnimalsByType(player)
-    if (availableByType.sheep + availableByType.boar + availableByType.cattle < 1) {
+    const onBoard = getAssignedAnimalsByType(player)
+    if (onBoard.sheep + onBoard.boar + onBoard.cattle < 1) {
       return { type: 'fail', logKey: 'salter-pick.error.no-animals-on-board' }
     }
     return {
       type: 'request',
       request: {
-        kind: 'animal-quantity-select',
+        kind: 'resource-quantity-select',
         cardId: CARD_ID,
-        availableByType,
+        availableByResource: {
+          sheep: onBoard.sheep,
+          boar: onBoard.boar,
+          cattle: onBoard.cattle,
+        },
         promptKey: 'cards.B157_Salter.pickAnimals',
         requireAtLeastOne: true,
       },
     }
   },
   resolveChoice: (ctx, _choice, payload) => {
-    const counts = ((payload as Record<string, unknown> | undefined)?.animalCounts ?? payload ?? {}) as { sheep?: number; boar?: number; cattle?: number }
+    const counts = ((payload as Record<string, unknown> | undefined)?.resourceCounts ?? payload ?? {}) as Partial<Record<keyof Resource, number>>
     return resolveSalterCounts(ctx.state, ctx.player, counts)
   },
 }
