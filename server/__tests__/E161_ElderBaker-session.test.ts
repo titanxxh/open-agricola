@@ -120,7 +120,7 @@ describe('E161_ElderBaker session integration', () => {
     let resp = session.takeAction(0, 'meeting-place')
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
-    resp = session.resolveChoice(0, 'action-minor-improvement-1')
+    resp = session.resolveChoice(0, 'action-improvement-1')
     return resp
   }
 

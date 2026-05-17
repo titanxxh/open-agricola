@@ -14,7 +14,7 @@ export const meetingPlace: ActionDefinition = {
     type: 'seq',
     children: [
       { type: 'leaf', actionId: 'set-first-player' },
-      wrapOptional({ type: 'leaf', actionId: 'minor-improvement' }),
+      wrapOptional({ type: 'leaf', actionId: 'improvement', params: { types: ['minor'] } }),
     ],
   },
 }

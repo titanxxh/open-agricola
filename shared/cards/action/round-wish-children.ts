@@ -13,7 +13,7 @@ export const wishChildren: ActionDefinition = {
     type: 'seq',
     children: [
       { type: 'leaf', actionId: 'family-growth' },
-      wrapOptional({ type: 'leaf', actionId: 'minor-improvement' }),
+      wrapOptional({ type: 'leaf', actionId: 'improvement', params: { types: ['minor'] } }),
     ],
   },
 }
