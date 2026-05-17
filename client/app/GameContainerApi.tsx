@@ -26,6 +26,7 @@ import { ScorePanel, type PlayerScoreRow } from '../components/board/ScorePanel'
 import { ActionLog } from '../components/board/ActionLog'
 import { GameHeader } from '../components/header/GameHeader'
 import { InteractionBar } from '../components/interaction/InteractionBar'
+import { AnimalQuantitySelectPanel } from '../components/interaction/AnimalQuantitySelectPanel'
 import { BrandMark } from '../components/common/BrandMark'
 import { ResourceLine } from '../components/common/ResourceLine'
 import { Section } from '../components/common/Section'
@@ -1788,6 +1789,26 @@ export const GameContainerApi = () => {
           )}
         </div>
       </div>
+
+      {interaction.stateId === 'wait' &&
+        interaction.request.kind === 'animal-quantity-select' && (
+          <AnimalQuantitySelectPanel
+            locale={locale}
+            availableByType={interaction.request.availableByType}
+            onConfirm={(counts) =>
+              void transport
+                .commitSelection(interaction.playerIndex, { animalCounts: counts })
+                .catch((e) => console.error(e))
+            }
+            onCancel={() =>
+              void transport
+                .commitSelection(interaction.playerIndex, {
+                  animalCounts: { sheep: 0, boar: 0, cattle: 0 },
+                })
+                .catch((e) => console.error(e))
+            }
+          />
+        )}
 
       <InteractionBar
         pendingAnimalReorg={pendingAnimalReorg} pendingChoice={pendingChoice}
