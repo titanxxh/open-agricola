@@ -72,22 +72,12 @@ export const D102_SampleStableMaker_impl = {
         },
         {
           type: 'leaf',
-          actionId: 'improvement-any',
+          actionId: 'improvement',
           sourceCard: CARD_ID,
           optional: true,
-          params: { allowedTypes: ['minor'], allowedPurchases: [] },
+          params: { types: ['minor'] },
         },
       ],
-    }
-    // Let the minor-improvement leaf be optional (the player may decline).
-    // The generic 'minor-improvement' leaf is the proper way, but our action
-    // dispatcher routes minor plays through 'minor-improvement' / 'improvement-any'.
-    // We use 'minor-improvement' directly to restrict choices to minor cards.
-    flow.children[1] = {
-      type: 'leaf',
-      actionId: 'minor-improvement',
-      sourceCard: CARD_ID,
-      optional: true,
     }
     return flow
   },

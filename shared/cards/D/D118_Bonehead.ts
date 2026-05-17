@@ -31,7 +31,7 @@ const afterImprovementListener: CardListenerRegistration = {
   id: 'D118-bonehead-after-improvement',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['improvement-any', 'minor-improvement'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const stack = getCardStack(context.player, CARD_ID)
     if (stack.length === 0) return

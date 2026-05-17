@@ -24,7 +24,7 @@ const afterConstructListener: CardListenerRegistration = {
       children: [
         {
           type: 'leaf' as const,
-          actionId: 'improvement-any',
+          actionId: 'improvement',
           sourceCard: CARD_ID,
           actionContext: { trueAction: false },
         },
@@ -46,7 +46,7 @@ const computeCostsListener: CardListenerRegistration = {
   id: 'D96-furnisher-compute-costs-improvement',
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
-  actions: ['improvement-any', 'minor-improvement'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.actionCardId !== CARD_ID) return
     // Reduce wood cost by 1 (the improvement doesn't need to cost any wood per BGA ruling)

@@ -1,5 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { readImprovementTypes } from '../../actions/effects/improvement'
 import type { ActionChoiceOption } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { C27_Blueprint } from '../../cards-display/C/C27_Blueprint'
@@ -31,7 +32,7 @@ const computeCostsListener: CardListenerRegistration = {
   id: 'C27-blueprint-compute-costs',
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
-  actions: ['improvement-any', 'minor-improvement'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.cardId || !ALLOWED_MAJORS.includes(context.cardId as typeof ALLOWED_MAJORS[number])) return
     return { costs: { stone: -1 } }
@@ -41,9 +42,11 @@ const computeCostsListener: CardListenerRegistration = {
 const choiceCandidateListener: CardListenerRegistration = {
   id: 'C27-blueprint-compute-choice-candidates',
   cardIds: [CARD_ID],
-  actions: ['minor-improvement'],
+  actions: ['improvement'],
   phases: ['computeChoiceCandidates' as ActionHookPhase],
   handler: (ctx: CardListenerContext): ActionHookResult | void => {
+    const types = readImprovementTypes(ctx)
+    if (types.length !== 1 || types[0] !== 'minor') return
     if (!ctx.player.minorPlayed.includes(CARD_ID)) return
     const available = ctx.state.availableMajorImprovements ?? []
     const extraOptions: ActionChoiceOption[] = ALLOWED_MAJORS
