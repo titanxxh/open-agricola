@@ -12,4 +12,5 @@ export const B141_FieldCaretaker = new Occupation({
   cost: {},
   players: '3+',
   isField: true,
+  cardField: { allowedCrops: ['grain', 'vegetable', 'wood', 'stone'], capacity: 1 },
 })

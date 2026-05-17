@@ -1123,9 +1123,14 @@ export const FarmBoard = ({
           const rawStacks = displayPlayer.cardStates?.[rawId]?.extraData?.stacks as
             | { kind: 'grain' | 'vegetable' | 'wood' | 'stone'; remaining: number }[]
             | undefined
+          const rawCardFieldStacks = displayPlayer.cardStates?.[rawId]?.extraData?.cardFieldStacks as
+            | { crop: 'grain' | 'vegetable' | 'wood' | 'stone'; remaining: number }[]
+            | undefined
           const cardStacks: CropStack[] | null =
-            rawStacks && rawStacks.length > 0
-              ? rawStacks.map((s) => ({ kind: s.kind, remaining: s.remaining }))
+            rawCardFieldStacks && rawCardFieldStacks.length > 0
+              ? rawCardFieldStacks.map((s) => ({ kind: s.crop, remaining: s.remaining }))
+              : rawStacks && rawStacks.length > 0
+                ? rawStacks.map((s) => ({ kind: s.kind, remaining: s.remaining }))
               : rawCardCrop && rawCardCrop.remaining > 0
                 ? [{ kind: rawCardCrop.crop, remaining: rawCardCrop.remaining }]
                 : null

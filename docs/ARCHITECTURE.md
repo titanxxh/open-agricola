@@ -686,8 +686,51 @@ Card lookup bootstrap：`shared/cards-display/types.ts` 的 registered lookup �
 - `card-state.ts` / `round-placement.ts` —— 一次性卡牌 `flagged/extraData` + 本轮放人顺序
 - `action-snapshot.ts` —— 单次行动起点快照（A74 等复用）
 - `card-held-workers.ts` —— 见 §8.3
+- `card-field.ts` —— "卡牌即田"声明式工厂，详见 §8.5
 
-### 8.5 命名 & 约束
+### 8.5 cardField 通用扩展点
+
+声明式"卡牌作为田"配置，定义在 `CardDefinition.cardField`：
+
+```ts
+cardField?: {
+  allowedCrops: readonly ('grain' | 'vegetable' | 'wood' | 'stone')[]
+  capacity: number
+}
+```
+
+`shared/cards/helpers/card-field.ts:makeCardFieldImpl(cardId, def, options?)` 是工厂，按
+`def` 派生 `onComputeSowableFields` / `onSowExtraField` / `onHarvestFieldPhase` / `sow-isDoable`
+listener。单卡只声明配置 + 可选 `onReap` 回调处理副作用，文件行数贴近甚至少于 BGA。
+
+虚拟 tile col 由
+`deriveVirtualTileCol(cardId, slotIdx) = deckOrdinal*1000 + cardNumber + slotIdx`
+派生，跨 deck 不冲突；同 deck 邻号 capacity 占位需 audit（当前 11 张卡 capacity≤3，安全余量充足）。
+
+副作用 `onReap` 回调签名：
+
+```ts
+onReap?: (ctx: {
+  state: GameState
+  player: PlayerState
+  crop: ExtraSowableCrop
+  /** 该卡上该 crop 经本次扣减后总 remaining === 0 */
+  isLast: boolean
+}) => ActionFlow | void
+```
+
+多 crop 各调一次回调；返回多个 flow 时基建用 `seq` 包装。对齐 BGA `$this->field = true`
++ `getFieldDetails()` + `onPlayerAfterReap` 语义。
+
+**Harvest reap log 时序**：`harvestReapSummary` 初始化已从 `continueHarvestReap` 提前到
+`continueHarvestFieldStart`，基建在 `onHarvestFieldPhase` 内累加 `summary.resources[crop]`，
+让 `log.harvestReapDetail` 同时包含普通 field 与 cardField 产出（之前 cardField 累加发生在
+summary 初始化前会被丢弃）。
+
+当前迁移到该 helper 的 11 张卡：B68 / D75 / E80 / D25 / E72 / C70 / E68 / E69 / E70 /
+B113 / B141。
+
+### 8.6 命名 & 约束
 
 - 卡牌文件 `{Deck}_{Number}_{Name}.ts`（例 `A123_FrameBuilder.ts`），导出常量名同卡牌名。
 - 卡牌能力**尽量在卡牌文件内部闭环**，不能扩散到 `pay.ts` / `improvement.ts` / `game-session.ts` 等核心文件。

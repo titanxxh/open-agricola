@@ -10,29 +10,40 @@ const CARD_ID = C140_PackagingArtist.id
  * C140 Packaging Artist — Each time you get a Minor Improvement action, you
  * can take a Bake Bread action instead.
  *
- * BGA: `onPlayerComputeReplaceImprovement` returns `bakeBreadNode()` — i.e.
- * the minor-improvement action is REPLACED by bake-bread (not appended). BGA
- * also forces `onPlayerIsDoable` to keep the underlying improvement action
- * doable so the player can pick the space even with no minor cards in hand,
- * and `onPlayerComputeArgsPlaceFarmer` adds ActionMajorImprovement to the
- * minor-action pool (so a major-improvement space can also be retargeted to
- * bake-bread).
+ * BGA: `onPlayerComputeReplaceImprovement` returns `bakeBreadNode()`. BGA's
+ * `onPlayerComputeArgsPlaceFarmer` adds the Major Improvement space to the
+ * placeFarmer pool, so a major-improvement space can also be retargeted to
+ * bake-bread. BGA `onPlayerIsDoable` forces the underlying action doable so
+ * the player can pick the space even with no minor cards in hand.
  *
  * Implementation:
- *   1. `computeReplace` listener on `minor-improvement` with
- *      `decline + alternativeFlow: bake-bread leaf` (mirrors B103 / B26 style).
- *   2. `isDoable` listener on `minor-improvement` to flip `doable` to true
- *      when the player has no minor cards but C140 still lets them bake.
- *   3. ActionMajorImprovement → minor-action merger NOT implemented (would
- *      require a new "merge action card pool" extension point — see §2.5).
+ *   1. `computeReplace` listener registered on BOTH `minor-improvement` and
+ *      `improvement-any` (the latter is this project's Major Improvement
+ *      space — same shape B103 FieldMerchant uses). Returns
+ *      `decline + alternativeFlow: bake-bread leaf`.
+ *   2. `isDoable` listener on both actions, force `doable: true` so the
+ *      player can place a farmer there even when no real improvement is
+ *      affordable / available. Maps BGA `ignoreResources: true`.
+ *   3. Both handlers bail out on `actionContext.checkedReplaceAction === true`
+ *      so picking the original branch from the inserted XOR does not re-fire
+ *      this listener and cause infinite XOR insertion. The engine
+ *      (`shared/engine/nodes/interaction-helpers.ts buildReplaceChoiceFlow`)
+ *      marks the original leaf with `checkedReplaceAction: true` but does NOT
+ *      add the listener id to `skipComputeReplaceListenerIds`, so this guard
+ *      is listener-side responsibility.
+ *
+ * Note: listener IDs keep the legacy `*-minor-improvement` suffix despite now
+ * covering `improvement-any` too — they are pure string keys (test lookup +
+ * skip-listener tracking), not behavior-affecting.
  */
 const computeReplaceListener: CardListenerRegistration = {
   id: 'C140-packaging-artist-replace-minor-improvement',
   cardIds: [CARD_ID],
   phases: ['computeReplace' as ActionHookPhase],
-  actions: ['minor-improvement'],
+  actions: ['minor-improvement', 'improvement-any'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.trueAction === false) return
+    if (context.actionContext?.checkedReplaceAction) return
     return {
       decline: true,
       alternativeFlow: {
@@ -49,9 +60,10 @@ const isDoableListener: CardListenerRegistration = {
   id: 'C140-packaging-artist-isdoable-minor-improvement',
   cardIds: [CARD_ID],
   phases: ['isDoable' as ActionHookPhase],
-  actions: ['minor-improvement'],
+  actions: ['minor-improvement', 'improvement-any'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.trueAction === false) return
+    if (context.actionContext?.checkedReplaceAction) return
     if (context.doable) return
     return { doable: true }
   },

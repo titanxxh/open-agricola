@@ -19,6 +19,7 @@ import type {
 import type { ActionDetailParts } from '../contract/protocol/game.ts'
 import { actionDefinitions, getActionDefinition } from '../actions/index.ts'
 import { internalActionDefinitions } from '../actions/internal-actions.ts'
+import { getAllAdHocActions } from '../actions/helpers/ad-hoc-action-registry.ts'
 import { clearActionHooks } from '../actions/hooks.ts'
 import { finalizeDraft } from '../draft/draft-manager.ts'
 import type { DraftPickPayload } from '../draft/types.ts'
@@ -573,6 +574,7 @@ export class GameCore {
     this.registry = new ActionRegistry()
     actionDefinitions.forEach((a) => this.registry.register(a))
     internalActionDefinitions.forEach((a) => this.registry.register(a))
+    getAllAdHocActions().forEach((a) => this.registry.register(a))
     clearActionHooks()
     this.hookDispatcher = new HookDispatcher()
     this.engineLog = new LogStore()
@@ -1423,6 +1425,20 @@ export class GameCore {
           costOverride,
           farm: request.farm,
           allowedCommands: buildCmds(['resolveChoice', 'commitFarm', 'undoStep', 'undoAction']),
+          anytimeActions: anytimeDescriptors,
+        }
+      case 'resource-quantity-select':
+        return {
+          stateId: 'wait',
+          playerIndex,
+          spaceId,
+          promptKey,
+          promptParams,
+          sourceCard,
+          request,
+          options: choiceOptions,
+          costOverride,
+          allowedCommands: buildCmds(['commitSelection', 'undoStep', 'undoAction']),
           anytimeActions: anytimeDescriptors,
         }
       case 'select-trigger':
@@ -2927,6 +2943,12 @@ export class GameCore {
           // the legacy pending-options path so tests/UX continue working
           // through PendingEnvelope choice validation.
           return this.resolvePendingChoice(playerIndex, value, true, payload)
+        case 'resource-quantity-select':
+          // B157_Salter-style mixed resource panel. The dedicated commit pathway
+          // is commitSelectionChoice (see Task C1); resolveChoice is rejected
+          // explicitly so future callers cannot silently route through the
+          // legacy pending-options path.
+          return this.respond(false, 'use commitSelectionChoice for resource-quantity-select')
         case 'card-draft':
           return this.respond(false, 'card-draft resolveChoice not supported')
         case 'engine-blocked':
@@ -3339,19 +3361,73 @@ export class GameCore {
 
   commitSelectionChoice(
     playerIndex: number,
-    payload: { positions?: FarmTilePosition[]; cardIds?: string[] },
+    payload: {
+      positions?: FarmTilePosition[]
+      cardIds?: string[]
+      resourceCounts?: Partial<Record<keyof Resource, number>>
+    },
   ): SessionResponse {
     const envelope = this.engineStack.peekPendingEnvelope()
     const frame = this.engineStack.current()
-    const isPlainChoice = envelope?.request.kind === 'choice'
+    const envelopeKind = envelope?.request.kind
+    const isPlainChoice = envelopeKind === 'choice'
+    const isResourceQuantity = envelopeKind === 'resource-quantity-select'
     const pendingPlayerIndex = frame && envelope
       ? this.effectiveOwnerIndexForFrame(frame, envelope.hostNodeId, envelope)
       : -1
-    if (!isPlainChoice || pendingPlayerIndex !== playerIndex) {
-      return this.respond(false, 'no pending selection choice for this player')
+    if ((!isPlainChoice && !isResourceQuantity) || pendingPlayerIndex !== playerIndex) {
+      return this.respond(false, 'no pending selection/resource-quantity choice for this player')
     }
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
+
+    // resource-quantity-select 分支：包装 resourceCounts 到 payload，透传到 action.resolveChoice。
+    // 与 occupation-hand path `{cards: cardIds}` / farm-position path `{positions: positionStrings}` 风格一致。
+    // Generic pre-validation: read availableByResource from envelope, check shape (int, >=0, <= avail)
+    // and >=1 total when requireAtLeastOne. Effect-layer bounds remain inside resolveChoice as defense-in-depth.
+    if (isResourceQuantity && envelope && envelope.request.kind === 'resource-quantity-select') {
+      const availableByResource = envelope.request.availableByResource
+      const requireAtLeastOne = envelope.request.requireAtLeastOne ?? false
+      const counts = (payload.resourceCounts ?? {}) as Partial<Record<keyof Resource, number>>
+      let total = 0
+      for (const key of Object.keys(availableByResource) as (keyof Resource)[]) {
+        const v = counts[key] ?? 0
+        const max = availableByResource[key] ?? 0
+        if (!Number.isInteger(v) || v < 0) {
+          return this.respond(false, `resource-quantity.error.invalid-count-${String(key)}`)
+        }
+        if (v > max) {
+          return this.respond(false, `resource-quantity.error.invalid-count-${String(key)}`)
+        }
+        total += v
+      }
+      if (requireAtLeastOne && total < 1) {
+        return this.respond(false, 'resource-quantity.error.must-pick-at-least-one')
+      }
+      this.pushHistory()
+      const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('resource-quantity')
+      const result = this.engine?.resolveChoice('confirm', {
+        state: this.state,
+        player,
+        space,
+      }, { resourceCounts: counts })
+      // Effect 校验失败应直接 respond(false)，pending envelope 保留，让前端再次提交合法选择。
+      if (result?.type === 'fail') {
+        this.flushEngineLog()
+        return this.respond(false, result.logKey ?? 'invalid resource-quantity selection')
+      }
+      // 与 occupation-hand 分支保持一致（line 3384）：只 record ok 结果。
+      if (result?.type === 'ok') {
+        this.recordActionResultDetails(
+          result,
+          this.currentFrameOwnerPlayerId(player.id),
+          player.id,
+        )
+      }
+      this.flushEngineLog()
+      this.runEngineSteps()
+      return this.continueAfterResolvedFarmChoice(playerIndex)
+    }
 
     const interactionContext = this.peekHostContextSnapshot()?.actionContext
     const selectionKind = (interactionContext?.selectionKind as string | undefined) ?? 'farm-position'

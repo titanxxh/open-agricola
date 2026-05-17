@@ -16,4 +16,5 @@ export const D75_WoodField = new MinorImprovement({
   prerequisite: '1 Occupation',
   occupationPrerequisites: { min: 1 },
   isField: true,
+  cardField: { allowedCrops: ['wood'], capacity: 2 },
 })

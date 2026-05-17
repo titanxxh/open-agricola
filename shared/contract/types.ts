@@ -612,6 +612,7 @@ export type SubFlowKind =
   | 'selection'
   | 'card-draft'
   | 'engine-blocked'
+  | 'resource-quantity-select'
 
 export type FarmSelectType = 'plow' | 'sow' | 'fence' | 'room' | 'stable'
 export type SelectionKind = 'farm-position' | 'occupation-hand'
@@ -687,6 +688,13 @@ export type InteractionRequest =
       kind: 'engine-blocked'
       actionId: string
       reasonKey?: PromptKey
+    }
+  | {
+      kind: 'resource-quantity-select'
+      cardId: string
+      availableByResource: Partial<Record<keyof Resource, number>>
+      promptKey?: string
+      requireAtLeastOne?: boolean
     }
 
 export type InteractionCommand =

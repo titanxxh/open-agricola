@@ -44,41 +44,41 @@ describe('special-effect: plant-additional-good — field location', () => {
   })
 })
 
-describe('special-effect: plant-additional-good — card-stacks location', () => {
-  it('grows the lone stack stored under cardStates extraData by 1', () => {
+describe('special-effect: plant-additional-good — card-field location (D75 multi-stack)', () => {
+  it('grows the lone stack stored under cardStates extraData.cardFieldStacks by 1', () => {
     const player = makePlayer({
       cardStates: {
         D75_WoodField: {
-          extraData: { stacks: [{ kind: 'wood', remaining: 1 }] },
+          extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }] },
         },
       },
     })
     const result = exec(player, {
       kind: 'plant-additional-good',
-      locations: [{ kind: 'card-stacks', cardId: 'D75_WoodField' }],
+      locations: [{ kind: 'card-field', cardId: 'D75_WoodField' }],
     })
     expect(result.type).toBe('ok')
-    expect(readCardExtraData(player, 'D75_WoodField', 'stacks'))
-      .toEqual([{ kind: 'wood', remaining: 2 }])
+    expect(readCardExtraData(player, 'D75_WoodField', 'cardFieldStacks'))
+      .toEqual([{ crop: 'wood', remaining: 2 }])
   })
 })
 
-describe('special-effect: plant-additional-good — card-crop location', () => {
-  it('grows the crop stored under cardStates extraData.cardCrop by 1', () => {
+describe('special-effect: plant-additional-good — card-field location (B68 single-slot)', () => {
+  it('grows the single-slot stack stored under cardStates extraData.cardFieldStacks by 1', () => {
     const player = makePlayer({
       cardStates: {
         B68_Beanfield: {
-          extraData: { cardCrop: { crop: 'vegetable', remaining: 1 } },
+          extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 1 }] },
         },
       },
     })
     const result = exec(player, {
       kind: 'plant-additional-good',
-      locations: [{ kind: 'card-crop', cardId: 'B68_Beanfield' }],
+      locations: [{ kind: 'card-field', cardId: 'B68_Beanfield' }],
     })
     expect(result.type).toBe('ok')
-    expect(readCardExtraData(player, 'B68_Beanfield', 'cardCrop'))
-      .toEqual({ crop: 'vegetable', remaining: 2 })
+    expect(readCardExtraData(player, 'B68_Beanfield', 'cardFieldStacks'))
+      .toEqual([{ crop: 'vegetable', remaining: 2 }])
   })
 })
 
@@ -107,12 +107,12 @@ describe('special-effect: plant-additional-good — invariant violations', () =>
 
   it('throws when card stacks empty', () => {
     const player = makePlayer({
-      cardStates: { D75_WoodField: { extraData: { stacks: [] } } },
+      cardStates: { D75_WoodField: { extraData: { cardFieldStacks: [] } } },
     })
     expect(() =>
       exec(player, {
         kind: 'plant-additional-good',
-        locations: [{ kind: 'card-stacks', cardId: 'D75_WoodField' }],
+        locations: [{ kind: 'card-field', cardId: 'D75_WoodField' }],
       }),
     ).toThrow(/no stack with remaining.*D75_WoodField/)
   })

@@ -34,4 +34,5 @@ export const D25_WitchesDanceFloor = new MinorImprovement({
     { from: { cattle: 1 }, to: { food: 3 }, triggers: ['anytime'] },
     { from: { grain: 1 }, to: { food: 2 }, triggers: ['bake-bread'] },
   ],
+  cardField: { allowedCrops: ['grain', 'vegetable'], capacity: 1 },
 })

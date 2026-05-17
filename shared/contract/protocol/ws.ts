@@ -1,5 +1,6 @@
 import type { StateUpdateEnvelope } from './game'
 import type { DraftMode, DraftPickPayload } from '../../draft/types'
+import type { Resource } from '../types'
 
 type ClientCommandBody =
   | { type: 'auth'; token: string }
@@ -12,6 +13,7 @@ type ClientCommandBody =
       payload: {
         positions?: { row: number; col: number }[]
         cardIds?: string[]
+        resourceCounts?: Partial<Record<keyof Resource, number>>
       }
     }
   | { type: 'roundEnd' }

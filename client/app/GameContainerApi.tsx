@@ -26,6 +26,7 @@ import { ScorePanel, type PlayerScoreRow } from '../components/board/ScorePanel'
 import { ActionLog } from '../components/board/ActionLog'
 import { GameHeader } from '../components/header/GameHeader'
 import { InteractionBar } from '../components/interaction/InteractionBar'
+import { ResourceQuantitySelectPanel } from '../components/interaction/ResourceQuantitySelectPanel'
 import { BrandMark } from '../components/common/BrandMark'
 import { ResourceLine } from '../components/common/ResourceLine'
 import { Section } from '../components/common/Section'
@@ -1788,6 +1789,25 @@ export const GameContainerApi = () => {
           )}
         </div>
       </div>
+
+      {interaction.stateId === 'wait' &&
+        interaction.request.kind === 'resource-quantity-select' && (
+          <ResourceQuantitySelectPanel
+            locale={locale}
+            availableByResource={interaction.request.availableByResource}
+            promptKey={interaction.request.promptKey}
+            onConfirm={(counts) => {
+              if (!isInteractive) return
+              void transport
+                .commitSelection(interaction.playerIndex, { resourceCounts: counts })
+                .catch((e) => console.error(e))
+            }}
+            onCancel={() => {
+              if (!isInteractive) return
+              void transport.undoAction().catch((e) => console.error('undoAction error', e))
+            }}
+          />
+        )}
 
       <InteractionBar
         pendingAnimalReorg={pendingAnimalReorg} pendingChoice={pendingChoice}

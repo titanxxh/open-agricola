@@ -8,7 +8,7 @@ import {
 } from '../shared/domain/index.ts'
 import { playerCanBuildPalisades } from '../shared/cards/helpers/card-type.ts'
 import { collectLockedFarmTileKeys } from '../shared/cards/card-effects.ts'
-import type { FarmTilePosition } from '../shared/contract/types.ts'
+import type { FarmTilePosition, Resource } from '../shared/contract/types.ts'
 import { getDb } from './db.ts'
 import { validateSession, extractToken } from './auth.ts'
 import type { CustomCardData } from '../shared/cards/session-card-context.ts'
@@ -238,12 +238,18 @@ export const handleGameRoute = async (
   if (req.method === 'POST' && req.url === '/api/game/commit-selection') {
     const body = JSON.parse(await readBody(req)) as {
       playerIndex?: number
-      payload?: { positions?: unknown[]; cardIds?: unknown[] }
+      payload?: {
+        positions?: unknown[]
+        cardIds?: unknown[]
+        resourceCounts?: Partial<Record<keyof Resource, number>>
+      }
     }
     if (
       typeof body.playerIndex !== 'number' ||
       !body.payload ||
-      (!Array.isArray(body.payload.positions) && !Array.isArray(body.payload.cardIds))
+      (!Array.isArray(body.payload.positions) &&
+        !Array.isArray(body.payload.cardIds) &&
+        typeof body.payload.resourceCounts !== 'object')
     ) {
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true

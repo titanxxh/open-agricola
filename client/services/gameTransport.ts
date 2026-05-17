@@ -1,6 +1,7 @@
 import type { GameSyncPayload, StateUpdateEnvelope } from '../../shared/contract/protocol/game'
 import type { ClientCommand, ServerEvent } from '../../shared/contract/protocol/ws'
 import type { DraftPickPayload } from '../../shared/draft/types'
+import type { Resource } from '../../shared/contract/types'
 
 export type ValidateResult = {
   valid: boolean
@@ -21,6 +22,7 @@ export interface GameTransport {
   commitSelection(playerIndex: number, payload: {
     positions?: { row: number; col: number }[]
     cardIds?: string[]
+    resourceCounts?: Partial<Record<keyof Resource, number>>
   }): Promise<GameSyncPayload>
   confirmFeed(playerIndex: number, selections: {
     count: number;
@@ -133,7 +135,11 @@ export class HttpGameTransport implements GameTransport {
 
   commitSelection(
     playerIndex: number,
-    payload: { positions?: { row: number; col: number }[]; cardIds?: string[] },
+    payload: {
+      positions?: { row: number; col: number }[]
+      cardIds?: string[]
+      resourceCounts?: Partial<Record<keyof Resource, number>>
+    },
   ) {
     return this.send(() => post('/api/game/commit-selection', { playerIndex, payload }))
   }
@@ -347,7 +353,11 @@ export class WsGameTransport implements GameTransport {
 
   async commitSelection(
     playerIndex: number,
-    payload: { positions?: { row: number; col: number }[]; cardIds?: string[] },
+    payload: {
+      positions?: { row: number; col: number }[]
+      cardIds?: string[]
+      resourceCounts?: Partial<Record<keyof Resource, number>>
+    },
   ): Promise<GameSyncPayload> {
     return this.sendCommand({ type: 'commitSelection', playerIndex, payload })
   }
