@@ -139,6 +139,41 @@ describe('salterPickAction', () => {
     expect(s.pendingFutureMeeples.length).toBe(1)
   })
 
+  it('resolveChoice: NaN count → fail (rejected by integer validator)', () => {
+    const p = createPlayer({
+      resources: { ...emptyResources(), sheep: 1 },
+      pastures: [{ id: 'p1', size: 1, tiles: [{ row: 2, col: 0 }], stables: 0, animalType: 'sheep', animalCount: 1 }],
+    })
+    const s = createState(p)
+    const r = callResolve(s, p, { sheep: Number.NaN })
+    expect(r.type).toBe('fail')
+    // 未 subtract
+    expect(p.resources.sheep).toBe(1)
+    expect(p.pastures[0].animalCount).toBe(1)
+  })
+
+  it('resolveChoice: 小数 count → fail (rejected by integer validator)', () => {
+    const p = createPlayer({
+      resources: { ...emptyResources(), sheep: 2 },
+      pastures: [{ id: 'p1', size: 1, tiles: [{ row: 2, col: 0 }], stables: 0, animalType: 'sheep', animalCount: 2 }],
+    })
+    const s = createState(p)
+    const r = callResolve(s, p, { sheep: 1.5 })
+    expect(r.type).toBe('fail')
+    expect(p.resources.sheep).toBe(2)
+  })
+
+  it('resolveChoice: 负数 count → fail (rejected by integer validator)', () => {
+    const p = createPlayer({
+      resources: { ...emptyResources(), sheep: 2 },
+      pastures: [{ id: 'p1', size: 1, tiles: [{ row: 2, col: 0 }], stables: 0, animalType: 'sheep', animalCount: 2 }],
+    })
+    const s = createState(p)
+    const r = callResolve(s, p, { sheep: -1 })
+    expect(r.type).toBe('fail')
+    expect(p.resources.sheep).toBe(2)
+  })
+
   it('resolveChoice clampRound: round=13 sheep → futureMeeples 入队 startRound=14 count=3', () => {
     // pending 入队 startRound=14 count=3；clampRound 由后续 resolveFutureMeepleRequests 处理（实际 future entries 只剩 round 14 一条，session 测试覆盖）
     const p = createPlayer({

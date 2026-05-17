@@ -82,6 +82,21 @@ describe('subtractAnimalsFromBoard', () => {
     expect((p.cardStates!.C148_MudWallower.extraData as any).held).toBe(1)
   })
 
+  it('animal-holder 卡 counters.held + extraData.animalType (C148 实际 schema)', () => {
+    const p = createPlayer({
+      resources: { ...emptyResources(), boar: 2 },
+      cardStates: {
+        C148_MudWallower: {
+          counters: { held: 2, counter: 0 },
+          extraData: { animalType: 'boar' },
+        } as any,
+      },
+    })
+    subtractAnimalsFromBoard(p, { boar: 1 })
+    expect(p.resources.boar).toBe(1)
+    expect((p.cardStates!.C148_MudWallower.counters as any).held).toBe(1)
+  })
+
   it('多 type 同时', () => {
     const p = createPlayer({
       resources: { ...emptyResources(), sheep: 1, boar: 1 },

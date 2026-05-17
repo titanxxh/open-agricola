@@ -22,12 +22,17 @@ const resolveSalterCounts = (
     boar: raw.boar ?? 0,
     cattle: raw.cattle ?? 0,
   }
+  for (const t of ['sheep', 'boar', 'cattle'] as const) {
+    if (!Number.isInteger(counts[t]) || counts[t] < 0) {
+      return { type: 'fail', logKey: `salter-pick.error.invalid-count-${t}` }
+    }
+  }
   if (counts.sheep + counts.boar + counts.cattle < 1) {
     return { type: 'fail', logKey: 'salter-pick.error.must-pick-at-least-one' }
   }
   const onBoard = getAssignedAnimalsByType(player)
   for (const t of ['sheep', 'boar', 'cattle'] as const) {
-    if (counts[t] < 0 || counts[t] > onBoard[t]) {
+    if (counts[t] > onBoard[t]) {
       return { type: 'fail', logKey: `salter-pick.error.invalid-count-${t}` }
     }
   }
