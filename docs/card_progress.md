@@ -166,6 +166,7 @@ pnpm run lint
 - 2026-05-16 — C8_PlantFertilizer 对齐 BGA（NODE_SEQ + optional + SPECIAL_EFFECT 等效形状）；新增 `plant-additional-good` special-effect kind
 - 2026-05-17 — `cardField` 基建落地 + 11 张"卡牌即田"卡（B68/D75/E80/D25/E72/C70/E68/E69/E70/B113/B141）统一迁移到声明式 helper；harvest reap log 时序修复使 cardField 产出进入 `log.harvestReapDetail`；B113/B141 顺带补完 4 crop 全允许的 sow/harvest 路径。
 - 2026-05-17 — `C140_PackagingArtist`：补齐 `improvement-any` 监听（computeReplace + isDoable）+ `checkedReplaceAction` 防递归，对齐 BGA `computeArgsPlaceFarmer` 行为；移除 JSDoc 中"需要新扩展点"的误判注释。
+- 2026-05-17 — `improvement` action 统一：合并 `minor-improvement` + `improvement-any` 两个 ActionDefinition → 单一 `'improvement'` action，参数 `types: ('major'|'minor')[]` 区分；50+ 张卡 listener `actions:` 从双 ID 简化为 `['improvement']`，Pattern B/C 加 `readImprovementTypes(ctx)` types-filter；4 个 wrapper（major-improvement / house-redevelopment / common-meeting-place / wish-children）leaf 同步迁移；helpers 文件从 `effects/improvement-options.ts` + `improvement-pool.ts` 合并到 `helpers/improvement-helpers.ts`；i18n key 合并为 `actions.improvement.*`；新增 ESLint `no-restricted-syntax` 守门禁 legacy 字面量。
 
 ## 10. 基础设施
 
@@ -186,6 +187,7 @@ pnpm run lint
 - `payGainActionFlow` / `payThenGainActionFlow` 不再把完整 resource-exchange preview 挂到 pay leaf；pay leaf 交给引擎生成 payment preview，gain leaf 生成 gain preview，避免描述重复。
 - Replace-listener 重入防护当前为 listener 端责任：`buildReplaceChoiceFlow` 只对 alternative 分支标 `skipComputeReplaceListenerIds`，原 leaf 仅得 `checkedReplaceAction: true`。每张 replace-style 卡 handler 必须自检 `actionContext.checkedReplaceAction`（参考 B103 / C140）。未来重构可考虑由引擎统一兜底。
 - `animal-quantity-select` interaction kind（`shared/protocol`）+ `subtractAnimalsFromBoard` helper（`shared/domain/animals.ts`）：通用多动物计数选择 + 按 pasture → house → stable → resource pool 顺序从场上扣除给定数量动物，供 B157_Salter 这类"按 on-board 数量结算"的卡牌复用。前端 `AnimalQuantitySelectPanel` 配套展示 sheep/boar/cattle 计数器并提交 `{ animalCounts }`。
+- `readImprovementTypes(ctx)` 通用 helper（`shared/actions/effects/improvement.ts`）—— 读 `params.types ?? actionContext.types`，默认 `['major','minor']`，过滤 unknown / dedupe / 非数组容错。所有 improvement listener 通过它做 BGA `types in args` 等价过滤。`collectComputeChoiceCandidates(state, player, actionId, actionContext?)` 支持把 types 传到 `computeChoiceCandidates` phase 的 listener context。ESLint `no-restricted-syntax` 守门禁止 legacy `'minor-improvement'` / `'improvement-any'` 字面量。
 
 ## 11. 时间线
 
