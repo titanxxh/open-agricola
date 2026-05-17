@@ -37,7 +37,7 @@ const setup = (options?: {
 }
 
 describe('B157_Salter session', () => {
-  it('多只触发: pending interaction kind=animal-quantity-select', () => {
+  it('多只触发: pending interaction kind=resource-quantity-select', () => {
     const session = setup({
       resources: { sheep: 2, cattle: 1 },
       pastures: [{ id:'p1',size:2,tiles:[{row:2,col:0}],stables:0,animalType:'sheep',animalCount:2 }],
@@ -48,9 +48,9 @@ describe('B157_Salter session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId === 'wait') {
-      expect(resp.interaction.request.kind).toBe('animal-quantity-select')
-      if (resp.interaction.request.kind === 'animal-quantity-select') {
-        expect(resp.interaction.request.availableByType).toEqual({ sheep:2, boar:0, cattle:1 })
+      expect(resp.interaction.request.kind).toBe('resource-quantity-select')
+      if (resp.interaction.request.kind === 'resource-quantity-select') {
+        expect(resp.interaction.request.availableByResource).toEqual({ sheep:2, boar:0, cattle:1 })
       }
     }
   })
@@ -63,7 +63,7 @@ describe('B157_Salter session', () => {
       round: 3,
     })
     session.takeAnytimeAction(0, 'B157-salter-anytime')
-    const resp = session.commitSelectionChoice(0, { animalCounts: { sheep:2, boar:0, cattle:1 } })
+    const resp = session.commitSelectionChoice(0, { resourceCounts: { sheep:2, boar:0, cattle:1 } })
     expect(resp.ok).toBe(true)
     const p = resp.state.players[0]!
     expect(p.resources.sheep).toBe(0)
@@ -121,7 +121,7 @@ describe('B157_Salter session', () => {
       round: 3,
     })
     session.takeAnytimeAction(0, 'B157-salter-anytime')
-    const resp = session.commitSelectionChoice(0, { animalCounts: { sheep:0, boar:0, cattle:0 } })
+    const resp = session.commitSelectionChoice(0, { resourceCounts: { sheep:0, boar:0, cattle:0 } })
     expect(resp.ok).toBe(false)
   })
 
@@ -135,15 +135,15 @@ describe('B157_Salter session', () => {
     expect(open.ok).toBe(true)
     expect(open.interaction.stateId).toBe('wait')
     // over-board commit: counts.sheep=99 > onBoard.sheep=2
-    const bad = session.commitSelectionChoice(0, { animalCounts: { sheep:99, boar:0, cattle:0 } })
+    const bad = session.commitSelectionChoice(0, { resourceCounts: { sheep:99, boar:0, cattle:0 } })
     expect(bad.ok).toBe(false)
     // pending envelope 仍保留（玩家可以再次提交）
     expect(bad.interaction.stateId).toBe('wait')
     if (bad.interaction.stateId === 'wait') {
-      expect(bad.interaction.request.kind).toBe('animal-quantity-select')
+      expect(bad.interaction.request.kind).toBe('resource-quantity-select')
     }
     // 重试合法 counts → success
-    const good = session.commitSelectionChoice(0, { animalCounts: { sheep:2, boar:0, cattle:0 } })
+    const good = session.commitSelectionChoice(0, { resourceCounts: { sheep:2, boar:0, cattle:0 } })
     expect(good.ok).toBe(true)
     const p = good.state.players[0]!
     expect(p.resources.sheep).toBe(0)

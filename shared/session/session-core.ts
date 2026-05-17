@@ -88,7 +88,6 @@ import { getCardEffect } from '../cards/card-effects.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
 import { runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks } from '../cards/card-effects.ts'
 import { positionKey } from '../domain/farm.ts'
-import { getAssignedAnimalsByType } from '../domain/animals.ts'
 import { getMatchingListeners, executeCardListener } from '../cards/card-listeners.ts'
 import { buildPhaseTrailingNodes, markOptional, stampOwner } from '../engine/engine-utils.ts'
 import { Scoring, playerBoard, type PlayerScoreSummary } from '../domain'
@@ -1428,7 +1427,7 @@ export class GameCore {
           allowedCommands: buildCmds(['resolveChoice', 'commitFarm', 'undoStep', 'undoAction']),
           anytimeActions: anytimeDescriptors,
         }
-      case 'animal-quantity-select':
+      case 'resource-quantity-select':
         return {
           stateId: 'wait',
           playerIndex,
@@ -2944,12 +2943,12 @@ export class GameCore {
           // the legacy pending-options path so tests/UX continue working
           // through PendingEnvelope choice validation.
           return this.resolvePendingChoice(playerIndex, value, true, payload)
-        case 'animal-quantity-select':
-          // B157_Salter-style mixed animal panel. The dedicated commit pathway
+        case 'resource-quantity-select':
+          // B157_Salter-style mixed resource panel. The dedicated commit pathway
           // is commitSelectionChoice (see Task C1); resolveChoice is rejected
           // explicitly so future callers cannot silently route through the
           // legacy pending-options path.
-          return this.respond(false, 'use commitSelectionChoice for animal-quantity-select')
+          return this.respond(false, 'use commitSelectionChoice for resource-quantity-select')
         case 'card-draft':
           return this.respond(false, 'card-draft resolveChoice not supported')
         case 'engine-blocked':
@@ -3365,63 +3364,57 @@ export class GameCore {
     payload: {
       positions?: FarmTilePosition[]
       cardIds?: string[]
-      animalCounts?: { sheep: number; boar: number; cattle: number }
+      resourceCounts?: Partial<Record<keyof Resource, number>>
     },
   ): SessionResponse {
     const envelope = this.engineStack.peekPendingEnvelope()
     const frame = this.engineStack.current()
     const envelopeKind = envelope?.request.kind
     const isPlainChoice = envelopeKind === 'choice'
-    const isAnimalQuantity = envelopeKind === 'animal-quantity-select'
+    const isResourceQuantity = envelopeKind === 'resource-quantity-select'
     const pendingPlayerIndex = frame && envelope
       ? this.effectiveOwnerIndexForFrame(frame, envelope.hostNodeId, envelope)
       : -1
-    if ((!isPlainChoice && !isAnimalQuantity) || pendingPlayerIndex !== playerIndex) {
-      return this.respond(false, 'no pending selection/animal-quantity choice for this player')
+    if ((!isPlainChoice && !isResourceQuantity) || pendingPlayerIndex !== playerIndex) {
+      return this.respond(false, 'no pending selection/resource-quantity choice for this player')
     }
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
 
-    // animal-quantity-select 分支：包装 animalCounts 到 payload，透传到 action.resolveChoice
-    // 与现有 occupation-hand path (line 3383) `{cards: cardIds}` / farm-position path (line 3432) `{positions: positionStrings}` 风格一致
-    if (isAnimalQuantity) {
-      const counts = payload.animalCounts ?? { sheep: 0, boar: 0, cattle: 0 }
-      // Pre-validate shape (finite non-negative int + at least one) BEFORE pushHistory,
-      // so a malformed submission does not pollute history with a no-op snapshot.
-      // Effect-layer bounds (count <= on-board) remain enforced inside resolveChoice.
+    // resource-quantity-select 分支：包装 resourceCounts 到 payload，透传到 action.resolveChoice。
+    // 与 occupation-hand path `{cards: cardIds}` / farm-position path `{positions: positionStrings}` 风格一致。
+    // Generic pre-validation: read availableByResource from envelope, check shape (int, >=0, <= avail)
+    // and >=1 total when requireAtLeastOne. Effect-layer bounds remain inside resolveChoice as defense-in-depth.
+    if (isResourceQuantity && envelope && envelope.request.kind === 'resource-quantity-select') {
+      const availableByResource = envelope.request.availableByResource
+      const requireAtLeastOne = envelope.request.requireAtLeastOne ?? false
+      const counts = (payload.resourceCounts ?? {}) as Partial<Record<keyof Resource, number>>
       let total = 0
-      for (const t of ['sheep', 'boar', 'cattle'] as const) {
-        const v = counts[t]
+      for (const key of Object.keys(availableByResource) as (keyof Resource)[]) {
+        const v = counts[key] ?? 0
+        const max = availableByResource[key] ?? 0
         if (!Number.isInteger(v) || v < 0) {
-          return this.respond(false, `salter-pick.error.invalid-count-${t}`)
+          return this.respond(false, `resource-quantity.error.invalid-count-${String(key)}`)
+        }
+        if (v > max) {
+          return this.respond(false, `resource-quantity.error.invalid-count-${String(key)}`)
         }
         total += v
       }
-      if (total < 1) {
-        return this.respond(false, 'salter-pick.error.must-pick-at-least-one')
-      }
-      // Pre-validate over-board BEFORE pushHistory / resolveChoice. Otherwise engine
-      // returns {type:'fail'} on bound violation, which already clears the pending
-      // envelope and drops the player to idle — a malformed submit would lock the
-      // interaction. Effect-layer bounds remain enforced as defense-in-depth.
-      const onBoard = getAssignedAnimalsByType(player)
-      for (const t of ['sheep', 'boar', 'cattle'] as const) {
-        if (counts[t] > onBoard[t]) {
-          return this.respond(false, `salter-pick.error.invalid-count-${t}`)
-        }
+      if (requireAtLeastOne && total < 1) {
+        return this.respond(false, 'resource-quantity.error.must-pick-at-least-one')
       }
       this.pushHistory()
-      const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('animal-quantity')
+      const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('resource-quantity')
       const result = this.engine?.resolveChoice('confirm', {
         state: this.state,
         player,
         space,
-      }, { animalCounts: counts })
-      // Effect 校验失败（如 {0,0,0} 或 count 超过 board）应直接 respond(false)，
-      // pending envelope 保留，让前端再次提交合法选择。
+      }, { resourceCounts: counts })
+      // Effect 校验失败应直接 respond(false)，pending envelope 保留，让前端再次提交合法选择。
       if (result?.type === 'fail') {
         this.flushEngineLog()
-        return this.respond(false, result.logKey ?? 'invalid animal-quantity selection')
+        return this.respond(false, result.logKey ?? 'invalid resource-quantity selection')
       }
       // 与 occupation-hand 分支保持一致（line 3384）：只 record ok 结果。
       if (result?.type === 'ok') {
