@@ -169,7 +169,7 @@ describe('D25_WitchesDanceFloor session', () => {
       const extras = computeExtraSowableFields(player)
       const d25Field = extras.find((f) => f.sourceCard === CARD_ID)
       expect(d25Field).toBeDefined()
-      expect(d25Field?.tile).toEqual({ row: -1, col: 25 })
+      expect(d25Field?.tile).toEqual({ row: -1, col: 4025 })
       expect(d25Field?.allowedCrops).toContain('grain')
       expect(d25Field?.allowedCrops).toContain('vegetable')
     })
@@ -192,14 +192,14 @@ describe('D25_WitchesDanceFloor session', () => {
       // Pre-seed a crop
       if (!player.cardStates) player.cardStates = {}
       if (!player.cardStates[CARD_ID]) player.cardStates[CARD_ID] = {}
-      player.cardStates[CARD_ID].extraData = { cardCrop: { crop: 'grain', remaining: 3 } }
+      player.cardStates[CARD_ID].extraData = { cardFieldStacks: [{ crop: 'grain', remaining: 3 }] }
 
       const extras = computeExtraSowableFields(player)
       const d25Field = extras.find((f) => f.sourceCard === CARD_ID)
       expect(d25Field).toBeUndefined()
     })
 
-    it('onSowExtraField: grain sow deducts resource and stores cardCrop', () => {
+    it('onSowExtraField: grain sow deducts resource and stores cardFieldStacks', () => {
       const session = setup()
       const state = session.getState().state
       const player = state.players[0]!
@@ -208,20 +208,17 @@ describe('D25_WitchesDanceFloor session', () => {
 
       const effect = getCardEffect(CARD_ID)
       expect(effect).toBeDefined()
-      const handled = effect!.onSowExtraField!(player, { row: -1, col: 25 }, 'grain')
+      const handled = effect!.onSowExtraField!(player, { row: -1, col: 4025 }, 'grain')
       expect(handled).toBe(true)
 
       expect(player.resources.grain).toBe(0)
-      const cardCrop = player.cardStates?.[CARD_ID]?.extraData?.cardCrop as {
-        crop: string
-        remaining: number
-      } | null
-      expect(cardCrop).not.toBeNull()
-      expect(cardCrop?.crop).toBe('grain')
-      expect(cardCrop?.remaining).toBe(3)
+      const stacks = player.cardStates?.[CARD_ID]?.extraData?.cardFieldStacks as
+        | { crop: string; remaining: number }[]
+        | undefined
+      expect(stacks).toEqual([{ crop: 'grain', remaining: 3 }])
     })
 
-    it('onSowExtraField: vegetable sow deducts resource and stores cardCrop with remaining=2', () => {
+    it('onSowExtraField: vegetable sow deducts resource and stores cardFieldStacks with remaining=2', () => {
       const session = setup()
       const state = session.getState().state
       const player = state.players[0]!
@@ -229,16 +226,14 @@ describe('D25_WitchesDanceFloor session', () => {
       player.resources.vegetable = 1
 
       const effect = getCardEffect(CARD_ID)!
-      const handled = effect.onSowExtraField!(player, { row: -1, col: 25 }, 'vegetable')
+      const handled = effect.onSowExtraField!(player, { row: -1, col: 4025 }, 'vegetable')
       expect(handled).toBe(true)
 
       expect(player.resources.vegetable).toBe(0)
-      const cardCrop = player.cardStates?.[CARD_ID]?.extraData?.cardCrop as {
-        crop: string
-        remaining: number
-      } | null
-      expect(cardCrop?.crop).toBe('vegetable')
-      expect(cardCrop?.remaining).toBe(2)
+      const stacks = player.cardStates?.[CARD_ID]?.extraData?.cardFieldStacks as
+        | { crop: string; remaining: number }[]
+        | undefined
+      expect(stacks).toEqual([{ crop: 'vegetable', remaining: 2 }])
     })
 
     it('onSowExtraField: returns false for wrong tile', () => {
@@ -264,17 +259,16 @@ describe('D25_WitchesDanceFloor session', () => {
       player.resources.grain = 0
       if (!player.cardStates) player.cardStates = {}
       if (!player.cardStates[CARD_ID]) player.cardStates[CARD_ID] = {}
-      player.cardStates[CARD_ID].extraData = { cardCrop: { crop: 'grain', remaining: 3 } }
+      player.cardStates[CARD_ID].extraData = { cardFieldStacks: [{ crop: 'grain', remaining: 3 }] }
 
       const effect = getCardEffect(CARD_ID)!
       effect.onHarvestFieldPhase!(state, player)
 
       expect(player.resources.grain).toBe(1)
-      const cardCrop = player.cardStates[CARD_ID]?.extraData?.cardCrop as {
-        crop: string
-        remaining: number
-      } | null
-      expect(cardCrop?.remaining).toBe(2)
+      const stacks = player.cardStates[CARD_ID]?.extraData?.cardFieldStacks as
+        | { crop: string; remaining: number }[]
+        | undefined
+      expect(stacks).toEqual([{ crop: 'grain', remaining: 2 }])
     })
   })
 
@@ -288,24 +282,23 @@ describe('D25_WitchesDanceFloor session', () => {
       player.resources.vegetable = 0
       if (!player.cardStates) player.cardStates = {}
       if (!player.cardStates[CARD_ID]) player.cardStates[CARD_ID] = {}
-      player.cardStates[CARD_ID].extraData = { cardCrop: { crop: 'vegetable', remaining: 2 } }
+      player.cardStates[CARD_ID].extraData = { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] }
 
       const effect = getCardEffect(CARD_ID)!
 
       // First harvest
       effect.onHarvestFieldPhase!(state, player)
       expect(player.resources.vegetable).toBe(1)
-      const afterFirst = player.cardStates[CARD_ID]?.extraData?.cardCrop as {
-        crop: string
-        remaining: number
-      } | null
-      expect(afterFirst?.remaining).toBe(1)
+      const afterFirst = player.cardStates[CARD_ID]?.extraData?.cardFieldStacks as
+        | { crop: string; remaining: number }[]
+        | undefined
+      expect(afterFirst).toEqual([{ crop: 'vegetable', remaining: 1 }])
 
       // Second harvest
       effect.onHarvestFieldPhase!(state, player)
       expect(player.resources.vegetable).toBe(2)
-      const afterSecond = player.cardStates[CARD_ID]?.extraData?.cardCrop
-      expect(afterSecond).toBeNull()
+      const afterSecond = player.cardStates[CARD_ID]?.extraData?.cardFieldStacks
+      expect(afterSecond).toEqual([])
     })
   })
 
@@ -324,7 +317,7 @@ describe('D25_WitchesDanceFloor session', () => {
       player.extraOccupationsFromCards.push(CARD_ID)
       if (!player.cardStates) player.cardStates = {}
       if (!player.cardStates[CARD_ID]) player.cardStates[CARD_ID] = {}
-      player.cardStates[CARD_ID].extraData = { cardCrop: { crop: 'grain', remaining: 3 } }
+      player.cardStates[CARD_ID].extraData = { cardFieldStacks: [{ crop: 'grain', remaining: 3 }] }
 
       // Ensure CookingHearth1 is available
       if (!state.availableMajorImprovements.includes('Major_CookingHearth1')) {
