@@ -190,4 +190,53 @@ describe('C140_PackagingArtist session', () => {
     } as unknown as CardListenerContext)
     expect(result?.doable).toBe(true)
   })
+
+  it('computeReplace bails out on re-entry (checkedReplaceAction guard, both action IDs)', () => {
+    const listener = findListener('C140-packaging-artist-replace-minor-improvement')
+    expect(listener).toBeDefined()
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    const player = state.players[0]!
+    player.occupationPlayed.push(CARD_ID)
+    session.loadState(state)
+
+    for (const actionId of ['minor-improvement', 'improvement-any']) {
+      const result = executeCardListener(listener!, {
+        state,
+        player,
+        actionId,
+        phase: 'computeReplace',
+        actionContext: { checkedReplaceAction: true },
+      } as unknown as CardListenerContext)
+      expect(result).toBeUndefined()
+    }
+  })
+
+  it('isDoable bails out on re-entry (checkedReplaceAction guard, both action IDs)', () => {
+    const listener = findListener('C140-packaging-artist-isdoable-minor-improvement')
+    expect(listener).toBeDefined()
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    const player = state.players[0]!
+    player.occupationPlayed.push(CARD_ID)
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+    state.players[1]!.minorHand = ['__test_placeholder__']
+    state.players[1]!.occupationHand = ['__test_placeholder__']
+    session.loadState(state)
+
+    for (const actionId of ['minor-improvement', 'improvement-any']) {
+      const result = executeCardListener(listener!, {
+        state,
+        player,
+        actionId,
+        phase: 'isDoable',
+        doable: false,
+        actionContext: { checkedReplaceAction: true },
+      } as unknown as CardListenerContext)
+      expect(result).toBeUndefined()
+    }
+  })
 })
