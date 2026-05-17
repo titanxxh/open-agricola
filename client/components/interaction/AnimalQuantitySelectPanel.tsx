@@ -19,7 +19,8 @@ export const AnimalQuantitySelectPanel = ({
     counts.sheep * TURNS.sheep + counts.boar * TURNS.boar + counts.cattle * TURNS.cattle
 
   const setCount = (type: 'sheep' | 'boar' | 'cattle', value: number) => {
-    const clamped = Math.max(0, Math.min(availableByType[type], value))
+    const normalized = Number.isFinite(value) ? Math.floor(value) : 0
+    const clamped = Math.max(0, Math.min(availableByType[type], normalized))
     setCounts((prev) => ({ ...prev, [type]: clamped }))
   }
 
