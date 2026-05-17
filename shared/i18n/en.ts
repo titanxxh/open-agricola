@@ -198,6 +198,9 @@ export const en = {
     interactionAnimalReorg: 'Reassign animals on your farm',
     interactionAnimalReorgConfirm: 'Confirm',
     interactionAnimalReorgCancel: 'Cancel',
+    interactionAnimalQuantitySelect: 'Select quantity',
+    interactionAnimalQuantityConfirm: 'Confirm',
+    interactionAnimalQuantityCancel: 'Cancel',
     interactionCancel: 'Cancel',
     interactionRoomSelect: 'Select room expansion tiles',
     interactionRoomConfirm: 'Confirm expansion',
@@ -489,6 +492,10 @@ export const en = {
     'anytime-reorg': { name: 'Reorganize Animals', description: 'Reorganize animals at any time' },
     reorganize: { name: 'Reorganize Animals', description: 'Reassign animals among pastures, house, and stables.' },
     'pay': { name: 'Pay Resources', description: 'Pay resources from your supply' },
+    'salter-pick': {
+      name: 'Salt animals',
+      description: 'Convert board animals (sheep/boar/cattle) into future round food',
+    },
     'return-to-space': { name: 'Return Resource', description: 'Return resources from your supply to the current action space' },
     'bonus-vp': { name: 'Gain Bonus VP', description: 'Gain 1 bonus victory point for the source card' },
     breed: { name: 'Breed', description: 'Breed animals (internal action used by harvest and breed-shaped cards)' },
@@ -1187,7 +1194,13 @@ export const en = {
       choicePlayDisabled: 'Not enough food (need 2)',
     },
       B157_Salter: {
-      anytime: 'Salter: Pay 1 Food → 1 Food',
+      anytime: 'Salt animals (→ food)',
+      pickAnimals: 'Pick animals to salt (reserve must be empty)',
+      single: {
+        sheep: 'Salt 1 sheep (→ +1 food each of next 3 rounds)',
+        boar: 'Salt 1 boar (→ +1 food each of next 5 rounds)',
+        cattle: 'Salt 1 cattle (→ +1 food each of next 7 rounds)',
+      },
     },
     B69_PottersMarket: {
       anytime: 'Potter\'s Market: Pay 1 Clay → 1 Food',
