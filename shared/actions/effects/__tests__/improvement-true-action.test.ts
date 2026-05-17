@@ -60,8 +60,8 @@ const makeState = (player: PlayerState): GameState =>
 
 const makeSpace = (): ActionSpace =>
   ({
-    id: 'improvement-any',
-    nameKey: 'actions.improvement-any.name',
+    id: 'improvement',
+    nameKey: 'actions.improvement.name',
     canBeExecutedByPlayer: () => true,
   } as unknown as ActionSpace)
 

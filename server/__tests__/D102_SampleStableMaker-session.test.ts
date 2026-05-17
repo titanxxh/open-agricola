@@ -77,7 +77,7 @@ describe('D102_SampleStableMaker card effect', () => {
     expect(flow.children[0].actionContext.selectionEffect).toBe(FIELD_EFFECT)
     expect(flow.children[0].actionContext.selectionKind).toBe('farm-position')
     expect(flow.children[0].actionContext.maxSelections).toBe(1)
-    expect(flow.children[1].actionId).toBe('minor-improvement')
+    expect(flow.children[1].actionId).toBe('improvement')
     expect(flow.children[1].optional).toBe(true)
     expect(flow.children[1].sourceCard).toBe(CARD_ID)
   })

@@ -127,12 +127,12 @@ describe('D82_HuntingTrophy listeners', () => {
     const listener = findListener('D82-hunting-trophy-improvement-compute-costs')
 
     const outside = listener.handler(
-      makeContext(player, 'minor-improvement', 'improvement-any', 'computeCosts'),
+      makeContext(player, 'improvement', 'improvement', 'computeCosts'),
     )
     expect(outside).toBeUndefined()
 
     const result = listener.handler(
-      makeContext(player, 'house-redevelopment', 'improvement-any', 'computeCosts'),
+      makeContext(player, 'house-redevelopment', 'improvement', 'computeCosts'),
     )
 
     expect(player.cardStates?.[CARD_ID]?.flagged).toBeUndefined()

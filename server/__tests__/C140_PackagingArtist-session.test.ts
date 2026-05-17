@@ -92,7 +92,7 @@ describe('C140_PackagingArtist session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      actionId: 'minor-improvement',
+      actionId: 'improvement',
       phase: 'computeReplace',
     } as unknown as CardListenerContext)
     expect(result).toBeDefined()
@@ -116,7 +116,7 @@ describe('C140_PackagingArtist session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      actionId: 'minor-improvement',
+      actionId: 'improvement',
       phase: 'computeReplace',
       trueAction: false,
     } as unknown as CardListenerContext)
@@ -142,7 +142,7 @@ describe('C140_PackagingArtist session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      actionId: 'minor-improvement',
+      actionId: 'improvement',
       phase: 'isDoable',
       doable: false,
     } as unknown as CardListenerContext)
@@ -163,7 +163,7 @@ describe('C140_PackagingArtist session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      actionId: 'minor-improvement',
+      actionId: 'improvement',
       phase: 'isDoable',
       doable: false,
       trueAction: false,
@@ -184,7 +184,7 @@ describe('C140_PackagingArtist session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      actionId: 'minor-improvement',
+      actionId: 'improvement',
       phase: 'isDoable',
       doable: true,
     } as unknown as CardListenerContext)
@@ -251,7 +251,7 @@ describe('C140_PackagingArtist session', () => {
     player.occupationPlayed.push(CARD_ID)
     session.loadState(state)
 
-    for (const actionId of ['minor-improvement', 'improvement-any']) {
+    for (const actionId of ['improvement']) {
       const result = executeCardListener(listener!, {
         state,
         player,
@@ -317,7 +317,7 @@ describe('C140_PackagingArtist session', () => {
     state.players[1]!.occupationHand = ['__test_placeholder__']
     session.loadState(state)
 
-    for (const actionId of ['minor-improvement', 'improvement-any']) {
+    for (const actionId of ['improvement']) {
       const result = executeCardListener(listener!, {
         state,
         player,

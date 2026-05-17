@@ -116,8 +116,8 @@ describe('A41_VegetableSlicer improvement listener', () => {
     const hookResult = executeCardListener(listener!, {
       state,
       player,
-      space: createSpace('improvement-any'),
-      actionId: 'improvement-any',
+      space: createSpace('improvement'),
+      actionId: 'improvement',
       phase: 'after',
       choice: `major:${COOKING_HEARTH_ID}`,
       result,
@@ -148,8 +148,8 @@ describe('A41_VegetableSlicer improvement listener', () => {
     const hookResult = executeCardListener(listener!, {
       state,
       player,
-      space: createSpace('improvement-any'),
-      actionId: 'improvement-any',
+      space: createSpace('improvement'),
+      actionId: 'improvement',
       phase: 'after',
       choice: `major:${COOKING_HEARTH_ID}`,
       result,

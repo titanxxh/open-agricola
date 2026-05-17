@@ -301,7 +301,7 @@ describe('E123_ResourceHoarder session', () => {
     executeCardListener(afterPayListener, mkContext('construct', 'after'))
 
     // Now top is reed
-    result = executeCardListener(costListener, mkContext('improvement-any', 'computeCosts'))
+    result = executeCardListener(costListener, mkContext('improvement', 'computeCosts'))
     expect(result!.bonuses![0]!.choices![1]!.discount).toEqual({ reed: 1 })
   })
 })

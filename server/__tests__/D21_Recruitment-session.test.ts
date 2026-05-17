@@ -37,7 +37,7 @@ describe('D21_Recruitment session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      actionId: 'minor-improvement',
+      actionId: 'improvement',
       phase: 'computeReplace',
     } as unknown as CardListenerContext)
 
@@ -65,7 +65,7 @@ describe('D21_Recruitment session', () => {
     const result = executeCardListener(listener, {
       state,
       player,
-      actionId: 'minor-improvement',
+      actionId: 'improvement',
       phase: 'computeReplace',
     } as unknown as CardListenerContext)
 
@@ -81,7 +81,7 @@ describe('D21_Recruitment session', () => {
     const result = executeCardListener(listener, {
       state,
       player,
-      actionId: 'minor-improvement',
+      actionId: 'improvement',
       phase: 'computeReplace',
     } as unknown as CardListenerContext)
 
@@ -97,7 +97,7 @@ describe('D21_Recruitment session', () => {
     const result = executeCardListener(listener, {
       state,
       player,
-      actionId: 'improvement-any',
+      actionId: 'improvement',
       phase: 'computeReplace',
     } as unknown as CardListenerContext)
 
@@ -114,7 +114,7 @@ describe('D21_Recruitment session', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      actionId: 'minor-improvement',
+      actionId: 'improvement',
       phase: 'isDoable',
       doable: false,
     } as unknown as CardListenerContext)
@@ -131,7 +131,7 @@ describe('D21_Recruitment session', () => {
     const result = executeCardListener(listener, {
       state,
       player,
-      actionId: 'minor-improvement',
+      actionId: 'improvement',
       phase: 'isDoable',
       doable: false,
     } as unknown as CardListenerContext)
@@ -167,7 +167,7 @@ describe('D21_Recruitment session', () => {
     const result = executeCardListener(listener, {
       state,
       player,
-      actionId: 'minor-improvement',
+      actionId: 'improvement',
       phase: 'computeReplace',
       actionContext: { trueAction: false },
     } as unknown as CardListenerContext)
