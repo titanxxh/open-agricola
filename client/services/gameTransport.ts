@@ -21,6 +21,7 @@ export interface GameTransport {
   commitSelection(playerIndex: number, payload: {
     positions?: { row: number; col: number }[]
     cardIds?: string[]
+    animalCounts?: { sheep: number; boar: number; cattle: number }
   }): Promise<GameSyncPayload>
   confirmFeed(playerIndex: number, selections: {
     count: number;
@@ -133,7 +134,11 @@ export class HttpGameTransport implements GameTransport {
 
   commitSelection(
     playerIndex: number,
-    payload: { positions?: { row: number; col: number }[]; cardIds?: string[] },
+    payload: {
+      positions?: { row: number; col: number }[]
+      cardIds?: string[]
+      animalCounts?: { sheep: number; boar: number; cattle: number }
+    },
   ) {
     return this.send(() => post('/api/game/commit-selection', { playerIndex, payload }))
   }
@@ -347,7 +352,11 @@ export class WsGameTransport implements GameTransport {
 
   async commitSelection(
     playerIndex: number,
-    payload: { positions?: { row: number; col: number }[]; cardIds?: string[] },
+    payload: {
+      positions?: { row: number; col: number }[]
+      cardIds?: string[]
+      animalCounts?: { sheep: number; boar: number; cattle: number }
+    },
   ): Promise<GameSyncPayload> {
     return this.sendCommand({ type: 'commitSelection', playerIndex, payload })
   }

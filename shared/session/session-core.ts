@@ -2927,6 +2927,12 @@ export class GameCore {
           // the legacy pending-options path so tests/UX continue working
           // through PendingEnvelope choice validation.
           return this.resolvePendingChoice(playerIndex, value, true, payload)
+        case 'animal-quantity-select':
+          // B157_Salter-style mixed animal panel. The dedicated commit pathway
+          // is commitSelectionChoice (see Task C1); resolveChoice falls back to
+          // the legacy pending-options path so the envelope's choice validator
+          // stays happy if a caller routes here.
+          return this.resolvePendingChoice(playerIndex, value, true, payload)
         case 'card-draft':
           return this.respond(false, 'card-draft resolveChoice not supported')
         case 'engine-blocked':
