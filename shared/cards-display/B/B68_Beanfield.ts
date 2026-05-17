@@ -14,4 +14,5 @@ export const B68_Beanfield = new MinorImprovement({
   prerequisite: '2 Occupations',
   occupationPrerequisites: { min: 2 },
   isField: true,
+  cardField: { allowedCrops: ['vegetable'], capacity: 1 },
 })
