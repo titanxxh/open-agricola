@@ -3345,19 +3345,49 @@ export class GameCore {
 
   commitSelectionChoice(
     playerIndex: number,
-    payload: { positions?: FarmTilePosition[]; cardIds?: string[] },
+    payload: {
+      positions?: FarmTilePosition[]
+      cardIds?: string[]
+      animalCounts?: { sheep: number; boar: number; cattle: number }
+    },
   ): SessionResponse {
     const envelope = this.engineStack.peekPendingEnvelope()
     const frame = this.engineStack.current()
-    const isPlainChoice = envelope?.request.kind === 'choice'
+    const envelopeKind = envelope?.request.kind
+    const isPlainChoice = envelopeKind === 'choice'
+    const isAnimalQuantity = envelopeKind === 'animal-quantity-select'
     const pendingPlayerIndex = frame && envelope
       ? this.effectiveOwnerIndexForFrame(frame, envelope.hostNodeId, envelope)
       : -1
-    if (!isPlainChoice || pendingPlayerIndex !== playerIndex) {
-      return this.respond(false, 'no pending selection choice for this player')
+    if ((!isPlainChoice && !isAnimalQuantity) || pendingPlayerIndex !== playerIndex) {
+      return this.respond(false, 'no pending selection/animal-quantity choice for this player')
     }
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
+
+    // animal-quantity-select 分支：包装 animalCounts 到 payload，透传到 action.resolveChoice
+    // 与现有 occupation-hand path (line 3383) `{cards: cardIds}` / farm-position path (line 3432) `{positions: positionStrings}` 风格一致
+    if (isAnimalQuantity) {
+      const counts = payload.animalCounts ?? { sheep: 0, boar: 0, cattle: 0 }
+      this.pushHistory()
+      const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('animal-quantity')
+      const result = this.engine?.resolveChoice('confirm', {
+        state: this.state,
+        player,
+        space,
+      }, { animalCounts: counts })
+      // 与 occupation-hand 分支保持一致（line 3384）：只 record ok 结果。
+      if (result?.type === 'ok') {
+        this.recordActionResultDetails(
+          result,
+          this.currentFrameOwnerPlayerId(player.id),
+          player.id,
+        )
+      }
+      this.flushEngineLog()
+      this.runEngineSteps()
+      return this.continueAfterResolvedFarmChoice(playerIndex)
+    }
 
     const interactionContext = this.peekHostContextSnapshot()?.actionContext
     const selectionKind = (interactionContext?.selectionKind as string | undefined) ?? 'farm-position'
