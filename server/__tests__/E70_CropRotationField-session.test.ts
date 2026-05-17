@@ -40,7 +40,7 @@ const setup = (options?: {
 
   if (options?.cardCrop !== undefined) {
     if (options.cardCrop !== null) {
-      writeCardExtraData(player, CARD_ID, 'cardCrop', options.cardCrop)
+      writeCardExtraData(player, CARD_ID, 'cardFieldStacks', [options.cardCrop])
     }
   }
 
@@ -80,7 +80,7 @@ describe('E70_CropRotationField session', () => {
 
       const extraFields = computeExtraSowableFields(player)
       const cardField = extraFields.find(
-        (f) => f.tile.row === -1 && f.tile.col === 70,
+        (f) => f.tile.row === -1 && f.tile.col === 5070,
       )
       expect(cardField).toBeDefined()
       expect(cardField?.allowedCrops).toContain('grain')
@@ -98,7 +98,7 @@ describe('E70_CropRotationField session', () => {
 
       const extraFields = computeExtraSowableFields(player)
       const cardField = extraFields.find(
-        (f) => f.tile.row === -1 && f.tile.col === 70,
+        (f) => f.tile.row === -1 && f.tile.col === 5070,
       )
       expect(cardField).toBeUndefined()
     })
@@ -116,19 +116,19 @@ describe('E70_CropRotationField session', () => {
 
       // Sow grain on the virtual tile
       resp = session.resolveChoice(0, 'confirm', {
-        crops: [{ row: -1, col: 70, crop: 'grain' }],
+        crops: [{ row: -1, col: 5070, crop: 'grain' }],
       })
       expect(resp.ok).toBe(true)
       expect(resp.state.players[0]!.resources.grain).toBe(1)
 
-      const cardCrop = readCardExtraData<{ crop: string; remaining: number }>(
+      const stacks = readCardExtraData<{ crop: string; remaining: number }[]>(
         resp.state.players[0]!,
         CARD_ID,
-        'cardCrop',
-      )
-      expect(cardCrop).toBeDefined()
-      expect(cardCrop!.crop).toBe('grain')
-      expect(cardCrop!.remaining).toBe(3)
+        'cardFieldStacks',
+      )!
+      expect(stacks).toBeDefined()
+      expect(stacks[0].crop).toBe('grain')
+      expect(stacks[0].remaining).toBe(3)
     })
 
     it('sowing vegetable works (remaining=2)', () => {
@@ -139,19 +139,19 @@ describe('E70_CropRotationField session', () => {
       expect(resp.ok).toBe(true)
 
       resp = session.resolveChoice(0, 'confirm', {
-        crops: [{ row: -1, col: 70, crop: 'vegetable' }],
+        crops: [{ row: -1, col: 5070, crop: 'vegetable' }],
       })
       expect(resp.ok).toBe(true)
       expect(resp.state.players[0]!.resources.vegetable).toBe(1)
 
-      const cardCrop = readCardExtraData<{ crop: string; remaining: number }>(
+      const stacks = readCardExtraData<{ crop: string; remaining: number }[]>(
         resp.state.players[0]!,
         CARD_ID,
-        'cardCrop',
-      )
-      expect(cardCrop).toBeDefined()
-      expect(cardCrop!.crop).toBe('vegetable')
-      expect(cardCrop!.remaining).toBe(2)
+        'cardFieldStacks',
+      )!
+      expect(stacks).toBeDefined()
+      expect(stacks[0].crop).toBe('vegetable')
+      expect(stacks[0].remaining).toBe(2)
     })
 
     it('fromSelectedFields filters out other extra sow fields in interaction', () => {
@@ -159,7 +159,7 @@ describe('E70_CropRotationField session', () => {
       addMinorCard(session, OTHER_EXTRA_CARD_ID)
 
       const player = session.getState().state.players[0]!
-      writeCardExtraData(player, CARD_ID, 'selectedPositions', ['-1-70'])
+      writeCardExtraData(player, CARD_ID, 'selectedPositions', ['-1-5070'])
 
       const interaction = buildSowFarmInteraction(player, {
         allowedFields: 'fromSelectedFields',
@@ -171,7 +171,7 @@ describe('E70_CropRotationField session', () => {
         throw new Error('expected sow interaction')
       }
       expect(interaction.selectableFields).toEqual([
-        { tile: { row: -1, col: 70 }, allowedCrops: ['vegetable'], sourceCard: CARD_ID },
+        { tile: { row: -1, col: 5070 }, allowedCrops: ['vegetable'], sourceCard: CARD_ID, groupKey: undefined },
       ])
     })
 
@@ -179,7 +179,7 @@ describe('E70_CropRotationField session', () => {
       // Drive the harvest-emitted optional sow leaf rather than mutating
       // private session fields: round-4 harvest with cardCrop={grain,1} +
       // vegetable=1 triggers E70's onHarvestFieldPhase to reap the last
-      // grain (cardCrop -> null, selectedPositions = ['-1-70']) and emit
+      // grain (cardCrop -> null, selectedPositions = ['-1-5070']) and emit
       // an optional sow leaf with actionContext
       // { allowedFields: 'fromSelectedFields', sourceCard: E70 }. The
       // commit-time selectableFields filter then narrows allowed extras
@@ -205,16 +205,16 @@ describe('E70_CropRotationField session', () => {
         .toBe('ui.interactionSowSelect')
 
       resp = session.resolveChoice(0, 'confirm', {
-        crops: [{ row: -1, col: 69, crop: 'vegetable' }],
+        crops: [{ row: -1, col: 5069, crop: 'vegetable' }],
       })
 
       expect(resp.ok).toBe(false)
       expect(session.getState().state.players[0]!.resources.vegetable).toBe(1)
       expect(
-        readCardExtraData<{ crop: string; remaining: number }>(
+        readCardExtraData<{ crop: string; remaining: number }[]>(
           session.getState().state.players[0]!,
           OTHER_EXTRA_CARD_ID,
-          'cardCrop',
+          'cardFieldStacks',
         ),
       ).toBeUndefined()
     })
@@ -232,13 +232,13 @@ describe('E70_CropRotationField session', () => {
 
       const playerAfter = resp.state.players[0]!
       expect(playerAfter.resources.grain).toBe(1) // harvested 1 grain
-      const cardCrop = readCardExtraData<{ crop: string; remaining: number }>(
+      const stacks = readCardExtraData<{ crop: string; remaining: number }[]>(
         playerAfter,
         CARD_ID,
-        'cardCrop',
-      )
-      expect(cardCrop).toBeDefined()
-      expect(cardCrop!.remaining).toBe(2)
+        'cardFieldStacks',
+      )!
+      expect(stacks).toBeDefined()
+      expect(stacks[0].remaining).toBe(2)
     })
 
     it('crop cleared when remaining reaches 0', () => {
@@ -253,12 +253,12 @@ describe('E70_CropRotationField session', () => {
 
       const playerAfter = resp.state.players[0]!
       expect(playerAfter.resources.grain).toBe(1) // harvested last grain
-      const cardCrop = readCardExtraData<{ crop: string; remaining: number } | null>(
+      const stacks = readCardExtraData<{ crop: string; remaining: number }[]>(
         playerAfter,
         CARD_ID,
-        'cardCrop',
+        'cardFieldStacks',
       )
-      expect(cardCrop).toBeNull() // cleared
+      expect(stacks ?? []).toEqual([]) // cleared
     })
 
     it('last grain harvested with vegetable available -> optional sow flow returned', () => {
@@ -288,16 +288,16 @@ describe('E70_CropRotationField session', () => {
 
       // Verify state changes
       expect(player.resources.grain).toBe(1) // gained 1 grain
-      const cardCrop = readCardExtraData<{ crop: string; remaining: number } | null>(
+      const stacks = readCardExtraData<{ crop: string; remaining: number }[]>(
         player,
         CARD_ID,
-        'cardCrop',
+        'cardFieldStacks',
       )
-      expect(cardCrop).toBeNull() // cleared
+      expect(stacks ?? []).toEqual([]) // cleared
 
       // Verify selectedPositions was set
       const selectedPositions = readCardExtraData<string[]>(player, CARD_ID, 'selectedPositions')
-      expect(selectedPositions).toEqual(['-1-70'])
+      expect(selectedPositions).toEqual(['-1-5070'])
     })
 
     it('last vegetable harvested with grain available -> optional sow flow returned', () => {
@@ -337,12 +337,12 @@ describe('E70_CropRotationField session', () => {
       expect(flow).toBeNull() // no opposite seeds
 
       expect(player.resources.grain).toBe(1) // still harvested
-      const cardCrop = readCardExtraData<{ crop: string; remaining: number } | null>(
+      const stacks = readCardExtraData<{ crop: string; remaining: number }[]>(
         player,
         CARD_ID,
-        'cardCrop',
+        'cardFieldStacks',
       )
-      expect(cardCrop).toBeNull() // still cleared
+      expect(stacks ?? []).toEqual([]) // still cleared
     })
 
     it('no harvest when card has no crop', () => {
