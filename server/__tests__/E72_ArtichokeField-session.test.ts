@@ -6,6 +6,8 @@ import { markAllWorkersUsed } from '../../shared/domain/player'
 import '../../shared/cards/E/E72_ArtichokeField'
 
 const CARD_ID = 'E72_ArtichokeField'
+const ROW = -1
+const COL = 5072
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 
 const setup = (options?: {
@@ -53,7 +55,7 @@ describe('E72_ArtichokeField session', () => {
       const player = state.players[0]!
       const extras = computeExtraSowableFields(player)
       expect(extras.length).toBe(1)
-      expect(extras[0].tile).toEqual({ row: -1, col: 72 })
+      expect(extras[0].tile).toEqual({ row: ROW, col: COL })
       expect(extras[0].allowedCrops).toContain('grain')
       expect(extras[0].allowedCrops).toContain('vegetable')
       expect(extras[0].sourceCard).toBe(CARD_ID)
@@ -65,7 +67,7 @@ describe('E72_ArtichokeField session', () => {
       const player = state.players[0]!
       // Manually set a crop on the card
       player.cardStates[CARD_ID] = {
-        extraData: { cardCrop: { crop: 'grain', remaining: 3 } },
+        extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 3 }] },
       }
       const extras = computeExtraSowableFields(player)
       expect(extras.length).toBe(0)
@@ -83,16 +85,16 @@ describe('E72_ArtichokeField session', () => {
 
       // Sow grain into virtual card tile
       resp = session.resolveChoice(0, 'confirm', {
-        crops: [{ row: -1, col: 72, crop: 'grain' }],
+        crops: [{ row: ROW, col: COL, crop: 'grain' }],
       })
       expect(resp.ok).toBe(true)
       expect(resp.state.players[0]!.resources.grain).toBe(1)
 
       const cardState = resp.state.players[0]!.cardStates[CARD_ID]
-      expect(cardState?.extraData?.cardCrop).toBeDefined()
-      const cardCrop = cardState?.extraData?.cardCrop as any
-      expect(cardCrop.crop).toBe('grain')
-      expect(cardCrop.remaining).toBe(3)
+      const stacks = cardState?.extraData?.cardFieldStacks as any[]
+      expect(stacks).toBeDefined()
+      expect(stacks[0].crop).toBe('grain')
+      expect(stacks[0].remaining).toBe(3)
     })
 
     it('sowing vegetable stores crop data (remaining=2)', () => {
@@ -103,14 +105,14 @@ describe('E72_ArtichokeField session', () => {
       expect(resp.ok).toBe(true)
 
       resp = session.resolveChoice(0, 'confirm', {
-        crops: [{ row: -1, col: 72, crop: 'vegetable' }],
+        crops: [{ row: ROW, col: COL, crop: 'vegetable' }],
       })
       expect(resp.ok).toBe(true)
       expect(resp.state.players[0]!.resources.vegetable).toBe(1)
 
-      const cardCrop = resp.state.players[0]!.cardStates[CARD_ID]?.extraData?.cardCrop as any
-      expect(cardCrop.crop).toBe('vegetable')
-      expect(cardCrop.remaining).toBe(2)
+      const stacks = resp.state.players[0]!.cardStates[CARD_ID]?.extraData?.cardFieldStacks as any[]
+      expect(stacks[0].crop).toBe('vegetable')
+      expect(stacks[0].remaining).toBe(2)
     })
 
     it('makes sow doable when only card field exists (no empty regular fields)', () => {
@@ -136,7 +138,7 @@ describe('E72_ArtichokeField session', () => {
       const state = session.getState().state
       const player = state.players[0]!
       player.cardStates[CARD_ID] = {
-        extraData: { cardCrop: { crop: 'grain', remaining: 3 } },
+        extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 3 }] },
       }
       for (const p of state.players) {
         p.resources.food = 10
@@ -149,10 +151,9 @@ describe('E72_ArtichokeField session', () => {
       // Should gain 1 grain from harvest
       expect(playerAfter.resources.grain).toBe(1)
       // Should gain 1 bonus food (on top of existing 10, minus feeding cost)
-      // Food = 10 + 1 (bonus) - feeding. Let's check the cardCrop state
-      const cardCrop = playerAfter.cardStates[CARD_ID]?.extraData?.cardCrop as any
-      expect(cardCrop).toBeDefined()
-      expect(cardCrop.remaining).toBe(2)
+      const stacks = playerAfter.cardStates[CARD_ID]?.extraData?.cardFieldStacks as any[]
+      expect(stacks).toBeDefined()
+      expect(stacks[0].remaining).toBe(2)
     })
 
     it('crop cleared when remaining reaches 0', () => {
@@ -164,7 +165,7 @@ describe('E72_ArtichokeField session', () => {
       const state = session.getState().state
       const player = state.players[0]!
       player.cardStates[CARD_ID] = {
-        extraData: { cardCrop: { crop: 'grain', remaining: 1 } },
+        extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] },
       }
       for (const p of state.players) {
         p.resources.food = 10
@@ -175,9 +176,9 @@ describe('E72_ArtichokeField session', () => {
       const playerAfter = resp.state.players[0]!
 
       expect(playerAfter.resources.grain).toBe(1)
-      // Crop should be cleared
-      const cardCrop = playerAfter.cardStates[CARD_ID]?.extraData?.cardCrop
-      expect(cardCrop).toBeNull()
+      // Stack should be cleared
+      const stacks = playerAfter.cardStates[CARD_ID]?.extraData?.cardFieldStacks as any[]
+      expect(stacks ?? []).toEqual([])
     })
 
     /**
@@ -206,7 +207,7 @@ describe('E72_ArtichokeField session', () => {
       player.resources.food = 0
       player.resources.grain = 0
       player.cardStates[CARD_ID] = {
-        extraData: { cardCrop: { crop: 'grain', remaining: 3 } },
+        extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 3 }] },
       }
       session.loadState(state)
 
@@ -217,7 +218,7 @@ describe('E72_ArtichokeField session', () => {
       }
       expect(player.resources.grain).toBe(3)
       expect(player.resources.food).toBe(3)
-      expect(player.cardStates[CARD_ID]?.extraData?.cardCrop).toBeNull()
+      expect(player.cardStates[CARD_ID]?.extraData?.cardFieldStacks ?? []).toEqual([])
     })
 
     it('multi-harvest food totals equal BGA expectation (2 vegetable → 2 food bonus)', () => {
@@ -228,7 +229,7 @@ describe('E72_ArtichokeField session', () => {
       player.resources.food = 0
       player.resources.vegetable = 0
       player.cardStates[CARD_ID] = {
-        extraData: { cardCrop: { crop: 'vegetable', remaining: 2 } },
+        extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] },
       }
       session.loadState(state)
 
@@ -238,7 +239,7 @@ describe('E72_ArtichokeField session', () => {
       }
       expect(player.resources.vegetable).toBe(2)
       expect(player.resources.food).toBe(2)
-      expect(player.cardStates[CARD_ID]?.extraData?.cardCrop).toBeNull()
+      expect(player.cardStates[CARD_ID]?.extraData?.cardFieldStacks ?? []).toEqual([])
     })
 
     it('no harvest crop → no bonus food (parity with BGA "harvested>=1" guard)', () => {
@@ -247,7 +248,7 @@ describe('E72_ArtichokeField session', () => {
       const player = state.players[0]!
       player.minorPlayed.push(CARD_ID)
       player.resources.food = 0
-      // No cardCrop set — empty card field.
+      // No stacks set — empty card field.
       session.loadState(state)
 
       const effect = getCardEffect(CARD_ID)!
@@ -261,7 +262,7 @@ describe('E72_ArtichokeField session', () => {
       const player = state.players[0]!
       player.minorPlayed.push(CARD_ID)
       player.cardStates[CARD_ID] = {
-        extraData: { cardCrop: { crop: 'vegetable', remaining: 2 } },
+        extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] },
       }
       session.loadState(state)
 
