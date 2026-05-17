@@ -153,6 +153,7 @@ pnpm run lint
 
 ## 9. 当前轮次
 
+- 2026-05-17 — `B42_ForestInn` / `D119_WoodBarterer` 纯 gain / pay-gain 选项去除重复 `choiceLabelKey`，改由 `descriptionPreview` 自动渲染资源变化。
 - 2026-05-16 — `B42_ForestInn` 对齐 BGA activate flow：非主人先支付 owner 1 food，随后进入 5/7/9 wood 的 XOR pay-gain 分支。
 - 2026-05-16 — C60_SmallPottersOven mandatory bake continuation fixed: skipping Stone Oven onBuy bake after C60 before-bake build now reaches engine-blocked instead of ending the turn.
 - 2026-05-15 — Engine-level mandatory bake alignment: client treats `engine-blocked` as a dedicated prompt-only pending state and hides choice/anytime actions while blocked.
@@ -178,11 +179,13 @@ pnpm run lint
 - `special-effect` 新增 `plant-additional-good` kind — 在玩家 field、cardStates 的 `extraData.stacks` 或 `extraData.cardCrop` 上把 lone good remaining +1。当前 C8_PlantFertilizer 使用；写入前先整体校验所有 location。
 - `cardField` 通用机制（`shared/cards/helpers/card-field.ts:makeCardFieldImpl`）— 声明 `CardDefinition.cardField = { allowedCrops, capacity }` + 可选 `onReap(ctx: { state, player, crop, isLast })`，工厂派生 sow / harvest / isDoable listener。`isLast` 语义 = 该卡上该 crop 经本次扣减后总 remaining === 0；多 crop 各调一次。虚拟 tile col：`deriveVirtualTileCol(cardId, slot) = deckOrdinal*1000 + cardNumber + slot`，跨 deck 不冲突。对齐 BGA `$this->field = true` + `getFieldDetails()` + `onPlayerAfterReap`。
 - `harvestReapSummary` 初始化时机：从 `continueHarvestReap` 提前到 `continueHarvestFieldStart`，让 `onHarvestFieldPhase` 内的 cardField 累加能进入同一份 summary，最终 `log.harvestReapDetail` 完整覆盖普通田 + cardField。
+- `payGainActionFlow` / `payThenGainActionFlow` 不再把完整 resource-exchange preview 挂到 pay leaf；pay leaf 交给引擎生成 payment preview，gain leaf 生成 gain preview，避免描述重复。
 
 ## 11. 时间线
 
 | 日期 | 批次 | 涉及卡牌 / 基建 |
 |---|---|---|
+| 2026-05-17 | pay-gain option rendering | B42_ForestInn / D119_WoodBarterer + pay-gain helper preview |
 | 2026-05-16 | B42 flow alignment | B42_ForestInn |
 | 2026-05-16 | C60 mandatory bake continuation | C60_SmallPottersOven + before-resolved continuation `skipBeforeTriggers` |
 | 2026-05-15 | C57 selection alignment | C57_Crudite + `remove-field-crops` / farm-position selectableTiles validation |

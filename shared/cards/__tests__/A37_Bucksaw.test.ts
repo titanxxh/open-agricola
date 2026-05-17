@@ -71,16 +71,11 @@ describe('A37_Bucksaw', () => {
           actionId: 'pay',
           params: { wood: 1 },
           sourceCard: 'A37_Bucksaw',
-          effectPreview: {
-            kind: 'resourceExchange',
-            resourcesPaid: { wood: 1 },
-            resourcesGained: { grain: 1 },
-            bonusVp: 1,
-          },
         },
         { type: 'leaf', actionId: 'bonus-vp', sourceCard: 'A37_Bucksaw' },
         { type: 'leaf', actionId: 'gain', params: { grain: 1 }, sourceCard: 'A37_Bucksaw' },
       ])
+      expect((result.flow.children[0] as { effectPreview?: unknown } | undefined)?.effectPreview).toBeUndefined()
     }
   })
 
