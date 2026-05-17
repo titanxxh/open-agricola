@@ -53,7 +53,8 @@
 | 卡牌 | 原始行为 | 当前 OA 行为 | BGA 差距 | 需要修复 |
 |---|---|---|---|---|
 | `B157_Salter` | 玩家可以腌制多种 / 多只动物，并按数量获得未来食物。 | 当前 flow 是 XOR，只能三选一且只能选 1 只动物。 | BGA 一次交互可选择 sheep / boar / cattle 的多个数量。 | 改成显式多类型计数选择，并按类型 / 数量发放 future food。 |
-| `C140_PackagingArtist` | 把 Major Improvement action 加入 replacement action pool。 | 实现了 minor replacement / `isDoable`，但没有把 Major Improvement 加进可替换 action pool。 | BGA 允许此卡扩展 replacement action 集合。 | 增加缺失的通用 action-pool 扩展点。 |
+
+Follow-up：`C28_TeachersDesk`、`B59_FoodChest` 等仍走同一 BGA `computeArgsPlaceFarmer` 模式，可复用本次 `C140_PackagingArtist` 的 `improvement-any` listener-action 扩展手法（无需新基建）。
 
 ## 3. Metadata Schema 上抬差异
 
@@ -162,6 +163,7 @@ pnpm run lint
 - 2026-05-15 — C57_Crudite aligned to BGA field-vegetable selection semantics; added strict multi-field crop removal and selection bound validation.
 - 2026-05-16 — C8_PlantFertilizer 对齐 BGA（NODE_SEQ + optional + SPECIAL_EFFECT 等效形状）；新增 `plant-additional-good` special-effect kind
 - 2026-05-17 — `cardField` 基建落地 + 11 张"卡牌即田"卡（B68/D75/E80/D25/E72/C70/E68/E69/E70/B113/B141）统一迁移到声明式 helper；harvest reap log 时序修复使 cardField 产出进入 `log.harvestReapDetail`；B113/B141 顺带补完 4 crop 全允许的 sow/harvest 路径。
+- 2026-05-17 — `C140_PackagingArtist`：补齐 `improvement-any` 监听（computeReplace + isDoable）+ `checkedReplaceAction` 防递归，对齐 BGA `computeArgsPlaceFarmer` 行为；移除 JSDoc 中"需要新扩展点"的误判注释。
 
 ## 10. 基础设施
 
@@ -180,6 +182,7 @@ pnpm run lint
 - `cardField` 通用机制（`shared/cards/helpers/card-field.ts:makeCardFieldImpl`）— 声明 `CardDefinition.cardField = { allowedCrops, capacity }` + 可选 `onReap(ctx: { state, player, crop, isLast })`，工厂派生 sow / harvest / isDoable listener。`isLast` 语义 = 该卡上该 crop 经本次扣减后总 remaining === 0；多 crop 各调一次。虚拟 tile col：`deriveVirtualTileCol(cardId, slot) = deckOrdinal*1000 + cardNumber + slot`，跨 deck 不冲突。对齐 BGA `$this->field = true` + `getFieldDetails()` + `onPlayerAfterReap`。
 - `harvestReapSummary` 初始化时机：从 `continueHarvestReap` 提前到 `continueHarvestFieldStart`，让 `onHarvestFieldPhase` 内的 cardField 累加能进入同一份 summary，最终 `log.harvestReapDetail` 完整覆盖普通田 + cardField。
 - `payGainActionFlow` / `payThenGainActionFlow` 不再把完整 resource-exchange preview 挂到 pay leaf；pay leaf 交给引擎生成 payment preview，gain leaf 生成 gain preview，避免描述重复。
+- Replace-listener 重入防护当前为 listener 端责任：`buildReplaceChoiceFlow` 只对 alternative 分支标 `skipComputeReplaceListenerIds`，原 leaf 仅得 `checkedReplaceAction: true`。每张 replace-style 卡 handler 必须自检 `actionContext.checkedReplaceAction`（参考 B103 / C140）。未来重构可考虑由引擎统一兜底。
 
 ## 11. 时间线
 
