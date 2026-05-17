@@ -733,7 +733,8 @@ export function engineProceed(
         result.request.kind === 'selection' ||
         result.request.kind === 'card-draft' ||
         result.request.kind === 'select-trigger' ||
-        result.request.kind === 'engine-blocked'
+        result.request.kind === 'engine-blocked' ||
+        result.request.kind === 'animal-quantity-select'
       ) {
         // Task 9 will add explicit emitters for these kinds. Until then no
         // current effect emits them, so they fall through to empty choices

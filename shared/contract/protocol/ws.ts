@@ -12,6 +12,7 @@ type ClientCommandBody =
       payload: {
         positions?: { row: number; col: number }[]
         cardIds?: string[]
+        animalCounts?: { sheep: number; boar: number; cattle: number }
       }
     }
   | { type: 'roundEnd' }

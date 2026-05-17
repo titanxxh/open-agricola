@@ -238,12 +238,18 @@ export const handleGameRoute = async (
   if (req.method === 'POST' && req.url === '/api/game/commit-selection') {
     const body = JSON.parse(await readBody(req)) as {
       playerIndex?: number
-      payload?: { positions?: unknown[]; cardIds?: unknown[] }
+      payload?: {
+        positions?: unknown[]
+        cardIds?: unknown[]
+        animalCounts?: { sheep: number; boar: number; cattle: number }
+      }
     }
     if (
       typeof body.playerIndex !== 'number' ||
       !body.payload ||
-      (!Array.isArray(body.payload.positions) && !Array.isArray(body.payload.cardIds))
+      (!Array.isArray(body.payload.positions) &&
+        !Array.isArray(body.payload.cardIds) &&
+        typeof body.payload.animalCounts !== 'object')
     ) {
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
