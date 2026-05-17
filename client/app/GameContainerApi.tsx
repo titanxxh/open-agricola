@@ -1795,18 +1795,16 @@ export const GameContainerApi = () => {
           <AnimalQuantitySelectPanel
             locale={locale}
             availableByType={interaction.request.availableByType}
-            onConfirm={(counts) =>
+            onConfirm={(counts) => {
+              if (!isInteractive) return
               void transport
                 .commitSelection(interaction.playerIndex, { animalCounts: counts })
                 .catch((e) => console.error(e))
-            }
-            onCancel={() =>
-              void transport
-                .commitSelection(interaction.playerIndex, {
-                  animalCounts: { sheep: 0, boar: 0, cattle: 0 },
-                })
-                .catch((e) => console.error(e))
-            }
+            }}
+            onCancel={() => {
+              if (!isInteractive) return
+              void transport.undoAction().catch((e) => console.error('undoAction error', e))
+            }}
           />
         )}
 
