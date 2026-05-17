@@ -12,4 +12,5 @@ export const E80_RockGarden = new MinorImprovement({
     'You can only plant <STONE> on this card. Plant as though it were 3 fields, but it is considered 1 field. Sow and harvest <STONE> on this card as you would vegetables.',
   ],
   isField: true,
+  cardField: { allowedCrops: ['stone'], capacity: 3 },
 })
