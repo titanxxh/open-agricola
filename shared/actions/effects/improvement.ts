@@ -29,11 +29,11 @@ import {
   getPositiveResourceLog,
   isMajorImprovementPlayable,
   isMinorImprovementPlayable,
+  isBlockedByMajorImprovementActionGate,
   parseImprovementChoice,
   readActionBonusSources,
   type ResolvedMinorImprovement,
-} from './improvement-options'
-import { isBlockedByMajorImprovementActionGate } from './improvement-pool'
+} from '../helpers/improvement-helpers'
 
 // Re-export Playable predicates so existing external callers (game-core.ts,
 // session tests) keep importing from `actions/effects/improvement`.
