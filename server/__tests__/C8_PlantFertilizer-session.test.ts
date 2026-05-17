@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { specialEffectAction } from '../../shared/actions/effects/special-effect'
-import type { ActionFlow, CropStack } from '../../shared/contract/types'
+import type { ActionFlow } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C8_PlantFertilizer'
 import '../../shared/cards/D/D75_WoodField'
@@ -97,7 +97,7 @@ describe('C8 PlantFertilizer session', () => {
     player.fields = [{ row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] }]
     player.minorPlayed.push('D75_WoodField')
     player.cardStates['D75_WoodField'] = {
-      extraData: { stacks: [{ kind: 'wood', remaining: 1 }] as CropStack[] },
+      extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }] },
     }
     session.loadState(state)
 
@@ -114,7 +114,7 @@ describe('C8 PlantFertilizer session', () => {
     })
 
     expect(player.fields[0]!.stacks[0]!.remaining).toBe(2)
-    const woodStacks = player.cardStates['D75_WoodField']!.extraData!['stacks'] as CropStack[]
+    const woodStacks = player.cardStates['D75_WoodField']!.extraData!['cardFieldStacks'] as Array<{ crop: string; remaining: number }>
     expect(woodStacks[0]!.remaining).toBe(2)
     expect(player.resources.grain ?? 0).toBe(0)
     expect(player.resources.wood ?? 0).toBe(0)
@@ -125,14 +125,14 @@ describe('C8 PlantFertilizer session', () => {
     player.fields = [{ row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] }]
     player.minorPlayed.push('D75_WoodField')
     player.cardStates['D75_WoodField'] = {
-      extraData: { stacks: [{ kind: 'wood', remaining: 1 }] as CropStack[] },
+      extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }] },
     }
     session.loadState(state)
 
     runCardEffectHook(state, player, CARD_ID, 'onBuy')
 
     expect(player.fields[0]!.stacks[0]!.remaining).toBe(1)
-    const woodStacks = player.cardStates['D75_WoodField']!.extraData!['stacks'] as CropStack[]
+    const woodStacks = player.cardStates['D75_WoodField']!.extraData!['cardFieldStacks'] as Array<{ crop: string; remaining: number }>
     expect(woodStacks[0]!.remaining).toBe(1)
     expect(player.minorPlayed.includes(CARD_ID)).toBe(true)
   })

@@ -1,6 +1,5 @@
 import type {
   ActionDefinition,
-  CropStack,
   GameState,
   PlayerState,
   Resource,
@@ -29,8 +28,7 @@ import { returnCardToBoard } from '../../cards/helpers/return-card'
 
 export type PlantAdditionalGoodLocation =
   | { kind: 'field'; row: number; col: number }
-  | { kind: 'card-stacks'; cardId: string }
-  | { kind: 'card-crop'; cardId: string }
+  | { kind: 'card-field'; cardId: string }
 
 export type SpecialEffectParams =
   | { kind: 'increment-extra-data'; key: string; amount: number }
@@ -78,12 +76,15 @@ const resolveTargetPlayer = (
   return target ?? actor
 }
 
-type CardCrop = {
-  crop: CropStack['kind']
+type CardFieldStack = {
+  crop: 'grain' | 'vegetable' | 'wood' | 'stone'
   remaining: number
 }
 
-const readGrowableStack = (stacks: CropStack[], errCtx: string): CropStack => {
+const readGrowableStack = <S extends { remaining: number }>(
+  stacks: readonly S[],
+  errCtx: string,
+): S => {
   const stack = stacks.find((s) => s.remaining >= 1)
   if (!stack) {
     throw new Error(`plant-additional-good: no stack with remaining>=1 on ${errCtx}`)
@@ -294,26 +295,13 @@ export const specialEffectAction: ActionDefinition = {
             mutations.push(() => {
               stack.remaining += 1
             })
-          } else if (loc.kind === 'card-stacks') {
+          } else {
             const stacks =
-              readCardExtraData<CropStack[]>(target, loc.cardId, 'stacks') ?? []
+              readCardExtraData<CardFieldStack[]>(target, loc.cardId, 'cardFieldStacks') ?? []
             const stack = readGrowableStack(stacks, `card ${loc.cardId}`)
             mutations.push(() => {
               stack.remaining += 1
-              writeCardExtraData(target, loc.cardId, 'stacks', stacks)
-            })
-          } else {
-            const cardCrop = readCardExtraData<CardCrop>(target, loc.cardId, 'cardCrop')
-            if (!cardCrop || cardCrop.remaining < 1) {
-              throw new Error(
-                `plant-additional-good: no cardCrop with remaining>=1 on card ${loc.cardId}`,
-              )
-            }
-            mutations.push(() => {
-              writeCardExtraData(target, loc.cardId, 'cardCrop', {
-                ...cardCrop,
-                remaining: cardCrop.remaining + 1,
-              })
+              writeCardExtraData(target, loc.cardId, 'cardFieldStacks', stacks)
             })
           }
         }
