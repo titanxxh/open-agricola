@@ -1271,6 +1271,15 @@ export const zh = {
       PALISADES_NOT_UNLOCKED: '尚未打出 Wood Palisades',
     },
   },
+  'salter-pick': {
+    error: {
+      'must-pick-at-least-one': '至少选 1 只动物腌制',
+      'no-animals-on-board': '版图上没有可腌制的动物',
+      'invalid-count-sheep': '羊数量非法',
+      'invalid-count-boar': '猪数量非法',
+      'invalid-count-cattle': '牛数量非法',
+    },
+  },
   'invalid extra sow field': '无效的额外播种田地',
   NO_SELECTION: '未选择',
   test: {
