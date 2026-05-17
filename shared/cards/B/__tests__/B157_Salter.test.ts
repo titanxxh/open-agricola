@@ -60,7 +60,7 @@ describe('B157_Salter listener', () => {
     })
     const r = callListener(p, createState(p, 5)) as any
     expect(r).toBeDefined()
-    expect(r.flow.actionId).toBe('salter-pick')
+    expect(r.flow.actionId).toBe('card_B157_Salter_salt-pick')
     expect(r.flow.params).toBeUndefined()
     expect(r.labelKey).toBe('cards.B157_Salter.anytime')
   })

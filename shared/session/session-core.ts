@@ -19,6 +19,7 @@ import type {
 import type { ActionDetailParts } from '../contract/protocol/game.ts'
 import { actionDefinitions, getActionDefinition } from '../actions/index.ts'
 import { internalActionDefinitions } from '../actions/internal-actions.ts'
+import { getAllAdHocActions } from '../actions/helpers/ad-hoc-action-registry.ts'
 import { clearActionHooks } from '../actions/hooks.ts'
 import { finalizeDraft } from '../draft/draft-manager.ts'
 import type { DraftPickPayload } from '../draft/types.ts'
@@ -574,6 +575,7 @@ export class GameCore {
     this.registry = new ActionRegistry()
     actionDefinitions.forEach((a) => this.registry.register(a))
     internalActionDefinitions.forEach((a) => this.registry.register(a))
+    getAllAdHocActions().forEach((a) => this.registry.register(a))
     clearActionHooks()
     this.hookDispatcher = new HookDispatcher()
     this.engineLog = new LogStore()
