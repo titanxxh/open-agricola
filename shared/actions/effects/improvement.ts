@@ -506,8 +506,8 @@ export const improvementAction: ActionDefinition = {
     }
     if (allowedMinor) {
       const minorOpts = isMinorOnly
-        ? buildPlayableMinorOptions(state, player, context?.sourceCard)
-        : buildMinorImprovementOptions(state, player, context?.sourceCard)
+        ? buildPlayableMinorOptions(state, player, context?.sourceCard, types)
+        : buildMinorImprovementOptions(state, player, context?.sourceCard, undefined, types)
       if (minorOpts.length > 0) return true
       const extras = collectComputeChoiceCandidates(state, player, 'improvement', { types })
       if (extras.some((opt) => canAffordInjectedImprovement(state, player, opt.value))) {
@@ -528,8 +528,8 @@ export const improvementAction: ActionDefinition = {
       : []
     const baseMinor = types.includes('minor')
       ? (isMinorOnly
-          ? buildPlayableMinorOptions(state, player, actionCardId)
-          : buildMinorImprovementOptions(state, player, actionCardId, allowedPurchases))
+          ? buildPlayableMinorOptions(state, player, actionCardId, types)
+          : buildMinorImprovementOptions(state, player, actionCardId, allowedPurchases, types))
       : []
     const extras = types.includes('minor')
       ? collectComputeChoiceCandidates(state, player, 'improvement', { types })
