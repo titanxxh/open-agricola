@@ -5,6 +5,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import '../../shared/cards/D/D65_GrainSieve'
 import type { ActionFlow } from '../../shared/contract/types'
+import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
 const CARD_ID = 'D65_GrainSieve'
 
@@ -99,19 +100,12 @@ describe('D65_GrainSieve session', () => {
 
     const grainBefore = session.getState().state.players[0]!.resources.grain
 
-    let resp = session.performRoundEnd()
+    autoAdvanceRoundEnd(session, {
+      onChoice: (intx, sess) =>
+        sess.resolveChoice(intx.playerIndex, 'ok'),
+    })
 
-    while (resp.interaction.stateId === 'wait') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'ok')
-    }
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
-    }
-    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones as any)
-    }
-
-    const player = resp.state.players[0]!
+    const player = session.getState().state.players[0]!
     // 2 grain fields harvested (1 each = 2 grain) + 1 bonus grain from sieve = grainBefore + 3
     expect(player.resources.grain).toBe(grainBefore + 2 + 1)
   })
@@ -125,16 +119,9 @@ describe('D65_GrainSieve session', () => {
 
     const grainBefore = session.getState().state.players[0]!.resources.grain
 
-    let resp = session.performRoundEnd()
+    autoAdvanceRoundEnd(session)
 
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
-    }
-    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones as any)
-    }
-
-    const player = resp.state.players[0]!
+    const player = session.getState().state.players[0]!
     // Only 1 grain field (remaining: 2 yields 1 grain) => +1 grain from harvest, no bonus
     expect(player.resources.grain).toBe(grainBefore + 1)
   })

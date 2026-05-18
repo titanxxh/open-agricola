@@ -4,6 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import '../../shared/cards/D/D72_StableManure'
 import type { ActionChoiceOption } from '../../shared/contract/types'
+import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
 describe('D72_StableManure session', () => {
   const setupHarvest = (unfencedStableCount: number) => {
@@ -72,14 +73,9 @@ describe('D72_StableManure session', () => {
     expect(resp.ok).toBe(true)
 
     // Continue through harvest phases
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
-    }
-    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
-    }
+    autoAdvanceRoundEnd(session)
 
-    const p = resp.state.players[0]!
+    const p = session.getState().state.players[0]!
     // harvest-extra: gain 1 grain + 1 vegetable from card effect
     // plus normal harvest: 1 grain (0-0) + 1 veg (0-1) + 1 grain (0-2)
     // Total: grain >= 3 (2 from harvest + 1 from card), vegetable >= 2 (1 from harvest + 1 from card)
@@ -106,14 +102,9 @@ describe('D72_StableManure session', () => {
     expect(resp.ok).toBe(true)
 
     // Continue through harvest
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
-    }
-    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
-    }
+    autoAdvanceRoundEnd(session)
 
-    const p = resp.state.players[0]!
+    const p = session.getState().state.players[0]!
     // Extra: 1 grain from card + 2 grain from normal harvest (0-0 and 0-2)
     expect(p.resources.grain).toBeGreaterThanOrEqual(3)
   })

@@ -4,6 +4,7 @@ import { computeAnimalZones } from '../../shared/domain/animal-zones'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import '../../shared/cards/D/D12_MilkingPlace'
+import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
 describe('D12_MilkingPlace session', () => {
   /**
@@ -65,22 +66,11 @@ describe('D12_MilkingPlace session', () => {
     state.players[0]!.resources.food = 1
     session.loadState(state)
 
-    let resp = session.performRoundEnd()
-
-    // Process harvest feed for all players
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      const pidx = resp.interaction.playerIndex
-      resp = session.resolveChoice(pidx, 'confirm', { selections: [] })
-    }
-
-    // Handle any animal reorgs
-    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
-    }
+    autoAdvanceRoundEnd(session)
 
     // Player 0 had 1 food, got 1 from MilkingPlace card = 2 food total.
     // Family of 1 requires 2 food. Should have 0 begging.
-    const playerAfter = resp.state.players[0]!
+    const playerAfter = session.getState().state.players[0]!
     expect(playerAfter.resources.begging).toBe(0)
     // Food should be fully consumed
     expect(playerAfter.resources.food).toBe(0)
@@ -102,19 +92,10 @@ describe('D12_MilkingPlace session', () => {
     state.players[0]!.resources.food = 1
     session.loadState(state)
 
-    let resp = session.performRoundEnd()
-
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      const pidx = resp.interaction.playerIndex
-      resp = session.resolveChoice(pidx, 'confirm', { selections: [] })
-    }
-
-    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
-    }
+    autoAdvanceRoundEnd(session)
 
     // Without the card: 1 food, need 2, so 1 begging
-    const playerAfter = resp.state.players[0]!
+    const playerAfter = session.getState().state.players[0]!
     expect(playerAfter.resources.begging).toBe(1)
   })
 })
