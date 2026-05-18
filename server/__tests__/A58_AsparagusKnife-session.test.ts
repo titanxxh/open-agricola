@@ -5,6 +5,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import '../../shared/cards/A/A58_AsparagusKnife'
 import type { ActionChoiceOption } from '../../shared/contract/types'
+import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
 const CARD_ID = 'A58_AsparagusKnife'
 
@@ -182,32 +183,21 @@ describe('A58_AsparagusKnife session', () => {
       ],
     })
 
-    let resp = session.performRoundEnd()
+    autoAdvanceRoundEnd(session, {
+      onChoice: (intx, sess) => {
+        const skipOption = intx.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+        const acceptOption = intx.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+        if (skipOption && acceptOption) {
+          return sess.resolveChoice(intx.playerIndex, acceptOption.value)
+        }
+        if (intx.promptKey === 'ui.interactionSelection') {
+          return sess.resolveChoice(intx.playerIndex, '0-0')
+        }
+        return sess.resolveChoice(intx.playerIndex, intx.options?.[0]?.value ?? 'ok')
+      },
+    })
 
-    // Should get an optional choice for the card effect
-    // Walk through choices: accept the optional, select the field, etc.
-    while (resp.interaction.stateId === 'wait') {
-      const skipOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
-      const acceptOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
-      if (skipOption && acceptOption) {
-        // This is the optional choice — accept it
-        resp = session.resolveChoice(resp.interaction.playerIndex, acceptOption.value)
-      } else if (resp.interaction.promptKey === 'ui.interactionSelection') {
-        // Select the vegetable field
-        resp = session.resolveChoice(resp.interaction.playerIndex, '0-0')
-      } else {
-        resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options[0]?.value ?? 'ok')
-      }
-    }
-    // Handle any remaining pending states
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
-    }
-    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones as any)
-    }
-
-    const player = resp.state.players[0]!
+    const player = session.getState().state.players[0]!
     // Vegetable field: had remaining=2, 1 taken by card → remaining=1
     const vegField = player.fields.find((f) => f.row === 0 && f.col === 0)
     expect(vegField?.stacks[0]?.remaining ?? 0).toBe(1)
@@ -226,25 +216,17 @@ describe('A58_AsparagusKnife session', () => {
       ],
     })
 
-    let resp = session.performRoundEnd()
+    autoAdvanceRoundEnd(session, {
+      onChoice: (intx, sess) => {
+        const skipOption = intx.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
+        if (skipOption) {
+          return sess.resolveChoice(intx.playerIndex, skipOption.value)
+        }
+        return sess.resolveChoice(intx.playerIndex, intx.options?.[0]?.value ?? 'ok')
+      },
+    })
 
-    // Skip the optional effect
-    while (resp.interaction.stateId === 'wait') {
-      const skipOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
-      if (skipOption) {
-        resp = session.resolveChoice(resp.interaction.playerIndex, skipOption.value)
-      } else {
-        resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options[0]?.value ?? 'ok')
-      }
-    }
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
-    }
-    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones as any)
-    }
-
-    const player = resp.state.players[0]!
+    const player = session.getState().state.players[0]!
     // Vegetable field should be untouched (no card effect)
     const vegField = player.fields.find((f) => f.row === 0 && f.col === 0)
     expect(vegField?.stacks[0]?.remaining ?? 0).toBe(2)
@@ -262,20 +244,12 @@ describe('A58_AsparagusKnife session', () => {
 
     const foodBefore = session.getState().state.players[0]!.resources.food
 
-    let resp = session.performRoundEnd()
+    autoAdvanceRoundEnd(session, {
+      onChoice: (intx, sess) =>
+        sess.resolveChoice(intx.playerIndex, 'ok'),
+    })
 
-    // Should go through harvest without the asparagus knife choice
-    while (resp.interaction.stateId === 'wait') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'ok')
-    }
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
-    }
-    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones as any)
-    }
-
-    const player = resp.state.players[0]!
+    const player = session.getState().state.players[0]!
     // Vegetable field should have been harvested normally (remaining 2→1)
     const vegField = player.fields.find((f) => f.row === 0 && f.col === 0)
     expect(vegField?.stacks[0]?.remaining ?? 0).toBe(1)

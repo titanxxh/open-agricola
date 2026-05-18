@@ -24,7 +24,7 @@ import {
 } from '../../shared/cards/custom-registry'
 import { registerExecutorBackedCustomCard } from '../../server/custom-code/runtime'
 import { createInitialState } from '../../shared/session/state-bootstrap'
-import type { GameState, PlayerState, Resource } from '../../shared/contract/types'
+import type { GameState, InteractionState, PlayerState, Resource } from '../../shared/contract/types'
 import { rewriteCardId } from './extract'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { solveBonusScoring } from '../../shared/domain/scoring'
@@ -34,7 +34,7 @@ import {
   setActiveWorkerCount,
   workersAvailable,
 } from '../../shared/domain/player'
-import { GameSession } from '../../server/game/authoritative-session'
+import { GameSession, type SessionResponse } from '../../server/game/authoritative-session'
 import { confirmNextPlayer, confirmPlayerSwitch } from '../../server/__tests__/_helpers/legacy-confirms'
 
 export type CardType = 'minor' | 'occupation'
@@ -273,6 +273,17 @@ export function getBonusBreakdownForSession(
 export interface AutoAdvanceOptions {
   /** Defensive max iterations to avoid infinite loops on engine bugs. Default 50. */
   maxIterations?: number
+  /**
+   * Handler for choice pendings that autoAdvanceRoundEnd doesn't handle
+   * natively (feed / animalReorg / confirm-next-player / confirm-player-switch).
+   * Receives the live wait `interaction` and the session; return the new
+   * `SessionResponse` to keep advancing, or `undefined` to fall through and
+   * let `autoAdvanceRoundEnd` throw its strict "hit a choice pending" error.
+   */
+  onChoice?: (
+    interaction: Extract<InteractionState, { stateId: 'wait' }>,
+    session: GameSession,
+  ) => SessionResponse | undefined
 }
 
 /**
@@ -344,17 +355,34 @@ function buildPreservingZones(
 export function autoAdvanceRoundEnd(
   session: GameSession,
   opts: AutoAdvanceOptions = {},
-): void {
+): SessionResponse {
   const max = opts.maxIterations ?? 50
   let iter = 0
-  let resp = session.performRoundEnd()
+  // If the session already has a pending interaction (e.g. caller already
+  // started performRoundEnd and manually walked through some prompts),
+  // resume from the current state instead of re-invoking performRoundEnd —
+  // which would reject with ok=false ("pending action exists") and the loop
+  // would burn iterations before throwing.
+  let resp: SessionResponse = session.peekEnginePendingEnvelope()
+    ? session.emitResponse()
+    : session.performRoundEnd()
   while (iter++ < max) {
-    if (resp.interaction.stateId !== 'wait' && session.getState().state.gameOver) return
+    if (resp.interaction.stateId !== 'wait' && session.getState().state.gameOver) return resp
+    // Round-end already complete: state advanced past the current round
+    // (roundPhase==='work' means the next round started) and there's no
+    // pending interaction. Return — further performRoundEnd calls would
+    // just reject with ok=false and burn iterations.
+    if (
+      resp.interaction.stateId !== 'wait' &&
+      session.getState().state.roundPhase === 'work'
+    ) {
+      return resp
+    }
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
       continue
     }
-    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionAnimalReorg') {
       // Default empty-zones wipes resources.{sheep,boar,cattle}; instead
       // build a zone list that preserves all current animals.
       const pi = resp.interaction.playerIndex
@@ -372,8 +400,15 @@ export function autoAdvanceRoundEnd(
       continue
     }
     if (resp.interaction.stateId === 'wait') {
+      if (opts.onChoice) {
+        const next = opts.onChoice(resp.interaction, session)
+        if (next !== undefined) {
+          resp = next
+          continue
+        }
+      }
       throw new Error(
-        `autoAdvanceRoundEnd hit a choice pending — fixture must pre-clear cards that prompt choices during round-end. choice: ${JSON.stringify(resp.interaction).slice(0, 200)}`,
+        `autoAdvanceRoundEnd hit a choice pending — fixture must pre-clear cards that prompt choices during round-end, or supply opts.onChoice. choice: ${JSON.stringify(resp.interaction).slice(0, 200)}`,
       )
     }
     // pending.type === 'none' but game not over → kick next round

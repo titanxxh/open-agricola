@@ -5,6 +5,7 @@ import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/pl
 import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/D/D60_LargePottery'
 import '../../shared/cards/B/B104_SheepWalker'
+import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 describe('harvest session flow', () => {
   it('uses start-player harvest order and logs reap/feed/breed details with begging', () => {
     const session = new GameSession()
@@ -76,17 +77,7 @@ describe('harvest session flow', () => {
 
     resp = session.resolveChoice(0, 'confirm', { selections: [] })
 
-    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      const pi = resp.interaction.playerIndex
-      const p = resp.state.players[pi]!
-      const zones = p.pastures.map((pasture) => ({
-        id: pasture.id,
-        zoneType: 'pasture' as const,
-        animalType: pasture.animalType ?? null,
-        animalCount: pasture.animalCount + (pasture.animalType ? 1 : 0),
-      }))
-      resp = session.resolveChoice(pi, 'confirm', zones as unknown as Record<string, unknown>)
-    }
+    resp = autoAdvanceRoundEnd(session)
 
     expect(isLegacyChoicePending(resp)).toBe(false)
     expect(resp.state.round).toBe(5)

@@ -4,6 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import '../../shared/cards/D/D70_StrawManure'
 import type { ActionChoiceOption } from '../../shared/contract/types'
+import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
 describe('D70_StrawManure session', () => {
   const setupHarvest = () => {
@@ -54,14 +55,9 @@ describe('D70_StrawManure session', () => {
     expect(resp.ok).toBe(true)
 
     // After resolving, continue through harvest phases (feed, breed)
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
-    }
-    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
-    }
+    autoAdvanceRoundEnd(session)
 
-    const p = resp.state.players[0]!
+    const p = session.getState().state.players[0]!
     // Initial grain=3, paid 1, harvested 1 from grain field: 3 - 1 + 1 = 3
     expect(p.resources.grain).toBe(3)
 
@@ -92,14 +88,9 @@ describe('D70_StrawManure session', () => {
     resp = session.resolveChoice(0, '__skip__')
 
     // Continue through harvest
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
-    }
-    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones)
-    }
+    autoAdvanceRoundEnd(session)
 
-    const p = resp.state.players[0]!
+    const p = session.getState().state.players[0]!
     // Grain not spent: initial 3 + 1 from harvest = 4
     expect(p.resources.grain).toBe(4)
   })

@@ -5,6 +5,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import '../../shared/cards/A/A59_PotatoRidger'
 import type { ActionFlow } from '../../shared/contract/types'
+import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
 const CARD_ID = 'A59_PotatoRidger'
 
@@ -126,21 +127,12 @@ describe('A59_PotatoRidger session', () => {
     const vegBefore = session.getState().state.players[0]!.resources.vegetable
     const foodBefore = session.getState().state.players[0]!.resources.food
 
-    let resp = session.performRoundEnd()
+    autoAdvanceRoundEnd(session, {
+      onChoice: (intx, sess) =>
+        sess.resolveChoice(intx.playerIndex, 'ok'),
+    })
 
-    // Walk through any pending states
-    while (resp.interaction.stateId === 'wait') {
-      // Mandatory flow — should auto-execute or we accept it
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'ok')
-    }
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
-    }
-    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones as any)
-    }
-
-    const player = resp.state.players[0]!
+    const player = session.getState().state.players[0]!
     // Started with 1 veg + harvested 3 = 4 veg, then -1 from exchange = 3 veg
     // But food cost was paid: -2 for feeding 1 family, +6 from exchange
     expect(player.resources.vegetable).toBe(3) // 4 - 1 = 3
@@ -155,17 +147,9 @@ describe('A59_PotatoRidger session', () => {
       extraVegetable: 1, // 1 already + 1 harvested = 2 total → no trigger
     })
 
-    let resp = session.performRoundEnd()
+    autoAdvanceRoundEnd(session)
 
-    // Should NOT get a choice for this card since 2 < 3
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
-    }
-    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones as any)
-    }
-
-    const player = resp.state.players[0]!
+    const player = session.getState().state.players[0]!
     expect(player.resources.vegetable).toBe(2) // 1 + 1 harvested, no exchange
   })
 })
