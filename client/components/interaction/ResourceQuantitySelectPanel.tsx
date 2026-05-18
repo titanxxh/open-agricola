@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { t, type Locale } from '../../../shared/i18n'
 import type { Resource } from '../../../shared/contract/types'
 
@@ -12,19 +12,37 @@ type Props = {
   onCancel: () => void
 }
 
+const normalizeCount = (value: unknown, max: number) => {
+  const numeric = typeof value === 'number' ? value : Number(value)
+  const normalized = Number.isFinite(numeric) ? Math.floor(numeric) : 0
+  return Math.max(0, Math.min(max, normalized))
+}
+
+const createCounts = (
+  entries: Array<[ResourceKey, number]>,
+  previous?: Partial<Record<ResourceKey, number>>,
+): Partial<Record<ResourceKey, number>> =>
+  Object.fromEntries(entries.map(([key, max]) => [
+    key,
+    normalizeCount(previous?.[key] ?? 0, max),
+  ])) as Partial<Record<ResourceKey, number>>
+
 export const ResourceQuantitySelectPanel = ({
   locale, availableByResource, promptKey, onConfirm, onCancel,
 }: Props) => {
-  const entries = Object.entries(availableByResource) as Array<[ResourceKey, number]>
-  const [counts, setCounts] = useState<Partial<Record<ResourceKey, number>>>(() =>
-    Object.fromEntries(entries.map(([k]) => [k, 0])) as Partial<Record<ResourceKey, number>>,
+  const entries = useMemo(
+    () => Object.entries(availableByResource) as Array<[ResourceKey, number]>,
+    [availableByResource],
   )
-  const total = entries.reduce((sum, [k]) => sum + (counts[k] ?? 0), 0)
+  const [counts, setCounts] = useState<Partial<Record<ResourceKey, number>>>(() => createCounts(entries))
+  const currentCounts = createCounts(entries, counts)
+  const total = entries.reduce((sum, [k]) => sum + (currentCounts[k] ?? 0), 0)
 
   const setCount = (key: ResourceKey, value: number, max: number) => {
-    const normalized = Number.isFinite(value) ? Math.floor(value) : 0
-    const clamped = Math.max(0, Math.min(max, normalized))
-    setCounts((prev) => ({ ...prev, [key]: clamped }))
+    setCounts((prev) => createCounts(entries, {
+      ...prev,
+      [key]: normalizeCount(value, max),
+    }))
   }
 
   return (
@@ -43,7 +61,7 @@ export const ResourceQuantitySelectPanel = ({
               type="number"
               min={0}
               max={max}
-              value={counts[key] ?? 0}
+              value={currentCounts[key] ?? 0}
               onChange={(e) => setCount(key, Number(e.target.value), max)}
               disabled={max === 0}
             />
@@ -51,7 +69,12 @@ export const ResourceQuantitySelectPanel = ({
         ))}
       </div>
       <div className="interaction-actions resource-quantity-actions">
-        <button type="button" className="is-primary" disabled={total < 1} onClick={() => onConfirm(counts)}>
+        <button
+          type="button"
+          className="is-primary"
+          disabled={total < 1}
+          onClick={() => onConfirm(currentCounts)}
+        >
           {t(locale, 'ui.interactionResourceQuantityConfirm')}
         </button>
         <button type="button" onClick={onCancel}>
