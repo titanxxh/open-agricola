@@ -403,7 +403,10 @@ export function engineProceed(
           action.canBeExecutedByPlayer(
             executionContext.state,
             executionContext.player,
-            { sourceCard: executionContext.sourceCard },
+            {
+              sourceCard: executionContext.sourceCard,
+              actionContext: executionContext.actionContext,
+            },
           ),
         )
         if (!doable) return null

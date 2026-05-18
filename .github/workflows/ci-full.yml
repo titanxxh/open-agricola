@@ -5,10 +5,14 @@ on:
     - cron: '0 18 * * *'   # daily 18:00 UTC = 02:00 CST (Beijing) next day
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
 jobs:
   full:
     runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 25
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
 

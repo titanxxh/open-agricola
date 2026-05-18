@@ -5,6 +5,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import '../../shared/cards/D/D126_FieldCultivator'
+import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
 const CARD_ID = 'D126_FieldCultivator'
 
@@ -59,17 +60,9 @@ describe('D126_FieldCultivator session', () => {
     const woodBefore = stateBefore.players[0]!.resources.wood
     const clayBefore = stateBefore.players[0]!.resources.clay
 
-    let resp = session.performRoundEnd()
+    autoAdvanceRoundEnd(session)
 
-    // Walk through any pending states (harvestFeed, etc.)
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
-    }
-    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones as any)
-    }
-
-    const player = resp.state.players[0]!
+    const player = session.getState().state.players[0]!
     const stack = getCardStack(player, CARD_ID)
     // 7 - 2 = 5 remaining
     expect(stack.length).toBe(5)
@@ -84,15 +77,9 @@ describe('D126_FieldCultivator session', () => {
       fields: [],
     })
 
-    let resp = session.performRoundEnd()
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
-    }
-    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones as any)
-    }
+    autoAdvanceRoundEnd(session)
 
-    const player = resp.state.players[0]!
+    const player = session.getState().state.players[0]!
     const stack = getCardStack(player, CARD_ID)
     expect(stack.length).toBe(7) // unchanged
   })
@@ -109,15 +96,9 @@ describe('D126_FieldCultivator session', () => {
     state.players[0]!.cardStates![CARD_ID]!.stack = []
     session.loadState(state)
 
-    let resp = session.performRoundEnd()
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
-    }
-    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones as any)
-    }
+    autoAdvanceRoundEnd(session)
 
-    const player = resp.state.players[0]!
+    const player = session.getState().state.players[0]!
     const stack = getCardStack(player, CARD_ID)
     expect(stack.length).toBe(0)
   })
@@ -136,15 +117,9 @@ describe('D126_FieldCultivator session', () => {
     state.players[0]!.cardStates![CARD_ID]!.stack = ['stone', 'reed']
     session.loadState(state)
 
-    let resp = session.performRoundEnd()
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
-    }
-    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones as any)
-    }
+    autoAdvanceRoundEnd(session)
 
-    const player = resp.state.players[0]!
+    const player = session.getState().state.players[0]!
     const stack = getCardStack(player, CARD_ID)
     // 3 fields harvested but only 2 items on stack, so both popped
     expect(stack.length).toBe(0)

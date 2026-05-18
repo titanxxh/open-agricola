@@ -19,15 +19,14 @@ const beforeWishChildrenListener: CardListenerRegistration = {
     return {
       flow: {
         type: 'leaf',
-        actionId: 'improvement-any',
+        actionId: 'improvement',
         optional: true,
         promptKey: 'ui.interactionOverachieverImprovement',
         sourceCard: CARD_ID,
-        params: { trueAction: false },
-        actionContext: { trueAction: false },
+        actionContext: { types: ['major', 'minor'], trueAction: false },
       },
       logKey: 'log.cardGrantedAction',
-      logParams: { cardId: CARD_ID, actionId: 'improvement-any' },
+      logParams: { cardId: CARD_ID, actionId: 'improvement' },
       sourceCard: CARD_ID,
     }
   },
@@ -37,7 +36,7 @@ const computeCostsListener: CardListenerRegistration = {
   id: 'E130-overachiever-compute-costs',
   cardIds: [CARD_ID],
   phases: ['computeCosts'],
-  actions: ['improvement-any'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.actionCardId !== CARD_ID) return
     return {

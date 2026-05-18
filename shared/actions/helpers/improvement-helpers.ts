@@ -7,26 +7,66 @@ import { majorCardDefinitions, getMajorCard } from '../../cards/major'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
 import { resolveCardPreviewCostByProvider } from '../payment/internal'
 import { isMajorCardId, isFireplaceIdentityCard } from '../../cards/helpers/card-type'
-import { isBlockedByMajorImprovementActionGate } from './improvement-pool'
+import type { ImprovementType } from '../effects/improvement'
 
-export type ResolvedMinorImprovement = NonNullable<ReturnType<typeof getMinorImprovement>>
+type ResolvedMinorImprovement = NonNullable<ReturnType<typeof getMinorImprovement>>
+export type { ResolvedMinorImprovement }
 
-/**
- * Returns the list of card IDs a player can use to satisfy a cost that
- * requires returning a Fireplace card — any played card declaring
- * `fireplaceIdentity` (Major Fireplace 1/2 plus any minor like D25 with the
- * same marker).
- */
+export const isBlockedByMajorImprovementActionGate = (
+  improvement: ResolvedMinorImprovement | undefined,
+  types?: readonly ImprovementType[],
+): boolean => {
+  if (!improvement?.mustBePlayedViaMajorImprovementAction) return false
+  return types !== undefined && types.length === 1 && types[0] === 'minor'
+}
+
+export const canPlayMajor = (
+  state: GameState,
+  improvementId: string,
+  allowedPurchases?: string[],
+): boolean => {
+  if (!state.availableMajorImprovements.includes(improvementId)) return false
+  if (allowedPurchases && !allowedPurchases.includes(improvementId)) return false
+  return true
+}
+
+export const canPlayMinor = (
+  state: GameState,
+  player: PlayerState,
+  improvementId: string,
+  types?: readonly ImprovementType[],
+  allowedPurchases?: string[],
+): boolean => {
+  const improvement = getMinorImprovement(improvementId)
+  if (!improvement) return false
+  if (!player.minorHand.includes(improvement.id)) return false
+  if (allowedPurchases && !allowedPurchases.includes(improvement.id)) return false
+  if (!meetsCardPrerequisites(player, improvement, state.round, state)) return false
+  if (isBlockedByMajorImprovementActionGate(improvement, types)) return false
+  return true
+}
+
+export const listAvailableMajors = (state: GameState): string[] => [
+  ...state.availableMajorImprovements,
+]
+
+export const listMinorHand = (player: PlayerState): string[] => [...player.minorHand]
+
+export const removeMajorFromPool = (state: GameState, improvementId: string): void => {
+  state.availableMajorImprovements = state.availableMajorImprovements.filter(
+    (id) => id !== improvementId,
+  )
+}
+
+export const removeMinorFromHand = (player: PlayerState, improvementId: string): void => {
+  player.minorHand = player.minorHand.filter((id) => id !== improvementId)
+}
+
 export const getFireplaceReturnPool = (player: PlayerState): string[] => [
   ...player.improvements.filter(isFireplaceIdentityCard),
   ...player.minorPlayed.filter(isFireplaceIdentityCard),
 ]
 
-/**
- * Returns the effective `playedCards` pool for cost resolution that may
- * include a Fireplace return. If the cost requires returning a Fireplace,
- * include both player.improvements AND any fireplaceIdentity minors.
- */
 export const getPlayedCardsForCost = (
   player: PlayerState,
   cost: Partial<PlayerState['resources']> | ComplexCost | null,
@@ -45,8 +85,6 @@ export const parseImprovementChoice = (choice: string): { kind: 'major' | 'minor
   if (choice.startsWith('minor:')) {
     return { kind: 'minor', id: choice.replace('minor:', '') }
   }
-  // Bare id — infer kind from which catalog the id lives in. Falls back to
-  // null for ids not (yet) registered (e.g. fixture/test ids resolved later).
   if (isMajorCardId(choice)) return { kind: 'major', id: choice }
   if (getMinorImprovement(choice)) return { kind: 'minor', id: choice }
   return { kind: null, id: choice }
@@ -102,12 +140,6 @@ export const buildImprovementLogParams = (
   return params
 }
 
-/**
- * Read-only snapshot of the session-transient bonus-source scratchpad
- * populated by `executePaymentSolution` during this action. Returned as a
- * copy so callers can embed it in log params without capturing a live
- * reference.
- */
 export const readActionBonusSources = (player: PlayerState): string[] | undefined => {
   const sources = player._activeActionBonusSources
   if (!sources || sources.length === 0) return undefined
@@ -167,7 +199,7 @@ export const getMajorImprovementPreviewCost = (
   return resolveCardPreviewCostByProvider(
     state,
     player,
-    'improvement-any',
+    'improvement',
     improvementId,
     () => getMajorCard(improvementId)?.cost ?? null,
     actionCardId,
@@ -185,7 +217,7 @@ export const getMinorImprovementPreviewCost = (
   const previewCost = resolveCardPreviewCostByProvider(
     state,
     player,
-    'improvement-any',
+    'improvement',
     improvementId,
     () => getMinorImprovementEffectiveCost(player, improvement),
     actionCardId,
@@ -217,7 +249,7 @@ export const isMajorImprovementPlayable = (
   state: GameState,
   player: PlayerState,
   improvementId: string,
-  actionCardId = 'improvement-any',
+  actionCardId = 'improvement',
   allowedPurchases?: string[],
 ) => {
   if (allowedPurchases && !allowedPurchases.includes(improvementId)) {
@@ -255,8 +287,9 @@ export const isMinorImprovementPlayable = (
   state: GameState,
   player: PlayerState,
   improvementId: string,
-  actionCardId = 'minor-improvement',
+  actionCardId = 'improvement',
   allowedPurchases?: string[],
+  types?: readonly ImprovementType[],
 ) => {
   const improvement = getMinorImprovement(improvementId)
   if (!improvement || !player.minorHand.includes(improvement.id)) return false
@@ -264,14 +297,15 @@ export const isMinorImprovementPlayable = (
     return false
   }
   if (!meetsCardPrerequisites(player, improvement, state.round, state)) return false
-  if (isBlockedByMajorImprovementActionGate(improvement, actionCardId)) return false
+  if (isBlockedByMajorImprovementActionGate(improvement, types)) return false
   return canAffordMinorImprovement(state, player, improvement, actionCardId)
 }
 
 export const buildPlayableMinorOptions = (
   state: GameState,
   player: PlayerState,
-  actionCardId = 'minor-improvement',
+  actionCardId = 'improvement',
+  types?: readonly ImprovementType[],
 ) =>
   player.minorHand
     .map((id) => getMinorImprovement(id))
@@ -280,7 +314,7 @@ export const buildPlayableMinorOptions = (
         !!improvement,
     )
     .filter((improvement) => meetsCardPrerequisites(player, improvement, state.round, state))
-    .filter((improvement) => !isBlockedByMajorImprovementActionGate(improvement, actionCardId))
+    .filter((improvement) => !isBlockedByMajorImprovementActionGate(improvement, types))
     .filter((improvement) =>
       canAffordMinorImprovement(state, player, improvement, actionCardId),
     )
@@ -293,7 +327,7 @@ export const buildMajorImprovementOptions = (
   available: string[],
   state: GameState,
   player: PlayerState,
-  actionCardId = 'improvement-any',
+  actionCardId = 'improvement',
   allowedPurchases?: string[],
 ) =>
   majorCardDefinitions
@@ -312,8 +346,9 @@ export const buildMajorImprovementOptions = (
 export const buildMinorImprovementOptions = (
   state: GameState,
   player: PlayerState,
-  actionCardId = 'improvement-any',
+  actionCardId = 'improvement',
   allowedPurchases?: string[],
+  types?: readonly ImprovementType[],
 ) =>
   player.minorHand
     .map((id) => getMinorImprovement(id))
@@ -325,7 +360,7 @@ export const buildMinorImprovementOptions = (
     .filter((improvement) =>
       !allowedPurchases || allowedPurchases.includes(improvement.id),
     )
-    .filter((improvement) => !isBlockedByMajorImprovementActionGate(improvement, actionCardId))
+    .filter((improvement) => !isBlockedByMajorImprovementActionGate(improvement, types))
     .filter((improvement) =>
       canAffordMinorImprovement(state, player, improvement, actionCardId),
     )
@@ -334,11 +369,6 @@ export const buildMinorImprovementOptions = (
       labelKey: `minorImprovements.${improvement.id}.name`,
     }))
 
-/**
- * Affordability probe for listener-injected improvement candidates.
- * Recognises `major:Major_X` / `minor:E78_Y` prefixes plus bare ids; falls
- * back to whichever side resolves the id.
- */
 export const canAffordInjectedImprovement = (
   state: GameState,
   player: PlayerState,

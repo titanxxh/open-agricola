@@ -249,6 +249,12 @@ export default defineConfig([
       'no-restricted-syntax': ['error', {
         selector: `ImportExpression[source.value=/${mainClientForbiddenDynamicImportPattern}/]`,
         message: 'Main client cannot dynamically import shared/session, shared/engine, card catalog/bootstrap/register-all, or per-card impl modules. Use shared/cards-display or manifest-backed client/services/card-meta for UI metadata.',
+      }, {
+        selector: "Literal[value='minor-improvement']",
+        message: "Use 'improvement' action id with params.types instead. Legacy 'minor-improvement' was removed in the improvement-unification refactor.",
+      }, {
+        selector: "Literal[value='improvement-any']",
+        message: "Use 'improvement' action id with params.types instead. Legacy 'improvement-any' was removed in the improvement-unification refactor.",
       }],
     },
   },

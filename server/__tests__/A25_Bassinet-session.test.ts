@@ -176,7 +176,7 @@ describe('A25_Bassinet session', () => {
     // optional minor-improvement tail. If so, skip it to reach the A92 offer.
     const fgInteraction = fgResp.interaction.stateId === 'wait' ? fgResp.interaction : null
     const showsWishChildrenMinorTail =
-      fgInteraction?.options?.some((o) => o.labelKey === 'actions.minor-improvement.name') ?? false
+      fgInteraction?.options?.some((o) => o.labelKey === 'actions.improvement.name') ?? false
     const a92Resp = showsWishChildrenMinorTail
       ? session.resolveChoice(0, '__skip__')
       : fgResp

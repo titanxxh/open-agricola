@@ -78,11 +78,20 @@ const scopeMatches = (
   return (state.players ?? []).some((entry) => playerHasAnyCard(entry, cardIds))
 }
 
+const matchesListenerAction = (
+  registration: CardListenerRegistration,
+  contextActionId: string,
+): boolean => {
+  const actions = registration.actions
+  if (!actions) return true
+  return actions.includes(contextActionId)
+}
+
 const matchesListener = (
   registration: CardListenerRegistration,
   context: CardListenerContext,
 ) => {
-  if (registration.actions && !registration.actions.includes(context.actionId)) {
+  if (registration.actions && !matchesListenerAction(registration, context.actionId)) {
     return false
   }
   if (registration.phases && !registration.phases.includes(context.phase)) {
@@ -262,12 +271,14 @@ export const collectComputeChoiceCandidates = (
   state: GameState,
   player: PlayerState,
   actionId: string,
+  actionContext?: Record<string, unknown>,
 ): import('../contract/types').ActionChoiceOption[] => {
   const baseCtx: CardListenerContext = {
     state,
     player,
     actionId,
     phase: 'computeChoiceCandidates' as ActionHookPhase,
+    actionContext,
   } as CardListenerContext
   const out: import('../contract/types').ActionChoiceOption[] = []
   for (const matched of getMatchingListeners(baseCtx)) {

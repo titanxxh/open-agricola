@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { improvementAnyAction } from '../improvement'
+import { improvementAction } from '../improvement'
 import type {
   ActionExecutionContext,
   ActionFlow,
@@ -60,8 +60,8 @@ const makeState = (player: PlayerState): GameState =>
 
 const makeSpace = (): ActionSpace =>
   ({
-    id: 'improvement-any',
-    nameKey: 'actions.improvement-any.name',
+    id: 'improvement',
+    nameKey: 'actions.improvement.name',
     canBeExecutedByPlayer: () => true,
   } as unknown as ActionSpace)
 
@@ -79,7 +79,7 @@ const resolve = (
     sourceCard: 'C60_SmallPottersOven',
     actionContext,
   }
-  return improvementAnyAction.resolveChoice!(ctx, 'major:Major_ClayOven')
+  return improvementAction.resolveChoice!(ctx, 'major:Major_ClayOven')
 }
 
 describe('improvement trueAction context', () => {

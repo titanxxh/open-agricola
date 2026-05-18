@@ -16,7 +16,7 @@ const computeCostsListener: CardListenerRegistration = {
   id: 'A27-oven-site-compute-costs',
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
-  actions: ['improvement-any', 'minor-improvement'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.actionCardId !== CARD_ID) return
     if (!context.cardId) return
@@ -46,7 +46,7 @@ export const A27_OvenSite_impl = {
       gainLeaf(CARD_ID, { wood: 2 }),
       {
         type: 'leaf',
-        actionId: 'improvement-any',
+        actionId: 'improvement',
         optional: true,
         sourceCard: CARD_ID,
         actionContext: { trueAction: false },

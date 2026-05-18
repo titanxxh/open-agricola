@@ -40,7 +40,7 @@ const computeReplaceListener: CardListenerRegistration = {
   id: 'C140-packaging-artist-replace-minor-improvement',
   cardIds: [CARD_ID],
   phases: ['computeReplace' as ActionHookPhase],
-  actions: ['minor-improvement', 'improvement-any'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.trueAction === false) return
     if (context.actionContext?.checkedReplaceAction) return
@@ -60,7 +60,7 @@ const isDoableListener: CardListenerRegistration = {
   id: 'C140-packaging-artist-isdoable-minor-improvement',
   cardIds: [CARD_ID],
   phases: ['isDoable' as ActionHookPhase],
-  actions: ['minor-improvement', 'improvement-any'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.trueAction === false) return
     if (context.actionContext?.checkedReplaceAction) return

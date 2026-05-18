@@ -8,7 +8,7 @@ import type {
   PlayerState,
   Resource,
 } from '../../../shared/contract/types'
-import { formatAnimalCounts, formatResources } from '../../utils/format'
+import { formatResources } from '../../utils/format'
 import { emptyResources } from '../../../shared/contract/state-constants'
 import { familySize } from '../../../shared/domain/player'
 import { readCardResourceStats } from '../../../shared/cards/helpers/card-state'
@@ -528,8 +528,6 @@ export const FarmBoard = ({
   stableDisplayMap,
   isReorgActive,
   reorgRemaining,
-  hasReorgOverflow,
-  animalReorg,
   pendingFenceSet,
   pendingPalisadeSet,
   existingFenceSet,
@@ -541,8 +539,6 @@ export const FarmBoard = ({
   updateSowSelection,
   toggleFenceEdge,
   adjustReorgAnimal,
-  confirmAnimalReorg,
-  cancelAnimalDiscardPrompt,
   setViewPlayerId,
   isSelectingMinor,
   isSelectingOccupation,
@@ -1056,52 +1052,6 @@ export const FarmBoard = ({
         </div>
       </div>
     ) : null}
-    {isReorgActive ? (
-      <div className="reorg-panel">
-        <div className="reorg-panel-title">{t(locale, 'ui.reorgPendingTitle')}</div>
-        <div className="reorg-panel-summary">
-          <div className="reorg-panel-row">
-            <span>{t(locale, 'ui.reorgPending')}</span>
-            <span>
-              {formatAnimalCounts(
-                locale,
-                reorgRemaining ?? { sheep: 0, boar: 0, cattle: 0 },
-              )}
-            </span>
-          </div>
-          {hasReorgOverflow ? (
-            <div className="reorg-error">{t(locale, 'ui.reorgOverAssign')}</div>
-          ) : null}
-        </div>
-        {animalReorg?.confirmDiscard ? (
-          <div className="reorg-warning">
-            <div>
-              {t(locale, 'ui.reorgDiscardPrompt', {
-                animals: formatAnimalCounts(
-                  locale,
-                  reorgRemaining ?? { sheep: 0, boar: 0, cattle: 0 },
-                ),
-              })}
-            </div>
-            <div className="reorg-actions">
-              <button onClick={cancelAnimalDiscardPrompt} disabled={!isInteractive}>
-                {t(locale, 'ui.reorgAdjustMore')}
-              </button>
-              <button onClick={confirmAnimalReorg} disabled={!isInteractive}>
-                {t(locale, 'ui.reorgDiscardConfirm')}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="reorg-actions">
-            <button onClick={confirmAnimalReorg} disabled={!isInteractive || hasReorgOverflow}>
-              {t(locale, 'ui.reorgConfirm')}
-            </button>
-          </div>
-        )}
-      </div>
-    ) : null}
-
     <div className="played-cards">
       <h3>{t(locale, 'ui.playedCards')}</h3>
       <div className="played-row">

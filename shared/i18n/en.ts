@@ -479,8 +479,7 @@ export const en = {
     },
     'urgent-wish-children': { name: 'Urgent Wish for Children', description: 'Grow family without rooms' },
     'family-growth': { name: 'Family Growth', description: 'Grow family' },
-    'minor-improvement': { name: 'Minor Improvement', description: 'Play a minor improvement' },
-    'major-improvement': { name: 'Improvements', description: 'Build a major improvement' },
+    'improvement': { name: 'Improvement', description: 'Build a major improvement or play a minor improvement' },
     fencing: { name: 'Fencing', description: 'Build fences to form a pasture' },
     stables: { name: 'Stables', description: 'Build 1 stable' },
     construct: { name: 'Build Rooms', description: 'Build rooms' },
@@ -865,6 +864,7 @@ export const en = {
     bakeBreadSourceCard: 'via {card}',
     returns: 'Returns {cards}',
     cardGrantedAction: '{player} gains {actionId} action from {cardId}',
+    salterFutureFood: '{player} uses {cardId}: converts {animals} into {futureFood} future food ({schedule})',
     cardEffectTrigger: '{cardId} effect triggered',
     cardEffectBlock: '{cardId} blocks this action',
     interactionBucksawPrompt: 'Bucksaw: Pay 1 wood for 1 grain and 1 bonus point?',
@@ -1195,7 +1195,7 @@ export const en = {
       choicePlayDisabled: 'Not enough food (need 2)',
     },
       B157_Salter: {
-      anytime: 'Salt animals (→ food)',
+      anytime: 'Convert animals to food',
       pickAnimals: 'Pick animals to salt (reserve must be empty)',
       single: {
         sheep: 'Salt 1 sheep (→ +1 food each of next 3 rounds)',

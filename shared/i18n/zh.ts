@@ -460,8 +460,7 @@ export const zh = {
     },
     'urgent-wish-children': { name: '紧急渴望孩子', description: '无需房间也可增加 1 家庭成员' },
     'family-growth': { name: '家庭增长', description: '增加 1 家庭成员' },
-    'minor-improvement': { name: '小改良', description: '打出 1 张小改良' },
-    'major-improvement': { name: '大型改良', description: '建造一张大型改良' },
+    'improvement': { name: '改良', description: '建造大型改良或打出小改良' },
     fencing: { name: '围栏', description: '建造围栏圈地' },
     stables: { name: '畜栏', description: '建造 1 个畜栏' },
     construct: { name: '扩建房屋', description: '扩建房屋' },
@@ -846,6 +845,7 @@ export const zh = {
     bakeBreadSourceCard: '来自 {card}',
     returns: '归还 {cards}',
     cardGrantedAction: '{player} 获得来自 {cardId} 的 {actionId} 行动',
+    salterFutureFood: '{player} 使用 {cardId}：将 {animals} 转换为未来 {futureFood} 食物（{schedule}）',
     cardEffectTrigger: '{cardId} 效果已触发',
     cardEffectBlock: '{cardId} 阻止了此行动',
     interactionBucksawPrompt: '锯木架：支付 1 木头获得 1 谷物和 1 奖励分？',
@@ -1160,7 +1160,7 @@ export const zh = {
       anytime: '清地铲：付1食物 → 获1田地',
     },
     B157_Salter: {
-      anytime: '盐渍动物（换食物）',
+      anytime: '将动物转换为食物',
       pickAnimals: '选择要盐渍的动物（手上动物需先安置）',
       single: {
         sheep: '盐渍 1 只羊（→ 接下来 3 回合每回合 +1 食物）',

@@ -59,7 +59,7 @@ const makeState = (override: Partial<GameState> = {}): GameState =>
     ...override,
   } as unknown as GameState)
 
-const makeSpace = (id = 'improvement-any'): ActionSpace =>
+const makeSpace = (id = 'improvement'): ActionSpace =>
   ({
     id,
     nameKey: `actions.${id}.name`,

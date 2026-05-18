@@ -3,14 +3,14 @@ import type { ActionDefinition } from '../../contract/types'
 
 export const majorImprovement: ActionDefinition = {
   id: 'major-improvement',
-  nameKey: 'actions.major-improvement.name',
-  descriptionKey: 'actions.major-improvement.description',
+  nameKey: 'actions.improvement.name',
+  descriptionKey: 'actions.improvement.description',
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: deriveCanBeExecutedByFlow(),
   execute: () => ({ type: 'ok' }),
   flow: {
     type: 'seq',
-    children: [{ type: 'leaf', actionId: 'improvement-any' }],
+    children: [{ type: 'leaf', actionId: 'improvement', actionContext: { types: ['major', 'minor'] } }],
   },
 }

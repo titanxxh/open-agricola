@@ -45,9 +45,9 @@ const anytimeListener: CardListenerRegistration = {
           // Build a free major improvement
           {
             type: 'leaf',
-            actionId: 'improvement-any',
+            actionId: 'improvement',
             sourceCard: CARD_ID,
-            actionContext: { trueAction: false },
+            actionContext: { types: ['major'], trueAction: false },
           },
           // Unflag card
           { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } },
@@ -89,7 +89,7 @@ const computeCostsListener: CardListenerRegistration = {
   id: 'E27-piggy-bank-compute-costs',
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
-  actions: ['improvement-any'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isCardFlagged(context.player, CARD_ID)) return
     // When flagged, the improvement is free — zero out all costs

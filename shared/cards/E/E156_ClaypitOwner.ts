@@ -54,7 +54,7 @@ const getBuiltCardId = (choice: string | undefined): string | undefined => {
 const listener: CardListenerRegistration = {
   id: 'E156-claypit-owner-opponent-improvement-clay',
   cardIds: [CARD_ID],
-  actions: ['improvement-any', 'minor-improvement'],
+  actions: ['improvement'],
   phases: ['after' as ActionHookPhase],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {

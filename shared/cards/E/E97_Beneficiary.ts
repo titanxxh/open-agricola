@@ -27,10 +27,9 @@ export const E97_Beneficiary_impl = {
           },
           {
             type: 'leaf' as const,
-            actionId: 'minor-improvement',
+            actionId: 'improvement',
             sourceCard: CARD_ID,
-            params: { trueAction: false },
-            actionContext: { trueAction: false },
+            actionContext: { types: ['minor'], trueAction: false },
           },
         ],
       }

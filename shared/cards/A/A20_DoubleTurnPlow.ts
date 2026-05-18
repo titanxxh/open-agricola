@@ -9,7 +9,7 @@ const computeCostsListener: CardListenerRegistration = {
   id: 'A20-double-turn-plow-compute-costs',
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
-  actions: ['minor-improvement', 'improvement-any'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.cardId !== CARD_ID) return
     if (context.state.round <= 3) return

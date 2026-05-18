@@ -32,7 +32,7 @@ const builtSomethingThisAction = (player: PlayerState): boolean =>
 
 const makeToolboxFlow = (): ActionFlow => ({
   type: 'leaf',
-  actionId: 'improvement-any',
+  actionId: 'improvement',
   optional: true,
   promptKey: 'ui.interactionToolboxImprovement',
   sourceCard: CARD_ID,

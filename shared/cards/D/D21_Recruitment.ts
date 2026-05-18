@@ -1,5 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { readImprovementTypes } from '../../actions/effects/improvement'
 import { getExtraRoomCapacity } from '../card-effects'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
@@ -47,8 +48,10 @@ const computeReplaceListener: CardListenerRegistration = {
   id: 'D21-recruitment-replace-improvement',
   cardIds: [CARD_ID],
   phases: ['computeReplace' as ActionHookPhase],
-  actions: ['minor-improvement', 'improvement-any'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    const types = readImprovementTypes(context)
+    if (!types.includes('minor')) return
     if (!shouldOfferReplace(context)) return
     return {
       decline: true,
@@ -72,8 +75,10 @@ const isDoableListener: CardListenerRegistration = {
   id: 'D21-recruitment-isdoable-improvement',
   cardIds: [CARD_ID],
   phases: ['isDoable' as ActionHookPhase],
-  actions: ['minor-improvement', 'improvement-any'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    const types = readImprovementTypes(context)
+    if (!types.includes('minor')) return
     if (context.state.round < 5) return
     if (!hasHouseRoom(context.player)) return
     if (context.actionContext?.trueAction === false) return

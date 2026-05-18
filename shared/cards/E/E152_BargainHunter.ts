@@ -17,9 +17,9 @@ export const E152_BargainHunter_impl = {
         payLeaf({ cardId: CARD_ID, cost: { food: 1 } }),
         {
           type: 'leaf',
-          actionId: 'minor-improvement',
+          actionId: 'improvement',
           sourceCard: CARD_ID,
-          actionContext: { trueAction: false },
+          actionContext: { types: ['minor'], trueAction: false },
         },
       ],
     }

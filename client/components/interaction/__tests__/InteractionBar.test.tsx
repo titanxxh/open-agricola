@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest'
+// @vitest-environment jsdom
+
+import { describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { fireEvent, render, screen } from '@testing-library/react'
 
 import type { AnytimeAction } from '../../../../shared/contract/types'
 import type { PendingChoice } from '../../../types/ui'
@@ -22,6 +25,221 @@ const pendingChoice: PendingChoice = {
 }
 
 describe('InteractionBar', () => {
+  it('renders animal reorg pending summary and confirm action in the bottom bar', () => {
+    const html = renderToStaticMarkup(
+      <InteractionBar
+        pendingAnimalReorg={{ playerIndex: 0, spaceId: 'reorganize' }}
+        pendingChoice={null}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={0}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+        animalReorg={{ zones: [], confirmDiscard: false }}
+        reorgRemaining={{ sheep: 0, boar: 2, cattle: 0 }}
+        hasReorgOverflow={false}
+        confirmAnimalReorg={noop}
+        cancelAnimalDiscardPrompt={noop}
+      />,
+    )
+
+    expect(html).toContain('interaction-reorg-panel')
+    expect(html).toContain('Pending Animals')
+    expect(html).toContain('Sheep 0 · Boar 2 · Cattle 0')
+    expect(html).toContain('Confirm')
+  })
+
+  it('renders B157 Salter anytime label with BGA-style conversion wording', () => {
+    const html = renderToStaticMarkup(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={null}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={0}
+        hasActionStartSnapshot={false}
+        anytimeActions={[{ id: 'B157-salter-anytime', labelKey: 'cards.B157_Salter.anytime' }]}
+        takeAnytimeAction={noop}
+      />,
+    )
+
+    expect(html).toContain('Convert animals to food')
+    expect(html).not.toContain('Salt animals')
+  })
+
+  it('renders resource quantity selection inside the interaction bar', () => {
+    const html = renderToStaticMarkup(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={null}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={0}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+        resourceQuantitySelect={{
+          availableByResource: { sheep: 2, boar: 1, cattle: 0 },
+          promptKey: 'cards.B157_Salter.pickAnimals',
+          onConfirm: noop,
+          onCancel: noop,
+        }}
+      />,
+    )
+
+    expect(html).toContain('interaction-bar__body')
+    expect(html).toContain('resource-quantity-select-panel')
+    expect(html).toContain('interaction-resource-quantity-panel')
+    expect(html).toContain('Pick animals to salt')
+    expect(html).toContain('Sheep (max 2)')
+  })
+
+  it('calls resource quantity cancel from the bottom bar panel', () => {
+    const onCancel = vi.fn()
+    render(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={null}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={0}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+        resourceQuantitySelect={{
+          availableByResource: { sheep: 2, boar: 1 },
+          promptKey: 'cards.B157_Salter.pickAnimals',
+          onConfirm: noop,
+          onCancel,
+        }}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(onCancel).toHaveBeenCalledTimes(1)
+  })
+
   it('renders top controls and anytime actions above pending content', () => {
     const html = renderToStaticMarkup(
       <InteractionBar

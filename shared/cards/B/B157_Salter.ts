@@ -20,6 +20,40 @@ const CARD_ID = B157_Salter.id
 const PICK_ACTION_ID = 'card_B157_Salter_salt-pick'
 
 const TURNS = { sheep: 3, boar: 5, cattle: 7 } as const
+const ANIMAL_TYPES = ['sheep', 'boar', 'cattle'] as const
+
+const clampRound = (round: number) => Math.max(1, Math.min(14, round))
+
+const formatAnimalSummary = (counts: Record<typeof ANIMAL_TYPES[number], number>) =>
+  ANIMAL_TYPES
+    .filter((t) => counts[t] > 0)
+    .map((t) => `${counts[t]} ${t}`)
+    .join(', ')
+
+const buildSalterLogParams = (
+  state: GameState,
+  counts: Record<typeof ANIMAL_TYPES[number], number>,
+) => {
+  const schedule: string[] = []
+  let futureFood = 0
+  for (const t of ANIMAL_TYPES) {
+    if (counts[t] <= 0) continue
+    const startRound = clampRound(state.round + 1)
+    const endRound = clampRound(state.round + TURNS[t])
+    if (endRound < startRound) continue
+    futureFood += counts[t] * (endRound - startRound + 1)
+    schedule.push(`${counts[t]} food in rounds ${startRound}-${endRound}`)
+  }
+  return {
+    cardId: CARD_ID,
+    animals: formatAnimalSummary(counts),
+    sheep: counts.sheep,
+    boar: counts.boar,
+    cattle: counts.cattle,
+    futureFood,
+    schedule: schedule.join('; '),
+  }
+}
 
 const resolveSalterCounts = (
   state: GameState,
@@ -60,6 +94,12 @@ const resolveSalterCounts = (
   return {
     type: 'flow',
     flow: flows.length === 1 ? flows[0] : { type: 'seq', children: flows },
+    immediateLogs: [
+      {
+        key: 'log.salterFutureFood',
+        params: buildSalterLogParams(state, counts),
+      },
+    ],
   }
 }
 

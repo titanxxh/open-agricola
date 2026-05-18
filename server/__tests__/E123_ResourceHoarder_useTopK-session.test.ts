@@ -68,8 +68,8 @@ describe('E123_ResourceHoarder use-top-k (BGA full)', () => {
     const state = mkState(player)
     const listener = findListener('E123-resource-hoarder-compute-costs')
     const context: CardListenerContext = {
-      state, player, space: createSpace('improvement-any'),
-      actionId: 'improvement-any', phase: 'computeCosts',
+      state, player, space: createSpace('improvement'),
+      actionId: 'improvement', phase: 'computeCosts',
     } as CardListenerContext
 
     const result = executeCardListener(listener, context)
@@ -117,8 +117,8 @@ describe('E123_ResourceHoarder use-top-k (BGA full)', () => {
     const state = mkState(player)
     const listener = findListener('E123-resource-hoarder-compute-costs')
     const context: CardListenerContext = {
-      state, player, space: createSpace('improvement-any'),
-      actionId: 'improvement-any', phase: 'computeCosts',
+      state, player, space: createSpace('improvement'),
+      actionId: 'improvement', phase: 'computeCosts',
     } as CardListenerContext
 
     const result = executeCardListener(listener, context)
@@ -137,7 +137,7 @@ describe('E123_ResourceHoarder use-top-k (BGA full)', () => {
     const state = mkState(player)
     const listener = findListener('E123-resource-hoarder-after-pay')
     const context: CardListenerContext = {
-      state, player, space: createSpace('improvement-any'),
+      state, player, space: createSpace('improvement'),
       actionId: 'pay', phase: 'after',
       result: {
         type: 'ok',
@@ -160,7 +160,7 @@ describe('E123_ResourceHoarder use-top-k (BGA full)', () => {
     const state = mkState(player)
     const listener = findListener('E123-resource-hoarder-after-pay')
     const context: CardListenerContext = {
-      state, player, space: createSpace('improvement-any'),
+      state, player, space: createSpace('improvement'),
       actionId: 'pay', phase: 'after',
       result: {
         type: 'ok',

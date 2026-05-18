@@ -10,6 +10,13 @@ export type AnimalTotals = {
   cattle: number
 }
 
+type AnimalType = 'sheep' | 'boar' | 'cattle'
+
+type AnimalDisplay = {
+  animalType: AnimalType | null
+  animalCount: number
+}
+
 export const hasUnassignedAnimals = (remaining: AnimalTotals | null | undefined) =>
   Boolean(remaining && (remaining.sheep > 0 || remaining.boar > 0 || remaining.cattle > 0))
 
@@ -52,6 +59,50 @@ export const applyAnimalReorgToPlayer = (params: {
   player.resources.sheep = totals.sheep
   player.resources.boar = totals.boar
   player.resources.cattle = totals.cattle
+}
+
+export const buildPastureDisplayMap = (
+  player: PlayerState | null | undefined,
+  animalReorg: AnimalReorgState | null | undefined,
+) => {
+  const map = new Map<string, AnimalDisplay>()
+  ;(player?.pastures ?? []).forEach((pasture) => {
+    map.set(pasture.id, {
+      animalType: pasture.animalType,
+      animalCount: pasture.animalCount,
+    })
+  })
+  animalReorg?.zones
+    .filter((zone) => zone.zoneType === 'pasture')
+    .forEach((zone) => {
+      map.set(zone.id, {
+        animalType: zone.animalType,
+        animalCount: zone.animalCount,
+      })
+    })
+  return map
+}
+
+export const buildStableDisplayMap = (
+  player: PlayerState | null | undefined,
+  animalReorg: AnimalReorgState | null | undefined,
+) => {
+  const map = new Map<string, AnimalDisplay>()
+  Object.entries(player?.stableAnimals ?? {}).forEach(([key, type]) => {
+    map.set(key, {
+      animalType: type as AnimalType | null,
+      animalCount: type ? 1 : 0,
+    })
+  })
+  animalReorg?.zones
+    .filter((zone) => zone.zoneType === 'stable')
+    .forEach((zone) => {
+      map.set(zone.id.replace('stable:', ''), {
+        animalType: zone.animalType,
+        animalCount: zone.animalCount,
+      })
+    })
+  return map
 }
 
 const getReorgFenceExtraWood = (promptKey: string | undefined, spaceId: string) =>

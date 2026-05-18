@@ -42,7 +42,7 @@ const improvementFieldListener: CardListenerRegistration = {
   id: 'C80-rocky-terrain-after-improvement-field',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['improvement-any'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const choice = context.choice ?? ''
     const builtId = choice.replace(/^major:/, '').replace(/^minor:/, '')

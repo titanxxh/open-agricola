@@ -18,7 +18,7 @@ export const C72_FestivalPlanning_impl = {
         },
         {
           type: 'leaf' as const,
-          actionId: 'improvement-any',
+          actionId: 'improvement',
           optional: true,
           sourceCard: CARD_ID,
         },

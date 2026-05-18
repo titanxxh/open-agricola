@@ -5,6 +5,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import '../../shared/cards/D/D113_FoodMerchant'
 import type { ActionFlow } from '../../shared/contract/types'
+import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
 const CARD_ID = 'D113_FoodMerchant'
 
@@ -119,26 +120,17 @@ describe('D113_FoodMerchant session', () => {
 
     session.loadState(state)
 
-    let resp = session.performRoundEnd()
-
-    // Should get a choice for the optional exchange
-    // The choice pending means the card effect triggered
     let sawChoice = false
-    while (resp.interaction.stateId === 'wait') {
-      sawChoice = true
-      // Accept the exchange
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'ok')
-    }
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', { selections: [] })
-    }
-    while (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', resp.interaction.zones as any)
-    }
+    autoAdvanceRoundEnd(session, {
+      onChoice: (intx, sess) => {
+        sawChoice = true
+        return sess.resolveChoice(intx.playerIndex, 'ok')
+      },
+    })
 
     // If the card effect triggered, player should have gained vegetable
     if (sawChoice) {
-      const p = resp.state.players[0]!
+      const p = session.getState().state.players[0]!
       // Started with 0 veg, gained 1 from exchange
       expect(p.resources.vegetable).toBeGreaterThanOrEqual(1)
       // Started with 10 food, paid 2 for exchange, paid 2 for feeding = 6

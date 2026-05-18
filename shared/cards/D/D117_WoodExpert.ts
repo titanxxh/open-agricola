@@ -46,7 +46,7 @@ const computeCostsListener: CardListenerRegistration = {
   id: 'D117-wood-expert-compute-costs-improvement',
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
-  actions: ['improvement-any', 'minor-improvement'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.cardId) return
     const woodInCost = getImprovementWoodCost(context.cardId)
