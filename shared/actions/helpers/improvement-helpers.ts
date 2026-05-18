@@ -62,9 +62,6 @@ export const removeMinorFromHand = (player: PlayerState, improvementId: string):
   player.minorHand = player.minorHand.filter((id) => id !== improvementId)
 }
 
-const actionCardIdToTypes = (actionCardId: string | undefined): readonly ImprovementType[] | undefined =>
-  actionCardId === 'minor-improvement' ? ['minor'] : undefined
-
 export const getFireplaceReturnPool = (player: PlayerState): string[] => [
   ...player.improvements.filter(isFireplaceIdentityCard),
   ...player.minorPlayed.filter(isFireplaceIdentityCard),
@@ -292,6 +289,7 @@ export const isMinorImprovementPlayable = (
   improvementId: string,
   actionCardId = 'improvement',
   allowedPurchases?: string[],
+  types?: readonly ImprovementType[],
 ) => {
   const improvement = getMinorImprovement(improvementId)
   if (!improvement || !player.minorHand.includes(improvement.id)) return false
@@ -299,7 +297,7 @@ export const isMinorImprovementPlayable = (
     return false
   }
   if (!meetsCardPrerequisites(player, improvement, state.round, state)) return false
-  if (isBlockedByMajorImprovementActionGate(improvement, actionCardIdToTypes(actionCardId))) return false
+  if (isBlockedByMajorImprovementActionGate(improvement, types)) return false
   return canAffordMinorImprovement(state, player, improvement, actionCardId)
 }
 
@@ -307,6 +305,7 @@ export const buildPlayableMinorOptions = (
   state: GameState,
   player: PlayerState,
   actionCardId = 'improvement',
+  types?: readonly ImprovementType[],
 ) =>
   player.minorHand
     .map((id) => getMinorImprovement(id))
@@ -315,7 +314,7 @@ export const buildPlayableMinorOptions = (
         !!improvement,
     )
     .filter((improvement) => meetsCardPrerequisites(player, improvement, state.round, state))
-    .filter((improvement) => !isBlockedByMajorImprovementActionGate(improvement, actionCardIdToTypes(actionCardId)))
+    .filter((improvement) => !isBlockedByMajorImprovementActionGate(improvement, types))
     .filter((improvement) =>
       canAffordMinorImprovement(state, player, improvement, actionCardId),
     )
@@ -349,6 +348,7 @@ export const buildMinorImprovementOptions = (
   player: PlayerState,
   actionCardId = 'improvement',
   allowedPurchases?: string[],
+  types?: readonly ImprovementType[],
 ) =>
   player.minorHand
     .map((id) => getMinorImprovement(id))
@@ -360,7 +360,7 @@ export const buildMinorImprovementOptions = (
     .filter((improvement) =>
       !allowedPurchases || allowedPurchases.includes(improvement.id),
     )
-    .filter((improvement) => !isBlockedByMajorImprovementActionGate(improvement, actionCardIdToTypes(actionCardId)))
+    .filter((improvement) => !isBlockedByMajorImprovementActionGate(improvement, types))
     .filter((improvement) =>
       canAffordMinorImprovement(state, player, improvement, actionCardId),
     )
