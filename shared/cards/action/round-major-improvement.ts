@@ -11,6 +11,6 @@ export const majorImprovement: ActionDefinition = {
   execute: () => ({ type: 'ok' }),
   flow: {
     type: 'seq',
-    children: [{ type: 'leaf', actionId: 'improvement', params: { types: ['major', 'minor'] } }],
+    children: [{ type: 'leaf', actionId: 'improvement', actionContext: { types: ['major', 'minor'] } }],
   },
 }
