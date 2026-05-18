@@ -1,8 +1,9 @@
 import { useState, type ReactNode } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import type { PendingChoice, PendingAnimalReorg } from '../../types/ui'
+import type { AnimalReorgState, PendingChoice, PendingAnimalReorg } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
+import { formatAnimalCounts } from '../../utils/format'
 import type {
   ActionChoiceOption,
   AnytimeAction,
@@ -12,6 +13,7 @@ import type {
 } from '../../../shared/contract/types'
 import { AnytimeBar } from './AnytimeBar'
 import { getAnyCardDisplayName, translateCardText } from '../common/cardText'
+import { ResourceQuantitySelectPanel } from './ResourceQuantitySelectPanel'
 
 type ResourceExchangeLabelParams = {
   resourcesPaid?: Partial<Resource>
@@ -354,6 +356,17 @@ type Props = {
   canBuildPalisades?: boolean
   fencePlacementMode?: 'fence' | 'palisade'
   setFencePlacementMode?: (mode: 'fence' | 'palisade') => void
+  animalReorg?: AnimalReorgState | null
+  reorgRemaining?: { sheep: number; boar: number; cattle: number } | null
+  hasReorgOverflow?: boolean
+  confirmAnimalReorg?: () => void
+  cancelAnimalDiscardPrompt?: () => void
+  resourceQuantitySelect?: {
+    availableByResource: Partial<Record<keyof Resource, number>>
+    promptKey?: string
+    onConfirm: (counts: Partial<Record<keyof Resource, number>>) => void
+    onCancel: () => void
+  } | null
 }
 
 export const InteractionBar = ({
@@ -398,6 +411,12 @@ export const InteractionBar = ({
   canBuildPalisades = false,
   fencePlacementMode = 'fence',
   setFencePlacementMode,
+  animalReorg = null,
+  reorgRemaining = null,
+  hasReorgOverflow = false,
+  confirmAnimalReorg = () => {},
+  cancelAnimalDiscardPrompt = () => {},
+  resourceQuantitySelect = null,
 }: Props) => {
   const isFarmSelectionPrompt =
     pendingChoice?.promptKey === 'ui.interactionFenceSelect' ||
@@ -423,6 +442,7 @@ export const InteractionBar = ({
     pendingPositionSelectionsLength === 0
   const hasBodyContent = !!(
     pendingAnimalReorg ||
+    resourceQuantitySelect ||
     harvestFeedPlayerName ||
     (pendingEngineBlocked && isInteractive) ||
     (pendingChoice && isInteractive) ||
@@ -467,7 +487,58 @@ export const InteractionBar = ({
               <div className="interaction-subtitle">
                 {t(locale, 'ui.interactionReorgAnimalsSubtitle')}
               </div>
+              <div className="interaction-reorg-panel">
+                <div className="interaction-reorg-title">
+                  {t(locale, 'ui.reorgPendingTitle')}
+                </div>
+                <div className="interaction-reorg-row">
+                  <span>{t(locale, 'ui.reorgPending')}</span>
+                  <span>
+                    {formatAnimalCounts(
+                      locale,
+                      reorgRemaining ?? { sheep: 0, boar: 0, cattle: 0 },
+                    )}
+                  </span>
+                </div>
+                {hasReorgOverflow ? (
+                  <div className="interaction-error">{t(locale, 'ui.reorgOverAssign')}</div>
+                ) : null}
+                {animalReorg?.confirmDiscard ? (
+                  <div className="interaction-reorg-warning">
+                    <div>
+                      {t(locale, 'ui.reorgDiscardPrompt', {
+                        animals: formatAnimalCounts(
+                          locale,
+                          reorgRemaining ?? { sheep: 0, boar: 0, cattle: 0 },
+                        ),
+                      })}
+                    </div>
+                    <div className="interaction-actions">
+                      <button onClick={cancelAnimalDiscardPrompt} disabled={!isInteractive}>
+                        {t(locale, 'ui.reorgAdjustMore')}
+                      </button>
+                      <button onClick={confirmAnimalReorg} disabled={!isInteractive}>
+                        {t(locale, 'ui.reorgDiscardConfirm')}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="interaction-actions">
+                    <button onClick={confirmAnimalReorg} disabled={!isInteractive || hasReorgOverflow}>
+                      {t(locale, 'ui.reorgConfirm')}
+                    </button>
+                  </div>
+                )}
+              </div>
             </>
+          ) : resourceQuantitySelect ? (
+            <ResourceQuantitySelectPanel
+              locale={locale}
+              availableByResource={resourceQuantitySelect.availableByResource}
+              promptKey={resourceQuantitySelect.promptKey}
+              onConfirm={resourceQuantitySelect.onConfirm}
+              onCancel={resourceQuantitySelect.onCancel}
+            />
           ) : harvestFeedPlayerName ? (
             <>
               <div className="interaction-title">

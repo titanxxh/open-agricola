@@ -393,7 +393,8 @@ export const prepareLogEntry = (
     (entry.key === 'log.cardEffectGain' ||
       entry.key === 'log.cardEffectPay' ||
       entry.key === 'log.cardEffectBonusVp' ||
-      entry.key === 'log.cardEffectOtherPlayersGain')
+      entry.key === 'log.cardEffectOtherPlayersGain' ||
+      entry.key === 'log.salterFutureFood')
   ) {
     params.cardId = resolveCardDisplayName(locale, String(params.cardId))
   }

@@ -26,7 +26,6 @@ import { ScorePanel, type PlayerScoreRow } from '../components/board/ScorePanel'
 import { ActionLog } from '../components/board/ActionLog'
 import { GameHeader } from '../components/header/GameHeader'
 import { InteractionBar } from '../components/interaction/InteractionBar'
-import { ResourceQuantitySelectPanel } from '../components/interaction/ResourceQuantitySelectPanel'
 import { BrandMark } from '../components/common/BrandMark'
 import { ResourceLine } from '../components/common/ResourceLine'
 import { Section } from '../components/common/Section'
@@ -45,7 +44,11 @@ import {
   type FarmCommitType,
   type WsStatus,
 } from './game-container-helpers'
-import { shouldShowAnimalDiscardPrompt } from './hooks/use-animal-reorg-flow'
+import {
+  buildPastureDisplayMap,
+  buildStableDisplayMap,
+  shouldShowAnimalDiscardPrompt,
+} from './hooks/use-animal-reorg-flow'
 
 type RoundSlot = { round: number; action?: ActionSpace }
 
@@ -975,10 +978,8 @@ export const GameContainerApi = () => {
     return map
   }, [displayPlayer?.pastures])
   const pastureDisplayMap = useMemo(() => {
-    const map = new Map<string, { animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number }>()
-    ;(displayPlayer?.pastures ?? []).forEach((p) => { if (p.tiles.length > 0) map.set(positionKey(p.tiles[0]), { animalType: p.animalType, animalCount: p.animalCount }) })
-    return map
-  }, [displayPlayer?.pastures])
+    return buildPastureDisplayMap(displayPlayer, animalReorg)
+  }, [displayPlayer, animalReorg])
   const pastureCapacityMap = useMemo(() => {
     const map = new Map<string, number>()
     ;(displayPlayer?.pastures ?? []).forEach((p) => {
@@ -1004,10 +1005,8 @@ export const GameContainerApi = () => {
     }
   }, [displayPlayer?.houseAnimalType, displayPlayer?.houseAnimalCount, isReorgActive, animalReorg])
   const stableDisplayMap = useMemo(() => {
-    const map = new Map<string, { animalType: 'sheep' | 'boar' | 'cattle' | null; animalCount: number }>()
-    Object.entries(displayPlayer?.stableAnimals ?? {}).forEach(([key, type]) => { map.set(key, { animalType: type as 'sheep' | 'boar' | 'cattle' | null, animalCount: type ? 1 : 0 }) })
-    return map
-  }, [displayPlayer?.stableAnimals])
+    return buildStableDisplayMap(displayPlayer, animalReorg)
+  }, [displayPlayer, animalReorg])
 
   const reorgAvailable = useMemo(() => {
     if (!state) return null
@@ -1790,25 +1789,6 @@ export const GameContainerApi = () => {
         </div>
       </div>
 
-      {interaction.stateId === 'wait' &&
-        interaction.request.kind === 'resource-quantity-select' && (
-          <ResourceQuantitySelectPanel
-            locale={locale}
-            availableByResource={interaction.request.availableByResource}
-            promptKey={interaction.request.promptKey}
-            onConfirm={(counts) => {
-              if (!isInteractive) return
-              void transport
-                .commitSelection(interaction.playerIndex, { resourceCounts: counts })
-                .catch((e) => console.error(e))
-            }}
-            onCancel={() => {
-              if (!isInteractive) return
-              void transport.undoAction().catch((e) => console.error('undoAction error', e))
-            }}
-          />
-        )}
-
       <InteractionBar
         pendingAnimalReorg={pendingAnimalReorg} pendingChoice={pendingChoice}
         pendingEngineBlocked={pendingEngineBlocked}
@@ -1838,6 +1818,30 @@ export const GameContainerApi = () => {
         canBuildPalisades={!!currentPlayer && playerCanBuildPalisades(currentPlayer)}
         fencePlacementMode={fencePlacementMode}
         setFencePlacementMode={setFencePlacementMode}
+        animalReorg={animalReorg}
+        reorgRemaining={reorgRemaining}
+        hasReorgOverflow={hasReorgOverflow}
+        confirmAnimalReorg={confirmAnimalReorg}
+        cancelAnimalDiscardPrompt={cancelAnimalDiscardPrompt}
+        resourceQuantitySelect={
+          interaction.stateId === 'wait' &&
+          interaction.request.kind === 'resource-quantity-select'
+            ? {
+                availableByResource: interaction.request.availableByResource,
+                promptKey: interaction.request.promptKey,
+                onConfirm: (counts) => {
+                  if (!isInteractive) return
+                  void transport
+                    .commitSelection(interaction.playerIndex, { resourceCounts: counts })
+                    .catch((e) => console.error(e))
+                },
+                onCancel: () => {
+                  if (!isInteractive) return
+                  void transport.undoStep().catch((e) => console.error('undoStep error', e))
+                },
+              }
+            : null
+        }
       />
     </div>
   )

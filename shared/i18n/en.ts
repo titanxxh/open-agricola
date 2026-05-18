@@ -864,6 +864,7 @@ export const en = {
     bakeBreadSourceCard: 'via {card}',
     returns: 'Returns {cards}',
     cardGrantedAction: '{player} gains {actionId} action from {cardId}',
+    salterFutureFood: '{player} uses {cardId}: converts {animals} into {futureFood} future food ({schedule})',
     cardEffectTrigger: '{cardId} effect triggered',
     cardEffectBlock: '{cardId} blocks this action',
     interactionBucksawPrompt: 'Bucksaw: Pay 1 wood for 1 grain and 1 bonus point?',
@@ -1194,7 +1195,7 @@ export const en = {
       choicePlayDisabled: 'Not enough food (need 2)',
     },
       B157_Salter: {
-      anytime: 'Salt animals (→ food)',
+      anytime: 'Convert animals to food',
       pickAnimals: 'Pick animals to salt (reserve must be empty)',
       single: {
         sheep: 'Salt 1 sheep (→ +1 food each of next 3 rounds)',

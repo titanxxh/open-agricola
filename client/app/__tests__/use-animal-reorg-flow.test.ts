@@ -3,9 +3,11 @@ import type { GameState, PlayerState, Resource } from '../../../shared/contract/
 import type { AnimalReorgState, PendingAnimalReorg } from '../../types/ui'
 import {
   applyAnimalReorgToPlayer,
+  buildPastureDisplayMap,
   buildPostReorgPlan,
   buildPendingChoiceFromReorgProgress,
   buildReorgEngineProgressPlan,
+  buildStableDisplayMap,
   hasUnassignedAnimals,
   shouldShowAnimalDiscardPrompt,
 } from '../hooks/use-animal-reorg-flow'
@@ -131,6 +133,17 @@ describe('use-animal-reorg-flow helpers', () => {
     expect(target.resources.sheep).toBe(5)
     expect(target.resources.boar).toBe(2)
     expect(target.resources.cattle).toBe(4)
+  })
+
+  it('builds pasture display from reorg draft zones while reorganizing', () => {
+    const display = buildPastureDisplayMap(player(), animalReorgState())
+    expect(display.get('pasture-1')).toEqual({ animalType: 'boar', animalCount: 4 })
+    expect(display.get('pasture-2')).toEqual({ animalType: null, animalCount: 0 })
+  })
+
+  it('builds stable display from reorg draft zones while reorganizing', () => {
+    const display = buildStableDisplayMap(player(), animalReorgState())
+    expect(display.get('1-1')).toEqual({ animalType: 'cattle', animalCount: 1 })
   })
 
   it('builds pending choice with farm-redevelopment fence bonus', () => {

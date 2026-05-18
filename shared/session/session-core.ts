@@ -887,6 +887,24 @@ export class GameCore {
     this.runEngineSteps()
   }
 
+  private startTopLevelReorganizeFlow(playerIndex: number): void {
+    const flow: ActionFlow = {
+      type: 'leaf',
+      actionId: 'reorganize',
+      actionContext: { trigger: 'anytime' },
+    }
+    this.engineStack.push({
+      engine: this.createFlowEngine(flow, playerIndex),
+      source: { kind: 'flow', flow },
+      ownerPlayerIndex: playerIndex,
+      spaceId: '__subflow:top-level',
+      stageResume: null,
+      deferredPlayerSwitch: null,
+      reason: 'top-level',
+    })
+    this.runEngineSteps()
+  }
+
   /**
    * Synthetic frame factory used by the start*-confirm/start*-feed triggers.
    * Pushes an `__interaction_only__` leaf flow frame whose root ActionNode
@@ -3516,11 +3534,19 @@ export class GameCore {
   devSetResources(playerIndex: number, resources: Record<string, number>): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
+    const animalKeys = new Set(['sheep', 'boar', 'cattle'])
+    let increasedAnimals = false
     Object.entries(resources).forEach(([key, value]) => {
       if (typeof value === 'number') {
-        (player.resources as Record<string, number>)[key] = value
+        const resourceBag = player.resources as Record<string, number>
+        const priorValue = resourceBag[key] ?? 0
+        resourceBag[key] = value
+        if (animalKeys.has(key) && value > priorValue) increasedAnimals = true
       }
     })
+    if (increasedAnimals) {
+      this.startTopLevelReorganizeFlow(playerIndex)
+    }
     return this.respond()
   }
 

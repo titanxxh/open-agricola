@@ -64,6 +64,30 @@ describe('GameSession contract', () => {
       expect(resp.state.players[0]?.resources.clay).toBe(30)
     })
 
+    it('starts animal reorg when dev mode increases animals', () => {
+      const resp = session.devSetResources(0, { sheep: 1 })
+      expect(resp.ok).toBe(true)
+      expect(resp.state.players[0]?.resources.sheep).toBe(1)
+      expect(resp.interaction.stateId).toBe('wait')
+      if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
+      expect(resp.interaction.request.kind).toBe('animal-reorg')
+      expect(resp.interaction.promptKey).toBe('ui.interactionAnimalReorg')
+    })
+
+    it('finishes dev animal reorg without advancing to the next player', () => {
+      session.devSetResources(0, { sheep: 1 })
+      const resp = session.resolveChoice(0, 'confirm', {
+        zones: [
+          { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+        ],
+      })
+      expect(resp.ok).toBe(true)
+      expect(resp.state.currentPlayerIndex).toBe(0)
+      expect(resp.interaction.stateId).toBe('idle')
+      expect(resp.state.players[0]?.houseAnimalType).toBe('sheep')
+      expect(resp.state.players[0]?.houseAnimalCount).toBe(1)
+    })
+
     it('rejects invalid player index', () => {
       const resp = session.devSetResources(99, { wood: 10 })
       expect(resp.ok).toBe(false)

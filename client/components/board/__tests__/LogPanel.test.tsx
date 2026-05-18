@@ -116,6 +116,29 @@ describe('LogPanel', () => {
     expect(html).toContain('log-card-link')
   })
 
+  it('renders Salter future food log with translated card name', () => {
+    const log: GameState['log'] = [
+      {
+        key: 'log.salterFutureFood',
+        params: {
+          player: 'Player A',
+          cardId: 'B157_Salter',
+          animals: '2 sheep, 1 cattle',
+          futureFood: 13,
+          schedule: '2 food in rounds 4-6; 1 food in rounds 4-10',
+        },
+      },
+    ]
+
+    const html = renderToStaticMarkup(<LogPanel locale="en" log={log} />)
+    const text = stripHtml(html)
+
+    expect(text).toContain('Player A uses Salter')
+    expect(text).toContain('2 sheep, 1 cattle')
+    expect(text).toContain('13 future food')
+    expect(html).toContain('log-card-link')
+  })
+
   it('linkifies action detail cards from nested effect payload', () => {
     const log: GameState['log'] = [
       {
