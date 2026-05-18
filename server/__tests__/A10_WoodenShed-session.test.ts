@@ -55,7 +55,7 @@ describe('A10_WoodenShed session', () => {
       const player = state.players[0]!
       player.minorHand.push(CARD_ID)
       givePayResources(player)
-      expect(isMinorImprovementPlayable(state, player, CARD_ID, 'minor-improvement')).toBe(false)
+      expect(isMinorImprovementPlayable(state, player, CARD_ID, 'improvement', undefined, ['minor'])).toBe(false)
     })
 
     it('is playable through the improvement-any (Major Improvement) action space', () => {
