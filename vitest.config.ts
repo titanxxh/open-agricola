@@ -111,6 +111,7 @@ export default mergeConfig(
             include: SLOW_INCLUDE,
             exclude: SHARED_EXCLUDE,
             setupFiles: ['./shared/cards/__tests__/setup-register-all.ts'],
+            isolate: false,
           },
         },
         {
