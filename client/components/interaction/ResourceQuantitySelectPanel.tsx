@@ -28,31 +28,33 @@ export const ResourceQuantitySelectPanel = ({
   }
 
   return (
-    <div className="resource-quantity-select-panel">
-      <div className="prompt">
+    <div className="resource-quantity-select-panel interaction-resource-quantity-panel">
+      <div className="interaction-title">
         {promptKey ? t(locale, promptKey) : t(locale, 'ui.interactionResourceQuantitySelect')}
       </div>
-      {entries.map(([key, max]) => (
-        <div key={key} className="row">
-          <label>{t(locale, 'ui.interactionResourceQuantityRow', {
-            type: t(locale, `resources.${key}`),
-            max,
-          })}</label>
-          <input
-            type="number"
-            min={0}
-            max={max}
-            value={counts[key] ?? 0}
-            onChange={(e) => setCount(key, Number(e.target.value), max)}
-            disabled={max === 0}
-          />
-        </div>
-      ))}
-      <div className="actions">
-        <button disabled={total < 1} onClick={() => onConfirm(counts)}>
+      <div className="resource-quantity-grid">
+        {entries.map(([key, max]) => (
+          <label key={key} className="resource-quantity-row">
+            <span className="resource-quantity-label">{t(locale, 'ui.interactionResourceQuantityRow', {
+              type: t(locale, `resources.${key}`),
+              max,
+            })}</span>
+            <input
+              type="number"
+              min={0}
+              max={max}
+              value={counts[key] ?? 0}
+              onChange={(e) => setCount(key, Number(e.target.value), max)}
+              disabled={max === 0}
+            />
+          </label>
+        ))}
+      </div>
+      <div className="interaction-actions resource-quantity-actions">
+        <button type="button" className="is-primary" disabled={total < 1} onClick={() => onConfirm(counts)}>
           {t(locale, 'ui.interactionResourceQuantityConfirm')}
         </button>
-        <button onClick={onCancel}>
+        <button type="button" onClick={onCancel}>
           {t(locale, 'ui.interactionResourceQuantityCancel')}
         </button>
       </div>

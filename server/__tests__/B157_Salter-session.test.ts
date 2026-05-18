@@ -55,6 +55,23 @@ describe('B157_Salter session', () => {
     }
   })
 
+  it('cancel from multi-pick returns to idle without salting animals', () => {
+    const session = setup({
+      resources: { sheep: 2 },
+      pastures: [{ id:'p1',size:2,tiles:[{row:2,col:0}],stables:0,animalType:'sheep',animalCount:2 }],
+      round: 3,
+    })
+    session.takeAnytimeAction(0, 'B157-salter-anytime')
+    const resp = session.undoStep()
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('idle')
+    const p = resp.state.players[0]!
+    expect(p.resources.sheep).toBe(2)
+    expect(p.pastures[0].animalType).toBe('sheep')
+    expect(p.pastures[0].animalCount).toBe(2)
+    expect(resp.state.futureMeeples).toEqual([])
+  })
+
   it('commit {sheep:2,cattle:1}: 扣 board + 入 futureMeeples', () => {
     const session = setup({
       resources: { sheep: 2, cattle: 1 },
@@ -77,6 +94,16 @@ describe('B157_Salter session', () => {
     const cattleRounds = fms.filter((e) => e.resources.food === 1).map((e) => e.round).sort((a, b) => a - b)
     expect(sheepRounds).toEqual([4,5,6])
     expect(cattleRounds).toEqual([4,5,6,7,8,9,10])
+    const log = resp.state.log.find((entry) => entry.key === 'log.salterFutureFood')
+    expect(log?.params).toMatchObject({
+      cardId: CARD_ID,
+      animals: '2 sheep, 1 cattle',
+      sheep: 2,
+      boar: 0,
+      cattle: 1,
+      futureFood: 13,
+      schedule: '2 food in rounds 4-6; 1 food in rounds 4-10',
+    })
   })
 
   it('Negative: reserve>0 不触发', () => {
@@ -112,6 +139,16 @@ describe('B157_Salter session', () => {
     expect(p.pastures[0].animalCount).toBe(0)
     const fms = resp.state.futureMeeples
     expect(fms.map((e) => e.round).sort((a, b) => a - b)).toEqual([4,5,6])
+    const log = resp.state.log.find((entry) => entry.key === 'log.salterFutureFood')
+    expect(log?.params).toMatchObject({
+      cardId: CARD_ID,
+      animals: '1 sheep',
+      sheep: 1,
+      boar: 0,
+      cattle: 0,
+      futureFood: 3,
+      schedule: '1 food in rounds 4-6',
+    })
   })
 
   it('commit {0,0,0}: 退回 invalid', () => {

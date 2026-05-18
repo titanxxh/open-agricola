@@ -61,7 +61,7 @@ BGA 将这些 buyability 规则写在自定义代码里，而不是普通 metada
 
 ## 3.2 B157_Salter 行为重对齐 desc 审计（2026-05-17）
 
-- `B157_Salter` — 2026-05-17 重写对齐 BGA：reserve=0 触发 + 多只混合 panel + futureMeeples 投递。desc 文案与 BGA 一致，无需改动。
+- `B157_Salter` — 2026-05-17 重写对齐 BGA：reserve=0 触发 + 多只混合 panel + futureMeeples 投递。desc 文案与 BGA 一致。2026-05-18 将 anytime action label 从简化的 "Salt animals (→ food)" 改为 BGA customDescription 风格的 "Convert animals to food"，避免按钮文案误导为即时换食物；结算日志新增动物数量和未来食物排程。
 
 ## 4. BGA-Banned 但 OA 保留
 
