@@ -75,7 +75,7 @@ export const D102_SampleStableMaker_impl = {
           actionId: 'improvement',
           sourceCard: CARD_ID,
           optional: true,
-          params: { types: ['minor'] },
+          actionContext: { types: ['minor'] },
         },
       ],
     }

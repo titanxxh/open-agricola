@@ -27,7 +27,7 @@ const immediatelyAfterListener: CardListenerRegistration = {
         optional: true,
         promptKey: 'ui.interactionMerchantPrompt',
         sourceCard: CARD_ID,
-        ...(secondTypes ? { params: { types: secondTypes } } : {}),
+        ...(secondTypes ? { actionContext: { types: secondTypes } } : {}),
       },
     })
   },

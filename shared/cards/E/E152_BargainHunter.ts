@@ -19,8 +19,7 @@ export const E152_BargainHunter_impl = {
           type: 'leaf',
           actionId: 'improvement',
           sourceCard: CARD_ID,
-          params: { types: ['minor'] },
-          actionContext: { trueAction: false },
+          actionContext: { types: ['minor'], trueAction: false },
         },
       ],
     }
