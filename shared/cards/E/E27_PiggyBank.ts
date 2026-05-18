@@ -46,9 +46,8 @@ const anytimeListener: CardListenerRegistration = {
           {
             type: 'leaf',
             actionId: 'improvement',
-            params: { types: ['major'] },
             sourceCard: CARD_ID,
-            actionContext: { trueAction: false },
+            actionContext: { types: ['major'], trueAction: false },
           },
           // Unflag card
           { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } },

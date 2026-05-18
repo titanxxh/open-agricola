@@ -37,7 +37,7 @@ const computeReplaceListener: CardListenerRegistration = {
       alternativeFlow: {
         type: 'leaf',
         actionId: 'improvement',
-        params: { types: ['major', 'minor'] },
+        actionContext: { types: ['major', 'minor'] },
         sourceCard: CARD_ID,
       },
       sourceCard: CARD_ID,
