@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mergeResources, clampNonNegative } from '../resources'
+import { mergeResources } from '../resources'
 
 describe('mergeResources', () => {
   it('sums same-key resources', () => {
@@ -10,11 +10,5 @@ describe('mergeResources', () => {
   })
   it('allows negative sum (no clamping)', () => {
     expect(mergeResources({ wood: 1 }, { wood: -3 })).toEqual({ wood: -2 })
-  })
-})
-
-describe('clampNonNegative', () => {
-  it('drops zero/negative entries', () => {
-    expect(clampNonNegative({ wood: 1, clay: 0, stone: -1 })).toEqual({ wood: 1 })
   })
 })

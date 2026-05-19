@@ -36,24 +36,13 @@ import {
   validateBonus,
   validateComplexCost,
 } from './cost-modifiers'
+import { mergeResources } from '../../../utils/resources'
 import type { InternalSolution } from './types'
 
-// Inline helpers — will move to shared/utils/resources.ts during T4.1.
 const scaleResources = (r: Partial<Resource>, n: number): Partial<Resource> => {
   const out: Partial<Resource> = {}
   for (const [k, v] of Object.entries(r)) {
     if (typeof v === 'number') out[k as keyof Resource] = v * n
-  }
-  return out
-}
-
-const mergeResources = (
-  a: Partial<Resource>,
-  b: Partial<Resource>,
-): Partial<Resource> => {
-  const out: Partial<Resource> = { ...a }
-  for (const [k, v] of Object.entries(b)) {
-    out[k as keyof Resource] = ((out[k as keyof Resource] ?? 0) + (v ?? 0))
   }
   return out
 }
