@@ -42,6 +42,39 @@ describe('E47_SyrupTap session', () => {
     expect(futureMeeples.length).toBe(1)
     expect(futureMeeples[0]!.round).toBe(2)
     expect(futureMeeples[0]!.resources.food).toBe(1)
+    const playerId = resp.state.players[0]!.id
+    const woodIndex = resp.state.events.findIndex((event) =>
+      event.type === 'resource.moved'
+      && event.from.kind === 'actionSpace'
+      && event.to.kind === 'player'
+      && event.to.playerId === playerId
+      && (event.resources.wood ?? 0) > 0
+    )
+    const triggerIndex = resp.state.events.findIndex((event) =>
+      event.type === 'card.triggered' && event.sourceCardId === CARD_ID
+    )
+    const queuedIndex = resp.state.events.findIndex((event) =>
+      event.type === 'futureMeeple.queued' && event.sourceCardId === CARD_ID
+    )
+    expect(woodIndex).toBeGreaterThanOrEqual(0)
+    expect(triggerIndex).toBeGreaterThan(woodIndex)
+    expect(queuedIndex).toBeGreaterThan(triggerIndex)
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.moved',
+        from: expect.objectContaining({ kind: 'actionSpace' }),
+        to: { kind: 'player', playerId },
+        resources: expect.objectContaining({ wood: expect.any(Number) }),
+      }),
+      expect.objectContaining({
+        type: 'card.triggered',
+        sourceCardId: CARD_ID,
+      }),
+      expect.objectContaining({
+        type: 'futureMeeple.queued',
+        sourceCardId: CARD_ID,
+      }),
+    ]))
   })
 
   it('collecting non-wood resources does not trigger', () => {
@@ -63,6 +96,10 @@ describe('E47_SyrupTap session', () => {
       (fm) => fm.cardId === CARD_ID,
     )
     expect(futureMeeples.length).toBe(0)
+    expect(resp.state.events).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'card.triggered', sourceCardId: CARD_ID }),
+      expect.objectContaining({ type: 'futureMeeple.queued', sourceCardId: CARD_ID }),
+    ]))
   })
 
   it('does not trigger on round 14 (no next round)', () => {

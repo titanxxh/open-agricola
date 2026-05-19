@@ -12,8 +12,6 @@ export const listener: CardListenerRegistration = {
     incCounter(context.player, CARD_ID, 'observedCount')
     return {
       flow: { type: 'leaf', actionId: 'construct', optional: true, promptKey: 'ui.optionalBuildRoom' },
-      logKey: 'log.cardGrantedAction',
-      logParams: { cardId: CARD_ID, actionId: 'construct' },
       sourceCard: CARD_ID,
     }
   },

@@ -19,7 +19,7 @@ import { occupations } from '../../shared/cards-display/_lookup'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { ActionFlow } from '../../shared/contract/types'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
-import { confirmPlayerSwitch, isLegacyChoicePending } from './_helpers/legacy-confirms'
+import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 const TEST_CARD_ID = '__TEST_RC_CARD__'
 
@@ -235,7 +235,7 @@ describe('CardEffect.resolveChoice hook', () => {
     // day-laborer: no pending choice produced (all resources granted immediately)
     const resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(handlerCalled).toBe(false)
   })
 })

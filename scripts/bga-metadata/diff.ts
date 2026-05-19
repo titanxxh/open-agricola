@@ -20,7 +20,7 @@ export type DiffResult = {
   totalTs: number
 }
 
-const LITERAL_FIELDS = ['extraVp', 'vp'] as const
+const LITERAL_FIELDS = ['extraVp', 'vp', 'passing'] as const
 const COMPLEX_FIELDS = ['category', 'players', 'cost', 'altCosts', 'prerequisite'] as const
 
 function objectShallowEqual(a: unknown, b: unknown): boolean {

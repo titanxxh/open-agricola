@@ -46,7 +46,7 @@ export const spendWorkerAction: ActionDefinition = {
   execute: ({ state, player, sourceCard, actionContext }) => {
     const worker = smallestAvailableWorker(state, player)
     if (!worker) {
-      return { type: 'fail', logKey: 'log.placeFarmerFail' }
+      return { type: 'fail', errorKey: 'log.placeFarmerFail' }
     }
 
     const roundPlacementId =

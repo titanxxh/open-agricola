@@ -1,79 +1,139 @@
-import { describe, it, expect } from 'vitest'
-import { GameSession } from '../../../server/game/authoritative-session'
-import { buildRoomCostPerUnit } from '../../actions/payment/internal/room-payment'
-import type { PlayerState } from '../../contract/types'
+import { describe, expect, it } from 'vitest'
+import { computeAllBuyableCombinations } from '../../actions/payment/internal/enumerate'
+import { D15_ClaySupports } from '../../cards-display/D/D15_ClaySupports'
+import type { CostModifier, PlayerState } from '../../contract/types'
 
-// D15_ClaySupports wires its trade through the static `modifier` field on the
-// cards-display definition (see ../cards-display/D/D15_ClaySupports.ts). The
-// modifier is synced into `player.activeModifiers` by `rebuildActiveModifiers`
-// during `loadState`, the same path the production code uses for any
-// modifier-bearing card. No manual `activeModifiers` injection here.
+// D15_ClaySupports unit test — wired through the static `modifier` field on
+// the cards-display definition. The static field is mirrored into
+// `player.activeModifiers` via `rebuildActiveModifiers` during loadState in
+// session paths; here we inject the modifier directly to keep the unit test
+// fast and independent of GameSession setup.
 
-const setupClayHouseWithD15 = (houseType: 'wood' | 'clay' | 'stone' = 'clay') => {
-  const session = new GameSession(42)
-  const state = session.getState().state
-  state.players = state.players.slice(0, 2)
-  state.players.forEach((p) => {
-    ;(p as any).minorHand = ['__test_placeholder__']
-    ;(p as any).occupationHand = ['__test_placeholder__']
+const makePlayer = (
+  houseType: PlayerState['houseType'] = 'clay',
+  resources: Partial<PlayerState['resources']> = {},
+): PlayerState => ({
+  id: 'p1',
+  name: 'P1',
+  color: 'red',
+  resources: {
+    wood: 99,
+    clay: 99,
+    reed: 99,
+    stone: 99,
+    food: 99,
+    grain: 0,
+    vegetable: 0,
+    sheep: 0,
+    boar: 0,
+    cattle: 0,
+    begging: 0,
+    ...resources,
+  },
+  workers: [],
+  rooms: 1,
+  houseType,
+  fields: [],
+  roomTiles: [],
+  stableTiles: [],
+  improvements: [],
+  minorHand: [],
+  minorPlayed: [],
+  occupationHand: [],
+  occupationPlayed: [],
+  extraOccupationsFromCards: [],
+  playedCards: [],
+  houseAnimalType: null,
+  houseAnimalCount: 0,
+  stableAnimals: {},
+  pastures: [],
+  fenceSegments: [],
+  majorEffects: { wellRounds: 0 },
+  startPlayer: false,
+  activeModifiers: D15_ClaySupports.modifier
+    ? [D15_ClaySupports.modifier as CostModifier]
+    : [],
+  cardStates: {},
+  stats: {} as any,
+})
+
+describe('D15_ClaySupports unit-scope trade migration', () => {
+  it('static modifier shape: scope:unit, houseTypeClay condition', () => {
+    expect(D15_ClaySupports.modifier).toBeDefined()
+    expect(D15_ClaySupports.modifier).toMatchObject({
+      type: 'trade',
+      cardId: 'D15_ClaySupports',
+      appliesTo: ['construct'],
+      scope: 'unit',
+      from: { wood: 1 },
+      to: { clay: 3, reed: 1 },
+      conditions: { houseTypeClay: 1 },
+    })
   })
-  const p = state.players[0]!
-  p.houseType = houseType
-  p.rooms = 1
-  p.minorPlayed = ['D15_ClaySupports']
-  session.loadState(state)
-  return session.getState().state.players[0]! as PlayerState
-}
 
-describe('D15_ClaySupports', () => {
-  it('registers D15 trade modifier on player.activeModifiers after loadState', () => {
-    const player = setupClayHouseWithD15('clay')
-    expect(player.activeModifiers).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        type: 'trade',
-        cardId: 'D15_ClaySupports',
-        appliesTo: ['construct'],
-        from: { wood: 1 },
-        to: { clay: 3, reed: 1 },
-        conditions: { houseTypeClay: 1 },
-      }),
-    ]))
+  it('clay-house nb=2: scope:unit budget allows k∈{0,1,2} per-room swaps', () => {
+    const sols = computeAllBuyableCombinations(
+      makePlayer('clay'),
+      { unitFee: { clay: 5, reed: 2 }, nb: 2 },
+      undefined,
+      'construct',
+    )
+    const swapCounts = new Set(
+      sols.map((s) => s.tradesUsed.reduce((acc, t) => acc + t.times, 0)),
+    )
+    // Σ-times ≤ nb=2 → swap counts in {0,1,2}.
+    expect(swapCounts).toEqual(new Set([0, 1, 2]))
   })
 
-  it('player without wood can still pay base 5 clay + 2 reed', () => {
-    const player = setupClayHouseWithD15('clay')
-    player.resources = { wood: 0, clay: 5, reed: 2, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0 } as any
-    const result = buildRoomCostPerUnit(player) as any
-    const fees = result.fees ?? [result]
-    expect(fees).toEqual(expect.arrayContaining([{ clay: 5, reed: 2 }]))
+  it('clay-house nb=1: swap counts in {0,1} (single room)', () => {
+    const sols = computeAllBuyableCombinations(
+      makePlayer('clay'),
+      { unitFee: { clay: 5, reed: 2 }, nb: 1 },
+      undefined,
+      'construct',
+    )
+    const swapCounts = new Set(
+      sols.map((s) => s.tradesUsed.reduce((acc, t) => acc + t.times, 0)),
+    )
+    expect(swapCounts).toEqual(new Set([0, 1]))
+    // The k=1 solution embeds D15: pays clay:2 + reed:1 + wood:1 instead of clay:5+reed:2.
+    const swapped = sols.find((s) =>
+      s.tradesUsed.some((t) => t.times === 1 && t.trade.from.wood === 1),
+    )
+    expect(swapped).toBeDefined()
+    expect(swapped!.resourcesPaid.clay).toBe(2)
+    expect(swapped!.resourcesPaid.reed).toBe(1)
+    expect(swapped!.resourcesPaid.wood).toBe(1)
   })
 
-  it('player with wood gets both base and trade option (clay house)', () => {
-    const player = setupClayHouseWithD15('clay')
-    player.resources = { wood: 1, clay: 5, reed: 2, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0 } as any
-    const result = buildRoomCostPerUnit(player) as any
-    const fees = result.fees ?? [result]
-    expect(fees).toEqual(expect.arrayContaining([
-      { clay: 5, reed: 2 },
-      { clay: 2, reed: 1, wood: 1 },
-    ]))
+  it('wood-house: D15 trade filtered out by houseTypeClay condition', () => {
+    const sols = computeAllBuyableCombinations(
+      makePlayer('wood'),
+      { unitFee: { wood: 5, reed: 2 }, nb: 1 },
+      undefined,
+      'construct',
+    )
+    expect(sols.length).toBeGreaterThan(0)
+    sols.forEach((s) => {
+      const total = s.tradesUsed.reduce((acc, t) => acc + t.times, 0)
+      expect(total).toBe(0)
+      // Pure wood-house base cost only — no clay component.
+      expect(s.resourcesPaid.clay ?? 0).toBe(0)
+    })
   })
 
-  it('does NOT apply when houseType=wood (modifier registered, condition gates it off)', () => {
-    const player = setupClayHouseWithD15('wood')
-    player.resources = { wood: 5, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0 } as any
-    const result = buildRoomCostPerUnit(player) as any
-    const fees = result.fees ?? [result]
-    // Wood-house base cost is {wood:5, reed:2}; no clay-based alternative
-    // should appear because the D15 condition `houseTypeClay: 1` blocks it.
-    expect(fees.every((f: any) => !('clay' in f))).toBe(true)
-  })
-
-  it('does NOT apply when houseType=stone', () => {
-    const player = setupClayHouseWithD15('stone')
-    player.resources = { wood: 5, clay: 0, reed: 5, stone: 5, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0 } as any
-    const result = buildRoomCostPerUnit(player) as any
-    const fees = result.fees ?? [result]
-    expect(fees.every((f: any) => !('clay' in f))).toBe(true)
+  it('stone-house: D15 trade filtered out', () => {
+    const sols = computeAllBuyableCombinations(
+      makePlayer('stone'),
+      { unitFee: { stone: 5, reed: 2 }, nb: 1 },
+      undefined,
+      'construct',
+    )
+    expect(sols.length).toBeGreaterThan(0)
+    sols.forEach((s) => {
+      const total = s.tradesUsed.reduce((acc, t) => acc + t.times, 0)
+      expect(total).toBe(0)
+      expect(s.resourcesPaid.clay ?? 0).toBe(0)
+    })
   })
 })

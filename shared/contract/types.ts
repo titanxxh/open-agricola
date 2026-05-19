@@ -1,4 +1,5 @@
 import type { PromptKey } from './prompt-keys'
+import type { EventSink, GameEvent } from './events'
 
 export type Resource = {
   wood: number
@@ -44,6 +45,7 @@ export type Trade = {
   from: Partial<Resource>
   to: Partial<Resource>
   max?: number
+  scope?: 'action' | 'unit'   // default 'action' (back-compat)
   source?: string
   sourceId?: string
   sideEffect?: TradeSideEffect
@@ -88,6 +90,7 @@ export type TradeModifier = {
   from: Partial<Resource>
   to: Partial<Resource>
   max?: number
+  scope?: 'action' | 'unit'   // default 'action'
   /**
    * Player-state conditions evaluated when the modifier is applied. Same
    * supported keys as `Bonus.conditions` (`minNumRooms`, `houseTypeWood` /
@@ -114,6 +117,8 @@ export type CostModifier = TradeModifier | BonusModifier
 export type ComplexCost = {
   fee?: Partial<Resource>
   fees?: Partial<Resource>[]
+  unitFee?: Partial<Resource>      // per-unit cost; total fee += nb × unitFee
+  nb?: number                       // unit count; construct=rooms, renovation=player.rooms
   trades?: Trade[]
   cards?: { type: string; list: string[]; cost?: Partial<Resource>; required?: boolean }
   bonuses?: Bonus[]
@@ -272,11 +277,6 @@ export type LogEntry = {
   params?: Record<string, unknown>
 }
 
-export type ImmediateLogEntry = {
-  key: string
-  params?: Record<string, unknown>
-}
-
 export type FutureMeepleRoomType = 'wood' | 'clay' | 'stone'
 
 export type FutureMeeple = {
@@ -341,6 +341,8 @@ export type GameState = {
   players: PlayerState[]
   actionSpaces: ActionSpace[]
   log: LogEntry[]
+  events: GameEvent[]
+  nextEventSeq: number
   roundStartSnapshot: GameState | null
   roundActionOrder: (string | null)[]
   gameSeed: number
@@ -405,6 +407,10 @@ export type ActionExecutionContext = {
   params?: Record<string, unknown>
   sourceCard?: string
   actionContext?: Record<string, unknown>
+}
+
+export type ActionMutationContext = ActionExecutionContext & {
+  eventSink: EventSink
 }
 
 export type ActionCostPreview = {
@@ -478,10 +484,10 @@ export type ActionChoiceOption = {
  * Use plain JSON-serializable values; Map/Set/Date are not preserved across snapshot/rehydrate.
  */
 export type ActionExecutionResult =
-  | { type: 'ok'; logKey?: string; resourcesGained?: Partial<Resource>; resourcesPaid?: Partial<Resource>; logParams?: Record<string, unknown>; immediateLogs?: ImmediateLogEntry[]; extraData?: Record<string, unknown> }
+  | { type: 'ok'; resourcesGained?: Partial<Resource>; resourcesPaid?: Partial<Resource>; extraData?: Record<string, unknown> }
   | { type: 'request'; request: InteractionRequest; promptKey?: PromptKey; promptParams?: Record<string, unknown>; sourceCard?: string; extraData?: Record<string, unknown> }
-  | { type: 'fail'; logKey: string; recoverable?: boolean }
-  | { type: 'flow'; flow: ActionFlow; logKey?: string; logParams?: Record<string, unknown>; immediateLogs?: ImmediateLogEntry[]; extraData?: Record<string, unknown> }
+  | { type: 'fail'; errorKey: string; recoverable?: boolean }
+  | { type: 'flow'; flow: ActionFlow; extraData?: Record<string, unknown> }
 export type ActionFlow =
   | {
       type: 'leaf'
@@ -535,9 +541,9 @@ export type ActionDefinition = {
   anytime?: boolean
   canBeExecutedByPlayer: CanBeExecutedByPlayer
   costPreview?: ActionCostPreview
-  execute: (context: ActionExecutionContext) => ActionExecutionResult
+  execute: (context: ActionMutationContext) => ActionExecutionResult
   resolveChoice?: (
-    context: ActionExecutionContext,
+    context: ActionMutationContext,
     choice: string,
     payload?: Record<string, unknown>,
   ) => ActionExecutionResult

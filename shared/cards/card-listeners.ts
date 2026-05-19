@@ -3,10 +3,14 @@ import { runActionHooks, type ActionHookContext, type ActionHookPhase, type Acti
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
 import { exchangeToTrade } from '../actions/effects/exchange'
+import type { DraftGameEvent, GameEvent } from '../contract/events'
+import { createEventQuery, type EventQuery } from '../events/query'
 
 export type CardListenerContext = ActionExecutionContext & {
   actionId: string
   phase: ActionHookPhase
+  transactionEvents: readonly (GameEvent | DraftGameEvent)[]
+  eventQuery: EventQuery
   result?: ActionExecutionResult
   choice?: string
   doable?: boolean
@@ -18,6 +22,10 @@ export type CardListenerContext = ActionExecutionContext & {
   effectPlayer?: PlayerState
   trueAction?: boolean
 }
+
+export type CardListenerContextInput =
+  Omit<CardListenerContext, 'transactionEvents' | 'eventQuery'> &
+  Partial<Pick<CardListenerContext, 'transactionEvents' | 'eventQuery'>>
 
 export type CardListenerScope = 'player' | 'opponent' | 'any'
 export type CardListenerDispatchMode = 'serial' | 'select'
@@ -117,13 +125,25 @@ const getOrderedListeners = (context: CardListenerContext) =>
     .filter((registration) => matchesListener(registration, context))
     .sort((left, right) => left.id.localeCompare(right.id))
 
-export const runCardListeners = (context: CardListenerContext) => {
+const normalizeCardListenerContext = (
+  context: CardListenerContextInput,
+): CardListenerContext => {
+  const transactionEvents = context.transactionEvents ?? []
+  return {
+    ...context,
+    transactionEvents,
+    eventQuery: context.eventQuery ?? createEventQuery(transactionEvents),
+  }
+}
+
+export const runCardListeners = (context: CardListenerContextInput) => {
+  const listenerContext = normalizeCardListenerContext(context)
   const results: ActionHookResult[] = []
-  getOrderedListeners(context).forEach((registration) => {
-    if (!scopeMatches(context.state, context.player, registration)) {
+  getOrderedListeners(listenerContext).forEach((registration) => {
+    if (!scopeMatches(listenerContext.state, listenerContext.player, registration)) {
       return
     }
-    const result = registration.handler(context)
+    const result = registration.handler(listenerContext)
     if (result) {
       results.push(result)
     }
@@ -167,18 +187,19 @@ const resolveOwnerPlayer = (
 
 export const buildCardListenerContext = (
   registration: CardListenerRegistration,
-  context: CardListenerContext,
+  context: CardListenerContextInput,
   ownerPlayerId?: string,
 ): CardListenerContext => {
-  const triggerPlayer = context.triggerPlayer ?? context.player
-  const ownerPlayer = resolveOwnerPlayer(registration, context, ownerPlayerId)
-  const effectPlayer = context.effectPlayer ?? ownerPlayer ?? triggerPlayer
+  const baseContext = normalizeCardListenerContext(context)
+  const triggerPlayer = baseContext.triggerPlayer ?? baseContext.player
+  const ownerPlayer = resolveOwnerPlayer(registration, baseContext, ownerPlayerId)
+  const effectPlayer = baseContext.effectPlayer ?? ownerPlayer ?? triggerPlayer
   const trueAction =
-    typeof context.trueAction === 'boolean'
-      ? context.trueAction
-      : context.actionContext?.trueAction !== false
+    typeof baseContext.trueAction === 'boolean'
+      ? baseContext.trueAction
+      : baseContext.actionContext?.trueAction !== false
   return {
-    ...context,
+    ...baseContext,
     triggerPlayer,
     ownerPlayer,
     effectPlayer,
@@ -186,9 +207,10 @@ export const buildCardListenerContext = (
   }
 }
 
-export const getMatchingListeners = (context: CardListenerContext): MatchedCardListener[] => {
+export const getMatchingListeners = (context: CardListenerContextInput): MatchedCardListener[] => {
+  const listenerContext = normalizeCardListenerContext(context)
   const matched: MatchedCardListener[] = []
-  getOrderedListeners(context).forEach((registration) => {
+  getOrderedListeners(listenerContext).forEach((registration) => {
     if (!registration.cardIds || registration.cardIds.length === 0) {
       matched.push({ registration, cardId: '', ownerPlayerId: '' })
       return
@@ -196,17 +218,17 @@ export const getMatchingListeners = (context: CardListenerContext): MatchedCardL
     const scope = registration.scope ?? 'player'
     for (const cardId of registration.cardIds) {
       if (scope === 'player') {
-        if (getPlayerCardIds(context.player).includes(cardId)) {
-          matched.push({ registration, cardId, ownerPlayerId: context.player.id })
+        if (getPlayerCardIds(listenerContext.player).includes(cardId)) {
+          matched.push({ registration, cardId, ownerPlayerId: listenerContext.player.id })
         }
       } else if (scope === 'opponent') {
-        for (const p of context.state.players ?? []) {
-          if (p.id !== context.player.id && getPlayerCardIds(p).includes(cardId)) {
+        for (const p of listenerContext.state.players ?? []) {
+          if (p.id !== listenerContext.player.id && getPlayerCardIds(p).includes(cardId)) {
             matched.push({ registration, cardId, ownerPlayerId: p.id })
           }
         }
       } else {
-        for (const p of context.state.players ?? []) {
+        for (const p of listenerContext.state.players ?? []) {
           if (getPlayerCardIds(p).includes(cardId)) {
             matched.push({ registration, cardId, ownerPlayerId: p.id })
             break
@@ -220,7 +242,7 @@ export const getMatchingListeners = (context: CardListenerContext): MatchedCardL
 
 export const executeCardListener = (
   registration: CardListenerRegistration,
-  context: CardListenerContext,
+  context: CardListenerContextInput,
   options?: { ownerPlayerId?: string },
 ): ActionHookResult | undefined => {
   return (
@@ -228,23 +250,6 @@ export const executeCardListener = (
       buildCardListenerContext(registration, context, options?.ownerPlayerId),
     ) ?? undefined
   )
-}
-
-const AUTO_LOGGED_CARD_EFFECT_ACTIONS = new Map<string, Set<string>>([
-  ['log.cardEffectGain', new Set(['gain', 'take-from-card'])],
-  ['log.cardEffectBonusVp', new Set(['bonus-vp'])],
-  ['log.cardEffectPay', new Set(['pay'])],
-  ['log.cardEffectOtherPlayersGain', new Set(['gain'])],
-])
-
-export const shouldSkipImmediateListenerLog = (
-  result: Pick<ActionHookResult, 'flow' | 'logKey'> | void,
-): boolean => {
-  if (!result?.logKey || !result.flow || result.flow.type !== 'leaf' || !result.flow.sourceCard) {
-    return false
-  }
-  const actionIds = AUTO_LOGGED_CARD_EFFECT_ACTIONS.get(result.logKey)
-  return actionIds?.has(result.flow.actionId) ?? false
 }
 
 export const getListenerById = (listenerId: string): CardListenerRegistration | undefined => {
@@ -273,13 +278,14 @@ export const collectComputeChoiceCandidates = (
   actionId: string,
   actionContext?: Record<string, unknown>,
 ): import('../contract/types').ActionChoiceOption[] => {
-  const baseCtx: CardListenerContext = {
+  const baseCtx: CardListenerContextInput = {
     state,
     player,
+    space: makeDummySpace(actionId),
     actionId,
     phase: 'computeChoiceCandidates' as ActionHookPhase,
     actionContext,
-  } as CardListenerContext
+  }
   const out: import('../contract/types').ActionChoiceOption[] = []
   for (const matched of getMatchingListeners(baseCtx)) {
     const result = executeCardListener(matched.registration, baseCtx, {
@@ -308,13 +314,14 @@ export const collectComputeExchanges = (
   player: PlayerState,
   window: string,
 ): Trade[] => {
-  const baseCtx: CardListenerContext = {
+  const baseCtx: CardListenerContextInput = {
     state,
     player,
+    space: makeDummySpace('compute-exchanges'),
     actionId: 'compute-exchanges',
     phase: 'computeExchanges' as ActionHookPhase,
     extraData: { window },
-  } as unknown as CardListenerContext
+  }
   const out: Trade[] = []
   for (const matched of getMatchingListeners(baseCtx)) {
     const result = executeCardListener(matched.registration, baseCtx, {
@@ -360,6 +367,8 @@ export const collectComputeCostsForFarmChoice = (
     params,
     actionId,
     phase: 'computeCosts',
+    transactionEvents: [],
+    eventQuery: createEventQuery([]),
   }
   const aggregated: Partial<Resource> = {}
   const merge = (costs?: Partial<Resource>) => {

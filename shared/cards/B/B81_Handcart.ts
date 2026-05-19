@@ -27,9 +27,9 @@ export const B81_Handcart_impl = {
         if ((space.resources[resource] ?? 0) < threshold) continue
         choices.push({
           type: 'leaf',
-          actionId: 'gain',
-          params: { [resource]: 1 },
+          actionId: 'collect',
           sourceCard: CARD_ID,
+          actionContext: { spaceId: space.id, resource, amount: 1 },
           choiceLabelKey: 'ui.interactionTakeFromSpace',
           choiceLabelParams: { resource, spaceId: space.id, spaceName: space.nameKey },
         })

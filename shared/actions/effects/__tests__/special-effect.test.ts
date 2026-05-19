@@ -5,7 +5,9 @@ import {
   readCardInfobox,
   isCardFlagged,
 } from '../../../cards/helpers/card-state'
+import { storePendingFenceBonus } from '../../../cards/helpers/pending-fence-bonus'
 import type { ActionExecutionContext, PlayerState, Resource, GameState, ActionSpace } from '../../../contract/types'
+import type { DraftGameEvent, EventSink } from '../../../contract/events'
 
 const makePlayer = (): PlayerState => ({
   id: 'p1', name: 'P1', color: 'red',
@@ -38,6 +40,15 @@ const makeCtx = (
 
 const CARD_ID = 'TEST_CARD'
 
+const makeEventSink = (events: DraftGameEvent[]): EventSink => ({
+  emit: (event) => {
+    events.push(event)
+  },
+  emitMany: (nextEvents) => {
+    events.push(...nextEvents)
+  },
+})
+
 describe('specialEffectAction — mutation dispatcher', () => {
   it('increment-extra-data: adds to existing counter, init from 0', () => {
     const player = makePlayer()
@@ -66,6 +77,60 @@ describe('specialEffectAction — mutation dispatcher', () => {
     expect(readCardExtraData(player, CARD_ID, 'foo')).toEqual({ nested: 1 })
   })
 
+  it('set-extra-data: emits public literal state changes only', () => {
+    const player = makePlayer()
+    const events: DraftGameEvent[] = []
+    specialEffectAction.execute({
+      ...makeCtx(player, { kind: 'set-extra-data', key: 'foo', value: 'hello' }, CARD_ID),
+      eventSink: makeEventSink(events),
+    })
+    specialEffectAction.execute({
+      ...makeCtx(player, { kind: 'set-extra-data', key: 'foo', value: { privateHand: ['E1'] } }, CARD_ID),
+      eventSink: makeEventSink(events),
+    })
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'card.stateChanged',
+        sourceCardId: CARD_ID,
+        cardId: CARD_ID,
+        key: 'foo',
+        value: 'hello',
+      }),
+    ])
+    expect(readCardExtraData(player, CARD_ID, 'foo')).toEqual({ privateHand: ['E1'] })
+  })
+
+  it('emits card state events for public counter and flag mutations', () => {
+    const player = makePlayer()
+    const events: DraftGameEvent[] = []
+    const eventSink = makeEventSink(events)
+
+    specialEffectAction.execute({
+      ...makeCtx(player, { kind: 'increment-extra-data', key: 'foo', amount: 5 }, CARD_ID),
+      eventSink,
+    })
+    specialEffectAction.execute({
+      ...makeCtx(player, { kind: 'increment-counter', key: 'uses', amount: 2 }, CARD_ID),
+      eventSink,
+    })
+    specialEffectAction.execute({
+      ...makeCtx(player, { kind: 'set-counter', key: 'uses', value: 4 }, CARD_ID),
+      eventSink,
+    })
+    specialEffectAction.execute({
+      ...makeCtx(player, { kind: 'set-flag', flag: true }, CARD_ID),
+      eventSink,
+    })
+
+    expect(events).toEqual([
+      expect.objectContaining({ type: 'card.stateChanged', key: 'foo', value: 5 }),
+      expect.objectContaining({ type: 'card.stateChanged', key: 'uses', value: 2 }),
+      expect.objectContaining({ type: 'card.stateChanged', key: 'uses', value: 4 }),
+      expect.objectContaining({ type: 'card.stateChanged', key: 'flagged', value: true }),
+    ])
+  })
+
   it('set-flag: toggles card flag both ways', () => {
     const player = makePlayer()
     specialEffectAction.execute(
@@ -84,6 +149,51 @@ describe('specialEffectAction — mutation dispatcher', () => {
       makeCtx(player, { kind: 'set-infobox', text: 'used 3x' }, CARD_ID),
     )
     expect(readCardInfobox(player, CARD_ID)).toBe('used 3x')
+  })
+
+  it('set-infobox: emits a public card infobox event', () => {
+    const player = makePlayer()
+    const events: DraftGameEvent[] = []
+
+    const result = specialEffectAction.execute({
+      ...makeCtx(player, { kind: 'set-infobox', text: 'used 3x' }, CARD_ID),
+      eventSink: makeEventSink(events),
+    })
+
+    expect(result.type).toBe('ok')
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'card.infoboxChanged',
+        cardId: CARD_ID,
+        text: 'used 3x',
+        targetPlayerId: player.id,
+      }),
+    ])
+  })
+
+  it('clear-pending-fence-bonus: clears state and emits a public state event', () => {
+    const player = makePlayer()
+    const events: DraftGameEvent[] = []
+    storePendingFenceBonus(player, {
+      sourceCard: CARD_ID,
+      counterKey: 'freeFences',
+      freeFences: 2,
+    })
+
+    const result = specialEffectAction.execute({
+      ...makeCtx(player, { kind: 'clear-pending-fence-bonus' }, CARD_ID),
+      eventSink: makeEventSink(events),
+    })
+
+    expect(result.type).toBe('ok')
+    expect(player.cardStates.__pendingFenceBonus__?.extraData).toBeUndefined()
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'card.stateChanged',
+        key: 'pendingFenceBonus',
+        value: null,
+      }),
+    ])
   })
 
   it('set-counter: writes counter exactly to the provided non-negative value', () => {
@@ -110,40 +220,62 @@ describe('specialEffectAction — mutation dispatcher', () => {
 
   it('pop-card-stack-top: removes stack top without granting the resource', () => {
     const player = makePlayer()
+    const events: DraftGameEvent[] = []
     player.resources.wood = 1
     player.cardStates[CARD_ID] = {
       stack: ['clay', 'wood'],
     }
 
-    const result = specialEffectAction.execute(
-      makeCtx(player, { kind: 'pop-card-stack-top' }, CARD_ID),
-    )
+    const result = specialEffectAction.execute({
+      ...makeCtx(player, { kind: 'pop-card-stack-top' }, CARD_ID),
+      eventSink: makeEventSink(events),
+    })
 
     expect(result.type).toBe('ok')
     expect(player.cardStates[CARD_ID]?.stack).toEqual(['clay'])
     expect(player.resources.wood).toBe(1)
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'card.stackChanged',
+        cardId: CARD_ID,
+        targetPlayerId: player.id,
+        resources: { wood: 1 },
+        delta: -1,
+        reason: 'take',
+      }),
+    ])
   })
 
   it('swap-improvement-with-board: swaps player improvement with available board improvement', () => {
     const player = makePlayer()
+    const events: DraftGameEvent[] = []
     player.improvements = ['major-from', 'minor-1']
     const state = {
       players: [player],
       availableMajorImprovements: ['major-to', 'major-other'],
     } as unknown as GameState
 
-    const result = specialEffectAction.execute(
-      makeCtx(
+    const result = specialEffectAction.execute({
+      ...makeCtx(
         player,
         { kind: 'swap-improvement-with-board', from: 'major-from', to: 'major-to' },
         CARD_ID,
         state,
       ),
-    )
+      eventSink: makeEventSink(events),
+    })
 
     expect(result.type).toBe('ok')
     expect(player.improvements).toEqual(['major-to', 'minor-1'])
     expect(state.availableMajorImprovements).toEqual(['major-from', 'major-other'])
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'card.swappedWithBoard',
+        playerId: player.id,
+        fromPlayerCardId: 'major-from',
+        toPlayerCardId: 'major-to',
+      }),
+    ])
   })
 
   it('swap-improvement-with-board: no-ops when player already has target improvement', () => {
@@ -239,24 +371,33 @@ describe('specialEffectAction — mutation dispatcher', () => {
 
   it('return-card-to-board: removes a played improvement and returns major cards to the board', () => {
     const player = makePlayer()
+    const events: DraftGameEvent[] = []
     player.improvements = ['Major_ClayOven', 'Major_StoneOven']
     const state = {
       players: [player],
       availableMajorImprovements: [],
     } as unknown as GameState
 
-    const result = specialEffectAction.execute(
-      makeCtx(
+    const result = specialEffectAction.execute({
+      ...makeCtx(
         player,
         { kind: 'return-card-to-board', cardId: 'Major_StoneOven' },
         CARD_ID,
         state,
       ),
-    )
+      eventSink: makeEventSink(events),
+    })
 
     expect(result.type).toBe('ok')
     expect(player.improvements).toEqual(['Major_ClayOven'])
     expect(state.availableMajorImprovements).toEqual(['Major_StoneOven'])
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'card.returnedToBoard',
+        playerId: player.id,
+        cardId: 'Major_StoneOven',
+      }),
+    ])
   })
 
   it('fails when sourceCard missing', () => {
@@ -318,16 +459,44 @@ describe('specialEffectAction — mutation dispatcher', () => {
   })
 
   describe('remove-field-crops', () => {
+    it('remove-field-crop: decrements the first matching crop field and emits a crop event', () => {
+      const player = makePlayer()
+      const events: DraftGameEvent[] = []
+      player.fields = [
+        { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] },
+        { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 2 }] },
+      ]
+
+      const result = specialEffectAction.execute({
+        ...makeCtx(player, { kind: 'remove-field-crop', crop: 'grain' }, CARD_ID),
+        eventSink: makeEventSink(events),
+      })
+
+      expect(result.type).toBe('ok')
+      expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 1 }])
+      expect(player.fields[1]!.stacks).toEqual([{ kind: 'grain', remaining: 1 }])
+      expect(events).toEqual([
+        expect.objectContaining({
+          type: 'farm.cropRemoved',
+          reason: 'cardEffect',
+          crops: [
+            { location: { kind: 'field', playerId: player.id, row: 0, col: 1 }, crop: 'grain', amount: 1 },
+          ],
+        }),
+      ])
+    })
+
     it('decrements two selected crop fields', () => {
       const player = makePlayer()
+      const events: DraftGameEvent[] = []
       player.fields = [
         { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
         { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] },
         { row: 1, col: 0, stacks: [{ kind: 'vegetable', remaining: 2 }] },
       ]
 
-      const result = specialEffectAction.execute(
-        makeCtx(
+      const result = specialEffectAction.execute({
+        ...makeCtx(
           player,
           {
             kind: 'remove-field-crops',
@@ -339,12 +508,23 @@ describe('specialEffectAction — mutation dispatcher', () => {
           },
           CARD_ID,
         ),
-      )
+        eventSink: makeEventSink(events),
+      })
 
       expect(result.type).toBe('ok')
       expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 1 }])
       expect(player.fields[1]!.stacks).toEqual([])
       expect(player.fields[2]!.stacks).toEqual([{ kind: 'vegetable', remaining: 2 }])
+      expect(events).toEqual([
+        expect.objectContaining({
+          type: 'farm.cropRemoved',
+          reason: 'cardEffect',
+          crops: [
+            { location: { kind: 'field', playerId: player.id, row: 0, col: 0 }, crop: 'grain', amount: 1 },
+            { location: { kind: 'field', playerId: player.id, row: 0, col: 1 }, crop: 'grain', amount: 1 },
+          ],
+        }),
+      ])
     })
 
     it('fails atomically when any selected field is not a valid source', () => {
@@ -376,7 +556,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
         ),
       )
 
-      expect(result).toEqual({ type: 'fail', logKey: 'log.specialEffectFail' })
+      expect(result).toEqual({ type: 'fail', errorKey: 'log.specialEffectFail' })
       expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
       expect(player.fields[1]!.stacks).toEqual([
         { kind: 'grain', remaining: 3 },
@@ -406,7 +586,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
         ),
       )
 
-      expect(result).toEqual({ type: 'fail', logKey: 'log.specialEffectFail' })
+      expect(result).toEqual({ type: 'fail', errorKey: 'log.specialEffectFail' })
       expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
       expect(player.fields[1]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
     })
@@ -431,11 +611,24 @@ describe('specialEffectAction — mutation dispatcher', () => {
           ),
         )
 
-        expect(result).toEqual({ type: 'fail', logKey: 'log.specialEffectFail' })
+        expect(result).toEqual({ type: 'fail', errorKey: 'log.specialEffectFail' })
         expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
         expect(player.fields[1]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
       }
     })
+  })
+
+  it('failed special-effect emits no events', () => {
+    const player = makePlayer()
+    const events: DraftGameEvent[] = []
+
+    const result = specialEffectAction.execute({
+      ...makeCtx(player, { kind: 'consume-fence', count: 1 }, CARD_ID),
+      eventSink: makeEventSink(events),
+    })
+
+    expect(result.type).toBe('fail')
+    expect(events).toEqual([])
   })
 
   // E166 Roastmaster relies on this SE kind. The plan (Task 9, F9) calls out
@@ -459,6 +652,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
 
     it('decrements source by amount and increments destination by the same amount', () => {
       const p1 = makePlayer()
+      const events: DraftGameEvent[] = []
       const fishing = makeSpace('fishing', 3)
       const tp = makeSpace('traveling-players', 1)
       const state = { actionSpaces: [fishing, tp], players: [p1] } as unknown as GameState
@@ -475,6 +669,7 @@ describe('specialEffectAction — mutation dispatcher', () => {
           resource: 'food',
           amount: 1,
         },
+        eventSink: makeEventSink(events),
       })
 
       expect(result.type).toBe('ok')
@@ -482,6 +677,15 @@ describe('specialEffectAction — mutation dispatcher', () => {
       expect(tp.resources.food).toBe(2)
       // Player resources unchanged: this is a meeple-move, not a gain.
       expect(p1.resources.food).toBe(0)
+      expect(events).toEqual([
+        expect.objectContaining({
+          type: 'resource.moved',
+          resources: { food: 1 },
+          from: { kind: 'actionSpace', spaceId: 'fishing' },
+          to: { kind: 'actionSpace', spaceId: 'traveling-players' },
+          reason: 'cardEffect',
+        }),
+      ])
     })
 
     it('fails when source has fewer than amount and leaves both spaces untouched', () => {
@@ -508,5 +712,144 @@ describe('specialEffectAction — mutation dispatcher', () => {
       expect(fishing.resources.food).toBe(0)
       expect(tp.resources.food).toBe(5)
     })
+  })
+
+  it('emits public events for future meeple removal, newborn promotion, fence use, stable build, and action accumulation', () => {
+    const player = makePlayer()
+    player.workers = [
+      { id: '1', isActive: true, isNewborn: true },
+      { id: '2', isActive: true, isNewborn: false },
+    ]
+    player.fenceSegments = [{ edge: '0-0:N', type: 'fence' }]
+    const state = {
+      players: [player],
+      actionSpaces: [
+        {
+          id: 'forest',
+          resources: {
+            wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
+            vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+          },
+          takenBy: [],
+        },
+      ],
+      futureMeeples: [
+        { id: 'f1', playerId: player.id, cardId: CARD_ID, round: 3, actionId: null, resources: { food: 1 } },
+      ],
+    } as unknown as GameState
+    const events: DraftGameEvent[] = []
+    const eventSink = makeEventSink(events)
+
+    specialEffectAction.execute({
+      ...makeCtx(player, { kind: 'remove-future-meeples', rounds: [3] }, CARD_ID, state),
+      eventSink,
+    })
+    specialEffectAction.execute({
+      ...makeCtx(player, { kind: 'promote-first-newborn' }, CARD_ID, state),
+      eventSink,
+    })
+    specialEffectAction.execute({
+      ...makeCtx(player, { kind: 'consume-fence', count: 1 }, CARD_ID, state),
+      eventSink,
+    })
+    specialEffectAction.execute({
+      ...makeCtx(player, { kind: 'add-resource-to-space', spaceId: 'forest', resource: 'wood', amount: 2 }, CARD_ID, state),
+      eventSink,
+    })
+    specialEffectAction.execute({
+      ...makeCtx(player, { kind: 'build-stable-on-first-empty-tile' }, CARD_ID, state),
+      eventSink,
+    })
+
+    expect(events).toEqual([
+      expect.objectContaining({ type: 'futureMeeple.removed', playerId: player.id, cardId: CARD_ID, rounds: [3] }),
+      expect.objectContaining({ type: 'worker.promoted', playerId: player.id, workerId: '1', from: 'newborn', to: 'adult' }),
+      expect.objectContaining({ type: 'farm.fenceConsumed', count: 1, reason: 'cardEffect' }),
+      expect.objectContaining({ type: 'action.accumulated', spaceId: 'forest', resources: { wood: 2 } }),
+      expect.objectContaining({ type: 'farm.stableBuilt', stables: [expect.objectContaining({ playerId: player.id })] }),
+    ])
+  })
+
+  it('add-resource-to-space: emits resource accumulation for card and round-card targets', () => {
+    const player = makePlayer()
+    const events: DraftGameEvent[] = []
+    const eventSink = makeEventSink(events)
+    const state = {
+      players: [player],
+      actionSpaces: [],
+    } as unknown as GameState
+
+    let result = specialEffectAction.execute({
+      ...makeCtx(
+        player,
+        { kind: 'add-resource-to-space', target: { kind: 'card', cardId: 'D75_WoodField' }, resource: 'wood', amount: 2 },
+        CARD_ID,
+        state,
+      ),
+      eventSink,
+    })
+    expect(result.type).toBe('ok')
+    result = specialEffectAction.execute({
+      ...makeCtx(
+        player,
+        { kind: 'add-resource-to-space', target: { kind: 'roundCard', round: 5 }, resource: 'food', amount: 1 },
+        CARD_ID,
+        state,
+      ),
+      eventSink,
+    })
+
+    expect(result.type).toBe('ok')
+    expect(player.cardStates.D75_WoodField?.counters?.wood).toBe(2)
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'resource.accumulated',
+        resources: { wood: 2 },
+        to: { kind: 'card', playerId: player.id, cardId: 'D75_WoodField' },
+      }),
+      expect.objectContaining({
+        type: 'resource.accumulated',
+        resources: { food: 1 },
+        to: { kind: 'roundCard', round: 5 },
+      }),
+    ])
+  })
+
+  it('plant-additional-good: adds crops to field and card-backed fields and emits crop-added', () => {
+    const player = makePlayer()
+    const events: DraftGameEvent[] = []
+    player.fields = [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] }]
+    player.cardStates.D75_WoodField = {
+      extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }] },
+    }
+
+    const result = specialEffectAction.execute({
+      ...makeCtx(
+        player,
+        {
+          kind: 'plant-additional-good',
+          locations: [
+            { kind: 'field', row: 0, col: 0 },
+            { kind: 'card-field', cardId: 'D75_WoodField' },
+          ],
+        },
+        CARD_ID,
+      ),
+      eventSink: makeEventSink(events),
+    })
+
+    expect(result.type).toBe('ok')
+    expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
+    expect(player.cardStates.D75_WoodField?.extraData?.cardFieldStacks).toEqual([{ crop: 'wood', remaining: 2 }])
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'farm.cropAdded',
+        reason: 'cardEffect',
+        crops: [
+          { location: { kind: 'field', playerId: player.id, row: 0, col: 0 }, crop: 'grain', amount: 1 },
+          { location: { kind: 'card', playerId: player.id, cardId: 'D75_WoodField' }, crop: 'wood', amount: 1 },
+        ],
+      }),
+    ])
   })
 })

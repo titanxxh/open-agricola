@@ -30,8 +30,6 @@ const listener: CardListenerRegistration = {
         sourceCard: CARD_ID,
         actionContext: { trueAction: false },
       },
-      logKey: 'log.cardGrantedAction',
-      logParams: { cardId: CARD_ID, actionId: 'sow' },
       sourceCard: CARD_ID,
     }
   },

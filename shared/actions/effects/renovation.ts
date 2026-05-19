@@ -4,6 +4,7 @@ import type {
   ActionDefinition,
   ActionExecutionResult,
   ActionFlow,
+  ComplexCost,
   PlayerState,
   Resource,
 } from '../../contract/types'
@@ -17,6 +18,7 @@ import {
   canAffordTypedFlatCost,
   payTypedFlatCost,
 } from '../payment/internal'
+import { mergeResources } from '../../utils/resources'
 
 const RENOVATE_PAYMENT_PREFIX = 'pay:renovate'
 
@@ -40,19 +42,20 @@ type RenovationTarget = Exclude<PlayerState['houseType'], 'wood'>
 
 const buildRenovationFlow = (
   target: RenovationTarget,
-  totalCost: Partial<Resource>,
+  totalCost: ComplexCost,
 ): ActionFlow => ({
   type: 'seq',
   children: [
     {
       type: 'leaf',
       actionId: 'pay',
-      // Wrap as ComplexCost so the pay leaf's multi-solution branch runs and
-      // surfaces a `prompt.selectPayment` choice when bonus modifiers (e.g.
-      // A123 FrameBuilder, A87 Conservator) make more than one variant
-      // affordable. A bare Partial<Resource> cost would auto-pay eagerly.
+      // totalCost is already a ComplexCost (with unitFee + nb + fees[0]);
+      // do NOT wrap in another { fee: ... }. The pay leaf's multi-solution
+      // branch surfaces a `prompt.selectPayment` choice when bonus modifiers
+      // (e.g. A123 FrameBuilder, A87 Conservator) make more than one variant
+      // affordable.
       params: {
-        cost: { fee: totalCost },
+        cost: totalCost,
         costType: 'renovation',
         optionPrefix: renovatePaymentOptionPrefix(target),
       },
@@ -68,22 +71,24 @@ const buildRenovationFlow = (
 
 type RenovationPlan = {
   nextType: RenovationTarget
-  cost: Partial<Resource>
+  cost: ComplexCost
 }
 
 const mergeRenovationCost = (
-  baseCost: Partial<Resource>,
+  baseCost: ComplexCost,
   costOverride?: Partial<Resource>,
-) => {
+): ComplexCost => {
   if (!costOverride) return baseCost
+  // costOverride is a per-action delta against the TOTAL cost, matching the
+  // legacy semantic where pre-spec baseCost was the pre-multiplied
+  // {[material]: rooms, reed: 1} and override modified that total. It lands
+  // in fees[0]; unitFee × nb stays the BGA-aligned per-room cost. Negative
+  // entries (e.g. D154 ChimneySweep `stone: -2`) remain in fees[0]; enumerate
+  // clamps the merged baseFee at the affordability stage so wood→clay (no
+  // stone in unitFee) doesn't credit a refund on the unrelated resource.
   return {
     ...baseCost,
-    ...Object.fromEntries(
-      Object.entries(costOverride).map(([key, value]) => [
-        key,
-        Math.max(0, (baseCost[key as keyof Resource] ?? 0) + (value ?? 0)),
-      ]),
-    ),
+    fees: [mergeResources(baseCost.fees?.[0] ?? {}, costOverride)],
   }
 }
 
@@ -100,16 +105,20 @@ export const buildRenovationPlan = (
   player: PlayerState,
   target: RenovationTarget,
 ): RenovationPlan | null => {
-  if (player.houseType === 'wood' && target === 'clay') {
-    return { nextType: 'clay', cost: { clay: player.rooms, reed: 1 } }
+  const isLegal =
+    (player.houseType === 'wood' && (target === 'clay' || target === 'stone'))
+    || (player.houseType === 'clay' && target === 'stone')
+  if (!isLegal) return null
+
+  const material: 'clay' | 'stone' = target
+  return {
+    nextType: target,
+    cost: {
+      fees: [{ reed: 1 }],
+      unitFee: { [material]: 1 },
+      nb: player.rooms,
+    },
   }
-  if (player.houseType === 'wood' && target === 'stone') {
-    return { nextType: 'stone', cost: { stone: player.rooms, reed: 1 } }
-  }
-  if (player.houseType === 'clay' && target === 'stone') {
-    return { nextType: 'stone', cost: { stone: player.rooms, reed: 1 } }
-  }
-  return null
 }
 
 /**
@@ -165,6 +174,16 @@ export const renovateHouse = (
   return true
 }
 
+const flattenRenovationCost = (cost: ComplexCost): Partial<Resource> => {
+  const unit = cost.unitFee ?? {}
+  const nb = cost.nb ?? 0
+  const acc: Partial<Resource> = {}
+  for (const [k, v] of Object.entries(unit)) {
+    acc[k as keyof Resource] = (v ?? 0) * nb
+  }
+  return mergeResources(acc, cost.fees?.[0] ?? {})
+}
+
 const renovateHouseCostPreview: ActionCostPreview = {
   isStructurallyPossible: ({ player }) =>
     player.houseType === 'wood' || player.houseType === 'clay',
@@ -172,7 +191,11 @@ const renovateHouseCostPreview: ActionCostPreview = {
     const plan = planForContext(player, params)
     return canRenovate(player, costOverride, plan)
   },
-  getBaseCost: ({ player, params }) => planForContext(player, params)?.cost ?? {},
+  getBaseCost: ({ player, params }) => {
+    const plan = planForContext(player, params)
+    if (!plan) return {}
+    return flattenRenovationCost(plan.cost)
+  },
 }
 
 const baseRenovationOptions = (player: PlayerState): ActionChoiceOption[] => {
@@ -202,7 +225,7 @@ export const renovateHouseAction: ActionDefinition = {
   choicePromptKey: 'ui.interactionChooseRenovationTarget',
   noChoiceLogKey: 'log.renovationFail',
   emitLeafActionDetail: true,
-  execute: () => ({ type: 'fail', logKey: 'log.renovationFail' }),
+  execute: () => ({ type: 'fail', errorKey: 'log.renovationFail' }),
   // 7b1: rewrite as `seq:[pay, apply-renovation]`. The pay leaf handles the
   // typed-flat (and any future ComplexCost) selection — including bonus and
   // surplus solutions — and only on success advances to apply-renovation,
@@ -210,7 +233,7 @@ export const renovateHouseAction: ActionDefinition = {
   // shared with `apply-improvement`. Stale `pay:renovate:*` choice strings
   // are intercepted by the pay leaf's own resolveChoice fallback.
   resolveChoice: ({ player, params, costs }, choice) => {
-    const failure: ActionExecutionResult = { type: 'fail', logKey: 'log.renovationFail' }
+    const failure: ActionExecutionResult = { type: 'fail', errorKey: 'log.renovationFail' }
     const payment = typeof choice === 'string' ? parseRenovatePaymentChoice(choice) : null
     const target: RenovationTarget | null =
       payment?.target

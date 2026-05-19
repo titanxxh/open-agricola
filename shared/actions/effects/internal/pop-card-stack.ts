@@ -12,9 +12,9 @@ export const popCardStackAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ state, player, sourceCard }) => {
+  execute: ({ state, player, sourceCard, eventSink }) => {
     if (!sourceCard) {
-      return { type: 'fail', logKey: 'log.actionFail' }
+      return { type: 'fail', errorKey: 'log.actionFail' }
     }
     const resource = popFromCardStack(player, sourceCard)
     if (!resource) {
@@ -25,11 +25,22 @@ export const popCardStackAction: ActionDefinition = {
     trackWorkPhaseBuildingResources(state, player.id, gain)
     addCardResourceGained(player, sourceCard, gain)
     addResourcesFromCards(player, gain)
-    return {
-      type: 'ok',
-      resourcesGained: gain,
-      logKey: 'log.cardEffectGain',
-      logParams: { gain, cardId: sourceCard },
-    }
+    eventSink?.emit<'card.stackChanged'>({
+      type: 'card.stackChanged',
+      cardId: sourceCard,
+      targetPlayerId: player.id,
+      resources: gain,
+      delta: -1,
+      reason: 'take',
+    })
+    eventSink?.emit<'resource.moved'>({
+      type: 'resource.moved',
+      resources: gain,
+      from: { kind: 'card', playerId: player.id, cardId: sourceCard },
+      to: { kind: 'player', playerId: player.id },
+      reason: 'cardEffect',
+      sourceCardId: sourceCard,
+    })
+    return { type: 'ok', resourcesGained: gain }
   },
 }

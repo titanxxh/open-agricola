@@ -1,7 +1,7 @@
 import type {
   ActionCostPreview,
   ActionDefinition,
-  ActionExecutionContext,
+  ActionMutationContext,
   ActionExecutionResult,
   FarmTilePosition,
   PlayerState,
@@ -13,7 +13,6 @@ import type {
 // construct.ts only uses room-payment helpers (S4 domain aggregate scope),
 // so no PaymentSolver call sites exist here yet.
 import {
-  buildRoomCostPerUnit,
   executeResolvedRoomPayment,
   getBuildRoomCost,
   getMaxBuildableRooms,
@@ -49,14 +48,14 @@ const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
 }
 
 const finalizeRoom = (
-  ctx: ActionExecutionContext,
+  ctx: ActionMutationContext,
   rooms: FarmTilePosition[],
   paymentChoice: string | undefined,
 ): ActionExecutionResult => {
   const lockedKeys = collectLockedFarmTileKeys(ctx.player)
   const idx = ctx.state.players.indexOf(ctx.player)
   const selection = playerBoard(ctx.state, idx).farmyard.canBuildRoom(rooms, lockedKeys)
-  if (!selection.ok) return { type: 'fail', logKey: selection.code ?? 'log.action' }
+  if (!selection.ok) return { type: 'fail', errorKey: selection.code ?? 'log.action' }
 
   const maxUnits =
     typeof ctx.actionContext?.maxRooms === 'number'
@@ -68,17 +67,16 @@ const finalizeRoom = (
     typeof maxUnits === 'number' ? { maxRooms: maxUnits } : undefined,
   )
   if (rooms.length > maxBuildableRooms) {
-    return { type: 'fail', logKey: 'log.buildRoomFail' }
+    return { type: 'fail', errorKey: 'log.buildRoomFail' }
   }
 
-  const costPerRoom = buildRoomCostPerUnit(ctx.player, ctx.costs)
   const payment = resolveRoomPaymentSelection(
     ctx.player,
-    costPerRoom,
+    ctx.costs,
     rooms.length,
     paymentChoice,
   )
-  if (payment.type !== 'selected') return { type: 'fail', logKey: 'log.buildRoomFail' }
+  if (payment.type !== 'selected') return { type: 'fail', errorKey: 'log.buildRoomFail' }
 
   const nextPlayer = JSON.parse(JSON.stringify(ctx.player)) as PlayerState
   executeResolvedRoomPayment(nextPlayer, payment)
@@ -95,6 +93,15 @@ const finalizeRoom = (
     addCardResourceGained(ctx.player, ctx.sourceCard, { [roomKey]: rooms.length })
   }
   incRoomsBuilt(ctx.player, rooms.length)
+  ctx.eventSink?.emit<'farm.roomBuilt'>({
+    type: 'farm.roomBuilt',
+    rooms: rooms.map((room) => ({
+      playerId: ctx.player.id,
+      row: room.row,
+      col: room.col,
+      type: ctx.player.houseType,
+    })),
+  })
 
   return {
     type: 'ok',
@@ -140,7 +147,7 @@ export const constructAction: ActionDefinition = {
         | undefined
       const rooms = farmPayload?.rooms
       if (!Array.isArray(rooms) || rooms.length === 0) {
-        return { type: 'fail', logKey: 'log.buildRoomFail' }
+        return { type: 'fail', errorKey: 'log.buildRoomFail' }
       }
       return finalizeRoom(ctx, rooms, choice)
     }
@@ -149,13 +156,13 @@ export const constructAction: ActionDefinition = {
     if (payload && choice === 'confirm') {
       const rooms = (payload as { rooms?: FarmTilePosition[] }).rooms
       if (!Array.isArray(rooms) || rooms.length === 0) {
-        return { type: 'fail', logKey: 'NO_SELECTION' }
+        return { type: 'fail', errorKey: 'NO_SELECTION' }
       }
       const lockedKeys = collectLockedFarmTileKeys(ctx.player)
       const idx = ctx.state.players.indexOf(ctx.player)
       const selection = playerBoard(ctx.state, idx).farmyard.canBuildRoom(rooms, lockedKeys)
       if (!selection.ok) {
-        return { type: 'fail', logKey: selection.code ?? 'log.buildRoomFail' }
+        return { type: 'fail', errorKey: selection.code ?? 'log.buildRoomFail' }
       }
 
       const maxUnits =
@@ -168,13 +175,12 @@ export const constructAction: ActionDefinition = {
         typeof maxUnits === 'number' ? { maxRooms: maxUnits } : undefined,
       )
       if (rooms.length > maxBuildableRooms) {
-        return { type: 'fail', logKey: 'log.buildRoomFail' }
+        return { type: 'fail', errorKey: 'log.buildRoomFail' }
       }
 
-      const costPerRoom = buildRoomCostPerUnit(ctx.player, ctx.costs)
       const payment = resolveRoomPaymentSelection(
         ctx.player,
-        costPerRoom,
+        ctx.costs,
         rooms.length,
       )
       if (payment.type === 'request') {
@@ -189,11 +195,11 @@ export const constructAction: ActionDefinition = {
         }
       }
       if (payment.type === 'fail') {
-        return { type: 'fail', logKey: 'log.buildRoomFail' }
+        return { type: 'fail', errorKey: 'log.buildRoomFail' }
       }
       return finalizeRoom(ctx, rooms, undefined)
     }
 
-    return { type: 'fail', logKey: 'log.buildRoomFail' }
+    return { type: 'fail', errorKey: 'log.buildRoomFail' }
   },
 }

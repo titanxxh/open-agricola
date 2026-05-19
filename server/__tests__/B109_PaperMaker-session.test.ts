@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 
-import '../../shared/cards/A/A123_FrameBuilder'
+import '../../shared/cards-display/A/A123_FrameBuilder'
 import '../../shared/cards/B/B109_PaperMaker'
 
 const setup = () => {
@@ -28,7 +27,7 @@ describe('B109_PaperMaker session', () => {
   it('makes lessons available when wood can cover the food cost via preview payment', () => {
     const resp = setup().getState()
     expect(resp.ok).toBe(true)
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId).toBe('idle')
     expect(resp.actionAvailability?.lessons).toBe(true)
   })
 

@@ -10,7 +10,7 @@ import {
   applyIsDoableHooks,
   runActionHooks,
 } from '../actions/hooks'
-import { getMatchingListeners, executeCardListener, type MatchedCardListener, type CardListenerContext } from '../cards/card-listeners'
+import { getMatchingListeners, executeCardListener, type MatchedCardListener } from '../cards/card-listeners'
 import { resolveActionPreviewCost } from '../actions/helpers/cost-preview'
 import { canPayResources } from '../actions/payment/internal'
 import { getSkipComputeReplaceListenerIds } from './replace-guard'
@@ -90,7 +90,7 @@ export class HookDispatcher {
     let sourceCard = context.sourceCard
     let replacementListenerIds = getSkipComputeReplaceListenerIds(context.actionContext)
     const skippedListenerIds = new Set(replacementListenerIds)
-    const listenerContext: CardListenerContext = { ...context, phase: 'computeReplace' }
+    const listenerContext = { ...context, phase: 'computeReplace' as const }
     const matched = getMatchingListeners(listenerContext)
     for (const entry of matched) {
       if (skippedListenerIds.has(entry.registration.id)) continue
@@ -122,7 +122,7 @@ export class HookDispatcher {
   ) {
     let doable = this.applyCostPreviewDoable(context, action, initialDoable)
     doable = applyIsDoableHooks(context, doable)
-    const listenerContext: CardListenerContext = { ...context, phase: 'isDoable', doable }
+    const listenerContext = { ...context, phase: 'isDoable' as const, doable }
     const matched = getMatchingListeners(listenerContext)
     for (const entry of matched) {
       const result = executeCardListener(entry.registration, listenerContext, {
@@ -137,7 +137,7 @@ export class HookDispatcher {
 
   computeCosts(context: ActionExecutionContext & { actionId: string }) {
     const actionResults = runActionHooks({ ...context, phase: 'computeCosts' })
-    const listenerContext: CardListenerContext = { ...context, phase: 'computeCosts' }
+    const listenerContext = { ...context, phase: 'computeCosts' as const }
     const matched = getMatchingListeners(listenerContext)
     const listenerResults: ActionHookResult[] = []
     for (const entry of matched) {
@@ -154,7 +154,7 @@ export class HookDispatcher {
     result: ActionExecutionResult,
   ) {
     const actionResults = runActionHooks({ ...context, phase: 'computeArgs', result })
-    const listenerContext: CardListenerContext = { ...context, phase: 'computeArgs', result }
+    const listenerContext = { ...context, phase: 'computeArgs' as const, result }
     const matched = getMatchingListeners(listenerContext)
     const listenerResults: ActionHookResult[] = []
     for (const entry of matched) {
@@ -170,9 +170,9 @@ export class HookDispatcher {
     context: ActionExecutionContext & { actionId: string },
   ) {
     const actionResults = runActionHooks({ ...context, phase: 'computeChoiceCandidates' })
-    const listenerContext: CardListenerContext = {
+    const listenerContext = {
       ...context,
-      phase: 'computeChoiceCandidates',
+      phase: 'computeChoiceCandidates' as const,
     }
     const matched = getMatchingListeners(listenerContext)
     const listenerResults: ActionHookResult[] = []

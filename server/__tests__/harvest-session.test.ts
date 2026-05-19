@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
-import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/D/D60_LargePottery'
 import '../../shared/cards/B/B104_SheepWalker'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
@@ -79,9 +78,42 @@ describe('harvest session flow', () => {
 
     resp = autoAdvanceRoundEnd(session)
 
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId).toBe('idle')
     expect(resp.state.round).toBe(5)
     expect(resp.state.roundPhase).toBe('work')
+
+    const eventTypes = resp.state.events.map((event) => event.type)
+    expect(eventTypes).toEqual(expect.arrayContaining([
+      'returnHome.started',
+      'worker.returned',
+      'harvest.started',
+      'harvest.phaseStarted',
+      'harvest.feedConverted',
+      'resource.paid',
+      'farm.animalBred',
+      'round.started',
+      'action.revealed',
+      'action.accumulated',
+      'work.started',
+    ]))
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'harvest.phaseStarted', harvestPhase: 'field' }),
+      expect.objectContaining({ type: 'harvest.phaseStarted', harvestPhase: 'feeding' }),
+      expect.objectContaining({ type: 'harvest.phaseStarted', harvestPhase: 'breeding' }),
+      expect.objectContaining({
+        type: 'harvest.feedConverted',
+        playerId: playerB.id,
+        source: '基础转化',
+        cost: { grain: 1 },
+        food: { food: 1 },
+      }),
+      expect.objectContaining({
+        type: 'resource.paid',
+        actorPlayerId: playerB.id,
+        paymentFor: 'feeding',
+        resources: expect.objectContaining({ grain: 1, begging: 1 }),
+      }),
+    ]))
 
     expect(resp.state.players[0]!.resources.begging).toBe(2)
     expect(resp.state.players[1]!.resources.begging).toBe(1)
@@ -151,6 +183,24 @@ describe('harvest session flow', () => {
         }),
       ]),
     )
+  })
+
+  it('emits a game-ended event when the last round completes', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.round = 14
+    state.players.forEach((player) => {
+      markAllWorkersUsed(state, player)
+      setActiveWorkerCount(player, 0)
+      player.resources.food = 10
+    })
+    session.loadState(state)
+
+    const resp = autoAdvanceRoundEnd(session, { maxIterations: 80 })
+
+    expect(resp.state.gameOver).toBe(true)
+    expect(resp.state.events).toContainEqual(expect.objectContaining({ type: 'game.ended' }))
   })
 
   // Helper for the new sourceId+exchangeIndex tests below: build a 2-player

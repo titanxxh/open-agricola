@@ -4,9 +4,7 @@ import type {
   ActionFlow,
   PlayerState,
   ActionChoiceOption,
-  ImmediateLogEntry,
   InteractionRequest,
-  LogEntry,
   Resource,
 } from '../contract/types'
 import type { InteractionContextSnapshot } from './types'
@@ -41,6 +39,10 @@ import {
   resolveSubtree,
 } from './engine-utils'
 import { withInjectedAnytimeResultFlag } from './action-context-flags'
+import { eventsToLogEntries } from '../events/log-mapper'
+import type { GameEvent } from '../contract/events'
+import { createEventQuery } from '../events/query'
+import { createBufferedEventSink, emitCardTriggered } from './card-trigger-events'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
@@ -48,12 +50,89 @@ type EngineContext = {
   space: ActionExecutionContext['space']
 }
 
+const hasLegacyLogSurface = (result: ActionExecutionResult): boolean => {
+  if (result.type === 'fail') return true
+  return false
+}
+
+const appendDerivedLogsForEventOnlyResult = (
+  int: EngineInternals,
+  context: EngineContext,
+  committed: readonly GameEvent[],
+  result: ActionExecutionResult,
+): void => {
+  if (committed.length === 0 || hasLegacyLogSurface(result)) return
+  const playerNames = Object.fromEntries(
+    context.state.players.map((player) => [player.id, player.name]),
+  )
+  const actionNames = Object.fromEntries([
+    ...context.state.actionSpaces.map((space) => [space.id, space.nameKey] as const),
+    ...[...int.registry.values()].map((action) => [action.id, action.nameKey] as const),
+  ])
+  const entries = eventsToLogEntries(committed, { playerNames, actionNames })
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    int.log.append(entries[index]!)
+  }
+}
+
+const recordEventLogDerivation = (
+  int: EngineInternals,
+  events: GameEvent[],
+  result: ActionExecutionResult,
+): void => {
+  int.eventLogDerivations.push({ events, result })
+}
+
+const clearEventLogDerivations = (int: EngineInternals): void => {
+  int.eventLogDerivations.splice(0, int.eventLogDerivations.length)
+}
+
+const ensureEventState = (state: EngineContext['state']): void => {
+  state.events ??= []
+  state.nextEventSeq ??= 1
+}
+
+const currentEventReadContext = (int: EngineInternals) => {
+  const transactionEvents = [...int.events.currentTransactionEvents()]
+  return {
+    transactionEvents,
+    eventQuery: createEventQuery(transactionEvents),
+  }
+}
+
+const commitIfEngineComplete = (
+  int: EngineInternals,
+  context: EngineContext,
+  result: ActionExecutionResult,
+): void => {
+  if (int.pendingNodeIdRef.value !== null) return
+  if (int.tree.nextUnresolved()) return
+  ensureEventState(context.state)
+  const committed = int.events.commitTransaction(context.state)
+  appendDerivedLogsForEventOnlyResult(int, context, committed, result)
+  clearEventLogDerivations(int)
+}
+
+const rollbackAndReturn = (
+  int: EngineInternals,
+  result: ActionExecutionResult & { type: 'fail' },
+): ActionExecutionResult => {
+  int.events.rollbackTransaction()
+  clearEventLogDerivations(int)
+  return result
+}
+
 const triggerSelectEvaluationOptions = (
   int: EngineInternals,
   context: ActionExecutionContext,
 ): TriggerSelectEvaluationOptions => ({
   canContinueWithoutTriggers: (actionId, resources) =>
-    canActionContinueWithoutBeforeTriggers(int, context, actionId, resources),
+    canActionContinueWithoutBeforeTriggers(
+      int,
+      { ...context, ...currentEventReadContext(int) },
+      actionId,
+      resources,
+    ),
   canReachContinuationThroughTriggers: (actionId, resources) => {
     const action = int.registry.get(actionId)
     if (!action) return false
@@ -67,7 +146,7 @@ const triggerSelectEvaluationOptions = (
       },
     )
     return int.hooks.applyIsDoable(
-      { ...scopedContext, actionId },
+      { ...scopedContext, ...currentEventReadContext(int), actionId },
       action,
       directDoable,
     )
@@ -101,56 +180,6 @@ const actionContextForNode = (
     ? { ...(node.actionContext ?? {}), skipBeforeTriggers: true }
     : node.actionContext
 
-type ImmediateLogCarrier = {
-  logKey?: string
-  logParams?: Record<string, unknown>
-  immediateLogs?: ImmediateLogEntry[]
-}
-
-const stableSerializeLogValue = (value: unknown): string => {
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableSerializeLogValue(item)).join(',')}]`
-  }
-  if (value && typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
-      a.localeCompare(b),
-    )
-    return `{${entries
-      .map(([key, item]) => `${JSON.stringify(key)}:${stableSerializeLogValue(item)}`)
-      .join(',')}}`
-  }
-  return JSON.stringify(value)
-}
-
-const serializeImmediateLog = (entry: ImmediateLogEntry): string =>
-  `${entry.key}:${stableSerializeLogValue(entry.params ?? {})}`
-
-const collectImmediateLogs = (
-  playerName: string,
-  result: ImmediateLogCarrier | null | undefined,
-  options: { includeLegacyLogKey?: boolean } = {},
-): LogEntry[] => {
-  if (!result) return []
-  const entries = [...(result.immediateLogs ?? [])]
-  const seenEntries = new Set(entries.map((entry) => serializeImmediateLog(entry)))
-  if ((options.includeLegacyLogKey ?? true) && result.logKey) {
-    const legacyEntry = {
-      key: result.logKey,
-      params: result.logParams,
-    }
-    if (!seenEntries.has(serializeImmediateLog(legacyEntry))) {
-      entries.unshift(legacyEntry)
-    }
-  }
-  return entries.map((entry) => ({
-    key: entry.key,
-    params: {
-      player: playerName,
-      ...(entry.params ?? {}),
-    },
-  }))
-}
-
 /**
  * S4c PR5 — extracted from `Engine.resolveChoice`. Resolve a pending choice
  * against the engine tree. Threading the optional `payload` lets
@@ -163,13 +192,15 @@ export function engineResolveChoice(
   context: EngineContext,
   payload?: Record<string, unknown>,
 ): ActionExecutionResult {
+  ensureEventState(context.state)
+  int.events.ensureTransaction()
   if (int.pendingNodeIdRef.value) {
     const node = int.tree.findNodeById(int.pendingNodeIdRef.value)
     const explicitPending = node?.getPending()
     if (node && explicitPending) {
       const envelope = pendingEnvelopeFromHostNode(node)
       if (envelope && !isPendingChoiceValueAllowed(envelope, choice)) {
-        return { type: 'fail', logKey: 'log.buildRoomFail' }
+        return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
       }
       if (
         node.optional === true &&
@@ -189,7 +220,11 @@ export function engineResolveChoice(
       }
       if (node instanceof ParallelNode && node.mode === 'trigger-select') {
         node.clearPending()
-        const offered = evaluateTriggerSelect(node, context, triggerSelectEvaluationOptions(int, context)).options
+        const offered = evaluateTriggerSelect(
+          node,
+          { ...context, ...currentEventReadContext(int) },
+          triggerSelectEvaluationOptions(int, context),
+        ).options
         if (offered.length === 0) {
           node.resolve()
           int.pendingNodeIdRef.value = null
@@ -198,7 +233,7 @@ export function engineResolveChoice(
         const selected = offered.find((opt) => opt.value === choice)
         if (!selected || selected.disabled) {
           int.pendingNodeIdRef.value = null
-          return { type: 'fail', logKey: 'log.buildRoomFail' }
+          return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
         }
         if (choice === '__pass__') {
           node.resolveRemainingTriggerChildrenForPass()
@@ -208,7 +243,7 @@ export function engineResolveChoice(
         const child = node.chooseCard(choice)
         if (!child) {
           int.pendingNodeIdRef.value = null
-          return { type: 'fail', logKey: 'log.buildRoomFail' }
+          return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
         }
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
@@ -222,7 +257,11 @@ export function engineResolveChoice(
       }
     }
     if (node instanceof ParallelNode && node.mode === 'trigger-select') {
-      const offered = evaluateTriggerSelect(node, context, triggerSelectEvaluationOptions(int, context)).options
+      const offered = evaluateTriggerSelect(
+        node,
+        { ...context, ...currentEventReadContext(int) },
+        triggerSelectEvaluationOptions(int, context),
+      ).options
       if (offered.length === 0) {
         node.resolve()
         int.pendingNodeIdRef.value = null
@@ -230,7 +269,7 @@ export function engineResolveChoice(
       }
       const selected = offered.find((opt) => opt.value === choice)
       if (!selected || selected.disabled) {
-        return { type: 'fail', logKey: 'log.buildRoomFail' }
+        return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
       }
       if (choice === '__pass__') {
         node.resolveRemainingTriggerChildrenForPass()
@@ -240,7 +279,7 @@ export function engineResolveChoice(
       const child = node.chooseCard(choice)
       if (!child) {
         int.pendingNodeIdRef.value = null
-        return { type: 'fail', logKey: 'log.buildRoomFail' }
+        return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
       }
       int.pendingNodeIdRef.value = null
       return { type: 'ok' }
@@ -277,6 +316,7 @@ export function engineResolveChoice(
       }
       const replaceResult = int.hooks.applyComputeReplace({
         ...executionContext,
+        ...currentEventReadContext(int),
         actionId: child.actionId,
       })
       const actionId = replaceResult.actionId
@@ -305,10 +345,11 @@ export function engineResolveChoice(
       const action = int.registry.get(actionId)
       if (!action) {
         int.pendingNodeIdRef.value = null
-        return { type: 'fail', logKey: 'log.buildRoomFail' }
+        return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
       }
       const costResults = int.hooks.computeCosts({
         ...executionContext,
+        ...currentEventReadContext(int),
         actionId,
       })
       const costOverride = costResults.reduce<Partial<PlayerState['resources']>>(
@@ -326,7 +367,9 @@ export function engineResolveChoice(
       executionContext.costs =
         Object.keys(costOverride).length > 0 ? costOverride : undefined
       const skipBefore = int.beforePhaseFlowNodeIds.has(child.id)
-      const beforePhase = skipBefore ? { matchedListeners: [] } : int.hooks.before({ ...executionContext, actionId })
+      const beforePhase = skipBefore
+        ? { matchedListeners: [] }
+        : int.hooks.before({ ...executionContext, ...currentEventReadContext(int), actionId })
       const beforeBaseEvent = buildListenerEvent(executionContext, {})
       const beforeActivateNodes = buildPhaseTrailingNodes(
         int,
@@ -352,15 +395,39 @@ export function engineResolveChoice(
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
-      const result = action.execute(executionContext)
-      int.hooks.during({ ...executionContext, actionId }, result)
+      const eventFrame = int.events.beginFrame({
+        actorPlayerId: executionContext.player.id,
+        sourceActionId: actionId,
+        sourceCardId: executionContext.sourceCard,
+      })
+      const eventBuffer = createBufferedEventSink()
+      const result = action.execute({
+        ...executionContext,
+        eventSink: eventBuffer.sink,
+      })
+      if (result.type === 'fail') {
+        eventFrame.rollback()
+        return rollbackAndReturn(int, result)
+      }
+      if (result.type !== 'request') {
+        emitCardTriggered(int, eventFrame.sink, executionContext, actionId, {
+          replacement: Boolean(replaceResult.sourceCard && replaceResult.sourceCard !== child.sourceCard),
+        })
+      }
+      eventBuffer.flushTo(eventFrame.sink)
+      ensureEventState(context.state)
+      recordEventLogDerivation(int, eventFrame.complete(context.state), result)
+      int.hooks.during({ ...executionContext, ...currentEventReadContext(int), actionId }, result)
       if (result.type === 'request' && (result.request.kind === 'choice' || result.request.kind === 'farm-select')) {
         // S2 Task 6: also accept farm-select kind emitted from an Or/Xor
         // child leaf. The computeArgs merging path only applies to 'choice'
         // kind (extraOptions hook); farm-select carries its own structured
         // payload + optional `options` (confirm/cancel).
         const argResults = result.request.kind === 'choice'
-          ? int.hooks.computeArgs({ ...executionContext, actionId }, result)
+          ? int.hooks.computeArgs(
+              { ...executionContext, ...currentEventReadContext(int), actionId },
+              result,
+            )
           : []
         const baseOptions: ActionChoiceOption[] = result.request.kind === 'choice'
           ? result.request.options
@@ -408,18 +475,13 @@ export function engineResolveChoice(
           ? { ...result, request: updatedRequest }
           : result
       }
-      if (result.type === 'ok' || result.type === 'flow') {
-        collectImmediateLogs(context.player.name, result).forEach((entry) => {
-          int.log.append(entry)
-        })
-      }
       const immediatePhase = int.hooks.immediatelyAfter(
-        { ...executionContext, actionId, choice },
+        { ...executionContext, ...currentEventReadContext(int), actionId, choice },
         result,
         choice,
       )
       const afterPhase = int.hooks.after(
-        { ...executionContext, actionId, choice },
+        { ...executionContext, ...currentEventReadContext(int), actionId, choice },
         result,
         choice,
       )
@@ -428,11 +490,6 @@ export function engineResolveChoice(
         ...immediatePhase.actionHookResults,
         ...afterPhase.actionHookResults,
       ]
-      allResults
-        .flatMap((entry) => collectImmediateLogs(context.player.name, entry))
-        .forEach((entry) => {
-          int.log.append(entry)
-        })
 
       const hookFlows = allResults
         .map((entry) => entry.flow
@@ -472,7 +529,7 @@ export function engineResolveChoice(
       // (resolveActionStep) for the same ordering rationale.
       const insertAnchor = node instanceof XorNode ? node.id : child.id
       const trailingHookNodes = [
-        ...buildFollowUpNodes(int, followUps, child.id, context.player),
+        ...buildFollowUpNodes(int, followUps, child.id, context.player, context.state),
         ...immediateActivateNodes,
         ...afterActivateNodes,
       ]
@@ -496,6 +553,7 @@ export function engineResolveChoice(
         node.resolve(choice)
       }
       int.pendingNodeIdRef.value = null
+      commitIfEngineComplete(int, context, result)
       return result
     }
   }
@@ -522,15 +580,37 @@ export function engineResolveChoice(
   }
   pendingHost?.clearPending()
   let result: ActionExecutionResult
+  let eventFrame: ReturnType<EngineInternals['events']['beginFrame']> | null = null
   if (action.resolveChoice) {
+    eventFrame = int.events.beginFrame({
+      actorPlayerId: executionContext.player.id,
+      sourceActionId: actionId,
+      sourceCardId: executionContext.sourceCard,
+    })
+    const eventBuffer = createBufferedEventSink()
     result = withInjectedAnytimeResultFlag(
-      action.resolveChoice(executionContext, choice, payload),
+      action.resolveChoice({
+        ...executionContext,
+        eventSink: eventBuffer.sink,
+      }, choice, payload),
       executionContext.actionContext,
     )
+    if (result.type !== 'fail' && result.type !== 'request') {
+      emitCardTriggered(int, eventFrame.sink, executionContext, actionId)
+    }
+    if (result.type !== 'fail') {
+      eventBuffer.flushTo(eventFrame.sink)
+    }
   } else {
     return { type: 'ok' }
   }
-  int.hooks.during({ ...executionContext, actionId }, result)
+  if (result.type === 'fail') {
+    eventFrame.rollback()
+  } else {
+    ensureEventState(context.state)
+    recordEventLogDerivation(int, eventFrame.complete(context.state), result)
+  }
+  int.hooks.during({ ...executionContext, ...currentEventReadContext(int), actionId }, result)
   if (result.type === 'fail' && result.recoverable === true && pendingHost && pendingEnvelope) {
     const contextSnapshot = pendingEnvelope.contextSnapshot as InteractionContextSnapshot | undefined
     applyInteractionRequest(int, {
@@ -549,6 +629,9 @@ export function engineResolveChoice(
       actionContext: contextSnapshot?.actionContext,
     })
     return result
+  }
+  if (result.type === 'fail') {
+    return rollbackAndReturn(int, result)
   }
   if (result.type === 'request' && result.request.kind === 'choice') {
     // Merge ActionDef-declared actionContext patches into the pending context.
@@ -577,24 +660,22 @@ export function engineResolveChoice(
     })
     return result
   }
-  if (result.type === 'ok' || result.type === 'flow') {
-    collectImmediateLogs(context.player.name, result).forEach((entry) => {
-      int.log.append(entry)
-    })
-  }
   const insertionTargetId = pendingEnvelope?.ownerNodeId ?? pendingHost?.id ?? int.pendingNodeIdRef.value
-  const immediatePhase = int.hooks.immediatelyAfter({ ...executionContext, actionId, choice }, result, choice)
-  const afterPhase = int.hooks.after({ ...executionContext, actionId, choice }, result, choice)
+  const immediatePhase = int.hooks.immediatelyAfter(
+    { ...executionContext, ...currentEventReadContext(int), actionId, choice },
+    result,
+    choice,
+  )
+  const afterPhase = int.hooks.after(
+    { ...executionContext, ...currentEventReadContext(int), actionId, choice },
+    result,
+    choice,
+  )
 
   const allResults = [
     ...immediatePhase.actionHookResults,
     ...afterPhase.actionHookResults,
   ]
-  allResults
-    .flatMap((entry) => collectImmediateLogs(context.player.name, entry))
-    .forEach((entry) => {
-      int.log.append(entry)
-    })
 
   const hookFlows = allResults
     .map((entry) => entry.flow
@@ -637,7 +718,7 @@ export function engineResolveChoice(
   //   [..., insertionTarget, hookFlows..., flowNode, trailingHooks..., ...]
   if (insertionTargetId) {
     const trailingHookNodes = [
-      ...buildFollowUpNodes(int, followUps, insertionTargetId, context.player),
+      ...buildFollowUpNodes(int, followUps, insertionTargetId, context.player, context.state),
       ...immediateActivateNodes,
       ...afterActivateNodes,
     ]
@@ -668,5 +749,6 @@ export function engineResolveChoice(
     }
   }
   int.pendingNodeIdRef.value = null
+  commitIfEngineComplete(int, context, result)
   return result
 }

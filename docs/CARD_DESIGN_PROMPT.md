@@ -1,7 +1,7 @@
 # Card Design Prompt 文档
 
 > **本文档面向两类受众**：
-> - **官方卡作者**（在 `shared/cards/<deck>/<id>.ts` 里写 TS 模块）—— 直接 import 任意 helper / hook。权威参考：`docs/ARCHITECTURE.md` + `docs/card_progress.md` §3 + `shared/cards/card-effects.ts`（`CardEffect` 类型 / `cardEffectHooks` 数组）+ `shared/actions/hooks.ts`（`ActionHookPhase`）。
+> - **官方卡作者**（在 `shared/cards/<deck>/<id>.ts` 里写 TS 模块）—— 直接 import 任意 helper / hook。权威参考：`docs/ARCHITECTURE.md` + `docs/card_implementation_status.md` + `shared/cards/card-effects.ts`（`CardEffect` 类型 / `cardEffectHooks` 数组）+ `shared/actions/hooks.ts`（`ActionHookPhase`）。
 > - **自定义卡 / Workshop 作者**（通过 AI Designer 提交 TS 源码）—— 受 `server/custom-code-executor/engine.ts`（isolated-vm 沙盒）+ `server/ast-validator.ts`（AST 白名单）双重约束。**沙盒可用接口的唯一真源是 [`docs/CUSTOM_CARD_SANDBOX.md`](./CUSTOM_CARD_SANDBOX.md)**——hook / phase / scope / actionId / 禁用标识符的权威清单都在那里，由 `pnpm run check:prompt-sync` 与代码自动比对。本文件下面的"自定义卡沙盒约束"章节是给设计者看的导读，遇到不一致以 SANDBOX.md 为准。LLM 系统提示词以 `client/services/llmPrompts.ts:CARD_DESIGNER_SYSTEM_PROMPT` 为准。
 >
 > - 工坊提交流程的 PR 文件清单（display + impl 双文件 + 4 个补丁文件）

@@ -8,6 +8,7 @@ import type {
   PlayerState,
   Resource,
 } from '../../contract/types'
+import type { EventSink, PaymentPurpose } from '../../contract/events'
 import { addCardResourcePaid } from '../../cards/helpers/card-state'
 // PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
 // the new payment module. Other helpers (preview-cost / typed-flat /
@@ -107,6 +108,52 @@ const normalizePayParams = (
   return undefined
 }
 
+const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
+  const out: Partial<Resource> = {}
+  Object.entries(resources).forEach(([key, value]) => {
+    if (typeof value !== 'number' || value <= 0) return
+    out[key as keyof Resource] = value
+  })
+  return out
+}
+
+const splitSourceIds = (csv: string | undefined): string[] =>
+  csv ? csv.split(',').map((s) => s.trim()).filter(Boolean) : []
+
+const paymentPurpose = (
+  costType: CostModifierType | undefined,
+): PaymentPurpose => costType ?? 'cardEffect'
+
+const emitPaidEvent = (
+  eventSink: EventSink | undefined,
+  player: PlayerState,
+  resources: Partial<Resource>,
+  costType: CostModifierType | undefined,
+  sourceCard: string | undefined,
+  provenance: {
+    bonusUsed?: string
+    bonusChoiceIndex?: Record<string, number>
+    returnedCardId?: string
+  } = {},
+) => {
+  const paid = positiveResources(resources)
+  if (Object.keys(paid).length === 0) return
+  const bonusSources = splitSourceIds(provenance.bonusUsed)
+  eventSink?.emit<'resource.paid'>({
+    type: 'resource.paid',
+    resources: paid,
+    to: { kind: 'supply' },
+    paymentFor: paymentPurpose(costType),
+    paymentSources: [
+      { from: { kind: 'player', playerId: player.id }, resources: paid },
+    ],
+    ...(sourceCard ? { sourceCardId: sourceCard } : {}),
+    ...(bonusSources.length > 0 ? { bonusSources } : {}),
+    ...(provenance.bonusChoiceIndex ? { bonusChoiceIndex: provenance.bonusChoiceIndex } : {}),
+    ...(provenance.returnedCardId ? { returnedCardId: provenance.returnedCardId } : {}),
+  })
+}
+
 const buildSelectedResult = (
   solution: PaymentSolution,
   sourceCard: string | undefined,
@@ -114,6 +161,7 @@ const buildSelectedResult = (
   player: import('../../contract/types').PlayerState,
   state: import('../../contract/types').GameState,
   includeReturnedCard?: boolean,
+  eventSink?: EventSink,
 ): ActionExecutionResult => {
   executePaymentSolution(player, solution, { costType, state })
   if (includeReturnedCard && solution.cardUsed) {
@@ -140,6 +188,11 @@ const buildSelectedResult = (
   if (sourceCard) {
     addCardResourcePaid(player, sourceCard, resourcesPaid)
   }
+  emitPaidEvent(eventSink, player, resourcesPaid, costType, sourceCard, {
+    bonusUsed: solution.bonusUsed,
+    bonusChoiceIndex: solution.bonusChoiceIndex,
+    returnedCardId: solution.cardUsed,
+  })
   const extraData: Record<string, unknown> = {
     resourcesPaid,
     bonusUsed: solution.bonusUsed
@@ -154,15 +207,6 @@ const buildSelectedResult = (
   }
   if (solution.feeIndex !== undefined) {
     extraData.feeIndex = solution.feeIndex
-  }
-  if (sourceCard) {
-    return {
-      type: 'ok',
-      resourcesPaid,
-      logKey: 'log.cardEffectPay',
-      logParams: { cost: resourcesPaid, cardId: sourceCard },
-      extraData,
-    }
   }
   return {
     type: 'ok',
@@ -208,9 +252,9 @@ export const payAction: ActionDefinition = {
       return PaymentSolver.computeOptions(buildSingletonState(player), 0, p.cost, ctx).length > 0
     },
   },
-  execute: ({ player, params, sourceCard, state }) => {
+  execute: ({ player, params, sourceCard, state, eventSink }) => {
     const p = normalizePayParams(params)
-    if (!p?.cost) return { type: 'fail', logKey: 'log.payFail' }
+    if (!p?.cost) return { type: 'fail', errorKey: 'log.payFail' }
     if (PaymentSolver.isComplexCost(p.cost)) {
       const optionPrefix = p.optionPrefix ?? 'pay:generic'
       const selection = resolveCostPaymentSelection(
@@ -218,7 +262,7 @@ export const payAction: ActionDefinition = {
         p.cost,
         optionPrefix,
         p.paymentChoice,
-        { type: 'fail', logKey: 'log.payFail' },
+        { type: 'fail', errorKey: 'log.payFail' },
         {
           costType: p.costType,
           includeReturnedCard: p.includeReturnedCard,
@@ -235,6 +279,7 @@ export const payAction: ActionDefinition = {
         player,
         state,
         p.includeReturnedCard,
+        eventSink,
       )
     }
     const flat = p.cost as Partial<Resource>
@@ -246,7 +291,7 @@ export const payAction: ActionDefinition = {
     // afford the cost via a trade swap.
     if (p.costType) {
       const detailed = payTypedFlatCostDetailed(player, flat, p.costType, state)
-      if (!detailed.ok) return { type: 'fail', logKey: 'log.payFail' }
+      if (!detailed.ok) return { type: 'fail', errorKey: 'log.payFail' }
       const resourcesPaid = detailed.resourcesPaid
       if (
         p.costType === 'major-improvement'
@@ -272,30 +317,26 @@ export const payAction: ActionDefinition = {
       }
       if (detailed.cardUsed) extraData.returnedCardId = detailed.cardUsed
       if (detailed.feeIndex !== undefined) extraData.feeIndex = detailed.feeIndex
+      if (detailed.bonusChoiceIndex) extraData.bonusChoiceIndex = detailed.bonusChoiceIndex
+      emitPaidEvent(eventSink, player, resourcesPaid, p.costType, sourceCard, {
+        bonusUsed: detailed.bonusUsed,
+        bonusChoiceIndex: detailed.bonusChoiceIndex,
+        returnedCardId: detailed.cardUsed,
+      })
       if (sourceCard) {
         addCardResourcePaid(player, sourceCard, resourcesPaid)
-        return {
-          type: 'ok',
-          resourcesPaid,
-          logKey: 'log.cardEffectPay',
-          logParams: { cost: resourcesPaid, cardId: sourceCard },
-          extraData,
-        }
+        return { type: 'ok', resourcesPaid, extraData }
       }
       return { type: 'ok', resourcesPaid, extraData }
     }
     if (!PaymentSolver.canAfford(buildSingletonState(player), 0, flat, { actionId: 'pay', costType: 'none' })) {
-      return { type: 'fail', logKey: 'log.payFail' }
+      return { type: 'fail', errorKey: 'log.payFail' }
     }
     payResources(player, flat)
+    emitPaidEvent(eventSink, player, flat, p.costType, sourceCard)
     if (sourceCard) {
       addCardResourcePaid(player, sourceCard, flat)
-      return {
-        type: 'ok',
-        resourcesPaid: flat,
-        logKey: 'log.cardEffectPay',
-        logParams: { cost: flat, cardId: sourceCard },
-      }
+      return { type: 'ok', resourcesPaid: flat }
     }
     return { type: 'ok', resourcesPaid: flat }
   },
@@ -306,9 +347,9 @@ export const payAction: ActionDefinition = {
   // Without this hook the engine's fallthrough would return `{type:'ok'}`
   // without paying, leaving downstream `seq` leaves (e.g. apply-improvement)
   // running on un-paid state.
-  resolveChoice: ({ player, params, sourceCard, state }, choice) => {
+  resolveChoice: ({ player, params, sourceCard, state, eventSink }, choice) => {
     const p = normalizePayParams(params)
-    if (!p?.cost) return { type: 'fail', logKey: 'log.payFail' }
+    if (!p?.cost) return { type: 'fail', errorKey: 'log.payFail' }
     if (!PaymentSolver.isComplexCost(p.cost)) {
       // Non-ComplexCost paths never reach resolveChoice (execute paid eagerly
       // and returned `ok`). Treat any stray invocation as a no-op success.
@@ -325,14 +366,21 @@ export const payAction: ActionDefinition = {
     const choiceLooksLikePayment =
       choice.startsWith(`${optionPrefix}:`) || /^\d+$/.test(choice)
     if (!choiceLooksLikePayment) {
-      return payAction.execute({ player, params, sourceCard, state, space: undefined as never })
+      return payAction.execute({
+        player,
+        params,
+        sourceCard,
+        state,
+        space: undefined as never,
+        eventSink,
+      })
     }
     const selection = resolveCostPaymentSelection(
       player,
       p.cost,
       optionPrefix,
       choice,
-      { type: 'fail', logKey: 'log.payFail' },
+      { type: 'fail', errorKey: 'log.payFail' },
       {
         costType: p.costType,
         includeReturnedCard: p.includeReturnedCard,
@@ -349,6 +397,7 @@ export const payAction: ActionDefinition = {
       player,
       state,
       p.includeReturnedCard,
+      eventSink,
     )
   },
 }

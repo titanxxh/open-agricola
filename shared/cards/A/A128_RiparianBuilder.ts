@@ -22,8 +22,6 @@ const triggerBuildListener: CardListenerRegistration = {
         sourceCard: CARD_ID,
         actionContext: { maxRooms: 1, trueAction: false },
       },
-      logKey: 'log.cardGrantedAction',
-      logParams: { cardId: CARD_ID, actionId: 'construct' },
       sourceCard: CARD_ID,
     }
   },

@@ -4,7 +4,6 @@ import type {
   ActionFlow,
   GameState,
   PlayerState,
-  Resource,
 } from '../../contract/types'
 import { getOccupation } from '../../cards/registry-display'
 import { getCardModifiers } from '../../cards/card-modifiers'
@@ -14,39 +13,8 @@ import {
   getRegisteredCardListeners,
   type CardListenerContext,
 } from '../../cards/card-listeners'
+import { createEventQuery } from '../../events/query'
 import type { ActionHookPhase } from '../hooks'
-
-const getPositiveResourceLog = (
-  resources?: Partial<Resource> | null,
-): Partial<Resource> | undefined => {
-  if (!resources) return undefined
-  const positiveEntries = Object.entries(resources).filter(
-    ([, amount]) => (amount ?? 0) > 0,
-  )
-  if (positiveEntries.length === 0) return undefined
-  return Object.fromEntries(positiveEntries) as Partial<Resource>
-}
-
-const readActionBonusSources = (player: PlayerState): string[] | undefined => {
-  const sources = player._activeActionBonusSources
-  if (!sources || sources.length === 0) return undefined
-  return [...sources]
-}
-
-const buildOccupationLogParams = (
-  occupationId: string,
-  costResources: Partial<Resource> | undefined,
-  bonusSources?: string[],
-) => {
-  const params: Record<string, unknown> = {
-    occupations: occupationId,
-    costResources: getPositiveResourceLog(costResources) ?? {},
-  }
-  if (bonusSources && bonusSources.length > 0) {
-    params.bonusSources = [...bonusSources]
-  }
-  return params
-}
 
 export type ApplyOccupationPlayParams = {
   occupationId: string
@@ -99,31 +67,28 @@ export const applyOccupationPlayAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ player, params, state, sourceCard }): ActionExecutionResult => {
+  execute: ({ player, params, state, sourceCard, eventSink }): ActionExecutionResult => {
     if (!isApplyOccupationPlayParams(params)) {
-      return { type: 'fail', logKey: 'log.occupationFail' }
+      return { type: 'fail', errorKey: 'log.occupationFail' }
     }
     const { occupationId } = params
     const occupation = getOccupation(occupationId)
     if (!occupation) {
-      return { type: 'fail', logKey: 'log.occupationFail' }
+      return { type: 'fail', errorKey: 'log.occupationFail' }
     }
     // Pop the seq-shared stash that the pay leaf wrote so we can echo
     // `resourcesPaid` back into log.playOccupation. Apply-occupation-play
     // doesn't currently pass it onwards (no occupation onBuy keys on
     // returnedCardId today), but pop here regardless so it doesn't leak
     // into the next pay leaf.
-    const paymentInfo = player._pendingImprovementPaymentInfo
     delete player._pendingImprovementPaymentInfo
     void sourceCard
-    const bonusSources = readActionBonusSources(player)
     applyOccupation(state, player, occupationId)
-    const logParams = buildOccupationLogParams(
-      occupationId,
-      paymentInfo?.resourcesPaid,
-      bonusSources,
-    )
-    const immediateLogs = [{ key: 'log.playOccupation', params: logParams }]
+    eventSink?.emit<'card.played'>({
+      type: 'card.played',
+      cardId: occupationId,
+      cardType: 'occupation',
+    })
 
     // Combine effect.onBuy (from card definitions) with the just-played
     // card's own 'after play-occupation' listener. The outer engine collects
@@ -140,8 +105,10 @@ export const applyOccupationPlayAction: ActionDefinition = {
       space: { id: '' } as never,
       actionId: 'play-occupation',
       phase: 'after' as ActionHookPhase,
+      transactionEvents: [],
+      eventQuery: createEventQuery([]),
       choice: occupationId,
-    } as CardListenerContext
+    }
     for (const reg of getRegisteredCardListeners()) {
       if (!reg.cardIds || !reg.cardIds.includes(occupationId)) continue
       if (reg.actions && !reg.actions.includes('play-occupation')) continue
@@ -168,19 +135,8 @@ export const applyOccupationPlayAction: ActionDefinition = {
       return {
         type: 'flow',
         flow: combinedFlow,
-        immediateLogs:
-          activation.type === 'flow'
-            ? [...immediateLogs, ...(activation.immediateLogs ?? [])]
-            : immediateLogs,
-        logKey: 'log.playOccupation',
-        logParams,
       }
     }
-    return {
-      type: 'ok',
-      immediateLogs,
-      logKey: 'log.playOccupation',
-      logParams,
-    }
+    return { type: 'ok' }
   },
 }

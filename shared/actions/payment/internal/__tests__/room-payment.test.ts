@@ -1,66 +1,66 @@
-import { describe, it, expect } from 'vitest'
-import { buildRoomCostPerUnit } from '../room-payment'
-import type { PlayerState, CostModifier } from '../../../../contract/types'
+import { describe, expect, it } from 'vitest'
+import { computeAllBuyableCombinations } from '../enumerate'
+import type { CostModifier, PaymentSolution, PlayerState, Resource } from '../../../../contract/types'
+
+const nonZeroPaid = (sol: PaymentSolution): Partial<Resource> => {
+  const out: Partial<Resource> = {}
+  for (const [k, v] of Object.entries(sol.resourcesPaid)) {
+    if ((v ?? 0) !== 0) out[k as keyof Resource] = v
+  }
+  return out
+}
 
 const makePlayer = (modifiers: CostModifier[], houseType: 'wood' | 'clay' | 'stone' = 'clay'): PlayerState => ({
-  id: 'p1',
-  houseType,
-  rooms: 1,
-  roomTiles: [], fields: [], stableTiles: [], pastures: [],
-  cardStates: {},
-  resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0 },
-  occupationPlayed: [], minorPlayed: [],
-  activeModifiers: modifiers,
-} as unknown as PlayerState)
+  id: 'p1', name: 'P1', color: 'red',
+  resources: { wood: 99, clay: 99, reed: 99, stone: 99, food: 99, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
+  workers: [], rooms: 1, houseType, fields: [], roomTiles: [], stableTiles: [],
+  improvements: [], minorHand: [], minorPlayed: [], occupationHand: [], occupationPlayed: [],
+  extraOccupationsFromCards: [], playedCards: [],
+  houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {}, pastures: [], fenceSegments: [],
+  majorEffects: { wellRounds: 0 }, startPlayer: false, activeModifiers: modifiers, cardStates: {},
+  stats: {} as never,
+})
 
-describe('buildRoomCostPerUnit (multi-key trade)', () => {
-  it('multi-key trade adds {clay:2,reed:1,wood:1} alongside base {clay:5,reed:2}', () => {
+describe('construct cost via unified enumerate (was buildRoomCostPerUnit)', () => {
+  // Migrated case 1: D15 multi-key trade — replicate the BGA cost shape and
+  // verify the alternative is enumerated.
+  it('D15 ClaySupports multi-key unit trade produces 1-room cost variants', () => {
     const player = makePlayer([{
       type: 'trade', cardId: 'D15_ClaySupports', appliesTo: ['construct'],
+      scope: 'unit',
       from: { wood: 1 }, to: { clay: 3, reed: 1 },
     }])
-    const result = buildRoomCostPerUnit(player) as { fees: any[] } | any
-    const fees = (result as any).fees ?? [result]
-    expect(fees).toEqual(expect.arrayContaining([
-      { clay: 5, reed: 2 },
-      { clay: 2, reed: 1, wood: 1 },
-    ]))
+    const sols = computeAllBuyableCombinations(
+      player,
+      { unitFee: { clay: 5, reed: 2 }, nb: 1 },
+      undefined,
+      'construct',
+    )
+    // Expect base path AND wood-swap path
+    expect(sols.length).toBeGreaterThanOrEqual(2)
+    const swapped = sols.find((s) => s.tradesUsed.some((t) => t.times > 0))
+    const noSwap = sols.find((s) => s.tradesUsed.every((t) => t.times === 0))
+    expect(swapped && nonZeroPaid(swapped)).toEqual({ clay: 2, reed: 1, wood: 1 })
+    expect(noSwap && nonZeroPaid(noSwap)).toEqual({ clay: 5, reed: 2 })
   })
 
-  it('multi-key trade with maxAmount=undefined defaults to perUseLimit (here 1 for base 5C+2R)', () => {
+  // Migrated case 2: max=1 implicit for unit trades — D15 with nb=1 maxes
+  // a single use of the swap (Σ ≤ nb).
+  it('D15 unit trade respects Σ-times ≤ nb (nb=1 → at most one swap)', () => {
     const player = makePlayer([{
       type: 'trade', cardId: 'D15_ClaySupports', appliesTo: ['construct'],
+      scope: 'unit',
       from: { wood: 1 }, to: { clay: 3, reed: 1 },
     }])
-    const result = buildRoomCostPerUnit(player) as any
-    const fees = result.fees ?? [result]
-    const tradedOnce = fees.find((f: any) => f.wood === 1)
-    expect(tradedOnce).toEqual({ clay: 2, reed: 1, wood: 1 })
-  })
-
-  it('single-key trade still works (regression: B109/B155/D117 pattern)', () => {
-    const player = makePlayer([{
-      type: 'trade', cardId: 'TEST', appliesTo: ['construct'],
-      from: { wood: 1 }, to: { clay: 2 },
-    }])
-    const result = buildRoomCostPerUnit(player) as any
-    const fees = result.fees ?? [result]
-    expect(fees).toEqual(expect.arrayContaining([
-      { clay: 5, reed: 2 },
-      { clay: 3, reed: 2, wood: 1 },
-      { clay: 1, reed: 2, wood: 2 },
-    ]))
-  })
-
-  it('multi-key trade does NOT apply when base lacks one of to-keys', () => {
-    const player = makePlayer([{
-      type: 'trade', cardId: 'TEST', appliesTo: ['construct'],
-      from: { wood: 1 }, to: { clay: 3, reed: 1 },
-    }], 'wood')
-    const result = buildRoomCostPerUnit(player) as any
-    const fees = result.fees ?? [result]
-    // wood-house base = {wood:5, reed:2}; clay key missing → perUseLimit=0,
-    // no transformed fee should be added (only the untouched base remains).
-    expect(fees).toEqual([{ wood: 5, reed: 2 }])
+    const sols = computeAllBuyableCombinations(
+      player,
+      { unitFee: { clay: 5, reed: 2 }, nb: 1 },
+      undefined,
+      'construct',
+    )
+    sols.forEach((s) => {
+      const totalUnitSwaps = s.tradesUsed.reduce((acc, t) => acc + t.times, 0)
+      expect(totalUnitSwaps).toBeLessThanOrEqual(1)
+    })
   })
 })

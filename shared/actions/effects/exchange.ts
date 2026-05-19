@@ -9,6 +9,7 @@ import type {
   Trade,
   ResourceKey,
 } from '../../contract/types'
+import type { DraftGameEvent, EventSink } from '../../contract/events'
 // PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
 // the new payment module. Other helpers (preview-cost / typed-flat /
 // room-payment / cost-modifier internals) remain on the shim through S3.
@@ -50,6 +51,40 @@ const mergePositiveResources = (
     next[resourceKey] = (next[resourceKey] ?? 0) + value
   })
   return next
+}
+
+const emitResourceExchanged = (
+  eventSink: EventSink | undefined,
+  player: PlayerState,
+  trade: Trade,
+  times: number,
+): DraftGameEvent<'resource.exchanged'> | undefined => {
+  if (times <= 0) return undefined
+  const paid = scaleResources(trade.from, times)
+  const gained = scaleResources(trade.to, times)
+  if (Object.keys(paid).length === 0 && Object.keys(gained).length === 0) return undefined
+  const exchangeSource = trade.sourceId ?? trade.source
+  const event: DraftGameEvent<'resource.exchanged'> = {
+    type: 'resource.exchanged',
+    paid,
+    gained,
+    paidFrom: { kind: 'player', playerId: player.id },
+    paidTo: { kind: 'supply' },
+    gainedFrom: { kind: 'supply' },
+    gainedTo: { kind: 'player', playerId: player.id },
+    ...(exchangeSource ? { exchangeSource } : {}),
+    times,
+  }
+  eventSink?.emit<'resource.exchanged'>(event)
+  return event
+}
+
+const readDirectTrade = (actionContext: Record<string, unknown> | undefined): Trade | undefined => {
+  const value = actionContext?.directTrade
+  if (!value || typeof value !== 'object') return undefined
+  const trade = value as Partial<Trade>
+  if (!trade.from || !trade.to) return undefined
+  return trade as Trade
 }
 
 // ============================================
@@ -118,6 +153,8 @@ export const dispatchTradeAppliedListener = (
   player: PlayerState,
   trade: Trade,
   times: number,
+  eventSink?: EventSink,
+  transactionEvents: readonly DraftGameEvent[] = [],
 ): void => {
   if (times <= 0) return
   const sourceId = trade.sourceId ?? trade.source ?? null
@@ -130,8 +167,9 @@ export const dispatchTradeAppliedListener = (
     actionId: 'trade-applied',
     phase: 'immediatelyAfter',
     extraData: { sourceId, times },
+    transactionEvents,
   })
-  executeImmediateSpecialEffectFlows({ state, player, space, results })
+  executeImmediateSpecialEffectFlows({ state, player, space, eventSink, results })
 }
 
 /**
@@ -406,6 +444,7 @@ const resolveExchangeChoice = (
   player: PlayerState,
   choice: string,
   tradeIds?: string[],
+  eventSink?: EventSink,
 ): ActionExecutionResult => {
   if (choice === 'cancel') {
     return { type: 'ok' }
@@ -437,7 +476,15 @@ const resolveExchangeChoice = (
             trade.sourceId ?? trade.source ?? 'unknown',
           )
         }
-        dispatchTradeAppliedListener(state, player, trade, times)
+        const exchangeEvent = emitResourceExchanged(eventSink, player, trade, times)
+        dispatchTradeAppliedListener(
+          state,
+          player,
+          trade,
+          times,
+          eventSink,
+          exchangeEvent ? [exchangeEvent] : [],
+        )
         paid = mergePositiveResources(paid, scaleResources(trade.from, times))
         gained = mergePositiveResources(gained, scaleResources(trade.to, times))
       }
@@ -465,7 +512,15 @@ const resolveExchangeChoice = (
           trade.sourceId ?? trade.source ?? 'unknown',
         )
       }
-      dispatchTradeAppliedListener(state, player, trade, times)
+      const exchangeEvent = emitResourceExchanged(eventSink, player, trade, times)
+      dispatchTradeAppliedListener(
+        state,
+        player,
+        trade,
+        times,
+        eventSink,
+        exchangeEvent ? [exchangeEvent] : [],
+      )
     }
     const gained = times > 0 ? scaleResources(trade.to, times) : {}
     const paid = times > 0 ? scaleResources(trade.from, times) : {}
@@ -483,13 +538,45 @@ export const anytimeExchangeAction: ActionDefinition = {
   gainPerRound: {},
   anytime: true,
   canBeExecutedByPlayer: (state, player, ctx) => {
+    const directTrade = readDirectTrade(ctx?.actionContext)
+    if (directTrade) return canAffordTrade(player, directTrade, 1)
     const tradeIds = (ctx?.actionContext as { tradeIds?: string[] } | undefined)?.tradeIds
     if (tradeIds && tradeIds.length > 0) {
       return hasAffordableTradeForIds(player, tradeIds, state) || hasAffordableCookeryTrade(player, state)
     }
     return hasAffordableCookeryTrade(player, state)
   },
-  execute: ({ state, player, actionContext }) => {
+  execute: ({ state, player, actionContext, eventSink }) => {
+    const directTrade = readDirectTrade(actionContext)
+    if (directTrade) {
+      if (!canAffordTrade(player, directTrade, 1)) {
+        return { type: 'fail', errorKey: 'log.actionNoExchange' }
+      }
+      applyTrade(player, directTrade, 1)
+      recordCookeryConversion(player, directTrade, 1)
+      if (directTrade.sideEffect) {
+        applyTradeSideEffect(
+          state,
+          player,
+          directTrade.sideEffect,
+          1,
+          directTrade.sourceId ?? directTrade.source ?? 'unknown',
+        )
+      }
+      const exchangeEvent = emitResourceExchanged(eventSink, player, directTrade, 1)
+      dispatchTradeAppliedListener(
+        state,
+        player,
+        directTrade,
+        1,
+        eventSink,
+        exchangeEvent ? [exchangeEvent] : [],
+      )
+      const gained = scaleResources(directTrade.to, 1)
+      const paid = scaleResources(directTrade.from, 1)
+      trackWorkPhaseBuildingResources(state, player.id, gained)
+      return { type: 'ok' as const, resourcesGained: gained, resourcesPaid: paid }
+    }
     const filterIds = actionContext?.tradeIds as string[] | undefined
     const { options: allOptions } = buildExchangeOptions(player, filterIds, state)
     const filtered = filterIds && filterIds.length > 0
@@ -501,7 +588,7 @@ export const anytimeExchangeAction: ActionDefinition = {
 
     const hasTradeOption = filtered.some((opt) => opt.value !== 'cancel')
     if (filterIds && filterIds.length > 0 && !hasTradeOption) {
-      return { type: 'fail' as const, logKey: 'log.actionNoExchange' }
+      return { type: 'fail', errorKey: 'log.actionNoExchange' }
     }
 
     return {
@@ -510,6 +597,6 @@ export const anytimeExchangeAction: ActionDefinition = {
       promptKey: 'ui.interactionExchangeChoice',
     }
   },
-  resolveChoice: ({ state, player, actionContext }, choice) =>
-    resolveExchangeChoice(state, player, choice, actionContext?.tradeIds as string[] | undefined),
+  resolveChoice: ({ state, player, actionContext, eventSink }, choice) =>
+    resolveExchangeChoice(state, player, choice, actionContext?.tradeIds as string[] | undefined, eventSink),
 }

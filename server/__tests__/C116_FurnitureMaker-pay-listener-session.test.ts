@@ -5,7 +5,7 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/register-all'
 import '../../shared/cards/C/C116_FurnitureMaker'
 import '../../shared/cards/B/B109_PaperMaker'
-import '../../shared/cards/A/A123_FrameBuilder'
+import '../../shared/cards-display/A/A123_FrameBuilder'
 
 const CARD_ID = 'C116_FurnitureMaker'
 

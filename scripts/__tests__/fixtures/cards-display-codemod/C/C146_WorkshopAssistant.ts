@@ -31,7 +31,7 @@ const CHOOSE_PAIRS_ACTION_ID = 'card_C146_WorkshopAssistant_choosePairs'
  * draining them through opponent renovations, we directly grant the chosen
  * pairs as resources (single-shot gain). This loses the after-renovate
  * "drain" interaction but keeps the player-meaningful onBuy choice. See
- * `docs/card_progress.md` §刻意不同.
+ * `docs/card_implementation_status.md`.
  */
 
 const PAIRS = [
@@ -96,8 +96,6 @@ const choosePairsAction: ActionDefinition = {
       gainResources(player, gain)
       return {
         type: 'ok',
-        logKey: 'log.cardEffectTrigger',
-        logParams: { card: CARD_ID },
         resourcesGained: gain,
       }
     }
@@ -117,8 +115,6 @@ const choosePairsAction: ActionDefinition = {
     gainResources(player, gain)
     return {
       type: 'ok',
-      logKey: 'log.cardEffectTrigger',
-      logParams: { card: CARD_ID },
       resourcesGained: gain,
     }
   },

@@ -8,6 +8,7 @@ import {
   executeCardListener,
   getListenerById,
   type CardListenerContext,
+  type CardListenerContextInput,
 } from '../cards/card-listeners'
 import { isActivateCardActionNode, type ActivateCardActionNode } from './activation-action'
 import type { ParallelNode } from './nodes'
@@ -42,10 +43,13 @@ const clonePlayerForPreview = (player: PlayerState): PlayerState => ({
   cardStates: JSON.parse(JSON.stringify(player.cardStates ?? {})) as PlayerState['cardStates'],
 })
 
+type TriggerSelectContext = ActionExecutionContext &
+  Partial<Pick<CardListenerContext, 'transactionEvents' | 'eventQuery'>>
+
 const previewContextForChild = (
   child: ActivateCardActionNode,
-  context: ActionExecutionContext,
-): { listenerContext: CardListenerContext; ownerPlayerId?: string } => {
+  context: TriggerSelectContext,
+): { listenerContext: CardListenerContextInput; ownerPlayerId?: string } => {
   const params = child.params
   const ownerPlayerId = params.ownerPlayerId ?? child.ownerPlayerId
   const triggerPlayerId = params.triggerPlayerId
@@ -87,6 +91,8 @@ const previewContextForChild = (
       space: context.space,
       actionId: params.actionId,
       phase: params.phase,
+      transactionEvents: context.transactionEvents,
+      eventQuery: context.eventQuery,
       ...event,
     },
   }
@@ -103,8 +109,6 @@ const resultHasApplicabilitySignal = (result: ActionHookResult | undefined): boo
       || result.trades
       || result.bonuses
       || result.sourceCard
-      || result.logKey
-      || (result.immediateLogs?.length ?? 0) > 0
       || result.extraData,
   )
 }
@@ -176,7 +180,7 @@ export const canPassTriggerSelect = (
 
 export const evaluateTriggerSelect = (
   node: ParallelNode,
-  context: ActionExecutionContext,
+  context: TriggerSelectContext,
   evalOptions: TriggerSelectEvaluationOptions = {},
 ): TriggerSelectEvaluation => {
   const optionStates: TriggerOptionState[] = []

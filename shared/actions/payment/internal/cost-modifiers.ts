@@ -20,22 +20,26 @@ import type {
   TradeModifier,
 } from '../../../contract/types'
 
-export const evaluateConditions = (
+export const evaluateStaticConditions = (
   player: PlayerState,
   conditions: Record<string, number> | undefined,
 ): boolean => {
   if (!conditions) return true
-  if (typeof conditions.minNumRooms === 'number' && player.rooms < conditions.minNumRooms) {
-    return false
-  }
-  if (typeof conditions.houseTypeWood === 'number' && conditions.houseTypeWood > 0 && player.houseType !== 'wood') {
-    return false
-  }
-  if (typeof conditions.houseTypeClay === 'number' && conditions.houseTypeClay > 0 && player.houseType !== 'clay') {
-    return false
-  }
-  if (typeof conditions.houseTypeStone === 'number' && conditions.houseTypeStone > 0 && player.houseType !== 'stone') {
-    return false
+  if (typeof conditions.houseTypeWood === 'number' && conditions.houseTypeWood > 0 && player.houseType !== 'wood') return false
+  if (typeof conditions.houseTypeClay === 'number' && conditions.houseTypeClay > 0 && player.houseType !== 'clay') return false
+  if (typeof conditions.houseTypeStone === 'number' && conditions.houseTypeStone > 0 && player.houseType !== 'stone') return false
+  return true
+}
+
+export const evaluateConditions = (
+  player: PlayerState,
+  conditions: Record<string, number> | undefined,
+  nb?: number,
+): boolean => {
+  if (!evaluateStaticConditions(player, conditions)) return false
+  if (typeof conditions?.minNumRooms === 'number') {
+    const target = nb ?? player.rooms
+    if (target < conditions.minNumRooms) return false
   }
   return true
 }
@@ -45,13 +49,9 @@ export const getModifiersForCostType = (
   costType: CostModifierType,
 ): CostModifier[] => {
   const all = player.activeModifiers?.filter((m) => m.appliesTo.includes(costType)) ?? []
-  // The `construct` cost type evaluates conditions inside `room-payment.ts`
-  // (per-build, with access to `roomCount`). Other cost types evaluate the
-  // player-only checks here, uniformly for both BonusModifier and
-  // TradeModifier (the latter gained `conditions` to support D15_ClaySupports
-  // and friends).
-  if (costType === 'construct') return all
-  return all.filter((m) => evaluateConditions(player, m.conditions))
+  // Layer 1 only: static player-state checks (houseType*). minNumRooms is
+  // deferred to evaluateConditions(_, _, nb) inside enumerate.
+  return all.filter((m) => evaluateStaticConditions(player, m.conditions))
 }
 
 export const applyCostModifiers = (
@@ -66,10 +66,16 @@ export const applyCostModifiers = (
   for (const mod of modifiers) {
     if (mod.type === 'trade') {
       const tradeMod = mod as TradeModifier
+      validateTradeModifier(tradeMod)
+      const scope = tradeMod.scope ?? 'action'
+      // scope:'action' + undefined max → keep `?? 1` fallback (current behaviour)
+      // scope:'unit' + undefined max → defer to enumerate (which defaults to nb)
+      const synthMax = tradeMod.max ?? (scope === 'unit' ? undefined : 1)
       effectiveTrades.push({
         from: tradeMod.from,
         to: tradeMod.to,
-        max: tradeMod.max ?? 1,
+        ...(synthMax !== undefined ? { max: synthMax } : {}),
+        scope,
         source: tradeMod.cardId,
         sourceId: tradeMod.cardId,
       })
@@ -80,6 +86,11 @@ export const applyCostModifiers = (
         choices: bonusMod.choices,
         optional: bonusMod.optional ?? true,
         sources: [bonusMod.cardId],
+        // Propagate nb-aware conditions (e.g. minNumRooms) so enumerate can
+        // re-evaluate them against the actual nb via evaluateConditions().
+        // Static conditions (houseType*) are already filtered by
+        // getModifiersForCostType; preserving them is a no-op here.
+        ...(bonusMod.conditions ? { conditions: bonusMod.conditions } : {}),
       })
     }
   }
@@ -97,6 +108,39 @@ export const applyCostModifiers = (
   }
 
   return result
+}
+
+const collectComplexCostViolations = (cost: ComplexCost): string[] => {
+  const violations: string[] = []
+  if (cost.nb !== undefined && cost.cards !== undefined) {
+    violations.push('`nb` and `cards` are mutually exclusive')
+  }
+  if (cost.trades?.some((t) => t.scope === 'unit') && cost.nb === undefined) {
+    violations.push('unit-scoped trades present but `nb` is missing')
+  }
+  return violations
+}
+
+export const validateComplexCost = (cost: ComplexCost): void => {
+  const violations = collectComplexCostViolations(cost)
+  if (violations.length === 0) return
+  const proc = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process
+  const isDev = !proc || proc.env?.NODE_ENV !== 'production'
+  if (isDev) {
+    throw new Error(`Invalid ComplexCost: ${violations.join('; ')}`)
+  }
+  // Production: log + best-effort — caller treats unconvertible cost as
+  // canPayCost === false (no affordable solutions).
+  console.error('[ComplexCost validation]', violations, 'cost:', cost)
+}
+
+export const validateTradeModifier = (modifier: TradeModifier): void => {
+  if (modifier.scope === 'unit' && modifier.conditions?.minNumRooms !== undefined) {
+    throw new Error(
+      `TradeModifier ${modifier.cardId}: scope:'unit' MUST NOT carry conditions.minNumRooms ` +
+      `(per-unit trades have no min-unit threshold).`,
+    )
+  }
 }
 
 export const validateBonus = (bonus: Bonus): void => {

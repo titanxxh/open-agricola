@@ -1,8 +1,10 @@
 import type { ActionExecutionResult, GameState, HarvestReapSummary, PlayerState } from '../../contract/types'
 import type { ActionSpace } from '../../contract/types'
+import type { EventSink } from '../../contract/events'
 import { fieldTopStack, fieldPopIfDepleted } from '../../domain/field'
 import { runCardListeners } from '../../cards/card-listeners'
 import { executeImmediateSpecialEffectFlows } from './internal/immediate-special-effect-flow'
+import { EventStore } from '../../events/store'
 
 /**
  * Dispatch a 'reap' synthetic action event to card listeners.
@@ -13,6 +15,7 @@ export const dispatchReapListener = (
   player: PlayerState,
   crop: 'grain' | 'vegetable' | 'wood' | 'stone',
   amount: number,
+  eventSink?: EventSink,
 ): void => {
   if (amount <= 0) return
   const space = {} as ActionSpace
@@ -23,13 +26,34 @@ export const dispatchReapListener = (
     actionId: 'reap',
     phase: 'immediatelyAfter',
     extraData: { crop, amount },
+  }) ?? []
+  if (eventSink) {
+    executeImmediateSpecialEffectFlows({ state, player, space, eventSink, results })
+    return
+  }
+  if (results.length === 0) return
+  if (!Array.isArray(state.events)) state.events = []
+  if (!Number.isSafeInteger(state.nextEventSeq) || state.nextEventSeq < 1) {
+    state.nextEventSeq = 1
+  }
+  const store = new EventStore()
+  const frame = store.beginFrame({
+    actorPlayerId: player.id,
+    sourceActionId: 'reap',
   })
-  executeImmediateSpecialEffectFlows({ state, player, space, results })
+  executeImmediateSpecialEffectFlows({ state, player, space, eventSink: frame.sink, results })
+  const completed = frame.complete(state)
+  if (completed.length > 0) {
+    store.commitTransaction(state)
+  } else {
+    store.rollbackTransaction()
+  }
 }
 
 export const reap = (
   state: GameState,
   player: PlayerState,
+  eventSink?: EventSink,
 ): ActionExecutionResult & { reapSummary: HarvestReapSummary } => {
   const reapSummary: HarvestReapSummary = {
     resources: {},
@@ -42,6 +66,11 @@ export const reap = (
     const top = fieldTopStack(field)
     if (!top || top.remaining <= 0) return
     const kind = top.kind
+    const cropEvent = {
+      location: { kind: 'field' as const, playerId: player.id, row: field.row, col: field.col },
+      crop: kind,
+      amount: 1,
+    }
     player.resources[kind] = (player.resources[kind] ?? 0) + 1
     reapSummary.resources[kind] = (reapSummary.resources[kind] ?? 0) + 1
     if (kind === 'grain') {
@@ -54,16 +83,28 @@ export const reap = (
     reapSummary.harvestedPositions!.push({ row: field.row, col: field.col })
     top.remaining -= 1
     fieldPopIfDepleted(field)
+    eventSink?.emit<'farm.cropRemoved'>({
+      type: 'farm.cropRemoved',
+      crops: [cropEvent],
+      reason: 'harvest',
+    })
+    eventSink?.emit<'resource.moved'>({
+      type: 'resource.moved',
+      resources: { [kind]: 1 },
+      from: cropEvent.location,
+      to: { kind: 'player', playerId: player.id },
+      reason: 'harvest',
+    })
   })
 
   if (reapSummary.grainFields > 0) {
-    dispatchReapListener(state, player, 'grain', reapSummary.grainFields)
+    dispatchReapListener(state, player, 'grain', reapSummary.grainFields, eventSink)
   }
   if (reapSummary.vegetableFields > 0) {
-    dispatchReapListener(state, player, 'vegetable', reapSummary.vegetableFields)
+    dispatchReapListener(state, player, 'vegetable', reapSummary.vegetableFields, eventSink)
   }
   if (stoneFields > 0) {
-    dispatchReapListener(state, player, 'stone', stoneFields)
+    dispatchReapListener(state, player, 'stone', stoneFields, eventSink)
   }
 
   return { type: 'ok', reapSummary }

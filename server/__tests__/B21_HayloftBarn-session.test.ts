@@ -65,6 +65,59 @@ describe('B21_HayloftBarn session', () => {
     // Should have gotten 1 food from the card
     expect(readCardExtraData<number>(player, CARD_ID, 'foodCount')).toBe(3)
     expect(player.resources.food).toBe(foodBefore + 1)
+    const grainIndex = resp.state.events.findIndex((event) =>
+      event.type === 'resource.moved' && (event.resources.grain ?? 0) > 0
+    )
+    const triggerIndex = resp.state.events.findIndex((event) =>
+      event.type === 'card.triggered' && event.sourceCardId === CARD_ID
+    )
+    const stateChangedIndex = resp.state.events.findIndex((event) =>
+      event.type === 'card.stateChanged'
+      && event.sourceCardId === CARD_ID
+      && event.cardId === CARD_ID
+      && event.key === 'foodCount'
+      && event.value === 3
+    )
+    const infoboxChangedIndex = resp.state.events.findIndex((event) =>
+      event.type === 'card.infoboxChanged'
+      && event.sourceCardId === CARD_ID
+      && event.cardId === CARD_ID
+      && event.text === '3 Food'
+    )
+    const foodIndex = resp.state.events.findIndex((event) =>
+      event.type === 'resource.moved'
+      && event.sourceCardId === CARD_ID
+      && (event.resources.food ?? 0) === 1
+    )
+    expect(grainIndex).toBeGreaterThanOrEqual(0)
+    expect(triggerIndex).toBeGreaterThan(grainIndex)
+    expect(stateChangedIndex).toBeGreaterThan(triggerIndex)
+    expect(infoboxChangedIndex).toBeGreaterThan(stateChangedIndex)
+    expect(foodIndex).toBeGreaterThan(infoboxChangedIndex)
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'card.stateChanged',
+        sourceCardId: CARD_ID,
+        cardId: CARD_ID,
+        key: 'foodCount',
+        value: 3,
+        targetPlayerId: player.id,
+      }),
+      expect.objectContaining({
+        type: 'card.infoboxChanged',
+        sourceCardId: CARD_ID,
+        cardId: CARD_ID,
+        text: '3 Food',
+        targetPlayerId: player.id,
+      }),
+      expect.objectContaining({
+        type: 'resource.moved',
+        sourceCardId: CARD_ID,
+        from: { kind: 'card', playerId: expect.any(String), cardId: CARD_ID },
+        to: { kind: 'player', playerId: expect.any(String) },
+        resources: { food: 1 },
+      }),
+    ]))
   })
 
   it('does not release food when card is empty', () => {
@@ -95,6 +148,12 @@ describe('B21_HayloftBarn session', () => {
     const player = resp.state.players[0]!
     // foodCount should remain 4 (no grain obtained)
     expect(readCardExtraData<number>(player, CARD_ID, 'foodCount')).toBe(4)
+    expect(resp.state.events).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'card.triggered',
+        sourceCardId: CARD_ID,
+      }),
+    ]))
   })
 
   it('food releases one at a time (only 1 per grain-obtaining action)', () => {

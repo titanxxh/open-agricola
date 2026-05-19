@@ -1,7 +1,7 @@
 import type {
   ActionDefinition,
-  ActionExecutionContext,
   ActionExecutionResult,
+  ActionMutationContext,
   ActionSpace,
   FenceSegment,
   GameState,
@@ -102,7 +102,7 @@ const computeFreeFenceTotal = (
 }
 
 const finalizeFence = (
-  ctx: ActionExecutionContext,
+  ctx: ActionMutationContext,
   edges: string[],
   palisadeEdges: string[],
   extraWood: number,
@@ -137,23 +137,45 @@ const finalizeFence = (
     lockedKeys,
   })
   if (!validated.ok) {
-    return { type: 'fail', logKey: validated.error?.code ?? 'log.fencingFail' }
+    return { type: 'fail', errorKey: validated.error?.code ?? 'log.fencingFail' }
   }
   const payment = resolveTypedFlatPaymentSelection(
     validated.player as unknown as PlayerState,
     { wood: validated.payableWoodCost },
     'pay:fence',
     paymentChoice,
-    { type: 'fail', logKey: 'log.fencingFail' },
+    { type: 'fail', errorKey: 'log.fencingFail' },
     'fencing',
   )
   if (payment.type !== 'selected') {
-    return { type: 'fail', logKey: 'log.fencingFail' }
+    return { type: 'fail', errorKey: 'log.fencingFail' }
   }
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
   executeResolvedTypedFlatPayment(nextPlayer, payment, 'fencing')
   const consumed = consumePendingFenceBonus(nextPlayer, validated.newFenceEdges.length)
   applyPlayerMutation(ctx.player, nextPlayer)
+  const paidResources = positiveResources(payment.solution.resourcesPaid)
+  if (Object.keys(paidResources).length > 0) {
+    ctx.eventSink?.emit<'resource.paid'>({
+      type: 'resource.paid',
+      resources: paidResources,
+      paymentFor: 'fencing',
+      paymentSources: [{
+        from: { kind: 'player', playerId: ctx.player.id },
+        resources: paidResources,
+      }],
+    })
+  }
+  const builtFences = [
+    ...validated.newFenceEdges.map((edge) => ({ edge, type: 'fence' })),
+    ...validated.newPalisadeEdges.map((edge) => ({ edge, type: 'palisade' })),
+  ]
+  if (builtFences.length > 0) {
+    ctx.eventSink?.emit<'farm.fenceBuilt'>({
+      type: 'farm.fenceBuilt',
+      fences: builtFences,
+    })
+  }
   // Mirror commitFarmChoice farmChoiceMeta -> engine resultOverride.extraData:
   // listeners (E108, A83, …) read these from `context.result.extraData`.
   const extraData: Record<string, unknown> = {
@@ -164,10 +186,17 @@ const finalizeFence = (
   if (consumed) {
     extraData.usedFreeFences = consumed.usedFreeFences
     extraData.sourceCard = consumed.sourceCard
+    if (consumed.usedFreeFences > 0) {
+      ctx.eventSink?.emit<'farm.fenceConsumed'>({
+        type: 'farm.fenceConsumed',
+        count: consumed.usedFreeFences,
+        reason: 'cardEffect',
+      })
+    }
   }
   return {
     type: 'ok',
-    resourcesPaid: positiveResources(payment.solution.resourcesPaid),
+    resourcesPaid: paidResources,
     extraData,
   }
 }
@@ -208,7 +237,7 @@ export const fenceAction: ActionDefinition = {
       const farmPayload = ctx.actionContext?.farmPayload as
         | { edges?: string[]; palisadeEdges?: string[]; extraWood?: number }
         | undefined
-      if (!farmPayload) return { type: 'fail', logKey: 'log.fencingFail' }
+      if (!farmPayload) return { type: 'fail', errorKey: 'log.fencingFail' }
       const edges = Array.isArray(farmPayload.edges) ? farmPayload.edges : []
       const palisadeEdges = Array.isArray(farmPayload.palisadeEdges)
         ? farmPayload.palisadeEdges
@@ -253,14 +282,14 @@ export const fenceAction: ActionDefinition = {
         lockedKeys,
       })
       if (!validated.ok) {
-        return { type: 'fail', logKey: validated.error?.code ?? 'log.fencingFail' }
+        return { type: 'fail', errorKey: validated.error?.code ?? 'log.fencingFail' }
       }
       const payment = resolveTypedFlatPaymentSelection(
         validated.player as unknown as PlayerState,
         { wood: validated.payableWoodCost },
         'pay:fence',
         undefined,
-        { type: 'fail', logKey: 'log.fencingFail' },
+        { type: 'fail', errorKey: 'log.fencingFail' },
         'fencing',
       )
       if (payment.type === 'request') {
@@ -277,11 +306,11 @@ export const fenceAction: ActionDefinition = {
         }
       }
       if (payment.type === 'fail') {
-        return { type: 'fail', logKey: 'log.fencingFail' }
+        return { type: 'fail', errorKey: 'log.fencingFail' }
       }
       return finalizeFence(ctx, edges, palisadeEdges, extraWood, undefined)
     }
 
-    return { type: 'fail', logKey: 'log.fencingFail' }
+    return { type: 'fail', errorKey: 'log.fencingFail' }
   },
 }

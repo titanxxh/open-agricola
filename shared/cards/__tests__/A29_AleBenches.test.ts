@@ -111,9 +111,6 @@ describe('A29_AleBenches', () => {
       sourceCard: 'A29_AleBenches',
     })
     expect(payResult.type).toBe('ok')
-    if (payResult.type === 'ok') {
-      expect(payResult.logKey).toBe('log.cardEffectPay')
-    }
 
     const vpResult = bonusVpAction.execute({
       state,
@@ -122,9 +119,6 @@ describe('A29_AleBenches', () => {
       sourceCard: 'A29_AleBenches',
     })
     expect(vpResult.type).toBe('ok')
-    if (vpResult.type === 'ok') {
-      expect(vpResult.logKey).toBe('log.cardEffectBonusVp')
-    }
 
     const gainResult = gainAction.execute({
       state,
@@ -134,9 +128,6 @@ describe('A29_AleBenches', () => {
       sourceCard: 'A29_AleBenches',
     })
     expect(gainResult.type).toBe('ok')
-    if (gainResult.type === 'ok') {
-      expect(gainResult.logKey).toBe('log.cardEffectOtherPlayersGain')
-    }
 
     expect(owner.resources.grain).toBe(0)
     expect(opponent.resources.food).toBe(1)

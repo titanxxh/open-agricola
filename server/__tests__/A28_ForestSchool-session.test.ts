@@ -3,9 +3,8 @@ import { GameSession } from '../game/authoritative-session'
 import { A28_ForestSchool as A28Card } from '../../shared/cards-display/A/A28_ForestSchool'
 
 import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
-import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/A/A28_ForestSchool'
-import '../../shared/cards/A/A123_FrameBuilder'
+import '../../shared/cards-display/A/A123_FrameBuilder'
 
 const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`
 
@@ -42,7 +41,7 @@ describe('A28_ForestSchool session', () => {
   it('makes occupied lessons available only when the card is played', () => {
     const withCard = setup(true).getState()
     expect(withCard.ok).toBe(true)
-    expect(isLegacyChoicePending(withCard)).toBe(false)
+    expect(withCard.interaction.stateId).toBe('idle')
     expect(withCard.actionAvailability?.lessons).toBe(true)
 
     const withoutCardSession = setup(false)

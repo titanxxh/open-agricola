@@ -147,7 +147,7 @@ describe('C148 MudWallower — after-pay sync listener', () => {
       space: createSpace('cooking'),
       actionId: 'pay', phase: 'after',
       sourceCard: undefined,
-      result: { type: 'fail', logKey: 'log.payFail' },
+      result: { type: 'fail', errorKey: 'log.payFail' },
     } as unknown as CardListenerContext)
     // listener should not even attempt a sync since the pay failed
     expect(player.cardStates![CARD_ID]!.counters!.held).toBe(2)

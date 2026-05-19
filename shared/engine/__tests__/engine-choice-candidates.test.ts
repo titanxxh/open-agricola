@@ -94,7 +94,7 @@ const buildOptInAction = (
   getBaseChoiceOptions: () => baseOptions,
   choicePromptKey: 'ui.testPrompt',
   noChoiceLogKey: 'log.testNoChoice',
-  execute: () => ({ type: 'fail', logKey: 'log.testNoChoice' }),
+  execute: () => ({ type: 'fail', errorKey: 'log.testNoChoice' }),
   resolveChoice: ({ params }, choice) => {
     resolveCalls.push({ value: choice, params })
     return { type: 'ok' }
@@ -174,7 +174,7 @@ describe('Engine — getBaseChoiceOptions opt-in flow', () => {
     const step = engine.proceed(ctx)
 
     expect(resolveCalls).toHaveLength(0)
-    expect(step.result).toEqual({ type: 'fail', logKey: 'log.testNoChoice' })
+    expect(step.result).toEqual({ type: 'fail', errorKey: 'log.testNoChoice' })
   })
 
   it('dedups duplicate option values (first wins) so listeners cannot override base labels', () => {

@@ -45,8 +45,31 @@ import {
   type DefaultSandboxDeckId,
   type InitialStateOptions,
 } from './state-constants'
+import {
+  assertEventSizeUnderLimit,
+  assertGameEventEnvelope,
+  assertJsonSafeEvent,
+  assertKnownGameEventShape,
+  assertPublicGameEvent,
+} from '../events/guards'
+import { eventsToLogEntries } from '../events/log-mapper'
+import type { GameEvent } from '../contract/events'
 
 export * from './state-constants'
+
+const isPersistedGameEvent = (event: unknown): event is GameState['events'][number] => {
+  if (typeof event !== 'object' || event === null) return false
+  try {
+    assertGameEventEnvelope(event)
+    assertKnownGameEventShape(event)
+    assertPublicGameEvent(event)
+    assertJsonSafeEvent(event)
+    assertEventSizeUnderLimit(event, 4096)
+  } catch {
+    return false
+  }
+  return true
+}
 
 const normalizeDeckIds = (deckIds?: string[]): DefaultSandboxDeckId[] => {
   const next = deckIds
@@ -314,6 +337,20 @@ export const normalizeState = (raw: GameState): GameState => {
   ).filter(
     (id) => majorImprovementIds.includes(id) && !takenImprovements.has(id),
   )
+  const events = Array.isArray(raw.events)
+    ? raw.events.filter(isPersistedGameEvent)
+    : []
+  const maxEventSeq = events.reduce(
+    (max, event) =>
+      Number.isSafeInteger(event.seq) && event.seq > 0 && event.seq > max
+        ? event.seq
+        : max,
+    0,
+  )
+  const nextEventSeq =
+    Number.isSafeInteger(raw.nextEventSeq) && raw.nextEventSeq > maxEventSeq
+      ? raw.nextEventSeq
+      : maxEventSeq + 1
   return {
     ...raw,
     players,
@@ -324,6 +361,8 @@ export const normalizeState = (raw: GameState): GameState => {
     phase: raw.phase ?? 'playing',
     roundPhase: raw.roundPhase ?? 'work',
     draft: raw.draft ?? null,
+    events,
+    nextEventSeq,
     futureMeeples: raw.futureMeeples ?? [],
     pendingFutureMeeples: raw.pendingFutureMeeples ?? [],
     enableCommunityDeck: raw.enableCommunityDeck ?? false,
@@ -469,6 +508,16 @@ export const createInitialState = (
     phase = 'draft'
   }
 
+  const initialEvents: GameEvent[] = [{
+    schemaVersion: 1,
+    id: '1',
+    seq: 1,
+    round: 1,
+    phase: 'work',
+    type: 'game.started',
+    visibility: 'public',
+  }]
+  const playerNames = Object.fromEntries(players.map((p) => [p.id, p.name]))
   const initialState: GameState = {
     round: 1,
     phase,
@@ -477,7 +526,9 @@ export const createInitialState = (
     currentPlayerIndex: 0,
     players,
     actionSpaces: createActionSpaces(options.playerCount ?? 2),
-    log: [{ key: 'log.startGame' }],
+    log: eventsToLogEntries(initialEvents, { playerNames }),
+    events: initialEvents,
+    nextEventSeq: 2,
     roundStartSnapshot: null,
     roundActionOrder,
     gameSeed,

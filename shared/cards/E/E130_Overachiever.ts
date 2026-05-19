@@ -25,8 +25,6 @@ const beforeWishChildrenListener: CardListenerRegistration = {
         sourceCard: CARD_ID,
         actionContext: { types: ['major', 'minor'], trueAction: false },
       },
-      logKey: 'log.cardGrantedAction',
-      logParams: { cardId: CARD_ID, actionId: 'improvement' },
       sourceCard: CARD_ID,
     }
   },

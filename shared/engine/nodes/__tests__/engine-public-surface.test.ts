@@ -25,6 +25,7 @@ describe('Engine surface guard', () => {
     'hasPendingChoiceCompositeAncestor',
     'insertFlowAfterPendingChoice',
     'getEffectiveOwnerPlayerId',
+    'flushEventTransaction',
     'peekNextUnresolvedNodeId',
     'peekPendingEnvelope',
     'peekPendingChoiceFromComposite',

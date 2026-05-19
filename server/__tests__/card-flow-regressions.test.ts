@@ -3,7 +3,6 @@ import { GameSession } from '../game/authoritative-session'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 
 import { setWorkersAtHome, workersAvailable, familySize } from '../../shared/domain/player'
-import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/A/A17_ReclamationPlow'
 import '../../shared/cards/D/D150_GodlySpouse'
 
@@ -95,7 +94,7 @@ describe('card flow regressions', () => {
     expect(resp.state.players[0]!.fields.length).toBe(1)
     expect(resp.state.players[0]!.cardStates?.A17_ReclamationPlow?.flagged).toBe(true)
     expect(resp.state.players[0]!.cardStates?.A17_ReclamationPlow?.infobox).toBe('✓')
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 
   it('D150_GodlySpouse returns the first placed worker based on round placement order', () => {

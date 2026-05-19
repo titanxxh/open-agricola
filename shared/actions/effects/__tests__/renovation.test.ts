@@ -63,7 +63,7 @@ describe('renovation', () => {
 
     expect(getRenovation(player)).toEqual({
       nextType: 'clay',
-      cost: { clay: 2, reed: 1 },
+      cost: { fees: [{ reed: 1 }], unitFee: { clay: 1 }, nb: 2 },
     })
   })
 
@@ -99,7 +99,7 @@ describe('renovation', () => {
 
     expect(buildRenovationPlan(player, 'stone')).toEqual({
       nextType: 'stone',
-      cost: { stone: 3, reed: 1 },
+      cost: { fees: [{ reed: 1 }], unitFee: { stone: 1 }, nb: 3 },
     })
   })
 
@@ -108,7 +108,7 @@ describe('renovation', () => {
 
     expect(buildRenovationPlan(player, 'stone')).toEqual({
       nextType: 'stone',
-      cost: { stone: 2, reed: 1 },
+      cost: { fees: [{ reed: 1 }], unitFee: { stone: 1 }, nb: 2 },
     })
   })
 
@@ -139,7 +139,7 @@ describe('renovation', () => {
 
     expect(getRenovation(player)).toEqual({
       nextType: 'clay',
-      cost: { clay: 2, reed: 1 },
+      cost: { fees: [{ reed: 1 }], unitFee: { clay: 1 }, nb: 2 },
     })
   })
 })
@@ -174,9 +174,7 @@ describe('renovateHouseAction (engine opt-in choice flow)', () => {
 
   it('execute() must never run directly — engine must use getBaseChoiceOptions/resolveChoice', () => {
     const player = createPlayer({ resources: { clay: 2, reed: 1 } })
-    expect(renovateHouseAction.execute(buildExecutionContext(player))).toEqual({
-      type: 'fail',
-      logKey: 'log.renovationFail',
+    expect(renovateHouseAction.execute(buildExecutionContext(player))).toEqual({ type: 'fail', errorKey: 'log.renovationFail',
     })
   })
 
@@ -189,7 +187,11 @@ describe('renovateHouseAction (engine opt-in choice flow)', () => {
     expect(flow.type).toBe('seq')
     expect(flow.children).toHaveLength(2)
     expect(flow.children[0]!.actionId).toBe('pay')
-    expect(flow.children[0]!.params.cost).toEqual({ fee: { clay: 2, reed: 1 } })
+    expect(flow.children[0]!.params.cost).toEqual({
+      fees: [{ reed: 1 }],
+      unitFee: { clay: 1 },
+      nb: 2,
+    })
     expect(flow.children[0]!.params.costType).toBe('renovation')
     expect(flow.children[0]!.params.optionPrefix).toBe('pay:renovate:clay')
     expect(flow.children[1]!.actionId).toBe('apply-renovation')
@@ -205,7 +207,11 @@ describe('renovateHouseAction (engine opt-in choice flow)', () => {
     expect(result.type).toBe('flow')
     if (result.type !== 'flow') return
     const flow = result.flow as { type: 'seq'; children: Array<{ type: 'leaf'; actionId: string; params: Record<string, unknown> }> }
-    expect(flow.children[0]!.params.cost).toEqual({ fee: { stone: 2, reed: 1 } })
+    expect(flow.children[0]!.params.cost).toEqual({
+      fees: [{ reed: 1 }],
+      unitFee: { stone: 1 },
+      nb: 2,
+    })
     expect(flow.children[0]!.params.optionPrefix).toBe('pay:renovate:stone')
     expect(flow.children[1]!.params).toEqual({ nextType: 'stone' })
     expect(player.houseType).toBe('wood')
@@ -213,9 +219,7 @@ describe('renovateHouseAction (engine opt-in choice flow)', () => {
 
   it('resolveChoice fails when the chosen target is illegal for the current house', () => {
     const stone = createPlayer({ houseType: 'stone' })
-    expect(renovateHouseAction.resolveChoice!(buildExecutionContext(stone), 'stone')).toEqual({
-      type: 'fail',
-      logKey: 'log.renovationFail',
+    expect(renovateHouseAction.resolveChoice!(buildExecutionContext(stone), 'stone')).toEqual({ type: 'fail', errorKey: 'log.renovationFail',
     })
   })
 })

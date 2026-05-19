@@ -34,8 +34,18 @@ import {
   evaluateConditions,
   getModifiersForCostType,
   validateBonus,
+  validateComplexCost,
 } from './cost-modifiers'
+import { mergeResources } from '../../../utils/resources'
 import type { InternalSolution } from './types'
+
+const scaleResources = (r: Partial<Resource>, n: number): Partial<Resource> => {
+  const out: Partial<Resource> = {}
+  for (const [k, v] of Object.entries(r)) {
+    if (typeof v === 'number') out[k as keyof Resource] = v * n
+  }
+  return out
+}
 
 const RESOURCE_ID: Record<string, number> = {
   wood: 1, food: 2, reed: 3, clay: 4, stone: 5,
@@ -249,19 +259,23 @@ const getMaxTradeTimesFromPartial = (
   return Math.min(maxFromResources, tradeMax)
 }
 
-export const generateTradeCombinations = (
-  trades: Trade[],
+type TradeCombo = {
+  tradesUsed: { trade: Trade; times: number }[]
+  result: Partial<Resource>
+}
+
+// Phase 1: recurse over action-scope trades only. Mirrors original recursion.
+const enumerateActionTradeCombos = (
+  actionTrades: Trade[],
   playerResources: Partial<Resource>,
-): { tradesUsed: { trade: Trade; times: number }[]; result: Partial<Resource> }[] => {
-  if (trades.length === 0) {
+): TradeCombo[] => {
+  if (actionTrades.length === 0) {
     return [{ tradesUsed: [], result: { ...playerResources } }]
   }
-
-  const [firstTrade, ...restTrades] = trades
-  const restCombinations = generateTradeCombinations(restTrades, playerResources)
-  const results: { tradesUsed: { trade: Trade; times: number }[]; result: Partial<Resource> }[] = []
-
-  for (const combo of restCombinations) {
+  const [firstTrade, ...restTrades] = actionTrades
+  const restCombos = enumerateActionTradeCombos(restTrades, playerResources)
+  const results: TradeCombo[] = []
+  for (const combo of restCombos) {
     const maxTimes = getMaxTradeTimesFromPartial(firstTrade, combo.result)
     for (let t = 0; t <= maxTimes; t++) {
       const afterTrade = convertResources(combo.result, firstTrade, t)
@@ -273,7 +287,59 @@ export const generateTradeCombinations = (
       }
     }
   }
+  return results
+}
 
+// Phase 2: recurse over unit-scope trades, bounded by remaining budget (= nb - sum).
+const enumerateUnitTradeCombos = (
+  unitTrades: Trade[],
+  base: TradeCombo,
+  remainingBudget: number,
+  i: number,
+  out: TradeCombo[],
+): void => {
+  if (i === unitTrades.length) {
+    out.push(base)
+    return
+  }
+  const trade = unitTrades[i]
+  const maxByMax = trade.max ?? remainingBudget
+  const maxByFrom = getMaxTradeTimesFromPartial({ ...trade, max: Infinity }, base.result)
+  const maxTimes = Math.min(remainingBudget, maxByMax, maxByFrom)
+  for (let t = 0; t <= maxTimes; t++) {
+    const afterTrade = convertResources(base.result, trade, t)
+    if (!hasValidResources(afterTrade)) continue
+    const next: TradeCombo = {
+      tradesUsed: t === 0
+        ? [...base.tradesUsed]
+        : [...base.tradesUsed, { trade, times: t }],
+      result: afterTrade,
+    }
+    enumerateUnitTradeCombos(unitTrades, next, remainingBudget - t, i + 1, out)
+  }
+}
+
+export const generateTradeCombinations = (
+  trades: Trade[],
+  playerResources: Partial<Resource>,
+  nb?: number,
+): TradeCombo[] => {
+  if (trades.length === 0) {
+    return [{ tradesUsed: [], result: { ...playerResources } }]
+  }
+  const actionTrades = trades.filter((t) => (t.scope ?? 'action') === 'action')
+  const unitTrades = trades.filter((t) => t.scope === 'unit')
+
+  const phase1 = enumerateActionTradeCombos(actionTrades, playerResources)
+
+  if (unitTrades.length === 0 || nb === undefined || nb <= 0) {
+    return phase1
+  }
+
+  const results: TradeCombo[] = []
+  for (const combo of phase1) {
+    enumerateUnitTradeCombos(unitTrades, combo, nb, 0, results)
+  }
   return results
 }
 
@@ -302,9 +368,11 @@ export const computeAllBuyableCombinations = (
   playedCards?: string[],
   costType?: CostModifierType,
 ): PaymentSolution[] => {
+  validateComplexCost(cost)
   const effectiveCost = costType
     ? applyCostModifiers(cost, getModifiersForCostType(player, costType))
     : cost
+  validateComplexCost(effectiveCost)
 
   const cacheKey = makeCacheKey(player, effectiveCost, costType, playedCards)
   const cached = solutionCache.get(cacheKey)
@@ -312,12 +380,33 @@ export const computeAllBuyableCombinations = (
 
   const playerResources: Partial<Resource> = { ...player.resources }
   const rawSolutions: InternalSolution[] = []
+  const nb = effectiveCost.nb
 
-  const baseFees: Partial<Resource>[] = effectiveCost.fees && effectiveCost.fees.length > 0
+  const unitFeeContribution: Partial<Resource> = nb !== undefined
+    ? scaleResources(effectiveCost.unitFee ?? {}, nb)
+    : {}
+
+  const baseFeesRaw: Partial<Resource>[] = effectiveCost.fees && effectiveCost.fees.length > 0
     ? effectiveCost.fees
     : effectiveCost.fee
       ? [effectiveCost.fee]
       : [{}]
+  // Clamp negative resource entries to 0 after merging fees + unitFee*nb.
+  // Negative deltas (e.g. D154_ChimneySweep `costs: { stone: -2 }`) cancel
+  // against the matching positive amount in unitFee×nb. They MUST NOT remain
+  // negative — otherwise canCoverCost / resourcesPaid leak a phantom refund
+  // on resources the player isn't actually paying (per spec §6.2 trace).
+  const clampNonNegative = (fee: Partial<Resource>): Partial<Resource> => {
+    const out: Partial<Resource> = {}
+    for (const [k, v] of Object.entries(fee)) {
+      const value = v ?? 0
+      if (value > 0) out[k as keyof Resource] = value
+    }
+    return out
+  }
+  const baseFees: Partial<Resource>[] = baseFeesRaw.map((fee) =>
+    clampNonNegative(mergeResources(fee, unitFeeContribution)),
+  )
 
   for (const bonus of effectiveCost.bonuses ?? []) {
     validateBonus(bonus)
@@ -326,7 +415,7 @@ export const computeAllBuyableCombinations = (
   for (let feeIdx = 0; feeIdx < baseFees.length; feeIdx++) {
     const baseFee = baseFees[feeIdx]
     const tradeCombos = effectiveCost.trades && effectiveCost.trades.length > 0
-      ? generateTradeCombinations(effectiveCost.trades, playerResources)
+      ? generateTradeCombinations(effectiveCost.trades, playerResources, nb)
       : [{ tradesUsed: [], result: { ...playerResources } }]
 
     for (const tradeCombo of tradeCombos) {
@@ -340,7 +429,7 @@ export const computeAllBuyableCombinations = (
       ]
 
       for (const bonus of effectiveCost.bonuses ?? []) {
-        if (!evaluateConditions(player, bonus.conditions)) {
+        if (!evaluateConditions(player, bonus.conditions, nb)) {
           continue
         }
 
@@ -369,7 +458,7 @@ export const computeAllBuyableCombinations = (
               },
             ]
         const candidates = rawCandidates.filter((c) =>
-          evaluateConditions(player, c.conditions),
+          evaluateConditions(player, c.conditions, nb),
         )
         if (candidates.length === 0) {
           continue
@@ -483,14 +572,13 @@ export const computeAllBuyableCombinations = (
 
 export const canPayCost = (
   player: PlayerState,
-  cost: ComplexCost | Partial<Resource>,
+  cost: Partial<Resource> | ComplexCost,
   costType?: CostModifierType,
 ): boolean => {
-  if (!isComplexCost(cost)) {
+  // Fast path: simple cost, no modifier injection
+  if (!isComplexCost(cost) && !costType) {
     return canPayResources(player, cost as Partial<Resource>)
   }
-
-  const complexCost = cost as ComplexCost
-  const solutions = computeAllBuyableCombinations(player, complexCost, undefined, costType)
-  return solutions.length > 0
+  const complex: ComplexCost = isComplexCost(cost) ? cost : { fee: cost as Partial<Resource> }
+  return computeAllBuyableCombinations(player, complex, undefined, costType).length > 0
 }

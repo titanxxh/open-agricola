@@ -1,11 +1,10 @@
 import type {
   ActionExecutionContext,
+  ActionExecutionResult,
   ActionFlow,
   PlayerState,
   ActionChoiceOption,
-  ImmediateLogEntry,
   InteractionRequest,
-  LogEntry,
   Resource,
 } from '../contract/types'
 import {
@@ -25,7 +24,6 @@ import type { EngineNode, EngineStepResult } from './types'
 import {
   executeCardListener,
   getListenerById,
-  shouldSkipImmediateListenerLog,
   type CardListenerContext,
 } from '../cards/card-listeners'
 import { incCardUsed } from '../cards/helpers/card-state'
@@ -54,6 +52,10 @@ import type { PendingEnvelope } from './types'
 import { isActivateCardActionNode, type ActivateCardActionNode } from './activation-action'
 import { evaluateTriggerSelect, type TriggerSelectEvaluationOptions } from './trigger-select'
 import { withInjectedAnytimeResultFlag } from './action-context-flags'
+import { eventsToLogEntries } from '../events/log-mapper'
+import type { GameEvent } from '../contract/events'
+import { createEventQuery } from '../events/query'
+import { createBufferedEventSink, emitCardTriggered } from './card-trigger-events'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
@@ -61,12 +63,96 @@ type EngineContext = {
   space: ActionExecutionContext['space']
 }
 
+const hasLegacyLogSurface = (result: ActionExecutionResult): boolean => {
+  if (result.type === 'fail') return true
+  return false
+}
+
+const playerNamesForLog = (context: EngineContext): Record<string, string> =>
+  Object.fromEntries(context.state.players.map((player) => [player.id, player.name]))
+
+const actionNamesForLog = (
+  int: EngineInternals,
+  context: EngineContext,
+): Record<string, string> =>
+  Object.fromEntries([
+    ...context.state.actionSpaces.map((space) => [space.id, space.nameKey] as const),
+    ...[...int.registry.values()].map((action) => [action.id, action.nameKey] as const),
+  ])
+
+const appendDerivedLogsForEventOnlyResult = (
+  int: EngineInternals,
+  context: EngineContext,
+  committed: readonly GameEvent[],
+  result: ActionExecutionResult,
+): void => {
+  if (committed.length === 0 || hasLegacyLogSurface(result)) return
+  const entries = eventsToLogEntries(committed, {
+    playerNames: playerNamesForLog(context),
+    actionNames: actionNamesForLog(int, context),
+  })
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    int.log.append(entries[index]!)
+  }
+}
+
+const recordEventLogDerivation = (
+  int: EngineInternals,
+  events: GameEvent[],
+  result: ActionExecutionResult,
+): void => {
+  int.eventLogDerivations.push({ events, result })
+}
+
+const clearEventLogDerivations = (int: EngineInternals): void => {
+  int.eventLogDerivations.splice(0, int.eventLogDerivations.length)
+}
+
+const ensureEventState = (state: EngineContext['state']): void => {
+  state.events ??= []
+  state.nextEventSeq ??= 1
+}
+
+const currentEventReadContext = (int: EngineInternals) => {
+  const transactionEvents = [...int.events.currentTransactionEvents()]
+  return {
+    transactionEvents,
+    eventQuery: createEventQuery(transactionEvents),
+  }
+}
+
+const commitIfEngineComplete = (
+  int: EngineInternals,
+  context: EngineContext,
+  result: ActionExecutionResult,
+): void => {
+  if (int.pendingNodeIdRef.value !== null) return
+  if (int.tree.nextUnresolved()) return
+  commitOpenEventTransaction(int, context, result)
+}
+
+const commitOpenEventTransaction = (
+  int: EngineInternals,
+  context: EngineContext,
+  result: ActionExecutionResult,
+): void => {
+  ensureEventState(context.state)
+  const committed = int.events.commitTransaction(context.state)
+  appendDerivedLogsForEventOnlyResult(int, context, committed, result)
+  clearEventLogDerivations(int)
+}
+
 const triggerSelectEvaluationOptions = (
   int: EngineInternals,
   context: ActionExecutionContext,
 ): TriggerSelectEvaluationOptions => ({
   canContinueWithoutTriggers: (actionId, resources) =>
-    canActionContinueWithoutBeforeTriggers(int, context, actionId, resources),
+    canActionContinueWithoutBeforeTriggers(
+      int,
+      { ...context, ...currentEventReadContext(int) },
+      actionId,
+      resources,
+    ),
   canReachContinuationThroughTriggers: (actionId, resources) => {
     const action = int.registry.get(actionId)
     if (!action) return false
@@ -80,7 +166,7 @@ const triggerSelectEvaluationOptions = (
       },
     )
     return int.hooks.applyIsDoable(
-      { ...scopedContext, actionId },
+      { ...scopedContext, ...currentEventReadContext(int), actionId },
       action,
       directDoable,
     )
@@ -113,56 +199,6 @@ const actionContextForNode = (
   node.beforePhaseResolved
     ? { ...(node.actionContext ?? {}), skipBeforeTriggers: true }
     : node.actionContext
-
-type ImmediateLogCarrier = {
-  logKey?: string
-  logParams?: Record<string, unknown>
-  immediateLogs?: ImmediateLogEntry[]
-}
-
-const stableSerializeLogValue = (value: unknown): string => {
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableSerializeLogValue(item)).join(',')}]`
-  }
-  if (value && typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
-      a.localeCompare(b),
-    )
-    return `{${entries
-      .map(([key, item]) => `${JSON.stringify(key)}:${stableSerializeLogValue(item)}`)
-      .join(',')}}`
-  }
-  return JSON.stringify(value)
-}
-
-const serializeImmediateLog = (entry: ImmediateLogEntry): string =>
-  `${entry.key}:${stableSerializeLogValue(entry.params ?? {})}`
-
-const collectImmediateLogs = (
-  playerName: string,
-  result: ImmediateLogCarrier | null | undefined,
-  options: { includeLegacyLogKey?: boolean } = {},
-): LogEntry[] => {
-  if (!result) return []
-  const entries = [...(result.immediateLogs ?? [])]
-  const seenEntries = new Set(entries.map((entry) => serializeImmediateLog(entry)))
-  if ((options.includeLegacyLogKey ?? true) && result.logKey) {
-    const legacyEntry = {
-      key: result.logKey,
-      params: result.logParams,
-    }
-    if (!seenEntries.has(serializeImmediateLog(legacyEntry))) {
-      entries.unshift(legacyEntry)
-    }
-  }
-  return entries.map((entry) => ({
-    key: entry.key,
-    params: {
-      player: playerName,
-      ...(entry.params ?? {}),
-    },
-  }))
-}
 
 const pendingEnvelopeChoices = (envelope: PendingEnvelope): ActionChoiceOption[] => {
   if (envelope.choices) return envelope.choices
@@ -199,7 +235,7 @@ const buildOptionalPrompt = (
     actionContext: actionContextForNode(actionNode),
   }
   const doable = int.hooks.applyIsDoable(
-    { ...executionContext, actionId: actionNode.actionId },
+    { ...executionContext, ...currentEventReadContext(int), actionId: actionNode.actionId },
     action,
     action.canBeExecutedByPlayer(
       executionContext.state,
@@ -296,6 +332,7 @@ const executeActivateCardAction = (
     space: context.space,
     actionId: params.actionId,
     phase: params.phase,
+    ...currentEventReadContext(int),
     ...event,
   }
   const result = executeCardListener(listener, listenerContext, {
@@ -315,11 +352,6 @@ const executeActivateCardAction = (
   const normalizedFollowUps = (result?.followUpActions ?? []).map((followUp) =>
     normalizeFollowUpAction(followUp, result?.sourceCard),
   )
-  collectImmediateLogs(effectPlayer.name, result, {
-    includeLegacyLogKey: result ? !shouldSkipImmediateListenerLog(result) : true,
-  }).forEach((entry) => {
-    int.log.append(entry)
-  })
   if (result?.flow || normalizedFollowUps.length > 0) {
     const insertedNodes: EngineNode[] = []
     if (result?.flow) {
@@ -328,7 +360,7 @@ const executeActivateCardAction = (
         effectPlayer.id,
       ))
     }
-    insertedNodes.push(...buildFollowUpNodes(int, normalizedFollowUps, node.id, effectPlayer))
+    insertedNodes.push(...buildFollowUpNodes(int, normalizedFollowUps, node.id, effectPlayer, context.state))
     if (params.phase === 'before') {
       insertedNodes.forEach((insertedNode) =>
         collectNodeIds(insertedNode, int.beforePhaseFlowNodeIds),
@@ -351,13 +383,17 @@ export function engineProceed(
   int: EngineInternals,
   context: EngineContext,
 ): EngineStepResult {
+  ensureEventState(context.state)
+  int.events.ensureTransaction()
   const node = int.tree.nextUnresolved()
   if (!node) {
+    commitOpenEventTransaction(int, context, { type: 'ok' })
     return { type: 'done' }
   }
   if (node.getPending() !== null) {
     const envelope = pendingEnvelopeFromHostNode(node)
     if (!envelope) return { type: 'blocked', nodeId: node.id }
+    commitOpenEventTransaction(int, context, { type: 'ok' })
     int.pendingNodeIdRef.value = node.id
     return {
       type: 'choice',
@@ -398,7 +434,7 @@ export function engineProceed(
         const action = int.registry.get(entry.actionNode.actionId)
         if (!action) return null
         const doable = int.hooks.applyIsDoable(
-          { ...executionContext, actionId: entry.actionNode.actionId },
+          { ...executionContext, ...currentEventReadContext(int), actionId: entry.actionNode.actionId },
           action,
           action.canBeExecutedByPlayer(
             executionContext.state,
@@ -414,7 +450,7 @@ export function engineProceed(
         if (!baseLabel) return null
         const label = getReplaceAwareChoiceLabel(
           entry.actionNode,
-          executionContext,
+          { ...executionContext, ...currentEventReadContext(int) },
           baseLabel,
           int.hooks,
           (flow, sc) => applyFallbackSourceCardToFlow(flow, sc),
@@ -500,7 +536,11 @@ export function engineProceed(
       return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
     }
     if (stepResult.kind === 'request') {
-      const evaluation = evaluateTriggerSelect(node, context, triggerSelectEvaluationOptions(int, context))
+      const evaluation = evaluateTriggerSelect(
+        node,
+        { ...context, ...currentEventReadContext(int) },
+        triggerSelectEvaluationOptions(int, context),
+      )
       const options = evaluation.options
       if (options.length === 0) {
         node.resolve()
@@ -548,6 +588,7 @@ export function engineProceed(
     }
     const replaceResult = int.hooks.applyComputeReplace({
       ...context,
+      ...currentEventReadContext(int),
       params: node.params,
       sourceCard: node.sourceCard,
       actionContext: node.actionContext,
@@ -586,7 +627,7 @@ export function engineProceed(
       actionContext: actionContextForNode(node),
     }
     const doable = int.hooks.applyIsDoable(
-      { ...executionContext, actionId: replacedActionId },
+      { ...executionContext, ...currentEventReadContext(int), actionId: replacedActionId },
       action,
       action.canBeExecutedByPlayer(
         executionContext.state,
@@ -609,6 +650,7 @@ export function engineProceed(
     }
     const costResults = int.hooks.computeCosts({
       ...executionContext,
+      ...currentEventReadContext(int),
       actionId: replacedActionId,
     })
     const costOverride = costResults.reduce<Partial<PlayerState['resources']>>(
@@ -626,7 +668,11 @@ export function engineProceed(
     executionContext.costs =
       Object.keys(costOverride).length > 0 ? costOverride : undefined
     if (!int.beforePhaseFlowNodeIds.has(node.id)) {
-      const beforePhase = int.hooks.before({ ...executionContext, actionId: replacedActionId })
+      const beforePhase = int.hooks.before({
+        ...executionContext,
+        ...currentEventReadContext(int),
+        actionId: replacedActionId,
+      })
       const beforeBaseEvent = buildListenerEvent(executionContext, {})
       const beforeActivateNodes = buildPhaseTrailingNodes(
         int,
@@ -643,14 +689,47 @@ export function engineProceed(
         return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
       }
     }
+    const eventFrame = int.events.beginFrame({
+      actorPlayerId: executionContext.player.id,
+      sourceActionId: replacedActionId,
+      sourceCardId: executionContext.sourceCard,
+    })
+    const eventBuffer = createBufferedEventSink()
     const optInChoice = maybeBuildChoiceCandidates(int,
-      executionContext,
+      { ...executionContext, ...currentEventReadContext(int) },
       action,
       replacedActionId,
+      eventBuffer.sink,
     )
-    const rawResult = optInChoice ?? action.execute(executionContext)
+    const rawResult = optInChoice ?? action.execute({
+      ...executionContext,
+      eventSink: eventBuffer.sink,
+    })
     const result = withInjectedAnytimeResultFlag(rawResult, executionContext.actionContext)
-    const duringPhase = int.hooks.during({ ...executionContext, actionId: replacedActionId }, result)
+    let completedEvents: GameEvent[] = []
+    if (result.type === 'fail') {
+      eventFrame.rollback()
+    } else {
+      if (result.type !== 'request') {
+        emitCardTriggered(int, eventFrame.sink, executionContext, replacedActionId, {
+          replacement: Boolean(replaceResult.sourceCard && replaceResult.sourceCard !== node.sourceCard),
+        })
+      }
+      eventBuffer.flushTo(eventFrame.sink)
+      ensureEventState(context.state)
+      completedEvents = eventFrame.complete(context.state)
+      recordEventLogDerivation(int, completedEvents, result)
+    }
+    if (result.type === 'fail') {
+      int.events.rollbackTransaction()
+      clearEventLogDerivations(int)
+      node.resolve(result)
+      return { type: 'ok', nodeId: node.id, actionId: replacedActionId, result }
+    }
+    const duringPhase = int.hooks.during(
+      { ...executionContext, ...currentEventReadContext(int), actionId: replacedActionId },
+      result,
+    )
     const duringActivateNodes = buildActivationActionNodes(int,
       duringPhase.matchedListeners, 'during', replacedActionId,
       {},
@@ -676,7 +755,7 @@ export function engineProceed(
         let mergedOptions = result.request.options
         if (!action.getBaseChoiceOptions) {
           const argResults = int.hooks.computeArgs(
-            { ...executionContext, actionId: replacedActionId },
+            { ...executionContext, ...currentEventReadContext(int), actionId: replacedActionId },
             result,
           )
           const existingValues = new Set(result.request.options.map((o) => o.value))
@@ -787,27 +866,12 @@ export function engineProceed(
         },
       }
     }
-    if (result.type === 'ok' || result.type === 'flow') {
-      collectImmediateLogs(context.player.name, result).forEach((entry) => {
-        int.log.append(entry)
-      })
-    }
     const immediatePhase = int.hooks.immediatelyAfter(
-      { ...executionContext, actionId: replacedActionId },
+      { ...executionContext, ...currentEventReadContext(int), actionId: replacedActionId },
       result,
     )
-    if (
-      (result.type === 'ok' && !result.logKey && (result.immediateLogs?.length ?? 0) === 0)
-      || (result.type === 'flow' && (result.immediateLogs?.length ?? 0) === 0)
-      || (result.type !== 'ok' && result.type !== 'flow')
-    ) {
-      int.log.append({
-        key: 'log.action',
-        params: { actionId: replacedActionId },
-      })
-    }
     const afterPhase = int.hooks.after(
-      { ...executionContext, actionId: replacedActionId },
+      { ...executionContext, ...currentEventReadContext(int), actionId: replacedActionId },
       result,
       undefined,
     )
@@ -815,11 +879,6 @@ export function engineProceed(
       ...immediatePhase.actionHookResults,
       ...afterPhase.actionHookResults,
     ]
-    allActionHookResults
-      .flatMap((entry) => collectImmediateLogs(context.player.name, entry))
-      .forEach((entry) => {
-        int.log.append(entry)
-      })
     const hookFlows = allActionHookResults
       .map((entry) => entry.flow
         ? applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
@@ -859,7 +918,7 @@ export function engineProceed(
     // pre-mutate snapshot. We therefore insert flow body FIRST (last call
     // wins via insertAfter), and trailing hooks AFTER the flow.
     const trailingHookNodes = [
-      ...buildFollowUpNodes(int, followUps, node.id, context.player),
+      ...buildFollowUpNodes(int, followUps, node.id, context.player, context.state),
       ...immediateActivateNodes,
       ...afterActivateNodes,
     ]
@@ -887,6 +946,7 @@ export function engineProceed(
       }
     }
     node.resolve(result)
+    commitIfEngineComplete(int, context, result)
     return { type: 'ok', nodeId: node.id, actionId: replacedActionId, result }
   }
   return { type: 'blocked', nodeId: node.id }

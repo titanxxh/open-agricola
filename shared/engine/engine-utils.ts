@@ -10,6 +10,7 @@ import type {
   InteractionRequest,
   Resource,
 } from '../contract/types'
+import type { EventSink } from '../contract/events'
 import type { PromptKey } from '../contract/prompt-keys'
 import type { FollowUpAction, ActionHookPhase } from '../actions/hooks'
 import {
@@ -82,20 +83,24 @@ export function buildFollowUpNodes(
   followUps: FollowUpAction[],
   baseId: string,
   player: PlayerState,
+  state?: GameState,
 ): EngineNode[] {
   return followUps
     .filter((followUp) => followUp)
     .map((followUp, index) => {
       const { actionId, sourceCard } = parseFollowUpAction(followUp)
-      if (sourceCard) {
-        int.log.append({
-          key: 'log.cardGrantedAction',
-          params: {
-            player: player.name,
-            actionId,
-            cardId: sourceCard,
-          },
+      if (sourceCard && state) {
+        const frame = int.events.beginFrame({
+          actorPlayerId: player.id,
+          sourceCardId: sourceCard,
         })
+        frame.sink.emit<'action.granted'>({
+          type: 'action.granted',
+          playerId: player.id,
+          actionId,
+          cardId: sourceCard,
+        })
+        frame.complete(state)
       }
       const node = new ActionNode(`chain-${baseId}-${index}`, actionId, sourceCard)
       node.ownerPlayerId = player.id
@@ -720,6 +725,7 @@ export function maybeBuildChoiceCandidates(
   executionContext: ActionExecutionContext,
   action: ActionDefinition,
   actionId: string,
+  eventSink: EventSink,
 ): ActionExecutionResult | null {
   if (!action.getBaseChoiceOptions) return null
   const baseOpts = action.getBaseChoiceOptions(executionContext) ?? []
@@ -746,7 +752,7 @@ export function maybeBuildChoiceCandidates(
     return int.hooks.isOptionAffordable(probeCtx, action)
   })
   if (affordable.length === 0) {
-    return { type: 'fail', logKey: action.noChoiceLogKey ?? 'log.action' }
+    return { type: 'fail', errorKey: action.noChoiceLogKey ?? 'log.action' }
   }
   if (affordable.length === 1 && action.resolveChoice) {
     const value = affordable[0]!.value
@@ -754,7 +760,7 @@ export function maybeBuildChoiceCandidates(
       ...(executionContext.params ?? {}),
       selectedOption: value,
     }
-    return action.resolveChoice(executionContext, value, undefined)
+    return action.resolveChoice({ ...executionContext, eventSink }, value, undefined)
   }
   return {
     type: 'request',

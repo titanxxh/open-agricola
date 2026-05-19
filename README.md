@@ -71,7 +71,7 @@ docs/      架构、部署、平台设计、卡牌进度
 | Deployment | [docs/HOW_TO_DEPLOY.md](docs/HOW_TO_DEPLOY.md) |
 | Platform & Workshop | [docs/PLATFORM_DESIGN.md](docs/PLATFORM_DESIGN.md) |
 | Card Test Template | [docs/CARD_TEST_TEMPLATE.md](docs/CARD_TEST_TEMPLATE.md) |
-| Card Implementation Progress | [docs/card_progress.md](docs/card_progress.md) |
+| 卡牌实现现状 | [docs/card_implementation_status.md](docs/card_implementation_status.md) |
 
 ## Contributing
 
