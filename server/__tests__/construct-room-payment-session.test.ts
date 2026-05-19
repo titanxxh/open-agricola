@@ -5,7 +5,6 @@ import { A123_FrameBuilder } from '../../shared/cards-display/A/A123_FrameBuilde
 import type { PlayerState } from '../../shared/contract/types.ts'
 
 import { workersAvailable } from '../../shared/domain/player'
-import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 describe('construct room payment session', () => {
   const setup = () => {
     const session = new GameSession()
@@ -128,7 +127,7 @@ describe('construct room payment session', () => {
 
     const secondUndoStepResp = session.undoStep()
     expect(secondUndoStepResp.ok).toBe(true)
-    expect(isLegacyChoicePending(secondUndoStepResp)).toBe(false)
+    expect(secondUndoStepResp.interaction.stateId).toBe('idle')
     expect(workersAvailable(secondUndoStepResp.state, secondUndoStepResp.state.players[0]!)).toBe(2)
     expect(secondUndoStepResp.state.actionSpaces.find((space) => space.id === 'farm-expansion')?.takenBy).toEqual([])
   })

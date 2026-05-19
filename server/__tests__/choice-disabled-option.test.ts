@@ -17,7 +17,6 @@ import { occupations } from '../../shared/cards-display/_lookup'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { ActionFlow } from '../../shared/contract/types'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
-import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 
 const TEST_CARD_ID = '__TEST_DISABLED_OPTION_CARD__'
 
@@ -119,6 +118,6 @@ describe('disabled option in pending choice', () => {
     // Attempt to resolve with the second (non-disabled) option → should succeed
     resp = session.resolveChoice(0, secondOption.value)
     expect(resp.ok).toBe(true)
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 })

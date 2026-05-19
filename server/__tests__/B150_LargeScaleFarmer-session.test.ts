@@ -5,7 +5,6 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/B/B150_LargeScaleFarmer'
 import type { ActionFlow } from '../../shared/contract/types'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
-import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 
 
 const CARD_ID = 'B150_LargeScaleFarmer'
@@ -140,7 +139,7 @@ describe('B150_LargeScaleFarmer session', () => {
     const session = setup({ withCard: true, food: 3 })
     const resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 
   it('does not offer chain when player has no food (direct listener check)', async () => {

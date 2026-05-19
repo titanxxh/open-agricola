@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
-import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/D/D60_LargePottery'
 import '../../shared/cards/B/B104_SheepWalker'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
@@ -79,7 +78,7 @@ describe('harvest session flow', () => {
 
     resp = autoAdvanceRoundEnd(session)
 
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId).toBe('idle')
     expect(resp.state.round).toBe(5)
     expect(resp.state.roundPhase).toBe('work')
 

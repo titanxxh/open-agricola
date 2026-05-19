@@ -3,7 +3,6 @@ import { GameSession } from '../game/authoritative-session'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 
 import { markAllWorkersUsed } from '../../shared/domain/player'
-import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/B/B70_NewPurchase'
 import '../../shared/cards/A/A166_Haydryer'
 import '../../shared/cards/A/A64_BarleyMill'
@@ -48,7 +47,7 @@ describe('stage hook flows', () => {
       .toBe('ui.interactionNewPurchaseVegetable')
 
     resp = chooseFirstOption(session, 0)
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId).toBe('idle')
     expect(resp.state.round).toBe(4)
     expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.players[0]!.resources.food).toBe(0)
@@ -96,7 +95,7 @@ describe('stage hook flows', () => {
       { id: 'p1', zoneType: 'pasture', animalType: 'cattle', animalCount: 1 },
     ])
 
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId).toBe('idle')
     expect(resp.state.players[0]!.resources.food).toBe(3)
     expect(resp.state.players[0]!.resources.cattle).toBe(1)
     expect(readCardResourceStats(resp.state.players[0]!, 'A166_Haydryer')).toMatchObject({
@@ -130,7 +129,7 @@ describe('stage hook flows', () => {
       .toBe('ui.interactionEarthenwarePotter')
 
     resp = chooseFirstOption(session, 0)
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId).toBe('gameover')
     expect(resp.state.gameOver).toBe(true)
     expect(resp.state.players[0]!.resources.clay).toBe(0)
     expect(resp.state.players[0]!.cardStates?.D99_EarthenwarePotter?.counters?.bonusVp).toBe(2)
@@ -160,7 +159,7 @@ describe('stage hook flows', () => {
     session.loadState(state)
     const resp = session.performRoundEnd()
 
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId).toBe('idle')
     expect(resp.state.round).toBe(5)
     expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.players[0]!.resources.food).toBe(8)
@@ -202,7 +201,7 @@ describe('stage hook flows', () => {
     session.loadState(state)
     const resp = session.performRoundEnd()
 
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId).toBe('idle')
     expect(resp.state.round).toBe(5)
     expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.players[0]!.resources.food).toBe(6)
@@ -277,7 +276,7 @@ describe('stage hook flows', () => {
       crops: [{ row: 0, col: 0, crop: 'grain' }],
     })
 
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId).toBe('idle')
     expect(resp.state.round).toBe(5)
     expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.players[0]!.resources.food).toBe(6)
@@ -359,7 +358,7 @@ describe('stage hook flows', () => {
       ],
     })
 
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId).toBe('idle')
     expect(resp.state.round).toBe(5)
     expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.players[0]!.resources.food).toBe(6)

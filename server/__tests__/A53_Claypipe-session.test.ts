@@ -4,7 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import { playImprovement } from '../../shared/actions/effects/improvement'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
-import { confirmNextPlayer, isLegacyChoicePending } from './_helpers/legacy-confirms'
+import { confirmNextPlayer } from './_helpers/legacy-confirms'
 describe('A53_Claypipe session flow', () => {
   it('triggers Claypipe at round 7 round-end after being played mid-work phase', () => {
     const session = new GameSession()
@@ -33,7 +33,7 @@ describe('A53_Claypipe session flow', () => {
     const resp = session.performRoundEnd()
 
     expect(resp.ok).toBe(true)
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId).toBe('idle')
     expect(resp.state.round).toBe(8)
     expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.players[0]!.cardStates?.A53_Claypipe?.infobox).toBe('0 / 7')
@@ -90,7 +90,7 @@ describe('A53_Claypipe session flow', () => {
     resp = confirmNextPlayer(session)
 
     expect(resp.ok).toBe(true)
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId).toBe('idle')
     expect(resp.state.round).toBe(8)
     expect(resp.state.roundPhase).toBe('work')
 

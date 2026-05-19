@@ -3,7 +3,6 @@ import { GameSession } from '../game/authoritative-session'
 import { getExtraRoomCapacity } from '../../shared/cards/card-effects'
 
 import { setActiveWorkerCount, setWorkersAtHome, familySize, newbornCount } from '../../shared/domain/player'
-import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/A/A85_Homekeeper'
 
 const CARD_ID = 'A85_Homekeeper'
@@ -174,7 +173,7 @@ describe('A85_Homekeeper session', () => {
 
     const loaded = session.getState()
     expect(loaded.ok).toBe(true)
-    expect(isLegacyChoicePending(loaded)).toBe(false)
+    expect(loaded.interaction.stateId).toBe('idle')
     expect(loaded.actionAvailability?.['wish-children']).toBe(true)
 
     const resp = session.takeAction(0, 'wish-children')

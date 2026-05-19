@@ -6,7 +6,6 @@ import '../../shared/cards/D/D129_LumberVirtuoso'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { SessionResponse } from '../../shared/session/session-core'
 import type { GameState } from '../../shared/contract/types'
-import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 
 describe('D129_LumberVirtuoso session', () => {
   /**
@@ -68,7 +67,7 @@ describe('D129_LumberVirtuoso session', () => {
     const resp = session.performRoundEnd()
     // With wood < 5, no optional flow from the card — harvest proceeds normally
     // (feeding or none)
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId).toBe('idle')
   })
 
   it('NOT triggered in non-harvest round', () => {

@@ -3,7 +3,6 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
-import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/A/A106_SlurrySpreader'
 
 const CARD_ID = 'A106_SlurrySpreader'
@@ -132,7 +131,7 @@ describe('A106_SlurrySpreader session', () => {
       throw new Error('unexpected interaction state')
     }
 
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId).toBe('idle')
     const playerAfter = resp.state.players[0]!
     expect(playerAfter.resources.food).toBe(0)
     expect(playerAfter.resources.grain).toBe(1)
