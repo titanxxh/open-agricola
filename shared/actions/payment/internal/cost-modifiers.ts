@@ -119,7 +119,8 @@ const collectComplexCostViolations = (cost: ComplexCost): string[] => {
 export const validateComplexCost = (cost: ComplexCost): void => {
   const violations = collectComplexCostViolations(cost)
   if (violations.length === 0) return
-  const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production'
+  const proc = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process
+  const isDev = !proc || proc.env?.NODE_ENV !== 'production'
   if (isDev) {
     throw new Error(`Invalid ComplexCost: ${violations.join('; ')}`)
   }
