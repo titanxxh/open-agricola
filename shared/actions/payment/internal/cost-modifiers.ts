@@ -70,10 +70,16 @@ export const applyCostModifiers = (
   for (const mod of modifiers) {
     if (mod.type === 'trade') {
       const tradeMod = mod as TradeModifier
+      validateTradeModifier(tradeMod)
+      const scope = tradeMod.scope ?? 'action'
+      // scope:'action' + undefined max → keep `?? 1` fallback (current behaviour)
+      // scope:'unit' + undefined max → defer to enumerate (which defaults to nb)
+      const synthMax = tradeMod.max ?? (scope === 'unit' ? undefined : 1)
       effectiveTrades.push({
         from: tradeMod.from,
         to: tradeMod.to,
-        max: tradeMod.max ?? 1,
+        ...(synthMax !== undefined ? { max: synthMax } : {}),
+        scope,
         source: tradeMod.cardId,
         sourceId: tradeMod.cardId,
       })

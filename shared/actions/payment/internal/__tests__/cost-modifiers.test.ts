@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyCostModifiers,
   evaluateStaticConditions,
   evaluateConditions,
   validateTradeModifier,
   validateComplexCost,
 } from '../cost-modifiers'
-import type { PlayerState } from '../../../../contract/types'
+import type { PlayerState, TradeModifier } from '../../../../contract/types'
 
 const mkPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
   id: 'p1', name: 'P1', color: 'red',
@@ -83,6 +84,49 @@ describe('validateComplexCost', () => {
       nb: 3, unitFee: { clay: 5 },
       trades: [{ from: { wood: 1 }, to: { clay: 2 }, scope: 'unit' }],
     })).not.toThrow()
+  })
+})
+
+describe('applyCostModifiers — scope handling', () => {
+  it('copies scope to synthesised Trade and validates', () => {
+    const result = applyCostModifiers({}, [
+      {
+        type: 'trade', cardId: 'A123_FrameBuilder', appliesTo: ['construct'],
+        from: { wood: 1 }, to: { clay: 2 },
+        scope: 'unit',
+        conditions: { houseTypeClay: 1 },
+      },
+    ])
+    expect(result.trades?.[0]?.scope).toBe('unit')
+    expect(result.trades?.[0]?.max).toBeUndefined()
+  })
+  it('applies `?? 1` default only for action-scope trades with undefined max', () => {
+    const result = applyCostModifiers({}, [
+      {
+        type: 'trade', cardId: 'B145_BrushwoodCollector', appliesTo: ['renovation'],
+        from: { wood: 1 }, to: { reed: 1 },
+      },
+    ])
+    expect(result.trades?.[0]?.max).toBe(1)
+  })
+  it('preserves explicit max regardless of scope', () => {
+    const result = applyCostModifiers({}, [
+      {
+        type: 'trade', cardId: 'A88_HedgeKeeper', appliesTo: ['fencing'],
+        from: {}, to: { wood: 1 }, max: 3, scope: 'action',
+      },
+    ])
+    expect(result.trades?.[0]?.max).toBe(3)
+  })
+  it('throws via validateTradeModifier on scope:unit + minNumRooms', () => {
+    expect(() => applyCostModifiers({}, [
+      {
+        type: 'trade', cardId: 'X', appliesTo: ['construct'],
+        from: { wood: 1 }, to: { clay: 2 },
+        scope: 'unit',
+        conditions: { minNumRooms: 2 },
+      } as TradeModifier,
+    ])).toThrow(/minNumRooms/)
   })
 })
 
