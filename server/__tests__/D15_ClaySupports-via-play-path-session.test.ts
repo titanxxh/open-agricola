@@ -9,7 +9,7 @@ import { computeAllBuyableCombinations } from '../../shared/actions/payment/inte
 void A143_Stonecutter
 void D15_ClaySupports
 
-describe('D15 ClaySupports + A143 Stonecutter stacking', () => {
+describe('D15 ClaySupports via play-path (with A143 Stonecutter co-played)', () => {
   it('D15 trade modifier is registered via play-path with scope:unit, surfaces in construct enumeration', () => {
     // Both cards register through their cards-display static fields and reach
     // `player.activeModifiers` via `rebuildActiveModifiers` during loadState.
