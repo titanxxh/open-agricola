@@ -13,6 +13,7 @@ export type BgaCard = {
   cost?: Record<string, number>
   altCosts?: Record<string, number>[]
   prerequisite?: string
+  passing?: boolean
   banned: boolean
 }
 
@@ -27,6 +28,7 @@ const RESOURCE_MAP: Record<string, string> = {
   SHEEP: 'sheep',
   BOAR: 'boar',
   CATTLE: 'cattle',
+  STABLE: 'stable',
 }
 
 function parseResourceMap(body: string): Record<string, number> {
@@ -131,6 +133,7 @@ export function parseBgaCard(phpPath: string): BgaCard {
         break
       }
       case 'prerequisite': card.prerequisite = unwrapClientTranslate(val); break
+      case 'passing': card.passing = val === 'true'; break
       case 'banned': if (val === 'true') card.banned = true; break
       default: break
     }

@@ -1,16 +1,30 @@
-# BGA Metadata Diff Report (2026-05-14)
+# BGA Metadata Diff Report (2026-05-19)
 
 ## Summary
 - Total BGA cards scanned: 888
 - Total TS cards scanned: 888
-- ⚠ Literal deviations: 0
-- ❌ Complex deviations: 4
+- ⚠ Literal deviations: 5
+- ❌ Complex deviations: 5
 - 🔍 BGA-only: 0
 - 🔍 TS-only: 0
 - 🔍 Banned-but-present: 33
 
 ## ⚠ Literal deviations (auto-fixable)
+### passing
+| Card | BGA | Ours |
+|---|---|---|
+| C1_Overhaul | true | (missing) |
+| C6_StoneClearing | true | (missing) |
+| C9_AutomaticWaterTrough | true | (missing) |
+| D1_ZigzagHarrow | true | (missing) |
+| E5_NightLoot | true | (missing) |
+
 ## ❌ Complex deviations (manual review)
+### cost
+| Card | BGA | Ours |
+|---|---|---|
+| C54_MarketBooth | `{"stable":1}` | (missing) |
+
 ### prerequisite
 | Card | BGA | Ours |
 |---|---|---|

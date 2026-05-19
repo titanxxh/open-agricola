@@ -21,7 +21,7 @@ const CARD_ID = 'D1_ZigzagHarrow'
  *   2. Threading `actionContext.allowedTiles` through plow → plow-validation
  *      → farm-edit UI
  * Both are main-path changes outside the F1 onBuy SEQ-truncation scope.
- * Tracked in card_progress §刻意不同.
+ * Tracked in docs/card_implementation_status.md.
  *
  * Implementation:
  *   - Emit optional plow leaf (current behavior).

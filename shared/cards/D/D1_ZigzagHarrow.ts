@@ -85,9 +85,9 @@ export const D1_ZigzagHarrow_impl = {
       optional: true,
       // Plow target restriction to zigzag candidates is still deferred —
       // requires `actionContext.allowedTiles` threading through plow leaf →
-      // farm-edit UI. Tracked in `card_progress.md` §2.5 as the residual D1
-      // simplification (buyable gate is now aligned with BGA; plow location
-      // gate is not).
+      // farm-edit UI. Tracked in `docs/card_implementation_status.md` as the
+      // residual D1 simplification (buyable gate is now aligned with BGA; plow
+      // location gate is not).
     }),
   },
   reaches: [] as readonly string[],

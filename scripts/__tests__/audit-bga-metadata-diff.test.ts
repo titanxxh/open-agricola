@@ -60,6 +60,12 @@ describe('parseBgaCard', () => {
     expect(card.altCosts).toEqual([{ wood: 1 }, { food: 2 }])
     expect(card.cost).toBeUndefined()
   })
+
+  it('parses STABLE cost as a cost pseudo-resource', () => {
+    const phpPath = path.join(FIXTURE_DIR, 'bga/C54_StableCost.php')
+    const card = parseBgaCard(phpPath)
+    expect(card.cost).toEqual({ stable: 1 })
+  })
 })
 
 describe('parseTsCard', () => {
@@ -100,6 +106,12 @@ describe('parseTsCard', () => {
     expect(card.altCosts).toEqual([{ wood: 1 }, { food: 2 }])
     expect(card.cost).toBeUndefined()
   })
+
+  it('parses passing metadata from TS card-display file', () => {
+    const tsPath = path.join(FIXTURE_DIR, 'ts/C1_Passing.ts')
+    const card = parseTsCard(tsPath)
+    expect(card.passing).toBe(true)
+  })
 })
 
 describe('diffCards', () => {
@@ -118,6 +130,7 @@ describe('diffCards', () => {
     expect(a99.find(d => d.field === 'vp')?.verdict).toBe('warn')
     expect(a99.find(d => d.field === 'extraVp')?.verdict).toBe('warn')
     expect(a99.find(d => d.field === 'prerequisite')?.verdict).toBe('error')
+    expect(a99.find(d => d.field === 'passing')).toBeUndefined()
 
     expect(result.bannedButPresent).toEqual([])
     expect(result.bgaOnly).toEqual(['A14_Banned'])
@@ -168,6 +181,35 @@ describe('diffCards cost normalization', () => {
     expect(costDevs).toHaveLength(2)
     expect(costDevs.find(d => d.id === 'X3_W')?.ours).toBeUndefined()
     expect(costDevs.find(d => d.id === 'X4_V')?.bga).toEqual({ wood: 2 })
+  })
+
+  it('reports STABLE cost differences after parsing it as stable', () => {
+    const bgaMap = new Map([
+      ['C54_StableCost', { id: 'C54_StableCost', deck: 'C', number: 54, cost: { stable: 1 }, banned: false }],
+    ])
+    const tsMap = new Map([
+      ['C54_StableCost', { id: 'C54_StableCost', deck: 'C', number: 54, cost: {} }],
+    ])
+    const result = diffCards(bgaMap as never, tsMap as never)
+    const costDev = result.deviations.find(d => d.field === 'cost')
+    expect(costDev?.bga).toEqual({ stable: 1 })
+    expect(costDev?.ours).toBeUndefined()
+    expect(costDev?.verdict).toBe('error')
+  })
+})
+
+describe('diffCards passing metadata', () => {
+  it('reports passing=true when TS omits it', () => {
+    const bgaMap = new Map([
+      ['C1_Overhaul', { id: 'C1_Overhaul', deck: 'C', number: 1, passing: true, banned: false }],
+    ])
+    const tsMap = new Map([
+      ['C1_Overhaul', { id: 'C1_Overhaul', deck: 'C', number: 1 }],
+    ])
+    const result = diffCards(bgaMap as never, tsMap as never)
+    expect(result.deviations).toEqual([
+      { id: 'C1_Overhaul', field: 'passing', bga: true, ours: undefined, verdict: 'warn' },
+    ])
   })
 })
 
@@ -234,10 +276,12 @@ describe('applySafeFix', () => {
     const patched = applySafeFix(before, [
       { field: 'vp', target: 2 },
       { field: 'extraVp', target: true },
+      { field: 'passing', target: true },
       { field: 'category', target: 'POINTS_PROVIDER' },
     ])
     expect(patched).toContain('vp: 2,')
     expect(patched).toContain('extraVp: true,')
+    expect(patched).toContain('passing: true,')
     expect(patched).toContain("category: 'POINTS_PROVIDER',")
     expect(patched).not.toContain('vp: 0')
   })
