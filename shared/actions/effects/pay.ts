@@ -306,7 +306,7 @@ export const payAction: ActionDefinition = {
   // Without this hook the engine's fallthrough would return `{type:'ok'}`
   // without paying, leaving downstream `seq` leaves (e.g. apply-improvement)
   // running on un-paid state.
-  resolveChoice: ({ player, params, sourceCard, state }, choice) => {
+  resolveChoice: ({ player, params, sourceCard, state, eventSink }, choice) => {
     const p = normalizePayParams(params)
     if (!p?.cost) return { type: 'fail', logKey: 'log.payFail' }
     if (!PaymentSolver.isComplexCost(p.cost)) {
@@ -325,7 +325,14 @@ export const payAction: ActionDefinition = {
     const choiceLooksLikePayment =
       choice.startsWith(`${optionPrefix}:`) || /^\d+$/.test(choice)
     if (!choiceLooksLikePayment) {
-      return payAction.execute({ player, params, sourceCard, state, space: undefined as never })
+      return payAction.execute({
+        player,
+        params,
+        sourceCard,
+        state,
+        space: undefined as never,
+        eventSink,
+      })
     }
     const selection = resolveCostPaymentSelection(
       player,

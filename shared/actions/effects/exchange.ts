@@ -9,6 +9,7 @@ import type {
   Trade,
   ResourceKey,
 } from '../../contract/types'
+import type { EventSink } from '../../contract/events'
 // PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
 // the new payment module. Other helpers (preview-cost / typed-flat /
 // room-payment / cost-modifier internals) remain on the shim through S3.
@@ -118,6 +119,7 @@ export const dispatchTradeAppliedListener = (
   player: PlayerState,
   trade: Trade,
   times: number,
+  eventSink?: EventSink,
 ): void => {
   if (times <= 0) return
   const sourceId = trade.sourceId ?? trade.source ?? null
@@ -131,7 +133,7 @@ export const dispatchTradeAppliedListener = (
     phase: 'immediatelyAfter',
     extraData: { sourceId, times },
   })
-  executeImmediateSpecialEffectFlows({ state, player, space, results })
+  executeImmediateSpecialEffectFlows({ state, player, space, eventSink, results })
 }
 
 /**
@@ -406,6 +408,7 @@ const resolveExchangeChoice = (
   player: PlayerState,
   choice: string,
   tradeIds?: string[],
+  eventSink?: EventSink,
 ): ActionExecutionResult => {
   if (choice === 'cancel') {
     return { type: 'ok' }
@@ -437,7 +440,7 @@ const resolveExchangeChoice = (
             trade.sourceId ?? trade.source ?? 'unknown',
           )
         }
-        dispatchTradeAppliedListener(state, player, trade, times)
+        dispatchTradeAppliedListener(state, player, trade, times, eventSink)
         paid = mergePositiveResources(paid, scaleResources(trade.from, times))
         gained = mergePositiveResources(gained, scaleResources(trade.to, times))
       }
@@ -465,7 +468,7 @@ const resolveExchangeChoice = (
           trade.sourceId ?? trade.source ?? 'unknown',
         )
       }
-      dispatchTradeAppliedListener(state, player, trade, times)
+      dispatchTradeAppliedListener(state, player, trade, times, eventSink)
     }
     const gained = times > 0 ? scaleResources(trade.to, times) : {}
     const paid = times > 0 ? scaleResources(trade.from, times) : {}
@@ -510,6 +513,6 @@ export const anytimeExchangeAction: ActionDefinition = {
       promptKey: 'ui.interactionExchangeChoice',
     }
   },
-  resolveChoice: ({ state, player, actionContext }, choice) =>
-    resolveExchangeChoice(state, player, choice, actionContext?.tradeIds as string[] | undefined),
+  resolveChoice: ({ state, player, actionContext, eventSink }, choice) =>
+    resolveExchangeChoice(state, player, choice, actionContext?.tradeIds as string[] | undefined, eventSink),
 }

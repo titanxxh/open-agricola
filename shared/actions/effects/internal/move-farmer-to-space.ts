@@ -1,4 +1,5 @@
 import type { ActionDefinition, ActionSpace } from '../../../contract/types'
+import type { EventSink } from '../../../contract/events'
 import { addWorkerRef, spaceHasPlayer } from '../../../domain/space'
 import { smallestAvailableWorker } from '../../../domain/player'
 import { computeAllowedPlacementSpaces, type AllowedPlacement } from '../../helpers/placement-availability'
@@ -10,6 +11,16 @@ import { computeAllowedPlacementSpaces, type AllowedPlacement } from '../../help
  * - execute(): lists selectable spaces (excluding params.excludeSpaceId) → returns choice
  * - resolveChoice(): marks target space as takenBy, executes the space's action
  */
+const withForwardedActionSource = (
+  eventSink: EventSink,
+  sourceActionId: string,
+): EventSink => ({
+  emit: (event) => eventSink.emit({ sourceActionId, ...event }),
+  emitMany: (events) => {
+    events.forEach((event) => eventSink.emit({ sourceActionId, ...event }))
+  },
+})
+
 const isSelectableSpace = (
   space: ActionSpace,
   excludeId: string | undefined,
@@ -40,7 +51,7 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
       promptKey: 'ui.interactionMoveFarmerToSpace',
     }
   },
-  resolveChoice: ({ state, player }, choice) => {
+  resolveChoice: ({ state, player, eventSink }, choice) => {
     const targetSpace = state.actionSpaces.find((s) => s.id === choice)
     if (!targetSpace) return { type: 'fail', logKey: 'log.actionFail' }
     // Move farmer to target space (mark as taken, but don't decrement workersAvailable).
@@ -52,6 +63,11 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
       addWorkerRef(targetSpace, player.id, worker?.id ?? '1')
     }
     // Execute the target space's action
-    return targetSpace.execute({ state, player, space: targetSpace })
+    return targetSpace.execute({
+      state,
+      player,
+      space: targetSpace,
+      eventSink: withForwardedActionSource(eventSink, targetSpace.id),
+    })
   },
 }

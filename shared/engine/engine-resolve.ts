@@ -41,11 +41,83 @@ import {
   resolveSubtree,
 } from './engine-utils'
 import { withInjectedAnytimeResultFlag } from './action-context-flags'
+import { eventsToLogEntries } from '../events/log-mapper'
+import type { GameEvent } from '../contract/events'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
   player: ActionExecutionContext['player']
   space: ActionExecutionContext['space']
+}
+
+const hasLegacyLogSurface = (result: ActionExecutionResult): boolean => {
+  if (result.type === 'fail') return true
+  return Boolean(
+    ('logKey' in result && result.logKey) ||
+    ('immediateLogs' in result && (result.immediateLogs?.length ?? 0) > 0) ||
+    ('resourcesGained' in result && result.resourcesGained) ||
+    ('resourcesPaid' in result && result.resourcesPaid),
+  )
+}
+
+const appendDerivedLogsForEventOnlyResult = (
+  int: EngineInternals,
+  context: EngineContext,
+  committed: readonly GameEvent[],
+  result: ActionExecutionResult,
+): void => {
+  if (committed.length === 0 || hasLegacyLogSurface(result)) return
+  const playerNames = Object.fromEntries(
+    context.state.players.map((player) => [player.id, player.name]),
+  )
+  const entries = eventsToLogEntries(committed, { playerNames })
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    int.log.append(entries[index]!)
+  }
+}
+
+const recordEventLogDerivation = (
+  int: EngineInternals,
+  events: GameEvent[],
+  result: ActionExecutionResult,
+): void => {
+  int.eventLogDerivations.push({ events, result })
+}
+
+const clearEventLogDerivations = (int: EngineInternals): void => {
+  int.eventLogDerivations.splice(0, int.eventLogDerivations.length)
+}
+
+const ensureEventState = (state: EngineContext['state']): void => {
+  state.events ??= []
+  state.nextEventSeq ??= 1
+}
+
+const commitIfEngineComplete = (
+  int: EngineInternals,
+  context: EngineContext,
+  result: ActionExecutionResult,
+): void => {
+  if (int.pendingNodeIdRef.value !== null) return
+  if (int.tree.nextUnresolved()) return
+  ensureEventState(context.state)
+  const committed = int.events.commitTransaction(context.state)
+  int.eventLogDerivations.forEach((entry) => {
+    appendDerivedLogsForEventOnlyResult(int, context, entry.events, entry.result)
+  })
+  if (int.eventLogDerivations.length === 0) {
+    appendDerivedLogsForEventOnlyResult(int, context, committed, result)
+  }
+  clearEventLogDerivations(int)
+}
+
+const rollbackAndReturn = (
+  int: EngineInternals,
+  result: ActionExecutionResult & { type: 'fail' },
+): ActionExecutionResult => {
+  int.events.rollbackTransaction()
+  clearEventLogDerivations(int)
+  return result
 }
 
 const triggerSelectEvaluationOptions = (
@@ -163,13 +235,15 @@ export function engineResolveChoice(
   context: EngineContext,
   payload?: Record<string, unknown>,
 ): ActionExecutionResult {
+  ensureEventState(context.state)
+  int.events.ensureTransaction()
   if (int.pendingNodeIdRef.value) {
     const node = int.tree.findNodeById(int.pendingNodeIdRef.value)
     const explicitPending = node?.getPending()
     if (node && explicitPending) {
       const envelope = pendingEnvelopeFromHostNode(node)
       if (envelope && !isPendingChoiceValueAllowed(envelope, choice)) {
-        return { type: 'fail', logKey: 'log.buildRoomFail' }
+        return rollbackAndReturn(int, { type: 'fail', logKey: 'log.buildRoomFail' })
       }
       if (
         node.optional === true &&
@@ -198,7 +272,7 @@ export function engineResolveChoice(
         const selected = offered.find((opt) => opt.value === choice)
         if (!selected || selected.disabled) {
           int.pendingNodeIdRef.value = null
-          return { type: 'fail', logKey: 'log.buildRoomFail' }
+          return rollbackAndReturn(int, { type: 'fail', logKey: 'log.buildRoomFail' })
         }
         if (choice === '__pass__') {
           node.resolveRemainingTriggerChildrenForPass()
@@ -208,7 +282,7 @@ export function engineResolveChoice(
         const child = node.chooseCard(choice)
         if (!child) {
           int.pendingNodeIdRef.value = null
-          return { type: 'fail', logKey: 'log.buildRoomFail' }
+          return rollbackAndReturn(int, { type: 'fail', logKey: 'log.buildRoomFail' })
         }
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
@@ -230,7 +304,7 @@ export function engineResolveChoice(
       }
       const selected = offered.find((opt) => opt.value === choice)
       if (!selected || selected.disabled) {
-        return { type: 'fail', logKey: 'log.buildRoomFail' }
+        return rollbackAndReturn(int, { type: 'fail', logKey: 'log.buildRoomFail' })
       }
       if (choice === '__pass__') {
         node.resolveRemainingTriggerChildrenForPass()
@@ -240,7 +314,7 @@ export function engineResolveChoice(
       const child = node.chooseCard(choice)
       if (!child) {
         int.pendingNodeIdRef.value = null
-        return { type: 'fail', logKey: 'log.buildRoomFail' }
+        return rollbackAndReturn(int, { type: 'fail', logKey: 'log.buildRoomFail' })
       }
       int.pendingNodeIdRef.value = null
       return { type: 'ok' }
@@ -305,7 +379,7 @@ export function engineResolveChoice(
       const action = int.registry.get(actionId)
       if (!action) {
         int.pendingNodeIdRef.value = null
-        return { type: 'fail', logKey: 'log.buildRoomFail' }
+        return rollbackAndReturn(int, { type: 'fail', logKey: 'log.buildRoomFail' })
       }
       const costResults = int.hooks.computeCosts({
         ...executionContext,
@@ -352,7 +426,21 @@ export function engineResolveChoice(
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
-      const result = action.execute(executionContext)
+      const eventFrame = int.events.beginFrame({
+        actorPlayerId: executionContext.player.id,
+        sourceActionId: actionId,
+        sourceCardId: executionContext.sourceCard,
+      })
+      const result = action.execute({
+        ...executionContext,
+        eventSink: eventFrame.sink,
+      })
+      if (result.type === 'fail') {
+        eventFrame.rollback()
+        return rollbackAndReturn(int, result)
+      }
+      ensureEventState(context.state)
+      recordEventLogDerivation(int, eventFrame.complete(context.state), result)
       int.hooks.during({ ...executionContext, actionId }, result)
       if (result.type === 'request' && (result.request.kind === 'choice' || result.request.kind === 'farm-select')) {
         // S2 Task 6: also accept farm-select kind emitted from an Or/Xor
@@ -496,6 +584,7 @@ export function engineResolveChoice(
         node.resolve(choice)
       }
       int.pendingNodeIdRef.value = null
+      commitIfEngineComplete(int, context, result)
       return result
     }
   }
@@ -522,13 +611,28 @@ export function engineResolveChoice(
   }
   pendingHost?.clearPending()
   let result: ActionExecutionResult
+  let eventFrame: ReturnType<EngineInternals['events']['beginFrame']> | null = null
   if (action.resolveChoice) {
+    eventFrame = int.events.beginFrame({
+      actorPlayerId: executionContext.player.id,
+      sourceActionId: actionId,
+      sourceCardId: executionContext.sourceCard,
+    })
     result = withInjectedAnytimeResultFlag(
-      action.resolveChoice(executionContext, choice, payload),
+      action.resolveChoice({
+        ...executionContext,
+        eventSink: eventFrame.sink,
+      }, choice, payload),
       executionContext.actionContext,
     )
   } else {
     return { type: 'ok' }
+  }
+  if (result.type === 'fail') {
+    eventFrame.rollback()
+  } else {
+    ensureEventState(context.state)
+    recordEventLogDerivation(int, eventFrame.complete(context.state), result)
   }
   int.hooks.during({ ...executionContext, actionId }, result)
   if (result.type === 'fail' && result.recoverable === true && pendingHost && pendingEnvelope) {
@@ -549,6 +653,9 @@ export function engineResolveChoice(
       actionContext: contextSnapshot?.actionContext,
     })
     return result
+  }
+  if (result.type === 'fail') {
+    return rollbackAndReturn(int, result)
   }
   if (result.type === 'request' && result.request.kind === 'choice') {
     // Merge ActionDef-declared actionContext patches into the pending context.
@@ -668,5 +775,6 @@ export function engineResolveChoice(
     }
   }
   int.pendingNodeIdRef.value = null
+  commitIfEngineComplete(int, context, result)
   return result
 }

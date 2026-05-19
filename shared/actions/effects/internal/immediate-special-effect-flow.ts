@@ -1,6 +1,8 @@
 import type { ActionHookResult } from '../../hooks'
 import type { ActionFlow, ActionSpace, GameState, PlayerState } from '../../../contract/types'
+import type { EventSink } from '../../../contract/events'
 import { specialEffectAction } from '../special-effect'
+import { noopEventSink } from '../../../events/noop'
 
 type ImmediateSpecialEffectInput = ActionHookResult | ActionFlow | undefined | void
 
@@ -8,6 +10,7 @@ type ExecuteImmediateSpecialEffectFlowsArgs = {
   state: GameState
   player: PlayerState
   space: ActionSpace
+  eventSink?: EventSink
   results?: ImmediateSpecialEffectInput | readonly ImmediateSpecialEffectInput[]
 }
 
@@ -24,6 +27,7 @@ const executeFlow = (
   state: GameState,
   player: PlayerState,
   space: ActionSpace,
+  eventSink: EventSink,
   flow: ActionFlow | undefined,
 ) => {
   if (!flow || ('optional' in flow && flow.optional)) return
@@ -37,12 +41,13 @@ const executeFlow = (
       sourceCard: flow.sourceCard,
       params: flow.params,
       actionContext: flow.actionContext,
+      eventSink,
     })
     return
   }
 
   if (flow.type === 'seq' || flow.type === 'parallel') {
-    flow.children.forEach((child) => executeFlow(state, player, space, child))
+    flow.children.forEach((child) => executeFlow(state, player, space, eventSink, child))
   }
 }
 
@@ -50,11 +55,12 @@ export const executeImmediateSpecialEffectFlows = ({
   state,
   player,
   space,
+  eventSink = noopEventSink,
   results,
 }: ExecuteImmediateSpecialEffectFlowsArgs) => {
   if (!results) return
   const inputs = Array.isArray(results) ? results : [results]
   inputs.forEach((input) => {
-    executeFlow(state, player, space, flowFromInput(input))
+    executeFlow(state, player, space, eventSink, flowFromInput(input))
   })
 }

@@ -6,6 +6,7 @@ import type {
   GameState,
   PlayerState,
 } from '../../contract/types'
+import type { EventSink } from '../../contract/events'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement'
 import { addWorkerRef, removeWorkerRef } from '../../domain/space'
 import { smallestAvailableWorker } from '../../domain/player'
@@ -16,6 +17,16 @@ import { executeCardListener, getMatchingListeners } from '../../cards/card-list
 import { writeCardExtraData } from '../../cards/helpers/card-state'
 
 export { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
+
+const withForwardedActionSource = (
+  eventSink: EventSink,
+  sourceActionId: string,
+): EventSink => ({
+  emit: (event) => eventSink.emit({ sourceActionId, ...event }),
+  emitMany: (events) => {
+    events.forEach((event) => eventSink.emit({ sourceActionId, ...event }))
+  },
+})
 
 /**
  * Low-level helper: place a worker belonging to `player` onto `space`.
@@ -183,7 +194,7 @@ export const placeFarmerAction: ActionDefinition = {
       promptKey: 'ui.interactionPlaceFarmerExtra',
     }
   },
-  resolveChoice: ({ state, player, sourceCard, actionContext }, choice) => {
+  resolveChoice: ({ state, player, sourceCard, actionContext, eventSink }, choice) => {
     const allowOccupied = choice.startsWith(OCCUPIED_SPACE_CHOICE_PREFIX)
     const targetSpaceId = allowOccupied
       ? choice.slice(OCCUPIED_SPACE_CHOICE_PREFIX.length)
@@ -204,7 +215,12 @@ export const placeFarmerAction: ActionDefinition = {
     ) {
       writeCardExtraData(player, sourceCard, 'markedSpaceId', targetSpaceId)
     }
-    const execResult = targetSpace.execute({ state, player, space: targetSpace })
+    const execResult = targetSpace.execute({
+      state,
+      player,
+      space: targetSpace,
+      eventSink: withForwardedActionSource(eventSink, targetSpace.id),
+    })
     if (execResult.type === 'flow') return execResult
     return execResult
   },

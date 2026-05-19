@@ -21,6 +21,7 @@ import { ActionRegistry } from './registry'
 import { HookDispatcher } from './dispatcher'
 import { EngineTree } from './tree'
 import { LogStore } from './log-store'
+import { EventStore } from '../events/store'
 import type { EngineInternals } from './engine-internals'
 import {
   buildOwnedFlowNode,
@@ -56,6 +57,17 @@ type ChoiceDataSnapshot = {
   sourceCard?: string
   syntheticKind?: PendingEnvelope['syntheticKind']
 }
+
+const cloneSnapshotValue = <T>(value: T): T =>
+  JSON.parse(JSON.stringify(value)) as T
+
+const cloneEventLogDerivations = (
+  derivations: EngineInternals['eventLogDerivations'],
+): EngineInternals['eventLogDerivations'] =>
+  derivations.map((entry) => ({
+    events: entry.events.map((event) => cloneSnapshotValue(event)),
+    result: cloneSnapshotValue(entry.result),
+  }))
 
 const setNodeState = (
   node: EngineNode,
@@ -224,6 +236,8 @@ export class Engine {
   private registry: ActionRegistry
   private hooks: HookDispatcher
   private log: LogStore
+  private events = new EventStore()
+  private eventLogDerivations: EngineInternals['eventLogDerivations'] = []
   private _pendingNodeIdRef: { value: string | null } = { value: null }
   private _counterRef: { value: number } = { value: 0 }
   private beforePhaseFlowNodeIds = new Set<string>()
@@ -244,6 +258,8 @@ export class Engine {
       registry: this.registry,
       hooks: this.hooks,
       log: this.log,
+      events: this.events,
+      eventLogDerivations: this.eventLogDerivations,
       counterRef: this._counterRef,
       beforePhaseFlowNodeIds: this.beforePhaseFlowNodeIds,
       pendingNodeIdRef: this._pendingNodeIdRef,
@@ -421,6 +437,8 @@ export class Engine {
       // the pending-choice host on rehydrate.
       compositeEmit: snapshotCompositeEmit(this._internals()),
       beforePhaseFlowNodeIds: [...this.beforePhaseFlowNodeIds],
+      eventTransaction: this.events.snapshot(),
+      eventLogDerivations: cloneEventLogDerivations(this.eventLogDerivations),
     }
   }
 
@@ -481,8 +499,12 @@ export class Engine {
       request?: InteractionRequest
     } | null
     beforePhaseFlowNodeIds?: string[]
+    eventTransaction?: ReturnType<Engine['events']['snapshot']>
+    eventLogDerivations?: EngineInternals['eventLogDerivations']
   }) {
     this.beforePhaseFlowNodeIds = new Set(snapshot.beforePhaseFlowNodeIds ?? [])
+    this.events.restore(snapshot.eventTransaction)
+    this.eventLogDerivations = cloneEventLogDerivations(snapshot.eventLogDerivations ?? [])
     const restoredRoot = snapshot.treeCursor ? restoreTreeFromCursor(snapshot.treeCursor) : null
     if (restoredRoot) {
       this.tree.root = restoredRoot

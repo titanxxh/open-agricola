@@ -10,6 +10,11 @@ export type EventEnvelopeContext = {
   trigger?: GameEvent['trigger']
 }
 
+export type EventStoreSnapshot = {
+  inTransaction: boolean
+  transactionEvents: GameEvent[]
+}
+
 export class EventStoreFrame {
   private drafts: DraftGameEvent[] = []
   private readonly store: EventStore
@@ -67,6 +72,23 @@ export class EventStore {
 
   currentTransactionEvents(): readonly GameEvent[] {
     return this.transactionEvents
+  }
+
+  snapshot(): EventStoreSnapshot {
+    return {
+      inTransaction: this.inTransaction,
+      transactionEvents: this.transactionEvents.map((event) => ({ ...event })),
+    }
+  }
+
+  restore(snapshot?: EventStoreSnapshot | null): void {
+    if (!snapshot?.inTransaction) {
+      this.rollbackTransaction()
+      return
+    }
+    this.transactionEvents = snapshot.transactionEvents.map((event) => ({ ...event }))
+    this.inTransaction = true
+    this.transactionToken += 1
   }
 
   commitTransaction(state: GameState): GameEvent[] {
