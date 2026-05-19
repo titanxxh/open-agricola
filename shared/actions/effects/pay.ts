@@ -8,6 +8,7 @@ import type {
   PlayerState,
   Resource,
 } from '../../contract/types'
+import type { EventSink, PaymentPurpose } from '../../contract/events'
 import { addCardResourcePaid } from '../../cards/helpers/card-state'
 // PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
 // the new payment module. Other helpers (preview-cost / typed-flat /
@@ -107,6 +108,52 @@ const normalizePayParams = (
   return undefined
 }
 
+const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
+  const out: Partial<Resource> = {}
+  Object.entries(resources).forEach(([key, value]) => {
+    if (typeof value !== 'number' || value <= 0) return
+    out[key as keyof Resource] = value
+  })
+  return out
+}
+
+const splitSourceIds = (csv: string | undefined): string[] =>
+  csv ? csv.split(',').map((s) => s.trim()).filter(Boolean) : []
+
+const paymentPurpose = (
+  costType: CostModifierType | undefined,
+): PaymentPurpose => costType ?? 'cardEffect'
+
+const emitPaidEvent = (
+  eventSink: EventSink | undefined,
+  player: PlayerState,
+  resources: Partial<Resource>,
+  costType: CostModifierType | undefined,
+  sourceCard: string | undefined,
+  provenance: {
+    bonusUsed?: string
+    bonusChoiceIndex?: Record<string, number>
+    returnedCardId?: string
+  } = {},
+) => {
+  const paid = positiveResources(resources)
+  if (Object.keys(paid).length === 0) return
+  const bonusSources = splitSourceIds(provenance.bonusUsed)
+  eventSink?.emit<'resource.paid'>({
+    type: 'resource.paid',
+    resources: paid,
+    to: { kind: 'supply' },
+    paymentFor: paymentPurpose(costType),
+    paymentSources: [
+      { from: { kind: 'player', playerId: player.id }, resources: paid },
+    ],
+    ...(sourceCard ? { sourceCardId: sourceCard } : {}),
+    ...(bonusSources.length > 0 ? { bonusSources } : {}),
+    ...(provenance.bonusChoiceIndex ? { bonusChoiceIndex: provenance.bonusChoiceIndex } : {}),
+    ...(provenance.returnedCardId ? { returnedCardId: provenance.returnedCardId } : {}),
+  })
+}
+
 const buildSelectedResult = (
   solution: PaymentSolution,
   sourceCard: string | undefined,
@@ -114,6 +161,7 @@ const buildSelectedResult = (
   player: import('../../contract/types').PlayerState,
   state: import('../../contract/types').GameState,
   includeReturnedCard?: boolean,
+  eventSink?: EventSink,
 ): ActionExecutionResult => {
   executePaymentSolution(player, solution, { costType, state })
   if (includeReturnedCard && solution.cardUsed) {
@@ -140,6 +188,11 @@ const buildSelectedResult = (
   if (sourceCard) {
     addCardResourcePaid(player, sourceCard, resourcesPaid)
   }
+  emitPaidEvent(eventSink, player, resourcesPaid, costType, sourceCard, {
+    bonusUsed: solution.bonusUsed,
+    bonusChoiceIndex: solution.bonusChoiceIndex,
+    returnedCardId: solution.cardUsed,
+  })
   const extraData: Record<string, unknown> = {
     resourcesPaid,
     bonusUsed: solution.bonusUsed
@@ -208,7 +261,7 @@ export const payAction: ActionDefinition = {
       return PaymentSolver.computeOptions(buildSingletonState(player), 0, p.cost, ctx).length > 0
     },
   },
-  execute: ({ player, params, sourceCard, state }) => {
+  execute: ({ player, params, sourceCard, state, eventSink }) => {
     const p = normalizePayParams(params)
     if (!p?.cost) return { type: 'fail', logKey: 'log.payFail' }
     if (PaymentSolver.isComplexCost(p.cost)) {
@@ -235,6 +288,7 @@ export const payAction: ActionDefinition = {
         player,
         state,
         p.includeReturnedCard,
+        eventSink,
       )
     }
     const flat = p.cost as Partial<Resource>
@@ -272,6 +326,12 @@ export const payAction: ActionDefinition = {
       }
       if (detailed.cardUsed) extraData.returnedCardId = detailed.cardUsed
       if (detailed.feeIndex !== undefined) extraData.feeIndex = detailed.feeIndex
+      if (detailed.bonusChoiceIndex) extraData.bonusChoiceIndex = detailed.bonusChoiceIndex
+      emitPaidEvent(eventSink, player, resourcesPaid, p.costType, sourceCard, {
+        bonusUsed: detailed.bonusUsed,
+        bonusChoiceIndex: detailed.bonusChoiceIndex,
+        returnedCardId: detailed.cardUsed,
+      })
       if (sourceCard) {
         addCardResourcePaid(player, sourceCard, resourcesPaid)
         return {
@@ -288,6 +348,7 @@ export const payAction: ActionDefinition = {
       return { type: 'fail', logKey: 'log.payFail' }
     }
     payResources(player, flat)
+    emitPaidEvent(eventSink, player, flat, p.costType, sourceCard)
     if (sourceCard) {
       addCardResourcePaid(player, sourceCard, flat)
       return {
@@ -356,6 +417,7 @@ export const payAction: ActionDefinition = {
       player,
       state,
       p.includeReturnedCard,
+      eventSink,
     )
   },
 }

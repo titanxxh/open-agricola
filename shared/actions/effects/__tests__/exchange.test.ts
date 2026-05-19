@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  anytimeExchangeAction,
   canAffordTrade,
   getMaxTradeTimes,
   applyTrade,
@@ -8,7 +9,17 @@ import {
   getPossibleTradeTimes,
   reverseTrade,
 } from '../exchange'
-import type { PlayerState, Resource, Trade } from '../../../contract/types'
+import type { DraftGameEvent, EventSink } from '../../../contract/events'
+import type { ActionMutationContext, ActionSpace, GameState, PlayerState, Resource, Trade } from '../../../contract/types'
+
+const makeEventSink = (capturedEvents: DraftGameEvent[]): EventSink => ({
+  emit: (event) => {
+    capturedEvents.push(event)
+  },
+  emitMany: (events) => {
+    capturedEvents.push(...events)
+  },
+})
 
 const createMockPlayer = (resources: Partial<Resource>): PlayerState => ({
   id: 'p1',
@@ -223,3 +234,70 @@ describe('reverseTrade', () => {
   })
 })
 
+describe('anytimeExchangeAction events', () => {
+  it('emits one resource.exchanged event for a selected trade', () => {
+    const player = createMockPlayer({ sheep: 2, food: 0 })
+    player.improvements = ['Major_Fireplace1']
+    const state = { players: [player], actionSpaces: [], workPhaseObtainedResources: {} } as unknown as GameState
+    const capturedEvents: DraftGameEvent[] = []
+    const result = anytimeExchangeAction.resolveChoice!(
+      {
+        state,
+        player,
+        space: { id: 'exchange' } as ActionSpace,
+        eventSink: makeEventSink(capturedEvents),
+      } as ActionMutationContext,
+      'trade:0:2',
+    )
+    expect(result.type).toBe('ok')
+    expect(capturedEvents).toEqual([
+      {
+        type: 'resource.exchanged',
+        paid: { sheep: 2 },
+        gained: { food: 4 },
+        paidFrom: { kind: 'player', playerId: 'p1' },
+        paidTo: { kind: 'supply' },
+        gainedFrom: { kind: 'supply' },
+        gainedTo: { kind: 'player', playerId: 'p1' },
+        exchangeSource: 'Major_Fireplace1',
+        times: 2,
+      },
+    ])
+  })
+
+  it('does not emit resource.exchanged when exchange is cancelled', () => {
+    const player = createMockPlayer({ sheep: 1 })
+    player.improvements = ['Major_Fireplace1']
+    const state = { players: [player], actionSpaces: [], workPhaseObtainedResources: {} } as unknown as GameState
+    const capturedEvents: DraftGameEvent[] = []
+    const result = anytimeExchangeAction.resolveChoice!(
+      {
+        state,
+        player,
+        space: { id: 'exchange' } as ActionSpace,
+        eventSink: makeEventSink(capturedEvents),
+      } as ActionMutationContext,
+      'cancel',
+    )
+    expect(result.type).toBe('ok')
+    expect(capturedEvents).toEqual([])
+  })
+
+  it('does not emit resource.exchanged for zero-count bulk exchange', () => {
+    const player = createMockPlayer({ sheep: 1 })
+    player.improvements = ['Major_Fireplace1']
+    const state = { players: [player], actionSpaces: [], workPhaseObtainedResources: {} } as unknown as GameState
+    const capturedEvents: DraftGameEvent[] = []
+    const result = anytimeExchangeAction.resolveChoice!(
+      {
+        state,
+        player,
+        space: { id: 'exchange' } as ActionSpace,
+        eventSink: makeEventSink(capturedEvents),
+      } as ActionMutationContext,
+      'bulk:0=0',
+    )
+    expect(result.type).toBe('ok')
+    expect(capturedEvents).toEqual([])
+  })
+})

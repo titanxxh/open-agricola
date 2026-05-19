@@ -53,6 +53,30 @@ const mergePositiveResources = (
   return next
 }
 
+const emitResourceExchanged = (
+  eventSink: EventSink | undefined,
+  player: PlayerState,
+  trade: Trade,
+  times: number,
+) => {
+  if (times <= 0) return
+  const paid = scaleResources(trade.from, times)
+  const gained = scaleResources(trade.to, times)
+  if (Object.keys(paid).length === 0 && Object.keys(gained).length === 0) return
+  const exchangeSource = trade.sourceId ?? trade.source
+  eventSink?.emit<'resource.exchanged'>({
+    type: 'resource.exchanged',
+    paid,
+    gained,
+    paidFrom: { kind: 'player', playerId: player.id },
+    paidTo: { kind: 'supply' },
+    gainedFrom: { kind: 'supply' },
+    gainedTo: { kind: 'player', playerId: player.id },
+    ...(exchangeSource ? { exchangeSource } : {}),
+    times,
+  })
+}
+
 // ============================================
 // Trade System (BGA-aligned)
 // ============================================
@@ -440,6 +464,7 @@ const resolveExchangeChoice = (
             trade.sourceId ?? trade.source ?? 'unknown',
           )
         }
+        emitResourceExchanged(eventSink, player, trade, times)
         dispatchTradeAppliedListener(state, player, trade, times, eventSink)
         paid = mergePositiveResources(paid, scaleResources(trade.from, times))
         gained = mergePositiveResources(gained, scaleResources(trade.to, times))
@@ -468,6 +493,7 @@ const resolveExchangeChoice = (
           trade.sourceId ?? trade.source ?? 'unknown',
         )
       }
+      emitResourceExchanged(eventSink, player, trade, times)
       dispatchTradeAppliedListener(state, player, trade, times, eventSink)
     }
     const gained = times > 0 ? scaleResources(trade.to, times) : {}
