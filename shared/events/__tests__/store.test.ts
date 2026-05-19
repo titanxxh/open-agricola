@@ -105,6 +105,38 @@ describe('EventStore', () => {
     expect(state.nextEventSeq).toBe(3)
   })
 
+  it('rebases completed transaction events if another transaction committed first', () => {
+    const state = makeState()
+    const store = new EventStore()
+    const delayed = store.beginFrame({ actorPlayerId: 'p1', sourceActionId: 'delayed' })
+    delayed.sink.emit({
+      type: 'resource.moved',
+      resources: { wood: 1 },
+      from: { kind: 'supply' },
+      to: { kind: 'player', playerId: 'p1' },
+      reason: 'gain',
+    })
+    expect(delayed.complete(state)[0]?.seq).toBe(1)
+
+    const other = new EventStore()
+    const immediate = other.beginFrame({ actorPlayerId: 'p1', sourceActionId: 'immediate' })
+    immediate.sink.emit({
+      type: 'resource.moved',
+      resources: { clay: 1 },
+      from: { kind: 'supply' },
+      to: { kind: 'player', playerId: 'p1' },
+      reason: 'gain',
+    })
+    immediate.complete(state)
+    other.commitTransaction(state)
+
+    const committed = store.commitTransaction(state)
+    expect(state.events.map((event) => event.seq)).toEqual([1, 2])
+    expect(state.events.map((event) => event.sourceActionId)).toEqual(['immediate', 'delayed'])
+    expect(committed[0]).toMatchObject({ id: '2', seq: 2 })
+    expect(state.nextEventSeq).toBe(3)
+  })
+
   it('does not clear existing transaction events when ensuring an open transaction', () => {
     const state = makeState()
     const store = new EventStore()
@@ -213,6 +245,42 @@ describe('EventStore', () => {
         { ...makeEvent(), seq: -1 },
       ],
     })).toThrow(/seq/)
+  })
+
+  it('rejects nested private payloads while completing frames without polluting state', () => {
+    const state = makeState()
+    const store = new EventStore()
+    const frame = store.beginFrame({ actorPlayerId: 'p1' })
+    frame.sink.emit({
+      type: 'resource.moved',
+      resources: { wood: 1 },
+      from: { kind: 'supply' },
+      to: { kind: 'player', playerId: 'p1', prompt: { kind: 'choose-card' } },
+      reason: 'gain',
+    } as never)
+
+    expect(() => frame.complete(state)).toThrow(/to/)
+    expect(state.events).toEqual([])
+    expect(state.nextEventSeq).toBe(1)
+  })
+
+  it('rejects nested private payloads while committing without polluting state', () => {
+    const state = makeState()
+    const store = new EventStore()
+    const internals = store as unknown as {
+      inTransaction: boolean
+      transactionEvents: GameEvent[]
+    }
+    internals.inTransaction = true
+    internals.transactionEvents = [
+      makeEvent({
+        to: { kind: 'player', playerId: 'p1', minorHand: ['E1_PrivateCard'] } as never,
+      }),
+    ]
+
+    expect(() => store.commitTransaction(state)).toThrow(/to/)
+    expect(state.events).toEqual([])
+    expect(state.nextEventSeq).toBe(1)
   })
 
   it('emits many drafts and returns void', () => {

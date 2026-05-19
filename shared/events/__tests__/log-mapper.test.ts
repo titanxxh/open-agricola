@@ -93,7 +93,7 @@ describe('eventsToLogEntries', () => {
     ])
   })
 
-  it('keeps resource exchange as one action detail log entry', () => {
+  it('maps grain-to-food resource exchange as bake bread', () => {
     const events = [
       {
         schemaVersion: 1,
@@ -115,11 +115,10 @@ describe('eventsToLogEntries', () => {
     ] satisfies GameEvent[]
     expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' } })).toEqual([
       {
-        key: 'log.actionDetail',
+        key: 'log.bakeBread',
         params: {
-          player: 'Alice',
-          action: 'Fireplace',
-          detailParts: { gains: { food: 4 }, costs: { grain: 1 } },
+          count: 1,
+          food: 4,
         },
       },
     ])
@@ -145,5 +144,143 @@ describe('eventsToLogEntries', () => {
       },
     ] satisfies GameEvent[]
     expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' } })[0]?.params?.action).toBe('exchange')
+  })
+
+  it('maps farm and phase events to legacy log entries', () => {
+    const base = {
+      schemaVersion: 1,
+      round: 3,
+      phase: 'work',
+      visibility: 'public',
+      actorPlayerId: 'p1',
+    } as const
+    const events = [
+      {
+        ...base,
+        id: '1',
+        seq: 1,
+        type: 'round.started',
+      },
+      {
+        ...base,
+        id: '2',
+        seq: 2,
+        type: 'worker.placed',
+        sourceActionId: 'forest',
+        workerId: '1',
+        spaceId: 'forest',
+      },
+      {
+        ...base,
+        id: '3',
+        seq: 3,
+        type: 'farm.sown',
+        sourceActionId: 'sow',
+        sows: [{
+          location: { kind: 'field', playerId: 'p1', row: 0, col: 0 },
+          crop: 'grain',
+          added: 3,
+        }],
+      },
+      {
+        ...base,
+        id: '4',
+        seq: 4,
+        type: 'farm.fenceBuilt',
+        sourceActionId: 'fence',
+        fences: [{ edge: 'H-0-0', type: 'fence' }],
+      },
+      {
+        ...base,
+        id: '5',
+        seq: 5,
+        type: 'harvest.phaseStarted',
+        phase: 'field',
+        harvestPhase: 'field',
+      },
+      {
+        ...base,
+        id: '6',
+        seq: 6,
+        type: 'farm.animalBred',
+        phase: 'breeding',
+        animals: { sheep: 1 },
+        source: 'harvest',
+      },
+      {
+        ...base,
+        id: '7',
+        seq: 7,
+        type: 'farm.animalDiscarded',
+        animals: { sheep: 2 },
+        reason: 'noRoom',
+      },
+    ] satisfies GameEvent[]
+
+    expect(eventsToLogEntries(events, {
+      playerNames: { p1: 'Alice' },
+      actionNames: { forest: 'Forest', fence: 'Fences' },
+    })).toEqual([
+      {
+        key: 'log.reorganizeDiscard',
+        params: { player: 'Alice', resources: { sheep: 2 } },
+      },
+      {
+        key: 'log.harvestBreedDetail',
+        params: { player: 'Alice', resources: { sheep: 1 } },
+      },
+      { key: 'log.harvestPhaseReap' },
+      {
+        key: 'log.actionDetail',
+        params: {
+          player: 'Alice',
+          action: 'Fences',
+          detailParts: { effects: { fencing: 1 } },
+        },
+      },
+      { key: 'log.sow', params: { player: 'Alice' } },
+      { key: 'log.placeFarmer', params: { player: 'Alice', action: 'Forest' } },
+      { key: 'log.enterRound', params: { round: 3 } },
+    ])
+  })
+
+  it('maps start and card-granted events to legacy log entries', () => {
+    const events = [
+      {
+        schemaVersion: 1,
+        id: '1',
+        seq: 1,
+        round: 1,
+        phase: 'work',
+        type: 'game.started',
+        visibility: 'public',
+      },
+      {
+        schemaVersion: 1,
+        id: '2',
+        seq: 2,
+        round: 1,
+        phase: 'work',
+        type: 'action.granted',
+        visibility: 'public',
+        actorPlayerId: 'p1',
+        sourceCardId: 'A150_Stagehand',
+        playerId: 'p1',
+        actionId: 'construct',
+        cardId: 'A150_Stagehand',
+      },
+    ] satisfies GameEvent[]
+
+    expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' } })).toEqual([
+      {
+        key: 'log.cardGrantedAction',
+        params: {
+          player: 'Alice',
+          actionId: 'construct',
+          cardId: 'A150_Stagehand',
+        },
+      },
+      { key: 'log.startGame' },
+    ])
   })
 })

@@ -27,8 +27,6 @@ const afterListener: CardListenerRegistration = {
     if (workersAvailable(context.state, context.player) <= 0) return
     return {
       flow: { type: 'leaf', actionId: 'place-farmer', optional: true, promptKey: 'ui.interactionStockProtectorPlace' },
-      logKey: 'log.cardGrantedAction',
-      logParams: { cardId: CARD_ID, actionId: 'place-farmer' },
       sourceCard: CARD_ID,
     }
   },

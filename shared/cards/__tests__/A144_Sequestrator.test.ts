@@ -98,8 +98,6 @@ describe('A144_Sequestrator', () => {
         },
       ],
     })
-    expect(result?.logKey).toBeUndefined()
-    expect(result?.logParams).toBeUndefined()
     expect(triggerPlayer.resources.reed).toBe(0)
     expect(owner.cardStates?.A144_Sequestrator?.counters?.reed).toBe(3)
   })
@@ -143,8 +141,6 @@ describe('A144_Sequestrator', () => {
         },
       ],
     })
-    expect(result?.logKey).toBeUndefined()
-    expect(result?.logParams).toBeUndefined()
     expect(triggerPlayer.resources.clay).toBe(0)
     expect(owner.cardStates?.A144_Sequestrator?.counters?.clay).toBe(4)
   })

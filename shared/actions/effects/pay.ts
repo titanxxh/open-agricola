@@ -208,15 +208,6 @@ const buildSelectedResult = (
   if (solution.feeIndex !== undefined) {
     extraData.feeIndex = solution.feeIndex
   }
-  if (sourceCard) {
-    return {
-      type: 'ok',
-      resourcesPaid,
-      logKey: 'log.cardEffectPay',
-      logParams: { cost: resourcesPaid, cardId: sourceCard },
-      extraData,
-    }
-  }
   return {
     type: 'ok',
     resourcesPaid,
@@ -263,7 +254,7 @@ export const payAction: ActionDefinition = {
   },
   execute: ({ player, params, sourceCard, state, eventSink }) => {
     const p = normalizePayParams(params)
-    if (!p?.cost) return { type: 'fail', logKey: 'log.payFail' }
+    if (!p?.cost) return { type: 'fail', errorKey: 'log.payFail' }
     if (PaymentSolver.isComplexCost(p.cost)) {
       const optionPrefix = p.optionPrefix ?? 'pay:generic'
       const selection = resolveCostPaymentSelection(
@@ -271,7 +262,7 @@ export const payAction: ActionDefinition = {
         p.cost,
         optionPrefix,
         p.paymentChoice,
-        { type: 'fail', logKey: 'log.payFail' },
+        { type: 'fail', errorKey: 'log.payFail' },
         {
           costType: p.costType,
           includeReturnedCard: p.includeReturnedCard,
@@ -300,7 +291,7 @@ export const payAction: ActionDefinition = {
     // afford the cost via a trade swap.
     if (p.costType) {
       const detailed = payTypedFlatCostDetailed(player, flat, p.costType, state)
-      if (!detailed.ok) return { type: 'fail', logKey: 'log.payFail' }
+      if (!detailed.ok) return { type: 'fail', errorKey: 'log.payFail' }
       const resourcesPaid = detailed.resourcesPaid
       if (
         p.costType === 'major-improvement'
@@ -334,29 +325,18 @@ export const payAction: ActionDefinition = {
       })
       if (sourceCard) {
         addCardResourcePaid(player, sourceCard, resourcesPaid)
-        return {
-          type: 'ok',
-          resourcesPaid,
-          logKey: 'log.cardEffectPay',
-          logParams: { cost: resourcesPaid, cardId: sourceCard },
-          extraData,
-        }
+        return { type: 'ok', resourcesPaid, extraData }
       }
       return { type: 'ok', resourcesPaid, extraData }
     }
     if (!PaymentSolver.canAfford(buildSingletonState(player), 0, flat, { actionId: 'pay', costType: 'none' })) {
-      return { type: 'fail', logKey: 'log.payFail' }
+      return { type: 'fail', errorKey: 'log.payFail' }
     }
     payResources(player, flat)
     emitPaidEvent(eventSink, player, flat, p.costType, sourceCard)
     if (sourceCard) {
       addCardResourcePaid(player, sourceCard, flat)
-      return {
-        type: 'ok',
-        resourcesPaid: flat,
-        logKey: 'log.cardEffectPay',
-        logParams: { cost: flat, cardId: sourceCard },
-      }
+      return { type: 'ok', resourcesPaid: flat }
     }
     return { type: 'ok', resourcesPaid: flat }
   },
@@ -369,7 +349,7 @@ export const payAction: ActionDefinition = {
   // running on un-paid state.
   resolveChoice: ({ player, params, sourceCard, state, eventSink }, choice) => {
     const p = normalizePayParams(params)
-    if (!p?.cost) return { type: 'fail', logKey: 'log.payFail' }
+    if (!p?.cost) return { type: 'fail', errorKey: 'log.payFail' }
     if (!PaymentSolver.isComplexCost(p.cost)) {
       // Non-ComplexCost paths never reach resolveChoice (execute paid eagerly
       // and returned `ok`). Treat any stray invocation as a no-op success.
@@ -400,7 +380,7 @@ export const payAction: ActionDefinition = {
       p.cost,
       optionPrefix,
       choice,
-      { type: 'fail', logKey: 'log.payFail' },
+      { type: 'fail', errorKey: 'log.payFail' },
       {
         costType: p.costType,
         includeReturnedCard: p.includeReturnedCard,

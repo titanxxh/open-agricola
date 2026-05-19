@@ -28,11 +28,11 @@ const scytheHarvestFieldAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ player, params, sourceCard }) => {
+  execute: ({ player, params }) => {
     const fieldIndex = params?.fieldIndex as number | undefined
-    if (fieldIndex === undefined) return { type: 'fail', logKey: 'log.actionFail' }
+    if (fieldIndex === undefined) return { type: 'fail', errorKey: 'log.actionFail' }
     const field = player.fields[fieldIndex]
-    if (!field || field.stacks.length === 0) return { type: 'fail', logKey: 'log.actionFail' }
+    if (!field || field.stacks.length === 0) return { type: 'fail', errorKey: 'log.actionFail' }
     // Reap the entire field — every stack — in one go.
     const gained: Partial<Resource> = {}
     for (const stack of field.stacks) {
@@ -46,8 +46,6 @@ const scytheHarvestFieldAction: ActionDefinition = {
     return {
       type: 'ok',
       resourcesGained: gained,
-      logKey: 'log.cardEffectGain',
-      logParams: { gain: gained, cardId: sourceCard },
     }
   },
 }

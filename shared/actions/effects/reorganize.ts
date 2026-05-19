@@ -82,6 +82,17 @@ const discardedAnimals = (
   return discarded
 }
 
+const positiveAnimals = (
+  animals: Pick<Resource, (typeof ANIMAL_TYPES)[number]>,
+): Partial<Pick<Resource, (typeof ANIMAL_TYPES)[number]>> => {
+  const result: Partial<Pick<Resource, (typeof ANIMAL_TYPES)[number]>> = {}
+  for (const type of ANIMAL_TYPES) {
+    const amount = animals[type] ?? 0
+    if (amount > 0) result[type] = amount
+  }
+  return result
+}
+
 export const reorganizeAction: ActionDefinition = {
   id: 'reorganize',
   nameKey: 'actions.reorganize.name',
@@ -123,14 +134,23 @@ export const reorganizeAction: ActionDefinition = {
       : typeof rawPayload === 'object' && rawPayload !== null && Array.isArray((rawPayload as { zones?: unknown }).zones)
         ? (rawPayload as { zones: ZoneAssignment[] }).zones
         : undefined
-    if (!zones) return { type: 'fail', logKey: 'log.reorganizeFail' }
+    if (!zones) return { type: 'fail', errorKey: 'log.reorganizeFail' }
     const before = animalTotals(ctx.player)
     applyReorganizeMutate(ctx.state, ctx.player, zones)
-    const discarded = discardedAnimals(before, animalTotals(ctx.player))
-    if (Object.keys(discarded).length > 0 && Array.isArray(ctx.state.log)) {
-      ctx.state.log.unshift({
-        key: 'log.reorganizeDiscard',
-        params: { player: ctx.player.name, resources: discarded },
+    const after = animalTotals(ctx.player)
+    const assigned = positiveAnimals(after)
+    if (Object.keys(assigned).length > 0) {
+      ctx.eventSink?.emit<'farm.animalMoved'>({
+        type: 'farm.animalMoved',
+        animals: assigned,
+      })
+    }
+    const discarded = discardedAnimals(before, after)
+    if (Object.keys(discarded).length > 0) {
+      ctx.eventSink?.emit<'farm.animalDiscarded'>({
+        type: 'farm.animalDiscarded',
+        animals: discarded,
+        reason: 'noRoom',
       })
     }
     return { type: 'ok' }

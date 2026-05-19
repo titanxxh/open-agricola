@@ -97,48 +97,43 @@ describe('canBakeBread', () => {
 describe('bakeBread with Minor oven', () => {
   it('E63 bakes 1 grain → 6 food', () => {
     const player = createPlayer({ minorPlayed: ['E63_IronOven'] })
-    const result = bakeBread(player, 'E63_IronOven', 1)
+    const events: unknown[] = []
+    const result = bakeBread(player, 'E63_IronOven', 1, undefined, {
+      emit: (event) => events.push(event),
+      emitMany: (items) => events.push(...items),
+    })
     expect(result.type).toBe('ok')
     if (result.type !== 'ok') return
     expect(player.resources.grain).toBe(2)
     expect(player.resources.food).toBe(6)
-    expect(result.immediateLogs).toEqual([
-      {
-        key: 'log.bakeBread',
-        params: { count: 1, food: 6 },
-      },
-    ])
-    expect(result.logKey).toBeUndefined()
-    expect(result.logParams).toBeUndefined()
+    expect(events).toMatchObject([{ type: 'resource.exchanged', paid: { grain: 1 }, gained: { food: 6 } }])
   })
 
   it('E64 bakes 1 grain → 3 food', () => {
     const player = createPlayer({ minorPlayed: ['E64_SimpleOven'] })
-    const result = bakeBread(player, 'E64_SimpleOven', 1)
+    const events: unknown[] = []
+    const result = bakeBread(player, 'E64_SimpleOven', 1, undefined, {
+      emit: (event) => events.push(event),
+      emitMany: (items) => events.push(...items),
+    })
     expect(result.type).toBe('ok')
     if (result.type !== 'ok') return
     expect(player.resources.grain).toBe(2)
     expect(player.resources.food).toBe(3)
-    expect(result.immediateLogs).toEqual([
-      {
-        key: 'log.bakeBread',
-        params: { count: 1, food: 3 },
-      },
-    ])
+    expect(events).toMatchObject([{ type: 'resource.exchanged', paid: { grain: 1 }, gained: { food: 3 } }])
   })
 
   it('Major still works after migration', () => {
     const player = createPlayer({ improvements: ['Major_ClayOven'] })
-    const result = bakeBread(player, 'Major_ClayOven', 1)
+    const events: unknown[] = []
+    const result = bakeBread(player, 'Major_ClayOven', 1, undefined, {
+      emit: (event) => events.push(event),
+      emitMany: (items) => events.push(...items),
+    })
     expect(result.type).toBe('ok')
     if (result.type !== 'ok') return
     expect(player.resources.grain).toBe(2)
     expect(player.resources.food).toBe(5)
-    expect(result.immediateLogs).toEqual([
-      {
-        key: 'log.bakeBread',
-        params: { count: 1, food: 5 },
-      },
-    ])
+    expect(events).toMatchObject([{ type: 'resource.exchanged', paid: { grain: 1 }, gained: { food: 5 } }])
   })
 })

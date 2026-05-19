@@ -1,43 +1,8 @@
-import type { ActionDefinition, ActionExecutionResult, GameState, PlayerState, Resource } from '../../contract/types'
+import type { ActionDefinition, ActionExecutionResult, GameState, PlayerState } from '../../contract/types'
 import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../session/stats'
 import { getMinorImprovement } from '../../cards/registry-display'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { activateCard } from './activate-card'
-
-const getPositiveResourceLog = (
-  resources?: Partial<Resource> | null,
-): Partial<Resource> | undefined => {
-  if (!resources) return undefined
-  const positiveEntries = Object.entries(resources).filter(
-    ([, amount]) => (amount ?? 0) > 0,
-  )
-  if (positiveEntries.length === 0) return undefined
-  return Object.fromEntries(positiveEntries) as Partial<Resource>
-}
-
-const buildImprovementLogParams = (
-  improvementId: string,
-  costResources: Partial<Resource>,
-  options?: { returnedCards?: string[]; bonusSources?: string[] },
-) => {
-  const params: Record<string, unknown> = {
-    improvements: improvementId,
-    costResources: getPositiveResourceLog(costResources) ?? {},
-  }
-  if (options?.returnedCards?.length) {
-    params.returnedCards = options.returnedCards
-  }
-  if (options?.bonusSources?.length) {
-    params.bonusSources = [...options.bonusSources]
-  }
-  return params
-}
-
-const readActionBonusSources = (player: PlayerState): string[] | undefined => {
-  const sources = player._activeActionBonusSources
-  if (!sources || sources.length === 0) return undefined
-  return [...sources]
-}
 
 export type ApplyImprovementParams = {
   improvementId: string
@@ -92,40 +57,27 @@ export const applyImprovementAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ player, params, state }): ActionExecutionResult => {
+  execute: ({ player, params, state, eventSink }): ActionExecutionResult => {
     if (!isApplyImprovementParams(params)) {
-      return { type: 'fail', logKey: 'log.improvementFail' }
+      return { type: 'fail', errorKey: 'log.improvementFail' }
     }
     const { improvementId, kind } = params
-    // Pop the seq-shared paymentInfo so onBuy effects match legacy finalize
-    // behaviour. Bonus sources are read while the per-action scratchpad is
-    // still live so the emitted log.playImprovement / log.playMinorImprovement
-    // entry attributes any discount cards (D95 etc.) just like the old
-    // mutate-in-place flow.
     const paymentInfo = player._pendingImprovementPaymentInfo
     delete player._pendingImprovementPaymentInfo
-    const bonusSources = readActionBonusSources(player)
     if (kind === 'major') {
       applyMajor(state, player, improvementId)
     } else {
       applyMinor(state, player, improvementId)
     }
-    const logKey = kind === 'major' ? 'log.playImprovement' : 'log.playMinorImprovement'
-    const logParams = buildImprovementLogParams(improvementId, paymentInfo?.resourcesPaid ?? {}, {
-      returnedCards: paymentInfo?.returnedCardId ? [paymentInfo.returnedCardId] : undefined,
-      bonusSources,
+    eventSink?.emit<'card.played'>({
+      type: 'card.played',
+      cardId: improvementId,
+      cardType: kind,
     })
-    const immediateLogs = [{ key: logKey, params: logParams }]
     const activation = activateCard(state, player, improvementId, 'onBuy', paymentInfo)
     if (activation.type === 'flow') {
-      activation.immediateLogs = [...immediateLogs, ...(activation.immediateLogs ?? [])]
       return activation
     }
-    return {
-      type: 'ok',
-      immediateLogs,
-      logKey,
-      logParams,
-    }
+    return { type: 'ok' }
   },
 }

@@ -43,7 +43,9 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'action.revealed': ['actionId', 'roundSlot'],
   'action.accumulated': ['spaceId', 'resources'],
   'action.exclusiveUseSet': ['actionId', 'playerId', 'sourceCardId'],
+  'action.granted': ['playerId', 'actionId', 'cardId'],
   'turn.skipped': ['playerId', 'reason'],
+  'startPlayer.changed': ['playerId'],
   'card.played': ['cardId', 'cardType'],
   'card.triggered': ['cardId', 'triggerActionId', 'optional', 'accepted', 'replacement'],
   'card.stateChanged': ['cardId', 'key', 'value', 'targetPlayerId'],
@@ -59,7 +61,263 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'round.started': ['round'],
   'work.started': [],
   'returnHome.started': [],
+  'harvest.started': [],
   'harvest.phaseStarted': ['harvestPhase'],
+  'harvest.reapSkipped': ['playerId'],
+  'harvest.reapNothing': ['playerId'],
+  'harvest.feedConverted': ['playerId', 'source', 'cost', 'food'],
+  'game.started': [],
+  'game.ended': [],
+}
+
+const resourceKeys = new Set([
+  'wood',
+  'clay',
+  'reed',
+  'stone',
+  'food',
+  'grain',
+  'vegetable',
+  'sheep',
+  'boar',
+  'cattle',
+  'begging',
+  'occupation',
+  'field',
+  'roomWood',
+  'roomClay',
+  'roomStone',
+  'stable',
+])
+
+const privatePayloadKeys = new Set([
+  'hand',
+  'minorHand',
+  'occupationHand',
+  'privateHand',
+  'draft',
+  'prompt',
+  'promptKey',
+  'pending',
+  'interaction',
+  'choice',
+  'choices',
+  'options',
+])
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const assertRecord = (value: unknown, path: string): Record<string, unknown> => {
+  if (!isRecord(value)) {
+    throw new Error(`GameEvent ${path} must be an object`)
+  }
+  return value
+}
+
+const assertOnlyKeys = (
+  value: Record<string, unknown>,
+  keys: readonly string[],
+  path: string,
+): void => {
+  const allowed = new Set(keys)
+  Object.keys(value).forEach((key) => {
+    if (!allowed.has(key)) {
+      throw new Error(`GameEvent ${path} has unknown field ${key}`)
+    }
+  })
+}
+
+const assertStringField = (value: unknown, path: string): void => {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error(`GameEvent ${path} must be a non-empty string`)
+  }
+}
+
+const assertFiniteNumberField = (value: unknown, path: string): void => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`GameEvent ${path} must be a finite number`)
+  }
+}
+
+const assertNoPrivatePayload = (value: unknown, path: string): void => {
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertNoPrivatePayload(entry, `${path}[${index}]`))
+    return
+  }
+  if (!isRecord(value)) return
+  Object.entries(value).forEach(([key, entry]) => {
+    if (privatePayloadKeys.has(key)) {
+      throw new Error(`GameEvent public schema rejects private payload at ${path}.${key}`)
+    }
+    assertNoPrivatePayload(entry, `${path}.${key}`)
+  })
+}
+
+const assertResourceMap = (value: unknown, path: string): void => {
+  const record = assertRecord(value, path)
+  Object.entries(record).forEach(([key, entry]) => {
+    if (!resourceKeys.has(key)) {
+      throw new Error(`GameEvent ${path} has unknown resource ${key}`)
+    }
+    assertFiniteNumberField(entry, `${path}.${key}`)
+  })
+}
+
+const assertResourceLocation = (value: unknown, path: string): void => {
+  const record = assertRecord(value, path)
+  const kind = record.kind
+  if (kind === 'supply') {
+    assertOnlyKeys(record, ['kind'], path)
+    return
+  }
+  if (kind === 'player') {
+    assertOnlyKeys(record, ['kind', 'playerId'], path)
+    assertStringField(record.playerId, `${path}.playerId`)
+    return
+  }
+  if (kind === 'actionSpace') {
+    assertOnlyKeys(record, ['kind', 'spaceId'], path)
+    assertStringField(record.spaceId, `${path}.spaceId`)
+    return
+  }
+  if (kind === 'field') {
+    assertOnlyKeys(record, ['kind', 'playerId', 'row', 'col'], path)
+    assertStringField(record.playerId, `${path}.playerId`)
+    assertFiniteNumberField(record.row, `${path}.row`)
+    assertFiniteNumberField(record.col, `${path}.col`)
+    return
+  }
+  if (kind === 'card') {
+    assertOnlyKeys(record, ['kind', 'playerId', 'cardId'], path)
+    if (record.playerId !== undefined) assertStringField(record.playerId, `${path}.playerId`)
+    assertStringField(record.cardId, `${path}.cardId`)
+    return
+  }
+  if (kind === 'roundCard') {
+    assertOnlyKeys(record, ['kind', 'round'], path)
+    assertFiniteNumberField(record.round, `${path}.round`)
+    return
+  }
+  throw new Error(`GameEvent ${path} has unknown ResourceLocation kind`)
+}
+
+const assertPaymentSources = (value: unknown): void => {
+  if (value === undefined) return
+  if (!Array.isArray(value)) {
+    throw new Error('GameEvent paymentSources must be an array')
+  }
+  value.forEach((entry, index) => {
+    const record = assertRecord(entry, `paymentSources[${index}]`)
+    assertOnlyKeys(record, ['from', 'resources'], `paymentSources[${index}]`)
+    assertResourceLocation(record.from, `paymentSources[${index}].from`)
+    assertResourceMap(record.resources, `paymentSources[${index}].resources`)
+  })
+}
+
+const assertPublicCardStateValue = (value: unknown, path: string): void => {
+  if (value === null) return
+  if (typeof value === 'string' || typeof value === 'boolean') return
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw new Error(`GameEvent ${path} must be a public scalar or array`)
+    }
+    return
+  }
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertPublicCardStateValue(entry, `${path}[${index}]`))
+    return
+  }
+  throw new Error(`GameEvent ${path} must be a public scalar or array`)
+}
+
+const assertKnownEventDetails = (type: string, event: Record<string, unknown>): void => {
+  switch (type) {
+    case 'resource.moved':
+      assertResourceMap(event.resources, 'resources')
+      assertResourceLocation(event.from, 'from')
+      assertResourceLocation(event.to, 'to')
+      return
+    case 'resource.exchanged':
+      assertResourceMap(event.paid, 'paid')
+      assertResourceMap(event.gained, 'gained')
+      assertResourceLocation(event.paidFrom, 'paidFrom')
+      assertResourceLocation(event.paidTo, 'paidTo')
+      assertResourceLocation(event.gainedFrom, 'gainedFrom')
+      assertResourceLocation(event.gainedTo, 'gainedTo')
+      return
+    case 'resource.accumulated':
+      assertResourceMap(event.resources, 'resources')
+      assertResourceLocation(event.to, 'to')
+      return
+    case 'resource.paid':
+      assertResourceMap(event.resources, 'resources')
+      if (event.to !== undefined) assertResourceLocation(event.to, 'to')
+      assertPaymentSources(event.paymentSources)
+      return
+    case 'farm.sown':
+      if (!Array.isArray(event.sows)) throw new Error('GameEvent sows must be an array')
+      event.sows.forEach((entry, index) => {
+        const record = assertRecord(entry, `sows[${index}]`)
+        assertOnlyKeys(record, ['location', 'crop', 'added'], `sows[${index}]`)
+        assertResourceLocation(record.location, `sows[${index}].location`)
+        assertFiniteNumberField(record.added, `sows[${index}].added`)
+      })
+      return
+    case 'farm.cropAdded':
+    case 'farm.cropRemoved':
+      if (!Array.isArray(event.crops)) throw new Error('GameEvent crops must be an array')
+      event.crops.forEach((entry, index) => {
+        const record = assertRecord(entry, `crops[${index}]`)
+        assertOnlyKeys(record, ['location', 'crop', 'amount'], `crops[${index}]`)
+        assertResourceLocation(record.location, `crops[${index}].location`)
+        assertFiniteNumberField(record.amount, `crops[${index}].amount`)
+      })
+      return
+    case 'farm.animalMoved':
+      assertResourceMap(event.animals, 'animals')
+      if (event.from !== undefined) assertResourceLocation(event.from, 'from')
+      if (event.to !== undefined) assertResourceLocation(event.to, 'to')
+      return
+    case 'farm.animalDiscarded':
+    case 'farm.animalBred':
+      assertResourceMap(event.animals, 'animals')
+      return
+    case 'worker.returned':
+      if (!Array.isArray(event.workers)) throw new Error('GameEvent workers must be an array')
+      event.workers.forEach((entry, index) => {
+        const record = assertRecord(entry, `workers[${index}]`)
+        assertOnlyKeys(record, ['playerId', 'workerId'], `workers[${index}]`)
+        assertStringField(record.playerId, `workers[${index}].playerId`)
+        assertStringField(record.workerId, `workers[${index}].workerId`)
+      })
+      return
+    case 'action.accumulated':
+      assertResourceMap(event.resources, 'resources')
+      return
+    case 'card.stateChanged':
+      assertPublicCardStateValue(event.value, 'card.stateChanged.value')
+      return
+    case 'card.stackChanged':
+      if (event.resources !== undefined) assertResourceMap(event.resources, 'resources')
+      return
+    case 'futureMeeple.queued':
+      if (!Array.isArray(event.entries)) throw new Error('GameEvent entries must be an array')
+      event.entries.forEach((entry, index) => {
+        const record = assertRecord(entry, `entries[${index}]`)
+        if (record.resources !== undefined) assertResourceMap(record.resources, `entries[${index}].resources`)
+      })
+      return
+    case 'futureMeeple.resolved':
+      if (event.resources !== undefined) assertResourceMap(event.resources, 'resources')
+      return
+    case 'harvest.feedConverted':
+      assertResourceMap(event.cost, 'cost')
+      assertResourceMap(event.food, 'food')
+      return
+    default:
+      assertNoPrivatePayload(event, '$')
+  }
 }
 
 export const assertKnownGameEventShape = (event: unknown): void => {
@@ -80,6 +338,8 @@ export const assertKnownGameEventShape = (event: unknown): void => {
       throw new Error(`Unknown GameEvent field ${key} for ${entry.type}`)
     }
   })
+  assertNoPrivatePayload(event, '$')
+  assertKnownEventDetails(entry.type, event as Record<string, unknown>)
 }
 
 export const assertGameEventEnvelope = (event: unknown): void => {

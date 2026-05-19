@@ -4,9 +4,7 @@ import type {
   ActionFlow,
   PlayerState,
   ActionChoiceOption,
-  ImmediateLogEntry,
   InteractionRequest,
-  LogEntry,
   Resource,
 } from '../contract/types'
 import type { InteractionContextSnapshot } from './types'
@@ -54,12 +52,7 @@ type EngineContext = {
 
 const hasLegacyLogSurface = (result: ActionExecutionResult): boolean => {
   if (result.type === 'fail') return true
-  return Boolean(
-    ('logKey' in result && result.logKey) ||
-    ('immediateLogs' in result && (result.immediateLogs?.length ?? 0) > 0) ||
-    ('resourcesGained' in result && result.resourcesGained) ||
-    ('resourcesPaid' in result && result.resourcesPaid),
-  )
+  return false
 }
 
 const appendDerivedLogsForEventOnlyResult = (
@@ -72,7 +65,11 @@ const appendDerivedLogsForEventOnlyResult = (
   const playerNames = Object.fromEntries(
     context.state.players.map((player) => [player.id, player.name]),
   )
-  const entries = eventsToLogEntries(committed, { playerNames })
+  const actionNames = Object.fromEntries([
+    ...context.state.actionSpaces.map((space) => [space.id, space.nameKey] as const),
+    ...[...int.registry.values()].map((action) => [action.id, action.nameKey] as const),
+  ])
+  const entries = eventsToLogEntries(committed, { playerNames, actionNames })
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     int.log.append(entries[index]!)
   }
@@ -112,12 +109,7 @@ const commitIfEngineComplete = (
   if (int.tree.nextUnresolved()) return
   ensureEventState(context.state)
   const committed = int.events.commitTransaction(context.state)
-  int.eventLogDerivations.forEach((entry) => {
-    appendDerivedLogsForEventOnlyResult(int, context, entry.events, entry.result)
-  })
-  if (int.eventLogDerivations.length === 0) {
-    appendDerivedLogsForEventOnlyResult(int, context, committed, result)
-  }
+  appendDerivedLogsForEventOnlyResult(int, context, committed, result)
   clearEventLogDerivations(int)
 }
 
@@ -188,56 +180,6 @@ const actionContextForNode = (
     ? { ...(node.actionContext ?? {}), skipBeforeTriggers: true }
     : node.actionContext
 
-type ImmediateLogCarrier = {
-  logKey?: string
-  logParams?: Record<string, unknown>
-  immediateLogs?: ImmediateLogEntry[]
-}
-
-const stableSerializeLogValue = (value: unknown): string => {
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableSerializeLogValue(item)).join(',')}]`
-  }
-  if (value && typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
-      a.localeCompare(b),
-    )
-    return `{${entries
-      .map(([key, item]) => `${JSON.stringify(key)}:${stableSerializeLogValue(item)}`)
-      .join(',')}}`
-  }
-  return JSON.stringify(value)
-}
-
-const serializeImmediateLog = (entry: ImmediateLogEntry): string =>
-  `${entry.key}:${stableSerializeLogValue(entry.params ?? {})}`
-
-const collectImmediateLogs = (
-  playerName: string,
-  result: ImmediateLogCarrier | null | undefined,
-  options: { includeLegacyLogKey?: boolean } = {},
-): LogEntry[] => {
-  if (!result) return []
-  const entries = [...(result.immediateLogs ?? [])]
-  const seenEntries = new Set(entries.map((entry) => serializeImmediateLog(entry)))
-  if ((options.includeLegacyLogKey ?? true) && result.logKey) {
-    const legacyEntry = {
-      key: result.logKey,
-      params: result.logParams,
-    }
-    if (!seenEntries.has(serializeImmediateLog(legacyEntry))) {
-      entries.unshift(legacyEntry)
-    }
-  }
-  return entries.map((entry) => ({
-    key: entry.key,
-    params: {
-      player: playerName,
-      ...(entry.params ?? {}),
-    },
-  }))
-}
-
 /**
  * S4c PR5 — extracted from `Engine.resolveChoice`. Resolve a pending choice
  * against the engine tree. Threading the optional `payload` lets
@@ -258,7 +200,7 @@ export function engineResolveChoice(
     if (node && explicitPending) {
       const envelope = pendingEnvelopeFromHostNode(node)
       if (envelope && !isPendingChoiceValueAllowed(envelope, choice)) {
-        return rollbackAndReturn(int, { type: 'fail', logKey: 'log.buildRoomFail' })
+        return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
       }
       if (
         node.optional === true &&
@@ -291,7 +233,7 @@ export function engineResolveChoice(
         const selected = offered.find((opt) => opt.value === choice)
         if (!selected || selected.disabled) {
           int.pendingNodeIdRef.value = null
-          return rollbackAndReturn(int, { type: 'fail', logKey: 'log.buildRoomFail' })
+          return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
         }
         if (choice === '__pass__') {
           node.resolveRemainingTriggerChildrenForPass()
@@ -301,7 +243,7 @@ export function engineResolveChoice(
         const child = node.chooseCard(choice)
         if (!child) {
           int.pendingNodeIdRef.value = null
-          return rollbackAndReturn(int, { type: 'fail', logKey: 'log.buildRoomFail' })
+          return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
         }
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
@@ -327,7 +269,7 @@ export function engineResolveChoice(
       }
       const selected = offered.find((opt) => opt.value === choice)
       if (!selected || selected.disabled) {
-        return rollbackAndReturn(int, { type: 'fail', logKey: 'log.buildRoomFail' })
+        return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
       }
       if (choice === '__pass__') {
         node.resolveRemainingTriggerChildrenForPass()
@@ -337,7 +279,7 @@ export function engineResolveChoice(
       const child = node.chooseCard(choice)
       if (!child) {
         int.pendingNodeIdRef.value = null
-        return rollbackAndReturn(int, { type: 'fail', logKey: 'log.buildRoomFail' })
+        return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
       }
       int.pendingNodeIdRef.value = null
       return { type: 'ok' }
@@ -403,7 +345,7 @@ export function engineResolveChoice(
       const action = int.registry.get(actionId)
       if (!action) {
         int.pendingNodeIdRef.value = null
-        return rollbackAndReturn(int, { type: 'fail', logKey: 'log.buildRoomFail' })
+        return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
       }
       const costResults = int.hooks.computeCosts({
         ...executionContext,
@@ -533,11 +475,6 @@ export function engineResolveChoice(
           ? { ...result, request: updatedRequest }
           : result
       }
-      if (result.type === 'ok' || result.type === 'flow') {
-        collectImmediateLogs(context.player.name, result).forEach((entry) => {
-          int.log.append(entry)
-        })
-      }
       const immediatePhase = int.hooks.immediatelyAfter(
         { ...executionContext, ...currentEventReadContext(int), actionId, choice },
         result,
@@ -553,11 +490,6 @@ export function engineResolveChoice(
         ...immediatePhase.actionHookResults,
         ...afterPhase.actionHookResults,
       ]
-      allResults
-        .flatMap((entry) => collectImmediateLogs(context.player.name, entry))
-        .forEach((entry) => {
-          int.log.append(entry)
-        })
 
       const hookFlows = allResults
         .map((entry) => entry.flow
@@ -597,7 +529,7 @@ export function engineResolveChoice(
       // (resolveActionStep) for the same ordering rationale.
       const insertAnchor = node instanceof XorNode ? node.id : child.id
       const trailingHookNodes = [
-        ...buildFollowUpNodes(int, followUps, child.id, context.player),
+        ...buildFollowUpNodes(int, followUps, child.id, context.player, context.state),
         ...immediateActivateNodes,
         ...afterActivateNodes,
       ]
@@ -728,11 +660,6 @@ export function engineResolveChoice(
     })
     return result
   }
-  if (result.type === 'ok' || result.type === 'flow') {
-    collectImmediateLogs(context.player.name, result).forEach((entry) => {
-      int.log.append(entry)
-    })
-  }
   const insertionTargetId = pendingEnvelope?.ownerNodeId ?? pendingHost?.id ?? int.pendingNodeIdRef.value
   const immediatePhase = int.hooks.immediatelyAfter(
     { ...executionContext, ...currentEventReadContext(int), actionId, choice },
@@ -749,11 +676,6 @@ export function engineResolveChoice(
     ...immediatePhase.actionHookResults,
     ...afterPhase.actionHookResults,
   ]
-  allResults
-    .flatMap((entry) => collectImmediateLogs(context.player.name, entry))
-    .forEach((entry) => {
-      int.log.append(entry)
-    })
 
   const hookFlows = allResults
     .map((entry) => entry.flow
@@ -796,7 +718,7 @@ export function engineResolveChoice(
   //   [..., insertionTarget, hookFlows..., flowNode, trailingHooks..., ...]
   if (insertionTargetId) {
     const trailingHookNodes = [
-      ...buildFollowUpNodes(int, followUps, insertionTargetId, context.player),
+      ...buildFollowUpNodes(int, followUps, insertionTargetId, context.player, context.state),
       ...immediateActivateNodes,
       ...afterActivateNodes,
     ]

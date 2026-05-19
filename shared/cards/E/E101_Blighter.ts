@@ -36,8 +36,6 @@ const onPlayListener: CardListenerRegistration = {
           sourceCard: CARD_ID,
         })),
       },
-      logKey: 'log.cardEffectTrigger',
-      logParams: { cardId: CARD_ID },
       sourceCard: CARD_ID,
     }
   },

@@ -109,8 +109,6 @@ const resultHasApplicabilitySignal = (result: ActionHookResult | undefined): boo
       || result.trades
       || result.bonuses
       || result.sourceCard
-      || result.logKey
-      || (result.immediateLogs?.length ?? 0) > 0
       || result.extraData,
   )
 }

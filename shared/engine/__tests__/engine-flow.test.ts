@@ -357,7 +357,7 @@ describe('Engine flow nodes', () => {
           ownerPlayerId: context.ownerPlayer?.id,
           mandatory: (context as CardListenerContext & { mandatory?: unknown }).mandatory,
         })
-        return { logKey: 'log.testCrossOwnerDuring' }
+        return {}
       },
     })
     setActiveCardRegistry(cardRegistry)

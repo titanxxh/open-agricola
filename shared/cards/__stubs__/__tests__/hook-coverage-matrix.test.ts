@@ -101,7 +101,7 @@ const makeBuildRoomAction = (): ActionDefinition => ({
     const woodCost = 5 + (ctx.costs?.wood ?? 0)
     const reedCost = 2 + (ctx.costs?.reed ?? 0)
     if (ctx.player.resources.wood < woodCost || ctx.player.resources.reed < reedCost) {
-      return { type: 'fail', logKey: 'log.buildRoomFail' }
+      return { type: 'fail', errorKey: 'log.buildRoomFail' }
     }
     ctx.player.resources.wood -= woodCost
     ctx.player.resources.reed -= reedCost

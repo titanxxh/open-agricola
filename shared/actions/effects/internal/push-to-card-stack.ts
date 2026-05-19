@@ -10,11 +10,11 @@ export const pushCardStackAction: ActionDefinition = {
   canBeExecutedByPlayer: () => true,
   execute: ({ player, sourceCard, params }) => {
     if (!sourceCard) {
-      return { type: 'fail', logKey: 'log.actionFail' }
+      return { type: 'fail', errorKey: 'log.actionFail' }
     }
     const item = (params as { item?: string } | undefined)?.item
     if (!item) {
-      return { type: 'fail', logKey: 'log.actionFail' }
+      return { type: 'fail', errorKey: 'log.actionFail' }
     }
     pushToCardStack(player, sourceCard, [item])
     return { type: 'ok' }

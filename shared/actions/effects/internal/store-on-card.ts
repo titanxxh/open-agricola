@@ -10,7 +10,7 @@ export const storeOnCardAction: ActionDefinition = {
   canBeExecutedByPlayer: () => true,
   execute: ({ player, params, sourceCard }) => {
     if (!sourceCard) {
-      return { type: 'fail', logKey: 'log.exchangeFail' }
+      return { type: 'fail', errorKey: 'log.exchangeFail' }
     }
     const counters = initCardState(player, sourceCard)
     const stored: Partial<Resource> = {}

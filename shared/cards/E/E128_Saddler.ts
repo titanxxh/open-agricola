@@ -21,8 +21,6 @@ const listener: CardListenerRegistration = {
         promptKey: 'ui.interactionSaddlerPlow',
         action: { type: 'leaf', actionId: 'plow' },
       }),
-      logKey: 'log.cardGrantedAction',
-      logParams: { cardId: CARD_ID, actionId: 'plow' },
       sourceCard: CARD_ID,
     }
   },

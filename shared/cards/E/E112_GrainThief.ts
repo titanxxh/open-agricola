@@ -19,12 +19,12 @@ const grainThiefProtectAction: ActionDefinition = {
   canBeExecutedByPlayer: () => true,
   execute: ({ player, params }) => {
     const fieldIndex = params?.fieldIndex as number | undefined
-    if (fieldIndex === undefined) return { type: 'fail', logKey: 'log.actionFail' }
+    if (fieldIndex === undefined) return { type: 'fail', errorKey: 'log.actionFail' }
     const field = player.fields[fieldIndex]
-    if (!field) return { type: 'fail', logKey: 'log.actionFail' }
+    if (!field) return { type: 'fail', errorKey: 'log.actionFail' }
     const top = fieldTopStack(field)
     if (!top || top.kind !== 'grain' || top.remaining <= 0) {
-      return { type: 'fail', logKey: 'log.actionFail' }
+      return { type: 'fail', errorKey: 'log.actionFail' }
     }
     const protected_ = readCardExtraData<{ index: number; remaining: number }[]>(
       player, CARD_ID, PROTECTED_KEY,

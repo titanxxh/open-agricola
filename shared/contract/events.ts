@@ -183,9 +183,19 @@ export type ActionExclusiveUseSetEvent = GameEventBase<'action.exclusiveUseSet'>
   sourceCardId: string
 }
 
+export type ActionGrantedEvent = GameEventBase<'action.granted'> & {
+  playerId: string
+  actionId: string
+  cardId: string
+}
+
 export type TurnSkippedEvent = GameEventBase<'turn.skipped'> & {
   playerId: string
   reason: 'cardEffect' | 'phaseRule'
+}
+
+export type StartPlayerChangedEvent = GameEventBase<'startPlayer.changed'> & {
+  playerId: string
 }
 
 export type CardPlayedEvent = GameEventBase<'card.played'> & {
@@ -273,9 +283,30 @@ export type WorkStartedEvent = GameEventBase<'work.started'>
 
 export type ReturnHomeStartedEvent = GameEventBase<'returnHome.started'>
 
+export type HarvestStartedEvent = GameEventBase<'harvest.started'>
+
 export type HarvestPhaseStartedEvent = GameEventBase<'harvest.phaseStarted'> & {
   harvestPhase: 'field' | 'feeding' | 'breeding'
 }
+
+export type HarvestReapSkippedEvent = GameEventBase<'harvest.reapSkipped'> & {
+  playerId: string
+}
+
+export type HarvestReapNothingEvent = GameEventBase<'harvest.reapNothing'> & {
+  playerId: string
+}
+
+export type HarvestFeedConvertedEvent = GameEventBase<'harvest.feedConverted'> & {
+  playerId: string
+  source: string
+  cost: Partial<Resource>
+  food: Partial<Resource>
+}
+
+export type GameStartedEvent = GameEventBase<'game.started'>
+
+export type GameEndedEvent = GameEventBase<'game.ended'>
 
 export type GameEvent =
   | ResourceMovedEvent
@@ -303,7 +334,9 @@ export type GameEvent =
   | ActionRevealedEvent
   | ActionAccumulatedEvent
   | ActionExclusiveUseSetEvent
+  | ActionGrantedEvent
   | TurnSkippedEvent
+  | StartPlayerChangedEvent
   | CardPlayedEvent
   | CardTriggeredEvent
   | CardStateChangedEvent
@@ -316,7 +349,13 @@ export type GameEvent =
   | RoundStartedEvent
   | WorkStartedEvent
   | ReturnHomeStartedEvent
+  | HarvestStartedEvent
   | HarvestPhaseStartedEvent
+  | HarvestReapSkippedEvent
+  | HarvestReapNothingEvent
+  | HarvestFeedConvertedEvent
+  | GameStartedEvent
+  | GameEndedEvent
 
 export type DraftGameEvent<T extends GameEvent['type'] = GameEvent['type']> =
   Omit<Extract<GameEvent, { type: T }>, 'id' | 'seq' | 'round' | 'phase' | 'visibility' | 'schemaVersion'> & {

@@ -64,7 +64,7 @@ describe('engine event transactions', () => {
   it('rolls back a failed leaf frame without consuming event seq', () => {
     const fail = action('failed-event-leaf', (context) => {
       emitWoodGain(context)
-      return { type: 'fail', logKey: 'log.buildRoomFail' }
+      return { type: 'fail', errorKey: 'log.buildRoomFail' }
     })
     const state = makeEventTestState()
     const player = state.players[0]!
@@ -87,7 +87,7 @@ describe('engine event transactions', () => {
     })
     const second = action('sequence-second-fail', (context) => {
       emitWoodGain(context)
-      return { type: 'fail', logKey: 'log.buildRoomFail' }
+      return { type: 'fail', errorKey: 'log.buildRoomFail' }
     })
     const state = makeEventTestState()
     const player = state.players[0]!
@@ -167,7 +167,7 @@ describe('engine event transactions', () => {
     const autoChoice: ActionDefinition = {
       ...action(
         'auto-choice-event-action',
-        () => ({ type: 'fail', logKey: 'log.shouldNotExecute' }),
+        () => ({ type: 'fail', errorKey: 'log.shouldNotExecute' }),
         (context) => {
           emitWoodGain(context, 3)
           return { type: 'ok' }
@@ -217,12 +217,21 @@ describe('engine event transactions', () => {
         seq: 1,
         id: '1',
         actorPlayerId: 'p1',
+        sourceActionId: placeFarmerAction.id,
+        type: 'worker.placed',
+        workerId: 'w1',
+        spaceId: 'target-space',
+      },
+      {
+        seq: 2,
+        id: '2',
+        actorPlayerId: 'p1',
         sourceActionId: targetSpace.id,
         type: 'resource.moved',
         resources: { wood: 4 },
       },
     ])
-    expect(state.nextEventSeq).toBe(2)
+    expect(state.nextEventSeq).toBe(3)
   })
 
   it('restores pending event transaction and derived log state across snapshot roundtrip', () => {
@@ -293,7 +302,7 @@ describe('engine event transactions', () => {
           },
         }
       },
-      () => ({ type: 'ok', logKey: 'log.legacyEvent' }),
+      () => ({ type: 'ok' }),
     )
     const state = makeEventTestState()
     const player = state.players[0]!
@@ -343,7 +352,7 @@ describe('engine event transactions', () => {
       (context, choice) => {
         emitWoodGain(context, choice === 'bad' ? 9 : 2)
         return choice === 'bad'
-          ? { type: 'fail', logKey: 'log.buildRoomFail', recoverable: true }
+          ? { type: 'fail', errorKey: 'log.buildRoomFail', recoverable: true }
           : { type: 'ok' }
       },
     )
@@ -369,30 +378,29 @@ describe('engine event transactions', () => {
     expect(state.nextEventSeq).toBe(3)
   })
 
-  it('derives logs for event-only results but not for legacy log results', () => {
+  it('derives logs for successful event results', () => {
     const eventOnly = action('event-only-log', (context) => {
       emitWoodGain(context)
       return { type: 'ok' }
     })
-    const legacy = action('legacy-log-event', (context) => {
+    const second = action('second-log-event', (context) => {
       emitWoodGain(context)
-      return { type: 'ok', logKey: 'log.legacyEvent' }
+      return { type: 'ok' }
     })
     const state = makeEventTestState()
     const player = state.players[0]!
     const root = new SequenceNode('log-sequence-root', [
       new ActionNode('action-event-only-log', eventOnly.id),
-      new ActionNode('action-legacy-log-event', legacy.id),
+      new ActionNode('action-second-log-event', second.id),
     ])
-    const { engine, log } = makeEventTestEngine([eventOnly, legacy], root)
+    const { engine, log } = makeEventTestEngine([eventOnly, second], root)
     const space = asActionSpace(eventOnly)
 
     expect(engine.proceed({ state, player, space }).type).toBe('ok')
     expect(engine.proceed({ state, player, space }).type).toBe('ok')
     expect(engine.proceed({ state, player, space }).type).toBe('done')
 
-    expect(log.all().filter((entry) => entry.key === 'log.actionDetail')).toHaveLength(1)
+    expect(log.all().filter((entry) => entry.key === 'log.actionDetail')).toHaveLength(2)
     expect(log.all().some((entry) => entry.key === 'log.action')).toBe(false)
-    expect(log.all().some((entry) => entry.key === 'log.legacyEvent')).toBe(true)
   })
 })

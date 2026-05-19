@@ -23,8 +23,6 @@ const listener: CardListenerRegistration = {
           { type: 'leaf', actionId: 'construct', sourceCard: CARD_ID, actionContext: { trueAction: false } },
         ],
       },
-      logKey: 'log.cardGrantedAction',
-      logParams: { cardId: CARD_ID },
       sourceCard: CARD_ID,
     }
   },

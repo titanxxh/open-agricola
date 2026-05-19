@@ -4,6 +4,7 @@ import type {
   PlayerState,
   Resource,
 } from '../../contract/types'
+import type { EventSink } from '../../contract/events'
 import {
   setCardFlag,
   writeCardInfobox,
@@ -30,6 +31,11 @@ export type PlantAdditionalGoodLocation =
   | { kind: 'field'; row: number; col: number }
   | { kind: 'card-field'; cardId: string }
 
+type ResourceAccumulationTarget =
+  | { kind: 'actionSpace'; spaceId: string }
+  | { kind: 'card'; cardId: string; playerId?: string }
+  | { kind: 'roundCard'; round: number }
+
 export type SpecialEffectParams =
   | { kind: 'increment-extra-data'; key: string; amount: number }
   | { kind: 'set-extra-data'; key: string; value: unknown }
@@ -52,6 +58,7 @@ export type SpecialEffectParams =
     }
   | { kind: 'consume-fence'; count?: number }
   | { kind: 'add-resource-to-space'; spaceId: string; resource: keyof Resource; amount: number }
+  | { kind: 'add-resource-to-space'; target: ResourceAccumulationTarget; resource: keyof Resource; amount: number }
   | { kind: 'build-stable-on-first-empty-tile' }
   | {
       kind: 'move-resource-between-spaces'
@@ -101,6 +108,53 @@ const isPublicCardStateEventValue = (value: unknown): boolean => {
   return false
 }
 
+const RESOURCE_KEYS = new Set<keyof Resource>([
+  'wood',
+  'clay',
+  'reed',
+  'stone',
+  'food',
+  'grain',
+  'vegetable',
+  'sheep',
+  'boar',
+  'cattle',
+  'begging',
+])
+
+const resourceAmount = (resource: keyof Resource, amount: number): Partial<Resource> =>
+  ({ [resource]: amount } as Partial<Resource>)
+
+const readAccumulationTarget = (
+  params: Extract<SpecialEffectParams, { kind: 'add-resource-to-space' }>,
+): ResourceAccumulationTarget => {
+  if ('target' in params) return params.target
+  return { kind: 'actionSpace', spaceId: params.spaceId }
+}
+
+const stackResource = (item: string | undefined): Partial<Resource> | undefined => {
+  if (!item || !RESOURCE_KEYS.has(item as keyof Resource)) return undefined
+  return resourceAmount(item as keyof Resource, 1)
+}
+
+const emitCardStateChanged = (
+  eventSink: EventSink | undefined,
+  sourceCard: string,
+  target: PlayerState,
+  key: string,
+  value: unknown,
+): void => {
+  if (!isPublicCardStateEventValue(value)) return
+  eventSink?.emit<'card.stateChanged'>({
+    type: 'card.stateChanged',
+    sourceCardId: sourceCard,
+    cardId: sourceCard,
+    key,
+    value,
+    targetPlayerId: target.id,
+  })
+}
+
 /**
  * Sprint 6a: `special-effect` is the canonical engine-mediated mutation
  * dispatcher. Cards that need to mutate `cardStates` from inside an action
@@ -118,44 +172,55 @@ export const specialEffectAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
   execute: ({ state, player, sourceCard, params, actionContext, eventSink }) => {
-    if (!sourceCard) return { type: 'fail', logKey: 'log.specialEffectFail' }
+    if (!sourceCard) return { type: 'fail', errorKey: 'log.specialEffectFail' }
     const p = params as SpecialEffectParams | undefined
     if (!p || typeof p !== 'object' || !('kind' in p)) {
-      return { type: 'fail', logKey: 'log.specialEffectFail' }
+      return { type: 'fail', errorKey: 'log.specialEffectFail' }
     }
     const target = resolveTargetPlayer(state, player, actionContext)
     switch (p.kind) {
       case 'increment-extra-data': {
         const current = readCardExtraData<number>(target, sourceCard, p.key) ?? 0
-        writeCardExtraData(target, sourceCard, p.key, current + p.amount)
+        const next = current + p.amount
+        writeCardExtraData(target, sourceCard, p.key, next)
+        emitCardStateChanged(eventSink, sourceCard, target, p.key, next)
         return { type: 'ok' }
       }
       case 'set-extra-data':
         writeCardExtraData(target, sourceCard, p.key, p.value)
         if (p.value !== undefined && isPublicCardStateEventValue(p.value)) {
-          eventSink?.emit<'card.stateChanged'>({
-            type: 'card.stateChanged',
-            sourceCardId: sourceCard,
-            cardId: sourceCard,
-            key: p.key,
-            value: p.value,
-            targetPlayerId: target.id,
-          })
+          emitCardStateChanged(eventSink, sourceCard, target, p.key, p.value)
         }
         return { type: 'ok' }
-      case 'increment-counter':
+      case 'increment-counter': {
         incCounter(target, sourceCard, p.key, p.amount)
-        return { type: 'ok' }
-      case 'set-counter': {
-        const counters = initCardState(target, sourceCard)
-        counters[p.key] = Math.max(0, p.value)
+        const next = target.cardStates?.[sourceCard]?.counters?.[p.key] ?? 0
+        emitCardStateChanged(eventSink, sourceCard, target, p.key, next)
         return { type: 'ok' }
       }
-      case 'pop-card-stack-top':
-        popFromCardStack(target, sourceCard)
+      case 'set-counter': {
+        const counters = initCardState(target, sourceCard)
+        const next = Math.max(0, p.value)
+        counters[p.key] = next
+        emitCardStateChanged(eventSink, sourceCard, target, p.key, next)
         return { type: 'ok' }
+      }
+      case 'pop-card-stack-top': {
+        const popped = popFromCardStack(target, sourceCard)
+        const resources = stackResource(popped)
+        eventSink?.emit<'card.stackChanged'>({
+          type: 'card.stackChanged',
+          sourceCardId: sourceCard,
+          cardId: sourceCard,
+          targetPlayerId: target.id,
+          ...(resources ? { resources } : {}),
+          delta: -1,
+          reason: 'take',
+        })
+        return { type: 'ok' }
+      }
       case 'swap-improvement-with-board': {
-        if (!state) return { type: 'fail', logKey: 'log.specialEffectFail' }
+        if (!state) return { type: 'fail', errorKey: 'log.specialEffectFail' }
         const playerIndex = target.improvements.indexOf(p.from)
         const board = state.availableMajorImprovements ?? []
         const boardIndex = board.indexOf(p.to)
@@ -166,14 +231,28 @@ export const specialEffectAction: ActionDefinition = {
         if (!board.includes(p.from)) {
           board.splice(boardIndex, 0, p.from)
         }
+        eventSink?.emit<'card.swappedWithBoard'>({
+          type: 'card.swappedWithBoard',
+          sourceCardId: sourceCard,
+          playerId: target.id,
+          fromPlayerCardId: p.from,
+          toPlayerCardId: p.to,
+        })
         return { type: 'ok' }
       }
       case 'return-card-to-board':
-        if (!state) return { type: 'fail', logKey: 'log.specialEffectFail' }
+        if (!state) return { type: 'fail', errorKey: 'log.specialEffectFail' }
         returnCardToBoard(target, p.cardId, state)
+        eventSink?.emit<'card.returnedToBoard'>({
+          type: 'card.returnedToBoard',
+          sourceCardId: sourceCard,
+          playerId: target.id,
+          cardId: p.cardId,
+        })
         return { type: 'ok' }
       case 'set-flag':
         setCardFlag(target, sourceCard, p.flag)
+        emitCardStateChanged(eventSink, sourceCard, target, 'flagged', p.flag)
         return { type: 'ok' }
       case 'set-infobox':
         writeCardInfobox(target, sourceCard, p.text)
@@ -187,23 +266,43 @@ export const specialEffectAction: ActionDefinition = {
         return { type: 'ok' }
       case 'clear-pending-fence-bonus':
         clearPendingFenceBonus(target)
+        emitCardStateChanged(eventSink, sourceCard, target, 'pendingFenceBonus', null)
         return { type: 'ok' }
-      case 'remove-future-meeples':
-        if (!state) return { type: 'fail', logKey: 'log.specialEffectFail' }
+      case 'remove-future-meeples': {
+        if (!state) return { type: 'fail', errorKey: 'log.specialEffectFail' }
+        const futureBefore = state.futureMeeples.length
         removeFutureMeeples(state, {
           playerId: target.id,
           cardId: sourceCard,
           rounds: p.rounds,
         })
+        if (state.futureMeeples.length < futureBefore) {
+          eventSink?.emit<'futureMeeple.removed'>({
+            type: 'futureMeeple.removed',
+            sourceCardId: sourceCard,
+            playerId: target.id,
+            cardId: sourceCard,
+            ...(p.rounds ? { rounds: p.rounds } : {}),
+          })
+        }
         return { type: 'ok' }
+      }
       case 'promote-first-newborn': {
-        if (!state) return { type: 'fail', logKey: 'log.specialEffectFail' }
+        if (!state) return { type: 'fail', errorKey: 'log.specialEffectFail' }
         const newborn = findFirstNewborn(target)
         if (!newborn) return { type: 'ok' }
         newborn.isNewborn = false
         for (const space of state.actionSpaces) {
           removeWorkerRef(space, target.id, newborn.id)
         }
+        eventSink?.emit<'worker.promoted'>({
+          type: 'worker.promoted',
+          sourceCardId: sourceCard,
+          playerId: target.id,
+          workerId: newborn.id,
+          from: 'newborn',
+          to: 'adult',
+        })
         return { type: 'ok' }
       }
       case 'remove-field-crop': {
@@ -223,38 +322,60 @@ export const specialEffectAction: ActionDefinition = {
         if (!stack) return { type: 'ok' }
         stack.remaining -= 1
         fieldPopIfDepleted(field)
+        eventSink?.emit<'farm.cropRemoved'>({
+          type: 'farm.cropRemoved',
+          sourceCardId: sourceCard,
+          crops: [
+            {
+              location: { kind: 'field', playerId: target.id, row: field.row, col: field.col },
+              crop: p.crop,
+              amount: 1,
+            },
+          ],
+          reason: 'cardEffect',
+        })
         return { type: 'ok' }
       }
       case 'remove-field-crops': {
         if (!Array.isArray(p.positions) || p.positions.length === 0) {
-          return { type: 'fail', logKey: 'log.specialEffectFail' }
+          return { type: 'fail', errorKey: 'log.specialEffectFail' }
         }
         const minRem = p.minRemaining ?? 1
         const seen = new Set<string>()
         const fields = []
         for (const pos of p.positions) {
           if (!pos || typeof pos !== 'object') {
-            return { type: 'fail', logKey: 'log.specialEffectFail' }
+            return { type: 'fail', errorKey: 'log.specialEffectFail' }
           }
           const { row, col } = pos
           if (!Number.isFinite(row) || !Number.isFinite(col)) {
-            return { type: 'fail', logKey: 'log.specialEffectFail' }
+            return { type: 'fail', errorKey: 'log.specialEffectFail' }
           }
           const key = `${row}:${col}`
           if (seen.has(key)) {
-            return { type: 'fail', logKey: 'log.specialEffectFail' }
+            return { type: 'fail', errorKey: 'log.specialEffectFail' }
           }
           seen.add(key)
           const field = target.fields.find((f) => f.row === row && f.col === col)
           const top = field ? fieldTopStack(field) : undefined
           if (!field || top?.kind !== p.crop || top.remaining < minRem) {
-            return { type: 'fail', logKey: 'log.specialEffectFail' }
+            return { type: 'fail', errorKey: 'log.specialEffectFail' }
           }
           fields.push(field)
         }
         for (const field of fields) {
           fieldDecrementTop(field)
         }
+        eventSink?.emit<'farm.cropRemoved'>({
+          type: 'farm.cropRemoved',
+          sourceCardId: sourceCard,
+          crops: fields.map((field) => ({
+            location: { kind: 'field' as const, playerId: target.id, row: field.row, col: field.col },
+            crop: p.crop,
+            amount: 1,
+          })),
+          reason: 'cardEffect',
+        })
         return { type: 'ok' }
       }
       case 'consume-fence': {
@@ -267,46 +388,113 @@ export const specialEffectAction: ActionDefinition = {
           }
         }
         if (removed < count) {
-          return { type: 'fail', logKey: 'log.specialEffectFail' }
+          return { type: 'fail', errorKey: 'log.specialEffectFail' }
         }
+        eventSink?.emit<'farm.fenceConsumed'>({
+          type: 'farm.fenceConsumed',
+          sourceCardId: sourceCard,
+          count: removed,
+          reason: 'cardEffect',
+        })
         return { type: 'ok' }
       }
       case 'add-resource-to-space': {
-        if (!state) return { type: 'fail', logKey: 'log.specialEffectFail' }
-        const targetSpace = state.actionSpaces.find((space) => space.id === p.spaceId)
-        if (!targetSpace?.resources) {
-          return { type: 'fail', logKey: 'log.specialEffectFail' }
+        if (!state) return { type: 'fail', errorKey: 'log.specialEffectFail' }
+        const accumulationTarget = readAccumulationTarget(p)
+        const resources = resourceAmount(p.resource, p.amount)
+        if (accumulationTarget.kind === 'actionSpace') {
+          const targetSpace = state.actionSpaces.find((space) => space.id === accumulationTarget.spaceId)
+          if (!targetSpace?.resources) {
+            return { type: 'fail', errorKey: 'log.specialEffectFail' }
+          }
+          const current =
+            (targetSpace.resources as Partial<Record<keyof Resource, number>>)[p.resource] ?? 0
+          ;(targetSpace.resources as Record<keyof Resource, number>)[p.resource] =
+            current + p.amount
+          if (p.amount > 0) {
+            eventSink?.emit<'action.accumulated'>({
+              type: 'action.accumulated',
+              sourceCardId: sourceCard,
+              spaceId: accumulationTarget.spaceId,
+              resources,
+            })
+          }
+          return { type: 'ok' }
         }
-        const current =
-          (targetSpace.resources as Partial<Record<keyof Resource, number>>)[p.resource] ?? 0
-        ;(targetSpace.resources as Record<keyof Resource, number>)[p.resource] =
-          current + p.amount
+        if (accumulationTarget.kind === 'card') {
+          const targetPlayer = accumulationTarget.playerId
+            ? state.players.find((entry) => entry.id === accumulationTarget.playerId) ?? target
+            : target
+          const counters = initCardState(targetPlayer, accumulationTarget.cardId)
+          counters[p.resource] = (counters[p.resource] ?? 0) + p.amount
+          if (p.amount > 0) {
+            eventSink?.emit<'resource.accumulated'>({
+              type: 'resource.accumulated',
+              sourceCardId: sourceCard,
+              resources,
+              to: {
+                kind: 'card',
+                playerId: targetPlayer.id,
+                cardId: accumulationTarget.cardId,
+              },
+            })
+          }
+          return { type: 'ok' }
+        }
+        if (p.amount > 0) {
+          eventSink?.emit<'resource.accumulated'>({
+            type: 'resource.accumulated',
+            sourceCardId: sourceCard,
+            resources,
+            to: { kind: 'roundCard', round: accumulationTarget.round },
+          })
+        }
         return { type: 'ok' }
       }
       case 'build-stable-on-first-empty-tile': {
         const tile = getNextEmptyTileForPlayer(target)
         if (!tile) return { type: 'ok' }
         target.stableTiles.push(tile)
+        eventSink?.emit<'farm.stableBuilt'>({
+          type: 'farm.stableBuilt',
+          sourceCardId: sourceCard,
+          stables: [{ playerId: target.id, row: tile.row, col: tile.col }],
+        })
         return { type: 'ok' }
       }
       case 'move-resource-between-spaces': {
-        if (!state) return { type: 'fail', logKey: 'log.specialEffectFail' }
+        if (!state) return { type: 'fail', errorKey: 'log.specialEffectFail' }
         const from = state.actionSpaces.find((s) => s.id === p.fromSpaceId)
         const to = state.actionSpaces.find((s) => s.id === p.toSpaceId)
         if (!from?.resources || !to?.resources) {
-          return { type: 'fail', logKey: 'log.specialEffectFail' }
+          return { type: 'fail', errorKey: 'log.specialEffectFail' }
         }
         const have = (from.resources as Partial<Record<keyof Resource, number>>)[p.resource] ?? 0
         if (have < p.amount) {
-          return { type: 'fail', logKey: 'log.specialEffectFail' }
+          return { type: 'fail', errorKey: 'log.specialEffectFail' }
         }
         ;(from.resources as Record<keyof Resource, number>)[p.resource] = have - p.amount
         const dest = (to.resources as Partial<Record<keyof Resource, number>>)[p.resource] ?? 0
         ;(to.resources as Record<keyof Resource, number>)[p.resource] = dest + p.amount
+        eventSink?.emit<'resource.moved'>({
+          type: 'resource.moved',
+          sourceCardId: sourceCard,
+          resources: resourceAmount(p.resource, p.amount),
+          from: { kind: 'actionSpace', spaceId: p.fromSpaceId },
+          to: { kind: 'actionSpace', spaceId: p.toSpaceId },
+          reason: 'cardEffect',
+        })
         return { type: 'ok' }
       }
       case 'plant-additional-good': {
         const mutations: Array<() => void> = []
+        const crops: Array<{
+          location:
+            | { kind: 'field'; playerId: string; row: number; col: number }
+            | { kind: 'card'; playerId: string; cardId: string }
+          crop: 'grain' | 'vegetable' | 'wood' | 'stone'
+          amount: number
+        }> = []
         for (const loc of p.locations) {
           if (loc.kind === 'field') {
             const field = target.fields.find(
@@ -318,6 +506,11 @@ export const specialEffectAction: ActionDefinition = {
               )
             }
             const stack = readGrowableStack(field.stacks, `field row=${loc.row} col=${loc.col}`)
+            crops.push({
+              location: { kind: 'field', playerId: target.id, row: loc.row, col: loc.col },
+              crop: stack.kind,
+              amount: 1,
+            })
             mutations.push(() => {
               stack.remaining += 1
             })
@@ -325,6 +518,11 @@ export const specialEffectAction: ActionDefinition = {
             const stacks =
               readCardExtraData<CardFieldStack[]>(target, loc.cardId, 'cardFieldStacks') ?? []
             const stack = readGrowableStack(stacks, `card ${loc.cardId}`)
+            crops.push({
+              location: { kind: 'card', playerId: target.id, cardId: loc.cardId },
+              crop: stack.crop,
+              amount: 1,
+            })
             mutations.push(() => {
               stack.remaining += 1
               writeCardExtraData(target, loc.cardId, 'cardFieldStacks', stacks)
@@ -332,6 +530,14 @@ export const specialEffectAction: ActionDefinition = {
           }
         }
         for (const mutate of mutations) mutate()
+        if (crops.length > 0) {
+          eventSink?.emit<'farm.cropAdded'>({
+            type: 'farm.cropAdded',
+            sourceCardId: sourceCard,
+            crops,
+            reason: 'cardEffect',
+          })
+        }
         return { type: 'ok' }
       }
     }

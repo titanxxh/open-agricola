@@ -40,14 +40,14 @@ const placeFarmer = (
   state: GameState,
   player: PlayerState,
   space: ActionSpace,
-): ActionExecutionResult => {
+): ActionExecutionResult & { workerId?: string } => {
   const worker = smallestAvailableWorker(state, player)
   if (!worker) {
-    return { type: 'fail', logKey: 'log.placeFarmerFail' }
+    return { type: 'fail', errorKey: 'log.placeFarmerFail' }
   }
   addWorkerRef(space, player.id, worker.id)
   recordRoundPlacement(player, space.id, worker.id)
-  return { type: 'ok' }
+  return { type: 'ok', workerId: worker.id }
 }
 
 export const placeFarmerAction: ActionDefinition = {
@@ -58,7 +58,7 @@ export const placeFarmerAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: (state, player) =>
     smallestAvailableWorker(state, player) !== null,
-  execute: ({ state, player, actionContext }) => {
+  execute: ({ state, player, actionContext, eventSink }) => {
     // viaCardJump branch (Sprint 5 mech-A): move farmer + return flow leaf so
     // the engine runs the second placement through the standard ActionNode path.
     if (actionContext?.viaCardJump) {
@@ -66,7 +66,7 @@ export const placeFarmerAction: ActionDefinition = {
       const workerId = actionContext.workerId as string | undefined
       const targetSpaceId = actionContext.targetSpaceId as string | undefined
       if (!sourceCard || !targetSpaceId) {
-        return { type: 'fail', logKey: 'log.placeFarmerFail' }
+        return { type: 'fail', errorKey: 'log.placeFarmerFail' }
       }
 
       // worker-less mode: A151-style "use this action space" trigger during
@@ -79,12 +79,12 @@ export const placeFarmerAction: ActionDefinition = {
           s.takenBy.some(t => t.playerId === player.id && t.workerId === workerId),
         )
         if (!fromSpace) {
-          return { type: 'fail', logKey: 'log.placeFarmerFail' }
+          return { type: 'fail', errorKey: 'log.placeFarmerFail' }
         }
       }
       const targetSpace = state.actionSpaces.find(s => s.id === targetSpaceId)
       if (!targetSpace) {
-        return { type: 'fail', logKey: 'log.placeFarmerFail' }
+        return { type: 'fail', errorKey: 'log.placeFarmerFail' }
       }
 
       // Reachability check only applies to worker mode (worker-less is invoked
@@ -92,7 +92,7 @@ export const placeFarmerAction: ActionDefinition = {
       if (!isWorkerless) {
         const allowed = computeAllowedPlacementSpaces(state, player)
         if (!allowed.some(a => a.spaceId === targetSpaceId)) {
-          return { type: 'fail', logKey: 'log.placeFarmerFail' }
+          return { type: 'fail', errorKey: 'log.placeFarmerFail' }
         }
       }
 
@@ -106,6 +106,12 @@ export const placeFarmerAction: ActionDefinition = {
         addWorkerRef(targetSpace, player.id, workerId!)
         recordRoundPlacement(player, targetSpace.id, workerId!)
         incPlacedFarmers(player)
+        eventSink?.emit<'worker.placed'>({
+          type: 'worker.placed',
+          workerId: workerId!,
+          spaceId: targetSpaceId,
+          viaCardId: sourceCard,
+        })
       }
 
       // Cascade place-farmer after hooks for the second placement.
@@ -167,7 +173,7 @@ export const placeFarmerAction: ActionDefinition = {
 
     if (actionContext?.fromSupply) {
       const supply = (player.workers ?? []).find((w) => !w.isActive)
-      if (!supply) return { type: 'fail', logKey: 'log.placeFarmerFail' }
+      if (!supply) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
       supply.isActive = true
     }
     let allowed = computeAllowedPlacementSpaces(state, player)
@@ -180,7 +186,7 @@ export const placeFarmerAction: ActionDefinition = {
       const allowSet = new Set(constraints)
       allowed = allowed.filter((a) => allowSet.has(a.spaceId))
     }
-    if (allowed.length === 0) return { type: 'fail', logKey: 'log.placeFarmerFail' }
+    if (allowed.length === 0) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
     const options = allowed.map((a) => {
       const space = state.actionSpaces.find((s) => s.id === a.spaceId)!
       return {
@@ -200,9 +206,15 @@ export const placeFarmerAction: ActionDefinition = {
       ? choice.slice(OCCUPIED_SPACE_CHOICE_PREFIX.length)
       : choice
     const targetSpace = state.actionSpaces.find((s) => s.id === targetSpaceId)
-    if (!targetSpace) return { type: 'fail', logKey: 'log.placeFarmerFail' }
+    if (!targetSpace) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
     const placeResult = placeFarmer(state, player, targetSpace)
     if (placeResult.type === 'fail') return placeResult
+    eventSink?.emit<'worker.placed'>({
+      type: 'worker.placed',
+      workerId: placeResult.workerId!,
+      spaceId: targetSpaceId,
+      ...(sourceCard ? { viaCardId: sourceCard } : {}),
+    })
     // B22 WalkingBoots-style fromSupply + markForRemoval pattern: when a
     // card pushes a temporary worker from supply and wants to retract it on
     // the next return-home, record the chosen space id on the source card's

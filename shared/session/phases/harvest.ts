@@ -11,6 +11,7 @@
 
 import type { GameState } from '../../contract/types.ts'
 import { computeStartPlayerIdx } from './round.ts'
+import { appendImmediateEvents } from '../../events/append.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
 
 /**
@@ -31,7 +32,7 @@ export const getHarvestPlayerIndices = (state: GameState): number[] => {
  */
 export const startHarvest = (core: GameCore): SessionResponse => {
   core.state.roundPhase = 'harvest'
-  core.state.log.unshift({ key: 'log.harvest', params: { round: core.state.round } })
+  appendImmediateEvents(core.state, [{ type: 'harvest.started' }])
   return core.invokeHarvestFromBeforeHarvest()
 }
 
@@ -42,6 +43,10 @@ export const startHarvest = (core: GameCore): SessionResponse => {
 export const startBreedPhase = (core: GameCore): SessionResponse => {
   core.state.completedFeedingPhases += 1
   core.state.roundPhase = 'breeding'
+  appendImmediateEvents(core.state, [{
+    type: 'harvest.phaseStarted',
+    harvestPhase: 'breeding',
+  }])
   return core.invokeAfterFeedingPhase()
 }
 

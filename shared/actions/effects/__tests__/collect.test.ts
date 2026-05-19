@@ -102,7 +102,7 @@ describe('collect.execute', () => {
     const result = collectAction.execute(ctx)
     expect(result.type).toBe('fail')
     if (result.type === 'fail') {
-      expect(result.logKey).toBe('log.collectInvalidPartial')
+      expect(result.errorKey).toBe('log.collectInvalidPartial')
     }
     expect(ctx.space.resources.wood).toBe(5)
     expect(ctx.player.resources.wood).toBe(0)

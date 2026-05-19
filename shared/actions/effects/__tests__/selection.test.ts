@@ -91,9 +91,7 @@ describe('selectionAction', () => {
       'cancel',
     )
 
-    expect(result).toEqual({
-      type: 'fail',
-      logKey: 'not enough selection positions',
+    expect(result).toEqual({ type: 'fail', errorKey: 'not enough selection positions',
       recoverable: true,
     })
   })
@@ -118,14 +116,10 @@ describe('selectionAction', () => {
       },
     } as never
 
-    expect(selectionAction.resolveChoice!(context, '0-0,0-0')).toEqual({
-      type: 'fail',
-      logKey: 'duplicate selection position',
+    expect(selectionAction.resolveChoice!(context, '0-0,0-0')).toEqual({ type: 'fail', errorKey: 'duplicate selection position',
       recoverable: true,
     })
-    expect(selectionAction.resolveChoice!(context, '0-1')).toEqual({
-      type: 'fail',
-      logKey: 'invalid selection position',
+    expect(selectionAction.resolveChoice!(context, '0-1')).toEqual({ type: 'fail', errorKey: 'invalid selection position',
       recoverable: true,
     })
     expect(received).toBeNull()

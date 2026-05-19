@@ -21,14 +21,14 @@ export const takeFromCardAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ state, player, params, sourceCard }) => {
+  execute: ({ state, player, params, sourceCard, eventSink }) => {
     if (!sourceCard) {
-      return { type: 'fail', logKey: 'log.exchangeFail' }
+      return { type: 'fail', errorKey: 'log.exchangeFail' }
     }
     const gain = params ?? {}
     const counters = player.cardStates?.[sourceCard]?.counters
     if (!canTakeFromCard(counters, gain as Partial<Resource>)) {
-      return { type: 'fail', logKey: 'log.exchangeFail' }
+      return { type: 'fail', errorKey: 'log.exchangeFail' }
     }
 
     const cardCounters = initCardState(player, sourceCard)
@@ -40,12 +40,26 @@ export const takeFromCardAction: ActionDefinition = {
     trackWorkPhaseBuildingResources(state, player.id, gain)
     addCardResourceGained(player, sourceCard, gain)
     addResourcesFromCards(player, gain as Partial<Resource>)
+    eventSink?.emit<'card.stackChanged'>({
+      type: 'card.stackChanged',
+      cardId: sourceCard,
+      targetPlayerId: player.id,
+      resources: gain as Partial<Resource>,
+      delta: -Object.values(gain as Partial<Resource>).reduce<number>(
+        (sum, value) => sum + (typeof value === 'number' && value > 0 ? value : 0),
+        0,
+      ),
+      reason: 'take',
+    })
+    eventSink?.emit<'resource.moved'>({
+      type: 'resource.moved',
+      resources: gain as Partial<Resource>,
+      from: { kind: 'card', playerId: player.id, cardId: sourceCard },
+      to: { kind: 'player', playerId: player.id },
+      reason: 'cardEffect',
+      sourceCardId: sourceCard,
+    })
 
-    return {
-      type: 'ok',
-      resourcesGained: gain,
-      logKey: 'log.cardEffectGain',
-      logParams: { gain, cardId: sourceCard },
-    }
+    return { type: 'ok', resourcesGained: gain }
   },
 }

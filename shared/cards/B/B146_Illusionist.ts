@@ -27,7 +27,7 @@ const discardFromHandAction: ActionDefinition = {
         labelKey: `minors.${id}.name`,
       })),
     ]
-    if (options.length === 0) return { type: 'fail', logKey: 'log.actionFail' }
+    if (options.length === 0) return { type: 'fail', errorKey: 'log.actionFail' }
     return {
       type: 'request',
       request: { kind: 'choice', options },
@@ -38,20 +38,20 @@ const discardFromHandAction: ActionDefinition = {
     if (choice.startsWith('occ:')) {
       const cardId = choice.slice(4)
       if (!player.occupationHand.includes(cardId)) {
-        return { type: 'fail', logKey: 'log.actionFail' }
+        return { type: 'fail', errorKey: 'log.actionFail' }
       }
       player.occupationHand = player.occupationHand.filter((id) => id !== cardId)
-      return { type: 'ok', logKey: 'log.cardEffectTrigger' }
+      return { type: 'ok' }
     }
     if (choice.startsWith('min:')) {
       const cardId = choice.slice(4)
       if (!player.minorHand.includes(cardId)) {
-        return { type: 'fail', logKey: 'log.actionFail' }
+        return { type: 'fail', errorKey: 'log.actionFail' }
       }
       player.minorHand = player.minorHand.filter((id) => id !== cardId)
-      return { type: 'ok', logKey: 'log.cardEffectTrigger' }
+      return { type: 'ok' }
     }
-    return { type: 'fail', logKey: 'log.actionFail' }
+    return { type: 'fail', errorKey: 'log.actionFail' }
   },
 }
 

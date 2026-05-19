@@ -108,9 +108,7 @@ type SelectedRoomPayment = {
 
 type RoomPaymentSelectionResult = ActionExecutionResult | SelectedRoomPayment
 
-const ROOM_PAYMENT_FAILURE: ActionExecutionResult = {
-  type: 'fail',
-  logKey: 'log.buildRoomFail',
+const ROOM_PAYMENT_FAILURE: ActionExecutionResult = { type: 'fail', errorKey: 'log.buildRoomFail',
 }
 
 const sanitizeCost = (cost: Partial<Resource>): Partial<Resource> => {

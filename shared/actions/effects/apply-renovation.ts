@@ -34,11 +34,19 @@ export const applyRenovationAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
   emitLeafActionDetail: true,
-  execute: ({ player, params }): ActionExecutionResult => {
+  execute: ({ player, params, eventSink }): ActionExecutionResult => {
     if (!isApplyRenovationParams(params)) {
-      return { type: 'fail', logKey: 'log.renovationFail' }
+      return { type: 'fail', errorKey: 'log.renovationFail' }
     }
+    const from = player.houseType
     player.houseType = params.nextType
+    eventSink?.emit<'farm.renovated'>({
+      type: 'farm.renovated',
+      playerId: player.id,
+      from,
+      to: params.nextType,
+      rooms: player.roomTiles.map(({ row, col }) => ({ row, col })),
+    })
     return { type: 'ok' }
   },
 }

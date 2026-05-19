@@ -21,6 +21,7 @@ import { recordRoundPlacement } from '../../cards/helpers/round-placement.ts'
 import { executeCardListener, getMatchingListeners } from '../../cards/card-listeners.ts'
 import { runRoundEndHooks, shouldSkipPlayerTurn } from '../../cards/card-effects.ts'
 import { tagInjectedAnytimeFlow } from '../../engine/action-context-flags.ts'
+import { appendImmediateEvents } from '../../events/append.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
 import type { FeedQueueEntry } from '../../contract/types.ts'
 import type { PendingEnvelope } from '../../engine/types.ts'
@@ -97,10 +98,17 @@ export const takeAction = (
   const worker = smallestAvailableWorker(state, player)
   if (worker) {
     addWorkerRef(space, player.id, worker.id)
+    appendImmediateEvents(state, [{
+      type: 'worker.placed',
+      workerId: worker.id,
+      spaceId,
+    }], {
+      actorPlayerId: player.id,
+      sourceActionId: spaceId,
+    })
   }
   recordRoundPlacement(player, spaceId, worker?.id ?? '?')
   incPlacedFarmers(player)
-  state.log.unshift({ key: 'log.placeFarmer', params: { player: player.name, action: space.nameKey } })
 
   core.pushEngineFrame({
     engine: core.createEngineForSpace(spaceId),
@@ -295,6 +303,7 @@ export const performRoundEnd = (core: GameCore): SessionResponse => {
 
   core.appendHistory()
   state.roundPhase = 'returning-home'
+  appendImmediateEvents(state, [{ type: 'returnHome.started' }])
   return core.invokeBeforeReturnHomeHooks()
 }
 
@@ -456,7 +465,11 @@ export const handleConfirmNextPlayerResolved = (
       continue
     }
     if (!shouldSkipPlayerTurn(state, current)) break
-    state.log.unshift({ key: 'log.playerSkipped', params: { playerName: current.name } })
+    appendImmediateEvents(state, [{
+      type: 'turn.skipped',
+      playerId: current.id,
+      reason: 'cardEffect',
+    }], { actorPlayerId: current.id })
     const next = nextSeatedPlayerIdx(state, state.players, state.currentPlayerIndex)
     if (next === state.currentPlayerIndex) break
     state.currentPlayerIndex = next
