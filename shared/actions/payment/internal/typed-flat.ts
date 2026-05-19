@@ -201,7 +201,14 @@ export const payTypedFlatCostDetailed = (
   costType?: CostModifierType,
   state?: GameState,
 ):
-  | { ok: true; resourcesPaid: Partial<Resource>; bonusUsed?: string; cardUsed?: string; feeIndex?: number }
+  | {
+      ok: true
+      resourcesPaid: Partial<Resource>
+      bonusUsed?: string
+      bonusChoiceIndex?: Record<string, number>
+      cardUsed?: string
+      feeIndex?: number
+    }
   | { ok: false } => {
   const resolved = resolveTypedFlatPaymentSolution(player, baseCost, costType)
   if (!resolved) return { ok: false }
@@ -214,8 +221,8 @@ export const payTypedFlatCostDetailed = (
     ok: true,
     resourcesPaid: resolved.solution.resourcesPaid,
     bonusUsed: resolved.solution.bonusUsed,
+    bonusChoiceIndex: resolved.solution.bonusChoiceIndex,
     cardUsed: resolved.solution.cardUsed,
     feeIndex: resolved.solution.feeIndex,
   }
 }
-
