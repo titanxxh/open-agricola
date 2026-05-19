@@ -115,6 +115,8 @@ export type CostModifier = TradeModifier | BonusModifier
 export type ComplexCost = {
   fee?: Partial<Resource>
   fees?: Partial<Resource>[]
+  unitFee?: Partial<Resource>      // per-unit cost; total fee += nb × unitFee
+  nb?: number                       // unit count; construct=rooms, renovation=player.rooms
   trades?: Trade[]
   cards?: { type: string; list: string[]; cost?: Partial<Resource>; required?: boolean }
   bonuses?: Bonus[]
