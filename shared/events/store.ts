@@ -143,7 +143,7 @@ export class EventStore {
       id: String(seq),
       seq,
       round: state.round,
-      phase: state.roundPhase,
+      phase: state.roundPhase ?? 'work',
       visibility: 'public',
       ...details,
     } as Record<string, unknown>
