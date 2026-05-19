@@ -28,10 +28,9 @@ export const D15_ClaySupports = new MinorImprovement({
     type: 'trade',
     cardId: CARD_ID,
     appliesTo: ['construct'],
-    // Alternative cost per clay room: {2 clay, 1 wood, 1 reed} replaces the
-    // base {5 clay, 2 reed}. `buildTradeFees` consumes `to` from the base
-    // fee and adds `from`, so to express "swap 3 clay + 1 reed for 1 wood",
-    // we set `to: { clay: 3, reed: 1 }` and `from: { wood: 1 }`.
+    // scope:'unit' bounds Σ-times ≤ nb (rooms being built) so D15 can apply
+    // at most once per clay room — matches BGA's per-room `addCost`.
+    scope: 'unit',
     from: { wood: 1 },
     to: { clay: 3, reed: 1 },
     conditions: { houseTypeClay: 1 },

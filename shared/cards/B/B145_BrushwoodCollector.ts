@@ -32,6 +32,7 @@ export const B145_BrushwoodCollector = new Occupation({
       type: 'trade',
       cardId: CARD_ID,
       appliesTo: ['construct'],
+      scope: 'unit',
       from: { wood: 1 },
       to: { reed: 2 },
     },

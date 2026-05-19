@@ -3,14 +3,14 @@ import { GameSession } from '../game/authoritative-session'
 import { A143_Stonecutter } from '../../shared/cards-display/A/A143_Stonecutter'
 import { D15_ClaySupports } from '../../shared/cards-display/D/D15_ClaySupports'
 import { setWorkersAtHome } from '../../shared/domain/player'
-import { buildRoomCostPerUnit } from '../../shared/actions/payment/internal/room-payment'
+import { computeAllBuyableCombinations } from '../../shared/actions/payment/internal/enumerate'
 
 // Keep side-effect imports referenced.
 void A143_Stonecutter
 void D15_ClaySupports
 
 describe('D15 ClaySupports + A143 Stonecutter stacking', () => {
-  it('D15 trade modifier is registered via play-path (no manual activeModifiers injection)', () => {
+  it('D15 trade modifier is registered via play-path with scope:unit, surfaces in construct enumeration', () => {
     // Both cards register through their cards-display static fields and reach
     // `player.activeModifiers` via `rebuildActiveModifiers` during loadState.
     // D15 targets `construct`; A143 contributes a BonusModifier (`construct`,
@@ -20,6 +20,10 @@ describe('D15 ClaySupports + A143 Stonecutter stacking', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
+    state.players.forEach((p) => {
+      ;(p as any).minorHand = ['__test_placeholder__']
+      ;(p as any).occupationHand = ['__test_placeholder__']
+    })
     state.currentPlayerIndex = 0
     state.round = 1
 
@@ -42,24 +46,50 @@ describe('D15 ClaySupports + A143 Stonecutter stacking', () => {
     expect(after.occupationPlayed).toContain('A143_Stonecutter')
     expect(after.houseType).toBe('clay')
 
-    // D15 trade modifier must be present on activeModifiers after loadState.
-    expect(after.activeModifiers).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        type: 'trade',
-        cardId: 'D15_ClaySupports',
-        appliesTo: ['construct'],
-        from: { wood: 1 },
-        to: { clay: 3, reed: 1 },
-        conditions: { houseTypeClay: 1 },
-      }),
-    ]))
+    // D15 trade modifier must be present on activeModifiers after loadState
+    // with scope:'unit' (T5.2 migration).
+    expect(after.activeModifiers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'trade',
+          cardId: 'D15_ClaySupports',
+          appliesTo: ['construct'],
+          scope: 'unit',
+          from: { wood: 1 },
+          to: { clay: 3, reed: 1 },
+          conditions: { houseTypeClay: 1 },
+        }),
+      ]),
+    )
 
-    // Cost preview for a clay-room construct must offer the trade alternative.
-    const costPreview = buildRoomCostPerUnit(after) as any
-    const fees = costPreview.fees ?? [costPreview]
-    expect(fees).toEqual(expect.arrayContaining([
-      { clay: 5, reed: 2 },                  // base
-      { clay: 2, reed: 1, wood: 1 },          // D15 alternative
-    ]))
+    // Construct enumeration for 1 clay room surfaces both base and D15 swap.
+    const sols = computeAllBuyableCombinations(
+      after,
+      { unitFee: { clay: 5, reed: 2 }, nb: 1 },
+      undefined,
+      'construct',
+    )
+    expect(sols.length).toBeGreaterThan(0)
+
+    // Σ-times across solutions covers k∈{0,1} (single room, scope:unit budget = nb = 1).
+    const swapCounts = new Set(
+      sols.map((s) => s.tradesUsed.reduce((acc, t) => acc + t.times, 0)),
+    )
+    expect(swapCounts).toEqual(new Set([0, 1]))
+
+    // Affordability with {wood:3, clay:5, reed:3}: both k=0 and k=1 affordable.
+    const k0 = sols.find((s) => s.tradesUsed.every((t) => t.times === 0))
+    expect(k0).toBeDefined()
+    expect(k0!.resourcesPaid.clay).toBe(5)
+    expect(k0!.resourcesPaid.reed).toBe(2)
+
+    const k1 = sols.find((s) =>
+      s.tradesUsed.some((t) => t.times === 1 && t.trade.from.wood === 1),
+    )
+    expect(k1).toBeDefined()
+    // D15 swap: pays clay:2 + reed:1 + wood:1.
+    expect(k1!.resourcesPaid.clay).toBe(2)
+    expect(k1!.resourcesPaid.reed).toBe(1)
+    expect(k1!.resourcesPaid.wood).toBe(1)
   })
 })
