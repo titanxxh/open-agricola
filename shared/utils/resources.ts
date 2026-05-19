@@ -10,11 +10,3 @@ export const mergeResources = (
   }
   return out
 }
-
-export const clampNonNegative = (cost: Partial<Resource>): Partial<Resource> => {
-  const out: Partial<Resource> = {}
-  for (const [k, v] of Object.entries(cost)) {
-    if (typeof v === 'number' && v > 0) out[k as keyof Resource] = v
-  }
-  return out
-}
