@@ -1,5 +1,6 @@
 import type { ActionExecutionResult, GameState, HarvestReapSummary, PlayerState } from '../../contract/types'
 import type { ActionSpace } from '../../contract/types'
+import type { EventSink } from '../../contract/events'
 import { fieldTopStack, fieldPopIfDepleted } from '../../domain/field'
 import { runCardListeners } from '../../cards/card-listeners'
 import { executeImmediateSpecialEffectFlows } from './internal/immediate-special-effect-flow'
@@ -13,6 +14,7 @@ export const dispatchReapListener = (
   player: PlayerState,
   crop: 'grain' | 'vegetable' | 'wood' | 'stone',
   amount: number,
+  eventSink?: EventSink,
 ): void => {
   if (amount <= 0) return
   const space = {} as ActionSpace
@@ -24,7 +26,7 @@ export const dispatchReapListener = (
     phase: 'immediatelyAfter',
     extraData: { crop, amount },
   })
-  executeImmediateSpecialEffectFlows({ state, player, space, results })
+  executeImmediateSpecialEffectFlows({ state, player, space, eventSink, results })
 }
 
 export const reap = (

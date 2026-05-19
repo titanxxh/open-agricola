@@ -1,5 +1,5 @@
 import type { PromptKey } from './prompt-keys'
-import type { GameEvent } from './events'
+import type { EventSink, GameEvent } from './events'
 
 export type Resource = {
   wood: number
@@ -410,6 +410,10 @@ export type ActionExecutionContext = {
   actionContext?: Record<string, unknown>
 }
 
+export type ActionMutationContext = ActionExecutionContext & {
+  eventSink: EventSink
+}
+
 export type ActionCostPreview = {
   isStructurallyPossible?: (context: ActionAvailabilityContext) => boolean
   canExecute?: (
@@ -538,9 +542,9 @@ export type ActionDefinition = {
   anytime?: boolean
   canBeExecutedByPlayer: CanBeExecutedByPlayer
   costPreview?: ActionCostPreview
-  execute: (context: ActionExecutionContext) => ActionExecutionResult
+  execute: (context: ActionMutationContext) => ActionExecutionResult
   resolveChoice?: (
-    context: ActionExecutionContext,
+    context: ActionMutationContext,
     choice: string,
     payload?: Record<string, unknown>,
   ) => ActionExecutionResult

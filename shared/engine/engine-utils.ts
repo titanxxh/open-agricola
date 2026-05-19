@@ -10,6 +10,7 @@ import type {
   InteractionRequest,
   Resource,
 } from '../contract/types'
+import type { EventSink } from '../contract/events'
 import type { PromptKey } from '../contract/prompt-keys'
 import type { FollowUpAction, ActionHookPhase } from '../actions/hooks'
 import {
@@ -720,6 +721,7 @@ export function maybeBuildChoiceCandidates(
   executionContext: ActionExecutionContext,
   action: ActionDefinition,
   actionId: string,
+  eventSink: EventSink,
 ): ActionExecutionResult | null {
   if (!action.getBaseChoiceOptions) return null
   const baseOpts = action.getBaseChoiceOptions(executionContext) ?? []
@@ -754,7 +756,7 @@ export function maybeBuildChoiceCandidates(
       ...(executionContext.params ?? {}),
       selectedOption: value,
     }
-    return action.resolveChoice(executionContext, value, undefined)
+    return action.resolveChoice({ ...executionContext, eventSink }, value, undefined)
   }
   return {
     type: 'request',
