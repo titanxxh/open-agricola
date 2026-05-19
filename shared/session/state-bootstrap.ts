@@ -314,6 +314,23 @@ export const normalizeState = (raw: GameState): GameState => {
   ).filter(
     (id) => majorImprovementIds.includes(id) && !takenImprovements.has(id),
   )
+  const events = Array.isArray(raw.events)
+    ? raw.events.filter(
+        (event): event is GameState['events'][number] =>
+          typeof event === 'object' && event !== null,
+      )
+    : []
+  const maxEventSeq = events.reduce(
+    (max, event) =>
+      Number.isSafeInteger(event.seq) && event.seq > 0 && event.seq > max
+        ? event.seq
+        : max,
+    0,
+  )
+  const nextEventSeq =
+    Number.isSafeInteger(raw.nextEventSeq) && raw.nextEventSeq > maxEventSeq
+      ? raw.nextEventSeq
+      : maxEventSeq + 1
   return {
     ...raw,
     players,
@@ -324,8 +341,8 @@ export const normalizeState = (raw: GameState): GameState => {
     phase: raw.phase ?? 'playing',
     roundPhase: raw.roundPhase ?? 'work',
     draft: raw.draft ?? null,
-    events: raw.events ?? [],
-    nextEventSeq: raw.nextEventSeq ?? 1,
+    events,
+    nextEventSeq,
     futureMeeples: raw.futureMeeples ?? [],
     pendingFutureMeeples: raw.pendingFutureMeeples ?? [],
     enableCommunityDeck: raw.enableCommunityDeck ?? false,
