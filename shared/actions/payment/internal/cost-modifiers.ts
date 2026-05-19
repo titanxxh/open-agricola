@@ -103,6 +103,15 @@ export const applyCostModifiers = (
   return result
 }
 
+export const validateTradeModifier = (modifier: TradeModifier): void => {
+  if (modifier.scope === 'unit' && modifier.conditions?.minNumRooms !== undefined) {
+    throw new Error(
+      `TradeModifier ${modifier.cardId}: scope:'unit' MUST NOT carry conditions.minNumRooms ` +
+      `(per-unit trades have no min-unit threshold).`,
+    )
+  }
+}
+
 export const validateBonus = (bonus: Bonus): void => {
   const hasDiscount = bonus.discount !== undefined
   const hasChoices = bonus.choices !== undefined
