@@ -1275,7 +1275,7 @@ export class GameCore {
       })
     }
     // Card-sourced anytime actions via CardListener phases:['anytime']
-    const anytimeContext: import('../cards/card-listeners').CardListenerContext = {
+    const anytimeContext: import('../cards/card-listeners').CardListenerContextInput = {
       state: this.state,
       player,
       space,
@@ -2640,7 +2640,7 @@ export class GameCore {
    * engine still wants to enter and present a skip-only choice.
    */
   private listenersVetoIsDoable(player: PlayerState, space: ActionSpace): boolean {
-    const ctx: import('../cards/card-listeners.ts').CardListenerContext = {
+    const ctx: import('../cards/card-listeners.ts').CardListenerContextInput = {
       state: this.state,
       player,
       space,
@@ -2699,7 +2699,7 @@ export class GameCore {
 
     // Also mark occupied spaces that computeArgs listeners expose as extra options
     if (workersAvailable(this.state, player) > 0) {
-      const listenerContext: import('../cards/card-listeners.ts').CardListenerContext = {
+      const listenerContext: import('../cards/card-listeners.ts').CardListenerContextInput = {
         state: this.state,
         player,
         space: this.state.actionSpaces[0],
