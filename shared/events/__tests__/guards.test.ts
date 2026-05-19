@@ -8,17 +8,21 @@ import {
 } from '../guards'
 
 describe('event guards', () => {
+  const baseEvent = {
+    schemaVersion: 1,
+    id: '1',
+    seq: 1,
+    round: 1,
+    phase: 'work',
+    visibility: 'public',
+  } as const
+
   it('accepts public json-safe events under size limit', () => {
     const event = {
-      schemaVersion: 1,
-      id: '1',
-      seq: 1,
-      round: 1,
-      phase: 'work',
-      type: 'card.stateChanged',
-      visibility: 'public',
+      ...baseEvent,
       cardId: 'B21_HayloftBarn',
       key: 'foodCount',
+      type: 'card.stateChanged',
       value: 3,
       targetPlayerId: 'p1',
     }
@@ -27,6 +31,135 @@ describe('event guards', () => {
     expect(() => assertPublicGameEvent(event)).not.toThrow()
     expect(() => assertJsonSafeEvent(event)).not.toThrow()
     expect(() => assertEventSizeUnderLimit(event, 4096)).not.toThrow()
+  })
+
+  it('accepts empty card infobox text as an explicit clear event', () => {
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'card.infoboxChanged',
+      cardId: 'C115_Sower',
+      text: '',
+      targetPlayerId: 'p1',
+    })).not.toThrow()
+  })
+
+  it.each([
+    [
+      'resource.moved resources',
+      {
+        resources: undefined,
+        type: 'resource.moved',
+        from: { kind: 'supply' },
+        to: { kind: 'player', playerId: 'p1' },
+        reason: 'gain',
+      },
+      /resources/,
+    ],
+    [
+      'resource.moved reason',
+      {
+        resources: { wood: 1 },
+        type: 'resource.moved',
+        from: { kind: 'supply' },
+        to: { kind: 'player', playerId: 'p1' },
+      },
+      /reason/,
+    ],
+    [
+      'resource.paid paymentFor',
+      {
+        resources: { food: 1 },
+        type: 'resource.paid',
+      },
+      /paymentFor/,
+    ],
+    [
+      'farm.sown crop',
+      {
+        type: 'farm.sown',
+        sows: [{ location: { kind: 'field', playerId: 'p1', row: 0, col: 0 }, added: 2 }],
+      },
+      /sows\[0\]\.crop/,
+    ],
+    [
+      'farm.cropRemoved reason',
+      {
+        type: 'farm.cropRemoved',
+        crops: [{ location: { kind: 'field', playerId: 'p1', row: 0, col: 0 }, crop: 'grain', amount: 1 }],
+      },
+      /reason/,
+    ],
+    [
+      'farm.cropAdded crop',
+      {
+        type: 'farm.cropAdded',
+        reason: 'cardEffect',
+        crops: [{ location: { kind: 'field', playerId: 'p1', row: 0, col: 0 }, amount: 1 }],
+      },
+      /crops\[0\]\.crop/,
+    ],
+    [
+      'farm.animalDiscarded reason',
+      {
+        type: 'farm.animalDiscarded',
+        animals: { sheep: 1 },
+      },
+      /reason/,
+    ],
+    [
+      'worker.returned to',
+      {
+        type: 'worker.returned',
+        workers: [{ playerId: 'p1', workerId: '1' }],
+      },
+      /to/,
+    ],
+    [
+      'worker.placed workerId',
+      {
+        type: 'worker.placed',
+        spaceId: 'forest',
+      },
+      /workerId/,
+    ],
+    [
+      'card.played cardId',
+      {
+        type: 'card.played',
+        cardType: 'minor',
+      },
+      /cardId/,
+    ],
+    [
+      'farm.renovated rooms',
+      {
+        type: 'farm.renovated',
+        playerId: 'p1',
+        from: 'wood',
+        to: 'clay',
+      },
+      /rooms/,
+    ],
+    [
+      'futureMeeple.queued entries round',
+      {
+        type: 'futureMeeple.queued',
+        playerId: 'p1',
+        cardId: 'E47_SyrupTap',
+        entries: [{ resources: { wood: 1 } }],
+      },
+      /entries\[0\]\.round/,
+    ],
+    [
+      'round.started round',
+      {
+        round: undefined,
+        type: 'round.started',
+      },
+      /round/,
+    ],
+  ])('rejects missing required event field for %s', (_name, event, error) => {
+    expect(() => assertKnownGameEventShape({ ...baseEvent, ...event })).toThrow(error)
   })
 
   it('rejects private visibility and non-json values', () => {

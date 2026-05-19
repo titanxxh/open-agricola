@@ -134,10 +134,47 @@ const assertStringField = (value: unknown, path: string): void => {
   }
 }
 
+const assertStringValue = (value: unknown, path: string): void => {
+  if (typeof value !== 'string') {
+    throw new Error(`GameEvent ${path} must be a string`)
+  }
+}
+
 const assertFiniteNumberField = (value: unknown, path: string): void => {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw new Error(`GameEvent ${path} must be a finite number`)
   }
+}
+
+const assertOptionalStringField = (value: unknown, path: string): void => {
+  if (value !== undefined) assertStringField(value, path)
+}
+
+const assertOptionalFiniteNumberField = (value: unknown, path: string): void => {
+  if (value !== undefined) assertFiniteNumberField(value, path)
+}
+
+const assertNumberArray = (value: unknown, path: string): void => {
+  if (!Array.isArray(value)) {
+    throw new Error(`GameEvent ${path} must be an array`)
+  }
+  value.forEach((entry, index) => assertFiniteNumberField(entry, `${path}[${index}]`))
+}
+
+const assertBoardPositions = (
+  value: unknown,
+  path: string,
+  keys: readonly string[],
+): void => {
+  if (!Array.isArray(value)) throw new Error(`GameEvent ${path} must be an array`)
+  value.forEach((entry, index) => {
+    const record = assertRecord(entry, `${path}[${index}]`)
+    assertOnlyKeys(record, keys, `${path}[${index}]`)
+    if (keys.includes('playerId')) assertStringField(record.playerId, `${path}[${index}].playerId`)
+    assertFiniteNumberField(record.row, `${path}[${index}].row`)
+    assertFiniteNumberField(record.col, `${path}[${index}].col`)
+    if (keys.includes('type')) assertStringField(record.type, `${path}[${index}].type`)
+  })
 }
 
 const assertNoPrivatePayload = (value: unknown, path: string): void => {
@@ -237,6 +274,7 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       assertResourceMap(event.resources, 'resources')
       assertResourceLocation(event.from, 'from')
       assertResourceLocation(event.to, 'to')
+      assertStringField(event.reason, 'reason')
       return
     case 'resource.exchanged':
       assertResourceMap(event.paid, 'paid')
@@ -252,6 +290,7 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       return
     case 'resource.paid':
       assertResourceMap(event.resources, 'resources')
+      assertStringField(event.paymentFor, 'paymentFor')
       if (event.to !== undefined) assertResourceLocation(event.to, 'to')
       assertPaymentSources(event.paymentSources)
       return
@@ -261,18 +300,43 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
         const record = assertRecord(entry, `sows[${index}]`)
         assertOnlyKeys(record, ['location', 'crop', 'added'], `sows[${index}]`)
         assertResourceLocation(record.location, `sows[${index}].location`)
+        assertStringField(record.crop, `sows[${index}].crop`)
         assertFiniteNumberField(record.added, `sows[${index}].added`)
       })
       return
     case 'farm.cropAdded':
     case 'farm.cropRemoved':
+      assertStringField(event.reason, 'reason')
       if (!Array.isArray(event.crops)) throw new Error('GameEvent crops must be an array')
       event.crops.forEach((entry, index) => {
         const record = assertRecord(entry, `crops[${index}]`)
         assertOnlyKeys(record, ['location', 'crop', 'amount'], `crops[${index}]`)
         assertResourceLocation(record.location, `crops[${index}].location`)
+        assertStringField(record.crop, `crops[${index}].crop`)
         assertFiniteNumberField(record.amount, `crops[${index}].amount`)
       })
+      return
+    case 'farm.fieldPlowed':
+      assertBoardPositions(event.fields, 'fields', ['playerId', 'row', 'col'])
+      return
+    case 'farm.roomBuilt':
+      assertBoardPositions(event.rooms, 'rooms', ['playerId', 'row', 'col', 'type'])
+      return
+    case 'farm.renovated':
+      assertStringField(event.playerId, 'playerId')
+      assertStringField(event.from, 'from')
+      assertStringField(event.to, 'to')
+      assertBoardPositions(event.rooms, 'rooms', ['row', 'col'])
+      return
+    case 'farm.stableBuilt':
+      assertBoardPositions(event.stables, 'stables', ['playerId', 'row', 'col'])
+      return
+    case 'farm.fenceBuilt':
+      if (!Array.isArray(event.fences)) throw new Error('GameEvent fences must be an array')
+      return
+    case 'farm.fenceConsumed':
+      assertFiniteNumberField(event.count, 'count')
+      assertStringField(event.reason, 'reason')
       return
     case 'farm.animalMoved':
       assertResourceMap(event.animals, 'animals')
@@ -280,6 +344,9 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       if (event.to !== undefined) assertResourceLocation(event.to, 'to')
       return
     case 'farm.animalDiscarded':
+      assertStringField(event.reason, 'reason')
+      assertResourceMap(event.animals, 'animals')
+      return
     case 'farm.animalBred':
       assertResourceMap(event.animals, 'animals')
       return
@@ -291,27 +358,125 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
         assertStringField(record.playerId, `workers[${index}].playerId`)
         assertStringField(record.workerId, `workers[${index}].workerId`)
       })
+      assertStringField(event.to, 'to')
+      return
+    case 'worker.placed':
+      assertStringField(event.workerId, 'workerId')
+      assertStringField(event.spaceId, 'spaceId')
+      assertOptionalStringField(event.viaCardId, 'viaCardId')
+      return
+    case 'worker.promoted':
+      assertStringField(event.playerId, 'playerId')
+      assertStringField(event.workerId, 'workerId')
+      assertStringField(event.from, 'from')
+      assertStringField(event.to, 'to')
+      return
+    case 'action.revealed':
+      assertStringField(event.actionId, 'actionId')
+      assertFiniteNumberField(event.roundSlot, 'roundSlot')
       return
     case 'action.accumulated':
+      assertStringField(event.spaceId, 'spaceId')
       assertResourceMap(event.resources, 'resources')
       return
+    case 'action.exclusiveUseSet':
+      assertStringField(event.actionId, 'actionId')
+      assertStringField(event.playerId, 'playerId')
+      assertStringField(event.sourceCardId, 'sourceCardId')
+      return
+    case 'action.granted':
+      assertStringField(event.playerId, 'playerId')
+      assertStringField(event.actionId, 'actionId')
+      assertStringField(event.cardId, 'cardId')
+      return
+    case 'turn.skipped':
+      assertStringField(event.playerId, 'playerId')
+      assertStringField(event.reason, 'reason')
+      return
+    case 'startPlayer.changed':
+      assertStringField(event.playerId, 'playerId')
+      return
+    case 'card.played':
+      assertStringField(event.cardId, 'cardId')
+      assertStringField(event.cardType, 'cardType')
+      return
+    case 'card.triggered':
+      assertStringField(event.cardId, 'cardId')
+      assertOptionalStringField(event.triggerActionId, 'triggerActionId')
+      return
     case 'card.stateChanged':
+      assertStringField(event.cardId, 'cardId')
+      assertStringField(event.key, 'key')
+      assertStringField(event.targetPlayerId, 'targetPlayerId')
       assertPublicCardStateValue(event.value, 'card.stateChanged.value')
       return
+    case 'card.infoboxChanged':
+      assertStringField(event.cardId, 'cardId')
+      assertStringValue(event.text, 'text')
+      assertStringField(event.targetPlayerId, 'targetPlayerId')
+      return
     case 'card.stackChanged':
+      assertStringField(event.cardId, 'cardId')
+      assertStringField(event.reason, 'reason')
+      assertOptionalStringField(event.targetPlayerId, 'targetPlayerId')
       if (event.resources !== undefined) assertResourceMap(event.resources, 'resources')
+      assertOptionalFiniteNumberField(event.delta, 'delta')
+      return
+    case 'card.swappedWithBoard':
+      assertStringField(event.playerId, 'playerId')
+      assertStringField(event.fromPlayerCardId, 'fromPlayerCardId')
+      assertStringField(event.toPlayerCardId, 'toPlayerCardId')
+      return
+    case 'card.returnedToBoard':
+      assertStringField(event.playerId, 'playerId')
+      assertStringField(event.cardId, 'cardId')
+      return
+    case 'card.destroyed':
+      assertOptionalStringField(event.playerId, 'playerId')
+      assertStringField(event.cardId, 'cardId')
+      assertStringField(event.reason, 'reason')
+      return
+    case 'card.passed':
+      assertStringField(event.fromPlayerId, 'fromPlayerId')
+      assertStringField(event.toPlayerId, 'toPlayerId')
+      assertStringField(event.cardId, 'cardId')
       return
     case 'futureMeeple.queued':
+      assertStringField(event.playerId, 'playerId')
+      assertStringField(event.cardId, 'cardId')
       if (!Array.isArray(event.entries)) throw new Error('GameEvent entries must be an array')
       event.entries.forEach((entry, index) => {
         const record = assertRecord(entry, `entries[${index}]`)
+        assertFiniteNumberField(record.round, `entries[${index}].round`)
         if (record.resources !== undefined) assertResourceMap(record.resources, `entries[${index}].resources`)
+        assertOptionalStringField(record.roomType, `entries[${index}].roomType`)
       })
       return
+    case 'futureMeeple.removed':
+      assertStringField(event.playerId, 'playerId')
+      assertStringField(event.cardId, 'cardId')
+      if (event.rounds !== undefined) assertNumberArray(event.rounds, 'rounds')
+      return
     case 'futureMeeple.resolved':
+      assertStringField(event.playerId, 'playerId')
+      assertStringField(event.cardId, 'cardId')
+      assertFiniteNumberField(event.round, 'round')
       if (event.resources !== undefined) assertResourceMap(event.resources, 'resources')
+      assertOptionalStringField(event.roomType, 'roomType')
+      return
+    case 'round.started':
+      assertFiniteNumberField(event.round, 'round')
+      return
+    case 'harvest.phaseStarted':
+      assertStringField(event.harvestPhase, 'harvestPhase')
+      return
+    case 'harvest.reapSkipped':
+    case 'harvest.reapNothing':
+      assertStringField(event.playerId, 'playerId')
       return
     case 'harvest.feedConverted':
+      assertStringField(event.playerId, 'playerId')
+      assertStringField(event.source, 'source')
       assertResourceMap(event.cost, 'cost')
       assertResourceMap(event.food, 'food')
       return
