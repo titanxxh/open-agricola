@@ -5,6 +5,7 @@ import { CardRegistry } from '../../../cards/registry'
 import type {
   ActionExecutionContext,
   ActionExecutionResult,
+  ActionMutationContext,
   GameState,
   PlayerState,
 } from '../../../contract/types'
@@ -41,11 +42,16 @@ const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
 
 const makeCtx = (
   player = makePlayer(),
-  overrides: Partial<ActionExecutionContext> = {},
-): ActionExecutionContext => ({
+  overrides: Partial<ActionMutationContext> = {},
+  events: unknown[] = [],
+): ActionMutationContext => ({
   state: { players: [player] } as unknown as GameState,
   player,
   space: { id: 'grain-utilization' } as ActionExecutionContext['space'],
+  eventSink: {
+    emit: (event) => events.push(event),
+    emitMany: (items) => events.push(...items),
+  },
   ...overrides,
 })
 
@@ -58,7 +64,6 @@ const expectNoBakeMutation = (
   expect(player.resources.grain).toBe(grain)
   expect(player.resources.food).toBe(0)
   expect(player.stats).toBeUndefined()
-  expect('immediateLogs' in result ? result.immediateLogs : undefined).toBeUndefined()
 }
 
 describe('bakeBreadAction non-empty semantics', () => {
@@ -108,9 +113,7 @@ describe('bakeBreadAction non-empty semantics', () => {
     const player = makePlayer()
     const result = bakeBreadAction.resolveChoice!(makeCtx(player), 'bulk:bad')
 
-    expect(result).toMatchObject({
-      type: 'fail',
-      logKey: 'log.action',
+    expect(result).toMatchObject({ type: 'fail', errorKey: 'log.action',
       recoverable: true,
     })
     expect(player.resources.grain).toBe(3)
@@ -157,8 +160,9 @@ describe('bakeBreadAction non-empty semantics', () => {
 
   it('valid bulk bakes at least one grain and records resources, stats, and logs', () => {
     const player = makePlayer()
+    const events: unknown[] = []
     const result = bakeBreadAction.resolveChoice!(
-      makeCtx(player),
+      makeCtx(player, {}, events),
       'bulk:Major_Fireplace1=1,Major_ClayOven=1',
     )
 
@@ -170,30 +174,29 @@ describe('bakeBreadAction non-empty semantics', () => {
       resourcesConverted: { grain: 2 },
       foodFromConversion: { grain: 7 },
     })
-    expect(result.immediateLogs).toEqual([
-      { key: 'log.bakeBread', params: { count: 1, food: 2, sourceActionId: 'grain-utilization' } },
-      { key: 'log.bakeBread', params: { count: 1, food: 5, sourceActionId: 'grain-utilization' } },
+    expect(events).toMatchObject([
+      { type: 'resource.exchanged', paid: { grain: 1 }, gained: { food: 2 }, sourceActionId: 'grain-utilization' },
+      { type: 'resource.exchanged', paid: { grain: 1 }, gained: { food: 5 }, sourceActionId: 'grain-utilization' },
     ])
   })
 
   it('records the source card when bake bread comes from an oven onBuy flow', () => {
     const player = makePlayer()
+    const events: unknown[] = []
     const result = bakeBreadAction.resolveChoice!(
-      makeCtx(player, { sourceCard: 'Major_ClayOven' }),
+      makeCtx(player, { sourceCard: 'Major_ClayOven' }, events),
       'Major_ClayOven',
     )
 
     expect(result.type).toBe('ok')
     if (result.type !== 'ok') return
-    expect(result.immediateLogs).toEqual([
+    expect(events).toMatchObject([
       {
-        key: 'log.bakeBread',
-        params: {
-          count: 1,
-          food: 5,
-          sourceActionId: 'grain-utilization',
-          sourceCard: 'Major_ClayOven',
-        },
+        type: 'resource.exchanged',
+        paid: { grain: 1 },
+        gained: { food: 5 },
+        sourceActionId: 'grain-utilization',
+        sourceCardId: 'Major_ClayOven',
       },
     ])
   })

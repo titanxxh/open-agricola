@@ -22,6 +22,7 @@ import { HookDispatcher } from './dispatcher'
 import { EngineTree } from './tree'
 import { LogStore } from './log-store'
 import { EventStore } from '../events/store'
+import { eventsToLogEntries } from '../events/log-mapper'
 import type { EngineInternals } from './engine-internals'
 import {
   buildOwnedFlowNode,
@@ -350,6 +351,26 @@ export class Engine {
    */
   peekNextUnresolvedNodeId(): string | null {
     return this.tree.nextUnresolved()?.id ?? null
+  }
+
+  flushEventTransaction(context: EngineContext): void {
+    const snapshot = this.events.snapshot()
+    if (!snapshot.inTransaction || snapshot.transactionEvents.length === 0) return
+    context.state.events ??= []
+    context.state.nextEventSeq ??= 1
+    const committed = this.events.commitTransaction(context.state)
+    this.eventLogDerivations = []
+    const playerNames = Object.fromEntries(
+      context.state.players.map((player) => [player.id, player.name]),
+    )
+    const actionNames = Object.fromEntries([
+      ...context.state.actionSpaces.map((space) => [space.id, space.nameKey] as const),
+      ...[...this.registry.values()].map((action) => [action.id, action.nameKey] as const),
+    ])
+    const entries = eventsToLogEntries(committed, { playerNames, actionNames })
+    for (let index = entries.length - 1; index >= 0; index -= 1) {
+      this.log.append(entries[index]!)
+    }
   }
 
   /**

@@ -18,7 +18,6 @@ import { resolvePaymentSolutionSelection } from '../payment/internal'
 import { collectComputeChoiceCandidates } from '../../cards/card-listeners'
 import { isMajorCardId } from '../../cards/helpers/card-type'
 import {
-  buildImprovementImmediateLogs,
   buildMajorImprovementOptions,
   buildMinorImprovementOptions,
   buildPlayableMinorOptions,
@@ -31,7 +30,6 @@ import {
   isMinorImprovementPlayable,
   isBlockedByMajorImprovementActionGate,
   parseImprovementChoice,
-  readActionBonusSources,
   type ResolvedMinorImprovement,
 } from '../helpers/improvement-helpers'
 
@@ -97,16 +95,6 @@ const finalizeMajorImprovementPurchase = (
   costResources: NonNullable<PaymentInfo['resourcesPaid']>,
   returnedMajorId?: string,
 ): ActionExecutionResult => {
-  const immediateLogs = buildImprovementImmediateLogs(
-    'major',
-    improvementId,
-    costResources,
-    {
-      returnedCards: returnedMajorId ? [returnedMajorId] : undefined,
-      bonusSources: readActionBonusSources(player),
-    },
-  )
-
   if (returnedMajorId) {
     returnCardToBoard(player, returnedMajorId, state)
   }
@@ -121,12 +109,6 @@ const finalizeMajorImprovementPurchase = (
   const result: SuccessfulImprovementResult =
     activation.type === 'flow' ? activation : { type: 'ok' }
 
-  result.immediateLogs = [...immediateLogs, ...(result.immediateLogs ?? [])]
-
-  if (result.type === 'ok') {
-    result.logKey = 'log.playImprovement'
-    result.logParams = immediateLogs[0]?.params as Record<string, unknown>
-  }
   return attachImprovementPayment(result, improvementId, costResources, returnedMajorId)
 }
 
@@ -138,16 +120,6 @@ const finalizeMinorImprovementPurchase = (
   costResources: NonNullable<PaymentInfo['resourcesPaid']>,
   returnedCardId?: string,
 ): ActionExecutionResult => {
-  const immediateLogs = buildImprovementImmediateLogs(
-    'minor',
-    improvement.id,
-    costResources,
-    {
-      returnedCards: returnedCardId ? [returnedCardId] : undefined,
-      bonusSources: readActionBonusSources(player),
-    },
-  )
-
   if (returnedCardId) {
     returnCardToBoard(player, returnedCardId, state)
   }
@@ -174,7 +146,6 @@ const finalizeMinorImprovementPurchase = (
 
   const activation = activateCard(state, player, improvement.id, 'onBuy', paymentInfo)
   if (activation.type === 'flow') {
-    activation.immediateLogs = [...immediateLogs, ...(activation.immediateLogs ?? [])]
     return attachImprovementPayment(
       activation,
       improvement.id,
@@ -185,9 +156,6 @@ const finalizeMinorImprovementPurchase = (
 
   return attachImprovementPayment({
     type: 'ok',
-    immediateLogs,
-    logKey: 'log.playMinorImprovement',
-    logParams: immediateLogs[0]?.params as Record<string, unknown>,
   }, improvement.id, costResources, returnedCardId)
 }
 
@@ -257,10 +225,10 @@ const playMajorImprovement = (
 ): ActionExecutionResult => {
   const improvement = getMajorCard(improvementId)
   if (!improvement) {
-    return { type: 'fail', logKey: 'log.improvementFail' }
+    return { type: 'fail', errorKey: 'log.improvementFail' }
   }
   if (!state.availableMajorImprovements.includes(improvement.id)) {
-    return { type: 'fail', logKey: 'log.improvementFail' }
+    return { type: 'fail', errorKey: 'log.improvementFail' }
   }
 
   const cost = getMajorImprovementPreviewCost(state, player, improvementId, actionCardId) ?? {}
@@ -273,7 +241,7 @@ const playMajorImprovement = (
     paymentChoice,
     `pay:${improvementId}`,
     true,
-    { type: 'fail', logKey: 'log.improvementFail' },
+    { type: 'fail', errorKey: 'log.improvementFail' },
     getPlayedCardsForCost(player, cost),
     improvementId,
   )
@@ -306,25 +274,25 @@ export const playMinorImprovement = (
 ): ActionExecutionResult => {
   const improvement = getMinorImprovement(improvementId)
   if (!improvement) {
-    return { type: 'fail', logKey: 'log.minorImprovementFail' }
+    return { type: 'fail', errorKey: 'log.minorImprovementFail' }
   }
   if (improvement.mustBePlayedViaMinorAction && playContext !== 'minorAction') {
-    return { type: 'fail', logKey: 'log.minorImprovementRequiresMinorAction' }
+    return { type: 'fail', errorKey: 'log.minorImprovementRequiresMinorAction' }
   }
   const effectiveTypes = types ?? (actionCardId === 'minor-improvement' ? (['minor'] as const) : undefined)
   if (isBlockedByMajorImprovementActionGate(improvement, effectiveTypes)) {
-    return { type: 'fail', logKey: 'log.minorImprovementFail' }
+    return { type: 'fail', errorKey: 'log.minorImprovementFail' }
   }
   if (!player.minorHand.includes(improvement.id)) {
-    return { type: 'fail', logKey: 'log.minorImprovementFail' }
+    return { type: 'fail', errorKey: 'log.minorImprovementFail' }
   }
   if (!meetsCardPrerequisites(player, improvement, state.round, state)) {
-    return { type: 'fail', logKey: 'log.minorImprovementFail' }
+    return { type: 'fail', errorKey: 'log.minorImprovementFail' }
   }
   const targetImprovement: ResolvedMinorImprovement = improvement
   const modifiedCost = getMinorImprovementPreviewCost(state, player, improvementId, actionCardId)
   if (!modifiedCost) {
-    return { type: 'fail', logKey: 'log.minorImprovementFail' }
+    return { type: 'fail', errorKey: 'log.minorImprovementFail' }
   }
 
   const resolvedPayment = resolveImprovementPayment(
@@ -336,7 +304,7 @@ export const playMinorImprovement = (
     paymentChoice,
     `pay:minor:${improvementId}`,
     !!(PaymentSolver.isComplexCost(modifiedCost) && modifiedCost.cards?.list?.length),
-    { type: 'fail', logKey: 'log.minorImprovementFail' },
+    { type: 'fail', errorKey: 'log.minorImprovementFail' },
     getPlayedCardsForCost(player, modifiedCost),
     improvementId,
   )
@@ -397,11 +365,11 @@ export const playImprovement = (
   const effectiveActionCardId = sourceCard ?? resolveImprovementActionCardId(mode)
 
   if (parsed.kind === 'major') {
-    if (!allowMajor) return { type: 'fail', logKey: 'log.improvementFail' }
+    if (!allowMajor) return { type: 'fail', errorKey: 'log.improvementFail' }
     return playMajorImprovement(state, player, parsed.id, effectiveActionCardId)
   }
   if (parsed.kind === 'minor') {
-    if (!allowMinor) return { type: 'fail', logKey: 'log.minorImprovementFail' }
+    if (!allowMinor) return { type: 'fail', errorKey: 'log.minorImprovementFail' }
     return playMinorImprovement(state, player, parsed.id, effectiveActionCardId)
   }
 
@@ -414,7 +382,7 @@ export const playImprovement = (
   if (allowMinor) {
     return playMinorImprovement(state, player, parsed.id, effectiveActionCardId)
   }
-  return { type: 'fail', logKey: 'log.improvementFail' }
+  return { type: 'fail', errorKey: 'log.improvementFail' }
 }
 
 const buildImprovementFlow = (
@@ -541,7 +509,7 @@ export const improvementAction: ActionDefinition = {
     const options = [...majorOpts, ...baseMinor, ...extraMinor]
     if (options.length === 0) {
       return types.includes('major')
-        ? { type: 'fail', logKey: 'log.improvementFail' }
+        ? { type: 'fail', errorKey: 'log.improvementFail' }
         : { type: 'ok' }
     }
     return {
@@ -560,7 +528,7 @@ export const improvementAction: ActionDefinition = {
       readTrueAction(params, actionContext),
       readImprovementTypes({ params, actionContext }),
     )
-    if (!flow) return { type: 'fail', logKey: 'log.improvementFail' }
+    if (!flow) return { type: 'fail', errorKey: 'log.improvementFail' }
     return { type: 'flow', flow }
   },
 }

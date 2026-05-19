@@ -173,20 +173,6 @@ describe('salterPickAction (ad-hoc)', () => {
     expect(s.pendingFutureMeeples[0]).toMatchObject({
       cardId: 'B157_Salter', startRound: 4, count: 3, resources: { food: 2 },
     })
-    expect('immediateLogs' in r ? r.immediateLogs : undefined).toEqual([
-      {
-        key: 'log.salterFutureFood',
-        params: {
-          cardId: 'B157_Salter',
-          animals: '2 sheep',
-          sheep: 2,
-          boar: 0,
-          cattle: 0,
-          futureFood: 6,
-          schedule: '2 food in rounds 4-6',
-        },
-      },
-    ])
   })
 
   it('resolveChoice: 混合 type → seq 包 3 个 futureMeeples', () => {
@@ -207,18 +193,6 @@ describe('salterPickAction (ad-hoc)', () => {
     expect(s.pendingFutureMeeples.length).toBe(3)
     const counts = s.pendingFutureMeeples.map((req: any) => req.count).sort((a: number, b: number) => a - b)
     expect(counts).toEqual([3, 5, 7])
-    expect('immediateLogs' in r ? r.immediateLogs?.[0] : undefined).toEqual({
-      key: 'log.salterFutureFood',
-      params: {
-        cardId: 'B157_Salter',
-        animals: '1 sheep, 1 boar, 1 cattle',
-        sheep: 1,
-        boar: 1,
-        cattle: 1,
-        futureFood: 15,
-        schedule: '1 food in rounds 4-6; 1 food in rounds 4-8; 1 food in rounds 4-10',
-      },
-    })
   })
 
   it('resolveChoice: 接 {resourceCounts: {...}} 包装 payload（来自 session-core）', () => {

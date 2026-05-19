@@ -195,7 +195,7 @@ describe('B18 GrasslandHarrow — after-pay listener', () => {
       state, player, space: createSpace('improvement'),
       actionId: 'pay', phase: 'after',
       sourceCard: CARD_ID,
-      result: { type: 'fail', logKey: 'log.payFail' },
+      result: { type: 'fail', errorKey: 'log.payFail' },
     } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
     expect(state.pendingFutureMeeples.length).toBe(0)

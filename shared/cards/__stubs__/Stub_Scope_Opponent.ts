@@ -14,8 +14,6 @@ export const listener: CardListenerRegistration = {
     incCounter(effectPlayer, CARD_ID, 'observedCount')
     effectPlayer.resources.food += 1
     return {
-      logKey: 'log.cardEffectGain',
-      logParams: { cardId: CARD_ID, gain: '1 FOOD' },
       sourceCard: CARD_ID,
     }
   },

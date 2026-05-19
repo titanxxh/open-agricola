@@ -202,7 +202,7 @@ export const renovateHouseAction: ActionDefinition = {
   choicePromptKey: 'ui.interactionChooseRenovationTarget',
   noChoiceLogKey: 'log.renovationFail',
   emitLeafActionDetail: true,
-  execute: () => ({ type: 'fail', logKey: 'log.renovationFail' }),
+  execute: () => ({ type: 'fail', errorKey: 'log.renovationFail' }),
   // 7b1: rewrite as `seq:[pay, apply-renovation]`. The pay leaf handles the
   // typed-flat (and any future ComplexCost) selection — including bonus and
   // surplus solutions — and only on success advances to apply-renovation,
@@ -210,7 +210,7 @@ export const renovateHouseAction: ActionDefinition = {
   // shared with `apply-improvement`. Stale `pay:renovate:*` choice strings
   // are intercepted by the pay leaf's own resolveChoice fallback.
   resolveChoice: ({ player, params, costs }, choice) => {
-    const failure: ActionExecutionResult = { type: 'fail', logKey: 'log.renovationFail' }
+    const failure: ActionExecutionResult = { type: 'fail', errorKey: 'log.renovationFail' }
     const payment = typeof choice === 'string' ? parseRenovatePaymentChoice(choice) : null
     const target: RenovationTarget | null =
       payment?.target

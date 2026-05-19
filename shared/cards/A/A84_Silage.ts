@@ -36,7 +36,7 @@ const payGrainAnyAction: ActionDefinition = {
       }
       return { type: 'ok' }
     }
-    return { type: 'fail', logKey: 'log.exchangeFail' }
+    return { type: 'fail', errorKey: 'log.exchangeFail' }
   },
 }
 

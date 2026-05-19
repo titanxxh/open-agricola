@@ -76,8 +76,6 @@ const opponentGrainSeedsListener: CardListenerRegistration = {
         sourceCard: CARD_ID,
         actionContext: { trueAction: false },
       },
-      logKey: 'log.cardGrantedAction',
-      logParams: { cardId: CARD_ID, actionId: 'bake-bread' },
       sourceCard: CARD_ID,
     }
   },

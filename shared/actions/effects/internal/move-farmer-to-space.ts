@@ -41,7 +41,7 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
     const excludeId = params?.excludeSpaceId as string | undefined
     const allowed = computeAllowedPlacementSpaces(state, player)
     const spaces = state.actionSpaces.filter((s) => isSelectableSpace(s, excludeId, allowed))
-    if (spaces.length === 0) return { type: 'fail', logKey: 'log.actionFail' }
+    if (spaces.length === 0) return { type: 'fail', errorKey: 'log.actionFail' }
     return {
       type: 'request',
       request: {
@@ -51,9 +51,9 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
       promptKey: 'ui.interactionMoveFarmerToSpace',
     }
   },
-  resolveChoice: ({ state, player, eventSink }, choice) => {
+  resolveChoice: ({ state, player, sourceCard, eventSink }, choice) => {
     const targetSpace = state.actionSpaces.find((s) => s.id === choice)
-    if (!targetSpace) return { type: 'fail', logKey: 'log.actionFail' }
+    if (!targetSpace) return { type: 'fail', errorKey: 'log.actionFail' }
     // Move farmer to target space (mark as taken, but don't decrement workersAvailable).
     // If the player isn't already present, add a worker ref. We don't remove the
     // worker from its source here because the old semantics treated this as a
@@ -61,6 +61,12 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
     if (!spaceHasPlayer(targetSpace, player.id)) {
       const worker = smallestAvailableWorker(state, player)
       addWorkerRef(targetSpace, player.id, worker?.id ?? '1')
+      eventSink?.emit<'worker.placed'>({
+        type: 'worker.placed',
+        workerId: worker?.id ?? '1',
+        spaceId: targetSpace.id,
+        ...(sourceCard ? { viaCardId: sourceCard } : {}),
+      })
     }
     // Execute the target space's action
     return targetSpace.execute({

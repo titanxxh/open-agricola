@@ -38,6 +38,20 @@ const emitExchange = (context: Parameters<ActionDefinition['execute']>[0]) => {
   })
 }
 
+const historicalMoveEvent: GameEvent = {
+  schemaVersion: 1,
+  id: '99',
+  seq: 99,
+  round: 1,
+  phase: 'work',
+  type: 'resource.moved',
+  visibility: 'public',
+  resources: { wood: 1 },
+  from: { kind: 'supply' },
+  to: { kind: 'player', playerId: 'p1' },
+  reason: 'gain',
+}
+
 describe('engine hook event context', () => {
   afterEach(() => {
     clearActionHooks()
@@ -49,6 +63,8 @@ describe('engine hook event context', () => {
       return { type: 'ok' }
     })
     const state = makeEventTestState()
+    state.events = [historicalMoveEvent]
+    state.nextEventSeq = 100
     const player = state.players[0]!
     const { engine } = makeEventTestEngine([exchange])
     const space = asActionSpace(exchange)
@@ -64,15 +80,18 @@ describe('engine hook event context', () => {
           (event) => (event.gained.wood ?? 0) === 2,
         )
         expect(context.transactionEvents).toHaveLength(1)
+        expect(context.transactionEvents).not.toContain(historicalMoveEvent)
+        expect(context.eventQuery.has('resource.moved')).toBe(false)
         expect('eventSink' in context).toBe(false)
-        expect(context.state.events).toEqual([])
+        expect(context.state.events).toEqual([historicalMoveEvent])
       },
     })
 
     expect(engine.proceed({ state, player, space }).type).toBe('ok')
 
     expect(observed).toBe(true)
-    expect(state.events).toHaveLength(1)
+    expect(state.events).toHaveLength(2)
+    expect(state.events[0]).toBe(historicalMoveEvent)
   })
 
   it('exposes current transaction events to card after listeners without eventSink', () => {
@@ -83,6 +102,8 @@ describe('engine hook event context', () => {
     const state = makeEventTestState()
     const player = state.players[0]!
     player.improvements.push('Test_Event_Query_Card')
+    state.events = [historicalMoveEvent]
+    state.nextEventSeq = 100
     const { engine } = makeEventTestEngine([exchange])
     const space = asActionSpace(exchange)
     const registry = new CardRegistry()
@@ -98,8 +119,10 @@ describe('engine hook event context', () => {
           (event) => event.exchangeSource === 'test-exchange',
         )
         expect(context.transactionEvents).toHaveLength(1)
+        expect(context.transactionEvents).not.toContain(historicalMoveEvent)
+        expect(context.eventQuery.has('resource.moved')).toBe(false)
         expect('eventSink' in context).toBe(false)
-        expect(context.state.events).toEqual([])
+        expect(context.state.events).toEqual([historicalMoveEvent])
       },
     }
     registry.registerListener(listener)
@@ -110,7 +133,7 @@ describe('engine hook event context', () => {
     })
 
     expect(observed).toBe(true)
-    expect(state.events).toEqual([])
+    expect(state.events).toEqual([historicalMoveEvent])
   })
 
   it('exposes current transaction events to computeReplace choice-label previews', () => {

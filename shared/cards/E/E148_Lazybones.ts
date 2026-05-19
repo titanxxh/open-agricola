@@ -79,8 +79,6 @@ const listener: CardListenerRegistration = {
       flow: children.length === 1 ? children[0] : { type: 'seq', children },
       ...(tile
         ? {
-            logKey: 'log.cardEffectGain',
-            logParams: { cardId: CARD_ID, gain: '1 STABLE' },
           }
         : { countCardUse: false }),
       sourceCard: CARD_ID,

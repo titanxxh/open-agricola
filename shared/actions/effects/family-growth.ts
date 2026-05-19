@@ -4,6 +4,7 @@ import type {
   GameState,
   PlayerState,
 } from '../../contract/types'
+import type { EventSink } from '../../contract/events'
 import { getExtraRoomCapacity } from '../../cards/card-effects'
 import { activateSmallestInactive, familySize } from '../../domain/player'
 import { addWorkerRef } from '../../domain/space'
@@ -15,16 +16,22 @@ const growFamilyCore = (
   state: GameState,
   player: PlayerState,
   fgSpaceId: string,
+  eventSink?: EventSink,
 ): ActionExecutionResult => {
   const newborn = activateSmallestInactive(player)
-  if (!newborn) return { type: 'fail', logKey: 'log.familyFull' }
+  if (!newborn) return { type: 'fail', errorKey: 'log.familyFull' }
   const fgSpace = state.actionSpaces.find((s) => s.id === fgSpaceId)
   if (fgSpace) {
     // Push newborn WorkerRef onto the FG space.
     // Deliberately NOT calling recordRoundPlacement — newborns don't count as placements.
     addWorkerRef(fgSpace, player.id, newborn.id)
   }
-  return { type: 'ok', logKey: 'log.familyGrowth' }
+  eventSink?.emit<'worker.placed'>({
+    type: 'worker.placed',
+    workerId: newborn.id,
+    spaceId: fgSpaceId,
+  })
+  return { type: 'ok' }
 }
 
 /**
@@ -45,12 +52,12 @@ export const familyGrowthAction: ActionDefinition = {
     // runs with full actionContext) is the authoritative gate.
     return true
   },
-  execute: ({ state, player, space, actionContext }) => {
+  execute: ({ state, player, space, actionContext, eventSink }) => {
     const skipRoom =
       (actionContext as { skipRoomCheck?: boolean } | undefined)?.skipRoomCheck === true
     if (!skipRoom && effectiveRooms(player) <= familySize(player)) {
-      return { type: 'fail', logKey: 'log.familyGrowthFail' }
+      return { type: 'fail', errorKey: 'log.familyGrowthFail' }
     }
-    return growFamilyCore(state, player, space.id)
+    return growFamilyCore(state, player, space.id, eventSink)
   },
 }

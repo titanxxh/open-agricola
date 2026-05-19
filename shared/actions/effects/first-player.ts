@@ -13,11 +13,11 @@ export const setFirstPlayerAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ state, player }) => {
+  execute: ({ state, player, eventSink }) => {
     setStartPlayer(state, player)
-    state.log.unshift({
-      key: 'log.startPlayer',
-      params: { player: player.name },
+    eventSink?.emit<'startPlayer.changed'>({
+      type: 'startPlayer.changed',
+      playerId: player.id,
     })
     return { type: 'ok' }
   },

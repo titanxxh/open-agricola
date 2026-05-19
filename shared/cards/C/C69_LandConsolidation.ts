@@ -17,26 +17,24 @@ const swapFieldGrainToVegAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ player, params, sourceCard }) => {
+  execute: ({ player, params }) => {
     const row = (params as { row?: number } | undefined)?.row
     const col = (params as { col?: number } | undefined)?.col
     if (row === undefined || col === undefined) {
-      return { type: 'fail', logKey: 'log.actionFail' }
+      return { type: 'fail', errorKey: 'log.actionFail' }
     }
     const field = player.fields.find((f) => f.row === row && f.col === col)
     if (!field || field.stacks.length !== 1) {
-      return { type: 'fail', logKey: 'log.actionFail' }
+      return { type: 'fail', errorKey: 'log.actionFail' }
     }
     const stack = field.stacks[0]
     if (!stack || stack.kind !== 'grain' || stack.remaining !== 3) {
-      return { type: 'fail', logKey: 'log.actionFail' }
+      return { type: 'fail', errorKey: 'log.actionFail' }
     }
     stack.kind = 'vegetable'
     stack.remaining = 1
     return {
       type: 'ok',
-      logKey: 'log.cardEffectGain',
-      logParams: { gain: { vegetable: 1 }, cardId: sourceCard },
     }
   },
 }

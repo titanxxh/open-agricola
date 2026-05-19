@@ -252,23 +252,6 @@ export const executeCardListener = (
   )
 }
 
-const AUTO_LOGGED_CARD_EFFECT_ACTIONS = new Map<string, Set<string>>([
-  ['log.cardEffectGain', new Set(['gain', 'take-from-card'])],
-  ['log.cardEffectBonusVp', new Set(['bonus-vp'])],
-  ['log.cardEffectPay', new Set(['pay'])],
-  ['log.cardEffectOtherPlayersGain', new Set(['gain'])],
-])
-
-export const shouldSkipImmediateListenerLog = (
-  result: Pick<ActionHookResult, 'flow' | 'logKey'> | void,
-): boolean => {
-  if (!result?.logKey || !result.flow || result.flow.type !== 'leaf' || !result.flow.sourceCard) {
-    return false
-  }
-  const actionIds = AUTO_LOGGED_CARD_EFFECT_ACTIONS.get(result.logKey)
-  return actionIds?.has(result.flow.actionId) ?? false
-}
-
 export const getListenerById = (listenerId: string): CardListenerRegistration | undefined => {
   const sessionCtx = getCurrentSessionContext()
   if (sessionCtx) {

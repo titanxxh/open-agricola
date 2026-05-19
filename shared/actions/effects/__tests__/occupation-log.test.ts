@@ -73,8 +73,8 @@ const createPlayer = (overrides?: Partial<PlayerState>): PlayerState =>
     ...overrides,
   }) as PlayerState
 
-describe('occupation immediate logs', () => {
-  it('returns immediateLogs on plain ok without occupationLog scratch data', () => {
+describe('occupation play result', () => {
+  it('plays plain occupation without legacy log payload', () => {
     const player = createPlayer({
       occupationHand: [OK_CARD_ID],
       resources: {
@@ -96,21 +96,11 @@ describe('occupation immediate logs', () => {
 
     expect(result.type).toBe('ok')
     if (result.type !== 'ok') return
-    expect(result.immediateLogs).toEqual([
-      {
-        key: 'log.playOccupation',
-        params: {
-          occupations: OK_CARD_ID,
-          costResources: { food: 1 },
-        },
-      },
-    ])
-    expect(result.logKey).toBeUndefined()
-    expect(result.logParams).toBeUndefined()
-    expect(result.extraData?.occupationLog).toBeUndefined()
+    expect(player.occupationPlayed).toContain(OK_CARD_ID)
+    expect(player.resources.food).toBe(0)
   })
 
-  it('returns immediateLogs on flow without occupationLog scratch data', () => {
+  it('returns flow without legacy log payload', () => {
     const state = createState()
     const player = createPlayer({
       occupationHand: [FLOW_CARD_ID],
@@ -135,16 +125,6 @@ describe('occupation immediate logs', () => {
 
     expect(result.type).toBe('flow')
     if (result.type !== 'flow') return
-    expect(result.immediateLogs).toEqual([
-      {
-        key: 'log.playOccupation',
-        params: {
-          occupations: FLOW_CARD_ID,
-          costResources: { food: 1 },
-          bonusSources: ['D95_SiteManager'],
-        },
-      },
-    ])
-    expect(result.extraData?.occupationLog).toBeUndefined()
+    expect(player.occupationPlayed).toContain(FLOW_CARD_ID)
   })
 })

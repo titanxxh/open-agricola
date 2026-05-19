@@ -8,9 +8,9 @@ export const bonusVpAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ state, player, sourceCard, actionContext }) => {
+  execute: ({ state, player, sourceCard, actionContext, eventSink }) => {
     if (!sourceCard) {
-      return { type: 'fail', logKey: 'log.exchangeFail' }
+      return { type: 'fail', errorKey: 'log.exchangeFail' }
     }
     // Mirror special-effect's targetPlayerId routing: when the card listener
     // owner ≠ actor, accumulate the bonus VP on the owner's cardStates.
@@ -19,10 +19,13 @@ export const bonusVpAction: ActionDefinition = {
       ? state.players.find((p) => p.id === targetId)
       : undefined) ?? player
     incCounter(target, sourceCard, 'bonusVp')
-    return {
-      type: 'ok',
-      logKey: 'log.cardEffectBonusVp',
-      logParams: { cardId: sourceCard },
-    }
+    eventSink?.emit<'card.stateChanged'>({
+      type: 'card.stateChanged',
+      cardId: sourceCard,
+      key: 'bonusVp',
+      value: target.cardStates?.[sourceCard]?.counters?.bonusVp ?? 0,
+      targetPlayerId: target.id,
+    })
+    return { type: 'ok' }
   },
 }

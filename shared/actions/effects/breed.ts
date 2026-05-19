@@ -6,6 +6,7 @@ import type {
   HarvestBreedSummary,
   PlayerState,
 } from '../../contract/types'
+import type { EventSink } from '../../contract/events'
 import { playerBoard, getTotalAnimalCapacity } from '../../domain'
 import { shouldEnforceReorganizeOnLastHarvest } from '../../cards/card-effects'
 
@@ -33,6 +34,7 @@ export const breed = (
   state: GameState,
   player: PlayerState,
   opts: BreedOptions,
+  eventSink?: EventSink,
 ): { breedSummary: HarvestBreedSummary } => {
   const types = opts.animalTypes ?? DEFAULT_TYPES
   let freeCapacity = getTotalAnimalCapacity(player, state)
@@ -45,6 +47,13 @@ export const breed = (
     summary.animalTypes += 1
     summary.animalCount += 1
     freeCapacity -= 1
+  }
+  if (summary.animalCount > 0) {
+    eventSink?.emit<'farm.animalBred'>({
+      type: 'farm.animalBred',
+      animals: summary.resources,
+      source: opts.sourceCard === 'harvest' ? 'harvest' : 'cardEffect',
+    })
   }
   return { breedSummary: summary }
 }
@@ -61,23 +70,16 @@ export const breedAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ state, player, actionContext }): ActionExecutionResult => {
+  execute: ({ state, player, actionContext, eventSink }): ActionExecutionResult => {
     const ctx = (actionContext ?? {}) as BreedActionContext
     const sourceCard = ctx.sourceCard ?? 'unknown'
     const { breedSummary } = breed(state, player, {
       animalTypes: ctx.animalTypes ?? undefined,
       sourceCard,
-    })
+    }, eventSink)
     if (sourceCard === 'harvest') {
       state.harvestBreedSummary ??= {}
       state.harvestBreedSummary[player.id] = breedSummary
-      // Match legacy applyBreedPhase log entry. Skip when no resources bred.
-      if (breedSummary.animalCount > 0) {
-        state.log.unshift({
-          key: 'log.harvestBreedDetail',
-          params: { player: player.name, resources: breedSummary.resources },
-        })
-      }
     }
     const buildReorgRequest = (): ActionExecutionResult => {
       const idx = state.players.indexOf(player)

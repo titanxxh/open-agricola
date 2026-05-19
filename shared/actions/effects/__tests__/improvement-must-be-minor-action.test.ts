@@ -76,7 +76,7 @@ describe('playMinorImprovement — mustBePlayedViaMinorAction', () => {
 
     expect(result.type).toBe('fail')
     if (result.type !== 'fail') return
-    expect(result.logKey).toBe('log.minorImprovementRequiresMinorAction')
+    expect(result.errorKey).toBe('log.minorImprovementRequiresMinorAction')
   })
 
   it('rejects playing D25 with setup context', () => {
@@ -94,7 +94,7 @@ describe('playMinorImprovement — mustBePlayedViaMinorAction', () => {
 
     expect(result.type).toBe('fail')
     if (result.type !== 'fail') return
-    expect(result.logKey).toBe('log.minorImprovementRequiresMinorAction')
+    expect(result.errorKey).toBe('log.minorImprovementRequiresMinorAction')
   })
 
   it('does NOT reject D25 with default minorAction context (guard does not block)', () => {
@@ -114,7 +114,7 @@ describe('playMinorImprovement — mustBePlayedViaMinorAction', () => {
     // The guard-specific rejection must NOT be returned
     const isGuardRejection =
       result.type === 'fail' &&
-      result.logKey === 'log.minorImprovementRequiresMinorAction'
+      result.errorKey === 'log.minorImprovementRequiresMinorAction'
     expect(isGuardRejection).toBe(false)
   })
 })
