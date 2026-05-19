@@ -124,6 +124,7 @@
 | Payment fallback 仍绕过 selected bonus 语义 | `E123_ResourceHoarder`、construct/renovate direct paths | 将 construct/renovate 迁到 pay leaf，或传递 selected bonus index。 |
 | 行动格生命周期建模不足 | `B23_FinalScenario` | 由后端持有 reveal/exclusive-use 机制。 |
 | 选择校验重复且容易泄漏 | `B115`、`B165`、`E71` | 通用 selectableTiles / exact-count / atomic selection helper。 |
+| Log / notification 缺少结构化 provenance | `B21_HayloftBarn`、`B81_Handcart`、`E47_SyrupTap`、`E78_SleightofHand` 等依赖资源来源、支付来源或行动格来源的卡 | 增加独立的结构化 action event/log event 层，再由该层生成 UI log；不要只从最终 state delta 反推。 |
 | 注释里的非阻塞 card-id 示例 | `shared/actions/effects/breed.ts`、`shared/contract/types.ts` 仅把 `A165_PigBreeder` / `D95_SiteManager` 作为例子提到 | 除非附近代码变动，否则保留；它们不是可执行的单卡分支。 |
 | Legacy/fallback 术语残留 | 旧 bad-smell 文档发现的剩余 fallback/direct-path 术语，主要在已迁移支付 flow 和测试中 | 将直接运行时 fallback 视为重构债；测试/baseline 名称除非真实迁移触及，否则不动。 |
 
@@ -140,15 +141,31 @@
 9. 增加共享 lessons action-space id helper，覆盖 `lessons`、`lessons-3`、`lessons-4`。
 10. 为 gain/exchange 结果增加 action-space provenance。
 11. 决定 BGA `implemented=false` data-only 卡是否进入 OA 发牌池。
+12. 增加结构化 action event/log event：记录 eventType、sourceAction、sourceCard、resource movement provenance、payment source、affected board/card ids，并从该层派生 UI log。
 
-## 7. BGA 坏味道：不要照抄
+## 7. Log 系统对比
+
+BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责玩家可见 gamelog 和客户端状态/动画通知；`Helpers/Log.php` 负责数据库变更、checkpoint/step/engine 边界、undo 后取消旧 gamelog packet 并发 `clearTurn` / `refreshUI` / `refreshHand`。OA 当前主要是 `GameState.log` 的 i18n key + params，可见日志由 `ActionLog` / `LogPanel` 渲染；规则状态同步仍靠后端 state snapshot，log 不是独立事件流。
+
+| 维度 | BGA | OA | 差距 |
+|---|---|---|---|
+| 生命周期事件 | `startNewTurn`、`revealActionCard`、`accumulate`、`startWork`、`startReturnHome`、`startHarvest*` 等都有 notification type 和结构化 payload。 | 有 `log.enterRound`、`log.harvest*`、`log.placeFarmer` 等可见 log。 | OA 对 reveal、accumulation、return-home 等事件的结构化记录较少，`B23_FinalScenario` 这类依赖行动卡 reveal/exclusive-use 的卡缺少可审计事件。 |
+| 行动和资源移动 | BGA 区分 `collectResources`、`gainResources`、`receiveResource(s)`、`receiveRoundResource`、`exchange`、`breed`，payload 包含 resources、source、sourceInfo、space/location/card。 | OA 常用 `log.actionDetail` 从前后 player snapshot 聚合 gains/costs/effects，部分 card effect 写 `logKey` / `immediateLogs`。 | 资源“从哪里来、从哪个行动格/卡/田/玩家来”不稳定，影响 `B21_HayloftBarn`、`B81_Handcart`、`E47_SyrupTap`、`E78_SleightofHand` 等卡的行为审计和 UI 解释。 |
+| 支付记录 | BGA `payResources` / `payResourcesTo` / `payWithCard` / `payResourcesFromFields` / `payResourcesFromCards` 会记录 source、cardSources、field/card 来源和接收玩家。 | OA 部分支付路径有 `resourcesPaid`、`costResources`、`sourceCards`，但 legacy/direct path 仍会丢 selected bonus 或来源。 | 支付 provenance 不统一，`E123_ResourceHoarder` 这类依赖 bonus choice/payment source 的卡仍有 fallback 风险。 |
+| 卡牌状态和 UI 标记 | BGA 有 `updateCardStats`、`placeInfobox`、`updateInfobox`、`markUsableExchange`、`populateCardCache`、`refreshHand` 等通知。 | OA 有 `player.cardStates`、card refs hover 和部分 log 文案；UI 主要从 state 渲染。 | card state 变更没有统一的可见/可审计事件层，调试计数器、infobox、可用 exchange 标记时不如 BGA 清楚。 |
+| 私有/公开通知 | BGA 显式区分 `notifyAll` 和 `notify($player, ...)`，手牌、draft、living-hand 等只发给目标玩家。 | OA 通过 snapshot/privacy 处理可见数据，`state.log` 基本是公共时间线。 | 私有 prompt/手牌类事件不进入独立 per-recipient log；如果后续要复盘或旁观，需要额外事件模型。 |
+| undo / replay | BGA undo 会回滚 DB 变更，按 `snapshot_packet_id` 或 move id 取消 gamelog packet，并通知客户端清除旧 turn log。 | OA 有 session state/history，但可见 `state.log` 没有 canceled packet / archived log 语义。 | undo 后日志可追溯性弱于 BGA；当前不一定阻塞卡牌对齐，但会影响调试、复盘和多人同步解释。 |
+
+结论：不要照抄 BGA 把 notification 当规则源的做法；OA 应保持后端 state 权威。但需要补一个比 `GameState.log` 更底层的结构化事件层：规则执行时记录事件，再由事件派生 UI log、动画提示、审计报告和未来 replay。这样可以同时解决本轮多张卡暴露的 provenance 缺口，而不是继续在单卡里重复补 `logKey` / `immediateLogs`。
+
+## 8. BGA 坏味道：不要照抄
 
 - 中心化 `SpecialEffect.js` cardId dispatch 和单卡 JS 方法。OA 应保留 typed pending/action flow。
 - BGA 在 action/main path 中出现卡名或一次性逻辑，例如全局 Scythe-style flag 或 C88 stable/fence cost relocation。OA 应优先使用卡牌本地 hooks/helpers。
 - BGA mutable PHP args 和原地 cost rewrite。OA 应保留结构化 modifiers 和 payment enumeration。
 - BGA 平台状态字段如 `banned`、`implemented` 不应自动驱动 OA 产品行为。
 
-## 8. BGA 使用 Special Effect 的卡牌
+## 9. BGA 使用 Special Effect 的卡牌
 
 | Deck | 卡牌 |
 |---|---|
@@ -158,7 +175,7 @@
 | D | `D101_SugarBaker`, `D102_SampleStableMaker`, `D103_CanalBoatman`, `D107_Bellfounder`, `D10_StorksNest`, `D116_TreeInspector`, `D124_Emissary`, `D126_FieldCultivator`, `D127_HardworkingMan`, `D129_LumberVirtuoso`, `D132_HideFarmer`, `D134_OysterEater`, `D137_TradeTeacher`, `D138_PetLover`, `D14_HammerCrusher`, `D150_GodlySpouse`, `D157_PartyOrganizer`, `D158_BeanCounter`, `D161_CabbageBuyer`, `D167_PureBreeder`, `D20_TurnwrestPlow`, `D22_WorkPermit`, `D23_PioneeringSpirit`, `D26_CarpentersYard`, `D27_Retraining`, `D51_Archway`, `D66_PotterCeramics`, `D70_StrawManure`, `D71_Changeover`, `D72_StableManure`, `D74_RoyalWood`, `D82_HuntingTrophy`, `D92_ChildOmbudsman`, `D93_SheepInspector`, `D94_HenpeckedHusband`, `D96_Furnisher`, `D98_Transactor` |
 | E | `E103_Wolf`, `E106_EmergencySeller`, `E10_StrawHat`, `E112_GrainThief`, `E123_ResourceHoarder`, `E125_DelayedWayfarer`, `E134_Omnifarmer`, `E148_Lazybones`, `E162_Entrepreneur`, `E166_Roastmaster`, `E167_DairyCrier`, `E22_GuestRoom`, `E27_PiggyBank`, `E4_Thunderbolt`, `E51_WhaleOil`, `E52_Cubbyhole`, `E53_BoarSpear`, `E58_LunchtimeBeer`, `E5_NightLoot`, `E71_CowPatty`, `E73_Scythe`, `E74_AshTrees`, `E76_LumberPile`, `E78_SleightofHand`, `E81_AlchemistsLab`, `E83_ShepherdsWhistle`, `E85_MasterTanner`, `E86_PenBuilder` |
 
-## 9. Hook 点清单
+## 10. Hook 点清单
 
 下表从 `shared/cards/A-E` 机械抽取。`$dynamic` 表示 action id 来自本地常量/表达式，重构前需要回到对应卡牌文件确认。
 
@@ -316,7 +333,7 @@
 | specialKind | `swap-improvement-with-board` | `D27_Retraining` |
 | specialKind | `vegetable` | `A113_HeresyTeacher` |
 
-## 10. 源码排除项
+## 11. 源码排除项
 
 | 来源 | 原因 |
 |---|---|
@@ -326,7 +343,7 @@
 | `E132_Shearer` | `E132_VeggieLover` 的 BGA legacy 源文件。 |
 | BGA `implemented=false` 且无运行时行为的卡牌 | 除非 OA 明确作为产品扩展实现，否则排除出行为对齐范围。 |
 
-## 11. 单卡附录
+## 12. 单卡附录
 
 状态值：`已对齐`、`已接受差异`、`需复核`、`排除`。
 
