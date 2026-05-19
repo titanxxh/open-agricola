@@ -32,6 +32,10 @@ export const B145_BrushwoodCollector = new Occupation({
       type: 'trade',
       cardId: CARD_ID,
       appliesTo: ['construct'],
+      // scope:'unit' — BGA `onPlayerComputeCostsConstruct` adds one alternative
+      // `addCost` trade per existing baseline trade per room. Σ-times ≤ nb
+      // bounds the substitution to one wood-for-reed swap per room.
+      scope: 'unit',
       from: { wood: 1 },
       to: { reed: 2 },
     },
@@ -39,6 +43,10 @@ export const B145_BrushwoodCollector = new Occupation({
       type: 'trade',
       cardId: CARD_ID,
       appliesTo: ['renovation'],
+      // Renovation reed total is normally 1 (or 2 with Trowel); BGA uses
+      // `addFees` (whole-cost replacement, one-shot) → maps to scope:'action'
+      // default. Trade.max defaults to 1 for action-scope under
+      // applyCostModifiers.
       from: { wood: 1 },
       to: { reed: 1 },
     },
