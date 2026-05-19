@@ -49,13 +49,9 @@ export const getModifiersForCostType = (
   costType: CostModifierType,
 ): CostModifier[] => {
   const all = player.activeModifiers?.filter((m) => m.appliesTo.includes(costType)) ?? []
-  // The `construct` cost type evaluates conditions inside `room-payment.ts`
-  // (per-build, with access to `roomCount`). Other cost types evaluate the
-  // player-only checks here, uniformly for both BonusModifier and
-  // TradeModifier (the latter gained `conditions` to support D15_ClaySupports
-  // and friends).
-  if (costType === 'construct') return all
-  return all.filter((m) => evaluateConditions(player, m.conditions))
+  // Layer 1 only: static player-state checks (houseType*). minNumRooms is
+  // deferred to evaluateConditions(_, _, nb) inside enumerate.
+  return all.filter((m) => evaluateStaticConditions(player, m.conditions))
 }
 
 export const applyCostModifiers = (
