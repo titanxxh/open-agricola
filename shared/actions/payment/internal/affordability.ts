@@ -57,6 +57,8 @@ export const isComplexCost = (
     'fees' in cost ||
     'trades' in cost ||
     'cards' in cost ||
-    'bonuses' in cost
+    'bonuses' in cost ||
+    'unitFee' in cost ||
+    'nb' in cost
   )
 }

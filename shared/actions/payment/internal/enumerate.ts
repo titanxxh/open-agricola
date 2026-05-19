@@ -568,14 +568,13 @@ export const computeAllBuyableCombinations = (
 
 export const canPayCost = (
   player: PlayerState,
-  cost: ComplexCost | Partial<Resource>,
+  cost: Partial<Resource> | ComplexCost,
   costType?: CostModifierType,
 ): boolean => {
-  if (!isComplexCost(cost)) {
+  // Fast path: simple cost, no modifier injection
+  if (!isComplexCost(cost) && !costType) {
     return canPayResources(player, cost as Partial<Resource>)
   }
-
-  const complexCost = cost as ComplexCost
-  const solutions = computeAllBuyableCombinations(player, complexCost, undefined, costType)
-  return solutions.length > 0
+  const complex: ComplexCost = isComplexCost(cost) ? cost : { fee: cost as Partial<Resource> }
+  return computeAllBuyableCombinations(player, complex, undefined, costType).length > 0
 }

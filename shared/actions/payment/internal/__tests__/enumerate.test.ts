@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeAllBuyableCombinations } from '../enumerate'
+import { canPayCost, computeAllBuyableCombinations } from '../enumerate'
 import type { PaymentSolution, PlayerState, Resource } from '../../../../contract/types'
 
 const nonZeroPaid = (sol: PaymentSolution): Partial<Resource> => {
@@ -120,5 +120,21 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
     // nb=2: with discount, fee = (4-2) reed + 10 wood = 2 reed + 10 wood
     expect(sols2[0]?.resourcesPaid.reed).toBe(2)
     expect(sols2[0]?.resourcesPaid.wood).toBe(10)
+  })
+})
+
+describe('canPayCost — costType parameter', () => {
+  it('fast path: simple Partial<Resource> + no costType → canPayResources', () => {
+    expect(canPayCost(baseTestPlayer({ wood: 5 }), { wood: 5 })).toBe(true)
+    expect(canPayCost(baseTestPlayer({ wood: 4 }), { wood: 5 })).toBe(false)
+  })
+  it('with costType: wraps Partial<Resource> into ComplexCost', () => {
+    expect(canPayCost(baseTestPlayer({ wood: 5 }), { wood: 5 }, 'plow')).toBe(true)
+  })
+  it('with ComplexCost: routes through enumerate', () => {
+    expect(canPayCost(
+      baseTestPlayer({ wood: 15, reed: 6 }),
+      { unitFee: { reed: 2, wood: 5 }, nb: 3 },
+    )).toBe(true)
   })
 })
