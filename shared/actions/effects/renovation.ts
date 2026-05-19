@@ -82,7 +82,10 @@ const mergeRenovationCost = (
   // costOverride is a per-action delta against the TOTAL cost, matching the
   // legacy semantic where pre-spec baseCost was the pre-multiplied
   // {[material]: rooms, reed: 1} and override modified that total. It lands
-  // in fees[0]; unitFee × nb stays the BGA-aligned per-room cost.
+  // in fees[0]; unitFee × nb stays the BGA-aligned per-room cost. Negative
+  // entries (e.g. D154 ChimneySweep `stone: -2`) remain in fees[0]; enumerate
+  // clamps the merged baseFee at the affordability stage so wood→clay (no
+  // stone in unitFee) doesn't credit a refund on the unrelated resource.
   return {
     ...baseCost,
     fees: [mergeResources(baseCost.fees?.[0] ?? {}, costOverride)],
