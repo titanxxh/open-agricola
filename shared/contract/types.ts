@@ -1,4 +1,5 @@
 import type { PromptKey } from './prompt-keys'
+import type { GameEvent } from './events'
 
 export type Resource = {
   wood: number
@@ -341,6 +342,8 @@ export type GameState = {
   players: PlayerState[]
   actionSpaces: ActionSpace[]
   log: LogEntry[]
+  events: GameEvent[]
+  nextEventSeq: number
   roundStartSnapshot: GameState | null
   roundActionOrder: (string | null)[]
   gameSeed: number
