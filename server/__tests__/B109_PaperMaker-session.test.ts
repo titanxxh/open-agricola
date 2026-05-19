@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import '../../shared/cards/A/A123_FrameBuilder'
+import '../../shared/cards-display/A/A123_FrameBuilder'
 import '../../shared/cards/B/B109_PaperMaker'
 
 const setup = () => {

@@ -4,7 +4,7 @@ import { A28_ForestSchool as A28Card } from '../../shared/cards-display/A/A28_Fo
 
 import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import '../../shared/cards/A/A28_ForestSchool'
-import '../../shared/cards/A/A123_FrameBuilder'
+import '../../shared/cards-display/A/A123_FrameBuilder'
 
 const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`
 
