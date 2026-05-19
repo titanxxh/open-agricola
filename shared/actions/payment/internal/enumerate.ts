@@ -391,7 +391,22 @@ export const computeAllBuyableCombinations = (
     : effectiveCost.fee
       ? [effectiveCost.fee]
       : [{}]
-  const baseFees: Partial<Resource>[] = baseFeesRaw.map((fee) => mergeResources(fee, unitFeeContribution))
+  // Clamp negative resource entries to 0 after merging fees + unitFee*nb.
+  // Negative deltas (e.g. D154_ChimneySweep `costs: { stone: -2 }`) cancel
+  // against the matching positive amount in unitFee×nb. They MUST NOT remain
+  // negative — otherwise canCoverCost / resourcesPaid leak a phantom refund
+  // on resources the player isn't actually paying (per spec §6.2 trace).
+  const clampNonNegative = (fee: Partial<Resource>): Partial<Resource> => {
+    const out: Partial<Resource> = {}
+    for (const [k, v] of Object.entries(fee)) {
+      const value = v ?? 0
+      if (value > 0) out[k as keyof Resource] = value
+    }
+    return out
+  }
+  const baseFees: Partial<Resource>[] = baseFeesRaw.map((fee) =>
+    clampNonNegative(mergeResources(fee, unitFeeContribution)),
+  )
 
   for (const bonus of effectiveCost.bonuses ?? []) {
     validateBonus(bonus)
