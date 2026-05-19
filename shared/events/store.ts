@@ -1,6 +1,12 @@
 import type { DraftGameEvent, EventSink, GameEvent } from '../contract/events'
 import type { GameState } from '../contract/types'
-import { assertEventSizeUnderLimit, assertJsonSafeEvent, assertPublicGameEvent } from './guards'
+import {
+  assertEventSizeUnderLimit,
+  assertGameEventEnvelope,
+  assertJsonSafeEvent,
+  assertKnownGameEventShape,
+  assertPublicGameEvent,
+} from './guards'
 
 export type EventEnvelopeContext = {
   actorPlayerId?: string
@@ -86,7 +92,9 @@ export class EventStore {
       this.rollbackTransaction()
       return
     }
-    this.transactionEvents = snapshot.transactionEvents.map((event) => ({ ...event }))
+    const restoredEvents = snapshot.transactionEvents.map((event) => ({ ...event }))
+    restoredEvents.forEach(validateGameEvent)
+    this.transactionEvents = restoredEvents
     this.inTransaction = true
     this.transactionToken += 1
   }
@@ -157,9 +165,15 @@ export class EventStore {
     Object.entries(envelope).forEach(([key, value]) => {
       if (value !== undefined) event[key] = value
     })
-    assertPublicGameEvent(event)
-    assertJsonSafeEvent(event)
-    assertEventSizeUnderLimit(event, 4096)
+    validateGameEvent(event)
     return event as GameEvent
   }
+}
+
+const validateGameEvent = (event: unknown): void => {
+  assertGameEventEnvelope(event)
+  assertKnownGameEventShape(event)
+  assertPublicGameEvent(event)
+  assertJsonSafeEvent(event)
+  assertEventSizeUnderLimit(event, 4096)
 }

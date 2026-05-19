@@ -1,37 +1,39 @@
-import type { GameEvent } from '../contract/events'
+import type { DraftGameEvent, GameEvent } from '../contract/events'
 
 export type EventQuery = {
-  has<T extends GameEvent['type']>(
+  has<T extends QueryableGameEvent['type']>(
     type: T,
-    predicate?: (event: Extract<GameEvent, { type: T }>) => boolean,
+    predicate?: (event: Extract<QueryableGameEvent, { type: T }>) => boolean,
   ): boolean
-  find<T extends GameEvent['type']>(
+  find<T extends QueryableGameEvent['type']>(
     type: T,
-    predicate?: (event: Extract<GameEvent, { type: T }>) => boolean,
-  ): Extract<GameEvent, { type: T }> | undefined
-  filter<T extends GameEvent['type']>(
+    predicate?: (event: Extract<QueryableGameEvent, { type: T }>) => boolean,
+  ): Extract<QueryableGameEvent, { type: T }> | undefined
+  filter<T extends QueryableGameEvent['type']>(
     type: T,
-    predicate?: (event: Extract<GameEvent, { type: T }>) => boolean,
-  ): Extract<GameEvent, { type: T }>[]
+    predicate?: (event: Extract<QueryableGameEvent, { type: T }>) => boolean,
+  ): Extract<QueryableGameEvent, { type: T }>[]
 }
 
-export const createEventQuery = (events: readonly GameEvent[]): EventQuery => {
-  const find = <T extends GameEvent['type']>(
+export type QueryableGameEvent = GameEvent | DraftGameEvent
+
+export const createEventQuery = (events: readonly QueryableGameEvent[]): EventQuery => {
+  const find = <T extends QueryableGameEvent['type']>(
     type: T,
-    predicate?: (event: Extract<GameEvent, { type: T }>) => boolean,
-  ): Extract<GameEvent, { type: T }> | undefined =>
-    events.find((event): event is Extract<GameEvent, { type: T }> => {
+    predicate?: (event: Extract<QueryableGameEvent, { type: T }>) => boolean,
+  ): Extract<QueryableGameEvent, { type: T }> | undefined =>
+    events.find((event): event is Extract<QueryableGameEvent, { type: T }> => {
       if (event.type !== type) return false
-      return predicate ? predicate(event as Extract<GameEvent, { type: T }>) : true
+      return predicate ? predicate(event as Extract<QueryableGameEvent, { type: T }>) : true
     })
 
-  const filter = <T extends GameEvent['type']>(
+  const filter = <T extends QueryableGameEvent['type']>(
     type: T,
-    predicate?: (event: Extract<GameEvent, { type: T }>) => boolean,
-  ): Extract<GameEvent, { type: T }>[] =>
-    events.filter((event): event is Extract<GameEvent, { type: T }> => {
+    predicate?: (event: Extract<QueryableGameEvent, { type: T }>) => boolean,
+  ): Extract<QueryableGameEvent, { type: T }>[] =>
+    events.filter((event): event is Extract<QueryableGameEvent, { type: T }> => {
       if (event.type !== type) return false
-      return predicate ? predicate(event as Extract<GameEvent, { type: T }>) : true
+      return predicate ? predicate(event as Extract<QueryableGameEvent, { type: T }>) : true
     })
 
   return {

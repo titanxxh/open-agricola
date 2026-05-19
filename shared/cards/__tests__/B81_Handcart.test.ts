@@ -112,8 +112,12 @@ describe('B81_Handcart', () => {
       amount: 1,
     })
 
+    const woodSpace = state.actionSpaces.find((entry) => entry.id === 'wood-accumulation')!
+    const woodBefore = woodSpace.resources.wood
     const result = executeFlowLeaf(state, player, xor.children[0])
     expect(result.type).toBe('ok')
+    expect(player.resources.wood).toBe(1)
+    expect(woodSpace.resources.wood).toBe(woodBefore - 1)
     expect(state.events).toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: 'resource.moved',

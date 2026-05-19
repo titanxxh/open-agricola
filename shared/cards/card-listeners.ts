@@ -3,13 +3,13 @@ import { runActionHooks, type ActionHookContext, type ActionHookPhase, type Acti
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
 import { exchangeToTrade } from '../actions/effects/exchange'
-import type { GameEvent } from '../contract/events'
+import type { DraftGameEvent, GameEvent } from '../contract/events'
 import { createEventQuery, type EventQuery } from '../events/query'
 
 export type CardListenerContext = ActionExecutionContext & {
   actionId: string
   phase: ActionHookPhase
-  transactionEvents: readonly GameEvent[]
+  transactionEvents: readonly (GameEvent | DraftGameEvent)[]
   eventQuery: EventQuery
   result?: ActionExecutionResult
   choice?: string

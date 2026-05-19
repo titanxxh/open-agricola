@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
-import type { ActionSpace, ComplexCost, GameState, PlayerState, Resource } from '../../shared/contract/types'
+import type { ActionSpace, ComplexCost, CostModifierType, GameState, PlayerState, Resource } from '../../shared/contract/types'
 import { payAction } from '../../shared/actions/effects/pay'
 import { Engine } from '../../shared/engine/engine'
 import { HookDispatcher } from '../../shared/engine/dispatcher'
@@ -67,13 +67,19 @@ const mkState = (player: PlayerState): GameState => ({
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)!
 
-const payWithEngine = (state: GameState, player: PlayerState, cost: ComplexCost, pick: (options: NonNullable<ReturnType<Engine['proceed']>['choice']>['options']) => string) => {
+const payWithEngine = (
+  state: GameState,
+  player: PlayerState,
+  cost: ComplexCost,
+  pick: (options: NonNullable<ReturnType<Engine['proceed']>['choice']>['options']) => string,
+  costType: CostModifierType = 'construct',
+) => {
   const registry = new ActionRegistry()
   registry.register(payAction)
   const engine = new Engine({
     tree: new EngineTree(new ActionNode('pay-e123', 'pay', CARD_ID, {
       cost,
-      costType: 'construct',
+      costType,
       optionPrefix: 'pay:e123',
     })),
     registry,
@@ -247,6 +253,9 @@ describe('E123_ResourceHoarder use-top-k (BGA full)', () => {
       expect.objectContaining({
         type: 'resource.paid',
         sourceCardId: CARD_ID,
+        resources: { wood: 1, clay: 1 },
+        paymentFor: 'construct',
+        bonusSources: [CARD_ID],
         bonusChoiceIndex: { [CARD_ID]: 2 },
         paymentSources: expect.arrayContaining([
           expect.objectContaining({
@@ -254,6 +263,47 @@ describe('E123_ResourceHoarder use-top-k (BGA full)', () => {
             resources: expect.any(Object),
           }),
         ]),
+      }),
+    ]))
+  })
+
+  it('renovation pay event keeps bonusChoiceIndex and bonus sources', () => {
+    const player = createPlayer({
+      resources: { ...emptyResources(), clay: 2, reed: 1 },
+      occupationPlayed: [CARD_ID],
+      cardStates: { [CARD_ID]: { stack: ['clay'] } },
+    })
+    const state = mkState(player)
+    const cost: ComplexCost = {
+      fee: { clay: 2, reed: 1 },
+      bonuses: [{
+        sources: [CARD_ID],
+        optional: false,
+        choices: [
+          { discount: {} },
+          { discount: { clay: 1 } },
+        ],
+      }],
+    }
+
+    const result = payWithEngine(state, player, cost, (options) => {
+      const option = options.find((entry) => {
+        const paid = (entry.labelParams as { resourcesPaid?: Partial<Resource> } | undefined)?.resourcesPaid
+        return paid?.clay === 1 && paid?.reed === 1
+      })
+      expect(option).toBeDefined()
+      return option!.value
+    }, 'renovation')
+
+    expect(result.type).toBe('ok')
+    expect(state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.paid',
+        sourceCardId: CARD_ID,
+        resources: { clay: 1, reed: 1 },
+        paymentFor: 'renovation',
+        bonusSources: [CARD_ID],
+        bonusChoiceIndex: { [CARD_ID]: 1 },
       }),
     ]))
   })

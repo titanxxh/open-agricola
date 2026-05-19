@@ -6,6 +6,7 @@ import {
   isCardFlagged,
 } from '../../../cards/helpers/card-state'
 import type { ActionExecutionContext, PlayerState, Resource, GameState, ActionSpace } from '../../../contract/types'
+import type { DraftGameEvent, EventSink } from '../../../contract/events'
 
 const makePlayer = (): PlayerState => ({
   id: 'p1', name: 'P1', color: 'red',
@@ -38,6 +39,15 @@ const makeCtx = (
 
 const CARD_ID = 'TEST_CARD'
 
+const makeEventSink = (events: DraftGameEvent[]): EventSink => ({
+  emit: (event) => {
+    events.push(event)
+  },
+  emitMany: (nextEvents) => {
+    events.push(...nextEvents)
+  },
+})
+
 describe('specialEffectAction — mutation dispatcher', () => {
   it('increment-extra-data: adds to existing counter, init from 0', () => {
     const player = makePlayer()
@@ -64,6 +74,30 @@ describe('specialEffectAction — mutation dispatcher', () => {
       makeCtx(player, { kind: 'set-extra-data', key: 'foo', value: { nested: 1 } }, CARD_ID),
     )
     expect(readCardExtraData(player, CARD_ID, 'foo')).toEqual({ nested: 1 })
+  })
+
+  it('set-extra-data: emits public literal state changes only', () => {
+    const player = makePlayer()
+    const events: DraftGameEvent[] = []
+    specialEffectAction.execute({
+      ...makeCtx(player, { kind: 'set-extra-data', key: 'foo', value: 'hello' }, CARD_ID),
+      eventSink: makeEventSink(events),
+    })
+    specialEffectAction.execute({
+      ...makeCtx(player, { kind: 'set-extra-data', key: 'foo', value: { privateHand: ['E1'] } }, CARD_ID),
+      eventSink: makeEventSink(events),
+    })
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'card.stateChanged',
+        sourceCardId: CARD_ID,
+        cardId: CARD_ID,
+        key: 'foo',
+        value: 'hello',
+      }),
+    ])
+    expect(readCardExtraData(player, CARD_ID, 'foo')).toEqual({ privateHand: ['E1'] })
   })
 
   it('set-flag: toggles card flag both ways', () => {

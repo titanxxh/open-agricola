@@ -9,7 +9,7 @@ import type {
   Trade,
   ResourceKey,
 } from '../../contract/types'
-import type { EventSink } from '../../contract/events'
+import type { DraftGameEvent, EventSink } from '../../contract/events'
 // PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
 // the new payment module. Other helpers (preview-cost / typed-flat /
 // room-payment / cost-modifier internals) remain on the shim through S3.
@@ -58,13 +58,13 @@ const emitResourceExchanged = (
   player: PlayerState,
   trade: Trade,
   times: number,
-) => {
-  if (times <= 0) return
+): DraftGameEvent<'resource.exchanged'> | undefined => {
+  if (times <= 0) return undefined
   const paid = scaleResources(trade.from, times)
   const gained = scaleResources(trade.to, times)
-  if (Object.keys(paid).length === 0 && Object.keys(gained).length === 0) return
+  if (Object.keys(paid).length === 0 && Object.keys(gained).length === 0) return undefined
   const exchangeSource = trade.sourceId ?? trade.source
-  eventSink?.emit<'resource.exchanged'>({
+  const event: DraftGameEvent<'resource.exchanged'> = {
     type: 'resource.exchanged',
     paid,
     gained,
@@ -74,7 +74,9 @@ const emitResourceExchanged = (
     gainedTo: { kind: 'player', playerId: player.id },
     ...(exchangeSource ? { exchangeSource } : {}),
     times,
-  })
+  }
+  eventSink?.emit<'resource.exchanged'>(event)
+  return event
 }
 
 const readDirectTrade = (actionContext: Record<string, unknown> | undefined): Trade | undefined => {
@@ -152,6 +154,7 @@ export const dispatchTradeAppliedListener = (
   trade: Trade,
   times: number,
   eventSink?: EventSink,
+  transactionEvents: readonly DraftGameEvent[] = [],
 ): void => {
   if (times <= 0) return
   const sourceId = trade.sourceId ?? trade.source ?? null
@@ -164,6 +167,7 @@ export const dispatchTradeAppliedListener = (
     actionId: 'trade-applied',
     phase: 'immediatelyAfter',
     extraData: { sourceId, times },
+    transactionEvents,
   })
   executeImmediateSpecialEffectFlows({ state, player, space, eventSink, results })
 }
@@ -472,8 +476,15 @@ const resolveExchangeChoice = (
             trade.sourceId ?? trade.source ?? 'unknown',
           )
         }
-        emitResourceExchanged(eventSink, player, trade, times)
-        dispatchTradeAppliedListener(state, player, trade, times, eventSink)
+        const exchangeEvent = emitResourceExchanged(eventSink, player, trade, times)
+        dispatchTradeAppliedListener(
+          state,
+          player,
+          trade,
+          times,
+          eventSink,
+          exchangeEvent ? [exchangeEvent] : [],
+        )
         paid = mergePositiveResources(paid, scaleResources(trade.from, times))
         gained = mergePositiveResources(gained, scaleResources(trade.to, times))
       }
@@ -501,8 +512,15 @@ const resolveExchangeChoice = (
           trade.sourceId ?? trade.source ?? 'unknown',
         )
       }
-      emitResourceExchanged(eventSink, player, trade, times)
-      dispatchTradeAppliedListener(state, player, trade, times, eventSink)
+      const exchangeEvent = emitResourceExchanged(eventSink, player, trade, times)
+      dispatchTradeAppliedListener(
+        state,
+        player,
+        trade,
+        times,
+        eventSink,
+        exchangeEvent ? [exchangeEvent] : [],
+      )
     }
     const gained = times > 0 ? scaleResources(trade.to, times) : {}
     const paid = times > 0 ? scaleResources(trade.from, times) : {}
@@ -545,8 +563,15 @@ export const anytimeExchangeAction: ActionDefinition = {
           directTrade.sourceId ?? directTrade.source ?? 'unknown',
         )
       }
-      emitResourceExchanged(eventSink, player, directTrade, 1)
-      dispatchTradeAppliedListener(state, player, directTrade, 1, eventSink)
+      const exchangeEvent = emitResourceExchanged(eventSink, player, directTrade, 1)
+      dispatchTradeAppliedListener(
+        state,
+        player,
+        directTrade,
+        1,
+        eventSink,
+        exchangeEvent ? [exchangeEvent] : [],
+      )
       const gained = scaleResources(directTrade.to, 1)
       const paid = scaleResources(directTrade.from, 1)
       trackWorkPhaseBuildingResources(state, player.id, gained)
