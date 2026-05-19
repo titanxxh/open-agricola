@@ -14,6 +14,7 @@ import {
   getRegisteredCardListeners,
   type CardListenerContext,
 } from '../../cards/card-listeners'
+import { createEventQuery } from '../../events/query'
 import type { ActionHookPhase } from '../hooks'
 
 const getPositiveResourceLog = (
@@ -140,8 +141,10 @@ export const applyOccupationPlayAction: ActionDefinition = {
       space: { id: '' } as never,
       actionId: 'play-occupation',
       phase: 'after' as ActionHookPhase,
+      transactionEvents: [],
+      eventQuery: createEventQuery([]),
       choice: occupationId,
-    } as CardListenerContext
+    }
     for (const reg of getRegisteredCardListeners()) {
       if (!reg.cardIds || !reg.cardIds.includes(occupationId)) continue
       if (reg.actions && !reg.actions.includes('play-occupation')) continue

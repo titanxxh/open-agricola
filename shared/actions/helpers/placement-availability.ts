@@ -5,7 +5,7 @@ import type {
   PlayerState,
   Resource,
 } from '../../contract/types'
-import type { CardListenerContext } from '../../cards/card-listeners'
+import type { CardListenerContextInput } from '../../cards/card-listeners'
 import { isSpaceOccupied } from '../../domain/space'
 import { getMatchingListeners, executeCardListener } from '../../cards/card-listeners'
 import { runActionHooks } from '../hooks'
@@ -44,7 +44,7 @@ export function computeAllowedPlacementSpaces(
   }
 
   const actionResults = runActionHooks({ ...context, phase: 'computeArgs' })
-  const listenerContext: CardListenerContext = { ...context, phase: 'computeArgs' }
+  const listenerContext: CardListenerContextInput = { ...context, phase: 'computeArgs' }
   const matched = getMatchingListeners(listenerContext)
   const listenerResults = matched
     .map(entry =>

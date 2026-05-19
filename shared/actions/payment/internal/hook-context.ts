@@ -8,13 +8,13 @@
  */
 
 import type { ActionSpace, GameState, PlayerState, Resource } from '../../../contract/types'
-import type { CardListenerContext } from '../../../cards/card-listeners'
+import type { CardListenerContextInput } from '../../../cards/card-listeners'
 
 export const buildCardCostListenerContext = (
   state: GameState,
   player: PlayerState,
   actionId: string,
-): CardListenerContext => {
+): CardListenerContextInput => {
   const emptySpace: ActionSpace = {
     id: '',
     nameKey: '',

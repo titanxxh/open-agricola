@@ -43,6 +43,7 @@ import {
 import { withInjectedAnytimeResultFlag } from './action-context-flags'
 import { eventsToLogEntries } from '../events/log-mapper'
 import type { GameEvent } from '../contract/events'
+import { createEventQuery } from '../events/query'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
@@ -93,6 +94,14 @@ const ensureEventState = (state: EngineContext['state']): void => {
   state.nextEventSeq ??= 1
 }
 
+const currentEventReadContext = (int: EngineInternals) => {
+  const transactionEvents = [...int.events.currentTransactionEvents()]
+  return {
+    transactionEvents,
+    eventQuery: createEventQuery(transactionEvents),
+  }
+}
+
 const commitIfEngineComplete = (
   int: EngineInternals,
   context: EngineContext,
@@ -125,7 +134,12 @@ const triggerSelectEvaluationOptions = (
   context: ActionExecutionContext,
 ): TriggerSelectEvaluationOptions => ({
   canContinueWithoutTriggers: (actionId, resources) =>
-    canActionContinueWithoutBeforeTriggers(int, context, actionId, resources),
+    canActionContinueWithoutBeforeTriggers(
+      int,
+      { ...context, ...currentEventReadContext(int) },
+      actionId,
+      resources,
+    ),
   canReachContinuationThroughTriggers: (actionId, resources) => {
     const action = int.registry.get(actionId)
     if (!action) return false
@@ -139,7 +153,7 @@ const triggerSelectEvaluationOptions = (
       },
     )
     return int.hooks.applyIsDoable(
-      { ...scopedContext, actionId },
+      { ...scopedContext, ...currentEventReadContext(int), actionId },
       action,
       directDoable,
     )
@@ -263,7 +277,11 @@ export function engineResolveChoice(
       }
       if (node instanceof ParallelNode && node.mode === 'trigger-select') {
         node.clearPending()
-        const offered = evaluateTriggerSelect(node, context, triggerSelectEvaluationOptions(int, context)).options
+        const offered = evaluateTriggerSelect(
+          node,
+          { ...context, ...currentEventReadContext(int) },
+          triggerSelectEvaluationOptions(int, context),
+        ).options
         if (offered.length === 0) {
           node.resolve()
           int.pendingNodeIdRef.value = null
@@ -296,7 +314,11 @@ export function engineResolveChoice(
       }
     }
     if (node instanceof ParallelNode && node.mode === 'trigger-select') {
-      const offered = evaluateTriggerSelect(node, context, triggerSelectEvaluationOptions(int, context)).options
+      const offered = evaluateTriggerSelect(
+        node,
+        { ...context, ...currentEventReadContext(int) },
+        triggerSelectEvaluationOptions(int, context),
+      ).options
       if (offered.length === 0) {
         node.resolve()
         int.pendingNodeIdRef.value = null
@@ -351,6 +373,7 @@ export function engineResolveChoice(
       }
       const replaceResult = int.hooks.applyComputeReplace({
         ...executionContext,
+        ...currentEventReadContext(int),
         actionId: child.actionId,
       })
       const actionId = replaceResult.actionId
@@ -383,6 +406,7 @@ export function engineResolveChoice(
       }
       const costResults = int.hooks.computeCosts({
         ...executionContext,
+        ...currentEventReadContext(int),
         actionId,
       })
       const costOverride = costResults.reduce<Partial<PlayerState['resources']>>(
@@ -400,7 +424,9 @@ export function engineResolveChoice(
       executionContext.costs =
         Object.keys(costOverride).length > 0 ? costOverride : undefined
       const skipBefore = int.beforePhaseFlowNodeIds.has(child.id)
-      const beforePhase = skipBefore ? { matchedListeners: [] } : int.hooks.before({ ...executionContext, actionId })
+      const beforePhase = skipBefore
+        ? { matchedListeners: [] }
+        : int.hooks.before({ ...executionContext, ...currentEventReadContext(int), actionId })
       const beforeBaseEvent = buildListenerEvent(executionContext, {})
       const beforeActivateNodes = buildPhaseTrailingNodes(
         int,
@@ -441,14 +467,17 @@ export function engineResolveChoice(
       }
       ensureEventState(context.state)
       recordEventLogDerivation(int, eventFrame.complete(context.state), result)
-      int.hooks.during({ ...executionContext, actionId }, result)
+      int.hooks.during({ ...executionContext, ...currentEventReadContext(int), actionId }, result)
       if (result.type === 'request' && (result.request.kind === 'choice' || result.request.kind === 'farm-select')) {
         // S2 Task 6: also accept farm-select kind emitted from an Or/Xor
         // child leaf. The computeArgs merging path only applies to 'choice'
         // kind (extraOptions hook); farm-select carries its own structured
         // payload + optional `options` (confirm/cancel).
         const argResults = result.request.kind === 'choice'
-          ? int.hooks.computeArgs({ ...executionContext, actionId }, result)
+          ? int.hooks.computeArgs(
+              { ...executionContext, ...currentEventReadContext(int), actionId },
+              result,
+            )
           : []
         const baseOptions: ActionChoiceOption[] = result.request.kind === 'choice'
           ? result.request.options
@@ -502,12 +531,12 @@ export function engineResolveChoice(
         })
       }
       const immediatePhase = int.hooks.immediatelyAfter(
-        { ...executionContext, actionId, choice },
+        { ...executionContext, ...currentEventReadContext(int), actionId, choice },
         result,
         choice,
       )
       const afterPhase = int.hooks.after(
-        { ...executionContext, actionId, choice },
+        { ...executionContext, ...currentEventReadContext(int), actionId, choice },
         result,
         choice,
       )
@@ -634,7 +663,7 @@ export function engineResolveChoice(
     ensureEventState(context.state)
     recordEventLogDerivation(int, eventFrame.complete(context.state), result)
   }
-  int.hooks.during({ ...executionContext, actionId }, result)
+  int.hooks.during({ ...executionContext, ...currentEventReadContext(int), actionId }, result)
   if (result.type === 'fail' && result.recoverable === true && pendingHost && pendingEnvelope) {
     const contextSnapshot = pendingEnvelope.contextSnapshot as InteractionContextSnapshot | undefined
     applyInteractionRequest(int, {
@@ -690,8 +719,16 @@ export function engineResolveChoice(
     })
   }
   const insertionTargetId = pendingEnvelope?.ownerNodeId ?? pendingHost?.id ?? int.pendingNodeIdRef.value
-  const immediatePhase = int.hooks.immediatelyAfter({ ...executionContext, actionId, choice }, result, choice)
-  const afterPhase = int.hooks.after({ ...executionContext, actionId, choice }, result, choice)
+  const immediatePhase = int.hooks.immediatelyAfter(
+    { ...executionContext, ...currentEventReadContext(int), actionId, choice },
+    result,
+    choice,
+  )
+  const afterPhase = int.hooks.after(
+    { ...executionContext, ...currentEventReadContext(int), actionId, choice },
+    result,
+    choice,
+  )
 
   const allResults = [
     ...immediatePhase.actionHookResults,
