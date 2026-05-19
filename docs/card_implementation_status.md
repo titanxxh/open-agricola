@@ -24,7 +24,6 @@
 
 | 卡牌 | 严重度 | 领域 | 差异 | 方向 |
 |---|---|---|---|---|
-| `A123_FrameBuilder` | 高 | 建房支付成本模型 | BGA 每个房间/行动只应用一次替换；OA bonus 同时参与 per-room 和 total-room 展开。 | 增加 bonus scope，或阻止 per-room bonus 在 total-room 阶段再次应用。 |
 | `B23_FinalScenario` | 高 | 行动格生命周期 | BGA 立即 reveal 第 14 轮行动并限制独占使用；OA 只写入 card extraData。 | 增加后端权威的行动格 reveal / exclusive-use 支持。 |
 | `B24_Lasso` | 高 | 额外放人 | BGA 任意第一次放人后都提供触发；OA 只有第一次放人在动物市场时才触发。 | 始终提供触发；仅当第一次不是动物市场时限制第二次必须去动物市场。 |
 | `B115_TinsmithMaster` | 高 | 田地选择 | BGA 是 optional 玩家选择；OA 自动修改所有新播种田。 | 复用 selectable field + plant-additional-good 风格选择。 |
@@ -53,7 +52,6 @@
 
 | 卡牌 | BGA 证据 | OA 证据 | UI / 交互证据 |
 |---|---|---|---|
-| `A123_FrameBuilder` | `A/A123_FrameBuilder.php` | `shared/cards/A/A123_FrameBuilder.ts`; `shared/actions/payment/internal/room-payment.ts` | Payment UI 消费后端 payment enumeration；未发现前端单卡分支。 |
 | `B23_FinalScenario` | `B/B23_FinalScenario.php` | `shared/cards/B/B23_FinalScenario.ts` | 缺少后端行动格 reveal/exclusive 模型，UI 无法权威承载这个行为。 |
 | `B24_Lasso` | `B/B24_Lasso.php` | `shared/cards/B/B24_Lasso.ts` | 使用通用 extra-placement flow；遗漏的是后端触发条件，不是客户端渲染。 |
 | `B115_TinsmithMaster` | `B/B115_TinsmithMaster.php`; `States/SpecialEffect.js` | `shared/cards/B/B115_TinsmithMaster.ts`; `server/__tests__/B115_TinsmithMaster-session.test.ts` | BGA 有田地选择 prompt；OA 当前通过修改所有新田跳过了 prompt。 |
@@ -134,7 +132,7 @@
 4. 为“从多个替换中选一个”的卡增加 TradeModifier group 限制。
 5. 增加后端权威的 action-space reveal/exclusive-use 支持。
 6. 扩大 accumulation-space partial-take 语义的复用范围；当前 `collect` 已支持指定行动格、资源和数量，`B81_Handcart` 已从行动格移除资源。
-7. 为 room/action bonus 增加 scope，避免 per-room 和 total-room cost modifier 双重应用。
+7. ~~为 room/action bonus 增加 scope，避免 per-room 和 total-room cost modifier 双重应用~~ ✅ 已落地：`ComplexCost` 统一形状（`fees / unitFee + nb / trades / bonuses`），`Trade.scope: 'action' \| 'unit'` + `TradeModifier.scope` 控制 Σ-times ≤ nb 的 per-unit 替换上限（A123_FrameBuilder construct、D15_ClaySupports、B145_BrushwoodCollector construct 分支已迁移）；construct / renovation / fencing / plow / occupation / pay 全部走单一 `computeAllBuyableCombinations`；条件评估拆成 `evaluateStaticConditions` + `evaluateConditions(_, _, nb)` 两层（`getModifiersForCostType` static-only，nb-aware gate 延后到 enumerate）。
 8. 增加通用处理：“before trigger 给资源后，原行动可能变得可达/mandatory”。
 9. 增加共享 lessons action-space id helper，覆盖 `lessons`、`lessons-3`、`lessons-4`。
 10. 继续扩大 gain/exchange/action-space provenance 覆盖。
@@ -469,7 +467,7 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 | `A120_ClayHutBuilder` | 已对齐 |  |
 | `A121_ClayPuncher` | 已对齐 |  |
 | `A122_PanBaker` | 已对齐 |  |
-| `A123_FrameBuilder` | 需复核 | construct bonus 可能同时按 per-room 和 total-room 应用，强于 BGA |
+| `A123_FrameBuilder` | 已对齐 |  |
 | `A124_Knapper` | 已对齐 |  |
 | `A125_Priest` | 已对齐 |  |
 | `A126_MasterWorkman` | 已对齐 |  |
