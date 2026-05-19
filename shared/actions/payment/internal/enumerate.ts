@@ -270,21 +270,23 @@ const getMaxTradeTimesFromPartial = (
   return Math.min(maxFromResources, tradeMax)
 }
 
-export const generateTradeCombinations = (
-  trades: Trade[],
+type TradeCombo = {
+  tradesUsed: { trade: Trade; times: number }[]
+  result: Partial<Resource>
+}
+
+// Phase 1: recurse over action-scope trades only. Mirrors original recursion.
+const enumerateActionTradeCombos = (
+  actionTrades: Trade[],
   playerResources: Partial<Resource>,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _nb?: number,
-): { tradesUsed: { trade: Trade; times: number }[]; result: Partial<Resource> }[] => {
-  if (trades.length === 0) {
+): TradeCombo[] => {
+  if (actionTrades.length === 0) {
     return [{ tradesUsed: [], result: { ...playerResources } }]
   }
-
-  const [firstTrade, ...restTrades] = trades
-  const restCombinations = generateTradeCombinations(restTrades, playerResources)
-  const results: { tradesUsed: { trade: Trade; times: number }[]; result: Partial<Resource> }[] = []
-
-  for (const combo of restCombinations) {
+  const [firstTrade, ...restTrades] = actionTrades
+  const restCombos = enumerateActionTradeCombos(restTrades, playerResources)
+  const results: TradeCombo[] = []
+  for (const combo of restCombos) {
     const maxTimes = getMaxTradeTimesFromPartial(firstTrade, combo.result)
     for (let t = 0; t <= maxTimes; t++) {
       const afterTrade = convertResources(combo.result, firstTrade, t)
@@ -296,7 +298,59 @@ export const generateTradeCombinations = (
       }
     }
   }
+  return results
+}
 
+// Phase 2: recurse over unit-scope trades, bounded by remaining budget (= nb - sum).
+const enumerateUnitTradeCombos = (
+  unitTrades: Trade[],
+  base: TradeCombo,
+  remainingBudget: number,
+  i: number,
+  out: TradeCombo[],
+): void => {
+  if (i === unitTrades.length) {
+    out.push(base)
+    return
+  }
+  const trade = unitTrades[i]
+  const maxByMax = trade.max ?? remainingBudget
+  const maxByFrom = getMaxTradeTimesFromPartial({ ...trade, max: Infinity }, base.result)
+  const maxTimes = Math.min(remainingBudget, maxByMax, maxByFrom)
+  for (let t = 0; t <= maxTimes; t++) {
+    const afterTrade = convertResources(base.result, trade, t)
+    if (!hasValidResources(afterTrade)) continue
+    const next: TradeCombo = {
+      tradesUsed: t === 0
+        ? [...base.tradesUsed]
+        : [...base.tradesUsed, { trade, times: t }],
+      result: afterTrade,
+    }
+    enumerateUnitTradeCombos(unitTrades, next, remainingBudget - t, i + 1, out)
+  }
+}
+
+export const generateTradeCombinations = (
+  trades: Trade[],
+  playerResources: Partial<Resource>,
+  nb?: number,
+): TradeCombo[] => {
+  if (trades.length === 0) {
+    return [{ tradesUsed: [], result: { ...playerResources } }]
+  }
+  const actionTrades = trades.filter((t) => (t.scope ?? 'action') === 'action')
+  const unitTrades = trades.filter((t) => t.scope === 'unit')
+
+  const phase1 = enumerateActionTradeCombos(actionTrades, playerResources)
+
+  if (unitTrades.length === 0 || nb === undefined || nb <= 0) {
+    return phase1
+  }
+
+  const results: TradeCombo[] = []
+  for (const combo of phase1) {
+    enumerateUnitTradeCombos(unitTrades, combo, nb, 0, results)
+  }
   return results
 }
 
