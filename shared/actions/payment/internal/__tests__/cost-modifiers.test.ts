@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { evaluateStaticConditions, evaluateConditions, validateTradeModifier } from '../cost-modifiers'
+import {
+  evaluateStaticConditions,
+  evaluateConditions,
+  validateTradeModifier,
+  validateComplexCost,
+} from '../cost-modifiers'
 import type { PlayerState } from '../../../../contract/types'
 
 const mkPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
@@ -52,6 +57,31 @@ describe('validateTradeModifier', () => {
       from: {}, to: { wood: 1 }, max: 3,
       scope: 'action',
       conditions: { minNumRooms: 2 },
+    })).not.toThrow()
+  })
+})
+
+describe('validateComplexCost', () => {
+  it('throws when nb and cards both present', () => {
+    expect(() => validateComplexCost({
+      nb: 3, unitFee: { wood: 5 },
+      cards: { type: 'major', list: ['A1'] },
+    })).toThrow(/mutually exclusive/)
+  })
+  it('throws when unit-scoped trade is present but nb is missing', () => {
+    expect(() => validateComplexCost({
+      trades: [{ from: { wood: 1 }, to: { clay: 2 }, scope: 'unit' }],
+    })).toThrow(/nb.*missing/)
+  })
+  it('does not throw for action-scoped trade with no nb', () => {
+    expect(() => validateComplexCost({
+      trades: [{ from: {}, to: { wood: 1 }, max: 3, scope: 'action' }],
+    })).not.toThrow()
+  })
+  it('does not throw for unit-scoped trade with nb', () => {
+    expect(() => validateComplexCost({
+      nb: 3, unitFee: { clay: 5 },
+      trades: [{ from: { wood: 1 }, to: { clay: 2 }, scope: 'unit' }],
     })).not.toThrow()
   })
 })

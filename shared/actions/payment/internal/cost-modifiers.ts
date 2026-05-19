@@ -103,6 +103,29 @@ export const applyCostModifiers = (
   return result
 }
 
+const collectComplexCostViolations = (cost: ComplexCost): string[] => {
+  const violations: string[] = []
+  if (cost.nb !== undefined && cost.cards !== undefined) {
+    violations.push('`nb` and `cards` are mutually exclusive')
+  }
+  if (cost.trades?.some((t) => t.scope === 'unit') && cost.nb === undefined) {
+    violations.push('unit-scoped trades present but `nb` is missing')
+  }
+  return violations
+}
+
+export const validateComplexCost = (cost: ComplexCost): void => {
+  const violations = collectComplexCostViolations(cost)
+  if (violations.length === 0) return
+  const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production'
+  if (isDev) {
+    throw new Error(`Invalid ComplexCost: ${violations.join('; ')}`)
+  }
+  // Production: log + best-effort — caller treats unconvertible cost as
+  // canPayCost === false (no affordable solutions).
+  console.error('[ComplexCost validation]', violations, 'cost:', cost)
+}
+
 export const validateTradeModifier = (modifier: TradeModifier): void => {
   if (modifier.scope === 'unit' && modifier.conditions?.minNumRooms !== undefined) {
     throw new Error(
