@@ -18,6 +18,8 @@ beforeEach(() => {
   clearPaymentCache()
 })
 import type {
+  ActionMutationContext,
+  ActionSpace,
   GameState,
   PlayerState,
   Resource,
@@ -26,6 +28,7 @@ import type {
   Trade,
   TradeModifier,
 } from '../../../contract/types'
+import type { DraftGameEvent, EventSink } from '../../../contract/events'
 import { A88_HedgeKeeper } from '../../../cards-display/A/A88_HedgeKeeper'
 
 const hedgeKeeperModifier = A88_HedgeKeeper.modifier as TradeModifier
@@ -52,6 +55,15 @@ const createMockPlayer = (resources: Partial<Resource>): PlayerState => ({
   fenceSegments: [],
   majorEffects: { wellRounds: 0 },
   startPlayer: false, activeModifiers: [], cardStates: {},
+})
+
+const makeEventSink = (capturedEvents: DraftGameEvent[]): EventSink => ({
+  emit: (event) => {
+    capturedEvents.push(event)
+  },
+  emitMany: (events) => {
+    capturedEvents.push(...events)
+  },
 })
 
 describe('payResources (legacy)', () => {
@@ -872,16 +884,20 @@ describe('Integration: Cooking Hearth upgrade scenario', () => {
 const callPay = (
   player: PlayerState,
   params: Record<string, unknown>,
-  extra: Partial<{ sourceCard: string; actionContext: Record<string, unknown> }> = {},
-) =>
-  payAction.execute({
-    state: {} as GameState,
+  extra: Partial<{ sourceCard: string; actionContext: Record<string, unknown>; state: GameState }> = {},
+) => {
+  const capturedEvents: DraftGameEvent[] = []
+  const result = payAction.execute({
+    state: extra.state ?? { players: [player] } as GameState,
     player,
-    space: { id: 'test', name: '', actionId: 'pay', round: 0 } as unknown as import('../../../contract/types').ActionSpace,
+    space: { id: 'test', name: '', actionId: 'pay', round: 0 } as unknown as ActionSpace,
     params,
     sourceCard: extra.sourceCard,
     actionContext: extra.actionContext,
-  })
+    eventSink: makeEventSink(capturedEvents),
+  } as ActionMutationContext)
+  return { result, capturedEvents }
+}
 
 describe('payAction', () => {
   it('exists with id "pay"', () => {
@@ -890,7 +906,7 @@ describe('payAction', () => {
 
   it('simple Partial<Resource>: pays from resources, returns ok', () => {
     const player = createMockPlayer({ wood: 3 })
-    const result = callPay(player, { cost: { wood: 2 } })
+    const { result } = callPay(player, { cost: { wood: 2 } })
     expect(result.type).toBe('ok')
     expect(player.resources.wood).toBe(1)
     if (result.type === 'ok') {
@@ -900,15 +916,32 @@ describe('payAction', () => {
 
   it('simple Partial<Resource> insufficient: returns fail', () => {
     const player = createMockPlayer({ wood: 1 })
-    const result = callPay(player, { cost: { wood: 2 } })
+    const { result } = callPay(player, { cost: { wood: 2 } })
     expect(result.type).toBe('fail')
     expect(player.resources.wood).toBe(1)
   })
 
   it('missing cost params: returns fail', () => {
     const player = createMockPlayer({ wood: 5 })
-    const result = callPay(player, {})
+    const { result } = callPay(player, {})
     expect(result.type).toBe('fail')
+  })
+
+  it('simple Partial<Resource>: emits resource.paid with payment source', () => {
+    const player = createMockPlayer({ wood: 3 })
+    const { result, capturedEvents } = callPay(player, { cost: { wood: 2 } })
+    expect(result.type).toBe('ok')
+    expect(capturedEvents).toEqual([
+      {
+        type: 'resource.paid',
+        resources: { wood: 2 },
+        to: { kind: 'supply' },
+        paymentFor: 'cardEffect',
+        paymentSources: [
+          { from: { kind: 'player', playerId: 'p1' }, resources: { wood: 2 } },
+        ],
+      },
+    ])
   })
 })
 
@@ -916,7 +949,7 @@ describe('payAction: ComplexCost typed-flat single solution', () => {
   it('typed-flat: pays single solution and decrements resources', () => {
     const player = createMockPlayer({ wood: 5 })
     const cost: ComplexCost = { fee: { wood: 2 } }
-    const result = callPay(player, { cost, costType: 'construct' })
+    const { result } = callPay(player, { cost, costType: 'construct' })
     expect(result.type).toBe('ok')
     expect(player.resources.wood).toBe(3)
   })
@@ -924,9 +957,57 @@ describe('payAction: ComplexCost typed-flat single solution', () => {
   it('typed-flat insufficient: returns fail and does not mutate', () => {
     const player = createMockPlayer({ wood: 1 })
     const cost: ComplexCost = { fee: { wood: 3 } }
-    const result = callPay(player, { cost })
+    const { result } = callPay(player, { cost })
     expect(result.type).toBe('fail')
     expect(player.resources.wood).toBe(1)
+  })
+
+  it('typed-flat: emits resource.paid with cost type', () => {
+    const player = createMockPlayer({ wood: 5 })
+    const cost: ComplexCost = { fee: { wood: 2 } }
+    const { result, capturedEvents } = callPay(player, { cost, costType: 'construct' })
+    expect(result.type).toBe('ok')
+    expect(capturedEvents).toEqual([
+      expect.objectContaining({
+        type: 'resource.paid',
+        resources: { wood: 2 },
+        paymentFor: 'construct',
+        paymentSources: [
+          { from: { kind: 'player', playerId: 'p1' }, resources: { wood: 2 } },
+        ],
+      }),
+    ])
+  })
+
+  it('typed-flat Partial<Resource>: event keeps bonusChoiceIndex provenance', () => {
+    const player = createMockPlayer({ wood: 1, clay: 2 })
+    player.activeModifiers = [
+      {
+        type: 'bonus',
+        cardId: 'TestBonusCard',
+        appliesTo: ['construct'],
+        optional: false,
+        choices: [
+          { discount: { wood: 1 } },
+          { discount: { clay: 1 } },
+        ],
+      },
+    ]
+    const { result, capturedEvents } = callPay(player, {
+      cost: { wood: 2, clay: 2 },
+      costType: 'construct',
+    })
+
+    expect(result.type).toBe('ok')
+    expect(capturedEvents).toEqual([
+      expect.objectContaining({
+        type: 'resource.paid',
+        resources: { wood: 1, clay: 2 },
+        paymentFor: 'construct',
+        bonusSources: ['TestBonusCard'],
+        bonusChoiceIndex: { TestBonusCard: 0 },
+      }),
+    ])
   })
 
 })
@@ -935,7 +1016,7 @@ describe('payAction: ComplexCost multi-solution choice', () => {
   it('emits choice when multiple solutions exist', () => {
     const player = createMockPlayer({ food: 2, grain: 1 })
     const cost: ComplexCost = { fees: [{ food: 2 }, { grain: 1 }] }
-    const result = callPay(player, { cost, optionPrefix: 'pay:test' })
+    const { result } = callPay(player, { cost, optionPrefix: 'pay:test' })
     expect(result.type).toBe('request')
     if (result.type !== 'request') return
     expect(result.request.kind).toBe('choice')
@@ -947,7 +1028,7 @@ describe('payAction: ComplexCost multi-solution choice', () => {
   it('resolveChoice / paymentChoice param applies selected solution', () => {
     const player = createMockPlayer({ food: 2, grain: 1 })
     const cost: ComplexCost = { fees: [{ food: 2 }, { grain: 1 }] }
-    const initial = callPay(player, { cost, optionPrefix: 'pay:test' })
+    const { result: initial } = callPay(player, { cost, optionPrefix: 'pay:test' })
     if (initial.type !== 'request') throw new Error('expected request')
     if (initial.request.kind !== 'choice') throw new Error('expected choice kind')
     const grainOption = initial.request.options.find(
@@ -956,7 +1037,7 @@ describe('payAction: ComplexCost multi-solution choice', () => {
           ?.resourcesPaid?.grain ?? 0) === 1,
     )
     expect(grainOption).toBeDefined()
-    const result = callPay(player, {
+    const { result } = callPay(player, {
       cost,
       optionPrefix: 'pay:test',
       paymentChoice: grainOption!.value,
@@ -982,7 +1063,7 @@ describe('payAction: ComplexCost multi-solution choice', () => {
         },
       ],
     }
-    const initial = callPay(player, { cost, optionPrefix: 'pay:bonus' })
+    const { result: initial } = callPay(player, { cost, optionPrefix: 'pay:bonus' })
     expect(initial.type).toBe('request')
     if (initial.type !== 'request') throw new Error('expected request')
     if (initial.request.kind !== 'choice') throw new Error('expected choice kind')
@@ -995,7 +1076,7 @@ describe('payAction: ComplexCost multi-solution choice', () => {
       return paid.wood === 1 && paid.clay === 2
     })
     expect(woodSaveOption).toBeDefined()
-    const result = callPay(player, {
+    const { result, capturedEvents } = callPay(player, {
       cost,
       optionPrefix: 'pay:bonus',
       paymentChoice: woodSaveOption!.value,
@@ -1008,7 +1089,41 @@ describe('payAction: ComplexCost multi-solution choice', () => {
       expect(extra?.bonusChoiceIndex?.['TestBonusCard']).toBe(0)
       expect(extra?.bonusUsed).toContain('TestBonusCard')
     }
+    expect(capturedEvents).toEqual([
+      expect.objectContaining({
+        type: 'resource.paid',
+        resources: { wood: 1, clay: 2 },
+        paymentFor: 'cardEffect',
+        bonusSources: ['TestBonusCard'],
+        bonusChoiceIndex: { TestBonusCard: 0 },
+      }),
+    ])
+  })
+
+  it('required returned card payment: event keeps returnedCardId provenance', () => {
+    const player = createMockPlayer({ clay: 2 })
+    player.improvements = ['Major_ClayOven']
+    const state = { players: [player], availableMajorImprovements: [] } as unknown as GameState
+    const cost: ComplexCost = {
+      fee: { clay: 2 },
+      cards: {
+        type: 'Major',
+        list: ['Major_ClayOven'],
+        required: true,
+      },
+    }
+    const { result, capturedEvents } = callPay(
+      player,
+      { cost, includeReturnedCard: true, playedCards: player.improvements },
+      { state },
+    )
+    expect(result.type).toBe('ok')
+    expect(capturedEvents).toEqual([
+      expect.objectContaining({
+        type: 'resource.paid',
+        resources: { clay: 2 },
+        returnedCardId: 'Major_ClayOven',
+      }),
+    ])
   })
 })
-
-
