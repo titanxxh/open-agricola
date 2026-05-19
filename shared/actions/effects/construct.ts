@@ -13,7 +13,6 @@ import type {
 // construct.ts only uses room-payment helpers (S4 domain aggregate scope),
 // so no PaymentSolver call sites exist here yet.
 import {
-  buildRoomCostPerUnit,
   executeResolvedRoomPayment,
   getBuildRoomCost,
   getMaxBuildableRooms,
@@ -71,10 +70,9 @@ const finalizeRoom = (
     return { type: 'fail', errorKey: 'log.buildRoomFail' }
   }
 
-  const costPerRoom = buildRoomCostPerUnit(ctx.player, ctx.costs)
   const payment = resolveRoomPaymentSelection(
     ctx.player,
-    costPerRoom,
+    ctx.costs,
     rooms.length,
     paymentChoice,
   )
@@ -180,10 +178,9 @@ export const constructAction: ActionDefinition = {
         return { type: 'fail', errorKey: 'log.buildRoomFail' }
       }
 
-      const costPerRoom = buildRoomCostPerUnit(ctx.player, ctx.costs)
       const payment = resolveRoomPaymentSelection(
         ctx.player,
-        costPerRoom,
+        ctx.costs,
         rooms.length,
       )
       if (payment.type === 'request') {
