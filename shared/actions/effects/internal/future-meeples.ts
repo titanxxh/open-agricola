@@ -5,6 +5,7 @@ import type {
   GameState,
   Resource,
 } from '../../../contract/types'
+import type { EventSink } from '../../../contract/events'
 
 export const futureMeeplesNode = (request?: FutureMeepleRequest): ActionFlow => ({
   type: 'leaf',
@@ -58,18 +59,25 @@ export const buildFutureEntries = (
 ): { round: number; resources: Partial<Resource> }[] =>
   items.map(({ offset, resources }) => ({ round: baseRound + offset, resources }))
 
-export const resolveFutureMeepleRequests = (state: GameState) => {
+export const resolveFutureMeepleRequests = (state: GameState, eventSink?: EventSink) => {
   if (state.pendingFutureMeeples.length === 0) return
   const requests = [...state.pendingFutureMeeples]
   state.pendingFutureMeeples = []
   const nextEntries = [...state.futureMeeples]
   requests.forEach((request, requestIndex) => {
+    const queuedEntries: { round: number; resources?: Partial<Resource>; roomType?: NonNullable<GameState['futureMeeples'][number]['roomType']> }[] = []
     if ('entries' in request) {
       for (const entry of request.entries) {
         const round = clampRound(entry.round)
         if (round <= state.round) continue
         const resources: Partial<Resource> = {}
         if (entry.resources) addResourceCounts(resources, entry.resources)
+        const queued = {
+          round,
+          ...(Object.keys(resources).length > 0 ? { resources } : {}),
+          ...(entry.roomType ? { roomType: entry.roomType } : {}),
+        }
+        queuedEntries.push(queued)
         nextEntries.push({
           id: `${request.cardId}-${request.playerId}-${round}-${requestIndex}`,
           cardId: request.cardId,
@@ -87,6 +95,11 @@ export const resolveFutureMeepleRequests = (state: GameState) => {
         const actionId = state.roundActionOrder[round - 1] ?? null
         const resources: Partial<Resource> = {}
         addResourceCounts(resources, request.resources)
+        const queued = {
+          round,
+          ...(Object.keys(resources).length > 0 ? { resources } : {}),
+        }
+        queuedEntries.push(queued)
         nextEntries.push({
           id: `${request.cardId}-${request.playerId}-${round}-${requestIndex}`,
           cardId: request.cardId,
@@ -96,6 +109,15 @@ export const resolveFutureMeepleRequests = (state: GameState) => {
           resources,
         })
       }
+    }
+    if (queuedEntries.length > 0) {
+      eventSink?.emit<'futureMeeple.queued'>({
+        type: 'futureMeeple.queued',
+        playerId: request.playerId,
+        cardId: request.cardId,
+        sourceCardId: request.cardId,
+        entries: queuedEntries,
+      })
     }
   })
   state.futureMeeples = nextEntries
@@ -108,13 +130,13 @@ export const futureMeeplesAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ state, params }) => {
+  execute: ({ state, params, eventSink }) => {
     // If params contain an inline queue request (from anytime handlers), queue it first
     const inlineRequest = params?.__futureMeepleRequest as FutureMeepleRequest | undefined
     if (inlineRequest) {
       queueFutureMeeples(state, inlineRequest)
     }
-    resolveFutureMeepleRequests(state)
+    resolveFutureMeepleRequests(state, eventSink)
     return { type: 'ok' }
   },
 }
