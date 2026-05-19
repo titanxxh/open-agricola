@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/A/A48_ShavingHorse'
 
 const CARD_ID = 'A48_ShavingHorse'
@@ -41,7 +40,7 @@ describe('A48_ShavingHorse session', () => {
     const session = setup({ forestWood: 3, playerWood: 4, cardPlayed: false })
     const resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.wood).toBe(7)
     expect(resp.state.players[0]!.resources.food).toBe(0)
   })
@@ -50,7 +49,7 @@ describe('A48_ShavingHorse session', () => {
     const session = setup({ forestWood: 3, playerWood: 1 })
     const resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.wood).toBe(4)
     expect(resp.state.players[0]!.resources.food).toBe(0)
   })
@@ -59,7 +58,7 @@ describe('A48_ShavingHorse session', () => {
     const session = setup({ forestWood: 0, playerWood: 6 })
     const resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.wood).toBe(6)
     expect(resp.state.players[0]!.resources.food).toBe(0)
   })
@@ -101,7 +100,7 @@ describe('A48_ShavingHorse session', () => {
     const resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
     // No choice prompt — mandatory flow runs through automatically
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.wood).toBe(6)
     expect(resp.state.players[0]!.resources.food).toBe(3)
   })

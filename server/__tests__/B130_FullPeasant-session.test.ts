@@ -3,7 +3,6 @@ import { GameSession } from '../game/authoritative-session'
 import { setFencesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-import { isLegacyChoicePending } from './_helpers/legacy-confirms'
 import '../../shared/cards/B/B130_FullPeasant'
 
 const CARD_ID = 'B130_FullPeasant'
@@ -118,7 +117,7 @@ describe('B130_FullPeasant session', () => {
     resp = session.resolveChoice(0, '__skip__')
     // After place-farmer hooks: B130 should NOT have triggered (fencing occupied).
     // So the engine should be done → no choice pending.
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 
   it('does not offer chain when player has no food', () => {
@@ -127,7 +126,7 @@ describe('B130_FullPeasant session', () => {
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId !== 'wait') return
     resp = session.resolveChoice(0, '__skip__')
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 
   it('does not offer chain without the card', () => {
@@ -136,7 +135,7 @@ describe('B130_FullPeasant session', () => {
     expect(resp.ok).toBe(true)
     if (resp.interaction.stateId !== 'wait') return
     resp = session.resolveChoice(0, '__skip__')
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 
   it('does not trigger on unrelated spaces', () => {
@@ -144,7 +143,7 @@ describe('B130_FullPeasant session', () => {
     const resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
     // day-laborer is a simple gain action; no B130 trigger
-    expect(isLegacyChoicePending(resp)).toBe(false)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 
   it('triggers symmetrically on fencing → grain-utilization direction', () => {

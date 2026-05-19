@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session'
 import { setWorkersAtHome } from '../../domain/player'
 import { rehydrateState, serializeState } from '../serialization'
-import { isLegacyChoicePending } from '../../../server/__tests__/_helpers/legacy-confirms'
 import { EngineStack } from '../../engine'
 
 describe('serialization cursor round-trip', () => {
@@ -457,7 +456,7 @@ describe('serialization cursor round-trip', () => {
     // Resolving the prompt advances to the next player and clears the stack.
     const after = restored.resolveChoice(0, 'confirm')
     expect(after.ok).toBe(true)
-    expect(isLegacyChoicePending(after)).toBe(false)
+    expect(after.interaction.stateId).toBe('idle')
     expect(after.state.currentPlayerIndex).toBe(1)
     expect(restored.getEngineStack().depth()).toBe(0)
   })
@@ -584,7 +583,7 @@ describe('serialization cursor round-trip', () => {
     if (after.interaction.stateId === 'wait' && after.interaction.request.kind === 'feed') {
       expect(remainingFeedFrames).toBe(true)
     } else {
-      expect(isLegacyChoicePending(after)).toBe(false)
+      expect(after.interaction.stateId).toBe('idle')
     }
   })
 })
