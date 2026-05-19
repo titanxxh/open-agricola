@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { GameEvent } from '../../contract/events'
 import type { GameState } from '../../contract/types'
 import { EventStore } from '../store'
 
@@ -24,6 +25,21 @@ const makeState = (): GameState => ({
   workPhaseObtainedResources: {},
   completedFeedingPhases: 0,
 })
+
+const makeEvent = (overrides?: Partial<GameEvent>): GameEvent => ({
+  schemaVersion: 1,
+  id: '1',
+  seq: 1,
+  round: 2,
+  phase: 'work',
+  type: 'resource.moved',
+  visibility: 'public',
+  resources: { wood: 1 },
+  from: { kind: 'supply' },
+  to: { kind: 'player', playerId: 'p1' },
+  reason: 'gain',
+  ...overrides,
+} as GameEvent)
 
 describe('EventStore', () => {
   it('completes leaf frames into transaction events without appending state', () => {
@@ -174,6 +190,29 @@ describe('EventStore', () => {
     expect(state.events).toEqual([])
     expect(state.nextEventSeq).toBe(1)
     expect(store.currentTransactionEvents()).toEqual([])
+  })
+
+  it('validates restored transaction events before commit', () => {
+    const store = new EventStore()
+
+    expect(() => store.restore({
+      inTransaction: true,
+      transactionEvents: [
+        { ...makeEvent(), visibility: 'private' } as GameEvent,
+      ],
+    })).toThrow(/public/)
+    expect(() => store.restore({
+      inTransaction: true,
+      transactionEvents: [
+        { ...makeEvent(), privateHand: ['E1'] } as unknown as GameEvent,
+      ],
+    })).toThrow(/Unknown GameEvent field privateHand/)
+    expect(() => store.restore({
+      inTransaction: true,
+      transactionEvents: [
+        { ...makeEvent(), seq: -1 },
+      ],
+    })).toThrow(/seq/)
   })
 
   it('emits many drafts and returns void', () => {

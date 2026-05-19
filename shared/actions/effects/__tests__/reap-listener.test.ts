@@ -7,6 +7,10 @@ import * as cardListeners from '../../../cards/card-listeners'
 import '../../../cards/catalog'
 
 describe('dispatchReapListener', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('calls runCardListeners with actionId=reap and crop/amount in extraData', () => {
     const spy = vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
     const state = { players: [] } as unknown as GameState
@@ -33,6 +37,40 @@ describe('dispatchReapListener', () => {
 
     expect(spy).not.toHaveBeenCalled()
     spy.mockRestore()
+  })
+
+  it('commits immediate special-effect events when no external event sink is provided', () => {
+    vi.spyOn(cardListeners, 'runCardListeners').mockReturnValue([{
+      flow: {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: 'Test_ReapCard',
+        params: { kind: 'set-extra-data', key: 'count', value: 1 },
+      },
+    }])
+    const player = {
+      id: 'p1',
+      cardStates: {},
+    } as unknown as PlayerState
+    const state = {
+      round: 3,
+      roundPhase: 'field',
+      players: [player],
+      actionSpaces: [],
+    } as unknown as GameState
+
+    dispatchReapListener(state, player, 'grain', 1)
+
+    expect(state.events).toEqual([
+      expect.objectContaining({
+        type: 'card.stateChanged',
+        seq: 1,
+        sourceActionId: 'reap',
+        sourceCardId: 'Test_ReapCard',
+        actorPlayerId: 'p1',
+      }),
+    ])
+    expect(state.nextEventSeq).toBe(2)
   })
 })
 

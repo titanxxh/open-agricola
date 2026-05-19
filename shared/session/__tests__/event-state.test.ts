@@ -69,6 +69,23 @@ describe('event state bootstrap', () => {
     expect(normalized?.nextEventSeq).toBe(4)
   })
 
+  it('drops persisted events that are not public json-safe events', () => {
+    const state = createInitialState(1)
+    const privateEvent = { ...makeEvent(2), visibility: 'private' }
+    const nonJsonEvent = { ...makeEvent(3), value: () => 1 }
+    const oversizedEvent = { ...makeEvent(4), payload: 'x'.repeat(4096) }
+    const raw = {
+      ...state,
+      events: [makeEvent(1), privateEvent, nonJsonEvent, oversizedEvent],
+      nextEventSeq: 5,
+    } as unknown as GameState
+
+    const normalized = normalizeState(raw)
+
+    expect(normalized.events).toEqual([makeEvent(1)])
+    expect(normalized.nextEventSeq).toBe(5)
+  })
+
   it('preserves event state through serialize and rehydrate JSON roundtrip', () => {
     const state = createInitialState(1)
     const events = [makeEvent(1), makeEvent(2)]
