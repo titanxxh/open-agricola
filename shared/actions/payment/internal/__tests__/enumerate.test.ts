@@ -64,6 +64,42 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
     )).toThrow(/nb.*missing/)
   })
 
+  it('unit-scope two trades — sigma-times <= nb', () => {
+    const sols = computeAllBuyableCombinations(
+      baseTestPlayer({ wood: 5, clay: 4, stone: 4, reed: 4 }),
+      {
+        unitFee: { reed: 2, wood: 5 }, nb: 2,
+        trades: [
+          { from: { wood: 1 }, to: { clay: 2 }, scope: 'unit' },
+          { from: { wood: 1 }, to: { stone: 2 }, scope: 'unit' },
+        ],
+      },
+    )
+    sols.forEach((s) => {
+      const k = s.tradesUsed.reduce((acc, t) => acc + t.times, 0)
+      expect(k).toBeLessThanOrEqual(2)
+    })
+  })
+
+  it('mixed action + unit trades — independent budgets', () => {
+    const sols = computeAllBuyableCombinations(
+      baseTestPlayer({ wood: 10 }),
+      {
+        unitFee: { wood: 3 }, nb: 1,
+        trades: [
+          { from: {}, to: { wood: 1 }, max: 2, scope: 'action' },
+          { from: { wood: 1 }, to: { clay: 1 }, scope: 'unit' },
+        ],
+      },
+    )
+    sols.forEach((s) => {
+      const actionTimes = s.tradesUsed.find((t) => Object.keys(t.trade.from).length === 0)?.times ?? 0
+      const unitTimes = s.tradesUsed.find((t) => t.trade.from.wood)?.times ?? 0
+      expect(actionTimes).toBeLessThanOrEqual(2)
+      expect(unitTimes).toBeLessThanOrEqual(1)
+    })
+  })
+
   it('bonus with minNumRooms:2 — applied when nb=2, skipped when nb=1', () => {
     const player = baseTestPlayer({ reed: 4, wood: 10 })
     const cost = (nb: number) => ({
