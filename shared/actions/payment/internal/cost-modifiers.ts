@@ -20,22 +20,26 @@ import type {
   TradeModifier,
 } from '../../../contract/types'
 
-export const evaluateConditions = (
+export const evaluateStaticConditions = (
   player: PlayerState,
   conditions: Record<string, number> | undefined,
 ): boolean => {
   if (!conditions) return true
-  if (typeof conditions.minNumRooms === 'number' && player.rooms < conditions.minNumRooms) {
-    return false
-  }
-  if (typeof conditions.houseTypeWood === 'number' && conditions.houseTypeWood > 0 && player.houseType !== 'wood') {
-    return false
-  }
-  if (typeof conditions.houseTypeClay === 'number' && conditions.houseTypeClay > 0 && player.houseType !== 'clay') {
-    return false
-  }
-  if (typeof conditions.houseTypeStone === 'number' && conditions.houseTypeStone > 0 && player.houseType !== 'stone') {
-    return false
+  if (typeof conditions.houseTypeWood === 'number' && conditions.houseTypeWood > 0 && player.houseType !== 'wood') return false
+  if (typeof conditions.houseTypeClay === 'number' && conditions.houseTypeClay > 0 && player.houseType !== 'clay') return false
+  if (typeof conditions.houseTypeStone === 'number' && conditions.houseTypeStone > 0 && player.houseType !== 'stone') return false
+  return true
+}
+
+export const evaluateConditions = (
+  player: PlayerState,
+  conditions: Record<string, number> | undefined,
+  nb?: number,
+): boolean => {
+  if (!evaluateStaticConditions(player, conditions)) return false
+  if (typeof conditions?.minNumRooms === 'number') {
+    const target = nb ?? player.rooms
+    if (target < conditions.minNumRooms) return false
   }
   return true
 }
