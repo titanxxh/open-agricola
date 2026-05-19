@@ -64,12 +64,12 @@ export const collectAction: ActionDefinition = {
         ? space
         : state.actionSpaces.find((s) => s.id === spaceIdHint)
       if (!targetSpace) {
-        return { type: 'fail' as const, logKey: 'log.collectNoSpace' }
+        return { type: 'fail', errorKey: 'log.collectNoSpace' }
       }
     } else {
       targetSpace = space
       if (!targetSpace) {
-        return { type: 'fail' as const, logKey: 'log.collectNoSpace' }
+        return { type: 'fail', errorKey: 'log.collectNoSpace' }
       }
     }
     const resource = actionContext?.resource
@@ -77,10 +77,10 @@ export const collectAction: ActionDefinition = {
 
     if (spaceIdHint) {
       if (!isCollectableResource(resource) || typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
-        return { type: 'fail' as const, logKey: 'log.collectInvalidPartial' }
+        return { type: 'fail', errorKey: 'log.collectInvalidPartial' }
       }
       const have = targetSpace.resources[resource] ?? 0
-      if (have < amount) return { type: 'fail' as const, logKey: 'log.collectNotEnough' }
+      if (have < amount) return { type: 'fail', errorKey: 'log.collectNotEnough' }
       ;(targetSpace.resources as Record<keyof Resource, number>)[resource] = have - amount
       player.resources[resource] = (player.resources[resource] ?? 0) + amount
       const gained = { [resource]: amount } as Partial<Resource>

@@ -550,7 +550,7 @@ export const anytimeExchangeAction: ActionDefinition = {
     const directTrade = readDirectTrade(actionContext)
     if (directTrade) {
       if (!canAffordTrade(player, directTrade, 1)) {
-        return { type: 'fail' as const, logKey: 'log.actionNoExchange' }
+        return { type: 'fail', errorKey: 'log.actionNoExchange' }
       }
       applyTrade(player, directTrade, 1)
       recordCookeryConversion(player, directTrade, 1)
@@ -588,7 +588,7 @@ export const anytimeExchangeAction: ActionDefinition = {
 
     const hasTradeOption = filtered.some((opt) => opt.value !== 'cancel')
     if (filterIds && filterIds.length > 0 && !hasTradeOption) {
-      return { type: 'fail' as const, logKey: 'log.actionNoExchange' }
+      return { type: 'fail', errorKey: 'log.actionNoExchange' }
     }
 
     return {

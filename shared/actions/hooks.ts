@@ -63,9 +63,6 @@ export type ActionHookResult = {
   trades?: import('../contract/types').Trade[]
   bonuses?: import('../contract/types').Bonus[]
   sourceCard?: string
-  logKey?: string
-  logParams?: Record<string, unknown>
-  immediateLogs?: import('../contract/types').ImmediateLogEntry[]
   countCardUse?: boolean
   labelKey?: string
   labelParams?: Record<string, unknown>

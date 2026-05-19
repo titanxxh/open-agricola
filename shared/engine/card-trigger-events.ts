@@ -28,6 +28,7 @@ export const emitCardTriggered = (
 ): void => {
   const sourceCard = context.sourceCard
   if (!sourceCard || shouldSkipCardTriggered(context, actionId)) return
+  if (sourceCard === 'harvest') return
   const alreadyTriggered = int.events.currentTransactionEvents().some((event) =>
     event.type === 'card.triggered' && event.sourceCardId === sourceCard
   )

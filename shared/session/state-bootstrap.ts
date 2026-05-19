@@ -52,6 +52,8 @@ import {
   assertKnownGameEventShape,
   assertPublicGameEvent,
 } from '../events/guards'
+import { eventsToLogEntries } from '../events/log-mapper'
+import type { GameEvent } from '../contract/events'
 
 export * from './state-constants'
 
@@ -506,6 +508,16 @@ export const createInitialState = (
     phase = 'draft'
   }
 
+  const initialEvents: GameEvent[] = [{
+    schemaVersion: 1,
+    id: '1',
+    seq: 1,
+    round: 1,
+    phase: 'work',
+    type: 'game.started',
+    visibility: 'public',
+  }]
+  const playerNames = Object.fromEntries(players.map((p) => [p.id, p.name]))
   const initialState: GameState = {
     round: 1,
     phase,
@@ -514,9 +526,9 @@ export const createInitialState = (
     currentPlayerIndex: 0,
     players,
     actionSpaces: createActionSpaces(options.playerCount ?? 2),
-    log: [{ key: 'log.startGame' }],
-    events: [],
-    nextEventSeq: 1,
+    log: eventsToLogEntries(initialEvents, { playerNames }),
+    events: initialEvents,
+    nextEventSeq: 2,
     roundStartSnapshot: null,
     roundActionOrder,
     gameSeed,

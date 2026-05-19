@@ -66,9 +66,8 @@ const finishOk = (
   p: RecallPlacedWorkerParams,
 ) => {
   if (sourceCard && p.flagSourceCard) setCardFlag(player, sourceCard, true)
-  return sourceCard && p.logCardTrigger
-    ? { type: 'ok' as const, logKey: 'log.cardEffectTrigger', logParams: { cardId: sourceCard } }
-    : { type: 'ok' as const, logKey: 'log.cardEffectTrigger' }
+  void p.logCardTrigger
+  return { type: 'ok' as const }
 }
 
 export const recallPlacedWorkerAction: ActionDefinition = {
@@ -92,7 +91,7 @@ export const recallPlacedWorkerAction: ActionDefinition = {
     // ── Direct mode ────────────────────────────────────────────────
     if (p.workerId !== undefined) {
       const ok = recallWorkerById(state, player, p.workerId, { targetCardHold })
-      if (!ok && !p.noOpIfMissing) return { type: 'fail', logKey: 'log.actionFail' }
+      if (!ok && !p.noOpIfMissing) return { type: 'fail', errorKey: 'log.actionFail' }
       return finishOk(player, sourceCard, p)
     }
 
@@ -107,7 +106,7 @@ export const recallPlacedWorkerAction: ActionDefinition = {
       return true
     })
 
-    if (candidates.length === 0) return { type: 'fail', logKey: 'log.actionFail' }
+    if (candidates.length === 0) return { type: 'fail', errorKey: 'log.actionFail' }
 
     if (candidates.length === 1) {
       const only = candidates[0]!
@@ -134,7 +133,7 @@ export const recallPlacedWorkerAction: ActionDefinition = {
     const target = state.actionSpaces.find(
       (space) => space.id === choice && spaceHasPlayer(space, player.id),
     )
-    if (!target) return { type: 'fail', logKey: 'log.actionFail' }
+    if (!target) return { type: 'fail', errorKey: 'log.actionFail' }
     const placements = getRoundPlacementDetails(player)
     const entry = placements.find((e) => e.spaceId === target.id)
     const removed = removeWorkerRef(target, player.id, entry?.workerId)

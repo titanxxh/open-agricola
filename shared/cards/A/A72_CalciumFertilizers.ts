@@ -44,8 +44,6 @@ const listener: CardListenerRegistration = {
     }
 
     return {
-      logKey: 'log.cardEffectGain',
-      logParams: { cardId: CARD_ID },
       sourceCard: CARD_ID,
     }
   },

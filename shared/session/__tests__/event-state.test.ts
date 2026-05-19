@@ -26,8 +26,11 @@ describe('event state bootstrap', () => {
       playerNames: ['Alice', 'Bob'],
     })
 
-    expect(state.events).toEqual([])
-    expect(state.nextEventSeq).toBe(1)
+    expect(state.events).toEqual([
+      expect.objectContaining({ type: 'game.started', seq: 1 }),
+    ])
+    expect(state.nextEventSeq).toBe(2)
+    expect(state.log).toEqual([{ key: 'log.startGame' }])
   })
 
   it('preserves initial event state in the round start snapshot', () => {
@@ -36,8 +39,10 @@ describe('event state bootstrap', () => {
       playerNames: ['Alice', 'Bob'],
     })
 
-    expect(state.roundStartSnapshot?.events).toEqual([])
-    expect(state.roundStartSnapshot?.nextEventSeq).toBe(1)
+    expect(state.roundStartSnapshot?.events).toEqual([
+      expect.objectContaining({ type: 'game.started', seq: 1 }),
+    ])
+    expect(state.roundStartSnapshot?.nextEventSeq).toBe(2)
   })
 
   it('backfills event state for legacy raw states', () => {
@@ -84,6 +89,32 @@ describe('event state bootstrap', () => {
 
     expect(normalized.events).toEqual([makeEvent(1)])
     expect(normalized.nextEventSeq).toBe(5)
+  })
+
+  it('drops persisted events with nested private payloads', () => {
+    const state = createInitialState(1)
+    const nestedPrivate = {
+      ...makeEvent(2),
+      to: { kind: 'player', playerId: 'p1', prompt: { kind: 'choose-card' } },
+    }
+    const raw = {
+      ...state,
+      events: [makeEvent(1), nestedPrivate],
+      nextEventSeq: 3,
+    } as unknown as GameState
+
+    const normalized = normalizeState(raw)
+    const rehydrated = rehydrateState({
+      ...raw,
+      actionSpaces: [],
+      roundStartSnapshot: null,
+      engineStack: { frames: [] },
+    } as never).state
+
+    expect(normalized.events).toEqual([makeEvent(1)])
+    expect(normalized.nextEventSeq).toBe(3)
+    expect(rehydrated.events).toEqual([makeEvent(1)])
+    expect(rehydrated.nextEventSeq).toBe(3)
   })
 
   it('preserves event state through serialize and rehydrate JSON roundtrip', () => {

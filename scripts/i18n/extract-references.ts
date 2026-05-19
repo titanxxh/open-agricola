@@ -22,7 +22,6 @@ const KEY_PROP_NAMES = new Set([
   'nameKey',
   'descKey',
   'descriptionKey',
-  'logKey',
   'promptKey',
   'titleKey',
   'labelKey',

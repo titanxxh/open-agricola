@@ -96,8 +96,6 @@ const choosePairsAction: ActionDefinition = {
       gainResources(player, gain)
       return {
         type: 'ok',
-        logKey: 'log.cardEffectTrigger',
-        logParams: { card: CARD_ID },
         resourcesGained: gain,
       }
     }
@@ -117,8 +115,6 @@ const choosePairsAction: ActionDefinition = {
     gainResources(player, gain)
     return {
       type: 'ok',
-      logKey: 'log.cardEffectTrigger',
-      logParams: { card: CARD_ID },
       resourcesGained: gain,
     }
   },

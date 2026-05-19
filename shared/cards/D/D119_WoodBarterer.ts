@@ -32,8 +32,6 @@ const beforeListener: CardListenerRegistration = {
           }),
         ],
       },
-      logKey: 'log.cardEffectTrigger',
-      logParams: { cardId: CARD_ID },
       sourceCard: CARD_ID,
     }
   },

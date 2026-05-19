@@ -13,8 +13,6 @@ export const listener: CardListenerRegistration = {
     incCounter(context.player, CARD_ID, 'observedCount')
     return {
       flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 } },
-      logKey: 'log.cardGrantedAction',
-      logParams: { cardId: CARD_ID, actionId: 'gain' },
       sourceCard: CARD_ID,
     }
   },

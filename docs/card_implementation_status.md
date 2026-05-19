@@ -147,14 +147,14 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 
 | 维度 | BGA | OA | 差距 |
 |---|---|---|---|
-| 生命周期事件 | `startNewTurn`、`revealActionCard`、`accumulate`、`startWork`、`startReturnHome`、`startHarvest*` 等都有 notification type 和结构化 payload。 | 有 `log.enterRound`、`log.harvest*`、`log.placeFarmer` 等可见 log。 | OA 对 reveal、accumulation、return-home 等事件的结构化记录较少，`B23_FinalScenario` 这类依赖行动卡 reveal/exclusive-use 的卡缺少可审计事件。 |
-| 行动和资源移动 | BGA 区分 `collectResources`、`gainResources`、`receiveResource(s)`、`receiveRoundResource`、`exchange`、`breed`，payload 包含 resources、source、sourceInfo、space/location/card。 | OA 已新增公共 `GameState.events`，`collect` / `gain` / `exchange` / `pay` 等路径开始记录来源；旧 `GameState.log` 仍保留为 UI 可见日志。 | 仍需扩大到 batch exchange、reveal/exclusive-use、更多卡牌 UI 标记；`B81_Handcart` 已不再从供应区反推。 |
+| 生命周期事件 | `startNewTurn`、`revealActionCard`、`accumulate`、`startWork`、`startReturnHome`、`startHarvest*` 等都有 notification type 和结构化 payload。 | 已新增 `round.started`、`work.started`、`returnHome.started`、`harvest.phaseStarted`、`action.revealed`、`action.accumulated`、`worker.placed/returned` 等公共事件；旧 `log.enterRound`、`log.harvest*`、`log.placeFarmer` 仍保留。 | lifecycle 已有可审计基础；下一步是把仍直写的 session log 全部改为事件 mapper 派生，并补 exclusive-use 类事件。 |
+| 行动和资源移动 | BGA 区分 `collectResources`、`gainResources`、`receiveResource(s)`、`receiveRoundResource`、`exchange`、`breed`，payload 包含 resources、source、sourceInfo、space/location/card。 | OA 已新增公共 `GameState.events`，`collect` / `gain` / `exchange` / `pay` / `reap` / `breed` / action/card/round-card accumulation 等路径记录来源；`GameState.log` 作为事件派生 UI 缓存保留。 | `B81_Handcart` 已不再从供应区反推；后续主要补 replay/undo 和更多动画通知映射。 |
 | 支付记录 | BGA `payResources` / `payResourcesTo` / `payWithCard` / `payResourcesFromFields` / `payResourcesFromCards` 会记录 source、cardSources、field/card 来源和接收玩家。 | OA 部分支付路径有 `resourcesPaid`、`costResources`、`sourceCards`，但 legacy/direct path 仍会丢 selected bonus 或来源。 | 支付 provenance 不统一，`E123_ResourceHoarder` 这类依赖 bonus choice/payment source 的卡仍有 fallback 风险。 |
-| 卡牌状态和 UI 标记 | BGA 有 `updateCardStats`、`placeInfobox`、`updateInfobox`、`markUsableExchange`、`populateCardCache`、`refreshHand` 等通知。 | OA 有 `player.cardStates`、card refs hover 和部分 log 文案；UI 主要从 state 渲染。 | card state 变更没有统一的可见/可审计事件层，调试计数器、infobox、可用 exchange 标记时不如 BGA 清楚。 |
+| 卡牌状态和 UI 标记 | BGA 有 `updateCardStats`、`placeInfobox`、`updateInfobox`、`markUsableExchange`、`populateCardCache`、`refreshHand` 等通知。 | `special-effect` 已为公开 card state、counter、flag、infobox、stack、board swap、future meeple、field crop、fence、stable、action-space move 等分支 emit 结构化事件；UI 仍主要从 state 渲染。 | 私有手牌/prompt 不进入公共事件；可用 exchange 标记和部分客户端动画仍需后续事件映射。 |
 | 私有/公开通知 | BGA 显式区分 `notifyAll` 和 `notify($player, ...)`，手牌、draft、living-hand 等只发给目标玩家。 | OA 通过 snapshot/privacy 处理可见数据，`state.log` 基本是公共时间线。 | 私有 prompt/手牌类事件不进入独立 per-recipient log；如果后续要复盘或旁观，需要额外事件模型。 |
 | undo / replay | BGA undo 会回滚 DB 变更，按 `snapshot_packet_id` 或 move id 取消 gamelog packet，并通知客户端清除旧 turn log。 | OA 有 session state/history，但可见 `state.log` 没有 canceled packet / archived log 语义。 | undo 后日志可追溯性弱于 BGA；当前不一定阻塞卡牌对齐，但会影响调试、复盘和多人同步解释。 |
 
-结论：不要照抄 BGA 把 notification 当规则源的做法；OA 应保持后端 state 权威。当前已补一个比 `GameState.log` 更底层的公共结构化事件层：规则执行时记录事件，再由事件派生 UI log、动画提示、审计报告和未来 replay。后续继续补齐 replay/undo、私有事件分流和更多事件映射，而不是继续在单卡里重复补 `logKey` / `immediateLogs`。
+结论：不要照抄 BGA 把 notification 当规则源的做法；OA 应保持后端 state 权威。当前已补一个比 `GameState.log` 更底层的公共结构化事件层：规则执行时记录事件，再由事件派生 UI log、动画提示、审计报告和未来 replay。事件层已覆盖资源主干、农场主干、阶段事件和 `special-effect` 主分支；剩余风险集中在私有事件分流、replay/undo 语义和更多客户端动画映射。
 
 ## 8. BGA 坏味道：不要照抄
 

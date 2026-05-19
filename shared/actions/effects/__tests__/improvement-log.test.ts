@@ -62,51 +62,27 @@ const createPlayer = (): PlayerState => ({
 })
 
 describe('improvement logging', () => {
-  it('logs costResources for minor improvement', () => {
+  it('plays minor improvement', () => {
     const state = createState()
     const player = createPlayer()
     const result = playImprovement(state, player, 'minor:A53_Claypipe', 'any')
     expect(result.type).toBe('ok')
     if (result.type !== 'ok') return
-    expect(result.immediateLogs).toEqual([
-      {
-        key: 'log.playMinorImprovement',
-        params: {
-          improvements: 'A53_Claypipe',
-          costResources: { clay: 1 },
-        },
-      },
-    ])
-    expect(result.logKey).toBe('log.playMinorImprovement')
-    expect(result.logParams).toEqual({
-      improvements: 'A53_Claypipe',
-      costResources: { clay: 1 },
-    })
+    expect(player.minorPlayed).toContain('A53_Claypipe')
+    expect(player.resources.clay).toBe(2)
   })
 
-  it('logs costResources for major improvement', () => {
+  it('plays major improvement', () => {
     const state = createState()
     const player = createPlayer()
     const result = playImprovement(state, player, 'major:Major_Fireplace1', 'any')
     expect(result.type).toBe('ok')
     if (result.type !== 'ok') return
-    expect(result.immediateLogs).toEqual([
-      {
-        key: 'log.playImprovement',
-        params: {
-          improvements: 'Major_Fireplace1',
-          costResources: { clay: 2 },
-        },
-      },
-    ])
-    expect(result.logKey).toBe('log.playImprovement')
-    expect(result.logParams).toEqual({
-      improvements: 'Major_Fireplace1',
-      costResources: { clay: 2 },
-    })
+    expect(player.improvements).toContain('Major_Fireplace1')
+    expect(player.resources.clay).toBe(1)
   })
 
-  it('emits immediateLogs for major improvement when onBuy returns flow', () => {
+  it('returns onBuy flow for major improvement', () => {
     const state = createState()
     state.availableMajorImprovements = ['Major_ClayOven']
     const player = createPlayer()
@@ -117,15 +93,7 @@ describe('improvement logging', () => {
 
     expect(result.type).toBe('flow')
     if (result.type !== 'flow') return
-    expect(result.immediateLogs).toEqual([
-      {
-        key: 'log.playImprovement',
-        params: {
-          improvements: 'Major_ClayOven',
-          costResources: { clay: 3, stone: 1 },
-        },
-      },
-    ])
+    expect(player.improvements).toContain('Major_ClayOven')
   })
 
   it('returns stable improvementPayment for Fireplace upgrade to Cooking Hearth', () => {
@@ -173,15 +141,6 @@ describe('improvement logging', () => {
 
     expect(result.type).toBe('flow')
     if (result.type !== 'flow') return
-    expect(result.immediateLogs).toEqual([
-      {
-        key: 'log.playMinorImprovement',
-        params: {
-          improvements: 'C60_SmallPottersOven',
-          costResources: { clay: 2 },
-        },
-      },
-    ])
     expect(result.extraData?.improvementPayment).toEqual({
       improvementId: 'C60_SmallPottersOven',
       resourcesPaid: { clay: 2 },

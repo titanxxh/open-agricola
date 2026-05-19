@@ -1,7 +1,7 @@
 import type {
   ActionCostPreview,
   ActionDefinition,
-  ActionExecutionContext,
+  ActionMutationContext,
   ActionExecutionResult,
   FarmTilePosition,
   GameState,
@@ -39,15 +39,15 @@ const buildSingletonState = (player: PlayerState): GameState =>
 export const buildStable = (player: PlayerState): ActionExecutionResult => {
   const next = getNextEmptyTileForPlayer(player)
   if (!next) {
-    return { type: 'fail', logKey: 'log.buildStableFail' }
+    return { type: 'fail', errorKey: 'log.buildStableFail' }
   }
   const stableCtx: PaymentCtx = { actionId: 'stables', costType: 'none' }
   if (!PaymentSolver.canAfford(buildSingletonState(player), 0, { wood: stableWoodCost }, stableCtx)) {
-    return { type: 'fail', logKey: 'log.buildStableFail' }
+    return { type: 'fail', errorKey: 'log.buildStableFail' }
   }
   payResources(player, { wood: stableWoodCost })
   player.stableTiles.push(next)
-  return { type: 'ok', logKey: 'log.buildStable' }
+  return { type: 'ok' }
 }
 
 const stablesCostPreview: ActionCostPreview = {
@@ -96,14 +96,14 @@ const applyPlayerMutation = (target: PlayerState, source: PlayerState) => {
 }
 
 const finalizeStables = (
-  ctx: ActionExecutionContext,
+  ctx: ActionMutationContext,
   stables: FarmTilePosition[],
   paymentChoice: string | undefined,
 ): ActionExecutionResult => {
   const lockedKeys = collectLockedFarmTileKeys(ctx.player)
   const idx = ctx.state.players.indexOf(ctx.player)
   const validated = playerBoard(ctx.state, idx).farmyard.canBuildStable(stables, lockedKeys)
-  if (!validated.ok) return { type: 'fail', logKey: validated.code ?? 'log.buildStableFail' }
+  if (!validated.ok) return { type: 'fail', errorKey: validated.code ?? 'log.buildStableFail' }
   const costOverride = readCostOverride(ctx.actionContext) ?? ctx.costs
   const costPerStable = applyCostOverride({ wood: stableWoodCost }, costOverride)
   const totalCost = scaleCost(costPerStable, stables.length)
@@ -112,10 +112,10 @@ const finalizeStables = (
     totalCost,
     'pay:stable',
     paymentChoice,
-    { type: 'fail', logKey: 'log.buildStableFail' },
+    { type: 'fail', errorKey: 'log.buildStableFail' },
     'stables',
   )
-  if (payment.type !== 'selected') return { type: 'fail', logKey: 'log.buildStableFail' }
+  if (payment.type !== 'selected') return { type: 'fail', errorKey: 'log.buildStableFail' }
   const nextPlayer = JSON.parse(JSON.stringify(ctx.player)) as PlayerState
   executeResolvedTypedFlatPayment(nextPlayer, payment, 'stables')
   nextPlayer.stableTiles = [...nextPlayer.stableTiles, ...stables]
@@ -123,9 +123,31 @@ const finalizeStables = (
   if (ctx.sourceCard) {
     addCardResourceGained(ctx.player, ctx.sourceCard, { stable: stables.length })
   }
+  const resourcesPaid = sanitizePayableCost(payment.solution.resourcesPaid)
+  if (Object.keys(resourcesPaid).length > 0) {
+    ctx.eventSink?.emit<'resource.paid'>({
+      type: 'resource.paid',
+      sourceActionId: ctx.space.id,
+      resources: resourcesPaid,
+      to: { kind: 'supply' },
+      paymentFor: 'stables',
+      paymentSources: [
+        { from: { kind: 'player', playerId: ctx.player.id }, resources: resourcesPaid },
+      ],
+    })
+  }
+  ctx.eventSink?.emit<'farm.stableBuilt'>({
+    type: 'farm.stableBuilt',
+    sourceActionId: ctx.space.id,
+    stables: stables.map((stable) => ({
+      playerId: ctx.player.id,
+      row: stable.row,
+      col: stable.col,
+    })),
+  })
   return {
     type: 'ok',
-    resourcesPaid: sanitizePayableCost(payment.solution.resourcesPaid),
+    resourcesPaid,
     extraData: { builtStables: stables },
   }
 }
@@ -171,7 +193,7 @@ export const stablesAction: ActionDefinition = {
         | undefined
       const stables = farmPayload?.stables
       if (!Array.isArray(stables) || stables.length === 0) {
-        return { type: 'fail', logKey: 'log.buildStableFail' }
+        return { type: 'fail', errorKey: 'log.buildStableFail' }
       }
       return finalizeStables(ctx, stables, choice)
     }
@@ -180,13 +202,13 @@ export const stablesAction: ActionDefinition = {
     if (payload && choice === 'confirm') {
       const stables = (payload as { stables?: FarmTilePosition[] }).stables
       if (!Array.isArray(stables) || stables.length === 0) {
-        return { type: 'fail', logKey: 'NO_SELECTION' }
+        return { type: 'fail', errorKey: 'NO_SELECTION' }
       }
       const lockedKeys = collectLockedFarmTileKeys(ctx.player)
       const idx = ctx.state.players.indexOf(ctx.player)
       const validated = playerBoard(ctx.state, idx).farmyard.canBuildStable(stables, lockedKeys)
       if (!validated.ok) {
-        return { type: 'fail', logKey: validated.code ?? 'log.buildStableFail' }
+        return { type: 'fail', errorKey: validated.code ?? 'log.buildStableFail' }
       }
       const costOverride = readCostOverride(ctx.actionContext) ?? ctx.costs
       const costPerStable = applyCostOverride({ wood: stableWoodCost }, costOverride)
@@ -196,7 +218,7 @@ export const stablesAction: ActionDefinition = {
         totalCost,
         'pay:stable',
         undefined,
-        { type: 'fail', logKey: 'log.buildStableFail' },
+        { type: 'fail', errorKey: 'log.buildStableFail' },
         'stables',
       )
       if (payment.type === 'request') {
@@ -211,12 +233,12 @@ export const stablesAction: ActionDefinition = {
         }
       }
       if (payment.type === 'fail') {
-        return { type: 'fail', logKey: 'log.buildStableFail' }
+        return { type: 'fail', errorKey: 'log.buildStableFail' }
       }
       return finalizeStables(ctx, stables, undefined)
     }
 
-    return { type: 'fail', logKey: 'log.buildStableFail' }
+    return { type: 'fail', errorKey: 'log.buildStableFail' }
   },
 }
 

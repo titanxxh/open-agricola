@@ -100,7 +100,11 @@ export class EventStore {
   }
 
   commitTransaction(state: GameState): GameEvent[] {
-    const committed = [...this.transactionEvents]
+    const committed = this.transactionEvents.map((event, index) => {
+      const seq = state.nextEventSeq + index
+      return { ...event, id: String(seq), seq }
+    })
+    committed.forEach(validateGameEvent)
     state.events.push(...committed)
     state.nextEventSeq += committed.length
     this.rollbackTransaction()

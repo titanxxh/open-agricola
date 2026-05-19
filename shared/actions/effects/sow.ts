@@ -1,6 +1,6 @@
 import type {
   ActionDefinition,
-  ActionExecutionContext,
+  ActionMutationContext,
   ActionExecutionResult,
   PlayerState,
 } from '../../contract/types'
@@ -23,16 +23,16 @@ export const sowCrop = (
 ): ActionExecutionResult => {
   const emptyField = player.fields.find(fieldIsEmpty)
   if (!emptyField) {
-    return { type: 'fail', logKey: 'log.sowFail' }
+    return { type: 'fail', errorKey: 'log.sowFail' }
   }
   const have = player.resources[crop] ?? 0
   if (have <= 0) {
-    return { type: 'fail', logKey: 'log.sowFail' }
+    return { type: 'fail', errorKey: 'log.sowFail' }
   }
   player.resources[crop] = have - 1
   const remaining = crop === 'grain' ? 3 : 2
   emptyField.stacks.push({ kind: crop, remaining })
-  return { type: 'ok', logKey: 'log.sow' }
+  return { type: 'ok' }
 }
 
 const applyPlayerMutation = (target: PlayerState, source: PlayerState) => {
@@ -45,7 +45,7 @@ const applyPlayerMutation = (target: PlayerState, source: PlayerState) => {
 }
 
 const finalizeSow = (
-  ctx: ActionExecutionContext,
+  ctx: ActionMutationContext,
   crops: SowSelection[],
 ): ActionExecutionResult => {
   const player = ctx.player
@@ -95,7 +95,7 @@ const finalizeSow = (
     },
   )
   if (!validated.ok) {
-    return { type: 'fail', logKey: validated.error?.code ?? 'log.action' }
+    return { type: 'fail', errorKey: validated.error?.code ?? 'log.action' }
   }
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
   if (extraAllowedCrops.size > 0) {
@@ -103,11 +103,19 @@ const finalizeSow = (
       const key = positionKey({ row: sel.row, col: sel.col })
       if (extraAllowedCrops.has(key)) {
         const handled = handleSowExtraField(nextPlayer, { row: sel.row, col: sel.col }, sel.crop)
-        if (!handled) return { type: 'fail', logKey: 'invalid extra sow field' }
+        if (!handled) return { type: 'fail', errorKey: 'invalid extra sow field' }
       }
     }
   }
   applyPlayerMutation(player, nextPlayer)
+  ctx.eventSink?.emit<'farm.sown'>({
+    type: 'farm.sown',
+    sows: crops.map((crop) => ({
+      location: { kind: 'field', playerId: player.id, row: crop.row, col: crop.col },
+      crop: crop.crop,
+      added: crop.crop === 'grain' ? 3 : crop.crop === 'vegetable' ? 2 : 1,
+    })),
+  })
   return { type: 'ok' }
 }
 
@@ -141,9 +149,9 @@ export const sowAction: ActionDefinition = {
     if (choice === 'cancel') return { type: 'ok' }
     if (choice === 'confirm' && payload) {
       const crops = (payload as { crops?: SowSelection[] }).crops
-      if (!Array.isArray(crops)) return { type: 'fail', logKey: 'log.action' }
+      if (!Array.isArray(crops)) return { type: 'fail', errorKey: 'log.action' }
       return finalizeSow(ctx, crops)
     }
-    return { type: 'fail', logKey: 'log.action' }
+    return { type: 'fail', errorKey: 'log.action' }
   },
 }

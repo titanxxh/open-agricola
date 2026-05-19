@@ -85,12 +85,12 @@ describe('reorganizeAction.execute', () => {
 })
 
 describe('reorganizeAction.resolveChoice', () => {
-  it('confirm without payload returns fail with logKey', () => {
+  it('confirm without payload returns fail with errorKey', () => {
     const ctx = makeCtx()
     const result = reorganizeAction.resolveChoice!(ctx, 'confirm', undefined)
     expect(result.type).toBe('fail')
     if (result.type !== 'fail') throw new Error('not fail')
-    expect(result.logKey).toBe('log.reorganizeFail')
+    expect(result.errorKey).toBe('log.reorganizeFail')
   })
 
   it('cancel returns ok without mutation', () => {

@@ -67,16 +67,16 @@ const resolveSalterCounts = (
   }
   for (const t of ['sheep', 'boar', 'cattle'] as const) {
     if (!Number.isInteger(counts[t]) || counts[t] < 0) {
-      return { type: 'fail', logKey: `salter-pick.error.invalid-count-${t}` }
+      return { type: 'fail', errorKey: `salter-pick.error.invalid-count-${t}` }
     }
   }
   if (counts.sheep + counts.boar + counts.cattle < 1) {
-    return { type: 'fail', logKey: 'salter-pick.error.must-pick-at-least-one' }
+    return { type: 'fail', errorKey: 'salter-pick.error.must-pick-at-least-one' }
   }
   const onBoard = getAssignedAnimalsByType(player)
   for (const t of ['sheep', 'boar', 'cattle'] as const) {
     if (counts[t] > onBoard[t]) {
-      return { type: 'fail', logKey: `salter-pick.error.invalid-count-${t}` }
+      return { type: 'fail', errorKey: `salter-pick.error.invalid-count-${t}` }
     }
   }
   subtractAnimalsFromBoard(player, counts)
@@ -91,15 +91,10 @@ const resolveSalterCounts = (
         resources: { food: counts[t] },
       }),
     )
+  void buildSalterLogParams
   return {
     type: 'flow',
     flow: flows.length === 1 ? flows[0] : { type: 'seq', children: flows },
-    immediateLogs: [
-      {
-        key: 'log.salterFutureFood',
-        params: buildSalterLogParams(state, counts),
-      },
-    ],
   }
 }
 
@@ -120,7 +115,7 @@ export const salterPickAction: ActionDefinition = {
     }
     const onBoard = getAssignedAnimalsByType(player)
     if (onBoard.sheep + onBoard.boar + onBoard.cattle < 1) {
-      return { type: 'fail', logKey: 'salter-pick.error.no-animals-on-board' }
+      return { type: 'fail', errorKey: 'salter-pick.error.no-animals-on-board' }
     }
     return {
       type: 'request',

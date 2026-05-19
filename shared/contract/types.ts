@@ -273,11 +273,6 @@ export type LogEntry = {
   params?: Record<string, unknown>
 }
 
-export type ImmediateLogEntry = {
-  key: string
-  params?: Record<string, unknown>
-}
-
 export type FutureMeepleRoomType = 'wood' | 'clay' | 'stone'
 
 export type FutureMeeple = {
@@ -485,10 +480,10 @@ export type ActionChoiceOption = {
  * Use plain JSON-serializable values; Map/Set/Date are not preserved across snapshot/rehydrate.
  */
 export type ActionExecutionResult =
-  | { type: 'ok'; logKey?: string; resourcesGained?: Partial<Resource>; resourcesPaid?: Partial<Resource>; logParams?: Record<string, unknown>; immediateLogs?: ImmediateLogEntry[]; extraData?: Record<string, unknown> }
+  | { type: 'ok'; resourcesGained?: Partial<Resource>; resourcesPaid?: Partial<Resource>; extraData?: Record<string, unknown> }
   | { type: 'request'; request: InteractionRequest; promptKey?: PromptKey; promptParams?: Record<string, unknown>; sourceCard?: string; extraData?: Record<string, unknown> }
-  | { type: 'fail'; logKey: string; recoverable?: boolean }
-  | { type: 'flow'; flow: ActionFlow; logKey?: string; logParams?: Record<string, unknown>; immediateLogs?: ImmediateLogEntry[]; extraData?: Record<string, unknown> }
+  | { type: 'fail'; errorKey: string; recoverable?: boolean }
+  | { type: 'flow'; flow: ActionFlow; extraData?: Record<string, unknown> }
 export type ActionFlow =
   | {
       type: 'leaf'

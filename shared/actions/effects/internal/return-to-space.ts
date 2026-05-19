@@ -21,7 +21,7 @@ export const returnToSpaceAction: ActionDefinition = {
   },
   execute: ({ player, space, params }) => {
     if (!canReturnResourcesToSpace(player.resources, params)) {
-      return { type: 'fail', logKey: 'log.exchangeFail' }
+      return { type: 'fail', errorKey: 'log.exchangeFail' }
     }
     Object.entries(params ?? {}).forEach(([key, value]) => {
       if (typeof value !== 'number' || value <= 0) return

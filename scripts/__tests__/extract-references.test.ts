@@ -18,7 +18,7 @@ describe('extractReferencesFromSource', () => {
   it('extracts *Key: literal property assignments', () => {
     const src = `
       const a = { nameKey: 'actions.foo.name' }
-      const b = { descKey: 'cards.A1.desc', logKey: 'log.foo' }
+      const b = { descKey: 'cards.A1.desc' }
       const c = { promptKey: 'prompt.bar', titleKey: 'ui.t', labelKey: 'ui.l' }
       const d = { i18nKey: 'ui.x', descriptionKey: 'ui.y' }
     `
@@ -27,7 +27,6 @@ describe('extractReferencesFromSource', () => {
     expect(keys).toEqual([
       'actions.foo.name',
       'cards.A1.desc',
-      'log.foo',
       'prompt.bar',
       'ui.l',
       'ui.t',

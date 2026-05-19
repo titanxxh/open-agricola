@@ -46,7 +46,7 @@ describe('improvement: pay fail idempotent', () => {
 
     const resp = session.takeAction(0, 'major-improvement')
     // No options affordable -> action should fail without mutating state.
-    // (Either resp.ok=false / fail logKey, or pending=choice with no Fireplace1 option.)
+    // (Either resp.ok=false / fail errorKey, or pending=choice with no Fireplace1 option.)
     const after = resp.state.players[0]!
     expect(after.improvements).toEqual(beforeImprovements)
     expect(after.minorPlayed).toEqual(beforeMinorPlayed)

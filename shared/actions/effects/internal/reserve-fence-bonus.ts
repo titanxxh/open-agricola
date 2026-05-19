@@ -10,7 +10,7 @@ export const reserveFenceBonusAction: ActionDefinition = {
   canBeExecutedByPlayer: () => true,
   execute: ({ player, params, sourceCard }) => {
     if (!sourceCard || typeof params?.freeFences !== 'number' || params.freeFences <= 0) {
-      return { type: 'fail', logKey: 'log.exchangeFail' }
+      return { type: 'fail', errorKey: 'log.exchangeFail' }
     }
     storePendingFenceBonus(player, {
       sourceCard,

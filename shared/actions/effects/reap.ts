@@ -66,6 +66,11 @@ export const reap = (
     const top = fieldTopStack(field)
     if (!top || top.remaining <= 0) return
     const kind = top.kind
+    const cropEvent = {
+      location: { kind: 'field' as const, playerId: player.id, row: field.row, col: field.col },
+      crop: kind,
+      amount: 1,
+    }
     player.resources[kind] = (player.resources[kind] ?? 0) + 1
     reapSummary.resources[kind] = (reapSummary.resources[kind] ?? 0) + 1
     if (kind === 'grain') {
@@ -78,6 +83,18 @@ export const reap = (
     reapSummary.harvestedPositions!.push({ row: field.row, col: field.col })
     top.remaining -= 1
     fieldPopIfDepleted(field)
+    eventSink?.emit<'farm.cropRemoved'>({
+      type: 'farm.cropRemoved',
+      crops: [cropEvent],
+      reason: 'harvest',
+    })
+    eventSink?.emit<'resource.moved'>({
+      type: 'resource.moved',
+      resources: { [kind]: 1 },
+      from: cropEvent.location,
+      to: { kind: 'player', playerId: player.id },
+      reason: 'harvest',
+    })
   })
 
   if (reapSummary.grainFields > 0) {

@@ -78,6 +78,17 @@ describe('reorganizeAction engine sub-flow integration', () => {
     expect(resp.state.players[0]!.resources.sheep).toBe(1)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId)
       .toBe('confirm-next-player')
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'farm.animalMoved',
+        animals: { sheep: 1 },
+      }),
+      expect.objectContaining({
+        type: 'farm.animalDiscarded',
+        animals: { sheep: 2 },
+        reason: 'noRoom',
+      }),
+    ]))
     const discardLog = resp.state.log.find((entry) => entry.key === 'log.reorganizeDiscard')
     expect(discardLog?.params).toMatchObject({
       player: resp.state.players[0]!.name,

@@ -1,4 +1,8 @@
 import type {
+  DraftGameEvent,
+  EventSink,
+} from '../contract/events.ts'
+import type {
   ActionChoiceOption,
   ActionFlow,
   ActionSpace,
@@ -104,6 +108,7 @@ import {
   BASIC_CONVERSION_SOURCE_ID,
   getBasicConversionExchange,
 } from '../cards/basic-conversion.ts'
+import { appendImmediateEvents, type ImmediateEventDraft } from '../events/append.ts'
 import {
   applyTradeSideEffect,
 } from '../actions/payment/internal'
@@ -171,6 +176,15 @@ type ActionDetailResourceDelta = {
   gains?: Partial<Resource>
   costs?: Partial<Resource>
 }
+
+const captureEventSink = (events: DraftGameEvent[]): EventSink => ({
+  emit: (event) => {
+    events.push(event)
+  },
+  emitMany: (nextEvents) => {
+    events.push(...nextEvents)
+  },
+})
 
 const actionDetailResourceDeltas = (
   result: ActionExecutionResult,
@@ -1030,13 +1044,17 @@ export class GameCore {
 
   private logHarvestResourceEntry(key: string, player: PlayerState, resources: Partial<Resource>) {
     if (!this.hasPositiveResources(resources)) return
-    this.state.log.unshift({
-      key,
-      params: {
-        player: player.name,
+    if (key === 'log.harvestFeedDetail') {
+      appendImmediateEvents(this.state, [{
+        type: 'resource.paid',
         resources,
-      },
-    })
+        paymentFor: 'feeding',
+        paymentSources: [{ from: { kind: 'player', playerId: player.id }, resources }],
+      }], {
+        actorPlayerId: player.id,
+        sourceActionId: 'harvest-feeding',
+      })
+    }
   }
 
   private hasAnyHarvestExchange(player: PlayerState) {
@@ -1812,7 +1830,6 @@ export class GameCore {
       }
       return
     }
-    if (result.logKey) return
     if (detailPlayerId && defaultPlayerId && detailPlayerId !== defaultPlayerId) return
     this.addPositiveResourceDetails('gains', result.resourcesGained)
     this.addPositiveResourceDetails('costs', result.resourcesPaid)
@@ -1844,14 +1861,10 @@ export class GameCore {
       || detailParts.effects?.bakeBread
     ) return
     if (!hasGains && !hasCosts && !hasEffects) return
-    this.state.log.unshift({
-      key: 'log.actionDetail',
-      params: {
-        player: player.name,
-        action: space.nameKey,
-        detailParts,
-      },
-    })
+    void space
+    void detailParts
+    player._activeActionBonusSources = []
+    this.actionStartPlayerSnapshot = this.clonePlayer(player)
   }
 
   /**
@@ -1863,9 +1876,8 @@ export class GameCore {
    * Skipped when:
    *   - no active snapshot (no in-flight action),
    *   - leaf actionId equals the top-level activeSpaceId (the wrapper itself),
-   *   - the action wrote its own logKey (e.g. `log.sow`, `log.buildStable`),
-   *   - the resulting change is already covered by a dedicated immediate log
-   *     (for example improvement / bake-bread).
+   *   - the resulting change is already covered by a dedicated event-derived
+   *     log (for example improvement / bake-bread).
    */
   private flushLeafActionDetail(
     actionId: string | undefined,
@@ -1899,15 +1911,12 @@ export class GameCore {
       this.actionStartPlayerSnapshot = this.clonePlayer(player)
       return
     }
-    const labelKey = def.nameKey ?? `actions.${actionId}.name`
-    this.state.log.unshift({
-      key: 'log.actionDetail',
-      params: {
-        player: player.name,
-        action: labelKey,
-        detailParts,
-      },
-    })
+    const frame = this.engineStack.current()
+    const space = frame?.spaceId ? this.getSpaceById(frame.spaceId) : undefined
+    if (frame && space) {
+      frame.engine.flushEventTransaction({ state: this.state, player, space })
+      this.flushEngineLog()
+    }
     player._activeActionBonusSources = []
     this.actionStartPlayerSnapshot = this.clonePlayer(player)
   }
@@ -2017,7 +2026,10 @@ export class GameCore {
   private continueHarvestFieldStart(playerIndex = 0, cardIndex = 0): SessionResponse {
     if (playerIndex === 0 && cardIndex === 0) {
       this.state.roundPhase = 'field'
-      this.state.log.unshift({ key: 'log.harvestPhaseReap' })
+      appendImmediateEvents(this.state, [{
+        type: 'harvest.phaseStarted',
+        harvestPhase: 'field',
+      }])
       this.state.harvestReapSummary = {}
       const harvestOrder = this.getHarvestPlayerIndices()
       harvestOrder.forEach((index) => {
@@ -2053,10 +2065,17 @@ export class GameCore {
       // E58 LunchtimeBeer (and any future card) may flag a player to skip
       // the field phase of the current harvest. Flagged players are not reaped.
       if (this.hasPassFieldAndBreed(player)) {
-        this.state.log.unshift({ key: 'log.harvestReapSkipped', params: { player: player.name } })
+        appendImmediateEvents(this.state, [{ type: 'harvest.reapSkipped', playerId: player.id }], {
+          actorPlayerId: player.id,
+        })
         return
       }
-      const result = reap(this.state, player)
+      const reapEvents: DraftGameEvent[] = []
+      const result = reap(this.state, player, captureEventSink(reapEvents))
+      appendImmediateEvents(this.state, reapEvents, {
+        actorPlayerId: player.id,
+        sourceActionId: 'reap',
+      })
       const entry = this.state.harvestReapSummary![player.id]!
       entry.grainFields += result.reapSummary.grainFields
       entry.vegetableFields += result.reapSummary.vegetableFields
@@ -2072,10 +2091,10 @@ export class GameCore {
       }
       incHarvestedGrain(player, result.reapSummary.resources.grain ?? 0)
       incHarvestedVegetable(player, result.reapSummary.resources.vegetable ?? 0)
-      if (this.hasPositiveResources(entry.resources)) {
-        this.logHarvestResourceEntry('log.harvestReapDetail', player, entry.resources)
-      } else {
-        this.state.log.unshift({ key: 'log.harvestReapNothing', params: { player: player.name } })
+      if (!this.hasPositiveResources(entry.resources)) {
+        appendImmediateEvents(this.state, [{ type: 'harvest.reapNothing', playerId: player.id }], {
+          actorPlayerId: player.id,
+        })
       }
     })
     return this.continueAfterReapEffects()
@@ -2103,6 +2122,10 @@ export class GameCore {
     }
 
     this.state.roundPhase = 'feeding'
+    appendImmediateEvents(this.state, [{
+      type: 'harvest.phaseStarted',
+      harvestPhase: 'feeding',
+    }])
     if (this.continueStageHook('onStartHarvestFeedingPhase')) {
       return this.respond()
     }
@@ -2111,7 +2134,6 @@ export class GameCore {
 
   private continueHarvestFeeding(playerIndex = 0, cardIndex = 0): SessionResponse {
     if (playerIndex === 0 && cardIndex === 0) {
-      this.state.log.unshift({ key: 'log.harvestPhaseFeed' })
       const harvestOrder = this.getHarvestPlayerIndices()
       harvestOrder.forEach((index) => {
         const player = this.state.players[index]
@@ -2203,8 +2225,54 @@ export class GameCore {
       return this.respond()
     }
     this.state.players.forEach((player) => resetRoundPlacements(player))
+    const roundOpen = createRoundOpenById(this.state.roundActionOrder)
+    const futureResolvedEvents = this.state.futureMeeples
+      .filter((entry) =>
+        entry.round === this.state.round &&
+        this.state.players.some((player) => player.id === entry.playerId),
+      )
+      .map((entry) => ({
+        type: 'futureMeeple.resolved',
+        playerId: entry.playerId,
+        cardId: entry.cardId,
+        sourceCardId: entry.cardId,
+        round: entry.round,
+        ...(Object.keys(entry.resources ?? {}).length > 0 ? { resources: entry.resources } : {}),
+        ...(entry.roomType ? { roomType: entry.roomType } : {}),
+      }) as ImmediateEventDraft)
+    const actionEvents = this.state.actionSpaces.flatMap((space): ImmediateEventDraft[] => {
+      const openRound = roundOpen.get(space.id) ?? space.roundAvailable
+      const events: ImmediateEventDraft[] = []
+      if (this.state.round === openRound) {
+        events.push({
+          type: 'action.revealed',
+          actionId: space.id,
+          roundSlot: this.state.round,
+        })
+      }
+      if (this.state.round >= openRound) {
+        const resources: Partial<Resource> = {}
+        resourceKeyList.forEach((key) => {
+          const amount = space.gainPerRound[key] ?? 0
+          if (amount > 0) resources[key] = amount
+        })
+        if (Object.keys(resources).length > 0) {
+          events.push({
+            type: 'action.accumulated',
+            spaceId: space.id,
+            resources,
+          })
+        }
+      }
+      return events
+    })
     applyRoundGrowth(this.state)
     applyFutureMeeples(this.state)
+    appendImmediateEvents(this.state, [
+      { type: 'round.started' },
+      ...futureResolvedEvents,
+      ...actionEvents,
+    ])
     if (this.continueStageHook('onRoundStart')) {
       return this.respond()
     }
@@ -2214,7 +2282,7 @@ export class GameCore {
       incFirstPlayer(this.state.players[startIdx]!)
     }
     this.state.roundPhase = 'work'
-    this.state.log.unshift({ key: 'log.enterRound', params: { round: this.state.round } })
+    appendImmediateEvents(this.state, [{ type: 'work.started' }])
     this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
     this.engineStack.clear()
     this.history = []
@@ -2542,7 +2610,7 @@ export class GameCore {
             this.flushEngineLog()
             if (result.type === 'ok' && resolvedActionId && !isInjectedAnytimeResult(result)) {
               this.recordActionResultDetails(result, frameOwnerPlayer.id, player.id)
-              this.flushLeafActionDetail(resolvedActionId, Boolean(result.logKey))
+              this.flushLeafActionDetail(resolvedActionId, false)
             }
             if (result.type === 'request' && result.request.kind === 'choice') {
               const requestOptions = result.request.options
@@ -2600,7 +2668,7 @@ export class GameCore {
         !isInjectedAnytimeResult(step.result)
       ) {
         this.recordActionResultDetails(step.result, frameOwnerPlayer.id, player.id)
-        this.flushLeafActionDetail(step.actionId, Boolean(step.result.logKey))
+        this.flushLeafActionDetail(step.actionId, false)
       }
 
       // NOTE: the legacy `step.result.type === 'animalReorg'` block lived
@@ -2617,6 +2685,8 @@ export class GameCore {
 
       if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
         const pIdx = effectivePlayerIndex
+        frame.engine.flushEventTransaction({ state: this.state, player, space })
+        this.flushEngineLog()
         // Parent frame stays on the stack; reorganize sub-flow is pushed on
         // top. When it completes, resumeStageFlow's onReorganizeComplete
         // branch detects the parent frame and calls runEngineSteps again.
@@ -2889,7 +2959,7 @@ export class GameCore {
         this.currentFrameOwnerPlayerId(player.id),
         player.id,
       )
-      this.flushLeafActionDetail(resolvedActionId, Boolean(result.logKey))
+      this.flushLeafActionDetail(resolvedActionId, false)
     }
     if (result.type === 'request' && result.request.kind === 'choice') {
       // The engine's `applyInteractionRequest` already wired the follow-up
@@ -2899,14 +2969,14 @@ export class GameCore {
     }
     if (result.type === 'fail') {
       if (result.recoverable === true) {
-        return this.respond(false, result.logKey ?? 'action failed')
+        return this.respond(false, result.errorKey ?? 'action failed')
       }
       this.engineStack.pop()
       this.actionStartIndex = null
       this.actionStartPlayerSnapshot = null
       delete player._activeActionBonusSources
       this.turnOwnerPlayerIndex = null
-      return this.respond(false, result.logKey ?? 'action failed')
+      return this.respond(false, result.errorKey ?? 'action failed')
     }
     this.runEngineSteps()
     return this.respond()
@@ -3113,15 +3183,13 @@ export class GameCore {
             if (fromKey0) addFoodFromConversion(player, fromKey0, total)
           }
         }
-        this.state.log.unshift({
-          key: 'log.harvestFeedConvert',
-          params: {
-            player: player.name,
-            source: sel.sourceName ?? 'Harvest conversion',
-            cost: costMap,
-            food: gainMap,
-          },
-        })
+        appendImmediateEvents(this.state, [{
+          type: 'harvest.feedConverted',
+          playerId: player.id,
+          source: sel.sourceName ?? 'Harvest conversion',
+          cost: costMap,
+          food: gainMap,
+        }], { actorPlayerId: player.id })
         // Dispatch CardExchange.sideEffect (e.g. E153 StoneSculptor bonusVp).
         if (exchange.sideEffect && times > 0) {
           applyTradeSideEffect(
@@ -3204,6 +3272,19 @@ export class GameCore {
     if (this.continueStageHook('onReturnHome', playerIndex, cardIndex)) {
       return this.respond()
     }
+    const returnedWorkers = this.state.actionSpaces.flatMap((space) =>
+      (space.takenBy ?? []).map((worker) => ({
+        playerId: worker.playerId,
+        workerId: worker.workerId,
+      })),
+    )
+    if (returnedWorkers.length > 0) {
+      appendImmediateEvents(this.state, [{
+        type: 'worker.returned',
+        workers: returnedWorkers,
+        to: 'home',
+      }])
+    }
     this.state.players.forEach((p) => clearWorkPhaseBuildingResources(this.state, p.id))
     // workersAvailable is derived from workers[]; clearing takenBy returns workers home.
     this.state.actionSpaces.forEach((s) => { s.takenBy = [] })
@@ -3240,7 +3321,6 @@ export class GameCore {
       const player = this.state.players[index]
       if (player) runAfterFeedHooks(this.state, player)
     })
-    this.state.log.unshift({ key: 'log.harvestPhaseBreed' })
     this.state.harvestBreedSummary = {}
 
     // E58 LunchtimeBeer-style cards opt out of breeding for the current round.
@@ -3287,7 +3367,7 @@ export class GameCore {
     if (this.state.round > 14) {
       this.state.players.forEach((p) => runBeforeEndGameHooks(this.state, p))
       this.state.gameOver = true
-      this.state.log.unshift({ key: 'log.gameOver' })
+      appendImmediateEvents(this.state, [{ type: 'game.ended' }])
       return this.respond()
     }
     return this.continueBeforeStartOfTurn()
@@ -3427,7 +3507,7 @@ export class GameCore {
       // Effect 校验失败应直接 respond(false)，pending envelope 保留，让前端再次提交合法选择。
       if (result?.type === 'fail') {
         this.flushEngineLog()
-        return this.respond(false, result.logKey ?? 'invalid resource-quantity selection')
+        return this.respond(false, result.errorKey ?? 'invalid resource-quantity selection')
       }
       // 与 occupation-hand 分支保持一致（line 3384）：只 record ok 结果。
       if (result?.type === 'ok') {

@@ -149,18 +149,6 @@ export const gainAction: ActionDefinition = {
       extraData.actionDetailDeltas = [{ playerId: payerId, costs: paid }]
     }
 
-    if (sourceCard) {
-      const logKey = recipientMode === 'others'
-        ? 'log.cardEffectOtherPlayersGain'
-        : 'log.cardEffectGain'
-      return {
-        type: 'ok' as const,
-        resourcesGained: gained,
-        logKey,
-        logParams: { gain: gained, cardId: sourceCard },
-        ...(Object.keys(extraData).length > 0 ? { extraData } : {}),
-      }
-    }
     return {
       type: 'ok' as const,
       resourcesGained: gained,

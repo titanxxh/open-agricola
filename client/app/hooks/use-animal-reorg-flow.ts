@@ -158,7 +158,7 @@ export type ReorgEngineProgressPlan =
       resetStableSelection: boolean
       pendingChoice: PendingChoice
     }
-  | { type: 'fail'; logKey: string }
+  | { type: 'fail'; errorKey: string }
   | { type: 'reorg'; playerIndex: number; spaceId: string }
   | { type: 'advance'; pendingNextPlayerIndex: number }
 
@@ -183,7 +183,7 @@ export const buildReorgEngineProgressPlan = (params: {
     }
   }
   if (progress.type === 'fail') {
-    return { type: 'fail', logKey: progress.logKey }
+    return { type: 'fail', errorKey: progress.errorKey }
   }
   if (progress.type === 'reorg') {
     return {

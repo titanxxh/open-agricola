@@ -1,7 +1,7 @@
 import type {
   ActionCostPreview,
   ActionDefinition,
-  ActionExecutionContext,
+  ActionMutationContext,
   ActionExecutionResult,
   FarmTilePosition,
   PlayerState,
@@ -98,30 +98,34 @@ const applyPlayerMutation = (target: PlayerState, source: PlayerState) => {
 }
 
 const finalizePlow = (
-  ctx: ActionExecutionContext,
+  ctx: ActionMutationContext,
   tile: FarmTilePosition,
   paymentChoice: string | undefined,
 ): ActionExecutionResult => {
   const lockedKeys = collectLockedFarmTileKeys(ctx.player)
   const idx = ctx.state.players.indexOf(ctx.player)
   const validated = playerBoard(ctx.state, idx).farmyard.canPlow(tile, lockedKeys)
-  if (!validated.ok) return { type: 'fail', logKey: validated.error?.code ?? 'log.action' }
+  if (!validated.ok) return { type: 'fail', errorKey: validated.error?.code ?? 'log.action' }
   const plowCost = sanitizePayableCost(ctx.costs)
   const payment = resolveTypedFlatPaymentSelection(
     validated.player as unknown as PlayerState,
     plowCost,
     'pay:plow',
     paymentChoice,
-    { type: 'fail', logKey: 'log.action' },
+    { type: 'fail', errorKey: 'log.action' },
     'plow',
   )
-  if (payment.type !== 'selected') return { type: 'fail', logKey: 'log.action' }
+  if (payment.type !== 'selected') return { type: 'fail', errorKey: 'log.action' }
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
   executeResolvedTypedFlatPayment(nextPlayer, payment, 'plow')
   applyPlayerMutation(ctx.player, nextPlayer)
   if (ctx.sourceCard) {
     addCardResourceGained(ctx.player, ctx.sourceCard, { field: 1 })
   }
+  ctx.eventSink?.emit<'farm.fieldPlowed'>({
+    type: 'farm.fieldPlowed',
+    fields: [{ playerId: ctx.player.id, row: tile.row, col: tile.col }],
+  })
   return {
     type: 'ok',
     resourcesPaid: sanitizePayableCost(payment.solution.resourcesPaid),
@@ -165,10 +169,10 @@ export const plowAction: ActionDefinition = {
         | { tile?: FarmTilePosition }
         | undefined
       const tile = farmPayload?.tile
-      if (!tile) return { type: 'fail', logKey: 'log.action' }
+      if (!tile) return { type: 'fail', errorKey: 'log.action' }
       const validated = playerBoard(ctx.state, idx).farmyard.canPlow(tile, lockedKeys)
       if (!validated.ok) {
-        return { type: 'fail', logKey: validated.error?.code ?? 'log.action' }
+        return { type: 'fail', errorKey: validated.error?.code ?? 'log.action' }
       }
       return finalizePlow(ctx, tile, choice)
     }
@@ -178,7 +182,7 @@ export const plowAction: ActionDefinition = {
       const tile = (payload as { tile?: FarmTilePosition }).tile
       const validated = playerBoard(ctx.state, idx).farmyard.canPlow(tile, lockedKeys)
       if (!validated.ok) {
-        return { type: 'fail', logKey: validated.error?.code ?? 'log.action' }
+        return { type: 'fail', errorKey: validated.error?.code ?? 'log.action' }
       }
       const selectedTile = tile as FarmTilePosition
       const payment = resolveTypedFlatPaymentSelection(
@@ -186,7 +190,7 @@ export const plowAction: ActionDefinition = {
         sanitizePayableCost(ctx.costs),
         'pay:plow',
         undefined,
-        { type: 'fail', logKey: 'log.action' },
+        { type: 'fail', errorKey: 'log.action' },
         'plow',
       )
       if (payment.type === 'request') {
@@ -201,11 +205,11 @@ export const plowAction: ActionDefinition = {
         }
       }
       if (payment.type === 'fail') {
-        return { type: 'fail', logKey: 'log.action' }
+        return { type: 'fail', errorKey: 'log.action' }
       }
       return finalizePlow(ctx, selectedTile, undefined)
     }
 
-    return { type: 'fail', logKey: 'log.action' }
+    return { type: 'fail', errorKey: 'log.action' }
   },
 }

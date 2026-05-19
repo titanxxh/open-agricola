@@ -2,9 +2,9 @@ import type {
   ActionChoiceOption,
   ActionDefinition,
   ActionExecutionResult,
-  ImmediateLogEntry,
   PlayerState,
 } from '../../contract/types'
+import type { EventSink } from '../../contract/events'
 import { getPlayerBakeRates } from '../../cards/helpers/exchange-registry'
 import { addFoodFromConversion, incResourceConverted } from '../../session/stats'
 
@@ -20,21 +20,8 @@ type BakeLogSource = {
   sourceCard?: string
 }
 
-const failInvalidBake = (): ActionExecutionResult => ({
-  type: 'fail',
-  logKey: 'log.action',
+const failInvalidBake = (): ActionExecutionResult => ({ type: 'fail', errorKey: 'log.action',
   recoverable: true,
-})
-
-const bakeLogParams = (
-  count: number,
-  food: number,
-  source?: BakeLogSource,
-): Record<string, unknown> => ({
-  count,
-  food,
-  ...(source?.sourceActionId ? { sourceActionId: source.sourceActionId } : {}),
-  ...(source?.sourceCard ? { sourceCard: source.sourceCard } : {}),
 })
 
 const canBakeBreadDirectly = (player: PlayerState): boolean =>
@@ -50,6 +37,7 @@ export const bakeBread = (
   cardId: string,
   times = 1,
   source?: BakeLogSource,
+  eventSink?: EventSink,
 ): ActionExecutionResult => {
   const rates = getPlayerBakeRates(player)
   const rate = rates.find((r) => r.cardId === cardId)
@@ -61,15 +49,19 @@ export const bakeBread = (
   player.resources.food += foodGained
   incResourceConverted(player, 'grain', bakeTimes)
   addFoodFromConversion(player, 'grain', foodGained)
-  return {
-    type: 'ok',
-    immediateLogs: [
-      {
-        key: 'log.bakeBread',
-        params: bakeLogParams(bakeTimes, foodGained, source),
-      },
-    ],
-  }
+  eventSink?.emit<'resource.exchanged'>({
+    type: 'resource.exchanged',
+    paid: { grain: bakeTimes },
+    gained: { food: foodGained },
+    paidFrom: { kind: 'player', playerId: player.id },
+    paidTo: { kind: 'supply' },
+    gainedFrom: { kind: 'supply' },
+    gainedTo: { kind: 'player', playerId: player.id },
+    exchangeSource: cardId,
+    sourceActionId: source?.sourceActionId ?? 'bake-bread',
+    ...(source?.sourceCard ? { sourceCardId: source.sourceCard } : {}),
+  })
+  return { type: 'ok' }
 }
 
 const buildBakeBreadOptions = (player: PlayerState): ActionChoiceOption[] => {
@@ -114,20 +106,20 @@ const applyBakePlan = (
   player: PlayerState,
   plan: BakePlanEntry[],
   source?: BakeLogSource,
+  eventSink?: EventSink,
 ): ActionExecutionResult => {
-  const immediateLogs: ImmediateLogEntry[] = []
   for (const entry of plan) {
-    const result = bakeBread(player, entry.cardId, entry.count, source)
+    const result = bakeBread(player, entry.cardId, entry.count, source, eventSink)
     if (result.type !== 'ok') return failInvalidBake()
-    if (result.immediateLogs) immediateLogs.push(...result.immediateLogs)
   }
-  return { type: 'ok', immediateLogs }
+  return { type: 'ok' }
 }
 
 const resolveBakeBreadChoice = (
   player: PlayerState,
   choice: string,
   source?: BakeLogSource,
+  eventSink?: EventSink,
 ): ActionExecutionResult => {
   if (choice === 'cancel') return failInvalidBake()
   const rates = getPlayerBakeRates(player)
@@ -137,7 +129,7 @@ const resolveBakeBreadChoice = (
     const payload = choice.replace('bulk:', '').trim()
     const plan = parseBulkBakePlan(player, payload, rateMap)
     if (!plan) return failInvalidBake()
-    return applyBakePlan(player, plan, source)
+    return applyBakePlan(player, plan, source, eventSink)
   }
 
   if (choice.startsWith('count-')) {
@@ -146,7 +138,7 @@ const resolveBakeBreadChoice = (
     const count = Number(countText)
     if (!rate || !Number.isInteger(count) || count <= 0) return failInvalidBake()
     if (count > rate.max || count > player.resources.grain) return failInvalidBake()
-    return bakeBread(player, cardId!, count, source)
+    return bakeBread(player, cardId!, count, source, eventSink)
   }
 
   const rate = rateMap.get(choice)
@@ -155,7 +147,7 @@ const resolveBakeBreadChoice = (
     const maxCount = Math.max(0, Math.min(grain, rate.max))
     if (maxCount <= 0) return failInvalidBake()
     if (maxCount <= 1) {
-      return bakeBread(player, choice, maxCount, source)
+      return bakeBread(player, choice, maxCount, source, eventSink)
     }
     return {
       type: 'request',
@@ -194,9 +186,9 @@ export const bakeBreadAction: ActionDefinition = {
       promptKey: 'ui.interactionBakeBreadChoice',
     }
   },
-  resolveChoice: ({ player, space, sourceCard }, choice) =>
+  resolveChoice: ({ player, space, sourceCard, eventSink }, choice) =>
     resolveBakeBreadChoice(player, choice, {
       sourceActionId: space.id,
       sourceCard,
-    }),
+    }, eventSink),
 }

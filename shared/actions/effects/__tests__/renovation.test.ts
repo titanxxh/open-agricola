@@ -174,9 +174,7 @@ describe('renovateHouseAction (engine opt-in choice flow)', () => {
 
   it('execute() must never run directly — engine must use getBaseChoiceOptions/resolveChoice', () => {
     const player = createPlayer({ resources: { clay: 2, reed: 1 } })
-    expect(renovateHouseAction.execute(buildExecutionContext(player))).toEqual({
-      type: 'fail',
-      logKey: 'log.renovationFail',
+    expect(renovateHouseAction.execute(buildExecutionContext(player))).toEqual({ type: 'fail', errorKey: 'log.renovationFail',
     })
   })
 
@@ -213,9 +211,7 @@ describe('renovateHouseAction (engine opt-in choice flow)', () => {
 
   it('resolveChoice fails when the chosen target is illegal for the current house', () => {
     const stone = createPlayer({ houseType: 'stone' })
-    expect(renovateHouseAction.resolveChoice!(buildExecutionContext(stone), 'stone')).toEqual({
-      type: 'fail',
-      logKey: 'log.renovationFail',
+    expect(renovateHouseAction.resolveChoice!(buildExecutionContext(stone), 'stone')).toEqual({ type: 'fail', errorKey: 'log.renovationFail',
     })
   })
 })

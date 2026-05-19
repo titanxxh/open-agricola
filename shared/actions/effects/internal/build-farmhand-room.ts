@@ -16,6 +16,6 @@ export const buildFarmhandRoomAction: ActionDefinition = {
   execute: ({ player }) => {
     player.rooms += 1
     incRoomsBuilt(player, 1)
-    return { type: 'ok', logKey: 'log.buildFarmHandRoom' }
+    return { type: 'ok' }
   },
 }

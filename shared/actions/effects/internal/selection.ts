@@ -78,7 +78,7 @@ export const selectionAction: ActionDefinition = {
     const kind = (actionContext?.selectionKind as string | undefined) ?? 'farm-position'
     if (kind === 'farm-position') {
       const validationError = validateFarmPositions(positions, actionContext)
-      if (validationError) return { type: 'fail', logKey: validationError, recoverable: true }
+      if (validationError) return { type: 'fail', errorKey: validationError, recoverable: true }
     }
     if (choice === 'cancel') return { type: 'ok' }
 
