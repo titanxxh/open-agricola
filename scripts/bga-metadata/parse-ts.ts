@@ -13,6 +13,7 @@ export type TsCard = {
   cost?: Record<string, number>
   altCosts?: Record<string, number>[]
   prerequisite?: string
+  passing?: boolean
 }
 
 function extractStringLiteral(line: string): string | undefined {
@@ -89,6 +90,7 @@ export function parseTsCard(tsPath: string): TsCard {
     else if (line.startsWith('cost:')) card.cost = extractObjectLiteral(line)
     else if (line.startsWith('altCosts:')) card.altCosts = extractArrayOfObjectsLiteral(line)
     else if (line.startsWith('prerequisite:')) card.prerequisite = extractStringLiteral(line)
+    else if (line.startsWith('passing:')) card.passing = line.includes('true')
   }
 
   return card

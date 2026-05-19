@@ -45,7 +45,7 @@ const SELECT_EFFECT = 'farmhand-stable-select'
  * The "occupant moves to other rooms on return" BGA ruling is modelled
  * implicitly: `familySize` is unchanged, capacity drops by 1, so the
  * next family-growth attempt blocks naturally — no explicit relocation
- * UI. Documented in `card_progress.md` §2.5.
+ * UI. Documented in `docs/card_implementation_status.md`.
  *
  * BGA additionally serialises cost-modifier cards via
  * `orderComputeCardCosts`. We do not implement listener ordering (see

@@ -79,19 +79,17 @@ pnpm run build              # tsc + vite build
 
 | Doc | When to update |
 |---|---|
-| `docs/card_progress.md` | 每次改卡牌相关代码（新实现 / 修 bug / 改简化 / 改 desc / 调 hook） |
-| `docs/card_desc_audit.md` | 改卡牌 desc 文案 / 改卡牌 ID 命名 / 跑完一轮 desc 重对齐 |
-| `docs/master-plan.md` | 启动 / 完成 sprint / 调整排期或工作量估算 |
+| `docs/card_implementation_status.md` | 每次改卡牌相关代码（新实现 / 修 bug / 改简化 / 改 desc / 调 hook / 调整计划） |
 | `docs/ARCHITECTURE.md` | 改通用扩展点（hook phase、ActionFlow node、协议层） |
 | `docs/CARD_TEST_TEMPLATE.md` | 测试策略 / 卡牌测试写法变化 |
 | `docs/PLATFORM_DESIGN.md` / `DEPLOY_PLAN.md` / `HOW_TO_DEPLOY.md` | 仅在对应议题改动时更新 |
 
-**`card_progress.md` 同步检查清单**（每次卡牌相关 commit）：
-- §2 当前轮次 — 加一行（日期 + 涉及卡 + 一句话摘要）
-- §3 / §4 / §5 / §6 — 把对应卡片从待实现 / 简化 / 刻意不同 / 待复核中迁出或更新状态
-- §1 总览数字 — 实现数 / Tier 数有变化时同步
-- §7 基础设施 — 新加的通用机制要登记
-- §8 时间线 — 新批次要加新行
+**`card_implementation_status.md` 同步检查清单**（每次卡牌相关 commit）：
+- §2 问题优先清单 — 修复后移除或降级，新增 gap 立即登记
+- §3 / §10 / §11 — 同步 accepted divergence、excluded、per-card appendix 状态
+- §1 总览数字 — 状态数量有变化时同步
+- §6 基础设施 — 新加的通用机制要登记
+- §9 Hook 清单 — 新增 / 删除 hook 点时同步
 
 ## Change Boundaries
 
@@ -141,8 +139,6 @@ Commit 标题规范：`feat: ...` / `fix: ...` / `refactor: ...` / `docs: ...`�
 | Deployment | `docs/HOW_TO_DEPLOY.md` |
 | Platform & Workshop | `docs/PLATFORM_DESIGN.md` |
 | Card Test Template | `docs/CARD_TEST_TEMPLATE.md` |
-| Card Progress | `docs/card_progress.md` |
-| Card Desc Audit | `docs/card_desc_audit.md` |
-| Master Plan | `docs/master-plan.md` |
+| 卡牌实现现状 | `docs/card_implementation_status.md` |
 | CI Checks | `docs/operations/ci-checks.md` |
 | GitHub OAuth Setup | `docs/operations/github-oauth-app-setup.md` |

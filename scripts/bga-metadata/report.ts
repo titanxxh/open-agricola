@@ -1,6 +1,6 @@
 import type { DiffResult, FieldDiff } from './diff'
 
-const LITERAL_FIELDS = ['extraVp', 'vp']
+const LITERAL_FIELDS = ['extraVp', 'vp', 'passing']
 const COMPLEX_FIELDS = ['category', 'players', 'cost', 'altCosts', 'prerequisite']
 
 function fmt(v: unknown): string {

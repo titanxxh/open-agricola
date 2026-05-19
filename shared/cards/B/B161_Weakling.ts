@@ -24,7 +24,8 @@ const CARD_ID = B161_Weakling.id
  * `ignoreResources: true` to all visible action cards so the player can
  * place onto resource-restricted spaces. We don't currently honor this
  * flag in placement-availability (sprint-7a fallback per spec §220 — flagged
- * for sprint-7b). Listed in card_progress.md §2.5 deliberate-divergence.
+ * for sprint-7b). Listed in docs/card_implementation_status.md as a
+ * deliberate divergence.
  */
 const isAccumulationSpace = (space: ActionSpace): boolean => {
   const gpr = space.gainPerRound ?? {}

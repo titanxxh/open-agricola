@@ -1,12 +1,14 @@
 export type SafeFix =
   | { field: 'vp'; target: number }
   | { field: 'extraVp'; target: boolean }
+  | { field: 'passing'; target: boolean }
   | { field: 'category'; target: string }
 
 function valueLiteral(fix: SafeFix): string {
   switch (fix.field) {
     case 'vp': return String(fix.target)
     case 'extraVp': return String(fix.target)
+    case 'passing': return String(fix.target)
     case 'category': return `'${fix.target}'`
   }
 }

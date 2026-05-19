@@ -33,7 +33,7 @@ const MAX_REBUILD_KEY = 'c1MaxRebuild'
  *     listener feeds the `canStartFencing` entry guard so fencing is
  *     doable even with 0 wood.
  *
- * Deliberate simplification (recorded in card_progress §刻意不同):
+ * Deliberate simplification (recorded in docs/card_implementation_status.md):
  *   - We do NOT enforce BGA's `min: n` (player can decline / build less);
  *     SEQ optional lets the player skip rebuild entirely.
  *   - We do NOT enforce BGA's `noWoodPalisades` flag; B30 + C1 coexistence

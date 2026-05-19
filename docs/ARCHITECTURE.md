@@ -985,12 +985,10 @@ pnpm run build              # tsc + vite build
 | Topic | Doc |
 |---|---|
 | 卡牌测试模板 | `docs/CARD_TEST_TEMPLATE.md` |
-| 卡牌实现进度 | `docs/card_progress.md` |
-| 卡牌描述对齐 | `docs/card_desc_audit.md` |
-| 主计划 / Sprint 排期 | `docs/master-plan.md` |
+| 卡牌实现现状 / 描述对齐 / 计划 | `docs/card_implementation_status.md` |
 | 平台 / Workshop | `docs/PLATFORM_DESIGN.md` |
 | 部署 | `docs/HOW_TO_DEPLOY.md` |
 | 自定义卡沙盒约束 | `docs/CUSTOM_CARD_SANDBOX.md` |
 | CI 检查 | `docs/operations/ci-checks.md` |
 | GitHub OAuth | `docs/operations/github-oauth-app-setup.md` |
-| 已知坏味道 | `docs/bad-smell.md` |
+| 已知卡牌架构债务 | `docs/card_implementation_status.md` |

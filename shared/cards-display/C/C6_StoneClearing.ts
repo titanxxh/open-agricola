@@ -18,8 +18,8 @@ const CARD_ID = 'C6_StoneClearing'
  *      shared/actions/effects/reap.ts and HarvestReapSummary).
  *   3. Updating sow / plow / field-display to ignore stone fields where
  *      appropriate (touches shared/domain/farmyard.ts and UI).
- * All main-path changes outside the F1 onBuy SEQ-truncation scope. Tracked
- * in card_progress §刻意不同.
+ * All main-path changes outside the F1 onBuy SEQ-truncation scope. Tracked in
+ * docs/card_implementation_status.md.
  *
  * **Deliberate divergence (Sprint 7a):** we directly grant the stone to the
  * player's supply at buy time rather than placing it on the field for the

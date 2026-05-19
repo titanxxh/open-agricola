@@ -12,8 +12,9 @@ const CARD_ID = A132_Publican.id
  * grain from the Publican. This avoids the case where the Publican declines
  * and the sowing player is stuck. We currently skip the deferred-check and
  * always offer when the sow is unconditional; the corner case where a
- * decline traps the sowing player is acknowledged in card_progress.md as a
- * known minor deviation. (Tests cover the common offer/accept/decline path.)
+ * decline traps the sowing player is acknowledged in
+ * docs/card_implementation_status.md as a known minor deviation. (Tests cover
+ * the common offer/accept/decline path.)
  */
 const isUnconditionalSow = (context: CardListenerContext) => {
   const actionContext = context.actionContext ?? {}
