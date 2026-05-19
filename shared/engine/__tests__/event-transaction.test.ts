@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { ActionDefinition } from '../../contract/types'
 import { placeFarmerAction } from '../../actions/effects/place-farmer'
 import { ActionNode, SequenceNode } from '../nodes'
+import { markOptional } from '../engine-utils'
 import {
   asActionSpace,
   makeEventTestEngine,
@@ -102,6 +103,25 @@ describe('engine event transactions', () => {
       type: 'ok',
       result: { type: 'fail' },
     })
+
+    expect(state.events).toEqual([])
+    expect(state.nextEventSeq).toBe(1)
+  })
+
+  it('does not append events when an optional leaf is skipped', () => {
+    const optional = action('optional-event-leaf', (context) => {
+      emitWoodGain(context)
+      return { type: 'ok' }
+    })
+    const state = makeEventTestState()
+    const player = state.players[0]!
+    const root = markOptional(new ActionNode('optional-event-node', optional.id))
+    const { engine } = makeEventTestEngine([optional], root)
+    const space = asActionSpace(optional)
+
+    expect(engine.proceed({ state, player, space }).type).toBe('choice')
+    expect(engine.resolveChoice('__skip__', { state, player, space }).type).toBe('ok')
+    expect(engine.proceed({ state, player, space }).type).toBe('done')
 
     expect(state.events).toEqual([])
     expect(state.nextEventSeq).toBe(1)

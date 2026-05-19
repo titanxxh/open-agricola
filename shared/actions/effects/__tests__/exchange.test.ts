@@ -11,6 +11,7 @@ import {
 } from '../exchange'
 import type { DraftGameEvent, EventSink } from '../../../contract/events'
 import type { ActionMutationContext, ActionSpace, GameState, PlayerState, Resource, Trade } from '../../../contract/types'
+import { SessionCardContext, withSessionContext } from '../../../cards/session-card-context'
 
 const makeEventSink = (capturedEvents: DraftGameEvent[]): EventSink => ({
   emit: (event) => {
@@ -299,5 +300,40 @@ describe('anytimeExchangeAction events', () => {
     )
     expect(result.type).toBe('ok')
     expect(capturedEvents).toEqual([])
+  })
+
+  it('passes the current exchange event to trade-applied listeners', () => {
+    const player = createMockPlayer({ sheep: 2, food: 0 })
+    player.improvements = ['Major_Fireplace1']
+    const state = { players: [player], actionSpaces: [], workPhaseObtainedResources: {} } as unknown as GameState
+    const capturedEvents: DraftGameEvent[] = []
+    const sessionContext = new SessionCardContext()
+    let observed = false
+    sessionContext.registerListener({
+      id: 'test-trade-applied-current-event',
+      actions: ['trade-applied'],
+      phases: ['immediatelyAfter'],
+      handler: (context) => {
+        observed = context.eventQuery.has('resource.exchanged', (event) =>
+          (event.paid.sheep ?? 0) === 2 && (event.gained.food ?? 0) === 4,
+        )
+        expect(context.transactionEvents).toHaveLength(1)
+      },
+    })
+
+    const result = withSessionContext(sessionContext, () =>
+      anytimeExchangeAction.resolveChoice!(
+        {
+          state,
+          player,
+          space: { id: 'exchange' } as ActionSpace,
+          eventSink: makeEventSink(capturedEvents),
+        } as ActionMutationContext,
+        'trade:0:2',
+      ),
+    )
+
+    expect(result.type).toBe('ok')
+    expect(observed).toBe(true)
   })
 })

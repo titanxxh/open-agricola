@@ -45,8 +45,29 @@ import {
   type DefaultSandboxDeckId,
   type InitialStateOptions,
 } from './state-constants'
+import {
+  assertEventSizeUnderLimit,
+  assertGameEventEnvelope,
+  assertJsonSafeEvent,
+  assertKnownGameEventShape,
+  assertPublicGameEvent,
+} from '../events/guards'
 
 export * from './state-constants'
+
+const isPersistedGameEvent = (event: unknown): event is GameState['events'][number] => {
+  if (typeof event !== 'object' || event === null) return false
+  try {
+    assertGameEventEnvelope(event)
+    assertKnownGameEventShape(event)
+    assertPublicGameEvent(event)
+    assertJsonSafeEvent(event)
+    assertEventSizeUnderLimit(event, 4096)
+  } catch {
+    return false
+  }
+  return true
+}
 
 const normalizeDeckIds = (deckIds?: string[]): DefaultSandboxDeckId[] => {
   const next = deckIds
@@ -315,10 +336,7 @@ export const normalizeState = (raw: GameState): GameState => {
     (id) => majorImprovementIds.includes(id) && !takenImprovements.has(id),
   )
   const events = Array.isArray(raw.events)
-    ? raw.events.filter(
-        (event): event is GameState['events'][number] =>
-          typeof event === 'object' && event !== null,
-      )
+    ? raw.events.filter(isPersistedGameEvent)
     : []
   const maxEventSeq = events.reduce(
     (max, event) =>

@@ -92,6 +92,15 @@ const readGrowableStack = <S extends { remaining: number }>(
   return stack
 }
 
+const isPublicCardStateEventValue = (value: unknown): boolean => {
+  if (value === null) return true
+  const valueType = typeof value
+  if (valueType === 'string' || valueType === 'boolean') return true
+  if (valueType === 'number') return Number.isFinite(value)
+  if (Array.isArray(value)) return value.every(isPublicCardStateEventValue)
+  return false
+}
+
 /**
  * Sprint 6a: `special-effect` is the canonical engine-mediated mutation
  * dispatcher. Cards that need to mutate `cardStates` from inside an action
@@ -108,7 +117,7 @@ export const specialEffectAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ state, player, sourceCard, params, actionContext }) => {
+  execute: ({ state, player, sourceCard, params, actionContext, eventSink }) => {
     if (!sourceCard) return { type: 'fail', logKey: 'log.specialEffectFail' }
     const p = params as SpecialEffectParams | undefined
     if (!p || typeof p !== 'object' || !('kind' in p)) {
@@ -123,6 +132,16 @@ export const specialEffectAction: ActionDefinition = {
       }
       case 'set-extra-data':
         writeCardExtraData(target, sourceCard, p.key, p.value)
+        if (p.value !== undefined && isPublicCardStateEventValue(p.value)) {
+          eventSink?.emit<'card.stateChanged'>({
+            type: 'card.stateChanged',
+            sourceCardId: sourceCard,
+            cardId: sourceCard,
+            key: p.key,
+            value: p.value,
+            targetPlayerId: target.id,
+          })
+        }
         return { type: 'ok' }
       case 'increment-counter':
         incCounter(target, sourceCard, p.key, p.amount)
@@ -158,6 +177,13 @@ export const specialEffectAction: ActionDefinition = {
         return { type: 'ok' }
       case 'set-infobox':
         writeCardInfobox(target, sourceCard, p.text)
+        eventSink?.emit<'card.infoboxChanged'>({
+          type: 'card.infoboxChanged',
+          sourceCardId: sourceCard,
+          cardId: sourceCard,
+          text: p.text,
+          targetPlayerId: target.id,
+        })
         return { type: 'ok' }
       case 'clear-pending-fence-bonus':
         clearPendingFenceBonus(target)
