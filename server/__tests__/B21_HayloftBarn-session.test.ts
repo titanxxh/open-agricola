@@ -65,6 +65,23 @@ describe('B21_HayloftBarn session', () => {
     // Should have gotten 1 food from the card
     expect(readCardExtraData<number>(player, CARD_ID, 'foodCount')).toBe(3)
     expect(player.resources.food).toBe(foodBefore + 1)
+    const grainIndex = resp.state.events.findIndex((event) =>
+      event.type === 'resource.moved' && (event.resources.grain ?? 0) > 0
+    )
+    const triggerIndex = resp.state.events.findIndex((event) =>
+      event.type === 'card.triggered' && event.sourceCardId === CARD_ID
+    )
+    expect(grainIndex).toBeGreaterThanOrEqual(0)
+    expect(triggerIndex).toBeGreaterThan(grainIndex)
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.moved',
+        sourceCardId: CARD_ID,
+        from: { kind: 'card', playerId: expect.any(String), cardId: CARD_ID },
+        to: { kind: 'player', playerId: expect.any(String) },
+        resources: { food: 1 },
+      }),
+    ]))
   })
 
   it('does not release food when card is empty', () => {
@@ -95,6 +112,12 @@ describe('B21_HayloftBarn session', () => {
     const player = resp.state.players[0]!
     // foodCount should remain 4 (no grain obtained)
     expect(readCardExtraData<number>(player, CARD_ID, 'foodCount')).toBe(4)
+    expect(resp.state.events).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'card.triggered',
+        sourceCardId: CARD_ID,
+      }),
+    ]))
   })
 
   it('food releases one at a time (only 1 per grain-obtaining action)', () => {

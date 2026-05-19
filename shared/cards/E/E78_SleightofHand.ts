@@ -1,5 +1,4 @@
 import type { ActionFlow, Resource } from '../../contract/types'
-import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { E78_SleightofHand } from '../../cards-display/E/E78_SleightofHand'
 
@@ -27,11 +26,22 @@ const buildSingleExchange = (): ActionFlow => ({
     BUILDING_RESOURCES
       .filter((gain) => gain !== pay)
       .map((gain) => ({
-        type: 'seq' as const,
-        children: [
-          payLeaf({ cardId: CARD_ID, cost: { [pay]: 1 } }),
-          gainLeaf(CARD_ID, { [gain]: 1 }),
-        ],
+        type: 'leaf' as const,
+        actionId: 'exchange',
+        sourceCard: CARD_ID,
+        actionContext: {
+          directTrade: {
+            from: { [pay]: 1 },
+            to: { [gain]: 1 },
+            max: 1,
+            sourceId: CARD_ID,
+          },
+        },
+        effectPreview: {
+          kind: 'resourceExchange' as const,
+          resourcesPaid: { [pay]: 1 },
+          resourcesGained: { [gain]: 1 },
+        },
       })),
   ),
 })

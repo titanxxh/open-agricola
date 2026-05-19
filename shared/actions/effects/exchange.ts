@@ -77,6 +77,14 @@ const emitResourceExchanged = (
   })
 }
 
+const readDirectTrade = (actionContext: Record<string, unknown> | undefined): Trade | undefined => {
+  const value = actionContext?.directTrade
+  if (!value || typeof value !== 'object') return undefined
+  const trade = value as Partial<Trade>
+  if (!trade.from || !trade.to) return undefined
+  return trade as Trade
+}
+
 // ============================================
 // Trade System (BGA-aligned)
 // ============================================
@@ -512,13 +520,38 @@ export const anytimeExchangeAction: ActionDefinition = {
   gainPerRound: {},
   anytime: true,
   canBeExecutedByPlayer: (state, player, ctx) => {
+    const directTrade = readDirectTrade(ctx?.actionContext)
+    if (directTrade) return canAffordTrade(player, directTrade, 1)
     const tradeIds = (ctx?.actionContext as { tradeIds?: string[] } | undefined)?.tradeIds
     if (tradeIds && tradeIds.length > 0) {
       return hasAffordableTradeForIds(player, tradeIds, state) || hasAffordableCookeryTrade(player, state)
     }
     return hasAffordableCookeryTrade(player, state)
   },
-  execute: ({ state, player, actionContext }) => {
+  execute: ({ state, player, actionContext, eventSink }) => {
+    const directTrade = readDirectTrade(actionContext)
+    if (directTrade) {
+      if (!canAffordTrade(player, directTrade, 1)) {
+        return { type: 'fail' as const, logKey: 'log.actionNoExchange' }
+      }
+      applyTrade(player, directTrade, 1)
+      recordCookeryConversion(player, directTrade, 1)
+      if (directTrade.sideEffect) {
+        applyTradeSideEffect(
+          state,
+          player,
+          directTrade.sideEffect,
+          1,
+          directTrade.sourceId ?? directTrade.source ?? 'unknown',
+        )
+      }
+      emitResourceExchanged(eventSink, player, directTrade, 1)
+      dispatchTradeAppliedListener(state, player, directTrade, 1, eventSink)
+      const gained = scaleResources(directTrade.to, 1)
+      const paid = scaleResources(directTrade.from, 1)
+      trackWorkPhaseBuildingResources(state, player.id, gained)
+      return { type: 'ok' as const, resourcesGained: gained, resourcesPaid: paid }
+    }
     const filterIds = actionContext?.tradeIds as string[] | undefined
     const { options: allOptions } = buildExchangeOptions(player, filterIds, state)
     const filtered = filterIds && filterIds.length > 0

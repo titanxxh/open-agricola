@@ -58,6 +58,7 @@ import { withInjectedAnytimeResultFlag } from './action-context-flags'
 import { eventsToLogEntries } from '../events/log-mapper'
 import type { GameEvent } from '../contract/events'
 import { createEventQuery } from '../events/query'
+import { createBufferedEventSink, emitCardTriggered } from './card-trigger-events'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
@@ -747,21 +748,28 @@ export function engineProceed(
       sourceActionId: replacedActionId,
       sourceCardId: executionContext.sourceCard,
     })
+    const eventBuffer = createBufferedEventSink()
     const optInChoice = maybeBuildChoiceCandidates(int,
       { ...executionContext, ...currentEventReadContext(int) },
       action,
       replacedActionId,
-      eventFrame.sink,
+      eventBuffer.sink,
     )
     const rawResult = optInChoice ?? action.execute({
       ...executionContext,
-      eventSink: eventFrame.sink,
+      eventSink: eventBuffer.sink,
     })
     const result = withInjectedAnytimeResultFlag(rawResult, executionContext.actionContext)
     let completedEvents: GameEvent[] = []
     if (result.type === 'fail') {
       eventFrame.rollback()
     } else {
+      if (result.type !== 'request') {
+        emitCardTriggered(int, eventFrame.sink, executionContext, replacedActionId, {
+          replacement: Boolean(replaceResult.sourceCard && replaceResult.sourceCard !== node.sourceCard),
+        })
+      }
+      eventBuffer.flushTo(eventFrame.sink)
       ensureEventState(context.state)
       completedEvents = eventFrame.complete(context.state)
       recordEventLogDerivation(int, completedEvents, result)

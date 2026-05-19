@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { runCardEffectHook } from '../card-effects'
 import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../contract/types'
+import { collectAction } from '../../actions/effects/collect'
+import { Engine } from '../../engine/engine'
+import { HookDispatcher } from '../../engine/dispatcher'
+import { LogStore } from '../../engine/log-store'
+import { ActionNode } from '../../engine/nodes'
+import { ActionRegistry } from '../../engine/registry'
+import { EngineTree } from '../../engine/tree'
 
 import '../B/B81_Handcart'
 
@@ -55,9 +62,37 @@ const createState = (...players: PlayerState[]): GameState =>
     log: [], roundStartSnapshot: null,
     roundActionOrder: Array.from({ length: 14 }).map(() => null),
     gameSeed: 1, availableMajorImprovements: [],
+    events: [], nextEventSeq: 1,
     futureMeeples: [], pendingFutureMeeples: [],
     gameOver: false, workPhaseObtainedResources: {},
   }) as unknown as GameState
+
+const executeFlowLeaf = (state: GameState, player: PlayerState, flow: ActionFlow) => {
+  if (flow.type !== 'leaf') throw new Error('expected leaf flow')
+  const registry = new ActionRegistry()
+  registry.register(collectAction)
+  const engine = new Engine({
+    tree: new EngineTree(new ActionNode(
+      'handcart-leaf',
+      flow.actionId,
+      flow.sourceCard,
+      flow.params,
+      flow.choiceLabelKey,
+      flow.choiceLabelParams,
+      flow.actionContext,
+      flow.effectPreview,
+    )),
+    registry,
+    hooks: new HookDispatcher(),
+    log: new LogStore(),
+  })
+  const space = state.actionSpaces.find((entry) => entry.id === 'wood-accumulation')!
+  const result = engine.proceed({ state, player, space })
+  for (let safety = 0; safety < 10; safety += 1) {
+    if (engine.proceed({ state, player, space }).type === 'done') break
+  }
+  return result
+}
 
 describe('B81_Handcart', () => {
   it('offers xor with wood option when wood space has >= 6 wood', () => {
@@ -70,8 +105,30 @@ describe('B81_Handcart', () => {
     expect(xor.optional).toBe(true)
     // Only wood qualifies (9 >= 6), clay doesn't (3 < 5)
     expect(xor.children).toHaveLength(1)
-    expect(xor.children[0].actionId).toBe('gain')
-    expect(xor.children[0].params).toEqual({ wood: 1 })
+    expect(xor.children[0].actionId).toBe('collect')
+    expect(xor.children[0].actionContext).toMatchObject({
+      spaceId: 'wood-accumulation',
+      resource: 'wood',
+      amount: 1,
+    })
+
+    const result = executeFlowLeaf(state, player, xor.children[0])
+    expect(result.type).toBe('ok')
+    expect(state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.moved',
+        sourceCardId: CARD_ID,
+        from: expect.objectContaining({ kind: 'actionSpace' }),
+        to: { kind: 'player', playerId: player.id },
+      }),
+    ]))
+    expect(state.events).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.moved',
+        sourceCardId: CARD_ID,
+        from: { kind: 'supply' },
+      }),
+    ]))
   })
 
   it('offers multiple options when multiple spaces qualify', () => {
@@ -96,6 +153,7 @@ describe('B81_Handcart', () => {
 
     const flow = runCardEffectHook(state, player, CARD_ID, 'onRoundStart')
     expect(flow).toBeNull()
+    expect(state.events).toEqual([])
   })
 
 })

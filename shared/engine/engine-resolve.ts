@@ -44,6 +44,7 @@ import { withInjectedAnytimeResultFlag } from './action-context-flags'
 import { eventsToLogEntries } from '../events/log-mapper'
 import type { GameEvent } from '../contract/events'
 import { createEventQuery } from '../events/query'
+import { createBufferedEventSink, emitCardTriggered } from './card-trigger-events'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
@@ -457,14 +458,21 @@ export function engineResolveChoice(
         sourceActionId: actionId,
         sourceCardId: executionContext.sourceCard,
       })
+      const eventBuffer = createBufferedEventSink()
       const result = action.execute({
         ...executionContext,
-        eventSink: eventFrame.sink,
+        eventSink: eventBuffer.sink,
       })
       if (result.type === 'fail') {
         eventFrame.rollback()
         return rollbackAndReturn(int, result)
       }
+      if (result.type !== 'request') {
+        emitCardTriggered(int, eventFrame.sink, executionContext, actionId, {
+          replacement: Boolean(replaceResult.sourceCard && replaceResult.sourceCard !== child.sourceCard),
+        })
+      }
+      eventBuffer.flushTo(eventFrame.sink)
       ensureEventState(context.state)
       recordEventLogDerivation(int, eventFrame.complete(context.state), result)
       int.hooks.during({ ...executionContext, ...currentEventReadContext(int), actionId }, result)
@@ -647,13 +655,20 @@ export function engineResolveChoice(
       sourceActionId: actionId,
       sourceCardId: executionContext.sourceCard,
     })
+    const eventBuffer = createBufferedEventSink()
     result = withInjectedAnytimeResultFlag(
       action.resolveChoice({
         ...executionContext,
-        eventSink: eventFrame.sink,
+        eventSink: eventBuffer.sink,
       }, choice, payload),
       executionContext.actionContext,
     )
+    if (result.type !== 'fail' && result.type !== 'request') {
+      emitCardTriggered(int, eventFrame.sink, executionContext, actionId)
+    }
+    if (result.type !== 'fail') {
+      eventBuffer.flushTo(eventFrame.sink)
+    }
   } else {
     return { type: 'ok' }
   }
