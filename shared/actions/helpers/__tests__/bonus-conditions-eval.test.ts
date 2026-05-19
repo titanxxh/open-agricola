@@ -155,8 +155,8 @@ describe('Bonus.conditions / BonusChoice.conditions evaluation', () => {
   })
 })
 
-describe('applyCostModifiers stops propagating redundant conditions', () => {
-  it('7. BonusModifier with conditions generates a Bonus without conditions', () => {
+describe('applyCostModifiers propagates nb-aware conditions to Bonus', () => {
+  it('7. BonusModifier with conditions generates a Bonus that retains them for enumerate', () => {
     const baseCost: ComplexCost = { fee: { stone: 4 } }
     const modifier: BonusModifier = {
       type: 'bonus',
@@ -168,7 +168,12 @@ describe('applyCostModifiers stops propagating redundant conditions', () => {
     const result = applyCostModifiers(baseCost, [modifier])
     expect(result.bonuses).toBeDefined()
     expect(result.bonuses!.length).toBe(1)
-    expect(result.bonuses![0].conditions).toBeUndefined()
+    // The generated Bonus retains conditions so enumerate's
+    // evaluateConditions(_, _, nb) can gate nb-aware constraints (minNumRooms)
+    // against the actual renovation/construct nb. Static conditions (houseType*)
+    // are already filtered upstream by getModifiersForCostType; preserving them
+    // here is harmless.
+    expect(result.bonuses![0].conditions).toEqual({ houseTypeWood: 1, minNumRooms: 5 })
     expect(result.bonuses![0].discount).toEqual({ stone: 2 })
   })
 })

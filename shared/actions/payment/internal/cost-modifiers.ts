@@ -86,6 +86,11 @@ export const applyCostModifiers = (
         choices: bonusMod.choices,
         optional: bonusMod.optional ?? true,
         sources: [bonusMod.cardId],
+        // Propagate nb-aware conditions (e.g. minNumRooms) so enumerate can
+        // re-evaluate them against the actual nb via evaluateConditions().
+        // Static conditions (houseType*) are already filtered by
+        // getModifiersForCostType; preserving them is a no-op here.
+        ...(bonusMod.conditions ? { conditions: bonusMod.conditions } : {}),
       })
     }
   }
