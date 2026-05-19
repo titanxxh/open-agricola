@@ -57,6 +57,7 @@ import { evaluateTriggerSelect, type TriggerSelectEvaluationOptions } from './tr
 import { withInjectedAnytimeResultFlag } from './action-context-flags'
 import { eventsToLogEntries } from '../events/log-mapper'
 import type { GameEvent } from '../contract/events'
+import { createEventQuery } from '../events/query'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
@@ -113,6 +114,14 @@ const ensureEventState = (state: EngineContext['state']): void => {
   state.nextEventSeq ??= 1
 }
 
+const currentEventReadContext = (int: EngineInternals) => {
+  const transactionEvents = [...int.events.currentTransactionEvents()]
+  return {
+    transactionEvents,
+    eventQuery: createEventQuery(transactionEvents),
+  }
+}
+
 const commitIfEngineComplete = (
   int: EngineInternals,
   context: EngineContext,
@@ -136,7 +145,12 @@ const triggerSelectEvaluationOptions = (
   context: ActionExecutionContext,
 ): TriggerSelectEvaluationOptions => ({
   canContinueWithoutTriggers: (actionId, resources) =>
-    canActionContinueWithoutBeforeTriggers(int, context, actionId, resources),
+    canActionContinueWithoutBeforeTriggers(
+      int,
+      { ...context, ...currentEventReadContext(int) },
+      actionId,
+      resources,
+    ),
   canReachContinuationThroughTriggers: (actionId, resources) => {
     const action = int.registry.get(actionId)
     if (!action) return false
@@ -150,7 +164,7 @@ const triggerSelectEvaluationOptions = (
       },
     )
     return int.hooks.applyIsDoable(
-      { ...scopedContext, actionId },
+      { ...scopedContext, ...currentEventReadContext(int), actionId },
       action,
       directDoable,
     )
@@ -269,7 +283,7 @@ const buildOptionalPrompt = (
     actionContext: actionContextForNode(actionNode),
   }
   const doable = int.hooks.applyIsDoable(
-    { ...executionContext, actionId: actionNode.actionId },
+    { ...executionContext, ...currentEventReadContext(int), actionId: actionNode.actionId },
     action,
     action.canBeExecutedByPlayer(
       executionContext.state,
@@ -366,6 +380,7 @@ const executeActivateCardAction = (
     space: context.space,
     actionId: params.actionId,
     phase: params.phase,
+    ...currentEventReadContext(int),
     ...event,
   }
   const result = executeCardListener(listener, listenerContext, {
@@ -472,7 +487,7 @@ export function engineProceed(
         const action = int.registry.get(entry.actionNode.actionId)
         if (!action) return null
         const doable = int.hooks.applyIsDoable(
-          { ...executionContext, actionId: entry.actionNode.actionId },
+          { ...executionContext, ...currentEventReadContext(int), actionId: entry.actionNode.actionId },
           action,
           action.canBeExecutedByPlayer(
             executionContext.state,
@@ -488,7 +503,7 @@ export function engineProceed(
         if (!baseLabel) return null
         const label = getReplaceAwareChoiceLabel(
           entry.actionNode,
-          executionContext,
+          { ...executionContext, ...currentEventReadContext(int) },
           baseLabel,
           int.hooks,
           (flow, sc) => applyFallbackSourceCardToFlow(flow, sc),
@@ -574,7 +589,11 @@ export function engineProceed(
       return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
     }
     if (stepResult.kind === 'request') {
-      const evaluation = evaluateTriggerSelect(node, context, triggerSelectEvaluationOptions(int, context))
+      const evaluation = evaluateTriggerSelect(
+        node,
+        { ...context, ...currentEventReadContext(int) },
+        triggerSelectEvaluationOptions(int, context),
+      )
       const options = evaluation.options
       if (options.length === 0) {
         node.resolve()
@@ -622,6 +641,7 @@ export function engineProceed(
     }
     const replaceResult = int.hooks.applyComputeReplace({
       ...context,
+      ...currentEventReadContext(int),
       params: node.params,
       sourceCard: node.sourceCard,
       actionContext: node.actionContext,
@@ -660,7 +680,7 @@ export function engineProceed(
       actionContext: actionContextForNode(node),
     }
     const doable = int.hooks.applyIsDoable(
-      { ...executionContext, actionId: replacedActionId },
+      { ...executionContext, ...currentEventReadContext(int), actionId: replacedActionId },
       action,
       action.canBeExecutedByPlayer(
         executionContext.state,
@@ -683,6 +703,7 @@ export function engineProceed(
     }
     const costResults = int.hooks.computeCosts({
       ...executionContext,
+      ...currentEventReadContext(int),
       actionId: replacedActionId,
     })
     const costOverride = costResults.reduce<Partial<PlayerState['resources']>>(
@@ -700,7 +721,11 @@ export function engineProceed(
     executionContext.costs =
       Object.keys(costOverride).length > 0 ? costOverride : undefined
     if (!int.beforePhaseFlowNodeIds.has(node.id)) {
-      const beforePhase = int.hooks.before({ ...executionContext, actionId: replacedActionId })
+      const beforePhase = int.hooks.before({
+        ...executionContext,
+        ...currentEventReadContext(int),
+        actionId: replacedActionId,
+      })
       const beforeBaseEvent = buildListenerEvent(executionContext, {})
       const beforeActivateNodes = buildPhaseTrailingNodes(
         int,
@@ -723,7 +748,7 @@ export function engineProceed(
       sourceCardId: executionContext.sourceCard,
     })
     const optInChoice = maybeBuildChoiceCandidates(int,
-      executionContext,
+      { ...executionContext, ...currentEventReadContext(int) },
       action,
       replacedActionId,
       eventFrame.sink,
@@ -747,7 +772,10 @@ export function engineProceed(
       node.resolve(result)
       return { type: 'ok', nodeId: node.id, actionId: replacedActionId, result }
     }
-    const duringPhase = int.hooks.during({ ...executionContext, actionId: replacedActionId }, result)
+    const duringPhase = int.hooks.during(
+      { ...executionContext, ...currentEventReadContext(int), actionId: replacedActionId },
+      result,
+    )
     const duringActivateNodes = buildActivationActionNodes(int,
       duringPhase.matchedListeners, 'during', replacedActionId,
       {},
@@ -773,7 +801,7 @@ export function engineProceed(
         let mergedOptions = result.request.options
         if (!action.getBaseChoiceOptions) {
           const argResults = int.hooks.computeArgs(
-            { ...executionContext, actionId: replacedActionId },
+            { ...executionContext, ...currentEventReadContext(int), actionId: replacedActionId },
             result,
           )
           const existingValues = new Set(result.request.options.map((o) => o.value))
@@ -890,7 +918,7 @@ export function engineProceed(
       })
     }
     const immediatePhase = int.hooks.immediatelyAfter(
-      { ...executionContext, actionId: replacedActionId },
+      { ...executionContext, ...currentEventReadContext(int), actionId: replacedActionId },
       result,
     )
     if (
@@ -904,7 +932,7 @@ export function engineProceed(
       })
     }
     const afterPhase = int.hooks.after(
-      { ...executionContext, actionId: replacedActionId },
+      { ...executionContext, ...currentEventReadContext(int), actionId: replacedActionId },
       result,
       undefined,
     )
