@@ -100,6 +100,13 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
     })
   })
 
+  it('cache key distinguishes nb (no cross-nb collisions)', () => {
+    const player = baseTestPlayer({ reed: 100, wood: 100 })
+    const sols1 = computeAllBuyableCombinations(player, { unitFee: { reed: 2, wood: 5 }, nb: 1 })
+    const sols2 = computeAllBuyableCombinations(player, { unitFee: { reed: 2, wood: 5 }, nb: 2 })
+    expect(sols1[0]?.resourcesPaid).not.toEqual(sols2[0]?.resourcesPaid)
+  })
+
   it('bonus with minNumRooms:2 — applied when nb=2, skipped when nb=1', () => {
     const player = baseTestPlayer({ reed: 4, wood: 10 })
     const cost = (nb: number) => ({
