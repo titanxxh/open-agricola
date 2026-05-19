@@ -34,8 +34,29 @@ import {
   evaluateConditions,
   getModifiersForCostType,
   validateBonus,
+  validateComplexCost,
 } from './cost-modifiers'
 import type { InternalSolution } from './types'
+
+// Inline helpers — will move to shared/utils/resources.ts during T4.1.
+const scaleResources = (r: Partial<Resource>, n: number): Partial<Resource> => {
+  const out: Partial<Resource> = {}
+  for (const [k, v] of Object.entries(r)) {
+    if (typeof v === 'number') out[k as keyof Resource] = v * n
+  }
+  return out
+}
+
+const mergeResources = (
+  a: Partial<Resource>,
+  b: Partial<Resource>,
+): Partial<Resource> => {
+  const out: Partial<Resource> = { ...a }
+  for (const [k, v] of Object.entries(b)) {
+    out[k as keyof Resource] = ((out[k as keyof Resource] ?? 0) + (v ?? 0))
+  }
+  return out
+}
 
 const RESOURCE_ID: Record<string, number> = {
   wood: 1, food: 2, reed: 3, clay: 4, stone: 5,
@@ -252,6 +273,8 @@ const getMaxTradeTimesFromPartial = (
 export const generateTradeCombinations = (
   trades: Trade[],
   playerResources: Partial<Resource>,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _nb?: number,
 ): { tradesUsed: { trade: Trade; times: number }[]; result: Partial<Resource> }[] => {
   if (trades.length === 0) {
     return [{ tradesUsed: [], result: { ...playerResources } }]
@@ -302,9 +325,11 @@ export const computeAllBuyableCombinations = (
   playedCards?: string[],
   costType?: CostModifierType,
 ): PaymentSolution[] => {
+  validateComplexCost(cost)
   const effectiveCost = costType
     ? applyCostModifiers(cost, getModifiersForCostType(player, costType))
     : cost
+  validateComplexCost(effectiveCost)
 
   const cacheKey = makeCacheKey(player, effectiveCost, costType, playedCards)
   const cached = solutionCache.get(cacheKey)
@@ -312,12 +337,18 @@ export const computeAllBuyableCombinations = (
 
   const playerResources: Partial<Resource> = { ...player.resources }
   const rawSolutions: InternalSolution[] = []
+  const nb = effectiveCost.nb
 
-  const baseFees: Partial<Resource>[] = effectiveCost.fees && effectiveCost.fees.length > 0
+  const unitFeeContribution: Partial<Resource> = nb !== undefined
+    ? scaleResources(effectiveCost.unitFee ?? {}, nb)
+    : {}
+
+  const baseFeesRaw: Partial<Resource>[] = effectiveCost.fees && effectiveCost.fees.length > 0
     ? effectiveCost.fees
     : effectiveCost.fee
       ? [effectiveCost.fee]
       : [{}]
+  const baseFees: Partial<Resource>[] = baseFeesRaw.map((fee) => mergeResources(fee, unitFeeContribution))
 
   for (const bonus of effectiveCost.bonuses ?? []) {
     validateBonus(bonus)
@@ -326,7 +357,7 @@ export const computeAllBuyableCombinations = (
   for (let feeIdx = 0; feeIdx < baseFees.length; feeIdx++) {
     const baseFee = baseFees[feeIdx]
     const tradeCombos = effectiveCost.trades && effectiveCost.trades.length > 0
-      ? generateTradeCombinations(effectiveCost.trades, playerResources)
+      ? generateTradeCombinations(effectiveCost.trades, playerResources, nb)
       : [{ tradesUsed: [], result: { ...playerResources } }]
 
     for (const tradeCombo of tradeCombos) {
@@ -340,7 +371,7 @@ export const computeAllBuyableCombinations = (
       ]
 
       for (const bonus of effectiveCost.bonuses ?? []) {
-        if (!evaluateConditions(player, bonus.conditions)) {
+        if (!evaluateConditions(player, bonus.conditions, nb)) {
           continue
         }
 
@@ -369,7 +400,7 @@ export const computeAllBuyableCombinations = (
               },
             ]
         const candidates = rawCandidates.filter((c) =>
-          evaluateConditions(player, c.conditions),
+          evaluateConditions(player, c.conditions, nb),
         )
         if (candidates.length === 0) {
           continue
