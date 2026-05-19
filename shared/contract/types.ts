@@ -45,6 +45,7 @@ export type Trade = {
   from: Partial<Resource>
   to: Partial<Resource>
   max?: number
+  scope?: 'action' | 'unit'   // default 'action' (back-compat)
   source?: string
   sourceId?: string
   sideEffect?: TradeSideEffect
@@ -89,6 +90,7 @@ export type TradeModifier = {
   from: Partial<Resource>
   to: Partial<Resource>
   max?: number
+  scope?: 'action' | 'unit'   // default 'action'
   /**
    * Player-state conditions evaluated when the modifier is applied. Same
    * supported keys as `Bonus.conditions` (`minNumRooms`, `houseTypeWood` /
