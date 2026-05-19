@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { evaluateStaticConditions, evaluateConditions } from '../cost-modifiers'
+import { evaluateStaticConditions, evaluateConditions, validateTradeModifier } from '../cost-modifiers'
 import type { PlayerState } from '../../../../contract/types'
 
 const mkPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
@@ -26,6 +26,33 @@ describe('evaluateStaticConditions', () => {
   })
   it('passes when houseTypeClay matches', () => {
     expect(evaluateStaticConditions(mkPlayer({ houseType: 'clay' }), { houseTypeClay: 1 })).toBe(true)
+  })
+})
+
+describe('validateTradeModifier', () => {
+  it('throws when scope:unit carries minNumRooms condition', () => {
+    expect(() => validateTradeModifier({
+      type: 'trade', cardId: 'X', appliesTo: ['construct'],
+      from: { wood: 1 }, to: { clay: 2 },
+      scope: 'unit',
+      conditions: { minNumRooms: 2 },
+    })).toThrow(/minNumRooms/)
+  })
+  it('allows scope:unit with only houseType conditions', () => {
+    expect(() => validateTradeModifier({
+      type: 'trade', cardId: 'X', appliesTo: ['construct'],
+      from: { wood: 1 }, to: { clay: 2 },
+      scope: 'unit',
+      conditions: { houseTypeClay: 1 },
+    })).not.toThrow()
+  })
+  it('allows scope:action with any conditions including minNumRooms', () => {
+    expect(() => validateTradeModifier({
+      type: 'trade', cardId: 'X', appliesTo: ['fencing'],
+      from: {}, to: { wood: 1 }, max: 3,
+      scope: 'action',
+      conditions: { minNumRooms: 2 },
+    })).not.toThrow()
   })
 })
 
