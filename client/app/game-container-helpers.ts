@@ -1,9 +1,11 @@
-import type { FarmTilePosition } from '../../shared/contract/types'
+import { resourceKeyList } from '../../shared/contract/state-constants'
+import type { FarmTilePosition, Resource } from '../../shared/contract/types'
 import { parsePositionKey, positionKey } from '../../shared/domain/farm'
 import type {
   PublicEventFenceEdgeHighlightTarget,
   PublicEventFarmTileHighlightTarget,
   PublicEventHighlightTargets,
+  PublicEventResourceAnimation,
 } from './public-event-notifications'
 
 export type WsStatus =
@@ -103,6 +105,11 @@ export const mergePublicEventHighlights = (
   fenceEdges: [...incoming.fenceEdges, ...current.fenceEdges],
 })
 
+export const mergePublicEventResourceAnimations = (
+  current: readonly PublicEventResourceAnimation[],
+  incoming: readonly PublicEventResourceAnimation[],
+): PublicEventResourceAnimation[] => [...incoming, ...current]
+
 const removeCountedItems = <T>(
   current: readonly T[],
   removing: readonly T[],
@@ -128,6 +135,14 @@ const farmTileHighlightKey = (target: PublicEventFarmTileHighlightTarget): strin
 const fenceEdgeHighlightKey = (target: PublicEventFenceEdgeHighlightTarget): string =>
   `${target.playerId}:${target.edgeId}`
 
+const resourceAnimationResourcesKey = (resources: Partial<Resource>): string =>
+  resourceKeyList
+    .map((key) => `${key}:${resources[key] ?? 0}`)
+    .join('|')
+
+const resourceAnimationKey = (animation: PublicEventResourceAnimation): string =>
+  `${animation.id}:${animation.kind}:${JSON.stringify(animation.from)}:${JSON.stringify(animation.to)}:${resourceAnimationResourcesKey(animation.resources)}`
+
 export const removePublicEventHighlights = (
   current: PublicEventHighlightTargets,
   removing: PublicEventHighlightTargets,
@@ -136,6 +151,12 @@ export const removePublicEventHighlights = (
   farmTiles: removeCountedItems(current.farmTiles, removing.farmTiles, farmTileHighlightKey),
   fenceEdges: removeCountedItems(current.fenceEdges, removing.fenceEdges, fenceEdgeHighlightKey),
 })
+
+export const removePublicEventResourceAnimations = (
+  current: readonly PublicEventResourceAnimation[],
+  removing: readonly PublicEventResourceAnimation[],
+): PublicEventResourceAnimation[] =>
+  removeCountedItems(current, removing, resourceAnimationKey)
 
 export const filterPublicFarmHighlightsForPlayer = (
   targets: readonly PublicEventFarmTileHighlightTarget[],

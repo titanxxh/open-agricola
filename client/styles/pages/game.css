@@ -603,6 +603,32 @@
 .public-event-notification[data-kind="farm"] {
   border-left-color: #744210;
 }
+.public-event-resource-animation-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+.public-event-supply-anchor {
+  position: fixed;
+  top: 96px;
+  right: 28px;
+  width: 1px;
+  height: 1px;
+}
+.public-event-resource-animation {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: inline-flex;
+  gap: 3px;
+  transform: translate(var(--from-x), var(--from-y));
+  animation: public-event-resource-flight 1.2s ease-out forwards;
+  filter: drop-shadow(0 4px 8px rgba(35, 35, 20, 0.24));
+}
+.public-event-resource-animation[data-kind="payment"] {
+  animation-duration: 1s;
+}
 .action-card-holder.event-highlight,
 .farm-tile.event-highlight,
 .farm-fence-h.event-highlight,
@@ -629,6 +655,23 @@
 @keyframes public-event-highlight-pulse {
   0%, 100% { filter: brightness(1); }
   50% { filter: brightness(1.18); }
+}
+@keyframes public-event-resource-flight {
+  0% {
+    opacity: 0;
+    transform: translate(var(--from-x), var(--from-y)) scale(0.84);
+  }
+  15% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+    transform: translate(var(--to-x), var(--to-y)) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--to-x), var(--to-y)) scale(0.92);
+  }
 }
 .header-locale-select {
   height: 34px;

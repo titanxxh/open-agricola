@@ -602,7 +602,7 @@ export const FarmBoard = ({
       <div>
         <h2>{t(locale, 'ui.farmTitle')}</h2>
         <div className="player-summary">{displayPlayer.name}</div>
-        <div className="player-resources-compact">
+        <div className="player-resources-compact" data-player-resource-anchor={displayPlayer.id}>
           <span className="res-compact-group">
             <span className="res-icon res-icon-wood" /><span className="res-compact-num">{displayPlayer.resources.wood}</span>
             <span className="res-icon res-icon-clay" /><span className="res-compact-num">{displayPlayer.resources.clay}</span>
@@ -769,6 +769,8 @@ export const FarmBoard = ({
           return (
             <div
               key={cell.key}
+              data-farm-tile-key={tileKey}
+              data-farm-tile-player={displayPlayer.id}
               className={`farm-cell farm-tile${
                 isRoom
                   ? ' room'
