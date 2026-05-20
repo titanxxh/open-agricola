@@ -93,6 +93,41 @@ describe('eventsToLogEntries', () => {
     ])
   })
 
+  it('maps explicit action detail log events', () => {
+    const events = [
+      {
+        schemaVersion: 1,
+        id: '1',
+        seq: 1,
+        round: 1,
+        phase: 'work',
+        type: 'action.detailLogged',
+        visibility: 'public',
+        playerId: 'p1',
+        actionId: 'forest',
+        detailParts: {
+          gains: { wood: 3 },
+          costs: {},
+          effects: {},
+        },
+      },
+    ] satisfies GameEvent[]
+    expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' }, actionNames: { forest: 'Forest' } })).toEqual([
+      {
+        key: 'log.actionDetail',
+        params: {
+          player: 'Alice',
+          action: 'Forest',
+          detailParts: {
+            gains: { wood: 3 },
+            costs: {},
+            effects: {},
+          },
+        },
+      },
+    ])
+  })
+
   it('maps payment provenance with bonus source and choice index', () => {
     const events = [
       {

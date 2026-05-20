@@ -200,6 +200,33 @@ const actionDetailResourceDeltas = (
   )
 }
 
+const positiveResourceDetail = (resources: Partial<Resource>): Partial<Resource> => {
+  const detail: Partial<Resource> = {}
+  for (const key of resourceKeyList) {
+    const amount = resources[key] ?? 0
+    if (amount > 0) detail[key] = amount
+  }
+  return detail
+}
+
+const compactActionDetailParts = (
+  detailParts: ActionDetailParts & {
+    gains: Resource
+    costs: Resource
+    effects: NonNullable<ActionDetailParts['effects']>
+  },
+): ActionDetailParts => {
+  const gains = positiveResourceDetail(detailParts.gains)
+  const costs = positiveResourceDetail(detailParts.costs)
+  const effects = Object.keys(detailParts.effects).length > 0 ? detailParts.effects : undefined
+  return {
+    ...(Object.keys(gains).length ? { gains } : {}),
+    ...(Object.keys(costs).length ? { costs } : {}),
+    ...(effects ? { effects } : {}),
+    ...(detailParts.bonusSources?.length ? { bonusSources: detailParts.bonusSources } : {}),
+  }
+}
+
 /**
  * Selection payload sent by the client to resolve a pending `harvestFeed`
  * interaction. Each entry references one row of `card.exchanges[]` via
@@ -1868,6 +1895,72 @@ export class GameCore {
     this.resetActionResultDetails()
   }
 
+  private hasEventDerivedActionDetail(playerId: string, actionId: string): boolean {
+    const latestPlacement = [...this.state.events]
+      .filter((event) =>
+        event.type === 'worker.placed' &&
+        event.actorPlayerId === playerId &&
+        (event.sourceActionId === actionId || event.spaceId === actionId),
+      )
+      .sort((left, right) => right.seq - left.seq)[0]
+    const latestPlacementSeq = latestPlacement?.seq ?? -1
+    return this.state.events.some((event) => {
+      if (event.seq <= latestPlacementSeq) return false
+      switch (event.type) {
+        case 'resource.moved':
+          if (event.actorPlayerId !== playerId || event.to.kind !== 'player') return false
+          if (event.reason === 'harvest' || event.reason === 'cardEffect') return false
+          if (!resourceKeyList.some((key) => (event.resources[key] ?? 0) > 0)) return false
+          return event.sourceActionId === actionId ||
+            (event.from.kind === 'actionSpace' && event.from.spaceId === actionId)
+        case 'farm.fieldPlowed':
+          return event.actorPlayerId === playerId && (event.sourceActionId ?? 'plow') === actionId
+        case 'farm.roomBuilt':
+          return event.actorPlayerId === playerId && (event.sourceActionId ?? 'construct') === actionId
+        case 'farm.renovated':
+          return (event.actorPlayerId ?? event.playerId) === playerId &&
+            (event.sourceActionId ?? 'renovate-house') === actionId
+        case 'farm.stableBuilt':
+          return event.actorPlayerId === playerId &&
+            ((event.sourceActionId ?? latestPlacement?.sourceActionId ?? 'stables') === actionId)
+        case 'farm.fenceBuilt':
+          return event.actorPlayerId === playerId && (event.sourceActionId ?? 'fence') === actionId
+        case 'resource.exchanged':
+          if (event.actorPlayerId !== playerId) return false
+          if ((event.paid.grain ?? 0) > 0 && (event.gained.food ?? 0) > 0 && event.exchangeSource) return false
+          return (event.sourceActionId ?? event.exchangeSource ?? 'exchange') === actionId
+        case 'resource.paid':
+          if (event.actorPlayerId !== playerId) return false
+          if (event.paymentFor === 'feeding' || event.paymentFor === 'begging' || event.sourceCardId) return false
+          return (event.sourceActionId ?? event.paymentFor) === actionId
+        default:
+          return false
+      }
+    })
+  }
+
+  private emitActionDetailLoggedEvent(
+    player: PlayerState,
+    actionId: string,
+    detailParts: ActionDetailParts & {
+      gains: Resource
+      costs: Resource
+      effects: NonNullable<ActionDetailParts['effects']>
+    },
+  ): void {
+    if (this.hasEventDerivedActionDetail(player.id, actionId)) return
+    const compact = compactActionDetailParts(detailParts)
+    if (Object.keys(compact).length === 0) return
+    appendImmediateEvents(this.state, [{
+      type: 'action.detailLogged',
+      playerId: player.id,
+      actionId,
+      detailParts: compact,
+      actorPlayerId: player.id,
+      sourceActionId: actionId,
+    }])
+  }
+
   private logActionDetail(before: PlayerState, player: PlayerState) {
     if (!this.activeSpaceId) return
     const space = this.getSpaceById(this.activeSpaceId)
@@ -1884,7 +1977,7 @@ export class GameCore {
     ) return
     if (!hasGains && !hasCosts && !hasEffects) return
     void space
-    void detailParts
+    this.emitActionDetailLoggedEvent(player, this.activeSpaceId, detailParts)
     player._activeActionBonusSources = []
     this.actionStartPlayerSnapshot = this.clonePlayer(player)
   }

@@ -54,6 +54,33 @@ describe('event guards', () => {
     })).not.toThrow()
   })
 
+  it('accepts public action detail log events', () => {
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'action.detailLogged',
+      playerId: 'p1',
+      actionId: 'forest',
+      detailParts: {
+        gains: { wood: 3 },
+        costs: {},
+        effects: {},
+      },
+    })).not.toThrow()
+  })
+
+  it('rejects private payloads in action detail log events', () => {
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'action.detailLogged',
+      playerId: 'p1',
+      actionId: 'forest',
+      detailParts: {
+        gains: { wood: 3 },
+        minorHand: ['E78_SleightofHand'],
+      },
+    })).toThrow(/private payload/)
+  })
+
   it('accepts future meeple queued source summaries', () => {
     expect(() => assertKnownGameEventShape({
       ...baseEvent,
