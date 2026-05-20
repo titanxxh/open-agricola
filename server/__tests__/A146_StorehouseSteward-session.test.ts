@@ -37,9 +37,18 @@ const supplyCardEffectFood = (food: number): DraftGameEvent<'resource.moved'> =>
   reason: 'cardEffect',
 })
 
+const fishingFood = (food: number): DraftGameEvent<'resource.moved'> => ({
+  type: 'resource.moved',
+  resources: { food },
+  from: { kind: 'actionSpace', spaceId: 'fishing' },
+  to: { kind: 'player', playerId: 'p1' },
+  reason: 'collect',
+})
+
 const runListener = (
   transactionEvents: DraftGameEvent[],
   resourcesGained: { food?: number },
+  actionEvents?: DraftGameEvent[],
 ) => A146_StorehouseSteward_impl.listeners![0]!.handler({
   state: { players: [{ id: 'p1', occupationPlayed: [CARD_ID] }] },
   player: { id: 'p1' },
@@ -47,6 +56,7 @@ const runListener = (
   actionId: 'collect',
   phase: 'after',
   transactionEvents,
+  actionEvents,
   result: { type: 'ok', resourcesGained },
 } as unknown as CardListenerContext)
 
@@ -87,6 +97,12 @@ describe('A146_StorehouseSteward session', () => {
 describe('A146_StorehouseSteward listener provenance guard', () => {
   it('ignores generic supply/cardEffect food even when result reports food gained', () => {
     const result = runListener([supplyCardEffectFood(3)], { food: 3 })
+
+    expect(result).toBeUndefined()
+  })
+
+  it('ignores stale transaction food when current action has no food movement', () => {
+    const result = runListener([fishingFood(3)], { food: 3 }, [])
 
     expect(result).toBeUndefined()
   })

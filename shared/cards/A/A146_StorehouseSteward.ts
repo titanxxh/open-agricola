@@ -19,7 +19,7 @@ const listener: CardListenerRegistration = {
     if (!isFoodAccumulationSpace(context.space)) return
     const spaceId = context.space?.id
     const foodGained = sumResourceMovedFromActionSpace(
-      context.transactionEvents,
+      context.actionEvents ?? context.transactionEvents,
       'food',
       (event) =>
         event.from.kind === 'actionSpace' &&
