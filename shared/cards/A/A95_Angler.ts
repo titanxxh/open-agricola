@@ -14,7 +14,7 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'fishing') return
     const foodGained = sumResourceMovedFromActionSpace(
-      context.transactionEvents,
+      context.actionEvents ?? context.transactionEvents,
       'food',
       (event) =>
         event.from.kind === 'actionSpace' &&
