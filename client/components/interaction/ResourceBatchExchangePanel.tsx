@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { t, type Locale } from '../../../shared/i18n'
 import type { Resource } from '../../../shared/contract/types'
 
@@ -39,18 +39,11 @@ export const ResourceBatchExchangePanel = ({
   onConfirm,
   onCancel,
 }: Props) => {
-  const discardEntries = useMemo(
-    () => Object.entries(discardAvailableByResource) as Array<[ResourceKey, number]>,
-    [discardAvailableByResource],
-  )
-  const receiveEntries = useMemo(
-    () => receiveResources.map((key) => [key, maxTotal] as [ResourceKey, number]),
-    [maxTotal, receiveResources],
-  )
+  const discardEntries = Object.entries(discardAvailableByResource) as Array<[ResourceKey, number]>
   const [discard, setDiscard] = useState<Partial<Record<ResourceKey, number>>>({})
   const [receive, setReceive] = useState<Partial<Record<ResourceKey, number>>>({})
   const discardTotal = discardEntries.reduce((sum, [key]) => sum + (discard[key] ?? 0), 0)
-  const receiveTotal = receiveEntries.reduce((sum, [key]) => sum + (receive[key] ?? 0), 0)
+  const receiveTotal = receiveResources.reduce((sum, key) => sum + (receive[key] ?? 0), 0)
   const totalsValid = discardTotal === receiveTotal && discardTotal <= maxTotal
 
   const setCount = (
@@ -76,33 +69,25 @@ export const ResourceBatchExchangePanel = ({
               max,
             })}</span>
             <input
-              aria-label={t(locale, 'ui.interactionBatchExchangeDiscard', {
-                type: t(locale, `resources.${key}`),
-                max,
-              })}
               type="number"
               min={0}
               max={max}
               value={discard[key] ?? 0}
               onChange={(e) => setCount(setDiscard, discard, key, Number(e.target.value), max)}
-              disabled={max === 0}
             />
           </label>
         ))}
-        {receiveEntries.map(([key, max]) => (
+        {receiveResources.map((key) => (
           <label key={`receive-${key}`} className="resource-quantity-row">
             <span className="resource-quantity-label">{t(locale, 'ui.interactionBatchExchangeReceive', {
               type: t(locale, `resources.${key}`),
             })}</span>
             <input
-              aria-label={t(locale, 'ui.interactionBatchExchangeReceive', {
-                type: t(locale, `resources.${key}`),
-              })}
               type="number"
               min={0}
-              max={max}
+              max={maxTotal}
               value={receive[key] ?? 0}
-              onChange={(e) => setCount(setReceive, receive, key, Number(e.target.value), max)}
+              onChange={(e) => setCount(setReceive, receive, key, Number(e.target.value), maxTotal)}
             />
           </label>
         ))}
