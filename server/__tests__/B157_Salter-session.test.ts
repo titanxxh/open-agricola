@@ -94,17 +94,36 @@ describe('B157_Salter session', () => {
     const cattleRounds = fms.filter((e) => e.resources.food === 1).map((e) => e.round).sort((a, b) => a - b)
     expect(sheepRounds).toEqual([4,5,6])
     expect(cattleRounds).toEqual([4,5,6,7,8,9,10])
-    const log = resp.state.log.find((entry) => entry.key === 'log.salterFutureFood')
-    expect(log?.params).toMatchObject({
-      cardId: CARD_ID,
-      animals: '2 sheep, 1 cattle',
-      sheep: 2,
+	    const log = resp.state.log.find((entry) => entry.key === 'log.salterFutureFood')
+	    expect(log?.params).toMatchObject({
+	      player: p.name,
+	      cardId: CARD_ID,
+	      animals: '2 sheep, 1 cattle',
+	      sheep: 2,
       boar: 0,
       cattle: 1,
       futureFood: 13,
-      schedule: '2 food in rounds 4-6; 1 food in rounds 4-10',
-    })
-  })
+	      schedule: '2 food in rounds 4-6; 1 food in rounds 4-10',
+	    })
+	    const queuedEvents = resp.state.events.filter((event) => event.type === 'futureMeeple.queued')
+	    expect(queuedEvents).toHaveLength(2)
+	    expect(queuedEvents.filter((event) => 'sourceSummary' in event)).toHaveLength(1)
+	    expect(queuedEvents).toEqual(expect.arrayContaining([
+	      expect.objectContaining({
+	        type: 'futureMeeple.queued',
+	        cardId: CARD_ID,
+	        playerId: p.id,
+	        sourceSummary: expect.objectContaining({
+	          key: 'log.salterFutureFood',
+	          params: expect.objectContaining({
+	            cardId: CARD_ID,
+	            animals: '2 sheep, 1 cattle',
+	            futureFood: 13,
+	          }),
+	        }),
+	      }),
+	    ]))
+	  })
 
   it('Negative: reserve>0 不触发', () => {
     const session = setup({
@@ -139,17 +158,28 @@ describe('B157_Salter session', () => {
     expect(p.pastures[0].animalCount).toBe(0)
     const fms = resp.state.futureMeeples
     expect(fms.map((e) => e.round).sort((a, b) => a - b)).toEqual([4,5,6])
-    const log = resp.state.log.find((entry) => entry.key === 'log.salterFutureFood')
-    expect(log?.params).toMatchObject({
-      cardId: CARD_ID,
-      animals: '1 sheep',
+	    const log = resp.state.log.find((entry) => entry.key === 'log.salterFutureFood')
+	    expect(log?.params).toMatchObject({
+	      player: p.name,
+	      cardId: CARD_ID,
+	      animals: '1 sheep',
       sheep: 1,
       boar: 0,
       cattle: 0,
-      futureFood: 3,
-      schedule: '1 food in rounds 4-6',
-    })
-  })
+	      futureFood: 3,
+	      schedule: '1 food in rounds 4-6',
+	    })
+	    expect(resp.state.events).toEqual(expect.arrayContaining([
+	      expect.objectContaining({
+	        type: 'futureMeeple.queued',
+	        cardId: CARD_ID,
+	        playerId: p.id,
+	        sourceSummary: expect.objectContaining({
+	          key: 'log.salterFutureFood',
+	        }),
+	      }),
+	    ]))
+	  })
 
   it('commit {0,0,0}: 退回 invalid', () => {
     const session = setup({

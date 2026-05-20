@@ -1,6 +1,7 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { B162_ForestClearer } from '../../cards-display/B/B162_ForestClearer'
@@ -23,10 +24,10 @@ const listener: CardListenerRegistration = {
   actions: ['collect'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.result?.type !== 'ok') return
-    const gained = context.result.resourcesGained
-    if (!gained) return
-    const woodGained = gained.wood ?? 0
+    const events = context.actionEvents ?? context.transactionEvents
+    const woodGained = sumResourceMovedToPlayer(events, 'wood', context.player.id, (event) =>
+      event.from.kind === 'actionSpace',
+    )
     if (woodGained < 2 || woodGained > 4) return
 
     const gain: Partial<Resource> = { wood: 1 }

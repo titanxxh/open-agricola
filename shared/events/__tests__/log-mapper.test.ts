@@ -185,6 +185,54 @@ describe('eventsToLogEntries', () => {
     ])
   })
 
+  it('maps future meeple source summary logs', () => {
+    const event = {
+      schemaVersion: 1,
+      id: '10',
+      seq: 10,
+      round: 3,
+      phase: 'work',
+      visibility: 'public',
+      type: 'futureMeeple.queued',
+      actorPlayerId: 'p1',
+      playerId: 'p1',
+      cardId: 'B157_Salter',
+      entries: [
+        { round: 4, resources: { food: 2 } },
+        { round: 5, resources: { food: 2 } },
+        { round: 6, resources: { food: 2 } },
+      ],
+      sourceSummary: {
+        key: 'log.salterFutureFood',
+        params: {
+          cardId: 'B157_Salter',
+          animals: '2 sheep',
+          sheep: 2,
+          boar: 0,
+          cattle: 0,
+          futureFood: 6,
+          schedule: '2 food in rounds 4-6',
+        },
+      },
+    } satisfies GameEvent
+
+    expect(eventsToLogEntries([event], { playerNames: { p1: 'Alice' } })).toEqual([
+      {
+        key: 'log.salterFutureFood',
+        params: {
+          player: 'Alice',
+          cardId: 'B157_Salter',
+          animals: '2 sheep',
+          sheep: 2,
+          boar: 0,
+          cattle: 0,
+          futureFood: 6,
+          schedule: '2 food in rounds 4-6',
+        },
+      },
+    ])
+  })
+
   it('maps grain-to-food resource exchange as bake bread', () => {
     const events = [
       {

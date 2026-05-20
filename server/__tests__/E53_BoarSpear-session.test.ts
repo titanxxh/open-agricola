@@ -4,14 +4,27 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import { recordActionSnapshot } from '../../shared/cards/helpers/action-snapshot'
 import { E53_BoarSpear_impl } from '../../shared/cards/E/E53_BoarSpear'
+import { executeCardListener } from '../../shared/cards/card-listeners'
 import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 import type { ActionFlow, GameState, PlayerState } from '../../shared/contract/types'
+import type { DraftGameEvent } from '../../shared/contract/events'
 
 import '../../shared/cards/E/E53_BoarSpear'
 import '../../shared/cards/E/E85_MasterTanner'
 
 const CARD_ID = 'E53_BoarSpear'
 const E85_ID = 'E85_MasterTanner'
+
+const moved = (
+  overrides: Partial<DraftGameEvent<'resource.moved'>> = {},
+): DraftGameEvent<'resource.moved'> => ({
+  type: 'resource.moved',
+  resources: { boar: 1 },
+  from: { kind: 'actionSpace', spaceId: 'pig-market' },
+  to: { kind: 'player', playerId: 'p1' },
+  reason: 'collect',
+  ...overrides,
+})
 
 const executeSpecialEffectLeaves = (
   flow: ActionFlow | undefined,
@@ -80,7 +93,7 @@ const driveToCompletion = (
 ) => {
   let resp = initialResp
   // First, satisfy animalReorg by placing boar in house
-  if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
+  if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionAnimalReorg') {
     const p = resp.state.players[0]!
     const zones: AnimalZone[] = [
       { id: 'house', zoneType: 'house', animalType: null, animalCount: 0, capacity: 1 },
@@ -200,46 +213,95 @@ describe('E53_BoarSpear session - exchange-based PIG -> 4 FOOD', () => {
   it('per-action once via actionToken: same token does not re-trigger', () => {
     const { state } = setup({ food: 0 })
     const player = state.players[0]!
+    player.id = 'p1'
     recordActionSnapshot(player, 99)
 
-    const handler = E53_BoarSpear_impl.listeners[0]!.handler
+    const listener = E53_BoarSpear_impl.listeners[0]!
     const ctx = {
       state,
       player,
       actionId: 'gain',
-      result: { type: 'ok', resourcesGained: { boar: 1 } },
+      phase: 'after',
+      result: { type: 'ok' },
+      transactionEvents: [moved()],
       space: state.actionSpaces[0],
     }
 
-    const result1 = handler(ctx as never)
+    const result1 = executeCardListener(listener, ctx as never)
     expect(result1).toBeDefined()
     executeSpecialEffectLeaves(result1?.flow, state, player)
     expect(readCardExtraData<number>(player, CARD_ID, 'E53UsedActionToken')).toBe(99)
 
-    const result2 = handler(ctx as never)
+    const result2 = executeCardListener(listener, ctx as never)
     expect(result2).toBeUndefined()
 
     recordActionSnapshot(player, 100)
-    const result3 = handler(ctx as never)
+    const result3 = executeCardListener(listener, ctx as never)
     expect(result3).toBeDefined()
   })
 
   it('does not fire during breeding phase', () => {
     const { state } = setup({ food: 0 })
     const player = state.players[0]!
+    player.id = 'p1'
     state.roundPhase = 'breeding'
     recordActionSnapshot(player, 200)
 
-    const handler = E53_BoarSpear_impl.listeners[0]!.handler
+    const listener = E53_BoarSpear_impl.listeners[0]!
     const ctx = {
       state,
       player,
       actionId: 'gain',
-      result: { type: 'ok', resourcesGained: { boar: 1 } },
+      phase: 'after',
+      result: { type: 'ok' },
+      transactionEvents: [moved()],
       space: state.actionSpaces[0],
     }
 
-    expect(handler(ctx as never)).toBeUndefined()
+    expect(executeCardListener(listener, ctx as never)).toBeUndefined()
+  })
+
+  it('does not fire without an action token even when boar moved to the player', () => {
+    const { state } = setup({ food: 0 })
+    const player = state.players[0]!
+    player.id = 'p1'
+
+    const listener = E53_BoarSpear_impl.listeners[0]!
+    const ctx = {
+      state,
+      player,
+      actionId: 'gain',
+      phase: 'after',
+      result: { type: 'ok' },
+      transactionEvents: [moved()],
+      space: state.actionSpaces[0],
+    }
+
+    expect(executeCardListener(listener, ctx as never)).toBeUndefined()
+  })
+
+  it('does not read prior global state events when current transaction has no boar moves', () => {
+    const { state } = setup({ food: 0 })
+    const player = state.players[0]!
+    player.id = 'p1'
+    recordActionSnapshot(player, 201)
+    state.events = [
+      { type: 'worker.placed', actorPlayerId: 'p1', workerId: 'w1', spaceId: 'pig-market' } as never,
+      moved() as never,
+    ]
+
+    const listener = E53_BoarSpear_impl.listeners[0]!
+    const ctx = {
+      state,
+      player,
+      actionId: 'gain',
+      phase: 'after',
+      result: { type: 'ok', resourcesGained: { boar: 1 } },
+      transactionEvents: [],
+      space: state.actionSpaces[0],
+    }
+
+    expect(executeCardListener(listener, ctx as never)).toBeUndefined()
   })
 
   it('coupling with E85 MasterTanner: exchange dispatch fires E85 listeners', () => {

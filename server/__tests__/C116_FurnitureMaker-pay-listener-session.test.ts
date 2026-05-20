@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
+import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 import '../../shared/cards/register-all'
 import '../../shared/cards/C/C116_FurnitureMaker'
@@ -8,6 +9,19 @@ import '../../shared/cards/B/B109_PaperMaker'
 import '../../shared/cards-display/A/A123_FrameBuilder'
 
 const CARD_ID = 'C116_FurnitureMaker'
+
+const paidEvent = (resources: Record<string, number>, sourceCardId: string) => ({
+  type: 'resource.paid',
+  resources,
+  paymentFor: 'occupation',
+  sourceCardId,
+})
+
+const findAfterPayListener = () => {
+  const listener = getRegisteredCardListeners().find((l) => l.id === 'C116-furniture-maker-after-pay')
+  if (!listener) throw new Error('C116 after-pay listener missing')
+  return listener
+}
 
 const setupBase = (playerCount = 2) => {
   const session = new GameSession(undefined, undefined, { playerCount })
@@ -40,6 +54,81 @@ const playLessons = (
 }
 
 describe('C116 FurnitureMaker — actions:[\'pay\'] migration', () => {
+  it('listener reads occupation food from resource.paid events without legacy result payload', () => {
+    const { state } = setupBase()
+    const player = state.players[0]!
+    player.occupationPlayed = [CARD_ID]
+    const result = { type: 'ok' as const }
+
+    expect('resourcesPaid' in result).toBe(false)
+    expect('extraData' in result).toBe(false)
+
+    const listenerResult = executeCardListener(findAfterPayListener(), {
+      state,
+      player,
+      space: { id: 'lessons' },
+      actionId: 'pay',
+      phase: 'after',
+      sourceCard: 'A123_FrameBuilder',
+      result,
+      transactionEvents: [paidEvent({ food: 2 }, 'A123_FrameBuilder')],
+    } as unknown as CardListenerContext)
+
+    expect(listenerResult?.flow).toEqual({
+      type: 'leaf',
+      actionId: 'gain',
+      params: { wood: 2 },
+      sourceCard: CARD_ID,
+    })
+  })
+
+  it('listener only counts current actionEvents when transaction has prior occupation food', () => {
+    const { state } = setupBase()
+    const player = state.players[0]!
+    player.occupationPlayed = [CARD_ID]
+
+    const listenerResult = executeCardListener(findAfterPayListener(), {
+      state,
+      player,
+      space: { id: 'lessons' },
+      actionId: 'pay',
+      phase: 'after',
+      sourceCard: 'A123_FrameBuilder',
+      result: { type: 'ok' },
+      transactionEvents: [
+        paidEvent({ food: 4 }, 'A123_FrameBuilder'),
+        paidEvent({ food: 2 }, 'A123_FrameBuilder'),
+      ],
+      actionEvents: [paidEvent({ food: 2 }, 'A123_FrameBuilder')],
+    } as unknown as CardListenerContext)
+
+    expect(listenerResult?.flow).toEqual({
+      type: 'leaf',
+      actionId: 'gain',
+      params: { wood: 2 },
+      sourceCard: CARD_ID,
+    })
+  })
+
+  it('listener excludes food paid by FurnitureMaker itself via resource.paid sourceCardId', () => {
+    const { state } = setupBase()
+    const player = state.players[0]!
+    player.occupationPlayed = [CARD_ID]
+    const result = { type: 'ok' as const }
+
+    const listenerResult = executeCardListener(findAfterPayListener(), {
+      state,
+      player,
+      space: { id: 'lessons' },
+      actionId: 'pay',
+      phase: 'after',
+      result,
+      transactionEvents: [paidEvent({ food: 2 }, CARD_ID)],
+    } as unknown as CardListenerContext)
+
+    expect(listenerResult).toBeUndefined()
+  })
+
   it('case 1: lessons cost 1 food → +1 wood', () => {
     const { session, state } = setupBase()
     const player = state.players[0]!
@@ -51,6 +140,13 @@ describe('C116 FurnitureMaker — actions:[\'pay\'] migration', () => {
 
     const resp = playLessons(session, 'lessons', 'A123_FrameBuilder')
     expect(resp.state.players[0]!.occupationPlayed).toContain('A123_FrameBuilder')
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.paid',
+        paymentFor: 'occupation',
+        resources: expect.objectContaining({ food: 1 }),
+      }),
+    ]))
     expect(resp.state.players[0]!.resources.food).toBe(4)
     expect(resp.state.players[0]!.resources.wood).toBe(1)
   })
@@ -66,6 +162,13 @@ describe('C116 FurnitureMaker — actions:[\'pay\'] migration', () => {
 
     const resp = playLessons(session, 'lessons-4', 'A123_FrameBuilder')
     expect(resp.state.players[0]!.occupationPlayed).toContain('A123_FrameBuilder')
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.paid',
+        paymentFor: 'occupation',
+        resources: expect.objectContaining({ food: 2 }),
+      }),
+    ]))
     expect(resp.state.players[0]!.resources.food).toBe(3)
     expect(resp.state.players[0]!.resources.wood).toBe(2)
   })
@@ -73,8 +176,7 @@ describe('C116 FurnitureMaker — actions:[\'pay\'] migration', () => {
   it('case 3: lessons-4 with B109 PaperMaker discount-via-trade pays 1 wood → 0 wood gained (no food paid)', () => {
     // B109 trade: pay 1 wood total to get N food (N = occupations played).
     // With 2 occupations played the trade yields 2 food, covering lessons-4
-    // base cost of 2 food → resourcesPaid = { wood: 1 }. C116 keys on
-    // resourcesPaid.food which is 0, so it should NOT fire.
+    // base cost of 2 food. C116 sees paid wood but no paid food, so it should NOT fire.
     const { session, state } = setupBase(4)
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
@@ -85,6 +187,13 @@ describe('C116 FurnitureMaker — actions:[\'pay\'] migration', () => {
 
     const resp = playLessons(session, 'lessons-4', 'A123_FrameBuilder')
     expect(resp.state.players[0]!.occupationPlayed).toContain('A123_FrameBuilder')
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.paid',
+        paymentFor: 'occupation',
+        resources: expect.objectContaining({ wood: 1 }),
+      }),
+    ]))
     expect(resp.state.players[0]!.resources.wood).toBe(0)
     expect(resp.state.players[0]!.resources.food).toBe(0)
   })

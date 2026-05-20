@@ -3,6 +3,7 @@ import { getRegisteredCardListeners, executeCardListener } from '../card-listene
 import { readCardInfobox } from '../helpers/card-state'
 import { specialEffectAction } from '../../actions/effects/special-effect'
 import type { ActionFlow, GameState, PlayerState, ActionSpace } from '../../contract/types'
+import type { DraftGameEvent } from '../../contract/events'
 import type { CardListenerContext } from '../card-listeners'
 
 import '../D/D36_BreedRegistry'
@@ -23,6 +24,14 @@ const createState = (player: PlayerState): GameState =>
 
 const createSpace = (id: string): ActionSpace =>
   ({ id, resources: {} } as unknown as ActionSpace)
+
+const sheepMoved = (sheep: number): DraftGameEvent<'resource.moved'> => ({
+  type: 'resource.moved',
+  resources: { sheep },
+  from: { kind: 'actionSpace', spaceId: 'sheep-market' },
+  to: { kind: 'player', playerId: 'p1' },
+  reason: 'collect',
+})
 
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)!
@@ -61,7 +70,9 @@ describe('D36_BreedRegistry infobox', () => {
       space: createSpace('sheep-market'),
       actionId: 'collect',
       phase: 'after',
-      result: { type: 'ok', resourcesGained: { sheep: 1 } },
+      result: { type: 'ok' },
+      transactionEvents: [sheepMoved(1)],
+      actionEvents: [sheepMoved(1)],
     } as unknown as CardListenerContext)
     executeSpecialEffectLeaves(result?.flow, state, player)
 
@@ -74,7 +85,9 @@ describe('D36_BreedRegistry infobox', () => {
       space: createSpace('sheep-market'),
       actionId: 'collect',
       phase: 'after',
-      result: { type: 'ok', resourcesGained: { sheep: 2 } },
+      result: { type: 'ok' },
+      transactionEvents: [sheepMoved(2)],
+      actionEvents: [sheepMoved(2)],
     } as unknown as CardListenerContext)
     executeSpecialEffectLeaves(result?.flow, state, player)
 

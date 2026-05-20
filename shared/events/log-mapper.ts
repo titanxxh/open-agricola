@@ -1,6 +1,7 @@
 import type {
   CardPlayedEvent,
   FarmFenceBuiltEvent,
+  FutureMeepleQueuedEvent,
   FarmRenovatedEvent,
   FarmStableBuiltEvent,
   GameEvent,
@@ -177,6 +178,21 @@ const mapHarvestPhaseStarted = (event: HarvestPhaseStartedEvent): LogEntry => {
   return { key: 'log.harvestPhaseBreed' }
 }
 
+const mapFutureMeepleQueued = (
+  event: FutureMeepleQueuedEvent,
+  ctx: EventLogMapperContext,
+): LogEntry | null => {
+  const sourceSummary = event.sourceSummary
+  if (!sourceSummary) return null
+  return {
+    key: sourceSummary.key,
+    params: {
+      player: playerName(ctx, event.playerId),
+      ...sourceSummary.params,
+    },
+  }
+}
+
 const cardPaymentFor = (
   events: readonly GameEvent[],
   played: CardPlayedEvent,
@@ -336,6 +352,11 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
             food: event.food,
           },
         }]
+      }
+
+      if (event.type === 'futureMeeple.queued') {
+        const entry = mapFutureMeepleQueued(event, ctx)
+        return entry ? [entry] : []
       }
 
       if (event.type === 'game.started') {

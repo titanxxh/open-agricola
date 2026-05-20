@@ -1,6 +1,7 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { D146_Porter } from '../../cards-display/D/D146_Porter'
@@ -15,14 +16,14 @@ const listener: CardListenerRegistration = {
   actions: ['collect'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.result?.type !== 'ok') return
-    const gained = context.result.resourcesGained
-    if (!gained) return
-    // Find any building resource with 4+ collected
+    const events = context.actionEvents ?? context.transactionEvents
     const gain: Partial<Resource> = {}
     let triggered = false
     for (const res of BUILDING_RESOURCES) {
-      if ((gained[res] ?? 0) >= 4) {
+      const amount = sumResourceMovedToPlayer(events, res, context.player.id, (event) =>
+        event.from.kind === 'actionSpace',
+      )
+      if (amount >= 4) {
         gain[res] = (gain[res] ?? 0) + 1
         triggered = true
       }

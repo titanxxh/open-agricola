@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
+import type { DraftGameEvent } from '../../shared/contract/events'
 import type { ActionFlow, ActionSpace, GameState, PlayerState } from '../../shared/contract/types'
 
 import '../../shared/cards/A/A142_Cordmaker'
@@ -65,6 +66,17 @@ const createSpace = (id: string): ActionSpace =>
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
 
+const moved = (
+  overrides: Partial<DraftGameEvent<'resource.moved'>> = {},
+): DraftGameEvent<'resource.moved'> => ({
+  type: 'resource.moved',
+  resources: { reed: 2 },
+  from: { kind: 'actionSpace', spaceId: 'reed-bank' },
+  to: { kind: 'player', playerId: 'p1' },
+  reason: 'collect',
+  ...overrides,
+})
+
 describe('A142_Cordmaker', () => {
   it('owner gains mandatory xor choice of grain/vegetable when owner collects 2+ reed from reed-bank', () => {
     const listener = findListener('A142-cordmaker-any-collect-reed')
@@ -81,7 +93,9 @@ describe('A142_Cordmaker', () => {
       space: createSpace('reed-bank'),
       actionId: 'collect',
       phase: 'after',
-      result: { type: 'ok', resourcesGained: { reed: 2 } },
+      result: { type: 'ok' },
+      transactionEvents: [moved({ to: { kind: 'player', playerId: owner.id } })],
+      actionEvents: [moved({ to: { kind: 'player', playerId: owner.id } })],
     } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
@@ -116,7 +130,11 @@ describe('A142_Cordmaker', () => {
       space: createSpace('reed-bank'),
       actionId: 'collect',
       phase: 'after',
-      result: { type: 'ok', resourcesGained: { reed: 3 } },
+      result: { type: 'ok' },
+      transactionEvents: [moved({
+        resources: { reed: 3 },
+        to: { kind: 'player', playerId: opponent.id },
+      })],
     } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
@@ -141,6 +159,10 @@ describe('A142_Cordmaker', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { reed: 1 } },
+      transactionEvents: [moved({
+        resources: { reed: 1 },
+        to: { kind: 'player', playerId: owner.id },
+      })],
     } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
@@ -160,6 +182,7 @@ describe('A142_Cordmaker', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { reed: 2 } },
+      transactionEvents: [moved({ to: { kind: 'player', playerId: owner.id } })],
     } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
@@ -179,6 +202,30 @@ describe('A142_Cordmaker', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok' },
+    } as unknown as CardListenerContext)
+
+    expect(result).toBeUndefined()
+  })
+
+  it('does not trigger for supply/cardEffect reed even when result reports reed', () => {
+    const listener = findListener('A142-cordmaker-any-collect-reed')!
+    const owner = createPlayer('p1')
+    owner.occupationPlayed.push(CARD_ID)
+
+    const result = executeCardListener(listener, {
+      state: createState(owner),
+      player: owner,
+      ownerPlayer: owner,
+      triggerPlayer: owner,
+      space: createSpace('reed-bank'),
+      actionId: 'collect',
+      phase: 'after',
+      result: { type: 'ok', resourcesGained: { reed: 2 } },
+      transactionEvents: [moved({
+        from: { kind: 'supply' },
+        reason: 'cardEffect',
+        to: { kind: 'player', playerId: owner.id },
+      })],
     } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()

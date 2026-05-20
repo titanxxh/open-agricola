@@ -54,6 +54,38 @@ describe('event guards', () => {
     })).not.toThrow()
   })
 
+  it('accepts future meeple queued source summaries', () => {
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'futureMeeple.queued',
+      playerId: 'p1',
+      cardId: 'B157_Salter',
+      entries: [{ round: 4, resources: { food: 2 } }],
+      sourceSummary: {
+        key: 'log.salterFutureFood',
+        params: {
+          cardId: 'B157_Salter',
+          animals: '2 sheep',
+          sheep: 2,
+          boar: 0,
+          cattle: 0,
+          futureFood: 6,
+          schedule: '2 food in rounds 4-6',
+        },
+      },
+    })).not.toThrow()
+  })
+
+  it('accepts fence-built provenance metadata', () => {
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'farm.fenceBuilt',
+      fences: [{ edge: 'H-0-0', type: 'fence' }],
+      newFenceEdges: ['H-0-0'],
+      newPastures: [{ tiles: [{ row: 0, col: 0 }] }],
+    })).not.toThrow()
+  })
+
   it.each([
     [
       'resource.moved resources',

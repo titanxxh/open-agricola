@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../contract/types'
+import type { DraftGameEvent } from '../../contract/events'
 
 import '../E/E118_KindlingGatherer'
 import type { CardListenerContext } from '../card-listeners'
@@ -51,16 +52,42 @@ const createSpace = (id: string, overrides?: Partial<ActionSpace>): ActionSpace 
 
 const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
 
+const foodMoved = (
+  playerId = 'p1',
+  spaceId = 'fishing',
+  food = 1,
+): DraftGameEvent<'resource.moved'> => ({
+  type: 'resource.moved',
+  resources: { food },
+  from: { kind: 'actionSpace', spaceId },
+  to: { kind: 'player', playerId },
+  reason: 'collect',
+})
+
+const foodGainedFromSupply = (
+  playerId = 'p1',
+  food = 2,
+): DraftGameEvent<'resource.moved'> => ({
+  type: 'resource.moved',
+  resources: { food },
+  from: { kind: 'supply' },
+  to: { kind: 'player', playerId },
+  reason: 'gain',
+})
+
 describe('E118_KindlingGatherer', () => {
   it('gains 1 wood after collecting from fishing', () => {
     const listener = findListener('E118-kindling-gatherer-after-collect')!
     expect(listener).toBeDefined()
     const player = createPlayer()
     const space = createSpace('fishing', { gainPerRound: { food: 1 } })
+    const actionEvents = [foodMoved(player.id, 'fishing', 3)]
     const result = executeCardListener(listener, {
       state: createState(player), player, space,
       actionId: 'collect', phase: 'after',
-      result: { type: 'ok', resourcesGained: { food: 3 } },
+      result: { type: 'ok' },
+      transactionEvents: actionEvents,
+      actionEvents,
     } as unknown as CardListenerContext)
     expect(result).toBeDefined()
     const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
@@ -72,10 +99,13 @@ describe('E118_KindlingGatherer', () => {
     const listener = findListener('E118-kindling-gatherer-after-collect')!
     const player = createPlayer()
     const space = createSpace('traveling-players', { gainPerRound: { food: 1 } })
+    const actionEvents = [foodMoved(player.id, 'traveling-players', 2)]
     const result = executeCardListener(listener, {
       state: createState(player), player, space,
       actionId: 'collect', phase: 'after',
-      result: { type: 'ok', resourcesGained: { food: 2 } },
+      result: { type: 'ok' },
+      transactionEvents: actionEvents,
+      actionEvents,
     } as unknown as CardListenerContext)
     expect(result).toBeDefined()
     const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
@@ -87,9 +117,12 @@ describe('E118_KindlingGatherer', () => {
     const listener = findListener('E118-kindling-gatherer-after-place-farmer')!
     expect(listener).toBeDefined()
     const player = createPlayer()
+    const actionEvents = [foodMoved(player.id, 'resource-market-4', 1)]
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('resource-market-4'),
       actionId: 'place-farmer', phase: 'after',
+      transactionEvents: actionEvents,
+      actionEvents,
     } as unknown as CardListenerContext)
     expect(result).toBeDefined()
     const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
@@ -101,10 +134,13 @@ describe('E118_KindlingGatherer', () => {
     const listener = findListener('E118-kindling-gatherer-after-gain')!
     expect(listener).toBeDefined()
     const player = createPlayer()
+    const actionEvents = [foodGainedFromSupply(player.id, 2)]
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('day-laborer'),
       actionId: 'gain', phase: 'after',
-      result: { type: 'ok', resourcesGained: { food: 1 } },
+      result: { type: 'ok' },
+      transactionEvents: actionEvents,
+      actionEvents,
     } as unknown as CardListenerContext)
     expect(result).toBeDefined()
     const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>

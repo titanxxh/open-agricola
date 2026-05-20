@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ActionFlow } from '../../contract/types'
+import type { DraftGameEvent } from '../../contract/events'
 import type { CardListenerContext } from '../card-listeners'
 import { A144_Sequestrator_impl } from '../A/A144_Sequestrator'
 import { B48_ForestStone_impl } from '../B/B48_ForestStone'
@@ -123,6 +124,14 @@ const makeE103Context = (
     minorPlayed: [],
     occupationPlayed: [WOLF_CARD_ID],
   } as never
+  const actionEvents: DraftGameEvent<'resource.moved'>[] = Object.entries(resourcesGained)
+    .map(([resource, amount]) => ({
+      type: 'resource.moved',
+      resources: { [resource]: amount },
+      from: { kind: 'supply' },
+      to: { kind: 'player', playerId: player.id },
+      reason: 'gain',
+    }) as DraftGameEvent<'resource.moved'>)
   return {
     state: { players: [player], actionSpaces: [] } as never,
     player,
@@ -133,6 +142,8 @@ const makeE103Context = (
     actionId: 'gain',
     phase: 'after',
     result: { type: 'ok', resourcesGained },
+    transactionEvents: actionEvents,
+    actionEvents,
   }
 }
 

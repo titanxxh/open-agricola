@@ -11,6 +11,7 @@ import type {
   Resource,
 } from '../contract/types'
 import type { EventSink } from '../contract/events'
+import type { GameEvent } from '../contract/events'
 import type { PromptKey } from '../contract/prompt-keys'
 import type { FollowUpAction, ActionHookPhase } from '../actions/hooks'
 import {
@@ -217,6 +218,8 @@ export function buildActivationActionNodes(
   actionId: string,
   event: Record<string, unknown> = {},
   triggerPlayerId?: string,
+  transactionEvents?: readonly GameEvent[],
+  actionEvents?: readonly GameEvent[],
 ): EngineNode[] {
   return matched.map((entry, index) => {
     const nodeId = `activate-${phase}-${actionId}-${index}-${int.counterRef.value++}`
@@ -230,6 +233,8 @@ export function buildActivationActionNodes(
       triggerPlayerId,
       mandatory: entry.registration.mandatory === true,
       countCardUse: typeof event.countCardUse === 'boolean' ? event.countCardUse : undefined,
+      transactionEvents: transactionEvents ? [...transactionEvents] : undefined,
+      actionEvents: actionEvents ? [...actionEvents] : undefined,
     }
     const node = new ActionNode(
       nodeId,
@@ -250,6 +255,9 @@ export function buildPhaseTrailingNodes(
   state: GameState,
   baseEvent: Record<string, unknown>,
   triggerPlayerId?: string,
+  transactionEvents?: readonly GameEvent[],
+  actionEvents?: readonly GameEvent[],
+  actionEventStartIndex?: number,
 ): EngineNode[] {
   if (matchedListeners.length === 0) return []
 
@@ -306,6 +314,9 @@ export function buildPhaseTrailingNodes(
         mandatory: p.ml.registration.mandatory === true,
         countCardUse:
           typeof baseEvent.countCardUse === 'boolean' ? baseEvent.countCardUse : undefined,
+        transactionEvents: transactionEvents ? [...transactionEvents] : undefined,
+        actionEvents: actionEvents ? [...actionEvents] : undefined,
+        actionEventStartIndex,
       }
       const node = new ActionNode(
         nodeId,

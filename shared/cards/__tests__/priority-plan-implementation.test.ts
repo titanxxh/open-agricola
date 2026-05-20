@@ -22,6 +22,7 @@ import { canRenovate, renovateHouseAction } from '../../actions/effects/renovati
 import { playImprovement } from '../../actions/effects/improvement'
 import { setFencesForTest } from './__fixtures__/fence'
 import type { CardListenerContext } from '../card-listeners'
+import type { DraftGameEvent } from '../../contract/events'
 
 const createPlayer = (id = 'p1', name = 'P1'): PlayerState =>
   ({
@@ -55,6 +56,18 @@ const createState = (...players: PlayerState[]): GameState =>
     futureMeeples: [], pendingFutureMeeples: [],
     gameOver: false, workPhaseObtainedResources: {},
   }) as GameState
+
+const movedToPlayer = (
+  resources: DraftGameEvent<'resource.moved'>['resources'],
+  playerId = 'p1',
+  from: DraftGameEvent<'resource.moved'>['from'] = { kind: 'actionSpace', spaceId: 'test-space' },
+): DraftGameEvent<'resource.moved'> => ({
+  type: 'resource.moved',
+  resources,
+  from,
+  to: { kind: 'player', playerId },
+  reason: from.kind === 'actionSpace' ? 'collect' : 'gain',
+})
 
 const createSpace = (id: string): ActionSpace =>
   ({
@@ -196,6 +209,7 @@ describe('priority plan implementations', () => {
       phase: 'before',
     } as unknown as CardListenerContext)
 
+    const actionEvents = [movedToPlayer({ sheep: 1 }, player.id, { kind: 'actionSpace', spaceId: 'sheep-market' })]
     const result = executeCardListener(afterListener!, {
       state: createState(player),
       player: {
@@ -206,6 +220,8 @@ describe('priority plan implementations', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { sheep: 1 } },
+      transactionEvents: actionEvents,
+      actionEvents,
     } as unknown as CardListenerContext)
 
     expect(result?.flow?.type).toBe('seq')
@@ -461,6 +477,7 @@ describe('priority plan implementations', () => {
     player.occupationPlayed = ['C120_AgriculturalLabourer']
     player.cardStates = { C120_AgriculturalLabourer: { counters: { clay: 4 } } }
 
+    const actionEvents = [movedToPlayer({ grain: 2 }, player.id, { kind: 'supply' })]
     const result = executeCardListener(listener!, {
       state: createState(player),
       player,
@@ -468,6 +485,8 @@ describe('priority plan implementations', () => {
       actionId: 'gain',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { grain: 2 } },
+      transactionEvents: actionEvents,
+      actionEvents,
     } as unknown as CardListenerContext)
 
     expect(result?.flow).toMatchObject({

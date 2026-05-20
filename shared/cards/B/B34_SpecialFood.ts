@@ -5,6 +5,7 @@ import {
   isCardFlagged,
   readCardExtraData,
 } from '../helpers/card-state'
+import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import type { CardImpl } from '../registry'
 import { B34_SpecialFood } from '../../cards-display/B/B34_SpecialFood'
 
@@ -14,9 +15,21 @@ type AnimalType = 'sheep' | 'boar' | 'cattle'
 
 const ANIMALS_BEFORE_KEY = 'animalsBeforeCollecting'
 
+const actionSpaceAnimalMovedToTriggerPlayer = (
+  context: CardListenerContext,
+  animalType: AnimalType,
+) =>
+  sumResourceMovedToPlayer(
+    context.actionEvents ?? context.transactionEvents,
+    animalType,
+    (context.triggerPlayer ?? context.player).id,
+    (event) => event.from.kind === 'actionSpace',
+  )
+
 const isAnimalAccumulationSpace = (context: CardListenerContext) => {
-  const gained = context.result?.type === 'ok' ? context.result.resourcesGained : undefined
-  return (gained?.sheep ?? 0) > 0 || (gained?.boar ?? 0) > 0 || (gained?.cattle ?? 0) > 0
+  return actionSpaceAnimalMovedToTriggerPlayer(context, 'sheep') > 0 ||
+    actionSpaceAnimalMovedToTriggerPlayer(context, 'boar') > 0 ||
+    actionSpaceAnimalMovedToTriggerPlayer(context, 'cattle') > 0
 }
 
 const getAnimalCountByType = (player: PlayerState): Record<AnimalType, number> => ({
@@ -108,12 +121,10 @@ const afterListener: CardListenerRegistration = {
     )
     if (!animalsBeforeCollecting) return
 
-    const resourcesGained =
-      context.result?.type === 'ok' ? context.result.resourcesGained : undefined
     const obtainedAnimals: Record<AnimalType, number> = {
-      sheep: resourcesGained?.sheep ?? 0,
-      boar: resourcesGained?.boar ?? 0,
-      cattle: resourcesGained?.cattle ?? 0,
+      sheep: actionSpaceAnimalMovedToTriggerPlayer(context, 'sheep'),
+      boar: actionSpaceAnimalMovedToTriggerPlayer(context, 'boar'),
+      cattle: actionSpaceAnimalMovedToTriggerPlayer(context, 'cattle'),
     }
     const totalObtained =
       obtainedAnimals.sheep + obtainedAnimals.boar + obtainedAnimals.cattle

@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
+import type { DraftGameEvent } from '../../shared/contract/events'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
+import { A48_ShavingHorse_impl } from '../../shared/cards/A/A48_ShavingHorse'
 import '../../shared/cards/A/A48_ShavingHorse'
 
 const CARD_ID = 'A48_ShavingHorse'
+const AFTER_OBTAIN = A48_ShavingHorse_impl.listeners.find((listener) => listener.id === 'A48-shaving-horse-after-obtain')!
+const AFTER_EXCHANGE = A48_ShavingHorse_impl.listeners.find((listener) => listener.id === 'A48-shaving-horse-after-exchange')!
 
 type SetupOptions = {
   forestWood?: number
@@ -33,6 +38,54 @@ const setup = (options: SetupOptions = {}) => {
 
   session.loadState(state)
   return session
+}
+
+const moved = (
+  overrides: Partial<DraftGameEvent<'resource.moved'>> = {},
+): DraftGameEvent<'resource.moved'> => ({
+  type: 'resource.moved',
+  resources: { wood: 1 },
+  from: { kind: 'supply' },
+  to: { kind: 'player', playerId: 'p1' },
+  reason: 'gain',
+  ...overrides,
+})
+
+const exchanged = (
+  overrides: Partial<DraftGameEvent<'resource.exchanged'>> = {},
+): DraftGameEvent<'resource.exchanged'> => ({
+  type: 'resource.exchanged',
+  paid: { food: 1 },
+  gained: { wood: 1 },
+  paidFrom: { kind: 'player', playerId: 'p1' },
+  paidTo: { kind: 'supply' },
+  gainedFrom: { kind: 'supply' },
+  gainedTo: { kind: 'player', playerId: 'p1' },
+  exchangeSource: 'test',
+  ...overrides,
+})
+
+const directContext = (
+  actionId: 'gain' | 'exchange',
+  transactionEvents: DraftGameEvent[],
+): CardListenerContext => {
+  const session = new GameSession()
+  const state = session.getState().state
+  state.players = state.players.slice(0, 2)
+  const player = state.players[0]!
+  player.id = 'p1'
+  player.minorPlayed.push(CARD_ID)
+  player.resources.wood = 5
+  return {
+    state,
+    player,
+    space: state.actionSpaces.find((space) => space.id === 'forest')!,
+    actionId,
+    phase: 'after',
+    transactionEvents,
+    actionEvents: transactionEvents,
+    result: { type: 'ok', resourcesGained: { wood: 1 } },
+  } as unknown as CardListenerContext
 }
 
 describe('A48_ShavingHorse session', () => {
@@ -103,6 +156,34 @@ describe('A48_ShavingHorse session', () => {
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.wood).toBe(6)
     expect(resp.state.players[0]!.resources.food).toBe(3)
+  })
+
+  it('uses resource.moved events to offer exchange even without result gains', () => {
+    const ctx = directContext('gain', [moved()])
+    ctx.result = { type: 'ok' }
+
+    const result = executeCardListener(AFTER_OBTAIN, ctx)
+
+    expect(result?.flow?.type).toBe('seq')
+    expect(result?.flow?.optional).toBe(true)
+  })
+
+  it('uses resource.exchanged events to offer exchange even without result gains', () => {
+    const ctx = directContext('exchange', [exchanged()])
+    ctx.result = { type: 'ok' }
+
+    const result = executeCardListener(AFTER_EXCHANGE, ctx)
+
+    expect(result?.flow?.type).toBe('seq')
+    expect(result?.flow?.optional).toBe(true)
+  })
+
+  it('does not trigger without a current wood event even when result reports wood', () => {
+    const ctx = directContext('gain', [])
+
+    const result = executeCardListener(AFTER_OBTAIN, ctx)
+
+    expect(result).toBeUndefined()
   })
 
   it('has cost { wood: 1 } aligned with BGA', async () => {

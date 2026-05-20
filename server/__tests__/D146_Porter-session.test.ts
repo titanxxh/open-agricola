@@ -1,10 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
+import { D146_Porter_impl } from '../../shared/cards/D/D146_Porter'
+import type { DraftGameEvent } from '../../shared/contract/events'
 
 import '../../shared/cards/D/D146_Porter'
 
 const CARD_ID = 'D146_Porter'
+const LISTENER = D146_Porter_impl.listeners[0]!
+
+const moved = (
+  overrides: Partial<DraftGameEvent<'resource.moved'>> = {},
+): DraftGameEvent<'resource.moved'> => ({
+  type: 'resource.moved',
+  resources: { clay: 4 },
+  from: { kind: 'actionSpace', spaceId: 'clay-pit' },
+  to: { kind: 'player', playerId: 'p1' },
+  reason: 'collect',
+  ...overrides,
+})
 
 describe('D146_Porter session', () => {
   const setup = () => {
@@ -19,6 +34,27 @@ describe('D146_Porter session', () => {
     session.loadState(state)
     session.devPlayCard(0, CARD_ID)
     return session
+  }
+
+  const directContext = (
+    transactionEvents: DraftGameEvent<'resource.moved'>[],
+  ): CardListenerContext => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    const player = state.players[0]!
+    player.id = 'p1'
+    player.occupationPlayed.push(CARD_ID)
+    return {
+      state,
+      player,
+      space: state.actionSpaces.find((space) => space.id === 'clay-pit')!,
+      actionId: 'collect',
+      phase: 'after',
+      transactionEvents,
+      actionEvents: transactionEvents,
+      result: { type: 'ok', resourcesGained: { clay: 4 } },
+    } as unknown as CardListenerContext
   }
 
   it('gains 1 clay + 1 food when collecting 4+ clay from clay-pit', () => {
@@ -120,5 +156,30 @@ describe('D146_Porter session', () => {
     const after = session.getState().state
     // No porter bonus — sheep is not a building resource
     expect(after.players[0]!.resources.food).toBe(foodBefore)
+  })
+
+  it('uses action-space building resource events even without result gains', () => {
+    const ctx = directContext([moved()])
+    ctx.result = { type: 'ok' }
+
+    const result = executeCardListener(LISTENER, ctx)
+
+    expect(result?.flow).toMatchObject({
+      type: 'leaf',
+      actionId: 'gain',
+      params: { clay: 1, food: 1 },
+      sourceCard: CARD_ID,
+    })
+  })
+
+  it('does not trigger for supply/cardEffect clay even when result reports clay', () => {
+    const ctx = directContext([moved({
+      from: { kind: 'supply' },
+      reason: 'cardEffect',
+    })])
+
+    const result = executeCardListener(LISTENER, ctx)
+
+    expect(result).toBeUndefined()
   })
 })

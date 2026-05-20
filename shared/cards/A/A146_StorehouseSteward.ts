@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A146_StorehouseSteward } from '../../cards-display/A/A146_StorehouseSteward'
+import { sumResourceMovedFromActionSpace } from '../helpers/event-provenance'
 
 const CARD_ID = A146_StorehouseSteward.id
 
@@ -16,9 +17,16 @@ const listener: CardListenerRegistration = {
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isFoodAccumulationSpace(context.space)) return
-    const foodGained = context.result?.type === 'ok'
-      ? (context.result.resourcesGained?.food ?? 0)
-      : 0
+    const spaceId = context.space?.id
+    const foodGained = sumResourceMovedFromActionSpace(
+      context.transactionEvents,
+      'food',
+      (event) =>
+        event.from.kind === 'actionSpace' &&
+        event.from.spaceId === spaceId &&
+        event.to.kind === 'player' &&
+        event.to.playerId === context.player.id,
+    )
     let gain: { stone?: number; reed?: number; clay?: number; wood?: number } | null = null
     if (foodGained === 2) {
       gain = { stone: 1 }

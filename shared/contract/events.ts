@@ -1,6 +1,7 @@
 import type {
   CostModifierType,
   FutureMeepleRoomType,
+  FutureMeepleSourceSummary,
   GameState,
   PlayerState,
   Resource,
@@ -126,6 +127,8 @@ export type FarmStableBuiltEvent = GameEventBase<'farm.stableBuilt'> & {
 
 export type FarmFenceBuiltEvent = GameEventBase<'farm.fenceBuilt'> & {
   fences: unknown[]
+  newFenceEdges?: string[]
+  newPastures?: Array<{ tiles?: unknown[] }>
 }
 
 export type FarmFenceConsumedEvent = GameEventBase<'farm.fenceConsumed'> & {
@@ -266,6 +269,7 @@ export type FutureMeepleQueuedEvent = GameEventBase<'futureMeeple.queued'> & {
   playerId: string
   cardId: string
   entries: Array<{ round: number; resources?: Partial<Resource>; roomType?: FutureMeepleRoomType }>
+  sourceSummary?: FutureMeepleSourceSummary
 }
 
 export type FutureMeepleRemovedEvent = GameEventBase<'futureMeeple.removed'> & {

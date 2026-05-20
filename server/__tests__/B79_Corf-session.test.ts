@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
+import { B79_Corf_impl } from '../../shared/cards/B/B79_Corf'
+import type { DraftGameEvent } from '../../shared/contract/events'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/B/B79_Corf'
 
 const CARD_ID = 'B79_Corf'
+const LISTENER = B79_Corf_impl.listeners[0]!
 
 const setup = () => {
   const session = new GameSession()
@@ -25,6 +29,43 @@ const setup = () => {
   session.loadState(state)
   session.devPlayCard(0, CARD_ID)
   return session
+}
+
+const moved = (
+  overrides: Partial<DraftGameEvent<'resource.moved'>> = {},
+): DraftGameEvent<'resource.moved'> => ({
+  type: 'resource.moved',
+  resources: { stone: 3 },
+  from: { kind: 'actionSpace', spaceId: 'eastern-quarry' },
+  to: { kind: 'player', playerId: 'p2' },
+  reason: 'collect',
+  ...overrides,
+})
+
+const directContext = (
+  transactionEvents: DraftGameEvent<'resource.moved'>[],
+  actionEvents = transactionEvents,
+): CardListenerContext => {
+  const session = new GameSession()
+  const state = session.getState().state
+  state.players = state.players.slice(0, 2)
+  const owner = state.players[0]!
+  const trigger = state.players[1]!
+  owner.id = 'p1'
+  trigger.id = 'p2'
+  owner.minorPlayed.push(CARD_ID)
+  return {
+    state,
+    player: trigger,
+    ownerPlayer: owner,
+    triggerPlayer: trigger,
+    space: state.actionSpaces.find((space) => space.id === 'eastern-quarry')!,
+    actionId: 'collect',
+    phase: 'after',
+    transactionEvents,
+    actionEvents,
+    result: { type: 'ok', resourcesGained: { stone: 3 } },
+  } as unknown as CardListenerContext
 }
 
 describe('B79_Corf session', () => {
@@ -99,5 +140,38 @@ describe('B79_Corf session', () => {
 
     // No stone gained (forest gives wood, not stone)
     expect(resp.state.players[0]!.resources.stone).toBe(stoneBefore)
+  })
+
+  it('uses action-space stone events for scope-any trigger even without result gains', () => {
+    const ctx = directContext([moved()])
+    ctx.result = { type: 'ok' }
+
+    const result = executeCardListener(LISTENER, ctx)
+
+    expect(result?.flow).toMatchObject({
+      type: 'leaf',
+      actionId: 'gain',
+      params: { stone: 1 },
+      sourceCard: CARD_ID,
+    })
+  })
+
+  it('does not trigger for supply/cardEffect stone even when result reports stone', () => {
+    const ctx = directContext([moved({
+      from: { kind: 'supply' },
+      reason: 'cardEffect',
+    })])
+
+    const result = executeCardListener(LISTENER, ctx)
+
+    expect(result).toBeUndefined()
+  })
+
+  it('ignores stale transaction stone when actionEvents has no current stone threshold', () => {
+    const ctx = directContext([moved()], [moved({ resources: { stone: 2 } })])
+
+    const result = executeCardListener(LISTENER, ctx)
+
+    expect(result).toBeUndefined()
   })
 })

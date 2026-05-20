@@ -299,10 +299,24 @@ export type FutureMeeple = {
   roomType?: FutureMeepleRoomType
 }
 
+export type FutureMeepleSourceSummary = {
+  key: 'log.salterFutureFood'
+  params: {
+    cardId: string
+    animals: string
+    sheep: number
+    boar: number
+    cattle: number
+    futureFood: number
+    schedule: string
+  }
+}
+
 export type FutureMeepleRequest =
   | {
       cardId: string
       playerId: string
+      sourceSummary?: FutureMeepleSourceSummary
       startRound: number
       count: number
       resources: Partial<Resource>
@@ -310,6 +324,7 @@ export type FutureMeepleRequest =
   | {
       cardId: string
       playerId: string
+      sourceSummary?: FutureMeepleSourceSummary
       entries: {
         round: number
         resources?: Partial<Resource>

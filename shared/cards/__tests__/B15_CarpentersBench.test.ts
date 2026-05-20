@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../contract/types'
+import type { DraftGameEvent } from '../../contract/events'
 
 import '../B/B15_CarpentersBench'
 
@@ -52,6 +53,17 @@ const createState = (...players: PlayerState[]): GameState =>
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
 
+const woodMoved = (
+  wood: number,
+  playerId = 'p1',
+): DraftGameEvent<'resource.moved'> => ({
+  type: 'resource.moved',
+  resources: { wood },
+  from: { kind: 'actionSpace', spaceId: 'forest' },
+  to: { kind: 'player', playerId },
+  reason: 'collect',
+})
+
 describe('B15_CarpentersBench', () => {
   it('triggers after collecting wood from a wood space, max=n+1 with benchWood=n', () => {
     const listener = findListener('B15-carpenters-bench-after-collect')
@@ -69,6 +81,8 @@ describe('B15_CarpentersBench', () => {
       // Actually-collected wood (BGA L42-46 counts wood meeples on space) is
       // the source of truth for bench cap, not space.gainPerRound.
       result: { type: 'ok', resourcesGained: { wood: 3 } },
+      transactionEvents: [woodMoved(3, player.id)],
+      actionEvents: [woodMoved(3, player.id)],
     })
     expect(result).toBeDefined()
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
@@ -97,6 +111,8 @@ describe('B15_CarpentersBench', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { wood: 1 } },
+      transactionEvents: [woodMoved(1, player.id)],
+      actionEvents: [woodMoved(1, player.id)],
     })
     expect(result).toBeDefined()
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
