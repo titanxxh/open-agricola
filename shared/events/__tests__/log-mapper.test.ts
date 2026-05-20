@@ -93,6 +93,98 @@ describe('eventsToLogEntries', () => {
     ])
   })
 
+  it('maps payment provenance with bonus source and choice index', () => {
+    const events = [
+      {
+        schemaVersion: 1,
+        id: '1',
+        seq: 1,
+        round: 5,
+        phase: 'work',
+        type: 'resource.paid',
+        visibility: 'public',
+        actorPlayerId: 'p1',
+        sourceActionId: 'construct',
+        resources: { wood: 1, clay: 1 },
+        paymentFor: 'construct',
+        paymentSources: [
+          { from: { kind: 'player', playerId: 'p1' }, resources: { wood: 1, clay: 1 } },
+        ],
+        bonusSources: ['E123_ResourceHoarder'],
+        bonusChoiceIndex: { E123_ResourceHoarder: 2 },
+      },
+    ] satisfies GameEvent[]
+    expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' }, actionNames: { construct: 'Build rooms' } })).toEqual([
+      {
+        key: 'log.actionDetail',
+        params: {
+          player: 'Alice',
+          action: 'Build rooms',
+          detailParts: {
+            costs: { wood: 1, clay: 1 },
+            bonusSources: ['E123_ResourceHoarder'],
+          },
+          bonusChoiceIndex: { E123_ResourceHoarder: 2 },
+        },
+      },
+    ])
+  })
+
+  it('maps action exclusive-use lifecycle events', () => {
+    const events = [
+      {
+        schemaVersion: 1,
+        id: '0',
+        seq: 0,
+        round: 13,
+        phase: 'work',
+        type: 'action.revealed',
+        visibility: 'public',
+        actionId: 'round14',
+        roundSlot: 14,
+      },
+      {
+        schemaVersion: 1,
+        id: '1',
+        seq: 1,
+        round: 13,
+        phase: 'work',
+        type: 'action.exclusiveUseSet',
+        visibility: 'public',
+        actionId: 'round14',
+        playerId: 'p1',
+        sourceCardId: 'B23_FinalScenario',
+        untilRound: 14,
+      },
+      {
+        schemaVersion: 1,
+        id: '2',
+        seq: 2,
+        round: 14,
+        phase: 'work',
+        type: 'action.exclusiveUseCleared',
+        visibility: 'public',
+        actionId: 'round14',
+        playerId: 'p1',
+        sourceCardId: 'B23_FinalScenario',
+      },
+    ] satisfies GameEvent[]
+    expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' }, actionNames: { round14: 'Round 14 Action' } })).toEqual([
+      {
+        key: 'log.actionExclusiveUseCleared',
+        params: { player: 'Alice', action: 'Round 14 Action', cardId: 'B23_FinalScenario' },
+      },
+      {
+        key: 'log.actionExclusiveUseSet',
+        params: { player: 'Alice', action: 'Round 14 Action', cardId: 'B23_FinalScenario' },
+      },
+      {
+        key: 'log.actionRevealed',
+        params: { action: 'Round 14 Action', roundSlot: 14 },
+      },
+    ])
+  })
+
   it('maps grain-to-food resource exchange as bake bread', () => {
     const events = [
       {

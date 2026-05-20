@@ -1842,6 +1842,27 @@ export const GameContainerApi = () => {
               }
             : null
         }
+        resourceBatchExchangeSelect={
+          interaction.stateId === 'wait' &&
+          interaction.request.kind === 'resource-batch-exchange-select'
+            ? {
+                discardAvailableByResource: interaction.request.discardAvailableByResource,
+                receiveResources: interaction.request.receiveResources,
+                maxTotal: interaction.request.maxTotal,
+                promptKey: interaction.request.promptKey,
+                onConfirm: (payload) => {
+                  if (!isInteractive) return
+                  void transport
+                    .commitSelection(interaction.playerIndex, { resourceBatchExchange: payload })
+                    .catch((e) => console.error(e))
+                },
+                onCancel: () => {
+                  if (!isInteractive) return
+                  void transport.undoStep().catch((e) => console.error('undoStep error', e))
+                },
+              }
+            : null
+        }
       />
     </div>
   )

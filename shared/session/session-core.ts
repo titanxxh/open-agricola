@@ -18,6 +18,7 @@ import type {
   InteractionState,
   PlayerState,
   Resource,
+  ResourceBatchExchangePayload,
   InteractionAnimalReorgZone,
 } from '../contract/types.ts'
 import type { ActionDetailParts } from '../contract/protocol/game.ts'
@@ -128,7 +129,10 @@ import {
 import { rebuildActiveModifiers } from '../session/serialization.ts'
 import { isSpaceOccupied, removeWorkerRef } from '../domain/space.ts'
 import { smallestAvailableWorker } from '../domain/player.ts'
-import { computeAllowedPlacementSpaces } from '../actions/helpers/placement-availability.ts'
+import {
+  canEnterSpace,
+  computeAllowedPlacementSpaces,
+} from '../actions/helpers/placement-availability.ts'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../actions/helpers/placement-constants.ts'
 import {
   computeAnytimePolicy,
@@ -1478,6 +1482,20 @@ export class GameCore {
           allowedCommands: buildCmds(['commitSelection', 'undoStep', 'undoAction']),
           anytimeActions: anytimeDescriptors,
         }
+      case 'resource-batch-exchange-select':
+        return {
+          stateId: 'wait',
+          playerIndex,
+          spaceId,
+          promptKey,
+          promptParams,
+          sourceCard,
+          request,
+          options: choiceOptions,
+          costOverride,
+          allowedCommands: buildCmds(['commitSelection', 'undoStep', 'undoAction']),
+          anytimeActions: anytimeDescriptors,
+        }
       case 'select-trigger':
         return {
           stateId: 'wait',
@@ -2250,6 +2268,16 @@ export class GameCore {
           roundSlot: this.state.round,
         })
       }
+      const exclusiveUse = space.exclusiveUse
+      if (exclusiveUse && this.state.round >= exclusiveUse.untilRound) {
+        events.push({
+          type: 'action.exclusiveUseCleared',
+          actionId: space.id,
+          playerId: exclusiveUse.playerId,
+          sourceCardId: exclusiveUse.sourceCardId,
+        })
+        delete space.exclusiveUse
+      }
       if (this.state.round >= openRound) {
         const resources: Partial<Resource> = {}
         resourceKeyList.forEach((key) => {
@@ -2734,9 +2762,8 @@ export class GameCore {
     return false
   }
 
-  private isActionSpaceAvailableToPlayer(player: PlayerState, space: ActionSpace, roundOpen: Map<string, number>): boolean {
-    const openRound = roundOpen.get(space.id) ?? space.roundAvailable
-    if (this.state.round < openRound) return false
+  private isActionSpaceAvailableToPlayer(player: PlayerState, space: ActionSpace): boolean {
+    if (!canEnterSpace(space, player, this.state)) return false
     if (workersAvailable(this.state, player) <= 0) return false
     if (isSpaceOccupied(space)) {
       const allowed = computeAllowedPlacementSpaces(this.state, player)
@@ -2752,9 +2779,8 @@ export class GameCore {
   getAvailableActions(playerIndex: number): { spaceId: string; nameKey: string }[] {
     const player = this.state.players[playerIndex]
     if (!player) return []
-    const roundOpen = createRoundOpenById(this.state.roundActionOrder)
     return this.state.actionSpaces
-      .filter((space) => this.isActionSpaceAvailableToPlayer(player, space, roundOpen))
+      .filter((space) => this.isActionSpaceAvailableToPlayer(player, space))
       .map((space) => ({ spaceId: space.id, nameKey: space.nameKey }))
   }
 
@@ -2766,11 +2792,10 @@ export class GameCore {
     const player = this.state.players[playerIndex]
     if (!player) return {}
 
-    const roundOpen = createRoundOpenById(this.state.roundActionOrder)
     const result: Record<string, boolean> = {}
 
     for (const space of this.state.actionSpaces) {
-      result[space.id] = this.isActionSpaceAvailableToPlayer(player, space, roundOpen)
+      result[space.id] = this.isActionSpaceAvailableToPlayer(player, space)
     }
 
     // Also mark occupied spaces that computeArgs listeners expose as extra options
@@ -3043,6 +3068,8 @@ export class GameCore {
           // explicitly so future callers cannot silently route through the
           // legacy pending-options path.
           return this.respond(false, 'use commitSelectionChoice for resource-quantity-select')
+        case 'resource-batch-exchange-select':
+          return this.respond(false, 'use commitSelectionChoice for resource-batch-exchange-select')
         case 'card-draft':
           return this.respond(false, 'card-draft resolveChoice not supported')
         case 'engine-blocked':
@@ -3522,6 +3549,7 @@ export class GameCore {
       positions?: FarmTilePosition[]
       cardIds?: string[]
       resourceCounts?: Partial<Record<keyof Resource, number>>
+      resourceBatchExchange?: ResourceBatchExchangePayload
     },
   ): SessionResponse {
     const envelope = this.engineStack.peekPendingEnvelope()
@@ -3529,11 +3557,12 @@ export class GameCore {
     const envelopeKind = envelope?.request.kind
     const isPlainChoice = envelopeKind === 'choice'
     const isResourceQuantity = envelopeKind === 'resource-quantity-select'
+    const isResourceBatchExchange = envelopeKind === 'resource-batch-exchange-select'
     const pendingPlayerIndex = frame && envelope
       ? this.effectiveOwnerIndexForFrame(frame, envelope.hostNodeId, envelope)
       : -1
-    if ((!isPlainChoice && !isResourceQuantity) || pendingPlayerIndex !== playerIndex) {
-      return this.respond(false, 'no pending selection/resource-quantity choice for this player')
+    if ((!isPlainChoice && !isResourceQuantity && !isResourceBatchExchange) || pendingPlayerIndex !== playerIndex) {
+      return this.respond(false, 'no pending selection/resource choice for this player')
     }
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
@@ -3574,6 +3603,66 @@ export class GameCore {
         return this.respond(false, result.errorKey ?? 'invalid resource-quantity selection')
       }
       // 与 occupation-hand 分支保持一致（line 3384）：只 record ok 结果。
+      if (result?.type === 'ok') {
+        this.recordActionResultDetails(
+          result,
+          this.currentFrameOwnerPlayerId(player.id),
+          player.id,
+        )
+      }
+      this.flushEngineLog()
+      this.runEngineSteps()
+      if (this.engineStack.peekPendingEnvelope()) return this.respond()
+      return this.continueAfterResolvedFarmChoice(playerIndex)
+    }
+
+    if (isResourceBatchExchange && envelope && envelope.request.kind === 'resource-batch-exchange-select') {
+      const batch = payload.resourceBatchExchange ?? { discard: {}, receive: {} }
+      const discard = batch.discard ?? {}
+      const receive = batch.receive ?? {}
+      const allowedReceive = new Set(envelope.request.receiveResources)
+      let discardTotal = 0
+      let receiveTotal = 0
+      for (const [key, raw] of Object.entries(discard)) {
+        const resourceKey = key as keyof Resource
+        const value = raw ?? 0
+        if (!Number.isInteger(value) || value < 0) {
+          return this.respond(false, `resource-batch.error.invalid-discard-${key}`)
+        }
+        const max = envelope.request.discardAvailableByResource[resourceKey] ?? 0
+        if (value > max) {
+          return this.respond(false, `resource-batch.error.invalid-discard-${key}`)
+        }
+        discardTotal += value
+      }
+      for (const [key, raw] of Object.entries(receive)) {
+        const resourceKey = key as keyof Resource
+        const value = raw ?? 0
+        if (!allowedReceive.has(resourceKey) || !Number.isInteger(value) || value < 0) {
+          return this.respond(false, `resource-batch.error.invalid-receive-${key}`)
+        }
+        receiveTotal += value
+      }
+      if (discardTotal > envelope.request.maxTotal || receiveTotal > envelope.request.maxTotal) {
+        return this.respond(false, 'resource-batch.error.too-many')
+      }
+      if (discardTotal !== receiveTotal) {
+        return this.respond(false, 'resource-batch.error.total-mismatch')
+      }
+      if ((envelope.request.requireAtLeastOne ?? false) && discardTotal < 1) {
+        return this.respond(false, 'resource-batch.error.must-pick-at-least-one')
+      }
+      this.pushHistory()
+      const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('resource-batch-exchange')
+      const result = this.engine?.resolveChoice('confirm', {
+        state: this.state,
+        player,
+        space,
+      }, { resourceBatchExchange: batch })
+      if (result?.type === 'fail') {
+        this.flushEngineLog()
+        return this.respond(false, result.errorKey ?? 'invalid resource batch exchange')
+      }
       if (result?.type === 'ok') {
         this.recordActionResultDetails(
           result,

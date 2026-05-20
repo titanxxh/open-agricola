@@ -43,6 +43,17 @@ describe('event guards', () => {
     })).not.toThrow()
   })
 
+  it('accepts action exclusive-use clear events', () => {
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      round: 13,
+      type: 'action.exclusiveUseCleared',
+      actionId: 'round-14-action',
+      playerId: 'p1',
+      sourceCardId: 'B23_FinalScenario',
+    })).not.toThrow()
+  })
+
   it.each([
     [
       'resource.moved resources',

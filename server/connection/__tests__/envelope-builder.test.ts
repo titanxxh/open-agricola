@@ -42,4 +42,72 @@ describe('buildEnvelope', () => {
     expect(players[0]!.id).toBe(player0Id)
     expect(players[1]!.id).not.toBe(player0Id)
   })
+
+  it('redacts private prompts and emits private events only for the target viewer', () => {
+    const session = new GameSession()
+    const resp = session.withCtx(() => session.getState())
+    const p0 = resp.state.players[0]!
+    const p1 = resp.state.players[1]!
+    const waitResp = {
+      ...resp,
+      interaction: {
+        stateId: 'wait' as const,
+        playerIndex: 0,
+        sourceCard: 'E78_SleightofHand',
+        promptKey: 'ui.interactionSleightOfHand' as const,
+        request: {
+          kind: 'resource-batch-exchange-select' as const,
+          cardId: 'E78_SleightofHand',
+          discardAvailableByResource: { wood: 2, clay: 1 },
+          receiveResources: ['wood', 'clay', 'reed', 'stone'] as const,
+          maxTotal: 4,
+        },
+        allowedCommands: ['commitSelection', 'undoStep', 'undoAction'] as const,
+        anytimeActions: [],
+      },
+    }
+
+    const target = buildEnvelope({
+      room: { id: 'r1', session },
+      resp: waitResp,
+      viewerPlayerId: p0.id,
+      version: 1,
+      cause: 'choice',
+      emittedAt: 0,
+    })
+    const other = buildEnvelope({
+      room: { id: 'r1', session },
+      resp: waitResp,
+      viewerPlayerId: p1.id,
+      version: 1,
+      cause: 'choice',
+      emittedAt: 0,
+    })
+    const observer = buildEnvelope({
+      room: { id: 'r1', session },
+      resp: waitResp,
+      viewerPlayerId: null,
+      version: 1,
+      cause: 'choice',
+      emittedAt: 0,
+    })
+
+    expect(target.payload.interaction.stateId).toBe('wait')
+    expect(target.payload.interaction.stateId === 'wait' && target.payload.interaction.request.kind)
+      .toBe('resource-batch-exchange-select')
+    expect(target.payload.privateEvents).toEqual([
+      expect.objectContaining({
+        type: 'private.promptShown',
+        recipientPlayerId: p0.id,
+        promptKind: 'resource-batch-exchange-select',
+        sourceCard: 'E78_SleightofHand',
+      }),
+    ])
+    expect(other.payload.privateEvents ?? []).toEqual([])
+    expect(observer.payload.privateEvents ?? []).toEqual([])
+    expect(other.payload.interaction.stateId === 'wait' && other.payload.interaction.request.kind)
+      .toBe('private-prompt')
+    expect(observer.payload.interaction.stateId === 'wait' && observer.payload.interaction.request.kind)
+      .toBe('private-prompt')
+  })
 })

@@ -96,31 +96,13 @@ const afterPayListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const stack = getStack(context.player)
     if (stack.length === 0) return
-    let fired = false
-    let k = 1 // default k=1 for the legacy path (bonusChoiceIndex unavailable)
-    const result = context.result as
-      | { extraData?: { bonusUsed?: string[]; bonusChoiceIndex?: Record<string, number> } }
-      | undefined
-    const extraBonusUsed = result?.extraData?.bonusUsed
-    if (Array.isArray(extraBonusUsed) && extraBonusUsed.includes(CARD_ID)) {
-      fired = true
-      const idx = result?.extraData?.bonusChoiceIndex?.[CARD_ID]
-      if (typeof idx === 'number') k = idx
-    }
-    if (!fired) {
-      // Legacy path (construct / renovate-house still mutate
-      // _activeActionBonusSources via executePaymentSolution). They use the
-      // pre-7b1 single-choice bonus shape, so k=1 (top-1) matches the
-      // discount that the payment solver actually applied.
-      const sources = context.player._activeActionBonusSources ?? []
-      if (sources.includes(CARD_ID)) {
-        fired = true
-        k = 1
-      }
-    }
-    if (!fired || k <= 0) return
+    const payment = context.eventQuery.find('resource.paid', (event) =>
+      event.bonusSources?.includes(CARD_ID) === true,
+    )
+    if (!payment) return
+    const k = payment.bonusChoiceIndex?.[CARD_ID] ?? 1
+    if (k <= 0) return
 
-    // Pop k items from the top of the stack (each was used as a 1-resource discount)
     const popCount = Math.min(k, stack.length)
     stack.length = stack.length - popCount
     updateInfobox(context.player)

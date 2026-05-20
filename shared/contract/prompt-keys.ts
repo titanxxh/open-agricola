@@ -22,6 +22,7 @@ export type PromptKey =
   | 'ui.interactionSelection'
   | 'ui.interactionOccupationHand'
   | 'ui.interactionCardDraft'
+  | 'ui.interactionSleightOfHand'
   | 'ui.interactionExchange' | 'ui.interactionExchangeChoice'
   | 'ui.interactionBakeBread' | 'ui.interactionBakeBreadCount' | 'ui.interactionBakeBreadChoice'
   // Other ad-hoc engine / improvement / occupation prompts
