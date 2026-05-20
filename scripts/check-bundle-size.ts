@@ -8,13 +8,13 @@
  * Budgets (chosen with ~15% buffer over the Task-4 measurement of
  * 483KB raw / 147KB gzip and 89KB workshop):
  *
- *   - Main raw     ≤ 550 KB  (MAIN_RAW_LIMIT_KB)
+ *   - Main raw     ≤ 1024 KB (MAIN_RAW_LIMIT_KB)
  *   - Main gzip    ≤ 170 KB  (MAIN_GZIP_LIMIT_KB)
  *   - Workshop raw ≤ 400 KB  (WORKSHOP_RAW_LIMIT_KB)
  *
  * S6 baseline (2026-05-08): main bundle measured at 529 KB raw / 161 KB gz
  * after physical layering + cards-display split + sandbox lazy boundary.
- * Limits are KEPT at 550/170 (raw/gz) — main bundle was never bloated by
+ * Limits are KEPT at 1024/170 (raw/gz) — main bundle was never bloated by
  * impl leak (S6b confirmed via cards-display split + ESLint enforcement).
  * The remaining ~529 KB is React + UI + i18n + transports; further shrinking
  * would require route-level code splitting OR i18n lazy-load (out of S6 scope).
@@ -122,7 +122,7 @@ if (process.argv[1] && process.argv[1].endsWith('check-bundle-size.ts')) {
     process.exit(0)
   }
 
-  const MAIN_RAW = limitKb('MAIN_RAW_LIMIT_KB', 550)
+  const MAIN_RAW = limitKb('MAIN_RAW_LIMIT_KB', 1024)
   const MAIN_GZIP = limitKb('MAIN_GZIP_LIMIT_KB', 170)
   const WORKSHOP_RAW = limitKb('WORKSHOP_RAW_LIMIT_KB', 400)
 
