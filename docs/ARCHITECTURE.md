@@ -505,23 +505,23 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 **统一 cost 模型（`ComplexCost`）**：construct / renovation / fencing / plow / occupation / minor / major / pay leaf 全部走同一条 `computeAllBuyableCombinations` 管线。`ComplexCost` 字段语义：
 
 - `fees: Partial<Resource>[]` —— per-action 总固定费用。Renovation 的 `computeCosts` 总成本 delta（D154_ChimneySweep `{stone:-2}`、D121_ClayPlasterer `{clay:-(rooms-1)}`、D81_RoofLadder `{reed:-1}`）写入 `fees[0]`。负值在 `enumerate` 内部 `mergeResources(fees[0], unitFee*nb)` 后 clamp 到 0，避免对 unrelated resource 退款。
-- `unitFee: Partial<Resource>` + `nb: number` —— per-unit × 数量。Construct 的每间房 `{wood: rooms_cost, reed: 1_per_pile_or_room}`、renovation 的 `{[material]: 1}`、fencing 的 `{wood: 1}` 都落在 `unitFee`，`nb` 是行动同时处理的单位数（建房间数 / fence 段数）。enumerate 用 `scaleResources(unitFee, nb)` 把 per-unit 部分展平后并入 `fees[0]`。
-- `trades: Trade[]` —— 资源替换选项（`from → to`），由 `TradeModifier` 经 `applyCostModifiers` 注入。`Trade.scope: 'action' | 'unit'` 控制 sigma-times 约束：scope:'action' 只限 `max` 上限；scope:'unit' 额外满足 Σ-times ≤ nb（每个单位最多换一次），让 A123_FrameBuilder 的 per-room wood-for-clay swap 严格按每间房一次裁定。
+- `unitFee: Partial<Resource>` + `nb: number` —— per-unit × 数量。Construct 的每间房 `{wood: rooms_cost, reed: 1_per_pile_or_room}`、renovation 的 `{[material]: 1}`、fencing 的 `{wood: 1}` 都落在 `unitFee`，`nb` 是行动同时处理的单位数（建房间数 / fence 段数）。enumerate 先对每个 unit cost row 生成有序替换后的可选行，再组合成总成本。
+- `trades: Trade[]` —— 资源替换选项（`from → to`），由 `TradeModifier` 经 `applyCostModifiers` 注入。`Trade.scope: 'action' | 'unit'` 控制替换位置：scope:'action' 在玩家资源池上做 per-action 转换；scope:'unit' 按 `order` 作用在每个 unit cost row 上。`replaceUpTo` 支持 B145_BrushwoodCollector 这类“把当前行里 1 或 2 reed 都替换成 1 wood”的 BGA `addCost` 形态。
 - `bonuses: Bonus[]` —— per-action 折扣 / 多选折扣（`{discount}` 单一折扣；`{choices: BonusChoice[]}` 多选）。`Bonus.optional` 决定 enumerate 是否生成"不应用 bonus"分支。
 - `bonuses[].conditions?: Record<string, number>` —— `applyCostModifiers` 把 BonusModifier.conditions 透传到生成的 Bonus，enumerate 用 `evaluateConditions(player, conditions, nb)` 重新评估 nb-aware 约束（如 C13_WoodSlideHammer `minNumRooms: 5`）。
 
 **两层 condition 评估**（`cost-modifiers.ts`）：
 
 - `evaluateStaticConditions(player, conditions)` —— 仅依赖 player 当前状态的静态判定（`houseTypeWood/Clay/Stone`）。
-- `evaluateConditions(player, conditions, nb)` —— 在 static 之上再判定 nb-aware 约束（`minNumRooms`）。enumerate 在生成 trade 组合（unit-scope DFS）和 bonus 应用时调用。
+- `evaluateConditions(player, conditions, nb)` —— 在 static 之上再判定 nb-aware 约束（`minNumRooms`）。enumerate 在生成 payment 分支和 bonus 应用时调用。
 - `getModifiersForCostType(player, costType)` —— 只用 static-only filter（`evaluateStaticConditions`），不再读 `player.rooms`。nb-aware 决策延后到 enumerate，确保 construct 的 `nb=rooms-to-build` 和 renovation 的 `nb=player.rooms` 都能正确驱动 `minNumRooms` gate。
 
 **`Trade.scope`**：
 
-| scope | sigma-times 约束 | max 默认 | 典型用例 |
+| scope | 应用位置 | max 默认 | 典型用例 |
 |---|---|---|---|
-| `action` | 无（每个 trade 独立到 `max`） | `?? 1` | A28_ForestSchool（lessons cost）、A88_HedgeKeeper（fencing 全部 3 段一次换）、E60_WorkingGloves（grouped exchange，未来加 groupMax）|
-| `unit` | Σ-times ≤ `nb` | defer to `nb`（无 `max` 时上限 = nb）| A123_FrameBuilder（每间房一次 wood-for-clay/stone）、D15_ClaySupports（每间房 wood-for-{clay,reed}）、B145_BrushwoodCollector construct 分支（每间房 wood-for-reed）|
+| `action` | 玩家资源池（每个 trade 独立到 `max`） | `?? 1` | A28_ForestSchool（lessons cost）、A88_HedgeKeeper（fencing 全部 3 段一次换）、E60_WorkingGloves（grouped exchange，未来加 groupMax）|
+| `unit` | 每个 unit cost row，按 `order` 有序展开 | `?? 1`（每个 row）| A123_FrameBuilder（每间房一次 wood-for-clay/stone）、D15_ClaySupports（每间房 wood-for-{clay,reed}）、B145_BrushwoodCollector construct 分支（每间房 wood-for-reed）|
 
 scope:'unit' MUST NOT 携带 `conditions.minNumRooms`（per-unit 没有 min-unit 阈值）；`validateTradeModifier` 在 `applyCostModifiers` 入口处强制此不变量。
 
@@ -533,7 +533,7 @@ scope:'unit' MUST NOT 携带 `conditions.minNumRooms`（per-unit 没有 min-unit
 
 **Renovation 对齐**（`shared/actions/effects/renovation.ts`）：`buildRenovationPlan` 直接返回 `ComplexCost`（`fees:[{reed:1}], unitFee:{[material]:1}, nb:player.rooms`）。`computeCosts` hook 的 `costs` 通过 `mergeRenovationCost` 落到 `fees[0]`；负 delta（D154 等）在 enumerate baseFee 合并后 clamp。`canAffordTypedFlatCost` / `payTypedFlatCost` / `payTypedFlatCostDetailed`（`typed-flat.ts`）接受 `Partial<Resource> | ComplexCost`，统一走 `computeAllBuyableCombinations` 单管线（之前的 `resolveSimpleTradeAdjustedCost` 已删除）。
 
-D15_ClaySupports clay→reed trade 仅当 `houseTypeClay > 0` 时生效；A123_FrameBuilder 的 construct 拆成两个 `scope:'unit'` TradeModifier（wood→clay / wood→stone），用 `houseTypeClay` / `houseTypeStone` 锁定方向，renovation 仍是 BonusModifier（单次 per-action 互斥选择，BGA 等价）。
+D15_ClaySupports clay→reed trade 仅当 `houseTypeClay > 0` 时生效；A123_FrameBuilder 的 construct 拆成两个 `scope:'unit'` TradeModifier（wood→clay / wood→stone），用 `houseTypeClay` / `houseTypeStone` 锁定方向；B145_BrushwoodCollector construct 用 `replaceUpTo` 覆盖 1/2 reed 行。renovation 仍走 BonusModifier（单次 per-action 互斥选择，BGA 等价）。
 
 ### 7.5 Hook 系统：行动生命周期 phase（11 个）
 
