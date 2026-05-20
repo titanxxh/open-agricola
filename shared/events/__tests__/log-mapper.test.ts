@@ -61,7 +61,7 @@ describe('eventsToLogEntries', () => {
         reason: 'collect',
       },
     ] satisfies GameEvent[]
-    expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' }, actionNames: { collect: 'Forest' } })).toEqual([
+    expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' }, actionNames: { forest: 'Forest' } })).toEqual([
       {
         key: 'log.actionDetail',
         params: { player: 'Alice', action: 'Forest', detailParts: { gains: { wood: 2 } } },

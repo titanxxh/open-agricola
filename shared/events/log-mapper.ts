@@ -40,7 +40,64 @@ const actionDetailLog = (
   },
 })
 
-const mapResourceMoved = (event: ResourceMovedEvent, ctx: EventLogMapperContext): LogEntry | null => {
+const containingActionId = (
+  events: readonly GameEvent[],
+  event: GameEvent,
+  fallback: string | undefined,
+): string | undefined => {
+  const placed = [...events]
+    .filter((candidate): candidate is WorkerPlacedEvent =>
+      candidate.type === 'worker.placed' &&
+      candidate.seq < event.seq &&
+      candidate.actorPlayerId === event.actorPlayerId,
+    )
+    .sort((left, right) => right.seq - left.seq)[0]
+  return placed?.sourceActionId ?? fallback
+}
+
+const relatedCardEffectCosts = (
+  events: readonly GameEvent[],
+  event: ResourceMovedEvent,
+): Partial<Resource> => {
+  if (event.reason !== 'collect' || event.to.kind !== 'player') return {}
+  const targetPlayerId = event.to.playerId
+  const placed = [...events]
+    .filter((candidate): candidate is WorkerPlacedEvent =>
+      candidate.type === 'worker.placed' &&
+      candidate.seq < event.seq &&
+      candidate.actorPlayerId === event.actorPlayerId,
+    )
+    .sort((left, right) => right.seq - left.seq)[0]
+  const startSeq = placed?.seq ?? -1
+  const endSeq = [...events]
+    .filter((candidate): candidate is WorkerPlacedEvent =>
+      candidate.type === 'worker.placed' &&
+      candidate.seq > event.seq,
+    )
+    .sort((left, right) => left.seq - right.seq)[0]?.seq ?? Number.POSITIVE_INFINITY
+  const costs: Partial<Resource> = {}
+  events.forEach((candidate) => {
+    if (
+      candidate.type !== 'resource.moved' ||
+      candidate.reason !== 'cardEffect' ||
+      candidate.seq <= startSeq ||
+      candidate.seq >= endSeq ||
+      candidate.from.kind !== 'player' ||
+      candidate.from.playerId !== targetPlayerId
+    ) return
+    Object.entries(positiveResources(candidate.resources)).forEach(([key, amount]) => {
+      const resource = key as keyof Resource
+      costs[resource] = (costs[resource] ?? 0) + (amount ?? 0)
+    })
+  })
+  return costs
+}
+
+const mapResourceMoved = (
+  events: readonly GameEvent[],
+  event: ResourceMovedEvent,
+  ctx: EventLogMapperContext,
+): LogEntry | null => {
   if (event.to.kind !== 'player') return null
 
   const gain = positiveResources(event.resources)
@@ -67,7 +124,18 @@ const mapResourceMoved = (event: ResourceMovedEvent, ctx: EventLogMapperContext)
     }
   }
 
-  return actionDetailLog(ctx, event.to.playerId, event.sourceActionId ?? event.reason, { gains: gain })
+  const costs = relatedCardEffectCosts(events, event)
+  return actionDetailLog(
+    ctx,
+    event.to.playerId,
+    event.from.kind === 'actionSpace'
+      ? containingActionId(events, event, event.from.spaceId)
+      : event.sourceActionId ?? event.reason,
+    {
+      gains: gain,
+      ...(Object.keys(costs).length ? { costs } : {}),
+    },
+  )
 }
 
 const mapWorkerPlaced = (event: WorkerPlacedEvent, ctx: EventLogMapperContext): LogEntry | null => {
@@ -138,21 +206,6 @@ const paymentForEvent = (
     )
     .sort((left, right) => right.seq - left.seq)[0]
 
-const containingActionId = (
-  events: readonly GameEvent[],
-  event: GameEvent,
-  fallback: string | undefined,
-): string | undefined => {
-  const placed = [...events]
-    .filter((candidate): candidate is WorkerPlacedEvent =>
-      candidate.type === 'worker.placed' &&
-      candidate.seq < event.seq &&
-      candidate.actorPlayerId === event.actorPlayerId,
-    )
-    .sort((left, right) => right.seq - left.seq)[0]
-  return placed?.sourceActionId ?? fallback
-}
-
 const mapCardPlayed = (
   event: CardPlayedEvent,
   payment: ResourcePaidEvent | undefined,
@@ -186,6 +239,7 @@ const mapFarmRenovated = (
   actionDetailLog(ctx, event.actorPlayerId ?? event.playerId, event.sourceActionId ?? 'renovate-house', {
     costs: positiveResources(payment?.resources ?? {}),
     effects: { renovate: { from: event.from, to: event.to } },
+    ...(payment?.bonusSources?.length ? { bonusSources: payment.bonusSources } : {}),
   })
 
 const mapStableBuilt = (
@@ -216,7 +270,7 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
       }
 
       if (event.type === 'resource.moved') {
-        const entry = mapResourceMoved(event, ctx)
+        const entry = mapResourceMoved(events, event, ctx)
         return entry ? [entry] : []
       }
 
@@ -236,7 +290,7 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
         return [{
           key: 'log.cardGrantedAction',
           params: {
-            player: playerName(ctx, event.playerId),
+            player: playerName(ctx, event.playerId ?? event.actorPlayerId ?? event.targetPlayerId),
             actionId: event.actionId,
             cardId: event.cardId,
           },

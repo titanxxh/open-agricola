@@ -21,7 +21,11 @@ const stoneOvenCandidateListener: CardListenerRegistration = {
   actions: ['improvement'],
   phases: ['computeChoiceCandidates' as ActionHookPhase],
   handler: (ctx) => {
-    const types = readImprovementTypes(ctx)
+    const hasExplicitTypes = Array.isArray((ctx.params as { types?: unknown } | undefined)?.types)
+      || Array.isArray(ctx.actionContext?.types)
+    const types = !hasExplicitTypes && ctx.actionId === 'improvement'
+      ? ['minor']
+      : readImprovementTypes(ctx)
     if (types.length !== 1 || types[0] !== 'minor') return
     if (!ctx.player.occupationPlayed.includes(CARD_ID)) return
     const available = ctx.state.availableMajorImprovements ?? []
