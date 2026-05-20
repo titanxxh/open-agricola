@@ -55,6 +55,29 @@ const createAction = (id: string, nameKey: string): ActionSpace => ({
 })
 
 describe('ActionBoard', () => {
+  it('marks highlighted action spaces', () => {
+    const playerA = createPlayer('p1', 'PlayerA', 'red')
+    const playerB = createPlayer('p2', 'PlayerB', 'blue')
+
+    const html = renderToStaticMarkup(
+      <ActionBoard
+        locale="en"
+        baseActions={[createAction('forest', 'actions.forest.name')]}
+        roundSlots={[]}
+        currentPlayer={playerA}
+        players={[playerA, playerB]}
+        futureMeeples={[]}
+        canTakeAction={() => true}
+        takeAction={() => {}}
+        currentRound={1}
+        devMode={false}
+        highlightedActionIds={new Set(['forest'])}
+      />,
+    )
+
+    expect(html).toMatch(/action-card-holder[^"]*\bevent-highlight\b[^"]*" data-action-id="forest"/)
+  })
+
   it('adds player-count-specific board classes', () => {
     const playerA = createPlayer('p1', 'PlayerA', 'red')
     const playerB = createPlayer('p2', 'PlayerB', 'blue')

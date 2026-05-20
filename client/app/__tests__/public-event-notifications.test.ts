@@ -4,7 +4,9 @@ import type { PrivateGameEvent } from '../../../shared/contract/protocol/game'
 import { collectPrivateEventNotifications } from '../private-event-notifications'
 import {
   buildEventNotificationStackItems,
+  collectNewPublicEventFeedback,
   collectNewPublicEventNotifications,
+  collectPublicEventHighlightTargets,
   collectPublicEventNotifications,
 } from '../public-event-notifications'
 
@@ -84,5 +86,78 @@ describe('public event notifications', () => {
       expect.objectContaining({ className: 'private-event-notification', kind: 'hand' }),
       expect.objectContaining({ className: 'public-event-notification', kind: 'payment' }),
     ])
+  })
+
+  it('collects highlight targets independently from notifications', () => {
+    const event = {
+      ...base,
+      type: 'worker.placed',
+      workerId: 'w1',
+      spaceId: 'forest',
+    } satisfies GameEvent
+
+    const feedback = collectNewPublicEventFeedback([event], 0, 'en')
+
+    expect(feedback.notifications).toEqual([])
+    expect(feedback.highlights.actionIds).toEqual(['forest'])
+    expect(feedback.nextCursor).toBe(1)
+  })
+
+  it('maps public event fields to board and farm highlight targets', () => {
+    const events: GameEvent[] = [
+      { ...base, type: 'action.revealed', actionId: 'fencing', roundSlot: 1 },
+      {
+        ...base,
+        id: 'evt-2',
+        seq: 2,
+        type: 'resource.exchanged',
+        paid: { grain: 1 },
+        gained: { food: 3 },
+        paidFrom: { kind: 'actionSpace', spaceId: 'grain-utilization' },
+        paidTo: { kind: 'supply' },
+        gainedFrom: { kind: 'supply' },
+        gainedTo: { kind: 'player', playerId: 'p1' },
+      },
+      {
+        ...base,
+        id: 'evt-3',
+        seq: 3,
+        type: 'resource.paid',
+        resources: { wood: 1 },
+        paymentFor: 'cardEffect',
+        paymentSources: [{ from: { kind: 'actionSpace', spaceId: 'forest' }, resources: { wood: 1 } }],
+      },
+      { ...base, id: 'evt-4', seq: 4, type: 'farm.fieldPlowed', fields: [{ playerId: 'p1', row: 1, col: 2 }] },
+      {
+        ...base,
+        id: 'evt-5',
+        seq: 5,
+        type: 'farm.sown',
+        sows: [{ location: { kind: 'field', playerId: 'p1', row: 1, col: 2 }, crop: 'grain', added: 2 }],
+      },
+      { ...base, id: 'evt-6', seq: 6, type: 'farm.fenceBuilt', newFenceEdges: ['h-0-0'], fences: [], actorPlayerId: 'p1' },
+    ]
+
+    expect(collectPublicEventHighlightTargets(events)).toEqual({
+      actionIds: ['fencing', 'grain-utilization', 'forest'],
+      farmTiles: [
+        { playerId: 'p1', key: '1-2' },
+      ],
+      fenceEdges: [
+        { playerId: 'p1', edgeId: 'h-0-0' },
+      ],
+    })
+  })
+
+  it('does not guess farm owners for fence highlights', () => {
+    const event = {
+      ...base,
+      actorPlayerId: undefined,
+      type: 'farm.fenceBuilt',
+      newFenceEdges: ['h-0-0'],
+      fences: [],
+    } satisfies GameEvent
+
+    expect(collectPublicEventHighlightTargets([event]).fenceEdges).toEqual([])
   })
 })

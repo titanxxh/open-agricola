@@ -1,12 +1,19 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
+import type { GameEvent } from '../../../shared/contract/events'
 
 import {
   farmCommitErrorMessageKey,
+  filterPublicFarmHighlightsForPlayer,
+  filterPublicFenceHighlightsForPlayer,
   getCurrentlySelectableRoomKeys,
+  hasPublicEventHighlights,
   isDevModeAllowedFromQuery,
+  mergePublicEventHighlights,
   playerIdFromWsStatus,
+  removePublicEventHighlights,
 } from '../game-container-helpers'
+import { collectNewPublicEventFeedback } from '../public-event-notifications'
 
 describe('GameContainerApi WS player identity', () => {
   it('uses the joined websocket seat as the local player when URL has no player param', () => {
@@ -47,5 +54,67 @@ describe('GameContainerApi WS player identity', () => {
       new Set(['1-0']),
       new Set(['1-1']),
     )).toEqual(new Set(['0-0', '0-1', '1-1', '2-1']))
+  })
+
+  it('merges and removes public event highlights for timer cleanup', () => {
+    const incoming = {
+      actionIds: ['forest'],
+      farmTiles: [{ playerId: 'p1', key: '0-0' }],
+      fenceEdges: [{ playerId: 'p1', edgeId: 'h-0-0' }],
+    }
+
+    expect(hasPublicEventHighlights(incoming)).toBe(true)
+
+    const merged = mergePublicEventHighlights({
+      actionIds: [],
+      farmTiles: [],
+      fenceEdges: [],
+    }, incoming)
+
+    expect(merged).toEqual(incoming)
+    expect(removePublicEventHighlights(merged, incoming)).toEqual({
+      actionIds: [],
+      farmTiles: [],
+      fenceEdges: [],
+    })
+
+    const overlapped = mergePublicEventHighlights(merged, incoming)
+    expect(removePublicEventHighlights(overlapped, incoming)).toEqual(incoming)
+  })
+
+  it('preserves action highlights for public events that do not produce notifications', () => {
+    const workerPlaced = {
+      schemaVersion: 1,
+      id: 'evt-worker',
+      seq: 1,
+      round: 1,
+      phase: 'work',
+      visibility: 'public',
+      actorPlayerId: 'p1',
+      type: 'worker.placed',
+      workerId: 'w1',
+      spaceId: 'forest',
+    } satisfies GameEvent
+
+    const feedback = collectNewPublicEventFeedback([workerPlaced], 0, 'en', 'public-test')
+
+    expect(feedback.notifications).toEqual([])
+    expect(mergePublicEventHighlights({
+      actionIds: [],
+      farmTiles: [],
+      fenceEdges: [],
+    }, feedback.highlights).actionIds).toEqual(['forest'])
+  })
+
+  it('filters public farm highlights by viewed player', () => {
+    expect(filterPublicFarmHighlightsForPlayer([
+      { playerId: 'p1', key: '0-0' },
+      { playerId: 'p2', key: '0-0' },
+    ], 'p1')).toEqual(new Set(['0-0']))
+
+    expect(filterPublicFenceHighlightsForPlayer([
+      { playerId: 'p1', edgeId: 'h-0-0' },
+      { playerId: 'p2', edgeId: 'h-0-0' },
+    ], 'p2')).toEqual(new Set(['h-0-0']))
   })
 })
