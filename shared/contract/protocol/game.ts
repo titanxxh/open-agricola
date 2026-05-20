@@ -2,6 +2,14 @@ import type { InteractionState, PlayerState, Resource } from '../../contract/typ
 import type { SerializedGameState } from '../../session/serialization'
 import type { PlayerScoreSummary } from '../../domain'
 import type { CardDefinition } from '../cards'
+import type { PrivateGameEvent as RuntimePrivateGameEvent } from '../private-events'
+
+export type {
+  PrivateDraftUpdatedEvent,
+  PrivateGameEvent,
+  PrivateHandChangedEvent,
+  PrivatePromptShownEvent,
+} from '../private-events'
 
 export type CustomCardDef = {
   cardType: 'minor' | 'occupation'
@@ -52,49 +60,10 @@ export type RedactedPrivatePromptInteraction =
 
 export type ClientInteractionState = InteractionState | RedactedPrivatePromptInteraction
 
-export type PrivatePromptShownEvent = {
-  schemaVersion: 1
-  type: 'private.promptShown'
-  recipientPlayerId: string
-  promptKind: string
-  sourceCard?: string
-  sourceActionId?: string
-  promptKey?: string
-}
-
-export type PrivateHandChangedEvent = {
-  schemaVersion: 1
-  type: 'private.handChanged'
-  recipientPlayerId: string
-  cardIds: string[]
-  cardType: 'minor' | 'occupation' | 'mixed'
-  reason: 'dev-draw-card' | 'draft-finalized' | 'card-effect'
-  sourceCard?: string
-  sourceActionId?: string
-}
-
-export type PrivateDraftUpdatedEvent = {
-  schemaVersion: 1
-  type: 'private.draftUpdated'
-  recipientPlayerId: string
-  round: number
-  totalRounds: number
-  picked?: { occCardId: string; minorCardId: string }
-  poolCounts: { occ: number; minor: number }
-  keptCounts: { occ: number; minor: number }
-  advanced: boolean
-  finished: boolean
-}
-
-export type PrivateGameEvent =
-  | PrivatePromptShownEvent
-  | PrivateHandChangedEvent
-  | PrivateDraftUpdatedEvent
-
 export type GameSyncPayload = {
   state: SerializedGameState
   interaction: ClientInteractionState
-  privateEvents?: PrivateGameEvent[]
+  privateEvents?: RuntimePrivateGameEvent[]
   scores: PlayerScoreSummary[] | null
   pastureCapacities?: Record<string, Record<string, number>>
   historyLength: number
