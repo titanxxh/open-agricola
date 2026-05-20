@@ -45,6 +45,14 @@ export type ActionDetailParts = {
   bonusSources?: string[]
 }
 
+export type PublicEventCancellation = {
+  reason: 'undoStep' | 'undoAction'
+  previousMaxSeq: number
+  nextMaxSeq: number
+  canceledEventIds: string[]
+  canceledSeqs: number[]
+}
+
 export type RedactedPrivatePromptInteraction =
   Omit<Extract<InteractionState, { stateId: 'wait' }>, 'request' | 'allowedCommands' | 'anytimeActions'> & {
     request: {
@@ -64,6 +72,7 @@ export type GameSyncPayload = {
   state: SerializedGameState
   interaction: ClientInteractionState
   privateEvents?: RuntimePrivateGameEvent[]
+  publicEventCancellations?: PublicEventCancellation[]
   scores: PlayerScoreSummary[] | null
   pastureCapacities?: Record<string, Record<string, number>>
   historyLength: number
