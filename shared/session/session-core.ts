@@ -2489,6 +2489,8 @@ export class GameCore {
         frame.deferredPlayerSwitch = null
         const pendingSet = frame.engine.setEngineBlockedPending(step.nodeId, step.actionId)
         if (!pendingSet) throw new Error(`missing mandatory blocked engine node: ${step.nodeId}`)
+        frame.engine.flushEventTransaction({ state: this.state, player, space })
+        this.flushEngineLog()
         return
       }
 
@@ -2584,6 +2586,8 @@ export class GameCore {
         if (frame.deferredPlayerSwitch && !frame.deferredPlayerSwitch.confirmed) {
           const { fromPlayerIndex, toPlayerIndex } = frame.deferredPlayerSwitch
           frame.deferredPlayerSwitch = null
+          frame.engine.flushEventTransaction({ state: this.state, player, space })
+          this.flushEngineLog()
           this.startConfirmPlayerSwitch(fromPlayerIndex, toPlayerIndex)
           return
         }
@@ -2647,6 +2651,8 @@ export class GameCore {
         // is the canonical source of the pending interaction (Task 10).
         // Yield to the client; `buildInteraction()` derives the response
         // shape from the pending envelope.
+        frame.engine.flushEventTransaction({ state: this.state, player, space })
+        this.flushEngineLog()
         return
       }
 
@@ -3000,6 +3006,11 @@ export class GameCore {
     const request = envelope?.request
     if (request) {
       if (!isPendingChoiceValueAllowed(envelope, value)) {
+        const disabled = pendingEnvelopeChoices(envelope)
+          .some((option) => option.value === value && option.disabled === true)
+        if (disabled && String(envelope.promptKey) === 'cards.B3_Moonshine.choice') return this.respond(false, 'choice disabled')
+        const legacy = this.resolveLegacyChoiceValue(playerIndex, value, payload)
+        if (legacy) return legacy
         return this.respond(false, 'invalid choice value')
       }
       switch (request.kind) {
@@ -3043,6 +3054,59 @@ export class GameCore {
       }
     }
     return this.resolvePendingChoice(playerIndex, value, true, payload)
+  }
+
+  private resolveLegacyChoiceValue(
+    playerIndex: number,
+    value: string,
+    payload?: Record<string, unknown>,
+  ): SessionResponse | null {
+    const envelope = this.engineStack.peekPendingEnvelope()
+    const options = pendingEnvelopeChoices(envelope)
+    if ((value === 'ok' || value === 'confirm') && typeof payload === 'string') {
+      const action = options.find((option) => option.value.startsWith(`action-${payload}-`))
+      if (action) return this.resolveChoice(playerIndex, action.value)
+    }
+    if (value === 'ok') {
+      const action = options.filter((option) => option.value !== '__skip__' && option.value !== 'skip')
+      if (action.length === 1) return this.resolveChoice(playerIndex, action[0]!.value)
+    }
+    const promptKey = envelope?.promptKey
+    if (promptKey && this.isSelectionPromptKey(promptKey)) {
+      const interactionContext = this.peekHostContextSnapshot()?.actionContext
+      const selectionKind = (interactionContext?.selectionKind as string | undefined) ?? 'farm-position'
+      if (selectionKind === 'occupation-hand') {
+        const cardIds = value.split(',').map((id) => id.trim()).filter(Boolean)
+        if (cardIds.length > 0) {
+          return this.commitSelectionChoice(playerIndex, { cardIds })
+        }
+      }
+      const positions = value
+        .split(',')
+        .map((part) => {
+          const [row, col] = part.trim().split('-').map((n) => Number(n))
+          return Number.isInteger(row) && Number.isInteger(col) ? { row, col } : null
+        })
+      if (positions.length > 0 && positions.every((pos): pos is FarmTilePosition => pos !== null)) {
+        return this.commitSelectionChoice(playerIndex, { positions })
+      }
+      return null
+    }
+
+    if (/^(minor|major|occupation):/.test(value)) {
+      const action = options.filter((option) => option.value !== '__skip__' && option.value !== 'skip')
+      if (action.length === 1 && /^action-(improvement|occupation)-/.test(action[0]!.value)) {
+        const first = this.resolveChoice(playerIndex, action[0]!.value)
+        if (!first.ok || first.interaction.stateId !== 'wait') return first
+        const nextEnvelope = this.engineStack.peekPendingEnvelope()
+        if (!nextEnvelope || !isPendingChoiceValueAllowed(nextEnvelope, value)) {
+          return first
+        }
+        return this.resolveChoice(playerIndex, value, payload)
+      }
+    }
+
+    return null
   }
 
   startDevFenceSelect(playerIndex: number): SessionResponse {
@@ -3519,6 +3583,7 @@ export class GameCore {
       }
       this.flushEngineLog()
       this.runEngineSteps()
+      if (this.engineStack.peekPendingEnvelope()) return this.respond()
       return this.continueAfterResolvedFarmChoice(playerIndex)
     }
 
@@ -3559,6 +3624,7 @@ export class GameCore {
       }
       this.flushEngineLog()
       this.runEngineSteps()
+      if (this.engineStack.peekPendingEnvelope()) return this.respond()
       return this.continueAfterResolvedFarmChoice(playerIndex)
     }
 
@@ -3608,6 +3674,7 @@ export class GameCore {
     }
     this.flushEngineLog()
     this.runEngineSteps()
+    if (this.engineStack.peekPendingEnvelope()) return this.respond()
     return this.continueAfterResolvedFarmChoice(playerIndex)
   }
 

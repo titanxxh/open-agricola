@@ -7,6 +7,7 @@ import type {
 import { readCardExtraData, writeCardExtraData } from './card-state'
 import { canSow } from '../../actions/effects/sow'
 import { dispatchReapListener } from '../../actions/effects/reap'
+import { appendImmediateEvents } from '../../events/append'
 
 type Crop = ExtraSowableCrop
 
@@ -133,6 +134,19 @@ export const makeCardFieldImpl = (
           for (const [crop, amount] of perCropAmount) {
             entry.resources[crop] = (entry.resources[crop] ?? 0) + amount
           }
+        }
+        if (Number.isSafeInteger(state.round) && state.round > 0) {
+          appendImmediateEvents(
+            state,
+            [...perCropAmount].map(([crop, amount]) => ({
+              type: 'resource.moved' as const,
+              resources: { [crop]: amount },
+              from: { kind: 'card' as const, playerId: player.id, cardId },
+              to: { kind: 'player' as const, playerId: player.id },
+              reason: 'harvest' as const,
+            })),
+            { actorPlayerId: player.id, sourceActionId: 'reap', sourceCardId: cardId },
+          )
         }
         writeStacks(player, cardId, nextStacks)
         // Pass 2: dispatch reap event + collect onReap flows

@@ -80,6 +80,10 @@ const resolveSalterCounts = (
     }
   }
   subtractAnimalsFromBoard(player, counts)
+  state.log.unshift({
+    key: 'log.salterFutureFood',
+    params: buildSalterLogParams(state, counts),
+  })
   const flows: ActionFlow[] = (['sheep', 'boar', 'cattle'] as const)
     .filter((t) => counts[t] > 0)
     .map((t) =>
@@ -91,7 +95,6 @@ const resolveSalterCounts = (
         resources: { food: counts[t] },
       }),
     )
-  void buildSalterLogParams
   return {
     type: 'flow',
     flow: flows.length === 1 ? flows[0] : { type: 'seq', children: flows },
