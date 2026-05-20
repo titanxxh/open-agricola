@@ -76,6 +76,8 @@ export const applyCostModifiers = (
         to: tradeMod.to,
         ...(synthMax !== undefined ? { max: synthMax } : {}),
         scope,
+        ...(tradeMod.replaceUpTo ? { replaceUpTo: true } : {}),
+        ...(tradeMod.order !== undefined ? { order: tradeMod.order } : {}),
         source: tradeMod.cardId,
         sourceId: tradeMod.cardId,
       })
@@ -86,6 +88,8 @@ export const applyCostModifiers = (
         choices: bonusMod.choices,
         optional: bonusMod.optional ?? true,
         sources: [bonusMod.cardId],
+        ...(bonusMod.minCost ? { minCost: bonusMod.minCost } : {}),
+        ...(bonusMod.maxCost ? { maxCost: bonusMod.maxCost } : {}),
         // Propagate nb-aware conditions (e.g. minNumRooms) so enumerate can
         // re-evaluate them against the actual nb via evaluateConditions().
         // Static conditions (houseType*) are already filtered by

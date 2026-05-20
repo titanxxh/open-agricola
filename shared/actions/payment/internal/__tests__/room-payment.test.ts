@@ -44,9 +44,9 @@ describe('construct cost via unified enumerate (was buildRoomCostPerUnit)', () =
     expect(noSwap && nonZeroPaid(noSwap)).toEqual({ clay: 5, reed: 2 })
   })
 
-  // Migrated case 2: max=1 implicit for unit trades — D15 with nb=1 maxes
-  // a single use of the swap (Σ ≤ nb).
-  it('D15 unit trade respects Σ-times ≤ nb (nb=1 → at most one swap)', () => {
+  // Migrated case 2: max=1 implicit for unit trades — D15 with nb=1 can use
+  // the row alternative at most once.
+  it('D15 unit trade applies at most once per room by default', () => {
     const player = makePlayer([{
       type: 'trade', cardId: 'D15_ClaySupports', appliesTo: ['construct'],
       scope: 'unit',
@@ -62,5 +62,63 @@ describe('construct cost via unified enumerate (was buildRoomCostPerUnit)', () =
       const totalUnitSwaps = s.tradesUsed.reduce((acc, t) => acc + t.times, 0)
       expect(totalUnitSwaps).toBeLessThanOrEqual(1)
     })
+  })
+
+  it('A123 FrameBuilder and B145 BrushwoodCollector can stack on one clay room', () => {
+    const player = makePlayer([
+      {
+        type: 'trade', cardId: 'B145_BrushwoodCollector', appliesTo: ['construct'],
+        scope: 'unit', order: 20, replaceUpTo: true, from: { wood: 1 }, to: { reed: 2 },
+      },
+      {
+        type: 'trade', cardId: 'A123_FrameBuilder', appliesTo: ['construct'],
+        scope: 'unit', order: 30, from: { wood: 1 }, to: { clay: 2 },
+      },
+    ])
+    player.resources = {
+      wood: 2, clay: 3, reed: 0, stone: 0, food: 0,
+      grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+    }
+
+    const sols = computeAllBuyableCombinations(
+      player,
+      { unitFee: { clay: 5, reed: 2 }, nb: 1 },
+      undefined,
+      'construct',
+    )
+
+    expect(sols.some((s) => {
+      const paid = nonZeroPaid(s)
+      return paid.clay === 3 && paid.wood === 2 && paid.reed === undefined
+    })).toBe(true)
+  })
+
+  it('D15 ClaySupports and B145 BrushwoodCollector can stack on one clay room', () => {
+    const player = makePlayer([
+      {
+        type: 'trade', cardId: 'D15_ClaySupports', appliesTo: ['construct'],
+        scope: 'unit', order: 10, from: { wood: 1 }, to: { clay: 3, reed: 1 },
+      },
+      {
+        type: 'trade', cardId: 'B145_BrushwoodCollector', appliesTo: ['construct'],
+        scope: 'unit', order: 20, replaceUpTo: true, from: { wood: 1 }, to: { reed: 2 },
+      },
+    ])
+    player.resources = {
+      wood: 2, clay: 2, reed: 0, stone: 0, food: 0,
+      grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+    }
+
+    const sols = computeAllBuyableCombinations(
+      player,
+      { unitFee: { clay: 5, reed: 2 }, nb: 1 },
+      undefined,
+      'construct',
+    )
+
+    expect(sols.some((s) => {
+      const paid = nonZeroPaid(s)
+      return paid.clay === 2 && paid.wood === 2 && paid.reed === undefined
+    })).toBe(true)
   })
 })

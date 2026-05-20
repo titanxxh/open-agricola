@@ -77,7 +77,7 @@ type RoomPaymentSelectionResult = ActionExecutionResult | SelectedRoomPayment
 
 const ROOM_PAYMENT_FAILURE: ActionExecutionResult = {
   type: 'fail',
-  logKey: 'log.buildRoomFail',
+  errorKey: 'log.buildRoomFail',
 }
 
 export const resolveRoomPaymentSelection = (

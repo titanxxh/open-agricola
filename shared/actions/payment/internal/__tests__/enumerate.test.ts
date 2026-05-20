@@ -34,7 +34,7 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
     expect(nonZeroPaid(sols[0])).toEqual({ reed: 6, wood: 15 })
   })
 
-  it('scope:unit trade is bounded by sigma-times <= nb', () => {
+  it('scope:unit trade applies at most once per unit by default', () => {
     const sols = computeAllBuyableCombinations(
       baseTestPlayer({ wood: 4, clay: 9, reed: 6 }),
       {
@@ -64,21 +64,21 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
     )).toThrow(/nb.*missing/)
   })
 
-  it('unit-scope two trades — sigma-times <= nb', () => {
+  it('independent unit-scope trades can both apply to one cost row', () => {
     const sols = computeAllBuyableCombinations(
-      baseTestPlayer({ wood: 5, clay: 4, stone: 4, reed: 4 }),
+      baseTestPlayer({ wood: 1, food: 1 }),
       {
-        unitFee: { reed: 2, wood: 5 }, nb: 2,
+        unitFee: { clay: 2, reed: 2 }, nb: 1,
         trades: [
           { from: { wood: 1 }, to: { clay: 2 }, scope: 'unit' },
-          { from: { wood: 1 }, to: { stone: 2 }, scope: 'unit' },
+          { from: { food: 1 }, to: { reed: 2 }, scope: 'unit' },
         ],
       },
     )
-    sols.forEach((s) => {
-      const k = s.tradesUsed.reduce((acc, t) => acc + t.times, 0)
-      expect(k).toBeLessThanOrEqual(2)
-    })
+    expect(sols.some((s) => {
+      const paid = nonZeroPaid(s)
+      return paid.wood === 1 && paid.food === 1 && paid.clay === undefined && paid.reed === undefined
+    })).toBe(true)
   })
 
   it('mixed action + unit trades — independent budgets', () => {
@@ -120,6 +120,55 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
     // nb=2: with discount, fee = (4-2) reed + 10 wood = 2 reed + 10 wood
     expect(sols2[0]?.resourcesPaid.reed).toBe(2)
     expect(sols2[0]?.resourcesPaid.wood).toBe(10)
+  })
+
+  it('B145 renovation can replace 2 reed with 1 wood', () => {
+    const player = baseTestPlayer({ stone: 2, food: 2, wood: 1 })
+    player.activeModifiers = [{
+      type: 'bonus',
+      cardId: 'B145_BrushwoodCollector',
+      appliesTo: ['renovation'],
+      optional: true,
+      choices: [
+        { discount: { reed: 1, wood: -1 }, sources: ['B145_BrushwoodCollector'], minCost: { reed: 1 }, maxCost: { reed: 1 } },
+        { discount: { reed: 2, wood: -1 }, sources: ['B145_BrushwoodCollector'], minCost: { reed: 2 }, maxCost: { reed: 2 } },
+      ],
+    }]
+
+    const sols = computeAllBuyableCombinations(
+      player,
+      { fees: [{ reed: 2, food: 2 }], unitFee: { stone: 1 }, nb: 2 },
+      undefined,
+      'renovation',
+    )
+
+    expect(sols.some((s) => {
+      const paid = nonZeroPaid(s)
+      return paid.stone === 2 && paid.food === 2 && paid.wood === 1 && paid.reed === undefined
+    })).toBe(true)
+  })
+
+  it('B145 renovation does not replace 3 reed', () => {
+    const player = baseTestPlayer({ stone: 3, food: 3, wood: 1, reed: 1 })
+    player.activeModifiers = [{
+      type: 'bonus',
+      cardId: 'B145_BrushwoodCollector',
+      appliesTo: ['renovation'],
+      optional: true,
+      choices: [
+        { discount: { reed: 1, wood: -1 }, sources: ['B145_BrushwoodCollector'], minCost: { reed: 1 }, maxCost: { reed: 1 } },
+        { discount: { reed: 2, wood: -1 }, sources: ['B145_BrushwoodCollector'], minCost: { reed: 2 }, maxCost: { reed: 2 } },
+      ],
+    }]
+
+    const sols = computeAllBuyableCombinations(
+      player,
+      { fees: [{ reed: 3, food: 3 }], unitFee: { stone: 1 }, nb: 3 },
+      undefined,
+      'renovation',
+    )
+
+    expect(sols).toEqual([])
   })
 })
 

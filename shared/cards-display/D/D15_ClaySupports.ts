@@ -28,9 +28,10 @@ export const D15_ClaySupports = new MinorImprovement({
     type: 'trade',
     cardId: CARD_ID,
     appliesTo: ['construct'],
-    // scope:'unit' bounds Σ-times ≤ nb (rooms being built) so D15 can apply
-    // at most once per clay room — matches BGA's per-room `addCost`.
+    // scope:'unit' applies this replacement to each clay-room cost row,
+    // matching BGA's per-room `addCost`.
     scope: 'unit',
+    order: 10,
     from: { wood: 1 },
     to: { clay: 3, reed: 1 },
     conditions: { houseTypeClay: 1 },

@@ -1,5 +1,5 @@
 import { Occupation } from '../types'
-import type { TradeModifier } from '../../contract/types'
+import type { BonusModifier, TradeModifier } from '../../contract/types'
 
 const CARD_ID = 'B145_BrushwoodCollector'
 
@@ -10,12 +10,12 @@ const CARD_ID = 'B145_BrushwoodCollector'
  * BGA reference:
  * - onPlayerComputeCostsConstruct: for each trade that contains REED, creates an
  *   alternative with WOOD +1 and REED removed (all reed replaced by 1 wood).
- * - onPlayerComputeCostsRenovation: for each fee with REED > 0, creates an
- *   alternative with WOOD +1 and REED -1.
+ * - onPlayerComputeCostsRenovation: for each fee with 1 or 2 REED, creates an
+ *   alternative with WOOD +1 and all REED removed.
  *
  * Implementation uses TradeModifiers to provide optional alternatives:
- * - construct: from { wood: 1 } to { reed: 2 } — replace 2 reed with 1 wood
- * - renovation: from { wood: 1 } to { reed: 1 } — replace 1 reed with 1 wood
+ * - construct: from { wood: 1 } to up to 2 reed — replace room reed with 1 wood
+ * - renovation: bounded bonus choices replace exactly 1 or 2 reed with 1 wood
  */
 
 export const B145_BrushwoodCollector = new Occupation({
@@ -32,23 +32,23 @@ export const B145_BrushwoodCollector = new Occupation({
       type: 'trade',
       cardId: CARD_ID,
       appliesTo: ['construct'],
-      // scope:'unit' — BGA `onPlayerComputeCostsConstruct` adds one alternative
-      // `addCost` trade per existing baseline trade per room. Σ-times ≤ nb
-      // bounds the substitution to one wood-for-reed swap per room.
+      // scope:'unit' applies this replacement to each room cost row, matching
+      // BGA's per-room `addCost` alternative.
       scope: 'unit',
+      order: 20,
+      replaceUpTo: true,
       from: { wood: 1 },
       to: { reed: 2 },
     },
     {
-      type: 'trade',
+      type: 'bonus',
       cardId: CARD_ID,
       appliesTo: ['renovation'],
-      // Renovation reed total is normally 1 (or 2 with Trowel); BGA uses
-      // `addFees` (whole-cost replacement, one-shot) → maps to scope:'action'
-      // default. Trade.max defaults to 1 for action-scope under
-      // applyCostModifiers.
-      from: { wood: 1 },
-      to: { reed: 1 },
+      optional: true,
+      choices: [
+        { discount: { reed: 1, wood: -1 }, sources: [CARD_ID], minCost: { reed: 1 }, maxCost: { reed: 1 } },
+        { discount: { reed: 2, wood: -1 }, sources: [CARD_ID], minCost: { reed: 2 }, maxCost: { reed: 2 } },
+      ],
     },
-  ] as TradeModifier[],
+  ] as (TradeModifier | BonusModifier)[],
 })
