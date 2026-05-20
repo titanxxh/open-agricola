@@ -14,8 +14,8 @@ const CARD_ID = C51_FishingNet.id
 const listener: CardListenerRegistration = {
   id: 'C51-fishing-net-opponent-fishing',
   cardIds: [CARD_ID],
-  actions: ['place-farmer'],
-  phases: ['after' as ActionHookPhase],
+  actions: ['collect'],
+  phases: ['before' as ActionHookPhase],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'fishing') return

@@ -108,6 +108,41 @@ const clearEventLogDerivations = (int: EngineInternals): void => {
   int.eventLogDerivations.splice(0, int.eventLogDerivations.length)
 }
 
+const grantedActionIdsFromFlow = (flow: ActionFlow): string[] => {
+  if (flow.type === 'leaf') {
+    return flow.actionContext?.trueAction === false ? [flow.actionId] : []
+  }
+  return flow.children.flatMap((child) => grantedActionIdsFromFlow(child))
+}
+
+const flowSourceCard = (flow: ActionFlow): string | undefined =>
+  flow.type === 'leaf' ? flow.sourceCard : undefined
+
+const recordGrantedActionsFromFlow = (
+  int: EngineInternals,
+  flow: ActionFlow,
+  player: PlayerState,
+  state: EngineContext['state'],
+  sourceCard?: string,
+): void => {
+  if (!sourceCard) return
+  const actionIds = [...new Set(grantedActionIdsFromFlow(flow))]
+  if (actionIds.length === 0) return
+  const frame = int.events.beginFrame({
+    actorPlayerId: player.id,
+    sourceCardId: sourceCard,
+  })
+  actionIds.forEach((actionId) => {
+    frame.sink.emit<'action.granted'>({
+      type: 'action.granted',
+      playerId: player.id,
+      actionId,
+      cardId: sourceCard,
+    })
+  })
+  frame.complete(state)
+}
+
 const ensureEventState = (state: EngineContext['state']): void => {
   state.events ??= []
   state.nextEventSeq ??= 1
@@ -355,10 +390,9 @@ const executeActivateCardAction = (
   if (result?.flow || normalizedFollowUps.length > 0) {
     const insertedNodes: EngineNode[] = []
     if (result?.flow) {
-      insertedNodes.push(buildOwnedFlowNode(int,
-        applyFallbackSourceCardToFlow(result.flow, result.sourceCard),
-        effectPlayer.id,
-      ))
+      const flow = applyFallbackSourceCardToFlow(result.flow, result.sourceCard)
+      recordGrantedActionsFromFlow(int, flow, effectPlayer, context.state, flowSourceCard(flow) ?? result.sourceCard)
+      insertedNodes.push(buildOwnedFlowNode(int, flow, effectPlayer.id))
     }
     insertedNodes.push(...buildFollowUpNodes(int, normalizedFollowUps, node.id, effectPlayer, context.state))
     if (params.phase === 'before') {

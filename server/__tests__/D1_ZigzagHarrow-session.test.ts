@@ -49,13 +49,14 @@ describe('D1_ZigzagHarrow session (verify-only)', () => {
       expect(meetsCardPrerequisites(player, D1_ZigzagHarrow, state.round, state)).toBe(false)
     })
 
-    it('allows (simplified) when player has at least 2 fields', () => {
+    it('allows when fields can complete a zigzag pattern', () => {
       const session = new GameSession()
       const state = session.getState().state
       const player = state.players[0]!
       player.fields = [
         { row: 0, col: 0, stacks: [] },
         { row: 0, col: 1, stacks: [] },
+        { row: 1, col: 1, stacks: [] },
       ]
       expect(meetsCardPrerequisites(player, D1_ZigzagHarrow, state.round, state)).toBe(true)
     })
