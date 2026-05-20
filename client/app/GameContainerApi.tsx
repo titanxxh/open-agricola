@@ -29,6 +29,7 @@ import { InteractionBar } from '../components/interaction/InteractionBar'
 import { BrandMark } from '../components/common/BrandMark'
 import { ResourceLine } from '../components/common/ResourceLine'
 import { Section } from '../components/common/Section'
+import { PublicEventResourceAnimations } from '../components/effects/PublicEventResourceAnimations'
 import { DraftOverlay } from './draft/DraftOverlay'
 import {
   buildBakeExchangeInfo,
@@ -44,8 +45,10 @@ import {
   hasPublicEventHighlights,
   isDevModeAllowedFromQuery,
   mergePublicEventHighlights,
+  mergePublicEventResourceAnimations,
   playerIdFromWsStatus,
   removePublicEventHighlights,
+  removePublicEventResourceAnimations,
   type FarmCommitType,
   type WsStatus,
 } from './game-container-helpers'
@@ -64,6 +67,7 @@ import {
   emptyPublicEventHighlightTargets,
   type PublicEventHighlightTargets,
   type PublicEventNotification,
+  type PublicEventResourceAnimation,
 } from './public-event-notifications'
 
 type RoundSlot = { round: number; action?: ActionSpace }
@@ -275,11 +279,13 @@ export const GameContainerApi = () => {
   const publicEventNotificationBatchSeqRef = useRef(0)
   const publicEventNotificationTimersRef = useRef<number[]>([])
   const publicEventHighlightTimersRef = useRef<number[]>([])
+  const publicEventResourceAnimationTimersRef = useRef<number[]>([])
   const lastSeenPublicEventSeqRef = useRef<number | null>(null)
   const { locale } = useLocale()
   const [privateEventNotifications, setPrivateEventNotifications] = useState<PrivateEventNotification[]>([])
   const [publicEventNotifications, setPublicEventNotifications] = useState<PublicEventNotification[]>([])
   const [publicEventHighlights, setPublicEventHighlights] = useState<PublicEventHighlightTargets>(() => emptyPublicEventHighlightTargets())
+  const [publicEventResourceAnimations, setPublicEventResourceAnimations] = useState<PublicEventResourceAnimation[]>([])
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
   const [showScoringPad, setShowScoringPad] = useState(false)
   const [devMode, setDevMode] = useState(() => isDevModeAllowedFromQuery(window.location.search))
@@ -314,6 +320,8 @@ export const GameContainerApi = () => {
     publicEventNotificationTimersRef.current = []
     publicEventHighlightTimersRef.current.forEach((timer) => window.clearTimeout(timer))
     publicEventHighlightTimersRef.current = []
+    publicEventResourceAnimationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
+    publicEventResourceAnimationTimersRef.current = []
   }, [])
 
   useEffect(() => {
@@ -355,6 +363,19 @@ export const GameContainerApi = () => {
         publicEventHighlightTimersRef.current = publicEventHighlightTimersRef.current.filter((entry) => entry !== timer)
       }, 3200)
       publicEventHighlightTimersRef.current.push(timer)
+    }
+    if (batch.resourceAnimations.length > 0) {
+      setPublicEventResourceAnimations((current) =>
+        mergePublicEventResourceAnimations(current, batch.resourceAnimations).slice(0, 12),
+      )
+      const timer = window.setTimeout(() => {
+        setPublicEventResourceAnimations((current) =>
+          removePublicEventResourceAnimations(current, batch.resourceAnimations),
+        )
+        publicEventResourceAnimationTimersRef.current =
+          publicEventResourceAnimationTimersRef.current.filter((entry) => entry !== timer)
+      }, 1400)
+      publicEventResourceAnimationTimersRef.current.push(timer)
     }
     if (batch.notifications.length > 0) {
       setPublicEventNotifications((current) => [...batch.notifications, ...current].slice(0, 4))
@@ -1584,6 +1605,11 @@ export const GameContainerApi = () => {
   return (
     <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
       {notificationStack}
+      <PublicEventResourceAnimations
+        animations={publicEventResourceAnimations}
+        displayPlayerId={displayPlayer.id}
+        locale={locale}
+      />
       {isHarvestFeedExchange && harvestPending && harvestFeedOptions.length > 0 && isInteractive ? (
         <div className="exchange-overlay">
           <div className="exchange-modal">

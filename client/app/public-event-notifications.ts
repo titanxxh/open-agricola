@@ -23,8 +23,23 @@ export type PublicEventHighlightTargets = {
   fenceEdges: PublicEventFenceEdgeHighlightTarget[]
 }
 
+export type PublicEventResourceAnimationEndpoint =
+  | { kind: 'actionSpace'; actionId: string }
+  | { kind: 'playerResources'; playerId: string }
+  | { kind: 'farmTile'; playerId: string; key: string }
+  | { kind: 'supply' }
+
+export type PublicEventResourceAnimation = {
+  id: string
+  resources: Partial<Resource>
+  from: PublicEventResourceAnimationEndpoint
+  to: PublicEventResourceAnimationEndpoint
+  kind: 'move' | 'exchange' | 'payment'
+}
+
 export type PublicEventFeedbackBatch = PublicEventNotificationBatch & {
   highlights: PublicEventHighlightTargets
+  resourceAnimations: PublicEventResourceAnimation[]
 }
 
 export type EventNotificationStackItem = {
@@ -64,6 +79,17 @@ const farmTileFromLocation = (location: ResourceLocation | undefined): PublicEve
     ? { playerId: location.playerId, key: `${location.row}-${location.col}` }
     : null
 
+const endpointFromLocation = (
+  location: ResourceLocation | undefined,
+): PublicEventResourceAnimationEndpoint | null => {
+  if (!location) return null
+  if (location.kind === 'supply') return { kind: 'supply' }
+  if (location.kind === 'player') return { kind: 'playerResources', playerId: location.playerId }
+  if (location.kind === 'actionSpace') return { kind: 'actionSpace', actionId: location.spaceId }
+  if (location.kind === 'field') return { kind: 'farmTile', playerId: location.playerId, key: `${location.row}-${location.col}` }
+  return null
+}
+
 const pushUnique = <T>(
   values: T[],
   seen: Set<string>,
@@ -73,6 +99,20 @@ const pushUnique = <T>(
   if (seen.has(key)) return
   seen.add(key)
   values.push(value)
+}
+
+const animationKey = (animation: PublicEventResourceAnimation): string =>
+  `${animation.id}:${animation.kind}:${JSON.stringify(animation.from)}:${JSON.stringify(animation.to)}:${JSON.stringify(positiveResources(animation.resources))}`
+
+const pushAnimation = (
+  animations: PublicEventResourceAnimation[],
+  seen: Set<string>,
+  animation: PublicEventResourceAnimation,
+) => {
+  const resources = positiveResources(animation.resources)
+  if (Object.keys(resources).length === 0) return
+  const normalized = { ...animation, resources }
+  pushUnique(animations, seen, animationKey(normalized), normalized)
 }
 
 const messageForPublicEvent = (event: GameEvent, locale: Locale): PublicEventNotification | null => {
@@ -225,6 +265,80 @@ export const collectPublicEventHighlightTargets = (
   return highlights
 }
 
+export const collectPublicEventResourceAnimations = (
+  events: readonly GameEvent[],
+): PublicEventResourceAnimation[] => {
+  const animations: PublicEventResourceAnimation[] = []
+  const seen = new Set<string>()
+  for (const event of events) {
+    if (event.type === 'resource.moved') {
+      const from = endpointFromLocation(event.from)
+      const to = endpointFromLocation(event.to)
+      if (!from || !to) continue
+      pushAnimation(animations, seen, {
+        id: `${event.id}:move:0`,
+        kind: 'move',
+        resources: event.resources,
+        from,
+        to,
+      })
+      continue
+    }
+    if (event.type === 'resource.exchanged') {
+      const paidFrom = endpointFromLocation(event.paidFrom)
+      const paidTo = endpointFromLocation(event.paidTo)
+      if (paidFrom && paidTo) {
+        pushAnimation(animations, seen, {
+          id: `${event.id}:exchange-paid:0`,
+          kind: 'exchange',
+          resources: event.paid,
+          from: paidFrom,
+          to: paidTo,
+        })
+      }
+      const gainedFrom = endpointFromLocation(event.gainedFrom)
+      const gainedTo = endpointFromLocation(event.gainedTo)
+      if (gainedFrom && gainedTo) {
+        pushAnimation(animations, seen, {
+          id: `${event.id}:exchange-gained:0`,
+          kind: 'exchange',
+          resources: event.gained,
+          from: gainedFrom,
+          to: gainedTo,
+        })
+      }
+      continue
+    }
+    if (event.type === 'resource.paid') {
+      const to = endpointFromLocation(event.to) ?? { kind: 'supply' as const }
+      const paymentSources = event.paymentSources ?? []
+      if (paymentSources.length > 0) {
+        paymentSources.forEach((source, index) => {
+          const from = endpointFromLocation(source.from)
+          if (!from) return
+          pushAnimation(animations, seen, {
+            id: `${event.id}:payment:${index}`,
+            kind: 'payment',
+            resources: source.resources,
+            from,
+            to,
+          })
+        })
+        continue
+      }
+      if (!event.actorPlayerId) continue
+      pushAnimation(animations, seen, {
+        id: `${event.id}:payment:0`,
+        kind: 'payment',
+        resources: event.resources,
+        from: { kind: 'playerResources', playerId: event.actorPlayerId },
+        to,
+      })
+    }
+  }
+  return animations
+}
+
 export const collectPublicEventNotifications = (
   events: readonly GameEvent[],
   locale: Locale,
@@ -254,12 +368,13 @@ export const collectNewPublicEventFeedback = (
 ): PublicEventFeedbackBatch => {
   const maxSeq = events.reduce((max, event) => Math.max(max, event.seq), 0)
   if (lastSeenSeq === null || maxSeq < lastSeenSeq) {
-    return { notifications: [], highlights: emptyPublicEventHighlightTargets(), nextCursor: maxSeq }
+    return { notifications: [], highlights: emptyPublicEventHighlightTargets(), resourceAnimations: [], nextCursor: maxSeq }
   }
   const nextEvents = events.filter((event) => event.seq > lastSeenSeq)
   return {
     notifications: collectPublicEventNotifications(nextEvents, locale, idPrefix),
     highlights: collectPublicEventHighlightTargets(nextEvents),
+    resourceAnimations: collectPublicEventResourceAnimations(nextEvents),
     nextCursor: maxSeq,
   }
 }
