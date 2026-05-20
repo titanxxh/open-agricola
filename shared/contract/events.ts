@@ -181,6 +181,13 @@ export type ActionExclusiveUseSetEvent = GameEventBase<'action.exclusiveUseSet'>
   actionId: string
   playerId: string
   sourceCardId: string
+  untilRound: number
+}
+
+export type ActionExclusiveUseClearedEvent = GameEventBase<'action.exclusiveUseCleared'> & {
+  actionId: string
+  playerId: string
+  sourceCardId: string
 }
 
 export type ActionGrantedEvent = GameEventBase<'action.granted'> & {
@@ -334,6 +341,7 @@ export type GameEvent =
   | ActionRevealedEvent
   | ActionAccumulatedEvent
   | ActionExclusiveUseSetEvent
+  | ActionExclusiveUseClearedEvent
   | ActionGrantedEvent
   | TurnSkippedEvent
   | StartPlayerChangedEvent

@@ -1,6 +1,6 @@
 # 卡牌实现现状报告
 
-> 生成/更新日期：2026-05-19。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
+> 生成/更新日期：2026-05-20。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
 
 ## 1. 当前快照
 
@@ -11,10 +11,10 @@
 | 自动 metadata 脚本 literal mismatch | 5 |
 | 自动 metadata 脚本 complex mismatch | 5 |
 | 其中 schema-up 已接受差异 | 4 |
-| 需要实现复核的卡牌 | 23 |
+| 需要实现复核的卡牌 | 18 |
 | 已接受 / 产品策略差异 | 70 |
 | 排除的 BGA legacy 或未实现行为目标 | 52 |
-| 本轮审计视为已对齐 | 743 |
+| 本轮审计视为已对齐 | 748 |
 
 说明：`scripts/audit-bga-metadata-diff.ts` 现在会解析 BGA `STABLE` 打印成本和 `passing`。当前 literal mismatch 是 5 个 `passing` 差异：`C1_Overhaul` 需复核，`C6_StoneClearing`、`C9_AutomaticWaterTrough`、`D1_ZigzagHarrow`、`E5_NightLoot` 为已接受的刻意省略。当前 complex mismatch 是 1 个 `cost` 差异（`C54_MarketBooth`）和 4 个已接受的 schema-up prerequisite 差异。
 
@@ -24,25 +24,20 @@
 
 | 卡牌 | 严重度 | 领域 | 差异 | 方向 |
 |---|---|---|---|---|
-| `B23_FinalScenario` | 高 | 行动格生命周期 | BGA 立即 reveal 第 14 轮行动并限制独占使用；OA 只写入 card extraData。 | 增加后端权威的行动格 reveal / exclusive-use 支持。 |
 | `B24_Lasso` | 高 | 额外放人 | BGA 任意第一次放人后都提供触发；OA 只有第一次放人在动物市场时才触发。 | 始终提供触发；仅当第一次不是动物市场时限制第二次必须去动物市场。 |
 | `B115_TinsmithMaster` | 高 | 田地选择 | BGA 是 optional 玩家选择；OA 自动修改所有新播种田。 | 复用 selectable field + plant-additional-good 风格选择。 |
 | `B165_GameProvider` | 高 | 田地选择校验 | BGA 禁止选择 2 块，并校验谷物田；OA 允许 2 块且跳过非法选择。 | 使用 exact-count selectableTiles 和原子校验。 |
 | `C54_MarketBooth` | 高 | metadata/cost | BGA 成本是 1 个 stable；OA cost 为空，自动 metadata 脚本现在会报出该差异。 | 支持 stable-token cost，或明确记录为已接受差异。 |
 | `D155_Ebonist` | 高 | exchange 触发窗口 | BGA exchange 仅收获期；OA 暴露为 anytime exchange。 | 改为 harvest trigger 并补回归测试。 |
 | `E71_CowPatty` | 高 | 田地选择 | BGA 即使只有一块田也是 optional SPECIAL_EFFECT；OA 单块田自动应用，多块时可选任意有作物田。 | 对所有 eligible 数量都使用 selectableTiles 和 optional flow。 |
-| `E78_SleightofHand` | 高 | 批量资源交换 | BGA 是原子的多资源 discard/receive；OA 是四个顺序 1:1 exchange。 | 增加 batch resource exchange 交互。 |
 | `B67_HandTruck` | 中 | bake 前 continuation | BGA 是 optional 拿谷物，然后 mandatory bake；OA 无条件给谷物。 | 建模 optional gain 分支，之后接 mandatory bake continuation。 |
 | `B124_Trimmer` | 中 | 触发频率 | BGA 每次牧场覆盖数增加都奖励；OA 每个工作阶段第一次奖励后打 flag。 | 若要严格对齐，移除 after-reward flag。 |
 | `B29_CookeryLesson / B63_Tasting` | 中 | 行动格 ID 覆盖 | OA 漏掉 `lessons-3`。 | 增加共享 lessons-space helper。 |
-| `B21_HayloftBarn` | 中 | 资源来源 | BGA 统计 exchange 获得的 grain；OA 只处理 collect/gain/receive。 | 暴露 exchange resourcesGained，或增加 exchange listener。 |
 | `B19_MoldboardPlow` | 中 | 成功顺序 | OA 在 plow 成功前消耗使用次数。 | plow 成功后再消耗使用次数。 |
 | `E60_WorkingGloves` | 中 | 支付枚举 | BGA 限制一次替换；OA 的独立 trade 可以叠加。 | 增加 trade `groupMax/groupId`。 |
 | `E10_StrawHat` | 中 | mandatory 选择 | BGA 强制在移动或拿食物中选一项；OA 可以跳过。 | 移除 XOR 外层 optional。 |
 | `C1_Overhaul` | 低 | metadata/passing | BGA `passing=true`；OA 省略，旧接受差异列表也没有记录 passing。 | 增加 passing 支持/测试，或明确记录为已接受差异。 |
 | `E68_CherryOrchard` | 低 | 描述文本 | OA desc 写成收获 wood；BGA 表达为像 grain 一样 sow 和 harvest wood。 | 恢复 BGA 文案语义。 |
-| `E123_ResourceHoarder` | 低 | 支付 fallback | legacy construct/renovate direct path 无法携带选中的 bonus index。 | 将 construct/renovate 迁到 pay leaf，或传递 `bonusChoiceIndex`。 |
-| `E47_SyrupTap` | 低 | 行动格 gain 来源 | BGA 对 fromActionSpace gain 也响应；OA 只处理 collect。 | 增加 provenance，或证明不存在遗漏路径。 |
 | `B34_SpecialFood` | 待验证 | 跨卡交互 | BGA 特判 A137；OA heuristic 可能覆盖，也可能遗漏。 | 增加 A137+B34 定向 session 测试。 |
 | `B75_WoodWorkshop` | 待验证 | 可达性 | OA 用单卡 preview 替代 before-grant reachability。 | 引入通用 before-grant reachability 模型。 |
 
@@ -52,25 +47,20 @@
 
 | 卡牌 | BGA 证据 | OA 证据 | UI / 交互证据 |
 |---|---|---|---|
-| `B23_FinalScenario` | `B/B23_FinalScenario.php` | `shared/cards/B/B23_FinalScenario.ts` | 缺少后端行动格 reveal/exclusive 模型，UI 无法权威承载这个行为。 |
 | `B24_Lasso` | `B/B24_Lasso.php` | `shared/cards/B/B24_Lasso.ts` | 使用通用 extra-placement flow；遗漏的是后端触发条件，不是客户端渲染。 |
 | `B115_TinsmithMaster` | `B/B115_TinsmithMaster.php`; `States/SpecialEffect.js` | `shared/cards/B/B115_TinsmithMaster.ts`; `server/__tests__/B115_TinsmithMaster-session.test.ts` | BGA 有田地选择 prompt；OA 当前通过修改所有新田跳过了 prompt。 |
 | `B165_GameProvider` | `B/B165_GameProvider.php`; `States/SpecialEffect.js` | `shared/cards/B/B165_GameProvider.ts` | 通用 farm-position selection 需要 exact-count 与 selectableTiles 约束才能对齐 BGA。 |
 | `C54_MarketBooth` | `C/C54_MarketBooth.php` | `shared/cards-display/C/C54_MarketBooth.ts` | OA 数据缺少 stable cost，因此 metadata/cost 渲染也受影响。 |
 | `D155_Ebonist` | `D/D155_Ebonist.php` | `shared/cards-display/D/D155_Ebonist.ts` | Harvest exchange 通过通用 exchange UI 暴露；OA 当前把它放进 anytime exchange UI。 |
 | `E71_CowPatty` | `E/E71_CowPatty.php` | `shared/cards/E/E71_CowPatty.ts` | BGA 使用 optional selection；OA 单田自动应用，多田 UI 缺 selectableTiles。 |
-| `E78_SleightofHand` | `E/E78_SleightofHand.php`; `States/SpecialEffect.js` | `shared/cards/E/E78_SleightofHand.ts` | BGA 是一次 batch discard/receive 交互；OA 暴露为重复顺序 exchange。 |
 | `B67_HandTruck` | `B/B67_HandTruck.php` | `shared/cards/B/B67_HandTruck.ts` | OA 使用通用 bake continuation，但缺少 mandatory bake 前的 optional grain 分支。 |
 | `B124_Trimmer` | `B/B124_Trimmer.php` | `shared/cards/B/B124_Trimmer.ts` | 无特殊 UI gap；触发频率是后端 card state 问题。 |
 | `B29_CookeryLesson / B63_Tasting` | `B/B29_CookeryLesson.php`; `B/B63_Tasting.php` | `shared/cards/B/B29_CookeryLesson.ts`; `shared/cards/B/B63_Tasting.ts`; `shared/cards/action/common-lessons-3.ts` | Lessons 行动格覆盖会同时影响行动可用性和行动格选项渲染。 |
-| `B21_HayloftBarn` | `B/B21_HayloftBarn.php` | `shared/cards/B/B21_HayloftBarn.ts` | 无特殊 UI gap；缺失的是后端 exchange provenance 事件数据。 |
 | `B19_MoldboardPlow` | `B/B19_MoldboardPlow.php` | `shared/cards/B/B19_MoldboardPlow.ts` | OA 已消耗存储次数后，UI 仍可能取消或失败 plow 选择。 |
 | `E60_WorkingGloves` | `E/E60_WorkingGloves.php` | `shared/cards-display/E/E60_WorkingGloves.ts`; `shared/actions/payment/internal/enumerate.ts` | replacement modifier 可叠加时，Payment UI 会收到过宽的枚举选项。 |
 | `E10_StrawHat` | `E/E10_StrawHat.php` | `shared/cards/E/E10_StrawHat.ts` | OA 将整个 flow 标为 optional，导致通用 XOR UI 包含 skip 路径。 |
 | `C1_Overhaul` | `C/C1_Overhaul.php` | `shared/cards-display/C/C1_Overhaul.ts`; `shared/cards/C/C1_Overhaul.ts` | metadata/passing 影响卡牌显示和可打出 metadata，而不是自定义 UI flow。 |
 | `E68_CherryOrchard` | `E/E68_CherryOrchard.php` | `shared/cards-display/E/E68_CherryOrchard.ts` | 描述文本面向 UI；实现本身主要基于 cardField。 |
-| `E123_ResourceHoarder` | `E/E123_ResourceHoarder.php` | `shared/cards/E/E123_ResourceHoarder.ts`; `shared/actions/payment/internal` | 只有选中的 bonus index 能传入 construct/renovate payment，Payment UI 才能精确。 |
-| `E47_SyrupTap` | `E/E47_SyrupTap.php` | `shared/cards/E/E47_SyrupTap.ts` | 无特殊 UI gap；缺失的是后端 action-space provenance 事件数据。 |
 | `B34_SpecialFood` | `B/B34_SpecialFood.php` | `shared/cards/B/B34_SpecialFood.ts`; `shared/cards/A/A137_RiverineShepherd.ts` | 需要 A137 交互的定向 session/UI 覆盖后，才能判断 UI 行为是否分歧。 |
 | `B75_WoodWorkshop` | `B/B75_WoodWorkshop.php` | `shared/cards/B/B75_WoodWorkshop.ts` | 支付/可达性 UI 依赖后端 isDoable 和 payment enumeration；preview 可能低估 BGA 可达性。 |
 
@@ -117,10 +107,10 @@
 | Metadata 审计覆盖需要随字段演进同步 | `scripts/audit-bga-metadata-diff.ts` 已覆盖 `STABLE` cost 和 `passing` | 新增 BGA metadata 字段时同步加 parser/diff fixture，避免统计口径回退。 |
 | 单卡 internal leaf | `B85_FarmHand` 的 `build-farmhand-room` | 内联回卡牌，或等第二个 caller 出现后再泛化。 |
 | 主路径 prefix namespace 检查 | 旧 bad-smell 文档中的 `CUSTOM_`、`card_` 模式 | 保留为 helper 常量/函数，避免散落的 startsWith 检查。 |
-| Payment fallback 仍绕过 selected bonus 语义 | `E123_ResourceHoarder`、construct/renovate direct paths | 将 construct/renovate 迁到 pay leaf，或传递 selected bonus index。 |
-| 行动格生命周期建模不足 | `B23_FinalScenario` | 由后端持有 reveal/exclusive-use 机制。 |
+| Payment fallback 仍需继续收敛到事件 provenance | construct/renovate bonus choice 已能通过 `resource.paid` 携带 selected index；后续关注其他 direct payment caller | 新增支付类卡时优先消费 `resource.paid` / `bonusChoiceIndex`，不要读 action result fallback。 |
+| 行动格生命周期已进入后端事件层 | `B23_FinalScenario` | 后端持有 reveal/exclusive-use 状态，round-start 统一清理并 emit `action.exclusiveUseCleared`。 |
 | 选择校验重复且容易泄漏 | `B115`、`B165`、`E71` | 通用 selectableTiles / exact-count / atomic selection helper。 |
-| Log / notification provenance 仍需扩大覆盖 | `B21_HayloftBarn`、`E47_SyrupTap`、`E78_SleightofHand` 等依赖资源来源、支付来源或行动格来源的卡 | 结构化 action event/log event 首版已落地；继续扩大到 batch exchange、reveal/exclusive-use、更多卡牌 UI 标记。 |
+| Log / notification provenance 仍需继续扩大到更多卡 | 本轮已覆盖 `B21_HayloftBarn`、`E47_SyrupTap`、`E78_SleightofHand`、`E123_ResourceHoarder`、`B23_FinalScenario` 的资源来源、支付来源、batch exchange、private prompt、replay/undo 与 UI 标记 | 结构化 action event/log event 继续作为卡牌判定、UI log、private notification 和 replay 的统一来源。 |
 | 注释里的非阻塞 card-id 示例 | `shared/actions/effects/breed.ts`、`shared/contract/types.ts` 仅把 `A165_PigBreeder` / `D95_SiteManager` 作为例子提到 | 除非附近代码变动，否则保留；它们不是可执行的单卡分支。 |
 | Legacy/fallback 术语残留 | 旧 bad-smell 文档发现的剩余 fallback/direct-path 术语，主要在已迁移支付 flow 和测试中 | 将直接运行时 fallback 视为重构债；测试/baseline 名称除非真实迁移触及，否则不动。 |
 
@@ -128,16 +118,16 @@
 
 1. 维护 metadata 审计 fixture 覆盖：`STABLE` cost 和 `passing` 已覆盖，后续新增 BGA metadata 字段时必须同步 parser/diff 测试。
 2. 增加精确 eligible farm-position selection，支持 selectableTiles、数量约束和非法选择原子失败。
-3. 增加 batch resource exchange / resource quantity selection，用于 BGA SPECIAL_EFFECT 风格的 discard/receive 交互。
+3. ~~增加 batch resource exchange / resource quantity selection，用于 BGA SPECIAL_EFFECT 风格的 discard/receive 交互。~~ ✅ 已落地：`resource-batch-exchange-select` 支持私有 prompt redaction、HTTP/WS commit、E78 原子 discard/receive、UI 面板和 replay 回放。
 4. 为“从多个替换中选一个”的卡增加 TradeModifier group 限制。
-5. 增加后端权威的 action-space reveal/exclusive-use 支持。
+5. ~~增加后端权威的 action-space reveal/exclusive-use 支持。~~ ✅ 已落地：ActionSpace 持有 `exclusiveUse`，round start 统一 emit `action.revealed` / `action.exclusiveUseCleared`，B23 使用该机制。
 6. 扩大 accumulation-space partial-take 语义的复用范围；当前 `collect` 已支持指定行动格、资源和数量，`B81_Handcart` 已从行动格移除资源。
 7. ~~为 room/action bonus 增加 scope，避免 per-room 和 total-room cost modifier 双重应用~~ ✅ 已落地：`ComplexCost` 统一形状（`fees / unitFee + nb / trades / bonuses`），`Trade.scope: 'action' \| 'unit'` + `TradeModifier.scope` 区分 per-action 资源池转换和 per-unit cost row 有序替换（A123_FrameBuilder construct、D15_ClaySupports、B145_BrushwoodCollector construct 分支已迁移，B145 使用 `replaceUpTo` 覆盖 1/2 reed 行）；construct / renovation / fencing / plow / occupation / pay 全部走单一 `computeAllBuyableCombinations`；条件评估拆成 `evaluateStaticConditions` + `evaluateConditions(_, _, nb)` 两层（`getModifiersForCostType` static-only，nb-aware gate 延后到 enumerate）。
 8. 增加通用处理：“before trigger 给资源后，原行动可能变得可达/mandatory”。
 9. 增加共享 lessons action-space id helper，覆盖 `lessons`、`lessons-3`、`lessons-4`。
-10. 继续扩大 gain/exchange/action-space provenance 覆盖。
+10. 继续扩大 gain/exchange/action-space provenance 覆盖；本轮已覆盖 B21 exchange grain、E47 action-space gain、C162 player action space、E78 batch exchange。
 11. 决定 BGA `implemented=false` data-only 卡是否进入 OA 发牌池。
-12. 扩展结构化 action event/log event：首版已记录 eventType、sourceAction、sourceCard、resource movement provenance、payment source、affected board/card ids，并从该层派生部分 UI log；后续补齐 replay/undo 与更多通知映射。
+12. 扩展结构化 action event/log event：首版已记录 eventType、sourceAction、sourceCard、resource movement provenance、payment source、affected board/card ids，并从该层派生部分 UI log；本轮已补 private prompt redaction、batch exchange replay/undo 定向覆盖和 action exclusive-use log，后续继续补更多通知映射。
 
 ## 7. Log 系统对比
 
@@ -145,14 +135,14 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 
 | 维度 | BGA | OA | 差距 |
 |---|---|---|---|
-| 生命周期事件 | `startNewTurn`、`revealActionCard`、`accumulate`、`startWork`、`startReturnHome`、`startHarvest*` 等都有 notification type 和结构化 payload。 | 已新增 `round.started`、`work.started`、`returnHome.started`、`harvest.phaseStarted`、`action.revealed`、`action.accumulated`、`worker.placed/returned` 等公共事件；旧 `log.enterRound`、`log.harvest*`、`log.placeFarmer` 仍保留。 | lifecycle 已有可审计基础；下一步是把仍直写的 session log 全部改为事件 mapper 派生，并补 exclusive-use 类事件。 |
-| 行动和资源移动 | BGA 区分 `collectResources`、`gainResources`、`receiveResource(s)`、`receiveRoundResource`、`exchange`、`breed`，payload 包含 resources、source、sourceInfo、space/location/card。 | OA 已新增公共 `GameState.events`，`collect` / `gain` / `exchange` / `pay` / `reap` / `breed` / action/card/round-card accumulation 等路径记录来源；`GameState.log` 作为事件派生 UI 缓存保留。 | `B81_Handcart` 已不再从供应区反推；后续主要补 replay/undo 和更多动画通知映射。 |
-| 支付记录 | BGA `payResources` / `payResourcesTo` / `payWithCard` / `payResourcesFromFields` / `payResourcesFromCards` 会记录 source、cardSources、field/card 来源和接收玩家。 | OA 部分支付路径有 `resourcesPaid`、`costResources`、`sourceCards`，但 legacy/direct path 仍会丢 selected bonus 或来源。 | 支付 provenance 不统一，`E123_ResourceHoarder` 这类依赖 bonus choice/payment source 的卡仍有 fallback 风险。 |
-| 卡牌状态和 UI 标记 | BGA 有 `updateCardStats`、`placeInfobox`、`updateInfobox`、`markUsableExchange`、`populateCardCache`、`refreshHand` 等通知。 | `special-effect` 已为公开 card state、counter、flag、infobox、stack、board swap、future meeple、field crop、fence、stable、action-space move 等分支 emit 结构化事件；UI 仍主要从 state 渲染。 | 私有手牌/prompt 不进入公共事件；可用 exchange 标记和部分客户端动画仍需后续事件映射。 |
-| 私有/公开通知 | BGA 显式区分 `notifyAll` 和 `notify($player, ...)`，手牌、draft、living-hand 等只发给目标玩家。 | OA 通过 snapshot/privacy 处理可见数据，`state.log` 基本是公共时间线。 | 私有 prompt/手牌类事件不进入独立 per-recipient log；如果后续要复盘或旁观，需要额外事件模型。 |
-| undo / replay | BGA undo 会回滚 DB 变更，按 `snapshot_packet_id` 或 move id 取消 gamelog packet，并通知客户端清除旧 turn log。 | OA 有 session state/history，但可见 `state.log` 没有 canceled packet / archived log 语义。 | undo 后日志可追溯性弱于 BGA；当前不一定阻塞卡牌对齐，但会影响调试、复盘和多人同步解释。 |
+| 生命周期事件 | `startNewTurn`、`revealActionCard`、`accumulate`、`startWork`、`startReturnHome`、`startHarvest*` 等都有 notification type 和结构化 payload。 | 已新增 `round.started`、`work.started`、`returnHome.started`、`harvest.phaseStarted`、`action.revealed`、`action.accumulated`、`action.exclusiveUseSet/Cleared`、`worker.placed/returned` 等公共事件；旧 `log.enterRound`、`log.harvest*`、`log.placeFarmer` 仍保留。 | lifecycle 已有可审计基础；下一步是把仍直写的 session log 继续改为事件 mapper 派生。 |
+| 行动和资源移动 | BGA 区分 `collectResources`、`gainResources`、`receiveResource(s)`、`receiveRoundResource`、`exchange`、`breed`，payload 包含 resources、source、sourceInfo、space/location/card。 | OA 已新增公共 `GameState.events`，`collect` / `gain` / `exchange` / batch exchange / `pay` / `reap` / `breed` / action/card/round-card accumulation 等路径记录来源；`GameState.log` 作为事件派生 UI 缓存保留。 | `B21`、`E47`、`E78` 本轮已改为读结构化 provenance；后续主要补更多动画通知映射。 |
+| 支付记录 | BGA `payResources` / `payResourcesTo` / `payWithCard` / `payResourcesFromFields` / `payResourcesFromCards` 会记录 source、cardSources、field/card 来源和接收玩家。 | OA `resource.paid` 已能携带 payment source、bonusSources、bonusChoiceIndex；construct room 与 E123 after-pay 读该事件，不再依赖 action result fallback。 | 支付 provenance 正在收敛；后续新增支付路径必须先 emit `resource.paid` 再让卡牌监听。 |
+| 卡牌状态和 UI 标记 | BGA 有 `updateCardStats`、`placeInfobox`、`updateInfobox`、`markUsableExchange`、`populateCardCache`、`refreshHand` 等通知。 | `special-effect` 已为公开 card state、counter、flag、infobox、stack、board swap、future meeple、field crop、fence、stable、action-space move 等分支 emit 结构化事件；B23 exclusive-use 已有 board marker，E78 batch prompt 已有专用 UI。 | 可用 exchange 标记和部分客户端动画仍需后续事件映射。 |
+| 私有/公开通知 | BGA 显式区分 `notifyAll` 和 `notify($player, ...)`，手牌、draft、living-hand 等只发给目标玩家。 | OA 通过 snapshot/privacy 处理可见数据；本轮增加 `privateEvents` 与 `private.promptShown`，非目标玩家看到 `private-prompt` redaction。 | 私有手牌类事件仍未完全独立成 per-recipient log；private prompt 已有首个模型。 |
+| undo / replay | BGA undo 会回滚 DB 变更，按 `snapshot_packet_id` 或 move id 取消 gamelog packet，并通知客户端清除旧 turn log。 | OA 有 session state/history；本轮补了 E78 private prompt/replay reconstruction 定向回归。 | OA 仍没有 canceled packet / archived log 语义；但本轮新增的 private/batch 交互已进入可回放覆盖。 |
 
-结论：不要照抄 BGA 把 notification 当规则源的做法；OA 应保持后端 state 权威。当前已补一个比 `GameState.log` 更底层的公共结构化事件层：规则执行时记录事件，再由事件派生 UI log、动画提示、审计报告和未来 replay。事件层已覆盖资源主干、农场主干、阶段事件和 `special-effect` 主分支；剩余风险集中在私有事件分流、replay/undo 语义和更多客户端动画映射。
+结论：不要照抄 BGA 把 notification 当规则源的做法；OA 应保持后端 state 权威。当前已补一个比 `GameState.log` 更底层的公共结构化事件层：规则执行时记录事件，再由事件派生 UI log、动画提示、审计报告和 replay。本轮 private prompt / batch exchange / exclusive-use 已证明同一事件层可以同时服务卡牌判定、UI、私有通知和回放；剩余风险集中在更多客户端动画映射、私有手牌类事件和 canceled packet 语义。
 
 ## 8. BGA 坏味道：不要照抄
 
@@ -218,11 +208,11 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 | handHooks | `onBeforeStartOfTurn` | `E96_Elder` |
 | listener | `after.$actionName` | `A40_PottersYard` |
 | listener | `after.$dynamic` | `A144_Sequestrator`, `C52_HuntsmansHat`, `E53_BoarSpear` |
-| listener | `after.*` | `E144_WaresSalesman` |
+| listener | `after.*` | `E47_SyrupTap`, `E144_WaresSalesman` |
 | listener | `after.bake-bread` | `A30_BakingSheet`, `A63_DutchWindmill`, `C61_BeerStein`, `E57_CheeseFondue` |
-| listener | `after.collect` | `A103_Portmonger`, `A142_Cordmaker`, `A146_StorehouseSteward`, `A15_CarpentersAxe`, `A164_WoodWorker`, `A17_ReclamationPlow`, `A23_StoneCompany`, `A48_ShavingHorse`, `A95_Angler`, `B131_Equipper`, `B147_Huntsman`, `B15_CarpentersBench`, `B162_ForestClearer`, `B17_ForestPlow`, `B21_HayloftBarn`, `B34_SpecialFood`, `B48_ForestStone`, `B55_MaintenancePremium`, `B79_Corf`, `C102_TreeGuard`, `C114_SoilScientist`, `C163_MaterialDeliveryman`, `C42_RavenousHunger`, `C81_MaterialHub`, `D140_Loudmouth`, `D143_TreeCutter`, `D144_WaterWorker`, `D146_Porter`, `D19_PulverizerPlow`, `D36_BreedRegistry`, `D73_SupplyBoat`, `E103_Wolf`, `E118_KindlingGatherer`, `E140_Carter`, `E15_NailBasket`, `E38_RodCollection`, `E47_SyrupTap`, `E51_WhaleOil`, `E77_Mattock` |
+| listener | `after.collect` | `A103_Portmonger`, `A142_Cordmaker`, `A146_StorehouseSteward`, `A15_CarpentersAxe`, `A164_WoodWorker`, `A17_ReclamationPlow`, `A23_StoneCompany`, `A48_ShavingHorse`, `A95_Angler`, `B131_Equipper`, `B147_Huntsman`, `B15_CarpentersBench`, `B162_ForestClearer`, `B17_ForestPlow`, `B21_HayloftBarn`, `B34_SpecialFood`, `B48_ForestStone`, `B55_MaintenancePremium`, `B79_Corf`, `C102_TreeGuard`, `C114_SoilScientist`, `C163_MaterialDeliveryman`, `C42_RavenousHunger`, `C81_MaterialHub`, `D140_Loudmouth`, `D143_TreeCutter`, `D144_WaterWorker`, `D146_Porter`, `D19_PulverizerPlow`, `D36_BreedRegistry`, `D73_SupplyBoat`, `E103_Wolf`, `E118_KindlingGatherer`, `E140_Carter`, `E15_NailBasket`, `E38_RodCollection`, `E51_WhaleOil`, `E77_Mattock` |
 | listener | `after.construct` | `A110_Roughcaster`, `A111_WallBuilder`, `A167_BreederBuyer`, `A21_FamilyFriendHome`, `A73_AgriculturalFertilizers`, `A93_BedMaker`, `B111_Rustic`, `B140_FarmyardWorker`, `B163_Pastor`, `B27_Toolbox`, `D123_RenovationPreparer`, `D128_BuildingTycoon`, `D163_JourneymanBricklayer`, `D74_RoyalWood`, `D94_HenpeckedHusband`, `D96_Furnisher`, `E123_ResourceHoarder`, `E49_Twibil`, `E52_Cubbyhole` |
-| listener | `after.exchange` | `A48_ShavingHorse`, `B29_CookeryLesson`, `C148_MudWallower`, `C53_GypsysCrock`, `D36_BreedRegistry`, `D56_FatstockStretcher`, `E85_MasterTanner` |
+| listener | `after.exchange` | `A48_ShavingHorse`, `B21_HayloftBarn`, `B29_CookeryLesson`, `C148_MudWallower`, `C53_GypsysCrock`, `D36_BreedRegistry`, `D56_FatstockStretcher`, `E85_MasterTanner` |
 | listener | `after.family-growth` | `D150_GodlySpouse`, `D157_PartyOrganizer`, `E113_Godmother` |
 | listener | `after.fence` | `A34_Loppers`, `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B94_StockProtector`, `C88_CarpentersApprentice`, `D89_Stablehand`, `E108_BlackberryFarmer`, `E74_AshTrees` |
 | listener | `after.fencing` | `B124_Trimmer`, `B140_FarmyardWorker`, `B27_Toolbox` |
@@ -545,9 +535,9 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 | `B18_GrasslandHarrow` | 已对齐 |  |
 | `B19_MoldboardPlow` | 需复核 | plow 成功前就消耗使用次数 |
 | `B20_ChainFloat` | 已对齐 |  |
-| `B21_HayloftBarn` | 需复核 | 不响应通过 exchange 获得的 grain |
+| `B21_HayloftBarn` | 已对齐 | 通过 resource exchange 获得的 grain 已由 provenance helper 触发 |
 | `B22_WalkingBoots` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
-| `B23_FinalScenario` | 需复核 | 第 14 轮行动没有真实 reveal / exclusive gate |
+| `B23_FinalScenario` | 已对齐 | 第 14 轮行动 reveal / exclusive gate / clear event 已由后端权威建模 |
 | `B24_Lasso` | 需复核 | 只在动物市场后触发，漏掉非动物市场首次放人路径 |
 | `B25_BreadPaddle` | 已对齐 |  |
 | `B26_AgrarianFences` | 已对齐 |  |
@@ -1111,7 +1101,7 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 | `E44_FodderBeets` | 已对齐 |  |
 | `E45_FruitLadder` | 已对齐 |  |
 | `E46_WaterlilyPond` | 已对齐 |  |
-| `E47_SyrupTap` | 需复核 | 只处理 collect；BGA 还响应 action-space gain provenance |
+| `E47_SyrupTap` | 已对齐 | 已响应来自 action-space 的 gain provenance，并防止自触发递归 |
 | `E48_TownHall` | 已对齐 |  |
 | `E49_Twibil` | 已对齐 |  |
 | `E50_WildGreens` | 已对齐 |  |
@@ -1142,7 +1132,7 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 | `E75_StoneAxe` | 已对齐 |  |
 | `E76_LumberPile` | 已对齐 |  |
 | `E77_Mattock` | 已对齐 |  |
-| `E78_SleightofHand` | 需复核 | 顺序 exchange 不是原子 batch exchange |
+| `E78_SleightofHand` | 已对齐 | 已迁到原子 batch exchange，覆盖 UI/private/replay |
 | `E79_FieldSpade` | 已对齐 |  |
 | `E80_RockGarden` | 已对齐 |  |
 | `E81_AlchemistsLab` | 已对齐 |  |
@@ -1187,7 +1177,7 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 | `E120_ScrapCollector` | 已对齐 |  |
 | `E121_HillCultivator` | 已对齐 |  |
 | `E122_Cottar` | 已对齐 |  |
-| `E123_ResourceHoarder` | 需复核 | legacy construct/renovate path 无法携带所选 bonus index |
+| `E123_ResourceHoarder` | 已对齐 | after-pay 改为读取 `resource.paid` 的 bonusSources / bonusChoiceIndex |
 | `E124_MayorCandidate` | 已对齐 |  |
 | `E125_DelayedWayfarer` | 已对齐 |  |
 | `E126_TaxCollector` | 已对齐 |  |

@@ -120,6 +120,34 @@ describe('B21_HayloftBarn session', () => {
     ]))
   })
 
+  it('exchange gaining grain releases 1 food from card', () => {
+    const session = setup({ foodCount: 4 })
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.occupationPlayed.push('D155_Ebonist')
+    player.resources.wood = 1
+    session.loadState(state)
+
+    let resp = session.takeAnytimeAction(0, 'exchange')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected exchange prompt')
+    const option = resp.interaction.options?.find((entry) =>
+      entry.effectPreview?.kind === 'resourceExchange' &&
+      entry.effectPreview.resourcesPaid?.wood === 1 &&
+      entry.effectPreview.resourcesGained?.grain === 1
+    )
+    expect(option).toBeDefined()
+    resp = session.resolveChoice(0, option!.value)
+
+    const updated = resp.state.players[0]!
+    expect(readCardExtraData<number>(updated, CARD_ID, 'foodCount')).toBe(3)
+    expect(updated.resources.food).toBe(12)
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'resource.exchanged', exchangeSource: 'D155_Ebonist' }),
+      expect.objectContaining({ type: 'card.triggered', sourceCardId: CARD_ID }),
+    ]))
+  })
+
   it('does not release food when card is empty', () => {
     const session = setup({ foodCount: 0 })
     const state = session.getState().state

@@ -47,6 +47,9 @@ const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
   return result
 }
 
+const splitSourceIds = (csv: string | undefined): string[] =>
+  csv ? csv.split(',').map((source) => source.trim()).filter(Boolean) : []
+
 const finalizeRoom = (
   ctx: ActionMutationContext,
   rooms: FarmTilePosition[],
@@ -102,10 +105,26 @@ const finalizeRoom = (
       type: ctx.player.houseType,
     })),
   })
+  const resourcesPaid = positiveResources(payment.solution.resourcesPaid)
+  const bonusSources = splitSourceIds(payment.solution.bonusUsed)
+  if (
+    Object.keys(resourcesPaid).length > 0 ||
+    bonusSources.length > 0 ||
+    payment.solution.bonusChoiceIndex
+  ) {
+    ctx.eventSink?.emit<'resource.paid'>({
+      type: 'resource.paid',
+      resources: resourcesPaid,
+      paymentFor: 'construct',
+      paymentSources: [{ from: { kind: 'player', playerId: ctx.player.id }, resources: resourcesPaid }],
+      ...(bonusSources.length > 0 ? { bonusSources } : {}),
+      ...(payment.solution.bonusChoiceIndex ? { bonusChoiceIndex: payment.solution.bonusChoiceIndex } : {}),
+    })
+  }
 
   return {
     type: 'ok',
-    resourcesPaid: positiveResources(payment.solution.resourcesPaid),
+    resourcesPaid,
     extraData: { builtRooms: rooms },
   }
 }

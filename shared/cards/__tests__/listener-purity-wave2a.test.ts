@@ -195,6 +195,13 @@ describe('listener purity wave 2a', () => {
     const ctx = context(p, {
       actionId: 'gain',
       result: { type: 'ok', resourcesGained: { grain: 1 } },
+      transactionEvents: [{
+        type: 'resource.moved',
+        resources: { grain: 1 },
+        from: { kind: 'supply' },
+        to: { kind: 'player', playerId: p.id },
+        reason: 'gain',
+      }],
     })
     const before = snapshot(p)
 

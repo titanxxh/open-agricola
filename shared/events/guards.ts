@@ -42,7 +42,8 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'worker.promoted': ['playerId', 'workerId', 'from', 'to'],
   'action.revealed': ['actionId', 'roundSlot'],
   'action.accumulated': ['spaceId', 'resources'],
-  'action.exclusiveUseSet': ['actionId', 'playerId', 'sourceCardId'],
+  'action.exclusiveUseSet': ['actionId', 'playerId', 'sourceCardId', 'untilRound'],
+  'action.exclusiveUseCleared': ['actionId', 'playerId', 'sourceCardId'],
   'action.granted': ['playerId', 'actionId', 'cardId'],
   'turn.skipped': ['playerId', 'reason'],
   'startPlayer.changed': ['playerId'],
@@ -380,6 +381,12 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       assertResourceMap(event.resources, 'resources')
       return
     case 'action.exclusiveUseSet':
+      assertStringField(event.actionId, 'actionId')
+      assertStringField(event.playerId, 'playerId')
+      assertStringField(event.sourceCardId, 'sourceCardId')
+      assertFiniteNumberField(event.untilRound, 'untilRound')
+      return
+    case 'action.exclusiveUseCleared':
       assertStringField(event.actionId, 'actionId')
       assertStringField(event.playerId, 'playerId')
       assertStringField(event.sourceCardId, 'sourceCardId')

@@ -6,6 +6,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { B21_HayloftBarn } from '../../cards-display/B/B21_HayloftBarn'
+import { hasExchangeGained, hasResourceMovedToPlayer } from '../helpers/event-provenance'
 
 const CARD_ID = B21_HayloftBarn.id
 
@@ -57,12 +58,12 @@ const grainGainListener: CardListenerRegistration = {
   id: 'B21-hayloft-barn-after-grain-gain',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['collect', 'gain', 'receive'],
+  actions: ['collect', 'gain', 'receive', 'exchange'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const grainGained = context.result?.type === 'ok'
-      ? (context.result.resourcesGained?.grain ?? 0)
-      : 0
-    if (grainGained <= 0) return
+    if (context.sourceCard === CARD_ID) return
+    const grainGained = hasExchangeGained(context.transactionEvents, 'grain') ||
+      hasResourceMovedToPlayer(context.transactionEvents, 'grain', context.player.id)
+    if (!grainGained) return
     const foodCount = readCardExtraData<number>(context.player, CARD_ID, 'foodCount') ?? 0
     if (foodCount <= 0) return
     const newCount = foodCount - 1

@@ -388,6 +388,29 @@
 .lazybones-stable-marker[data-player-color="blue"] .res-icon-barn { background-position-x: 50%; }
 .lazybones-stable-marker[data-player-color="black"] { border: 2px solid #1f2937; }
 .lazybones-stable-marker[data-player-color="black"] .res-icon-barn { background-position-x: 75%; }
+.action-exclusive-use {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 16;
+  pointer-events: none;
+  max-width: calc(100% - 8px);
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #1f2937;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.action-exclusive-use[data-player-color="red"] { border-left: 3px solid var(--color-danger); }
+.action-exclusive-use[data-player-color="yellow"] { border-left: 3px solid #d6b332; }
+.action-exclusive-use[data-player-color="blue"] { border-left: 3px solid #3f6ee8; }
+.action-exclusive-use[data-player-color="black"] { border-left: 3px solid #1f2937; }
 .player-action-card-owner {
   font-size: 11px;
   font-weight: 600;
@@ -701,6 +724,9 @@
 }
 .action-card-holder.occupied-available .action-card {
   filter: none;
+}
+.action-card-holder.exclusive-locked .action-card {
+  filter: saturate(70%) brightness(0.92);
 }
 /* --- Action card (3-section frame) --- */
 .action-card {

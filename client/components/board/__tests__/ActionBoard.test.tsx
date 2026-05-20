@@ -264,4 +264,33 @@ describe('ActionBoard', () => {
     expect(html).toContain('title="PlayerA: Wood"')
     expect(html).toContain('data-owner-player="p1"')
   })
+
+  it('renders exclusive-use round slot as locked for non-owner before its normal round', () => {
+    const owner = createPlayer('p1', 'Alice', 'red')
+    const viewer = createPlayer('p2', 'Bob', 'blue')
+    const action = {
+      ...createAction('round14', 'actions.round14.name'),
+      exclusiveUse: { playerId: 'p1', sourceCardId: 'B23_FinalScenario', untilRound: 14 },
+    }
+    const html = renderToStaticMarkup(
+      <ActionBoard
+        locale="en"
+        baseActions={[]}
+        roundSlots={[{ round: 14, action }]}
+        currentPlayer={viewer}
+        players={[owner, viewer]}
+        futureMeeples={[]}
+        canTakeAction={() => false}
+        takeAction={() => {}}
+        currentRound={13}
+        devMode={false}
+      />,
+    )
+
+    expect(html).toContain('action-exclusive-use')
+    expect(html).toContain('exclusive-locked')
+    expect(html).toContain('Alice')
+    expect(html).toContain('actions.round14.name')
+    expect(html).toContain('disabled')
+  })
 })

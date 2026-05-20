@@ -146,12 +146,13 @@ export const normalizeState = (raw: GameState): GameState => {
   const spaceMap = new Map(
     (raw.actionSpaces ?? []).map((space) => [space.id, space]),
   )
-  const actionSpaces = baseSpaces.map((space) => {
+  const actionSpaces: ActionSpace[] = baseSpaces.map((space): ActionSpace => {
     const stored = spaceMap.get(space.id)
     return {
       ...space,
       resources: stored?.resources ?? space.resources,
       takenBy: normalizeTakenBy(stored?.takenBy),
+      exclusiveUse: stored?.exclusiveUse,
     }
   })
   // Append PlayerActionCard dynamic spaces
@@ -161,6 +162,7 @@ export const normalizeState = (raw: GameState): GameState => {
     if (stored) {
       pas.resources = stored.resources ?? pas.resources
       pas.takenBy = normalizeTakenBy(stored.takenBy)
+      pas.exclusiveUse = stored.exclusiveUse
     }
     actionSpaces.push(pas)
   }

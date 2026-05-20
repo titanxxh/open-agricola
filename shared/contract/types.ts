@@ -604,6 +604,12 @@ export type ActionDefinition = {
 export type ActionSpace = ActionDefinition & {
   resources: Resource
   takenBy: WorkerRef[]
+  exclusiveUse?: { playerId: string; sourceCardId: string; untilRound: number }
+}
+
+export type ResourceBatchExchangePayload = {
+  discard: Partial<Record<keyof Resource, number>>
+  receive: Partial<Record<keyof Resource, number>>
 }
 
 /**
@@ -629,6 +635,7 @@ export type SubFlowKind =
   | 'card-draft'
   | 'engine-blocked'
   | 'resource-quantity-select'
+  | 'resource-batch-exchange-select'
 
 export type FarmSelectType = 'plow' | 'sow' | 'fence' | 'room' | 'stable'
 export type SelectionKind = 'farm-position' | 'occupation-hand'
@@ -709,6 +716,15 @@ export type InteractionRequest =
       kind: 'resource-quantity-select'
       cardId: string
       availableByResource: Partial<Record<keyof Resource, number>>
+      promptKey?: string
+      requireAtLeastOne?: boolean
+    }
+  | {
+      kind: 'resource-batch-exchange-select'
+      cardId: string
+      discardAvailableByResource: Partial<Record<keyof Resource, number>>
+      receiveResources: readonly (keyof Resource)[]
+      maxTotal: number
       promptKey?: string
       requireAtLeastOne?: boolean
     }
