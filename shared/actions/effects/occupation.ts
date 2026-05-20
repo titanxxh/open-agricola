@@ -15,6 +15,14 @@ import { activateCard } from './activate-card'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { incOccupationBuilt, recordDraftPlayed } from '../../session/stats'
 
+const privateHandChangeContext = (
+  sourceCard: string | undefined,
+  occupationId: string,
+): Record<string, unknown> | undefined =>
+  sourceCard && sourceCard !== occupationId
+    ? { privateHandChangeSourceCard: sourceCard }
+    : undefined
+
 const buildOccupationCostProvider = (
   player: PlayerState,
   occupationId: string,
@@ -300,6 +308,7 @@ export const playOccupationAction: ActionDefinition = {
             actionId: 'apply-occupation-play',
             sourceCard: choice,
             params: { occupationId: choice },
+            actionContext: privateHandChangeContext(sourceCard, choice),
           },
         ],
       },

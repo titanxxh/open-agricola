@@ -21,7 +21,8 @@ import type {
   ResourceBatchExchangePayload,
   InteractionAnimalReorgZone,
 } from '../contract/types.ts'
-import type { ActionDetailParts, PrivateGameEvent } from '../contract/protocol/game.ts'
+import type { ActionDetailParts } from '../contract/protocol/game.ts'
+import type { PrivateGameEvent } from '../contract/private-events.ts'
 import { actionDefinitions, getActionDefinition } from '../actions/index.ts'
 import { internalActionDefinitions } from '../actions/internal-actions.ts'
 import { getAllAdHocActions } from '../actions/helpers/ad-hoc-action-registry.ts'
@@ -410,6 +411,8 @@ export class GameCore {
     gains: {},
     costs: {},
   }
+  private responsePrivateEvents: PrivateGameEvent[] = []
+  private deferPrivateEventDrainDepth = 0
   /**
    * Monotonic counter for two purposes:
    *   1. `recordActionSnapshot(player, n)` — per-player action token used by
@@ -497,6 +500,10 @@ export class GameCore {
   /** @internal phase access — emit a SessionResponse with the current state. */
   emitResponse(ok = true, error?: string, privateEvents?: PrivateGameEvent[]): SessionResponse {
     return this.respond(ok, error, privateEvents)
+  }
+
+  emitResponsePrivateEvent(event: PrivateGameEvent): void {
+    this.responsePrivateEvents.push(event)
   }
 
   /** @internal phase access — drive the engine's step loop until it blocks. */
@@ -1661,8 +1668,29 @@ export class GameCore {
       )
     }
     if (error) resp.error = error
-    if (ok && privateEvents && privateEvents.length > 0) resp.privateEvents = privateEvents
+    const drainedPrivateEvents = this.drainResponsePrivateEvents(ok, privateEvents)
+    if (drainedPrivateEvents) resp.privateEvents = drainedPrivateEvents
     return resp
+  }
+
+  private drainResponsePrivateEvents(
+    ok: boolean,
+    explicit?: PrivateGameEvent[],
+  ): PrivateGameEvent[] | undefined {
+    if (this.deferPrivateEventDrainDepth > 0 && !explicit) return undefined
+    const buffered = this.responsePrivateEvents.splice(0)
+    if (!ok) return undefined
+    const events = [...(explicit ?? []), ...buffered]
+    return events.length > 0 ? events : undefined
+  }
+
+  private buildEngineExecutionContext(player: PlayerState, space: ActionSpace) {
+    return {
+      state: this.state,
+      player,
+      space,
+      emitPrivateEvent: (event: PrivateGameEvent) => this.emitResponsePrivateEvent(event),
+    }
   }
 
   /**
@@ -2611,7 +2639,7 @@ export class GameCore {
         frame.deferredPlayerSwitch = null
       }
       const before = this.clonePlayer(player)
-      const step = frame.engine.proceed({ state: this.state, player, space })
+      const step = frame.engine.proceed(this.buildEngineExecutionContext(player, space))
       this.flushEngineLog()
 
       if (step.type === 'blocked' && step.mandatory === true && step.actionId) {
@@ -2739,7 +2767,10 @@ export class GameCore {
             const auto = autoOptions[0]
             if (auto?.disabled === true) return
             const resolvedActionId = this.peekHostPendingActionId()
-            const result = frame.engine.resolveChoice(auto.value, { state: this.state, player, space })
+            const result = frame.engine.resolveChoice(
+              auto.value,
+              this.buildEngineExecutionContext(player, space),
+            )
             this.flushEngineLog()
             if (result.type === 'ok' && resolvedActionId && !isInjectedAnytimeResult(result)) {
               this.recordActionResultDetails(result, frameOwnerPlayer.id, player.id)
@@ -3074,6 +3105,7 @@ export class GameCore {
         const cardFlow = cardEffect.resolveChoice(this.state, player, value, {
           sourceCard: pendingSourceCard,
           actionContext: pendingActionContext,
+          emitPrivateEvent: (event) => this.emitResponsePrivateEvent(event),
         })
         if (cardFlow && this.engine) {
           // Insert the follow-up so it runs after the engine finishes resolving the choice.
@@ -3083,7 +3115,11 @@ export class GameCore {
       }
     }
     const resolvedActionId = this.peekHostPendingActionId()
-    const result = this.engine.resolveChoice(value, { state: this.state, player, space }, payload)
+    const result = this.engine.resolveChoice(
+      value,
+      this.buildEngineExecutionContext(player, space),
+      payload,
+    )
     this.flushEngineLog()
     if (result.type === 'ok' && resolvedActionId && !isInjectedAnytimeResult(result)) {
       this.recordActionResultDetails(
@@ -3110,7 +3146,12 @@ export class GameCore {
       this.turnOwnerPlayerIndex = null
       return this.respond(false, result.errorKey ?? 'action failed')
     }
-    this.runEngineSteps()
+    this.deferPrivateEventDrainDepth += 1
+    try {
+      this.runEngineSteps()
+    } finally {
+      this.deferPrivateEventDrainDepth -= 1
+    }
     return this.respond()
   }
 
@@ -3618,7 +3659,7 @@ export class GameCore {
 
     const result = this.engine.resolveChoice(
       'confirm',
-      { state: this.state, player: updatedPlayer, space },
+      this.buildEngineExecutionContext(updatedPlayer, space),
     )
     this.flushEngineLog()
     if (result.type === 'ok') {
@@ -3694,9 +3735,7 @@ export class GameCore {
       this.pushHistory()
       const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('resource-quantity')
       const result = this.engine?.resolveChoice('confirm', {
-        state: this.state,
-        player,
-        space,
+        ...this.buildEngineExecutionContext(player, space),
       }, { resourceCounts: counts })
       // Effect 校验失败应直接 respond(false)，pending envelope 保留，让前端再次提交合法选择。
       if (result?.type === 'fail') {
@@ -3756,9 +3795,7 @@ export class GameCore {
       this.pushHistory()
       const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('resource-batch-exchange')
       const result = this.engine?.resolveChoice('confirm', {
-        state: this.state,
-        player,
-        space,
+        ...this.buildEngineExecutionContext(player, space),
       }, { resourceBatchExchange: batch })
       if (result?.type === 'fail') {
         this.flushEngineLog()
@@ -3801,9 +3838,7 @@ export class GameCore {
       const choiceValue = cardIds.length > 0 ? 'confirm' : 'cancel'
       const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('selection')
       const result = this.engine?.resolveChoice(choiceValue, {
-        state: this.state,
-        player: this.state.players[playerIndex]!,
-        space,
+        ...this.buildEngineExecutionContext(this.state.players[playerIndex]!, space),
       }, { cards: cardIds })
       if (result?.type === 'ok') {
         this.recordActionResultDetails(
@@ -3851,9 +3886,7 @@ export class GameCore {
     const choiceValue = positions.length > 0 ? 'confirm' : 'cancel'
     const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('selection')
     const result = this.engine?.resolveChoice(choiceValue, {
-      state: this.state,
-      player: this.state.players[playerIndex]!,
-      space,
+      ...this.buildEngineExecutionContext(this.state.players[playerIndex]!, space),
     }, { positions: positionStrings })
     if (result?.type === 'ok') {
       this.recordActionResultDetails(

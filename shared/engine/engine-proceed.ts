@@ -61,6 +61,7 @@ type EngineContext = {
   state: ActionExecutionContext['state']
   player: ActionExecutionContext['player']
   space: ActionExecutionContext['space']
+  emitPrivateEvent?: ActionExecutionContext['emitPrivateEvent']
 }
 
 const hasLegacyLogSurface = (result: ActionExecutionResult): boolean => {
@@ -295,6 +296,7 @@ const buildOptionalPrompt = (
     params: actionNode.params,
     sourceCard: actionNode.sourceCard,
     actionContext: actionContextForNode(actionNode),
+    emitPrivateEvent: context.emitPrivateEvent,
   }
   const doable = int.hooks.applyIsDoable(
     { ...executionContext, ...currentEventReadContext(int), actionId: actionNode.actionId },
@@ -492,6 +494,7 @@ export function engineProceed(
           params: entry.actionNode.params,
           sourceCard: entry.actionNode.sourceCard,
           actionContext: actionContextForNode(entry.actionNode),
+          emitPrivateEvent: context.emitPrivateEvent,
         }
         const action = int.registry.get(entry.actionNode.actionId)
         if (!action) return null
@@ -687,6 +690,7 @@ export function engineProceed(
       params: node.params,
       sourceCard: replaceSourceCard,
       actionContext: actionContextForNode(node),
+      emitPrivateEvent: context.emitPrivateEvent,
     }
     const doable = int.hooks.applyIsDoable(
       { ...executionContext, ...currentEventReadContext(int), actionId: replacedActionId },

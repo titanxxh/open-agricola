@@ -16,7 +16,7 @@ describe('passOccupationToNextPlayer', () => {
     const p2 = mkPlayer('p2', [])
     const state = { players: [p1, p2] } as unknown as GameState
     const result = passOccupationToNextPlayer(state, p1, 'OCC_X')
-    expect(result).toEqual({ target: 'next', playerId: 'p2' })
+    expect(result).toEqual({ target: 'next', cardId: 'OCC_X', fromPlayerId: 'p1', targetPlayerId: 'p2' })
     expect(p1.occupationHand).toEqual(['OCC_Y'])
     expect(p2.occupationHand).toEqual(['OCC_X'])
   })
@@ -27,7 +27,7 @@ describe('passOccupationToNextPlayer', () => {
     const p3 = mkPlayer('p3', [])
     const state = { players: [p1, p2, p3] } as unknown as GameState
     const r = passOccupationToNextPlayer(state, p1, 'OCC_X')
-    expect(r).toEqual({ target: 'next', playerId: 'p2' })
+    expect(r).toEqual({ target: 'next', cardId: 'OCC_X', fromPlayerId: 'p1', targetPlayerId: 'p2' })
     expect(p2.occupationHand).toEqual(['OCC_X'])
     expect(p3.occupationHand).toEqual([])
   })
@@ -38,7 +38,7 @@ describe('passOccupationToNextPlayer', () => {
     const p3 = mkPlayer('p3', ['OCC_Z'])
     const state = { players: [p1, p2, p3] } as unknown as GameState
     const r = passOccupationToNextPlayer(state, p3, 'OCC_Z')
-    expect(r).toEqual({ target: 'next', playerId: 'p1' })
+    expect(r).toEqual({ target: 'next', cardId: 'OCC_Z', fromPlayerId: 'p3', targetPlayerId: 'p1' })
     expect(p1.occupationHand).toEqual(['OCC_Z'])
   })
 
@@ -46,7 +46,7 @@ describe('passOccupationToNextPlayer', () => {
     const p1 = mkPlayer('p1', ['OCC_X'])
     const state = { players: [p1] } as unknown as GameState
     const r = passOccupationToNextPlayer(state, p1, 'OCC_X')
-    expect(r).toEqual({ target: 'discard' })
+    expect(r).toEqual({ target: 'discard', cardId: 'OCC_X', fromPlayerId: 'p1' })
     expect(p1.occupationHand).toEqual([])
   })
 
@@ -55,7 +55,7 @@ describe('passOccupationToNextPlayer', () => {
     const p2 = mkPlayer('p2', [])
     const state = { players: [p1, p2] } as unknown as GameState
     const r = passOccupationToNextPlayer(state, p1, 'OCC_X')
-    expect(r).toEqual({ target: 'discard' })
+    expect(r).toEqual({ target: 'discard', fromPlayerId: 'p1' })
     expect(p1.occupationHand).toEqual(['OCC_Y'])
     expect(p2.occupationHand).toEqual([])
   })

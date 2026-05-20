@@ -781,7 +781,12 @@ export function maybeBuildChoiceCandidates(
 }
 
 export function buildChoiceExecutionContext(
-  context: { state: ActionExecutionContext['state']; player: ActionExecutionContext['player']; space: ActionExecutionContext['space'] },
+  context: {
+    state: ActionExecutionContext['state']
+    player: ActionExecutionContext['player']
+    space: ActionExecutionContext['space']
+    emitPrivateEvent?: ActionExecutionContext['emitPrivateEvent']
+  },
   base?: Pick<ActionExecutionContext, 'params' | 'costs' | 'sourceCard' | 'actionContext'> | null,
 ): ActionExecutionContext {
   return {
@@ -792,6 +797,7 @@ export function buildChoiceExecutionContext(
     costs: base?.costs,
     sourceCard: base?.sourceCard,
     actionContext: base?.actionContext,
+    emitPrivateEvent: context.emitPrivateEvent,
   }
 }
 

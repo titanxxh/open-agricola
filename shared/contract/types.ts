@@ -1,5 +1,6 @@
 import type { PromptKey } from './prompt-keys'
 import type { EventSink, GameEvent } from './events'
+import type { PrivateGameEvent } from './private-events'
 
 export type Resource = {
   wood: number
@@ -432,6 +433,7 @@ export type ActionExecutionContext = {
   params?: Record<string, unknown>
   sourceCard?: string
   actionContext?: Record<string, unknown>
+  emitPrivateEvent?: (event: PrivateGameEvent) => void
 }
 
 export type ActionMutationContext = ActionExecutionContext & {

@@ -4,6 +4,7 @@ import type { ActionChoiceOption, ActionDefinition, ActionFlow } from '../../con
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
 import { B146_Illusionist } from '../../cards-display/B/B146_Illusionist'
+import { cardEffectHandChangedEvent } from '../../session/private-hand-events'
 
 const CARD_ID = B146_Illusionist.id
 
@@ -34,13 +35,20 @@ const discardFromHandAction: ActionDefinition = {
       promptKey: 'ui.interactionDiscardFromHand',
     }
   },
-  resolveChoice: ({ player }, choice) => {
+  resolveChoice: ({ player, emitPrivateEvent }, choice) => {
     if (choice.startsWith('occ:')) {
       const cardId = choice.slice(4)
       if (!player.occupationHand.includes(cardId)) {
         return { type: 'fail', errorKey: 'log.actionFail' }
       }
       player.occupationHand = player.occupationHand.filter((id) => id !== cardId)
+      emitPrivateEvent?.(cardEffectHandChangedEvent(
+        player.id,
+        [cardId],
+        'occupation',
+        CARD_ID,
+        DISCARD_ACTION_ID,
+      ))
       return { type: 'ok' }
     }
     if (choice.startsWith('min:')) {
@@ -49,6 +57,13 @@ const discardFromHandAction: ActionDefinition = {
         return { type: 'fail', errorKey: 'log.actionFail' }
       }
       player.minorHand = player.minorHand.filter((id) => id !== cardId)
+      emitPrivateEvent?.(cardEffectHandChangedEvent(
+        player.id,
+        [cardId],
+        'minor',
+        CARD_ID,
+        DISCARD_ACTION_ID,
+      ))
       return { type: 'ok' }
     }
     return { type: 'fail', errorKey: 'log.actionFail' }
