@@ -48,6 +48,7 @@ type EngineContext = {
   state: ActionExecutionContext['state']
   player: ActionExecutionContext['player']
   space: ActionExecutionContext['space']
+  emitPrivateEvent?: ActionExecutionContext['emitPrivateEvent']
 }
 
 const hasLegacyLogSurface = (result: ActionExecutionResult): boolean => {
@@ -317,6 +318,7 @@ export function engineResolveChoice(
         params: child.params,
         sourceCard: child.sourceCard,
         actionContext: actionContextForNode(child),
+        emitPrivateEvent: context.emitPrivateEvent,
       }
       const replaceResult = int.hooks.applyComputeReplace({
         ...executionContext,

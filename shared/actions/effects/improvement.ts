@@ -61,6 +61,27 @@ type SuccessfulImprovementResult = Extract<ActionExecutionResult, { type: 'ok' |
 
 const resolveImprovementActionCardId = (_mode: ImprovementPlayMode) => 'improvement'
 
+const privateHandChangeContext = (
+  actionCardId: string | undefined,
+  kind: 'major' | 'minor',
+  improvementId: string,
+  trueAction?: boolean,
+): Record<string, unknown> | undefined => {
+  const context = trueAction === false ? { trueAction: false } as Record<string, unknown> : undefined
+  if (
+    kind === 'minor'
+    && actionCardId
+    && actionCardId !== improvementId
+    && actionCardId !== 'improvement'
+  ) {
+    return {
+      ...(context ?? {}),
+      privateHandChangeSourceCard: actionCardId,
+    }
+  }
+  return context
+}
+
 const readTrueAction = (
   params?: unknown,
   actionContext?: Record<string, unknown>,
@@ -432,7 +453,7 @@ const buildImprovementFlow = (
     costType,
     improvementKind: kind,
   }
-  const actionContext = trueAction === false ? { trueAction: false } : undefined
+  const actionContext = privateHandChangeContext(actionCardId, kind, id, trueAction)
   if (actionContext) {
     Object.assign(payActionContext, actionContext)
   }

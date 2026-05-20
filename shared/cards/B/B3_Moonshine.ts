@@ -4,6 +4,7 @@ import { passOccupationToNextPlayer } from '../helpers/pass-occupation'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { B3_Moonshine } from '../../cards-display/B/B3_Moonshine'
+import { cardEffectHandChangedEvent } from '../../session/private-hand-events'
 
 const CARD_ID = B3_Moonshine.id
 
@@ -48,7 +49,7 @@ export const B3_Moonshine_impl = {
     return flow
   },
 
-  resolveChoice: (state, player, choice, _ctx) => {
+  resolveChoice: (state, player, choice, ctx) => {
     const pick = readCardExtraData<string>(player, CARD_ID, KEY_OCC)
     if (!pick) return
 
@@ -63,7 +64,23 @@ export const B3_Moonshine_impl = {
     }
 
     if (choice === 'pass') {
-      passOccupationToNextPlayer(state, player, pick)
+      const result = passOccupationToNextPlayer(state, player, pick)
+      if (result.cardId) {
+        ctx.emitPrivateEvent?.(cardEffectHandChangedEvent(
+          result.fromPlayerId,
+          [result.cardId],
+          'occupation',
+          CARD_ID,
+        ))
+        if (result.target === 'next') {
+          ctx.emitPrivateEvent?.(cardEffectHandChangedEvent(
+            result.targetPlayerId,
+            [result.cardId],
+            'occupation',
+            CARD_ID,
+          ))
+        }
+      }
       writeCardExtraData(player, CARD_ID, KEY_OCC, undefined)
     }
   },

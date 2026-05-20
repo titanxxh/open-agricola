@@ -1,4 +1,5 @@
 import type { ActionFlow, FarmTilePosition, GameState, PlayerState, Resource } from '../contract/types'
+import type { PrivateGameEvent } from '../contract/private-events'
 import type { AnimalZone, PlayerScoreSummary, ScoreCategoryResult } from '../domain'
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
@@ -110,7 +111,11 @@ export type ResolveChoiceHandler = (
   state: GameState,
   player: PlayerState,
   choice: string,
-  ctx: { sourceCard: string; actionContext?: Record<string, unknown> },
+  ctx: {
+    sourceCard: string
+    actionContext?: Record<string, unknown>
+    emitPrivateEvent?: (event: PrivateGameEvent) => void
+  },
 ) => ActionFlow | void
 
 /** A discrete (cost, score) option offered by a costed bonus card.
