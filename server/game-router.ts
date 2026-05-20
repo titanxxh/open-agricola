@@ -14,6 +14,10 @@ import { validateSession, extractToken } from './auth.ts'
 import type { CustomCardData } from '../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../shared/custom-code/types.ts'
 import { defaultSandboxDeckIds, defaultSandboxPlayerNames } from '../shared/session/state-bootstrap.ts'
+import {
+  filterInteractionForViewer,
+  privateEventsForViewer,
+} from '../shared/session/interaction-privacy.ts'
 
 /**
  * Per-user HTTP game sessions, keyed by user ID.
@@ -155,13 +159,23 @@ const respondWith = (
   viewerPlayerId: string | null = null,
 ) => {
   const ctx = { engineStack: session.getEngineStack() }
+  const playerIds = resp.state.players.map((player) => player.id)
+  const privateEvents = viewerPlayerId === null
+    ? []
+    : privateEventsForViewer(resp.interaction, playerIds, viewerPlayerId, resp.privateEvents ?? [])
+  const { privateEvents: _privateEvents, ...publicResp } = resp
   const result: Record<string, unknown> = {
-    ...resp,
+    ...publicResp,
     state:
       viewerPlayerId != null
         ? serializeStateForPlayer(resp.state, viewerPlayerId, ctx)
         : serializeState(resp.state, ctx),
+    interaction:
+      viewerPlayerId != null
+        ? filterInteractionForViewer(resp.interaction, playerIds, viewerPlayerId)
+        : resp.interaction,
   }
+  if (privateEvents.length > 0) result.privateEvents = privateEvents
   // Include custom card definitions so the frontend can register them
   // in its card registry — custom cards render identically to built-in cards.
   const defs = session.getCustomCardDefs()
@@ -242,6 +256,7 @@ export const handleGameRoute = async (
         positions?: unknown[]
         cardIds?: unknown[]
         resourceCounts?: Partial<Record<keyof Resource, number>>
+        resourceBatchExchange?: unknown
       }
     }
     if (
@@ -249,7 +264,8 @@ export const handleGameRoute = async (
       !body.payload ||
       (!Array.isArray(body.payload.positions) &&
         !Array.isArray(body.payload.cardIds) &&
-        typeof body.payload.resourceCounts !== 'object')
+        typeof body.payload.resourceCounts !== 'object' &&
+        typeof body.payload.resourceBatchExchange !== 'object')
     ) {
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
@@ -528,6 +544,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
+    if (!enforceSeatBinding(req, res, body.playerIndex)) return true
     const { resp, result } = callAndRespond(req, s => s.devDrawCard(body.playerIndex!, body.cardId!))
     sendJson(res, resp.ok ? 200 : 400, result)
     return true

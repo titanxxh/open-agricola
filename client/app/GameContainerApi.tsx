@@ -29,6 +29,7 @@ import { InteractionBar } from '../components/interaction/InteractionBar'
 import { BrandMark } from '../components/common/BrandMark'
 import { ResourceLine } from '../components/common/ResourceLine'
 import { Section } from '../components/common/Section'
+import { PublicEventResourceAnimations } from '../components/effects/PublicEventResourceAnimations'
 import { DraftOverlay } from './draft/DraftOverlay'
 import {
   buildBakeExchangeInfo,
@@ -37,10 +38,18 @@ import {
 } from './bake-exchange-ui'
 import { getCardMeta } from '../services/card-meta'
 import {
+  applyPublicEventCancellationSnapshot,
   farmCommitErrorMessageKey,
+  filterPublicFarmHighlightsForPlayer,
+  filterPublicFenceHighlightsForPlayer,
   getCurrentlySelectableRoomKeys,
+  hasPublicEventHighlights,
   isDevModeAllowedFromQuery,
+  mergePublicEventHighlights,
+  mergePublicEventResourceAnimations,
   playerIdFromWsStatus,
+  removePublicEventHighlights,
+  removePublicEventResourceAnimations,
   type FarmCommitType,
   type WsStatus,
 } from './game-container-helpers'
@@ -49,6 +58,18 @@ import {
   buildStableDisplayMap,
   shouldShowAnimalDiscardPrompt,
 } from './hooks/use-animal-reorg-flow'
+import {
+  collectPrivateEventNotifications,
+  type PrivateEventNotification,
+} from './private-event-notifications'
+import {
+  buildEventNotificationStackItems,
+  collectNewPublicEventFeedback,
+  emptyPublicEventHighlightTargets,
+  type PublicEventHighlightTargets,
+  type PublicEventNotification,
+  type PublicEventResourceAnimation,
+} from './public-event-notifications'
 
 type RoundSlot = { round: number; action?: ActionSpace }
 
@@ -252,9 +273,20 @@ export const GameContainerApi = () => {
   }, [])
   const { user } = useAuth()
   const { transport, wsStatus, isWs, isReady, wsTransport } = useTransportSetup(lockedViewPlayerId, user?.displayName, isWsMode)
-  const { state, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, applySnapshot } =
+  const { state, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, privateEvents, applySnapshot } =
     useGameSync()
+  const privateEventNotificationBatchSeqRef = useRef(0)
+  const privateEventNotificationTimersRef = useRef<number[]>([])
+  const publicEventNotificationBatchSeqRef = useRef(0)
+  const publicEventNotificationTimersRef = useRef<number[]>([])
+  const publicEventHighlightTimersRef = useRef<number[]>([])
+  const publicEventResourceAnimationTimersRef = useRef<number[]>([])
+  const lastSeenPublicEventSeqRef = useRef<number | null>(null)
   const { locale } = useLocale()
+  const [privateEventNotifications, setPrivateEventNotifications] = useState<PrivateEventNotification[]>([])
+  const [publicEventNotifications, setPublicEventNotifications] = useState<PublicEventNotification[]>([])
+  const [publicEventHighlights, setPublicEventHighlights] = useState<PublicEventHighlightTargets>(() => emptyPublicEventHighlightTargets())
+  const [publicEventResourceAnimations, setPublicEventResourceAnimations] = useState<PublicEventResourceAnimation[]>([])
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
   const [showScoringPad, setShowScoringPad] = useState(false)
   const [devMode, setDevMode] = useState(() => isDevModeAllowedFromQuery(window.location.search))
@@ -282,6 +314,95 @@ export const GameContainerApi = () => {
   const headerRef = useRef<HTMLDivElement | null>(null)
   const [headerHeight, setHeaderHeight] = useState(0)
 
+  const clearPublicEventFeedbackTimers = useCallback(() => {
+    publicEventNotificationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
+    publicEventNotificationTimersRef.current = []
+    publicEventHighlightTimersRef.current.forEach((timer) => window.clearTimeout(timer))
+    publicEventHighlightTimersRef.current = []
+    publicEventResourceAnimationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
+    publicEventResourceAnimationTimersRef.current = []
+  }, [])
+
+  const clearPublicEventFeedback = useCallback(() => {
+    clearPublicEventFeedbackTimers()
+    setPublicEventNotifications([])
+    setPublicEventHighlights(emptyPublicEventHighlightTargets())
+    setPublicEventResourceAnimations([])
+  }, [clearPublicEventFeedbackTimers])
+
+  useEffect(() => () => {
+    privateEventNotificationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
+    privateEventNotificationTimersRef.current = []
+    clearPublicEventFeedbackTimers()
+  }, [clearPublicEventFeedbackTimers])
+
+  useEffect(() => {
+    if (privateEvents.length === 0) return
+    privateEventNotificationBatchSeqRef.current += 1
+    const notifications = collectPrivateEventNotifications(
+      privateEvents,
+      locale,
+      `batch-${privateEventNotificationBatchSeqRef.current}`,
+    )
+    if (notifications.length === 0) return
+    setPrivateEventNotifications((current) => [...notifications, ...current].slice(0, 4))
+    notifications.forEach((notification) => {
+      const timer = window.setTimeout(() => {
+        setPrivateEventNotifications((current) =>
+          current.filter((entry) => entry.id !== notification.id),
+        )
+        privateEventNotificationTimersRef.current = privateEventNotificationTimersRef.current.filter((entry) => entry !== timer)
+      }, 4500)
+      privateEventNotificationTimersRef.current.push(timer)
+    })
+  }, [privateEvents, locale])
+
+  useEffect(() => {
+    if (!state) return
+    const events = state.events ?? []
+    publicEventNotificationBatchSeqRef.current += 1
+    const batch = collectNewPublicEventFeedback(
+      events,
+      lastSeenPublicEventSeqRef.current,
+      locale,
+      `public-batch-${publicEventNotificationBatchSeqRef.current}`,
+    )
+    lastSeenPublicEventSeqRef.current = batch.nextCursor
+    if (hasPublicEventHighlights(batch.highlights)) {
+      setPublicEventHighlights((current) => mergePublicEventHighlights(current, batch.highlights))
+      const timer = window.setTimeout(() => {
+        setPublicEventHighlights((current) => removePublicEventHighlights(current, batch.highlights))
+        publicEventHighlightTimersRef.current = publicEventHighlightTimersRef.current.filter((entry) => entry !== timer)
+      }, 3200)
+      publicEventHighlightTimersRef.current.push(timer)
+    }
+    if (batch.resourceAnimations.length > 0) {
+      setPublicEventResourceAnimations((current) =>
+        mergePublicEventResourceAnimations(current, batch.resourceAnimations).slice(0, 12),
+      )
+      const timer = window.setTimeout(() => {
+        setPublicEventResourceAnimations((current) =>
+          removePublicEventResourceAnimations(current, batch.resourceAnimations),
+        )
+        publicEventResourceAnimationTimersRef.current =
+          publicEventResourceAnimationTimersRef.current.filter((entry) => entry !== timer)
+      }, 1400)
+      publicEventResourceAnimationTimersRef.current.push(timer)
+    }
+    if (batch.notifications.length > 0) {
+      setPublicEventNotifications((current) => [...batch.notifications, ...current].slice(0, 4))
+      batch.notifications.forEach((notification) => {
+        const timer = window.setTimeout(() => {
+          setPublicEventNotifications((current) =>
+            current.filter((entry) => entry.id !== notification.id),
+          )
+          publicEventNotificationTimersRef.current = publicEventNotificationTimersRef.current.filter((entry) => entry !== timer)
+        }, 4500)
+        publicEventNotificationTimersRef.current.push(timer)
+      })
+    }
+  }, [state, locale])
+
   const {
     pendingFenceEdges, setPendingFenceEdges, pendingPalisadeEdges,
     fencePlacementMode, setFencePlacementMode, fenceError, setFenceError,
@@ -300,6 +421,12 @@ export const GameContainerApi = () => {
 
   const handleSnapshot = useCallback((payload: GameSyncPayload) => {
     applySnapshot(payload)
+    applyPublicEventCancellationSnapshot(payload, {
+      clearPublicEventFeedback,
+      setLastSeenPublicEventSeq: (seq) => {
+        lastSeenPublicEventSeqRef.current = seq
+      },
+    })
     if (
       payload.interaction.stateId === 'wait' &&
       payload.interaction.request.kind === 'animal-reorg'
@@ -324,7 +451,7 @@ export const GameContainerApi = () => {
       setSowError(null)
       setPendingPositionSelections(new Set())
     }
-  }, [applySnapshot, setPendingFenceEdges, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError, setPendingPositionSelections])
+  }, [applySnapshot, clearPublicEventFeedback, setPendingFenceEdges, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError, setPendingPositionSelections])
 
   useEffect(() => {
     if (!isReady) return
@@ -887,6 +1014,18 @@ export const GameContainerApi = () => {
   const existingFenceSet = useMemo(() => new Set((displayPlayer?.fenceSegments ?? []).map((s) => s.edge)), [displayPlayer?.fenceSegments])
   const pendingFenceSet = useMemo(() => new Set(pendingFenceEdges), [pendingFenceEdges])
   const pendingPalisadeSet = useMemo(() => new Set(pendingPalisadeEdges), [pendingPalisadeEdges])
+  const highlightedActionIds = useMemo(
+    () => new Set(publicEventHighlights.actionIds),
+    [publicEventHighlights.actionIds],
+  )
+  const highlightedFarmTileKeys = useMemo(
+    () => filterPublicFarmHighlightsForPlayer(publicEventHighlights.farmTiles, displayPlayer?.id ?? ''),
+    [displayPlayer?.id, publicEventHighlights.farmTiles],
+  )
+  const highlightedFenceEdgeIds = useMemo(
+    () => filterPublicFenceHighlightsForPlayer(publicEventHighlights.fenceEdges, displayPlayer?.id ?? ''),
+    [displayPlayer?.id, publicEventHighlights.fenceEdges],
+  )
 
   const farmInteraction =
     interaction.stateId === 'wait' ? interaction.farm ?? null : null
@@ -1442,6 +1581,20 @@ export const GameContainerApi = () => {
     return <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>Loading...</div>
   }
 
+  const notificationStack = privateEventNotifications.length > 0 || publicEventNotifications.length > 0 ? (
+    <div className="event-notifications" role="status" aria-live="polite">
+      {buildEventNotificationStackItems(privateEventNotifications, publicEventNotifications).map((notification) => (
+        <div
+          key={notification.id}
+          className={notification.className}
+          data-kind={notification.kind}
+        >
+          {notification.message}
+        </div>
+      ))}
+    </div>
+  ) : null
+
   // Card-draft phase — render the draft overlay instead of the game board.
   // The locked URL-pinned player wins in WS mode; otherwise fall back to the
   // sandbox "self" (current player) so HTTP debugging still works.
@@ -1449,6 +1602,7 @@ export const GameContainerApi = () => {
     const meId = (isWs && localPlayerId) ? localPlayerId : (selfPlayer?.id ?? state.players[0]?.id ?? '')
     return (
       <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
+        {notificationStack}
         <DraftOverlay
           state={state}
           meId={meId}
@@ -1468,6 +1622,12 @@ export const GameContainerApi = () => {
 
   return (
     <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
+      {notificationStack}
+      <PublicEventResourceAnimations
+        animations={publicEventResourceAnimations}
+        displayPlayerId={displayPlayer.id}
+        locale={locale}
+      />
       {isHarvestFeedExchange && harvestPending && harvestFeedOptions.length > 0 && isInteractive ? (
         <div className="exchange-overlay">
           <div className="exchange-modal">
@@ -1716,7 +1876,7 @@ export const GameContainerApi = () => {
       >
         <div className="game-layout__left">
           <section className="board-panel board-action">
-            <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} />
+            <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} highlightedActionIds={highlightedActionIds} />
           </section>
         </div>
         <div className="game-layout__center">
@@ -1761,6 +1921,8 @@ export const GameContainerApi = () => {
               selectableOccupationIds={selectableOccupationIds} cardAvailability={cardAvailability} futureCardResources={futureCardResources} resolveChoice={resolveChoice}
               isInteractive={isInteractive}
               occupationHandSelection={occupationHandInteraction ?? undefined}
+              highlightedFarmTileKeys={highlightedFarmTileKeys}
+              highlightedFenceEdgeIds={highlightedFenceEdgeIds}
               onConfirmOccupationHandSelection={(ids) => {
                 if (!isInteractive) return
                 const pendingPlayerIndex =
@@ -1833,6 +1995,27 @@ export const GameContainerApi = () => {
                   if (!isInteractive) return
                   void transport
                     .commitSelection(interaction.playerIndex, { resourceCounts: counts })
+                    .catch((e) => console.error(e))
+                },
+                onCancel: () => {
+                  if (!isInteractive) return
+                  void transport.undoStep().catch((e) => console.error('undoStep error', e))
+                },
+              }
+            : null
+        }
+        resourceBatchExchangeSelect={
+          interaction.stateId === 'wait' &&
+          interaction.request.kind === 'resource-batch-exchange-select'
+            ? {
+                discardAvailableByResource: interaction.request.discardAvailableByResource,
+                receiveResources: interaction.request.receiveResources,
+                maxTotal: interaction.request.maxTotal,
+                promptKey: interaction.request.promptKey,
+                onConfirm: (payload) => {
+                  if (!isInteractive) return
+                  void transport
+                    .commitSelection(interaction.playerIndex, { resourceBatchExchange: payload })
                     .catch((e) => console.error(e))
                 },
                 onCancel: () => {

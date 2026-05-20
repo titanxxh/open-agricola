@@ -149,9 +149,11 @@ ESLint 三层强制（`eslint.config.js`）：
 
 `completedFeedingPhases` 在 `shared/session/phases/harvest.ts` 的 feeding phase 结束时 `+= 1`，等价于 BGA Globals 同款全局计数；A148/B86 等"按已完成收获 +1 容量"卡牌从此字段读取，避免再走 per-card post-play counter。
 
-`events` 是公共结构化规则事件流，位于 `GameState.log` 下层。后端规则执行时先写 `GameEvent`，再由 mapper 派生 UI log、动画提示、审计报告和未来 replay；`log` 仍是当前可见文字日志，不作为规则来源。`nextEventSeq` 是持久化事件序号游标，`normalizeState` 会丢弃不符合公开事件 envelope/schema/json/size guard 的旧事件并从最大 `seq` 继续。
+`events` 是公共结构化规则事件流，位于 `GameState.log` 下层。后端规则执行时先写 `GameEvent`，再由 mapper 派生 UI log、动画提示、审计报告和未来 replay；`log` 仍是当前可见文字日志，不作为规则来源。客户端还会按 `seq` 增量消费部分 public events，转成本地 transient notification、action/farm/fence highlight 和 resource animation；首次 snapshot 只初始化 cursor，不回放历史事件。该 cue 层只服务 UI 反馈，不作为规则来源。旧 action-result detail 也通过 `action.detailLogged` 这类公开事件进入 mapper，而不是直接把规则事实写进 `state.log`。`nextEventSeq` 是持久化事件序号游标，`normalizeState` 会丢弃不符合公开事件 envelope/schema/json/size guard 的旧事件并从最大 `seq` 继续。
 
-首版只允许 `visibility: 'public'` 的规则事件进入 `GameState.events`。私有 prompt、手牌、draft、living-hand 等 per-recipient 信息不写入公共事件流，仍通过现有 snapshot/privacy/pending 通道处理；未来如需 replay 私有视角，应新增独立的私有事件通道，而不是把私有 payload 塞进公共事件。
+Undo 的 public event cancellation 是同步响应 metadata，不写入 `GameState.events`。成功 undo 如果移除了已提交 public events，HTTP/WS payload 会带 `publicEventCancellations`，客户端用它清理当前 transient public feedback 并把 public event cursor 对齐到 undo 后 snapshot；普通 reconnect/getState 不重放旧 cancellation。
+
+首版只允许 `visibility: 'public'` 的规则事件进入 `GameState.events`。私有 prompt、手牌、draft、living-hand 等 per-recipient 信息不写入公共事件流，仍通过 snapshot/privacy/pending 通道处理。`privateEvents` 是独立的 per-viewer 同步附加层：只描述当前快照中目标玩家可见的私有提示和私有手牌/draft 更新（例如 `private.promptShown`、`private.handChanged`、`private.draftUpdated`），由客户端消费为短暂 UI 通知，不进入公共 replay 事件流，也不作为规则来源。卡牌效果导致的手牌变化通过 runtime-only response buffer 发出 `private.handChanged`，不写入 `ActionExecutionResult`、engine snapshot/history 或 `GameState.events`。
 
 `SerializedGameState` 是 `GameState` 的 JSON 网络/持久化形态，额外携带 `engineStack: EngineStackCursor` 便于跨进程恢复引擎光标。同步版本号 / 历史 / 房间连接 **不进** `GameState`。
 
@@ -181,7 +183,7 @@ type ClientCommand = (
   | { type: 'action'; spaceId }              // 放置工人 / 启动 anytime
   | { type: 'choice'; value; payload? }       // 统一的"选择"命令（含 farm/选格/分支）
   | { type: 'anytime'; actionId }
-  | { type: 'commitSelection'; playerIndex; payload: { positions?, cardIds? } }
+  | { type: 'commitSelection'; playerIndex; payload: { positions?, cardIds?, resourceCounts?, resourceBatchExchange? } }
   | { type: 'roundEnd' }
   | { type: 'undoStep' } | { type: 'undoAction' }
   | { type: 'newGame'; seed? } | { type: 'loadGame'; state }
@@ -193,7 +195,7 @@ type ClientCommand = (
 注意：
 
 - 没有独立的 `reorg` / `feed` / `nextPlayer` / `confirmPlayerSwitch` / `commitFarm` 命令。这些等待形态全部归并到 `choice` 命令，由 `payload` 携带具体形状（按 `InteractionRequest.kind` 决定）。
-- `commitSelection` 只为 farm-position / occupation-hand 两种定向选择保留单独入口。
+- `commitSelection` 只为 farm-position / occupation-hand / resource-quantity / resource-batch-exchange 这类带结构化 payload 的定向选择保留单独入口。
 
 ### 4.5 ServerEvent / StateUpdateEnvelope
 
@@ -218,7 +220,8 @@ type StateUpdateEnvelope = {
 
 type GameSyncPayload = {
   state: SerializedGameState
-  interaction: InteractionState
+  interaction: ClientInteractionState
+  privateEvents?: PrivateGameEvent[]
   scores: PlayerScoreSummary[] | null
   pastureCapacities?: Record<string, Record<string, number>>
   historyLength: number
@@ -231,7 +234,7 @@ type GameSyncPayload = {
 }
 ```
 
-**广播 vs 单播**：`stateUpdate` / `gameStarted` / `playerJoined` / `playerDisconnected` / `roomDissolved` 广播；`roomCreated` / `roomJoined` / `authOk` / 请求级 `error` 单播。
+**广播 vs 单播**：`stateUpdate` / `gameStarted` / `playerJoined` / `playerDisconnected` / `roomDissolved` 广播；`roomCreated` / `roomJoined` / `authOk` / 请求级 `error` 单播。WS 广播会按连接对应的 `viewerPlayerId` 构造 per-viewer payload：目标玩家收到真实私有 prompt 和 `privateEvents`，其他玩家收到 `private-prompt` redaction。HTTP sandbox 默认无 `X-Viewer-Player` 时保持未过滤多座位开发流；带 `X-Viewer-Player` 时使用同一套 viewer 过滤和 seat guard。
 
 ### 4.6 InteractionState — 前端唯一渲染真相
 
@@ -505,23 +508,23 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 **统一 cost 模型（`ComplexCost`）**：construct / renovation / fencing / plow / occupation / minor / major / pay leaf 全部走同一条 `computeAllBuyableCombinations` 管线。`ComplexCost` 字段语义：
 
 - `fees: Partial<Resource>[]` —— per-action 总固定费用。Renovation 的 `computeCosts` 总成本 delta（D154_ChimneySweep `{stone:-2}`、D121_ClayPlasterer `{clay:-(rooms-1)}`、D81_RoofLadder `{reed:-1}`）写入 `fees[0]`。负值在 `enumerate` 内部 `mergeResources(fees[0], unitFee*nb)` 后 clamp 到 0，避免对 unrelated resource 退款。
-- `unitFee: Partial<Resource>` + `nb: number` —— per-unit × 数量。Construct 的每间房 `{wood: rooms_cost, reed: 1_per_pile_or_room}`、renovation 的 `{[material]: 1}`、fencing 的 `{wood: 1}` 都落在 `unitFee`，`nb` 是行动同时处理的单位数（建房间数 / fence 段数）。enumerate 用 `scaleResources(unitFee, nb)` 把 per-unit 部分展平后并入 `fees[0]`。
-- `trades: Trade[]` —— 资源替换选项（`from → to`），由 `TradeModifier` 经 `applyCostModifiers` 注入。`Trade.scope: 'action' | 'unit'` 控制 sigma-times 约束：scope:'action' 只限 `max` 上限；scope:'unit' 额外满足 Σ-times ≤ nb（每个单位最多换一次），让 A123_FrameBuilder 的 per-room wood-for-clay swap 严格按每间房一次裁定。
+- `unitFee: Partial<Resource>` + `nb: number` —— per-unit × 数量。Construct 的每间房 `{wood: rooms_cost, reed: 1_per_pile_or_room}`、renovation 的 `{[material]: 1}`、fencing 的 `{wood: 1}` 都落在 `unitFee`，`nb` 是行动同时处理的单位数（建房间数 / fence 段数）。enumerate 先对每个 unit cost row 生成有序替换后的可选行，再组合成总成本。
+- `trades: Trade[]` —— 资源替换选项（`from → to`），由 `TradeModifier` 经 `applyCostModifiers` 注入。`Trade.scope: 'action' | 'unit'` 控制替换位置：scope:'action' 在玩家资源池上做 per-action 转换；scope:'unit' 按 `order` 作用在每个 unit cost row 上。`replaceUpTo` 支持 B145_BrushwoodCollector 这类“把当前行里 1 或 2 reed 都替换成 1 wood”的 BGA `addCost` 形态。
 - `bonuses: Bonus[]` —— per-action 折扣 / 多选折扣（`{discount}` 单一折扣；`{choices: BonusChoice[]}` 多选）。`Bonus.optional` 决定 enumerate 是否生成"不应用 bonus"分支。
 - `bonuses[].conditions?: Record<string, number>` —— `applyCostModifiers` 把 BonusModifier.conditions 透传到生成的 Bonus，enumerate 用 `evaluateConditions(player, conditions, nb)` 重新评估 nb-aware 约束（如 C13_WoodSlideHammer `minNumRooms: 5`）。
 
 **两层 condition 评估**（`cost-modifiers.ts`）：
 
 - `evaluateStaticConditions(player, conditions)` —— 仅依赖 player 当前状态的静态判定（`houseTypeWood/Clay/Stone`）。
-- `evaluateConditions(player, conditions, nb)` —— 在 static 之上再判定 nb-aware 约束（`minNumRooms`）。enumerate 在生成 trade 组合（unit-scope DFS）和 bonus 应用时调用。
+- `evaluateConditions(player, conditions, nb)` —— 在 static 之上再判定 nb-aware 约束（`minNumRooms`）。enumerate 在生成 payment 分支和 bonus 应用时调用。
 - `getModifiersForCostType(player, costType)` —— 只用 static-only filter（`evaluateStaticConditions`），不再读 `player.rooms`。nb-aware 决策延后到 enumerate，确保 construct 的 `nb=rooms-to-build` 和 renovation 的 `nb=player.rooms` 都能正确驱动 `minNumRooms` gate。
 
 **`Trade.scope`**：
 
-| scope | sigma-times 约束 | max 默认 | 典型用例 |
+| scope | 应用位置 | max 默认 | 典型用例 |
 |---|---|---|---|
-| `action` | 无（每个 trade 独立到 `max`） | `?? 1` | A28_ForestSchool（lessons cost）、A88_HedgeKeeper（fencing 全部 3 段一次换）、E60_WorkingGloves（grouped exchange，未来加 groupMax）|
-| `unit` | Σ-times ≤ `nb` | defer to `nb`（无 `max` 时上限 = nb）| A123_FrameBuilder（每间房一次 wood-for-clay/stone）、D15_ClaySupports（每间房 wood-for-{clay,reed}）、B145_BrushwoodCollector construct 分支（每间房 wood-for-reed）|
+| `action` | 玩家资源池（每个 trade 独立到 `max`） | `?? 1` | A28_ForestSchool（lessons cost）、A88_HedgeKeeper（fencing 全部 3 段一次换）、E60_WorkingGloves（grouped exchange，未来加 groupMax）|
+| `unit` | 每个 unit cost row，按 `order` 有序展开 | `?? 1`（每个 row）| A123_FrameBuilder（每间房一次 wood-for-clay/stone）、D15_ClaySupports（每间房 wood-for-{clay,reed}）、B145_BrushwoodCollector construct 分支（每间房 wood-for-reed）|
 
 scope:'unit' MUST NOT 携带 `conditions.minNumRooms`（per-unit 没有 min-unit 阈值）；`validateTradeModifier` 在 `applyCostModifiers` 入口处强制此不变量。
 
@@ -533,7 +536,7 @@ scope:'unit' MUST NOT 携带 `conditions.minNumRooms`（per-unit 没有 min-unit
 
 **Renovation 对齐**（`shared/actions/effects/renovation.ts`）：`buildRenovationPlan` 直接返回 `ComplexCost`（`fees:[{reed:1}], unitFee:{[material]:1}, nb:player.rooms`）。`computeCosts` hook 的 `costs` 通过 `mergeRenovationCost` 落到 `fees[0]`；负 delta（D154 等）在 enumerate baseFee 合并后 clamp。`canAffordTypedFlatCost` / `payTypedFlatCost` / `payTypedFlatCostDetailed`（`typed-flat.ts`）接受 `Partial<Resource> | ComplexCost`，统一走 `computeAllBuyableCombinations` 单管线（之前的 `resolveSimpleTradeAdjustedCost` 已删除）。
 
-D15_ClaySupports clay→reed trade 仅当 `houseTypeClay > 0` 时生效；A123_FrameBuilder 的 construct 拆成两个 `scope:'unit'` TradeModifier（wood→clay / wood→stone），用 `houseTypeClay` / `houseTypeStone` 锁定方向，renovation 仍是 BonusModifier（单次 per-action 互斥选择，BGA 等价）。
+D15_ClaySupports clay→reed trade 仅当 `houseTypeClay > 0` 时生效；A123_FrameBuilder 的 construct 拆成两个 `scope:'unit'` TradeModifier（wood→clay / wood→stone），用 `houseTypeClay` / `houseTypeStone` 锁定方向；B145_BrushwoodCollector construct 用 `replaceUpTo` 覆盖 1/2 reed 行。renovation 仍走 BonusModifier（单次 per-action 互斥选择，BGA 等价）。
 
 ### 7.5 Hook 系统：行动生命周期 phase（11 个）
 
@@ -556,7 +559,7 @@ anytime                  额外注册的 anytime 行动
 
 `ActionHookResult { doable?, actionId?, extraOptions?, followUpActions?, flow?, costs?, sourceCard? }`。规则事实写入 `GameState.events`，不要再为单卡补日志字段。
 
-当前事件覆盖已包括资源主干（collect/gain/pay/exchange）、农场主干（sow/plow/construct/stables/fencing/reap/breed/reorganize）、worker 放置/返家/新生儿、round/work/return-home/harvest phase、action reveal/accumulate、future meeple 以及 `special-effect` mutation 分支。`state.log` 作为 UI 缓存保留，由事件 mapper 和 session cache writer 派生；业务代码不再通过旧日志字段记录规则事实。
+当前事件覆盖已包括资源主干（collect/gain/pay/exchange）、农场主干（sow/plow/construct/stables/fencing/reap/breed/reorganize）、worker 放置/返家/新生儿、round/work/return-home/harvest phase、action reveal/accumulate、future meeple、legacy action detail 以及 `special-effect` mutation 分支。`state.log` 作为 UI 缓存保留，由事件 mapper 和 session cache writer 派生；业务代码不再通过旧日志字段记录规则事实。
 
 `sourceCard` 兜底：`ActionHookResult.flow` 顶层 `sourceCard` 递归补到缺失 child leaf；组合 pending / leaf request 写入 `PendingEnvelope.sourceCard`，`SessionCore` 透传到 `interaction`。
 

@@ -10,6 +10,7 @@ export type CardListenerContext = ActionExecutionContext & {
   actionId: string
   phase: ActionHookPhase
   transactionEvents: readonly (GameEvent | DraftGameEvent)[]
+  actionEvents?: readonly (GameEvent | DraftGameEvent)[]
   eventQuery: EventQuery
   result?: ActionExecutionResult
   choice?: string
@@ -24,8 +25,8 @@ export type CardListenerContext = ActionExecutionContext & {
 }
 
 export type CardListenerContextInput =
-  Omit<CardListenerContext, 'transactionEvents' | 'eventQuery'> &
-  Partial<Pick<CardListenerContext, 'transactionEvents' | 'eventQuery'>>
+  Omit<CardListenerContext, 'transactionEvents' | 'actionEvents' | 'eventQuery'> &
+  Partial<Pick<CardListenerContext, 'transactionEvents' | 'actionEvents' | 'eventQuery'>>
 
 export type CardListenerScope = 'player' | 'opponent' | 'any'
 export type CardListenerDispatchMode = 'serial' | 'select'

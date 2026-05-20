@@ -1,6 +1,8 @@
 import type {
+  ActionDetailLoggedEvent,
   CardPlayedEvent,
   FarmFenceBuiltEvent,
+  FutureMeepleQueuedEvent,
   FarmRenovatedEvent,
   FarmStableBuiltEvent,
   GameEvent,
@@ -31,16 +33,75 @@ const actionDetailLog = (
   playerId: string | undefined,
   actionId: string | undefined,
   detailParts: ActionDetailParts,
+  extraParams: Record<string, unknown> = {},
 ): LogEntry => ({
   key: 'log.actionDetail',
   params: {
     player: playerName(ctx, playerId),
     action: actionName(ctx, actionId),
     detailParts,
+    ...extraParams,
   },
 })
 
-const mapResourceMoved = (event: ResourceMovedEvent, ctx: EventLogMapperContext): LogEntry | null => {
+const containingActionId = (
+  events: readonly GameEvent[],
+  event: GameEvent,
+  fallback: string | undefined,
+): string | undefined => {
+  const placed = [...events]
+    .filter((candidate): candidate is WorkerPlacedEvent =>
+      candidate.type === 'worker.placed' &&
+      candidate.seq < event.seq &&
+      candidate.actorPlayerId === event.actorPlayerId,
+    )
+    .sort((left, right) => right.seq - left.seq)[0]
+  return placed?.sourceActionId ?? fallback
+}
+
+const relatedCardEffectCosts = (
+  events: readonly GameEvent[],
+  event: ResourceMovedEvent,
+): Partial<Resource> => {
+  if (event.reason !== 'collect' || event.to.kind !== 'player') return {}
+  const targetPlayerId = event.to.playerId
+  const placed = [...events]
+    .filter((candidate): candidate is WorkerPlacedEvent =>
+      candidate.type === 'worker.placed' &&
+      candidate.seq < event.seq &&
+      candidate.actorPlayerId === event.actorPlayerId,
+    )
+    .sort((left, right) => right.seq - left.seq)[0]
+  const startSeq = placed?.seq ?? -1
+  const endSeq = [...events]
+    .filter((candidate): candidate is WorkerPlacedEvent =>
+      candidate.type === 'worker.placed' &&
+      candidate.seq > event.seq,
+    )
+    .sort((left, right) => left.seq - right.seq)[0]?.seq ?? Number.POSITIVE_INFINITY
+  const costs: Partial<Resource> = {}
+  events.forEach((candidate) => {
+    if (
+      candidate.type !== 'resource.moved' ||
+      candidate.reason !== 'cardEffect' ||
+      candidate.seq <= startSeq ||
+      candidate.seq >= endSeq ||
+      candidate.from.kind !== 'player' ||
+      candidate.from.playerId !== targetPlayerId
+    ) return
+    Object.entries(positiveResources(candidate.resources)).forEach(([key, amount]) => {
+      const resource = key as keyof Resource
+      costs[resource] = (costs[resource] ?? 0) + (amount ?? 0)
+    })
+  })
+  return costs
+}
+
+const mapResourceMoved = (
+  events: readonly GameEvent[],
+  event: ResourceMovedEvent,
+  ctx: EventLogMapperContext,
+): LogEntry | null => {
   if (event.to.kind !== 'player') return null
 
   const gain = positiveResources(event.resources)
@@ -67,7 +128,18 @@ const mapResourceMoved = (event: ResourceMovedEvent, ctx: EventLogMapperContext)
     }
   }
 
-  return actionDetailLog(ctx, event.to.playerId, event.sourceActionId ?? event.reason, { gains: gain })
+  const costs = relatedCardEffectCosts(events, event)
+  return actionDetailLog(
+    ctx,
+    event.to.playerId,
+    event.from.kind === 'actionSpace'
+      ? containingActionId(events, event, event.from.spaceId)
+      : event.sourceActionId ?? event.reason,
+    {
+      gains: gain,
+      ...(Object.keys(costs).length ? { costs } : {}),
+    },
+  )
 }
 
 const mapWorkerPlaced = (event: WorkerPlacedEvent, ctx: EventLogMapperContext): LogEntry | null => {
@@ -107,6 +179,21 @@ const mapHarvestPhaseStarted = (event: HarvestPhaseStartedEvent): LogEntry => {
   return { key: 'log.harvestPhaseBreed' }
 }
 
+const mapFutureMeepleQueued = (
+  event: FutureMeepleQueuedEvent,
+  ctx: EventLogMapperContext,
+): LogEntry | null => {
+  const sourceSummary = event.sourceSummary
+  if (!sourceSummary) return null
+  return {
+    key: sourceSummary.key,
+    params: {
+      player: playerName(ctx, event.playerId),
+      ...sourceSummary.params,
+    },
+  }
+}
+
 const cardPaymentFor = (
   events: readonly GameEvent[],
   played: CardPlayedEvent,
@@ -137,21 +224,6 @@ const paymentForEvent = (
       candidate.paymentFor === paymentFor,
     )
     .sort((left, right) => right.seq - left.seq)[0]
-
-const containingActionId = (
-  events: readonly GameEvent[],
-  event: GameEvent,
-  fallback: string | undefined,
-): string | undefined => {
-  const placed = [...events]
-    .filter((candidate): candidate is WorkerPlacedEvent =>
-      candidate.type === 'worker.placed' &&
-      candidate.seq < event.seq &&
-      candidate.actorPlayerId === event.actorPlayerId,
-    )
-    .sort((left, right) => right.seq - left.seq)[0]
-  return placed?.sourceActionId ?? fallback
-}
 
 const mapCardPlayed = (
   event: CardPlayedEvent,
@@ -186,6 +258,7 @@ const mapFarmRenovated = (
   actionDetailLog(ctx, event.actorPlayerId ?? event.playerId, event.sourceActionId ?? 'renovate-house', {
     costs: positiveResources(payment?.resources ?? {}),
     effects: { renovate: { from: event.from, to: event.to } },
+    ...(payment?.bonusSources?.length ? { bonusSources: payment.bonusSources } : {}),
   })
 
 const mapStableBuilt = (
@@ -204,6 +277,12 @@ const mapStableBuilt = (
     },
   )
 
+const mapActionDetailLogged = (
+  event: ActionDetailLoggedEvent,
+  ctx: EventLogMapperContext,
+): LogEntry =>
+  actionDetailLog(ctx, event.playerId, event.actionId, event.detailParts)
+
 export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMapperContext): LogEntry[] => {
   const consumedPaymentSeqs = new Set<number>()
   return [...events]
@@ -216,7 +295,7 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
       }
 
       if (event.type === 'resource.moved') {
-        const entry = mapResourceMoved(event, ctx)
+        const entry = mapResourceMoved(events, event, ctx)
         return entry ? [entry] : []
       }
 
@@ -236,7 +315,7 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
         return [{
           key: 'log.cardGrantedAction',
           params: {
-            player: playerName(ctx, event.playerId),
+            player: playerName(ctx, event.playerId ?? event.actorPlayerId ?? event.targetPlayerId),
             actionId: event.actionId,
             cardId: event.cardId,
           },
@@ -280,6 +359,11 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
             food: event.food,
           },
         }]
+      }
+
+      if (event.type === 'futureMeeple.queued') {
+        const entry = mapFutureMeepleQueued(event, ctx)
+        return entry ? [entry] : []
       }
 
       if (event.type === 'game.started') {
@@ -383,6 +467,9 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
           return [
             actionDetailLog(ctx, event.actorPlayerId, event.sourceActionId ?? event.paymentFor, {
               costs: cost,
+              ...(event.bonusSources?.length ? { bonusSources: event.bonusSources } : {}),
+            }, {
+              ...(event.bonusChoiceIndex ? { bonusChoiceIndex: event.bonusChoiceIndex } : {}),
             }),
           ]
         }
@@ -397,6 +484,42 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
             },
           },
         ]
+      }
+
+      if (event.type === 'action.revealed') {
+        return [{
+          key: 'log.actionRevealed',
+          params: {
+            action: actionName(ctx, event.actionId),
+            roundSlot: event.roundSlot,
+          },
+        }]
+      }
+
+      if (event.type === 'action.exclusiveUseSet') {
+        return [{
+          key: 'log.actionExclusiveUseSet',
+          params: {
+            player: playerName(ctx, event.playerId),
+            action: actionName(ctx, event.actionId),
+            cardId: event.sourceCardId,
+          },
+        }]
+      }
+
+      if (event.type === 'action.exclusiveUseCleared') {
+        return [{
+          key: 'log.actionExclusiveUseCleared',
+          params: {
+            player: playerName(ctx, event.playerId),
+            action: actionName(ctx, event.actionId),
+            cardId: event.sourceCardId,
+          },
+        }]
+      }
+
+      if (event.type === 'action.detailLogged') {
+        return [mapActionDetailLogged(event, ctx)]
       }
 
       return []

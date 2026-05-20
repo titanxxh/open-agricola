@@ -242,6 +242,7 @@ type Props = {
   takeAction: (space: ActionSpace) => void
   currentRound: number
   devMode: boolean
+  highlightedActionIds?: ReadonlySet<string>
 }
 
 type TooltipInfo = {
@@ -339,6 +340,7 @@ const getHarvestPositions = (playerCount: 2 | 3 | 4): Record<number, SlotPos> =>
 export const ActionBoard = ({
   locale, baseActions, roundSlots, currentPlayer, players,
   futureMeeples, canTakeAction, takeAction, currentRound, devMode,
+  highlightedActionIds = new Set<string>(),
 }: Props) => {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(1)
@@ -483,6 +485,17 @@ export const ActionBoard = ({
     )
   }
 
+  const renderExclusiveUseMarker = (space: ActionSpace) => {
+    const exclusive = space.exclusiveUse
+    if (!exclusive) return null
+    const owner = playerById.get(exclusive.playerId)
+    return (
+      <div className="action-exclusive-use" data-player-color={owner?.color}>
+        {owner?.name ?? exclusive.playerId}
+      </div>
+    )
+  }
+
   const renderFarmerHolder = (space: ActionSpace) => {
     const markers = farmerMarkersBySpace.get(space.id)
     // Fallback: if there are no custom markers for this space, synthesize one
@@ -576,6 +589,7 @@ export const ActionBoard = ({
                   accDir && `accumulate-${accDir}`,
                   hasFarmer && !canTake && 'taken',
                   hasFarmer && canTake && 'occupied-available',
+                  highlightedActionIds.has(space.id) && 'event-highlight',
                 ].filter(Boolean).join(' ')}
                 data-action-id={space.id}
                 style={{ position: 'absolute', top: pos.top, left: pos.left, width: pos.width, height: pos.height }}
@@ -600,6 +614,7 @@ export const ActionBoard = ({
                 {renderResourceHolder(space)}
                 {renderFarmerHolder(space)}
                 {renderStableMarker(space)}
+                {renderExclusiveUseMarker(space)}
               </div>
             )
           })}
@@ -609,6 +624,7 @@ export const ActionBoard = ({
             if (!pos) return null
             const isOpen = devMode || currentRound >= slot.round
             const action = slot.action
+            const isExclusiveVisible = !!action?.exclusiveUse && currentRound < slot.round
             const accDir = action ? ACCUMULATE_DIR[action.id] : undefined
             const canTake = action ? canTakeAction(action, currentPlayer) : false
             const hasFarmer = action
@@ -620,13 +636,15 @@ export const ActionBoard = ({
                 className="turn-action-container"
                 style={{ position: 'absolute', top: pos.top, left: pos.left, width: ROUND_SLOT_SIZE, height: ROUND_SLOT_SIZE }}
               >
-                {action && isOpen ? (
+                {action && (isOpen || isExclusiveVisible) ? (
                   <div
                     className={[
                       'action-card-holder round',
+                      isExclusiveVisible && 'exclusive-locked',
                       accDir && `accumulate-${accDir}`,
                       hasFarmer && !canTake && 'taken',
                       hasFarmer && canTake && 'occupied-available',
+                      highlightedActionIds.has(action.id) && 'event-highlight',
                     ].filter(Boolean).join(' ')}
                     data-action-id={action.id}
                     onMouseEnter={(e) => showTooltip(e, action)}
@@ -649,6 +667,7 @@ export const ActionBoard = ({
                     </button>
                     {renderResourceHolder(action, true)}
                     {renderFarmerHolder(action)}
+                    {renderExclusiveUseMarker(action)}
                   </div>
                 ) : (
                   <div className="turn-number-placeholder">
@@ -711,6 +730,7 @@ export const ActionBoard = ({
                     className={space.takenBy.length > 0 ? 'taken' : ''}
                   />
                   {renderFarmerHolder(space)}
+                  {renderExclusiveUseMarker(space)}
                   {owner && (
                     <div className="player-action-card-owner" data-player-color={owner.color}>
                       {owner.name}

@@ -240,6 +240,113 @@ describe('InteractionBar', () => {
     expect(onCancel).toHaveBeenCalledTimes(1)
   })
 
+  it('renders resource batch exchange selection inside the interaction bar', () => {
+    const html = renderToStaticMarkup(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={null}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={0}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+        resourceBatchExchangeSelect={{
+          discardAvailableByResource: { wood: 2, clay: 1 },
+          receiveResources: ['wood', 'clay', 'reed', 'stone'],
+          maxTotal: 4,
+          onConfirm: noop,
+          onCancel: noop,
+        }}
+      />,
+    )
+
+    expect(html).toContain('resource-batch-exchange-panel')
+    expect(html).toContain('Exchange building resources')
+    expect(html).toContain('Discard Wood (max 2)')
+    expect(html).toContain('Receive Stone')
+  })
+
+  it('renders redacted private prompts as waiting without the batch exchange form', () => {
+    const html = renderToStaticMarkup(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={null}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={false}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={0}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+        resourceBatchExchangeSelect={null}
+      />,
+    )
+
+    expect(html).toContain('Waiting')
+    expect(html).not.toContain('resource-batch-exchange-panel')
+    expect(html).not.toContain('Exchange building resources')
+  })
+
   it('renders top controls and anytime actions above pending content', () => {
     const html = renderToStaticMarkup(
       <InteractionBar

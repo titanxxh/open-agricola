@@ -1,5 +1,5 @@
 import type { ActionDefinition, PlayerState, Resource } from '../../contract/types'
-import type { EventSink } from '../../contract/events'
+import type { EventSink, ResourceLocation } from '../../contract/events'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { gainConfigByActionId } from '../factories/gain'
 import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resources'
@@ -37,6 +37,7 @@ const emitGainEvent = (
   sourceCard?: string,
   actorPlayerId?: string,
   payer?: { playerId: string; resources: Partial<Resource> },
+  sourceLocation?: ResourceLocation,
 ) => {
   const gained = positiveResources(resources)
   const paid = payer ? positiveResources(payer.resources) : {}
@@ -48,6 +49,8 @@ const emitGainEvent = (
     resources: eventResources,
     from: usePayer
       ? { kind: 'player', playerId: payer.playerId }
+      : sourceLocation
+      ? sourceLocation
       : sourceCard
       ? { kind: 'card', playerId: actorPlayerId, cardId: sourceCard }
       : { kind: 'supply' },
@@ -64,7 +67,7 @@ export const gainAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ state, player, space, params, sourceCard, eventSink }) => {
+  execute: ({ state, player, space, params, sourceCard, actionContext, eventSink }) => {
     const {
       recipientPlayerId,
       recipientMode,
@@ -126,6 +129,7 @@ export const gainAction: ActionDefinition = {
         sourceCard,
         player.id,
         payerId ? { playerId: payerId, resources: paid } : undefined,
+        actionContext?.sourceLocation as ResourceLocation | undefined,
       )
       if (recipient.id === player.id) {
         trackWorkPhaseBuildingResources(state, recipient.id, gained)

@@ -4,6 +4,7 @@ import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples
 import type { FutureMeepleRequest } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E47_SyrupTap } from '../../cards-display/E/E47_SyrupTap'
+import { hasResourceMovedFromActionSpace } from '../helpers/event-provenance'
 
 const CARD_ID = E47_SyrupTap.id
 
@@ -18,11 +19,15 @@ const afterCollectListener: CardListenerRegistration = {
   id: 'E47-syrup-tap-after-collect',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const gained =
-      context.result?.type === 'ok' ? context.result.resourcesGained : undefined
-    if (!gained || (gained.wood ?? 0) <= 0) return
+    if (context.sourceCard === CARD_ID) return
+
+    const gainedWoodFromActionSpace = hasResourceMovedFromActionSpace(
+      context.transactionEvents,
+      'wood',
+      (event) => event.to.kind === 'player' && event.to.playerId === context.player.id,
+    )
+    if (!gainedWoodFromActionSpace) return
 
     const nextRound = context.state.round + 1
     if (nextRound > 14) return

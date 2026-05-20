@@ -86,9 +86,9 @@ describe('A88_HedgeKeeper fencing regression — scope:action default, max=3, nb
     expect(sols.length).toBe(0)
   })
 
-  it('Σ-times constraint NOT applied (nb absent for fencing); swap count bounded only by trade.max=3', () => {
-    // Even with abundant wood, the Σ-times ≤ nb constraint should NOT apply
-    // because nb is undefined for fencing costs. Action-scope cap = trade.max.
+  it('action-scope fencing trade is bounded only by trade.max=3', () => {
+    // A88 is an action-scope trade on the total fencing cost, so the cap is
+    // trade.max rather than a per-unit cost-row rule.
     const sols = computeAllBuyableCombinations(
       mkPlayer({ wood: 5 }, [a88]),
       { fee: { wood: 5 } },

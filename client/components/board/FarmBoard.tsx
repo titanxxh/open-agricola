@@ -267,6 +267,8 @@ export type FarmBoardProps = {
     maxSelections: number
   }
   onConfirmOccupationHandSelection?: (cardIds: string[]) => void
+  highlightedFarmTileKeys?: ReadonlySet<string>
+  highlightedFenceEdgeIds?: ReadonlySet<string>
 }
 
 type TooltipPosition = {
@@ -552,6 +554,8 @@ export const FarmBoard = ({
   isInteractive,
   occupationHandSelection,
   onConfirmOccupationHandSelection,
+  highlightedFarmTileKeys = new Set<string>(),
+  highlightedFenceEdgeIds = new Set<string>(),
 }: FarmBoardProps) => {
   const canInteractHand = displayPlayer.id === currentPlayer.id && isInteractive
 
@@ -598,7 +602,7 @@ export const FarmBoard = ({
       <div>
         <h2>{t(locale, 'ui.farmTitle')}</h2>
         <div className="player-summary">{displayPlayer.name}</div>
-        <div className="player-resources-compact">
+        <div className="player-resources-compact" data-player-resource-anchor={displayPlayer.id}>
           <span className="res-compact-group">
             <span className="res-icon res-icon-wood" /><span className="res-compact-num">{displayPlayer.resources.wood}</span>
             <span className="res-icon res-icon-clay" /><span className="res-compact-num">{displayPlayer.resources.clay}</span>
@@ -765,6 +769,8 @@ export const FarmBoard = ({
           return (
             <div
               key={cell.key}
+              data-farm-tile-key={tileKey}
+              data-farm-tile-player={displayPlayer.id}
               className={`farm-cell farm-tile${
                 isRoom
                   ? ' room'
@@ -775,7 +781,7 @@ export const FarmBoard = ({
                       : ''
               }${isTileLocked ? ' locked' : ''}${isTileSelectable ? ' selectable' : ''}${isTileSelected ? ' selected' : ''}${
                 isStableSelectable ? ' stable-selectable' : ''
-              }${isStableSelected ? ' stable-selected' : ''}`}
+              }${isStableSelected ? ' stable-selected' : ''}${highlightedFarmTileKeys.has(tileKey) ? ' event-highlight' : ''}`}
               onClick={() => {
                 if (isRoomSelectable) {
                   toggleRoomTile({ row: tileRow, col: tileCol })
@@ -991,7 +997,7 @@ export const FarmBoard = ({
               key={cell.key}
               className={`farm-cell farm-${cell.type}${isActive ? ' active' : ''}${
                 isPending ? ' selected' : ''
-              }${segmentType ? ' ' + segmentType : ''}${isSelectable ? ' selectable' : ''}${blockedForPalisade ? ' palisade-disabled' : ''}`}
+              }${segmentType ? ' ' + segmentType : ''}${isSelectable ? ' selectable' : ''}${blockedForPalisade ? ' palisade-disabled' : ''}${edgeId && highlightedFenceEdgeIds.has(edgeId) ? ' event-highlight' : ''}`}
               onClick={() => {
                 if (isSelectable && edgeId) {
                   toggleFenceEdge(edgeId)

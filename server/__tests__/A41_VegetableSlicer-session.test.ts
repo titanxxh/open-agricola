@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { playImprovement } from '../../shared/actions/effects/improvement'
-import type { ActionSpace, GameState, PlayerState } from '../../shared/contract/types'
+import type { DraftGameEvent } from '../../shared/contract/events'
+import type { ActionExecutionResult, ActionSpace, GameState, PlayerState } from '../../shared/contract/types'
+import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/A/A41_VegetableSlicer'
 
@@ -100,7 +103,85 @@ const createSpace = (id: string): ActionSpace =>
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((listener) => listener.id === id)
 
+const playedMajor = (
+  cardId = COOKING_HEARTH_ID,
+): DraftGameEvent<'card.played'> => ({
+  type: 'card.played',
+  cardId,
+  cardType: 'major',
+})
+
+const paidForImprovement = (
+  returnedCardId?: string,
+): DraftGameEvent<'resource.paid'> => ({
+  type: 'resource.paid',
+  resources: {},
+  paymentFor: 'major-improvement',
+  ...(returnedCardId ? { returnedCardId } : {}),
+})
+
 describe('A41_VegetableSlicer improvement listener', () => {
+  it('triggers through the real major improvement action flow', () => {
+    const session = new GameSession(1)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.roundPhase = 'work'
+    state.availableMajorImprovements = [COOKING_HEARTH_ID]
+
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 1)
+    player.minorPlayed.push(CARD_ID)
+    player.improvements = [FIREPLACE_ID]
+    player.resources = {
+      ...player.resources,
+      wood: 0,
+      clay: 0,
+      reed: 0,
+      stone: 0,
+      food: 0,
+      grain: 0,
+      vegetable: 0,
+    }
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+
+    state.players[1]!.minorHand = ['__test_placeholder__']
+    state.players[1]!.occupationHand = ['__test_placeholder__']
+    session.loadState(state)
+
+    const resp = session.takeAction(0, 'major-improvement')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.state.players[0]!.improvements).toContain(COOKING_HEARTH_ID)
+    expect(resp.state.players[0]!.improvements).not.toContain(FIREPLACE_ID)
+    expect(resp.state.players[0]!.resources.wood).toBe(2)
+    expect(resp.state.players[0]!.resources.vegetable).toBe(1)
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.paid',
+        paymentFor: 'major-improvement',
+        returnedCardId: FIREPLACE_ID,
+      }),
+      expect.objectContaining({
+        type: 'card.played',
+        cardId: COOKING_HEARTH_ID,
+        cardType: 'major',
+      }),
+      expect.objectContaining({
+        type: 'card.triggered',
+        cardId: CARD_ID,
+      }),
+      expect.objectContaining({
+        type: 'resource.moved',
+        from: expect.objectContaining({ kind: 'card', cardId: CARD_ID }),
+        to: expect.objectContaining({ kind: 'player', playerId: player.id }),
+        resources: expect.objectContaining({ wood: 2, vegetable: 1 }),
+      }),
+    ]))
+  })
+
   it('gains 2 wood and 1 vegetable when Fireplace becomes Cooking Hearth', () => {
     const listener = findListener('A41-vegetable-slicer-after-improvement')
     expect(listener).toBeDefined()
@@ -113,6 +194,7 @@ describe('A41_VegetableSlicer improvement listener', () => {
     const result = playImprovement(state, player, `major:${COOKING_HEARTH_ID}`, 'any')
 
     expect(result.type).toBe('ok')
+    const actionEvents = [paidForImprovement(FIREPLACE_ID), playedMajor()]
     const hookResult = executeCardListener(listener!, {
       state,
       player,
@@ -120,7 +202,9 @@ describe('A41_VegetableSlicer improvement listener', () => {
       actionId: 'improvement',
       phase: 'after',
       choice: `major:${COOKING_HEARTH_ID}`,
-      result,
+      result: { type: 'ok' },
+      transactionEvents: actionEvents,
+      actionEvents,
     } as unknown as CardListenerContext)
 
     expect(player.improvements).toContain(COOKING_HEARTH_ID)
@@ -145,6 +229,7 @@ describe('A41_VegetableSlicer improvement listener', () => {
     const result = playImprovement(state, player, `major:${COOKING_HEARTH_ID}`, 'any')
 
     expect(result.type).toBe('ok')
+    const actionEvents = [paidForImprovement(), playedMajor()]
     const hookResult = executeCardListener(listener!, {
       state,
       player,
@@ -153,9 +238,44 @@ describe('A41_VegetableSlicer improvement listener', () => {
       phase: 'after',
       choice: `major:${COOKING_HEARTH_ID}`,
       result,
+      transactionEvents: actionEvents,
+      actionEvents,
     } as unknown as CardListenerContext)
 
     expect(player.improvements).toContain(COOKING_HEARTH_ID)
+    expect(hookResult).toBeUndefined()
+  })
+
+  it('ignores legacy improvementPayment extraData when returned-card event is missing', () => {
+    const listener = findListener('A41-vegetable-slicer-after-improvement')
+    expect(listener).toBeDefined()
+
+    const player = createPlayer()
+    player.minorPlayed = [CARD_ID]
+    const state = createState(player)
+    const actionEvents = [playedMajor()]
+    const result = {
+      type: 'ok',
+      extraData: {
+        improvementPayment: {
+          improvementId: COOKING_HEARTH_ID,
+          returnedCardId: FIREPLACE_ID,
+        },
+      },
+    } as ActionExecutionResult
+
+    const hookResult = executeCardListener(listener!, {
+      state,
+      player,
+      space: createSpace('improvement'),
+      actionId: 'improvement',
+      phase: 'after',
+      choice: `major:${COOKING_HEARTH_ID}`,
+      result,
+      transactionEvents: actionEvents,
+      actionEvents,
+    } as unknown as CardListenerContext)
+
     expect(hookResult).toBeUndefined()
   })
 })

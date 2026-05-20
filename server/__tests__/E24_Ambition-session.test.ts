@@ -48,6 +48,15 @@ describe('E24_Ambition session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
+    if (resp.interaction.promptKey === 'ui.interactionFlowSelect') {
+      const replacedImprovement = resp.interaction.options?.find((option) => option.sourceCard === CARD_ID)
+      expect(replacedImprovement).toBeDefined()
+      resp = session.resolveChoice(0, replacedImprovement!.value)
+      expect(resp.ok).toBe(true)
+      expect(resp.interaction.stateId).toBe('wait')
+      if (resp.interaction.stateId !== 'wait') return
+    }
+
     expect(resp.interaction.promptKey).toBe('ui.interactionChooseImprovement')
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)

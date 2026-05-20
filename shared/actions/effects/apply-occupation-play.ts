@@ -15,6 +15,10 @@ import {
 } from '../../cards/card-listeners'
 import { createEventQuery } from '../../events/query'
 import type { ActionHookPhase } from '../hooks'
+import {
+  cardEffectHandChangedEvent,
+  readPrivateHandChangeSourceCard,
+} from '../../session/private-hand-events'
 
 export type ApplyOccupationPlayParams = {
   occupationId: string
@@ -67,7 +71,7 @@ export const applyOccupationPlayAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ player, params, state, sourceCard, eventSink }): ActionExecutionResult => {
+  execute: ({ player, params, state, sourceCard, actionContext, emitPrivateEvent, eventSink }): ActionExecutionResult => {
     if (!isApplyOccupationPlayParams(params)) {
       return { type: 'fail', errorKey: 'log.occupationFail' }
     }
@@ -83,7 +87,17 @@ export const applyOccupationPlayAction: ActionDefinition = {
     // into the next pay leaf.
     delete player._pendingImprovementPaymentInfo
     void sourceCard
+    const wasInHand = player.occupationHand.includes(occupationId)
     applyOccupation(state, player, occupationId)
+    const handChangeSourceCard = readPrivateHandChangeSourceCard(actionContext, occupationId)
+    if (wasInHand && handChangeSourceCard) {
+      emitPrivateEvent?.(cardEffectHandChangedEvent(
+        player.id,
+        [occupationId],
+        'occupation',
+        handChangeSourceCard,
+      ))
+    }
     eventSink?.emit<'card.played'>({
       type: 'card.played',
       cardId: occupationId,

@@ -61,6 +61,7 @@ type EngineContext = {
   state: ActionExecutionContext['state']
   player: ActionExecutionContext['player']
   space: ActionExecutionContext['space']
+  emitPrivateEvent?: ActionExecutionContext['emitPrivateEvent']
 }
 
 const hasLegacyLogSurface = (result: ActionExecutionResult): boolean => {
@@ -108,16 +109,78 @@ const clearEventLogDerivations = (int: EngineInternals): void => {
   int.eventLogDerivations.splice(0, int.eventLogDerivations.length)
 }
 
+const grantedActionIdsFromFlow = (flow: ActionFlow): string[] => {
+  if (flow.type === 'leaf') {
+    return flow.actionContext?.trueAction === false ? [flow.actionId] : []
+  }
+  return flow.children.flatMap((child) => grantedActionIdsFromFlow(child))
+}
+
+const flowSourceCard = (flow: ActionFlow): string | undefined =>
+  flow.type === 'leaf' ? flow.sourceCard : undefined
+
+const recordGrantedActionsFromFlow = (
+  int: EngineInternals,
+  flow: ActionFlow,
+  player: PlayerState,
+  state: EngineContext['state'],
+  sourceCard?: string,
+): void => {
+  if (!sourceCard) return
+  const actionIds = [...new Set(grantedActionIdsFromFlow(flow))]
+  if (actionIds.length === 0) return
+  const frame = int.events.beginFrame({
+    actorPlayerId: player.id,
+    sourceCardId: sourceCard,
+  })
+  actionIds.forEach((actionId) => {
+    frame.sink.emit<'action.granted'>({
+      type: 'action.granted',
+      playerId: player.id,
+      actionId,
+      cardId: sourceCard,
+    })
+  })
+  frame.complete(state)
+}
+
 const ensureEventState = (state: EngineContext['state']): void => {
   state.events ??= []
   state.nextEventSeq ??= 1
 }
 
-const currentEventReadContext = (int: EngineInternals) => {
+const currentEventReadContext = (
+  int: EngineInternals,
+  actionEvents?: readonly GameEvent[],
+) => {
   const transactionEvents = [...int.events.currentTransactionEvents()]
   return {
     transactionEvents,
+    actionEvents: actionEvents ? [...actionEvents] : undefined,
     eventQuery: createEventQuery(transactionEvents),
+  }
+}
+
+const eventReadContextForActivation = (
+  int: EngineInternals,
+  params: ActivateCardActionNode['params'],
+) => {
+  const transactionEvents = params.transactionEvents
+  if (!transactionEvents) {
+    const live = currentEventReadContext(int)
+    if (typeof params.actionEventStartIndex === 'number') {
+      return {
+        ...live,
+        actionEvents: live.transactionEvents.slice(params.actionEventStartIndex),
+      }
+    }
+    return live
+  }
+  const events = [...transactionEvents]
+  return {
+    transactionEvents: events,
+    actionEvents: params.actionEvents ? [...params.actionEvents] : undefined,
+    eventQuery: createEventQuery(events),
   }
 }
 
@@ -233,6 +296,7 @@ const buildOptionalPrompt = (
     params: actionNode.params,
     sourceCard: actionNode.sourceCard,
     actionContext: actionContextForNode(actionNode),
+    emitPrivateEvent: context.emitPrivateEvent,
   }
   const doable = int.hooks.applyIsDoable(
     { ...executionContext, ...currentEventReadContext(int), actionId: actionNode.actionId },
@@ -323,6 +387,7 @@ const executeActivateCardAction = (
     mandatory: params.mandatory,
   }
   if (params.countCardUse !== undefined) event.countCardUse = params.countCardUse
+  const eventReadContext = eventReadContextForActivation(int, params)
   const listenerContext: CardListenerContext = {
     state: context.state,
     player: triggerPlayer,
@@ -332,7 +397,7 @@ const executeActivateCardAction = (
     space: context.space,
     actionId: params.actionId,
     phase: params.phase,
-    ...currentEventReadContext(int),
+    ...eventReadContext,
     ...event,
   }
   const result = executeCardListener(listener, listenerContext, {
@@ -355,10 +420,9 @@ const executeActivateCardAction = (
   if (result?.flow || normalizedFollowUps.length > 0) {
     const insertedNodes: EngineNode[] = []
     if (result?.flow) {
-      insertedNodes.push(buildOwnedFlowNode(int,
-        applyFallbackSourceCardToFlow(result.flow, result.sourceCard),
-        effectPlayer.id,
-      ))
+      const flow = applyFallbackSourceCardToFlow(result.flow, result.sourceCard)
+      recordGrantedActionsFromFlow(int, flow, effectPlayer, context.state, flowSourceCard(flow) ?? result.sourceCard)
+      insertedNodes.push(buildOwnedFlowNode(int, flow, effectPlayer.id))
     }
     insertedNodes.push(...buildFollowUpNodes(int, normalizedFollowUps, node.id, effectPlayer, context.state))
     if (params.phase === 'before') {
@@ -430,6 +494,7 @@ export function engineProceed(
           params: entry.actionNode.params,
           sourceCard: entry.actionNode.sourceCard,
           actionContext: actionContextForNode(entry.actionNode),
+          emitPrivateEvent: context.emitPrivateEvent,
         }
         const action = int.registry.get(entry.actionNode.actionId)
         if (!action) return null
@@ -625,6 +690,7 @@ export function engineProceed(
       params: node.params,
       sourceCard: replaceSourceCard,
       actionContext: actionContextForNode(node),
+      emitPrivateEvent: context.emitPrivateEvent,
     }
     const doable = int.hooks.applyIsDoable(
       { ...executionContext, ...currentEventReadContext(int), actionId: replacedActionId },
@@ -726,14 +792,17 @@ export function engineProceed(
       node.resolve(result)
       return { type: 'ok', nodeId: node.id, actionId: replacedActionId, result }
     }
+    const eventReadContext = currentEventReadContext(int, completedEvents)
     const duringPhase = int.hooks.during(
-      { ...executionContext, ...currentEventReadContext(int), actionId: replacedActionId },
+      { ...executionContext, ...eventReadContext, actionId: replacedActionId },
       result,
     )
     const duringActivateNodes = buildActivationActionNodes(int,
       duringPhase.matchedListeners, 'during', replacedActionId,
       {},
       executionContext.player.id,
+      eventReadContext.transactionEvents,
+      eventReadContext.actionEvents,
     )
     if (result.type === 'request') {
       // Mirror the resolveChoice second-pass: ActionDef-declared
@@ -816,7 +885,8 @@ export function engineProceed(
         result.request.kind === 'card-draft' ||
         result.request.kind === 'select-trigger' ||
         result.request.kind === 'engine-blocked' ||
-        result.request.kind === 'resource-quantity-select'
+        result.request.kind === 'resource-quantity-select' ||
+        result.request.kind === 'resource-batch-exchange-select'
       ) {
         // Task 9 will add explicit emitters for these kinds. Until then no
         // current effect emits them, so they fall through to empty choices
@@ -867,11 +937,11 @@ export function engineProceed(
       }
     }
     const immediatePhase = int.hooks.immediatelyAfter(
-      { ...executionContext, ...currentEventReadContext(int), actionId: replacedActionId },
+      { ...executionContext, ...eventReadContext, actionId: replacedActionId },
       result,
     )
     const afterPhase = int.hooks.after(
-      { ...executionContext, ...currentEventReadContext(int), actionId: replacedActionId },
+      { ...executionContext, ...eventReadContext, actionId: replacedActionId },
       result,
       undefined,
     )
@@ -893,6 +963,11 @@ export function engineProceed(
       )
       .filter((action) => action)
     const proceedBaseEvent = buildListenerEvent(executionContext, { result })
+    const trailingTransactionEvents = result.type === 'flow' ? undefined : eventReadContext.transactionEvents
+    const trailingActionEvents = result.type === 'flow' ? undefined : eventReadContext.actionEvents
+    const trailingActionEventStartIndex = result.type === 'flow'
+      ? eventReadContext.transactionEvents.length - completedEvents.length
+      : undefined
     const immediateActivateNodes = buildPhaseTrailingNodes(
       int,
       immediatePhase.matchedListeners,
@@ -901,6 +976,9 @@ export function engineProceed(
       context.state,
       proceedBaseEvent,
       executionContext.player.id,
+      trailingTransactionEvents,
+      trailingActionEvents,
+      trailingActionEventStartIndex,
     )
     const afterActivateNodes = buildPhaseTrailingNodes(
       int,
@@ -910,6 +988,9 @@ export function engineProceed(
       context.state,
       proceedBaseEvent,
       executionContext.player.id,
+      trailingTransactionEvents,
+      trailingActionEvents,
+      trailingActionEventStartIndex,
     )
     // 7b1: when the action returns a `flow`, the wrapper action's `after`
     // / `immediatelyAfter` listeners (and follow-ups) must observe the

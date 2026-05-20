@@ -1,6 +1,5 @@
 import type { GameSession, SessionResponse } from '../game/authoritative-session.ts'
 import {
-  serializeState,
   serializeStateForPlayer,
 } from '../../shared/session/serialization.ts'
 import type {
@@ -8,6 +7,10 @@ import type {
   StateUpdateCause,
   StateUpdateEnvelope,
 } from '../../shared/contract/protocol/game.ts'
+import {
+  filterInteractionForViewer,
+  privateEventsForViewer,
+} from '../../shared/session/interaction-privacy.ts'
 
 type Args = {
   room: { id: string; session: GameSession }
@@ -23,12 +26,17 @@ type Args = {
 const buildPayload = (args: Args): GameSyncPayload => {
   const { resp, room, viewerPlayerId } = args
   const stateOpts = { engineStack: room.session.getEngineStack() }
-  const state = viewerPlayerId === null
-    ? serializeState(resp.state, stateOpts)
-    : serializeStateForPlayer(resp.state, viewerPlayerId, stateOpts)
+  const state = serializeStateForPlayer(resp.state, viewerPlayerId, stateOpts)
+  const playerIds = resp.state.players.map((player) => player.id)
+  const privateEvents = privateEventsForViewer(
+    resp.interaction,
+    playerIds,
+    viewerPlayerId,
+    resp.privateEvents ?? [],
+  )
   const payload: GameSyncPayload = {
     state,
-    interaction: resp.interaction,
+    interaction: filterInteractionForViewer(resp.interaction, playerIds, viewerPlayerId),
     scores: resp.scores ?? null,
     pastureCapacities: resp.pastureCapacities,
     historyLength: resp.historyLength,
@@ -37,6 +45,10 @@ const buildPayload = (args: Args): GameSyncPayload => {
     actionAvailability: resp.actionAvailability,
     cardAvailability: resp.cardAvailability,
     error: resp.error,
+  }
+  if (privateEvents.length > 0) payload.privateEvents = privateEvents
+  if (resp.publicEventCancellations?.length) {
+    payload.publicEventCancellations = resp.publicEventCancellations
   }
   const defs = room.session.getCustomCardDefs()
   if (defs.length > 0) payload.customCardDefs = defs

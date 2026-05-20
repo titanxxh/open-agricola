@@ -1,8 +1,23 @@
 import { writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { B23_FinalScenario } from '../../cards-display/B/B23_FinalScenario'
+import type { GameState, PlayerState } from '../../contract/types'
+import { appendImmediateEvents } from '../../events/append'
 
 const CARD_ID = B23_FinalScenario.id
+
+const setExclusiveUse = (state: GameState, player: PlayerState, actionId: string) => {
+  const space = state.actionSpaces.find((entry) => entry.id === actionId)
+  if (!space) return
+  space.exclusiveUse = { playerId: player.id, sourceCardId: CARD_ID, untilRound: 14 }
+  appendImmediateEvents(state, [{
+    type: 'action.exclusiveUseSet',
+    actionId,
+    playerId: player.id,
+    sourceCardId: CARD_ID,
+    untilRound: 14,
+  }], { actorPlayerId: player.id, sourceCardId: CARD_ID })
+}
 
 export const B23_FinalScenario_impl = {
   prerequisiteCheck: (_player, state) => {
@@ -12,18 +27,35 @@ export const B23_FinalScenario_impl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
-    // Only works before round 14
     if (state.round >= 14) return
     const round14SpaceId = state.roundActionOrder[13]
     if (round14SpaceId) {
       writeCardExtraData(player, CARD_ID, 'round14Space', round14SpaceId)
       writeCardExtraData(player, CARD_ID, 'exclusiveOwnerId', player.id)
       writeCardInfobox(player, CARD_ID, `Round 14: ${round14SpaceId}`)
+      appendImmediateEvents(state, [{
+        type: 'action.revealed',
+        actionId: round14SpaceId,
+        roundSlot: 14,
+      }], { actorPlayerId: player.id, sourceCardId: CARD_ID })
+      setExclusiveUse(state, player, round14SpaceId)
     }
   },
   onRoundStart: (state, player) => {
-    // When round 14 starts, remove exclusive use
     if (state.round === 14) {
+      const round14SpaceId = player.cardStates?.[CARD_ID]?.extraData?.round14Space
+      if (typeof round14SpaceId === 'string') {
+        const space = state.actionSpaces.find((entry) => entry.id === round14SpaceId)
+        if (space?.exclusiveUse?.sourceCardId === CARD_ID) {
+          delete space.exclusiveUse
+          appendImmediateEvents(state, [{
+            type: 'action.exclusiveUseCleared',
+            actionId: round14SpaceId,
+            playerId: player.id,
+            sourceCardId: CARD_ID,
+          }], { actorPlayerId: player.id, sourceCardId: CARD_ID })
+        }
+      }
       writeCardExtraData(player, CARD_ID, 'exclusiveOwnerId', null)
     }
   },

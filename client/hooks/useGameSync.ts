@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { GameState, InteractionState } from '../../shared/contract/types'
+import type { GameState } from '../../shared/contract/types'
 import type { PlayerScoreSummary } from '../../shared/domain'
-import type { GameSyncPayload } from '../../shared/contract/protocol/game'
+import type { ClientInteractionState, GameSyncPayload, PrivateGameEvent } from '../../shared/contract/protocol/game'
 import { rehydrateStateForClient } from '../services/rehydrate'
 import { registerCustomCard } from '../../shared/cards/custom-registry'
 
 export const useGameSync = () => {
   const [state, setState] = useState<GameState | null>(null)
-  const [interaction, setInteraction] = useState<InteractionState>({
+  const [interaction, setInteraction] = useState<ClientInteractionState>({
     stateId: 'idle',
     allowedCommands: [],
     anytimeActions: [],
@@ -19,6 +19,7 @@ export const useGameSync = () => {
   const [hasActionStartSnapshot, setHasActionStartSnapshot] = useState(false)
   const [actionAvailability, setActionAvailability] = useState<Record<string, boolean>>({})
   const [cardAvailability, setCardAvailability] = useState<Record<string, boolean>>({})
+  const [privateEvents, setPrivateEvents] = useState<PrivateGameEvent[]>([])
   const mountedRef = useRef(true)
 
   useEffect(() => {
@@ -47,6 +48,7 @@ export const useGameSync = () => {
     setHasActionStartSnapshot(payload.hasActionStartSnapshot ?? false)
     setActionAvailability(payload.actionAvailability ?? {})
     setCardAvailability(payload.cardAvailability ?? {})
+    setPrivateEvents(payload.privateEvents ?? [])
   }, [])
 
   return {
@@ -59,6 +61,7 @@ export const useGameSync = () => {
     hasActionStartSnapshot,
     actionAvailability,
     cardAvailability,
+    privateEvents,
     applySnapshot,
   }
 }

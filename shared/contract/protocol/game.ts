@@ -2,6 +2,14 @@ import type { InteractionState, PlayerState, Resource } from '../../contract/typ
 import type { SerializedGameState } from '../../session/serialization'
 import type { PlayerScoreSummary } from '../../domain'
 import type { CardDefinition } from '../cards'
+import type { PrivateGameEvent as RuntimePrivateGameEvent } from '../private-events'
+
+export type {
+  PrivateDraftUpdatedEvent,
+  PrivateGameEvent,
+  PrivateHandChangedEvent,
+  PrivatePromptShownEvent,
+} from '../private-events'
 
 export type CustomCardDef = {
   cardType: 'minor' | 'occupation'
@@ -37,9 +45,34 @@ export type ActionDetailParts = {
   bonusSources?: string[]
 }
 
+export type PublicEventCancellation = {
+  reason: 'undoStep' | 'undoAction'
+  previousMaxSeq: number
+  nextMaxSeq: number
+  canceledEventIds: string[]
+  canceledSeqs: number[]
+}
+
+export type RedactedPrivatePromptInteraction =
+  Omit<Extract<InteractionState, { stateId: 'wait' }>, 'request' | 'allowedCommands' | 'anytimeActions'> & {
+    request: {
+      kind: 'private-prompt'
+      playerIndex: number
+      promptKind: string
+      sourceCard?: string
+      promptKey?: string
+    }
+    allowedCommands: []
+    anytimeActions: []
+  }
+
+export type ClientInteractionState = InteractionState | RedactedPrivatePromptInteraction
+
 export type GameSyncPayload = {
   state: SerializedGameState
-  interaction: InteractionState
+  interaction: ClientInteractionState
+  privateEvents?: RuntimePrivateGameEvent[]
+  publicEventCancellations?: PublicEventCancellation[]
   scores: PlayerScoreSummary[] | null
   pastureCapacities?: Record<string, Record<string, number>>
   historyLength: number

@@ -43,6 +43,76 @@ describe('event guards', () => {
     })).not.toThrow()
   })
 
+  it('accepts action exclusive-use clear events', () => {
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      round: 13,
+      type: 'action.exclusiveUseCleared',
+      actionId: 'round-14-action',
+      playerId: 'p1',
+      sourceCardId: 'B23_FinalScenario',
+    })).not.toThrow()
+  })
+
+  it('accepts public action detail log events', () => {
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'action.detailLogged',
+      playerId: 'p1',
+      actionId: 'forest',
+      detailParts: {
+        gains: { wood: 3 },
+        costs: {},
+        effects: {},
+      },
+    })).not.toThrow()
+  })
+
+  it('rejects private payloads in action detail log events', () => {
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'action.detailLogged',
+      playerId: 'p1',
+      actionId: 'forest',
+      detailParts: {
+        gains: { wood: 3 },
+        minorHand: ['E78_SleightofHand'],
+      },
+    })).toThrow(/private payload/)
+  })
+
+  it('accepts future meeple queued source summaries', () => {
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'futureMeeple.queued',
+      playerId: 'p1',
+      cardId: 'B157_Salter',
+      entries: [{ round: 4, resources: { food: 2 } }],
+      sourceSummary: {
+        key: 'log.salterFutureFood',
+        params: {
+          cardId: 'B157_Salter',
+          animals: '2 sheep',
+          sheep: 2,
+          boar: 0,
+          cattle: 0,
+          futureFood: 6,
+          schedule: '2 food in rounds 4-6',
+        },
+      },
+    })).not.toThrow()
+  })
+
+  it('accepts fence-built provenance metadata', () => {
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'farm.fenceBuilt',
+      fences: [{ edge: 'H-0-0', type: 'fence' }],
+      newFenceEdges: ['H-0-0'],
+      newPastures: [{ tiles: [{ row: 0, col: 0 }] }],
+    })).not.toThrow()
+  })
+
   it.each([
     [
       'resource.moved resources',

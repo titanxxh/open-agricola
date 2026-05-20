@@ -1,5 +1,14 @@
-import type { FarmTilePosition } from '../../shared/contract/types'
+import { resourceKeyList } from '../../shared/contract/state-constants'
+import type { FarmTilePosition, Resource } from '../../shared/contract/types'
+import type { GameSyncPayload } from '../../shared/contract/protocol/game'
 import { parsePositionKey, positionKey } from '../../shared/domain/farm'
+import type {
+  PublicEventFenceEdgeHighlightTarget,
+  PublicEventFarmTileHighlightTarget,
+  PublicEventHighlightTargets,
+  PublicEventResourceAnimation,
+} from './public-event-notifications'
+import { maxPublicEventSeq } from './public-event-notifications'
 
 export type WsStatus =
   | { phase: 'idle' }
@@ -12,6 +21,26 @@ export type WsStatus =
 
 export const playerIdFromWsStatus = (status: WsStatus): string | null =>
   status.phase === 'ready' ? `p${status.playerIndex + 1}` : null
+
+type PublicEventCancellationSnapshotPayload = {
+  publicEventCancellations?: GameSyncPayload['publicEventCancellations']
+  state: { events?: readonly { seq: number }[] }
+}
+
+type PublicEventCancellationSnapshotHandlers = {
+  clearPublicEventFeedback: () => void
+  setLastSeenPublicEventSeq: (seq: number) => void
+}
+
+export const applyPublicEventCancellationSnapshot = (
+  payload: PublicEventCancellationSnapshotPayload,
+  handlers: PublicEventCancellationSnapshotHandlers,
+): boolean => {
+  if (!payload.publicEventCancellations?.length) return false
+  handlers.clearPublicEventFeedback()
+  handlers.setLastSeenPublicEventSeq(maxPublicEventSeq(payload.state.events))
+  return true
+}
 
 export type FarmCommitType = 'fence' | 'room' | 'stable' | 'plow' | 'sow'
 
@@ -85,6 +114,83 @@ export const getCurrentlySelectableRoomKeys = (
       .filter((key) => pendingRoomKeys.has(key) || roomNeighborKeys(key).some((neighbor) => anchors.has(neighbor))),
   )
 }
+
+export const hasPublicEventHighlights = (targets: PublicEventHighlightTargets): boolean =>
+  targets.actionIds.length > 0 || targets.farmTiles.length > 0 || targets.fenceEdges.length > 0
+
+export const mergePublicEventHighlights = (
+  current: PublicEventHighlightTargets,
+  incoming: PublicEventHighlightTargets,
+): PublicEventHighlightTargets => ({
+  actionIds: [...incoming.actionIds, ...current.actionIds],
+  farmTiles: [...incoming.farmTiles, ...current.farmTiles],
+  fenceEdges: [...incoming.fenceEdges, ...current.fenceEdges],
+})
+
+export const mergePublicEventResourceAnimations = (
+  current: readonly PublicEventResourceAnimation[],
+  incoming: readonly PublicEventResourceAnimation[],
+): PublicEventResourceAnimation[] => [...incoming, ...current]
+
+const removeCountedItems = <T>(
+  current: readonly T[],
+  removing: readonly T[],
+  keyOf: (value: T) => string,
+): T[] => {
+  const remaining = new Map<string, number>()
+  removing.forEach((value) => {
+    const key = keyOf(value)
+    remaining.set(key, (remaining.get(key) ?? 0) + 1)
+  })
+  return current.filter((value) => {
+    const key = keyOf(value)
+    const count = remaining.get(key) ?? 0
+    if (count <= 0) return true
+    remaining.set(key, count - 1)
+    return false
+  })
+}
+
+const farmTileHighlightKey = (target: PublicEventFarmTileHighlightTarget): string =>
+  `${target.playerId}:${target.key}`
+
+const fenceEdgeHighlightKey = (target: PublicEventFenceEdgeHighlightTarget): string =>
+  `${target.playerId}:${target.edgeId}`
+
+const resourceAnimationResourcesKey = (resources: Partial<Resource>): string =>
+  resourceKeyList
+    .map((key) => `${key}:${resources[key] ?? 0}`)
+    .join('|')
+
+const resourceAnimationKey = (animation: PublicEventResourceAnimation): string =>
+  `${animation.id}:${animation.kind}:${JSON.stringify(animation.from)}:${JSON.stringify(animation.to)}:${resourceAnimationResourcesKey(animation.resources)}`
+
+export const removePublicEventHighlights = (
+  current: PublicEventHighlightTargets,
+  removing: PublicEventHighlightTargets,
+): PublicEventHighlightTargets => ({
+  actionIds: removeCountedItems(current.actionIds, removing.actionIds, (value) => value),
+  farmTiles: removeCountedItems(current.farmTiles, removing.farmTiles, farmTileHighlightKey),
+  fenceEdges: removeCountedItems(current.fenceEdges, removing.fenceEdges, fenceEdgeHighlightKey),
+})
+
+export const removePublicEventResourceAnimations = (
+  current: readonly PublicEventResourceAnimation[],
+  removing: readonly PublicEventResourceAnimation[],
+): PublicEventResourceAnimation[] =>
+  removeCountedItems(current, removing, resourceAnimationKey)
+
+export const filterPublicFarmHighlightsForPlayer = (
+  targets: readonly PublicEventFarmTileHighlightTarget[],
+  playerId: string,
+): Set<string> =>
+  new Set(targets.filter((target) => target.playerId === playerId).map((target) => target.key))
+
+export const filterPublicFenceHighlightsForPlayer = (
+  targets: readonly PublicEventFenceEdgeHighlightTarget[],
+  playerId: string,
+): Set<string> =>
+  new Set(targets.filter((target) => target.playerId === playerId).map((target) => target.edgeId))
 
 const FIXED_DEV_ROOM_IDS = new Set(['dev2', 'dev3', 'dev4'])
 

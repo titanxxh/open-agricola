@@ -14,6 +14,9 @@ type TestSocket = WebSocket & {
 const countTakenSpaces = (event: StateUpdateEnvelope) =>
   event.payload.state.actionSpaces.filter((space) => space.takenBy.length > 0).length
 
+const maxEventSeq = (events: Array<{ seq: number }>): number =>
+  events.reduce((max, event) => Math.max(max, event.seq), 0)
+
 const findTakenBy = (event: StateUpdateEnvelope, spaceId: string) =>
   event.payload.state.actionSpaces.find((space) => space.id === spaceId)?.takenBy ?? null
 
@@ -139,6 +142,7 @@ describe('room-manager ws sync', () => {
     )
     const initialTaken = countTakenSpaces(initialP1)
     expect(countTakenSpaces(initialP2)).toBe(initialTaken)
+    const initialMaxSeq = maxEventSeq(initialP1.payload.state.events)
 
     const spaceId = initialP1.payload.state.actionSpaces.find((space) => space.takenBy.length === 0)?.id
     expect(spaceId).toBeTruthy()
@@ -155,7 +159,10 @@ describe('room-manager ws sync', () => {
         event.type === 'stateUpdate' && event.requestId === 'action-1',
     )
     const takenAfterAction = countTakenSpaces(actionP1)
+    const actionMaxSeq = maxEventSeq(actionP1.payload.state.events)
+    const addedEvents = actionP1.payload.state.events.filter((event) => event.seq > initialMaxSeq)
     expect(takenAfterAction).toBeGreaterThan(initialTaken)
+    expect(addedEvents.length).toBeGreaterThan(0)
     expect(countTakenSpaces(actionP2)).toBe(takenAfterAction)
     expect(findTakenBy(actionP1, spaceId!)?.[0]?.playerId).toBe(actionP1.payload.state.players[0]?.id)
     expect(findTakenBy(actionP2, spaceId!)?.[0]?.playerId).toBe(actionP2.payload.state.players[0]?.id)
@@ -177,6 +184,14 @@ describe('room-manager ws sync', () => {
     expect(countTakenSpaces(undoP2)).toBe(initialTaken)
     expect(findTakenBy(undoP1, spaceId!)).toEqual([])
     expect(findTakenBy(undoP2, spaceId!)).toEqual([])
+    expect(undoP1.payload.publicEventCancellations).toEqual(undoP2.payload.publicEventCancellations)
+    expect(undoP1.payload.publicEventCancellations).toEqual([{
+      reason: 'undoStep',
+      previousMaxSeq: actionMaxSeq,
+      nextMaxSeq: initialMaxSeq,
+      canceledEventIds: addedEvents.map((event) => event.id),
+      canceledSeqs: addedEvents.map((event) => event.seq),
+    }])
 
     p2.send(JSON.stringify({ type: 'getState', requestId: 'state-1' }))
     const resync = await waitForEvent(
@@ -188,6 +203,7 @@ describe('room-manager ws sync', () => {
     expect(resync.version).toBe(undoP1.version)
     expect(countTakenSpaces(resync)).toBe(initialTaken)
     expect(findTakenBy(resync, spaceId!)).toEqual([])
+    expect(resync.payload.publicEventCancellations).toBeUndefined()
   })
 
   it('broadcasts devSetResources and devSetRound updates over ws', async () => {

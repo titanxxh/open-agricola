@@ -3,6 +3,10 @@ import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } f
 import { getMinorImprovement } from '../../cards/registry-display'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { activateCard } from './activate-card'
+import {
+  cardEffectHandChangedEvent,
+  readPrivateHandChangeSourceCard,
+} from '../../session/private-hand-events'
 
 export type ApplyImprovementParams = {
   improvementId: string
@@ -57,17 +61,27 @@ export const applyImprovementAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ player, params, state, eventSink }): ActionExecutionResult => {
+  execute: ({ player, params, state, actionContext, emitPrivateEvent, eventSink }): ActionExecutionResult => {
     if (!isApplyImprovementParams(params)) {
       return { type: 'fail', errorKey: 'log.improvementFail' }
     }
     const { improvementId, kind } = params
     const paymentInfo = player._pendingImprovementPaymentInfo
     delete player._pendingImprovementPaymentInfo
+    const wasMinorInHand = kind === 'minor' && player.minorHand.includes(improvementId)
     if (kind === 'major') {
       applyMajor(state, player, improvementId)
     } else {
       applyMinor(state, player, improvementId)
+    }
+    const handChangeSourceCard = readPrivateHandChangeSourceCard(actionContext, improvementId)
+    if (wasMinorInHand && handChangeSourceCard) {
+      emitPrivateEvent?.(cardEffectHandChangedEvent(
+        player.id,
+        [improvementId],
+        'minor',
+        handChangeSourceCard,
+      ))
     }
     eventSink?.emit<'card.played'>({
       type: 'card.played',

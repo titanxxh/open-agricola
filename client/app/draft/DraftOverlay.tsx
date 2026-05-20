@@ -70,8 +70,7 @@ export function canSubmitPick(
 
 /**
  * Covers the whole game board while `state.phase === 'draft'`. Only the local
- * player's view is rendered — other players' pools are intentionally hidden
- * (per-connection filtering is a follow-up issue).
+ * player's view is rendered; server serialization masks other players' picks.
  */
 export function DraftOverlay({ state, meId, locale, onSubmit }: Props) {
   if (state.phase !== 'draft' || !state.draft) return null

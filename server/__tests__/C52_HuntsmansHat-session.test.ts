@@ -8,12 +8,24 @@ import {
 
 import '../../shared/cards/C/C52_HuntsmansHat'
 import type { ActionExecutionResult, ActionFlow } from '../../shared/contract/types'
+import type { DraftGameEvent } from '../../shared/contract/events'
 
 const CARD_ID = 'C52_HuntsmansHat'
 const LISTENER_ID = 'C52-huntsmans-hat-after-boar-gain'
 
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
+
+const moved = (
+  overrides: Partial<DraftGameEvent<'resource.moved'>> = {},
+): DraftGameEvent<'resource.moved'> => ({
+  type: 'resource.moved',
+  resources: { boar: 1 },
+  from: { kind: 'actionSpace', spaceId: 'pig-market' },
+  to: { kind: 'player', playerId: 'p1' },
+  reason: 'collect',
+  ...overrides,
+})
 
 describe('C52_HuntsmansHat server session', () => {
   it('adds food and logs cardEffectGain when collecting boar from pig-market', () => {
@@ -38,7 +50,7 @@ describe('C52_HuntsmansHat server session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0].resources.boar).toBe(2)
 
-    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
+    if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionAnimalReorg') {
       resp = session.resolveChoice(0, 'confirm', [
         { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
       ] as unknown as Record<string, unknown>)
@@ -60,8 +72,8 @@ describe('C52_HuntsmansHat server session', () => {
  * BGA C52 listens to **any** Gain event with `fromActionSpace`, summing
  * obtained PIG and emitting `gainNode([FOOD => N])`. Our previous
  * implementation only handled `pig-market` collect; we now match BGA by
- * listening to `phase: 'after', actions: ['gain','collect','receive']` and
- * inspecting `resourcesGained.boar`. AnimalMarket flow modification
+   * listening to `phase: 'after', actions: ['gain','collect','receive']` and
+   * inspecting action-space resource.moved boar events. AnimalMarket flow modification
  * (sheep+food / boar+food / pay-food→cattle xor) is NOT implemented since
  * we have no AnimalMarket action space — registered as §2.5.
  */
@@ -70,11 +82,13 @@ describe('C52_HuntsmansHat listener — generic boar-gain trigger (any space)', 
     actionId: string,
     spaceId: string,
     boarGained: number,
+    result: ActionExecutionResult = { type: 'ok' },
   ) => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
+    player.id = 'p1'
     player.minorPlayed.push(CARD_ID)
     session.loadState(state)
     return {
@@ -83,10 +97,10 @@ describe('C52_HuntsmansHat listener — generic boar-gain trigger (any space)', 
       space: { id: spaceId } as never,
       actionId,
       phase: 'after' as const,
-      result: {
-        type: 'ok',
-        resourcesGained: { boar: boarGained },
-      } as ActionExecutionResult,
+      result,
+      transactionEvents: boarGained > 0
+        ? [moved({ resources: { boar: boarGained }, from: { kind: 'actionSpace', spaceId } })]
+        : [],
     } as unknown as CardListenerContext
   }
 
@@ -128,6 +142,38 @@ describe('C52_HuntsmansHat listener — generic boar-gain trigger (any space)', 
     expect(result).toBeUndefined()
   })
 
+  it('does not read prior global state events when current transaction has no boar moves', () => {
+    const listener = findListener(LISTENER_ID)!
+    const ctx = setupListenerContext('collect', 'forest', 0, {
+      type: 'ok',
+      resourcesGained: { boar: 1 },
+    } as ActionExecutionResult)
+    ctx.state.events = [
+      { type: 'worker.placed', actorPlayerId: 'p1', workerId: 'w1', spaceId: 'pig-market' } as never,
+      moved() as never,
+    ]
+
+    const result = executeCardListener(listener, ctx)
+
+    expect(result).toBeUndefined()
+  })
+
+  it('does not trigger for card/source boar moves even when result claims boar gained', () => {
+    const listener = findListener(LISTENER_ID)!
+    const ctx = setupListenerContext('gain', 'card-source', 0, {
+      type: 'ok',
+      resourcesGained: { boar: 1 },
+    } as ActionExecutionResult)
+    ctx.transactionEvents = [
+      moved({
+        from: { kind: 'card', playerId: 'p1', cardId: 'OtherCard' },
+        reason: 'cardEffect',
+      }),
+    ]
+    const result = executeCardListener(listener, ctx)
+    expect(result).toBeUndefined()
+  })
+
   it('does not trigger on irrelevant action ids', () => {
     const listener = findListener(LISTENER_ID)!
     const session = new GameSession()
@@ -155,4 +201,3 @@ describe('C52_HuntsmansHat listener — generic boar-gain trigger (any space)', 
     expect(result).toBeUndefined()
   })
 })
-

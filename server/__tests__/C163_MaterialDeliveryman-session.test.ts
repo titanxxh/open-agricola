@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
+import type { DraftGameEvent } from '../../shared/contract/events'
 import type { ActionSpace, GameState, PlayerState } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C163_MaterialDeliveryman'
@@ -66,6 +67,18 @@ const createSpace = (id: string): ActionSpace =>
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
 
+const moved = (
+  resources: DraftGameEvent<'resource.moved'>['resources'],
+  playerId: string,
+  from: DraftGameEvent<'resource.moved'>['from'] = { kind: 'actionSpace', spaceId: 'forest' },
+): DraftGameEvent<'resource.moved'> => ({
+  type: 'resource.moved',
+  resources,
+  from,
+  to: { kind: 'player', playerId },
+  reason: from.kind === 'actionSpace' ? 'collect' : 'cardEffect',
+})
+
 describe('C163_MaterialDeliveryman', () => {
   it('gives 1 wood when any player collects exactly 5 goods', () => {
     const listener = findListener('C163-material-deliveryman-any-collect')
@@ -83,7 +96,8 @@ describe('C163_MaterialDeliveryman', () => {
       space: createSpace('forest'),
       actionId: 'collect',
       phase: 'after',
-      result: { type: 'ok', resourcesGained: { wood: 5 } },
+      result: { type: 'ok' },
+      transactionEvents: [moved({ wood: 5 }, trigger.id)],
     } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
@@ -106,7 +120,8 @@ describe('C163_MaterialDeliveryman', () => {
       space: createSpace('forest'),
       actionId: 'collect',
       phase: 'after',
-      result: { type: 'ok', resourcesGained: { wood: 6 } },
+      result: { type: 'ok' },
+      transactionEvents: [moved({ wood: 6 }, trigger.id)],
     } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
@@ -127,7 +142,8 @@ describe('C163_MaterialDeliveryman', () => {
       space: createSpace('forest'),
       actionId: 'collect',
       phase: 'after',
-      result: { type: 'ok', resourcesGained: { wood: 7 } },
+      result: { type: 'ok' },
+      transactionEvents: [moved({ wood: 7 }, trigger.id)],
     } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
@@ -148,7 +164,8 @@ describe('C163_MaterialDeliveryman', () => {
       space: createSpace('forest'),
       actionId: 'collect',
       phase: 'after',
-      result: { type: 'ok', resourcesGained: { wood: 8 } },
+      result: { type: 'ok' },
+      transactionEvents: [moved({ wood: 8 }, trigger.id)],
     } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
@@ -169,7 +186,8 @@ describe('C163_MaterialDeliveryman', () => {
       space: createSpace('resource-market-4'),
       actionId: 'collect',
       phase: 'after',
-      result: { type: 'ok', resourcesGained: { wood: 3, clay: 3, reed: 2, stone: 2 } },
+      result: { type: 'ok' },
+      transactionEvents: [moved({ wood: 3, clay: 3, reed: 2, stone: 2 }, trigger.id, { kind: 'actionSpace', spaceId: 'resource-market-4' })],
     } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
@@ -191,6 +209,7 @@ describe('C163_MaterialDeliveryman', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { wood: 4 } },
+      transactionEvents: [moved({ wood: 4 }, trigger.id)],
     } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
@@ -211,6 +230,49 @@ describe('C163_MaterialDeliveryman', () => {
       actionId: 'collect',
       phase: 'after',
       result: { type: 'ok' },
+    } as unknown as CardListenerContext)
+
+    expect(result).toBeUndefined()
+  })
+
+  it('does not trigger for supply/cardEffect goods even when result reports 5+ goods', () => {
+    const listener = findListener('C163-material-deliveryman-any-collect')!
+    const owner = createPlayer('p1')
+    owner.occupationPlayed.push(CARD_ID)
+    const trigger = createPlayer('p2')
+
+    const result = executeCardListener(listener, {
+      state: createState(owner, trigger),
+      player: trigger,
+      ownerPlayer: owner,
+      triggerPlayer: trigger,
+      space: createSpace('forest'),
+      actionId: 'collect',
+      phase: 'after',
+      result: { type: 'ok', resourcesGained: { wood: 5 } },
+      transactionEvents: [moved({ wood: 5 }, trigger.id, { kind: 'supply' })],
+    } as unknown as CardListenerContext)
+
+    expect(result).toBeUndefined()
+  })
+
+  it('ignores stale transaction goods when actionEvents has no current threshold', () => {
+    const listener = findListener('C163-material-deliveryman-any-collect')!
+    const owner = createPlayer('p1')
+    owner.occupationPlayed.push(CARD_ID)
+    const trigger = createPlayer('p2')
+
+    const result = executeCardListener(listener, {
+      state: createState(owner, trigger),
+      player: trigger,
+      ownerPlayer: owner,
+      triggerPlayer: trigger,
+      space: createSpace('forest'),
+      actionId: 'collect',
+      phase: 'after',
+      result: { type: 'ok', resourcesGained: { wood: 5 } },
+      transactionEvents: [moved({ wood: 5 }, trigger.id)],
+      actionEvents: [moved({ wood: 4 }, trigger.id)],
     } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()

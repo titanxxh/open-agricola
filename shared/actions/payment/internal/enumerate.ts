@@ -4,9 +4,8 @@
  * payment decompositions for a ComplexCost given the player's resources,
  * trade options, bonuses, and played cards.
  *
- * Largest internal file (~481 lines). Future split candidate: split the
- * enumeration core from the post-processing (Pareto filter + sort) if it
- * grows further.
+ * Future split candidate: split the enumeration core from the
+ * post-processing (Pareto filter + sort) if it grows further.
  *
  * Internal to shared/actions/payment/. Not exported from the package
  * barrel (shared/actions/payment/index.ts). Use PaymentSolver from
@@ -264,7 +263,167 @@ type TradeCombo = {
   result: Partial<Resource>
 }
 
-// Phase 1: recurse over action-scope trades only. Mirrors original recursion.
+type UnitCostOption = {
+  cost: Partial<Resource>
+  tradesUsed: { trade: Trade; times: number }[]
+}
+
+const normalizePositiveResources = (resources: Partial<Resource>): Partial<Resource> => {
+  const out: Partial<Resource> = {}
+  for (const [key, value] of Object.entries(resources)) {
+    if (typeof value === 'number' && value > 0) {
+      out[key as ResourceKey] = value
+    }
+  }
+  return out
+}
+
+const resourceSignature = (resources: Partial<Resource>) =>
+  PAYMENT_RESOURCE_ORDER
+    .map((key) => `${key}:${resources[key] ?? 0}`)
+    .join('|')
+
+const tradeSignature = (trade: Trade) =>
+  [
+    trade.sourceId ?? trade.source ?? '',
+    resourceSignature(trade.from),
+    resourceSignature(trade.to),
+    trade.replaceUpTo ? 'upTo' : 'exact',
+  ].join('#')
+
+const tradeUsageSignature = (tradesUsed: { trade: Trade; times: number }[]) =>
+  tradesUsed
+    .filter((entry) => entry.times > 0)
+    .map((entry) => `${tradeSignature(entry.trade)}:${entry.times}`)
+    .sort()
+    .join('|')
+
+const unitCostOptionSignature = (option: UnitCostOption) =>
+  `${resourceSignature(option.cost)}::${tradeUsageSignature(option.tradesUsed)}`
+
+const mergeTradeUsage = (
+  left: { trade: Trade; times: number }[],
+  right: { trade: Trade; times: number }[],
+) => {
+  const merged = left.map((entry) => ({ ...entry }))
+  for (const entry of right) {
+    if (entry.times <= 0) continue
+    const existing = merged.find((candidate) => candidate.trade === entry.trade)
+    if (existing) {
+      existing.times += entry.times
+    } else {
+      merged.push({ ...entry })
+    }
+  }
+  return merged
+}
+
+const incrementTradeUsage = (
+  tradesUsed: { trade: Trade; times: number }[],
+  trade: Trade,
+) => mergeTradeUsage(tradesUsed, [{ trade, times: 1 }])
+
+const getTradeUsage = (
+  tradesUsed: { trade: Trade; times: number }[],
+  trade: Trade,
+) => tradesUsed.find((entry) => entry.trade === trade)?.times ?? 0
+
+const applyUnitTradeToCost = (
+  cost: Partial<Resource>,
+  trade: Trade,
+): Partial<Resource> | null => {
+  const toEntries = (Object.entries(trade.to) as [ResourceKey, number][])
+    .filter(([, amount]) => amount > 0)
+  if (toEntries.length === 0) return null
+
+  const next: Partial<Resource> = { ...cost }
+  for (const [key, amount] of toEntries) {
+    const current = next[key] ?? 0
+    const removed = trade.replaceUpTo ? Math.min(current, amount) : amount
+    if (removed <= 0 || current < removed || (!trade.replaceUpTo && current < amount)) {
+      return null
+    }
+    next[key] = current - removed
+  }
+
+  for (const [key, amount] of Object.entries(trade.from) as [ResourceKey, number][]) {
+    if (amount <= 0) continue
+    next[key] = (next[key] ?? 0) + amount
+  }
+
+  return normalizePositiveResources(next)
+}
+
+const dedupeUnitCostOptions = (options: UnitCostOption[]) => {
+  const seen = new Set<string>()
+  const deduped: UnitCostOption[] = []
+  for (const option of options) {
+    const key = unitCostOptionSignature(option)
+    if (seen.has(key)) continue
+    seen.add(key)
+    deduped.push(option)
+  }
+  return deduped
+}
+
+const buildUnitCostOptions = (
+  unitFee: Partial<Resource>,
+  unitTrades: Trade[],
+): UnitCostOption[] => {
+  const sortedTrades = [...unitTrades].sort((left, right) => (left.order ?? 0) - (right.order ?? 0))
+  let options: UnitCostOption[] = [{ cost: normalizePositiveResources(unitFee), tradesUsed: [] }]
+
+  for (const trade of sortedTrades) {
+    const additions: UnitCostOption[] = []
+    for (const option of options) {
+      const maxPerUnit = Math.max(0, Math.floor(trade.max ?? 1))
+      let currentCost = option.cost
+      let currentTrades = option.tradesUsed
+      for (let count = getTradeUsage(option.tradesUsed, trade); count < maxPerUnit; count += 1) {
+        const nextCost = applyUnitTradeToCost(currentCost, trade)
+        if (!nextCost) break
+        currentTrades = incrementTradeUsage(currentTrades, trade)
+        additions.push({ cost: nextCost, tradesUsed: currentTrades })
+        currentCost = nextCost
+      }
+    }
+    options = dedupeUnitCostOptions([...options, ...additions])
+  }
+
+  return options
+}
+
+const buildUnitTotalOptions = (
+  unitFee: Partial<Resource>,
+  unitTrades: Trade[],
+  nb?: number,
+): UnitCostOption[] => {
+  if (nb === undefined || nb <= 0) {
+    return [{ cost: {}, tradesUsed: [] }]
+  }
+  if (unitTrades.length === 0) {
+    return [{ cost: scaleResources(unitFee, nb), tradesUsed: [] }]
+  }
+
+  const unitOptions = buildUnitCostOptions(unitFee, unitTrades)
+  let totals: UnitCostOption[] = [{ cost: {}, tradesUsed: [] }]
+
+  for (let i = 0; i < nb; i += 1) {
+    const nextTotals: UnitCostOption[] = []
+    for (const total of totals) {
+      for (const unitOption of unitOptions) {
+        nextTotals.push({
+          cost: normalizePositiveResources(mergeResources(total.cost, unitOption.cost)),
+          tradesUsed: mergeTradeUsage(total.tradesUsed, unitOption.tradesUsed),
+        })
+      }
+    }
+    totals = dedupeUnitCostOptions(nextTotals)
+  }
+
+  return totals
+}
+
 const enumerateActionTradeCombos = (
   actionTrades: Trade[],
   playerResources: Partial<Resource>,
@@ -290,57 +449,13 @@ const enumerateActionTradeCombos = (
   return results
 }
 
-// Phase 2: recurse over unit-scope trades, bounded by remaining budget (= nb - sum).
-const enumerateUnitTradeCombos = (
-  unitTrades: Trade[],
-  base: TradeCombo,
-  remainingBudget: number,
-  i: number,
-  out: TradeCombo[],
-): void => {
-  if (i === unitTrades.length) {
-    out.push(base)
-    return
-  }
-  const trade = unitTrades[i]
-  const maxByMax = trade.max ?? remainingBudget
-  const maxByFrom = getMaxTradeTimesFromPartial({ ...trade, max: Infinity }, base.result)
-  const maxTimes = Math.min(remainingBudget, maxByMax, maxByFrom)
-  for (let t = 0; t <= maxTimes; t++) {
-    const afterTrade = convertResources(base.result, trade, t)
-    if (!hasValidResources(afterTrade)) continue
-    const next: TradeCombo = {
-      tradesUsed: t === 0
-        ? [...base.tradesUsed]
-        : [...base.tradesUsed, { trade, times: t }],
-      result: afterTrade,
-    }
-    enumerateUnitTradeCombos(unitTrades, next, remainingBudget - t, i + 1, out)
-  }
-}
-
 export const generateTradeCombinations = (
   trades: Trade[],
   playerResources: Partial<Resource>,
-  nb?: number,
+  _nb?: number,
 ): TradeCombo[] => {
-  if (trades.length === 0) {
-    return [{ tradesUsed: [], result: { ...playerResources } }]
-  }
   const actionTrades = trades.filter((t) => (t.scope ?? 'action') === 'action')
-  const unitTrades = trades.filter((t) => t.scope === 'unit')
-
-  const phase1 = enumerateActionTradeCombos(actionTrades, playerResources)
-
-  if (unitTrades.length === 0 || nb === undefined || nb <= 0) {
-    return phase1
-  }
-
-  const results: TradeCombo[] = []
-  for (const combo of phase1) {
-    enumerateUnitTradeCombos(unitTrades, combo, nb, 0, results)
-  }
-  return results
+  return enumerateActionTradeCombos(actionTrades, playerResources)
 }
 
 const canCoverCost = (
@@ -382,10 +497,6 @@ export const computeAllBuyableCombinations = (
   const rawSolutions: InternalSolution[] = []
   const nb = effectiveCost.nb
 
-  const unitFeeContribution: Partial<Resource> = nb !== undefined
-    ? scaleResources(effectiveCost.unitFee ?? {}, nb)
-    : {}
-
   const baseFeesRaw: Partial<Resource>[] = effectiveCost.fees && effectiveCost.fees.length > 0
     ? effectiveCost.fees
     : effectiveCost.fee
@@ -404,101 +515,133 @@ export const computeAllBuyableCombinations = (
     }
     return out
   }
-  const baseFees: Partial<Resource>[] = baseFeesRaw.map((fee) =>
-    clampNonNegative(mergeResources(fee, unitFeeContribution)),
-  )
+
+  const allTrades = effectiveCost.trades ?? []
+  const actionTrades = allTrades.filter((trade) => (trade.scope ?? 'action') === 'action')
+  const unitTrades = allTrades.filter((trade) => trade.scope === 'unit')
+  const unitTotals = buildUnitTotalOptions(effectiveCost.unitFee ?? {}, unitTrades, nb)
 
   for (const bonus of effectiveCost.bonuses ?? []) {
     validateBonus(bonus)
   }
 
-  for (let feeIdx = 0; feeIdx < baseFees.length; feeIdx++) {
-    const baseFee = baseFees[feeIdx]
-    const tradeCombos = effectiveCost.trades && effectiveCost.trades.length > 0
-      ? generateTradeCombinations(effectiveCost.trades, playerResources, nb)
-      : [{ tradesUsed: [], result: { ...playerResources } }]
+  const costBoundsSatisfied = (
+    currentCost: Partial<Resource>,
+    minCost?: Partial<Resource>,
+    maxCost?: Partial<Resource>,
+  ) => {
+    for (const [key, value] of Object.entries(minCost ?? {})) {
+      if ((currentCost[key as ResourceKey] ?? 0) < (value ?? 0)) return false
+    }
+    for (const [key, value] of Object.entries(maxCost ?? {})) {
+      if ((currentCost[key as ResourceKey] ?? 0) > (value ?? 0)) return false
+    }
+    return true
+  }
 
-    for (const tradeCombo of tradeCombos) {
-      type BonusPath = {
-        cost: Partial<Resource>
-        sources: string[]
-        choiceIndices: Record<string, number>
-      }
-      let bonusPaths: BonusPath[] = [
-        { cost: baseFee, sources: [], choiceIndices: {} },
-      ]
+  for (let feeIdx = 0; feeIdx < baseFeesRaw.length; feeIdx++) {
+    const baseFeeRaw = baseFeesRaw[feeIdx]
+    for (const unitTotal of unitTotals) {
+      const baseFee = clampNonNegative(mergeResources(baseFeeRaw, unitTotal.cost))
+      const tradeCombos = actionTrades.length > 0
+        ? generateTradeCombinations(actionTrades, playerResources)
+        : [{ tradesUsed: [], result: { ...playerResources } }]
 
-      for (const bonus of effectiveCost.bonuses ?? []) {
-        if (!evaluateConditions(player, bonus.conditions, nb)) {
-          continue
+      for (const tradeCombo of tradeCombos) {
+        const tradesUsed = mergeTradeUsage(unitTotal.tradesUsed, tradeCombo.tradesUsed)
+        type BonusPath = {
+          cost: Partial<Resource>
+          sources: string[]
+          choiceIndices: Record<string, number>
         }
+        let bonusPaths: BonusPath[] = [
+          { cost: baseFee, sources: [], choiceIndices: {} },
+        ]
 
-        const expanded: BonusPath[] = []
-        if (bonus.optional) {
+        for (const bonus of effectiveCost.bonuses ?? []) {
+          if (!evaluateConditions(player, bonus.conditions, nb)) {
+            continue
+          }
+
+          const expanded: BonusPath[] = []
+          if (bonus.optional) {
+            for (const path of bonusPaths) {
+              expanded.push({
+                cost: path.cost,
+                sources: [...path.sources],
+                choiceIndices: { ...path.choiceIndices },
+              })
+            }
+          }
+          const rawCandidates: {
+            discount: Partial<Resource>
+            sources?: string[]
+            conditions?: Record<string, number>
+            minCost?: Partial<Resource>
+            maxCost?: Partial<Resource>
+            _origIndex: number
+          }[] = bonus.choices
+            ? bonus.choices.map((c, i) => ({
+                ...c,
+                minCost: c.minCost ?? bonus.minCost,
+                maxCost: c.maxCost ?? bonus.maxCost,
+                _origIndex: i,
+              }))
+            : [
+                {
+                  discount: bonus.discount!,
+                  sources: bonus.sources,
+                  minCost: bonus.minCost,
+                  maxCost: bonus.maxCost,
+                  _origIndex: 0,
+                },
+              ]
+          const candidates = rawCandidates.filter((c) =>
+            evaluateConditions(player, c.conditions, nb),
+          )
+          if (candidates.length === 0) {
+            continue
+          }
+          const isMultiChoice = (bonus.choices?.length ?? 0) > 0
+          const bonusKey = bonus.sources?.[0]
           for (const path of bonusPaths) {
-            expanded.push({
-              cost: path.cost,
-              sources: [...path.sources],
-              choiceIndices: { ...path.choiceIndices },
-            })
+            for (const candidate of candidates) {
+              if (!costBoundsSatisfied(path.cost, candidate.minCost, candidate.maxCost)) {
+                continue
+              }
+              const nextCost = applyBonus(path.cost, candidate.discount)
+              const combined = new Set([
+                ...path.sources,
+                ...(bonus.sources ?? []),
+                ...(candidate.sources ?? []),
+              ])
+              const nextSources = [...combined]
+              const nextChoiceIndices =
+                isMultiChoice && bonusKey
+                  ? { ...path.choiceIndices, [bonusKey]: candidate._origIndex }
+                  : { ...path.choiceIndices }
+              expanded.push({
+                cost: nextCost,
+                sources: nextSources,
+                choiceIndices: nextChoiceIndices,
+              })
+            }
           }
+          bonusPaths = expanded
         }
-        const rawCandidates: {
-          discount: Partial<Resource>
-          sources?: string[]
-          conditions?: Record<string, number>
-          _origIndex: number
-        }[] = bonus.choices
-          ? bonus.choices.map((c, i) => ({ ...c, _origIndex: i }))
-          : [
-              {
-                discount: bonus.discount!,
-                sources: bonus.sources,
-                _origIndex: 0,
-              },
-            ]
-        const candidates = rawCandidates.filter((c) =>
-          evaluateConditions(player, c.conditions, nb),
-        )
-        if (candidates.length === 0) {
-          continue
-        }
-        const isMultiChoice = (bonus.choices?.length ?? 0) > 0
-        const bonusKey = bonus.sources?.[0]
-        for (const path of bonusPaths) {
-          for (const candidate of candidates) {
-            const nextCost = applyBonus(path.cost, candidate.discount)
-            const combined = new Set([
-              ...path.sources,
-              ...(bonus.sources ?? []),
-              ...(candidate.sources ?? []),
-            ])
-            const nextSources = [...combined]
-            const nextChoiceIndices =
-              isMultiChoice && bonusKey
-                ? { ...path.choiceIndices, [bonusKey]: candidate._origIndex }
-                : { ...path.choiceIndices }
-            expanded.push({
-              cost: nextCost,
-              sources: nextSources,
-              choiceIndices: nextChoiceIndices,
-            })
-          }
-        }
-        bonusPaths = expanded
-      }
 
-      for (const { cost: effectiveCostFee, sources, choiceIndices } of bonusPaths) {
-        if (canCoverCost(tradeCombo.result, effectiveCostFee)) {
-          const remaining = subtractResources(tradeCombo.result, effectiveCostFee)
-          rawSolutions.push({
-            resourcesRemaining: remaining,
-            tradesUsed: tradeCombo.tradesUsed,
-            bonusUsed: sources.length > 0 ? sources.join(',') : undefined,
-            bonusChoiceIndex:
-              Object.keys(choiceIndices).length > 0 ? choiceIndices : undefined,
-            feeIndex: baseFees.length > 1 ? feeIdx : undefined,
-          })
+        for (const { cost: effectiveCostFee, sources, choiceIndices } of bonusPaths) {
+          if (canCoverCost(tradeCombo.result, effectiveCostFee)) {
+            const remaining = subtractResources(tradeCombo.result, effectiveCostFee)
+            rawSolutions.push({
+              resourcesRemaining: remaining,
+              tradesUsed,
+              bonusUsed: sources.length > 0 ? sources.join(',') : undefined,
+              bonusChoiceIndex:
+                Object.keys(choiceIndices).length > 0 ? choiceIndices : undefined,
+              feeIndex: baseFeesRaw.length > 1 ? feeIdx : undefined,
+            })
+          }
         }
       }
     }

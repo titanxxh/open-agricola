@@ -388,6 +388,29 @@
 .lazybones-stable-marker[data-player-color="blue"] .res-icon-barn { background-position-x: 50%; }
 .lazybones-stable-marker[data-player-color="black"] { border: 2px solid #1f2937; }
 .lazybones-stable-marker[data-player-color="black"] .res-icon-barn { background-position-x: 75%; }
+.action-exclusive-use {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 16;
+  pointer-events: none;
+  max-width: calc(100% - 8px);
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #1f2937;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.action-exclusive-use[data-player-color="red"] { border-left: 3px solid var(--color-danger); }
+.action-exclusive-use[data-player-color="yellow"] { border-left: 3px solid #d6b332; }
+.action-exclusive-use[data-player-color="blue"] { border-left: 3px solid #3f6ee8; }
+.action-exclusive-use[data-player-color="black"] { border-left: 3px solid #1f2937; }
 .player-action-card-owner {
   font-size: 11px;
   font-weight: 600;
@@ -537,6 +560,118 @@
 .status-text {
   font-size: 13px;
   color: #718096;
+}
+.event-notifications,
+.private-event-notifications {
+  position: fixed;
+  top: 76px;
+  right: 16px;
+  z-index: 2200;
+  display: grid;
+  gap: 8px;
+  width: min(340px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.private-event-notification,
+.public-event-notification {
+  padding: 10px 12px;
+  border: 1px solid rgba(47, 133, 90, 0.3);
+  border-left: 4px solid #2f855a;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.97);
+  color: #23422d;
+  box-shadow: 0 8px 24px rgba(23, 38, 25, 0.18);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.private-event-notification[data-kind="prompt"] {
+  border-left-color: #b7791f;
+}
+.private-event-notification[data-kind="draft"] {
+  border-left-color: #2b6cb0;
+}
+.public-event-notification[data-kind="payment"] {
+  border-left-color: #805ad5;
+}
+.public-event-notification[data-kind="action"] {
+  border-left-color: #2b6cb0;
+}
+.public-event-notification[data-kind="future"] {
+  border-left-color: #b7791f;
+}
+.public-event-notification[data-kind="farm"] {
+  border-left-color: #744210;
+}
+.public-event-resource-animation-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+.public-event-supply-anchor {
+  position: fixed;
+  top: 96px;
+  right: 28px;
+  width: 1px;
+  height: 1px;
+}
+.public-event-resource-animation {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: inline-flex;
+  gap: 3px;
+  transform: translate(var(--from-x), var(--from-y));
+  animation: public-event-resource-flight 1.2s ease-out forwards;
+  filter: drop-shadow(0 4px 8px rgba(35, 35, 20, 0.24));
+}
+.public-event-resource-animation[data-kind="payment"] {
+  animation-duration: 1s;
+}
+.action-card-holder.event-highlight,
+.farm-tile.event-highlight,
+.farm-fence-h.event-highlight,
+.farm-fence-v.event-highlight {
+  animation: public-event-highlight-pulse 1.4s ease-in-out 2;
+}
+.action-card-holder.event-highlight {
+  box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.7), 0 0 18px rgba(234, 179, 8, 0.45);
+}
+.farm-tile.event-highlight {
+  box-shadow:
+    inset 0 0 0 2px rgba(234, 179, 8, 0.9),
+    0 0 18px rgba(234, 179, 8, 0.45);
+}
+.farm-fence-h.event-highlight,
+.farm-fence-v.event-highlight {
+  background: rgba(234, 179, 8, 0.18);
+}
+.farm-fence-h.event-highlight::before,
+.farm-fence-v.event-highlight::before {
+  opacity: 1;
+  box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.65), 0 0 14px rgba(234, 179, 8, 0.55);
+}
+@keyframes public-event-highlight-pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.18); }
+}
+@keyframes public-event-resource-flight {
+  0% {
+    opacity: 0;
+    transform: translate(var(--from-x), var(--from-y)) scale(0.84);
+  }
+  15% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+    transform: translate(var(--to-x), var(--to-y)) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--to-x), var(--to-y)) scale(0.92);
+  }
 }
 .header-locale-select {
   height: 34px;
@@ -701,6 +836,9 @@
 }
 .action-card-holder.occupied-available .action-card {
   filter: none;
+}
+.action-card-holder.exclusive-locked .action-card {
+  filter: saturate(70%) brightness(0.92);
 }
 /* --- Action card (3-section frame) --- */
 .action-card {

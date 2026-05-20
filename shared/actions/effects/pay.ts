@@ -137,8 +137,13 @@ const emitPaidEvent = (
   } = {},
 ) => {
   const paid = positiveResources(resources)
-  if (Object.keys(paid).length === 0) return
   const bonusSources = splitSourceIds(provenance.bonusUsed)
+  if (
+    Object.keys(paid).length === 0 &&
+    bonusSources.length === 0 &&
+    !provenance.bonusChoiceIndex &&
+    !provenance.returnedCardId
+  ) return
   eventSink?.emit<'resource.paid'>({
     type: 'resource.paid',
     resources: paid,

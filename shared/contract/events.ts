@@ -1,10 +1,12 @@
 import type {
   CostModifierType,
   FutureMeepleRoomType,
+  FutureMeepleSourceSummary,
   GameState,
   PlayerState,
   Resource,
 } from './types'
+import type { ActionDetailParts } from './protocol/game'
 
 export type GameEventBase<T extends string> = {
   schemaVersion: 1
@@ -126,6 +128,8 @@ export type FarmStableBuiltEvent = GameEventBase<'farm.stableBuilt'> & {
 
 export type FarmFenceBuiltEvent = GameEventBase<'farm.fenceBuilt'> & {
   fences: unknown[]
+  newFenceEdges?: string[]
+  newPastures?: Array<{ tiles?: unknown[] }>
 }
 
 export type FarmFenceConsumedEvent = GameEventBase<'farm.fenceConsumed'> & {
@@ -181,6 +185,19 @@ export type ActionExclusiveUseSetEvent = GameEventBase<'action.exclusiveUseSet'>
   actionId: string
   playerId: string
   sourceCardId: string
+  untilRound: number
+}
+
+export type ActionExclusiveUseClearedEvent = GameEventBase<'action.exclusiveUseCleared'> & {
+  actionId: string
+  playerId: string
+  sourceCardId: string
+}
+
+export type ActionDetailLoggedEvent = GameEventBase<'action.detailLogged'> & {
+  playerId: string
+  actionId: string
+  detailParts: ActionDetailParts
 }
 
 export type ActionGrantedEvent = GameEventBase<'action.granted'> & {
@@ -259,6 +276,7 @@ export type FutureMeepleQueuedEvent = GameEventBase<'futureMeeple.queued'> & {
   playerId: string
   cardId: string
   entries: Array<{ round: number; resources?: Partial<Resource>; roomType?: FutureMeepleRoomType }>
+  sourceSummary?: FutureMeepleSourceSummary
 }
 
 export type FutureMeepleRemovedEvent = GameEventBase<'futureMeeple.removed'> & {
@@ -334,6 +352,8 @@ export type GameEvent =
   | ActionRevealedEvent
   | ActionAccumulatedEvent
   | ActionExclusiveUseSetEvent
+  | ActionExclusiveUseClearedEvent
+  | ActionDetailLoggedEvent
   | ActionGrantedEvent
   | TurnSkippedEvent
   | StartPlayerChangedEvent

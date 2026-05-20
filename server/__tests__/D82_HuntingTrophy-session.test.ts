@@ -46,7 +46,7 @@ describe('D82_HuntingTrophy session', () => {
 
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
-    expect(resp.interaction.options?.map((option) => option.value)).toContain('action-fence-3')
+    expect(resp.interaction.options?.some((option) => option.labelKey === 'actions.fencing.name')).toBe(true)
 
     const updatedPlayer = resp.state.players[0]!
     expect(updatedPlayer.activeModifiers?.some((modifier) => modifier.cardId === CARD_ID)).toBe(false)

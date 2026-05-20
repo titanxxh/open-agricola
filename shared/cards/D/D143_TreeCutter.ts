@@ -1,6 +1,7 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { D143_TreeCutter } from '../../cards-display/D/D143_TreeCutter'
@@ -17,11 +18,12 @@ const listener: CardListenerRegistration = {
   actions: ['collect'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.result?.type !== 'ok') return
-    const gained = context.result.resourcesGained
-    if (!gained) return
-    // Check if any non-wood resource was collected >= 3
-    const hasThreePlus = NON_WOOD_RESOURCES.some((res) => (gained[res] ?? 0) >= 3)
+    const events = context.actionEvents ?? context.transactionEvents
+    const hasThreePlus = NON_WOOD_RESOURCES.some((res) =>
+      sumResourceMovedToPlayer(events, res, context.player.id, (event) =>
+        event.from.kind === 'actionSpace',
+      ) >= 3,
+    )
     if (!hasThreePlus) return
     return { flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }
   },

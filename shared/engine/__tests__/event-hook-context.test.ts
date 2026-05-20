@@ -11,6 +11,7 @@ import {
   makeEventTestEngine,
   makeEventTestState,
 } from './event-test-helpers'
+import type { GameEvent } from '../../contract/events'
 
 const action = (
   id: string,
@@ -26,10 +27,17 @@ const action = (
 })
 
 const emitExchange = (context: Parameters<ActionDefinition['execute']>[0]) => {
+  emitWoodExchange(context, 2)
+}
+
+const emitWoodExchange = (
+  context: Parameters<ActionDefinition['execute']>[0],
+  wood: number,
+) => {
   context.eventSink.emit({
     type: 'resource.exchanged',
     paid: { food: 1 },
-    gained: { wood: 2 },
+    gained: { wood },
     paidFrom: { kind: 'player', playerId: context.player.id },
     paidTo: { kind: 'supply' },
     gainedFrom: { kind: 'supply' },
@@ -92,6 +100,101 @@ describe('engine hook event context', () => {
     expect(observed).toBe(true)
     expect(state.events).toHaveLength(2)
     expect(state.events[0]).toBe(historicalMoveEvent)
+  })
+
+  it('exposes only current frame events as actionEvents to action after hooks', () => {
+    const first = action('action-events-first', (context) => {
+      emitWoodExchange(context, 2)
+      return { type: 'ok' }
+    })
+    const second = action('action-events-second', (context) => {
+      emitWoodExchange(context, 3)
+      return { type: 'ok' }
+    })
+    const state = makeEventTestState()
+    const player = state.players[0]!
+    const { engine } = makeEventTestEngine(
+      [first, second],
+      new SequenceNode('action-events-root', [
+        new ActionNode('action-events-first-node', first.id),
+        new ActionNode('action-events-second-node', second.id),
+      ]),
+    )
+    let observed = false
+
+    registerActionHook({
+      id: 'test-action-events-after',
+      actions: [second.id],
+      phases: ['after'],
+      handler: (context) => {
+        observed = true
+        expect(context.transactionEvents).toHaveLength(2)
+        expect(context.actionEvents).toHaveLength(1)
+        expect(context.actionEvents?.[0]).toEqual(expect.objectContaining({
+          type: 'resource.exchanged',
+          gained: expect.objectContaining({ wood: 3 }),
+        }))
+        expect(context.eventQuery.has(
+          'resource.exchanged',
+          (event) => (event.gained.wood ?? 0) === 2,
+        )).toBe(true)
+      },
+    })
+
+    expect(engine.proceed({ state, player, space: asActionSpace(first) }).type).toBe('ok')
+    expect(engine.proceed({ state, player, space: asActionSpace(second) }).type).toBe('ok')
+
+    expect(observed).toBe(true)
+  })
+
+  it('exposes wrapper flow events as actionEvents to delayed card after listeners', () => {
+    const before = action('wrapper-flow-before', (context) => {
+      emitWoodExchange(context, 2)
+      return { type: 'ok' }
+    })
+    const child = action('wrapper-flow-child', (context) => {
+      emitWoodExchange(context, 3)
+      return { type: 'ok' }
+    })
+    const wrapper = action('wrapper-flow-parent', () => ({
+      type: 'flow' as const,
+      flow: { type: 'leaf' as const, actionId: child.id },
+    }))
+    const state = makeEventTestState()
+    const player = state.players[0]!
+    player.improvements.push('Test_Wrapper_Flow_Card')
+    const registry = new CardRegistry()
+    let observed = false
+    registry.registerListener({
+      id: 'test-wrapper-flow-event-slice',
+      cardIds: ['Test_Wrapper_Flow_Card'],
+      actions: [wrapper.id],
+      phases: ['after'],
+      handler: (context) => {
+        observed = true
+        expect(context.transactionEvents).toHaveLength(2)
+        expect(context.actionEvents).toHaveLength(1)
+        expect(context.actionEvents?.[0]).toEqual(expect.objectContaining({
+          type: 'resource.exchanged',
+          gained: expect.objectContaining({ wood: 3 }),
+        }))
+      },
+    })
+    const { engine } = makeEventTestEngine(
+      [before, wrapper, child],
+      new SequenceNode('wrapper-flow-root', [
+        new ActionNode('wrapper-flow-before-node', before.id),
+        new ActionNode('wrapper-flow-parent-node', wrapper.id),
+      ]),
+    )
+
+    withActiveRegistry(registry, () => {
+      for (let index = 0; index < 4 && !observed; index += 1) {
+        expect(engine.proceed({ state, player, space: asActionSpace(before) }).type).toBe('ok')
+      }
+    })
+
+    expect(observed).toBe(true)
   })
 
   it('exposes current transaction events to card after listeners without eventSink', () => {

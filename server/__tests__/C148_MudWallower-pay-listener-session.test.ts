@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest'
+import { GameSession } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C148_MudWallower'
 
 const CARD_ID = 'C148_MudWallower'
+
+const paidEvent = (resources: Record<string, number>) => ({
+  type: 'resource.paid',
+  resources,
+  paymentFor: 'cardEffect',
+})
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -46,6 +54,16 @@ const createSpace = (id: string): ActionSpace =>
     takenBy: [],
   }) as ActionSpace
 
+const createPayBoarSpace = (boar: number): ActionSpace =>
+  ({
+    ...createSpace('__test-pay-boar'),
+    flow: {
+      type: 'leaf',
+      actionId: 'pay',
+      params: { cost: { boar }, costType: 'cardEffect' },
+    },
+  }) as ActionSpace
+
 const findListener = (id: string) => getRegisteredCardListeners().find((l) => l.id === id)
 
 describe('C148 MudWallower — after-pay sync listener', () => {
@@ -64,12 +82,16 @@ describe('C148 MudWallower — after-pay sync listener', () => {
     // Player paid 1 boar (e.g. cooking): now has 1 boar, but cap is 2
     player.resources.boar = 1
     const state = createState(player)
+    const payResult = { type: 'ok' as const }
+    expect('resourcesPaid' in payResult).toBe(false)
+    expect('extraData' in payResult).toBe(false)
     const result = executeCardListener(listener, {
       state, player,
       space: createSpace('cooking'),
       actionId: 'pay', phase: 'after',
       sourceCard: undefined,
-      result: { type: 'ok', resourcesPaid: { boar: 1 } },
+      result: payResult,
+      transactionEvents: [paidEvent({ boar: 1 })],
     } as unknown as CardListenerContext)
     expect(result?.flow).toEqual({
       type: 'leaf',
@@ -86,12 +108,14 @@ describe('C148 MudWallower — after-pay sync listener', () => {
     player.cardStates = { [CARD_ID]: { counters: { counter: 0, held: 2 } } }
     player.resources.boar = 0
     const state = createState(player)
+    const payResult = { type: 'ok' as const }
     const result = executeCardListener(listener, {
       state, player,
       space: createSpace('begging-card-pay'),
       actionId: 'pay', phase: 'after',
       sourceCard: undefined,
-      result: { type: 'ok', resourcesPaid: { boar: 2 } },
+      result: payResult,
+      transactionEvents: [paidEvent({ boar: 2 })],
     } as unknown as CardListenerContext)
     expect(result?.flow).toEqual({
       type: 'leaf',
@@ -102,20 +126,50 @@ describe('C148 MudWallower — after-pay sync listener', () => {
     expect(player.cardStates![CARD_ID]!.counters!.held).toBe(2)
   })
 
+  it('real GameSession pay action emits resource.paid and syncs held to remaining boar', () => {
+    const session = new GameSession(undefined, undefined, { playerCount: 2 })
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 1
+    state.roundPhase = 'work'
+    state.actionSpaces.push(createPayBoarSpace(1))
+
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
+    player.occupationPlayed = [CARD_ID]
+    player.cardStates = { [CARD_ID]: { counters: { counter: 0, held: 2 } } }
+    player.resources = { ...player.resources, boar: 2 }
+    session.loadState(state)
+
+    const resp = session.takeAction(0, '__test-pay-boar')
+    expect(resp.ok).toBe(true)
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.paid',
+        resources: expect.objectContaining({ boar: 1 }),
+        paymentFor: 'cardEffect',
+      }),
+    ]))
+    expect(resp.state.players[0]!.resources.boar).toBe(1)
+    expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.counters?.held).toBe(1)
+  })
+
   it('does not sync when no boar paid (e.g. wood/food only payment)', () => {
     const listener = findListener('C148-mud-wallower-after-pay-sync')!
     const player = createPlayer()
     player.cardStates = { [CARD_ID]: { counters: { counter: 0, held: 2 } } }
-    // Player has 3 boar, cap is 2 — no sync should happen on a non-boar pay
-    player.resources.boar = 3
+    player.resources.boar = 1
     const state = createState(player)
-    executeCardListener(listener, {
+    const result = executeCardListener(listener, {
       state, player,
       space: createSpace('improvement'),
       actionId: 'pay', phase: 'after',
       sourceCard: undefined,
-      result: { type: 'ok', resourcesPaid: { wood: 2, clay: 1 } },
+      result: { type: 'ok' },
+      transactionEvents: [paidEvent({ boar: 1 }), paidEvent({ wood: 2, clay: 1 })],
+      actionEvents: [paidEvent({ wood: 2, clay: 1 })],
     } as unknown as CardListenerContext)
+    expect(result).toBeUndefined()
     expect(player.cardStates![CARD_ID]!.counters!.held).toBe(2)
   })
 
@@ -131,7 +185,8 @@ describe('C148 MudWallower — after-pay sync listener', () => {
       space: createSpace('cooking'),
       actionId: 'pay', phase: 'after',
       sourceCard: undefined,
-      result: { type: 'ok', resourcesPaid: { boar: 1 } },
+      result: { type: 'ok' },
+      transactionEvents: [paidEvent({ boar: 1 })],
     } as unknown as CardListenerContext)
     expect(player.cardStates![CARD_ID]!.counters!.held).toBe(1)
   })
@@ -168,7 +223,8 @@ describe('C148 MudWallower — after-pay sync listener', () => {
         space: createSpace('cooking'),
         actionId: 'pay', phase: 'after',
         sourceCard: undefined,
-        result: { type: 'ok', resourcesPaid: { boar: 1 } },
+        result: { type: 'ok' },
+        transactionEvents: [paidEvent({ boar: 1 })],
       } as unknown as CardListenerContext)
     }).not.toThrow()
   })

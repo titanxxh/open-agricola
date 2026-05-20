@@ -18,9 +18,11 @@ import type {
   InteractionState,
   PlayerState,
   Resource,
+  ResourceBatchExchangePayload,
   InteractionAnimalReorgZone,
 } from '../contract/types.ts'
-import type { ActionDetailParts } from '../contract/protocol/game.ts'
+import type { ActionDetailParts, PublicEventCancellation } from '../contract/protocol/game.ts'
+import type { PrivateGameEvent } from '../contract/private-events.ts'
 import { actionDefinitions, getActionDefinition } from '../actions/index.ts'
 import { internalActionDefinitions } from '../actions/internal-actions.ts'
 import { getAllAdHocActions } from '../actions/helpers/ad-hoc-action-registry.ts'
@@ -128,7 +130,10 @@ import {
 import { rebuildActiveModifiers } from '../session/serialization.ts'
 import { isSpaceOccupied, removeWorkerRef } from '../domain/space.ts'
 import { smallestAvailableWorker } from '../domain/player.ts'
-import { computeAllowedPlacementSpaces } from '../actions/helpers/placement-availability.ts'
+import {
+  canEnterSpace,
+  computeAllowedPlacementSpaces,
+} from '../actions/helpers/placement-availability.ts'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../actions/helpers/placement-constants.ts'
 import {
   computeAnytimePolicy,
@@ -194,6 +199,33 @@ const actionDetailResourceDeltas = (
   return raw.filter((entry): entry is ActionDetailResourceDelta =>
     typeof entry === 'object' && entry !== null,
   )
+}
+
+const positiveResourceDetail = (resources: Partial<Resource>): Partial<Resource> => {
+  const detail: Partial<Resource> = {}
+  for (const key of resourceKeyList) {
+    const amount = resources[key] ?? 0
+    if (amount > 0) detail[key] = amount
+  }
+  return detail
+}
+
+const compactActionDetailParts = (
+  detailParts: ActionDetailParts & {
+    gains: Resource
+    costs: Resource
+    effects: NonNullable<ActionDetailParts['effects']>
+  },
+): ActionDetailParts => {
+  const gains = positiveResourceDetail(detailParts.gains)
+  const costs = positiveResourceDetail(detailParts.costs)
+  const effects = Object.keys(detailParts.effects).length > 0 ? detailParts.effects : undefined
+  return {
+    ...(Object.keys(gains).length ? { gains } : {}),
+    ...(Object.keys(costs).length ? { costs } : {}),
+    ...(effects ? { effects } : {}),
+    ...(detailParts.bonusSources?.length ? { bonusSources: detailParts.bonusSources } : {}),
+  }
 }
 
 /**
@@ -272,7 +304,13 @@ export type SessionResponse = {
   pastureCapacities?: Record<string, Record<string, number>>
   actionAvailability?: Record<string, boolean>
   cardAvailability?: Record<string, boolean>
+  privateEvents?: PrivateGameEvent[]
+  publicEventCancellations?: PublicEventCancellation[]
   error?: string
+}
+
+type ResponseMetadata = {
+  publicEventCancellations?: PublicEventCancellation[]
 }
 
 /**
@@ -378,6 +416,8 @@ export class GameCore {
     gains: {},
     costs: {},
   }
+  private responsePrivateEvents: PrivateGameEvent[] = []
+  private deferPrivateEventDrainDepth = 0
   /**
    * Monotonic counter for two purposes:
    *   1. `recordActionSnapshot(player, n)` — per-player action token used by
@@ -463,7 +503,13 @@ export class GameCore {
   resetActionResultDetails(): void { this.actionResultDetailsSinceFlush = { gains: {}, costs: {} } }
 
   /** @internal phase access — emit a SessionResponse with the current state. */
-  emitResponse(ok = true, error?: string): SessionResponse { return this.respond(ok, error) }
+  emitResponse(ok = true, error?: string, privateEvents?: PrivateGameEvent[]): SessionResponse {
+    return this.respond(ok, error, privateEvents)
+  }
+
+  emitResponsePrivateEvent(event: PrivateGameEvent): void {
+    this.responsePrivateEvents.push(event)
+  }
 
   /** @internal phase access — drive the engine's step loop until it blocks. */
   driveEngineSteps(): void { this.runEngineSteps() }
@@ -1478,6 +1524,20 @@ export class GameCore {
           allowedCommands: buildCmds(['commitSelection', 'undoStep', 'undoAction']),
           anytimeActions: anytimeDescriptors,
         }
+      case 'resource-batch-exchange-select':
+        return {
+          stateId: 'wait',
+          playerIndex,
+          spaceId,
+          promptKey,
+          promptParams,
+          sourceCard,
+          request,
+          options: choiceOptions,
+          costOverride,
+          allowedCommands: buildCmds(['commitSelection', 'undoStep', 'undoAction']),
+          anytimeActions: anytimeDescriptors,
+        }
       case 'select-trigger':
         return {
           stateId: 'wait',
@@ -1584,7 +1644,12 @@ export class GameCore {
     return Scoring.computeAll(this.state).map((s) => ({ playerId: s.playerId, total: s.total }))
   }
 
-  private respond(ok = true, error?: string): SessionResponse {
+  private respond(
+    ok = true,
+    error?: string,
+    privateEvents?: PrivateGameEvent[],
+    metadata: ResponseMetadata = {},
+  ): SessionResponse {
     // While the top-level game phase is 'draft', the client uses
     // DraftOverlay (which reads `state.draft` directly), so surface an
     // idle interaction. Otherwise let `buildInteraction()` derive the
@@ -1613,7 +1678,67 @@ export class GameCore {
       )
     }
     if (error) resp.error = error
+    const drainedPrivateEvents = this.drainResponsePrivateEvents(ok, privateEvents)
+    if (drainedPrivateEvents) resp.privateEvents = drainedPrivateEvents
+    if (metadata.publicEventCancellations?.length) {
+      resp.publicEventCancellations = metadata.publicEventCancellations
+    }
     return resp
+  }
+
+  private maxPublicEventSeq(events: GameState['events']): number {
+    if (events.length === 0) return 0
+    return events.reduce((max, event) => Math.max(max, event.seq), 0)
+  }
+
+  private buildPublicEventCancellation(
+    reason: PublicEventCancellation['reason'],
+    beforeEvents: GameState['events'],
+  ): PublicEventCancellation | null {
+    const previousMaxSeq = this.maxPublicEventSeq(beforeEvents)
+    const nextMaxSeq = this.maxPublicEventSeq(this.state.events)
+    const afterIds = new Set(this.state.events.map((event) => event.id))
+    const canceledEvents = beforeEvents.filter((event) =>
+      event.seq > nextMaxSeq || !afterIds.has(event.id)
+    ).sort((a, b) => a.seq - b.seq)
+    if (canceledEvents.length === 0) return null
+    return {
+      reason,
+      previousMaxSeq,
+      nextMaxSeq,
+      canceledEventIds: canceledEvents.map((event) => event.id),
+      canceledSeqs: canceledEvents.map((event) => event.seq),
+    }
+  }
+
+  private respondWithPublicEventCancellation(
+    reason: PublicEventCancellation['reason'],
+    beforeEvents: GameState['events'],
+  ): SessionResponse {
+    const cancellation = this.buildPublicEventCancellation(reason, beforeEvents)
+    return this.respond(true, undefined, undefined, cancellation
+      ? { publicEventCancellations: [cancellation] }
+      : {})
+  }
+
+  private drainResponsePrivateEvents(
+    ok: boolean,
+    explicit?: PrivateGameEvent[],
+  ): PrivateGameEvent[] | undefined {
+    if (this.deferPrivateEventDrainDepth > 0 && !explicit) return undefined
+    const buffered = this.responsePrivateEvents.splice(0)
+    if (!ok) return undefined
+    const events = [...(explicit ?? []), ...buffered]
+    return events.length > 0 ? events : undefined
+  }
+
+  private buildEngineExecutionContext(player: PlayerState, space: ActionSpace) {
+    return {
+      state: this.state,
+      player,
+      space,
+      emitPrivateEvent: (event: PrivateGameEvent) => this.emitResponsePrivateEvent(event),
+    }
   }
 
   /**
@@ -1846,6 +1971,72 @@ export class GameCore {
     this.resetActionResultDetails()
   }
 
+  private hasEventDerivedActionDetail(playerId: string, actionId: string): boolean {
+    const latestPlacement = [...this.state.events]
+      .filter((event) =>
+        event.type === 'worker.placed' &&
+        event.actorPlayerId === playerId &&
+        (event.sourceActionId === actionId || event.spaceId === actionId),
+      )
+      .sort((left, right) => right.seq - left.seq)[0]
+    const latestPlacementSeq = latestPlacement?.seq ?? -1
+    return this.state.events.some((event) => {
+      if (event.seq <= latestPlacementSeq) return false
+      switch (event.type) {
+        case 'resource.moved':
+          if (event.actorPlayerId !== playerId || event.to.kind !== 'player') return false
+          if (event.reason === 'harvest' || event.reason === 'cardEffect') return false
+          if (!resourceKeyList.some((key) => (event.resources[key] ?? 0) > 0)) return false
+          return event.sourceActionId === actionId ||
+            (event.from.kind === 'actionSpace' && event.from.spaceId === actionId)
+        case 'farm.fieldPlowed':
+          return event.actorPlayerId === playerId && (event.sourceActionId ?? 'plow') === actionId
+        case 'farm.roomBuilt':
+          return event.actorPlayerId === playerId && (event.sourceActionId ?? 'construct') === actionId
+        case 'farm.renovated':
+          return (event.actorPlayerId ?? event.playerId) === playerId &&
+            (event.sourceActionId ?? 'renovate-house') === actionId
+        case 'farm.stableBuilt':
+          return event.actorPlayerId === playerId &&
+            ((event.sourceActionId ?? latestPlacement?.sourceActionId ?? 'stables') === actionId)
+        case 'farm.fenceBuilt':
+          return event.actorPlayerId === playerId && (event.sourceActionId ?? 'fence') === actionId
+        case 'resource.exchanged':
+          if (event.actorPlayerId !== playerId) return false
+          if ((event.paid.grain ?? 0) > 0 && (event.gained.food ?? 0) > 0 && event.exchangeSource) return false
+          return (event.sourceActionId ?? event.exchangeSource ?? 'exchange') === actionId
+        case 'resource.paid':
+          if (event.actorPlayerId !== playerId) return false
+          if (event.paymentFor === 'feeding' || event.paymentFor === 'begging' || event.sourceCardId) return false
+          return (event.sourceActionId ?? event.paymentFor) === actionId
+        default:
+          return false
+      }
+    })
+  }
+
+  private emitActionDetailLoggedEvent(
+    player: PlayerState,
+    actionId: string,
+    detailParts: ActionDetailParts & {
+      gains: Resource
+      costs: Resource
+      effects: NonNullable<ActionDetailParts['effects']>
+    },
+  ): void {
+    if (this.hasEventDerivedActionDetail(player.id, actionId)) return
+    const compact = compactActionDetailParts(detailParts)
+    if (Object.keys(compact).length === 0) return
+    appendImmediateEvents(this.state, [{
+      type: 'action.detailLogged',
+      playerId: player.id,
+      actionId,
+      detailParts: compact,
+      actorPlayerId: player.id,
+      sourceActionId: actionId,
+    }])
+  }
+
   private logActionDetail(before: PlayerState, player: PlayerState) {
     if (!this.activeSpaceId) return
     const space = this.getSpaceById(this.activeSpaceId)
@@ -1862,7 +2053,7 @@ export class GameCore {
     ) return
     if (!hasGains && !hasCosts && !hasEffects) return
     void space
-    void detailParts
+    this.emitActionDetailLoggedEvent(player, this.activeSpaceId, detailParts)
     player._activeActionBonusSources = []
     this.actionStartPlayerSnapshot = this.clonePlayer(player)
   }
@@ -2243,12 +2434,26 @@ export class GameCore {
     const actionEvents = this.state.actionSpaces.flatMap((space): ImmediateEventDraft[] => {
       const openRound = roundOpen.get(space.id) ?? space.roundAvailable
       const events: ImmediateEventDraft[] = []
-      if (this.state.round === openRound) {
+      const alreadyRevealed = this.state.events.some((event) =>
+        event.type === 'action.revealed' &&
+        event.actionId === space.id &&
+        event.roundSlot === this.state.round)
+      if (this.state.round === openRound && !alreadyRevealed) {
         events.push({
           type: 'action.revealed',
           actionId: space.id,
           roundSlot: this.state.round,
         })
+      }
+      const exclusiveUse = space.exclusiveUse
+      if (exclusiveUse && this.state.round >= exclusiveUse.untilRound) {
+        events.push({
+          type: 'action.exclusiveUseCleared',
+          actionId: space.id,
+          playerId: exclusiveUse.playerId,
+          sourceCardId: exclusiveUse.sourceCardId,
+        })
+        delete space.exclusiveUse
       }
       if (this.state.round >= openRound) {
         const resources: Partial<Resource> = {}
@@ -2482,13 +2687,15 @@ export class GameCore {
         frame.deferredPlayerSwitch = null
       }
       const before = this.clonePlayer(player)
-      const step = frame.engine.proceed({ state: this.state, player, space })
+      const step = frame.engine.proceed(this.buildEngineExecutionContext(player, space))
       this.flushEngineLog()
 
       if (step.type === 'blocked' && step.mandatory === true && step.actionId) {
         frame.deferredPlayerSwitch = null
         const pendingSet = frame.engine.setEngineBlockedPending(step.nodeId, step.actionId)
         if (!pendingSet) throw new Error(`missing mandatory blocked engine node: ${step.nodeId}`)
+        frame.engine.flushEventTransaction({ state: this.state, player, space })
+        this.flushEngineLog()
         return
       }
 
@@ -2584,6 +2791,8 @@ export class GameCore {
         if (frame.deferredPlayerSwitch && !frame.deferredPlayerSwitch.confirmed) {
           const { fromPlayerIndex, toPlayerIndex } = frame.deferredPlayerSwitch
           frame.deferredPlayerSwitch = null
+          frame.engine.flushEventTransaction({ state: this.state, player, space })
+          this.flushEngineLog()
           this.startConfirmPlayerSwitch(fromPlayerIndex, toPlayerIndex)
           return
         }
@@ -2606,7 +2815,10 @@ export class GameCore {
             const auto = autoOptions[0]
             if (auto?.disabled === true) return
             const resolvedActionId = this.peekHostPendingActionId()
-            const result = frame.engine.resolveChoice(auto.value, { state: this.state, player, space })
+            const result = frame.engine.resolveChoice(
+              auto.value,
+              this.buildEngineExecutionContext(player, space),
+            )
             this.flushEngineLog()
             if (result.type === 'ok' && resolvedActionId && !isInjectedAnytimeResult(result)) {
               this.recordActionResultDetails(result, frameOwnerPlayer.id, player.id)
@@ -2647,6 +2859,8 @@ export class GameCore {
         // is the canonical source of the pending interaction (Task 10).
         // Yield to the client; `buildInteraction()` derives the response
         // shape from the pending envelope.
+        frame.engine.flushEventTransaction({ state: this.state, player, space })
+        this.flushEngineLog()
         return
       }
 
@@ -2728,9 +2942,8 @@ export class GameCore {
     return false
   }
 
-  private isActionSpaceAvailableToPlayer(player: PlayerState, space: ActionSpace, roundOpen: Map<string, number>): boolean {
-    const openRound = roundOpen.get(space.id) ?? space.roundAvailable
-    if (this.state.round < openRound) return false
+  private isActionSpaceAvailableToPlayer(player: PlayerState, space: ActionSpace): boolean {
+    if (!canEnterSpace(space, player, this.state)) return false
     if (workersAvailable(this.state, player) <= 0) return false
     if (isSpaceOccupied(space)) {
       const allowed = computeAllowedPlacementSpaces(this.state, player)
@@ -2746,9 +2959,8 @@ export class GameCore {
   getAvailableActions(playerIndex: number): { spaceId: string; nameKey: string }[] {
     const player = this.state.players[playerIndex]
     if (!player) return []
-    const roundOpen = createRoundOpenById(this.state.roundActionOrder)
     return this.state.actionSpaces
-      .filter((space) => this.isActionSpaceAvailableToPlayer(player, space, roundOpen))
+      .filter((space) => this.isActionSpaceAvailableToPlayer(player, space))
       .map((space) => ({ spaceId: space.id, nameKey: space.nameKey }))
   }
 
@@ -2760,11 +2972,10 @@ export class GameCore {
     const player = this.state.players[playerIndex]
     if (!player) return {}
 
-    const roundOpen = createRoundOpenById(this.state.roundActionOrder)
     const result: Record<string, boolean> = {}
 
     for (const space of this.state.actionSpaces) {
-      result[space.id] = this.isActionSpaceAvailableToPlayer(player, space, roundOpen)
+      result[space.id] = this.isActionSpaceAvailableToPlayer(player, space)
     }
 
     // Also mark occupied spaces that computeArgs listeners expose as extra options
@@ -2942,6 +3153,7 @@ export class GameCore {
         const cardFlow = cardEffect.resolveChoice(this.state, player, value, {
           sourceCard: pendingSourceCard,
           actionContext: pendingActionContext,
+          emitPrivateEvent: (event) => this.emitResponsePrivateEvent(event),
         })
         if (cardFlow && this.engine) {
           // Insert the follow-up so it runs after the engine finishes resolving the choice.
@@ -2951,7 +3163,11 @@ export class GameCore {
       }
     }
     const resolvedActionId = this.peekHostPendingActionId()
-    const result = this.engine.resolveChoice(value, { state: this.state, player, space }, payload)
+    const result = this.engine.resolveChoice(
+      value,
+      this.buildEngineExecutionContext(player, space),
+      payload,
+    )
     this.flushEngineLog()
     if (result.type === 'ok' && resolvedActionId && !isInjectedAnytimeResult(result)) {
       this.recordActionResultDetails(
@@ -2978,7 +3194,12 @@ export class GameCore {
       this.turnOwnerPlayerIndex = null
       return this.respond(false, result.errorKey ?? 'action failed')
     }
-    this.runEngineSteps()
+    this.deferPrivateEventDrainDepth += 1
+    try {
+      this.runEngineSteps()
+    } finally {
+      this.deferPrivateEventDrainDepth -= 1
+    }
     return this.respond()
   }
 
@@ -3000,6 +3221,11 @@ export class GameCore {
     const request = envelope?.request
     if (request) {
       if (!isPendingChoiceValueAllowed(envelope, value)) {
+        const disabled = pendingEnvelopeChoices(envelope)
+          .some((option) => option.value === value && option.disabled === true)
+        if (disabled && String(envelope.promptKey) === 'cards.B3_Moonshine.choice') return this.respond(false, 'choice disabled')
+        const legacy = this.resolveLegacyChoiceValue(playerIndex, value, payload)
+        if (legacy) return legacy
         return this.respond(false, 'invalid choice value')
       }
       switch (request.kind) {
@@ -3032,6 +3258,8 @@ export class GameCore {
           // explicitly so future callers cannot silently route through the
           // legacy pending-options path.
           return this.respond(false, 'use commitSelectionChoice for resource-quantity-select')
+        case 'resource-batch-exchange-select':
+          return this.respond(false, 'use commitSelectionChoice for resource-batch-exchange-select')
         case 'card-draft':
           return this.respond(false, 'card-draft resolveChoice not supported')
         case 'engine-blocked':
@@ -3043,6 +3271,59 @@ export class GameCore {
       }
     }
     return this.resolvePendingChoice(playerIndex, value, true, payload)
+  }
+
+  private resolveLegacyChoiceValue(
+    playerIndex: number,
+    value: string,
+    payload?: Record<string, unknown>,
+  ): SessionResponse | null {
+    const envelope = this.engineStack.peekPendingEnvelope()
+    const options = pendingEnvelopeChoices(envelope)
+    if ((value === 'ok' || value === 'confirm') && typeof payload === 'string') {
+      const action = options.find((option) => option.value.startsWith(`action-${payload}-`))
+      if (action) return this.resolveChoice(playerIndex, action.value)
+    }
+    if (value === 'ok') {
+      const action = options.filter((option) => option.value !== '__skip__' && option.value !== 'skip')
+      if (action.length === 1) return this.resolveChoice(playerIndex, action[0]!.value)
+    }
+    const promptKey = envelope?.promptKey
+    if (promptKey && this.isSelectionPromptKey(promptKey)) {
+      const interactionContext = this.peekHostContextSnapshot()?.actionContext
+      const selectionKind = (interactionContext?.selectionKind as string | undefined) ?? 'farm-position'
+      if (selectionKind === 'occupation-hand') {
+        const cardIds = value.split(',').map((id) => id.trim()).filter(Boolean)
+        if (cardIds.length > 0) {
+          return this.commitSelectionChoice(playerIndex, { cardIds })
+        }
+      }
+      const positions = value
+        .split(',')
+        .map((part) => {
+          const [row, col] = part.trim().split('-').map((n) => Number(n))
+          return Number.isInteger(row) && Number.isInteger(col) ? { row, col } : null
+        })
+      if (positions.length > 0 && positions.every((pos): pos is FarmTilePosition => pos !== null)) {
+        return this.commitSelectionChoice(playerIndex, { positions })
+      }
+      return null
+    }
+
+    if (/^(minor|major|occupation):/.test(value)) {
+      const action = options.filter((option) => option.value !== '__skip__' && option.value !== 'skip')
+      if (action.length === 1 && /^action-(improvement|occupation)-/.test(action[0]!.value)) {
+        const first = this.resolveChoice(playerIndex, action[0]!.value)
+        if (!first.ok || first.interaction.stateId !== 'wait') return first
+        const nextEnvelope = this.engineStack.peekPendingEnvelope()
+        if (!nextEnvelope || !isPendingChoiceValueAllowed(nextEnvelope, value)) {
+          return first
+        }
+        return this.resolveChoice(playerIndex, value, payload)
+      }
+    }
+
+    return null
   }
 
   startDevFenceSelect(playerIndex: number): SessionResponse {
@@ -3426,7 +3707,7 @@ export class GameCore {
 
     const result = this.engine.resolveChoice(
       'confirm',
-      { state: this.state, player: updatedPlayer, space },
+      this.buildEngineExecutionContext(updatedPlayer, space),
     )
     this.flushEngineLog()
     if (result.type === 'ok') {
@@ -3458,6 +3739,7 @@ export class GameCore {
       positions?: FarmTilePosition[]
       cardIds?: string[]
       resourceCounts?: Partial<Record<keyof Resource, number>>
+      resourceBatchExchange?: ResourceBatchExchangePayload
     },
   ): SessionResponse {
     const envelope = this.engineStack.peekPendingEnvelope()
@@ -3465,11 +3747,12 @@ export class GameCore {
     const envelopeKind = envelope?.request.kind
     const isPlainChoice = envelopeKind === 'choice'
     const isResourceQuantity = envelopeKind === 'resource-quantity-select'
+    const isResourceBatchExchange = envelopeKind === 'resource-batch-exchange-select'
     const pendingPlayerIndex = frame && envelope
       ? this.effectiveOwnerIndexForFrame(frame, envelope.hostNodeId, envelope)
       : -1
-    if ((!isPlainChoice && !isResourceQuantity) || pendingPlayerIndex !== playerIndex) {
-      return this.respond(false, 'no pending selection/resource-quantity choice for this player')
+    if ((!isPlainChoice && !isResourceQuantity && !isResourceBatchExchange) || pendingPlayerIndex !== playerIndex) {
+      return this.respond(false, 'no pending selection/resource choice for this player')
     }
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
@@ -3500,9 +3783,7 @@ export class GameCore {
       this.pushHistory()
       const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('resource-quantity')
       const result = this.engine?.resolveChoice('confirm', {
-        state: this.state,
-        player,
-        space,
+        ...this.buildEngineExecutionContext(player, space),
       }, { resourceCounts: counts })
       // Effect 校验失败应直接 respond(false)，pending envelope 保留，让前端再次提交合法选择。
       if (result?.type === 'fail') {
@@ -3519,6 +3800,65 @@ export class GameCore {
       }
       this.flushEngineLog()
       this.runEngineSteps()
+      if (this.engineStack.peekPendingEnvelope()) return this.respond()
+      return this.continueAfterResolvedFarmChoice(playerIndex)
+    }
+
+    if (isResourceBatchExchange && envelope && envelope.request.kind === 'resource-batch-exchange-select') {
+      const batch = payload.resourceBatchExchange ?? { discard: {}, receive: {} }
+      const discard = batch.discard ?? {}
+      const receive = batch.receive ?? {}
+      const allowedReceive = new Set(envelope.request.receiveResources)
+      let discardTotal = 0
+      let receiveTotal = 0
+      for (const [key, raw] of Object.entries(discard)) {
+        const resourceKey = key as keyof Resource
+        const value = raw ?? 0
+        if (!Number.isInteger(value) || value < 0) {
+          return this.respond(false, `resource-batch.error.invalid-discard-${key}`)
+        }
+        const max = envelope.request.discardAvailableByResource[resourceKey] ?? 0
+        if (value > max) {
+          return this.respond(false, `resource-batch.error.invalid-discard-${key}`)
+        }
+        discardTotal += value
+      }
+      for (const [key, raw] of Object.entries(receive)) {
+        const resourceKey = key as keyof Resource
+        const value = raw ?? 0
+        if (!allowedReceive.has(resourceKey) || !Number.isInteger(value) || value < 0) {
+          return this.respond(false, `resource-batch.error.invalid-receive-${key}`)
+        }
+        receiveTotal += value
+      }
+      if (discardTotal > envelope.request.maxTotal || receiveTotal > envelope.request.maxTotal) {
+        return this.respond(false, 'resource-batch.error.too-many')
+      }
+      if (discardTotal !== receiveTotal) {
+        return this.respond(false, 'resource-batch.error.total-mismatch')
+      }
+      if ((envelope.request.requireAtLeastOne ?? false) && discardTotal < 1) {
+        return this.respond(false, 'resource-batch.error.must-pick-at-least-one')
+      }
+      this.pushHistory()
+      const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('resource-batch-exchange')
+      const result = this.engine?.resolveChoice('confirm', {
+        ...this.buildEngineExecutionContext(player, space),
+      }, { resourceBatchExchange: batch })
+      if (result?.type === 'fail') {
+        this.flushEngineLog()
+        return this.respond(false, result.errorKey ?? 'invalid resource batch exchange')
+      }
+      if (result?.type === 'ok') {
+        this.recordActionResultDetails(
+          result,
+          this.currentFrameOwnerPlayerId(player.id),
+          player.id,
+        )
+      }
+      this.flushEngineLog()
+      this.runEngineSteps()
+      if (this.engineStack.peekPendingEnvelope()) return this.respond()
       return this.continueAfterResolvedFarmChoice(playerIndex)
     }
 
@@ -3546,9 +3886,7 @@ export class GameCore {
       const choiceValue = cardIds.length > 0 ? 'confirm' : 'cancel'
       const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('selection')
       const result = this.engine?.resolveChoice(choiceValue, {
-        state: this.state,
-        player: this.state.players[playerIndex]!,
-        space,
+        ...this.buildEngineExecutionContext(this.state.players[playerIndex]!, space),
       }, { cards: cardIds })
       if (result?.type === 'ok') {
         this.recordActionResultDetails(
@@ -3559,6 +3897,7 @@ export class GameCore {
       }
       this.flushEngineLog()
       this.runEngineSteps()
+      if (this.engineStack.peekPendingEnvelope()) return this.respond()
       return this.continueAfterResolvedFarmChoice(playerIndex)
     }
 
@@ -3595,9 +3934,7 @@ export class GameCore {
     const choiceValue = positions.length > 0 ? 'confirm' : 'cancel'
     const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('selection')
     const result = this.engine?.resolveChoice(choiceValue, {
-      state: this.state,
-      player: this.state.players[playerIndex]!,
-      space,
+      ...this.buildEngineExecutionContext(this.state.players[playerIndex]!, space),
     }, { positions: positionStrings })
     if (result?.type === 'ok') {
       this.recordActionResultDetails(
@@ -3608,6 +3945,7 @@ export class GameCore {
     }
     this.flushEngineLog()
     this.runEngineSteps()
+    if (this.engineStack.peekPendingEnvelope()) return this.respond()
     return this.continueAfterResolvedFarmChoice(playerIndex)
   }
 
@@ -3657,17 +3995,27 @@ export class GameCore {
   devDrawCard(playerIndex: number, cardId: string): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
+    const isOccupation = this.isOccupationCard(cardId)
     // Remove from all players' hands first
     for (const p of this.state.players) {
       p.minorHand = p.minorHand.filter(id => id !== cardId)
       p.occupationHand = p.occupationHand.filter(id => id !== cardId)
     }
-    if (this.isOccupationCard(cardId)) {
+    if (isOccupation) {
       player.occupationHand.push(cardId)
     } else {
       player.minorHand.push(cardId)
     }
-    return this.respond()
+    return this.respond(true, undefined, [
+      {
+        schemaVersion: 1,
+        type: 'private.handChanged',
+        recipientPlayerId: player.id,
+        cardIds: [cardId],
+        cardType: isOccupation ? 'occupation' : 'minor',
+        reason: 'dev-draw-card',
+      },
+    ])
   }
 
   devPlayCard(playerIndex: number, cardId: string): SessionResponse {
@@ -3744,16 +4092,18 @@ export class GameCore {
         entry.activePlayerIndex === this.activePlayerIndex &&
         entry.hadChoicePending
       if (canRestorePriorChoice) {
+        const beforeEvents = [...this.state.events]
         this.history.pop()
         this.restoreHistory(entry)
         this.recomputeActionStartIndex()
-        return this.respond()
+        return this.respondWithPublicEventCancellation('undoStep', beforeEvents)
       }
       if (entry && this.engineStack.hasPendingChoiceCompositeAncestor()) {
+        const beforeEvents = [...this.state.events]
         this.history.pop()
         this.restoreHistory(entry)
         this.recomputeActionStartIndex()
-        return this.respond()
+        return this.respondWithPublicEventCancellation('undoStep', beforeEvents)
       }
       const cancelResult = this.resolvePendingChoice(currentPlayerIndex, 'cancel', false)
       const stillOnSameFarmPrompt =
@@ -3779,9 +4129,10 @@ export class GameCore {
     }
     const entry = this.history.pop()
     if (!entry) return this.respond(false, 'no history to undo')
+    const beforeEvents = [...this.state.events]
     this.restoreHistory(entry)
     this.recomputeActionStartIndex()
-    return this.respond()
+    return this.respondWithPublicEventCancellation('undoStep', beforeEvents)
   }
 
   undoAction(): SessionResponse {
@@ -3795,6 +4146,7 @@ export class GameCore {
     }
     const entry = this.history[targetIndex]
     if (!entry) return this.respond(false, 'no action snapshot')
+    const beforeEvents = [...this.state.events]
     this.restoreHistory(entry)
     this.history = this.history.slice(0, targetIndex)
     if (targetIndex === this.actionStartIndex) {
@@ -3802,6 +4154,6 @@ export class GameCore {
     } else {
       this.recomputeActionStartIndex()
     }
-    return this.respond()
+    return this.respondWithPublicEventCancellation('undoAction', beforeEvents)
   }
 }
