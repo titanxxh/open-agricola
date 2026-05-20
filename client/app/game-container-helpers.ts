@@ -1,5 +1,10 @@
 import type { FarmTilePosition } from '../../shared/contract/types'
 import { parsePositionKey, positionKey } from '../../shared/domain/farm'
+import type {
+  PublicEventFenceEdgeHighlightTarget,
+  PublicEventFarmTileHighlightTarget,
+  PublicEventHighlightTargets,
+} from './public-event-notifications'
 
 export type WsStatus =
   | { phase: 'idle' }
@@ -85,6 +90,64 @@ export const getCurrentlySelectableRoomKeys = (
       .filter((key) => pendingRoomKeys.has(key) || roomNeighborKeys(key).some((neighbor) => anchors.has(neighbor))),
   )
 }
+
+export const hasPublicEventHighlights = (targets: PublicEventHighlightTargets): boolean =>
+  targets.actionIds.length > 0 || targets.farmTiles.length > 0 || targets.fenceEdges.length > 0
+
+export const mergePublicEventHighlights = (
+  current: PublicEventHighlightTargets,
+  incoming: PublicEventHighlightTargets,
+): PublicEventHighlightTargets => ({
+  actionIds: [...incoming.actionIds, ...current.actionIds],
+  farmTiles: [...incoming.farmTiles, ...current.farmTiles],
+  fenceEdges: [...incoming.fenceEdges, ...current.fenceEdges],
+})
+
+const removeCountedItems = <T>(
+  current: readonly T[],
+  removing: readonly T[],
+  keyOf: (value: T) => string,
+): T[] => {
+  const remaining = new Map<string, number>()
+  removing.forEach((value) => {
+    const key = keyOf(value)
+    remaining.set(key, (remaining.get(key) ?? 0) + 1)
+  })
+  return current.filter((value) => {
+    const key = keyOf(value)
+    const count = remaining.get(key) ?? 0
+    if (count <= 0) return true
+    remaining.set(key, count - 1)
+    return false
+  })
+}
+
+const farmTileHighlightKey = (target: PublicEventFarmTileHighlightTarget): string =>
+  `${target.playerId}:${target.key}`
+
+const fenceEdgeHighlightKey = (target: PublicEventFenceEdgeHighlightTarget): string =>
+  `${target.playerId}:${target.edgeId}`
+
+export const removePublicEventHighlights = (
+  current: PublicEventHighlightTargets,
+  removing: PublicEventHighlightTargets,
+): PublicEventHighlightTargets => ({
+  actionIds: removeCountedItems(current.actionIds, removing.actionIds, (value) => value),
+  farmTiles: removeCountedItems(current.farmTiles, removing.farmTiles, farmTileHighlightKey),
+  fenceEdges: removeCountedItems(current.fenceEdges, removing.fenceEdges, fenceEdgeHighlightKey),
+})
+
+export const filterPublicFarmHighlightsForPlayer = (
+  targets: readonly PublicEventFarmTileHighlightTarget[],
+  playerId: string,
+): Set<string> =>
+  new Set(targets.filter((target) => target.playerId === playerId).map((target) => target.key))
+
+export const filterPublicFenceHighlightsForPlayer = (
+  targets: readonly PublicEventFenceEdgeHighlightTarget[],
+  playerId: string,
+): Set<string> =>
+  new Set(targets.filter((target) => target.playerId === playerId).map((target) => target.edgeId))
 
 const FIXED_DEV_ROOM_IDS = new Set(['dev2', 'dev3', 'dev4'])
 

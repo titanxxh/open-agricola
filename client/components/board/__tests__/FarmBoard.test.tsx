@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import type { PlayerState, Resource } from '../../../../shared/contract/types'
-import { FarmBoard } from '../FarmBoard'
+import { FarmBoard, type FarmBoardProps } from '../FarmBoard'
 
 const resources = (): Resource => ({
   wood: 0,
@@ -44,7 +44,101 @@ const createPlayer = (id: string, name: string, color: PlayerState['color']): Pl
   cardStates: {},
 })
 
+const createFarmBoardProps = (
+  player: PlayerState,
+  overrides: Partial<FarmBoardProps> = {},
+): FarmBoardProps => ({
+  locale: 'en',
+  players: [player],
+  currentPlayer: player,
+  displayPlayer: player,
+  devMode: false,
+  currentStartPlayerId: '',
+  nextStartPlayerId: '',
+  playedCards: [],
+  farmCells: [],
+  roomPositions: new Set(),
+  fieldPositions: new Set(),
+  fieldMap: new Map(),
+  stablePositions: new Set(),
+  pendingRoomSet: new Set(),
+  pendingStableSet: new Set(),
+  roomSelectableSet: new Set(),
+  stableSelectableSet: new Set(),
+  maxStableSelections: 0,
+  plowSelectableSet: new Set(),
+  pendingPlowTile: null,
+  positionSelectableSet: new Set(),
+  pendingPositionSelections: new Set(),
+  togglePositionSelection: () => {},
+  pendingSowSelections: {},
+  sowRemaining: { grain: 0, vegetable: 0, wood: 0, stone: 0 },
+  sowSelectableMap: new Map(),
+  extraSowTargets: [],
+  pastureTiles: new Map(),
+  pastureDisplayMap: new Map(),
+  pastureCapacityMap: new Map(),
+  houseDisplay: { animalType: null, animalCount: 0 },
+  stableDisplayMap: new Map(),
+  isReorgActive: false,
+  reorgRemaining: null,
+  hasReorgOverflow: false,
+  animalReorg: null,
+  pendingFenceSet: new Set(),
+  existingFenceSet: new Set(),
+  fenceSelectableSet: new Set(),
+  toggleRoomTile: () => {},
+  toggleStableTile: () => {},
+  togglePlowTile: () => {},
+  updateSowSelection: () => {},
+  toggleFenceEdge: () => {},
+  adjustReorgAnimal: () => {},
+  confirmAnimalReorg: () => {},
+  cancelAnimalDiscardPrompt: () => {},
+  setViewPlayerId: () => {},
+  isSelectingMinor: false,
+  isSelectingOccupation: false,
+  isSelectingImprovementAny: false,
+  selectableMinorIds: new Set(),
+  selectableOccupationIds: new Set(),
+  cardAvailability: {},
+  futureCardResources: {},
+  resolveChoice: () => {},
+  isInteractive: true,
+  ...overrides,
+})
+
 describe('FarmBoard', () => {
+  it('marks highlighted farm tiles', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 }],
+          highlightedFarmTileKeys: new Set(['0-0']),
+        })}
+      />,
+    )
+
+    expect(html).toMatch(/farm-tile[^"]*\bevent-highlight\b/)
+  })
+
+  it('marks highlighted fence edges', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [{ key: 'fence-h-0-0', type: 'fence-h', fenceId: 'h-0-0' }],
+          highlightedFenceEdgeIds: new Set(['h-0-0']),
+        })}
+      />,
+    )
+
+    expect(html).toMatch(/farm-fence-h[^"]*\bevent-highlight\b/)
+  })
+
   it('renders off-board sow targets in a tray below the farm grid', () => {
     const player = createPlayer('p1', 'Player A', 'red')
 

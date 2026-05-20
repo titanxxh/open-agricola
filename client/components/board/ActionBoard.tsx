@@ -242,6 +242,7 @@ type Props = {
   takeAction: (space: ActionSpace) => void
   currentRound: number
   devMode: boolean
+  highlightedActionIds?: ReadonlySet<string>
 }
 
 type TooltipInfo = {
@@ -339,6 +340,7 @@ const getHarvestPositions = (playerCount: 2 | 3 | 4): Record<number, SlotPos> =>
 export const ActionBoard = ({
   locale, baseActions, roundSlots, currentPlayer, players,
   futureMeeples, canTakeAction, takeAction, currentRound, devMode,
+  highlightedActionIds = new Set<string>(),
 }: Props) => {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(1)
@@ -587,6 +589,7 @@ export const ActionBoard = ({
                   accDir && `accumulate-${accDir}`,
                   hasFarmer && !canTake && 'taken',
                   hasFarmer && canTake && 'occupied-available',
+                  highlightedActionIds.has(space.id) && 'event-highlight',
                 ].filter(Boolean).join(' ')}
                 data-action-id={space.id}
                 style={{ position: 'absolute', top: pos.top, left: pos.left, width: pos.width, height: pos.height }}
@@ -641,6 +644,7 @@ export const ActionBoard = ({
                       accDir && `accumulate-${accDir}`,
                       hasFarmer && !canTake && 'taken',
                       hasFarmer && canTake && 'occupied-available',
+                      highlightedActionIds.has(action.id) && 'event-highlight',
                     ].filter(Boolean).join(' ')}
                     data-action-id={action.id}
                     onMouseEnter={(e) => showTooltip(e, action)}
