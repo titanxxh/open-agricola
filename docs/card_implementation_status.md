@@ -110,7 +110,7 @@
 | Payment fallback 仍需继续收敛到事件 provenance | construct/renovate bonus choice 已能通过 `resource.paid` 携带 selected index；后续关注其他 direct payment caller | 新增支付类卡时优先消费 `resource.paid` / `bonusChoiceIndex`，不要读 action result fallback。 |
 | 行动格生命周期已进入后端事件层 | `B23_FinalScenario` | 后端持有 reveal/exclusive-use 状态，round-start 统一清理并 emit `action.exclusiveUseCleared`。 |
 | 选择校验重复且容易泄漏 | `B115`、`B165`、`E71` | 通用 selectableTiles / exact-count / atomic selection helper。 |
-| Log / notification provenance 仍需继续扩大到更多卡 | 本轮已覆盖 `B21_HayloftBarn`、`E47_SyrupTap`、`E78_SleightofHand`、`E123_ResourceHoarder`、`B23_FinalScenario` 的资源来源、支付来源、batch exchange、private prompt、replay/undo 与 UI 标记 | 结构化 action event/log event 继续作为卡牌判定、UI log、private notification 和 replay 的统一来源。 |
+| Log / notification provenance 仍需继续扩大到更多卡 | 本轮已覆盖 `B21_HayloftBarn`、`E47_SyrupTap`、`E78_SleightofHand`、`E123_ResourceHoarder`、`B23_FinalScenario` 的资源来源、支付来源、batch exchange、private prompt、private hand/draft payload、draft masking、replay/undo 与 UI 标记 | 结构化 action event/log event 继续作为卡牌判定、UI log、private notification 和 replay 的统一来源；UI animation/toast、更多卡牌效果手牌通知和公共 canceled packet 仍保留 follow-up。 |
 | 注释里的非阻塞 card-id 示例 | `shared/actions/effects/breed.ts`、`shared/contract/types.ts` 仅把 `A165_PigBreeder` / `D95_SiteManager` 作为例子提到 | 除非附近代码变动，否则保留；它们不是可执行的单卡分支。 |
 | Legacy/fallback 术语残留 | 旧 bad-smell 文档发现的剩余 fallback/direct-path 术语，主要在已迁移支付 flow 和测试中 | 将直接运行时 fallback 视为重构债；测试/baseline 名称除非真实迁移触及，否则不动。 |
 
@@ -127,7 +127,7 @@
 9. 增加共享 lessons action-space id helper，覆盖 `lessons`、`lessons-3`、`lessons-4`。
 10. 继续扩大 gain/exchange/action-space provenance 覆盖；本轮已覆盖 B21 exchange grain、E47 action-space gain、C162 player action space、E78 batch exchange。
 11. 决定 BGA `implemented=false` data-only 卡是否进入 OA 发牌池。
-12. 扩展结构化 action event/log event：首版已记录 eventType、sourceAction、sourceCard、resource movement provenance、payment source、affected board/card ids，并从该层派生部分 UI log；本轮已补 private prompt redaction、batch exchange replay/undo 定向覆盖和 action exclusive-use log，后续继续补更多通知映射。
+12. 扩展结构化 action event/log event：首版已记录 eventType、sourceAction、sourceCard、resource movement provenance、payment source、affected board/card ids，并从该层派生部分 UI log；C 第一波已补 `private.promptShown`、private hand/draft event payloads（`private.handChanged`、`private.draftUpdated`）、`draft.pendingPicks` per-viewer masking、batch exchange replay/undo 定向覆盖和 action exclusive-use log；UI animation/toast、广泛 card-effect hand notifications、公共 replay/canceled packet 仍保留 follow-up。
 
 ## 7. Log 系统对比
 
@@ -139,10 +139,10 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 | 行动和资源移动 | BGA 区分 `collectResources`、`gainResources`、`receiveResource(s)`、`receiveRoundResource`、`exchange`、`breed`，payload 包含 resources、source、sourceInfo、space/location/card。 | OA 已新增公共 `GameState.events`，`collect` / `gain` / `exchange` / batch exchange / `pay` / `reap` / `breed` / action/card/round-card accumulation 等路径记录来源；`GameState.log` 作为事件派生 UI 缓存保留。 | `B21`、`E47`、`E78` 本轮已改为读结构化 provenance；后续主要补更多动画通知映射。 |
 | 支付记录 | BGA `payResources` / `payResourcesTo` / `payWithCard` / `payResourcesFromFields` / `payResourcesFromCards` 会记录 source、cardSources、field/card 来源和接收玩家。 | OA `resource.paid` 已能携带 payment source、bonusSources、bonusChoiceIndex；construct room 与 E123 after-pay 读该事件，不再依赖 action result fallback。 | 支付 provenance 正在收敛；后续新增支付路径必须先 emit `resource.paid` 再让卡牌监听。 |
 | 卡牌状态和 UI 标记 | BGA 有 `updateCardStats`、`placeInfobox`、`updateInfobox`、`markUsableExchange`、`populateCardCache`、`refreshHand` 等通知。 | `special-effect` 已为公开 card state、counter、flag、infobox、stack、board swap、future meeple、field crop、fence、stable、action-space move 等分支 emit 结构化事件；B23 exclusive-use 已有 board marker，E78 batch prompt 已有专用 UI。 | 可用 exchange 标记和部分客户端动画仍需后续事件映射。 |
-| 私有/公开通知 | BGA 显式区分 `notifyAll` 和 `notify($player, ...)`，手牌、draft、living-hand 等只发给目标玩家。 | OA 通过 snapshot/privacy 处理可见数据；本轮增加 `privateEvents` 与 `private.promptShown`，非目标玩家看到 `private-prompt` redaction。 | 私有手牌类事件仍未完全独立成 per-recipient log；private prompt 已有首个模型。 |
-| undo / replay | BGA undo 会回滚 DB 变更，按 `snapshot_packet_id` 或 move id 取消 gamelog packet，并通知客户端清除旧 turn log。 | OA 有 session state/history；本轮补了 E78 private prompt/replay reconstruction 定向回归。 | OA 仍没有 canceled packet / archived log 语义；但本轮新增的 private/batch 交互已进入可回放覆盖。 |
+| 私有/公开通知 | BGA 显式区分 `notifyAll` 和 `notify($player, ...)`，手牌、draft、living-hand 等只发给目标玩家。 | OA 通过 snapshot/privacy 处理可见数据；C 第一波已覆盖 `private.promptShown`、private hand/draft event payloads（`private.handChanged`、`private.draftUpdated`）和 `draft.pendingPicks` per-viewer masking，非目标玩家看到 private prompt redaction 且 draft picks 被遮蔽。 | private prompt、手牌和 draft 已有首个 per-viewer 模型；UI animation/toast 与广泛 card-effect hand notifications 仍需后续补映射。 |
+| undo / replay | BGA undo 会回滚 DB 变更，按 `snapshot_packet_id` 或 move id 取消 gamelog packet，并通知客户端清除旧 turn log。 | OA 有 session state/history；本轮补了 E78 private prompt/replay reconstruction 定向回归，private/batch 交互已进入可回放覆盖。 | OA 仍没有公共 canceled packet / archived log 语义；公共 replay/canceled packet 仍保留 follow-up。 |
 
-结论：不要照抄 BGA 把 notification 当规则源的做法；OA 应保持后端 state 权威。当前已补一个比 `GameState.log` 更底层的公共结构化事件层：规则执行时记录事件，再由事件派生 UI log、动画提示、审计报告和 replay。本轮 private prompt / batch exchange / exclusive-use 已证明同一事件层可以同时服务卡牌判定、UI、私有通知和回放；剩余风险集中在更多客户端动画映射、私有手牌类事件和 canceled packet 语义。
+结论：不要照抄 BGA 把 notification 当规则源的做法；OA 应保持后端 state 权威。当前已补一个比 `GameState.log` 更底层的公共结构化事件层：规则执行时记录事件，再由事件派生 UI log、动画提示、审计报告和 replay。C 第一波 private prompt / hand / draft、batch exchange / exclusive-use 已证明同一事件层可以同时服务卡牌判定、UI、私有通知和回放；剩余风险集中在 UI animation/toast、广泛 card-effect hand notifications 和公共 replay/canceled packet 语义。
 
 ## 8. BGA 坏味道：不要照抄
 

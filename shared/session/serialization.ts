@@ -48,9 +48,10 @@ export const serializeState = (
  * Currently filters:
  *   - `players[i].occupationHand` and `players[i].minorHand` for every
  *     player other than the viewer.
- *   - `draft.pools[pid].occ` and `draft.pools[pid].minor` for every player
- *     other than the viewer (public data like `draft.kept`, `draft.round`,
- *     `draft.pendingPicks`, `draft.seatOrder` is preserved verbatim).
+ *   - `draft.pools[pid].occ`, `draft.pools[pid].minor`, and
+ *     `draft.pendingPicks[pid]` for every player other than the viewer
+ *     (public data like `draft.kept`, `draft.round`, `draft.seatOrder`
+ *     is preserved verbatim).
  *
  * Pass `viewerPlayerId = null` (or an unknown id) to produce a spectator
  * view where every player's hand and pool is masked.
@@ -83,6 +84,19 @@ export const serializeStateForPlayer = (
                   {
                     occ: Array(pool.occ.length).fill('?'),
                     minor: Array(pool.minor.length).fill('?'),
+                  },
+                ],
+          ),
+        ),
+        pendingPicks: Object.fromEntries(
+          Object.entries(base.draft.pendingPicks).map(([pid, pick]) =>
+            pid === viewerPlayerId
+              ? [pid, pick]
+              : [
+                  pid,
+                  {
+                    occ: pick.occ === null ? null : '?',
+                    minor: pick.minor === null ? null : '?',
                   },
                 ],
           ),

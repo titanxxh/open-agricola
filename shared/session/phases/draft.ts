@@ -14,6 +14,7 @@ import type { DraftPickPayload } from '../../draft/types.ts'
 import { processSubmit, tryAdvanceRound } from '../../draft/draft-manager.ts'
 import { recordDraftPick } from '../../session/stats.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
+import type { PrivateGameEvent } from '../../contract/protocol/game.ts'
 
 /**
  * Submit a single player's pick for the current draft round. Validates
@@ -35,6 +36,8 @@ export const submitDraftPick = (
   if (sub.error) {
     return core.emitResponse(false, sub.error)
   }
+  const submittedRound = sub.draft.round
+  const totalRounds = sub.draft.totalRounds
   core.setDraftState(sub.draft)
   const player = core.state.players.find((p) => p.id === playerId)
   if (player && core.state.draft) {
@@ -45,8 +48,41 @@ export const submitDraftPick = (
   if (!core.state.draft) return core.emitResponse()
   const advance = tryAdvanceRound(core.state.draft)
   core.setDraftState(advance.draft)
+  const draftAfterAdvance = core.state.draft
+  const playerPool = draftAfterAdvance.pools[playerId]
+  const playerKept = draftAfterAdvance.kept[playerId]
+  const privateEvents: PrivateGameEvent[] = [
+    {
+      schemaVersion: 1,
+      type: 'private.draftUpdated',
+      recipientPlayerId: playerId,
+      round: submittedRound,
+      totalRounds,
+      picked: pick,
+      poolCounts: {
+        occ: playerPool?.occ.length ?? 0,
+        minor: playerPool?.minor.length ?? 0,
+      },
+      keptCounts: {
+        occ: playerKept?.occ.length ?? 0,
+        minor: playerKept?.minor.length ?? 0,
+      },
+      advanced: advance.advanced,
+      finished: advance.finished,
+    },
+  ]
   if (advance.finished) {
     core.applyDraftFinalize()
+    for (const p of core.state.players) {
+      privateEvents.push({
+        schemaVersion: 1,
+        type: 'private.handChanged',
+        recipientPlayerId: p.id,
+        cardIds: [...p.occupationHand, ...p.minorHand],
+        cardType: 'mixed',
+        reason: 'draft-finalized',
+      })
+    }
   }
-  return core.emitResponse()
+  return core.emitResponse(true, undefined, privateEvents)
 }

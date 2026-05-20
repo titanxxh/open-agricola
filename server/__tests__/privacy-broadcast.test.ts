@@ -155,6 +155,73 @@ describe('WS broadcast per-viewer filter', () => {
     return { p1, p2, initialP1, initialP2 }
   }
 
+  const pickFirst = (state: StateUpdateEnvelope['payload']['state'], playerId: string) => {
+    const pool = state.draft!.pools[playerId]
+    return {
+      occCardId: pool.occ[0]!,
+      minorCardId: pool.minor[0]!,
+    }
+  }
+
+  const submitDraftWs = async (
+    ws: TestSocket,
+    playerId: string,
+    state: StateUpdateEnvelope['payload']['state'],
+    requestId: string,
+  ) => {
+    const pick = pickFirst(state, playerId)
+    ws.send(
+      JSON.stringify({
+        type: 'draftSubmit',
+        playerId,
+        pick,
+        requestId,
+      }),
+    )
+    return pick
+  }
+
+  const joinTwoPlayerDevRoom = async (): Promise<{
+    p1: TestSocket
+    p2: TestSocket
+    initialP1: StateUpdateEnvelope
+    initialP2: StateUpdateEnvelope
+  }> => {
+    const p1 = await connectSocket()
+    p1.send(
+      JSON.stringify({
+        type: 'joinRoom',
+        roomId: 'dev2',
+        requestedPlayerIndex: 0,
+        name: 'P1',
+      }),
+    )
+    await waitForEvent(
+      p1,
+      (event): event is Extract<ServerEvent, { type: 'roomJoined' }> =>
+        event.type === 'roomJoined',
+    )
+
+    const p2 = await connectSocket()
+    p2.send(
+      JSON.stringify({
+        type: 'joinRoom',
+        roomId: 'dev2',
+        requestedPlayerIndex: 1,
+        name: 'P2',
+      }),
+    )
+    await waitForEvent(
+      p2,
+      (event): event is Extract<ServerEvent, { type: 'roomJoined' }> =>
+        event.type === 'roomJoined',
+    )
+
+    const initialP1 = await waitForEvent(p1, isReconnectState)
+    const initialP2 = await waitForEvent(p2, isReconnectState)
+    return { p1, p2, initialP1, initialP2 }
+  }
+
   it('each ws receives its own hand; the opponent hand is masked with same-length ?', async () => {
     const { initialP1, initialP2 } = await openTwoPlayerRoom()
 
@@ -294,6 +361,112 @@ describe('WS broadcast per-viewer filter', () => {
     expect(p1Draft.mode).toBe(p2Draft.mode)
   })
 
+  it('draftSubmit broadcasts private draftUpdated only to the submitter', async () => {
+    const { p1, p2, initialP1 } = await openTwoPlayerRoom({
+      draftMode: 'simultaneous',
+      draftPoolSize: 7,
+    })
+    const pick = await submitDraftWs(p1, 'p1', initialP1.payload.state, 'draft-p1-r1')
+
+    const p1Update = await waitForEvent(
+      p1,
+      (event): event is StateUpdateEnvelope =>
+        isStateUpdate(event) && event.requestId === 'draft-p1-r1',
+    )
+    const p2Update = await waitForEvent(
+      p2,
+      (event): event is StateUpdateEnvelope =>
+        isStateUpdate(event) && event.requestId === 'draft-p1-r1',
+    )
+
+    expect(p1Update.payload.privateEvents).toEqual([
+      {
+        schemaVersion: 1,
+        type: 'private.draftUpdated',
+        recipientPlayerId: 'p1',
+        round: 1,
+        totalRounds: 7,
+        picked: pick,
+        poolCounts: { occ: 7, minor: 7 },
+        keptCounts: { occ: 0, minor: 0 },
+        advanced: false,
+        finished: false,
+      },
+    ])
+    expect(p2Update.payload.privateEvents ?? []).toEqual([])
+    expect(p2Update.payload.state.draft!.pendingPicks.p1).toEqual({ occ: '?', minor: '?' })
+  })
+
+  it('draft finalization broadcasts each player their final handChanged event', async () => {
+    const { p1, p2, initialP1, initialP2 } = await openTwoPlayerRoom({
+      draftMode: 'simultaneous',
+      draftPoolSize: 7,
+    })
+    let p1State = initialP1.payload.state
+    let p2State = initialP2.payload.state
+
+    for (let round = 1; round <= 7; round += 1) {
+      const p1RequestId = `draft-p1-r${round}`
+      const p2RequestId = `draft-p2-r${round}`
+      await submitDraftWs(p1, 'p1', p1State, p1RequestId)
+      const p1AfterP1 = await waitForEvent(
+        p1,
+        (event): event is StateUpdateEnvelope =>
+          isStateUpdate(event) && event.requestId === p1RequestId,
+      )
+      const p2AfterP1 = await waitForEvent(
+        p2,
+        (event): event is StateUpdateEnvelope =>
+          isStateUpdate(event) && event.requestId === p1RequestId,
+      )
+
+      await submitDraftWs(p2, 'p2', p2AfterP1.payload.state, p2RequestId)
+      const p1AfterP2 = await waitForEvent(
+        p1,
+        (event): event is StateUpdateEnvelope =>
+          isStateUpdate(event) && event.requestId === p2RequestId,
+      )
+      const p2AfterP2 = await waitForEvent(
+        p2,
+        (event): event is StateUpdateEnvelope =>
+          isStateUpdate(event) && event.requestId === p2RequestId,
+      )
+
+      p1State = p1AfterP2.payload.state
+      p2State = p2AfterP2.payload.state
+    }
+
+    const p1FinalEvent = p1State.players[0]!.occupationHand.concat(p1State.players[0]!.minorHand)
+    const p2FinalEvent = p2State.players[1]!.occupationHand.concat(p2State.players[1]!.minorHand)
+    const p1FinalUpdate = p1.received.filter(isStateUpdate).findLast((event) => event.requestId === 'draft-p2-r7')!
+    const p2FinalUpdate = p2.received.filter(isStateUpdate).findLast((event) => event.requestId === 'draft-p2-r7')!
+
+    expect(p1FinalUpdate.payload.privateEvents).toEqual([
+      expect.objectContaining({
+        type: 'private.handChanged',
+        recipientPlayerId: 'p1',
+        cardIds: p1FinalEvent,
+        cardType: 'mixed',
+        reason: 'draft-finalized',
+      }),
+    ])
+    expect(p2FinalUpdate.payload.privateEvents).toEqual([
+      expect.objectContaining({
+        type: 'private.draftUpdated',
+        recipientPlayerId: 'p2',
+        advanced: true,
+        finished: true,
+      }),
+      expect.objectContaining({
+        type: 'private.handChanged',
+        recipientPlayerId: 'p2',
+        cardIds: p2FinalEvent,
+        cardType: 'mixed',
+        reason: 'draft-finalized',
+      }),
+    ])
+  })
+
   it('reconnect getState returns the viewer-specific filter for that ws', async () => {
     const { p1, p2 } = await openTwoPlayerRoom()
 
@@ -326,5 +499,41 @@ describe('WS broadcast per-viewer filter', () => {
     expect(
       stateP2.payload.state.players[0]!.occupationHand.every((c) => c === '?'),
     ).toBe(true)
+  })
+
+  it('devDrawCard broadcasts private handChanged only to the target player', async () => {
+    const { p1, p2 } = await joinTwoPlayerDevRoom()
+
+    p1.send(
+      JSON.stringify({
+        type: 'devDrawCard',
+        playerIndex: 0,
+        cardId: 'A116_WoodCutter',
+        requestId: 'draw-private-1',
+      }),
+    )
+
+    const drawP1 = await waitForEvent(
+      p1,
+      (event): event is StateUpdateEnvelope =>
+        isStateUpdate(event) && event.requestId === 'draw-private-1',
+    )
+    const drawP2 = await waitForEvent(
+      p2,
+      (event): event is StateUpdateEnvelope =>
+        isStateUpdate(event) && event.requestId === 'draw-private-1',
+    )
+
+    expect(drawP1.payload.privateEvents).toEqual([
+      {
+        schemaVersion: 1,
+        type: 'private.handChanged',
+        recipientPlayerId: 'p1',
+        cardIds: ['A116_WoodCutter'],
+        cardType: 'occupation',
+        reason: 'dev-draw-card',
+      },
+    ])
+    expect(drawP2.payload.privateEvents ?? []).toEqual([])
   })
 })

@@ -21,7 +21,7 @@ import type {
   ResourceBatchExchangePayload,
   InteractionAnimalReorgZone,
 } from '../contract/types.ts'
-import type { ActionDetailParts } from '../contract/protocol/game.ts'
+import type { ActionDetailParts, PrivateGameEvent } from '../contract/protocol/game.ts'
 import { actionDefinitions, getActionDefinition } from '../actions/index.ts'
 import { internalActionDefinitions } from '../actions/internal-actions.ts'
 import { getAllAdHocActions } from '../actions/helpers/ad-hoc-action-registry.ts'
@@ -276,6 +276,7 @@ export type SessionResponse = {
   pastureCapacities?: Record<string, Record<string, number>>
   actionAvailability?: Record<string, boolean>
   cardAvailability?: Record<string, boolean>
+  privateEvents?: PrivateGameEvent[]
   error?: string
 }
 
@@ -467,7 +468,9 @@ export class GameCore {
   resetActionResultDetails(): void { this.actionResultDetailsSinceFlush = { gains: {}, costs: {} } }
 
   /** @internal phase access — emit a SessionResponse with the current state. */
-  emitResponse(ok = true, error?: string): SessionResponse { return this.respond(ok, error) }
+  emitResponse(ok = true, error?: string, privateEvents?: PrivateGameEvent[]): SessionResponse {
+    return this.respond(ok, error, privateEvents)
+  }
 
   /** @internal phase access — drive the engine's step loop until it blocks. */
   driveEngineSteps(): void { this.runEngineSteps() }
@@ -1602,7 +1605,7 @@ export class GameCore {
     return Scoring.computeAll(this.state).map((s) => ({ playerId: s.playerId, total: s.total }))
   }
 
-  private respond(ok = true, error?: string): SessionResponse {
+  private respond(ok = true, error?: string, privateEvents?: PrivateGameEvent[]): SessionResponse {
     // While the top-level game phase is 'draft', the client uses
     // DraftOverlay (which reads `state.draft` directly), so surface an
     // idle interaction. Otherwise let `buildInteraction()` derive the
@@ -1631,6 +1634,7 @@ export class GameCore {
       )
     }
     if (error) resp.error = error
+    if (ok && privateEvents && privateEvents.length > 0) resp.privateEvents = privateEvents
     return resp
   }
 
@@ -3817,17 +3821,27 @@ export class GameCore {
   devDrawCard(playerIndex: number, cardId: string): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
+    const isOccupation = this.isOccupationCard(cardId)
     // Remove from all players' hands first
     for (const p of this.state.players) {
       p.minorHand = p.minorHand.filter(id => id !== cardId)
       p.occupationHand = p.occupationHand.filter(id => id !== cardId)
     }
-    if (this.isOccupationCard(cardId)) {
+    if (isOccupation) {
       player.occupationHand.push(cardId)
     } else {
       player.minorHand.push(cardId)
     }
-    return this.respond()
+    return this.respond(true, undefined, [
+      {
+        schemaVersion: 1,
+        type: 'private.handChanged',
+        recipientPlayerId: player.id,
+        cardIds: [cardId],
+        cardType: isOccupation ? 'occupation' : 'minor',
+        reason: 'dev-draw-card',
+      },
+    ])
   }
 
   devPlayCard(playerIndex: number, cardId: string): SessionResponse {
