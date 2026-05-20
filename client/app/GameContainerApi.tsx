@@ -38,9 +38,14 @@ import {
 import { getCardMeta } from '../services/card-meta'
 import {
   farmCommitErrorMessageKey,
+  filterPublicFarmHighlightsForPlayer,
+  filterPublicFenceHighlightsForPlayer,
   getCurrentlySelectableRoomKeys,
+  hasPublicEventHighlights,
   isDevModeAllowedFromQuery,
+  mergePublicEventHighlights,
   playerIdFromWsStatus,
+  removePublicEventHighlights,
   type FarmCommitType,
   type WsStatus,
 } from './game-container-helpers'
@@ -55,7 +60,9 @@ import {
 } from './private-event-notifications'
 import {
   buildEventNotificationStackItems,
-  collectNewPublicEventNotifications,
+  collectNewPublicEventFeedback,
+  emptyPublicEventHighlightTargets,
+  type PublicEventHighlightTargets,
   type PublicEventNotification,
 } from './public-event-notifications'
 
@@ -267,10 +274,12 @@ export const GameContainerApi = () => {
   const privateEventNotificationTimersRef = useRef<number[]>([])
   const publicEventNotificationBatchSeqRef = useRef(0)
   const publicEventNotificationTimersRef = useRef<number[]>([])
+  const publicEventHighlightTimersRef = useRef<number[]>([])
   const lastSeenPublicEventSeqRef = useRef<number | null>(null)
   const { locale } = useLocale()
   const [privateEventNotifications, setPrivateEventNotifications] = useState<PrivateEventNotification[]>([])
   const [publicEventNotifications, setPublicEventNotifications] = useState<PublicEventNotification[]>([])
+  const [publicEventHighlights, setPublicEventHighlights] = useState<PublicEventHighlightTargets>(() => emptyPublicEventHighlightTargets())
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
   const [showScoringPad, setShowScoringPad] = useState(false)
   const [devMode, setDevMode] = useState(() => isDevModeAllowedFromQuery(window.location.search))
@@ -303,6 +312,8 @@ export const GameContainerApi = () => {
     privateEventNotificationTimersRef.current = []
     publicEventNotificationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
     publicEventNotificationTimersRef.current = []
+    publicEventHighlightTimersRef.current.forEach((timer) => window.clearTimeout(timer))
+    publicEventHighlightTimersRef.current = []
   }, [])
 
   useEffect(() => {
@@ -330,24 +341,33 @@ export const GameContainerApi = () => {
     if (!state) return
     const events = state.events ?? []
     publicEventNotificationBatchSeqRef.current += 1
-    const batch = collectNewPublicEventNotifications(
+    const batch = collectNewPublicEventFeedback(
       events,
       lastSeenPublicEventSeqRef.current,
       locale,
       `public-batch-${publicEventNotificationBatchSeqRef.current}`,
     )
     lastSeenPublicEventSeqRef.current = batch.nextCursor
-    if (batch.notifications.length === 0) return
-    setPublicEventNotifications((current) => [...batch.notifications, ...current].slice(0, 4))
-    batch.notifications.forEach((notification) => {
+    if (hasPublicEventHighlights(batch.highlights)) {
+      setPublicEventHighlights((current) => mergePublicEventHighlights(current, batch.highlights))
       const timer = window.setTimeout(() => {
-        setPublicEventNotifications((current) =>
-          current.filter((entry) => entry.id !== notification.id),
-        )
-        publicEventNotificationTimersRef.current = publicEventNotificationTimersRef.current.filter((entry) => entry !== timer)
-      }, 4500)
-      publicEventNotificationTimersRef.current.push(timer)
-    })
+        setPublicEventHighlights((current) => removePublicEventHighlights(current, batch.highlights))
+        publicEventHighlightTimersRef.current = publicEventHighlightTimersRef.current.filter((entry) => entry !== timer)
+      }, 3200)
+      publicEventHighlightTimersRef.current.push(timer)
+    }
+    if (batch.notifications.length > 0) {
+      setPublicEventNotifications((current) => [...batch.notifications, ...current].slice(0, 4))
+      batch.notifications.forEach((notification) => {
+        const timer = window.setTimeout(() => {
+          setPublicEventNotifications((current) =>
+            current.filter((entry) => entry.id !== notification.id),
+          )
+          publicEventNotificationTimersRef.current = publicEventNotificationTimersRef.current.filter((entry) => entry !== timer)
+        }, 4500)
+        publicEventNotificationTimersRef.current.push(timer)
+      })
+    }
   }, [state, locale])
 
   const {
@@ -955,6 +975,18 @@ export const GameContainerApi = () => {
   const existingFenceSet = useMemo(() => new Set((displayPlayer?.fenceSegments ?? []).map((s) => s.edge)), [displayPlayer?.fenceSegments])
   const pendingFenceSet = useMemo(() => new Set(pendingFenceEdges), [pendingFenceEdges])
   const pendingPalisadeSet = useMemo(() => new Set(pendingPalisadeEdges), [pendingPalisadeEdges])
+  const highlightedActionIds = useMemo(
+    () => new Set(publicEventHighlights.actionIds),
+    [publicEventHighlights.actionIds],
+  )
+  const highlightedFarmTileKeys = useMemo(
+    () => filterPublicFarmHighlightsForPlayer(publicEventHighlights.farmTiles, displayPlayer?.id ?? ''),
+    [displayPlayer?.id, publicEventHighlights.farmTiles],
+  )
+  const highlightedFenceEdgeIds = useMemo(
+    () => filterPublicFenceHighlightsForPlayer(publicEventHighlights.fenceEdges, displayPlayer?.id ?? ''),
+    [displayPlayer?.id, publicEventHighlights.fenceEdges],
+  )
 
   const farmInteraction =
     interaction.stateId === 'wait' ? interaction.farm ?? null : null
@@ -1800,7 +1832,7 @@ export const GameContainerApi = () => {
       >
         <div className="game-layout__left">
           <section className="board-panel board-action">
-            <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} />
+            <ActionBoard locale={locale} baseActions={baseActions} roundSlots={roundSlots} currentPlayer={currentPlayer} players={state.players} futureMeeples={state.futureMeeples} canTakeAction={canTakeActionForBoard} takeAction={takeAction} currentRound={state.round} devMode={devMode} highlightedActionIds={highlightedActionIds} />
           </section>
         </div>
         <div className="game-layout__center">
@@ -1845,6 +1877,8 @@ export const GameContainerApi = () => {
               selectableOccupationIds={selectableOccupationIds} cardAvailability={cardAvailability} futureCardResources={futureCardResources} resolveChoice={resolveChoice}
               isInteractive={isInteractive}
               occupationHandSelection={occupationHandInteraction ?? undefined}
+              highlightedFarmTileKeys={highlightedFarmTileKeys}
+              highlightedFenceEdgeIds={highlightedFenceEdgeIds}
               onConfirmOccupationHandSelection={(ids) => {
                 if (!isInteractive) return
                 const pendingPlayerIndex =
