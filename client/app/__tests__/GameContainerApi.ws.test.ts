@@ -10,10 +10,21 @@ import {
   hasPublicEventHighlights,
   isDevModeAllowedFromQuery,
   mergePublicEventHighlights,
+  mergePublicEventResourceAnimations,
   playerIdFromWsStatus,
   removePublicEventHighlights,
+  removePublicEventResourceAnimations,
 } from '../game-container-helpers'
+import type { PublicEventResourceAnimation } from '../public-event-notifications'
 import { collectNewPublicEventFeedback } from '../public-event-notifications'
+
+const animation = (id: string): PublicEventResourceAnimation => ({
+  id,
+  kind: 'move',
+  resources: { wood: 1 },
+  from: { kind: 'actionSpace', actionId: 'forest' },
+  to: { kind: 'playerResources', playerId: 'p1' },
+})
 
 describe('GameContainerApi WS player identity', () => {
   it('uses the joined websocket seat as the local player when URL has no player param', () => {
@@ -104,6 +115,36 @@ describe('GameContainerApi WS player identity', () => {
       farmTiles: [],
       fenceEdges: [],
     }, feedback.highlights).actionIds).toEqual(['forest'])
+  })
+
+  it('removes only one counted resource animation batch occurrence', () => {
+    const incoming = [animation('a')]
+    const merged = mergePublicEventResourceAnimations([], incoming)
+    const overlapped = mergePublicEventResourceAnimations(merged, incoming)
+    expect(removePublicEventResourceAnimations(overlapped, incoming)).toEqual(incoming)
+  })
+
+  it('collects resource animations for public events that do not produce notifications', () => {
+    const moved = {
+      schemaVersion: 1,
+      id: 'evt-moved',
+      seq: 1,
+      round: 1,
+      phase: 'work',
+      visibility: 'public',
+      actorPlayerId: 'p1',
+      type: 'resource.moved',
+      resources: { wood: 1 },
+      from: { kind: 'actionSpace', spaceId: 'forest' },
+      to: { kind: 'player', playerId: 'p1' },
+      reason: 'collect',
+    } satisfies GameEvent
+
+    const feedback = collectNewPublicEventFeedback([moved], 0, 'en', 'public-test')
+
+    expect(feedback.notifications).toEqual([])
+    expect(feedback.resourceAnimations).toEqual([expect.objectContaining({ id: 'evt-moved:move:0' })])
+    expect(mergePublicEventResourceAnimations([], feedback.resourceAnimations)).toHaveLength(1)
   })
 
   it('filters public farm highlights by viewed player', () => {

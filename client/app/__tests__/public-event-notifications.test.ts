@@ -8,6 +8,7 @@ import {
   collectNewPublicEventNotifications,
   collectPublicEventHighlightTargets,
   collectPublicEventNotifications,
+  collectPublicEventResourceAnimations,
 } from '../public-event-notifications'
 
 const base = {
@@ -159,5 +160,117 @@ describe('public event notifications', () => {
     } satisfies GameEvent
 
     expect(collectPublicEventHighlightTargets([event]).fenceEdges).toEqual([])
+  })
+
+  it('maps resource.moved action-space to player resource animation', () => {
+    const event = {
+      ...base,
+      type: 'resource.moved',
+      resources: { wood: 3 },
+      from: { kind: 'actionSpace', spaceId: 'forest' },
+      to: { kind: 'player', playerId: 'p1' },
+      reason: 'collect',
+    } satisfies GameEvent
+
+    expect(collectPublicEventResourceAnimations([event])).toEqual([
+      expect.objectContaining({
+        id: 'evt:move:0',
+        kind: 'move',
+        resources: { wood: 3 },
+        from: { kind: 'actionSpace', actionId: 'forest' },
+        to: { kind: 'playerResources', playerId: 'p1' },
+      }),
+    ])
+  })
+
+  it('maps resource.exchanged paid and gained sides as exchange animations', () => {
+    const event = {
+      ...base,
+      type: 'resource.exchanged',
+      paid: { grain: 1 },
+      gained: { food: 3 },
+      paidFrom: { kind: 'player', playerId: 'p1' },
+      paidTo: { kind: 'supply' },
+      gainedFrom: { kind: 'supply' },
+      gainedTo: { kind: 'player', playerId: 'p1' },
+    } satisfies GameEvent
+
+    expect(collectPublicEventResourceAnimations([event])).toEqual([
+      expect.objectContaining({ id: 'evt:exchange-paid:0', kind: 'exchange', resources: { grain: 1 } }),
+      expect.objectContaining({ id: 'evt:exchange-gained:0', kind: 'exchange', resources: { food: 3 } }),
+    ])
+  })
+
+  it('maps resource.paid paymentSources and actor fallback to payment animations', () => {
+    const withSources = {
+      ...base,
+      type: 'resource.paid',
+      resources: { wood: 2 },
+      paymentFor: 'major-improvement',
+      to: { kind: 'supply' },
+      paymentSources: [{ from: { kind: 'player', playerId: 'p1' }, resources: { wood: 2 } }],
+    } satisfies GameEvent
+    const actorFallback = {
+      ...base,
+      id: 'evt-2',
+      seq: 2,
+      type: 'resource.paid',
+      resources: { clay: 1 },
+      paymentFor: 'bonus',
+    } satisfies GameEvent
+
+    expect(collectPublicEventResourceAnimations([withSources, actorFallback])).toEqual([
+      expect.objectContaining({ id: 'evt:payment:0', kind: 'payment', resources: { wood: 2 } }),
+      expect.objectContaining({
+        id: 'evt-2:payment:0',
+        kind: 'payment',
+        resources: { clay: 1 },
+        from: { kind: 'playerResources', playerId: 'p1' },
+        to: { kind: 'supply' },
+      }),
+    ])
+  })
+
+  it('does not animate empty resources or unsupported locations', () => {
+    const emptyMoved = {
+      ...base,
+      type: 'resource.moved',
+      resources: { wood: 0 },
+      from: { kind: 'supply' },
+      to: { kind: 'player', playerId: 'p1' },
+      reason: 'gain',
+    } satisfies GameEvent
+    const cardMoved = {
+      ...base,
+      id: 'evt-2',
+      seq: 2,
+      type: 'resource.moved',
+      resources: { wood: 1 },
+      from: { kind: 'card', cardId: 'A1_Test' },
+      to: { kind: 'player', playerId: 'p1' },
+      reason: 'cardEffect',
+    } satisfies GameEvent
+
+    expect(collectPublicEventResourceAnimations([emptyMoved, cardMoved])).toEqual([])
+  })
+
+  it('includes resource animations in the shared public event feedback cursor', () => {
+    const oldEvent = { ...base, type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'supply' }, to: { kind: 'player', playerId: 'p1' }, reason: 'gain' } satisfies GameEvent
+    const newEvent = { ...base, id: 'evt-2', seq: 2, type: 'resource.moved', resources: { clay: 1 }, from: { kind: 'actionSpace', spaceId: 'clay-pit' }, to: { kind: 'player', playerId: 'p1' }, reason: 'collect' } satisfies GameEvent
+
+    expect(collectNewPublicEventFeedback([oldEvent], null, 'en').resourceAnimations).toEqual([])
+    expect(collectNewPublicEventFeedback([oldEvent, newEvent], 1, 'en').resourceAnimations).toEqual([
+      expect.objectContaining({ resources: { clay: 1 } }),
+    ])
+  })
+
+  it('does not dedupe distinct events with identical endpoints and resources', () => {
+    const first = { ...base, type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'actionSpace', spaceId: 'forest' }, to: { kind: 'player', playerId: 'p1' }, reason: 'collect' } satisfies GameEvent
+    const second = { ...base, id: 'evt-2', seq: 2, type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'actionSpace', spaceId: 'forest' }, to: { kind: 'player', playerId: 'p1' }, reason: 'collect' } satisfies GameEvent
+
+    expect(collectPublicEventResourceAnimations([first, second]).map((animation) => animation.id)).toEqual([
+      'evt:move:0',
+      'evt-2:move:0',
+    ])
   })
 })
