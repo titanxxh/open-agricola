@@ -31,12 +31,14 @@ const actionDetailLog = (
   playerId: string | undefined,
   actionId: string | undefined,
   detailParts: ActionDetailParts,
+  extraParams: Record<string, unknown> = {},
 ): LogEntry => ({
   key: 'log.actionDetail',
   params: {
     player: playerName(ctx, playerId),
     action: actionName(ctx, actionId),
     detailParts,
+    ...extraParams,
   },
 })
 
@@ -437,6 +439,9 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
           return [
             actionDetailLog(ctx, event.actorPlayerId, event.sourceActionId ?? event.paymentFor, {
               costs: cost,
+              ...(event.bonusSources?.length ? { bonusSources: event.bonusSources } : {}),
+            }, {
+              ...(event.bonusChoiceIndex ? { bonusChoiceIndex: event.bonusChoiceIndex } : {}),
             }),
           ]
         }
@@ -451,6 +456,38 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
             },
           },
         ]
+      }
+
+      if (event.type === 'action.revealed') {
+        return [{
+          key: 'log.actionRevealed',
+          params: {
+            action: actionName(ctx, event.actionId),
+            roundSlot: event.roundSlot,
+          },
+        }]
+      }
+
+      if (event.type === 'action.exclusiveUseSet') {
+        return [{
+          key: 'log.actionExclusiveUseSet',
+          params: {
+            player: playerName(ctx, event.playerId),
+            action: actionName(ctx, event.actionId),
+            cardId: event.sourceCardId,
+          },
+        }]
+      }
+
+      if (event.type === 'action.exclusiveUseCleared') {
+        return [{
+          key: 'log.actionExclusiveUseCleared',
+          params: {
+            player: playerName(ctx, event.playerId),
+            action: actionName(ctx, event.actionId),
+            cardId: event.sourceCardId,
+          },
+        }]
       }
 
       return []

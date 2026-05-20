@@ -132,6 +132,7 @@ export const rehydrateState = (raw: SerializedGameState): RehydratedState => {
       ...template,
       resources: saved?.resources ?? template.resources,
       takenBy: normalizeTakenBy(saved?.takenBy),
+      exclusiveUse: saved?.exclusiveUse,
     }
   })
   // Append PlayerActionCard dynamic spaces
@@ -141,6 +142,7 @@ export const rehydrateState = (raw: SerializedGameState): RehydratedState => {
     if (saved) {
       pas.resources = saved.resources ?? pas.resources
       pas.takenBy = normalizeTakenBy(saved.takenBy)
+      pas.exclusiveUse = saved.exclusiveUse
     }
     restored.actionSpaces.push(pas)
   }

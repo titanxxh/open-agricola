@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { runCardEffectHook } from '../../shared/cards/card-effects'
+import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
 
 import '../../shared/cards/E/E47_SyrupTap'
+import '../../shared/cards/C/C162_ForestOwner'
 
 const CARD_ID = 'E47_SyrupTap'
 
@@ -74,6 +75,39 @@ describe('E47_SyrupTap session', () => {
         type: 'futureMeeple.queued',
         sourceCardId: CARD_ID,
       }),
+    ]))
+  })
+
+  it('getting wood from a player action space queues 1 food on next round', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.minorPlayed.push('C162_ForestOwner')
+    for (const space of createPlayerActionSpaces(state)) {
+      if (!state.actionSpaces.some((entry) => entry.id === space.id)) {
+        state.actionSpaces.push(space)
+      }
+    }
+    session.loadState(state)
+
+    const resp = session.takeAction(0, 'C162_ForestOwner')
+    expect(resp.ok).toBe(true)
+
+    expect(resp.state.futureMeeples).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        cardId: CARD_ID,
+        round: 2,
+        resources: { food: 1 },
+      }),
+    ]))
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.moved',
+        from: { kind: 'actionSpace', spaceId: 'C162_ForestOwner' },
+        to: { kind: 'player', playerId: player.id },
+        resources: { wood: 4 },
+      }),
+      expect.objectContaining({ type: 'card.triggered', sourceCardId: CARD_ID }),
     ]))
   })
 

@@ -6,10 +6,12 @@ import type {
   GameState,
   PlayerState,
   Resource,
+  ResourceBatchExchangePayload,
   Trade,
   ResourceKey,
 } from '../../contract/types'
 import type { DraftGameEvent, EventSink } from '../../contract/events'
+import type { PromptKey } from '../../contract/prompt-keys'
 // PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
 // the new payment module. Other helpers (preview-cost / typed-flat /
 // room-payment / cost-modifier internals) remain on the shim through S3.
@@ -85,6 +87,96 @@ const readDirectTrade = (actionContext: Record<string, unknown> | undefined): Tr
   const trade = value as Partial<Trade>
   if (!trade.from || !trade.to) return undefined
   return trade as Trade
+}
+
+const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
+type BuildingResource = typeof BUILDING_RESOURCES[number]
+
+const isBuildingResource = (key: string): key is BuildingResource =>
+  BUILDING_RESOURCES.includes(key as BuildingResource)
+
+const normalizeBatchExchange = (
+  discard: Partial<Record<keyof Resource, number>>,
+  receive: Partial<Record<keyof Resource, number>>,
+): { paid: Partial<Resource>; gained: Partial<Resource> } => {
+  const paid: Partial<Resource> = {}
+  const gained: Partial<Resource> = {}
+  for (const key of BUILDING_RESOURCES) {
+    const d = Math.max(0, Math.floor(discard[key] ?? 0))
+    const r = Math.max(0, Math.floor(receive[key] ?? 0))
+    if (d > r) paid[key] = d - r
+    if (r > d) gained[key] = r - d
+  }
+  return { paid, gained }
+}
+
+const sumBuildingResources = (
+  resources: Partial<Record<keyof Resource, number>>,
+): number =>
+  BUILDING_RESOURCES.reduce((sum, key) =>
+    sum + Math.max(0, Math.floor(resources[key] ?? 0)), 0)
+
+const resolveBatchExchange = (
+  state: GameState,
+  player: PlayerState,
+  batch: { cardId: string; maxTotal: number; requireAtLeastOne?: boolean },
+  payload: ResourceBatchExchangePayload,
+  eventSink?: EventSink,
+): ActionExecutionResult => {
+  const discard = payload.discard ?? {}
+  const receive = payload.receive ?? {}
+  const discardTotal = sumBuildingResources(discard)
+  const receiveTotal = sumBuildingResources(receive)
+  if (discardTotal > batch.maxTotal || receiveTotal > batch.maxTotal) {
+    return { type: 'fail', errorKey: 'exchange.batch.too-many' }
+  }
+  if (discardTotal !== receiveTotal) {
+    return { type: 'fail', errorKey: 'exchange.batch.total-mismatch' }
+  }
+  if (batch.requireAtLeastOne && discardTotal === 0) {
+    return { type: 'fail', errorKey: 'exchange.batch.empty' }
+  }
+  for (const [key, value] of Object.entries(discard)) {
+    if (!isBuildingResource(key)) return { type: 'fail', errorKey: 'exchange.batch.invalid-discard' }
+    const amount = Math.max(0, Math.floor(value ?? 0))
+    if (amount > player.resources[key]) return { type: 'fail', errorKey: 'exchange.batch.not-enough' }
+  }
+  for (const key of Object.keys(receive)) {
+    if (!isBuildingResource(key)) return { type: 'fail', errorKey: 'exchange.batch.invalid-receive' }
+  }
+  const { paid, gained } = normalizeBatchExchange(discard, receive)
+  if (Object.keys(paid).length === 0 && Object.keys(gained).length === 0) {
+    return { type: 'ok' }
+  }
+  for (const [key, amount] of Object.entries(paid)) {
+    player.resources[key as keyof Resource] -= amount ?? 0
+  }
+  for (const [key, amount] of Object.entries(gained)) {
+    player.resources[key as keyof Resource] += amount ?? 0
+  }
+  const event: DraftGameEvent<'resource.exchanged'> = {
+    type: 'resource.exchanged',
+    paid,
+    gained,
+    paidFrom: { kind: 'player', playerId: player.id },
+    paidTo: { kind: 'supply' },
+    gainedFrom: { kind: 'supply' },
+    gainedTo: { kind: 'player', playerId: player.id },
+    sourceCardId: batch.cardId,
+    exchangeSource: batch.cardId,
+    times: 1,
+  }
+  eventSink?.emit<'resource.exchanged'>(event)
+  dispatchTradeAppliedListener(
+    state,
+    player,
+    { from: paid, to: gained, sourceId: batch.cardId },
+    1,
+    eventSink,
+    [event],
+  )
+  trackWorkPhaseBuildingResources(state, player.id, gained)
+  return { type: 'ok', resourcesPaid: paid, resourcesGained: gained }
 }
 
 // ============================================
@@ -538,6 +630,10 @@ export const anytimeExchangeAction: ActionDefinition = {
   gainPerRound: {},
   anytime: true,
   canBeExecutedByPlayer: (state, player, ctx) => {
+    const batch = ctx?.actionContext?.batchExchange as { maxTotal?: number } | undefined
+    if (batch) {
+      return BUILDING_RESOURCES.some((resource) => (player.resources[resource] ?? 0) > 0)
+    }
     const directTrade = readDirectTrade(ctx?.actionContext)
     if (directTrade) return canAffordTrade(player, directTrade, 1)
     const tradeIds = (ctx?.actionContext as { tradeIds?: string[] } | undefined)?.tradeIds
@@ -547,6 +643,27 @@ export const anytimeExchangeAction: ActionDefinition = {
     return hasAffordableCookeryTrade(player, state)
   },
   execute: ({ state, player, actionContext, eventSink }) => {
+    const batch = actionContext?.batchExchange as
+      | { cardId: string; maxTotal: number; promptKey?: PromptKey; requireAtLeastOne?: boolean }
+      | undefined
+    if (batch) {
+      const discardAvailableByResource = Object.fromEntries(
+        BUILDING_RESOURCES.map((key) => [key, Math.min(player.resources[key] ?? 0, batch.maxTotal)]),
+      ) as Partial<Record<keyof Resource, number>>
+      return {
+        type: 'request' as const,
+        request: {
+          kind: 'resource-batch-exchange-select' as const,
+          cardId: batch.cardId,
+          discardAvailableByResource,
+          receiveResources: BUILDING_RESOURCES,
+          maxTotal: batch.maxTotal,
+          promptKey: batch.promptKey,
+          requireAtLeastOne: batch.requireAtLeastOne,
+        },
+        promptKey: batch.promptKey ?? 'ui.interactionSleightOfHand',
+      }
+    }
     const directTrade = readDirectTrade(actionContext)
     if (directTrade) {
       if (!canAffordTrade(player, directTrade, 1)) {
@@ -597,6 +714,14 @@ export const anytimeExchangeAction: ActionDefinition = {
       promptKey: 'ui.interactionExchangeChoice',
     }
   },
-  resolveChoice: ({ state, player, actionContext, eventSink }, choice) =>
-    resolveExchangeChoice(state, player, choice, actionContext?.tradeIds as string[] | undefined, eventSink),
+  resolveChoice: ({ state, player, actionContext, eventSink }, choice, payload) => {
+    const batch = actionContext?.batchExchange as
+      | { cardId: string; maxTotal: number; requireAtLeastOne?: boolean }
+      | undefined
+    const batchPayload = payload?.resourceBatchExchange as ResourceBatchExchangePayload | undefined
+    if (batch && batchPayload) {
+      return resolveBatchExchange(state, player, batch, batchPayload, eventSink)
+    }
+    return resolveExchangeChoice(state, player, choice, actionContext?.tradeIds as string[] | undefined, eventSink)
+  },
 }

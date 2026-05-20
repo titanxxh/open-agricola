@@ -37,9 +37,35 @@ export type ActionDetailParts = {
   bonusSources?: string[]
 }
 
+export type RedactedPrivatePromptInteraction =
+  Omit<Extract<InteractionState, { stateId: 'wait' }>, 'request' | 'allowedCommands' | 'anytimeActions'> & {
+    request: {
+      kind: 'private-prompt'
+      playerIndex: number
+      promptKind: string
+      sourceCard?: string
+      promptKey?: string
+    }
+    allowedCommands: []
+    anytimeActions: []
+  }
+
+export type ClientInteractionState = InteractionState | RedactedPrivatePromptInteraction
+
+export type PrivateGameEvent = {
+  schemaVersion: 1
+  type: 'private.promptShown'
+  recipientPlayerId: string
+  promptKind: string
+  sourceCard?: string
+  sourceActionId?: string
+  promptKey?: string
+}
+
 export type GameSyncPayload = {
   state: SerializedGameState
-  interaction: InteractionState
+  interaction: ClientInteractionState
+  privateEvents?: PrivateGameEvent[]
   scores: PlayerScoreSummary[] | null
   pastureCapacities?: Record<string, Record<string, number>>
   historyLength: number

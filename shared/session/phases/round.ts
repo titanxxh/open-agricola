@@ -14,7 +14,10 @@
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types.ts'
 import { smallestAvailableWorker, workersAvailable } from '../../domain/player.ts'
 import { addWorkerRef, isSpaceOccupied } from '../../domain/space.ts'
-import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability.ts'
+import {
+  canUseExclusiveSpace,
+  computeAllowedPlacementSpaces,
+} from '../../actions/helpers/placement-availability.ts'
 import { incPlacedFarmers } from '../../session/stats.ts'
 import { recordActionSnapshot } from '../../cards/helpers/action-snapshot.ts'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement.ts'
@@ -76,15 +79,16 @@ export const takeAction = (
   }
   const space = state.actionSpaces.find((s) => s.id === spaceId)
   if (!space) return core.emitResponse(false, 'space unavailable')
+  if (!canUseExclusiveSpace(space, player, state)) {
+    return core.emitResponse(false, 'space unavailable')
+  }
   if (isSpaceOccupied(space)) {
     const allowed = computeAllowedPlacementSpaces(state, player)
     if (!allowed.some(a => a.spaceId === spaceId)) return core.emitResponse(false, 'space unavailable')
   }
   // Honor explicit `isDoable` listener vetoes (e.g. C51 FishingNet blocks
-  // opponents with 0 food). We only check listener-driven `doable: false`
-  // here — `space.canBeExecutedByPlayer` (which is conservatively false for
-  // OR-style flows whose every child is currently undoable) is intentionally
-  // skipped, so the existing fall-through-OR semantic in tests is preserved.
+  // opponents with 0 food). `space.canBeExecutedByPlayer` is intentionally
+  // not used here so OR-style fall-through actions keep their existing route.
   if (core.listenersVetoIsDoableCheck(player, space)) {
     return core.emitResponse(false, 'space unavailable')
   }

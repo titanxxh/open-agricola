@@ -8,6 +8,10 @@ import type {
   StateUpdateCause,
   StateUpdateEnvelope,
 } from '../../shared/contract/protocol/game.ts'
+import {
+  filterInteractionForViewer,
+  privateEventsForViewer,
+} from '../../shared/session/interaction-privacy.ts'
 
 type Args = {
   room: { id: string; session: GameSession }
@@ -26,9 +30,11 @@ const buildPayload = (args: Args): GameSyncPayload => {
   const state = viewerPlayerId === null
     ? serializeState(resp.state, stateOpts)
     : serializeStateForPlayer(resp.state, viewerPlayerId, stateOpts)
+  const playerIds = resp.state.players.map((player) => player.id)
+  const privateEvents = privateEventsForViewer(resp.interaction, playerIds, viewerPlayerId)
   const payload: GameSyncPayload = {
     state,
-    interaction: resp.interaction,
+    interaction: filterInteractionForViewer(resp.interaction, playerIds, viewerPlayerId),
     scores: resp.scores ?? null,
     pastureCapacities: resp.pastureCapacities,
     historyLength: resp.historyLength,
@@ -38,6 +44,7 @@ const buildPayload = (args: Args): GameSyncPayload => {
     cardAvailability: resp.cardAvailability,
     error: resp.error,
   }
+  if (privateEvents.length > 0) payload.privateEvents = privateEvents
   const defs = room.session.getCustomCardDefs()
   if (defs.length > 0) payload.customCardDefs = defs
   return payload

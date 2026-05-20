@@ -242,6 +242,7 @@ export const handleGameRoute = async (
         positions?: unknown[]
         cardIds?: unknown[]
         resourceCounts?: Partial<Record<keyof Resource, number>>
+        resourceBatchExchange?: unknown
       }
     }
     if (
@@ -249,7 +250,8 @@ export const handleGameRoute = async (
       !body.payload ||
       (!Array.isArray(body.payload.positions) &&
         !Array.isArray(body.payload.cardIds) &&
-        typeof body.payload.resourceCounts !== 'object')
+        typeof body.payload.resourceCounts !== 'object' &&
+        typeof body.payload.resourceBatchExchange !== 'object')
     ) {
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true

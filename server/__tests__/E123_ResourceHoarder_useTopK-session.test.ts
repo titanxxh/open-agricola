@@ -180,13 +180,13 @@ describe('E123_ResourceHoarder use-top-k (BGA full)', () => {
     const context: CardListenerContext = {
       state, player, space: createSpace('improvement'),
       actionId: 'pay', phase: 'after',
-      result: {
-        type: 'ok',
-        extraData: {
-          bonusUsed: [CARD_ID],
-          bonusChoiceIndex: { [CARD_ID]: 0 },
-        },
-      },
+      transactionEvents: [{
+        type: 'resource.paid',
+        resources: {},
+        paymentFor: 'construct',
+        bonusSources: [CARD_ID],
+        bonusChoiceIndex: { [CARD_ID]: 0 },
+      }],
     } as CardListenerContext
 
     executeCardListener(listener, context)
@@ -206,13 +206,13 @@ describe('E123_ResourceHoarder use-top-k (BGA full)', () => {
     const context: CardListenerContext = {
       state, player, space: createSpace('improvement'),
       actionId: 'pay', phase: 'after',
-      result: {
-        type: 'ok',
-        extraData: {
-          bonusUsed: [CARD_ID],
-          bonusChoiceIndex: { [CARD_ID]: 2 },
-        },
-      },
+      transactionEvents: [{
+        type: 'resource.paid',
+        resources: { wood: 1 },
+        paymentFor: 'construct',
+        bonusSources: [CARD_ID],
+        bonusChoiceIndex: { [CARD_ID]: 2 },
+      }],
     } as CardListenerContext
 
     executeCardListener(listener, context)

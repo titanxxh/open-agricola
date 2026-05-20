@@ -14,6 +14,7 @@ import type {
 import { AnytimeBar } from './AnytimeBar'
 import { getAnyCardDisplayName, translateCardText } from '../common/cardText'
 import { ResourceQuantitySelectPanel } from './ResourceQuantitySelectPanel'
+import { ResourceBatchExchangePanel } from './ResourceBatchExchangePanel'
 
 type ResourceExchangeLabelParams = {
   resourcesPaid?: Partial<Resource>
@@ -367,6 +368,17 @@ type Props = {
     onConfirm: (counts: Partial<Record<keyof Resource, number>>) => void
     onCancel: () => void
   } | null
+  resourceBatchExchangeSelect?: {
+    discardAvailableByResource: Partial<Record<keyof Resource, number>>
+    receiveResources: readonly (keyof Resource)[]
+    maxTotal: number
+    promptKey?: string
+    onConfirm: (payload: {
+      discard: Partial<Record<keyof Resource, number>>
+      receive: Partial<Record<keyof Resource, number>>
+    }) => void
+    onCancel: () => void
+  } | null
 }
 
 export const InteractionBar = ({
@@ -417,6 +429,7 @@ export const InteractionBar = ({
   confirmAnimalReorg = () => {},
   cancelAnimalDiscardPrompt = () => {},
   resourceQuantitySelect = null,
+  resourceBatchExchangeSelect = null,
 }: Props) => {
   const isFarmSelectionPrompt =
     pendingChoice?.promptKey === 'ui.interactionFenceSelect' ||
@@ -442,6 +455,7 @@ export const InteractionBar = ({
     pendingPositionSelectionsLength === 0
   const hasBodyContent = !!(
     pendingAnimalReorg ||
+    resourceBatchExchangeSelect ||
     resourceQuantitySelect ||
     harvestFeedPlayerName ||
     (pendingEngineBlocked && isInteractive) ||
@@ -531,6 +545,16 @@ export const InteractionBar = ({
                 )}
               </div>
             </>
+          ) : resourceBatchExchangeSelect ? (
+            <ResourceBatchExchangePanel
+              locale={locale}
+              discardAvailableByResource={resourceBatchExchangeSelect.discardAvailableByResource}
+              receiveResources={resourceBatchExchangeSelect.receiveResources}
+              maxTotal={resourceBatchExchangeSelect.maxTotal}
+              promptKey={resourceBatchExchangeSelect.promptKey}
+              onConfirm={resourceBatchExchangeSelect.onConfirm}
+              onCancel={resourceBatchExchangeSelect.onCancel}
+            />
           ) : resourceQuantitySelect ? (
             <ResourceQuantitySelectPanel
               locale={locale}

@@ -28,12 +28,37 @@ const createPlaceFarmerVirtualSpace = (): ActionSpace => ({
   takenBy: [],
 })
 
+export const canUseExclusiveSpace = (space: ActionSpace, player: PlayerState, state: GameState): boolean => {
+  const exclusive = space.exclusiveUse
+  if (!exclusive) return true
+  if (state.round >= exclusive.untilRound) return true
+  return exclusive.playerId === player.id
+}
+
+export const exclusiveOwnerOverride = (space: ActionSpace, player: PlayerState, state: GameState): boolean =>
+  space.exclusiveUse?.playerId === player.id && state.round < space.exclusiveUse.untilRound
+
+export const openRoundForSpace = (state: GameState, space: ActionSpace): number => {
+  const roundIndex = state.roundActionOrder.indexOf(space.id)
+  return roundIndex === -1 ? space.roundAvailable : roundIndex + 1
+}
+
+export const canEnterSpace = (space: ActionSpace, player: PlayerState, state: GameState): boolean => {
+  const exclusiveOverride = exclusiveOwnerOverride(space, player, state)
+  if (exclusiveOverride) return true
+  if (state.round < openRoundForSpace(state, space)) return false
+  return canUseExclusiveSpace(space, player, state)
+}
+
 export function computeAllowedPlacementSpaces(
   state: GameState,
   player: PlayerState,
 ): AllowedPlacement[] {
   const base: AllowedPlacement[] = state.actionSpaces
-    .filter(s => !isSpaceOccupied(s) && s.canBeExecutedByPlayer(state, player))
+    .filter((s) => {
+      if (!canEnterSpace(s, player, state)) return false
+      return !isSpaceOccupied(s) && s.canBeExecutedByPlayer(state, player)
+    })
     .map(s => ({ spaceId: s.id, allowOccupied: false }))
 
   const context: ActionExecutionContext & { actionId: string } = {
@@ -61,6 +86,7 @@ export function computeAllowedPlacementSpaces(
       const spaceId = opt.value.slice(OCCUPIED_SPACE_CHOICE_PREFIX.length)
       const space = state.actionSpaces.find(s => s.id === spaceId)
       if (!space) continue
+      if (!canEnterSpace(space, player, state)) continue
       if (!space.canBeExecutedByPlayer(state, player)) continue
       extra.push({ spaceId, allowOccupied: true })
     }
