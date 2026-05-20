@@ -9,6 +9,7 @@ import {
   collectPublicEventHighlightTargets,
   collectPublicEventNotifications,
   collectPublicEventResourceAnimations,
+  maxPublicEventSeq,
 } from '../public-event-notifications'
 
 const base = {
@@ -22,6 +23,12 @@ const base = {
 } as const
 
 describe('public event notifications', () => {
+  it('returns the maximum public event sequence', () => {
+    expect(maxPublicEventSeq()).toBe(0)
+    expect(maxPublicEventSeq([])).toBe(0)
+    expect(maxPublicEventSeq([{ seq: 2 }, { seq: 8 }, { seq: 5 }])).toBe(8)
+  })
+
   it('maps resource and lifecycle events to transient cues', () => {
     const events: GameEvent[] = [
       { ...base, type: 'resource.exchanged', paid: { grain: 1 }, gained: { food: 3 }, paidFrom: { kind: 'player', playerId: 'p1' }, paidTo: { kind: 'supply' }, gainedFrom: { kind: 'supply' }, gainedTo: { kind: 'player', playerId: 'p1' }, exchangeSource: 'bake-bread' },
@@ -262,6 +269,21 @@ describe('public event notifications', () => {
     expect(collectNewPublicEventFeedback([oldEvent, newEvent], 1, 'en').resourceAnimations).toEqual([
       expect.objectContaining({ resources: { clay: 1 } }),
     ])
+  })
+
+  it('does not replay canceled events after aligning the cursor to the snapshot max seq', () => {
+    const canceledEvent = { ...base, type: 'resource.paid', resources: { wood: 1 }, paymentFor: 'bonus' } satisfies GameEvent
+    const undoSnapshotEvents = [
+      { ...base, id: 'evt-kept', seq: 2, type: 'game.started' },
+    ] satisfies GameEvent[]
+
+    expect(collectNewPublicEventFeedback([canceledEvent], 0, 'en').notifications).toHaveLength(1)
+    expect(collectNewPublicEventFeedback(undoSnapshotEvents, maxPublicEventSeq(undoSnapshotEvents), 'en')).toEqual({
+      notifications: [],
+      highlights: { actionIds: [], farmTiles: [], fenceEdges: [] },
+      resourceAnimations: [],
+      nextCursor: 2,
+    })
   })
 
   it('does not dedupe distinct events with identical endpoints and resources', () => {

@@ -47,6 +47,9 @@ const buildPayload = (args: Args): GameSyncPayload => {
     error: resp.error,
   }
   if (privateEvents.length > 0) payload.privateEvents = privateEvents
+  if (resp.publicEventCancellations?.length) {
+    payload.publicEventCancellations = resp.publicEventCancellations
+  }
   const defs = room.session.getCustomCardDefs()
   if (defs.length > 0) payload.customCardDefs = defs
   return payload

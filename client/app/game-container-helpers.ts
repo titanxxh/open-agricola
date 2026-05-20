@@ -1,5 +1,6 @@
 import { resourceKeyList } from '../../shared/contract/state-constants'
 import type { FarmTilePosition, Resource } from '../../shared/contract/types'
+import type { GameSyncPayload } from '../../shared/contract/protocol/game'
 import { parsePositionKey, positionKey } from '../../shared/domain/farm'
 import type {
   PublicEventFenceEdgeHighlightTarget,
@@ -7,6 +8,7 @@ import type {
   PublicEventHighlightTargets,
   PublicEventResourceAnimation,
 } from './public-event-notifications'
+import { maxPublicEventSeq } from './public-event-notifications'
 
 export type WsStatus =
   | { phase: 'idle' }
@@ -19,6 +21,26 @@ export type WsStatus =
 
 export const playerIdFromWsStatus = (status: WsStatus): string | null =>
   status.phase === 'ready' ? `p${status.playerIndex + 1}` : null
+
+type PublicEventCancellationSnapshotPayload = {
+  publicEventCancellations?: GameSyncPayload['publicEventCancellations']
+  state: { events?: readonly { seq: number }[] }
+}
+
+type PublicEventCancellationSnapshotHandlers = {
+  clearPublicEventFeedback: () => void
+  setLastSeenPublicEventSeq: (seq: number) => void
+}
+
+export const applyPublicEventCancellationSnapshot = (
+  payload: PublicEventCancellationSnapshotPayload,
+  handlers: PublicEventCancellationSnapshotHandlers,
+): boolean => {
+  if (!payload.publicEventCancellations?.length) return false
+  handlers.clearPublicEventFeedback()
+  handlers.setLastSeenPublicEventSeq(maxPublicEventSeq(payload.state.events))
+  return true
+}
 
 export type FarmCommitType = 'fence' | 'room' | 'stable' | 'plow' | 'sow'
 

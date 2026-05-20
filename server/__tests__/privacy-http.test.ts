@@ -21,6 +21,9 @@ const E78_CARD_ID = 'E78_SleightofHand'
 
 type MockRes = ServerResponse & { statusCode: number; body: string }
 
+const maxEventSeq = (events: Array<{ seq: number }>): number =>
+  events.reduce((max, event) => Math.max(max, event.seq), 0)
+
 const mockReq = (
   method: string,
   url: string,
@@ -454,6 +457,59 @@ describe('HTTP privacy + seat binding', () => {
       expect(observerData.interaction.stateId).toBe('wait')
       expect(observerData.interaction.request.kind).toBe('resource-batch-exchange-select')
       expect(observerData.privateEvents ?? []).toEqual([])
+    })
+
+    it('POST /api/game/undo-action returns public event cancellations with viewer filtering', async () => {
+      setupE78BatchPromptSession()
+
+      const commitRes = mockRes()
+      await handleGameRoute(
+        mockReq(
+          'POST',
+          '/api/game/commit-selection',
+          {
+            playerIndex: 0,
+            payload: {
+              resourceBatchExchange: {
+                discard: { wood: 2, clay: 1 },
+                receive: { wood: 1, stone: 2 },
+              },
+            },
+          },
+          { 'x-viewer-player': 'p1' },
+        ),
+        commitRes,
+      )
+      expect(commitRes.statusCode).toBe(200)
+      const commitData = JSON.parse(commitRes.body)
+      const exchangedEvent = commitData.state.events.find((event: {
+        type: string
+        sourceCardId?: string
+      }) => event.type === 'resource.exchanged' && event.sourceCardId === E78_CARD_ID)
+      expect(exchangedEvent).toBeDefined()
+      const previousMaxSeq = maxEventSeq(commitData.state.events)
+
+      const undoRes = mockRes()
+      await handleGameRoute(
+        mockReq(
+          'POST',
+          '/api/game/undo-action',
+          null,
+          { 'x-viewer-player': 'p1' },
+        ),
+        undoRes,
+      )
+      expect(undoRes.statusCode).toBe(200)
+      const undoData = JSON.parse(undoRes.body)
+      expect(undoData.publicEventCancellations).toEqual([
+        expect.objectContaining({
+          reason: 'undoAction',
+          previousMaxSeq,
+          canceledEventIds: expect.arrayContaining([exchangedEvent.id]),
+          canceledSeqs: expect.arrayContaining([exchangedEvent.seq]),
+        }),
+      ])
+      expect(undoData.privateEvents ?? []).toEqual([])
     })
 
     it('GET /api/game/state filters response privateEvents per viewer', async () => {
