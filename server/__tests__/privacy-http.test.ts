@@ -15,6 +15,10 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { handleGameRoute, setSession } from '../game-router.ts'
 import { GameSession } from '../game/authoritative-session.ts'
 
+import '../../shared/cards/E/E78_SleightofHand'
+
+const E78_CARD_ID = 'E78_SleightofHand'
+
 type MockRes = ServerResponse & { statusCode: number; body: string }
 
 const mockReq = (
@@ -51,6 +55,38 @@ const mockRes = (): MockRes => {
     writeHead(code: number) { statusCode = code },
     end(data?: string) { body = data ?? '' },
   } as unknown as MockRes
+}
+
+const setupE78BatchPromptSession = () => {
+  const session = new GameSession()
+  const state = session.getState().state
+  state.players = state.players.slice(0, 2)
+  state.currentPlayerIndex = 0
+  const player = state.players[0]!
+  player.minorHand = [E78_CARD_ID]
+  player.occupationPlayed = ['occ-1', 'occ-2', 'occ-3']
+  player.resources.wood = 2
+  player.resources.clay = 1
+  state.players[1]!.minorHand = ['__test_placeholder__']
+  state.players[1]!.occupationHand = ['__test_placeholder__']
+  session.loadState(state)
+
+  let resp = session.takeAction(0, 'meeting-place')
+  for (let safety = 0; safety < 20; safety += 1) {
+    expect(resp.ok).toBe(true)
+    if (
+      resp.interaction.stateId === 'wait' &&
+      resp.interaction.request.kind === 'resource-batch-exchange-select'
+    ) {
+      setSession(session)
+      return session
+    }
+    if (resp.interaction.stateId !== 'wait') break
+    const next = resp.interaction.options?.find((option) => option.value !== '__skip__' && option.value !== 'cancel')
+    if (!next) break
+    resp = session.resolveChoice(resp.interaction.playerIndex, next.value)
+  }
+  throw new Error('resource batch prompt not reached')
 }
 
 describe('HTTP privacy + seat binding', () => {
@@ -192,6 +228,47 @@ describe('HTTP privacy + seat binding', () => {
       expect(res.statusCode).toBe(403)
       const data = JSON.parse(res.body)
       expect(data.error).toBe('seat mismatch')
+    })
+
+    it('GET /api/game/state filters E78 private batch prompt per viewer', async () => {
+      setupE78BatchPromptSession()
+
+      const targetRes = mockRes()
+      await handleGameRoute(
+        mockReq('GET', '/api/game/state', null, { 'x-viewer-player': 'p1' }),
+        targetRes,
+      )
+      expect(targetRes.statusCode).toBe(200)
+      const targetData = JSON.parse(targetRes.body)
+      expect(targetData.interaction.stateId).toBe('wait')
+      expect(targetData.interaction.request.kind).toBe('resource-batch-exchange-select')
+      expect(targetData.privateEvents).toEqual([
+        expect.objectContaining({
+          type: 'private.promptShown',
+          recipientPlayerId: 'p1',
+          promptKind: 'resource-batch-exchange-select',
+          sourceCard: E78_CARD_ID,
+        }),
+      ])
+
+      const otherRes = mockRes()
+      await handleGameRoute(
+        mockReq('GET', '/api/game/state', null, { 'x-viewer-player': 'p2' }),
+        otherRes,
+      )
+      expect(otherRes.statusCode).toBe(200)
+      const otherData = JSON.parse(otherRes.body)
+      expect(otherData.interaction.stateId).toBe('wait')
+      expect(otherData.interaction.request.kind).toBe('private-prompt')
+      expect(otherData.privateEvents ?? []).toEqual([])
+
+      const observerRes = mockRes()
+      await handleGameRoute(mockReq('GET', '/api/game/state'), observerRes)
+      expect(observerRes.statusCode).toBe(200)
+      const observerData = JSON.parse(observerRes.body)
+      expect(observerData.interaction.stateId).toBe('wait')
+      expect(observerData.interaction.request.kind).toBe('resource-batch-exchange-select')
+      expect(observerData.privateEvents ?? []).toEqual([])
     })
   })
 

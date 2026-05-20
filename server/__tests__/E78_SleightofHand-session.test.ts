@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
+import type { Resource } from '../../shared/contract/types'
 
 import '../../shared/cards/E/E78_SleightofHand'
 
 const CARD_ID = 'E78_SleightofHand'
 
-const setupPlaySession = () => {
+const setupPlaySession = (resources?: Partial<Resource>) => {
   const session = new GameSession()
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -17,6 +18,7 @@ const setupPlaySession = () => {
   player.resources.wood = 2
   player.resources.clay = 1
   player.resources.stone = 0
+  Object.assign(player.resources, resources)
   state.players[1]!.minorHand = ['__test_placeholder__']
   state.players[1]!.occupationHand = ['__test_placeholder__']
   session.loadState(state)
@@ -120,6 +122,66 @@ describe('E78_SleightofHand session', () => {
     expect(resp.state.events).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'resource.exchanged', sourceCardId: CARD_ID }),
     ]))
+  })
+
+  it('rejects batch exchange when discard and receive totals differ', () => {
+    const session = setupPlaySession()
+    const resp = playUntilBatchPrompt(session)
+    const rejected = session.commitSelectionChoice(0, {
+      resourceBatchExchange: {
+        discard: { wood: 1 },
+        receive: { stone: 2 },
+      },
+    })
+
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(rejected.ok).toBe(false)
+    expect(rejected.error).toBe('resource-batch.error.total-mismatch')
+  })
+
+  it('rejects batch exchange when discarding more than available', () => {
+    const session = setupPlaySession()
+    playUntilBatchPrompt(session)
+
+    const rejected = session.commitSelectionChoice(0, {
+      resourceBatchExchange: {
+        discard: { wood: 3 },
+        receive: { stone: 3 },
+      },
+    })
+
+    expect(rejected.ok).toBe(false)
+    expect(rejected.error).toBe('resource-batch.error.invalid-discard-wood')
+  })
+
+  it('rejects batch exchange when total exceeds max', () => {
+    const session = setupPlaySession({ wood: 4, clay: 1 })
+    playUntilBatchPrompt(session)
+
+    const rejected = session.commitSelectionChoice(0, {
+      resourceBatchExchange: {
+        discard: { wood: 4, clay: 1 },
+        receive: { stone: 4, reed: 1 },
+      },
+    })
+
+    expect(rejected.ok).toBe(false)
+    expect(rejected.error).toBe('resource-batch.error.too-many')
+  })
+
+  it('rejects batch exchange with invalid receive resource', () => {
+    const session = setupPlaySession()
+    playUntilBatchPrompt(session)
+
+    const rejected = session.commitSelectionChoice(0, {
+      resourceBatchExchange: {
+        discard: { wood: 1 },
+        receive: { food: 1 },
+      },
+    })
+
+    expect(rejected.ok).toBe(false)
+    expect(rejected.error).toBe('resource-batch.error.invalid-receive-food')
   })
 
   it('opens the batch prompt even without any normal exchange action source', () => {

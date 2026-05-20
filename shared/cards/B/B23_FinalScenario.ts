@@ -33,6 +33,11 @@ export const B23_FinalScenario_impl = {
       writeCardExtraData(player, CARD_ID, 'round14Space', round14SpaceId)
       writeCardExtraData(player, CARD_ID, 'exclusiveOwnerId', player.id)
       writeCardInfobox(player, CARD_ID, `Round 14: ${round14SpaceId}`)
+      appendImmediateEvents(state, [{
+        type: 'action.revealed',
+        actionId: round14SpaceId,
+        roundSlot: 14,
+      }], { actorPlayerId: player.id, sourceCardId: CARD_ID })
       setExclusiveUse(state, player, round14SpaceId)
     }
   },
