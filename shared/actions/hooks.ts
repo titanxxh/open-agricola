@@ -39,6 +39,7 @@ export type ActionHookContext = ActionExecutionContext & {
   actionId: string
   phase: ActionHookPhase
   transactionEvents: readonly GameEvent[]
+  actionEvents?: readonly GameEvent[]
   eventQuery: EventQuery
   result?: ActionExecutionResult
   choice?: string
@@ -46,8 +47,8 @@ export type ActionHookContext = ActionExecutionContext & {
 }
 
 type ActionHookContextInput =
-  Omit<ActionHookContext, 'transactionEvents' | 'eventQuery'> &
-  Partial<Pick<ActionHookContext, 'transactionEvents' | 'eventQuery'>>
+  Omit<ActionHookContext, 'transactionEvents' | 'actionEvents' | 'eventQuery'> &
+  Partial<Pick<ActionHookContext, 'transactionEvents' | 'actionEvents' | 'eventQuery'>>
 
 export type FollowUpAction = string | { actionId: string; sourceCard?: string }
 

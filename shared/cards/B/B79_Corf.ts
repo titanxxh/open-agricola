@@ -1,5 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B79_Corf } from '../../cards-display/B/B79_Corf'
@@ -19,9 +20,11 @@ const listener: CardListenerRegistration = {
   actions: ['collect'],
   scope: 'any',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const gained = context.result?.type === 'ok'
-      ? (context.result.resourcesGained?.stone ?? 0)
-      : 0
+    const events = context.actionEvents ?? context.transactionEvents
+    const triggerPlayer = context.triggerPlayer ?? context.player
+    const gained = sumResourceMovedToPlayer(events, 'stone', triggerPlayer.id, (event) =>
+      event.from.kind === 'actionSpace',
+    )
     if (gained < 3) return
     return { flow: gainLeaf(CARD_ID, { stone: 1 }), sourceCard: CARD_ID }
   },

@@ -117,6 +117,7 @@ export const resolveFutureMeepleRequests = (state: GameState, eventSink?: EventS
         cardId: request.cardId,
         sourceCardId: request.cardId,
         entries: queuedEntries,
+        ...(request.sourceSummary ? { sourceSummary: request.sourceSummary } : {}),
       })
     }
   })

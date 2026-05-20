@@ -7,11 +7,24 @@ import {
   enforceAnimalCapacity,
 } from '../../domain/animal-zones'
 import type { ActionSpace, GameState, Pasture, PlayerState } from '../../contract/types'
+import type { DraftGameEvent } from '../../contract/events'
 
 import '../E/E33_BeaverColony'
 import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'E33_BeaverColony'
+
+const reedMoved = (
+  reed: number,
+  playerId = 'p1',
+  spaceId = 'reed-bank',
+): DraftGameEvent<'resource.moved'> => ({
+  type: 'resource.moved',
+  resources: { reed },
+  from: { kind: 'actionSpace', spaceId },
+  to: { kind: 'player', playerId },
+  reason: 'collect',
+})
 
 const makePasture = (id: string, size: number, stables: number, animal?: { type: 'sheep' | 'boar' | 'cattle'; count: number }): Pasture => ({
   id,
@@ -201,6 +214,8 @@ describe('E33_BeaverColony reed bonus VP', () => {
       space: createSpace('reed-bank'),
       actionId: 'collect', phase: 'immediatelyAfter',
       result: { type: 'ok', resourcesGained: { reed: 2 } },
+      transactionEvents: [reedMoved(2, player.id)],
+      actionEvents: [reedMoved(2, player.id)],
     } as unknown as CardListenerContext)
     expect(result?.flow?.type).toBe('leaf')
     if (result?.flow?.type === 'leaf') {
@@ -232,6 +247,8 @@ describe('E33_BeaverColony reed bonus VP', () => {
       space: createSpace('resource-market-4'),
       actionId: 'gain', phase: 'immediatelyAfter',
       result: { type: 'ok', resourcesGained: { reed: 1, stone: 1, food: 1 } },
+      transactionEvents: [reedMoved(1, player.id, 'resource-market-4')],
+      actionEvents: [reedMoved(1, player.id, 'resource-market-4')],
     } as unknown as CardListenerContext)
     expect(result?.flow?.type).toBe('leaf')
     if (result?.flow?.type === 'leaf') {

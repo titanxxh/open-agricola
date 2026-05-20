@@ -1,6 +1,7 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getStoredResource } from '../helpers/card-storage'
+import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { C81_MaterialHub } from '../../cards-display/C/C81_MaterialHub'
@@ -19,6 +20,17 @@ const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
 const findOwner = (state: import('../../contract/types').GameState): PlayerState | undefined =>
   state.players?.find((p) => p.minorPlayed.includes(CARD_ID))
 
+const actionSpaceResourceMovedToTriggerPlayer = (
+  context: CardListenerContext,
+  resource: (typeof BUILDING_RESOURCES)[number],
+) =>
+  sumResourceMovedToPlayer(
+    context.actionEvents ?? context.transactionEvents,
+    resource,
+    (context.triggerPlayer ?? context.player).id,
+    (event) => event.from.kind === 'actionSpace',
+  )
+
 const collectListener: CardListenerRegistration = {
   id: 'C81-material-hub-after-collect',
   cardIds: [CARD_ID],
@@ -26,16 +38,13 @@ const collectListener: CardListenerRegistration = {
   actions: ['collect'],
   scope: 'any',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const owner = findOwner(context.state)
+    const owner = context.ownerPlayer ?? findOwner(context.state)
     if (!owner) return
-
-    const gained = context.result?.type === 'ok' ? context.result.resourcesGained : undefined
-    if (!gained) return
 
     const takeChildren: import('../../contract/types').ActionFlow[] = []
 
     for (const resource of BUILDING_RESOURCES) {
-      const amount = gained[resource] ?? 0
+      const amount = actionSpaceResourceMovedToTriggerPlayer(context, resource)
       const threshold = THRESHOLDS[resource]!
       if (amount >= threshold) {
         const stored = getStoredResource(owner, CARD_ID, resource)

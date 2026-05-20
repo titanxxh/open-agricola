@@ -92,10 +92,14 @@ const ensureEventState = (state: EngineContext['state']): void => {
   state.nextEventSeq ??= 1
 }
 
-const currentEventReadContext = (int: EngineInternals) => {
+const currentEventReadContext = (
+  int: EngineInternals,
+  actionEvents?: readonly GameEvent[],
+) => {
   const transactionEvents = [...int.events.currentTransactionEvents()]
   return {
     transactionEvents,
+    actionEvents: actionEvents ? [...actionEvents] : undefined,
     eventQuery: createEventQuery(transactionEvents),
   }
 }
@@ -367,9 +371,10 @@ export function engineResolveChoice(
       executionContext.costs =
         Object.keys(costOverride).length > 0 ? costOverride : undefined
       const skipBefore = int.beforePhaseFlowNodeIds.has(child.id)
+      const beforeEventReadContext = currentEventReadContext(int)
       const beforePhase = skipBefore
         ? { matchedListeners: [] }
-        : int.hooks.before({ ...executionContext, ...currentEventReadContext(int), actionId })
+        : int.hooks.before({ ...executionContext, ...beforeEventReadContext, actionId })
       const beforeBaseEvent = buildListenerEvent(executionContext, {})
       const beforeActivateNodes = buildPhaseTrailingNodes(
         int,
@@ -379,6 +384,7 @@ export function engineResolveChoice(
         context.state,
         beforeBaseEvent,
         executionContext.player.id,
+        beforeEventReadContext.transactionEvents,
       )
       if (beforeActivateNodes.length > 0 && !child.beforePhaseResolved) {
         child.beforePhaseResolved = true
@@ -401,6 +407,7 @@ export function engineResolveChoice(
         sourceCardId: executionContext.sourceCard,
       })
       const eventBuffer = createBufferedEventSink()
+      let completedEvents: GameEvent[] = []
       const result = action.execute({
         ...executionContext,
         eventSink: eventBuffer.sink,
@@ -416,8 +423,9 @@ export function engineResolveChoice(
       }
       eventBuffer.flushTo(eventFrame.sink)
       ensureEventState(context.state)
-      recordEventLogDerivation(int, eventFrame.complete(context.state), result)
-      int.hooks.during({ ...executionContext, ...currentEventReadContext(int), actionId }, result)
+      completedEvents = eventFrame.complete(context.state)
+      recordEventLogDerivation(int, completedEvents, result)
+      int.hooks.during({ ...executionContext, ...currentEventReadContext(int, completedEvents), actionId }, result)
       if (result.type === 'request' && (result.request.kind === 'choice' || result.request.kind === 'farm-select')) {
         // S2 Task 6: also accept farm-select kind emitted from an Or/Xor
         // child leaf. The computeArgs merging path only applies to 'choice'
@@ -475,13 +483,14 @@ export function engineResolveChoice(
           ? { ...result, request: updatedRequest }
           : result
       }
+      const eventReadContext = currentEventReadContext(int, completedEvents)
       const immediatePhase = int.hooks.immediatelyAfter(
-        { ...executionContext, ...currentEventReadContext(int), actionId, choice },
+        { ...executionContext, ...eventReadContext, actionId, choice },
         result,
         choice,
       )
       const afterPhase = int.hooks.after(
-        { ...executionContext, ...currentEventReadContext(int), actionId, choice },
+        { ...executionContext, ...eventReadContext, actionId, choice },
         result,
         choice,
       )
@@ -505,6 +514,11 @@ export function engineResolveChoice(
         )
         .filter((action) => action)
       const baseEvent = buildListenerEvent(executionContext, { result, choice })
+      const trailingTransactionEvents = result.type === 'flow' ? undefined : eventReadContext.transactionEvents
+      const trailingActionEvents = result.type === 'flow' ? undefined : eventReadContext.actionEvents
+      const trailingActionEventStartIndex = result.type === 'flow'
+        ? eventReadContext.transactionEvents.length - completedEvents.length
+        : undefined
       const immediateActivateNodes = buildPhaseTrailingNodes(
         int,
         immediatePhase.matchedListeners,
@@ -513,6 +527,9 @@ export function engineResolveChoice(
         context.state,
         baseEvent,
         executionContext.player.id,
+        trailingTransactionEvents,
+        trailingActionEvents,
+        trailingActionEventStartIndex,
       )
       const afterActivateNodes = buildPhaseTrailingNodes(
         int,
@@ -522,6 +539,9 @@ export function engineResolveChoice(
         context.state,
         baseEvent,
         executionContext.player.id,
+        trailingTransactionEvents,
+        trailingActionEvents,
+        trailingActionEventStartIndex,
       )
       // 7b1: insert flow body BEFORE trailing hook nodes so wrapper-style
       // actions (renovate-house, occupation, improvement-any) emit their
@@ -581,6 +601,7 @@ export function engineResolveChoice(
   pendingHost?.clearPending()
   let result: ActionExecutionResult
   let eventFrame: ReturnType<EngineInternals['events']['beginFrame']> | null = null
+  let completedEvents: GameEvent[] = []
   if (action.resolveChoice) {
     eventFrame = int.events.beginFrame({
       actorPlayerId: executionContext.player.id,
@@ -608,9 +629,10 @@ export function engineResolveChoice(
     eventFrame.rollback()
   } else {
     ensureEventState(context.state)
-    recordEventLogDerivation(int, eventFrame.complete(context.state), result)
+    completedEvents = eventFrame.complete(context.state)
+    recordEventLogDerivation(int, completedEvents, result)
   }
-  int.hooks.during({ ...executionContext, ...currentEventReadContext(int), actionId }, result)
+  int.hooks.during({ ...executionContext, ...currentEventReadContext(int, completedEvents), actionId }, result)
   if (result.type === 'fail' && result.recoverable === true && pendingHost && pendingEnvelope) {
     const contextSnapshot = pendingEnvelope.contextSnapshot as InteractionContextSnapshot | undefined
     applyInteractionRequest(int, {
@@ -661,13 +683,14 @@ export function engineResolveChoice(
     return result
   }
   const insertionTargetId = pendingEnvelope?.ownerNodeId ?? pendingHost?.id ?? int.pendingNodeIdRef.value
+  const eventReadContext = currentEventReadContext(int, completedEvents)
   const immediatePhase = int.hooks.immediatelyAfter(
-    { ...executionContext, ...currentEventReadContext(int), actionId, choice },
+    { ...executionContext, ...eventReadContext, actionId, choice },
     result,
     choice,
   )
   const afterPhase = int.hooks.after(
-    { ...executionContext, ...currentEventReadContext(int), actionId, choice },
+    { ...executionContext, ...eventReadContext, actionId, choice },
     result,
     choice,
   )
@@ -691,6 +714,11 @@ export function engineResolveChoice(
     )
     .filter((action) => action)
   const baseEvent2 = buildListenerEvent(executionContext, { result, choice })
+  const trailingTransactionEvents = result.type === 'flow' ? undefined : eventReadContext.transactionEvents
+  const trailingActionEvents = result.type === 'flow' ? undefined : eventReadContext.actionEvents
+  const trailingActionEventStartIndex = result.type === 'flow'
+    ? eventReadContext.transactionEvents.length - completedEvents.length
+    : undefined
   const immediateActivateNodes = buildPhaseTrailingNodes(
     int,
     immediatePhase.matchedListeners,
@@ -699,6 +727,9 @@ export function engineResolveChoice(
     context.state,
     baseEvent2,
     executionContext.player.id,
+    trailingTransactionEvents,
+    trailingActionEvents,
+    trailingActionEventStartIndex,
   )
   const afterActivateNodes = buildPhaseTrailingNodes(
     int,
@@ -708,6 +739,9 @@ export function engineResolveChoice(
     context.state,
     baseEvent2,
     executionContext.player.id,
+    trailingTransactionEvents,
+    trailingActionEvents,
+    trailingActionEventStartIndex,
   )
   // 7b1: insert flow body BEFORE the trailing hook nodes (followUps,
   // immediatelyAfter / after activate) so wrapper actions returning a

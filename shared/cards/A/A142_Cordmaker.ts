@@ -1,5 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import { gainLeaf, payGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A142_Cordmaker } from '../../cards-display/A/A142_Cordmaker'
@@ -20,12 +21,14 @@ const listener: CardListenerRegistration = {
   scope: 'any',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'reed-bank') return
-    if (context.result?.type !== 'ok') return
-    const reedGained = context.result.resourcesGained?.reed ?? 0
+    const events = context.actionEvents ?? context.transactionEvents
+    const triggerPlayer = context.triggerPlayer ?? context.player
+    const reedGained = sumResourceMovedToPlayer(events, 'reed', triggerPlayer.id, (event) =>
+      event.from.kind === 'actionSpace' && event.from.spaceId === 'reed-bank',
+    )
     if (reedGained < 2) return
 
     const ownerPlayer = context.ownerPlayer ?? context.player
-    const triggerPlayer = context.triggerPlayer ?? context.player
     const isOwner = ownerPlayer.id === triggerPlayer.id
 
     return {

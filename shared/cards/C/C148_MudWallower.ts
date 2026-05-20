@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, PlayerState } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { initCardState } from '../__stubs__/helpers'
+import { sumResourcePaid } from '../helpers/event-provenance'
 import { writeCardInfobox } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { C148_MudWallower } from '../../cards-display/C/C148_MudWallower'
@@ -135,12 +136,6 @@ const afterReorgSyncListener: CardListenerRegistration = {
   },
 }
 
-/**
- * 7b1 PR-4 migration: cover any pay path that drains pigs (BeggingCard pay,
- * cooking pay, future improvement-buy pay variants paying boar). When the
- * pay leaf reports `resourcesPaid.boar > 0`, sync the held cap downward to
- * match `min(held, boar)`. Always-permanent: never raises the cap.
- */
 const afterPaySyncListener: CardListenerRegistration = {
   id: 'C148-mud-wallower-after-pay-sync',
   cardIds: [CARD_ID],
@@ -149,8 +144,8 @@ const afterPaySyncListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const result = context.result
     if (!result || result.type !== 'ok') return
-    const resourcesPaid = (result.resourcesPaid as { boar?: number } | undefined) ?? {}
-    if (!resourcesPaid.boar || resourcesPaid.boar <= 0) return
+    const boarPaid = sumResourcePaid(context.actionEvents ?? context.transactionEvents, 'boar')
+    if (boarPaid <= 0) return
     const flow = syncHeldDownwardFlow(context.player)
     return flow ? { flow, sourceCard: CARD_ID } : undefined
   },

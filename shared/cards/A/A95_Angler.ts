@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { A95_Angler } from '../../cards-display/A/A95_Angler'
+import { sumResourceMovedFromActionSpace } from '../helpers/event-provenance'
 
 const CARD_ID = A95_Angler.id
 
@@ -12,12 +13,17 @@ const listener: CardListenerRegistration = {
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'fishing') return
-    // The food was on the space before collecting - check the resources that were gained
-    // BGA check: count($event['meeples']) <= 2 means ≤2 food was on the space
-    const foodGained = (context.result?.type === 'ok'
-      ? (context.result.resourcesGained?.food ?? 0)
-      : 0)
+    const foodGained = sumResourceMovedFromActionSpace(
+      context.transactionEvents,
+      'food',
+      (event) =>
+        event.from.kind === 'actionSpace' &&
+        event.from.spaceId === 'fishing' &&
+        event.to.kind === 'player' &&
+        event.to.playerId === context.player.id,
+    )
     if (foodGained > 2) return
+    if (foodGained <= 0) return
     return {
       flow: {
         type: 'leaf',

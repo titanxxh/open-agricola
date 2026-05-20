@@ -3,6 +3,7 @@ import type { ActionFlow } from '../../contract/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionSpace, PlayerState, Pasture } from '../../contract/types'
 import { isCardFlagged } from '../helpers/card-state'
+import { sumResourceMovedFromActionSpace } from '../helpers/event-provenance'
 import type { CardImpl } from '../registry'
 import { A17_ReclamationPlow } from '../../cards-display/A/A17_ReclamationPlow'
 
@@ -47,6 +48,16 @@ const specialEffect = (params: Record<string, unknown>): ActionFlow => ({
   params,
 })
 
+const countObtainedAnimalFromActionSpace = (
+  context: CardListenerContext,
+  animalType: AnimalType,
+): number => {
+  const events = context.actionEvents ?? context.transactionEvents
+  return sumResourceMovedFromActionSpace(events, animalType, (event) =>
+    event.to.kind === 'player' && event.to.playerId === context.player.id,
+  )
+}
+
 const reclamationPlowAfterCollectListener: CardListenerRegistration = {
   id: 'A17-reclamation-plow-after',
   cardIds: [CARD_ID],
@@ -57,12 +68,10 @@ const reclamationPlowAfterCollectListener: CardListenerRegistration = {
     if (!isAnimalAccumulationSpace(space)) return
     if (isCardFlagged(player, CARD_ID)) return
 
-    const resourcesGained =
-      context.result?.type === 'ok' ? context.result.resourcesGained : undefined
     const obtainedAnimals: Record<AnimalType, number> = {
-      sheep: resourcesGained?.sheep ?? 0,
-      boar: resourcesGained?.boar ?? 0,
-      cattle: resourcesGained?.cattle ?? 0,
+      sheep: countObtainedAnimalFromActionSpace(context, 'sheep'),
+      boar: countObtainedAnimalFromActionSpace(context, 'boar'),
+      cattle: countObtainedAnimalFromActionSpace(context, 'cattle'),
     }
     const totalObtained = obtainedAnimals.sheep + obtainedAnimals.boar + obtainedAnimals.cattle
     if (totalObtained <= 0) return

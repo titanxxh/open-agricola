@@ -4,6 +4,9 @@ import {
   hasExchangeGained,
   hasResourceMovedFromActionSpace,
   hasResourceMovedToPlayer,
+  sumResourceMovedFromActionSpace,
+  sumResourceMovedToPlayer,
+  sumResourcePaid,
 } from '../event-provenance'
 
 const moved = (overrides: Partial<Extract<QueryableGameEvent, { type: 'resource.moved' }>> = {}) => ({
@@ -27,6 +30,15 @@ const exchanged = (overrides: Partial<Extract<QueryableGameEvent, { type: 'resou
   ...overrides,
 }) as Extract<QueryableGameEvent, { type: 'resource.exchanged' }>
 
+const paid = (overrides: Partial<Extract<QueryableGameEvent, { type: 'resource.paid' }>> = {}) => ({
+  type: 'resource.paid',
+  resources: { food: 1 },
+  to: { kind: 'supply' },
+  paymentFor: 'occupation',
+  paymentSources: [{ from: { kind: 'player', playerId: 'p1' }, resources: { food: 1 } }],
+  ...overrides,
+}) as Extract<QueryableGameEvent, { type: 'resource.paid' }>
+
 describe('event provenance helpers', () => {
   it('matches resource moves to a specific player', () => {
     expect(hasResourceMovedToPlayer([moved()], 'grain', 'p1')).toBe(true)
@@ -48,5 +60,32 @@ describe('event provenance helpers', () => {
     expect(hasExchangeGained([exchanged()], 'grain', event => event.exchangeSource === 'E78_SleightofHand')).toBe(true)
     expect(hasExchangeGained([exchanged()], 'vegetable')).toBe(false)
     expect(hasExchangeGained([exchanged()], 'grain', event => event.exchangeSource === 'other')).toBe(false)
+  })
+
+  it('sums moved and paid resources with predicates', () => {
+    const events: readonly QueryableGameEvent[] = [
+      moved({ resources: { wood: 1 } }),
+      moved({ resources: { wood: 2 }, from: { kind: 'supply' } }),
+      moved({ resources: { wood: 4 }, to: { kind: 'player', playerId: 'p2' } }),
+      moved({ resources: { clay: 2 }, from: { kind: 'actionSpace', spaceId: 'clay-pit' } }),
+      moved({ resources: { clay: 5 }, from: { kind: 'supply' } }),
+      moved({ resources: { wood: 0 } }),
+      moved({ resources: { wood: -1 } }),
+      paid(),
+      paid({ resources: { food: 1 } }),
+      paid({ resources: { food: 4 }, paymentFor: 'major-improvement' }),
+      paid({ resources: { food: 0 } }),
+      paid({ resources: { food: -1 } }),
+      exchanged(),
+    ]
+    const snapshot = JSON.stringify(events)
+
+    expect(sumResourceMovedToPlayer(events, 'wood', 'p1')).toBe(3)
+    expect(sumResourceMovedFromActionSpace(events, 'clay')).toBe(2)
+    expect(sumResourcePaid(events, 'food', event => event.paymentFor === 'occupation')).toBe(2)
+    expect(sumResourceMovedToPlayer(undefined, 'wood', 'p1')).toBe(0)
+    expect(sumResourceMovedFromActionSpace(undefined, 'clay')).toBe(0)
+    expect(sumResourcePaid(undefined, 'food')).toBe(0)
+    expect(JSON.stringify(events)).toBe(snapshot)
   })
 })

@@ -44,7 +44,7 @@ const clonePlayerForPreview = (player: PlayerState): PlayerState => ({
 })
 
 type TriggerSelectContext = ActionExecutionContext &
-  Partial<Pick<CardListenerContext, 'transactionEvents' | 'eventQuery'>>
+  Partial<Pick<CardListenerContext, 'transactionEvents' | 'actionEvents' | 'eventQuery'>>
 
 const previewContextForChild = (
   child: ActivateCardActionNode,
@@ -91,7 +91,8 @@ const previewContextForChild = (
       space: context.space,
       actionId: params.actionId,
       phase: params.phase,
-      transactionEvents: context.transactionEvents,
+      transactionEvents: context.transactionEvents ?? params.transactionEvents,
+      actionEvents: context.actionEvents ?? params.actionEvents,
       eventQuery: context.eventQuery,
       ...event,
     },

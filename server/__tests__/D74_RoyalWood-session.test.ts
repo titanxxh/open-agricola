@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/D/D74_RoyalWood'
@@ -7,6 +8,22 @@ import '../../shared/cards/B/B81_Handcart'
 import '../../shared/cards/E/E14_WoodSaw'
 
 const CARD_ID = 'D74_RoyalWood'
+
+const paidEvent = (wood: number, paymentFor: string) => ({
+  type: 'resource.paid',
+  resources: { wood },
+  paymentFor,
+})
+
+const findAfterListener = (actionId: string) => {
+  const listener = getRegisteredCardListeners().find((l) =>
+    l.cardIds?.includes(CARD_ID) &&
+    l.actions?.includes(actionId) &&
+    l.phases?.includes('after'),
+  )
+  if (!listener) throw new Error(`D74 after listener missing for ${actionId}`)
+  return listener
+}
 
 const setup = (options?: { wood?: number }) => {
   const session = new GameSession()
@@ -53,6 +70,67 @@ const playOneWoodMinorTurn = (session: GameSession, minorId: string) => {
 }
 
 describe('D74_RoyalWood session', () => {
+  it.each([
+    ['pay', 'major-improvement'],
+    ['pay', 'minor-improvement'],
+    ['construct', 'construct'],
+    ['stables', 'stables'],
+  ])('reads paid wood from resource.paid events for %s/%s without legacy result payload', (actionId, paymentFor) => {
+    const session = setup({ wood: 10 })
+    const state = session.getState().state
+    const player = state.players[0]!
+    const result = { type: 'ok' as const }
+
+    expect('resourcesPaid' in result).toBe(false)
+    expect('extraData' in result).toBe(false)
+
+    const listenerResult = executeCardListener(findAfterListener(actionId), {
+      state,
+      player,
+      space: { id: actionId },
+      actionId,
+      phase: 'after',
+      result,
+      transactionEvents: [paidEvent(3, paymentFor)],
+    } as unknown as CardListenerContext)
+
+    expect(listenerResult?.flow).toEqual({
+      type: 'leaf',
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'set-extra-data', key: 'woodSpent', value: 3 },
+    })
+  })
+
+  it.each([
+    ['pay', 'major-improvement'],
+    ['pay', 'minor-improvement'],
+    ['construct', 'construct'],
+    ['stables', 'stables'],
+  ])('only counts current actionEvents for %s/%s when transaction has prior paid wood', (actionId, paymentFor) => {
+    const session = setup({ wood: 10 })
+    const state = session.getState().state
+    const player = state.players[0]!
+
+    const listenerResult = executeCardListener(findAfterListener(actionId), {
+      state,
+      player,
+      space: { id: actionId },
+      actionId,
+      phase: 'after',
+      result: { type: 'ok' },
+      transactionEvents: [paidEvent(5, paymentFor), paidEvent(3, paymentFor)],
+      actionEvents: [paidEvent(3, paymentFor)],
+    } as unknown as CardListenerContext)
+
+    expect(listenerResult?.flow).toEqual({
+      type: 'leaf',
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'set-extra-data', key: 'woodSpent', value: 3 },
+    })
+  })
+
   it('refunds wood before confirmNextPlayer after building Joinery', () => {
     const session = setup({ wood: 5 })
     const state = session.getState().state
@@ -69,6 +147,13 @@ describe('D74_RoyalWood session', () => {
     resp = session.resolveChoice(0, 'major:Major_Joinery')
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.paid',
+        paymentFor: 'major-improvement',
+        resources: expect.objectContaining({ wood: 2 }),
+      }),
+    ]))
     expect(resp.state.players[0]!.resources.wood).toBe(4)
     expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.woodSpent).toBe(0)
   })
@@ -77,10 +162,24 @@ describe('D74_RoyalWood session', () => {
     const session = setup({ wood: 10 })
 
     let resp = playOneWoodMinorTurn(session, 'B81_Handcart')
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.paid',
+        paymentFor: 'minor-improvement',
+        resources: expect.objectContaining({ wood: 1 }),
+      }),
+    ]))
     expect(resp.state.players[0]!.resources.wood).toBe(9)
     expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.woodSpent).toBe(0)
 
     resp = playOneWoodMinorTurn(session, 'E14_WoodSaw')
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.paid',
+        paymentFor: 'minor-improvement',
+        resources: expect.objectContaining({ wood: 1 }),
+      }),
+    ]))
     expect(resp.state.players[0]!.resources.wood).toBe(8)
     expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.woodSpent).toBe(0)
   })
