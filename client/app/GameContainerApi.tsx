@@ -10,7 +10,7 @@ import { parsePositionKey, positionKey } from '../../shared/domain/farm'
 import { emptyResources, resourceKeyList } from '../../shared/contract/state-constants'
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, parseDraftParamsFromQuery, type GameTransport } from '../services/gameTransport'
-import type { GameSyncPayload } from '../../shared/contract/protocol/game'
+import type { GameSyncPayload, PrivateGameEvent } from '../../shared/contract/protocol/game'
 import { playerCanBuildPalisades } from '../../shared/cards/helpers/card-type'
 import { useFarmSelection } from '../hooks/useFarmSelection'
 import { buildHarvestFeedOptions } from './hooks/use-harvest-flow'
@@ -252,8 +252,9 @@ export const GameContainerApi = () => {
   }, [])
   const { user } = useAuth()
   const { transport, wsStatus, isWs, isReady, wsTransport } = useTransportSetup(lockedViewPlayerId, user?.displayName, isWsMode)
-  const { state, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, applySnapshot } =
+  const { state, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, privateEvents, applySnapshot } =
     useGameSync()
+  const privateEventsRef = useRef<PrivateGameEvent[]>([])
   const { locale } = useLocale()
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
   const [showScoringPad, setShowScoringPad] = useState(false)
@@ -281,6 +282,10 @@ export const GameContainerApi = () => {
   const [resetSeedInput, setResetSeedInput] = useState('')
   const headerRef = useRef<HTMLDivElement | null>(null)
   const [headerHeight, setHeaderHeight] = useState(0)
+
+  useEffect(() => {
+    privateEventsRef.current = privateEvents
+  }, [privateEvents])
 
   const {
     pendingFenceEdges, setPendingFenceEdges, pendingPalisadeEdges,

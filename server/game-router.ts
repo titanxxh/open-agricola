@@ -162,9 +162,10 @@ const respondWith = (
   const playerIds = resp.state.players.map((player) => player.id)
   const privateEvents = viewerPlayerId === null
     ? []
-    : privateEventsForViewer(resp.interaction, playerIds, viewerPlayerId)
+    : privateEventsForViewer(resp.interaction, playerIds, viewerPlayerId, resp.privateEvents ?? [])
+  const { privateEvents: _privateEvents, ...publicResp } = resp
   const result: Record<string, unknown> = {
-    ...resp,
+    ...publicResp,
     state:
       viewerPlayerId != null
         ? serializeStateForPlayer(resp.state, viewerPlayerId, ctx)
@@ -543,6 +544,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
+    if (!enforceSeatBinding(req, res, body.playerIndex)) return true
     const { resp, result } = callAndRespond(req, s => s.devDrawCard(body.playerIndex!, body.cardId!))
     sendJson(res, resp.ok ? 200 : 400, result)
     return true

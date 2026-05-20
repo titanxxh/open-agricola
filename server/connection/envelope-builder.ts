@@ -1,6 +1,5 @@
 import type { GameSession, SessionResponse } from '../game/authoritative-session.ts'
 import {
-  serializeState,
   serializeStateForPlayer,
 } from '../../shared/session/serialization.ts'
 import type {
@@ -27,11 +26,14 @@ type Args = {
 const buildPayload = (args: Args): GameSyncPayload => {
   const { resp, room, viewerPlayerId } = args
   const stateOpts = { engineStack: room.session.getEngineStack() }
-  const state = viewerPlayerId === null
-    ? serializeState(resp.state, stateOpts)
-    : serializeStateForPlayer(resp.state, viewerPlayerId, stateOpts)
+  const state = serializeStateForPlayer(resp.state, viewerPlayerId, stateOpts)
   const playerIds = resp.state.players.map((player) => player.id)
-  const privateEvents = privateEventsForViewer(resp.interaction, playerIds, viewerPlayerId)
+  const privateEvents = privateEventsForViewer(
+    resp.interaction,
+    playerIds,
+    viewerPlayerId,
+    resp.privateEvents ?? [],
+  )
   const payload: GameSyncPayload = {
     state,
     interaction: filterInteractionForViewer(resp.interaction, playerIds, viewerPlayerId),

@@ -41,17 +41,23 @@ export const privateEventsForViewer = (
   interaction: InteractionState,
   playerIds: readonly string[],
   viewerPlayerId: string | null,
+  responsePrivateEvents: PrivateGameEvent[] = [],
 ): PrivateGameEvent[] => {
-  if (interaction.stateId !== 'wait') return []
-  if (!PRIVATE_PROMPT_KINDS.has(interaction.request.kind)) return []
-  const recipient = targetPlayerId(interaction, playerIds)
-  if (recipient === null || recipient !== viewerPlayerId) return []
-  return [{
-    schemaVersion: 1,
-    type: 'private.promptShown',
-    recipientPlayerId: recipient,
-    promptKind: interaction.request.kind,
-    sourceCard: interaction.sourceCard,
-    promptKey: interaction.promptKey,
-  }]
+  if (viewerPlayerId === null) return []
+  const events: PrivateGameEvent[] = []
+  if (interaction.stateId === 'wait' && PRIVATE_PROMPT_KINDS.has(interaction.request.kind)) {
+    const recipient = targetPlayerId(interaction, playerIds)
+    if (recipient !== null && recipient === viewerPlayerId) {
+      events.push({
+        schemaVersion: 1,
+        type: 'private.promptShown',
+        recipientPlayerId: recipient,
+        promptKind: interaction.request.kind,
+        sourceCard: interaction.sourceCard,
+        promptKey: interaction.promptKey,
+      })
+    }
+  }
+  events.push(...responsePrivateEvents.filter((event) => event.recipientPlayerId === viewerPlayerId))
+  return events
 }

@@ -110,4 +110,107 @@ describe('buildEnvelope', () => {
     expect(observer.payload.interaction.stateId === 'wait' && observer.payload.interaction.request.kind)
       .toBe('private-prompt')
   })
+
+  it('filters response private events for each viewer', () => {
+    const session = new GameSession()
+    const resp = session.withCtx(() => session.getState())
+    const p0 = resp.state.players[0]!
+    const p1 = resp.state.players[1]!
+    const eventResp = {
+      ...resp,
+      privateEvents: [
+        {
+          schemaVersion: 1 as const,
+          type: 'private.handChanged' as const,
+          recipientPlayerId: p0.id,
+          cardIds: ['A116_WoodCutter'],
+          cardType: 'occupation' as const,
+          reason: 'dev-draw-card' as const,
+        },
+        {
+          schemaVersion: 1 as const,
+          type: 'private.handChanged' as const,
+          recipientPlayerId: p1.id,
+          cardIds: ['B116_Shoreforester'],
+          cardType: 'occupation' as const,
+          reason: 'dev-draw-card' as const,
+        },
+      ],
+    }
+
+    const p0Env = buildEnvelope({
+      room: { id: 'r1', session },
+      resp: eventResp,
+      viewerPlayerId: p0.id,
+      version: 1,
+      cause: 'dev',
+      emittedAt: 0,
+    })
+    const p1Env = buildEnvelope({
+      room: { id: 'r1', session },
+      resp: eventResp,
+      viewerPlayerId: p1.id,
+      version: 1,
+      cause: 'dev',
+      emittedAt: 0,
+    })
+    const observer = buildEnvelope({
+      room: { id: 'r1', session },
+      resp: eventResp,
+      viewerPlayerId: null,
+      version: 1,
+      cause: 'dev',
+      emittedAt: 0,
+    })
+
+    expect(p0Env.payload.privateEvents).toEqual([
+      expect.objectContaining({ recipientPlayerId: p0.id, cardIds: ['A116_WoodCutter'] }),
+    ])
+    expect(p1Env.payload.privateEvents).toEqual([
+      expect.objectContaining({ recipientPlayerId: p1.id, cardIds: ['B116_Shoreforester'] }),
+    ])
+    expect(observer.payload.privateEvents ?? []).toEqual([])
+  })
+
+  it('masks draft pending picks for player and null-viewer envelopes', () => {
+    const session = new GameSession(12345, undefined, {
+      playerCount: 2,
+      draftMode: 'simultaneous',
+      draftPoolSize: 7,
+    })
+    const resp = session.withCtx(() => session.getState())
+    const p1Pick = {
+      occ: resp.state.draft!.pools.p1!.occ[0]!,
+      minor: resp.state.draft!.pools.p1!.minor[0]!,
+    }
+    resp.state.draft!.pendingPicks.p1 = {
+      ...p1Pick,
+    }
+    resp.state.draft!.pendingPicks.p2 = {
+      occ: resp.state.draft!.pools.p2!.occ[0]!,
+      minor: resp.state.draft!.pools.p2!.minor[0]!,
+    }
+
+    const p1 = buildEnvelope({
+      room: { id: 'r1', session },
+      resp,
+      viewerPlayerId: 'p1',
+      version: 1,
+      cause: 'reconnect',
+      emittedAt: 0,
+    })
+    const observer = buildEnvelope({
+      room: { id: 'r1', session },
+      resp,
+      viewerPlayerId: null,
+      version: 1,
+      cause: 'reconnect',
+      emittedAt: 0,
+    })
+
+    expect(p1.payload.state.draft!.pendingPicks.p1).toEqual(p1Pick)
+    expect(p1.payload.state.draft!.pendingPicks.p2).toEqual({ occ: '?', minor: '?' })
+    expect(observer.payload.state.draft!.pendingPicks.p1).toEqual({ occ: '?', minor: '?' })
+    expect(observer.payload.state.draft!.pendingPicks.p2).toEqual({ occ: '?', minor: '?' })
+  })
 })
