@@ -44,6 +44,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'action.accumulated': ['spaceId', 'resources'],
   'action.exclusiveUseSet': ['actionId', 'playerId', 'sourceCardId', 'untilRound'],
   'action.exclusiveUseCleared': ['actionId', 'playerId', 'sourceCardId'],
+  'action.detailLogged': ['playerId', 'actionId', 'detailParts'],
   'action.granted': ['playerId', 'actionId', 'cardId'],
   'turn.skipped': ['playerId', 'reason'],
   'startPlayer.changed': ['playerId'],
@@ -306,6 +307,55 @@ const assertFutureMeepleSourceSummary = (value: unknown): void => {
   assertStringField(params.schedule, 'sourceSummary.params.schedule')
 }
 
+const assertActionDetailEffects = (value: unknown): void => {
+  if (value === undefined) return
+  const effects = assertRecord(value, 'detailParts.effects')
+  assertOnlyKeys(effects, [
+    'buildRoom',
+    'buildStables',
+    'growFamily',
+    'plow',
+    'sowGrain',
+    'sowVegetable',
+    'renovate',
+    'fencing',
+    'palisading',
+    'improvements',
+    'minorImprovements',
+    'startPlayer',
+    'bakeBread',
+  ], 'detailParts.effects')
+  for (const key of ['buildRoom', 'buildStables', 'growFamily', 'plow', 'sowGrain', 'sowVegetable', 'fencing', 'palisading']) {
+    if (effects[key] !== undefined) assertFiniteNumberField(effects[key], `detailParts.effects.${key}`)
+  }
+  if (effects.startPlayer !== undefined && typeof effects.startPlayer !== 'boolean') {
+    throw new Error('GameEvent detailParts.effects.startPlayer must be a boolean')
+  }
+  if (effects.improvements !== undefined) assertStringArray(effects.improvements, 'detailParts.effects.improvements')
+  if (effects.minorImprovements !== undefined) assertStringArray(effects.minorImprovements, 'detailParts.effects.minorImprovements')
+  if (effects.renovate !== undefined) {
+    const renovate = assertRecord(effects.renovate, 'detailParts.effects.renovate')
+    assertOnlyKeys(renovate, ['from', 'to'], 'detailParts.effects.renovate')
+    assertStringField(renovate.from, 'detailParts.effects.renovate.from')
+    assertStringField(renovate.to, 'detailParts.effects.renovate.to')
+  }
+  if (effects.bakeBread !== undefined) {
+    const bakeBread = assertRecord(effects.bakeBread, 'detailParts.effects.bakeBread')
+    assertOnlyKeys(bakeBread, ['count', 'food'], 'detailParts.effects.bakeBread')
+    assertFiniteNumberField(bakeBread.count, 'detailParts.effects.bakeBread.count')
+    assertFiniteNumberField(bakeBread.food, 'detailParts.effects.bakeBread.food')
+  }
+}
+
+const assertActionDetailParts = (value: unknown): void => {
+  const detailParts = assertRecord(value, 'detailParts')
+  assertOnlyKeys(detailParts, ['gains', 'costs', 'effects', 'bonusSources'], 'detailParts')
+  if (detailParts.gains !== undefined) assertResourceMap(detailParts.gains, 'detailParts.gains')
+  if (detailParts.costs !== undefined) assertResourceMap(detailParts.costs, 'detailParts.costs')
+  assertActionDetailEffects(detailParts.effects)
+  if (detailParts.bonusSources !== undefined) assertStringArray(detailParts.bonusSources, 'detailParts.bonusSources')
+}
+
 const assertKnownEventDetails = (type: string, event: Record<string, unknown>): void => {
   switch (type) {
     case 'resource.moved':
@@ -429,6 +479,11 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       assertStringField(event.actionId, 'actionId')
       assertStringField(event.playerId, 'playerId')
       assertStringField(event.sourceCardId, 'sourceCardId')
+      return
+    case 'action.detailLogged':
+      assertStringField(event.playerId, 'playerId')
+      assertStringField(event.actionId, 'actionId')
+      assertActionDetailParts(event.detailParts)
       return
     case 'action.granted':
       assertStringField(event.playerId, 'playerId')

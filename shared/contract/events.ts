@@ -6,6 +6,7 @@ import type {
   PlayerState,
   Resource,
 } from './types'
+import type { ActionDetailParts } from './protocol/game'
 
 export type GameEventBase<T extends string> = {
   schemaVersion: 1
@@ -193,6 +194,12 @@ export type ActionExclusiveUseClearedEvent = GameEventBase<'action.exclusiveUseC
   sourceCardId: string
 }
 
+export type ActionDetailLoggedEvent = GameEventBase<'action.detailLogged'> & {
+  playerId: string
+  actionId: string
+  detailParts: ActionDetailParts
+}
+
 export type ActionGrantedEvent = GameEventBase<'action.granted'> & {
   playerId: string
   actionId: string
@@ -346,6 +353,7 @@ export type GameEvent =
   | ActionAccumulatedEvent
   | ActionExclusiveUseSetEvent
   | ActionExclusiveUseClearedEvent
+  | ActionDetailLoggedEvent
   | ActionGrantedEvent
   | TurnSkippedEvent
   | StartPlayerChangedEvent

@@ -1,4 +1,5 @@
 import type {
+  ActionDetailLoggedEvent,
   CardPlayedEvent,
   FarmFenceBuiltEvent,
   FutureMeepleQueuedEvent,
@@ -276,6 +277,12 @@ const mapStableBuilt = (
     },
   )
 
+const mapActionDetailLogged = (
+  event: ActionDetailLoggedEvent,
+  ctx: EventLogMapperContext,
+): LogEntry =>
+  actionDetailLog(ctx, event.playerId, event.actionId, event.detailParts)
+
 export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMapperContext): LogEntry[] => {
   const consumedPaymentSeqs = new Set<number>()
   return [...events]
@@ -509,6 +516,10 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
             cardId: event.sourceCardId,
           },
         }]
+      }
+
+      if (event.type === 'action.detailLogged') {
+        return [mapActionDetailLogged(event, ctx)]
       }
 
       return []

@@ -49,6 +49,9 @@ const baseSetup = () => {
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
   state.round = 2
+  state.roundActionOrder = state.roundActionOrder.map((spaceId) =>
+    spaceId === 'wish-children' ? null : spaceId,
+  )
 
   for (const p of state.players) {
     setActiveWorkerCount(p, 2)
@@ -194,23 +197,12 @@ describe('A25_Bassinet session', () => {
     const fgSpaceMid = afterAccept.state.actionSpaces.find((s) => s.id === 'wish-children')!
     expect(fgSpaceMid.takenBy).toHaveLength(1)
 
-    // Skip the extra place-farmer space selection by cancelling if possible; otherwise
-    // just stash state and force switch.
-    // For our test, we need to end P1's turn. Instead of chasing the extra placement,
-    // pick any farmSelect option to dismiss it — but if the pending is farmSelect, we
-    // can't easily pick a farm tile. Simplest: just grab the current state, force
-    // switch to P2 and clear pending via direct state manipulation.
-    const midState = afterAccept.state
-    // Keep the FG takenBy length as-is, just switch current player to P2.
-    // However `pending` is internal to session; load the state and ensure it
-    // carries no pending by running undoAction or manipulate directly.
-    // Simpler: cancel the extra place-farmer by resolving with cancel if it's a choice.
     if (afterAccept.interaction.stateId === 'wait') {
-      // Try cancel
-      const cancelResp = session.resolveChoice(0, 'cancel')
-      // cancel may or may not succeed; if still pending, try skip
-      if (cancelResp.interaction.stateId === 'wait') {
-        session.resolveChoice(0, '__skip__')
+      const extraPlacement = session.resolveChoice(0, 'forest')
+      expect(extraPlacement.ok).toBe(true)
+      if (extraPlacement.interaction.stateId === 'wait') {
+        const confirm = session.resolveChoice(0, 'confirm')
+        expect(confirm.ok).toBe(true)
       }
     }
 
