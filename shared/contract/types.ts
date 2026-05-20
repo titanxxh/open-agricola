@@ -46,6 +46,8 @@ export type Trade = {
   to: Partial<Resource>
   max?: number
   scope?: 'action' | 'unit'   // default 'action' (back-compat)
+  replaceUpTo?: boolean
+  order?: number
   source?: string
   sourceId?: string
   sideEffect?: TradeSideEffect
@@ -63,6 +65,8 @@ export type BonusChoice = {
    * `BonusModifier` — `room-payment.ts` evaluates per build call.
    */
   conditions?: Record<string, number>
+  minCost?: Partial<Resource>
+  maxCost?: Partial<Resource>
 }
 
 export type Bonus = {
@@ -79,6 +83,8 @@ export type Bonus = {
    * `BonusModifier` — `room-payment.ts` evaluates per build call.
    */
   conditions?: Record<string, number>
+  minCost?: Partial<Resource>
+  maxCost?: Partial<Resource>
 }
 
 export type CostModifierType = 'construct' | 'renovation' | 'occupation' | 'fencing' | 'stables' | 'plow' | 'major-improvement' | 'minor-improvement'
@@ -91,6 +97,8 @@ export type TradeModifier = {
   to: Partial<Resource>
   max?: number
   scope?: 'action' | 'unit'   // default 'action'
+  replaceUpTo?: boolean
+  order?: number
   /**
    * Player-state conditions evaluated when the modifier is applied. Same
    * supported keys as `Bonus.conditions` (`minNumRooms`, `houseTypeWood` /
@@ -110,6 +118,8 @@ export type BonusModifier = {
   choices?: BonusChoice[]
   optional?: boolean
   conditions?: Record<string, number>
+  minCost?: Partial<Resource>
+  maxCost?: Partial<Resource>
 }
 
 export type CostModifier = TradeModifier | BonusModifier
