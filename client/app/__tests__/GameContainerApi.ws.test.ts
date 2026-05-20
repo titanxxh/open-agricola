@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { GameEvent } from '../../../shared/contract/events'
 
 import {
+  applyPublicEventCancellationSnapshot,
   farmCommitErrorMessageKey,
   filterPublicFarmHighlightsForPlayer,
   filterPublicFenceHighlightsForPlayer,
@@ -16,7 +17,7 @@ import {
   removePublicEventResourceAnimations,
 } from '../game-container-helpers'
 import type { PublicEventResourceAnimation } from '../public-event-notifications'
-import { collectNewPublicEventFeedback } from '../public-event-notifications'
+import { collectNewPublicEventFeedback, maxPublicEventSeq } from '../public-event-notifications'
 
 const animation = (id: string): PublicEventResourceAnimation => ({
   id,
@@ -145,6 +146,75 @@ describe('GameContainerApi WS player identity', () => {
     expect(feedback.notifications).toEqual([])
     expect(feedback.resourceAnimations).toEqual([expect.objectContaining({ id: 'evt-moved:move:0' })])
     expect(mergePublicEventResourceAnimations([], feedback.resourceAnimations)).toHaveLength(1)
+  })
+
+  it('clears canceled public feedback and aligns the cursor to the undo snapshot', () => {
+    const canceledEvent = {
+      schemaVersion: 1,
+      id: 'evt-canceled',
+      seq: 3,
+      round: 1,
+      phase: 'work',
+      visibility: 'public',
+      actorPlayerId: 'p1',
+      type: 'resource.paid',
+      resources: { wood: 1 },
+      paymentFor: 'bonus',
+    } satisfies GameEvent
+    const undoSnapshotEvents = [
+      {
+        schemaVersion: 1,
+        id: 'evt-kept',
+        seq: 2,
+        round: 1,
+        phase: 'work',
+        visibility: 'public',
+        actorPlayerId: 'p1',
+        type: 'game.started',
+      },
+    ] satisfies GameEvent[]
+    const clearPublicEventFeedback = vi.fn()
+    const setLastSeenPublicEventSeq = vi.fn()
+
+    expect(collectNewPublicEventFeedback([canceledEvent], 0, 'en', 'public-test').notifications)
+      .toHaveLength(1)
+
+    expect(applyPublicEventCancellationSnapshot({
+      publicEventCancellations: [{
+        reason: 'undoStep',
+        previousMaxSeq: 3,
+        nextMaxSeq: 2,
+        canceledEventIds: ['evt-canceled'],
+        canceledSeqs: [3],
+      }],
+      state: { events: undoSnapshotEvents },
+    }, {
+      clearPublicEventFeedback,
+      setLastSeenPublicEventSeq,
+    })).toBe(true)
+    expect(clearPublicEventFeedback).toHaveBeenCalledTimes(1)
+    expect(setLastSeenPublicEventSeq).toHaveBeenCalledWith(maxPublicEventSeq(undoSnapshotEvents))
+    expect(collectNewPublicEventFeedback(undoSnapshotEvents, setLastSeenPublicEventSeq.mock.calls[0]![0], 'en', 'public-test'))
+      .toEqual({
+        notifications: [],
+        highlights: { actionIds: [], farmTiles: [], fenceEdges: [] },
+        resourceAnimations: [],
+        nextCursor: 2,
+      })
+  })
+
+  it('ignores snapshots without public event cancellations', () => {
+    const clearPublicEventFeedback = vi.fn()
+    const setLastSeenPublicEventSeq = vi.fn()
+
+    expect(applyPublicEventCancellationSnapshot({
+      state: { events: [] },
+    }, {
+      clearPublicEventFeedback,
+      setLastSeenPublicEventSeq,
+    })).toBe(false)
+    expect(clearPublicEventFeedback).not.toHaveBeenCalled()
+    expect(setLastSeenPublicEventSeq).not.toHaveBeenCalled()
   })
 
   it('filters public farm highlights by viewed player', () => {

@@ -3,6 +3,14 @@ import { buildEnvelope } from '../envelope-builder.ts'
 import { GameSession } from '../../game/authoritative-session.ts'
 
 describe('buildEnvelope', () => {
+  const publicEventCancellations = [{
+    reason: 'undoStep' as const,
+    previousMaxSeq: 12,
+    nextMaxSeq: 10,
+    canceledEventIds: ['event-11', 'event-12'],
+    canceledSeqs: [11, 12],
+  }]
+
   it('emits a stateUpdate envelope with the given metadata', () => {
     const session = new GameSession()
     const resp = session.withCtx(() => session.getState())
@@ -50,6 +58,7 @@ describe('buildEnvelope', () => {
     const p1 = resp.state.players[1]!
     const waitResp = {
       ...resp,
+      publicEventCancellations,
       interaction: {
         stateId: 'wait' as const,
         playerIndex: 0,
@@ -109,6 +118,9 @@ describe('buildEnvelope', () => {
       .toBe('private-prompt')
     expect(observer.payload.interaction.stateId === 'wait' && observer.payload.interaction.request.kind)
       .toBe('private-prompt')
+    expect(target.payload.publicEventCancellations).toEqual(publicEventCancellations)
+    expect(other.payload.publicEventCancellations).toEqual(publicEventCancellations)
+    expect(observer.payload.publicEventCancellations).toEqual(publicEventCancellations)
   })
 
   it('filters response private events for each viewer', () => {

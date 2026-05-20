@@ -38,6 +38,7 @@ import {
 } from './bake-exchange-ui'
 import { getCardMeta } from '../services/card-meta'
 import {
+  applyPublicEventCancellationSnapshot,
   farmCommitErrorMessageKey,
   filterPublicFarmHighlightsForPlayer,
   filterPublicFenceHighlightsForPlayer,
@@ -313,9 +314,7 @@ export const GameContainerApi = () => {
   const headerRef = useRef<HTMLDivElement | null>(null)
   const [headerHeight, setHeaderHeight] = useState(0)
 
-  useEffect(() => () => {
-    privateEventNotificationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
-    privateEventNotificationTimersRef.current = []
+  const clearPublicEventFeedbackTimers = useCallback(() => {
     publicEventNotificationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
     publicEventNotificationTimersRef.current = []
     publicEventHighlightTimersRef.current.forEach((timer) => window.clearTimeout(timer))
@@ -323,6 +322,19 @@ export const GameContainerApi = () => {
     publicEventResourceAnimationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
     publicEventResourceAnimationTimersRef.current = []
   }, [])
+
+  const clearPublicEventFeedback = useCallback(() => {
+    clearPublicEventFeedbackTimers()
+    setPublicEventNotifications([])
+    setPublicEventHighlights(emptyPublicEventHighlightTargets())
+    setPublicEventResourceAnimations([])
+  }, [clearPublicEventFeedbackTimers])
+
+  useEffect(() => () => {
+    privateEventNotificationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
+    privateEventNotificationTimersRef.current = []
+    clearPublicEventFeedbackTimers()
+  }, [clearPublicEventFeedbackTimers])
 
   useEffect(() => {
     if (privateEvents.length === 0) return
@@ -409,6 +421,12 @@ export const GameContainerApi = () => {
 
   const handleSnapshot = useCallback((payload: GameSyncPayload) => {
     applySnapshot(payload)
+    applyPublicEventCancellationSnapshot(payload, {
+      clearPublicEventFeedback,
+      setLastSeenPublicEventSeq: (seq) => {
+        lastSeenPublicEventSeqRef.current = seq
+      },
+    })
     if (
       payload.interaction.stateId === 'wait' &&
       payload.interaction.request.kind === 'animal-reorg'
@@ -433,7 +451,7 @@ export const GameContainerApi = () => {
       setSowError(null)
       setPendingPositionSelections(new Set())
     }
-  }, [applySnapshot, setPendingFenceEdges, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError, setPendingPositionSelections])
+  }, [applySnapshot, clearPublicEventFeedback, setPendingFenceEdges, setFenceError, setPendingRoomTiles, setRoomError, setPendingStableTiles, setStableError, setPendingPlowTile, setPlowError, setPendingSowSelections, setSowError, setPendingPositionSelections])
 
   useEffect(() => {
     if (!isReady) return

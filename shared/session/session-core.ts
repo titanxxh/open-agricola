@@ -21,7 +21,7 @@ import type {
   ResourceBatchExchangePayload,
   InteractionAnimalReorgZone,
 } from '../contract/types.ts'
-import type { ActionDetailParts } from '../contract/protocol/game.ts'
+import type { ActionDetailParts, PublicEventCancellation } from '../contract/protocol/game.ts'
 import type { PrivateGameEvent } from '../contract/private-events.ts'
 import { actionDefinitions, getActionDefinition } from '../actions/index.ts'
 import { internalActionDefinitions } from '../actions/internal-actions.ts'
@@ -305,7 +305,12 @@ export type SessionResponse = {
   actionAvailability?: Record<string, boolean>
   cardAvailability?: Record<string, boolean>
   privateEvents?: PrivateGameEvent[]
+  publicEventCancellations?: PublicEventCancellation[]
   error?: string
+}
+
+type ResponseMetadata = {
+  publicEventCancellations?: PublicEventCancellation[]
 }
 
 /**
@@ -1639,7 +1644,12 @@ export class GameCore {
     return Scoring.computeAll(this.state).map((s) => ({ playerId: s.playerId, total: s.total }))
   }
 
-  private respond(ok = true, error?: string, privateEvents?: PrivateGameEvent[]): SessionResponse {
+  private respond(
+    ok = true,
+    error?: string,
+    privateEvents?: PrivateGameEvent[],
+    metadata: ResponseMetadata = {},
+  ): SessionResponse {
     // While the top-level game phase is 'draft', the client uses
     // DraftOverlay (which reads `state.draft` directly), so surface an
     // idle interaction. Otherwise let `buildInteraction()` derive the
@@ -1670,7 +1680,45 @@ export class GameCore {
     if (error) resp.error = error
     const drainedPrivateEvents = this.drainResponsePrivateEvents(ok, privateEvents)
     if (drainedPrivateEvents) resp.privateEvents = drainedPrivateEvents
+    if (metadata.publicEventCancellations?.length) {
+      resp.publicEventCancellations = metadata.publicEventCancellations
+    }
     return resp
+  }
+
+  private maxPublicEventSeq(events: GameState['events']): number {
+    if (events.length === 0) return 0
+    return events.reduce((max, event) => Math.max(max, event.seq), 0)
+  }
+
+  private buildPublicEventCancellation(
+    reason: PublicEventCancellation['reason'],
+    beforeEvents: GameState['events'],
+  ): PublicEventCancellation | null {
+    const previousMaxSeq = this.maxPublicEventSeq(beforeEvents)
+    const nextMaxSeq = this.maxPublicEventSeq(this.state.events)
+    const afterIds = new Set(this.state.events.map((event) => event.id))
+    const canceledEvents = beforeEvents.filter((event) =>
+      event.seq > nextMaxSeq || !afterIds.has(event.id)
+    ).sort((a, b) => a.seq - b.seq)
+    if (canceledEvents.length === 0) return null
+    return {
+      reason,
+      previousMaxSeq,
+      nextMaxSeq,
+      canceledEventIds: canceledEvents.map((event) => event.id),
+      canceledSeqs: canceledEvents.map((event) => event.seq),
+    }
+  }
+
+  private respondWithPublicEventCancellation(
+    reason: PublicEventCancellation['reason'],
+    beforeEvents: GameState['events'],
+  ): SessionResponse {
+    const cancellation = this.buildPublicEventCancellation(reason, beforeEvents)
+    return this.respond(true, undefined, undefined, cancellation
+      ? { publicEventCancellations: [cancellation] }
+      : {})
   }
 
   private drainResponsePrivateEvents(
@@ -4044,16 +4092,18 @@ export class GameCore {
         entry.activePlayerIndex === this.activePlayerIndex &&
         entry.hadChoicePending
       if (canRestorePriorChoice) {
+        const beforeEvents = [...this.state.events]
         this.history.pop()
         this.restoreHistory(entry)
         this.recomputeActionStartIndex()
-        return this.respond()
+        return this.respondWithPublicEventCancellation('undoStep', beforeEvents)
       }
       if (entry && this.engineStack.hasPendingChoiceCompositeAncestor()) {
+        const beforeEvents = [...this.state.events]
         this.history.pop()
         this.restoreHistory(entry)
         this.recomputeActionStartIndex()
-        return this.respond()
+        return this.respondWithPublicEventCancellation('undoStep', beforeEvents)
       }
       const cancelResult = this.resolvePendingChoice(currentPlayerIndex, 'cancel', false)
       const stillOnSameFarmPrompt =
@@ -4079,9 +4129,10 @@ export class GameCore {
     }
     const entry = this.history.pop()
     if (!entry) return this.respond(false, 'no history to undo')
+    const beforeEvents = [...this.state.events]
     this.restoreHistory(entry)
     this.recomputeActionStartIndex()
-    return this.respond()
+    return this.respondWithPublicEventCancellation('undoStep', beforeEvents)
   }
 
   undoAction(): SessionResponse {
@@ -4095,6 +4146,7 @@ export class GameCore {
     }
     const entry = this.history[targetIndex]
     if (!entry) return this.respond(false, 'no action snapshot')
+    const beforeEvents = [...this.state.events]
     this.restoreHistory(entry)
     this.history = this.history.slice(0, targetIndex)
     if (targetIndex === this.actionStartIndex) {
@@ -4102,6 +4154,6 @@ export class GameCore {
     } else {
       this.recomputeActionStartIndex()
     }
-    return this.respond()
+    return this.respondWithPublicEventCancellation('undoAction', beforeEvents)
   }
 }

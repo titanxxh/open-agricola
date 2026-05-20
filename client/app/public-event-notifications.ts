@@ -360,13 +360,16 @@ export const collectPublicEventNotifications = (
   return notifications
 }
 
+export const maxPublicEventSeq = (events?: readonly { seq: number }[]): number =>
+  events?.reduce((max, event) => Math.max(max, event.seq), 0) ?? 0
+
 export const collectNewPublicEventFeedback = (
   events: readonly GameEvent[],
   lastSeenSeq: number | null,
   locale: Locale,
   idPrefix = '',
 ): PublicEventFeedbackBatch => {
-  const maxSeq = events.reduce((max, event) => Math.max(max, event.seq), 0)
+  const maxSeq = maxPublicEventSeq(events)
   if (lastSeenSeq === null || maxSeq < lastSeenSeq) {
     return { notifications: [], highlights: emptyPublicEventHighlightTargets(), resourceAnimations: [], nextCursor: maxSeq }
   }
