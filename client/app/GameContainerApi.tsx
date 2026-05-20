@@ -53,6 +53,11 @@ import {
   collectPrivateEventNotifications,
   type PrivateEventNotification,
 } from './private-event-notifications'
+import {
+  buildEventNotificationStackItems,
+  collectNewPublicEventNotifications,
+  type PublicEventNotification,
+} from './public-event-notifications'
 
 type RoundSlot = { round: number; action?: ActionSpace }
 
@@ -260,8 +265,12 @@ export const GameContainerApi = () => {
     useGameSync()
   const privateEventNotificationBatchSeqRef = useRef(0)
   const privateEventNotificationTimersRef = useRef<number[]>([])
+  const publicEventNotificationBatchSeqRef = useRef(0)
+  const publicEventNotificationTimersRef = useRef<number[]>([])
+  const lastSeenPublicEventSeqRef = useRef<number | null>(null)
   const { locale } = useLocale()
   const [privateEventNotifications, setPrivateEventNotifications] = useState<PrivateEventNotification[]>([])
+  const [publicEventNotifications, setPublicEventNotifications] = useState<PublicEventNotification[]>([])
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
   const [showScoringPad, setShowScoringPad] = useState(false)
   const [devMode, setDevMode] = useState(() => isDevModeAllowedFromQuery(window.location.search))
@@ -292,6 +301,8 @@ export const GameContainerApi = () => {
   useEffect(() => () => {
     privateEventNotificationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
     privateEventNotificationTimersRef.current = []
+    publicEventNotificationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
+    publicEventNotificationTimersRef.current = []
   }, [])
 
   useEffect(() => {
@@ -309,10 +320,35 @@ export const GameContainerApi = () => {
         setPrivateEventNotifications((current) =>
           current.filter((entry) => entry.id !== notification.id),
         )
+        privateEventNotificationTimersRef.current = privateEventNotificationTimersRef.current.filter((entry) => entry !== timer)
       }, 4500)
       privateEventNotificationTimersRef.current.push(timer)
     })
   }, [privateEvents, locale])
+
+  useEffect(() => {
+    if (!state) return
+    const events = state.events ?? []
+    publicEventNotificationBatchSeqRef.current += 1
+    const batch = collectNewPublicEventNotifications(
+      events,
+      lastSeenPublicEventSeqRef.current,
+      locale,
+      `public-batch-${publicEventNotificationBatchSeqRef.current}`,
+    )
+    lastSeenPublicEventSeqRef.current = batch.nextCursor
+    if (batch.notifications.length === 0) return
+    setPublicEventNotifications((current) => [...batch.notifications, ...current].slice(0, 4))
+    batch.notifications.forEach((notification) => {
+      const timer = window.setTimeout(() => {
+        setPublicEventNotifications((current) =>
+          current.filter((entry) => entry.id !== notification.id),
+        )
+        publicEventNotificationTimersRef.current = publicEventNotificationTimersRef.current.filter((entry) => entry !== timer)
+      }, 4500)
+      publicEventNotificationTimersRef.current.push(timer)
+    })
+  }, [state, locale])
 
   const {
     pendingFenceEdges, setPendingFenceEdges, pendingPalisadeEdges,
@@ -1474,12 +1510,12 @@ export const GameContainerApi = () => {
     return <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>Loading...</div>
   }
 
-  const privateNotificationStack = privateEventNotifications.length > 0 ? (
-    <div className="private-event-notifications" role="status" aria-live="polite">
-      {privateEventNotifications.map((notification) => (
+  const notificationStack = privateEventNotifications.length > 0 || publicEventNotifications.length > 0 ? (
+    <div className="event-notifications" role="status" aria-live="polite">
+      {buildEventNotificationStackItems(privateEventNotifications, publicEventNotifications).map((notification) => (
         <div
           key={notification.id}
-          className="private-event-notification"
+          className={notification.className}
           data-kind={notification.kind}
         >
           {notification.message}
@@ -1495,7 +1531,7 @@ export const GameContainerApi = () => {
     const meId = (isWs && localPlayerId) ? localPlayerId : (selfPlayer?.id ?? state.players[0]?.id ?? '')
     return (
       <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
-        {privateNotificationStack}
+        {notificationStack}
         <DraftOverlay
           state={state}
           meId={meId}
@@ -1515,7 +1551,7 @@ export const GameContainerApi = () => {
 
   return (
     <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
-      {privateNotificationStack}
+      {notificationStack}
       {isHarvestFeedExchange && harvestPending && harvestFeedOptions.length > 0 && isInteractive ? (
         <div className="exchange-overlay">
           <div className="exchange-modal">
