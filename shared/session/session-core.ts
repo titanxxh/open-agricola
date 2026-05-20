@@ -2261,7 +2261,11 @@ export class GameCore {
     const actionEvents = this.state.actionSpaces.flatMap((space): ImmediateEventDraft[] => {
       const openRound = roundOpen.get(space.id) ?? space.roundAvailable
       const events: ImmediateEventDraft[] = []
-      if (this.state.round === openRound) {
+      const alreadyRevealed = this.state.events.some((event) =>
+        event.type === 'action.revealed' &&
+        event.actionId === space.id &&
+        event.roundSlot === this.state.round)
+      if (this.state.round === openRound && !alreadyRevealed) {
         events.push({
           type: 'action.revealed',
           actionId: space.id,

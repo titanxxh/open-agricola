@@ -56,6 +56,12 @@ describe('B23_FinalScenario prerequisite', () => {
     expect(ownerAction.ok).toBe(true)
     expect(afterBuy.events).toEqual(expect.arrayContaining([
       expect.objectContaining({
+        type: 'action.revealed',
+        actionId: round14Id,
+        roundSlot: 14,
+        sourceCardId: 'B23_FinalScenario',
+      }),
+      expect.objectContaining({
         type: 'action.exclusiveUseSet',
         actionId: round14Id,
         playerId: owner.id,
@@ -83,5 +89,10 @@ describe('B23_FinalScenario prerequisite', () => {
     expect(resp.state.events).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'action.exclusiveUseCleared', actionId: round14Id }),
     ]))
+    const revealEvents = resp.state.events.filter((event) =>
+      event.type === 'action.revealed' &&
+      event.actionId === round14Id &&
+      event.roundSlot === 14)
+    expect(revealEvents).toHaveLength(1)
   })
 })

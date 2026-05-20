@@ -151,7 +151,7 @@ ESLint 三层强制（`eslint.config.js`）：
 
 `events` 是公共结构化规则事件流，位于 `GameState.log` 下层。后端规则执行时先写 `GameEvent`，再由 mapper 派生 UI log、动画提示、审计报告和未来 replay；`log` 仍是当前可见文字日志，不作为规则来源。`nextEventSeq` 是持久化事件序号游标，`normalizeState` 会丢弃不符合公开事件 envelope/schema/json/size guard 的旧事件并从最大 `seq` 继续。
 
-首版只允许 `visibility: 'public'` 的规则事件进入 `GameState.events`。私有 prompt、手牌、draft、living-hand 等 per-recipient 信息不写入公共事件流，仍通过现有 snapshot/privacy/pending 通道处理；未来如需 replay 私有视角，应新增独立的私有事件通道，而不是把私有 payload 塞进公共事件。
+首版只允许 `visibility: 'public'` 的规则事件进入 `GameState.events`。私有 prompt、手牌、draft、living-hand 等 per-recipient 信息不写入公共事件流，仍通过 snapshot/privacy/pending 通道处理。`privateEvents` 是独立的 per-viewer 同步附加层：只描述当前快照中目标玩家可见的私有提示（例如 `private.promptShown`），不进入公共 replay 事件流，也不作为规则来源。
 
 `SerializedGameState` 是 `GameState` 的 JSON 网络/持久化形态，额外携带 `engineStack: EngineStackCursor` 便于跨进程恢复引擎光标。同步版本号 / 历史 / 房间连接 **不进** `GameState`。
 
@@ -181,7 +181,7 @@ type ClientCommand = (
   | { type: 'action'; spaceId }              // 放置工人 / 启动 anytime
   | { type: 'choice'; value; payload? }       // 统一的"选择"命令（含 farm/选格/分支）
   | { type: 'anytime'; actionId }
-  | { type: 'commitSelection'; playerIndex; payload: { positions?, cardIds? } }
+  | { type: 'commitSelection'; playerIndex; payload: { positions?, cardIds?, resourceCounts?, resourceBatchExchange? } }
   | { type: 'roundEnd' }
   | { type: 'undoStep' } | { type: 'undoAction' }
   | { type: 'newGame'; seed? } | { type: 'loadGame'; state }
@@ -193,7 +193,7 @@ type ClientCommand = (
 注意：
 
 - 没有独立的 `reorg` / `feed` / `nextPlayer` / `confirmPlayerSwitch` / `commitFarm` 命令。这些等待形态全部归并到 `choice` 命令，由 `payload` 携带具体形状（按 `InteractionRequest.kind` 决定）。
-- `commitSelection` 只为 farm-position / occupation-hand 两种定向选择保留单独入口。
+- `commitSelection` 只为 farm-position / occupation-hand / resource-quantity / resource-batch-exchange 这类带结构化 payload 的定向选择保留单独入口。
 
 ### 4.5 ServerEvent / StateUpdateEnvelope
 
@@ -218,7 +218,8 @@ type StateUpdateEnvelope = {
 
 type GameSyncPayload = {
   state: SerializedGameState
-  interaction: InteractionState
+  interaction: ClientInteractionState
+  privateEvents?: PrivateGameEvent[]
   scores: PlayerScoreSummary[] | null
   pastureCapacities?: Record<string, Record<string, number>>
   historyLength: number
@@ -231,7 +232,7 @@ type GameSyncPayload = {
 }
 ```
 
-**广播 vs 单播**：`stateUpdate` / `gameStarted` / `playerJoined` / `playerDisconnected` / `roomDissolved` 广播；`roomCreated` / `roomJoined` / `authOk` / 请求级 `error` 单播。
+**广播 vs 单播**：`stateUpdate` / `gameStarted` / `playerJoined` / `playerDisconnected` / `roomDissolved` 广播；`roomCreated` / `roomJoined` / `authOk` / 请求级 `error` 单播。WS 广播会按连接对应的 `viewerPlayerId` 构造 per-viewer payload：目标玩家收到真实私有 prompt 和 `privateEvents`，其他玩家收到 `private-prompt` redaction。HTTP sandbox 默认无 `X-Viewer-Player` 时保持未过滤多座位开发流；带 `X-Viewer-Player` 时使用同一套 viewer 过滤和 seat guard。
 
 ### 4.6 InteractionState — 前端唯一渲染真相
 
