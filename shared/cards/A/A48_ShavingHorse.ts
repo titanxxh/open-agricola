@@ -1,5 +1,6 @@
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { hasExchangeGained, hasResourceMovedToPlayer } from '../helpers/event-provenance'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { A48_ShavingHorse } from '../../cards-display/A/A48_ShavingHorse'
@@ -17,10 +18,13 @@ const CARD_ID = A48_ShavingHorse.id
 const checkAndExchange = (
   context: CardListenerContext,
 ): ActionHookResult | void => {
-  const result = context.result
-  const gained =
-    result?.type === 'ok' ? result.resourcesGained?.wood ?? 0 : 0
-  if (gained <= 0) return
+  const events = context.actionEvents ?? context.transactionEvents
+  const playerId = context.player.id
+  const gainedWood = hasResourceMovedToPlayer(events, 'wood', playerId) ||
+    hasExchangeGained(events, 'wood', (event) =>
+      event.gainedTo.kind === 'player' && event.gainedTo.playerId === playerId,
+    )
+  if (!gainedWood) return
   const currentWood = context.player.resources.wood ?? 0
   if (currentWood < 5) return
   const mandatory = currentWood >= 7

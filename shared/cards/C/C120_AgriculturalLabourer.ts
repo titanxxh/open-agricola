@@ -1,6 +1,7 @@
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getStoredResource } from '../helpers/card-storage'
+import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { C120_AgriculturalLabourer } from '../../cards-display/C/C120_AgriculturalLabourer'
@@ -50,9 +51,8 @@ const gainListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['gain', 'receive'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const grainCount = context.result?.type === 'ok'
-      ? (context.result.resourcesGained?.grain ?? 0)
-      : 0
+    const events = context.actionEvents ?? context.transactionEvents
+    const grainCount = sumResourceMovedToPlayer(events, 'grain', context.player.id)
     return grainRewardFlow(context, grainCount)
   },
 }

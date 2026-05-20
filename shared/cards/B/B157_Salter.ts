@@ -80,21 +80,25 @@ const resolveSalterCounts = (
     }
   }
   subtractAnimalsFromBoard(player, counts)
-  state.log.unshift({
+  const sourceSummary = {
     key: 'log.salterFutureFood',
     params: buildSalterLogParams(state, counts),
-  })
+  } as const
+  let summaryAttached = false
   const flows: ActionFlow[] = (['sheep', 'boar', 'cattle'] as const)
     .filter((t) => counts[t] > 0)
-    .map((t) =>
-      queueFutureMeeplesFlow(state, {
+    .map((t) => {
+      const attachSummary = !summaryAttached
+      summaryAttached = true
+      return queueFutureMeeplesFlow(state, {
         cardId: CARD_ID,
         playerId: player.id,
+        ...(attachSummary ? { sourceSummary } : {}),
         startRound: state.round + 1,
         count: TURNS[t],
         resources: { food: counts[t] },
-      }),
-    )
+      })
+    })
   return {
     type: 'flow',
     flow: flows.length === 1 ? flows[0] : { type: 'seq', children: flows },

@@ -1,6 +1,7 @@
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { playerBoard, type AnimalZone, getPastureCapacity } from '../../domain'
+import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import type { CardImpl } from '../registry'
 import { E33_BeaverColony } from '../../cards-display/E/E33_BeaverColony'
 
@@ -8,14 +9,20 @@ const CARD_ID = E33_BeaverColony.id
 
 const REED_ACTION_SPACES = new Set(['reed-bank', 'resource-market-4'])
 
+const reedMovedFromActionSpace = (context: CardListenerContext): number => {
+  const events = context.actionEvents ?? context.transactionEvents
+  return sumResourceMovedToPlayer(events, 'reed', context.player.id, (event) =>
+    event.from.kind === 'actionSpace',
+  )
+}
+
 const afterCollectListener: CardListenerRegistration = {
   id: 'E33-beaver-colony-after-collect',
   cardIds: [CARD_ID],
   phases: ['immediatelyAfter' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const gained = context.result?.type === 'ok' ? (context.result.resourcesGained?.reed ?? 0) : 0
-    if (gained <= 0) return
+    if (reedMovedFromActionSpace(context) <= 0) return
     return {
       flow: { type: 'leaf', actionId: 'bonus-vp', params: { score: 1 }, sourceCard: CARD_ID },
       sourceCard: CARD_ID,
@@ -30,8 +37,7 @@ const afterGainListener: CardListenerRegistration = {
   actions: ['gain'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || !REED_ACTION_SPACES.has(context.space.id)) return
-    const gained = context.result?.type === 'ok' ? (context.result.resourcesGained?.reed ?? 0) : 0
-    if (gained <= 0) return
+    if (reedMovedFromActionSpace(context) <= 0) return
     return {
       flow: { type: 'leaf', actionId: 'bonus-vp', params: { score: 1 }, sourceCard: CARD_ID },
       sourceCard: CARD_ID,

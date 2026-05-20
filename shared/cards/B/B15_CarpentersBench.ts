@@ -1,5 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import type { CardImpl } from '../registry'
 import { B15_CarpentersBench } from '../../cards-display/B/B15_CarpentersBench'
 
@@ -9,8 +10,10 @@ const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =
   (space?.gainPerRound?.wood ?? 0) > 0
 
 const collectedWood = (context: CardListenerContext): number => {
-  if (context.result?.type !== 'ok') return 0
-  return context.result.resourcesGained?.wood ?? 0
+  const events = context.actionEvents ?? context.transactionEvents
+  return sumResourceMovedToPlayer(events, 'wood', context.player.id, (event) =>
+    event.from.kind === 'actionSpace',
+  )
 }
 
 const afterCollectListener: CardListenerRegistration = {

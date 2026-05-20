@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ActionFlow, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
+import type { DraftGameEvent } from '../../contract/events'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import { recordActionSnapshot } from '../helpers/action-snapshot'
 import { storePendingFenceBonus } from '../helpers/pending-fence-bonus'
@@ -178,6 +179,44 @@ const context = (
   phase: 'after',
   result: { type: 'ok' },
   ...overrides,
+})
+
+const movedToPlayer = (
+  resources: Partial<Resource>,
+  playerId = 'p1',
+  from: DraftGameEvent<'resource.moved'>['from'] = { kind: 'actionSpace', spaceId: 'test-space' },
+): DraftGameEvent<'resource.moved'> => ({
+  type: 'resource.moved',
+  resources,
+  from,
+  to: { kind: 'player', playerId },
+  reason: from.kind === 'actionSpace' ? 'collect' : 'gain',
+})
+
+const paidByPlayer = (
+  resources: Partial<Resource>,
+  paymentFor: DraftGameEvent<'resource.paid'>['paymentFor'],
+  playerId = 'p1',
+): DraftGameEvent<'resource.paid'> => ({
+  type: 'resource.paid',
+  resources,
+  paymentFor,
+  paymentSources: [{ from: { kind: 'player', playerId }, resources }],
+  to: { kind: 'supply' },
+})
+
+const exchangedByPlayer = (
+  paid: Partial<Resource>,
+  gained: Partial<Resource>,
+  playerId = 'p1',
+): DraftGameEvent<'resource.exchanged'> => ({
+  type: 'resource.exchanged',
+  paid,
+  gained,
+  paidFrom: { kind: 'player', playerId },
+  paidTo: { kind: 'supply' },
+  gainedFrom: { kind: 'supply' },
+  gainedTo: { kind: 'player', playerId },
 })
 
 const stateSnapshot = (gameState: GameState) => JSON.stringify({
@@ -611,8 +650,16 @@ describe('listener purity wave 2b/c', () => {
     const game = state([p])
     const before = stateSnapshot(game)
 
+    const actionEvents = [movedToPlayer({ sheep: 1 }, p.id)]
     const result = listenerById(D36_BreedRegistry_impl.listeners, 'D36-breed-registry-after-collect')
-      .handler(context(p, { state: game, actionId: 'collect', phase: 'after', result: { type: 'ok', resourcesGained: { sheep: 1 } } }))
+      .handler(context(p, {
+        state: game,
+        actionId: 'collect',
+        phase: 'after',
+        result: { type: 'ok', resourcesGained: { sheep: 1 } },
+        transactionEvents: actionEvents,
+        actionEvents,
+      }))
 
     expectUnchanged(before, game)
     expect(result?.flow).toMatchObject({
@@ -624,20 +671,27 @@ describe('listener purity wave 2b/c', () => {
     })
   })
 
-  it('D36 BreedRegistry before-exchange snapshots sheep by flow only', () => {
+  it('D36 BreedRegistry after-exchange marks sheep conversion by flow only', () => {
     const p = player('D36_BreedRegistry', { resources: resource({ sheep: 2 }) })
     const game = state([p])
     const before = stateSnapshot(game)
+    const actionEvents = [exchangedByPlayer({ sheep: 1 }, { food: 2 }, p.id)]
 
-    const result = listenerById(D36_BreedRegistry_impl.listeners, 'D36-breed-registry-before-exchange')
-      .handler(context(p, { state: game, actionId: 'exchange', phase: 'before' }))
+    const result = listenerById(D36_BreedRegistry_impl.listeners, 'D36-breed-registry-after-exchange')
+      .handler(context(p, {
+        state: game,
+        actionId: 'exchange',
+        phase: 'after',
+        transactionEvents: actionEvents,
+        actionEvents,
+      }))
 
     expectUnchanged(before, game)
     expect(result?.flow).toMatchObject({
       type: 'leaf',
       actionId: 'special-effect',
       sourceCard: 'D36_BreedRegistry',
-      params: { kind: 'set-extra-data', key: 'sheepBeforeExchange', value: 2 },
+      params: { kind: 'set-extra-data', key: 'sheepConverted', value: true },
     })
   })
 
@@ -659,20 +713,30 @@ describe('listener purity wave 2b/c', () => {
     })
   })
 
-  it('D74 RoyalWood before-action snapshots wood by flow only', () => {
-    const p = player('D74_RoyalWood', { resources: resource({ wood: 5 }) })
+  it('D74 RoyalWood after construct accumulates wood spent by flow only', () => {
+    const p = player('D74_RoyalWood', {
+      resources: resource({ wood: 5 }),
+      cardStates: { D74_RoyalWood: { extraData: { woodSpent: 1 } } },
+    })
     const game = state([p])
     const before = stateSnapshot(game)
+    const actionEvents = [paidByPlayer({ wood: 2 }, 'construct', p.id)]
 
-    const result = listenerById(D74_RoyalWood_impl.listeners, 'D74-royal-wood-before')
-      .handler(context(p, { state: game, actionId: 'construct', phase: 'before' }))
+    const result = listenerById(D74_RoyalWood_impl.listeners, 'D74-royal-wood-after')
+      .handler(context(p, {
+        state: game,
+        actionId: 'construct',
+        phase: 'after',
+        transactionEvents: actionEvents,
+        actionEvents,
+      }))
 
     expectUnchanged(before, game)
     expect(result?.flow).toMatchObject({
       type: 'leaf',
       actionId: 'special-effect',
       sourceCard: 'D74_RoyalWood',
-      params: { kind: 'set-extra-data', key: 'woodBefore', value: 5 },
+      params: { kind: 'set-extra-data', key: 'woodSpent', value: 3 },
     })
   })
 
@@ -682,6 +746,7 @@ describe('listener purity wave 2b/c', () => {
     })
     const game = state([p])
     const before = stateSnapshot(game)
+    const actionEvents = [paidByPlayer({ wood: 2 }, 'minor-improvement', p.id)]
 
     const result = listenerById(D74_RoyalWood_impl.listeners, 'D74-royal-wood-after-pay')
       .handler(context(p, {
@@ -690,6 +755,8 @@ describe('listener purity wave 2b/c', () => {
         phase: 'after',
         actionContext: { costType: 'minor-improvement' },
         result: { type: 'ok', resourcesPaid: { wood: 2 } },
+        transactionEvents: actionEvents,
+        actionEvents,
       }))
 
     expectUnchanged(before, game)
@@ -725,9 +792,17 @@ describe('listener purity wave 2b/c', () => {
     recordActionSnapshot(p, 11)
     const game = state([p], { roundPhase: 'work' })
     const before = stateSnapshot(game)
+    const actionEvents = [movedToPlayer({ boar: 1 }, p.id, { kind: 'actionSpace', spaceId: 'boar-market' })]
 
     const result = listenerById(E53_BoarSpear_impl.listeners, 'E53-boar-spear-after-obtain')
-      .handler(context(p, { state: game, actionId: 'collect', phase: 'after', result: { type: 'ok', resourcesGained: { boar: 1 } } }))
+      .handler(context(p, {
+        state: game,
+        actionId: 'collect',
+        phase: 'after',
+        result: { type: 'ok', resourcesGained: { boar: 1 } },
+        transactionEvents: actionEvents,
+        actionEvents,
+      }))
 
     expectUnchanged(before, game)
     expect(result?.flow).toMatchObject({

@@ -170,15 +170,15 @@ const finalizeFence = (
     ...validated.newFenceEdges.map((edge) => ({ edge, type: 'fence' })),
     ...validated.newPalisadeEdges.map((edge) => ({ edge, type: 'palisade' })),
   ]
-  if (builtFences.length > 0) {
-    ctx.eventSink?.emit<'farm.fenceBuilt'>({
-      type: 'farm.fenceBuilt',
-      fences: builtFences,
-    })
-  }
-  // Mirror commitFarmChoice farmChoiceMeta -> engine resultOverride.extraData:
-  // listeners (E108, A83, …) read these from `context.result.extraData`.
-  const extraData: Record<string, unknown> = {
+	  if (builtFences.length > 0) {
+	    ctx.eventSink?.emit<'farm.fenceBuilt'>({
+	      type: 'farm.fenceBuilt',
+	      fences: builtFences,
+	      newFenceEdges: validated.newFenceEdges,
+	      newPastures: validated.newPastures,
+	    })
+	  }
+	  const extraData: Record<string, unknown> = {
     newFenceEdges: validated.newFenceEdges,
     newPalisadeEdges: validated.newPalisadeEdges,
     newPastures: validated.newPastures,

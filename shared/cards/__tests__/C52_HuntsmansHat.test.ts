@@ -1,9 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ActionExecutionResult, ActionSpace, GameState, PlayerState } from '../../contract/types'
-import { CardRegistry } from '../registry'
-import { setActiveCardRegistry, requireActiveCardRegistry } from '../active-registry'
+import type { ActionSpace, GameState, PlayerState } from '../../contract/types'
+import type { DraftGameEvent } from '../../contract/events'
+import type { CardListenerContext } from '../card-listeners'
 
 const CARD_ID = 'C52_HuntsmansHat'
+
+const boarMoved = (
+  boar: number,
+  playerId = 'p1',
+  spaceId = 'pig-market',
+): DraftGameEvent<'resource.moved'> => ({
+  type: 'resource.moved',
+  resources: { boar },
+  from: { kind: 'actionSpace', spaceId },
+  to: { kind: 'player', playerId },
+  reason: 'collect',
+})
 
 const createPlayer = (): PlayerState => ({
   id: 'p1',
@@ -108,22 +120,25 @@ describe('C52_HuntsmansHat', () => {
 
   // BGA C52 listens to **any** Gain event with `fromActionSpace`. We mirror
   // that with a `phase: 'after'` listener on { gain | collect | receive } and
-  // gate on resourcesGained.boar > 0.
+  // gate on action-space resource.moved boar events.
 
   it('adds food equal to boar gained from pig-market collect', () => {
     const listener = cardApi.getRegisteredCardListeners().find(
       (entry) => entry.id === 'C52-huntsmans-hat-after-boar-gain',
     )
     const player = createPlayer()
+    const event = boarMoved(2, player.id, 'pig-market')
     const context = {
       state: createState(),
       player,
       space: { ...createSpace('pig-market'), resources: { ...createSpace('pig-market').resources, boar: 2 } },
       actionId: 'collect',
       phase: 'after',
-      result: { type: 'ok', resourcesGained: { boar: 2 } } as ActionExecutionResult,
+      result: { type: 'ok' },
+      transactionEvents: [event],
+      actionEvents: [event],
     }
-    const result = listener?.handler(context as unknown as ActionHookContext)
+    const result = listener?.handler(context as unknown as CardListenerContext)
     expect(result?.flow).toBeDefined()
     expect(result?.flow?.type).toBe('leaf')
     if (result?.flow?.type === 'leaf') {
@@ -138,15 +153,18 @@ describe('C52_HuntsmansHat', () => {
       (entry) => entry.id === 'C52-huntsmans-hat-after-boar-gain',
     )
     const player = createPlayer()
+    const event = boarMoved(1, player.id, 'day-laborer')
     const context = {
       state: createState(),
       player,
       space: createSpace('day-laborer'),
       actionId: 'gain',
       phase: 'after',
-      result: { type: 'ok', resourcesGained: { boar: 1 } } as ActionExecutionResult,
+      result: { type: 'ok' },
+      transactionEvents: [event],
+      actionEvents: [event],
     }
-    const result = listener?.handler(context as unknown as ActionHookContext)
+    const result = listener?.handler(context as unknown as CardListenerContext)
     expect(result?.flow).toBeDefined()
     if (result?.flow?.type === 'leaf') {
       expect(result.flow.params).toEqual({ food: 1 })
@@ -164,9 +182,11 @@ describe('C52_HuntsmansHat', () => {
       space: createSpace('day-laborer'),
       actionId: 'collect',
       phase: 'after',
-      result: { type: 'ok', resourcesGained: {} } as ActionExecutionResult,
+      result: { type: 'ok' },
+      transactionEvents: [],
+      actionEvents: [],
     }
-    const result = listener?.handler(context as unknown as ActionHookContext)
+    const result = listener?.handler(context as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
 })

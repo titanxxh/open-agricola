@@ -1,10 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
+import { B162_ForestClearer_impl } from '../../shared/cards/B/B162_ForestClearer'
+import type { DraftGameEvent } from '../../shared/contract/events'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/B/B162_ForestClearer'
 
 const CARD_ID = 'B162_ForestClearer'
+const LISTENER = B162_ForestClearer_impl.listeners[0]!
+
+const moved = (
+  overrides: Partial<DraftGameEvent<'resource.moved'>> = {},
+): DraftGameEvent<'resource.moved'> => ({
+  type: 'resource.moved',
+  resources: { wood: 2 },
+  from: { kind: 'actionSpace', spaceId: 'forest' },
+  to: { kind: 'player', playerId: 'p1' },
+  reason: 'collect',
+  ...overrides,
+})
 
 describe('B162_ForestClearer session', () => {
   const setup = (woodOnForest: number) => {
@@ -27,6 +42,27 @@ describe('B162_ForestClearer session', () => {
     session.loadState(state)
     session.devPlayCard(0, CARD_ID)
     return session
+  }
+
+  const directContext = (
+    transactionEvents: DraftGameEvent<'resource.moved'>[],
+  ): CardListenerContext => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    const player = state.players[0]!
+    player.id = 'p1'
+    player.occupationPlayed.push(CARD_ID)
+    return {
+      state,
+      player,
+      space: state.actionSpaces.find((space) => space.id === 'forest')!,
+      actionId: 'collect',
+      phase: 'after',
+      transactionEvents,
+      actionEvents: transactionEvents,
+      result: { type: 'ok', resourcesGained: { wood: 2 } },
+    } as unknown as CardListenerContext
   }
 
   it('gains +1 wood +1 food when collecting exactly 2 wood', () => {
@@ -98,5 +134,30 @@ describe('B162_ForestClearer session', () => {
 
     const player = resp.state.players[0]!
     expect(player.resources.wood).toBe(0)
+  })
+
+  it('uses action-space wood events even without result gains', () => {
+    const ctx = directContext([moved({ resources: { wood: 4 } })])
+    ctx.result = { type: 'ok' }
+
+    const result = executeCardListener(LISTENER, ctx)
+
+    expect(result?.flow).toMatchObject({
+      type: 'leaf',
+      actionId: 'gain',
+      params: { wood: 1, food: 1 },
+      sourceCard: CARD_ID,
+    })
+  })
+
+  it('does not trigger for supply/cardEffect wood even when result reports wood', () => {
+    const ctx = directContext([moved({
+      from: { kind: 'supply' },
+      reason: 'cardEffect',
+    })])
+
+    const result = executeCardListener(LISTENER, ctx)
+
+    expect(result).toBeUndefined()
   })
 })

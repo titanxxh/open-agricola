@@ -32,7 +32,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'farm.roomBuilt': ['rooms'],
   'farm.renovated': ['playerId', 'from', 'to', 'rooms'],
   'farm.stableBuilt': ['stables'],
-  'farm.fenceBuilt': ['fences'],
+  'farm.fenceBuilt': ['fences', 'newFenceEdges', 'newPastures'],
   'farm.fenceConsumed': ['count', 'reason'],
   'farm.animalMoved': ['animals', 'from', 'to'],
   'farm.animalDiscarded': ['animals', 'reason'],
@@ -56,7 +56,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'card.returnedToBoard': ['playerId', 'cardId'],
   'card.destroyed': ['playerId', 'cardId', 'reason'],
   'card.passed': ['fromPlayerId', 'toPlayerId', 'cardId'],
-  'futureMeeple.queued': ['playerId', 'cardId', 'entries'],
+  'futureMeeple.queued': ['playerId', 'cardId', 'entries', 'sourceSummary'],
   'futureMeeple.removed': ['playerId', 'cardId', 'rounds'],
   'futureMeeple.resolved': ['playerId', 'cardId', 'round', 'resources', 'roomType'],
   'round.started': ['round'],
@@ -160,6 +160,25 @@ const assertNumberArray = (value: unknown, path: string): void => {
     throw new Error(`GameEvent ${path} must be an array`)
   }
   value.forEach((entry, index) => assertFiniteNumberField(entry, `${path}[${index}]`))
+}
+
+const assertStringArray = (value: unknown, path: string): void => {
+  if (!Array.isArray(value)) {
+    throw new Error(`GameEvent ${path} must be an array`)
+  }
+  value.forEach((entry, index) => assertStringField(entry, `${path}[${index}]`))
+}
+
+const assertFencePastures = (value: unknown, path: string): void => {
+  if (!Array.isArray(value)) {
+    throw new Error(`GameEvent ${path} must be an array`)
+  }
+  value.forEach((entry, index) => {
+    const record = assertRecord(entry, `${path}[${index}]`)
+    if (record.tiles !== undefined && !Array.isArray(record.tiles)) {
+      throw new Error(`GameEvent ${path}[${index}].tiles must be an array`)
+    }
+  })
 }
 
 const assertBoardPositions = (
@@ -269,6 +288,24 @@ const assertPublicCardStateValue = (value: unknown, path: string): void => {
   throw new Error(`GameEvent ${path} must be a public scalar or array`)
 }
 
+const assertFutureMeepleSourceSummary = (value: unknown): void => {
+  if (value === undefined) return
+  const summary = assertRecord(value, 'sourceSummary')
+  assertOnlyKeys(summary, ['key', 'params'], 'sourceSummary')
+  if (summary.key !== 'log.salterFutureFood') {
+    throw new Error('GameEvent sourceSummary.key must be log.salterFutureFood')
+  }
+  const params = assertRecord(summary.params, 'sourceSummary.params')
+  assertOnlyKeys(params, ['cardId', 'animals', 'sheep', 'boar', 'cattle', 'futureFood', 'schedule'], 'sourceSummary.params')
+  assertStringField(params.cardId, 'sourceSummary.params.cardId')
+  assertStringField(params.animals, 'sourceSummary.params.animals')
+  assertFiniteNumberField(params.sheep, 'sourceSummary.params.sheep')
+  assertFiniteNumberField(params.boar, 'sourceSummary.params.boar')
+  assertFiniteNumberField(params.cattle, 'sourceSummary.params.cattle')
+  assertFiniteNumberField(params.futureFood, 'sourceSummary.params.futureFood')
+  assertStringField(params.schedule, 'sourceSummary.params.schedule')
+}
+
 const assertKnownEventDetails = (type: string, event: Record<string, unknown>): void => {
   switch (type) {
     case 'resource.moved':
@@ -334,6 +371,8 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       return
     case 'farm.fenceBuilt':
       if (!Array.isArray(event.fences)) throw new Error('GameEvent fences must be an array')
+      if (event.newFenceEdges !== undefined) assertStringArray(event.newFenceEdges, 'newFenceEdges')
+      if (event.newPastures !== undefined) assertFencePastures(event.newPastures, 'newPastures')
       return
     case 'farm.fenceConsumed':
       assertFiniteNumberField(event.count, 'count')
@@ -458,6 +497,7 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
         if (record.resources !== undefined) assertResourceMap(record.resources, `entries[${index}].resources`)
         assertOptionalStringField(record.roomType, `entries[${index}].roomType`)
       })
+      assertFutureMeepleSourceSummary(event.sourceSummary)
       return
     case 'futureMeeple.removed':
       assertStringField(event.playerId, 'playerId')

@@ -1,6 +1,7 @@
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { sumResourceMovedFromActionSpace } from '../helpers/event-provenance'
 import type { CardImpl } from '../registry'
 import { C52_HuntsmansHat } from '../../cards-display/C/C52_HuntsmansHat'
 
@@ -18,7 +19,7 @@ const CARD_ID = C52_HuntsmansHat.id
  *
  * Implementation: generic listener on `phase: 'after'` for the union of
  * `gain` / `collect` / `receive` actions (mirrors E53 BoarSpear pattern).
- * Reads `result.resourcesGained.boar` and emits 1 food per boar gained.
+ * Reads action-space `resource.moved` events and emits 1 food per boar gained.
  */
 const TRACKED_ACTIONS = ['gain', 'collect', 'receive'] as const
 
@@ -29,8 +30,10 @@ const huntsmansHatListener: CardListenerRegistration = {
   actions: [...TRACKED_ACTIONS],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!(TRACKED_ACTIONS as readonly string[]).includes(context.actionId)) return
-    const result = context.result
-    const gained = result?.type === 'ok' ? (result.resourcesGained?.boar ?? 0) : 0
+    const events = context.actionEvents ?? context.transactionEvents
+    const gained = sumResourceMovedFromActionSpace(events, 'boar', (event) =>
+      event.to.kind === 'player' && event.to.playerId === context.player.id,
+    )
     if (gained <= 0) return
     return {
       flow: gainLeaf(CARD_ID, { food: gained }),

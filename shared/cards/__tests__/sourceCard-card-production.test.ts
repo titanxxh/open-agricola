@@ -13,6 +13,7 @@ import '../E/E73_Scythe'
 import '../E/E74_AshTrees'
 import type { CardListenerContext } from '../card-listeners'
 import type { ActionExecutionContext } from '../../contract/types'
+import type { DraftGameEvent } from '../../contract/events'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -78,6 +79,18 @@ const createState = (players: PlayerState[], spaces: ActionSpace[] = []): GameSt
     gameOver: false,
     workPhaseObtainedResources: {},
   }) as GameState
+
+const movedToPlayer = (
+  resources: DraftGameEvent<'resource.moved'>['resources'],
+  playerId = 'p1',
+  from: DraftGameEvent<'resource.moved'>['from'] = { kind: 'actionSpace', spaceId: 'test-space' },
+): DraftGameEvent<'resource.moved'> => ({
+  type: 'resource.moved',
+  resources,
+  from,
+  to: { kind: 'player', playerId },
+  reason: from.kind === 'actionSpace' ? 'collect' : 'gain',
+})
 
 const createSpace = (id: string): ActionSpace =>
   ({
@@ -178,6 +191,7 @@ describe('sourceCard card production contract', () => {
       __actionSnapshot__: { extraData: { token: 1 } },
     }
 
+    const actionEvents = [movedToPlayer({ boar: 2 }, player.id, { kind: 'actionSpace', spaceId: 'boar-market' })]
     const after = executeCardListener(obtainListener!, {
       state: createState([player]),
       player,
@@ -185,6 +199,8 @@ describe('sourceCard card production contract', () => {
       actionId: 'gain',
       phase: 'after',
       result: { type: 'ok', resourcesGained: { boar: 2 } },
+      transactionEvents: actionEvents,
+      actionEvents,
     } as unknown as CardListenerContext)
 
     expect(after?.sourceCard).toBe('E53_BoarSpear')
