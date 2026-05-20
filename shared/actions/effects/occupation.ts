@@ -257,16 +257,18 @@ export const playOccupationAction: ActionDefinition = {
       () => baseCost,
       space.id,
     )
-    // Only wrap as ComplexCost when listener-collected trades / bonuses
-    // make the cost meaningfully multi-solution. For the common typed-flat
-    // case (just lessons base cost), pass it through as Partial<Resource>
-    // so the pay leaf's typed-flat path uses payTypedFlatCost — that is
-    // where modifier trades (A28 ForestSchool) get cost-replacement
-    // treatment without surfacing a payment prompt.
-    const finalCost: ComplexCost | Partial<PlayerState['resources']> =
-      previewCost && PaymentSolver.isComplexCost(previewCost)
-        ? previewCost
-        : ((previewCost as Partial<PlayerState['resources']> | null) ?? baseCost)
+    // Always wrap as ComplexCost so the pay leaf routes through
+    // resolveCostPaymentSelection. When `activeModifiers` contributes a
+    // trade (A28 ForestSchool wood→food) the resulting multi-solution
+    // payment surfaces a `prompt.selectPayment` choice instead of being
+    // silently auto-resolved by the typed-flat fast path. Single-solution
+    // cases (no trade / no bonus) auto-resolve inside the pay leaf without
+    // any extra prompt.
+    const resolvedCost: ComplexCost | Partial<PlayerState['resources']> =
+      previewCost ?? baseCost
+    const finalCost: ComplexCost = PaymentSolver.isComplexCost(resolvedCost)
+      ? resolvedCost
+      : { fee: resolvedCost as Partial<PlayerState['resources']> }
     if (
       sourceCard
       && sourceCard !== choice
