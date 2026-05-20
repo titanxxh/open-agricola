@@ -561,6 +561,34 @@
   font-size: 13px;
   color: #718096;
 }
+.private-event-notifications {
+  position: fixed;
+  top: 76px;
+  right: 16px;
+  z-index: 2200;
+  display: grid;
+  gap: 8px;
+  width: min(340px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.private-event-notification {
+  padding: 10px 12px;
+  border: 1px solid rgba(47, 133, 90, 0.3);
+  border-left: 4px solid #2f855a;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.97);
+  color: #23422d;
+  box-shadow: 0 8px 24px rgba(23, 38, 25, 0.18);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.private-event-notification[data-kind="prompt"] {
+  border-left-color: #b7791f;
+}
+.private-event-notification[data-kind="draft"] {
+  border-left-color: #2b6cb0;
+}
 .header-locale-select {
   height: 34px;
   padding: 0 10px;

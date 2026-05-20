@@ -10,7 +10,7 @@ import { parsePositionKey, positionKey } from '../../shared/domain/farm'
 import { emptyResources, resourceKeyList } from '../../shared/contract/state-constants'
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, parseDraftParamsFromQuery, type GameTransport } from '../services/gameTransport'
-import type { GameSyncPayload, PrivateGameEvent } from '../../shared/contract/protocol/game'
+import type { GameSyncPayload } from '../../shared/contract/protocol/game'
 import { playerCanBuildPalisades } from '../../shared/cards/helpers/card-type'
 import { useFarmSelection } from '../hooks/useFarmSelection'
 import { buildHarvestFeedOptions } from './hooks/use-harvest-flow'
@@ -49,6 +49,10 @@ import {
   buildStableDisplayMap,
   shouldShowAnimalDiscardPrompt,
 } from './hooks/use-animal-reorg-flow'
+import {
+  collectPrivateEventNotifications,
+  type PrivateEventNotification,
+} from './private-event-notifications'
 
 type RoundSlot = { round: number; action?: ActionSpace }
 
@@ -254,8 +258,10 @@ export const GameContainerApi = () => {
   const { transport, wsStatus, isWs, isReady, wsTransport } = useTransportSetup(lockedViewPlayerId, user?.displayName, isWsMode)
   const { state, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, privateEvents, applySnapshot } =
     useGameSync()
-  const privateEventsRef = useRef<PrivateGameEvent[]>([])
+  const privateEventNotificationBatchSeqRef = useRef(0)
+  const privateEventNotificationTimersRef = useRef<number[]>([])
   const { locale } = useLocale()
+  const [privateEventNotifications, setPrivateEventNotifications] = useState<PrivateEventNotification[]>([])
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
   const [showScoringPad, setShowScoringPad] = useState(false)
   const [devMode, setDevMode] = useState(() => isDevModeAllowedFromQuery(window.location.search))
@@ -283,9 +289,30 @@ export const GameContainerApi = () => {
   const headerRef = useRef<HTMLDivElement | null>(null)
   const [headerHeight, setHeaderHeight] = useState(0)
 
+  useEffect(() => () => {
+    privateEventNotificationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
+    privateEventNotificationTimersRef.current = []
+  }, [])
+
   useEffect(() => {
-    privateEventsRef.current = privateEvents
-  }, [privateEvents])
+    if (privateEvents.length === 0) return
+    privateEventNotificationBatchSeqRef.current += 1
+    const notifications = collectPrivateEventNotifications(
+      privateEvents,
+      locale,
+      `batch-${privateEventNotificationBatchSeqRef.current}`,
+    )
+    if (notifications.length === 0) return
+    setPrivateEventNotifications((current) => [...notifications, ...current].slice(0, 4))
+    notifications.forEach((notification) => {
+      const timer = window.setTimeout(() => {
+        setPrivateEventNotifications((current) =>
+          current.filter((entry) => entry.id !== notification.id),
+        )
+      }, 4500)
+      privateEventNotificationTimersRef.current.push(timer)
+    })
+  }, [privateEvents, locale])
 
   const {
     pendingFenceEdges, setPendingFenceEdges, pendingPalisadeEdges,
@@ -1447,6 +1474,20 @@ export const GameContainerApi = () => {
     return <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>Loading...</div>
   }
 
+  const privateNotificationStack = privateEventNotifications.length > 0 ? (
+    <div className="private-event-notifications" role="status" aria-live="polite">
+      {privateEventNotifications.map((notification) => (
+        <div
+          key={notification.id}
+          className="private-event-notification"
+          data-kind={notification.kind}
+        >
+          {notification.message}
+        </div>
+      ))}
+    </div>
+  ) : null
+
   // Card-draft phase — render the draft overlay instead of the game board.
   // The locked URL-pinned player wins in WS mode; otherwise fall back to the
   // sandbox "self" (current player) so HTTP debugging still works.
@@ -1454,6 +1495,7 @@ export const GameContainerApi = () => {
     const meId = (isWs && localPlayerId) ? localPlayerId : (selfPlayer?.id ?? state.players[0]?.id ?? '')
     return (
       <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
+        {privateNotificationStack}
         <DraftOverlay
           state={state}
           meId={meId}
@@ -1473,6 +1515,7 @@ export const GameContainerApi = () => {
 
   return (
     <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
+      {privateNotificationStack}
       {isHarvestFeedExchange && harvestPending && harvestFeedOptions.length > 0 && isInteractive ? (
         <div className="exchange-overlay">
           <div className="exchange-modal">

@@ -99,8 +99,8 @@ const afterPayListener: CardListenerRegistration = {
     const payment = context.eventQuery.find('resource.paid', (event) =>
       event.bonusSources?.includes(CARD_ID) === true,
     )
-    if (!payment) return
-    const k = payment.bonusChoiceIndex?.[CARD_ID] ?? 1
+    if (!payment && !context.player._activeActionBonusSources?.includes(CARD_ID)) return
+    const k = payment?.bonusChoiceIndex?.[CARD_ID] ?? 1
     if (k <= 0) return
 
     const popCount = Math.min(k, stack.length)
