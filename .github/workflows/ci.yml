@@ -51,6 +51,9 @@ jobs:
       - name: Unit tests (fast tier)
         run: pnpm run test:fast
 
+      - name: Check direct session log writes
+        run: pnpm run check:direct-session-log
+
       - name: Build (includes cards manifest)
         run: pnpm run build
 

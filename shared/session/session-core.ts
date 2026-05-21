@@ -111,6 +111,7 @@ import {
   getBasicConversionExchange,
 } from '../cards/basic-conversion.ts'
 import { appendImmediateEvents, type ImmediateEventDraft } from '../events/append.ts'
+import { prependDerivedLogEntries } from '../events/log-cache.ts'
 import {
   appendPublicEventCanceledPacket,
   assertPublicEventArchiveCanAppend,
@@ -2179,9 +2180,7 @@ export class GameCore {
     const entries = this.engineLog.all()
     if (entries.length > 0) {
       const toAdd = entries.filter((e) => e.key !== 'log.action')
-      for (let i = toAdd.length - 1; i >= 0; i--) {
-        this.state.log.unshift(toAdd[i])
-      }
+      prependDerivedLogEntries(this.state, toAdd)
       this.engineLog.clear()
     }
   }
