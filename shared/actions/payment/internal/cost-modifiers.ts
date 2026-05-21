@@ -76,6 +76,8 @@ export const applyCostModifiers = (
         to: tradeMod.to,
         ...(synthMax !== undefined ? { max: synthMax } : {}),
         scope,
+        ...(tradeMod.groupId !== undefined ? { groupId: tradeMod.groupId } : {}),
+        ...(tradeMod.groupMax !== undefined ? { groupMax: tradeMod.groupMax } : {}),
         ...(tradeMod.replaceUpTo ? { replaceUpTo: true } : {}),
         ...(tradeMod.order !== undefined ? { order: tradeMod.order } : {}),
         source: tradeMod.cardId,
@@ -144,6 +146,20 @@ export const validateTradeModifier = (modifier: TradeModifier): void => {
       `TradeModifier ${modifier.cardId}: scope:'unit' MUST NOT carry conditions.minNumRooms ` +
       `(per-unit trades have no min-unit threshold).`,
     )
+  }
+  const hasGroupId = modifier.groupId !== undefined
+  const hasGroupMax = modifier.groupMax !== undefined
+  if (hasGroupId !== hasGroupMax) {
+    throw new Error(`TradeModifier ${modifier.cardId}: groupId and groupMax must be set together.`)
+  }
+  if (modifier.groupId !== undefined && modifier.groupId.trim().length === 0) {
+    throw new Error(`TradeModifier ${modifier.cardId}: groupId must be non-empty.`)
+  }
+  if (
+    modifier.groupMax !== undefined &&
+    (!Number.isInteger(modifier.groupMax) || modifier.groupMax <= 0)
+  ) {
+    throw new Error(`TradeModifier ${modifier.cardId}: groupMax must be a positive integer.`)
   }
 }
 

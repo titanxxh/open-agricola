@@ -47,6 +47,8 @@ export type Trade = {
   to: Partial<Resource>
   max?: number
   scope?: 'action' | 'unit'   // default 'action' (back-compat)
+  groupId?: string
+  groupMax?: number
   replaceUpTo?: boolean
   order?: number
   source?: string
@@ -98,6 +100,8 @@ export type TradeModifier = {
   to: Partial<Resource>
   max?: number
   scope?: 'action' | 'unit'   // default 'action'
+  groupId?: string
+  groupMax?: number
   replaceUpTo?: boolean
   order?: number
   /**

@@ -286,6 +286,8 @@ const resourceSignature = (resources: Partial<Resource>) =>
 const tradeSignature = (trade: Trade) =>
   [
     trade.sourceId ?? trade.source ?? '',
+    trade.groupId ?? '',
+    trade.groupMax ?? '',
     resourceSignature(trade.from),
     resourceSignature(trade.to),
     trade.replaceUpTo ? 'upTo' : 'exact',
@@ -327,6 +329,45 @@ const getTradeUsage = (
   tradesUsed: { trade: Trade; times: number }[],
   trade: Trade,
 ) => tradesUsed.find((entry) => entry.trade === trade)?.times ?? 0
+
+const getTradeGroupUsage = (
+  tradesUsed: { trade: Trade; times: number }[],
+  trade: Trade,
+) => {
+  if (!trade.groupId || trade.groupMax === undefined) return 0
+  return tradesUsed.reduce(
+    (sum, entry) => sum + (entry.trade.groupId === trade.groupId ? entry.times : 0),
+    0,
+  )
+}
+
+const getRemainingTradeGroupUses = (
+  tradesUsed: { trade: Trade; times: number }[],
+  trade: Trade,
+) => {
+  if (!trade.groupId || trade.groupMax === undefined) return Infinity
+  return Math.max(0, trade.groupMax - getTradeGroupUsage(tradesUsed, trade))
+}
+
+const isWithinTradeGroupLimits = (
+  tradesUsed: { trade: Trade; times: number }[],
+) => {
+  const groups = new Map<string, { max: number; used: number }>()
+  for (const entry of tradesUsed) {
+    if (entry.times <= 0 || !entry.trade.groupId || entry.trade.groupMax === undefined) continue
+    const existing = groups.get(entry.trade.groupId)
+    if (existing) {
+      existing.used += entry.times
+      existing.max = Math.min(existing.max, entry.trade.groupMax)
+    } else {
+      groups.set(entry.trade.groupId, { max: entry.trade.groupMax, used: entry.times })
+    }
+  }
+  for (const group of groups.values()) {
+    if (group.used > group.max) return false
+  }
+  return true
+}
 
 const applyUnitTradeToCost = (
   cost: Partial<Resource>,
@@ -376,7 +417,10 @@ const buildUnitCostOptions = (
   for (const trade of sortedTrades) {
     const additions: UnitCostOption[] = []
     for (const option of options) {
-      const maxPerUnit = Math.max(0, Math.floor(trade.max ?? 1))
+      const maxPerUnit = Math.min(
+        Math.max(0, Math.floor(trade.max ?? 1)),
+        getRemainingTradeGroupUses(option.tradesUsed, trade),
+      )
       let currentCost = option.cost
       let currentTrades = option.tradesUsed
       for (let count = getTradeUsage(option.tradesUsed, trade); count < maxPerUnit; count += 1) {
@@ -412,9 +456,11 @@ const buildUnitTotalOptions = (
     const nextTotals: UnitCostOption[] = []
     for (const total of totals) {
       for (const unitOption of unitOptions) {
+        const tradesUsed = mergeTradeUsage(total.tradesUsed, unitOption.tradesUsed)
+        if (!isWithinTradeGroupLimits(tradesUsed)) continue
         nextTotals.push({
           cost: normalizePositiveResources(mergeResources(total.cost, unitOption.cost)),
-          tradesUsed: mergeTradeUsage(total.tradesUsed, unitOption.tradesUsed),
+          tradesUsed,
         })
       }
     }
@@ -435,7 +481,10 @@ const enumerateActionTradeCombos = (
   const restCombos = enumerateActionTradeCombos(restTrades, playerResources)
   const results: TradeCombo[] = []
   for (const combo of restCombos) {
-    const maxTimes = getMaxTradeTimesFromPartial(firstTrade, combo.result)
+    const maxTimes = Math.min(
+      getMaxTradeTimesFromPartial(firstTrade, combo.result),
+      getRemainingTradeGroupUses(combo.tradesUsed, firstTrade),
+    )
     for (let t = 0; t <= maxTimes; t++) {
       const afterTrade = convertResources(combo.result, firstTrade, t)
       if (hasValidResources(afterTrade)) {
@@ -549,6 +598,7 @@ export const computeAllBuyableCombinations = (
 
       for (const tradeCombo of tradeCombos) {
         const tradesUsed = mergeTradeUsage(unitTotal.tradesUsed, tradeCombo.tradesUsed)
+        if (!isWithinTradeGroupLimits(tradesUsed)) continue
         type BonusPath = {
           cost: Partial<Resource>
           sources: string[]
