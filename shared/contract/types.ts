@@ -808,6 +808,7 @@ export type InteractionSelection =
       selectablePositions: FarmTilePosition[]
       maxSelections: number
       minSelections?: number
+      allowedSelectionCounts?: number[]
     }
   | {
       kind: 'occupation-hand'

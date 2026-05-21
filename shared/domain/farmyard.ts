@@ -1337,6 +1337,10 @@ export const buildFarmPositionSelectionInteraction = (
   const filter = actionContext?.positionFilter as string | undefined
   const maxSelections = (actionContext?.maxSelections as number) ?? 1
   const minSelections = (actionContext?.minSelections as number) ?? 0
+  const allowedSelectionCounts = Array.isArray(actionContext?.allowedSelectionCounts)
+    ? actionContext.allowedSelectionCounts
+        .filter((count): count is number => typeof count === 'number' && Number.isInteger(count))
+    : undefined
   const selectablePositions: FarmTilePosition[] =
     selectableTiles ??
     player.fields
@@ -1361,6 +1365,7 @@ export const buildFarmPositionSelectionInteraction = (
     selectablePositions,
     maxSelections,
     minSelections,
+    ...(allowedSelectionCounts ? { allowedSelectionCounts } : {}),
   }
 }
 
