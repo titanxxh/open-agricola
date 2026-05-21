@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
+import type { ActionChoiceOption, FarmTilePosition } from '../../shared/contract/types'
 import '../../shared/cards/B/B115_TinsmithMaster'
 
 const CARD_ID = 'B115_TinsmithMaster'
@@ -152,7 +153,23 @@ describe('B115_TinsmithMaster session', () => {
   // --- Sow bonus tests ---
 
   describe('sow bonus crop', () => {
-    it('auto-adds 1 bonus crop when sowing grain in 1 field', () => {
+    const acceptSelection = (session: GameSession, resp: ReturnType<GameSession['resolveChoice']>) => {
+      expect(resp.interaction.stateId).toBe('wait')
+      if (resp.interaction.stateId !== 'wait') throw new Error('expected optional choice')
+      const accept = resp.interaction.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
+      expect(accept).toBeDefined()
+      resp = session.resolveChoice(0, accept!.value)
+      expect(resp.interaction.stateId).toBe('wait')
+      if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
+      expect(resp.interaction.sourceCard).toBe(CARD_ID)
+      expect(resp.interaction.selection?.kind).toBe('farm-position')
+      return resp
+    }
+
+    const selectPositions = (session: GameSession, positions: FarmTilePosition[]) =>
+      session.commitSelectionChoice(0, { positions })
+
+    it('offers optional selection and adds 1 bonus crop when sowing grain in 1 field', () => {
       const session = setupForSow({
         grain: 2,
         fields: [{ row: 0, col: 0, stacks: [] }],
@@ -168,19 +185,37 @@ describe('B115_TinsmithMaster session', () => {
       })
       expect(resp.ok).toBe(true)
 
-      // Continue through any remaining choices
-      while (resp.interaction.stateId === 'wait') {
-        if (resp.interaction.request.kind !== 'choice') break
-        resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options?.[0]?.value ?? 'ok')
-      }
+      resp = acceptSelection(session, resp)
+      expect(resp.interaction.selection?.selectablePositions).toEqual([{ row: 0, col: 0 }])
+      resp = selectPositions(session, [{ row: 0, col: 0 }])
+      expect(resp.ok).toBe(true)
 
-      // Field should have 4 grain (3 normal + 1 bonus from card)
       const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 0)
       expect(field?.stacks[0]?.kind).toBe('grain')
       expect(field?.stacks[0]?.remaining ?? 0).toBe(4)
     })
 
-    it('auto-adds 1 bonus vegetable when sowing vegetable in 1 field', () => {
+    it('skip leaves a single eligible field at its normal sow count', () => {
+      const session = setupForSow({
+        grain: 2,
+        fields: [{ row: 0, col: 0, stacks: [] }],
+      })
+
+      let resp = session.takeAction(0, 'grain-utilization')
+      expect(resp.ok).toBe(true)
+
+      resp = session.resolveChoice(0, 'confirm', {
+        crops: [{ row: 0, col: 0, crop: 'grain' }],
+      })
+      expect(resp.ok).toBe(true)
+      expect(resp.interaction.stateId).toBe('wait')
+      resp = session.resolveChoice(0, '__skip__')
+
+      const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 0)
+      expect(field?.stacks[0]?.remaining ?? 0).toBe(3)
+    })
+
+    it('offers optional selection and adds 1 bonus vegetable when sowing vegetable in 1 field', () => {
       const session = setupForSow({
         vegetable: 2,
         fields: [{ row: 0, col: 0, stacks: [] }],
@@ -195,10 +230,9 @@ describe('B115_TinsmithMaster session', () => {
       })
       expect(resp.ok).toBe(true)
 
-      while (resp.interaction.stateId === 'wait') {
-        if (resp.interaction.request.kind !== 'choice') break
-        resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options?.[0]?.value ?? 'ok')
-      }
+      resp = acceptSelection(session, resp)
+      resp = selectPositions(session, [{ row: 0, col: 0 }])
+      expect(resp.ok).toBe(true)
 
       const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 0)
       expect(field?.stacks[0]?.kind).toBe('vegetable')
@@ -230,7 +264,7 @@ describe('B115_TinsmithMaster session', () => {
       expect(field?.stacks[0]?.remaining ?? 0).toBe(3) // normal grain sow, no bonus
     })
 
-    it('auto-adds 1 bonus crop to EACH field when sowing in 2 fields', () => {
+    it('only adds bonus crop to selected freshly sown fields', () => {
       const session = setupForSow({
         grain: 3,
         fields: [
@@ -252,18 +286,49 @@ describe('B115_TinsmithMaster session', () => {
       })
       expect(resp.ok).toBe(true)
 
-      // No selection prompt — both fields get +1 automatically (BGA actAddAdditionalGood)
-      while (resp.interaction.stateId === 'wait') {
-        if (resp.interaction.request.kind !== 'choice') break
-        resp = session.resolveChoice(resp.interaction.playerIndex, resp.interaction.options?.[0]?.value ?? 'ok')
-      }
+      resp = acceptSelection(session, resp)
+      expect(resp.interaction.selection?.selectablePositions).toEqual([
+        { row: 0, col: 0 },
+        { row: 0, col: 1 },
+      ])
+      resp = selectPositions(session, [{ row: 0, col: 0 }])
+      expect(resp.ok).toBe(true)
 
       const player = resp.state.players[0]!
       const f0 = player.fields.find((f) => f.row === 0 && f.col === 0)
       const f1 = player.fields.find((f) => f.row === 0 && f.col === 1)
-      // Each field should have 4 (3 normal + 1 bonus from card)
       expect(f0?.stacks[0]?.remaining ?? 0).toBe(4)
-      expect(f1?.stacks[0]?.remaining ?? 0).toBe(4)
+      expect(f1?.stacks[0]?.remaining ?? 0).toBe(3)
+    })
+
+    it('rejects a crop field that was not freshly sown without partial mutation', () => {
+      const session = setupForSow({
+        grain: 2,
+        fields: [
+          { row: 0, col: 0, stacks: [] },
+          { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 3 }] },
+        ],
+      })
+
+      let resp = session.takeAction(0, 'grain-utilization')
+      expect(resp.ok).toBe(true)
+
+      resp = session.resolveChoice(0, 'confirm', {
+        crops: [{ row: 0, col: 0, crop: 'grain' }],
+      })
+      expect(resp.ok).toBe(true)
+
+      resp = acceptSelection(session, resp)
+      expect(resp.interaction.selection?.selectablePositions).toEqual([{ row: 0, col: 0 }])
+      resp = selectPositions(session, [{ row: 0, col: 1 }])
+      expect(resp.ok).toBe(false)
+      expect(resp.error).toBe('invalid selection position')
+
+      const player = resp.state.players[0]!
+      const f0 = player.fields.find((f) => f.row === 0 && f.col === 0)
+      const f1 = player.fields.find((f) => f.row === 0 && f.col === 1)
+      expect(f0?.stacks[0]?.remaining ?? 0).toBe(3)
+      expect(f1?.stacks[0]?.remaining ?? 0).toBe(3)
     })
   })
 })

@@ -3928,6 +3928,13 @@ export class GameCore {
         }
       }
     }
+    const allowedSelectionCounts = Array.isArray(interactionContext?.allowedSelectionCounts)
+      ? interactionContext.allowedSelectionCounts
+          .filter((count): count is number => typeof count === 'number' && Number.isInteger(count))
+      : null
+    if (allowedSelectionCounts && !allowedSelectionCounts.includes(positions.length)) {
+      return this.respond(false, 'invalid selection count')
+    }
 
     this.pushHistory()
     const positionStrings = positions.map((p) => `${p.row}-${p.col}`)

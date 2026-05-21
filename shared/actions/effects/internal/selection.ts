@@ -34,6 +34,14 @@ const validateFarmPositions = (
     }
   }
 
+  const allowedSelectionCounts = Array.isArray(actionContext?.allowedSelectionCounts)
+    ? actionContext.allowedSelectionCounts
+        .filter((count): count is number => typeof count === 'number' && Number.isInteger(count))
+    : null
+  if (allowedSelectionCounts && !allowedSelectionCounts.includes(positions.length)) {
+    return 'invalid selection count'
+  }
+
   return null
 }
 

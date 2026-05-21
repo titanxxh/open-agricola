@@ -124,6 +124,41 @@ describe('selectionAction', () => {
     })
     expect(received).toBeNull()
   })
+
+  it('rejects farm-position selections outside allowedSelectionCounts before effects run', () => {
+    const player = createMockPlayer()
+    let received: string[] | null = null
+
+    registerSelectionEffect('test-selection-count-validation', ({ positions }) => {
+      received = positions
+    })
+
+    const result = selectionAction.resolveChoice!(
+      {
+        player,
+        sourceCard: 'Test_Card',
+        actionContext: {
+          selectionKind: 'farm-position',
+          minSelections: 1,
+          maxSelections: 4,
+          allowedSelectionCounts: [1, 3, 4],
+          selectableTiles: [
+            { row: 0, col: 0 },
+            { row: 0, col: 1 },
+          ],
+          selectionEffect: 'test-selection-count-validation',
+        },
+      } as never,
+      '0-0,0-1',
+    )
+
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'invalid selection count',
+      recoverable: true,
+    })
+    expect(received).toBeNull()
+  })
 })
 
 describe('selection action with occupation-hand kind', () => {
