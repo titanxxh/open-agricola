@@ -1,6 +1,6 @@
 # 卡牌实现现状报告
 
-> 生成/更新日期：2026-05-20。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
+> 生成/更新日期：2026-05-21。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
 
 ## 1. 当前快照
 
@@ -11,10 +11,10 @@
 | 自动 metadata 脚本 literal mismatch | 5 |
 | 自动 metadata 脚本 complex mismatch | 5 |
 | 其中 schema-up 已接受差异 | 4 |
-| 需要实现复核的卡牌 | 15 |
+| 需要实现复核的卡牌 | 14 |
 | 已接受 / 产品策略差异 | 70 |
 | 排除的 BGA legacy 或未实现行为目标 | 52 |
-| 本轮审计视为已对齐 | 751 |
+| 本轮审计视为已对齐 | 752 |
 
 说明：`scripts/audit-bga-metadata-diff.ts` 现在会解析 BGA `STABLE` 打印成本和 `passing`。当前 literal mismatch 是 5 个 `passing` 差异：`C1_Overhaul` 需复核，`C6_StoneClearing`、`C9_AutomaticWaterTrough`、`D1_ZigzagHarrow`、`E5_NightLoot` 为已接受的刻意省略。当前 complex mismatch 是 1 个 `cost` 差异（`C54_MarketBooth`）和 4 个已接受的 schema-up prerequisite 差异。
 
@@ -31,7 +31,6 @@
 | `B124_Trimmer` | 中 | 触发频率 | BGA 每次牧场覆盖数增加都奖励；OA 每个工作阶段第一次奖励后打 flag。 | 若要严格对齐，移除 after-reward flag。 |
 | `B29_CookeryLesson / B63_Tasting` | 中 | 行动格 ID 覆盖 | OA 漏掉 `lessons-3`。 | 增加共享 lessons-space helper。 |
 | `B19_MoldboardPlow` | 中 | 成功顺序 | OA 在 plow 成功前消耗使用次数。 | plow 成功后再消耗使用次数。 |
-| `E60_WorkingGloves` | 中 | 支付枚举 | BGA 限制一次替换；OA 的独立 trade 可以叠加。 | 增加 trade `groupMax/groupId`。 |
 | `E10_StrawHat` | 中 | mandatory 选择 | BGA 强制在移动或拿食物中选一项；OA 可以跳过。 | 移除 XOR 外层 optional。 |
 | `C1_Overhaul` | 低 | metadata/passing | BGA `passing=true`；OA 省略，旧接受差异列表也没有记录 passing。 | 增加 passing 支持/测试，或明确记录为已接受差异。 |
 | `E68_CherryOrchard` | 低 | 描述文本 | OA desc 写成收获 wood；BGA 表达为像 grain 一样 sow 和 harvest wood。 | 恢复 BGA 文案语义。 |
@@ -51,7 +50,6 @@
 | `B124_Trimmer` | `B/B124_Trimmer.php` | `shared/cards/B/B124_Trimmer.ts` | 无特殊 UI gap；触发频率是后端 card state 问题。 |
 | `B29_CookeryLesson / B63_Tasting` | `B/B29_CookeryLesson.php`; `B/B63_Tasting.php` | `shared/cards/B/B29_CookeryLesson.ts`; `shared/cards/B/B63_Tasting.ts`; `shared/cards/action/common-lessons-3.ts` | Lessons 行动格覆盖会同时影响行动可用性和行动格选项渲染。 |
 | `B19_MoldboardPlow` | `B/B19_MoldboardPlow.php` | `shared/cards/B/B19_MoldboardPlow.ts` | OA 已消耗存储次数后，UI 仍可能取消或失败 plow 选择。 |
-| `E60_WorkingGloves` | `E/E60_WorkingGloves.php` | `shared/cards-display/E/E60_WorkingGloves.ts`; `shared/actions/payment/internal/enumerate.ts` | replacement modifier 可叠加时，Payment UI 会收到过宽的枚举选项。 |
 | `E10_StrawHat` | `E/E10_StrawHat.php` | `shared/cards/E/E10_StrawHat.ts` | OA 将整个 flow 标为 optional，导致通用 XOR UI 包含 skip 路径。 |
 | `C1_Overhaul` | `C/C1_Overhaul.php` | `shared/cards-display/C/C1_Overhaul.ts`; `shared/cards/C/C1_Overhaul.ts` | metadata/passing 影响卡牌显示和可打出 metadata，而不是自定义 UI flow。 |
 | `E68_CherryOrchard` | `E/E68_CherryOrchard.php` | `shared/cards-display/E/E68_CherryOrchard.ts` | 描述文本面向 UI；实现本身主要基于 cardField。 |
@@ -112,7 +110,7 @@
 1. 维护 metadata 审计 fixture 覆盖：`STABLE` cost 和 `passing` 已覆盖，后续新增 BGA metadata 字段时必须同步 parser/diff 测试。
 2. ~~增加精确 eligible farm-position selection，支持 selectableTiles、数量约束和非法选择原子失败。~~ ✅ 已落地：`selection` action / session commit 支持 `allowedSelectionCounts`，`B115_TinsmithMaster`、`E71_CowPatty` 基于 `farm.sown` event 计算本次 eligible 田，`B165_GameProvider` 使用当前 grain fields；三者均使用精确 `selectableTiles`，非法选择在 effect 前 recoverable fail。
 3. ~~增加 batch resource exchange / resource quantity selection，用于 BGA SPECIAL_EFFECT 风格的 discard/receive 交互。~~ ✅ 已落地：`resource-batch-exchange-select` 支持私有 prompt redaction、HTTP/WS commit、E78 原子 discard/receive、UI 面板和 replay 回放。
-4. 为“从多个替换中选一个”的卡增加 TradeModifier group 限制。
+4. ~~为“从多个替换中选一个”的卡增加 TradeModifier group 限制。~~ ✅ 已落地：`Trade` / `TradeModifier` 支持 `groupId` + `groupMax`，payment 枚举在 action-scope、unit-scope 和最终组合合并时按组累计 `times`，`E60_WorkingGloves` 的四个职业支付替代共享 `groupMax: 1`，避免一次职业支付内叠加多个替换。
 5. ~~增加后端权威的 action-space reveal/exclusive-use 支持。~~ ✅ 已落地：ActionSpace 持有 `exclusiveUse`，round start 统一 emit `action.revealed` / `action.exclusiveUseCleared`，B23 使用该机制。
 6. 扩大 accumulation-space partial-take 语义的复用范围；当前 `collect` 已支持指定行动格、资源和数量，`B81_Handcart` 已从行动格移除资源。
 7. ~~为 room/action bonus 增加 scope，避免 per-room 和 total-room cost modifier 双重应用~~ ✅ 已落地：`ComplexCost` 统一形状（`fees / unitFee + nb / trades / bonuses`），`Trade.scope: 'action' \| 'unit'` + `TradeModifier.scope` 区分 per-action 资源池转换和 per-unit cost row 有序替换（A123_FrameBuilder construct、D15_ClaySupports、B145_BrushwoodCollector construct 分支已迁移，B145 使用 `replaceUpTo` 覆盖 1/2 reed 行）；construct / renovation / fencing / plow / occupation / pay 全部走单一 `computeAllBuyableCombinations`；条件评估拆成 `evaluateStaticConditions` + `evaluateConditions(_, _, nb)` 两层（`getModifiersForCostType` static-only，nb-aware gate 延后到 enumerate）。
@@ -1107,7 +1105,7 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 | `E57_CheeseFondue` | 已对齐 |  |
 | `E58_LunchtimeBeer` | 已对齐 |  |
 | `E59_CombandCutter` | 已对齐 |  |
-| `E60_WorkingGloves` | 需复核 | 多个独立 trade modifier 可叠加；BGA 限制一次替换 |
+| `E60_WorkingGloves` | 已对齐 |  |
 | `E61_RaisedBed` | 已对齐 |  |
 | `E62_SourDough` | 已对齐 |  |
 | `E63_IronOven` | 已对齐 |  |
