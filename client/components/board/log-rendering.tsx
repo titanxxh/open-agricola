@@ -51,6 +51,28 @@ const resolveCardName = (locale: Locale, id: string): CardRef | null => {
 const resolveCardDisplayName = (locale: Locale, id: string) =>
   resolveCardName(locale, id)?.name ?? humanizeCardId(id)
 
+const resolveAccumulationTarget = (
+  locale: Locale,
+  params: Record<string, unknown>,
+): ReactNode => {
+  if (params.target === 'actionSpace') return String(params.action ?? '')
+  if (params.target === 'card') {
+    const cardId = typeof params.cardId === 'string' ? params.cardId : ''
+    const cardName = cardId ? resolveCardDisplayName(locale, cardId) : ''
+    const player = typeof params.player === 'string' ? params.player : ''
+    if (locale === 'zh') return player ? `${player} 的 ${cardName}` : cardName
+    return player ? `${player}'s ${cardName}` : cardName
+  }
+  if (params.target === 'roundCard') {
+    const round = Number(params.round)
+    if (!Number.isInteger(round) || round < 1 || round > 14) {
+      return locale === 'zh' ? '回合牌' : 'round card'
+    }
+    return locale === 'zh' ? `第 ${round} 回合牌` : `Round ${round} card`
+  }
+  return String(params.target ?? '')
+}
+
 const resolveCardDesc = (locale: Locale, ref: CardRef): string => {
   const prefix =
     ref.type === 'major' ? 'improvements' : ref.type === 'minor' ? 'minorImprovements' : 'occupations'
@@ -456,6 +478,18 @@ export const prepareLogEntry = (
     richParams.gain = (
       <ResourceLine locale={locale} resources={params.gain as Partial<Resource>} />
     )
+  }
+  if (
+    params &&
+    (entry.key === 'log.actionAccumulated' || entry.key === 'log.resourceAccumulated') &&
+    typeof params.resources === 'object'
+  ) {
+    richParams.resources = (
+      <ResourceLine locale={locale} resources={params.resources as Partial<Resource>} />
+    )
+    if (entry.key === 'log.resourceAccumulated') {
+      richParams.target = resolveAccumulationTarget(locale, params)
+    }
   }
   if (params && params.detailParts && entry.key === 'log.actionDetail') {
     const detailParts = params.detailParts as ActionDetailParts

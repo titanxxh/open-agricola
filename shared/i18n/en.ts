@@ -847,6 +847,8 @@ export const en = {
     action: '{player} performs {action}',
     actionDetail: '{player} takes {action}{detail}',
     actionRevealed: 'Round {roundSlot} action revealed: {action}',
+    actionAccumulated: '{action} accumulates {resources}',
+    resourceAccumulated: '{target} accumulates {resources}',
     actionExclusiveUseSet: '{player} reserves {action} via {cardId}',
     actionExclusiveUseCleared: "{player}'s reservation on {action} ends",
     reorganizeDiscard: '{player} discards {resources}',
