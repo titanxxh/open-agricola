@@ -6,17 +6,19 @@ import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import '../../shared/cards/A/A28_ForestSchool'
 import '../../shared/cards-display/A/A123_FrameBuilder'
 
-const setup = (withForestSchool: boolean) => {
-  const session = new GameSession()
+const setup = (withForestSchool: boolean, options?: { playerCount?: number; spaceId?: string }) => {
+  const playerCount = options?.playerCount ?? 2
+  const spaceId = options?.spaceId ?? 'lessons'
+  const session = new GameSession(undefined, undefined, { playerCount })
   const state = session.getState().state
-  state.players = state.players.slice(0, 2)
+  state.players = state.players.slice(0, playerCount)
   state.currentPlayerIndex = 0
 
   const player = state.players[0]!
   setWorkersAtHome(state, player, 2)
   player.resources = {
     ...player.resources,
-    wood: withForestSchool ? 1 : 0,
+    wood: withForestSchool ? (spaceId === 'lessons-3' ? 2 : 1) : 0,
     food: 0,
   }
   player.occupationHand = ['A123_FrameBuilder']
@@ -27,8 +29,8 @@ const setup = (withForestSchool: boolean) => {
     player.activeModifiers.push({ ...((A28Card as any).modifier ?? {}) })
   }
 
-  const lessons = state.actionSpaces.find((space) => space.id === 'lessons')
-  if (!lessons) throw new Error('lessons space missing')
+  const lessons = state.actionSpaces.find((space) => space.id === spaceId)
+  if (!lessons) throw new Error(`${spaceId} space missing`)
   lessons.takenBy = state.players[1]!.id
 
   session.loadState(state)
@@ -47,6 +49,21 @@ describe('A28_ForestSchool session', () => {
     expect(withoutCard.actionAvailability?.lessons).toBe(false)
 
     const failedTake = withoutCardSession.takeAction(0, 'lessons')
+    expect(failedTake.ok).toBe(false)
+    expect(failedTake.error).toBe('space unavailable')
+  })
+
+  it('makes occupied lessons-3 available in a 3-player game', () => {
+    const withCard = setup(true, { playerCount: 3, spaceId: 'lessons-3' }).getState()
+    expect(withCard.ok).toBe(true)
+    expect(withCard.interaction.stateId).toBe('idle')
+    expect(withCard.actionAvailability?.['lessons-3']).toBe(true)
+
+    const withoutCardSession = setup(false, { playerCount: 3, spaceId: 'lessons-3' })
+    const withoutCard = withoutCardSession.getState()
+    expect(withoutCard.actionAvailability?.['lessons-3']).toBe(false)
+
+    const failedTake = withoutCardSession.takeAction(0, 'lessons-3')
     expect(failedTake.ok).toBe(false)
     expect(failedTake.error).toBe('space unavailable')
   })

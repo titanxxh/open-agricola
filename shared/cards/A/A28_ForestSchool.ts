@@ -3,12 +3,11 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../contract/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
 import { isSpaceOccupied } from '../../domain/space'
+import { isLessonsSpaceId } from '../helpers/lessons-spaces'
 import type { CardImpl } from '../registry'
 import { A28_ForestSchool } from '../../cards-display/A/A28_ForestSchool'
 
 const CARD_ID = A28_ForestSchool.id
-
-const LESSONS_SPACE_IDS = ['lessons', 'lessons-4']
 
 const lessonsComputeArgsListener: CardListenerRegistration = {
   id: 'A28-forest-school-compute-args-place-farmer',
@@ -19,7 +18,7 @@ const lessonsComputeArgsListener: CardListenerRegistration = {
     if (!context.player.minorPlayed.includes(CARD_ID)) return
     const extraOptions: ActionChoiceOption[] = context.state.actionSpaces
       .filter((space) =>
-        LESSONS_SPACE_IDS.includes(space.id) &&
+        isLessonsSpaceId(space.id) &&
         isSpaceOccupied(space) &&
         space.canBeExecutedByPlayer(context.state, context.player),
       )

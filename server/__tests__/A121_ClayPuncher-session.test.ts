@@ -9,10 +9,10 @@ import type { ActionFlow } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 describe('A121_ClayPuncher session', () => {
-  const setup = () => {
-    const session = new GameSession()
+  const setup = (playerCount: number = 2) => {
+    const session = new GameSession(undefined, undefined, { playerCount })
     const state = session.getState().state
-    state.players = state.players.slice(0, 2)
+    state.players = state.players.slice(0, playerCount)
     state.currentPlayerIndex = 0
     state.round = 1
 
@@ -22,7 +22,9 @@ describe('A121_ClayPuncher session', () => {
     player.resources.clay = 0
     player.resources.food = 5
 
-    state.players[1]!.workersAvailable = 2
+    for (const otherPlayer of state.players.slice(1)) {
+      otherPlayer.workersAvailable = 2
+    }
 
     // Ensure clay-pit has accumulated resources
     const clayPit = state.actionSpaces.find((s) => s.id === 'clay-pit')
@@ -85,6 +87,32 @@ describe('A121_ClayPuncher session', () => {
 
     const after = session.getState().state
     // Should have gained 1 clay from ClayPuncher trigger on lessons
+    expect(after.players[0]!.resources.clay).toBe(clayBefore + 1)
+  })
+
+  it('gains 1 extra clay when using lessons-3', () => {
+    const session = setup(3)
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.occupationHand.push('A93_BedMaker')
+    const clayBefore = player.resources.clay
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'lessons-3')
+    expect(resp.ok).toBe(true)
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId === 'wait') {
+      const option = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === 'A93_BedMaker')
+      expect(option).toBeDefined()
+      resp = session.resolveChoice(0, option!.value)
+    }
+
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
+    }
+
+    const after = session.getState().state
     expect(after.players[0]!.resources.clay).toBe(clayBefore + 1)
   })
 

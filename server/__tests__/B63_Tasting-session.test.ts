@@ -10,21 +10,27 @@ import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 const CARD_ID = 'B63_Tasting'
 
 describe('B63_Tasting session', () => {
-  const setup = (grain = 2) => {
-    const session = new GameSession()
+  const setup = (grain = 2, opts?: { food?: number; playerCount?: number }) => {
+    const session = opts?.playerCount
+      ? new GameSession(42, undefined, { playerCount: opts.playerCount })
+      : new GameSession()
     const state = session.getState().state
-    state.players = state.players.slice(0, 2)
+    state.players = state.players.slice(0, opts?.playerCount ?? 2)
     state.currentPlayerIndex = 0
     state.round = 1
 
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
     setWorkersAtHome(state, player, 2)
+    player.resources.food = opts?.food ?? player.resources.food
     player.resources.grain = grain
-    // Need an occupation in hand to make lessons usable (free for first occupation)
-    player.occupationHand.push('A93_BedMaker')
+    player.occupationHand = ['A93_BedMaker', 'A110_Roughcaster']
+    player.minorHand = ['__test_placeholder__']
 
     state.players[1]!.workersAvailable = 2
+    if (opts?.playerCount === 3) {
+      state.players[2]!.workersAvailable = 2
+    }
 
     session.loadState(state)
     return session
@@ -76,6 +82,34 @@ describe('B63_Tasting session', () => {
     const exchanged = after.resources.grain === 0 && after.resources.food >= 4
     const skipped = after.resources.grain === 1
     expect(exchanged || skipped).toBe(true)
+  })
+
+  it('offers lessons-3 exchange before occupation cost in a 3-player game', () => {
+    const session = setup(1, { food: 0, playerCount: 3 })
+    let resp = session.takeAction(0, 'lessons-3')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('choice')
+    expect(resp.interaction.sourceCard).toBe(CARD_ID)
+
+    const exchangeOption = resp.interaction.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
+    expect(exchangeOption).toBeDefined()
+    resp = session.resolveChoice(0, exchangeOption!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.grain).toBe(0)
+    expect(resp.state.players[0]!.resources.food).toBe(4)
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('choice')
+    expect(resp.interaction.promptKey).toBe('ui.interactionChooseOccupation')
+    expect(resp.interaction.options?.map((option: ActionChoiceOption) => option.value)).toContain('A93_BedMaker')
+
+    resp = session.resolveChoice(0, 'A93_BedMaker')
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.food).toBe(2)
+    expect(resp.state.players[0]!.occupationPlayed).toContain('A93_BedMaker')
   })
 
   it('skipping exchange leaves grain unchanged', () => {
