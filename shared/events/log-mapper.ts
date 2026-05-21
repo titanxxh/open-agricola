@@ -1,5 +1,6 @@
 import type {
   ActionDetailLoggedEvent,
+  ActionAccumulatedEvent,
   CardPlayedEvent,
   FarmFenceBuiltEvent,
   FutureMeepleQueuedEvent,
@@ -7,6 +8,7 @@ import type {
   FarmStableBuiltEvent,
   GameEvent,
   HarvestPhaseStartedEvent,
+  ResourceAccumulatedEvent,
   ResourcePaidEvent,
   ResourceMovedEvent,
   WorkerPlacedEvent,
@@ -27,6 +29,61 @@ const playerName = (ctx: EventLogMapperContext, playerId?: string): string | und
 
 const actionName = (ctx: EventLogMapperContext, actionId?: string): string | undefined =>
   actionId ? ctx.actionNames?.[actionId] ?? actionId : undefined
+
+const mapActionAccumulated = (
+  event: ActionAccumulatedEvent,
+  ctx: EventLogMapperContext,
+): LogEntry | null => {
+  const resources = positiveResources(event.resources)
+  if (Object.keys(resources).length === 0) return null
+  return {
+    key: 'log.actionAccumulated',
+    params: {
+      action: actionName(ctx, event.spaceId),
+      resources,
+    },
+  }
+}
+
+const mapResourceAccumulated = (
+  event: ResourceAccumulatedEvent,
+  ctx: EventLogMapperContext,
+): LogEntry | null => {
+  const resources = positiveResources(event.resources)
+  if (Object.keys(resources).length === 0) return null
+
+  if (event.to.kind === 'actionSpace') {
+    return {
+      key: 'log.resourceAccumulated',
+      params: {
+        target: 'actionSpace',
+        action: actionName(ctx, event.to.spaceId),
+        resources,
+      },
+    }
+  }
+
+  if (event.to.kind === 'card') {
+    return {
+      key: 'log.resourceAccumulated',
+      params: {
+        target: 'card',
+        cardId: event.to.cardId,
+        ...(event.to.playerId ? { player: playerName(ctx, event.to.playerId) } : {}),
+        resources,
+      },
+    }
+  }
+
+  return {
+    key: 'log.resourceAccumulated',
+    params: {
+      target: 'roundCard',
+      round: event.to.round,
+      resources,
+    },
+  }
+}
 
 const actionDetailLog = (
   ctx: EventLogMapperContext,
@@ -296,6 +353,16 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
 
       if (event.type === 'resource.moved') {
         const entry = mapResourceMoved(events, event, ctx)
+        return entry ? [entry] : []
+      }
+
+      if (event.type === 'action.accumulated') {
+        const entry = mapActionAccumulated(event, ctx)
+        return entry ? [entry] : []
+      }
+
+      if (event.type === 'resource.accumulated') {
+        const entry = mapResourceAccumulated(event, ctx)
         return entry ? [entry] : []
       }
 

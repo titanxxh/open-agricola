@@ -295,4 +295,92 @@ describe('public event notifications', () => {
       'evt-2:move:0',
     ])
   })
+
+  it('maps accumulation events to notifications, highlights, and animations', () => {
+    const actionAccumulated = {
+      ...base,
+      type: 'action.accumulated',
+      spaceId: 'forest',
+      resources: { wood: 2 },
+    } satisfies GameEvent
+    const resourceSpace = {
+      ...base,
+      id: 'evt-2',
+      seq: 2,
+      type: 'resource.accumulated',
+      resources: { food: 1 },
+      to: { kind: 'actionSpace', spaceId: 'fishing' },
+    } satisfies GameEvent
+    const resourceCard = {
+      ...base,
+      id: 'evt-3',
+      seq: 3,
+      type: 'resource.accumulated',
+      resources: { food: 2 },
+      to: { kind: 'card', playerId: 'p1', cardId: 'B48_ForestStone' },
+    } satisfies GameEvent
+
+    expect(collectPublicEventNotifications([actionAccumulated, resourceSpace, resourceCard], 'en')).toEqual([
+      expect.objectContaining({ id: 'evt', kind: 'resource', message: expect.stringContaining('forest') }),
+      expect.objectContaining({ id: 'evt-2', kind: 'resource', message: expect.stringContaining('fishing') }),
+      expect.objectContaining({ id: 'evt-3', kind: 'resource', message: expect.stringContaining('B48_ForestStone') }),
+    ])
+    expect(collectPublicEventHighlightTargets([actionAccumulated, resourceSpace, resourceCard]).actionIds).toEqual([
+      'forest',
+      'fishing',
+    ])
+    expect(collectPublicEventResourceAnimations([actionAccumulated, resourceSpace, resourceCard])).toEqual([
+      expect.objectContaining({
+        id: 'evt:accumulate:0',
+        kind: 'move',
+        resources: { wood: 2 },
+        from: { kind: 'supply' },
+        to: { kind: 'actionSpace', actionId: 'forest' },
+      }),
+      expect.objectContaining({
+        id: 'evt-2:accumulate:0',
+        kind: 'move',
+        resources: { food: 1 },
+        from: { kind: 'supply' },
+        to: { kind: 'actionSpace', actionId: 'fishing' },
+      }),
+    ])
+  })
+
+  it('keeps silent action-space accumulation visual cues without notifications', () => {
+    const silent = {
+      ...base,
+      type: 'resource.accumulated',
+      resources: { reed: 1 },
+      to: { kind: 'actionSpace', spaceId: 'reed-bank' },
+      silent: true,
+    } satisfies GameEvent
+
+    expect(collectPublicEventNotifications([silent], 'en')).toEqual([])
+    expect(collectPublicEventHighlightTargets([silent]).actionIds).toEqual(['reed-bank'])
+    expect(collectPublicEventResourceAnimations([silent])).toEqual([
+      expect.objectContaining({ id: 'evt:accumulate:0', resources: { reed: 1 } }),
+    ])
+  })
+
+  it('does not notify, highlight, or animate empty accumulation resources', () => {
+    const emptyAction = {
+      ...base,
+      type: 'action.accumulated',
+      spaceId: 'forest',
+      resources: { wood: 0 },
+    } satisfies GameEvent
+    const emptyResource = {
+      ...base,
+      id: 'evt-2',
+      seq: 2,
+      type: 'resource.accumulated',
+      resources: {},
+      to: { kind: 'actionSpace', spaceId: 'fishing' },
+    } satisfies GameEvent
+
+    expect(collectPublicEventNotifications([emptyAction, emptyResource], 'en')).toEqual([])
+    expect(collectPublicEventHighlightTargets([emptyAction, emptyResource]).actionIds).toEqual([])
+    expect(collectPublicEventResourceAnimations([emptyAction, emptyResource])).toEqual([])
+  })
 })
