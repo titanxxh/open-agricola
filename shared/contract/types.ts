@@ -1,5 +1,5 @@
 import type { PromptKey } from './prompt-keys'
-import type { EventSink, GameEvent } from './events'
+import type { EventSink, GameEvent, PublicEventArchivePacket } from './events'
 import type { PrivateGameEvent } from './private-events'
 
 export type Resource = {
@@ -373,6 +373,8 @@ export type GameState = {
   log: LogEntry[]
   events: GameEvent[]
   nextEventSeq: number
+  publicEventArchive: PublicEventArchivePacket[]
+  nextPublicEventArchivePacketSeq: number
   roundStartSnapshot: GameState | null
   roundActionOrder: (string | null)[]
   gameSeed: number

@@ -326,6 +326,34 @@ export type GameStartedEvent = GameEventBase<'game.started'>
 
 export type GameEndedEvent = GameEventBase<'game.ended'>
 
+export type PublicEventArchiveCommittedPacket = {
+  schemaVersion: 1
+  id: string
+  packetSeq: number
+  type: 'publicEvents.committed'
+  eventIds: string[]
+  eventSeqs: number[]
+  firstEventSeq: number
+  lastEventSeq: number
+}
+
+export type PublicEventArchiveCanceledPacket = {
+  schemaVersion: 1
+  id: string
+  packetSeq: number
+  type: 'publicEvents.canceled'
+  reason: 'undoStep' | 'undoAction'
+  previousMaxSeq: number
+  nextMaxSeq: number
+  canceledEventIds: string[]
+  canceledSeqs: number[]
+  canceledEvents: GameEvent[]
+}
+
+export type PublicEventArchivePacket =
+  | PublicEventArchiveCommittedPacket
+  | PublicEventArchiveCanceledPacket
+
 export type GameEvent =
   | ResourceMovedEvent
   | ResourceExchangedEvent
