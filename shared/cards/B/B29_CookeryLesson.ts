@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { readActionSnapshotToken } from '../helpers/action-snapshot'
+import { isLessonsSpaceId } from '../helpers/lessons-spaces'
 import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { B29_CookeryLesson } from '../../cards-display/B/B29_CookeryLesson'
@@ -24,7 +25,7 @@ const LESSONS_TOKEN_KEY = 'lessonsActionToken'
  * via the action snapshot token.
  *
  * - cookedActionToken: written on after-exchange (cooking)
- * - lessonsActionToken: written on after-placeFarmer (lessons / lessons-4)
+ * - lessonsActionToken: written on after-placeFarmer (Lessons spaces)
  *
  * VP awarded when both tokens equal the current actionToken in the same
  * triggering listener call. USED_ACTION_TOKEN_KEY guards against double-award
@@ -33,8 +34,6 @@ const LESSONS_TOKEN_KEY = 'lessonsActionToken'
  * onRoundStart resets all three tokens defensively (action tokens normally
  * monotonically increase across the game so this is mostly cosmetic).
  */
-
-const LESSONS_SPACE_IDS = new Set(['lessons', 'lessons-4'])
 
 const currentActionToken = (player: PlayerState) =>
   readActionSnapshotToken(player)
@@ -89,7 +88,7 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.space || !LESSONS_SPACE_IDS.has(context.space.id)) return
+    if (!isLessonsSpaceId(context.space?.id)) return
     writeCurrentToken(context.player, LESSONS_TOKEN_KEY)
     if (tokenMatchesCurrent(context.player, COOKED_TOKEN_KEY)) {
       return awardBonusVp(context)

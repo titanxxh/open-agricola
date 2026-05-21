@@ -1,12 +1,11 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
+import { isLessonsSpaceId } from '../helpers/lessons-spaces'
 import type { CardImpl } from '../registry'
 import { A168_AnimalTeacher } from '../../cards-display/A/A168_AnimalTeacher'
 
 const CARD_ID = A168_AnimalTeacher.id
-
-const LESSONS_SPACES = new Set(['lessons', 'lessons-4'])
 
 const listener: CardListenerRegistration = {
   id: 'A168-animal-teacher-after-place-farmer',
@@ -14,7 +13,7 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!context.space || !LESSONS_SPACES.has(context.space.id)) return
+    if (!context.space || !isLessonsSpaceId(context.space.id)) return
     return {
       flow: {
         type: 'xor',

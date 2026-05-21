@@ -3,10 +3,9 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { D137_TradeTeacher } from '../../cards-display/D/D137_TradeTeacher'
+import { isLessonsSpaceId } from '../helpers/lessons-spaces'
 
 const CARD_ID = D137_TradeTeacher.id
-
-const LESSONS_SPACE_IDS = new Set(['lessons', 'lessons-4'])
 
 /**
  * D137 Trade Teacher (Occupation, D, 137):
@@ -21,7 +20,7 @@ const LESSONS_SPACE_IDS = new Set(['lessons', 'lessons-4'])
  *
  * Implementation:
  * - registerCardListener on place-farmer `after`, filter by space id in
- *   {lessons, lessons-4}.
+ *   lessons action spaces.
  * - Return optional XOR over the full set of "valid selections" = 6 singles +
  *   15 unordered pairs of distinct goods. Each option is a SEQ of pay +
  *   per-good gain leaves.
@@ -97,7 +96,7 @@ const listener: CardListenerRegistration = {
   scope: 'player',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id
-    if (!spaceId || !LESSONS_SPACE_IDS.has(spaceId)) return
+    if (!isLessonsSpaceId(spaceId)) return
 
     return {
       flow: buildBuyFlow(),

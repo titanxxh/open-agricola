@@ -99,6 +99,34 @@ describe('B29_CookeryLesson — per-action token tracking, not per-round', () =>
     expect(result!.flow?.type).toBe('leaf')
   })
 
+  it('cook first, then lessons-3 in same action → 1 VP awarded on lessons', () => {
+    const exchangeListener = findListener('B29-cookery-lesson-after-exchange')
+    const placeListener = findListener('B29-cookery-lesson-after-place-farmer')
+    const { state, player } = setup()
+    setActionToken(player, 201)
+
+    let result = executeCardListener(exchangeListener!, {
+      state,
+      player,
+      space: mkActionSpace({ id: 'anytime-exchange' }),
+      actionId: 'anytime-exchange',
+      phase: 'after',
+      result: { type: 'ok' },
+    } as CardListenerContext)
+    expect(result).toBeUndefined()
+
+    result = executeCardListener(placeListener!, {
+      state,
+      player,
+      space: mkActionSpace({ id: 'lessons-3' }),
+      actionId: 'place-farmer',
+      phase: 'after',
+      result: { type: 'ok' },
+    } as CardListenerContext)
+    expect(result).toBeDefined()
+    expect(result!.flow?.type).toBe('leaf')
+  })
+
   it('cook in action 100, lessons in action 101 → NO VP (per-action gating)', () => {
     const exchangeListener = findListener('B29-cookery-lesson-after-exchange')
     const placeListener = findListener('B29-cookery-lesson-after-place-farmer')

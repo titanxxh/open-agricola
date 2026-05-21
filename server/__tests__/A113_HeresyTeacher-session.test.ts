@@ -113,6 +113,16 @@ describe('A113 Heresy Teacher session', () => {
     ])
   })
 
+  it('triggers on lessons-3 space in 3-player game', () => {
+    const session = setup({ playerCount: 3 })
+    fireListener(session, 'lessons-3')
+    const p1 = session.getState().state.players[0]!
+    expect(p1.fields[0]!.stacks).toEqual([
+      { kind: 'vegetable', remaining: 1 },
+      { kind: 'grain', remaining: 3 },
+    ])
+  })
+
   it('does not trigger on non-lessons spaces', () => {
     const session = setup()
     fireListener(session, 'forest')
