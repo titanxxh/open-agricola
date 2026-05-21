@@ -271,4 +271,33 @@ describe('ActionLog', () => {
     expect(container.querySelector('[data-resource="grain"][data-amount="1"]')).not.toBeNull()
     expect(container.querySelectorAll('.log-card-link').length).toBeGreaterThanOrEqual(3)
   })
+
+  it('localizes structured card trigger details at render time', () => {
+    const { container } = render(
+      <ActionLog
+        locale="zh"
+        currentRound={2}
+        log={[
+          {
+            key: 'log.cardTriggered',
+            params: {
+              cardId: 'B48_ForestStone',
+              triggerAction: 'actions.forest.name',
+              replacement: true,
+              optional: true,
+              declined: true,
+            },
+          },
+        ]}
+      />,
+    )
+
+    const text = container.textContent ?? ''
+    expect(text).toContain('森林')
+    expect(text).toContain('替换')
+    expect(text).toContain('可选')
+    expect(text).toContain('已拒绝')
+    expect(text).not.toContain('actions.forest.name')
+    expect(text).not.toContain('replacement')
+  })
 })
