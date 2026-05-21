@@ -1,5 +1,6 @@
 import type { DraftGameEvent, GameEvent } from '../contract/events'
 import type { GameState } from '../contract/types'
+import { prependDerivedLogEntries } from './log-cache'
 import { eventsToLogEntries } from './log-mapper'
 import { EventStore, type EventEnvelopeContext } from './store'
 
@@ -23,8 +24,6 @@ export const appendImmediateEvents = (
   const playerNames = Object.fromEntries((state.players ?? []).map((player) => [player.id, player.name]))
   const actionNames = Object.fromEntries((state.actionSpaces ?? []).map((space) => [space.id, space.nameKey]))
   const entries = eventsToLogEntries(committed, { playerNames, actionNames })
-  for (let index = entries.length - 1; index >= 0; index -= 1) {
-    state.log.unshift(entries[index]!)
-  }
+  prependDerivedLogEntries(state, entries)
   return committed
 }
