@@ -39,6 +39,7 @@ import {
 import { getCardMeta } from '../services/card-meta'
 import {
   applyPublicEventCancellationSnapshot,
+  buildReplayFeedback,
   farmCommitErrorMessageKey,
   filterPublicFarmHighlightsForPlayer,
   filterPublicFenceHighlightsForPlayer,
@@ -53,6 +54,7 @@ import {
   type FarmCommitType,
   type WsStatus,
 } from './game-container-helpers'
+import { buildActionLogTimelineRows } from './action-log-timeline'
 import {
   buildPastureDisplayMap,
   buildStableDisplayMap,
@@ -70,6 +72,13 @@ import {
   type PublicEventNotification,
   type PublicEventResourceAnimation,
 } from './public-event-notifications'
+import {
+  buildReplayTimeline,
+  filterReplayTimeline,
+  summarizeReplayTimeline,
+  type ReplayTimelineEntry,
+  type ReplayTimelineFilter,
+} from './replay-timeline'
 
 type RoundSlot = { round: number; action?: ActionSpace }
 
@@ -287,6 +296,9 @@ export const GameContainerApi = () => {
   const [publicEventNotifications, setPublicEventNotifications] = useState<PublicEventNotification[]>([])
   const [publicEventHighlights, setPublicEventHighlights] = useState<PublicEventHighlightTargets>(() => emptyPublicEventHighlightTargets())
   const [publicEventResourceAnimations, setPublicEventResourceAnimations] = useState<PublicEventResourceAnimation[]>([])
+  const [replayFilter, setReplayFilter] = useState<ReplayTimelineFilter>('all')
+  const [selectedReplayKey, setSelectedReplayKey] = useState<string | null>(null)
+  const [isReplayPlaying, setIsReplayPlaying] = useState(false)
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(lockedViewPlayerId)
   const [showScoringPad, setShowScoringPad] = useState(false)
   const [devMode, setDevMode] = useState(() => isDevModeAllowedFromQuery(window.location.search))
@@ -329,6 +341,10 @@ export const GameContainerApi = () => {
     setPublicEventHighlights(emptyPublicEventHighlightTargets())
     setPublicEventResourceAnimations([])
   }, [clearPublicEventFeedbackTimers])
+
+  const clearReplayCue = useCallback(() => {
+    setSelectedReplayKey(null)
+  }, [])
 
   useEffect(() => () => {
     privateEventNotificationTimersRef.current.forEach((timer) => window.clearTimeout(timer))
@@ -800,6 +816,85 @@ export const GameContainerApi = () => {
     if (!actionSpaces) return new Map<string, ActionSpace>()
     return new Map(actionSpaces.map((s) => [s.id, s]))
   }, [actionSpaces])
+  const actionNames = useMemo(() => {
+    if (!actionSpaces) return {}
+    return Object.fromEntries(actionSpaces.map((space) => [space.id, space.nameKey]))
+  }, [actionSpaces])
+  const playerNames = useMemo(() => {
+    if (!state) return {}
+    return Object.fromEntries(state.players.map((player) => [player.id, player.name ?? player.id]))
+  }, [state])
+  const replayTimeline = useMemo(
+    () => buildReplayTimeline({
+      events: state?.events ?? [],
+      publicEventArchive: state?.publicEventArchive ?? [],
+    }),
+    [state?.events, state?.publicEventArchive],
+  )
+  const replaySummary = useMemo(() => summarizeReplayTimeline(replayTimeline), [replayTimeline])
+  const replayStepEntries = useMemo(
+    () => filterReplayTimeline(replayTimeline, replayFilter).filter((entry) => entry.replayable),
+    [replayFilter, replayTimeline],
+  )
+  const actionLogTimelineBuckets = useMemo(
+    () => buildActionLogTimelineRows({
+      entries: replayTimeline,
+      legacyLog: state?.log ?? [],
+      currentRound: state?.round ?? 1,
+      locale,
+      playerNames,
+      actionNames,
+    }),
+    [actionNames, locale, playerNames, replayTimeline, state?.log, state?.round],
+  )
+  const selectedReplayEntry = useMemo(
+    () => selectedReplayKey
+      ? replayTimeline.find((entry) => entry.key === selectedReplayKey) ?? null
+      : null,
+    [replayTimeline, selectedReplayKey],
+  )
+  const replayFeedback = useMemo(
+    () => buildReplayFeedback(selectedReplayEntry, locale),
+    [locale, selectedReplayEntry],
+  )
+  const handleSelectReplayEntry = useCallback((entry: ReplayTimelineEntry) => {
+    setSelectedReplayKey(entry.key)
+  }, [])
+  const handleReplayLatest = useCallback(() => {
+    setIsReplayPlaying(false)
+    clearReplayCue()
+  }, [clearReplayCue])
+  const handleReplayStep = useCallback((direction: 'prev' | 'next') => {
+    if (replayStepEntries.length === 0) return
+    const currentIndex = replayStepEntries.findIndex((entry) => entry.key === selectedReplayKey)
+    const nextIndex = direction === 'next'
+      ? (currentIndex < 0 ? 0 : Math.min(currentIndex + 1, replayStepEntries.length - 1))
+      : (currentIndex < 0 ? replayStepEntries.length - 1 : Math.max(currentIndex - 1, 0))
+    const nextEntry = replayStepEntries[nextIndex]
+    if (nextEntry) handleSelectReplayEntry(nextEntry)
+  }, [handleSelectReplayEntry, replayStepEntries, selectedReplayKey])
+  const handleReplayPlayPause = useCallback(() => {
+    setIsReplayPlaying((current) => !current)
+  }, [])
+
+  useEffect(() => {
+    if (!isReplayPlaying) return
+    const timer = window.setTimeout(() => {
+      if (replayStepEntries.length === 0) {
+        setIsReplayPlaying(false)
+        return
+      }
+      const currentIndex = replayStepEntries.findIndex((entry) => entry.key === selectedReplayKey)
+      const nextIndex = currentIndex < 0 ? 0 : currentIndex + 1
+      if (nextIndex >= replayStepEntries.length) {
+        setIsReplayPlaying(false)
+        return
+      }
+      const nextEntry = replayStepEntries[nextIndex]
+      if (nextEntry) handleSelectReplayEntry(nextEntry)
+    }, 1200)
+    return () => window.clearTimeout(timer)
+  }, [handleSelectReplayEntry, isReplayPlaying, replayStepEntries, selectedReplayKey])
   const roundSlots: RoundSlot[] = useMemo(() => {
     if (!roundActionOrder) return []
     return roundActionOrder.map((id, index) => {
@@ -1014,17 +1109,32 @@ export const GameContainerApi = () => {
   const existingFenceSet = useMemo(() => new Set((displayPlayer?.fenceSegments ?? []).map((s) => s.edge)), [displayPlayer?.fenceSegments])
   const pendingFenceSet = useMemo(() => new Set(pendingFenceEdges), [pendingFenceEdges])
   const pendingPalisadeSet = useMemo(() => new Set(pendingPalisadeEdges), [pendingPalisadeEdges])
+  const displayPublicEventNotifications = useMemo(
+    () => [...replayFeedback.notifications, ...publicEventNotifications].slice(0, 4),
+    [publicEventNotifications, replayFeedback.notifications],
+  )
+  const displayPublicEventHighlights = useMemo(
+    () => mergePublicEventHighlights(publicEventHighlights, replayFeedback.highlights),
+    [publicEventHighlights, replayFeedback.highlights],
+  )
+  const displayPublicEventResourceAnimations = useMemo(
+    () => mergePublicEventResourceAnimations(
+      publicEventResourceAnimations,
+      replayFeedback.resourceAnimations,
+    ).slice(0, 12),
+    [publicEventResourceAnimations, replayFeedback.resourceAnimations],
+  )
   const highlightedActionIds = useMemo(
-    () => new Set(publicEventHighlights.actionIds),
-    [publicEventHighlights.actionIds],
+    () => new Set(displayPublicEventHighlights.actionIds),
+    [displayPublicEventHighlights.actionIds],
   )
   const highlightedFarmTileKeys = useMemo(
-    () => filterPublicFarmHighlightsForPlayer(publicEventHighlights.farmTiles, displayPlayer?.id ?? ''),
-    [displayPlayer?.id, publicEventHighlights.farmTiles],
+    () => filterPublicFarmHighlightsForPlayer(displayPublicEventHighlights.farmTiles, displayPlayer?.id ?? ''),
+    [displayPlayer?.id, displayPublicEventHighlights.farmTiles],
   )
   const highlightedFenceEdgeIds = useMemo(
-    () => filterPublicFenceHighlightsForPlayer(publicEventHighlights.fenceEdges, displayPlayer?.id ?? ''),
-    [displayPlayer?.id, publicEventHighlights.fenceEdges],
+    () => filterPublicFenceHighlightsForPlayer(displayPublicEventHighlights.fenceEdges, displayPlayer?.id ?? ''),
+    [displayPlayer?.id, displayPublicEventHighlights.fenceEdges],
   )
 
   const farmInteraction =
@@ -1581,9 +1691,9 @@ export const GameContainerApi = () => {
     return <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>Loading...</div>
   }
 
-  const notificationStack = privateEventNotifications.length > 0 || publicEventNotifications.length > 0 ? (
+  const notificationStack = privateEventNotifications.length > 0 || displayPublicEventNotifications.length > 0 ? (
     <div className="event-notifications" role="status" aria-live="polite">
-      {buildEventNotificationStackItems(privateEventNotifications, publicEventNotifications).map((notification) => (
+      {buildEventNotificationStackItems(privateEventNotifications, displayPublicEventNotifications).map((notification) => (
         <div
           key={notification.id}
           className={notification.className}
@@ -1624,7 +1734,7 @@ export const GameContainerApi = () => {
     <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
       {notificationStack}
       <PublicEventResourceAnimations
-        animations={publicEventResourceAnimations}
+        animations={displayPublicEventResourceAnimations}
         displayPlayerId={displayPlayer.id}
         locale={locale}
       />
@@ -1939,13 +2049,41 @@ export const GameContainerApi = () => {
                 <ScorePanel rows={scoreRows} />
               </Section>
               <Section collapsible defaultCollapsed icon="📜" title="行动记录" variant="parchment">
-                <ActionLog locale={locale} log={state.log} currentRound={state.round ?? 1} />
+                <ActionLog
+                  locale={locale}
+                  log={state.log}
+                  currentRound={state.round ?? 1}
+                  timelineBuckets={actionLogTimelineBuckets}
+                  selectedReplayKey={selectedReplayKey}
+                  replayFilter={replayFilter}
+                  replaySummary={replaySummary}
+                  onReplayFilterChange={setReplayFilter}
+                  onSelectReplayEntry={handleSelectReplayEntry}
+                  onReplayStep={handleReplayStep}
+                  onReplayPlayPause={handleReplayPlayPause}
+                  onReplayLatest={handleReplayLatest}
+                  isReplayPlaying={isReplayPlaying}
+                />
               </Section>
             </>
           ) : (
             <>
               <ScorePanel rows={scoreRows} />
-              <ActionLog locale={locale} log={state.log} currentRound={state.round ?? 1} />
+              <ActionLog
+                locale={locale}
+                log={state.log}
+                currentRound={state.round ?? 1}
+                timelineBuckets={actionLogTimelineBuckets}
+                selectedReplayKey={selectedReplayKey}
+                replayFilter={replayFilter}
+                replaySummary={replaySummary}
+                onReplayFilterChange={setReplayFilter}
+                onSelectReplayEntry={handleSelectReplayEntry}
+                onReplayStep={handleReplayStep}
+                onReplayPlayPause={handleReplayPlayPause}
+                onReplayLatest={handleReplayLatest}
+                isReplayPlaying={isReplayPlaying}
+              />
             </>
           )}
         </div>
