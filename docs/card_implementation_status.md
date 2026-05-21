@@ -11,10 +11,10 @@
 | 自动 metadata 脚本 literal mismatch | 5 |
 | 自动 metadata 脚本 complex mismatch | 5 |
 | 其中 schema-up 已接受差异 | 4 |
-| 需要实现复核的卡牌 | 14 |
+| 需要实现复核的卡牌 | 12 |
 | 已接受 / 产品策略差异 | 70 |
 | 排除的 BGA legacy 或未实现行为目标 | 52 |
-| 本轮审计视为已对齐 | 752 |
+| 本轮审计视为已对齐 | 754 |
 
 说明：`scripts/audit-bga-metadata-diff.ts` 现在会解析 BGA `STABLE` 打印成本和 `passing`。当前 literal mismatch 是 5 个 `passing` 差异：`C1_Overhaul` 需复核，`C6_StoneClearing`、`C9_AutomaticWaterTrough`、`D1_ZigzagHarrow`、`E5_NightLoot` 为已接受的刻意省略。当前 complex mismatch 是 1 个 `cost` 差异（`C54_MarketBooth`）和 4 个已接受的 schema-up prerequisite 差异。
 
@@ -29,7 +29,6 @@
 | `D155_Ebonist` | 高 | exchange 触发窗口 | BGA exchange 仅收获期；OA 暴露为 anytime exchange。 | 改为 harvest trigger 并补回归测试。 |
 | `B67_HandTruck` | 中 | bake 前 continuation | BGA 是 optional 拿谷物，然后 mandatory bake；OA 无条件给谷物。 | 建模 optional gain 分支，之后接 mandatory bake continuation。 |
 | `B124_Trimmer` | 中 | 触发频率 | BGA 每次牧场覆盖数增加都奖励；OA 每个工作阶段第一次奖励后打 flag。 | 若要严格对齐，移除 after-reward flag。 |
-| `B29_CookeryLesson / B63_Tasting` | 中 | 行动格 ID 覆盖 | OA 漏掉 `lessons-3`。 | 增加共享 lessons-space helper。 |
 | `B19_MoldboardPlow` | 中 | 成功顺序 | OA 在 plow 成功前消耗使用次数。 | plow 成功后再消耗使用次数。 |
 | `E10_StrawHat` | 中 | mandatory 选择 | BGA 强制在移动或拿食物中选一项；OA 可以跳过。 | 移除 XOR 外层 optional。 |
 | `C1_Overhaul` | 低 | metadata/passing | BGA `passing=true`；OA 省略，旧接受差异列表也没有记录 passing。 | 增加 passing 支持/测试，或明确记录为已接受差异。 |
@@ -48,7 +47,6 @@
 | `D155_Ebonist` | `D/D155_Ebonist.php` | `shared/cards-display/D/D155_Ebonist.ts` | Harvest exchange 通过通用 exchange UI 暴露；OA 当前把它放进 anytime exchange UI。 |
 | `B67_HandTruck` | `B/B67_HandTruck.php` | `shared/cards/B/B67_HandTruck.ts` | OA 使用通用 bake continuation，但缺少 mandatory bake 前的 optional grain 分支。 |
 | `B124_Trimmer` | `B/B124_Trimmer.php` | `shared/cards/B/B124_Trimmer.ts` | 无特殊 UI gap；触发频率是后端 card state 问题。 |
-| `B29_CookeryLesson / B63_Tasting` | `B/B29_CookeryLesson.php`; `B/B63_Tasting.php` | `shared/cards/B/B29_CookeryLesson.ts`; `shared/cards/B/B63_Tasting.ts`; `shared/cards/action/common-lessons-3.ts` | Lessons 行动格覆盖会同时影响行动可用性和行动格选项渲染。 |
 | `B19_MoldboardPlow` | `B/B19_MoldboardPlow.php` | `shared/cards/B/B19_MoldboardPlow.ts` | OA 已消耗存储次数后，UI 仍可能取消或失败 plow 选择。 |
 | `E10_StrawHat` | `E/E10_StrawHat.php` | `shared/cards/E/E10_StrawHat.ts` | OA 将整个 flow 标为 optional，导致通用 XOR UI 包含 skip 路径。 |
 | `C1_Overhaul` | `C/C1_Overhaul.php` | `shared/cards-display/C/C1_Overhaul.ts`; `shared/cards/C/C1_Overhaul.ts` | metadata/passing 影响卡牌显示和可打出 metadata，而不是自定义 UI flow。 |
@@ -115,7 +113,8 @@
 6. ~~扩大 accumulation-space partial-take 语义的复用范围；当前 `collect` 已支持指定行动格、资源和数量，`B81_Handcart` 已从行动格移除资源。~~ ✅ 已落地：新增 `createPartialTakeFromSpaceLeaf`，统一生成 `collect` partial-take leaf、choice label metadata 和可选 effect preview；`A82_WorkCertificate`、`B81_Handcart`、`E5_NightLoot` 已迁移到共享 helper，`collect` 执行语义不变。
 7. ~~为 room/action bonus 增加 scope，避免 per-room 和 total-room cost modifier 双重应用~~ ✅ 已落地：`ComplexCost` 统一形状（`fees / unitFee + nb / trades / bonuses`），`Trade.scope: 'action' \| 'unit'` + `TradeModifier.scope` 区分 per-action 资源池转换和 per-unit cost row 有序替换（A123_FrameBuilder construct、D15_ClaySupports、B145_BrushwoodCollector construct 分支已迁移，B145 使用 `replaceUpTo` 覆盖 1/2 reed 行）；construct / renovation / fencing / plow / occupation / pay 全部走单一 `computeAllBuyableCombinations`；条件评估拆成 `evaluateStaticConditions` + `evaluateConditions(_, _, nb)` 两层（`getModifiersForCostType` static-only，nb-aware gate 延后到 enumerate）。
 8. 增加通用处理：“before trigger 给资源后，原行动可能变得可达/mandatory”。
-9. 增加共享 lessons action-space id helper，覆盖 `lessons`、`lessons-3`、`lessons-4`。
+9. ~~增加共享 lessons action-space id helper，覆盖 `lessons`、`lessons-3`、`lessons-4`。~~ ✅ 已落地：共享 helper 覆盖标准 lessons action-space id，并已用于 lessons identity 判定。
+   Follow-up / exclusion：`C23_JobContract`、`B152_JuniorArtist`、`C117_Legworker` 与 space-pairing 的 cost / jump / adjacency 语义相关，不属于本 helper 关闭范围。
 10. 继续扩大 gain/exchange/action-space provenance 覆盖；已覆盖 B21 exchange grain、E47 action-space gain、C162 player action space、E78 batch exchange，并补齐本轮 A2-A6 支付、动物、food、building-resource、farm metadata 卡牌对 `actionEvents` 优先、`transactionEvents` 回退的消费模型。本轮补齐 B21 HayloftBarn 与 E47 SyrupTap 的 action-frame 事件优先读取，防止同一 transaction 中较早资源事件误触发当前 listener；同时补上生产卡牌 `context.result` 资源事实 fallback 审计；现存 `context.result` 用途仅限 D50/A94 的 request-shape 调整和 B18/C148 的 ok guard，不作为资源来源。
 11. 决定 BGA `implemented=false` data-only 卡是否进入 OA 发牌池。
 12. 扩展结构化 action event/log event：首版已记录 eventType、sourceAction、sourceCard、resource movement provenance、payment source、affected board/card ids，并从该层派生部分 UI log；C 第一波已补 `private.promptShown`、private hand/draft event payloads（`private.handChanged`、`private.draftUpdated`）、`draft.pendingPicks` per-viewer masking、batch exchange replay/undo、action exclusive-use log；本轮继续补 future meeple source summary、fence delta metadata、wrapper-flow actionEvents 切片、legacy action detail event 派生、privateEvents 客户端短通知、gameplay card-effect hand notification 发射点（`B146_Illusionist`、`B3_Moonshine`、sourceCard-driven occupation/minor improvement），public events 客户端 notification、action/farm/fence highlight 与 resource animation 入口，以及 undo 后 public event canceled packet 首版同步 metadata。后续 archived log / replay UI 仍保留 follow-up；待办 10 的剩余 provenance audit 不在本项中标记完成。
@@ -534,7 +533,7 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 | `B26_AgrarianFences` | 已对齐 |  |
 | `B27_Toolbox` | 已接受差异 | 已接受的简化实现 |
 | `B28_ForestryStudies` | 已对齐 |  |
-| `B29_CookeryLesson` | 需复核 | 未覆盖 lessons-3 行动格 |
+| `B29_CookeryLesson` | 已对齐 | lessons-3 行动格覆盖已由共享 lessons-space helper 对齐 |
 | `B30_WoodPalisades` | 已对齐 |  |
 | `B31_PotteryYard` | 已对齐 |  |
 | `B32_Kettle` | 已对齐 |  |
@@ -568,7 +567,7 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 | `B60_BrewingWater` | 已对齐 |  |
 | `B61_ThreeFieldRotation` | 已对齐 |  |
 | `B62_Pitchfork` | 已对齐 |  |
-| `B63_Tasting` | 需复核 | 未覆盖 lessons-3 行动格 |
+| `B63_Tasting` | 已对齐 | lessons-3 行动格覆盖已由共享 lessons-space helper 对齐 |
 | `B64_MillWheel` | 已对齐 |  |
 | `B65_GrainDepot` | 已对齐 |  |
 | `B66_SackCart` | 已对齐 |  |

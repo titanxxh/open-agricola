@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { D28_WritingDesk } from '../../cards-display/D/D28_WritingDesk'
+import { isLessonsSpaceId } from '../helpers/lessons-spaces'
 
 const CARD_ID = D28_WritingDesk.id
 
@@ -12,7 +13,7 @@ const listener: CardListenerRegistration = {
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id
-    if (spaceId !== 'lessons' && spaceId !== 'lessons-2') return
+    if (!isLessonsSpaceId(spaceId)) return
     // Need at least 2 occupations in hand (one for main Lessons, one for Writing Desk)
     if ((context.player.occupationHand?.length ?? 0) < 2) return
     return {
