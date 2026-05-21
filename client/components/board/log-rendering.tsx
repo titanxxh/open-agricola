@@ -56,6 +56,19 @@ const resolveMaybeTranslationKey = (locale: Locale, value: string): string => {
   return translated === value ? value : translated
 }
 
+const houseTypeLabel = (locale: Locale, type: PlayerState['houseType']) => {
+  if (type === 'clay') return t(locale, 'ui.houseClay')
+  if (type === 'stone') return t(locale, 'ui.houseStone')
+  return t(locale, 'ui.houseWood')
+}
+
+const workerDestinationLabel = (locale: Locale, destination: string): string => {
+  if (destination === 'home') return t(locale, 'log.workerDestinationHome')
+  if (destination === 'reserve') return t(locale, 'log.workerDestinationReserve')
+  if (destination === 'supply') return t(locale, 'log.workerDestinationSupply')
+  return destination
+}
+
 const resolveAccumulationTarget = (
   locale: Locale,
   params: Record<string, unknown>,
@@ -359,6 +372,16 @@ export const prepareLogEntry = (
     if (params.declined === true) details.push(t(locale, 'log.cardTriggerDeclined'))
     params.detail = details.length ? ` (${details.join(locale === 'zh' ? '，' : ', ')})` : ''
   }
+  if (params && entry.key === 'log.futureMeepleResolved') {
+    if (params.roomType === 'wood' || params.roomType === 'clay' || params.roomType === 'stone') {
+      params.roomType = ` ${houseTypeLabel(locale, params.roomType)}`
+    } else {
+      params.roomType = ''
+    }
+  }
+  if (params && entry.key === 'log.workerReturned' && typeof params.destination === 'string') {
+    params.destination = workerDestinationLabel(locale, params.destination)
+  }
   if (
     params &&
     (entry.key === 'log.playImprovement' ||
@@ -553,15 +576,10 @@ export const prepareLogEntry = (
       )
     }
     if (effectData.renovate) {
-      const houseLabel = (type: PlayerState['houseType']) => {
-        if (type === 'clay') return t(locale, 'ui.houseClay')
-        if (type === 'stone') return t(locale, 'ui.houseStone')
-        return t(locale, 'ui.houseWood')
-      }
       effects.push(
         t(locale, 'log.effectRenovate', {
-          from: houseLabel(effectData.renovate.from),
-          to: houseLabel(effectData.renovate.to),
+          from: houseTypeLabel(locale, effectData.renovate.from),
+          to: houseTypeLabel(locale, effectData.renovate.to),
         }),
       )
     }

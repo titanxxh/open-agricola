@@ -300,4 +300,35 @@ describe('ActionLog', () => {
     expect(text).not.toContain('actions.forest.name')
     expect(text).not.toContain('replacement')
   })
+
+  it('localizes future worker room types and worker return destinations', () => {
+    const { container } = render(
+      <ActionLog
+        locale="zh"
+        currentRound={2}
+        log={[
+          {
+            key: 'log.futureMeepleResolved',
+            params: {
+              player: '玩家A',
+              cardId: 'B157_Salter',
+              round: 6,
+              roomType: 'clay',
+              resources: { food: 2 },
+            },
+          },
+          {
+            key: 'log.workerReturned',
+            params: { destination: 'home' },
+          },
+        ]}
+      />,
+    )
+
+    const text = container.textContent ?? ''
+    expect(text).toContain('黏土')
+    expect(text).toContain('回收工人回家')
+    expect(text).not.toContain('clay')
+    expect(text).not.toContain('home')
+  })
 })

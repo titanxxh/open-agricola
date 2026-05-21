@@ -306,9 +306,6 @@ const mapCardStackChanged = (event: CardStackChangedEvent): LogEntry => ({
   },
 })
 
-const futureRoomTypeLabel = (roomType: FutureMeepleResolvedEvent['roomType']): string =>
-  roomType ? ` ${roomType}` : ''
-
 const mapFutureMeepleResolved = (
   event: FutureMeepleResolvedEvent,
   ctx: EventLogMapperContext,
@@ -318,7 +315,7 @@ const mapFutureMeepleResolved = (
     player: playerName(ctx, event.playerId),
     cardId: event.cardId,
     round: event.round,
-    roomType: futureRoomTypeLabel(event.roomType),
+    roomType: event.roomType ?? '',
     resources: resourceSuffix(event.resources),
   },
 })
