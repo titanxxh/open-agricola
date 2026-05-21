@@ -66,6 +66,10 @@ const clientFixtureMatrix = {
     },
   },
   'resource.paid': {
+    notification: {
+      mapped: { ...base, type: 'resource.paid', resources: { wood: 1 }, paymentFor: 'room' },
+      silent: { ...base, id: 'paid-empty-notification', seq: 2, type: 'resource.paid', resources: {}, paymentFor: 'bonus', bonusSources: ['A1_Test'] },
+    },
     highlight: {
       mapped: { ...base, type: 'resource.paid', sourceActionId: 'construct', resources: { wood: 1 }, paymentFor: 'room' },
       silent: { ...base, id: 'paid-no-action', seq: 2, type: 'resource.paid', resources: { wood: 1 }, paymentFor: 'bonus' },
@@ -231,6 +235,19 @@ describe('public event notifications', () => {
 
     expect(publicEventMappingPolicy['card.stackChanged'].notification.mode).toBe('conditional')
     expect(collectPublicEventNotifications([event], 'zh')).toEqual([])
+  })
+
+  it('keeps empty resource payment notifications silent', () => {
+    const event = {
+      ...base,
+      type: 'resource.paid',
+      resources: {},
+      paymentFor: 'bonus',
+      bonusSources: ['A1_Test'],
+    } satisfies GameEvent
+
+    expect(publicEventMappingPolicy['resource.paid'].notification.mode).toBe('conditional')
+    expect(collectPublicEventNotifications([event], 'en')).toEqual([])
   })
 
   it('uses a minus sign for card stack take notifications', () => {

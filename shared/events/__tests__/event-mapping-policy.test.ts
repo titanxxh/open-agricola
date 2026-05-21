@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import * as path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { eventsToLogEntries } from '../log-mapper'
-import { privateEventMappingPolicy, publicEventMappingPolicy } from '../event-mapping-policy'
+import { isPublicEventReplayable, privateEventMappingPolicy, publicEventMappingPolicy } from '../event-mapping-policy'
 import type { GameEvent } from '../../contract/events'
 import type { PrivateGameEvent } from '../../contract/private-events'
 
@@ -161,6 +161,10 @@ const publicEventFixtureMatrix = {
     },
   },
   'resource.paid': {
+    notification: {
+      mapped: { ...base, type: 'resource.paid', resources: { wood: 1 }, paymentFor: 'room' },
+      silent: { ...base, id: 'paid-empty-notification', seq: 2, type: 'resource.paid', resources: {}, paymentFor: 'bonus', bonusSources: ['A1_Test'] },
+    },
     highlight: {
       mapped: { ...base, type: 'resource.paid', sourceActionId: 'construct', resources: { wood: 1 }, paymentFor: 'room' },
       silent: { ...base, id: 'paid-no-action', seq: 2, type: 'resource.paid', resources: { wood: 1 }, paymentFor: 'bonus' },
@@ -283,6 +287,16 @@ describe('event mapping policy', () => {
         }
       }
     }
+  })
+
+  it('keeps replay helper aligned with metadata-only policy entries', () => {
+    const replayable = { ...base, type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'supply' }, to: { kind: 'player', playerId: 'p1' }, reason: 'gain' } satisfies GameEvent
+    const metadataOnly = { ...base, type: 'card.stateChanged', cardId: 'B21_HayloftBarn', key: 'food', value: 3, targetPlayerId: 'p1' } satisfies GameEvent
+
+    expect(publicEventMappingPolicy[replayable.type].replay).toBe('replayable')
+    expect(isPublicEventReplayable(replayable)).toBe(true)
+    expect(publicEventMappingPolicy[metadataOnly.type].replay).toBe('metadataOnly')
+    expect(isPublicEventReplayable(metadataOnly)).toBe(false)
   })
 
   it('documents conditional log mapping for existing event shapes', () => {

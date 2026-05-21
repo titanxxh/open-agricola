@@ -134,7 +134,9 @@ const messageForPublicEvent = (event: GameEvent, locale: Locale): PublicEventNot
     }
   }
   if (event.type === 'resource.paid') {
-    const paid = resourceText(positiveResources(event.resources), locale)
+    const resources = positiveResources(event.resources)
+    if (Object.keys(resources).length === 0) return null
+    const paid = resourceText(resources, locale)
     return {
       id: event.id,
       kind: 'payment',

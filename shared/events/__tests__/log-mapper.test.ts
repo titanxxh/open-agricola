@@ -660,7 +660,7 @@ describe('eventsToLogEntries', () => {
       { key: 'log.cardSwappedWithBoard', params: { player: 'Alice', fromCardId: 'A1_FromHand', toCardId: 'A2_FromBoard' } },
       { key: 'log.cardStackChanged', params: { cardId: 'B48_ForestStone', resources: { wood: 2 }, delta: 2, reason: 'store' } },
       { key: 'log.cardInfoboxChanged', params: { cardId: 'B48_ForestStone', text: '2 wood' } },
-      { key: 'log.cardTriggered', params: { cardId: 'B48_ForestStone', detail: ' (Forest, replacement, optional, declined)' } },
+      { key: 'log.cardTriggered', params: { cardId: 'B48_ForestStone', triggerAction: 'Forest', replacement: true, optional: true, declined: true } },
     ])
   })
 

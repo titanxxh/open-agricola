@@ -284,17 +284,14 @@ const mapCardTriggered = (
   event: CardTriggeredEvent,
   ctx: EventLogMapperContext,
 ): LogEntry => {
-  const detailParts = [
-    ...(event.triggerActionId ? [actionName(ctx, event.triggerActionId)] : []),
-    ...(event.replacement ? ['replacement'] : []),
-    ...(event.optional ? ['optional'] : []),
-    ...(event.accepted === false ? ['declined'] : []),
-  ].filter((part): part is string => typeof part === 'string' && part.length > 0)
   return {
     key: 'log.cardTriggered',
     params: {
       cardId: event.cardId,
-      detail: detailParts.length ? ` (${detailParts.join(', ')})` : '',
+      ...(event.triggerActionId ? { triggerAction: actionName(ctx, event.triggerActionId) } : {}),
+      ...(event.replacement ? { replacement: true } : {}),
+      ...(event.optional ? { optional: true } : {}),
+      ...(event.accepted === false ? { declined: true } : {}),
     },
   }
 }
