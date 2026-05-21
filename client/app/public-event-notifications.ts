@@ -5,7 +5,7 @@ import { t, type Locale } from '../../shared/i18n'
 
 export type PublicEventNotification = {
   id: string
-  kind: 'resource' | 'payment' | 'action' | 'future' | 'farm'
+  kind: 'resource' | 'payment' | 'action' | 'future' | 'farm' | 'card'
   message: string
 }
 
@@ -189,6 +189,64 @@ const messageForPublicEvent = (event: GameEvent, locale: Locale): PublicEventNot
       message: locale === 'zh' ? `已安排未来工人：${event.cardId}` : `Future worker queued: ${event.cardId}`,
     }
   }
+  if (event.type === 'futureMeeple.removed') {
+    return {
+      id: event.id,
+      kind: 'future',
+      message: locale === 'zh' ? `移除未来工人：${event.cardId}` : `Future worker removed: ${event.cardId}`,
+    }
+  }
+  if (event.type === 'futureMeeple.resolved') {
+    return {
+      id: event.id,
+      kind: 'future',
+      message: locale === 'zh' ? `未来工人执行：${event.cardId}` : `Future worker resolved: ${event.cardId}`,
+    }
+  }
+  if (event.type === 'worker.promoted') {
+    return {
+      id: event.id,
+      kind: 'action',
+      message: locale === 'zh' ? `新生工人成年：${event.workerId}` : `Newborn worker promoted: ${event.workerId}`,
+    }
+  }
+  if (event.type === 'card.infoboxChanged') {
+    return {
+      id: event.id,
+      kind: 'card',
+      message: locale === 'zh'
+        ? `卡牌标记：${event.cardId}：${event.text}`
+        : `Card note: ${event.cardId}: ${event.text}`,
+    }
+  }
+  if (event.type === 'card.stackChanged') {
+    const resources = positiveResources(event.resources ?? {})
+    if (Object.keys(resources).length === 0) return null
+    const sign = (typeof event.delta === 'number' && event.delta < 0) || event.reason === 'take' ? '-' : '+'
+    return {
+      id: event.id,
+      kind: 'card',
+      message: locale === 'zh'
+        ? `卡牌资源：${event.cardId} ${sign} ${resourceText(resources, locale)}`
+        : `Card resources: ${event.cardId} ${sign} ${resourceText(resources, locale)}`,
+    }
+  }
+  if (event.type === 'card.swappedWithBoard') {
+    return {
+      id: event.id,
+      kind: 'card',
+      message: locale === 'zh'
+        ? `卡牌交换：${event.fromPlayerCardId} -> ${event.toPlayerCardId}`
+        : `Card swapped: ${event.fromPlayerCardId} -> ${event.toPlayerCardId}`,
+    }
+  }
+  if (event.type === 'card.returnedToBoard') {
+    return {
+      id: event.id,
+      kind: 'card',
+      message: locale === 'zh' ? `卡牌归还：${event.cardId}` : `Card returned: ${event.cardId}`,
+    }
+  }
   if (event.type === 'farm.fenceBuilt') {
     return {
       id: event.id,
@@ -279,6 +337,12 @@ export const collectPublicEventHighlightTargets = (
     if (event.type === 'farm.stableBuilt') {
       for (const stable of event.stables) {
         pushFarmTile({ playerId: stable.playerId, key: `${stable.row}-${stable.col}` })
+      }
+      continue
+    }
+    if (event.type === 'farm.renovated') {
+      for (const room of event.rooms) {
+        pushFarmTile({ playerId: event.playerId, key: `${room.row}-${room.col}` })
       }
       continue
     }
