@@ -112,7 +112,7 @@
 3. ~~增加 batch resource exchange / resource quantity selection，用于 BGA SPECIAL_EFFECT 风格的 discard/receive 交互。~~ ✅ 已落地：`resource-batch-exchange-select` 支持私有 prompt redaction、HTTP/WS commit、E78 原子 discard/receive、UI 面板和 replay 回放。
 4. ~~为“从多个替换中选一个”的卡增加 TradeModifier group 限制。~~ ✅ 已落地：`Trade` / `TradeModifier` 支持 `groupId` + `groupMax`，payment 枚举在 action-scope、unit-scope 和最终组合合并时按组累计 `times`，`E60_WorkingGloves` 的四个职业支付替代共享 `groupMax: 1`，避免一次职业支付内叠加多个替换。
 5. ~~增加后端权威的 action-space reveal/exclusive-use 支持。~~ ✅ 已落地：ActionSpace 持有 `exclusiveUse`，round start 统一 emit `action.revealed` / `action.exclusiveUseCleared`，B23 使用该机制。
-6. 扩大 accumulation-space partial-take 语义的复用范围；当前 `collect` 已支持指定行动格、资源和数量，`B81_Handcart` 已从行动格移除资源。
+6. ~~扩大 accumulation-space partial-take 语义的复用范围；当前 `collect` 已支持指定行动格、资源和数量，`B81_Handcart` 已从行动格移除资源。~~ ✅ 已落地：新增 `createPartialTakeFromSpaceLeaf`，统一生成 `collect` partial-take leaf、choice label metadata 和可选 effect preview；`A82_WorkCertificate`、`B81_Handcart`、`E5_NightLoot` 已迁移到共享 helper，`collect` 执行语义不变。
 7. ~~为 room/action bonus 增加 scope，避免 per-room 和 total-room cost modifier 双重应用~~ ✅ 已落地：`ComplexCost` 统一形状（`fees / unitFee + nb / trades / bonuses`），`Trade.scope: 'action' \| 'unit'` + `TradeModifier.scope` 区分 per-action 资源池转换和 per-unit cost row 有序替换（A123_FrameBuilder construct、D15_ClaySupports、B145_BrushwoodCollector construct 分支已迁移，B145 使用 `replaceUpTo` 覆盖 1/2 reed 行）；construct / renovation / fencing / plow / occupation / pay 全部走单一 `computeAllBuyableCombinations`；条件评估拆成 `evaluateStaticConditions` + `evaluateConditions(_, _, nb)` 两层（`getModifiersForCostType` static-only，nb-aware gate 延后到 enumerate）。
 8. 增加通用处理：“before trigger 给资源后，原行动可能变得可达/mandatory”。
 9. 增加共享 lessons action-space id helper，覆盖 `lessons`、`lessons-3`、`lessons-4`。
@@ -407,7 +407,7 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 | `A79_GardenHoe` | 已对齐 |  |
 | `A80_StoneTongs` | 已对齐 |  |
 | `A81_InterimStorage` | 已对齐 |  |
-| `A82_WorkCertificate` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
+| `A82_WorkCertificate` | 已接受差异 | BGA banned，但 OA 按产品策略保留；runtime 使用共享 partial-take helper 从 accumulation space 移除资源 |
 | `A83_ShepherdsCrook` | 已对齐 |  |
 | `A84_Silage` | 已对齐 |  |
 | `A85_Homekeeper` | 已对齐 |  |
@@ -586,7 +586,7 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 | `B78_ReedBelt` | 已对齐 |  |
 | `B79_Corf` | 已对齐 |  |
 | `B80_HardPorcelain` | 已对齐 |  |
-| `B81_Handcart` | 已对齐 | 使用 `collect` partial-take 从 accumulation space 移除 1 个资源并记录 `resource.moved` 来源 |
+| `B81_Handcart` | 已对齐 | 使用共享 partial-take helper 生成 `collect` leaf，从 accumulation space 移除 1 个资源并记录 `resource.moved` 来源 |
 | `B82_ValueAssets` | 已对齐 |  |
 | `B83_MuddyPuddles` | 已对齐 |  |
 | `B84_AcornsBasket` | 已对齐 |  |
@@ -1050,7 +1050,7 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 | `E2_RenovationMaterials` | 已对齐 |  |
 | `E3_TeaTime` | 已对齐 |  |
 | `E4_Thunderbolt` | 已对齐 |  |
-| `E5_NightLoot` | 已接受差异 | BGA passing=true 已按 session 测试刻意省略 |
+| `E5_NightLoot` | 已接受差异 | BGA passing=true 已按 session 测试刻意省略；onBuy 使用共享 partial-take helper 从 accumulation space 移除资源 |
 | `E6_Recount` | 已对齐 |  |
 | `E7_Pumpernickel` | 已对齐 |  |
 | `E8_FarmersMarket` | 已对齐 |  |
