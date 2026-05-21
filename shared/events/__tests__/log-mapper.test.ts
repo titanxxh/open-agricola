@@ -784,7 +784,7 @@ describe('eventsToLogEntries', () => {
       { key: 'log.workStarted' },
       { key: 'log.workerPromoted', params: { player: 'Alice' } },
       { key: 'log.workerReturned', params: { destination: 'home' } },
-      { key: 'log.futureMeepleResolved', params: { player: 'Alice', cardId: 'B157_Salter', round: 6, roomType: ' clay', resources: { food: 2 } } },
+      { key: 'log.futureMeepleResolved', params: { player: 'Alice', cardId: 'B157_Salter', round: 6, roomType: 'clay', resources: { food: 2 } } },
       { key: 'log.futureMeepleRemoved', params: { player: 'Alice', cardId: 'B157_Salter', rounds: '6, 7' } },
       { key: 'log.farmAnimalMoved', params: { player: 'Alice', animals: { sheep: 2, cattle: 1 } } },
       { key: 'log.farmFenceConsumed', params: { player: 'Alice', count: 3 } },
