@@ -1,5 +1,6 @@
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { createPartialTakeFromSpaceLeaf } from '../helpers/partial-take'
 import { B81_Handcart } from '../../cards-display/B/B81_Handcart'
 
 const CARD_ID = B81_Handcart.id
@@ -25,14 +26,12 @@ export const B81_Handcart_impl = {
         if (!threshold) continue
         if ((space.gainPerRound[resource] ?? 0) <= 0) continue
         if ((space.resources[resource] ?? 0) < threshold) continue
-        choices.push({
-          type: 'leaf',
-          actionId: 'collect',
+        choices.push(createPartialTakeFromSpaceLeaf({
           sourceCard: CARD_ID,
-          actionContext: { spaceId: space.id, resource, amount: 1 },
-          choiceLabelKey: 'ui.interactionTakeFromSpace',
-          choiceLabelParams: { resource, spaceId: space.id, spaceName: space.nameKey },
-        })
+          spaceId: space.id,
+          spaceName: space.nameKey,
+          resource,
+        }))
       }
     }
 
