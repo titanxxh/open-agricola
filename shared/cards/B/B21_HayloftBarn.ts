@@ -61,8 +61,9 @@ const grainGainListener: CardListenerRegistration = {
   actions: ['collect', 'gain', 'receive', 'exchange'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.sourceCard === CARD_ID) return
-    const grainGained = hasExchangeGained(context.transactionEvents, 'grain') ||
-      hasResourceMovedToPlayer(context.transactionEvents, 'grain', context.player.id)
+    const events = context.actionEvents ?? context.transactionEvents
+    const grainGained = hasExchangeGained(events, 'grain') ||
+      hasResourceMovedToPlayer(events, 'grain', context.player.id)
     if (!grainGained) return
     const foodCount = readCardExtraData<number>(context.player, CARD_ID, 'foodCount') ?? 0
     if (foodCount <= 0) return
