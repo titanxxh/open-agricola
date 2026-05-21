@@ -828,6 +828,8 @@ export const zh = {
     action: '{player} 执行 {action}',
     actionDetail: '{player} 选择 {action}{detail}',
     actionRevealed: '第 {roundSlot} 回合行动揭示：{action}',
+    actionAccumulated: '{action} 累积 {resources}',
+    resourceAccumulated: '{target} 累积 {resources}',
     actionExclusiveUseSet: '{player} 通过 {cardId} 预定 {action}',
     actionExclusiveUseCleared: '{player} 对 {action} 的预定结束',
     reorganizeDiscard: '{player} 丢弃 {resources}',

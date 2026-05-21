@@ -62,6 +62,12 @@ const resourceText = (resources: Partial<Resource>, locale: Locale): string =>
     .map((key) => `${resources[key]} ${t(locale, `resources.${key}`)}`)
     .join(' · ')
 
+const accumulationTargetText = (event: Extract<GameEvent, { type: 'resource.accumulated' }>): string => {
+  if (event.to.kind === 'actionSpace') return event.to.spaceId
+  if (event.to.kind === 'card') return event.to.cardId
+  return `round ${event.to.round}`
+}
+
 const actionLabel = (event: GameEvent): string =>
   'actionId' in event ? event.actionId : event.sourceActionId ?? ''
 
@@ -135,6 +141,30 @@ const messageForPublicEvent = (event: GameEvent, locale: Locale): PublicEventNot
       message: locale === 'zh' ? `支付资源：${paid}` : `Resources paid: ${paid}`,
     }
   }
+  if (event.type === 'action.accumulated') {
+    const resources = positiveResources(event.resources)
+    if (Object.keys(resources).length === 0) return null
+    return {
+      id: event.id,
+      kind: 'resource',
+      message: locale === 'zh'
+        ? `行动格积累：${event.spaceId} + ${resourceText(resources, locale)}`
+        : `Action accumulated: ${event.spaceId} + ${resourceText(resources, locale)}`,
+    }
+  }
+  if (event.type === 'resource.accumulated') {
+    if (event.silent) return null
+    const resources = positiveResources(event.resources)
+    if (Object.keys(resources).length === 0) return null
+    const target = accumulationTargetText(event)
+    return {
+      id: event.id,
+      kind: 'resource',
+      message: locale === 'zh'
+        ? `资源积累：${target} + ${resourceText(resources, locale)}`
+        : `Resource accumulated: ${target} + ${resourceText(resources, locale)}`,
+    }
+  }
   if (event.type === 'action.revealed') {
     return {
       id: event.id,
@@ -202,6 +232,16 @@ export const collectPublicEventHighlightTargets = (
     if (event.type === 'worker.placed') {
       pushAction(event.spaceId)
       pushAction(event.sourceActionId)
+      continue
+    }
+    if (event.type === 'action.accumulated') {
+      if (Object.keys(positiveResources(event.resources)).length === 0) continue
+      pushAction(event.spaceId)
+      continue
+    }
+    if (event.type === 'resource.accumulated') {
+      if (Object.keys(positiveResources(event.resources)).length === 0) continue
+      if (event.to.kind === 'actionSpace') pushAction(event.to.spaceId)
       continue
     }
     if (event.type === 'resource.moved') {
@@ -333,6 +373,27 @@ export const collectPublicEventResourceAnimations = (
         resources: event.resources,
         from: { kind: 'playerResources', playerId: event.actorPlayerId },
         to,
+      })
+      continue
+    }
+    if (event.type === 'action.accumulated') {
+      pushAnimation(animations, seen, {
+        id: `${event.id}:accumulate:0`,
+        kind: 'move',
+        resources: event.resources,
+        from: { kind: 'supply' },
+        to: { kind: 'actionSpace', actionId: event.spaceId },
+      })
+      continue
+    }
+    if (event.type === 'resource.accumulated') {
+      if (event.to.kind !== 'actionSpace') continue
+      pushAnimation(animations, seen, {
+        id: `${event.id}:accumulate:0`,
+        kind: 'move',
+        resources: event.resources,
+        from: { kind: 'supply' },
+        to: { kind: 'actionSpace', actionId: event.to.spaceId },
       })
     }
   }

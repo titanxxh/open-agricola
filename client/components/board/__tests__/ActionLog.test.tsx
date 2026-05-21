@@ -162,4 +162,59 @@ describe('ActionLog', () => {
     expect(onSelectReplayEntry).toHaveBeenCalledTimes(1)
     expect(onSelectReplayEntry.mock.calls[0]?.[0].key).toBe('event-active')
   })
+
+  it('renders accumulation log resources without leaking raw placeholders', () => {
+    const { container } = render(
+      <ActionLog
+        locale="en"
+        currentRound={2}
+        log={[
+          {
+            key: 'log.actionAccumulated',
+            params: { action: 'actions.forest.name', resources: { wood: 3 } },
+          },
+          {
+            key: 'log.resourceAccumulated',
+            params: { target: 'actionSpace', action: 'actions.fishing.name', resources: { food: 1 } },
+          },
+          {
+            key: 'log.resourceAccumulated',
+            params: {
+              target: 'card',
+              player: 'Alice',
+              cardId: 'Major_ClayOven',
+              resources: { food: 2 },
+            },
+          },
+          {
+            key: 'log.resourceAccumulated',
+            params: { target: 'roundCard', round: 7, resources: { stone: 1 } },
+          },
+          {
+            key: 'log.resourceAccumulated',
+            params: { target: 'roundCard', round: Number.NaN, resources: { clay: 1 } },
+          },
+        ]}
+      />,
+    )
+
+    const text = container.textContent ?? ''
+    expect(text).toContain('Forest')
+    expect(text).toContain('Fishing')
+    expect(text).toContain('Clay Oven')
+    expect(text).toContain('Round 7')
+    expect(text).toContain('round card')
+    expect(text).not.toContain('log.actionAccumulated')
+    expect(text).not.toContain('log.resourceAccumulated')
+    expect(text).not.toContain('[object Object]')
+    expect(text).not.toContain('{resources}')
+    expect(text).not.toContain('Round NaN')
+    expect(text).not.toContain('第 NaN')
+
+    expect(container.querySelector('[data-resource="wood"][data-amount="3"]')).not.toBeNull()
+    expect(container.querySelector('[data-resource="food"][data-amount="1"]')).not.toBeNull()
+    expect(container.querySelector('[data-resource="food"][data-amount="2"]')).not.toBeNull()
+    expect(container.querySelector('[data-resource="stone"][data-amount="1"]')).not.toBeNull()
+    expect(container.querySelector('[data-resource="clay"][data-amount="1"]')).not.toBeNull()
+  })
 })

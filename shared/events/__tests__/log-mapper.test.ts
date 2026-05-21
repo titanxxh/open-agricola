@@ -220,6 +220,109 @@ describe('eventsToLogEntries', () => {
     ])
   })
 
+  it('maps accumulation events to log entries', () => {
+    const events = [
+      {
+        schemaVersion: 1,
+        id: 'action-acc',
+        seq: 1,
+        round: 2,
+        phase: 'work',
+        visibility: 'public',
+        type: 'action.accumulated',
+        spaceId: 'forest',
+        resources: { wood: 3, clay: 0 },
+      },
+      {
+        schemaVersion: 1,
+        id: 'resource-space',
+        seq: 2,
+        round: 2,
+        phase: 'work',
+        visibility: 'public',
+        type: 'resource.accumulated',
+        resources: { food: 1 },
+        to: { kind: 'actionSpace', spaceId: 'fishing' },
+      },
+      {
+        schemaVersion: 1,
+        id: 'resource-card',
+        seq: 3,
+        round: 2,
+        phase: 'work',
+        visibility: 'public',
+        actorPlayerId: 'p1',
+        type: 'resource.accumulated',
+        resources: { food: 2 },
+        to: { kind: 'card', playerId: 'p1', cardId: 'B48_ForestStone' },
+      },
+      {
+        schemaVersion: 1,
+        id: 'resource-round',
+        seq: 4,
+        round: 2,
+        phase: 'work',
+        visibility: 'public',
+        type: 'resource.accumulated',
+        resources: { stone: 1 },
+        to: { kind: 'roundCard', round: 7 },
+        silent: true,
+      },
+    ] satisfies GameEvent[]
+
+    expect(eventsToLogEntries(events, {
+      playerNames: { p1: 'Alice' },
+      actionNames: { forest: 'Forest', fishing: 'Fishing' },
+    })).toEqual([
+      {
+        key: 'log.resourceAccumulated',
+        params: { target: 'roundCard', round: 7, resources: { stone: 1 } },
+      },
+      {
+        key: 'log.resourceAccumulated',
+        params: { target: 'card', cardId: 'B48_ForestStone', player: 'Alice', resources: { food: 2 } },
+      },
+      {
+        key: 'log.resourceAccumulated',
+        params: { target: 'actionSpace', action: 'Fishing', resources: { food: 1 } },
+      },
+      {
+        key: 'log.actionAccumulated',
+        params: { action: 'Forest', resources: { wood: 3 } },
+      },
+    ])
+  })
+
+  it('does not map empty accumulation resources', () => {
+    const events = [
+      {
+        schemaVersion: 1,
+        id: 'empty-action',
+        seq: 1,
+        round: 2,
+        phase: 'work',
+        visibility: 'public',
+        type: 'action.accumulated',
+        spaceId: 'forest',
+        resources: { wood: 0 },
+      },
+      {
+        schemaVersion: 1,
+        id: 'empty-resource',
+        seq: 2,
+        round: 2,
+        phase: 'work',
+        visibility: 'public',
+        type: 'resource.accumulated',
+        resources: {},
+        to: { kind: 'card', cardId: 'B48_ForestStone' },
+        silent: true,
+      },
+    ] satisfies GameEvent[]
+
+    expect(eventsToLogEntries(events, { playerNames: {} })).toEqual([])
+  })
+
   it('maps future meeple source summary logs', () => {
     const event = {
       schemaVersion: 1,
