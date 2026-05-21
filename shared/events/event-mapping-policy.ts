@@ -40,6 +40,7 @@ const silentPublicCues = (log: EventConsumerMappingPolicy): PublicEventMappingPo
 const boardHighlight = 'payload contains a stable board target'
 const noAnimation = 'event changes board state without moving resources between supported endpoints'
 const positiveResources = 'payload contains positive resources'
+const metadataOnlyPublicEventTypes = new Set<GameEvent['type']>(['card.stateChanged'])
 
 export const publicEventMappingPolicy = {
   'resource.moved': {
@@ -65,7 +66,7 @@ export const publicEventMappingPolicy = {
   },
   'resource.paid': {
     log: mapped(),
-    notification: mapped(),
+    notification: conditional(positiveResources, 'empty payment events are bonus/card-return metadata and do not notify'),
     highlight: conditional('source action, action-space target, or action-space payment source exists', 'payment has no action-space endpoint to highlight'),
     resourceAnimation: conditional('actor fallback or paymentSources endpoint is supported', 'payment source or destination cannot be rendered as resource animation endpoints'),
     replay: 'replayable',
@@ -279,3 +280,6 @@ export const privateEventMappingPolicy = {
     reason: 'draft state is per-viewer private state',
   },
 } satisfies Record<PrivateGameEvent['type'], PrivateEventMappingPolicy>
+
+export const isPublicEventReplayable = (event: GameEvent): boolean =>
+  !metadataOnlyPublicEventTypes.has(event.type)

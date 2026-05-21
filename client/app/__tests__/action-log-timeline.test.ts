@@ -59,6 +59,21 @@ const cardStateChangedEvent = (id: string, seq: number): GameEvent => ({
   value: 3,
 })
 
+const silentReplayableEvent = (id: string, seq: number): GameEvent => ({
+  schemaVersion: 1,
+  id,
+  seq,
+  round: 2,
+  phase: 'work',
+  visibility: 'public',
+  actorPlayerId: 'p1',
+  type: 'resource.moved',
+  resources: { wood: 1 },
+  from: { kind: 'card', cardId: 'A1_Test' },
+  to: { kind: 'card', cardId: 'A2_Test' },
+  reason: 'cardEffect',
+})
+
 const replayEntry = (
   overrides: Partial<ReplayTimelineEntry> = {},
 ): ReplayTimelineEntry => {
@@ -187,7 +202,7 @@ describe('buildActionLogTimelineRows', () => {
   })
 
   it('uses a structured fallback for replayable silent events without logs or notifications', () => {
-    const event = cardStateChangedEvent('evt-card-state', 3)
+    const event = silentReplayableEvent('evt-silent-replayable', 3)
     const buckets = buildActionLogTimelineRows({
       entries: [replayEntryForEvent(event, 1)],
       legacyLog: [],
@@ -204,8 +219,22 @@ describe('buildActionLogTimelineRows', () => {
       logEntry: null,
       replayable: true,
     })
-    expect(row?.label).toContain('card.stateChanged')
-    expect(row?.label).toContain('B21_HayloftBarn')
+    expect(row?.label).toContain('resource.moved')
+    expect(row?.label).toContain('seq=3')
+  })
+
+  it('omits metadata-only replay entries without logs or notifications', () => {
+    const event = cardStateChangedEvent('evt-card-state', 3)
+    const buckets = buildActionLogTimelineRows({
+      entries: [{ ...replayEntryForEvent(event, 1), replayable: false }],
+      legacyLog: [],
+      currentRound: 2,
+      locale: 'en',
+      playerNames: { p1: 'Alice' },
+      actionNames: {},
+    })
+
+    expect(buckets).toEqual([])
   })
 
   it('does not attach payment context across archive packet boundaries', () => {

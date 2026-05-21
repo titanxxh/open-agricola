@@ -1,4 +1,5 @@
 import type { GameEvent, PublicEventArchivePacket } from '../../shared/contract/events'
+import { isPublicEventReplayable } from '../../shared/events/event-mapping-policy'
 
 export type ReplayTimelineStatus = 'active' | 'canceled' | 'missing'
 export type ReplayTimelineFilter = 'all' | 'active' | 'canceled'
@@ -81,7 +82,7 @@ export const buildReplayTimeline = ({
           eventSeq,
           status: event ? 'active' : 'missing',
           payloadSource: event ? 'currentEvents' : 'missing',
-          replayable: !!event,
+          replayable: event ? isPublicEventReplayable(event) : false,
         })
       })
       continue
@@ -93,7 +94,7 @@ export const buildReplayTimeline = ({
       match.event = event
       match.status = 'canceled'
       match.payloadSource = 'canceledArchive'
-      match.replayable = true
+      match.replayable = isPublicEventReplayable(event)
       match.canceledByPacketSeq = packet.packetSeq
       match.cancelReason = packet.reason
     })

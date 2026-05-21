@@ -17,6 +17,20 @@ const event = (id: string, seq: number, type: GameEvent['type'] = 'resource.move
   reason: 'collect',
 } as GameEvent)
 
+const metadataOnlyEvent = (id: string, seq: number): GameEvent => ({
+  schemaVersion: 1,
+  id,
+  seq,
+  round: 1,
+  phase: 'work',
+  visibility: 'public',
+  targetPlayerId: 'p1',
+  type: 'card.stateChanged',
+  cardId: 'B21_HayloftBarn',
+  key: 'food',
+  value: 3,
+})
+
 const committed = (
   packetSeq: number,
   refs: Array<{ id: string; seq: number }>,
@@ -137,6 +151,28 @@ describe('buildReplayTimeline', () => {
         replayable: true,
         canceledByPacketSeq: 2,
       }),
+    ])
+  })
+
+  it('keeps metadata-only events in archive rows but marks them non-replayable', () => {
+    const activeMetadata = metadataOnlyEvent('evt-card-state', 5)
+    const canceledMetadata = metadataOnlyEvent('evt-card-state-canceled', 6)
+    const entries = buildReplayTimeline({
+      events: [activeMetadata],
+      publicEventArchive: [
+        committed(1, [{ id: activeMetadata.id, seq: activeMetadata.seq }]),
+        committed(2, [{ id: canceledMetadata.id, seq: canceledMetadata.seq }]),
+        canceled(3, [canceledMetadata]),
+      ],
+    })
+
+    expect(entries.map((entry) => ({
+      eventId: entry.eventId,
+      status: entry.status,
+      replayable: entry.replayable,
+    }))).toEqual([
+      { eventId: 'evt-card-state', status: 'active', replayable: false },
+      { eventId: 'evt-card-state-canceled', status: 'canceled', replayable: false },
     ])
   })
 

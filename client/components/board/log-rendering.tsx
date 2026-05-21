@@ -51,6 +51,11 @@ const resolveCardName = (locale: Locale, id: string): CardRef | null => {
 const resolveCardDisplayName = (locale: Locale, id: string) =>
   resolveCardName(locale, id)?.name ?? humanizeCardId(id)
 
+const resolveMaybeTranslationKey = (locale: Locale, value: string): string => {
+  const translated = t(locale, value)
+  return translated === value ? value : translated
+}
+
 const resolveAccumulationTarget = (
   locale: Locale,
   params: Record<string, unknown>,
@@ -342,7 +347,17 @@ export const prepareLogEntry = (
   const params = entry.params ? { ...entry.params } : undefined
   const richParams: Record<string, ReactNode> = {}
   if (params && typeof params.action === 'string') {
-    params.action = t(locale, params.action)
+    params.action = resolveMaybeTranslationKey(locale, params.action)
+  }
+  if (params && entry.key === 'log.cardTriggered') {
+    const details: string[] = []
+    if (typeof params.triggerAction === 'string' && params.triggerAction) {
+      details.push(resolveMaybeTranslationKey(locale, params.triggerAction))
+    }
+    if (params.replacement === true) details.push(t(locale, 'log.cardTriggerReplacement'))
+    if (params.optional === true) details.push(t(locale, 'log.cardTriggerOptional'))
+    if (params.declined === true) details.push(t(locale, 'log.cardTriggerDeclined'))
+    params.detail = details.length ? ` (${details.join(locale === 'zh' ? '，' : ', ')})` : ''
   }
   if (
     params &&

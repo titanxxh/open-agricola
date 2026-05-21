@@ -245,6 +245,8 @@ const eventLabel = (
   const [notification] = collectPublicEventNotifications([entry.event], locale)
   if (notification) return { logEntry: null, label: notification.message }
 
+  if (!entry.replayable) return { logEntry: null, label: '' }
+
   return { logEntry: null, label: structuredEventSummary(entry.event, playerNames, actionNames) }
 }
 
@@ -273,7 +275,7 @@ export const buildActionLogTimelineRows = ({
   const eventRows: ActionLogTimelineRow[] = [...entries]
     .sort((left, right) =>
       right.packetSeq - left.packetSeq || right.packetLocalIndex - left.packetLocalIndex)
-    .map((entry) => {
+    .flatMap((entry): ActionLogTimelineRow[] => {
       const { logEntry, label } = eventLabel(
         entry,
         locale,
@@ -281,7 +283,8 @@ export const buildActionLogTimelineRows = ({
         actionNames,
         contextualLogEntries.get(entry.key),
       )
-      return {
+      if (!entry.replayable && !logEntry && !label) return []
+      return [{
         kind: 'event',
         key: entry.key,
         entry,
@@ -291,7 +294,7 @@ export const buildActionLogTimelineRows = ({
         status: entry.status,
         replayable: entry.replayable,
         strikethrough: entry.status === 'canceled',
-      }
+      }]
     })
   const visibleLegacyLog = removeReplayDerivedLegacyRows(legacyLog, contextualLogEntries)
   const legacyRows = groupLegacyLog(visibleLegacyLog, currentRound).flatMap((bucket) => bucket.rows)
