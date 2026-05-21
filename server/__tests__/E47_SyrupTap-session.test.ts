@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
+import type { CardListenerContext } from '../../shared/cards/card-listeners'
+import type { DraftGameEvent, ResourceMovedEvent } from '../../shared/contract/events'
+import { E47_SyrupTap_impl } from '../../shared/cards/E/E47_SyrupTap'
 
 import '../../shared/cards/E/E47_SyrupTap'
 import '../../shared/cards/C/C162_ForestOwner'
@@ -21,6 +24,59 @@ describe('E47_SyrupTap session', () => {
     session.loadState(state)
     return session
   }
+
+  const listener = E47_SyrupTap_impl.listeners?.[0]
+
+  const movedWood = (
+    playerId: string,
+    resources: ResourceMovedEvent['resources'] = { wood: 1 },
+  ): DraftGameEvent<'resource.moved'> => ({
+    type: 'resource.moved',
+    resources,
+    from: { kind: 'actionSpace', spaceId: 'forest' },
+    to: { kind: 'player', playerId },
+    reason: 'collect',
+  })
+
+  const listenerContext = (
+    events: DraftGameEvent<'resource.moved'>[],
+    actionEvents?: DraftGameEvent<'resource.moved'>[],
+  ): CardListenerContext => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    return {
+      state,
+      player,
+      space: state.actionSpaces.find((space) => space.id === 'forest')!,
+      actionId: 'collect',
+      phase: 'after',
+      result: { type: 'ok' },
+      transactionEvents: events,
+      ...(actionEvents ? { actionEvents } : {}),
+    }
+  }
+
+  it('falls back to transactionEvents when actionEvents is absent', () => {
+    if (!listener) throw new Error('missing listener')
+    const ctx = listenerContext([movedWood('p1')])
+
+    const result = listener.handler(ctx)
+
+    expect(result?.flow?.type).toBe('leaf')
+    if (result?.flow?.type !== 'leaf') return
+    expect(result.flow.actionId).toBe('future-meeples')
+    expect(result.sourceCard).toBe(CARD_ID)
+  })
+
+  it('ignores stale transaction wood when current actionEvents have no wood', () => {
+    if (!listener) throw new Error('missing listener')
+    const ctx = listenerContext([movedWood('p1')], [movedWood('p1', { clay: 1 })])
+
+    const result = listener.handler(ctx)
+
+    expect(result).toBeUndefined()
+  })
 
   it('collecting wood from forest queues 1 food on next round', () => {
     const session = setup()
