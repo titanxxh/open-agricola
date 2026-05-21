@@ -1,12 +1,15 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { AnimalZone } from '../../domain'
-import type { PlayerState } from '../../contract/types'
+import type { ActionFlow, PlayerState } from '../../contract/types'
+import type { FarmSownEvent } from '../../contract/events'
 import { fieldTopStack } from '../../domain/field'
+import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import type { CardImpl } from '../registry'
 import { B115_TinsmithMaster } from '../../cards-display/B/B115_TinsmithMaster'
 
 const CARD_ID = B115_TinsmithMaster.id
+const SELECTION_EFFECT = 'B115-tinsmith-master-add-additional-good'
 
 /**
  * B115 Tinsmith Master (Occupation):
@@ -14,21 +17,46 @@ const CARD_ID = B115_TinsmithMaster.id
  * EFFECT 1 (passive): Each pasture WITHOUT a stable gets +1 animal capacity.
  *   - Implemented via onComputeAnimalZones
  *
- * EFFECT 2 (after sow): BGA actAddAdditionalGood iterates every freshly sown
- *   field and adds 1 crop to each — no player selection. We mirror this by
- *   bumping every fresh field's top stack remaining by 1 directly in the
- *   after-sow listener.
+ * EFFECT 2 (after sow): Optionally add 1 crop to selected freshly sown fields.
  */
 
-/** Initial remaining values for each crop type when freshly sown. */
-const INITIAL_REMAINING: Record<string, number> = { grain: 3, vegetable: 2 }
-
-/** Detect fields that were freshly sown (top stack at full initial remaining). */
-const getFreshlySownFields = (context: CardListenerContext) =>
-  context.player.fields.filter((f) => {
-    const top = fieldTopStack(f)
-    return !!top && top.remaining === INITIAL_REMAINING[top.kind]
+const getFreshlySownFields = (context: CardListenerContext) => {
+  const cropByPosition = new Map(
+    (context.actionEvents ?? context.transactionEvents)
+      .flatMap((event) =>
+        event.type === 'farm.sown'
+          ? (event as Pick<FarmSownEvent, 'sows'>).sows
+          : [],
+      )
+      .flatMap((sow) => {
+        const location = sow.location
+        if (location.kind !== 'field') return []
+        if (location.playerId !== context.player.id) return []
+        if (sow.crop !== 'grain' && sow.crop !== 'vegetable') return []
+        return [[`${location.row}-${location.col}`, sow.crop] as const]
+      }),
+  )
+  return context.player.fields.filter((field) => {
+    const crop = cropByPosition.get(`${field.row}-${field.col}`)
+    const top = fieldTopStack(field)
+    return !!crop && !!top && top.kind === crop && top.remaining > 0
   })
+}
+
+registerSelectionEffect(SELECTION_EFFECT, ({ player, positions }) => {
+  const selected = positions.map((key) => {
+    const [r, c] = key.split('-').map(Number)
+    const field = player.fields.find((f) => f.row === r && f.col === c)
+    const top = field ? fieldTopStack(field) : null
+    if (!field || !top) return null
+    return top
+  })
+  const selectedStacks = selected.filter((top): top is NonNullable<typeof top> => top !== null)
+  if (selectedStacks.length !== selected.length) return
+  for (const top of selectedStacks) {
+    top.remaining += 1
+  }
+})
 
 const afterSowListener: CardListenerRegistration = {
   id: 'B115-tinsmith-master-after-sow',
@@ -38,9 +66,21 @@ const afterSowListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const freshFields = getFreshlySownFields(context)
     if (freshFields.length === 0) return
-    for (const field of freshFields) {
-      const top = fieldTopStack(field)
-      if (top) top.remaining += 1
+    return {
+      flow: {
+        type: 'leaf',
+        actionId: 'selection',
+        sourceCard: CARD_ID,
+        optional: true,
+        actionContext: {
+          selectionKind: 'farm-position',
+          selectableTiles: freshFields.map(({ row, col }) => ({ row, col })),
+          minSelections: 1,
+          maxSelections: freshFields.length,
+          selectionEffect: SELECTION_EFFECT,
+        },
+      } satisfies ActionFlow,
+      sourceCard: CARD_ID,
     }
   },
 }
