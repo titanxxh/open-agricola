@@ -7,6 +7,7 @@ import {
   assertKnownGameEventShape,
   assertPublicGameEvent,
 } from './guards'
+import { appendPublicEventCommittedPacket } from './archive'
 
 export type EventEnvelopeContext = {
   actorPlayerId?: string
@@ -105,8 +106,22 @@ export class EventStore {
       return { ...event, id: String(seq), seq }
     })
     committed.forEach(validateGameEvent)
-    state.events.push(...committed)
-    state.nextEventSeq += committed.length
+    const eventsLengthBeforeCommit = state.events.length
+    const nextEventSeqBeforeCommit = state.nextEventSeq
+    const mutableArchiveState = state as GameState & { publicEventArchive: unknown }
+    const archiveBeforeCommit = mutableArchiveState.publicEventArchive
+    const nextArchivePacketSeqBeforeCommit = state.nextPublicEventArchivePacketSeq
+    try {
+      state.events.push(...committed)
+      state.nextEventSeq += committed.length
+      appendPublicEventCommittedPacket(state, committed)
+    } catch (error) {
+      state.events.splice(eventsLengthBeforeCommit)
+      state.nextEventSeq = nextEventSeqBeforeCommit
+      mutableArchiveState.publicEventArchive = archiveBeforeCommit
+      state.nextPublicEventArchivePacketSeq = nextArchivePacketSeqBeforeCommit
+      throw error
+    }
     this.rollbackTransaction()
     return committed
   }
