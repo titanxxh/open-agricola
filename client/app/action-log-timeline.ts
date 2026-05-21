@@ -213,6 +213,21 @@ const removeReplayDerivedLegacyRows = (
   })
 }
 
+const structuredEventSummary = (
+  event: GameEvent,
+  playerNames: Record<string, string>,
+  actionNames?: Record<string, string>,
+): string => {
+  const parts: string[] = [event.type]
+  if (event.actorPlayerId) parts.push(`actor=${playerNames[event.actorPlayerId] ?? event.actorPlayerId}`)
+  if (event.targetPlayerId) parts.push(`target=${playerNames[event.targetPlayerId] ?? event.targetPlayerId}`)
+  if (event.sourceActionId) parts.push(`action=${actionNames?.[event.sourceActionId] ?? event.sourceActionId}`)
+  if (event.sourceCardId) parts.push(`card=${event.sourceCardId}`)
+  if ('cardId' in event && typeof event.cardId === 'string') parts.push(`cardId=${event.cardId}`)
+  parts.push(`seq=${event.seq}`)
+  return parts.join(' · ')
+}
+
 const eventLabel = (
   entry: ReplayTimelineEntry,
   locale: Locale,
@@ -230,7 +245,7 @@ const eventLabel = (
   const [notification] = collectPublicEventNotifications([entry.event], locale)
   if (notification) return { logEntry: null, label: notification.message }
 
-  return { logEntry: null, label: entry.event.type }
+  return { logEntry: null, label: structuredEventSummary(entry.event, playerNames, actionNames) }
 }
 
 const mergeBuckets = (rows: ActionLogTimelineRow[]): ActionLogTimelineBucket[] => {
