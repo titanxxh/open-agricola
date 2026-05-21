@@ -2,13 +2,23 @@ import { resourceKeyList } from '../../shared/contract/state-constants'
 import type { FarmTilePosition, Resource } from '../../shared/contract/types'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
 import { parsePositionKey, positionKey } from '../../shared/domain/farm'
+import type { Locale } from '../../shared/i18n'
 import type {
   PublicEventFenceEdgeHighlightTarget,
   PublicEventFarmTileHighlightTarget,
   PublicEventHighlightTargets,
+  PublicEventNotification,
   PublicEventResourceAnimation,
 } from './public-event-notifications'
-import { maxPublicEventSeq } from './public-event-notifications'
+import {
+  collectPublicEventHighlightTargets,
+  collectPublicEventNotifications,
+  collectPublicEventResourceAnimations,
+  emptyPublicEventHighlightTargets,
+  maxPublicEventSeq,
+} from './public-event-notifications'
+import type { ReplayTimelineEntry } from './replay-timeline'
+import { replayTimelineNamespaceId } from './replay-timeline'
 
 export type WsStatus =
   | { phase: 'idle' }
@@ -40,6 +50,34 @@ export const applyPublicEventCancellationSnapshot = (
   handlers.clearPublicEventFeedback()
   handlers.setLastSeenPublicEventSeq(maxPublicEventSeq(payload.state.events))
   return true
+}
+
+export type ReplayFeedback = {
+  notifications: PublicEventNotification[]
+  highlights: PublicEventHighlightTargets
+  resourceAnimations: PublicEventResourceAnimation[]
+}
+
+export const clearReplayFeedback = (): ReplayFeedback => ({
+  notifications: [],
+  highlights: emptyPublicEventHighlightTargets(),
+  resourceAnimations: [],
+})
+
+export const buildReplayFeedback = (
+  entry: ReplayTimelineEntry | null,
+  locale: Locale,
+): ReplayFeedback => {
+  if (!entry?.event || !entry.replayable || entry.kind !== 'event') return clearReplayFeedback()
+  const idPrefix = `replay:${entry.key}`
+  return {
+    notifications: collectPublicEventNotifications([entry.event], locale, idPrefix),
+    highlights: collectPublicEventHighlightTargets([entry.event]),
+    resourceAnimations: collectPublicEventResourceAnimations([entry.event]).map((animation) => ({
+      ...animation,
+      id: replayTimelineNamespaceId(entry, animation.id),
+    })),
+  }
 }
 
 export type FarmCommitType = 'fence' | 'room' | 'stable' | 'plow' | 'sow'

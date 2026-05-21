@@ -4,6 +4,8 @@ import type { GameEvent } from '../../../shared/contract/events'
 
 import {
   applyPublicEventCancellationSnapshot,
+  buildReplayFeedback,
+  clearReplayFeedback,
   farmCommitErrorMessageKey,
   filterPublicFarmHighlightsForPlayer,
   filterPublicFenceHighlightsForPlayer,
@@ -18,6 +20,7 @@ import {
 } from '../game-container-helpers'
 import type { PublicEventResourceAnimation } from '../public-event-notifications'
 import { collectNewPublicEventFeedback, maxPublicEventSeq } from '../public-event-notifications'
+import type { ReplayTimelineEntry } from '../replay-timeline'
 
 const animation = (id: string): PublicEventResourceAnimation => ({
   id,
@@ -146,6 +149,59 @@ describe('GameContainerApi WS player identity', () => {
     expect(feedback.notifications).toEqual([])
     expect(feedback.resourceAnimations).toEqual([expect.objectContaining({ id: 'evt-moved:move:0' })])
     expect(mergePublicEventResourceAnimations([], feedback.resourceAnimations)).toHaveLength(1)
+  })
+
+  it('namespaces replay feedback without touching live cursor inputs', () => {
+    const event = {
+      schemaVersion: 1,
+      id: 'evt-replay',
+      seq: 1,
+      round: 1,
+      phase: 'work',
+      visibility: 'public',
+      actorPlayerId: 'p1',
+      sourceActionId: 'forest',
+      type: 'resource.paid',
+      resources: { wood: 1 },
+      paymentFor: 'bonus',
+    } satisfies GameEvent
+    const entry = {
+      key: 'event:1:0:evt-replay:1',
+      kind: 'event',
+      packetSeq: 1,
+      packetLocalIndex: 0,
+      event,
+      eventId: event.id,
+      eventSeq: event.seq,
+      status: 'active',
+      payloadSource: 'currentEvents',
+      replayable: true,
+    } satisfies ReplayTimelineEntry
+
+    const feedback = buildReplayFeedback(entry, 'en')
+
+    expect(feedback.notifications).toHaveLength(1)
+    expect(feedback.notifications.every((item) =>
+      item.id.startsWith('replay:event:1:0:evt-replay:1:'))).toBe(true)
+    expect(feedback.resourceAnimations).toHaveLength(1)
+    expect(feedback.resourceAnimations.every((item) =>
+      item.id.startsWith('replay:event:1:0:evt-replay:1:'))).toBe(true)
+    expect(feedback.highlights.actionIds).toEqual(['forest'])
+  })
+
+  it('does not build replay feedback for missing entries', () => {
+    expect(buildReplayFeedback({
+      key: 'event:1:0:missing:9',
+      kind: 'event',
+      packetSeq: 1,
+      packetLocalIndex: 0,
+      event: null,
+      eventId: 'missing',
+      eventSeq: 9,
+      status: 'missing',
+      payloadSource: 'missing',
+      replayable: false,
+    }, 'en')).toEqual(clearReplayFeedback())
   })
 
   it('clears canceled public feedback and aligns the cursor to the undo snapshot', () => {
