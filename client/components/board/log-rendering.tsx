@@ -289,6 +289,8 @@ const collectReferencedCardIds = (params: Record<string, unknown> | undefined): 
 
   const cardIds: string[] = []
   if (typeof params.cardId === 'string') cardIds.push(params.cardId)
+  if (typeof params.fromCardId === 'string') cardIds.push(params.fromCardId)
+  if (typeof params.toCardId === 'string') cardIds.push(params.toCardId)
   if (typeof params.sourceCard === 'string') cardIds.push(params.sourceCard)
   if (params.improvements) {
     const ids = Array.isArray(params.improvements)
@@ -325,6 +327,12 @@ const collectReferencedCardIds = (params: Record<string, unknown> | undefined): 
   detailParts?.bonusSources?.forEach((id) => cardIds.push(id))
   return cardIds
 }
+
+const richResourceParamKeys = ['resources', 'animals', 'crops'] as const
+const cardDisplayParamKeys = ['cardId', 'fromCardId', 'toCardId'] as const
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value)
 
 export const prepareLogEntry = (
   entry: GameState['log'][number],
@@ -490,6 +498,20 @@ export const prepareLogEntry = (
     if (entry.key === 'log.resourceAccumulated') {
       richParams.target = resolveAccumulationTarget(locale, params)
     }
+  }
+  if (params) {
+    richResourceParamKeys.forEach((key) => {
+      if (isRecord(params[key])) {
+        richParams[key] = (
+          <ResourceLine locale={locale} resources={params[key] as Partial<Resource>} />
+        )
+      }
+    })
+    cardDisplayParamKeys.forEach((key) => {
+      if (typeof params[key] === 'string') {
+        params[key] = resolveCardDisplayName(locale, params[key])
+      }
+    })
   }
   if (params && params.detailParts && entry.key === 'log.actionDetail') {
     const detailParts = params.detailParts as ActionDetailParts

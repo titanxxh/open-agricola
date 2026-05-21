@@ -45,6 +45,20 @@ const playedEvent = (id: string, seq: number): GameEvent => ({
   cardType: 'minor',
 })
 
+const cardStateChangedEvent = (id: string, seq: number): GameEvent => ({
+  schemaVersion: 1,
+  id,
+  seq,
+  round: 2,
+  phase: 'work',
+  visibility: 'public',
+  targetPlayerId: 'p1',
+  type: 'card.stateChanged',
+  cardId: 'B21_HayloftBarn',
+  key: 'food',
+  value: 3,
+})
+
 const replayEntry = (
   overrides: Partial<ReplayTimelineEntry> = {},
 ): ReplayTimelineEntry => {
@@ -170,6 +184,28 @@ describe('buildActionLogTimelineRows', () => {
     })
     expect(rows.some((row) =>
       row.kind === 'legacyLog' && row.logEntry.key === 'log.playMinorImprovement')).toBe(false)
+  })
+
+  it('uses a structured fallback for replayable silent events without logs or notifications', () => {
+    const event = cardStateChangedEvent('evt-card-state', 3)
+    const buckets = buildActionLogTimelineRows({
+      entries: [replayEntryForEvent(event, 1)],
+      legacyLog: [],
+      currentRound: 2,
+      locale: 'en',
+      playerNames: { p1: 'Alice' },
+      actionNames: {},
+    })
+
+    const row = buckets.flatMap((bucket) => bucket.rows)[0]
+
+    expect(row).toMatchObject({
+      kind: 'event',
+      logEntry: null,
+      replayable: true,
+    })
+    expect(row?.label).toContain('card.stateChanged')
+    expect(row?.label).toContain('B21_HayloftBarn')
   })
 
   it('does not attach payment context across archive packet boundaries', () => {

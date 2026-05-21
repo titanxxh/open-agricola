@@ -217,4 +217,58 @@ describe('ActionLog', () => {
     expect(container.querySelector('[data-resource="stone"][data-amount="1"]')).not.toBeNull()
     expect(container.querySelector('[data-resource="clay"][data-amount="1"]')).not.toBeNull()
   })
+
+  it('renders rich card and resource log params without leaking raw objects or html', () => {
+    const { container } = render(
+      <ActionLog
+        locale="en"
+        currentRound={2}
+        log={[
+          {
+            key: 'log.cardInfoboxChanged',
+            params: { cardId: 'B21_HayloftBarn', text: '<b>Food: 3</b>' },
+          },
+          {
+            key: 'log.cardStackChanged',
+            params: { cardId: 'C81_MaterialHub', resources: { wood: 2 } },
+          },
+          {
+            key: 'log.futureMeepleResolved',
+            params: {
+              player: 'Alice',
+              cardId: 'B157_Salter',
+              round: 3,
+              roomType: '',
+              resources: { food: 2 },
+            },
+          },
+          {
+            key: 'log.farmCropAdded',
+            params: { player: 'Alice', crops: { grain: 1 } },
+          },
+          {
+            key: 'log.cardSwappedWithBoard',
+            params: {
+              player: 'Alice',
+              fromCardId: 'B21_HayloftBarn',
+              toCardId: 'C81_MaterialHub',
+            },
+          },
+        ]}
+      />,
+    )
+
+    const text = container.textContent ?? ''
+    expect(text).toContain('Food: 3')
+    expect(text).toContain('Hayloft Barn')
+    expect(text).toContain('Material Hub')
+    expect(text).toContain('Salter')
+    expect(text).not.toContain('[object Object]')
+    expect(text).not.toContain('log.cardInfoboxChanged')
+    expect(container.querySelector('b')).toBeNull()
+    expect(container.querySelector('[data-resource="wood"][data-amount="2"]')).not.toBeNull()
+    expect(container.querySelector('[data-resource="food"][data-amount="2"]')).not.toBeNull()
+    expect(container.querySelector('[data-resource="grain"][data-amount="1"]')).not.toBeNull()
+    expect(container.querySelectorAll('.log-card-link').length).toBeGreaterThanOrEqual(3)
+  })
 })
