@@ -51,6 +51,46 @@ const resolveCardName = (locale: Locale, id: string): CardRef | null => {
 const resolveCardDisplayName = (locale: Locale, id: string) =>
   resolveCardName(locale, id)?.name ?? humanizeCardId(id)
 
+const resolveMaybeTranslationKey = (locale: Locale, value: string): string => {
+  const translated = t(locale, value)
+  return translated === value ? value : translated
+}
+
+const houseTypeLabel = (locale: Locale, type: PlayerState['houseType']) => {
+  if (type === 'clay') return t(locale, 'ui.houseClay')
+  if (type === 'stone') return t(locale, 'ui.houseStone')
+  return t(locale, 'ui.houseWood')
+}
+
+const workerDestinationLabel = (locale: Locale, destination: string): string => {
+  if (destination === 'home') return t(locale, 'log.workerDestinationHome')
+  if (destination === 'reserve') return t(locale, 'log.workerDestinationReserve')
+  if (destination === 'supply') return t(locale, 'log.workerDestinationSupply')
+  return destination
+}
+
+const resolveAccumulationTarget = (
+  locale: Locale,
+  params: Record<string, unknown>,
+): ReactNode => {
+  if (params.target === 'actionSpace') return String(params.action ?? '')
+  if (params.target === 'card') {
+    const cardId = typeof params.cardId === 'string' ? params.cardId : ''
+    const cardName = cardId ? resolveCardDisplayName(locale, cardId) : ''
+    const player = typeof params.player === 'string' ? params.player : ''
+    if (locale === 'zh') return player ? `${player} 的 ${cardName}` : cardName
+    return player ? `${player}'s ${cardName}` : cardName
+  }
+  if (params.target === 'roundCard') {
+    const round = Number(params.round)
+    if (!Number.isInteger(round) || round < 1 || round > 14) {
+      return locale === 'zh' ? '回合牌' : 'round card'
+    }
+    return locale === 'zh' ? `第 ${round} 回合牌` : `Round ${round} card`
+  }
+  return String(params.target ?? '')
+}
+
 const resolveCardDesc = (locale: Locale, ref: CardRef): string => {
   const prefix =
     ref.type === 'major' ? 'improvements' : ref.type === 'minor' ? 'minorImprovements' : 'occupations'
@@ -267,6 +307,8 @@ const collectReferencedCardIds = (params: Record<string, unknown> | undefined): 
 
   const cardIds: string[] = []
   if (typeof params.cardId === 'string') cardIds.push(params.cardId)
+  if (typeof params.fromCardId === 'string') cardIds.push(params.fromCardId)
+  if (typeof params.toCardId === 'string') cardIds.push(params.toCardId)
   if (typeof params.sourceCard === 'string') cardIds.push(params.sourceCard)
   if (params.improvements) {
     const ids = Array.isArray(params.improvements)
@@ -304,6 +346,12 @@ const collectReferencedCardIds = (params: Record<string, unknown> | undefined): 
   return cardIds
 }
 
+const richResourceParamKeys = ['resources', 'animals', 'crops'] as const
+const cardDisplayParamKeys = ['cardId', 'fromCardId', 'toCardId'] as const
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value)
+
 export const prepareLogEntry = (
   entry: GameState['log'][number],
   locale: Locale,
@@ -312,7 +360,27 @@ export const prepareLogEntry = (
   const params = entry.params ? { ...entry.params } : undefined
   const richParams: Record<string, ReactNode> = {}
   if (params && typeof params.action === 'string') {
-    params.action = t(locale, params.action)
+    params.action = resolveMaybeTranslationKey(locale, params.action)
+  }
+  if (params && entry.key === 'log.cardTriggered') {
+    const details: string[] = []
+    if (typeof params.triggerAction === 'string' && params.triggerAction) {
+      details.push(resolveMaybeTranslationKey(locale, params.triggerAction))
+    }
+    if (params.replacement === true) details.push(t(locale, 'log.cardTriggerReplacement'))
+    if (params.optional === true) details.push(t(locale, 'log.cardTriggerOptional'))
+    if (params.declined === true) details.push(t(locale, 'log.cardTriggerDeclined'))
+    params.detail = details.length ? ` (${details.join(locale === 'zh' ? '，' : ', ')})` : ''
+  }
+  if (params && entry.key === 'log.futureMeepleResolved') {
+    if (params.roomType === 'wood' || params.roomType === 'clay' || params.roomType === 'stone') {
+      params.roomType = ` ${houseTypeLabel(locale, params.roomType)}`
+    } else {
+      params.roomType = ''
+    }
+  }
+  if (params && entry.key === 'log.workerReturned' && typeof params.destination === 'string') {
+    params.destination = workerDestinationLabel(locale, params.destination)
   }
   if (
     params &&
@@ -457,6 +525,32 @@ export const prepareLogEntry = (
       <ResourceLine locale={locale} resources={params.gain as Partial<Resource>} />
     )
   }
+  if (
+    params &&
+    (entry.key === 'log.actionAccumulated' || entry.key === 'log.resourceAccumulated') &&
+    typeof params.resources === 'object'
+  ) {
+    richParams.resources = (
+      <ResourceLine locale={locale} resources={params.resources as Partial<Resource>} />
+    )
+    if (entry.key === 'log.resourceAccumulated') {
+      richParams.target = resolveAccumulationTarget(locale, params)
+    }
+  }
+  if (params) {
+    richResourceParamKeys.forEach((key) => {
+      if (isRecord(params[key])) {
+        richParams[key] = (
+          <ResourceLine locale={locale} resources={params[key] as Partial<Resource>} />
+        )
+      }
+    })
+    cardDisplayParamKeys.forEach((key) => {
+      if (typeof params[key] === 'string') {
+        params[key] = resolveCardDisplayName(locale, params[key])
+      }
+    })
+  }
   if (params && params.detailParts && entry.key === 'log.actionDetail') {
     const detailParts = params.detailParts as ActionDetailParts
     const effects: ReactNode[] = []
@@ -482,15 +576,10 @@ export const prepareLogEntry = (
       )
     }
     if (effectData.renovate) {
-      const houseLabel = (type: PlayerState['houseType']) => {
-        if (type === 'clay') return t(locale, 'ui.houseClay')
-        if (type === 'stone') return t(locale, 'ui.houseStone')
-        return t(locale, 'ui.houseWood')
-      }
       effects.push(
         t(locale, 'log.effectRenovate', {
-          from: houseLabel(effectData.renovate.from),
-          to: houseLabel(effectData.renovate.to),
+          from: houseTypeLabel(locale, effectData.renovate.from),
+          to: houseTypeLabel(locale, effectData.renovate.to),
         }),
       )
     }

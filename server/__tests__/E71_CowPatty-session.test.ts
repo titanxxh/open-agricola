@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
+import type { ActionChoiceOption, FarmTilePosition } from '../../shared/contract/types'
 import { E71_CowPatty } from '../../shared/cards-display/E/E71_CowPatty'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 
@@ -48,7 +49,23 @@ describe('E71_CowPatty session', () => {
     return session
   }
 
-  it('adds 1 bonus crop when sowing in a field adjacent to a pasture', () => {
+  const acceptSelection = (session: GameSession, resp: ReturnType<GameSession['resolveChoice']>) => {
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected optional choice')
+    const accept = resp.interaction.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+    resp = session.resolveChoice(0, accept!.value)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
+    expect(resp.interaction.sourceCard).toBe(CARD_ID)
+    expect(resp.interaction.selection?.kind).toBe('farm-position')
+    return resp
+  }
+
+  const selectPositions = (session: GameSession, positions: FarmTilePosition[]) =>
+    session.commitSelectionChoice(0, { positions })
+
+  it('offers optional selection and adds 1 bonus crop when sowing adjacent to a pasture', () => {
     // Field at (0,2), pasture at (0,3) — orthogonally adjacent
     const session = setup({
       grain: 2,
@@ -74,20 +91,44 @@ describe('E71_CowPatty session', () => {
     })
     expect(resp.ok).toBe(true)
 
-    // Continue through any remaining choices
-    {
-      let safety = 16
-      while (resp.interaction.stateId === 'wait' && safety-- > 0) {
-        const next = resp.interaction.options?.[0]?.value
-        if (!next) break
-        resp = session.resolveChoice(resp.interaction.playerIndex, next)
-      }
-    }
+    resp = acceptSelection(session, resp)
+    expect(resp.interaction.selection?.selectablePositions).toEqual([{ row: 0, col: 2 }])
+    resp = selectPositions(session, [{ row: 0, col: 2 }])
+    expect(resp.ok).toBe(true)
 
-    // Field should have 4 grain (3 normal + 1 bonus)
     const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 2)
     expect(field?.stacks[0]?.kind).toBe('grain')
     expect(field?.stacks[0]?.remaining ?? 0).toBe(4)
+  })
+
+  it('skip leaves a single eligible field at its normal sow count', () => {
+    const session = setup({
+      grain: 2,
+      fields: [{ row: 0, col: 2, stacks: [] }],
+      pastures: [
+        {
+          id: 'p1',
+          size: 1,
+          tiles: [{ row: 0, col: 3 }],
+          stables: 0,
+          animalType: null,
+          animalCount: 0,
+        },
+      ],
+    })
+
+    let resp = session.takeAction(0, 'grain-utilization')
+    expect(resp.ok).toBe(true)
+
+    resp = session.resolveChoice(0, 'confirm', {
+      crops: [{ row: 0, col: 2, crop: 'grain' }],
+    })
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    resp = session.resolveChoice(0, '__skip__')
+
+    const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 2)
+    expect(field?.stacks[0]?.remaining ?? 0).toBe(3)
   })
 
   it('does NOT add bonus crop when field is NOT adjacent to a pasture', () => {
@@ -224,14 +265,9 @@ describe('E71_CowPatty session', () => {
     })
     expect(resp.ok).toBe(true)
 
-    {
-      let safety = 16
-      while (resp.interaction.stateId === 'wait' && safety-- > 0) {
-        const next = resp.interaction.options?.[0]?.value
-        if (!next) break
-        resp = session.resolveChoice(resp.interaction.playerIndex, next)
-      }
-    }
+    resp = acceptSelection(session, resp)
+    resp = selectPositions(session, [{ row: 0, col: 2 }])
+    expect(resp.ok).toBe(true)
 
     const field = resp.state.players[0]!.fields.find((f) => f.row === 0 && f.col === 2)
     expect(field?.stacks[0]?.kind).toBe('vegetable')
@@ -271,22 +307,15 @@ describe('E71_CowPatty session', () => {
     })
     expect(resp.ok).toBe(true)
 
-    // Continue through any remaining choices
-    {
-      let safety = 16
-      while (resp.interaction.stateId === 'wait' && safety-- > 0) {
-        const next = resp.interaction.options?.[0]?.value
-        if (!next) break
-        resp = session.resolveChoice(resp.interaction.playerIndex, next)
-      }
-    }
+    resp = acceptSelection(session, resp)
+    expect(resp.interaction.selection?.selectablePositions).toEqual([{ row: 0, col: 2 }])
+    resp = selectPositions(session, [{ row: 0, col: 2 }])
+    expect(resp.ok).toBe(true)
 
     const player = resp.state.players[0]!
-    // Adjacent field gets +1 bonus
     const f0 = player.fields.find((f) => f.row === 0 && f.col === 2)
     expect(f0?.stacks[0]?.remaining ?? 0).toBe(4) // 3 + 1 bonus
 
-    // Non-adjacent field stays normal
     const f1 = player.fields.find((f) => f.row === 2 && f.col === 4)
     expect(f1?.stacks[0]?.remaining ?? 0).toBe(3) // no bonus
   })
@@ -325,28 +354,59 @@ describe('E71_CowPatty session', () => {
     })
     expect(resp.ok).toBe(true)
 
-    // Should get a selection choice for which field gets the bonus
-    if (resp.interaction.stateId === 'wait') {
-      resp = session.resolveChoice(0, '0-2')
-      expect(resp.ok).toBe(true)
-    }
-
-    // Continue through any remaining choices
-    {
-      let safety = 16
-      while (resp.interaction.stateId === 'wait' && safety-- > 0) {
-        const next = resp.interaction.options?.[0]?.value
-        if (!next) break
-        resp = session.resolveChoice(resp.interaction.playerIndex, next)
-      }
-    }
+    resp = acceptSelection(session, resp)
+    expect(resp.interaction.selection?.selectablePositions).toEqual([
+      { row: 0, col: 2 },
+      { row: 0, col: 4 },
+    ])
+    resp = selectPositions(session, [{ row: 0, col: 2 }])
+    expect(resp.ok).toBe(true)
 
     const player = resp.state.players[0]!
     const f0 = player.fields.find((f) => f.row === 0 && f.col === 2)
     const f4 = player.fields.find((f) => f.row === 0 && f.col === 4)
-    // Total should be 7 (3 + 3 + 1 bonus on selected field)
     const total = (f0?.stacks[0]?.remaining ?? 0 ?? 0) + (f4?.stacks[0]?.remaining ?? 0 ?? 0)
     expect(total).toBe(7)
+  })
+
+  it('rejects a non-eligible crop field without partial mutation', () => {
+    const session = setup({
+      grain: 2,
+      fields: [
+        { row: 0, col: 2, stacks: [] },
+        { row: 0, col: 4, stacks: [{ kind: 'grain', remaining: 3 }] },
+      ],
+      pastures: [
+        {
+          id: 'p1',
+          size: 1,
+          tiles: [{ row: 0, col: 3 }],
+          stables: 0,
+          animalType: null,
+          animalCount: 0,
+        },
+      ],
+    })
+
+    let resp = session.takeAction(0, 'grain-utilization')
+    expect(resp.ok).toBe(true)
+
+    resp = session.resolveChoice(0, 'confirm', {
+      crops: [{ row: 0, col: 2, crop: 'grain' }],
+    })
+    expect(resp.ok).toBe(true)
+
+    resp = acceptSelection(session, resp)
+    expect(resp.interaction.selection?.selectablePositions).toEqual([{ row: 0, col: 2 }])
+    resp = selectPositions(session, [{ row: 0, col: 4 }])
+    expect(resp.ok).toBe(false)
+    expect(resp.error).toBe('invalid selection position')
+
+    const player = resp.state.players[0]!
+    const eligible = player.fields.find((f) => f.row === 0 && f.col === 2)
+    const ineligible = player.fields.find((f) => f.row === 0 && f.col === 4)
+    expect(eligible?.stacks[0]?.remaining ?? 0).toBe(3)
+    expect(ineligible?.stacks[0]?.remaining ?? 0).toBe(3)
   })
 
   describe('prerequisite "1 Cattle"', () => {

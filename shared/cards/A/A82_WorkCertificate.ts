@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { createPartialTakeFromSpaceLeaf } from '../helpers/partial-take'
 import { A82_WorkCertificate } from '../../cards-display/A/A82_WorkCertificate'
 
 const CARD_ID = A82_WorkCertificate.id
@@ -35,14 +36,12 @@ const findChoices = (context: CardListenerContext): ActionFlow[] => {
     if (totalBuildingResources < 4) continue
     for (const r of BUILDING_RESOURCES) {
       if ((space.resources[r] ?? 0) <= 0) continue
-      choices.push({
-        type: 'leaf',
-        actionId: 'collect',
+      choices.push(createPartialTakeFromSpaceLeaf({
         sourceCard: CARD_ID,
-        actionContext: { spaceId: space.id, resource: r, amount: 1 },
-        choiceLabelKey: 'ui.interactionTakeFromSpace',
-        choiceLabelParams: { resource: r, spaceId: space.id, spaceName: space.nameKey },
-      })
+        spaceId: space.id,
+        spaceName: space.nameKey,
+        resource: r,
+      }))
     }
   }
   return choices

@@ -22,8 +22,9 @@ const afterCollectListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.sourceCard === CARD_ID) return
 
+    const events = context.actionEvents ?? context.transactionEvents
     const gainedWoodFromActionSpace = hasResourceMovedFromActionSpace(
-      context.transactionEvents,
+      events,
       'wood',
       (event) => event.to.kind === 'player' && event.to.playerId === context.player.id,
     )

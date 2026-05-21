@@ -111,6 +111,12 @@ import {
   getBasicConversionExchange,
 } from '../cards/basic-conversion.ts'
 import { appendImmediateEvents, type ImmediateEventDraft } from '../events/append.ts'
+import { prependDerivedLogEntries } from '../events/log-cache.ts'
+import {
+  appendPublicEventCanceledPacket,
+  assertPublicEventArchiveCanAppend,
+  PublicEventArchivePayloadError,
+} from '../events/archive.ts'
 import {
   applyTradeSideEffect,
 } from '../actions/payment/internal'
@@ -311,6 +317,16 @@ export type SessionResponse = {
 
 type ResponseMetadata = {
   publicEventCancellations?: PublicEventCancellation[]
+}
+
+type PublicEventArchiveSnapshot = {
+  publicEventArchive: GameState['publicEventArchive']
+  nextPublicEventArchivePacketSeq: number
+}
+
+type PublicEventCancellationPlan = {
+  publicEventCancellations?: PublicEventCancellation[]
+  archiveAfterAppend?: PublicEventArchiveSnapshot
 }
 
 /**
@@ -1691,33 +1707,81 @@ export class GameCore {
     return events.reduce((max, event) => Math.max(max, event.seq), 0)
   }
 
+  private capturePublicEventArchive(): PublicEventArchiveSnapshot {
+    assertPublicEventArchiveCanAppend(this.state)
+    return {
+      publicEventArchive: JSON.parse(JSON.stringify(this.state.publicEventArchive ?? [])) as GameState['publicEventArchive'],
+      nextPublicEventArchivePacketSeq: this.state.nextPublicEventArchivePacketSeq ?? 1,
+    }
+  }
+
+  private restorePublicEventArchive(snapshot: PublicEventArchiveSnapshot): void {
+    this.state.publicEventArchive = JSON.parse(JSON.stringify(snapshot.publicEventArchive)) as GameState['publicEventArchive']
+    this.state.nextPublicEventArchivePacketSeq = snapshot.nextPublicEventArchivePacketSeq
+  }
+
   private buildPublicEventCancellation(
     reason: PublicEventCancellation['reason'],
     beforeEvents: GameState['events'],
-  ): PublicEventCancellation | null {
+    afterEvents: GameState['events'] = this.state.events,
+  ): { cancellation: PublicEventCancellation; canceledEvents: GameState['events'] } | null {
     const previousMaxSeq = this.maxPublicEventSeq(beforeEvents)
-    const nextMaxSeq = this.maxPublicEventSeq(this.state.events)
-    const afterIds = new Set(this.state.events.map((event) => event.id))
+    const nextMaxSeq = this.maxPublicEventSeq(afterEvents)
+    const afterIds = new Set(afterEvents.map((event) => event.id))
     const canceledEvents = beforeEvents.filter((event) =>
       event.seq > nextMaxSeq || !afterIds.has(event.id)
     ).sort((a, b) => a.seq - b.seq)
     if (canceledEvents.length === 0) return null
-    return {
+    const cancellation = {
       reason,
       previousMaxSeq,
       nextMaxSeq,
       canceledEventIds: canceledEvents.map((event) => event.id),
       canceledSeqs: canceledEvents.map((event) => event.seq),
     }
+    return { cancellation, canceledEvents }
   }
 
-  private respondWithPublicEventCancellation(
+  private preparePublicEventCancellation(
     reason: PublicEventCancellation['reason'],
     beforeEvents: GameState['events'],
+    afterEvents: GameState['events'],
+    archiveBeforeAppend: PublicEventArchiveSnapshot,
+  ): PublicEventCancellationPlan {
+    const result = this.buildPublicEventCancellation(reason, beforeEvents, afterEvents)
+    if (!result) return {}
+    const archiveState = {
+      ...this.state,
+      publicEventArchive: JSON.parse(JSON.stringify(archiveBeforeAppend.publicEventArchive)) as GameState['publicEventArchive'],
+      nextPublicEventArchivePacketSeq: archiveBeforeAppend.nextPublicEventArchivePacketSeq,
+    } as GameState
+    try {
+      appendPublicEventCanceledPacket(archiveState, {
+        ...result.cancellation,
+        canceledEvents: result.canceledEvents,
+      })
+    } catch (error) {
+      if (error instanceof PublicEventArchivePayloadError) {
+        return { publicEventCancellations: [result.cancellation] }
+      }
+      throw error
+    }
+    return {
+      publicEventCancellations: [result.cancellation],
+      archiveAfterAppend: {
+        publicEventArchive: archiveState.publicEventArchive,
+        nextPublicEventArchivePacketSeq: archiveState.nextPublicEventArchivePacketSeq,
+      },
+    }
+  }
+
+  private applyPreparedPublicEventCancellation(
+    archiveBeforeAppend: PublicEventArchiveSnapshot,
+    plan: PublicEventCancellationPlan,
   ): SessionResponse {
-    const cancellation = this.buildPublicEventCancellation(reason, beforeEvents)
-    return this.respond(true, undefined, undefined, cancellation
-      ? { publicEventCancellations: [cancellation] }
+    this.restorePublicEventArchive(plan.archiveAfterAppend ?? archiveBeforeAppend)
+    return this.respond(true, undefined, undefined, plan.publicEventCancellations
+      ? { publicEventCancellations: plan.publicEventCancellations }
       : {})
   }
 
@@ -2116,9 +2180,7 @@ export class GameCore {
     const entries = this.engineLog.all()
     if (entries.length > 0) {
       const toAdd = entries.filter((e) => e.key !== 'log.action')
-      for (let i = toAdd.length - 1; i >= 0; i--) {
-        this.state.log.unshift(toAdd[i])
-      }
+      prependDerivedLogEntries(this.state, toAdd)
       this.engineLog.clear()
     }
   }
@@ -3928,6 +3990,13 @@ export class GameCore {
         }
       }
     }
+    const allowedSelectionCounts = Array.isArray(interactionContext?.allowedSelectionCounts)
+      ? interactionContext.allowedSelectionCounts
+          .filter((count): count is number => typeof count === 'number' && Number.isInteger(count))
+      : null
+    if (allowedSelectionCounts && !allowedSelectionCounts.includes(positions.length)) {
+      return this.respond(false, 'invalid selection count')
+    }
 
     this.pushHistory()
     const positionStrings = positions.map((p) => `${p.row}-${p.col}`)
@@ -4093,17 +4162,31 @@ export class GameCore {
         entry.hadChoicePending
       if (canRestorePriorChoice) {
         const beforeEvents = [...this.state.events]
+        const beforeArchive = this.capturePublicEventArchive()
+        const cancellationPlan = this.preparePublicEventCancellation(
+          'undoStep',
+          beforeEvents,
+          entry.state.events,
+          beforeArchive,
+        )
         this.history.pop()
         this.restoreHistory(entry)
         this.recomputeActionStartIndex()
-        return this.respondWithPublicEventCancellation('undoStep', beforeEvents)
+        return this.applyPreparedPublicEventCancellation(beforeArchive, cancellationPlan)
       }
       if (entry && this.engineStack.hasPendingChoiceCompositeAncestor()) {
         const beforeEvents = [...this.state.events]
+        const beforeArchive = this.capturePublicEventArchive()
+        const cancellationPlan = this.preparePublicEventCancellation(
+          'undoStep',
+          beforeEvents,
+          entry.state.events,
+          beforeArchive,
+        )
         this.history.pop()
         this.restoreHistory(entry)
         this.recomputeActionStartIndex()
-        return this.respondWithPublicEventCancellation('undoStep', beforeEvents)
+        return this.applyPreparedPublicEventCancellation(beforeArchive, cancellationPlan)
       }
       const cancelResult = this.resolvePendingChoice(currentPlayerIndex, 'cancel', false)
       const stillOnSameFarmPrompt =
@@ -4127,12 +4210,20 @@ export class GameCore {
     if (this.history.length > 0 && this.history[this.history.length - 1]?.undoBoundary) {
       return this.respond(false, 'cannot undo past boundary')
     }
-    const entry = this.history.pop()
+    const entry = this.history[this.history.length - 1]
     if (!entry) return this.respond(false, 'no history to undo')
     const beforeEvents = [...this.state.events]
+    const beforeArchive = this.capturePublicEventArchive()
+    const cancellationPlan = this.preparePublicEventCancellation(
+      'undoStep',
+      beforeEvents,
+      entry.state.events,
+      beforeArchive,
+    )
+    this.history.pop()
     this.restoreHistory(entry)
     this.recomputeActionStartIndex()
-    return this.respondWithPublicEventCancellation('undoStep', beforeEvents)
+    return this.applyPreparedPublicEventCancellation(beforeArchive, cancellationPlan)
   }
 
   undoAction(): SessionResponse {
@@ -4147,6 +4238,13 @@ export class GameCore {
     const entry = this.history[targetIndex]
     if (!entry) return this.respond(false, 'no action snapshot')
     const beforeEvents = [...this.state.events]
+    const beforeArchive = this.capturePublicEventArchive()
+    const cancellationPlan = this.preparePublicEventCancellation(
+      'undoAction',
+      beforeEvents,
+      entry.state.events,
+      beforeArchive,
+    )
     this.restoreHistory(entry)
     this.history = this.history.slice(0, targetIndex)
     if (targetIndex === this.actionStartIndex) {
@@ -4154,6 +4252,6 @@ export class GameCore {
     } else {
       this.recomputeActionStartIndex()
     }
-    return this.respondWithPublicEventCancellation('undoAction', beforeEvents)
+    return this.applyPreparedPublicEventCancellation(beforeArchive, cancellationPlan)
   }
 }

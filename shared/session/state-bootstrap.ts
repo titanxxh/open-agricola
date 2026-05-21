@@ -52,6 +52,7 @@ import {
   assertKnownGameEventShape,
   assertPublicGameEvent,
 } from '../events/guards'
+import { normalizePublicEventArchive } from '../events/archive'
 import { eventsToLogEntries } from '../events/log-mapper'
 import type { GameEvent } from '../contract/events'
 
@@ -353,6 +354,10 @@ export const normalizeState = (raw: GameState): GameState => {
     Number.isSafeInteger(raw.nextEventSeq) && raw.nextEventSeq > maxEventSeq
       ? raw.nextEventSeq
       : maxEventSeq + 1
+  const archiveState = normalizePublicEventArchive(
+    raw.publicEventArchive,
+    raw.nextPublicEventArchivePacketSeq,
+  )
   return {
     ...raw,
     players,
@@ -365,6 +370,8 @@ export const normalizeState = (raw: GameState): GameState => {
     draft: raw.draft ?? null,
     events,
     nextEventSeq,
+    publicEventArchive: archiveState.publicEventArchive,
+    nextPublicEventArchivePacketSeq: archiveState.nextPublicEventArchivePacketSeq,
     futureMeeples: raw.futureMeeples ?? [],
     pendingFutureMeeples: raw.pendingFutureMeeples ?? [],
     enableCommunityDeck: raw.enableCommunityDeck ?? false,
@@ -531,6 +538,17 @@ export const createInitialState = (
     log: eventsToLogEntries(initialEvents, { playerNames }),
     events: initialEvents,
     nextEventSeq: 2,
+    publicEventArchive: [{
+      schemaVersion: 1,
+      id: '1',
+      packetSeq: 1,
+      type: 'publicEvents.committed',
+      eventIds: ['1'],
+      eventSeqs: [1],
+      firstEventSeq: 1,
+      lastEventSeq: 1,
+    }],
+    nextPublicEventArchivePacketSeq: 2,
     roundStartSnapshot: null,
     roundActionOrder,
     gameSeed,

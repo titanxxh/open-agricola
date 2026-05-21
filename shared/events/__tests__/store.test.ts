@@ -14,6 +14,8 @@ const makeState = (): GameState => ({
   log: [],
   events: [],
   nextEventSeq: 1,
+  publicEventArchive: [],
+  nextPublicEventArchivePacketSeq: 1,
   roundStartSnapshot: null,
   roundActionOrder: [],
   gameSeed: 1,
@@ -103,6 +105,169 @@ describe('EventStore', () => {
     expect(committed.map((event) => event.seq)).toEqual([1, 2])
     expect(state.events.map((event) => event.seq)).toEqual([1, 2])
     expect(state.nextEventSeq).toBe(3)
+  })
+
+  it('archives committed public event packets', () => {
+    const state = makeState()
+    const store = new EventStore()
+    store.beginTransaction()
+    const frame = store.beginFrame({ actorPlayerId: 'p1', sourceActionId: 'gain' })
+    frame.sink.emit({
+      type: 'resource.moved',
+      resources: { wood: 1 },
+      from: { kind: 'supply' },
+      to: { kind: 'player', playerId: 'p1' },
+      reason: 'gain',
+    })
+    frame.sink.emit({
+      type: 'resource.moved',
+      resources: { clay: 1 },
+      from: { kind: 'supply' },
+      to: { kind: 'player', playerId: 'p1' },
+      reason: 'gain',
+    })
+    frame.complete(state)
+
+    const committed = store.commitTransaction(state)
+
+    expect(committed.map((event) => event.seq)).toEqual([1, 2])
+    expect(state.publicEventArchive).toEqual([
+      {
+        schemaVersion: 1,
+        id: '1',
+        packetSeq: 1,
+        type: 'publicEvents.committed',
+        eventIds: ['1', '2'],
+        eventSeqs: [1, 2],
+        firstEventSeq: 1,
+        lastEventSeq: 2,
+      },
+    ])
+    expect(state.nextPublicEventArchivePacketSeq).toBe(2)
+  })
+
+  it('does not archive rolled back transaction events', () => {
+    const state = makeState()
+    const store = new EventStore()
+    store.beginTransaction()
+    const frame = store.beginFrame({ actorPlayerId: 'p1' })
+    frame.sink.emit({
+      type: 'resource.moved',
+      resources: { wood: 1 },
+      from: { kind: 'supply' },
+      to: { kind: 'player', playerId: 'p1' },
+      reason: 'gain',
+    })
+    frame.complete(state)
+    store.rollbackTransaction()
+
+    expect(state.publicEventArchive).toEqual([])
+    expect(state.nextPublicEventArchivePacketSeq).toBe(1)
+  })
+
+  it('rolls back event state when archive append fails', () => {
+    const state = makeState()
+    state.publicEventArchive = [{
+      schemaVersion: 1,
+      id: '1',
+      packetSeq: 1,
+      type: 'publicEvents.committed',
+      eventIds: ['99'],
+      eventSeqs: [99],
+      firstEventSeq: 99,
+      lastEventSeq: 99,
+    }]
+    state.nextPublicEventArchivePacketSeq = 1
+    const beforeArchive = JSON.parse(JSON.stringify(state.publicEventArchive))
+    const store = new EventStore()
+    store.beginTransaction()
+    const frame = store.beginFrame({ actorPlayerId: 'p1', sourceActionId: 'gain' })
+    frame.sink.emit({
+      type: 'resource.moved',
+      resources: { wood: 1 },
+      from: { kind: 'supply' },
+      to: { kind: 'player', playerId: 'p1' },
+      reason: 'gain',
+    })
+    frame.complete(state)
+
+    expect(() => store.commitTransaction(state)).toThrow()
+    expect(state.events).toEqual([])
+    expect(state.nextEventSeq).toBe(1)
+    expect(state.publicEventArchive).toEqual(beforeArchive)
+    expect(state.nextPublicEventArchivePacketSeq).toBe(1)
+    expect(store.currentTransactionEvents()).toHaveLength(1)
+
+    state.nextPublicEventArchivePacketSeq = 2
+    const committed = store.commitTransaction(state)
+    expect(committed.map((event) => event.seq)).toEqual([1])
+    expect(state.events).toHaveLength(1)
+    expect(state.publicEventArchive).toHaveLength(2)
+    expect(state.publicEventArchive.at(-1)).toMatchObject({
+      packetSeq: 2,
+      eventIds: ['1'],
+      eventSeqs: [1],
+    })
+  })
+
+  it('rolls back event state when archive cursor is stale but not duplicated', () => {
+    const state = makeState()
+    state.publicEventArchive = [{
+      schemaVersion: 1,
+      id: '7',
+      packetSeq: 7,
+      type: 'publicEvents.committed',
+      eventIds: ['99'],
+      eventSeqs: [99],
+      firstEventSeq: 99,
+      lastEventSeq: 99,
+    }]
+    state.nextPublicEventArchivePacketSeq = 3
+    const beforeArchive = JSON.parse(JSON.stringify(state.publicEventArchive))
+    const store = new EventStore()
+    store.beginTransaction()
+    const frame = store.beginFrame({ actorPlayerId: 'p1', sourceActionId: 'gain' })
+    frame.sink.emit({
+      type: 'resource.moved',
+      resources: { wood: 1 },
+      from: { kind: 'supply' },
+      to: { kind: 'player', playerId: 'p1' },
+      reason: 'gain',
+    })
+    frame.complete(state)
+
+    expect(() => store.commitTransaction(state)).toThrow(/Invalid public event archive state/)
+    expect(state.events).toEqual([])
+    expect(state.nextEventSeq).toBe(1)
+    expect(state.publicEventArchive).toEqual(beforeArchive)
+    expect(state.nextPublicEventArchivePacketSeq).toBe(3)
+    expect(store.currentTransactionEvents()).toHaveLength(1)
+  })
+
+  it('rolls back event state without normalizing malformed live archive state', () => {
+    const state = makeState()
+    const archiveState = state as GameState & { publicEventArchive: unknown }
+    archiveState.publicEventArchive = { malformed: true }
+    state.nextPublicEventArchivePacketSeq = 1
+    const beforeArchive = archiveState.publicEventArchive
+    const store = new EventStore()
+    store.beginTransaction()
+    const frame = store.beginFrame({ actorPlayerId: 'p1', sourceActionId: 'gain' })
+    frame.sink.emit({
+      type: 'resource.moved',
+      resources: { wood: 1 },
+      from: { kind: 'supply' },
+      to: { kind: 'player', playerId: 'p1' },
+      reason: 'gain',
+    })
+    frame.complete(state)
+
+    expect(() => store.commitTransaction(state)).toThrow(/Invalid public event archive state/)
+    expect(state.events).toEqual([])
+    expect(state.nextEventSeq).toBe(1)
+    expect(archiveState.publicEventArchive).toBe(beforeArchive)
+    expect(state.nextPublicEventArchivePacketSeq).toBe(1)
+    expect(store.currentTransactionEvents()).toHaveLength(1)
   })
 
   it('rebases completed transaction events if another transaction committed first', () => {

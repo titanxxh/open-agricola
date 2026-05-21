@@ -3523,6 +3523,46 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
   font-weight: 700;
   font-size: 11px;
 }
+.action-log__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 0 0 8px;
+}
+.action-log__control {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--color-text);
+  padding: 3px 8px;
+  font-size: var(--fs-small);
+}
+.action-log__control.is-active {
+  background: var(--color-primary);
+  color: #fff;
+}
+.action-log__entry--event {
+  cursor: pointer;
+}
+.action-log__entry--legacy,
+.action-log__entry--missing {
+  cursor: default;
+}
+.action-log__entry--canceled .action-log__text,
+.action-log__text--canceled {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
+.action-log__entry--missing {
+  background: rgba(180, 70, 45, 0.08);
+}
+.action-log__meta {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.2;
+}
 
 /* ══════════ StageBar ══════════ */
 .stage-bar {

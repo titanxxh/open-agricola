@@ -5,7 +5,7 @@ import { t, type Locale } from '../../shared/i18n'
 
 export type PublicEventNotification = {
   id: string
-  kind: 'resource' | 'payment' | 'action' | 'future' | 'farm'
+  kind: 'resource' | 'payment' | 'action' | 'future' | 'farm' | 'card'
   message: string
 }
 
@@ -61,6 +61,12 @@ const resourceText = (resources: Partial<Resource>, locale: Locale): string =>
     .filter((key) => (resources[key] ?? 0) > 0)
     .map((key) => `${resources[key]} ${t(locale, `resources.${key}`)}`)
     .join(' · ')
+
+const accumulationTargetText = (event: Extract<GameEvent, { type: 'resource.accumulated' }>): string => {
+  if (event.to.kind === 'actionSpace') return event.to.spaceId
+  if (event.to.kind === 'card') return event.to.cardId
+  return `round ${event.to.round}`
+}
 
 const actionLabel = (event: GameEvent): string =>
   'actionId' in event ? event.actionId : event.sourceActionId ?? ''
@@ -128,11 +134,37 @@ const messageForPublicEvent = (event: GameEvent, locale: Locale): PublicEventNot
     }
   }
   if (event.type === 'resource.paid') {
-    const paid = resourceText(positiveResources(event.resources), locale)
+    const resources = positiveResources(event.resources)
+    if (Object.keys(resources).length === 0) return null
+    const paid = resourceText(resources, locale)
     return {
       id: event.id,
       kind: 'payment',
       message: locale === 'zh' ? `支付资源：${paid}` : `Resources paid: ${paid}`,
+    }
+  }
+  if (event.type === 'action.accumulated') {
+    const resources = positiveResources(event.resources)
+    if (Object.keys(resources).length === 0) return null
+    return {
+      id: event.id,
+      kind: 'resource',
+      message: locale === 'zh'
+        ? `行动格积累：${event.spaceId} + ${resourceText(resources, locale)}`
+        : `Action accumulated: ${event.spaceId} + ${resourceText(resources, locale)}`,
+    }
+  }
+  if (event.type === 'resource.accumulated') {
+    if (event.silent) return null
+    const resources = positiveResources(event.resources)
+    if (Object.keys(resources).length === 0) return null
+    const target = accumulationTargetText(event)
+    return {
+      id: event.id,
+      kind: 'resource',
+      message: locale === 'zh'
+        ? `资源积累：${target} + ${resourceText(resources, locale)}`
+        : `Resource accumulated: ${target} + ${resourceText(resources, locale)}`,
     }
   }
   if (event.type === 'action.revealed') {
@@ -157,6 +189,64 @@ const messageForPublicEvent = (event: GameEvent, locale: Locale): PublicEventNot
       id: event.id,
       kind: 'future',
       message: locale === 'zh' ? `已安排未来工人：${event.cardId}` : `Future worker queued: ${event.cardId}`,
+    }
+  }
+  if (event.type === 'futureMeeple.removed') {
+    return {
+      id: event.id,
+      kind: 'future',
+      message: locale === 'zh' ? `移除未来工人：${event.cardId}` : `Future worker removed: ${event.cardId}`,
+    }
+  }
+  if (event.type === 'futureMeeple.resolved') {
+    return {
+      id: event.id,
+      kind: 'future',
+      message: locale === 'zh' ? `未来工人执行：${event.cardId}` : `Future worker resolved: ${event.cardId}`,
+    }
+  }
+  if (event.type === 'worker.promoted') {
+    return {
+      id: event.id,
+      kind: 'action',
+      message: locale === 'zh' ? `新生工人成年：${event.workerId}` : `Newborn worker promoted: ${event.workerId}`,
+    }
+  }
+  if (event.type === 'card.infoboxChanged') {
+    return {
+      id: event.id,
+      kind: 'card',
+      message: locale === 'zh'
+        ? `卡牌标记：${event.cardId}：${event.text}`
+        : `Card note: ${event.cardId}: ${event.text}`,
+    }
+  }
+  if (event.type === 'card.stackChanged') {
+    const resources = positiveResources(event.resources ?? {})
+    if (Object.keys(resources).length === 0) return null
+    const sign = (typeof event.delta === 'number' && event.delta < 0) || event.reason === 'take' ? '-' : '+'
+    return {
+      id: event.id,
+      kind: 'card',
+      message: locale === 'zh'
+        ? `卡牌资源：${event.cardId} ${sign} ${resourceText(resources, locale)}`
+        : `Card resources: ${event.cardId} ${sign} ${resourceText(resources, locale)}`,
+    }
+  }
+  if (event.type === 'card.swappedWithBoard') {
+    return {
+      id: event.id,
+      kind: 'card',
+      message: locale === 'zh'
+        ? `卡牌交换：${event.fromPlayerCardId} -> ${event.toPlayerCardId}`
+        : `Card swapped: ${event.fromPlayerCardId} -> ${event.toPlayerCardId}`,
+    }
+  }
+  if (event.type === 'card.returnedToBoard') {
+    return {
+      id: event.id,
+      kind: 'card',
+      message: locale === 'zh' ? `卡牌归还：${event.cardId}` : `Card returned: ${event.cardId}`,
     }
   }
   if (event.type === 'farm.fenceBuilt') {
@@ -204,6 +294,16 @@ export const collectPublicEventHighlightTargets = (
       pushAction(event.sourceActionId)
       continue
     }
+    if (event.type === 'action.accumulated') {
+      if (Object.keys(positiveResources(event.resources)).length === 0) continue
+      pushAction(event.spaceId)
+      continue
+    }
+    if (event.type === 'resource.accumulated') {
+      if (Object.keys(positiveResources(event.resources)).length === 0) continue
+      if (event.to.kind === 'actionSpace') pushAction(event.to.spaceId)
+      continue
+    }
     if (event.type === 'resource.moved') {
       pushAction(actionIdFromLocation(event.from))
       pushAction(actionIdFromLocation(event.to))
@@ -239,6 +339,12 @@ export const collectPublicEventHighlightTargets = (
     if (event.type === 'farm.stableBuilt') {
       for (const stable of event.stables) {
         pushFarmTile({ playerId: stable.playerId, key: `${stable.row}-${stable.col}` })
+      }
+      continue
+    }
+    if (event.type === 'farm.renovated') {
+      for (const room of event.rooms) {
+        pushFarmTile({ playerId: event.playerId, key: `${room.row}-${room.col}` })
       }
       continue
     }
@@ -333,6 +439,27 @@ export const collectPublicEventResourceAnimations = (
         resources: event.resources,
         from: { kind: 'playerResources', playerId: event.actorPlayerId },
         to,
+      })
+      continue
+    }
+    if (event.type === 'action.accumulated') {
+      pushAnimation(animations, seen, {
+        id: `${event.id}:accumulate:0`,
+        kind: 'move',
+        resources: event.resources,
+        from: { kind: 'supply' },
+        to: { kind: 'actionSpace', actionId: event.spaceId },
+      })
+      continue
+    }
+    if (event.type === 'resource.accumulated') {
+      if (event.to.kind !== 'actionSpace') continue
+      pushAnimation(animations, seen, {
+        id: `${event.id}:accumulate:0`,
+        kind: 'move',
+        resources: event.resources,
+        from: { kind: 'supply' },
+        to: { kind: 'actionSpace', actionId: event.to.spaceId },
       })
     }
   }

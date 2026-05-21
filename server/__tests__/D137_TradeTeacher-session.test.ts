@@ -159,6 +159,24 @@ describe('D137_TradeTeacher listener', () => {
     expect(result).toBeDefined()
   })
 
+  it('triggers on lessons-3 as well', () => {
+    const listener = findListener()!
+    const player = createPlayer('p1')
+    player.occupationPlayed.push(CARD_ID)
+    const lessons3 = createSpace('lessons-3', player.id)
+    const state = createState([player], [lessons3])
+
+    const result = executeCardListener(listener, {
+      state,
+      player,
+      space: lessons3,
+      actionId: 'place-farmer',
+      phase: 'after',
+    } as unknown as CardListenerContext)
+
+    expect(result).toBeDefined()
+  })
+
   it('cattle costs 2 food, grain costs 1 food (verified on combo flow params)', () => {
     const listener = findListener()!
     const player = createPlayer('p1')

@@ -1,5 +1,6 @@
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { createPartialTakeFromSpaceLeaf } from '../helpers/partial-take'
 import { E5_NightLoot } from '../../cards-display/E/E5_NightLoot'
 
 const CARD_ID = E5_NightLoot.id
@@ -8,18 +9,14 @@ const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 
 type Option = { spaceId: string; spaceName: string; type: keyof Resource }
 
-const collectLeaf = (opt: Option): ActionFlow => {
-  const resourcesGained: Partial<Resource> = { [opt.type]: 1 }
-  return {
-    type: 'leaf',
-    actionId: 'collect',
+const collectLeaf = (opt: Option): ActionFlow =>
+  createPartialTakeFromSpaceLeaf({
     sourceCard: CARD_ID,
-    actionContext: { spaceId: opt.spaceId, resource: opt.type, amount: 1 },
-    choiceLabelKey: 'ui.interactionTakeFromSpace',
-    choiceLabelParams: { resource: opt.type, spaceId: opt.spaceId, spaceName: opt.spaceName },
-    effectPreview: { kind: 'resourceExchange', resourcesGained },
-  }
-}
+    spaceId: opt.spaceId,
+    spaceName: opt.spaceName,
+    resource: opt.type,
+    includeEffectPreview: true,
+  })
 
 export const E5_NightLoot_impl = {
   effect: {

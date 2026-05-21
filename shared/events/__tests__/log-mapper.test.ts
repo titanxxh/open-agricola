@@ -220,6 +220,109 @@ describe('eventsToLogEntries', () => {
     ])
   })
 
+  it('maps accumulation events to log entries', () => {
+    const events = [
+      {
+        schemaVersion: 1,
+        id: 'action-acc',
+        seq: 1,
+        round: 2,
+        phase: 'work',
+        visibility: 'public',
+        type: 'action.accumulated',
+        spaceId: 'forest',
+        resources: { wood: 3, clay: 0 },
+      },
+      {
+        schemaVersion: 1,
+        id: 'resource-space',
+        seq: 2,
+        round: 2,
+        phase: 'work',
+        visibility: 'public',
+        type: 'resource.accumulated',
+        resources: { food: 1 },
+        to: { kind: 'actionSpace', spaceId: 'fishing' },
+      },
+      {
+        schemaVersion: 1,
+        id: 'resource-card',
+        seq: 3,
+        round: 2,
+        phase: 'work',
+        visibility: 'public',
+        actorPlayerId: 'p1',
+        type: 'resource.accumulated',
+        resources: { food: 2 },
+        to: { kind: 'card', playerId: 'p1', cardId: 'B48_ForestStone' },
+      },
+      {
+        schemaVersion: 1,
+        id: 'resource-round',
+        seq: 4,
+        round: 2,
+        phase: 'work',
+        visibility: 'public',
+        type: 'resource.accumulated',
+        resources: { stone: 1 },
+        to: { kind: 'roundCard', round: 7 },
+        silent: true,
+      },
+    ] satisfies GameEvent[]
+
+    expect(eventsToLogEntries(events, {
+      playerNames: { p1: 'Alice' },
+      actionNames: { forest: 'Forest', fishing: 'Fishing' },
+    })).toEqual([
+      {
+        key: 'log.resourceAccumulated',
+        params: { target: 'roundCard', round: 7, resources: { stone: 1 } },
+      },
+      {
+        key: 'log.resourceAccumulated',
+        params: { target: 'card', cardId: 'B48_ForestStone', player: 'Alice', resources: { food: 2 } },
+      },
+      {
+        key: 'log.resourceAccumulated',
+        params: { target: 'actionSpace', action: 'Fishing', resources: { food: 1 } },
+      },
+      {
+        key: 'log.actionAccumulated',
+        params: { action: 'Forest', resources: { wood: 3 } },
+      },
+    ])
+  })
+
+  it('does not map empty accumulation resources', () => {
+    const events = [
+      {
+        schemaVersion: 1,
+        id: 'empty-action',
+        seq: 1,
+        round: 2,
+        phase: 'work',
+        visibility: 'public',
+        type: 'action.accumulated',
+        spaceId: 'forest',
+        resources: { wood: 0 },
+      },
+      {
+        schemaVersion: 1,
+        id: 'empty-resource',
+        seq: 2,
+        round: 2,
+        phase: 'work',
+        visibility: 'public',
+        type: 'resource.accumulated',
+        resources: {},
+        to: { kind: 'card', cardId: 'B48_ForestStone' },
+        silent: true,
+      },
+    ] satisfies GameEvent[]
+
+    expect(eventsToLogEntries(events, { playerNames: {} })).toEqual([])
+  })
+
   it('maps future meeple source summary logs', () => {
     const event = {
       schemaVersion: 1,
@@ -456,6 +559,258 @@ describe('eventsToLogEntries', () => {
         },
       },
       { key: 'log.startGame' },
+    ])
+  })
+
+  it('maps card lifecycle events to newest-first log entries', () => {
+    const base = {
+      schemaVersion: 1,
+      round: 4,
+      phase: 'work',
+      visibility: 'public',
+      actorPlayerId: 'p1',
+    } as const
+    const events = [
+      {
+        ...base,
+        id: '1',
+        seq: 1,
+        type: 'card.triggered',
+        cardId: 'B48_ForestStone',
+        triggerActionId: 'forest',
+        replacement: true,
+        optional: true,
+        accepted: false,
+      },
+      {
+        ...base,
+        id: '2',
+        seq: 2,
+        type: 'card.infoboxChanged',
+        cardId: 'B48_ForestStone',
+        text: '2 wood',
+        targetPlayerId: 'p1',
+      },
+      {
+        ...base,
+        id: '3',
+        seq: 3,
+        type: 'card.stackChanged',
+        cardId: 'B48_ForestStone',
+        targetPlayerId: 'p1',
+        resources: { wood: 2, food: 0 },
+        delta: 2,
+        reason: 'store',
+      },
+      {
+        ...base,
+        id: '4',
+        seq: 4,
+        type: 'card.swappedWithBoard',
+        playerId: 'p1',
+        fromPlayerCardId: 'A1_FromHand',
+        toPlayerCardId: 'A2_FromBoard',
+      },
+      {
+        ...base,
+        id: '5',
+        seq: 5,
+        type: 'card.returnedToBoard',
+        playerId: 'p1',
+        cardId: 'A2_FromBoard',
+      },
+      {
+        ...base,
+        id: '6',
+        seq: 6,
+        type: 'card.destroyed',
+        playerId: 'p1',
+        cardId: 'A3_Destroyed',
+        reason: 'cardEffect',
+      },
+      {
+        ...base,
+        id: '7',
+        seq: 7,
+        type: 'card.passed',
+        fromPlayerId: 'p1',
+        toPlayerId: 'p2',
+        cardId: 'A4_Passed',
+      },
+    ] satisfies GameEvent[]
+
+    const entries = eventsToLogEntries(events, {
+      playerNames: { p1: 'Alice', p2: 'Bob' },
+      actionNames: { forest: 'Forest' },
+    })
+
+    expect(entries.map((entry) => entry.key)).toEqual([
+      'log.cardPassed',
+      'log.cardDestroyed',
+      'log.cardReturnedToBoard',
+      'log.cardSwappedWithBoard',
+      'log.cardStackChanged',
+      'log.cardInfoboxChanged',
+      'log.cardTriggered',
+    ])
+    expect(entries).toEqual([
+      { key: 'log.cardPassed', params: { fromPlayer: 'Alice', toPlayer: 'Bob', cardId: 'A4_Passed' } },
+      { key: 'log.cardDestroyed', params: { player: 'Alice', cardId: 'A3_Destroyed' } },
+      { key: 'log.cardReturnedToBoard', params: { player: 'Alice', cardId: 'A2_FromBoard' } },
+      { key: 'log.cardSwappedWithBoard', params: { player: 'Alice', fromCardId: 'A1_FromHand', toCardId: 'A2_FromBoard' } },
+      { key: 'log.cardStackChanged', params: { cardId: 'B48_ForestStone', resources: { wood: 2 }, delta: 2, reason: 'store' } },
+      { key: 'log.cardInfoboxChanged', params: { cardId: 'B48_ForestStone', text: '2 wood' } },
+      { key: 'log.cardTriggered', params: { cardId: 'B48_ForestStone', triggerAction: 'Forest', replacement: true, optional: true, declined: true } },
+    ])
+  })
+
+  it('maps remaining farm, future meeple, worker, and lifecycle events to newest-first log entries', () => {
+    const base = {
+      schemaVersion: 1,
+      round: 5,
+      phase: 'work',
+      visibility: 'public',
+      actorPlayerId: 'p1',
+    } as const
+    const events = [
+      {
+        ...base,
+        id: '1',
+        seq: 1,
+        type: 'farm.cropAdded',
+        crops: [
+          { location: { kind: 'field', playerId: 'p1', row: 0, col: 0 }, crop: 'grain', amount: 2 },
+          { location: { kind: 'field', playerId: 'p1', row: 0, col: 1 }, crop: 'grain', amount: 1 },
+          { location: { kind: 'field', playerId: 'p1', row: 0, col: 2 }, crop: 'vegetable', amount: 0 },
+        ],
+        reason: 'cardEffect',
+      },
+      {
+        ...base,
+        id: '2',
+        seq: 2,
+        type: 'farm.cropRemoved',
+        crops: [
+          { location: { kind: 'field', playerId: 'p1', row: 0, col: 0 }, crop: 'vegetable', amount: 1 },
+          { location: { kind: 'field', playerId: 'p1', row: 0, col: 1 }, crop: 'grain', amount: -1 },
+        ],
+        reason: 'harvest',
+      },
+      {
+        ...base,
+        id: '3',
+        seq: 3,
+        type: 'farm.fenceConsumed',
+        count: 3,
+        reason: 'cardEffect',
+      },
+      {
+        ...base,
+        id: '4',
+        seq: 4,
+        type: 'farm.animalMoved',
+        animals: { sheep: 2, boar: 0, cattle: 1 },
+        from: { kind: 'supply' },
+        to: { kind: 'player', playerId: 'p1' },
+      },
+      {
+        ...base,
+        id: '5',
+        seq: 5,
+        type: 'futureMeeple.removed',
+        playerId: 'p1',
+        cardId: 'B157_Salter',
+        rounds: [6, 7],
+      },
+      {
+        ...base,
+        id: '6',
+        seq: 6,
+        type: 'futureMeeple.resolved',
+        playerId: 'p1',
+        cardId: 'B157_Salter',
+        round: 6,
+        roomType: 'clay',
+        resources: { food: 2, wood: 0 },
+      },
+      {
+        ...base,
+        id: '7',
+        seq: 7,
+        type: 'worker.returned',
+        workers: [{ playerId: 'p1', workerId: 'w1' }],
+        to: 'home',
+      },
+      {
+        ...base,
+        id: '8',
+        seq: 8,
+        type: 'worker.promoted',
+        playerId: 'p1',
+        workerId: 'w2',
+        from: 'newborn',
+        to: 'adult',
+      },
+      {
+        ...base,
+        id: '9',
+        seq: 9,
+        type: 'work.started',
+      },
+      {
+        ...base,
+        id: '10',
+        seq: 10,
+        type: 'returnHome.started',
+      },
+    ] satisfies GameEvent[]
+
+    const entries = eventsToLogEntries(events, { playerNames: { p1: 'Alice' } })
+
+    expect(entries.map((entry) => entry.key)).toEqual([
+      'log.returnHomeStarted',
+      'log.workStarted',
+      'log.workerPromoted',
+      'log.workerReturned',
+      'log.futureMeepleResolved',
+      'log.futureMeepleRemoved',
+      'log.farmAnimalMoved',
+      'log.farmFenceConsumed',
+      'log.farmCropRemoved',
+      'log.farmCropAdded',
+    ])
+    expect(entries).toEqual([
+      { key: 'log.returnHomeStarted' },
+      { key: 'log.workStarted' },
+      { key: 'log.workerPromoted', params: { player: 'Alice' } },
+      { key: 'log.workerReturned', params: { destination: 'home' } },
+      { key: 'log.futureMeepleResolved', params: { player: 'Alice', cardId: 'B157_Salter', round: 6, roomType: 'clay', resources: { food: 2 } } },
+      { key: 'log.futureMeepleRemoved', params: { player: 'Alice', cardId: 'B157_Salter', rounds: '6, 7' } },
+      { key: 'log.farmAnimalMoved', params: { player: 'Alice', animals: { sheep: 2, cattle: 1 } } },
+      { key: 'log.farmFenceConsumed', params: { player: 'Alice', count: 3 } },
+      { key: 'log.farmCropRemoved', params: { player: 'Alice', crops: { vegetable: 1 } } },
+      { key: 'log.farmCropAdded', params: { player: 'Alice', crops: { grain: 3 } } },
+    ])
+  })
+
+  it('maps returned workers without player attribution when multiple players return workers', () => {
+    const event = {
+      schemaVersion: 1,
+      id: 'worker-returned',
+      seq: 1,
+      round: 5,
+      phase: 'returnHome',
+      visibility: 'public',
+      type: 'worker.returned',
+      workers: [
+        { playerId: 'p1', workerId: 'w1' },
+        { playerId: 'p2', workerId: 'w2' },
+      ],
+      to: 'home',
+    } satisfies GameEvent
+
+    expect(eventsToLogEntries([event], { playerNames: { p1: 'Alice', p2: 'Bob' } })).toEqual([
+      { key: 'log.workerReturned', params: { destination: 'home' } },
     ])
   })
 })

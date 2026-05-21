@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PrivateGameEvent } from '../../../shared/contract/protocol/game'
+import { privateEventMappingPolicy } from '../../../shared/events/event-mapping-policy'
 import {
   collectPrivateEventNotifications,
   privateEventSignature,
@@ -20,6 +21,27 @@ describe('private event notifications', () => {
       expect.objectContaining({
         kind: 'hand',
         message: expect.stringContaining('2'),
+      }),
+    ])
+  })
+
+  it('maps draft update events to draft notifications', () => {
+    const events: PrivateGameEvent[] = [{
+      schemaVersion: 1,
+      type: 'private.draftUpdated',
+      recipientPlayerId: 'p1',
+      round: 1,
+      totalRounds: 7,
+      poolCounts: { occ: 6, minor: 6 },
+      keptCounts: { occ: 1, minor: 1 },
+      advanced: true,
+      finished: false,
+    }]
+
+    expect(collectPrivateEventNotifications(events, 'en')).toEqual([
+      expect.objectContaining({
+        kind: 'draft',
+        message: expect.stringContaining('round 2'),
       }),
     ])
   })
@@ -71,5 +93,18 @@ describe('private event notifications', () => {
 
     expect(collectPrivateEventNotifications([event], 'en')).toHaveLength(1)
     expect(collectPrivateEventNotifications([event], 'en')).toHaveLength(1)
+  })
+
+  it('keeps private event mapping policy notification-only and excluded from public replay', () => {
+    expect(Object.keys(privateEventMappingPolicy).sort()).toEqual([
+      'private.draftUpdated',
+      'private.handChanged',
+      'private.promptShown',
+    ])
+
+    for (const policy of Object.values(privateEventMappingPolicy)) {
+      expect(policy.notification.mode).toBe('mapped')
+      expect(policy.publicReplay).toBe('excluded')
+    }
   })
 })

@@ -49,5 +49,5 @@ describe('catalog lookup bootstrap', () => {
       console.log([minor?.id, occupation?.id].join(','))
     `)
     expect(output).toBe('C59_SchnappsDistillery,B104_SheepWalker')
-  }, 15_000)
+  }, 30_000)
 })

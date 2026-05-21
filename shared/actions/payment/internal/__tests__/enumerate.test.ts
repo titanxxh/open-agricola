@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { canPayCost, computeAllBuyableCombinations } from '../enumerate'
-import type { PaymentSolution, PlayerState, Resource } from '../../../../contract/types'
+import type { PaymentSolution, PlayerState, Resource, Trade } from '../../../../contract/types'
 
 const nonZeroPaid = (sol: PaymentSolution): Partial<Resource> => {
   const out: Partial<Resource> = {}
@@ -79,6 +79,42 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
       const paid = nonZeroPaid(s)
       return paid.wood === 1 && paid.food === 1 && paid.clay === undefined && paid.reed === undefined
     })).toBe(true)
+  })
+
+  it('groupMax caps action-scope alternatives across one payment solution', () => {
+    const groupedTrades: Trade[] = [
+      { from: { wood: 1 }, to: { food: 2 }, max: 1, groupId: 'g', groupMax: 1 },
+      { from: { clay: 1 }, to: { food: 2 }, max: 1, groupId: 'g', groupMax: 1 },
+    ]
+
+    const sols = computeAllBuyableCombinations(
+      baseTestPlayer({ wood: 1, clay: 1 }),
+      { fee: { food: 4 }, trades: groupedTrades },
+    )
+
+    expect(sols).toEqual([])
+  })
+
+  it('groupMax caps unit-scope alternatives across the total unit cost', () => {
+    const groupedTrades: Trade[] = [
+      { from: { wood: 1 }, to: { food: 2 }, scope: 'unit', groupId: 'g', groupMax: 1 },
+      { from: { clay: 1 }, to: { food: 2 }, scope: 'unit', groupId: 'g', groupMax: 1 },
+    ]
+
+    const sols = computeAllBuyableCombinations(
+      baseTestPlayer({ wood: 1, clay: 1, food: 2 }),
+      { unitFee: { food: 2 }, nb: 2, trades: groupedTrades },
+    )
+
+    expect(sols.length).toBeGreaterThan(0)
+    for (const sol of sols) {
+      const groupedTimes = sol.tradesUsed.reduce((sum, entry) => sum + entry.times, 0)
+      expect(groupedTimes).toBeLessThanOrEqual(1)
+    }
+    expect(sols.some((s) => {
+      const paid = nonZeroPaid(s)
+      return paid.wood === 1 && paid.clay === 1 && paid.food === undefined
+    })).toBe(false)
   })
 
   it('mixed action + unit trades — independent budgets', () => {

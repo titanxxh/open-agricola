@@ -26,6 +26,8 @@
     "check:test-project-coverage": "tsx scripts/check-test-project-coverage.ts",
     "check:bundle-size": "tsx scripts/check-bundle-size.ts",
     "check:catalog-types": "tsx scripts/check-catalog-types.ts",
+    "check:direct-session-log": "tsx scripts/check-direct-session-log.ts",
+    "check:provenance-result-audit": "vitest run shared/cards/__tests__/provenance-result-audit.test.ts",
     "build:cards-manifest": "tsx scripts/build-cards-manifest.ts",
     "prebuild": "pnpm run build:cards-manifest",
     "pretest": "pnpm run build:cards-manifest",

@@ -1,5 +1,5 @@
 import type { PromptKey } from './prompt-keys'
-import type { EventSink, GameEvent } from './events'
+import type { EventSink, GameEvent, PublicEventArchivePacket } from './events'
 import type { PrivateGameEvent } from './private-events'
 
 export type Resource = {
@@ -47,6 +47,8 @@ export type Trade = {
   to: Partial<Resource>
   max?: number
   scope?: 'action' | 'unit'   // default 'action' (back-compat)
+  groupId?: string
+  groupMax?: number
   replaceUpTo?: boolean
   order?: number
   source?: string
@@ -98,6 +100,8 @@ export type TradeModifier = {
   to: Partial<Resource>
   max?: number
   scope?: 'action' | 'unit'   // default 'action'
+  groupId?: string
+  groupMax?: number
   replaceUpTo?: boolean
   order?: number
   /**
@@ -369,6 +373,8 @@ export type GameState = {
   log: LogEntry[]
   events: GameEvent[]
   nextEventSeq: number
+  publicEventArchive: PublicEventArchivePacket[]
+  nextPublicEventArchivePacketSeq: number
   roundStartSnapshot: GameState | null
   roundActionOrder: (string | null)[]
   gameSeed: number
@@ -808,6 +814,7 @@ export type InteractionSelection =
       selectablePositions: FarmTilePosition[]
       maxSelections: number
       minSelections?: number
+      allowedSelectionCounts?: number[]
     }
   | {
       kind: 'occupation-hand'

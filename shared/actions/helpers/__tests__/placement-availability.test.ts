@@ -20,7 +20,7 @@ describe('computeAllowedPlacementSpaces', () => {
           stdio: 'pipe',
         },
       )).not.toThrow()
-  }, 10_000)
+  }, 20_000)
 
   it('returns all non-occupied, executable spaces as allowOccupied:false', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 2 })

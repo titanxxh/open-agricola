@@ -60,6 +60,26 @@ describe('validateTradeModifier', () => {
       conditions: { minNumRooms: 2 },
     })).not.toThrow()
   })
+  it('requires groupId and groupMax to be set together', () => {
+    expect(() => validateTradeModifier({
+      type: 'trade', cardId: 'X', appliesTo: ['occupation'],
+      from: { wood: 1 }, to: { food: 2 },
+      groupId: 'g',
+    })).toThrow(/groupId.*groupMax/)
+    expect(() => validateTradeModifier({
+      type: 'trade', cardId: 'X', appliesTo: ['occupation'],
+      from: { wood: 1 }, to: { food: 2 },
+      groupMax: 1,
+    })).toThrow(/groupId.*groupMax/)
+  })
+  it('requires groupMax to be a positive integer', () => {
+    expect(() => validateTradeModifier({
+      type: 'trade', cardId: 'X', appliesTo: ['occupation'],
+      from: { wood: 1 }, to: { food: 2 },
+      groupId: 'g',
+      groupMax: 0,
+    })).toThrow(/positive integer/)
+  })
 })
 
 describe('validateComplexCost', () => {
@@ -117,6 +137,18 @@ describe('applyCostModifiers — scope handling', () => {
       },
     ])
     expect(result.trades?.[0]?.max).toBe(3)
+  })
+  it('copies groupId and groupMax to synthesised Trade', () => {
+    const result = applyCostModifiers({}, [
+      {
+        type: 'trade', cardId: 'E60_WorkingGloves', appliesTo: ['occupation'],
+        from: { wood: 1 }, to: { food: 2 }, max: 1,
+        groupId: 'E60_WorkingGloves:occupation-food-replacement',
+        groupMax: 1,
+      },
+    ])
+    expect(result.trades?.[0]?.groupId).toBe('E60_WorkingGloves:occupation-food-replacement')
+    expect(result.trades?.[0]?.groupMax).toBe(1)
   })
   it('throws via validateTradeModifier on scope:unit + minNumRooms', () => {
     expect(() => applyCostModifiers({}, [

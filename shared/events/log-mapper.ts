@@ -1,14 +1,31 @@
 import type {
   ActionDetailLoggedEvent,
+  ActionAccumulatedEvent,
+  CardDestroyedEvent,
+  CardInfoboxChangedEvent,
+  CardPassedEvent,
   CardPlayedEvent,
+  CardReturnedToBoardEvent,
+  CardStackChangedEvent,
+  CardSwappedWithBoardEvent,
+  CardTriggeredEvent,
+  FarmAnimalMovedEvent,
+  FarmCropAddedEvent,
+  FarmCropRemovedEvent,
   FarmFenceBuiltEvent,
+  FarmFenceConsumedEvent,
+  FutureMeepleRemovedEvent,
+  FutureMeepleResolvedEvent,
   FutureMeepleQueuedEvent,
   FarmRenovatedEvent,
   FarmStableBuiltEvent,
   GameEvent,
   HarvestPhaseStartedEvent,
+  ResourceAccumulatedEvent,
   ResourcePaidEvent,
   ResourceMovedEvent,
+  WorkerPromotedEvent,
+  WorkerReturnedEvent,
   WorkerPlacedEvent,
 } from '../contract/events'
 import type { ActionDetailParts } from '../contract/protocol/game'
@@ -22,11 +39,80 @@ export type EventLogMapperContext = {
 const positiveResources = (resources: Partial<Resource>): Partial<Resource> =>
   Object.fromEntries(Object.entries(resources).filter(([, value]) => typeof value === 'number' && value > 0))
 
+const resourceSuffix = (resources: Partial<Resource> | undefined): Partial<Resource> =>
+  positiveResources(resources ?? {})
+
+const cropsToResources = (
+  crops: FarmCropAddedEvent['crops'] | FarmCropRemovedEvent['crops'],
+): Partial<Resource> => {
+  const resources: Partial<Resource> = {}
+  crops.forEach((crop) => {
+    if (crop.amount <= 0) return
+    resources[crop.crop] = (resources[crop.crop] ?? 0) + crop.amount
+  })
+  return resources
+}
+
 const playerName = (ctx: EventLogMapperContext, playerId?: string): string | undefined =>
   playerId ? ctx.playerNames[playerId] ?? playerId : undefined
 
 const actionName = (ctx: EventLogMapperContext, actionId?: string): string | undefined =>
   actionId ? ctx.actionNames?.[actionId] ?? actionId : undefined
+
+const mapActionAccumulated = (
+  event: ActionAccumulatedEvent,
+  ctx: EventLogMapperContext,
+): LogEntry | null => {
+  const resources = positiveResources(event.resources)
+  if (Object.keys(resources).length === 0) return null
+  return {
+    key: 'log.actionAccumulated',
+    params: {
+      action: actionName(ctx, event.spaceId),
+      resources,
+    },
+  }
+}
+
+const mapResourceAccumulated = (
+  event: ResourceAccumulatedEvent,
+  ctx: EventLogMapperContext,
+): LogEntry | null => {
+  const resources = positiveResources(event.resources)
+  if (Object.keys(resources).length === 0) return null
+
+  if (event.to.kind === 'actionSpace') {
+    return {
+      key: 'log.resourceAccumulated',
+      params: {
+        target: 'actionSpace',
+        action: actionName(ctx, event.to.spaceId),
+        resources,
+      },
+    }
+  }
+
+  if (event.to.kind === 'card') {
+    return {
+      key: 'log.resourceAccumulated',
+      params: {
+        target: 'card',
+        cardId: event.to.cardId,
+        ...(event.to.playerId ? { player: playerName(ctx, event.to.playerId) } : {}),
+        resources,
+      },
+    }
+  }
+
+  return {
+    key: 'log.resourceAccumulated',
+    params: {
+      target: 'roundCard',
+      round: event.to.round,
+      resources,
+    },
+  }
+}
 
 const actionDetailLog = (
   ctx: EventLogMapperContext,
@@ -194,6 +280,155 @@ const mapFutureMeepleQueued = (
   }
 }
 
+const mapCardTriggered = (
+  event: CardTriggeredEvent,
+  ctx: EventLogMapperContext,
+): LogEntry => {
+  return {
+    key: 'log.cardTriggered',
+    params: {
+      cardId: event.cardId,
+      ...(event.triggerActionId ? { triggerAction: actionName(ctx, event.triggerActionId) } : {}),
+      ...(event.replacement ? { replacement: true } : {}),
+      ...(event.optional ? { optional: true } : {}),
+      ...(event.accepted === false ? { declined: true } : {}),
+    },
+  }
+}
+
+const mapCardStackChanged = (event: CardStackChangedEvent): LogEntry => ({
+  key: 'log.cardStackChanged',
+  params: {
+    cardId: event.cardId,
+    resources: resourceSuffix(event.resources),
+    delta: event.delta,
+    reason: event.reason,
+  },
+})
+
+const mapFutureMeepleResolved = (
+  event: FutureMeepleResolvedEvent,
+  ctx: EventLogMapperContext,
+): LogEntry => ({
+  key: 'log.futureMeepleResolved',
+  params: {
+    player: playerName(ctx, event.playerId),
+    cardId: event.cardId,
+    round: event.round,
+    roomType: event.roomType ?? '',
+    resources: resourceSuffix(event.resources),
+  },
+})
+
+const mapCardInfoboxChanged = (event: CardInfoboxChangedEvent): LogEntry => ({
+  key: 'log.cardInfoboxChanged',
+  params: {
+    cardId: event.cardId,
+    text: event.text,
+  },
+})
+
+const mapCardSwappedWithBoard = (
+  event: CardSwappedWithBoardEvent,
+  ctx: EventLogMapperContext,
+): LogEntry => ({
+  key: 'log.cardSwappedWithBoard',
+  params: {
+    player: playerName(ctx, event.playerId),
+    fromCardId: event.fromPlayerCardId,
+    toCardId: event.toPlayerCardId,
+  },
+})
+
+const mapCardReturnedToBoard = (
+  event: CardReturnedToBoardEvent,
+  ctx: EventLogMapperContext,
+): LogEntry => ({
+  key: 'log.cardReturnedToBoard',
+  params: {
+    player: playerName(ctx, event.playerId),
+    cardId: event.cardId,
+  },
+})
+
+const mapCardDestroyed = (event: CardDestroyedEvent, ctx: EventLogMapperContext): LogEntry => ({
+  key: 'log.cardDestroyed',
+  params: {
+    player: playerName(ctx, event.playerId ?? event.actorPlayerId),
+    cardId: event.cardId,
+  },
+})
+
+const mapCardPassed = (event: CardPassedEvent, ctx: EventLogMapperContext): LogEntry => ({
+  key: 'log.cardPassed',
+  params: {
+    fromPlayer: playerName(ctx, event.fromPlayerId),
+    toPlayer: playerName(ctx, event.toPlayerId),
+    cardId: event.cardId,
+  },
+})
+
+const mapFarmCropAdded = (event: FarmCropAddedEvent, ctx: EventLogMapperContext): LogEntry => ({
+  key: 'log.farmCropAdded',
+  params: {
+    player: playerName(ctx, event.actorPlayerId ?? event.targetPlayerId),
+    crops: cropsToResources(event.crops),
+  },
+})
+
+const mapFarmCropRemoved = (event: FarmCropRemovedEvent, ctx: EventLogMapperContext): LogEntry => ({
+  key: 'log.farmCropRemoved',
+  params: {
+    player: playerName(ctx, event.actorPlayerId ?? event.targetPlayerId),
+    crops: cropsToResources(event.crops),
+  },
+})
+
+const mapFarmFenceConsumed = (
+  event: FarmFenceConsumedEvent,
+  ctx: EventLogMapperContext,
+): LogEntry => ({
+  key: 'log.farmFenceConsumed',
+  params: {
+    player: playerName(ctx, event.actorPlayerId ?? event.targetPlayerId),
+    count: event.count,
+  },
+})
+
+const mapFarmAnimalMoved = (event: FarmAnimalMovedEvent, ctx: EventLogMapperContext): LogEntry => ({
+  key: 'log.farmAnimalMoved',
+  params: {
+    player: playerName(ctx, event.actorPlayerId ?? event.targetPlayerId),
+    animals: resourceSuffix(event.animals),
+  },
+})
+
+const mapFutureMeepleRemoved = (
+  event: FutureMeepleRemovedEvent,
+  ctx: EventLogMapperContext,
+): LogEntry => ({
+  key: 'log.futureMeepleRemoved',
+  params: {
+    player: playerName(ctx, event.playerId),
+    cardId: event.cardId,
+    rounds: event.rounds?.join(', ') ?? '',
+  },
+})
+
+const mapWorkerReturned = (event: WorkerReturnedEvent): LogEntry => ({
+  key: 'log.workerReturned',
+  params: {
+    destination: event.to,
+  },
+})
+
+const mapWorkerPromoted = (event: WorkerPromotedEvent, ctx: EventLogMapperContext): LogEntry => ({
+  key: 'log.workerPromoted',
+  params: {
+    player: playerName(ctx, event.playerId),
+  },
+})
+
 const cardPaymentFor = (
   events: readonly GameEvent[],
   played: CardPlayedEvent,
@@ -294,14 +529,60 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
         return [mapCardPlayed(event, payment)]
       }
 
+      if (event.type === 'card.triggered') {
+        return [mapCardTriggered(event, ctx)]
+      }
+
+      if (event.type === 'card.infoboxChanged') {
+        return [mapCardInfoboxChanged(event)]
+      }
+
+      if (event.type === 'card.stackChanged') {
+        return [mapCardStackChanged(event)]
+      }
+
+      if (event.type === 'card.swappedWithBoard') {
+        return [mapCardSwappedWithBoard(event, ctx)]
+      }
+
+      if (event.type === 'card.returnedToBoard') {
+        return [mapCardReturnedToBoard(event, ctx)]
+      }
+
+      if (event.type === 'card.destroyed') {
+        return [mapCardDestroyed(event, ctx)]
+      }
+
+      if (event.type === 'card.passed') {
+        return [mapCardPassed(event, ctx)]
+      }
+
       if (event.type === 'resource.moved') {
         const entry = mapResourceMoved(events, event, ctx)
+        return entry ? [entry] : []
+      }
+
+      if (event.type === 'action.accumulated') {
+        const entry = mapActionAccumulated(event, ctx)
+        return entry ? [entry] : []
+      }
+
+      if (event.type === 'resource.accumulated') {
+        const entry = mapResourceAccumulated(event, ctx)
         return entry ? [entry] : []
       }
 
       if (event.type === 'worker.placed') {
         const entry = mapWorkerPlaced(event, ctx)
         return entry ? [entry] : []
+      }
+
+      if (event.type === 'worker.returned') {
+        return [mapWorkerReturned(event)]
+      }
+
+      if (event.type === 'worker.promoted') {
+        return [mapWorkerPromoted(event, ctx)]
       }
 
       if (event.type === 'turn.skipped') {
@@ -331,6 +612,14 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
 
       if (event.type === 'round.started') {
         return [{ key: 'log.enterRound', params: { round: event.round } }]
+      }
+
+      if (event.type === 'work.started') {
+        return [{ key: 'log.workStarted' }]
+      }
+
+      if (event.type === 'returnHome.started') {
+        return [{ key: 'log.returnHomeStarted' }]
       }
 
       if (event.type === 'harvest.started') {
@@ -366,6 +655,14 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
         return entry ? [entry] : []
       }
 
+      if (event.type === 'futureMeeple.removed') {
+        return [mapFutureMeepleRemoved(event, ctx)]
+      }
+
+      if (event.type === 'futureMeeple.resolved') {
+        return [mapFutureMeepleResolved(event, ctx)]
+      }
+
       if (event.type === 'game.started') {
         return [{ key: 'log.startGame' }]
       }
@@ -379,6 +676,14 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
           key: 'log.sow',
           params: { player: playerName(ctx, event.actorPlayerId) },
         }]
+      }
+
+      if (event.type === 'farm.cropAdded') {
+        return [mapFarmCropAdded(event, ctx)]
+      }
+
+      if (event.type === 'farm.cropRemoved') {
+        return [mapFarmCropRemoved(event, ctx)]
       }
 
       if (event.type === 'farm.fieldPlowed') {
@@ -408,6 +713,14 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
       if (event.type === 'farm.fenceBuilt') {
         const entry = mapFenceBuilt(event, ctx)
         return entry ? [entry] : []
+      }
+
+      if (event.type === 'farm.fenceConsumed') {
+        return [mapFarmFenceConsumed(event, ctx)]
+      }
+
+      if (event.type === 'farm.animalMoved') {
+        return [mapFarmAnimalMoved(event, ctx)]
       }
 
       if (event.type === 'farm.animalBred') {

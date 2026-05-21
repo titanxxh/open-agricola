@@ -3,10 +3,9 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { C131_PrivateTeacher } from '../../cards-display/C/C131_PrivateTeacher'
+import { LESSONS_SPACE_IDS } from '../helpers/lessons-spaces'
 
 const CARD_ID = C131_PrivateTeacher.id
-
-const LESSONS_SPACES = ['lessons', 'lessons-2', 'lessons-4']
 
 const listener: CardListenerRegistration = {
   id: 'C131-private-teacher-after-place-farmer',
@@ -15,7 +14,7 @@ const listener: CardListenerRegistration = {
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'grain-seeds') return
-    const lessonsOccupied = LESSONS_SPACES.some((id) => {
+    const lessonsOccupied = LESSONS_SPACE_IDS.some((id) => {
       const s = context.state.actionSpaces.find((space) => space.id === id)
       return !!s && isSpaceOccupied(s)
     })

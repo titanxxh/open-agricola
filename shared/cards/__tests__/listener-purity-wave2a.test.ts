@@ -239,6 +239,71 @@ describe('listener purity wave 2a', () => {
     expect((rewardFlow.children[1] as LeafFlow).actionContext).toEqual({ skipRoomCheck: true })
   })
 
+  it('B21 HayloftBarn falls back to transactionEvents when actionEvents is absent', () => {
+    const p = player(B21, {
+      cardStates: { [B21]: { extraData: { foodCount: 2 }, infobox: '2 Food' } },
+      workers: [
+        { id: '1', isActive: true, isNewborn: false },
+        { id: '2', isActive: true, isNewborn: false },
+      ],
+    })
+    const ctx = context(p, {
+      actionId: 'gain',
+      result: { type: 'ok', resourcesGained: { grain: 1 } },
+      transactionEvents: [{
+        type: 'resource.moved',
+        resources: { grain: 1 },
+        from: { kind: 'supply' },
+        to: { kind: 'player', playerId: p.id },
+        reason: 'gain',
+      }],
+    })
+
+    const result = listenerById(
+      B21_HayloftBarn_impl.listeners,
+      'B21-hayloft-barn-after-grain-gain',
+    ).handler(ctx)
+
+    expect(result?.flow?.type).toBe('seq')
+  })
+
+  it('B21 HayloftBarn ignores stale transaction grain when current actionEvents have no grain', () => {
+    const p = player(B21, {
+      cardStates: { [B21]: { extraData: { foodCount: 2 }, infobox: '2 Food' } },
+      workers: [
+        { id: '1', isActive: true, isNewborn: false },
+        { id: '2', isActive: true, isNewborn: false },
+      ],
+    })
+    const ctx = context(p, {
+      actionId: 'gain',
+      result: { type: 'ok', resourcesGained: { food: 1 } },
+      transactionEvents: [{
+        type: 'resource.moved',
+        resources: { grain: 1 },
+        from: { kind: 'supply' },
+        to: { kind: 'player', playerId: p.id },
+        reason: 'gain',
+      }],
+      actionEvents: [{
+        type: 'resource.moved',
+        resources: { food: 1 },
+        from: { kind: 'supply' },
+        to: { kind: 'player', playerId: p.id },
+        reason: 'gain',
+      }],
+    })
+    const before = snapshot(p)
+
+    const result = listenerById(
+      B21_HayloftBarn_impl.listeners,
+      'B21-hayloft-barn-after-grain-gain',
+    ).handler(ctx)
+
+    expect(result).toBeUndefined()
+    expectCardStatesUnchanged(p, before, 'B21 owner')
+  })
+
   it('A130 MummysBoy after-place-farmer listener returns flag leaf without mutating cardStates', () => {
     const p = player(A130, {
       occupationPlayed: [A130],

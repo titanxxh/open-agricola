@@ -32,6 +32,9 @@ jobs:
       - name: All tests (fast + slow)
         run: pnpm test
 
+      - name: Check direct session log writes
+        run: pnpm run check:direct-session-log
+
       - name: Build (includes cards manifest)
         run: pnpm run build
 

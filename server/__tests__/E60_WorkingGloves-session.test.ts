@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { computeAllBuyableCombinations } from '../../shared/actions/payment/internal'
+import type { PaymentSolution } from '../../shared/contract/types'
 import '../../shared/cards/E/E60_WorkingGloves'
 
 const CARD_ID = 'E60_WorkingGloves'
@@ -27,6 +28,12 @@ describe('E60_WorkingGloves session — trade-style modifier on occupation cost'
     const live = session.getState().state.players[0]!
     return { session, state, player: live }
   }
+
+  const e60TradeTimes = (solution: PaymentSolution) =>
+    solution.tradesUsed.reduce(
+      (sum, entry) => sum + (entry.trade.sourceId === CARD_ID ? entry.times : 0),
+      0,
+    )
 
   it('player.activeModifiers contains 4 trade modifiers for occupation cost', () => {
     const { player } = setup()
@@ -85,5 +92,49 @@ describe('E60_WorkingGloves session — trade-style modifier on occupation cost'
       s.tradesUsed.some((t) => t.trade.sourceId === CARD_ID && t.times > 0),
     )
     expect(e60TradeUsed).toBeUndefined()
+  })
+
+  it('does not allow two building resources to replace 4 food in one occupation payment', () => {
+    const { player } = setup()
+    player.resources = {
+      ...player.resources,
+      wood: 1,
+      clay: 1,
+      reed: 0,
+      stone: 0,
+      food: 0,
+    }
+
+    const solutions = computeAllBuyableCombinations(
+      player,
+      { fee: { food: 4 } },
+      undefined,
+      'occupation',
+    )
+
+    expect(solutions).toEqual([])
+  })
+
+  it('allows one building resource replacement when the remaining food is paid', () => {
+    const { player } = setup()
+    player.resources = {
+      ...player.resources,
+      wood: 1,
+      clay: 1,
+      reed: 0,
+      stone: 0,
+      food: 2,
+    }
+
+    const solutions = computeAllBuyableCombinations(
+      player,
+      { fee: { food: 4 } },
+      undefined,
+      'occupation',
+    )
+
+    expect(solutions.length).toBeGreaterThan(0)
+    expect(solutions.every((s) => e60TradeTimes(s) <= 1)).toBe(true)
+    expect(solutions.some((s) => e60TradeTimes(s) === 1 && (s.resourcesPaid.food ?? 0) === 2)).toBe(true)
   })
 })
