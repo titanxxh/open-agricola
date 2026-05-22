@@ -4,11 +4,12 @@ import type {
   ActionFlow,
   ActionSpace,
   CanBeExecutedByPlayer,
+  CanBeExecutedByPlayerContext,
   GameState,
   PlayerState,
   Resource,
 } from '../contract/types'
-import { applyIsDoableHooks } from './hooks'
+import { applyIsDoableHooksDetailed } from './hooks'
 
 const deferredFlowDoableFns = new WeakSet<CanBeExecutedByPlayer>()
 
@@ -31,7 +32,14 @@ type FlowDoableContext = {
   state: GameState
   player: PlayerState
   space: ActionSpace
+  sourceCard?: string
+  actionContext?: Record<string, unknown>
 }
+
+const childCanBeExecutedContext = (context: FlowDoableContext): CanBeExecutedByPlayerContext => ({
+  sourceCard: context.sourceCard,
+  actionContext: context.actionContext,
+})
 
 export const wrapOptional = (flow: ActionFlow): ActionFlow => ({
   type: 'seq',
@@ -91,18 +99,23 @@ const applyChildActionDoable = (
       context.space,
       context.state,
       context.player,
+      childCanBeExecutedContext(context),
     )
   }
 
-  doable = applyIsDoableHooks(
+  const actionHookDoable = applyIsDoableHooksDetailed(
     {
       state: context.state,
       player: context.player,
       space: context.space,
       actionId,
+      sourceCard: context.sourceCard,
+      actionContext: context.actionContext,
     },
     doable,
   )
+  doable = actionHookDoable.doable
+  let vetoed = actionHookDoable.vetoed
 
   const listenerContext = {
     state: context.state,
@@ -111,14 +124,19 @@ const applyChildActionDoable = (
     actionId,
     phase: 'isDoable' as const,
     doable,
+    sourceCard: context.sourceCard,
+    actionContext: context.actionContext,
   }
   const matched = getMatchingListeners(listenerContext)
   for (const entry of matched) {
     const result = executeCardListener(entry.registration, listenerContext, {
       ownerPlayerId: entry.ownerPlayerId,
     })
-    if (typeof result?.doable === 'boolean') {
-      doable = result.doable
+    if (result?.doable === false) {
+      doable = false
+      vetoed = true
+    } else if (result?.doable === true && !vetoed) {
+      doable = true
     }
   }
 
@@ -140,10 +158,17 @@ const evaluateFlowDoable = (
     if (!action) {
       return false
     }
+    const childContext: FlowDoableContext = {
+      ...context,
+      sourceCard: flow.sourceCard ?? context.sourceCard,
+      actionContext: flow.actionContext
+        ? { ...(context.actionContext ?? {}), ...flow.actionContext }
+        : context.actionContext,
+    }
     return applyChildActionDoable(
       flow.actionId,
       action,
-      context,
+      childContext,
       resolveAction,
       seenActionIds,
     )
@@ -175,11 +200,18 @@ export const initializeFlowDerivedCanBeExecutedByPlayer = (
     this: ActionDefinition | ActionSpace,
     state,
     player,
+    context,
   ) {
     const space = asActionSpace(action, this)
     return evaluateFlowDoable(
       action.flow!,
-      { state, player, space },
+      {
+        state,
+        player,
+        space,
+        sourceCard: context?.sourceCard,
+        actionContext: context?.actionContext,
+      },
       resolveAction,
       new Set([action.id]),
     )
