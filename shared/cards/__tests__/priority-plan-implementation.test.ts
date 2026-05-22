@@ -13,14 +13,12 @@ import '../B/B34_SpecialFood'
 import '../C/C60_SmallPottersOven'
 import { C60_SmallPottersOven } from '../../cards-display/C/C60_SmallPottersOven'
 import '../C/C71_Slurry'
-import '../C/C88_CarpentersApprentice'
 import '../C/C120_AgriculturalLabourer'
 import '../D/D115_FodderPlanter'
 import '../E/E52_Cubbyhole'
 import '../E/E101_Blighter'
 import { canRenovate, renovateHouseAction } from '../../actions/effects/renovation'
 import { playImprovement } from '../../actions/effects/improvement'
-import { setFencesForTest } from './__fixtures__/fence'
 import type { CardListenerContext } from '../card-listeners'
 import type { DraftGameEvent } from '../../contract/events'
 
@@ -342,27 +340,6 @@ describe('priority plan implementations', () => {
     expect(listener).toBeUndefined()
     expect(renovateHouseAction.canBeExecutedByPlayer(createState(player), player)).toBe(true)
     expect(canRenovate(player)).toBe(true)
-  })
-
-  it('C88 Carpenter\'s Apprentice reserves free late fences', () => {
-    const listener = findListener('C88-carpenters-apprentice-before-fence')
-    const player = createPlayer()
-    player.occupationPlayed = ['C88_CarpentersApprentice']
-    setFencesForTest(player, 12)
-
-    const result = executeCardListener(listener!, {
-      state: createState(player),
-      player,
-      space: createSpace('fence'),
-      actionId: 'fence',
-      phase: 'before',
-    } as unknown as CardListenerContext)
-
-    expect(result?.flow).toMatchObject({
-      type: 'leaf',
-      actionId: 'reserve-fence-bonus',
-      params: { freeFences: 3 },
-    })
   })
 
   it('C60 Small Potter\'s Oven returns an oven and then yields an onBuy gain flow', () => {

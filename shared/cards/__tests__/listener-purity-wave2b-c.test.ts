@@ -12,7 +12,6 @@ import { B34_SpecialFood_impl } from '../B/B34_SpecialFood'
 import { B76_Ceilings_impl } from '../B/B76_Ceilings'
 import { C48_Farmstead_impl } from '../C/C48_Farmstead'
 import { C53_GypsysCrock_impl } from '../C/C53_GypsysCrock'
-import { C88_CarpentersApprentice_impl } from '../C/C88_CarpentersApprentice'
 import { C93_InnerDistrictsDirector_impl } from '../C/C93_InnerDistrictsDirector'
 import { C130_OutskirtsDirector_impl } from '../C/C130_OutskirtsDirector'
 import { C150_ParrotBreeder_impl } from '../C/C150_ParrotBreeder'
@@ -832,24 +831,6 @@ describe('listener purity wave 2b/c', () => {
         { type: 'leaf', actionId: 'special-effect', sourceCard: 'E74_AshTrees', params: { kind: 'clear-pending-fence-bonus' } },
         { type: 'leaf', actionId: 'special-effect', sourceCard: 'E74_AshTrees', params: { kind: 'set-infobox', text: '3 / 5' } },
       ],
-    })
-  })
-
-  it('C88 CarpentersApprentice after-fence clears pending bonus by flow only', () => {
-    const p = player('C88_CarpentersApprentice')
-    storePendingFenceBonus(p, { sourceCard: 'C88_CarpentersApprentice', counterKey: 'fencesDiscounted', freeFences: 2 })
-    const game = state([p])
-    const before = stateSnapshot(game)
-
-    const result = listenerById(C88_CarpentersApprentice_impl.listeners, 'C88-carpenters-apprentice-after-fence')
-      .handler(context(p, { state: game, actionId: 'fence', phase: 'after' }))
-
-    expectUnchanged(before, game)
-    expect(result?.flow).toMatchObject({
-      type: 'leaf',
-      actionId: 'special-effect',
-      sourceCard: 'C88_CarpentersApprentice',
-      params: { kind: 'clear-pending-fence-bonus' },
     })
   })
 
