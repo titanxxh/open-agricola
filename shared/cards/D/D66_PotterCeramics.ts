@@ -42,6 +42,7 @@ const isDoableListener: CardListenerRegistration = {
   actions: ['bake-bread'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
+    if (context.actionContext?.skipBeforeTriggers === true) return
     if ((context.player.resources.clay ?? 0) < 1) return
     if (getPlayerBakeRates(context.player).length > 0) {
       return { doable: true }

@@ -1,6 +1,5 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { canStartFencing } from '../../actions/effects/fencing'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
@@ -13,6 +12,8 @@ const beforeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
   actions: ['fence'],
+  dispatchMode: 'select',
+  mandatory: true,
   handler: (_context: CardListenerContext): ActionHookResult | void => {
     return { flow: gainLeaf(CARD_ID, { wood: 2 }), sourceCard: CARD_ID }
   },
@@ -39,14 +40,7 @@ const isDoableListener: CardListenerRegistration = {
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
-    const previewPlayer = {
-      ...context.player,
-      resources: {
-        ...context.player.resources,
-        wood: (context.player.resources.wood ?? 0) + 2,
-      },
-    }
-    if (!canStartFencing(context.state, previewPlayer)) return
+    if (context.actionContext?.skipBeforeTriggers === true) return
     return { doable: true }
   },
 }

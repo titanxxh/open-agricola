@@ -23,6 +23,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { SANDBOX_ALLOWED_ACTION_IDS } from '../shared/custom-code/sandbox-action-ids'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -148,6 +149,12 @@ export function extractSandboxDocInjections(): string[] {
 /**
  * Extract a `<!-- prompt-sync:begin id=X --> ... <!-- prompt-sync:end id=X -->`
  * block from a markdown file and return the bullet-list items as strings.
+ *
+ * The list-item regex tolerates an optional backslash around the backticks so
+ * the same block parses in both contexts:
+ *   - `.md` files: bare backticks      `- `gain` ...`
+ *   - `.ts` template literals: escaped `- \`gain\` ...` (backtick must be
+ *     escaped inside a template string)
  */
 function extractMarkdownBlock(file: string, blockId: string): string[] | null {
   const src = readFile(file)
@@ -157,7 +164,7 @@ function extractMarkdownBlock(file: string, blockId: string): string[] | null {
   )
   const m = src.match(re)
   if (!m) return null
-  return [...m[1].matchAll(/^-\s*`([^`]+)`/gm)].map(m2 => m2[1])
+  return [...m[1].matchAll(/^-\s*\\?`([^`\\]+)\\?`/gm)].map(m2 => m2[1])
 }
 
 /**
@@ -222,6 +229,7 @@ function main() {
   reports.push(...checkBlock('listener-scopes', listenerScopes, `${SOURCES.engine}:isCardListenerScope`))
   reports.push(...checkBlock('denied-identifiers', deniedIdentifiers, `${SOURCES.astValidator}:DENIED_IDENTIFIERS`))
   reports.push(...checkBlock('denied-property-access', deniedPropertyAccess, `${SOURCES.astValidator}:DENIED_PROPERTY_ACCESS`))
+  reports.push(...checkBlock('action-ids', [...SANDBOX_ALLOWED_ACTION_IDS], 'shared/custom-code/sandbox-action-ids.ts:SANDBOX_ALLOWED_ACTION_IDS'))
 
   // sandbox-injections sub-check (S9 B4): verify every function in
   // injected-helpers.ts is documented in the §1 table of CUSTOM_CARD_SANDBOX.md.
@@ -287,6 +295,27 @@ function main() {
     console.log(`      ${promptPhaseCheck.missing.join(', ')}`)
   } else {
     console.log(`  ✓ ${TARGETS.llmPrompt} mentions all ${actionHookPhases.length} phase names`)
+  }
+
+  // Unlike hook/phase names (substring match via checkTargetMentions), the
+  // actionId whitelist needs a structured prompt-sync block: only an exact
+  // block diff can catch an *extra* actionId the prompt lists outside the
+  // whitelist — a substring scan would silently miss that drift direction.
+  const promptActionIds = extractMarkdownBlock(TARGETS.llmPrompt, 'action-ids')
+  if (promptActionIds === null) {
+    driftCount++
+    console.log(`  ✗ ${TARGETS.llmPrompt} is missing the prompt-sync:begin id=action-ids block`)
+    console.log(`      expected actionIds: ${[...SANDBOX_ALLOWED_ACTION_IDS].join(', ')}`)
+  } else {
+    const r = diff('action-ids', TARGETS.llmPrompt, 'sandbox-action-ids.ts', [...SANDBOX_ALLOWED_ACTION_IDS], promptActionIds)
+    if (r.missingInTarget.length > 0 || r.extraInTarget.length > 0) {
+      driftCount++
+      console.log(`  ✗ [action-ids] ${TARGETS.llmPrompt} ↔ SANDBOX_ALLOWED_ACTION_IDS`)
+      if (r.missingInTarget.length > 0) console.log(`      missing: ${r.missingInTarget.join(', ')}`)
+      if (r.extraInTarget.length > 0) console.log(`      extra:   ${r.extraInTarget.join(', ')}`)
+    } else {
+      console.log(`  ✓ [action-ids] ${TARGETS.llmPrompt} ↔ SANDBOX_ALLOWED_ACTION_IDS`)
+    }
   }
 
   console.log()

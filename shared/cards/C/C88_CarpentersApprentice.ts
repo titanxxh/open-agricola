@@ -1,6 +1,12 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { canStartFencing, getFenceCount } from '../../actions/effects/fencing'
+import {
+  canStartFencing,
+  getFenceCount,
+  getTotalPastureCells,
+  maxFences,
+  maxPastureCells,
+} from '../../actions/effects/fencing'
 import type { CardImpl } from '../registry'
 import { C88_CarpentersApprentice } from '../../cards-display/C/C88_CarpentersApprentice'
 
@@ -38,58 +44,51 @@ const fenceIsDoableListener: CardListenerRegistration = {
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
-    const freeFences = Math.max(0, 15 - getFenceCount(context.player))
-    if (freeFences <= 0) return
+    const player = context.player
+    const before = getFenceCount(player)
+    if (before >= maxFences) return
+    if (getTotalPastureCells(player) >= maxPastureCells) return
+    const wood = player.resources.wood ?? 0
+    // BGA Fencing.php:195-201: the free band unlocks only once the player
+    // can self-pay up to the 12th fence.
+    const neededToReach12 = Math.max(0, 12 - before)
+    if (wood < neededToReach12) return
+    // before >= 12: the 13th-15th fences are all free, wood is not a
+    // constraint. Do not call canStartFencing — its first line
+    // `getFenceCount+4>15` assumes building 4 segments at once, which
+    // conflicts with the 1-3 segments remaining here.
+    if (before >= 12) return { doable: true }
+    // before < 12: the free band (13th-15th fence) always offers exactly 3.
+    const freeFences = 3
     const previewPlayer = {
-      ...context.player,
-      resources: {
-        ...context.player.resources,
-        wood: (context.player.resources.wood ?? 0) + freeFences,
-      },
+      ...player,
+      resources: { ...player.resources, wood: wood + freeFences },
     }
     if (!canStartFencing(context.state, previewPlayer)) return
     return { doable: true }
   },
 }
 
-const fenceBeforeListener: CardListenerRegistration = {
-  id: 'C88-carpenters-apprentice-before-fence',
+const fenceCostListener: CardListenerRegistration = {
+  id: 'C88-carpenters-apprentice-costs-fence',
   cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
+  phases: ['computeCosts' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const freeFences = Math.max(0, 15 - getFenceCount(context.player))
-    if (freeFences <= 0) return
-    return {
-      flow: {
-        type: 'leaf',
-        actionId: 'reserve-fence-bonus',
-        sourceCard: CARD_ID,
-        params: {
-          freeFences,
-          counterKey: 'fencesDiscounted',
-        },
-      },
-    }
+    const newFenceEdges = context.params?.newFenceEdges as string[] | undefined
+    const buildingNow = newFenceEdges?.length ?? 0
+    if (buildingNow <= 0) return
+    // BGA Fencing.php:595-601: the 13th-15th fence each cost 1 wood less.
+    const before = getFenceCount(context.player)
+    const start = before + 1
+    const end = before + buildingNow
+    const free = Math.max(0, Math.min(end, 15) - Math.max(start, 13) + 1)
+    if (free <= 0) return
+    return { costs: { wood: -free } }
   },
 }
 
-const fenceAfterListener: CardListenerRegistration = {
-  id: 'C88-carpenters-apprentice-after-fence',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['fence'],
-  handler: (_context: CardListenerContext): ActionHookResult | void => ({
-    flow: {
-      type: 'leaf',
-      actionId: 'special-effect',
-      sourceCard: CARD_ID,
-      params: { kind: 'clear-pending-fence-bonus' },
-    },
-  }),
-}
-
 export const C88_CarpentersApprentice_impl = {
-  listeners: [constructCostListener, stablesCostListener, fenceIsDoableListener, fenceBeforeListener, fenceAfterListener],
+  listeners: [constructCostListener, stablesCostListener, fenceIsDoableListener, fenceCostListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl

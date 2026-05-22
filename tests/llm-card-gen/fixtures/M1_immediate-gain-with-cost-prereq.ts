@@ -6,7 +6,7 @@ import {
   setHand,
   setWorkersAtHome,
 } from '../session-helpers'
-import type { CardFixture, FixtureContext, FixtureResult, TriggerResult } from './types'
+import type { CardFixture, FixtureContext, FixtureResult } from './types'
 
 const CARD_ID = 'CUSTOM_M1_QuickHaul'
 
@@ -21,10 +21,7 @@ const fixture: CardFixture = {
     '- 卡牌名称: 速运',
     '- 打出费用 (cost): 1 wood',
     '- 前置条件 (prerequisite): 3 Occupations',
-    '- 效果: 打出本牌时 (onBuy)，立即获得 3 木材和 1 食物。',
-    '',
-    '请用 onBuy 钩子实现获得效果，使用 gainLeaf(CARD_ID, { wood: 3, food: 1 }) 这种格式返回 ActionFlow。',
-    '注意 cost 和 prerequisite 必须出现在 CARD_DEF 字面量中（new MinorImprovement({ ... }) 的参数）。',
+    '- 效果: 打出本牌时立即获得 3 木材和 1 食物。',
   ].join('\n'),
 
   setup(llmCode) {
@@ -57,83 +54,27 @@ const fixture: CardFixture = {
     return { session: built.session, ctx }
   },
 
-  trigger(session): TriggerResult {
-    const steps: TriggerResult['steps'] = []
-    // meeting-place flow: seq[set-first-player, optional minor-improvement].
-    // Engine surfaces a choice with options [<accept>, __skip__] for the
-    // optional wrapper. Picking the accept value runs minor-improvement; if
-    // the inner choice has only one option, it's auto-resolved against our
-    // CARD_ID and the play happens before pending settles to confirmNextPlayer.
-    const r1 = session.takeAction(0, 'meeting-place') as {
-      ok: boolean
-      interaction: { stateId: string; options?: Array<{ value: string }> }
-    }
-    steps.push({ label: "takeAction(0,'meeting-place')", resp: r1 })
-    if (r1.interaction.stateId !== 'wait') return { steps }
-
-    const acceptOpt = (r1.interaction.options ?? []).find((o) => o.value !== '__skip__')
-    if (!acceptOpt) return { steps }
-    const r2 = session.resolveChoice(0, acceptOpt.value) as {
-      ok: boolean
-      interaction: { stateId: string; options?: Array<{ value: string }> }
-    }
-    steps.push({ label: `resolveChoice(0, ${acceptOpt.value}) [accept-minor]`, resp: r2 })
-
-    // If a further minor-selection choice surfaces, resolve it; otherwise the
-    // sole option was auto-resolved.
-    if (r2.interaction.stateId === 'wait') {
-      const r3 = session.resolveChoice(0, CARD_ID)
-      steps.push({ label: `resolveChoice(0, ${CARD_ID})`, resp: r3 })
-    }
-    return { steps }
+  scenario(driver) {
+    driver.playMinorViaMeetingPlace(0)
   },
 
-  assert(session, _ctx, result): FixtureResult {
-    const r1 = result.steps[0]!.resp as {
-      ok: boolean
-      error?: string
-      interaction: { stateId: string }
-    }
-    if (!r1.ok) {
-      return { ok: false, reason: `takeAction(meeting-place) not ok: ${r1.error ?? '?'}` }
-    }
-    if (r1.interaction.stateId !== 'wait') {
-      return {
-        ok: false,
-        reason: `expected wait interaction (skip/accept) after meeting-place, got ${r1.interaction.stateId}`,
-      }
-    }
-    // Verify CARD_ID survived the cost/prerequisite filter — it must appear
-    // somewhere as a selectable target. If it didn't, either the optional
-    // minor would not be offered (only __skip__) or the inner selection
-    // would lack our card. We confirm by checking the final state below.
-    const last = result.steps[result.steps.length - 1]!.resp as { ok: boolean; error?: string } | undefined
-    if (!last || !last.ok) {
-      return { ok: false, reason: `last step failed: ${last?.error ?? '?'}` }
-    }
+  assert(session, _ctx): FixtureResult {
     const state = session.getState().state as any
     const p0 = state.players[0]
-    if (!p0.minorPlayed.includes(CARD_ID)) {
-      return {
-        ok: false,
-        reason: `expected ${CARD_ID} in minorPlayed (cost/prerequisite filter likely rejected it). minorPlayed=${JSON.stringify(p0.minorPlayed)}`,
-      }
+    if (!p0.minorPlayed.includes('CUSTOM_M1_QuickHaul')) {
+      return { ok: false, reason: `expected CUSTOM_M1_QuickHaul in minorPlayed, got ${JSON.stringify(p0.minorPlayed)}` }
     }
-    if (p0.minorHand.includes(CARD_ID)) {
-      return { ok: false, reason: `card still in minorHand after play: ${JSON.stringify(p0.minorHand)}` }
+    if (p0.minorHand.includes('CUSTOM_M1_QuickHaul')) {
+      return { ok: false, reason: `card still in minorHand: ${JSON.stringify(p0.minorHand)}` }
     }
     if (p0.resources.wood !== 3) {
       return { ok: false, reason: `expected wood=3 (1 start - 1 cost + 3 gain), got ${p0.resources.wood}` }
     }
-    if (p0.resources.food !== 1) {
-      return { ok: false, reason: `expected food=1 (gain), got ${p0.resources.food}` }
-    }
+    if (p0.resources.food !== 1) return { ok: false, reason: `expected food=1, got ${p0.resources.food}` }
+    // 验证 scenario 确实执行了 meeting-place 行动（占用了行动格），而非被 driver drain 短路
     const space = state.actionSpaces.find((s: any) => s.id === 'meeting-place')
     if (!space || space.takenBy.length !== 1) {
-      return {
-        ok: false,
-        reason: `expected meeting-place takenBy.length=1, got ${JSON.stringify(space?.takenBy)}`,
-      }
+      return { ok: false, reason: `expected meeting-place takenBy.length=1, got ${JSON.stringify(space?.takenBy)}` }
     }
     return { ok: true }
   },

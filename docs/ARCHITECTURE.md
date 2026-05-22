@@ -658,6 +658,8 @@ OA 对齐规则：
 
 **2026-05-15 replacement-aware trigger pass:** before-action trigger-select 的 pass gate 不能只看 base action `canBeExecutedByPlayer`，也不能套完整 `applyIsDoable`，否则会把同批 before unlocker 自己当成可跳过依据。当前规则是：先用 `skipBeforeTriggers=true` 检查原 action 是否能直接继续；失败时只允许通用 `computeReplace` fallback 参与 continuation 判断，并在可启动性预览里用 `checkedReplaceAction=true` 避免 replacement 递归。这覆盖 B26 Agrarian Fences 这类"跳过 D66 后仍可继续 fencing replacement"的路径，同时不在 engine 中硬编码卡牌 id。`computeReplace` decline 返回的 alternative flow 如果顶层是 `xor`，引擎会展开其 children 作为 replacement 分支，再追加 original action 分支；运行时 replacement 分支 leaf 不携带 `checkedReplaceAction`，只携带 `skipComputeReplaceListenerIds` 来跳过产生该 replacement 的 listener，因此真实替代分支里的 sow / bake 仍能触发普通 before / after listener。original fallback 分支继续携带 `checkedReplaceAction=true`，保持旧的"已检查 replacement"语义。
 
+**2026-05-22 before-reachability 决策：** 多个同一时机的 `before` listener 不是 availability 阶段可静态排序或预览的链路；它们属于真实 trigger 流程，顺序由玩家通过 `ParallelNode(mode='trigger-select')` 执行。卡牌如果能让原本不可达的 action 先进入 before 流程，应通过 scoped `isDoable` listener 返回 `doable: true` 表达启动 opt-in，并在 `actionContext.skipBeforeTriggers === true` 的 continuation 中退出。所有 before listener 和它们触发的 after / exchange / optional 分支真实执行完以后，原 action leaf 必须用真实 state 重新做 strict doable 检查；如果仍不可达，不能继续原 action，只能走现有 blocked / undo-only 语义。不要为 before-grant reachability 添加单卡 payment preview，也不要在 dispatcher 中枚举 before listener 顺序或静态模拟资源 / 转换链。参考模型是 C60 Small Potter's Oven / D66 Potter Ceramics / `STUB_BeforeBakeGainClay`：先让 action 进入 trigger-select，玩家按真实顺序执行 unlocker，剩余 trigger 与 pass gate 基于新状态重算，最终 continuation 再严格检查。
+
 ### 7.8 farm-type 提交
 
 5 种 farmType 全在各自 ActionDef.resolveChoice 内闭环（`shared/actions/effects/`）：

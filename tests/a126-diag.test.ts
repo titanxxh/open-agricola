@@ -13,11 +13,13 @@ describe('A126 MasterWorkman integration', () => {
     const p0 = s0.state.players[0]
 
     const woodBefore = p0.resources.wood
-    const resp = session.takeAction(0, 'sheep-market')
+    let resp = session.takeAction(0, 'sheep-market')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
+    expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
+
+    resp = session.resolveChoice(0, 'A126_MasterWorkman')
     const woodAfter = resp.state.players[0].resources.wood
-    console.log('Wood before:', woodBefore, 'Wood after:', woodAfter)
-    console.log('Interaction:', resp.interaction.stateId)
-    console.log('Log:', JSON.stringify(resp.state.log.slice(0, 5), null, 2))
 
     expect(woodAfter).toBeGreaterThan(woodBefore)
 

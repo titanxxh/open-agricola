@@ -17,6 +17,11 @@
  *   - server/custom-code/engine.ts (isActionHookPhase, isCardListenerScope)
  *   - shared/custom-code/ast-validator.ts (DENIED_IDENTIFIERS, DENIED_PROPERTY_ACCESS)
  *   - server/custom-code/injected-helpers.ts (sandbox injections; S9)
+ *   - shared/custom-code/sandbox-action-ids.ts (SANDBOX_ALLOWED_ACTION_IDS)
+ *
+ * The actionId whitelist lives as a prompt-sync block (id=action-ids) inside
+ * PROMPT_BODY itself (markdown comments are harmless to the LLM), so
+ * check-prompt-sync verifies the exact list the LLM sees.
  */
 
 import communityExamples from '../../docs/community-card-examples.md?raw'
@@ -171,6 +176,8 @@ const CARD_IMPL = {
 | anytime | 任意时刻 | 全局触发 |
 | computeChoiceCandidates | 计算可选项时 | 修改选项列表 |
 
+⚠️ **anytime listener 禁止设 \`actions\` 字段**：\`phases: ['anytime']\` 的 listener 不绑定具体行动，若设了 \`actions\`（哪怕空数组 \`[]\`），引擎会执行 \`actions.includes(contextActionId)\`，结果永为 false，listener 永远不会触发。正确写法：省略 \`actions\` 字段。
+
 ### 可监听的行动（actions）
 
 collect、gain、receive、plow、sow、construct、renovate-house、fence、stables、improvement-any、minor-improvement、play-occupation、place-farmer、wish-children、wish-children-growth、family-growth、bake-bread
@@ -235,21 +242,83 @@ return {
 
 ## 可用 actionId
 
-| actionId | 说明 | params |
-|----------|------|--------|
-| gain | 获得资源 | { food: 2, wood: 1 } |
-| pay | 支付资源 | { grain: 1 } |
-| bonus-vp | +1 VP（固定，不接受 amount） | {} |
-| gain-other-players | 其他每位玩家各获得 | { food: 1 } |
-| bake-bread | 烤面包 | {} |
-| store-on-card | 在卡上存放资源 | { grain: 6 } |
-| take-from-card | 从卡上取出资源 | { grain: 1 } |
-| push-card-stack | 向卡牌 stack 推入一项 | (自定义数据) |
-| write-card-extra-data | 写入卡牌 extraData | (自定义数据) |
-| hold-worker-on-card | 将工人标记为被卡持有 | {} |
-| release-worker-from-card | 释放被卡持有的工人 | {} |
+leaf 节点的 \`actionId\` **只能**取下表 9 个之一。其它字符串（如旧版的 \`write-card-extra-data\`、\`hold-worker-on-card\` 等）已从引擎删除，不可使用。
+
+| actionId | 说明 | params 形态 |
+|----------|------|------------|
+| \`gain\` | 获得资源 | 资源对象，如 \`{ food: 2, wood: 1 }\` |
+| \`pay\` | 支付资源 | 资源对象，如 \`{ grain: 1 }\` |
+| \`bonus-vp\` | +1 VP（固定，不接受 amount） | \`{}\` |
+| \`bake-bread\` | 烤面包（grain → food） | \`{}\` |
+| \`store-on-card\` | 在本卡 \`cardStates[cardId].counters\` 上存资源 | 资源对象，如 \`{ grain: 6 }\` |
+| \`take-from-card\` | 从本卡 counters 取资源给玩家（不足则失败） | 资源对象，如 \`{ grain: 1 }\` |
+| \`push-to-card-stack\` | 向本卡 \`cardStates[cardId].stack\` 推入一个字符串项 | \`{ item: 'someString' }\` |
+| \`special-effect\` | cardStates mutation 统一入口 | discriminated union，\`{ kind, ... }\`（见下方 kind 说明） |
+| \`future-meeples\` | 预放资源到未来回合 | \`{ __futureMeepleRequest: FutureMeepleRequest }\`（见下方说明） |
 
 > 多次 +VP 时串多个 \`bonus-vp\` leaf 进 seq；不要尝试 \`{ amount: N }\`。
+> \`store-on-card\` / \`take-from-card\` / \`push-to-card-stack\` 都作用于触发它的卡（\`sourceCard\`），所以 leaf 必须带 \`sourceCard: CARD_ID\`。
+
+下面是 actionId 的**权威白名单**，与引擎 \`SANDBOX_ALLOWED_ACTION_IDS\` 由 \`pnpm run check:prompt-sync\` 自动校验，必须与上表完全一致：
+
+<!-- prompt-sync:begin id=action-ids -->
+- \`gain\` — 获得资源，params 形如 { food: 2, wood: 1 }
+- \`pay\` — 支付资源
+- \`bonus-vp\` — +1 VP（固定，不接受 amount）
+- \`bake-bread\` — 烤面包
+- \`store-on-card\` — 在卡上存资源
+- \`take-from-card\` — 从卡上取资源
+- \`push-to-card-stack\` — 向卡牌 stack 推入一项
+- \`special-effect\` — cardStates mutation 统一入口，params 为 discriminated union
+- \`future-meeples\` — 预放资源到未来回合
+<!-- prompt-sync:end id=action-ids -->
+
+### special-effect 的 kind union
+
+\`special-effect\` 的 params 是一个带 \`kind\` 判别字段的对象。卡牌设计常用以下子集：
+
+| kind | 字段 | 作用 |
+|------|------|------|
+| \`increment-counter\` | \`key: string\`、\`amount: number\` | 把 \`cardStates[cardId].counters[key]\` 增加 amount（可为负） |
+| \`set-counter\` | \`key: string\`、\`value: number\` | 把 counters[key] 设为 value；值会被截断为 ≥ 0，不能用负数清零（清零用 \`value: 0\`） |
+| \`increment-extra-data\` | \`key: string\`、\`amount: number\` | 把 \`cardStates[cardId].extraData[key]\` 数值增加 amount |
+| \`set-extra-data\` | \`key: string\`、\`value: unknown\` | 把 extraData[key] 设为 value |
+| \`set-flag\` | \`flag: boolean\` | 设置 \`cardStates[cardId].flagged\` |
+| \`set-infobox\` | \`text: string\` | 设置 \`cardStates[cardId].infobox\`（卡面文字提示） |
+
+以上是沙盒卡牌推荐使用的 kind 子集；\`special-effect\` 引擎实有更多 kind，其余为引擎内部用途，沙盒卡牌不应使用。
+
+- **累计计数类卡**（每次某事件发生 +1，终局按计数加分）→ 用 \`kind: 'increment-counter'\`，落在 \`counters\`：
+  \`{ type: 'leaf', actionId: 'special-effect', params: { kind: 'increment-counter', key: 'tally', amount: 1 }, sourceCard: CARD_ID }\`
+- **一次性标记类卡**（只需记录"做过没"）→ 用 \`kind: 'set-flag'\`：
+  \`{ type: 'leaf', actionId: 'special-effect', params: { kind: 'set-flag', flag: true }, sourceCard: CARD_ID }\`
+
+读回这些值：\`player.cardStates?.[CARD_ID]?.counters?.tally ?? 0\` / \`player.cardStates?.[CARD_ID]?.flagged\`。
+
+### future-meeples 的用法
+
+\`future-meeples\` 把资源预存到未来某轮，到那轮自动发给玩家。leaf 的 \`params\` 是 \`{ __futureMeepleRequest: FutureMeepleRequest }\`。
+
+\`FutureMeepleRequest\` 有两种形态，卡牌设计推荐 \`entries\` 形态：
+- \`entries\` 形态：\`{ cardId, playerId, entries: [{ round, resources? }] }\`——逐轮指定要发的资源。
+- 区间形态：\`{ cardId, playerId, startRound, count, resources }\`——从 startRound 起连续 count 轮，每轮发相同 resources。
+
+示例（打出此卡时预放 1 wood 到下一轮）：
+
+\`\`\`typescript
+onBuy: (state, player) => ({
+  type: 'leaf',
+  actionId: 'future-meeples',
+  params: {
+    __futureMeepleRequest: {
+      cardId: CARD_ID,
+      playerId: player.id,
+      entries: [{ round: state.round + 1, resources: { wood: 1 } }],
+    },
+  },
+  sourceCard: CARD_ID,
+}),
+\`\`\`
 
 ## 可用 helper
 
@@ -263,6 +332,7 @@ return {
 | \`positionKey({ x, y })\` | 将位置转为字符串 \`"x,y"\` |
 | \`getCardStack(player, cardId)\` | 读取 \`cardStates[cardId].stack\` |
 | \`readCardExtraData(player, cardId)\` | 读取 \`cardStates[cardId].extraData\` |
+| \`getCardDefinition(cardId)\` | 沙盒内为存根（始终返回 \`null\`），不要依赖它 |
 
 ❌ 不可用：\`familySize\`、\`workersAvailable\`、\`initCardState\`、\`getFenceCount\` 等项目内 helper
 

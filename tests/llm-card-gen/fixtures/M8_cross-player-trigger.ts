@@ -4,8 +4,7 @@ import {
   setActiveWorkerCount,
   setWorkersAtHome,
 } from '../session-helpers'
-import type { CardFixture, FixtureContext, FixtureResult, TriggerResult } from './types'
-import { confirmNextPlayer } from '../../../server/__tests__/_helpers/legacy-confirms'
+import type { CardFixture, FixtureContext, FixtureResult } from './types'
 
 const CARD_ID = 'CUSTOM_M8_NeighborlyHelp'
 
@@ -18,14 +17,8 @@ const fixture: CardFixture = {
     '',
     '- 卡牌类型: 职业 (Occupation)',
     '- 卡牌名称: 邻居互助',
-    "- 效果: 当**任何玩家**（包括对手）使用「伐木」(forest) 行动空间后，",
-    '  本卡牌的所有者额外获得 1 木材。（即触发玩家不一定是卡主时，奖励仍归卡主。）',
-    '',
-    "请用 listener 实现：监听 actions: ['place-farmer']，phases: ['after']，",
-    "scope: 'any'，cardIds: [CARD_ID]。handler 内通过 context.space?.id === 'forest'",
-    '过滤；条件满足时返回 `{ flow: gainLeaf(CARD_ID, { wood: 1 }), sourceCard: CARD_ID }`。',
-    '引擎会在卡主与触发玩家不同时自动插入 PlayerSwitchNode，使奖励归到卡主。',
-    '不要手动检查所有权或在 handler 内做玩家切换。',
+    '- 效果: 当任何玩家（包括对手）使用「伐木」(forest) 行动空间后，',
+    '  本卡牌的所有者额外获得 1 木材（奖励始终归卡主，无论谁触发）。',
   ].join('\n'),
 
   setup(llmCode) {
@@ -58,30 +51,16 @@ const fixture: CardFixture = {
     return { session: built.session, ctx }
   },
 
-  trigger(session): TriggerResult {
-    const steps: TriggerResult['steps'] = []
-    const r1 = session.takeAction(1, 'forest') as { ok: boolean }
-    steps.push({ label: "takeAction(1,'forest')", resp: r1 })
-    if (r1.interaction.stateId === 'wait' && r1.interaction.request.kind === 'confirm-next-player') {
-      steps.push({ label: 'confirmNextPlayer', resp: confirmNextPlayer(session) })
-    }
-    return { steps }
+  scenario(driver) {
+    driver.takeAction(1, 'forest')
   },
 
-  assert(session, _ctx, result): FixtureResult {
-    const last = result.steps[result.steps.length - 1]!.resp as { ok: boolean; error?: string } | undefined
-    if (last && last.ok === false) {
-      return { ok: false, reason: `last step failed: ${last.error ?? '?'}` }
-    }
+  assert(session, _ctx): FixtureResult {
     const state = session.getState().state as any
     const p0Wood = state.players[0].resources.wood
     const p1Wood = state.players[1].resources.wood
-    if (p1Wood !== 3) {
-      return { ok: false, reason: `expected p1.wood=3 (took 3 from forest), got ${p1Wood}` }
-    }
-    if (p0Wood !== 1) {
-      return { ok: false, reason: `expected p0.wood=1 (cross-player gain via card), got ${p0Wood}` }
-    }
+    if (p1Wood !== 3) return { ok: false, reason: `expected p1.wood=3 (took 3 from forest), got ${p1Wood}` }
+    if (p0Wood !== 1) return { ok: false, reason: `expected p0.wood=1 (cross-player gain via card), got ${p0Wood}` }
     return { ok: true }
   },
 }

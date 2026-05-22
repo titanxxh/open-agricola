@@ -50,6 +50,7 @@ const isDoableListener: CardListenerRegistration = {
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
+    if (context.actionContext?.skipBeforeTriggers === true) return
     if ((context.player.resources.food ?? 0) < 1) return
     // Player has 1+ food → before-hook will buy them 1 grain, after which
     // sow becomes possible (assuming an empty field exists). Empty-field

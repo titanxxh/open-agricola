@@ -1,6 +1,6 @@
 # 卡牌实现现状报告
 
-> 生成/更新日期：2026-05-21。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
+> 生成/更新日期：2026-05-22。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
 
 ## 1. 当前快照
 
@@ -11,10 +11,10 @@
 | 自动 metadata 脚本 literal mismatch | 5 |
 | 自动 metadata 脚本 complex mismatch | 5 |
 | 其中 schema-up 已接受差异 | 4 |
-| 需要实现复核的卡牌 | 12 |
+| 需要实现复核的卡牌 | 11 |
 | 已接受 / 产品策略差异 | 70 |
 | 排除的 BGA legacy 或未实现行为目标 | 52 |
-| 本轮审计视为已对齐 | 754 |
+| 本轮审计视为已对齐 | 755 |
 
 说明：`scripts/audit-bga-metadata-diff.ts` 现在会解析 BGA `STABLE` 打印成本和 `passing`。当前 literal mismatch 是 5 个 `passing` 差异：`C1_Overhaul` 需复核，`C6_StoneClearing`、`C9_AutomaticWaterTrough`、`D1_ZigzagHarrow`、`E5_NightLoot` 为已接受的刻意省略。当前 complex mismatch 是 1 个 `cost` 差异（`C54_MarketBooth`）和 4 个已接受的 schema-up prerequisite 差异。
 
@@ -34,7 +34,6 @@
 | `C1_Overhaul` | 低 | metadata/passing | BGA `passing=true`；OA 省略，旧接受差异列表也没有记录 passing。 | 增加 passing 支持/测试，或明确记录为已接受差异。 |
 | `E68_CherryOrchard` | 低 | 描述文本 | OA desc 写成收获 wood；BGA 表达为像 grain 一样 sow 和 harvest wood。 | 恢复 BGA 文案语义。 |
 | `B34_SpecialFood` | 待验证 | 跨卡交互 | BGA 特判 A137；OA heuristic 可能覆盖，也可能遗漏。 | 增加 A137+B34 定向 session 测试。 |
-| `B75_WoodWorkshop` | 待验证 | 可达性 | OA 用单卡 preview 替代 before-grant reachability。 | 引入通用 before-grant reachability 模型。 |
 
 ### 需复核卡牌证据索引
 
@@ -52,7 +51,6 @@
 | `C1_Overhaul` | `C/C1_Overhaul.php` | `shared/cards-display/C/C1_Overhaul.ts`; `shared/cards/C/C1_Overhaul.ts` | metadata/passing 影响卡牌显示和可打出 metadata，而不是自定义 UI flow。 |
 | `E68_CherryOrchard` | `E/E68_CherryOrchard.php` | `shared/cards-display/E/E68_CherryOrchard.ts` | 描述文本面向 UI；实现本身主要基于 cardField。 |
 | `B34_SpecialFood` | `B/B34_SpecialFood.php` | `shared/cards/B/B34_SpecialFood.ts`; `shared/cards/A/A137_RiverineShepherd.ts` | 需要 A137 交互的定向 session/UI 覆盖后，才能判断 UI 行为是否分歧。 |
-| `B75_WoodWorkshop` | `B/B75_WoodWorkshop.php` | `shared/cards/B/B75_WoodWorkshop.ts` | 支付/可达性 UI 依赖后端 isDoable 和 payment enumeration；preview 可能低估 BGA 可达性。 |
 
 ## 3. 已接受差异
 
@@ -73,11 +71,10 @@
 
 | 卡牌 | BGA 行数 | OA 行数 | 比例 | 备注 |
 |---|---:|---:|---:|---|
-| `B75_WoodWorkshop` | 43 | 135 | 3.14 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
 | `E161_ElderBaker` | 24 | 69 | 2.88 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
 | `A87_Conservator` | 21 | 54 | 2.57 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
 | `E16_BriarHedge` | 27 | 68 | 2.52 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
-| `C88_CarpentersApprentice` | 40 | 98 | 2.45 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
+| `C88_CarpentersApprentice` | 40 | 98 | 2.45 | fence 折扣已从 `reserve-fence-bonus` 机制改为单个 `computeCosts.fence` listener；修复「第 13 个起」下界 bug（旧实现 `freeFences = 15 − getFenceCount` 导致第 13 之前的 fence 也免费，新实现用 `min(end,15) − max(start,13) + 1` 只释放第 13–15 fence）。 |
 | `D131_CraftsmanshipPromoter` | 25 | 56 | 2.24 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
 | `B18_GrasslandHarrow` | 38 | 82 | 2.16 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
 | `C150_ParrotBreeder` | 74 | 159 | 2.15 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
@@ -86,7 +83,7 @@
 | `B137_Wholesaler` | 57 | 117 | 2.05 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
 | `E118_KindlingGatherer` | 34 | 68 | 2.00 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
 
-首要简化目标不一定是比例最高的行：`B75_WoodWorkshop`、`E123_ResourceHoarder`、`E78_SleightofHand` 更重要，因为它们的复杂度同时伴随行为风险。
+首要简化目标不一定是比例最高的行：`E123_ResourceHoarder`、`E78_SleightofHand` 更重要，因为它们的复杂度同时伴随行为风险。
 
 ## 5. 架构审阅
 
@@ -112,7 +109,7 @@
 5. ~~增加后端权威的 action-space reveal/exclusive-use 支持。~~ ✅ 已落地：ActionSpace 持有 `exclusiveUse`，round start 统一 emit `action.revealed` / `action.exclusiveUseCleared`，B23 使用该机制。
 6. ~~扩大 accumulation-space partial-take 语义的复用范围；当前 `collect` 已支持指定行动格、资源和数量，`B81_Handcart` 已从行动格移除资源。~~ ✅ 已落地：新增 `createPartialTakeFromSpaceLeaf`，统一生成 `collect` partial-take leaf、choice label metadata 和可选 effect preview；`A82_WorkCertificate`、`B81_Handcart`、`E5_NightLoot` 已迁移到共享 helper，`collect` 执行语义不变。
 7. ~~为 room/action bonus 增加 scope，避免 per-room 和 total-room cost modifier 双重应用~~ ✅ 已落地：`ComplexCost` 统一形状（`fees / unitFee + nb / trades / bonuses`），`Trade.scope: 'action' \| 'unit'` + `TradeModifier.scope` 区分 per-action 资源池转换和 per-unit cost row 有序替换（A123_FrameBuilder construct、D15_ClaySupports、B145_BrushwoodCollector construct 分支已迁移，B145 使用 `replaceUpTo` 覆盖 1/2 reed 行）；construct / renovation / fencing / plow / occupation / pay 全部走单一 `computeAllBuyableCombinations`；条件评估拆成 `evaluateStaticConditions` + `evaluateConditions(_, _, nb)` 两层（`getModifiersForCostType` static-only，nb-aware gate 延后到 enumerate）。
-8. 增加通用处理：“before trigger 给资源后，原行动可能变得可达/mandatory”。
+8. ~~增加通用处理：“before trigger 给资源后，原行动可能变得可达/mandatory”。~~ ✅ 已落地：before listener unlocker 通过 scoped `isDoable` opt-in 启动原本不可达的 action，`skipBeforeTriggers` continuation 不把 unlocker 自己当作可跳过依据；所有 before/after/optional 分支真实执行后，原 action 重新 strict doable，失败时进入 engine-blocked / undo-only。
 9. ~~增加共享 lessons action-space id helper，覆盖 `lessons`、`lessons-3`、`lessons-4`。~~ ✅ 已落地：共享 helper 覆盖标准 lessons action-space id，并已用于 lessons identity 判定。
    Follow-up / exclusion：`C23_JobContract`、`B152_JuniorArtist`、`C117_Legworker` 与 space-pairing 的 cost / jump / adjacency 语义相关，不属于本 helper 关闭范围。
 10. ~~继续扩大 gain/exchange/action-space provenance 覆盖；已覆盖 B21 exchange grain、E47 action-space gain、C162 player action space、E78 batch exchange，并补齐本轮 A2-A6 支付、动物、food、building-resource、farm metadata 卡牌对 `actionEvents` 优先、`transactionEvents` 回退的消费模型。本轮补齐 B21 HayloftBarn 与 E47 SyrupTap 的 action-frame 事件优先读取，防止同一 transaction 中较早资源事件误触发当前 listener；同时补上生产卡牌 `context.result` 资源事实 fallback 审计。~~ ✅ 已落地：生产卡牌 `context.result` 资源事实 fallback 已由 `shared/cards/__tests__/provenance-result-audit.test.ts` 和 `pnpm run check:provenance-result-audit` 守住；现存 `context.result` 用途仅限 A94/D50 的 request-shape 调整和 B18/C148 的 ok guard，不作为资源来源。
@@ -204,7 +201,7 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 | listener | `after.construct` | `A110_Roughcaster`, `A111_WallBuilder`, `A167_BreederBuyer`, `A21_FamilyFriendHome`, `A73_AgriculturalFertilizers`, `A93_BedMaker`, `B111_Rustic`, `B140_FarmyardWorker`, `B163_Pastor`, `B27_Toolbox`, `D123_RenovationPreparer`, `D128_BuildingTycoon`, `D163_JourneymanBricklayer`, `D74_RoyalWood`, `D94_HenpeckedHusband`, `D96_Furnisher`, `E123_ResourceHoarder`, `E49_Twibil`, `E52_Cubbyhole` |
 | listener | `after.exchange` | `A48_ShavingHorse`, `B21_HayloftBarn`, `B29_CookeryLesson`, `C148_MudWallower`, `C53_GypsysCrock`, `D36_BreedRegistry`, `D56_FatstockStretcher`, `E85_MasterTanner` |
 | listener | `after.family-growth` | `D150_GodlySpouse`, `D157_PartyOrganizer`, `E113_Godmother` |
-| listener | `after.fence` | `A34_Loppers`, `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B94_StockProtector`, `C88_CarpentersApprentice`, `D89_Stablehand`, `E108_BlackberryFarmer`, `E74_AshTrees` |
+| listener | `after.fence` | `A34_Loppers`, `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B94_StockProtector`, `D89_Stablehand`, `E108_BlackberryFarmer`, `E74_AshTrees` |
 | listener | `after.fencing` | `B124_Trimmer`, `B140_FarmyardWorker`, `B27_Toolbox` |
 | listener | `after.gain` | `A48_ShavingHorse`, `B21_HayloftBarn`, `C120_AgriculturalLabourer`, `E103_Wolf`, `E118_KindlingGatherer` |
 | listener | `after.improvement` | `A109_SmallTrader`, `A131_CraftTeacher`, `A41_VegetableSlicer`, `B100_Clutterer`, `C115_Sower`, `C137_CharcoalBurner`, `C43_FarmBuilding`, `C75_Firewood`, `C80_RockyTerrain`, `D118_Bonehead`, `D161_CabbageBuyer`, `D80_BrickHammer`, `E156_ClaypitOwner`, `E165_MasterHuntsman`, `E18_SeedAlmanac`, `E31_Upholstery` |
@@ -230,7 +227,7 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 | listener | `before.exchange` | `D36_BreedRegistry`, `D56_FatstockStretcher`, `E85_MasterTanner` |
 | listener | `before.family-growth` | `E130_Overachiever` |
 | listener | `before.farmland` | `C112_Thresher` |
-| listener | `before.fence` | `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B94_StockProtector`, `C88_CarpentersApprentice`, `D119_WoodBarterer`, `E74_AshTrees` |
+| listener | `before.fence` | `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B94_StockProtector`, `D119_WoodBarterer`, `E74_AshTrees` |
 | listener | `before.fencing` | `A40_PottersYard` |
 | listener | `before.grain-utilization` | `C112_Thresher` |
 | listener | `before.improvement` | `B75_WoodWorkshop` |
@@ -245,7 +242,7 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 | listener | `computeChoiceCandidates.improvement` | `C27_Blueprint`, `D131_CraftsmanshipPromoter`, `E161_ElderBaker` |
 | listener | `computeChoiceCandidates.renovate-house` | `A87_Conservator`, `D13_Trowel` |
 | listener | `computeCosts.construct` | `A128_RiparianBuilder`, `A149_HouseArtist`, `B126_Carpenter`, `B13_CarpentersParlor`, `C128_WoodenHutExtender`, `C88_CarpentersApprentice`, `D121_ClayPlasterer`, `E123_ResourceHoarder`, `E150_RockBeater` |
-| listener | `computeCosts.fence` | `C16_FieldFences`, `C1_Overhaul`, `D82_HuntingTrophy`, `E16_BriarHedge` |
+| listener | `computeCosts.fence` | `C16_FieldFences`, `C1_Overhaul`, `C88_CarpentersApprentice`, `D82_HuntingTrophy`, `E16_BriarHedge` |
 | listener | `computeCosts.improvement` | `A143_Stonecutter`, `A20_DoubleTurnPlow`, `A27_OvenSite`, `A75_LumberMill`, `B36_Bottles`, `B95_MasterBricklayer`, `C122_Bricklayer`, `C27_Blueprint`, `C95_BasketWeaver`, `D117_WoodExpert`, `D82_HuntingTrophy`, `D95_SiteManager`, `D96_Furnisher`, `E109_BraidMaker`, `E123_ResourceHoarder`, `E130_Overachiever`, `E27_PiggyBank` |
 | listener | `computeCosts.play-occupation` | `B109_PaperMaker`, `B155_ArtTeacher` |
 | listener | `computeCosts.plow` | `C37_DwellingMound` |
@@ -285,7 +282,7 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 | specialKind | `build-stable-on-first-empty-tile` | `E148_Lazybones` |
 | specialKind | `card-field` | `C8_PlantFertilizer` |
 | specialKind | `choice` | `B146_Illusionist`, `D23_PioneeringSpirit` |
-| specialKind | `clear-pending-fence-bonus` | `C88_CarpentersApprentice`, `E74_AshTrees` |
+| specialKind | `clear-pending-fence-bonus` | `E74_AshTrees` |
 | specialKind | `consume-fence` | `C1_Overhaul`, `C54_MarketBooth` |
 | specialKind | `field` | `C8_PlantFertilizer` |
 | specialKind | `grain` | `E112_GrainThief` |
@@ -579,7 +576,7 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 | `B72_LoveforAgriculture` | 已对齐 |  |
 | `B73_GiftBasket` | 已对齐 |  |
 | `B74_ThickForest` | 已接受差异 | schema-up prerequisite / isBuyable metadata 差异 |
-| `B75_WoodWorkshop` | 需复核 | 用单卡 reachability preview 替代缺失的 before-grant 基础设施 |
+| `B75_WoodWorkshop` | 已对齐 | 使用通用 before-reachability opt-in；B75 session 覆盖 gain wood 后打出小改、经 A48 转换后打出 food-cost 小改，以及最终仍不可达时 engine-blocked / undo-only |
 | `B76_Ceilings` | 已对齐 |  |
 | `B77_LoamPit` | 已对齐 |  |
 | `B78_ReedBelt` | 已对齐 |  |

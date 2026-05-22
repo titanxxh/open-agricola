@@ -31,6 +31,13 @@ describe('B94_StockProtector session', () => {
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
+
+    resp = session.resolveChoice(0, CARD_ID)
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.wood).toBe(8)
+    expect(resp.interaction.stateId).toBe('wait')
 
     resp = session.resolveChoice(0, 'confirm', {
       edges: edgesForTile(1, 1),
@@ -43,5 +50,33 @@ describe('B94_StockProtector session', () => {
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
     expect(resp.interaction.stateId).toBe('wait')
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
+  })
+
+  it('blocks after gaining 2 wood if fencing is still not doable', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+
+    const player = state.players[0]!
+    player.occupationPlayed.push(CARD_ID)
+    player.resources = { ...player.resources, wood: 0 }
+
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'fencing')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
+    expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
+    expect(resp.interaction.options?.find((option) => option.value === '__pass__')?.disabled).toBe(true)
+
+    resp = session.resolveChoice(0, CARD_ID)
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.wood).toBe(2)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
+    expect(resp.interaction.request.kind).toBe('engine-blocked')
+    expect(resp.interaction.allowedCommands).toEqual(['undoStep', 'undoAction'])
   })
 })

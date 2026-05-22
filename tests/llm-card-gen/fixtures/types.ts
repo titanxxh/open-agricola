@@ -1,20 +1,12 @@
 import type { GameSession } from '../../../server/game/authoritative-session'
 import type { CustomCardData } from '../../../shared/cards/custom-registry'
+import type { Driver } from '../driver'
 
 export interface FixtureContext {
   cardId: string
   cardData: CustomCardData
   manifest: any
   [k: string]: unknown
-}
-
-export interface TriggerStep {
-  label: string
-  resp?: unknown
-}
-
-export interface TriggerResult {
-  steps: TriggerStep[]
 }
 
 export interface FixtureResult {
@@ -28,6 +20,6 @@ export interface CardFixture {
   cardType: 'minor' | 'occupation'
   userMessage: string
   setup: (llmGeneratedCode: string) => { session: GameSession; ctx: FixtureContext }
-  trigger: (session: GameSession, ctx: FixtureContext) => TriggerResult
-  assert: (session: GameSession, ctx: FixtureContext, result: TriggerResult) => FixtureResult
+  scenario: (driver: Driver, ctx: FixtureContext) => void
+  assert: (session: GameSession, ctx: FixtureContext) => FixtureResult
 }
