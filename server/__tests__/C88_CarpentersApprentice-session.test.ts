@@ -176,3 +176,49 @@ describe('C88 — fenceCostListener 区间公式(第 13-15 个 fence 免费)', (
     expect(fenceCostWood(makeFencePlayer(13), [])).toBe(0)
   })
 })
+
+const fenceDoable = (player: PlayerState): boolean => {
+  const listener = getRegisteredCardListeners().find(
+    (l) =>
+      l.cardIds?.includes('C88_CarpentersApprentice') &&
+      l.actions?.includes('fence') &&
+      l.phases?.includes('isDoable'),
+  )
+  if (!listener) throw new Error('C88 fenceIsDoableListener (isDoable/fence) not registered')
+  // state 用空对象:fenceIsDoableListener 的 before>=12 分支不读 state,
+  // before<12 分支调的 canStartFencing 形参 `_state` 也不读。
+  const ctx = {
+    state: {} as GameState,
+    player,
+    space: {} as never,
+    actionId: 'fence',
+    phase: 'isDoable',
+    doable: false,
+  } as unknown as CardListenerContext
+  const result = listener.handler(ctx)
+  return (result as { doable?: boolean } | void)?.doable === true
+}
+
+describe('C88 — fenceIsDoableListener 精确 BGA doability', () => {
+  it('before 12,wood 0 → doable(第 13-15 全免费)', () => {
+    expect(fenceDoable(makeFencePlayer(12, 0))).toBe(true)
+  })
+  it('before 13,wood 0 → doable', () => {
+    expect(fenceDoable(makeFencePlayer(13, 0))).toBe(true)
+  })
+  it('before 10,wood 1 → 不 doable(自费撑不到第 12 个)', () => {
+    expect(fenceDoable(makeFencePlayer(10, 1))).toBe(false)
+  })
+  it('before 10,wood 2 → doable(自费够到第 12,免费区解锁)', () => {
+    expect(fenceDoable(makeFencePlayer(10, 2))).toBe(true)
+  })
+  it('before 11,wood 1 → doable(自费够到第 12,免费区解锁)', () => {
+    expect(fenceDoable(makeFencePlayer(11, 1))).toBe(true)
+  })
+  it('before 0,wood 0 → 不 doable(自费撑不到第 12 个)', () => {
+    expect(fenceDoable(makeFencePlayer(0, 0))).toBe(false)
+  })
+  it('before 15,wood 0 → 不 doable(fence 已满)', () => {
+    expect(fenceDoable(makeFencePlayer(15, 0))).toBe(false)
+  })
+})

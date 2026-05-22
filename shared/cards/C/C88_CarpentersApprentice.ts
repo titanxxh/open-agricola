@@ -1,6 +1,12 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { canStartFencing, getFenceCount } from '../../actions/effects/fencing'
+import {
+  canStartFencing,
+  getFenceCount,
+  getTotalPastureCells,
+  maxFences,
+  maxPastureCells,
+} from '../../actions/effects/fencing'
 import type { CardImpl } from '../registry'
 import { C88_CarpentersApprentice } from '../../cards-display/C/C88_CarpentersApprentice'
 
@@ -38,14 +44,24 @@ const fenceIsDoableListener: CardListenerRegistration = {
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
-    const freeFences = Math.max(0, 15 - getFenceCount(context.player))
-    if (freeFences <= 0) return
+    const player = context.player
+    const before = getFenceCount(player)
+    if (before >= maxFences) return
+    if (getTotalPastureCells(player) >= maxPastureCells) return
+    const wood = player.resources.wood ?? 0
+    // BGA Fencing.php:195-201: the free band unlocks only once the player
+    // can self-pay up to the 12th fence.
+    const neededToReach12 = Math.max(0, 12 - before)
+    if (wood < neededToReach12) return
+    // before >= 12: the 13th-15th fences are all free, wood is not a
+    // constraint. Do not call canStartFencing — its first line
+    // `getFenceCount+4>15` assumes building 4 segments at once, which
+    // conflicts with the 1-3 segments remaining here.
+    if (before >= 12) return { doable: true }
+    const freeFences = Math.max(0, 15 - Math.max(before + 1, 13) + 1)
     const previewPlayer = {
-      ...context.player,
-      resources: {
-        ...context.player.resources,
-        wood: (context.player.resources.wood ?? 0) + freeFences,
-      },
+      ...player,
+      resources: { ...player.resources, wood: wood + freeFences },
     }
     if (!canStartFencing(context.state, previewPlayer)) return
     return { doable: true }
