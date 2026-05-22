@@ -1,12 +1,11 @@
 import {
   buildSessionWithLLMCard,
-  autoAdvanceRoundEnd,
   getBonusBreakdownForSession,
   ALL_ZERO_RESOURCES,
   markAllWorkersUsed,
   setActiveWorkerCount,
 } from '../session-helpers'
-import type { CardFixture, FixtureContext, FixtureResult, TriggerResult } from './types'
+import type { CardFixture, FixtureContext, FixtureResult } from './types'
 
 const CARD_ID = 'CUSTOM_M4_CattleSteward'
 
@@ -48,13 +47,7 @@ const fixture: CardFixture = {
     '',
     '- 卡牌类型: 职业 (Occupation)',
     '- 卡牌名称: 牛倌',
-    '- 效果: 局末计分时，你每 2 头牛获得 1 额外分 (向下取整)。',
-    '',
-    '实现方式（重要约束）：',
-    '- 用 effect.computeBonusScore 实现，签名 (state, player) => number。',
-    '  直接 return Math.floor(player.resources.cattle / 2) 即可。',
-    '- 不要返回 { score, label } 对象，返回纯数字。',
-    '- 不要用 listener，本卡不需要监听任何行动。',
+    '- 效果: 局末计分时，你每 2 头牛获得 1 额外分（向下取整）。',
   ].join('\n'),
 
   setup(llmCode) {
@@ -100,52 +93,23 @@ const fixture: CardFixture = {
     return { session: built.session, ctx }
   },
 
-  trigger(session): TriggerResult {
-    autoAdvanceRoundEnd(session, { maxIterations: 100 })
-    const final = session.getState().state as { gameOver: boolean }
-    return {
-      steps: [
-        { label: 'autoAdvanceRoundEnd → game over', resp: { gameOver: final.gameOver } },
-      ],
-    }
+  scenario(driver) {
+    driver.advanceToGameEnd()
   },
 
-  assert(session, ctx, _result): FixtureResult {
-    const manifest = (ctx.manifest ?? {}) as { effectHooks?: string[] }
-    const hooks = manifest.effectHooks ?? []
-    if (!hooks.includes('computeBonusScore')) {
-      return {
-        ok: false,
-        reason: `expected effect.computeBonusScore hook in manifest (got effectHooks=${JSON.stringify(hooks)})`,
-      }
-    }
+  assert(session, _ctx, _result): FixtureResult {
     const final = session.getState().state as any
-    if (final.gameOver !== true) {
-      return { ok: false, reason: `expected gameOver=true, got ${final.gameOver}` }
-    }
-    // runBonusSolver must run inside session.withCtx (see session-helpers.ts:runBonusSolver)
-    // so the per-session custom-card effect registry is visible to getCardEffect.
+    if (final.gameOver !== true) return { ok: false, reason: `expected gameOver=true, got ${final.gameOver}` }
     const p0Entries = getBonusBreakdownForSession(session, 0)
     const p1Entries = getBonusBreakdownForSession(session, 1)
     const p0Card = p0Entries.find((e) => e.cardId === CARD_ID)
-    if (!p0Card) {
-      return {
-        ok: false,
-        reason: `expected p0 bonus entry for ${CARD_ID}, got ${JSON.stringify(p0Entries)}`,
-      }
-    }
+    if (!p0Card) return { ok: false, reason: `expected p0 bonus entry for ${CARD_ID}, got ${JSON.stringify(p0Entries)}` }
     if (p0Card.score !== 2) {
-      return {
-        ok: false,
-        reason: `expected p0 ${CARD_ID} score=2 (4 setup cattle → 5 after breeding → floor(5/2)=2), got ${p0Card.score}`,
-      }
+      return { ok: false, reason: `expected p0 score=2 (4 cattle → 5 after breeding → floor(5/2)=2), got ${p0Card.score}` }
     }
     const p1Card = p1Entries.find((e) => e.cardId === CARD_ID)
     if (p1Card !== undefined) {
-      return {
-        ok: false,
-        reason: `expected p1 to have no ${CARD_ID} entry (card not played), got ${JSON.stringify(p1Card)}`,
-      }
+      return { ok: false, reason: `expected p1 to have no ${CARD_ID} entry, got ${JSON.stringify(p1Card)}` }
     }
     return { ok: true }
   },

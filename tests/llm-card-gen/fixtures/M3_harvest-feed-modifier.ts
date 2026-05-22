@@ -4,7 +4,7 @@ import {
   markAllWorkersUsed,
   setActiveWorkerCount,
 } from '../session-helpers'
-import type { CardFixture, FixtureContext, FixtureResult, TriggerResult } from './types'
+import type { CardFixture, FixtureContext, FixtureResult } from './types'
 
 const CARD_ID = 'CUSTOM_M3_HarvestHelper'
 
@@ -45,13 +45,6 @@ const fixture: CardFixture = {
     '- 卡牌类型: 职业 (Occupation)',
     '- 卡牌名称: 收获助手',
     '- 效果: 每次收获的喂养阶段开始时，你额外获得 1 食物（用于本次喂养）。',
-    '',
-    '实现方式（重要约束）：',
-    "- 用 effect.onHarvest 实现，签名 (state, player) => ActionFlow。",
-    '- 必须 **return** `gainLeaf(CARD_ID, { food: 1 })`，不要直接 `player.resources.food += 1`。',
-    '  （沙盒会 JSON 克隆 state/player，直接 mutate 不会反映到主机状态，',
-    '   只有返回的 ActionFlow 会被引擎执行。）',
-    '- 不要使用 listener，因为引擎的喂养扣食阶段不经过 listener 行动派发。',
   ].join('\n'),
 
   setup(llmCode) {
@@ -81,47 +74,16 @@ const fixture: CardFixture = {
     return { session: built.session, ctx }
   },
 
-  trigger(session): TriggerResult {
-    const steps: TriggerResult['steps'] = []
-    let resp = session.performRoundEnd() as {
-      ok: boolean
-      interaction: { stateId: string; playerIndex?: number; request: { kind: string } }
-    }
-    steps.push({ label: 'performRoundEnd', resp })
-    let safety = 0
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed' && safety++ < 10) {
-      const pi = resp.interaction.playerIndex!
-      resp = session.resolveChoice(pi, 'confirm', { selections: [] }) as typeof resp
-      steps.push({ label: `confirmHarvestFeed(${pi}, [])`, resp })
-    }
-    return { steps }
+  scenario(driver) {
+    driver.advanceToHarvest()
   },
 
-  assert(session, ctx, result): FixtureResult {
-    // Manifest sanity: we expect onStartHarvestFeedingPhase in effectHooks.
-    const manifest = (ctx.manifest ?? {}) as { effectHooks?: string[] }
-    const hooks = manifest.effectHooks ?? []
-    if (!hooks.includes('onHarvest')) {
-      return {
-        ok: false,
-        reason: `expected effect.onHarvest hook in manifest (got effectHooks=${JSON.stringify(hooks)})`,
-      }
-    }
-    const last = result.steps[result.steps.length - 1]!.resp as
-      | { ok: boolean; error?: string }
-      | undefined
-    if (last && last.ok === false) {
-      return { ok: false, reason: `last step failed: ${last.error ?? '?'}` }
-    }
+  assert(session, _ctx, _result): FixtureResult {
     const state = session.getState().state as any
     const p0Beg = state.players[0].resources.begging
     const p1Beg = state.players[1].resources.begging
-    if (p0Beg !== 0) {
-      return { ok: false, reason: `expected p0.begging=0 (card grants +1 food, 1+1=2 covers cost), got ${p0Beg}` }
-    }
-    if (p1Beg !== 1) {
-      return { ok: false, reason: `expected p1.begging=1 (control player has only 1 of 2 food), got ${p1Beg}` }
-    }
+    if (p0Beg !== 0) return { ok: false, reason: `expected p0.begging=0 (card grants +1 food, 1+1=2 covers cost), got ${p0Beg}` }
+    if (p1Beg !== 1) return { ok: false, reason: `expected p1.begging=1 (control player has only 1 of 2 food), got ${p1Beg}` }
     return { ok: true }
   },
 }
