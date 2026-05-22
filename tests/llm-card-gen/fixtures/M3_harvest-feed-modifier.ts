@@ -45,6 +45,7 @@ const fixture: CardFixture = {
     '- 卡牌类型: 职业 (Occupation)',
     '- 卡牌名称: 收获助手',
     '- 效果: 每次收获的喂养阶段开始时，你额外获得 1 食物（用于本次喂养）。',
+    '- 实现提示: 请用 effect.onHarvest hook 实现（返回 gainLeaf）。',
   ].join('\n'),
 
   setup(llmCode) {

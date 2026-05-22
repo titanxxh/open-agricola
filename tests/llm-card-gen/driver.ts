@@ -77,6 +77,18 @@ export class Driver {
     return this.drain(label, r0)
   }
 
+  /**
+   * 占行动位但不 drain——返回首个 response（可能停在 wait interaction）。
+   * 用于需要在「行动产生的 wait interaction 进行中」操作的 fixture，
+   * 例如 anytime 行动只在有 active interaction 时才暴露。
+   */
+  takeActionRaw(pi: number, spaceId: string): SessionResp {
+    return this.record(
+      `takeActionRaw(${pi},'${spaceId}')`,
+      this.session.takeAction(pi, spaceId) as unknown as SessionResp,
+    )
+  }
+
   playMinorViaMeetingPlace(pi: number): SessionResp {
     return this.takeAction(pi, 'meeting-place')
   }

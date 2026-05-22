@@ -19,6 +19,7 @@ const fixture: CardFixture = {
     '- 卡牌名称: 行动计数官',
     '- 效果: 每当你使用「伐木」(forest)、「采土坑」(clay-pit) 或「芦苇地」(reed-bank)',
     '  行动空间时，在本卡上累计计数 +1（用于回顾本局触发次数）。其它行动不计数。',
+    '- 实现提示: 把计数累计在本卡计数器（counter）的键名 `actionCount` 上。',
   ].join('\n'),
 
   setup(llmCode) {
