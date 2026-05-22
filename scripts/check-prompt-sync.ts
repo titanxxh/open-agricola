@@ -23,6 +23,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { SANDBOX_ALLOWED_ACTION_IDS } from '../shared/custom-code/sandbox-action-ids'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -222,6 +223,7 @@ function main() {
   reports.push(...checkBlock('listener-scopes', listenerScopes, `${SOURCES.engine}:isCardListenerScope`))
   reports.push(...checkBlock('denied-identifiers', deniedIdentifiers, `${SOURCES.astValidator}:DENIED_IDENTIFIERS`))
   reports.push(...checkBlock('denied-property-access', deniedPropertyAccess, `${SOURCES.astValidator}:DENIED_PROPERTY_ACCESS`))
+  reports.push(...checkBlock('action-ids', [...SANDBOX_ALLOWED_ACTION_IDS], 'shared/custom-code/sandbox-action-ids.ts:SANDBOX_ALLOWED_ACTION_IDS'))
 
   // sandbox-injections sub-check (S9 B4): verify every function in
   // injected-helpers.ts is documented in the §1 table of CUSTOM_CARD_SANDBOX.md.
@@ -287,6 +289,27 @@ function main() {
     console.log(`      ${promptPhaseCheck.missing.join(', ')}`)
   } else {
     console.log(`  ✓ ${TARGETS.llmPrompt} mentions all ${actionHookPhases.length} phase names`)
+  }
+
+  // Unlike hook/phase names (substring match via checkTargetMentions), the
+  // actionId whitelist needs a structured prompt-sync block: only an exact
+  // block diff can catch an *extra* actionId the prompt lists outside the
+  // whitelist — a substring scan would silently miss that drift direction.
+  const promptActionIds = extractMarkdownBlock(TARGETS.llmPrompt, 'action-ids')
+  if (promptActionIds === null) {
+    driftCount++
+    console.log(`  ✗ ${TARGETS.llmPrompt} is missing the prompt-sync:begin id=action-ids block`)
+    console.log(`      expected actionIds: ${[...SANDBOX_ALLOWED_ACTION_IDS].join(', ')}`)
+  } else {
+    const r = diff('action-ids', TARGETS.llmPrompt, 'sandbox-action-ids.ts', [...SANDBOX_ALLOWED_ACTION_IDS], promptActionIds)
+    if (r.missingInTarget.length > 0 || r.extraInTarget.length > 0) {
+      driftCount++
+      console.log(`  ✗ [action-ids] ${TARGETS.llmPrompt} ↔ SANDBOX_ALLOWED_ACTION_IDS`)
+      if (r.missingInTarget.length > 0) console.log(`      missing: ${r.missingInTarget.join(', ')}`)
+      if (r.extraInTarget.length > 0) console.log(`      extra:   ${r.extraInTarget.join(', ')}`)
+    } else {
+      console.log(`  ✓ [action-ids] ${TARGETS.llmPrompt} ↔ SANDBOX_ALLOWED_ACTION_IDS`)
+    }
   }
 
   console.log()
