@@ -7,7 +7,7 @@ const CARD_DEF = new Occupation({
   deck: 'CUSTOM',
   number: 0,
   desc: ['Each time you use the Forest, Clay-Pit or Reed-Bank action space, increment the counter on this card by 1 (for tracking purposes). Other actions do not count.'],
-  cost: { food: 1 },
+  cost: {},
   vp: 0,
   implemented: true,
   locales: {
