@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { getRegisteredCardListeners } from '../../shared/cards/card-listeners'
+import { getRegisteredCardListeners, collectComputeCostsForFarmChoice } from '../../shared/cards/card-listeners'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 import type { PlayerState, GameState } from '../../shared/contract/types'
 
@@ -80,6 +80,8 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
     player.resources.wood = 6
     player.occupationPlayed.push('C88_CarpentersApprentice')
     player.minorPlayed.push('B30_WoodPalisades')
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
 
     session.loadState(state)
 
@@ -109,6 +111,8 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
     player.resources.wood = 5
     player.occupationPlayed.push('C88_CarpentersApprentice')
     player.minorPlayed.push('B30_WoodPalisades')
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
 
     session.loadState(state)
 
@@ -220,5 +224,71 @@ describe('C88 — fenceIsDoableListener 精确 BGA doability', () => {
   })
   it('before 15,wood 0 → 不 doable(fence 已满)', () => {
     expect(fenceDoable(makeFencePlayer(15, 0))).toBe(false)
+  })
+})
+
+describe('C88 — fence 折扣经 collectComputeCostsForFarmChoice 聚合', () => {
+  it('before 12,造 3 个 → 聚合 wood -3(hook 路径生效)', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    const player = makeFencePlayer(12)
+    state.players[0] = player
+    const result = collectComputeCostsForFarmChoice(
+      state,
+      player,
+      'fence',
+      { newFenceEdges: fenceEdges(3) },
+    )
+    expect(result.wood).toBe(-3)
+  })
+  it('before 0,造 2 个 → 聚合无 wood 折扣', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    const player = makeFencePlayer(0)
+    state.players[0] = player
+    const result = collectComputeCostsForFarmChoice(
+      state,
+      player,
+      'fence',
+      { newFenceEdges: fenceEdges(2) },
+    )
+    expect(result.wood ?? 0).toBe(0)
+  })
+})
+
+describe('C88 — fence 折扣 Session 端到端(第 13-14 个免费)', () => {
+  it('0 fence 一次造 14 个 fence:第 13/14 个免费,wood 12→0', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+
+    const player = state.players[0]!
+    // 14 个普通 fence 围 row 0-2, col 1-4 的 3×4 矩形(col 0 是初始房间):
+    // 第 1-12 个付 12 wood,第 13、14 个免费。
+    player.resources.wood = 12
+    player.occupationPlayed.push('C88_CarpentersApprentice')
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'fencing')
+    expect(resp.ok).toBe(true)
+
+    resp = session.resolveChoice(0, 'confirm', {
+      edges: [
+        'H-0-1', 'H-0-2', 'H-0-3', 'H-0-4',
+        'H-3-1', 'H-3-2', 'H-3-3', 'H-3-4',
+        'V-0-1', 'V-1-1', 'V-2-1',
+        'V-0-5', 'V-1-5', 'V-2-5',
+      ],
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.wood).toBe(0)
+    expect(resp.state.players[0]!.fenceSegments.length).toBe(14)
   })
 })
