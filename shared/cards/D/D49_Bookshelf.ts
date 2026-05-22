@@ -21,7 +21,9 @@ const isDoableListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['isDoable' as ActionHookPhase],
   actions: ['play-occupation'],
-  handler: (_context: CardListenerContext): ActionHookResult | void => {
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.doable) return
+    if (context.actionContext?.skipBeforeTriggers === true) return
     return { doable: true }
   },
 }

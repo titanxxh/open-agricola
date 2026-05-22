@@ -50,7 +50,8 @@ export const canStartFencing = (
 ) => {
   if (getFenceCount(player) + minimumFenceSegments > maxFences) return false
   if (getTotalPastureCells(player) >= maxPastureCells) return false
-  const free = Math.max(0, Math.abs(costOverride?.wood ?? 0))
+  const pendingFreeFences = readPendingFenceBonus(player)?.freeFences ?? 0
+  const free = pendingFreeFences + Math.max(0, Math.abs(costOverride?.wood ?? 0))
   if (free > 0) {
     const woodCount = player.resources.wood ?? 0
     if (woodCount + free >= minimumFenceSegments) return true

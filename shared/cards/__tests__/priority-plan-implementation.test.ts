@@ -295,7 +295,7 @@ describe('priority plan implementations', () => {
     const listener = findListener('B94-stock-protector-isdoable-fencing')
     const player = createPlayer()
     player.occupationPlayed = ['B94_StockProtector']
-    player.resources.wood = 2
+    player.resources.wood = 0
 
     const result = executeCardListener(listener!, {
       state: createState(player),
@@ -307,6 +307,25 @@ describe('priority plan implementations', () => {
     } as unknown as CardListenerContext)
 
     expect(result?.doable).toBe(true)
+  })
+
+  it('B94 Stock Protector does not re-open skipBeforeTriggers continuation', () => {
+    const listener = findListener('B94-stock-protector-isdoable-fencing')
+    const player = createPlayer()
+    player.occupationPlayed = ['B94_StockProtector']
+    player.resources.wood = 0
+
+    const result = executeCardListener(listener!, {
+      state: createState(player),
+      player,
+      space: createSpace('fence'),
+      actionId: 'fence',
+      phase: 'isDoable',
+      doable: false,
+      actionContext: { skipBeforeTriggers: true },
+    } as unknown as CardListenerContext)
+
+    expect(result).toBeUndefined()
   })
 
   it('A123 Frame Builder can make renovation doable with wood substitution', () => {

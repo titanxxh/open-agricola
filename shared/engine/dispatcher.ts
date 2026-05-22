@@ -7,7 +7,7 @@ import type {
 import type { ActionHookResult } from '../actions/hooks'
 import {
   applyComputeReplaceHooks,
-  applyIsDoableHooks,
+  applyIsDoableHooksDetailed,
   runActionHooks,
 } from '../actions/hooks'
 import { getMatchingListeners, executeCardListener, type MatchedCardListener } from '../cards/card-listeners'
@@ -121,15 +121,20 @@ export class HookDispatcher {
     initialDoable: boolean,
   ) {
     let doable = this.applyCostPreviewDoable(context, action, initialDoable)
-    doable = applyIsDoableHooks(context, doable)
+    const actionHookDoable = applyIsDoableHooksDetailed(context, doable)
+    doable = actionHookDoable.doable
+    let vetoed = actionHookDoable.vetoed
     const listenerContext = { ...context, phase: 'isDoable' as const, doable }
     const matched = getMatchingListeners(listenerContext)
     for (const entry of matched) {
       const result = executeCardListener(entry.registration, listenerContext, {
         ownerPlayerId: entry.ownerPlayerId,
       })
-      if (result && typeof result.doable === 'boolean') {
-        doable = result.doable
+      if (result?.doable === false) {
+        doable = false
+        vetoed = true
+      } else if (result?.doable === true && !vetoed) {
+        doable = true
       }
     }
     return doable

@@ -1,6 +1,6 @@
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { PlayerState, Resource } from '../../contract/types'
+import type { Resource } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -19,7 +19,10 @@ const masterWorkmanBeforeListener: CardListenerRegistration = {
   id: 'A126-master-workman-before',
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
+  dispatchMode: 'select',
+  mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.sourceCard === CARD_ID) return
     const resource = getRoundResource(context)
     if (!resource) return
     return { flow: gainLeaf(CARD_ID, { [resource]: 1 }), sourceCard: CARD_ID }
@@ -32,18 +35,11 @@ const masterWorkmanIsDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
+    if (context.actionContext?.skipBeforeTriggers === true) return
+    if (context.sourceCard === CARD_ID) return
     const resource = getRoundResource(context)
     if (!resource) return
-    const previewPlayer: PlayerState = {
-      ...context.player,
-      resources: {
-        ...context.player.resources,
-        [resource]: (context.player.resources[resource] ?? 0) + 1,
-      },
-    }
-    if (context.space.canBeExecutedByPlayer(context.state, previewPlayer)) {
-      return { doable: true }
-    }
+    return { doable: true }
   },
 }
 

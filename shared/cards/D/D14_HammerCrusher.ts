@@ -33,6 +33,7 @@ const isDoableListener: CardListenerRegistration = {
   actions: ['renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
+    if (context.actionContext?.skipBeforeTriggers === true) return
     if (context.player.houseType !== 'clay') return
     // With 2 clay + 1 reed from this card, stone renovation becomes possible
     return { doable: true }

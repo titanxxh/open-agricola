@@ -751,6 +751,7 @@ export function engineProceed(
       )
       if (beforeActivateNodes.length > 0 && !node.beforePhaseResolved) {
         node.beforePhaseResolved = true
+        enforceCompositeContinuationMandatory(node)
         int.tree.insertBefore(node.id, beforeActivateNodes)
         return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
       }

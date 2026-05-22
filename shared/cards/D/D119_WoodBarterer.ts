@@ -44,6 +44,7 @@ const isDoableListener: CardListenerRegistration = {
   actions: ['fence', 'construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
+    if (context.actionContext?.skipBeforeTriggers === true) return
     if (context.trueAction === false) return
     return { doable: true }
   },
