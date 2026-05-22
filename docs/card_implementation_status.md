@@ -74,7 +74,7 @@
 | `E161_ElderBaker` | 24 | 69 | 2.88 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
 | `A87_Conservator` | 21 | 54 | 2.57 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
 | `E16_BriarHedge` | 27 | 68 | 2.52 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
-| `C88_CarpentersApprentice` | 40 | 98 | 2.45 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
+| `C88_CarpentersApprentice` | 40 | 98 | 2.45 | fence 折扣已从 `reserve-fence-bonus` 机制改为单个 `computeCosts.fence` listener；修复「第 13 个起」下界 bug（旧实现 `freeFences = 15 − getFenceCount` 导致第 13 之前的 fence 也免费，新实现用 `min(end,15) − max(start,13) + 1` 只释放第 13–15 fence）。 |
 | `D131_CraftsmanshipPromoter` | 25 | 56 | 2.24 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
 | `B18_GrasslandHarrow` | 38 | 82 | 2.16 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
 | `C150_ParrotBreeder` | 74 | 159 | 2.15 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
@@ -201,7 +201,7 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 | listener | `after.construct` | `A110_Roughcaster`, `A111_WallBuilder`, `A167_BreederBuyer`, `A21_FamilyFriendHome`, `A73_AgriculturalFertilizers`, `A93_BedMaker`, `B111_Rustic`, `B140_FarmyardWorker`, `B163_Pastor`, `B27_Toolbox`, `D123_RenovationPreparer`, `D128_BuildingTycoon`, `D163_JourneymanBricklayer`, `D74_RoyalWood`, `D94_HenpeckedHusband`, `D96_Furnisher`, `E123_ResourceHoarder`, `E49_Twibil`, `E52_Cubbyhole` |
 | listener | `after.exchange` | `A48_ShavingHorse`, `B21_HayloftBarn`, `B29_CookeryLesson`, `C148_MudWallower`, `C53_GypsysCrock`, `D36_BreedRegistry`, `D56_FatstockStretcher`, `E85_MasterTanner` |
 | listener | `after.family-growth` | `D150_GodlySpouse`, `D157_PartyOrganizer`, `E113_Godmother` |
-| listener | `after.fence` | `A34_Loppers`, `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B94_StockProtector`, `C88_CarpentersApprentice`, `D89_Stablehand`, `E108_BlackberryFarmer`, `E74_AshTrees` |
+| listener | `after.fence` | `A34_Loppers`, `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B94_StockProtector`, `D89_Stablehand`, `E108_BlackberryFarmer`, `E74_AshTrees` |
 | listener | `after.fencing` | `B124_Trimmer`, `B140_FarmyardWorker`, `B27_Toolbox` |
 | listener | `after.gain` | `A48_ShavingHorse`, `B21_HayloftBarn`, `C120_AgriculturalLabourer`, `E103_Wolf`, `E118_KindlingGatherer` |
 | listener | `after.improvement` | `A109_SmallTrader`, `A131_CraftTeacher`, `A41_VegetableSlicer`, `B100_Clutterer`, `C115_Sower`, `C137_CharcoalBurner`, `C43_FarmBuilding`, `C75_Firewood`, `C80_RockyTerrain`, `D118_Bonehead`, `D161_CabbageBuyer`, `D80_BrickHammer`, `E156_ClaypitOwner`, `E165_MasterHuntsman`, `E18_SeedAlmanac`, `E31_Upholstery` |
@@ -227,7 +227,7 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 | listener | `before.exchange` | `D36_BreedRegistry`, `D56_FatstockStretcher`, `E85_MasterTanner` |
 | listener | `before.family-growth` | `E130_Overachiever` |
 | listener | `before.farmland` | `C112_Thresher` |
-| listener | `before.fence` | `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B94_StockProtector`, `C88_CarpentersApprentice`, `D119_WoodBarterer`, `E74_AshTrees` |
+| listener | `before.fence` | `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B94_StockProtector`, `D119_WoodBarterer`, `E74_AshTrees` |
 | listener | `before.fencing` | `A40_PottersYard` |
 | listener | `before.grain-utilization` | `C112_Thresher` |
 | listener | `before.improvement` | `B75_WoodWorkshop` |
@@ -242,7 +242,7 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 | listener | `computeChoiceCandidates.improvement` | `C27_Blueprint`, `D131_CraftsmanshipPromoter`, `E161_ElderBaker` |
 | listener | `computeChoiceCandidates.renovate-house` | `A87_Conservator`, `D13_Trowel` |
 | listener | `computeCosts.construct` | `A128_RiparianBuilder`, `A149_HouseArtist`, `B126_Carpenter`, `B13_CarpentersParlor`, `C128_WoodenHutExtender`, `C88_CarpentersApprentice`, `D121_ClayPlasterer`, `E123_ResourceHoarder`, `E150_RockBeater` |
-| listener | `computeCosts.fence` | `C16_FieldFences`, `C1_Overhaul`, `D82_HuntingTrophy`, `E16_BriarHedge` |
+| listener | `computeCosts.fence` | `C16_FieldFences`, `C1_Overhaul`, `C88_CarpentersApprentice`, `D82_HuntingTrophy`, `E16_BriarHedge` |
 | listener | `computeCosts.improvement` | `A143_Stonecutter`, `A20_DoubleTurnPlow`, `A27_OvenSite`, `A75_LumberMill`, `B36_Bottles`, `B95_MasterBricklayer`, `C122_Bricklayer`, `C27_Blueprint`, `C95_BasketWeaver`, `D117_WoodExpert`, `D82_HuntingTrophy`, `D95_SiteManager`, `D96_Furnisher`, `E109_BraidMaker`, `E123_ResourceHoarder`, `E130_Overachiever`, `E27_PiggyBank` |
 | listener | `computeCosts.play-occupation` | `B109_PaperMaker`, `B155_ArtTeacher` |
 | listener | `computeCosts.plow` | `C37_DwellingMound` |
@@ -282,7 +282,7 @@ BGA 不是单纯的文字 log。它有两层：`Core/Notifications.php` 负责�
 | specialKind | `build-stable-on-first-empty-tile` | `E148_Lazybones` |
 | specialKind | `card-field` | `C8_PlantFertilizer` |
 | specialKind | `choice` | `B146_Illusionist`, `D23_PioneeringSpirit` |
-| specialKind | `clear-pending-fence-bonus` | `C88_CarpentersApprentice`, `E74_AshTrees` |
+| specialKind | `clear-pending-fence-bonus` | `E74_AshTrees` |
 | specialKind | `consume-fence` | `C1_Overhaul`, `C54_MarketBooth` |
 | specialKind | `field` | `C8_PlantFertilizer` |
 | specialKind | `grain` | `E112_GrainThief` |
