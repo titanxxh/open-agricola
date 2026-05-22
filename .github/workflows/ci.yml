@@ -26,6 +26,25 @@ jobs:
       - name: Check prompt sync (strict)
         run: pnpm run check:prompt-sync -- --strict
 
+  llm-cards-record:
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: LLM card-gen (record mode)
+        run: pnpm test:llm
+
   verify:
     runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
