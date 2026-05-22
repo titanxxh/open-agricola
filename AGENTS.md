@@ -23,6 +23,9 @@ pnpm install                # canvas 需要系统库：libcairo2-dev libpango1.0
 pnpm test                   # vitest 全量（fast + slow）
 pnpm test:fast              # 只跑 fast project（CI 默认）
 pnpm test:slow              # 只跑 slow project（单卡 session 测试）
+pnpm test:llm               # LLM card-gen：record 模式（回放 recordings/ 的 golden，不调 API，确定性，进 CI）
+pnpm test:llm:live          # live 模式：实时调 LLM API 做 prompt 健康检查（需 LLM provider key）
+pnpm test:llm:record        # 实时调 LLM 并把输出录制写回 recordings/ golden（改 prompt / fixture userMessage 后用）
 pnpm run test:e2e           # Playwright E2E（需要后端 + 前端在跑）
 pnpm exec vitest run <file> # 单文件
 pnpm run lint               # ESLint（error 必须清零）
