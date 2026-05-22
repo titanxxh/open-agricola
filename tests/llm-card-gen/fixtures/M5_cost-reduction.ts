@@ -60,7 +60,7 @@ const fixture: CardFixture = {
     driver.takeAction(0, 'house-redevelopment')
   },
 
-  assert(session, _ctx, _result): FixtureResult {
+  assert(session, _ctx): FixtureResult {
     const p0 = (session.getState().state as any).players[0]
     if (p0.houseType !== 'clay') {
       return { ok: false, reason: `expected houseType=clay after renovation, got ${p0.houseType}` }

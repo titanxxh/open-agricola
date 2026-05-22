@@ -55,7 +55,7 @@ const fixture: CardFixture = {
     driver.takeAction(1, 'forest')
   },
 
-  assert(session, _ctx, _result): FixtureResult {
+  assert(session, _ctx): FixtureResult {
     const state = session.getState().state as any
     const p0Wood = state.players[0].resources.wood
     const p1Wood = state.players[1].resources.wood

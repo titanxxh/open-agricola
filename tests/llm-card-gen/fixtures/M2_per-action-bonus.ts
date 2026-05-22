@@ -48,7 +48,7 @@ const fixture: CardFixture = {
     driver.takeAction(0, 'forest')
   },
 
-  assert(session, _ctx, _result): FixtureResult {
+  assert(session, _ctx): FixtureResult {
     const state = session.getState().state as any
     const wood = state.players[0].resources.wood
     if (wood !== 4) return { ok: false, reason: `expected wood=4 (3 from space + 1 bonus), got ${wood}` }
