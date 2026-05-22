@@ -58,7 +58,8 @@ const fenceIsDoableListener: CardListenerRegistration = {
     // `getFenceCount+4>15` assumes building 4 segments at once, which
     // conflicts with the 1-3 segments remaining here.
     if (before >= 12) return { doable: true }
-    const freeFences = Math.max(0, 15 - Math.max(before + 1, 13) + 1)
+    // before < 12: the free band (13th-15th fence) always offers exactly 3.
+    const freeFences = 3
     const previewPlayer = {
       ...player,
       resources: { ...player.resources, wood: wood + freeFences },
