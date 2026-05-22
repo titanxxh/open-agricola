@@ -1,5 +1,6 @@
 import type { GameSession } from '../../../server/game/authoritative-session'
 import type { CustomCardData } from '../../../shared/cards/custom-registry'
+import type { Driver } from '../driver'
 
 export interface FixtureContext {
   cardId: string
@@ -28,6 +29,9 @@ export interface CardFixture {
   cardType: 'minor' | 'occupation'
   userMessage: string
   setup: (llmGeneratedCode: string) => { session: GameSession; ctx: FixtureContext }
-  trigger: (session: GameSession, ctx: FixtureContext) => TriggerResult
-  assert: (session: GameSession, ctx: FixtureContext, result: TriggerResult) => FixtureResult
+  /** 旧结构，迁移期保留。Task 12 收尾删除。 */
+  trigger?: (session: GameSession, ctx: FixtureContext) => TriggerResult
+  /** 新结构：调 driver 原语。迁移期 optional，Task 12 收尾改必填。 */
+  scenario?: (driver: Driver, ctx: FixtureContext) => void
+  assert: (session: GameSession, ctx: FixtureContext, result?: TriggerResult) => FixtureResult
 }
