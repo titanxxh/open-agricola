@@ -149,6 +149,12 @@ export function extractSandboxDocInjections(): string[] {
 /**
  * Extract a `<!-- prompt-sync:begin id=X --> ... <!-- prompt-sync:end id=X -->`
  * block from a markdown file and return the bullet-list items as strings.
+ *
+ * The list-item regex tolerates an optional backslash around the backticks so
+ * the same block parses in both contexts:
+ *   - `.md` files: bare backticks      `- `gain` ...`
+ *   - `.ts` template literals: escaped `- \`gain\` ...` (backtick must be
+ *     escaped inside a template string)
  */
 function extractMarkdownBlock(file: string, blockId: string): string[] | null {
   const src = readFile(file)
@@ -158,7 +164,7 @@ function extractMarkdownBlock(file: string, blockId: string): string[] | null {
   )
   const m = src.match(re)
   if (!m) return null
-  return [...m[1].matchAll(/^-\s*`([^`]+)`/gm)].map(m2 => m2[1])
+  return [...m[1].matchAll(/^-\s*\\?`([^`\\]+)\\?`/gm)].map(m2 => m2[1])
 }
 
 /**
