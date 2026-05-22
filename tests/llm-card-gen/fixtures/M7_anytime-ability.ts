@@ -13,6 +13,9 @@ const fixture: CardFixture = {
   id: 'M7-anytime-ability',
   cardId: CARD_ID,
   cardType: 'occupation',
+  // spec §5.1 例外：userMessage 显式提示用 phases: ['anytime'] listener。「任意时机」
+  // 能力到 anytime listener 的映射对小模型非显然，作为 fixture 级最小提示保留——
+  // 不是去实现化遗漏，勿删。
   userMessage: [
     '请实现一张职业卡牌：',
     '',

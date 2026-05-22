@@ -39,6 +39,10 @@ const fixture: CardFixture = {
   id: 'M3-harvest-feed-modifier',
   cardId: CARD_ID,
   cardType: 'occupation',
+  // spec §5.1 例外：userMessage 显式指定 onHarvest hook。onStartHarvestFeedingPhase
+  // 的 resume 路径有引擎递归 bug（从 cardIndex=0 重启致 stack overflow），onHarvest
+  // 是可用替代。这是单卡场景的引擎 quirk，无法在通用 system prompt 里描述，故按
+  // spec §5.1 作为 fixture 级最小提示保留——不是去实现化遗漏，勿删。
   userMessage: [
     '请实现一张职业卡牌：',
     '',

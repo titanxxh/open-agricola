@@ -98,9 +98,14 @@ export class Driver {
   }
 
   takeAnytimeAction(pi: number, anytimeId: string): SessionResp {
-    const label = `takeAnytimeAction(${pi},'${anytimeId}')`
-    const r0 = this.record(label, this.session.takeAnytimeAction(pi, anytimeId) as unknown as SessionResp)
-    return this.drain(label, r0)
+    // 不 drain：anytime 行动的 flow 通常自包含（纯资源操作），执行后会停回
+    // 触发它的宿主 interaction（如 farmland 的 farm-select）——宿主 interaction
+    // 不该被 driver 消化。若将来某 anytime flow 产生需 resolve 的 sub-interaction，
+    // driver 需扩展（目前 9 个 fixture 无此需求）。
+    return this.record(
+      `takeAnytimeAction(${pi},'${anytimeId}')`,
+      this.session.takeAnytimeAction(pi, anytimeId) as unknown as SessionResp,
+    )
   }
 
   /** 触发本卡的 anytime 行动；找不到则记录步骤并抛错。 */
