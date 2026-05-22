@@ -176,6 +176,8 @@ const CARD_IMPL = {
 | anytime | 任意时刻 | 全局触发 |
 | computeChoiceCandidates | 计算可选项时 | 修改选项列表 |
 
+⚠️ **anytime listener 禁止设 \`actions\` 字段**：\`phases: ['anytime']\` 的 listener 不绑定具体行动，若设了 \`actions\`（哪怕空数组 \`[]\`），引擎会执行 \`actions.includes(contextActionId)\`，结果永为 false，listener 永远不会触发。正确写法：省略 \`actions\` 字段。
+
 ### 可监听的行动（actions）
 
 collect、gain、receive、plow、sow、construct、renovate-house、fence、stables、improvement-any、minor-improvement、play-occupation、place-farmer、wish-children、wish-children-growth、family-growth、bake-bread

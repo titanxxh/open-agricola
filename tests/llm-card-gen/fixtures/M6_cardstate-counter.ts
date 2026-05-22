@@ -12,6 +12,9 @@ const fixture: CardFixture = {
   id: 'M6-cardstate-counter',
   cardId: CARD_ID,
   cardType: 'occupation',
+  // spec §5.1 例外：userMessage 显式指定计数器键名 actionCount。该键名是本 fixture
+  // 的 assert 与卡牌实现之间的契约（assert 按此键读 cardStates[CARD_ID].counters
+  // .actionCount 验证），键名由 LLM 自取会破坏 assert，故须指定——勿删。
   userMessage: [
     '请实现一张职业卡牌：',
     '',

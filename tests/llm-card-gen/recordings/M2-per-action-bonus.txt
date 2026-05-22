@@ -1,0 +1,37 @@
+```typescript
+const CARD_ID = 'CUSTOM_LoggingBoots'
+
+const CARD_DEF = new Occupation({
+  id: CARD_ID,
+  name: 'Logging Boots',
+  deck: 'CUSTOM',
+  number: 0,
+  desc: ['Each time you use a forest (collect) action space, gain 1 extra <WOOD>.'],
+  cost: {},
+  vp: 0,
+  implemented: true,
+  locales: {
+    zh: {
+      name: '伐木靴',
+      desc: ['每次你使用「伐木」行动空间时，额外获得 1 <WOOD>。'],
+    },
+  },
+})
+
+const CARD_IMPL = {
+  listeners: [
+    {
+      cardIds: [CARD_ID],
+      actions: ['collect'],
+      phases: ['after'],
+      handler: (context) => {
+        if (!context.space?.id?.startsWith('forest')) return
+        return {
+          flow: gainLeaf(CARD_ID, { wood: 1 }),
+          sourceCard: CARD_ID,
+        }
+      },
+    },
+  ],
+}
+```
