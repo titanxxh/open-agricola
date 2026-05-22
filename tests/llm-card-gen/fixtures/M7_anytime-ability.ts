@@ -19,6 +19,7 @@ const fixture: CardFixture = {
     '- 卡牌类型: 职业 (Occupation)',
     '- 卡牌名称: 木材换食物',
     '- 效果: 任意时机，你可以支付 2 木材，获得 3 食物。整局游戏只能使用一次。',
+    '- 实现提示: 用 listener、phases 设为 [\'anytime\'] 实现这个「任意时机」能力。',
   ].join('\n'),
 
   setup(llmCode) {
@@ -46,7 +47,7 @@ const fixture: CardFixture = {
   },
 
   scenario(driver) {
-    driver.takeAction(0, 'farmland')
+    driver.takeActionRaw(0, 'farmland')
     driver.takeAnytimeForCard(0)
   },
 
