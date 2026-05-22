@@ -1,0 +1,31 @@
+```typescript
+const CARD_ID = 'CUSTOM_ExpressDelivery'
+
+const CARD_DEF = new MinorImprovement({
+  id: CARD_ID,
+  name: 'Express Delivery',
+  deck: 'CUSTOM',
+  number: 0,
+  desc: ['When played, gain 3 <WOOD> and 1 <FOOD>.'],
+  prerequisite: ['3 Occupations'],
+  cost: { wood: 1 },
+  vp: 0,
+  implemented: true,
+  locales: {
+    zh: {
+      name: '速运',
+      desc: ['打出本牌时，立即获得 3 <WOOD> 和 1 <FOOD>。'],
+      prerequisite: ['3个职业'],
+    },
+  },
+})
+
+const CARD_IMPL = {
+  effect: {
+    id: CARD_ID,
+    onBuy: (state, player) => {
+      return gainLeaf(CARD_ID, { wood: 3, food: 1 })
+    },
+  },
+}
+```
