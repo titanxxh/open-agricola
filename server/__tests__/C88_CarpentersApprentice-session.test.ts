@@ -7,6 +7,43 @@ import type { PlayerState, GameState } from '../../shared/contract/types'
 import '../../shared/cards/C/C88_CarpentersApprentice'
 import '../../shared/cards/B/B30_WoodPalisades'
 
+const makeFencePlayer = (fenceCount: number, wood = 0): PlayerState => {
+  const session = new GameSession()
+  const state = session.getState().state
+  const p = state.players[0]!
+  p.occupationPlayed.push('C88_CarpentersApprentice')
+  p.fenceSegments = Array.from({ length: fenceCount }, (_, i) => ({
+    edge: `fence-stub-${i}`,
+    type: 'fence' as const,
+  }))
+  p.resources.wood = wood
+  return p
+}
+
+const fenceCostWood = (player: PlayerState, newFenceEdges: string[]): number => {
+  const listener = getRegisteredCardListeners().find(
+    (l) =>
+      l.cardIds?.includes('C88_CarpentersApprentice') &&
+      l.actions?.includes('fence') &&
+      l.phases?.includes('computeCosts'),
+  )
+  if (!listener) throw new Error('C88 fenceCostListener (computeCosts/fence) not registered')
+  const ctx = {
+    state: {} as GameState,
+    player,
+    space: {} as never,
+    actionId: 'fence',
+    phase: 'computeCosts',
+    params: { newFenceEdges },
+  } as unknown as CardListenerContext
+  const result = listener.handler(ctx)
+  if (!result || typeof result !== 'object') return 0
+  return (result as { costs?: { wood?: number } }).costs?.wood ?? 0
+}
+
+const fenceEdges = (n: number): string[] =>
+  Array.from({ length: n }, (_, i) => `new-edge-${i}`)
+
 const stablesDiscount = (player: PlayerState): number => {
   const listeners = getRegisteredCardListeners().filter((l) =>
     l.cardIds?.includes('C88_CarpentersApprentice'),
@@ -31,18 +68,16 @@ const stablesDiscount = (player: PlayerState): number => {
 }
 
 describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
-  it('freeFences discount fences only; palisades still cost full wood', () => {
+  it('低 fence 不打折:0 fence 造 2 fence + 2 palisade 全额付费', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
 
     const player = state.players[0]!
-    // No existing fences → freeFences = 15
-    // 2 fence edges × 1 wood = 2, minus freeFences (2 used) → 0
-    // 2 palisade edges × 2 wood = 4
-    // total = 4 wood
-    player.resources.wood = 4
+    // 0 fence: 第 1、2 个 fence 不在 13-15 区间 → 不免费。
+    // 2 fence × 1 wood = 2,2 palisade × 2 wood = 4,total = 6 wood。
+    player.resources.wood = 6
     player.occupationPlayed.push('C88_CarpentersApprentice')
     player.minorPlayed.push('B30_WoodPalisades')
 
@@ -51,9 +86,6 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
 
-    // Fence tile (0,0). 2 fences (internal) + 2 palisades (border).
-    // Palisades must be on border: H-0-0 (top), V-0-0 (left).
-    // Fences on internal: H-1-0, V-0-1.
     resp = session.resolveChoice(0, 'confirm', {
       edges: ['H-1-0', 'V-0-1'],
       palisadeEdges: ['H-0-0', 'V-0-0'],
@@ -62,20 +94,19 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
 
     expect(resp.ok).toBe(true)
     const result = resp.state.players[0]!
-    // Wood fully consumed
     expect(result.resources.wood).toBe(0)
     expect(result.pastures).toHaveLength(1)
   })
 
-  it('rejects insufficient wood when palisades dominate (no double-discount)', () => {
+  it('palisade 不打折:5 wood 不足 6 wood 的 2 fence + 2 palisade build', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
 
     const player = state.players[0]!
-    // Only 3 wood — not enough for 4-wood palisade+fence build (2 palisades @ 2 each).
-    player.resources.wood = 3
+    // 需 6 wood(2 fence 全额 + 2 palisade 全额);只有 5 → 不足。
+    player.resources.wood = 5
     player.occupationPlayed.push('C88_CarpentersApprentice')
     player.minorPlayed.push('B30_WoodPalisades')
 
@@ -84,7 +115,6 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
 
-    // Same layout as above but insufficient wood.
     resp = session.resolveChoice(0, 'confirm', {
       edges: ['H-1-0', 'V-0-1'],
       palisadeEdges: ['H-0-0', 'V-0-0'],
@@ -123,5 +153,26 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
     it('4 stables built → no further discount (cap)', () => {
       expect(stablesDiscount(makePlayer(4))).toBe(0)
     })
+  })
+})
+
+describe('C88 — fenceCostListener 区间公式(第 13-15 个 fence 免费)', () => {
+  it('before 0,造 2 个 → 无折扣(第 1、2 个不在 13-15)', () => {
+    expect(fenceCostWood(makeFencePlayer(0), fenceEdges(2))).toBe(0)
+  })
+  it('before 12,造 3 个(第 13/14/15)→ -3', () => {
+    expect(fenceCostWood(makeFencePlayer(12), fenceEdges(3))).toBe(-3)
+  })
+  it('before 13,造 2 个(第 14/15)→ -2', () => {
+    expect(fenceCostWood(makeFencePlayer(13), fenceEdges(2))).toBe(-2)
+  })
+  it('before 11,造 4 个(第 12 付费 + 13/14/15 免费)→ -3', () => {
+    expect(fenceCostWood(makeFencePlayer(11), fenceEdges(4))).toBe(-3)
+  })
+  it('before 15,造 1 个 → 无折扣(已满)', () => {
+    expect(fenceCostWood(makeFencePlayer(15), fenceEdges(1))).toBe(0)
+  })
+  it('newFenceEdges 为空 → 无折扣', () => {
+    expect(fenceCostWood(makeFencePlayer(13), [])).toBe(0)
   })
 })
