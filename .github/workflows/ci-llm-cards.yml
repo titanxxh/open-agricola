@@ -50,7 +50,7 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.MY_TEST_OPENROUTER_APIKEY }}
           DEEPSEEK_API_KEY: ${{ secrets.MY_TEST_DEEPSEEK_APIKEY }}
           AIHUBMIX_API_KEY: ${{ secrets.MY_TEST_AIHUBMIX_APIKEY }}
-        run: pnpm run test:llm
+        run: pnpm run test:llm:live
 
       - name: Upload LLM response dumps
         if: always()

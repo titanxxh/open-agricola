@@ -18,6 +18,8 @@
     "test:fast": "pnpm run check:test-project-coverage && vitest run --project fast-shared --project fast-cards --project fast-card-runtime --project fast-client --project fast-server --project fast-scripts --project fast-tests --exclude e2e-tests --exclude scripts/test-actions.spec.ts",
     "test:slow": "vitest run --project slow --exclude e2e-tests --exclude scripts/test-actions.spec.ts",
     "test:llm": "vitest run --project llm --testTimeout=120000",
+    "test:llm:live": "LLM_TEST_MODE=live vitest run --project llm --testTimeout=120000",
+    "test:llm:record": "LLM_TEST_MODE=live LLM_TEST_RECORD=1 vitest run --project llm --testTimeout=120000",
     "test:bench": "RUN_BENCHMARKS=1 vitest run --project fast-tests tests/pay-dp.test.ts tests/pay-optimizations.test.ts --testTimeout=20000",
     "test:e2e": "npx playwright test",
     "verify": "bash scripts/verify.sh",
