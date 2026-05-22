@@ -57,10 +57,6 @@ describe.skipIf(suiteSkip)(`LLM card-gen [${MODE}${MODE === 'live' ? ` ${PROVIDE
         throw new Error(`[${fixture.id}] extract failed: ${reason} (see ${DUMP_DIR}/${fixture.id}.txt)`)
       }
 
-      if (typeof fixture.scenario !== 'function') {
-        throw new Error(`[${fixture.id}] fixture not yet migrated: missing scenario`)
-      }
-
       const { session, ctx } = fixture.setup(code)
       const driver = new Driver(session, ctx)
       try {
@@ -69,8 +65,7 @@ describe.skipIf(suiteSkip)(`LLM card-gen [${MODE}${MODE === 'live' ? ` ${PROVIDE
         throw new Error(`[${fixture.id}] scenario threw: ${(err as Error).message} | steps: ${driver.steps.map((s) => s.label).join(' → ')} | dump: ${DUMP_DIR}/${fixture.id}.txt`)
       }
 
-      // 迁移期 assert 第三参兼容旧三参签名；新 fixture 忽略它。Task 12 收尾改两参。
-      const result = fixture.assert(session, ctx, { steps: driver.steps.map((s) => ({ label: s.label })) })
+      const result = fixture.assert(session, ctx)
       if (!result.ok) {
         throw new Error(`[${fixture.id}] assert failed: ${result.reason} | steps: ${driver.steps.map((s) => s.label).join(' → ')} | dump: ${DUMP_DIR}/${fixture.id}.txt`)
       }

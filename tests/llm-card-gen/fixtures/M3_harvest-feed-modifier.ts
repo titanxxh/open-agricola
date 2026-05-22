@@ -83,7 +83,7 @@ const fixture: CardFixture = {
     driver.advanceToHarvest()
   },
 
-  assert(session, _ctx, _result): FixtureResult {
+  assert(session, _ctx): FixtureResult {
     const state = session.getState().state as any
     const p0Beg = state.players[0].resources.begging
     const p1Beg = state.players[1].resources.begging

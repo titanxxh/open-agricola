@@ -9,15 +9,6 @@ export interface FixtureContext {
   [k: string]: unknown
 }
 
-export interface TriggerStep {
-  label: string
-  resp?: unknown
-}
-
-export interface TriggerResult {
-  steps: TriggerStep[]
-}
-
 export interface FixtureResult {
   ok: boolean
   reason?: string
@@ -29,9 +20,6 @@ export interface CardFixture {
   cardType: 'minor' | 'occupation'
   userMessage: string
   setup: (llmGeneratedCode: string) => { session: GameSession; ctx: FixtureContext }
-  /** 旧结构，迁移期保留。Task 12 收尾删除。 */
-  trigger?: (session: GameSession, ctx: FixtureContext) => TriggerResult
-  /** 新结构：调 driver 原语。迁移期 optional，Task 12 收尾改必填。 */
-  scenario?: (driver: Driver, ctx: FixtureContext) => void
-  assert: (session: GameSession, ctx: FixtureContext, result?: TriggerResult) => FixtureResult
+  scenario: (driver: Driver, ctx: FixtureContext) => void
+  assert: (session: GameSession, ctx: FixtureContext) => FixtureResult
 }

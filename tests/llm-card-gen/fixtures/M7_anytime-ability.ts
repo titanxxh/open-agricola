@@ -54,7 +54,7 @@ const fixture: CardFixture = {
     driver.takeAnytimeForCard(0)
   },
 
-  assert(session, ctx, _result): FixtureResult {
+  assert(session, ctx): FixtureResult {
     const p0 = (session.getState().state as any).players[0]
     if (p0.resources.wood !== 0) return { ok: false, reason: `expected wood=0 (2-2 paid), got ${p0.resources.wood}` }
     if (p0.resources.food !== 3) return { ok: false, reason: `expected food=3 (gained), got ${p0.resources.food}` }
