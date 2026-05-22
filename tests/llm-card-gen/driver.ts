@@ -77,11 +77,11 @@ export class Driver {
     return this.drain(label, r0)
   }
 
-  playMinorViaMeetingPlace(pi: number, _cardId: string): SessionResp {
+  playMinorViaMeetingPlace(pi: number): SessionResp {
     return this.takeAction(pi, 'meeting-place')
   }
 
-  playOccupationViaLessons(pi: number, _cardId: string): SessionResp {
+  playOccupationViaLessons(pi: number): SessionResp {
     return this.takeAction(pi, 'lessons')
   }
 
@@ -89,6 +89,16 @@ export class Driver {
     const label = `takeAnytimeAction(${pi},'${anytimeId}')`
     const r0 = this.record(label, this.session.takeAnytimeAction(pi, anytimeId) as unknown as SessionResp)
     return this.drain(label, r0)
+  }
+
+  /** 触发本卡的 anytime 行动；找不到则记录步骤并抛错。 */
+  takeAnytimeForCard(pi: number): SessionResp {
+    const anytimeId = this.findAnytimeId()
+    if (!anytimeId) {
+      this.steps.push({ label: `findAnytimeId('${this.ctx.cardId}'): none`, ok: false, stateId: 'idle' })
+      throw new Error(`driver: no anytime action exposed for ${this.ctx.cardId}`)
+    }
+    return this.takeAnytimeAction(pi, anytimeId)
   }
 
   findAnytimeId(): string | undefined {
