@@ -63,7 +63,7 @@ const fixture: CardFixture = {
     }
   },
 
-  assert(session, _ctx, _result): FixtureResult {
+  assert(session, _ctx): FixtureResult {
     const p0 = (session.getState().state as any).players[0]
     const cs = p0.cardStates?.['CUSTOM_M6_ActionTallyman']
     if (!cs) return { ok: false, reason: 'cardStates[CUSTOM_M6_ActionTallyman] missing' }

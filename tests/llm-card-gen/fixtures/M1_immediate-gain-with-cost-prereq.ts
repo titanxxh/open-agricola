@@ -58,7 +58,7 @@ const fixture: CardFixture = {
     driver.playMinorViaMeetingPlace(0)
   },
 
-  assert(session, _ctx, _result): FixtureResult {
+  assert(session, _ctx): FixtureResult {
     const state = session.getState().state as any
     const p0 = state.players[0]
     if (!p0.minorPlayed.includes('CUSTOM_M1_QuickHaul')) {

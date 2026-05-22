@@ -1,29 +1,26 @@
 /**
  * Helper layer for LLM card-gen fixtures.
  *
- * Approach: instead of spinning up a full GameSession (which requires lots
- * of action-routing plumbing per fixture), we test at the hook-invocation
- * level — same pattern as server/__tests__/custom-code-executor.test.ts.
+ * Each fixture builds a full GameSession via `buildSessionWithLLMCard` — the
+ * LLM-generated code is compiled, registered, and wired into a real session.
+ * The fixture's `scenario` then drives that session through real action flows
+ * using the declarative primitives in `driver.ts`, and `assert` inspects the
+ * resulting state. This answers the "is the LLM code runnable?" acceptance
+ * question end-to-end: passing means the code validates AND behaves correctly
+ * under real gameplay.
  *
- * Each fixture compiles the LLM-generated code, registers it, and then
- * invokes the relevant effect hook or listener to verify the returned
- * ActionFlow matches expectations. This is the "is the LLM code runnable?"
- * acceptance question — passing means the code validates AND produces the
- * right shape under the right input.
+ * This file provides the scenario-setup helpers (hand/worker/resource
+ * fixtures, round-action ordering) and the round-end advancement used by the
+ * driver.
  */
 
 import {
   validateAndCompileCustomCode,
-  invokeCustomCodeEffect,
-  invokeCustomCodeListener,
 } from '../../server/custom-code/engine'
 import {
-  registerCustomCard,
   clearCustomCards,
   type CustomCardData,
 } from '../../shared/cards/custom-registry'
-import { registerExecutorBackedCustomCard } from '../../server/custom-code/runtime'
-import { createInitialState } from '../../shared/session/state-bootstrap'
 import type { GameState, InteractionState, PlayerState, Resource } from '../../shared/contract/types'
 import { rewriteCardId } from './extract'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -84,23 +81,11 @@ function compileLLMCard(opts: CompileLLMOptions): CompiledCardArtifacts {
   return { compiledCode: result.compiledCode, manifest: result.manifest, cardData }
 }
 
-/** Register the card globally so it can be discovered by the engine. */
 /** Clear any registered custom cards — call in afterEach. */
 export function resetCards(): void {
   clearCustomCards()
 }
 
-/** Build a fresh GameState with a deterministic seed. */
-/** Mark a card as played by the given player. */
-/** Mutate player resources (e.g. set wood to 0 for a clean baseline). */
-/**
- * Invoke an effect hook on the LLM card. Returns the result envelope from
- * the runtime — caller inspects `.ok` and `.result` (the ActionFlow the
- * hook returned, or scoring object for compute* hooks).
- */
-/**
- * Invoke a listener entry from the manifest by index (default 0 = first).
- */
 export const FIXED_ROUND_ACTION_ORDER = [
   'sheep-market', 'grain-utilization', 'fencing', 'major-improvement',
   'wish-children', 'western-quarry', 'house-redevelopment',

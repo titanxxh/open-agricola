@@ -97,7 +97,7 @@ const fixture: CardFixture = {
     driver.advanceToGameEnd()
   },
 
-  assert(session, _ctx, _result): FixtureResult {
+  assert(session, _ctx): FixtureResult {
     const final = session.getState().state as any
     if (final.gameOver !== true) return { ok: false, reason: `expected gameOver=true, got ${final.gameOver}` }
     const p0Entries = getBonusBreakdownForSession(session, 0)
