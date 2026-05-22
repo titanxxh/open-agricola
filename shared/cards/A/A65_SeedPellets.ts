@@ -31,6 +31,8 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.doable) return
+    if (context.actionContext?.skipBeforeTriggers === true) return
     if (!isUnconditionalSow(context)) return
     if (canSow(context.player)) return
     if (!context.player.fields.some((field) => fieldIsEmpty(field))) return

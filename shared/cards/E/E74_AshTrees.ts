@@ -16,6 +16,8 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.doable) return
+    if (context.actionContext?.skipBeforeTriggers === true) return
     const stored = context.player.cardStates?.[CARD_ID]?.counters?.fences ?? 0
     if (stored <= 0) return
     if ((context.player.resources.wood ?? 0) + stored < minimumFenceSegments) return

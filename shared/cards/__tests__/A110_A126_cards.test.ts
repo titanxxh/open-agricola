@@ -220,17 +220,18 @@ describe('A126_MasterWorkman', () => {
     expect(result).toBeUndefined()
   })
 
-  // ─── isDoable with preview player ───
+  // ─── isDoable before-reachability opt-in ───
 
-  it('isDoable returns true when preview resource unlocks the action', () => {
+  it('isDoable returns true for a round 1-4 action without previewing execution', () => {
     const listener = findListener('A126-master-workman-isdoable')!
     expect(listener).toBeDefined()
     const player = createPlayer()
     player.occupationPlayed = ['A126_MasterWorkman']
     const state = createRoundState(player, 'construct', 0)
-    // canBeExecutedByPlayer returns true only if player has wood >= 1
     const space = createSpace('construct', {
-      canBeExecutedByPlayer: (_s: GameState, p: PlayerState) => (p.resources.wood ?? 0) >= 1,
+      canBeExecutedByPlayer: () => {
+        throw new Error('preview should not run')
+      },
     } as any)
     const result = executeCardListener(listener, {
       state, player, space,
@@ -251,18 +252,20 @@ describe('A126_MasterWorkman', () => {
     expect(result).toBeUndefined()
   })
 
-  it('isDoable stays false when preview resource still cannot unlock action', () => {
+  it('isDoable does not re-open skipBeforeTriggers continuation', () => {
     const listener = findListener('A126-master-workman-isdoable')!
     const player = createPlayer()
     player.occupationPlayed = ['A126_MasterWorkman']
     const state = createRoundState(player, 'construct', 0)
-    // canBeExecutedByPlayer always returns false
     const space = createSpace('construct', {
-      canBeExecutedByPlayer: () => false,
+      canBeExecutedByPlayer: () => {
+        throw new Error('preview should not run')
+      },
     } as any)
     const result = executeCardListener(listener, {
       state, player, space,
       actionId: 'construct', phase: 'isDoable', doable: false,
+      actionContext: { skipBeforeTriggers: true },
     } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })

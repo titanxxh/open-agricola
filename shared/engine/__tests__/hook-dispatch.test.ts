@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type {
   ActionDefinition,
   ActionSpace,
+  CanBeExecutedByPlayerContext,
   GameState,
   PlayerState,
 } from '../../contract/types'
@@ -14,6 +15,10 @@ import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
 import { ActionNode } from '../nodes'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
+import {
+  deriveCanBeExecutedByFlow,
+  initializeFlowDerivedCanBeExecutedByPlayer,
+} from '../../actions/flow'
 import { constructAction } from '../../actions/effects/construct'
 import { plowAction } from '../../actions/effects/plow'
 import { stablesAction } from '../../actions/effects/stables'
@@ -153,6 +158,174 @@ describe('Hook dispatch merge order', () => {
     }
 
     expect(order).toEqual(['action-hook', 'card-listener'])
+  })
+
+  it('does not let a card opt-in override an action hook veto', () => {
+    registerActionHook({
+      id: 'aaa-veto',
+      actions: ['test-action'],
+      phases: ['isDoable'],
+      handler: () => ({ doable: false }),
+    })
+    requireActiveCardRegistry('hook-dispatch').registerListener({
+      id: 'zzz-before-opt-in',
+      cardIds: ['card-A'],
+      actions: ['test-action'],
+      phases: ['isDoable'],
+      handler: () => ({ doable: true }),
+    })
+
+    const player = createPlayer()
+    player.minorPlayed = ['card-A']
+    const action = { ...createAction(), canBeExecutedByPlayer: () => false }
+    const state = {
+      round: 1, currentPlayerIndex: 0,
+      players: [player], actionSpaces: [], log: [],
+      roundStartSnapshot: null, roundActionOrder: [],
+      gameSeed: 1, availableMajorImprovements: [],
+      futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
+    } as GameState
+    const dispatcher = new HookDispatcher()
+
+    const doable = dispatcher.applyIsDoable({
+      state,
+      player,
+      space: createSpace(action),
+      actionId: 'test-action',
+    }, action, false)
+
+    expect(doable).toBe(false)
+  })
+
+  it('does not let a later card opt-in override an earlier card veto', () => {
+    requireActiveCardRegistry('hook-dispatch').registerListener({
+      id: 'aaa-card-veto',
+      cardIds: ['card-A'],
+      actions: ['test-action'],
+      phases: ['isDoable'],
+      handler: () => ({ doable: false }),
+    })
+    requireActiveCardRegistry('hook-dispatch').registerListener({
+      id: 'zzz-card-opt-in',
+      cardIds: ['card-B'],
+      actions: ['test-action'],
+      phases: ['isDoable'],
+      handler: () => ({ doable: true }),
+    })
+
+    const player = createPlayer()
+    player.minorPlayed = ['card-A', 'card-B']
+    const action = { ...createAction(), canBeExecutedByPlayer: () => false }
+    const state = {
+      round: 1, currentPlayerIndex: 0,
+      players: [player], actionSpaces: [], log: [],
+      roundStartSnapshot: null, roundActionOrder: [],
+      gameSeed: 1, availableMajorImprovements: [],
+      futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
+    } as GameState
+    const dispatcher = new HookDispatcher()
+
+    const doable = dispatcher.applyIsDoable({
+      state,
+      player,
+      space: createSpace(action),
+      actionId: 'test-action',
+    }, action, false)
+
+    expect(doable).toBe(false)
+  })
+
+  it('does not let a flow-derived child opt-in override a child veto', () => {
+    registerActionHook({
+      id: 'aaa-child-veto',
+      actions: ['child-action'],
+      phases: ['isDoable'],
+      handler: () => ({ doable: false }),
+    })
+    requireActiveCardRegistry('hook-dispatch').registerListener({
+      id: 'zzz-child-opt-in',
+      cardIds: ['card-A'],
+      actions: ['child-action'],
+      phases: ['isDoable'],
+      handler: () => ({ doable: true }),
+    })
+
+    const player = createPlayer()
+    player.minorPlayed = ['card-A']
+    const childAction = {
+      ...createAction(),
+      id: 'child-action',
+      canBeExecutedByPlayer: () => false,
+    }
+    const parentAction = {
+      ...createAction(),
+      id: 'parent-action',
+      flow: { type: 'leaf' as const, actionId: 'child-action' },
+      canBeExecutedByPlayer: deriveCanBeExecutedByFlow(),
+    }
+    const actions = new Map<string, ActionDefinition>([
+      [childAction.id, childAction],
+      [parentAction.id, parentAction],
+    ])
+    initializeFlowDerivedCanBeExecutedByPlayer(parentAction, (actionId) => actions.get(actionId))
+    const state = {
+      round: 1, currentPlayerIndex: 0,
+      players: [player], actionSpaces: [], log: [],
+      roundStartSnapshot: null, roundActionOrder: [],
+      gameSeed: 1, availableMajorImprovements: [],
+      futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
+    } as GameState
+
+    const doable = parentAction.canBeExecutedByPlayer.call(createSpace(parentAction), state, player)
+
+    expect(doable).toBe(false)
+  })
+
+  it('passes skipBeforeTriggers to flow-derived child opt-ins', () => {
+    requireActiveCardRegistry('hook-dispatch').registerListener({
+      id: 'child-before-opt-in',
+      cardIds: ['card-A'],
+      actions: ['child-action'],
+      phases: ['isDoable'],
+      handler: (context) => {
+        if (context.actionContext?.skipBeforeTriggers === true) return
+        return { doable: true }
+      },
+    })
+
+    const player = createPlayer()
+    player.minorPlayed = ['card-A']
+    const childAction = {
+      ...createAction(),
+      id: 'child-action',
+      canBeExecutedByPlayer: () => false,
+    }
+    const parentAction = {
+      ...createAction(),
+      id: 'parent-action',
+      flow: { type: 'leaf' as const, actionId: 'child-action' },
+      canBeExecutedByPlayer: deriveCanBeExecutedByFlow(),
+    }
+    const actions = new Map<string, ActionDefinition>([
+      [childAction.id, childAction],
+      [parentAction.id, parentAction],
+    ])
+    initializeFlowDerivedCanBeExecutedByPlayer(parentAction, (actionId) => actions.get(actionId))
+    const state = {
+      round: 1, currentPlayerIndex: 0,
+      players: [player], actionSpaces: [], log: [],
+      roundStartSnapshot: null, roundActionOrder: [],
+      gameSeed: 1, availableMajorImprovements: [],
+      futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
+    } as GameState
+
+    expect(parentAction.canBeExecutedByPlayer.call(createSpace(parentAction), state, player)).toBe(true)
+    expect(parentAction.canBeExecutedByPlayer.call(
+      createSpace(parentAction),
+      state,
+      player,
+      { actionContext: { skipBeforeTriggers: true } } as CanBeExecutedByPlayerContext,
+    )).toBe(false)
   })
 })
 
@@ -404,7 +577,7 @@ describe('Multiple hooks overriding doable', () => {
     setActiveCardRegistry(new CardRegistry())
   })
 
-  it('later hook doable overrides earlier', () => {
+  it('does not let a later hook opt-in override an earlier hook veto', () => {
     registerActionHook({
       id: 'block-it',
       actions: ['test-action'],
@@ -440,7 +613,7 @@ describe('Multiple hooks overriding doable', () => {
       log: new LogStore(),
     })
     const result = engine.proceed({ state, player, space })
-    expect(result.type).toBe('ok')
+    expect(result.type).not.toBe('ok')
   })
 })
 

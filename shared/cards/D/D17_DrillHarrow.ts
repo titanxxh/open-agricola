@@ -50,8 +50,9 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isUnconditionalSow(context)) return
     if (context.doable) return
+    if (context.actionContext?.skipBeforeTriggers === true) return
+    if (!isUnconditionalSow(context)) return
     // Player can plow to create an empty field, making sow possible
     if (context.player.resources.food < 3) return
     return { doable: true }

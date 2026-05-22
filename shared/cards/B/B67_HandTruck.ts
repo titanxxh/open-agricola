@@ -33,6 +33,7 @@ const isDoableListener: CardListenerRegistration = {
   actions: ['bake-bread'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
+    if (context.actionContext?.skipBeforeTriggers === true) return
     const hasWorkersOnAccumulation = context.state.actionSpaces.some(
       (space) =>
         spaceHasPlayer(space, context.player.id) &&

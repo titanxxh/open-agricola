@@ -164,27 +164,36 @@ export const runActionHooks = (context: ActionHookContextInput) => {
   return results
 }
 
-export const applyIsDoableHooks = (
+export const applyIsDoableHooksDetailed = (
   context: Omit<ActionHookContextInput, 'phase' | 'doable'>,
   initialDoable: boolean,
 ) => {
   let doable = initialDoable
+  let vetoed = false
   const hookContext = normalizeActionHookContext({
     ...context,
     phase: 'isDoable',
     doable,
   })
-  getOrderedHooks(hookContext).forEach((registration) => {
+  for (const registration of getOrderedHooks(hookContext)) {
     const result = registration.handler({
       ...hookContext,
       doable,
     })
-    if (typeof result?.doable === 'boolean') {
-      doable = result.doable
+    if (result?.doable === false) {
+      doable = false
+      vetoed = true
+    } else if (result?.doable === true && !vetoed) {
+      doable = true
     }
-  })
-  return doable
+  }
+  return { doable, vetoed }
 }
+
+export const applyIsDoableHooks = (
+  context: Omit<ActionHookContextInput, 'phase' | 'doable'>,
+  initialDoable: boolean,
+) => applyIsDoableHooksDetailed(context, initialDoable).doable
 
 export const applyComputeReplaceHooks = (
   context: Omit<ActionHookContextInput, 'phase'>,
