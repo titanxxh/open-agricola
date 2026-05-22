@@ -485,6 +485,18 @@ return {
 下面这几个是高频踩坑点。完整 `actionId` 列表见 `shared/actions/effects/*` 目录。
 
 
+<!-- prompt-sync:begin id=action-ids -->
+- `gain`
+- `pay`
+- `bonus-vp`
+- `bake-bread`
+- `store-on-card`
+- `take-from-card`
+- `push-to-card-stack`
+- `special-effect`
+- `future-meeples`
+<!-- prompt-sync:end id=action-ids -->
+
 | actionId                   | 关键约束                                                                              |
 | -------------------------- | --------------------------------------------------------------------------------- |
 | `bonus-vp`                 | **固定 +1 VP，不接受 `amount` / `vp` 参数**。要 N 分就把 N 个 leaf 串入 seq                       |
@@ -493,11 +505,11 @@ return {
 | `gain`                     | params 形如 `{ food: 2, wood: 1 }`                                                  |
 | `pay`                      | 同上，扣资源                                                                            |
 | `bake-bread`               | 启动一段烤面包子流程                                                                        |
-| `push-card-stack`          | 向 `player.cardStates[CARD_ID].stack` 推入一项                                         |
+| `push-to-card-stack`       | 向 `player.cardStates[CARD_ID].stack` 推入一项                                         |
 | `special-effect`           | **唯一的 cardStates mutation 入口**（Sprint 6a/6b）。`params: { kind: 'set-flag' \| 'set-infobox' \| 'set-extra-data' \| 'increment-extra-data', ... }`。取代旧的 `flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data` 5 个 leaf。详见 §6.1。 |
 | `future-meeples`           | 沙箱专用：用 `params.__futureMeepleRequest` 预放未来回合资源（见 §5.7）                            |
 
-> Sprint 6b（2026-04-30）已删除 5 个独立 mutation actionId（`flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data`）+ 3 个 dead actionId（`hold-worker-on-card` / `release-worker-from-card` / `gain-other-players`）。统一使用 `special-effect` discriminated-union。Workshop 生成的卡若仍引用旧 actionId，AST validator 会报错——改用 `special-effect`。
+> Sprint 6b（2026-04-30）已删除 5 个独立 mutation actionId（`flag-card` / `unflag-card` / `set-card-infobox` / `clear-card-infobox` / `write-card-extra-data`）+ 3 个 dead actionId（`hold-worker-on-card` / `release-worker-from-card` / `gain-other-players`）。统一使用 `special-effect` discriminated-union。`check-prompt-sync` 在 CI 校验 prompt 只暴露白名单内 actionId；白名单外的 actionId 不会出现在 prompt 中，沙盒卡牌不应使用——改用 `special-effect`。
 
 ### 6.1 `special-effect` `params.kind` 完整列表
 
@@ -519,7 +531,7 @@ return {
 
 可选 `actionContext.targetPlayerId?: string` 让 mutation 路由到 `state.players` 中匹配的玩家（默认是 `context.player` 即 actor）。Workshop 通常用不到 targetPlayerId（仅 D134 OysterEater 等跨玩家场景需要）。
 
-> **`card_*` 前缀 ad-hoc actions**（Sprint 6b）：repo-internal 单卡专用 actions（如 `card_E112_GrainThief_protect`）通过 `registerAdHocAction()` 注册，仅在主仓库代码中可见。Workshop 生成的卡 **不能** dispatch `card_*` actionId——AST validator 不放行。如果需要单卡 mutation，请用 `special-effect` 或标准 `gain`。
+> **`card_*` 前缀 ad-hoc actions**（Sprint 6b）：repo-internal 单卡专用 actions（如 `card_E112_GrainThief_protect`）通过 `registerAdHocAction()` 注册，仅在主仓库代码中可见。Workshop 生成的卡 **不能** dispatch `card_*` actionId——这类 id 不在 `SANDBOX_ALLOWED_ACTION_IDS` 白名单内、不会出现在 prompt 中，沙盒运行时也不接受。如果需要单卡 mutation，请用 `special-effect` 或标准 `gain`。
 
 
 ---
