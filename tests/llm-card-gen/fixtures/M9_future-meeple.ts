@@ -6,7 +6,7 @@ import {
   setHand,
   setWorkersAtHome,
 } from '../session-helpers'
-import type { CardFixture, FixtureContext, FixtureResult, TriggerResult } from './types'
+import type { CardFixture, FixtureContext, FixtureResult } from './types'
 
 const CARD_ID = 'CUSTOM_M9_Foreseer'
 
@@ -19,29 +19,7 @@ const fixture: CardFixture = {
     '',
     '- 卡牌类型: 职业 (Occupation)',
     '- 卡牌名称: 预兆者',
-    '- 效果: 打出本牌时 (onBuy)，在下一回合 (state.round + 1) 的回合开始为你预放 1 木材。',
-    '',
-    '## 实现要求',
-    '',
-    'sandbox 没有暴露 `futureMeeplesNode` 等 helper，请直接构造 future-meeples 的 leaf flow：',
-    '',
-    '```ts',
-    'onBuy: (state, player) => ({',
-    '  type: "leaf",',
-    '  actionId: "future-meeples",',
-    '  params: {',
-    '    __futureMeepleRequest: {',
-    '      cardId: CARD_ID,',
-    '      playerId: player.id,',
-    '      entries: [{ round: state.round + 1, resources: { wood: 1 } }],',
-    '    },',
-    '  },',
-    '  sourceCard: CARD_ID,',
-    '})',
-    '```',
-    '',
-    '不要使用 gainLeaf — 这是预放未来回合的资源，不是立即获得。',
-    '不要直接 mutate state.pendingFutureMeeples / state.futureMeeples（state 是只读快照）。',
+    '- 效果: 打出此卡时，预放 1 木材，在下一轮开始时获得。',
   ].join('\n'),
 
   setup(llmCode) {
@@ -69,67 +47,24 @@ const fixture: CardFixture = {
     return { session: built.session, ctx }
   },
 
-  trigger(session): TriggerResult {
-    const steps: TriggerResult['steps'] = []
-    // 'lessons' is base; with one occupation in hand and zero played,
-    // it presents a single-option choice that auto-resolves the play.
-    const r1 = session.takeAction(0, 'lessons') as {
-      ok: boolean
-      interaction: { stateId: string; options?: Array<{ value: string }> }
-    }
-    steps.push({ label: "takeAction(0,'lessons')", resp: r1 })
-    if (r1.interaction.stateId === 'wait') {
-      const r2 = session.resolveChoice(0, CARD_ID)
-      steps.push({ label: `resolveChoice(0, ${CARD_ID})`, resp: r2 })
-    }
-    return { steps }
+  scenario(driver) {
+    driver.playOccupationViaLessons(0)
   },
 
-  assert(session, _ctx, result): FixtureResult {
-    const last = result.steps[result.steps.length - 1]!.resp as { ok: boolean; error?: string } | undefined
-    if (!last || !last.ok) {
-      return { ok: false, reason: `last step failed: ${last?.error ?? '?'}` }
-    }
+  assert(session, _ctx, _result): FixtureResult {
     const state = session.getState().state as any
     const p0 = state.players[0]
-    if (!p0.occupationPlayed.includes(CARD_ID)) {
-      return {
-        ok: false,
-        reason: `expected ${CARD_ID} in occupationPlayed, got ${JSON.stringify(p0.occupationPlayed)}`,
-      }
+    if (!p0.occupationPlayed.includes('CUSTOM_M9_Foreseer')) {
+      return { ok: false, reason: `expected CUSTOM_M9_Foreseer in occupationPlayed, got ${JSON.stringify(p0.occupationPlayed)}` }
     }
-    const futureMeeples = (state.futureMeeples ?? []) as Array<{
-      round: number
-      resources: Record<string, number>
-      playerId?: string
-      cardId?: string
-    }>
-    if (futureMeeples.length < 1) {
-      return {
-        ok: false,
-        reason: `expected at least 1 entry in state.futureMeeples, got ${JSON.stringify(futureMeeples)}`,
-      }
+    const fm = (state.futureMeeples ?? []) as Array<{ playerId?: string; round?: number; resources?: { wood?: number } }>
+    const woodEntry = fm.find((e) => e.playerId === p0.id && (e.resources?.wood ?? 0) >= 1)
+    if (!woodEntry) {
+      return { ok: false, reason: `expected a futureMeeples entry for p0 with wood>=1, got ${JSON.stringify(fm)}` }
     }
-    const match = futureMeeples.find(
-      (e) => e.round === 2 && (e.resources?.wood ?? 0) === 1,
-    )
-    if (!match) {
-      return {
-        ok: false,
-        reason: `expected futureMeeples entry with round=2, resources.wood=1, got ${JSON.stringify(futureMeeples)}`,
-      }
+    if (woodEntry.round !== state.round + 1) {
+      return { ok: false, reason: `expected future-meeple round=${state.round + 1} (next round), got ${woodEntry.round}` }
     }
-    if (match.playerId && match.playerId !== p0.id) {
-      return {
-        ok: false,
-        reason: `expected futureMeeples entry to belong to p0 (${p0.id}), got playerId=${match.playerId}`,
-      }
-    }
-    // TODO: deferred — also advance to round 2 and verify the wood actually
-    // lands on grain-utilization (or wherever the round map sends it). The
-    // landing semantics depend on FIXED_ROUND_ACTION_ORDER + the ambient
-    // resolveFutureMeeples step at round-start, which is finicky to set up
-    // here without dragging in a full round-end / next-player simulation.
     return { ok: true }
   },
 }
