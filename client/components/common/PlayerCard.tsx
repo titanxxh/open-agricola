@@ -250,6 +250,7 @@ export const PlayerCard = ({
       className={classes}
       enablePreview={enablePreview}
       previewCard={previewCard}
+      data-card-anchor={cardId}
     >
       <div 
         className="player-card-inner" 

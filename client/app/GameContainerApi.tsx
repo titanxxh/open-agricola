@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
 import type { ActionSpace, CropStack, FarmTilePosition, PlayerState, Resource } from '../../shared/contract/types'
+import type { CardPassedEvent } from '../../shared/contract/events'
 import { getPlayedCardKeys } from '../../shared/domain/player'
 import { t } from '../../shared/i18n'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../types/ui'
@@ -30,6 +31,7 @@ import { BrandMark } from '../components/common/BrandMark'
 import { ResourceLine } from '../components/common/ResourceLine'
 import { Section } from '../components/common/Section'
 import { PublicEventResourceAnimations } from '../components/effects/PublicEventResourceAnimations'
+import { PublicEventCardPassAnimation } from '../components/effects/PublicEventCardPassAnimation'
 import { DraftOverlay } from './draft/DraftOverlay'
 import {
   buildBakeExchangeInfo,
@@ -1737,6 +1739,9 @@ export const GameContainerApi = () => {
         animations={displayPublicEventResourceAnimations}
         displayPlayerId={displayPlayer.id}
         locale={locale}
+      />
+      <PublicEventCardPassAnimation
+        events={(state.events ?? []).filter((e): e is CardPassedEvent => e.type === 'card.passed')}
       />
       {isHarvestFeedExchange && harvestPending && harvestFeedOptions.length > 0 && isInteractive ? (
         <div className="exchange-overlay">

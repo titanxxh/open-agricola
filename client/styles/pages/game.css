@@ -673,6 +673,49 @@
     transform: translate(var(--to-x), var(--to-y)) scale(0.92);
   }
 }
+.card-pass-animation-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+.card-pass-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(var(--from-x), var(--from-y));
+  animation: card-pass-flight 1.2s ease-out forwards;
+  filter: drop-shadow(0 4px 12px rgba(35, 35, 20, 0.3));
+}
+.card-pass-card {
+  background: #e8d5a0;
+  border: 2px solid #b8860b;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: #5a3e00;
+  white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@keyframes card-pass-flight {
+  0% {
+    opacity: 0;
+    transform: translate(var(--from-x), var(--from-y)) scale(0.84);
+  }
+  15% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+    transform: translate(var(--to-x), var(--to-y)) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--to-x), var(--to-y)) scale(0.92);
+  }
+}
 .header-locale-select {
   height: 34px;
   padding: 0 10px;
