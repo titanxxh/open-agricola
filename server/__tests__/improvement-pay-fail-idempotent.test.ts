@@ -54,26 +54,7 @@ describe('improvement: pay fail idempotent', () => {
     expect(resp.state.availableMajorImprovements).toEqual(beforeAvail)
   })
 
-  it('mid-flow pay-fail (resources mutated to zero) keeps apply-improvement uncommitted', () => {
-    // Simulate: player passes affordability check at action-start (clay=2),
-    // but a hook removes resources before pay leaf runs. The seq:[pay,
-    // apply-improvement] must abort cleanly — apply-improvement should NOT
-    // push the card.
-    //
-    // We rely on the engine semantics: pay leaf returns `fail` → engine
-    // aborts the seq, so apply-improvement never executes. Verify by:
-    // 1) start: clay 2 (affordable for Fireplace1)
-    // 2) take action, pick Major_Fireplace1
-    // 3) at this point, before resolveChoice runs the flow, mutate clay=0
-    // 4) pay leaf will fail because resources < cost
-    // 5) assert: improvements does NOT contain Major_Fireplace1, available still has it
-    //
-    // Fixed seed: `new GameSession()` defaulted to `Math.random()`, which
-    // produced non-deterministic `availableMajorImprovements` ordering and
-    // could drop Fireplace1 from the option list emitted by
-    // `major-improvement` (or rotate the deal so the player draws a minor
-    // hand whose listeners interfere). Pin the seed to keep this test
-    // focused on the pay-flow semantics.
+  it('mid-flow pay-fail keeps improvement finalizer uncommitted', () => {
     const session = new GameSession(1)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -81,44 +62,49 @@ describe('improvement: pay fail idempotent', () => {
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
     setWorkersAtHome(state, state.players[1]!, 0)
-    player.resources = { ...player.resources, food: 0, clay: 2 }
-    if (!state.availableMajorImprovements.includes('Major_Fireplace1')) {
-      state.availableMajorImprovements.push('Major_Fireplace1')
-    }
+    player.resources = { ...player.resources, wood: 2, clay: 2, stone: 2, food: 0 }
+    player.minorHand = ['B65_GrainDepot']
+    player.occupationHand = ['__test_placeholder__']
+    state.availableMajorImprovements = []
     session.loadState(state)
-    // loadState's normalizeState replaces `availableMajorImprovements` (and
-    // resources). Re-pin both on the live state: drop the Fireplace2 sibling
-    // (BGA rule: only one Fireplace tile is in the pool at a time, so if
-    // both are listed only Fireplace2 is surfaced as an option), keep
-    // Fireplace1, and re-set clay=2.
     const liveState = session.getState().state
-    liveState.availableMajorImprovements = liveState.availableMajorImprovements.filter(
-      (id) => id !== 'Major_Fireplace2',
-    )
-    if (!liveState.availableMajorImprovements.includes('Major_Fireplace1')) {
-      liveState.availableMajorImprovements.push('Major_Fireplace1')
-    }
+    liveState.availableMajorImprovements = []
     liveState.players[0]!.resources = {
       ...liveState.players[0]!.resources,
-      food: 0,
+      wood: 2,
       clay: 2,
+      stone: 2,
+      food: 0,
     }
-    // takeAction: improvement-any emits a choice. When Fireplace1 is the only
-    // affordable major and the player has no playable minors, GameCore's
-    // single-option auto-resolve path (session-core.ts:2313) picks it
-    // automatically and finishes the seq. Either path is valid; we only
-    // need to assert the build committed.
+    liveState.players[0]!.minorHand = ['B65_GrainDepot']
+    liveState.players[0]!.occupationHand = ['__test_placeholder__']
+    liveState.players[1]!.minorHand = ['__test_placeholder__']
+    liveState.players[1]!.occupationHand = ['__test_placeholder__']
     let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
-    // If a choice was actually emitted (more than one affordable option),
-    // pick Fireplace1 explicitly. Otherwise the build already happened via
-    // auto-resolve.
-    const opt = resp.interaction.stateId === 'wait'
-      ? resp.interaction.options?.find((o) => o.value === 'major:Major_Fireplace1')
-      : undefined
-    if (opt) {
-      resp = session.resolveChoice(0, opt.value)
+    if (resp.interaction.promptKey !== 'prompt.selectPayment') {
+      const opt = resp.interaction.options?.find((o) => o.value === 'minor:B65_GrainDepot')
+      expect(opt).toBeDefined()
+      resp = session.resolveChoice(0, opt!.value)
     }
-    expect(resp.state.players[0]!.improvements).toContain('Major_Fireplace1')
+    expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
+
+    const payOption = resp.interaction.options?.find((o) => o.value === 'pay:improvement:minor:B65_GrainDepot:1')
+    expect(payOption).toBeDefined()
+    liveState.players[0]!.resources = {
+      ...liveState.players[0]!.resources,
+      wood: 0,
+      stone: 0,
+      food: 0,
+      clay: 0,
+    }
+
+    resp = session.resolveChoice(0, payOption!.value)
+
+    expect(resp.ok).toBe(false)
+    expect(resp.state.players[0]!.minorHand).toContain('B65_GrainDepot')
+    expect(resp.state.players[0]!.minorPlayed).not.toContain('B65_GrainDepot')
+    expect(resp.state.players[0]!.stats?.totalMinorBuilt ?? 0).toBe(0)
+    expect(resp.state.futureMeeples.some((entry) => entry.cardId === 'B65_GrainDepot')).toBe(false)
   })
 })
