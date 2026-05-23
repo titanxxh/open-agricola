@@ -1,4 +1,4 @@
-import type { ActionDefinition, ActionExecutionResult, ActionFlow, GameState, PlayerState, ComplexCost } from '../../contract/types'
+import type { ActionDefinition, ActionExecutionResult, GameState, InternalActionChildren, PlayerState, ComplexCost } from '../../contract/types'
 import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../cards/registry-display'
 // PaymentSolver namespace (S3 Task 6): core payment APIs migrated to the
@@ -406,14 +406,14 @@ export const playImprovement = (
   return { type: 'fail', errorKey: 'log.improvementFail' }
 }
 
-const buildImprovementFlow = (
+const buildImprovementInternalChildren = (
   state: GameState,
   player: PlayerState,
   choice: string,
   actionCardId: string,
   trueAction?: boolean,
   _types?: readonly ImprovementType[],
-): ActionFlow | null => {
+): InternalActionChildren | null => {
   const parsed = parseImprovementChoice(choice)
   let kind: 'major' | 'minor'
   let id: string
@@ -458,21 +458,20 @@ const buildImprovementFlow = (
     Object.assign(payActionContext, actionContext)
   }
   return {
-    type: 'seq',
-    children: [
+    beforeHostListeners: [
       {
-        type: 'leaf',
         actionId: 'pay',
         sourceCard: id,
         params: payParams,
         actionContext: payActionContext,
+        resultKey: 'payment',
       },
       {
-        type: 'leaf',
         actionId: 'apply-improvement',
         sourceCard: id,
         params: { improvementId: id, kind },
         actionContext,
+        paymentInfoFrom: 'payment',
       },
     ],
   }
@@ -541,7 +540,7 @@ export const improvementAction: ActionDefinition = {
   },
   resolveChoice: ({ state, player, sourceCard, params, actionContext }, choice) => {
     const actionCardId = sourceCard ?? 'improvement'
-    const flow = buildImprovementFlow(
+    const internalChildren = buildImprovementInternalChildren(
       state,
       player,
       choice,
@@ -549,7 +548,7 @@ export const improvementAction: ActionDefinition = {
       readTrueAction(params, actionContext),
       readImprovementTypes({ params, actionContext }),
     )
-    if (!flow) return { type: 'fail', errorKey: 'log.improvementFail' }
-    return { type: 'flow', flow }
+    if (!internalChildren) return { type: 'fail', errorKey: 'log.improvementFail' }
+    return { type: 'ok', internalChildren }
   },
 }

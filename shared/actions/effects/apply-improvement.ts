@@ -1,4 +1,5 @@
 import type { ActionDefinition, ActionExecutionResult, GameState, PlayerState } from '../../contract/types'
+import type { PaymentInfo } from '../../cards/card-effects'
 import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../session/stats'
 import { getMinorImprovement } from '../../cards/registry-display'
 import { getCardModifiers } from '../../cards/card-modifiers'
@@ -88,7 +89,7 @@ export const applyImprovementAction: ActionDefinition = {
       return { type: 'fail', errorKey: 'log.improvementFail' }
     }
     const { improvementId, kind } = params
-    const paymentInfo = player._pendingImprovementPaymentInfo
+    const paymentInfo = actionContext?.paymentInfo as PaymentInfo | undefined
     delete player._pendingImprovementPaymentInfo
     const wasMinorInHand = kind === 'minor' && player.minorHand.includes(improvementId)
     let passResult: ApplyMinorResult | null = null // null when kind === 'major'
