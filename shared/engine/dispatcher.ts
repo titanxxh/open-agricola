@@ -76,6 +76,12 @@ export class HookDispatcher {
       })
       return acc
     }, {})
+    // U8 fix: merge ctx.actionContext.costOverride into listener override
+    const actionContextOverride = (context.actionContext?.costOverride ?? {}) as Record<string, unknown>
+    Object.entries(actionContextOverride).forEach(([key, value]) => {
+      if (typeof value !== 'number') return
+      costOverride[key] = (costOverride[key] ?? 0) + value
+    })
     if (preview.canExecute) {
       return preview.canExecute(context, costOverride)
     }
