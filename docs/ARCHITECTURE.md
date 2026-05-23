@@ -793,6 +793,21 @@ B113 / B141。
 - 优先用 Hook 系统、`CardDefinition` 通用字段（`cost` / `reward` / `prerequisite`）、`cardStates`。
 - 禁止：核心文件内针对单卡的 `if-else`；集中式卡牌效果注册表；前端硬编码卡牌特定规则。
 
+### 8.7 Minor improvement passing mechanism
+
+OA 通过 `CardBase.passing?: boolean` 标记 BGA minor improvement 的"过手"机制。
+`shared/actions/effects/apply-improvement.ts` 的 `applyMinor` 检测该字段，passing 卡：
+
+- 不进 buyer.minorPlayed；卡 push 进 `nextPlayer.minorHand`（按 `state.currentPlayerIndex` wrap）
+- 不累加 `totalMinorBuilt`、不注入 `activeModifiers`、不触发 `providesOccupation` / `isField` 路径
+- emit `card.passed`（`fromPlayerId` / `toPlayerId` / `cardId`）替代 `card.played`
+- onBuy 仍执行——买家拿到效果，卡进入下家手牌等待下家自己回合再 actBuy
+
+listener 隔离自然成立：passing 卡不进 `minorPlayed` → `getPlayerCardIds` 自然不含 → "卡进场"反应 skip。
+无需写 `extraData.passing`（activateCard 路径不收 listener context）。
+
+客户端：`PublicEventCardPassAnimation` 订阅 `card.passed` events 流，按 `data-card-anchor` / `data-hand-anchor` DOM 锚点播放卡片飞行动画；LogPanel 通过现有 `mapCardPassed` 派生 `log.cardPassed` i18n 条目。
+
 ---
 
 ## 9. shared/domain/ — 领域聚合层
