@@ -110,7 +110,7 @@
 
 ## 6. 基础设施待办
 
-1. 维护 metadata 审计 fixture 覆盖：`STABLE` cost 和 `passing` 已覆盖，后续新增 BGA metadata 字段时必须同步 parser/diff 测试。
+1. ~~维护 metadata 审计 fixture 覆盖：`STABLE` cost 和 `passing` 已覆盖，后续新增 BGA metadata 字段时必须同步 parser/diff 测试。~~ ✅ 已落地：`scripts/__tests__/audit-bga-metadata-diff.test.ts` 的 "BGA metadata field coverage" 测试扫所有 BGA A-E 卡 PHP 中的 `$this->xxx =` 字段，对比 `COVERED_FIELDS`（parser 已识别）与 `IGNORED_FIELDS`（平台/runtime/typed-prerequisite 显式跳过），出现未分类新字段即 fail，强制更新 parser 或显式登记 ignored。
 2. ~~增加精确 eligible farm-position selection，支持 selectableTiles、数量约束和非法选择原子失败。~~ ✅ 已落地：`selection` action / session commit 支持 `allowedSelectionCounts`，`B115_TinsmithMaster`、`E71_CowPatty` 基于 `farm.sown` event 计算本次 eligible 田，`B165_GameProvider` 使用当前 grain fields；三者均使用精确 `selectableTiles`，非法选择在 effect 前 recoverable fail。
 3. ~~增加 batch resource exchange / resource quantity selection，用于 BGA SPECIAL_EFFECT 风格的 discard/receive 交互。~~ ✅ 已落地：`resource-batch-exchange-select` 支持私有 prompt redaction、HTTP/WS commit、E78 原子 discard/receive、UI 面板和 replay 回放。
 4. ~~为“从多个替换中选一个”的卡增加 TradeModifier group 限制。~~ ✅ 已落地：`Trade` / `TradeModifier` 支持 `groupId` + `groupMax`，payment 枚举在 action-scope、unit-scope 和最终组合合并时按组累计 `times`，`E60_WorkingGloves` 的四个职业支付替代共享 `groupMax: 1`，避免一次职业支付内叠加多个替换。
