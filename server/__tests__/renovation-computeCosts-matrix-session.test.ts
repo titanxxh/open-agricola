@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import type {
   ActionAvailabilityContext,
   ActionExecutionContext,
-  ActionFlow,
+  ActionExecutionResult,
   ComplexCost,
+  InternalActionChild,
   PlayerState,
   Resource,
 } from '../../shared/contract/types'
@@ -63,13 +64,15 @@ const buildContext = (
   costs,
 })
 
-const extractPayCost = (flow: ActionFlow): ComplexCost => {
-  if (flow.type !== 'seq') throw new Error('expected seq flow')
-  const pay = flow.children[0]
-  if (!pay || pay.type !== 'leaf' || pay.actionId !== 'pay') {
-    throw new Error('expected pay leaf as first child')
-  }
-  return pay.params!.cost as ComplexCost
+const extractPayChild = (result: ActionExecutionResult): InternalActionChild => {
+  if (result.type !== 'ok') throw new Error('expected ok result')
+  const pay = result.internalChildren?.beforeHostListeners?.[0]
+  if (!pay || pay.actionId !== 'pay') throw new Error('expected pay child')
+  return pay
+}
+
+const extractPayCost = (result: ActionExecutionResult): ComplexCost => {
+  return extractPayChild(result).params!.cost as ComplexCost
 }
 
 const totalOf = (cost: ComplexCost): Partial<Resource> => {
@@ -95,9 +98,16 @@ describe('renovation computeCosts matrix', () => {
 
     const ctx = buildContext(player, { selectedOption: 'clay' }, { clay: -2 })
     const result = renovateHouseAction.resolveChoice!(ctx, 'clay')
-    expect(result.type).toBe('flow')
-    if (result.type !== 'flow') return
-    const cost = extractPayCost(result.flow)
+    const pay = extractPayChild(result)
+    expect(pay).toMatchObject({
+      actionId: 'pay',
+      params: {
+        costType: 'renovation',
+        optionPrefix: 'renovation',
+      },
+      resultKey: 'payment',
+    })
+    const cost = extractPayCost(result)
     expect(cost.fees).toEqual([{ reed: 1, clay: -2 }])
     expect(totalOf(cost)).toEqual({ reed: 1, clay: 1 })
   })
@@ -111,8 +121,7 @@ describe('renovation computeCosts matrix', () => {
 
     const ctx = buildContext(player, { selectedOption: 'stone' }, { stone: -2 })
     const result = renovateHouseAction.resolveChoice!(ctx, 'stone')
-    if (result.type !== 'flow') throw new Error('expected flow')
-    const cost = extractPayCost(result.flow)
+    const cost = extractPayCost(result)
     expect(cost.fees).toEqual([{ reed: 1, stone: -2 }])
     expect(totalOf(cost)).toEqual({ reed: 1, stone: 1 })
   })
@@ -122,8 +131,7 @@ describe('renovation computeCosts matrix', () => {
     const player = createPlayer({ rooms: 3, houseType: 'wood' })
     const ctx = buildContext(player, { selectedOption: 'clay' }, { reed: -1 })
     const result = renovateHouseAction.resolveChoice!(ctx, 'clay')
-    if (result.type !== 'flow') throw new Error('expected flow')
-    const cost = extractPayCost(result.flow)
+    const cost = extractPayCost(result)
     expect(cost.fees).toEqual([{ reed: 0 }])
     expect(totalOf(cost)).toEqual({ reed: 0, clay: 3 })
   })
@@ -133,8 +141,7 @@ describe('renovation computeCosts matrix', () => {
     const player = createPlayer({ rooms: 3, houseType: 'wood' })
     const ctx = buildContext(player, { selectedOption: 'stone' }, { food: 3, reed: 2 })
     const result = renovateHouseAction.resolveChoice!(ctx, 'stone')
-    if (result.type !== 'flow') throw new Error('expected flow')
-    const cost = extractPayCost(result.flow)
+    const cost = extractPayCost(result)
     expect(cost.fees).toEqual([{ reed: 3, food: 3 }])
     expect(totalOf(cost)).toEqual({ stone: 3, reed: 3, food: 3 })
   })
@@ -144,8 +151,7 @@ describe('renovation computeCosts matrix', () => {
     const player = createPlayer({ rooms: 3, houseType: 'wood' })
     const ctx = buildContext(player, { selectedOption: 'clay' }, { clay: -2 })
     const result = renovateHouseAction.resolveChoice!(ctx, 'clay')
-    if (result.type !== 'flow') throw new Error('expected flow')
-    const cost = extractPayCost(result.flow)
+    const cost = extractPayCost(result)
     expect(totalOf(cost)).toEqual({ reed: 1, clay: 1 })
   })
 
@@ -153,8 +159,7 @@ describe('renovation computeCosts matrix', () => {
     const player = createPlayer({ rooms: 3, houseType: 'clay' })
     const ctx = buildContext(player, { selectedOption: 'stone' }, { stone: -2 })
     const result = renovateHouseAction.resolveChoice!(ctx, 'stone')
-    if (result.type !== 'flow') throw new Error('expected flow')
-    const cost = extractPayCost(result.flow)
+    const cost = extractPayCost(result)
     expect(totalOf(cost)).toEqual({ reed: 1, stone: 1 })
   })
 
@@ -171,8 +176,7 @@ describe('renovation computeCosts matrix', () => {
     // override = { clay: -(rooms-1) } = { clay: 0 } => merge applied but value 0
     const ctx = buildContext(player, { selectedOption: 'clay' }, { clay: 0 })
     const result = renovateHouseAction.resolveChoice!(ctx, 'clay')
-    if (result.type !== 'flow') throw new Error('expected flow')
-    const cost = extractPayCost(result.flow)
+    const cost = extractPayCost(result)
     expect(totalOf(cost)).toEqual({ reed: 1, clay: 1 })
   })
 
@@ -180,8 +184,7 @@ describe('renovation computeCosts matrix', () => {
     const player = createPlayer({ rooms: 2, houseType: 'wood' })
     const ctx = buildContext(player, { selectedOption: 'clay' }, { clay: -1 })
     const result = renovateHouseAction.resolveChoice!(ctx, 'clay')
-    if (result.type !== 'flow') throw new Error('expected flow')
-    const cost = extractPayCost(result.flow)
+    const cost = extractPayCost(result)
     expect(totalOf(cost)).toEqual({ reed: 1, clay: 1 })
   })
 })
