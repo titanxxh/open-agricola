@@ -294,15 +294,37 @@ const withInternalPaymentInfo = (
   }
 }
 
+const recordInternalResult = (
+  int: EngineInternals,
+  hostNodeId: string | undefined,
+  resultKey: string | undefined,
+  result: ActionExecutionResult,
+): void => {
+  if (!hostNodeId || !resultKey) return
+  const hostResults = int.internalChildResults.get(hostNodeId) ?? {}
+  hostResults[resultKey] = result
+  int.internalChildResults.set(hostNodeId, hostResults)
+}
+
 const recordInternalChildResult = (
   int: EngineInternals,
   node: ActionNode,
   result: ActionExecutionResult,
 ): void => {
-  if (!node.internalHostNodeId || !node.internalResultKey) return
-  const hostResults = int.internalChildResults.get(node.internalHostNodeId) ?? {}
-  hostResults[node.internalResultKey] = result
-  int.internalChildResults.set(node.internalHostNodeId, hostResults)
+  recordInternalResult(int, node.internalHostNodeId, node.internalResultKey, result)
+}
+
+const recordDeferredHostResult = (
+  int: EngineInternals,
+  node: ActionNode,
+  result: ActionExecutionResult,
+): void => {
+  recordInternalResult(
+    int,
+    node.deferredHostResultTargetNodeId,
+    node.deferredHostResultKey,
+    result,
+  )
 }
 
 const blockingBeforeHostChildResult = (
@@ -383,6 +405,8 @@ const buildDeferredHostNode = (
   node.deferredHostTransactionEvents = [...transactionEvents]
   node.deferredHostActionEvents = [...actionEvents]
   node.deferredHostChoice = choice
+  node.deferredHostResultTargetNodeId = hostNode.internalHostNodeId
+  node.deferredHostResultKey = hostNode.internalResultKey
   return node
 }
 
@@ -570,6 +594,7 @@ const executeDeferredHostAction = (
   if (!result) return { type: 'blocked', nodeId: node.id, actionId: node.actionId }
   const blockedResult = blockingBeforeHostChildResult(int, node)
   if (blockedResult) {
+    recordDeferredHostResult(int, node, blockedResult)
     node.resolve(blockedResult)
     commitIfEngineComplete(int, context, blockedResult)
     return { type: 'ok', nodeId: node.id, actionId: node.actionId, result: blockedResult }
@@ -714,6 +739,7 @@ const executeDeferredHostAction = (
       int.tree.insertAfter(node.id, allInsertNodes)
     }
   }
+  recordDeferredHostResult(int, node, result)
   node.resolve(result)
   commitIfEngineComplete(int, context, result)
   return { type: 'ok', nodeId: node.id, actionId: node.actionId, result }
@@ -1094,7 +1120,6 @@ export function engineProceed(
         currentEventReadContext(int).transactionEvents,
         completedEvents,
       )
-      recordInternalChildResult(int, node, result)
       node.resolve(result)
       int.tree.insertAfter(node.id, [...beforeHostNodes, deferredHostNode])
       return { type: 'ok', nodeId: node.id, actionId: replacedActionId, result }

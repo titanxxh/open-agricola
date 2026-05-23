@@ -302,6 +302,8 @@ const buildDeferredHostNode = (
   node.deferredHostTransactionEvents = [...transactionEvents]
   node.deferredHostActionEvents = [...actionEvents]
   node.deferredHostChoice = choice
+  node.deferredHostResultTargetNodeId = hostNode.internalHostNodeId
+  node.deferredHostResultKey = hostNode.internalResultKey
   return node
 }
 
@@ -585,7 +587,6 @@ export function engineResolveChoice(
         if (node instanceof XorNode) {
           node.resolve(choice)
         }
-        recordInternalChildResult(int, child, result)
         int.pendingNodeIdRef.value = null
         int.tree.insertAfter(insertAnchor, [...beforeHostNodes, deferredHostNode])
         return { type: 'ok' }
@@ -907,18 +908,16 @@ export function engineResolveChoice(
       completedEvents,
       choice,
     )
+    deferredHostNode.deferredHostResultTargetNodeId =
+      pendingEnvelope?.internalHostNodeId ?? pendingHost.internalHostNodeId
+    deferredHostNode.deferredHostResultKey =
+      pendingEnvelope?.internalResultKey ?? pendingHost.internalResultKey
     const insertAnchor = pendingEnvelope?.ownerNodeId ?? pendingHost.id
     pendingHost.resolve(result)
     if (pendingEnvelope?.ownerNodeId) {
       const ownerNode = int.tree.findNodeById(pendingEnvelope.ownerNodeId)
       if (ownerNode instanceof XorNode) ownerNode.resolve()
     }
-    recordInternalResult(
-      int,
-      pendingEnvelope?.internalHostNodeId ?? pendingHost.internalHostNodeId,
-      pendingEnvelope?.internalResultKey ?? pendingHost.internalResultKey,
-      result,
-    )
     int.pendingNodeIdRef.value = null
     int.tree.insertAfter(insertAnchor, [...beforeHostNodes, deferredHostNode])
     return result

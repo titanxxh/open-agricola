@@ -26,6 +26,8 @@ export class ActionNode extends BaseNode {
   public deferredHostTransactionEvents?: GameEvent[]
   public deferredHostActionEvents?: GameEvent[]
   public deferredHostChoice?: string
+  public deferredHostResultTargetNodeId?: string
+  public deferredHostResultKey?: string
   /**
    * S7 Batch 1 (Sprint S7) — when a leaf ActionNode is built from an
    * ActionDef without `resolveChoice`, its
@@ -113,6 +115,8 @@ export class ActionNode extends BaseNode {
       deferredHostTransactionEvents: this.deferredHostTransactionEvents,
       deferredHostActionEvents: this.deferredHostActionEvents,
       deferredHostChoice: this.deferredHostChoice,
+      deferredHostResultTargetNodeId: this.deferredHostResultTargetNodeId,
+      deferredHostResultKey: this.deferredHostResultKey,
     }
   }
 }
