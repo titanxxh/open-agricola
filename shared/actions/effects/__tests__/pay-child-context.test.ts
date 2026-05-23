@@ -186,4 +186,46 @@ describe('pay child context', () => {
       { grain: 1 },
     ])
   })
+
+  it('preserves selected paymentInfo on the public improvement pay apply path', () => {
+    const state = createState()
+    const player = createPlayer()
+    player.minorHand = [CARD_ID]
+    player.minorPlayed = []
+    player.improvements = []
+    state.players = [player]
+    const improvementAction = internalActionDefinitions.find((action) => action.id === 'improvement')
+    if (!improvementAction) throw new Error('missing improvement action')
+    const space = createSpace(improvementAction)
+    const engine = buildEngine(internalActionDefinitions, improvementAction.id)
+
+    const improvementStep = engine.proceed({ state, player, space })
+    expect(improvementStep.type).toBe('choice')
+    const improvementChoice = improvementStep.type === 'choice'
+      ? improvementStep.choice.options.find((option) => option.value === `minor:${CARD_ID}`)
+      : undefined
+    expect(improvementChoice).toBeDefined()
+
+    const improvementResolved = engine.resolveChoice(improvementChoice!.value, { state, player, space })
+    expect(improvementResolved.type).toBe('ok')
+    const paymentStep = engine.proceed({ state, player, space })
+    expect(paymentStep.type).toBe('choice')
+    expect(engine.peekPendingEnvelope()).toMatchObject({
+      promptKey: 'prompt.selectPayment',
+      pendingActionId: 'pay',
+    })
+
+    const paymentResolved = engine.resolveChoice(`pay:improvement:minor:${CARD_ID}:1`, { state, player, space })
+    expect(paymentResolved.type).toBe('ok')
+    const finalStep = runUntilDone(engine, { state, player, space })
+
+    expect(finalStep.type).toBe('done')
+    expect(player.minorPlayed).toContain(CARD_ID)
+    expect(state.futureMeeples).toHaveLength(3)
+    expect(state.futureMeeples.map((entry) => entry.resources)).toEqual([
+      { grain: 1 },
+      { grain: 1 },
+      { grain: 1 },
+    ])
+  })
 })
