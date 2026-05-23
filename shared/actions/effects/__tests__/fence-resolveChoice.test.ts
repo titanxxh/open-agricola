@@ -87,7 +87,7 @@ describe('fenceAction.resolveChoice', () => {
     expect(ctx.player.resources.wood).toBe(4)
     expect(ctx.player.fenceSegments).toHaveLength(4)
     expect(ctx.player.pastures).toHaveLength(1)
-    expect(result.internalChildren?.afterHostListeners).toMatchObject([
+    expect(result.internalChildren?.beforeHostListeners).toMatchObject([
       {
         actionId: 'pay',
         params: {

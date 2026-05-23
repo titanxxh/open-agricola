@@ -91,7 +91,8 @@ describe('fence payment session', () => {
     expect(afterFencingIndex).toBeGreaterThanOrEqual(0)
     expect(paidIndex).toBeGreaterThanOrEqual(0)
     expect(fenceBuiltIndex).toBeLessThan(afterFencingIndex)
-    expect(afterFencingIndex).toBeLessThan(paidIndex)
+    expect(fenceBuiltIndex).toBeLessThan(paidIndex)
+    expect(paidIndex).toBeLessThan(afterFencingIndex)
   })
 
   it('preserves palisade selection across fence payment-choice resolution', () => {

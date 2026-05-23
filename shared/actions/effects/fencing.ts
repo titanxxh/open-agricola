@@ -188,7 +188,7 @@ const finalizeFence = (
     resourcesPaid: paidResources,
     extraData,
     internalChildren: {
-      afterHostListeners: [
+      beforeHostListeners: [
         buildInternalPayChild({
           cost: { fee: { wood: validated.payableWoodCost } },
           costType: 'fencing',
