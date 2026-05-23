@@ -79,11 +79,9 @@ export const applyOccupationPlayAction: ActionDefinition = {
     if (!occupation) {
       return { type: 'fail', errorKey: 'log.occupationFail' }
     }
-    // Pop the seq-shared stash that the pay leaf wrote so we can echo
-    // `resourcesPaid` back into log.playOccupation. Apply-occupation-play
-    // doesn't currently pass it onwards (no occupation onBuy keys on
-    // returnedCardId today), but pop here regardless so it doesn't leak
-    // into the next pay leaf.
+    // Clear any legacy payment stash left by older callers. Current pay leaves
+    // report payment details through their result/event data, and occupation
+    // onBuy effects do not consume PaymentInfo here.
     delete player._pendingImprovementPaymentInfo
     void sourceCard
     const wasInHand = player.occupationHand.includes(occupationId)
