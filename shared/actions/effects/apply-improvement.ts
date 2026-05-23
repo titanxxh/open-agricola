@@ -91,7 +91,7 @@ export const applyImprovementAction: ActionDefinition = {
     const paymentInfo = player._pendingImprovementPaymentInfo
     delete player._pendingImprovementPaymentInfo
     const wasMinorInHand = kind === 'minor' && player.minorHand.includes(improvementId)
-    let passResult: ApplyMinorResult | null = null
+    let passResult: ApplyMinorResult | null = null // null when kind === 'major'
     if (kind === 'major') {
       applyMajor(state, player, improvementId)
     } else {
