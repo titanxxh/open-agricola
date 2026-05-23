@@ -1038,6 +1038,7 @@ export function engineProceed(
         currentEventReadContext(int).transactionEvents,
         completedEvents,
       )
+      recordInternalChildResult(int, node, result)
       node.resolve(result)
       int.tree.insertAfter(node.id, [...beforeHostNodes, deferredHostNode])
       return { type: 'ok', nodeId: node.id, actionId: replacedActionId, result }

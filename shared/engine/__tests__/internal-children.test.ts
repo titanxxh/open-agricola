@@ -423,6 +423,88 @@ describe('engine internal children', () => {
     ])
   })
 
+  it('keeps an internal child result when that child defers to its own beforeHostListeners', () => {
+    const events: string[] = []
+    const hostAction: ActionDefinition = {
+      id: 'host-before-slot',
+      nameKey: 'test.hostBefore',
+      descriptionKey: 'test.hostBefore',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('host.execute')
+        return {
+          type: 'ok',
+          internalChildren: {
+            beforeHostListeners: [
+              { actionId: 'internal-pay-probe', params: { nestedBefore: true }, resultKey: 'payment' },
+              { actionId: 'internal-onbuy-probe', paymentInfoFrom: 'payment' },
+            ],
+          },
+        }
+      },
+    }
+    const payProbe: ActionDefinition = {
+      id: 'internal-pay-probe',
+      nameKey: 'test.payProbe',
+      descriptionKey: 'test.payProbe',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: ({ params }) => {
+        events.push('internal-pay-probe.execute')
+        return {
+          type: 'ok',
+          resourcesPaid: { food: 2 },
+          internalChildren: params?.nestedBefore === true
+            ? { beforeHostListeners: [{ actionId: 'internal-nested-probe' }] }
+            : undefined,
+        }
+      },
+    }
+    const nestedProbe: ActionDefinition = {
+      id: 'internal-nested-probe',
+      nameKey: 'test.nestedProbe',
+      descriptionKey: 'test.nestedProbe',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('internal-nested-probe.execute')
+        return { type: 'ok' }
+      },
+    }
+    const onBuyProbe: ActionDefinition = {
+      id: 'internal-onbuy-probe',
+      nameKey: 'test.onBuyProbe',
+      descriptionKey: 'test.onBuyProbe',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: ({ actionContext }) => {
+        const paymentInfo = actionContext?.paymentInfo as { resourcesPaid?: { food?: number } } | undefined
+        events.push(`internal-onbuy-probe.payment=${paymentInfo?.resourcesPaid?.food ?? 'missing'}`)
+        return { type: 'ok' }
+      },
+    }
+    const state = createState()
+    const player = createPlayer()
+    state.players = [player]
+    const space = createSpace(hostAction)
+    const engine = buildEngine([hostAction, payProbe, nestedProbe, onBuyProbe], hostAction.id)
+
+    const step = runUntilDone(engine, { state, player, space })
+
+    expect(step.type).toBe('done')
+    expect(events).toEqual([
+      'host.execute',
+      'internal-pay-probe.execute',
+      'internal-nested-probe.execute',
+      'internal-onbuy-probe.payment=2',
+    ])
+  })
+
   it('preserves host actionEvents when deferred host hooks run after internal children', () => {
     let afterActionEventReasons: string[] | undefined
     let afterTransactionEventReasons: string[] | undefined
