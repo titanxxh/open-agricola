@@ -3,7 +3,7 @@ import type {
   ActionCostPreview,
   ActionDefinition,
   ActionExecutionResult,
-  ActionFlow,
+  InternalActionChild,
   ComplexCost,
   PlayerState,
   Resource,
@@ -19,55 +19,9 @@ import {
   payTypedFlatCost,
 } from '../payment/internal'
 import { mergeResources } from '../../utils/resources'
-
-const RENOVATE_PAYMENT_PREFIX = 'pay:renovate'
-
-const renovatePaymentOptionPrefix = (target: RenovationTarget) =>
-  `${RENOVATE_PAYMENT_PREFIX}:${target}`
-
-const parseRenovatePaymentChoice = (
-  choice: string,
-): { target: RenovationTarget; value: string } | null => {
-  const head = `${RENOVATE_PAYMENT_PREFIX}:`
-  if (!choice.startsWith(head)) return null
-  const remainder = choice.slice(head.length)
-  const separator = remainder.indexOf(':')
-  if (separator < 0) return null
-  const target = remainder.slice(0, separator)
-  if (target !== 'clay' && target !== 'stone') return null
-  return { target, value: choice }
-}
+import { buildPayChild } from '../helpers/pay-child'
 
 type RenovationTarget = Exclude<PlayerState['houseType'], 'wood'>
-
-const buildRenovationFlow = (
-  target: RenovationTarget,
-  totalCost: ComplexCost,
-): ActionFlow => ({
-  type: 'seq',
-  children: [
-    {
-      type: 'leaf',
-      actionId: 'pay',
-      // totalCost is already a ComplexCost (with unitFee + nb + fees[0]);
-      // do NOT wrap in another { fee: ... }. The pay leaf's multi-solution
-      // branch surfaces a `prompt.selectPayment` choice when bonus modifiers
-      // (e.g. A123 FrameBuilder, A87 Conservator) make more than one variant
-      // affordable.
-      params: {
-        cost: totalCost,
-        costType: 'renovation',
-        optionPrefix: renovatePaymentOptionPrefix(target),
-      },
-      actionContext: { costType: 'renovation' },
-    },
-    {
-      type: 'leaf',
-      actionId: 'apply-renovation',
-      params: { nextType: target },
-    },
-  ],
-})
 
 type RenovationPlan = {
   nextType: RenovationTarget
@@ -212,6 +166,23 @@ const baseRenovationOptions = (player: PlayerState): ActionChoiceOption[] => {
   return []
 }
 
+const buildRenovationPayChild = (cost: ComplexCost): InternalActionChild => {
+  const payChild = buildPayChild({
+    cost,
+    costType: 'renovation',
+    optionPrefix: 'renovation',
+  })
+  if (payChild.type !== 'leaf') {
+    throw new Error('Expected pay child leaf')
+  }
+  return {
+    actionId: payChild.actionId,
+    sourceCard: payChild.sourceCard,
+    params: payChild.params,
+    resultKey: 'payment',
+  }
+}
+
 export const renovateHouseAction: ActionDefinition = {
   id: 'renovate-house',
   nameKey: 'actions.renovate-house.name',
@@ -226,23 +197,29 @@ export const renovateHouseAction: ActionDefinition = {
   noChoiceLogKey: 'log.renovationFail',
   emitLeafActionDetail: true,
   execute: () => ({ type: 'fail', errorKey: 'log.renovationFail' }),
-  // 7b1: rewrite as `seq:[pay, apply-renovation]`. The pay leaf handles the
-  // typed-flat (and any future ComplexCost) selection — including bonus and
-  // surplus solutions — and only on success advances to apply-renovation,
-  // which mutates `player.houseType`. This keeps mutate-after-pay invariant
-  // shared with `apply-improvement`. Stale `pay:renovate:*` choice strings
-  // are intercepted by the pay leaf's own resolveChoice fallback.
-  resolveChoice: ({ player, params, costs }, choice) => {
+  resolveChoice: ({ player, params, costs, eventSink }, choice) => {
     const failure: ActionExecutionResult = { type: 'fail', errorKey: 'log.renovationFail' }
-    const payment = typeof choice === 'string' ? parseRenovatePaymentChoice(choice) : null
     const target: RenovationTarget | null =
-      payment?.target
-      ?? (choice === 'clay' || choice === 'stone' ? choice : null)
+      (choice === 'clay' || choice === 'stone' ? choice : null)
       ?? readSelectedTarget(params)
     if (!target) return failure
     const plan = buildRenovationPlan(player, target)
     if (!plan) return failure
     const totalCost = mergeRenovationCost(plan.cost, costs)
-    return { type: 'flow', flow: buildRenovationFlow(target, totalCost) }
+    const from = player.houseType
+    player.houseType = plan.nextType
+    eventSink?.emit<'farm.renovated'>({
+      type: 'farm.renovated',
+      playerId: player.id,
+      from,
+      to: plan.nextType,
+      rooms: player.roomTiles.map(({ row, col }) => ({ row, col })),
+    })
+    return {
+      type: 'ok',
+      internalChildren: {
+        beforeHostListeners: [buildRenovationPayChild(totalCost)],
+      },
+    }
   },
 }
