@@ -84,8 +84,22 @@ describe('house-redevelopment leaf-flush logging', () => {
       }
     }).detailParts!
     expect(detailParts.effects?.renovate).toEqual({ from: 'wood', to: 'clay' })
-    expect(detailParts.costs?.clay).toBe(2)
-    expect(detailParts.costs?.reed).toBe(1)
+    expect(detailParts.costs ?? {}).toEqual({})
+
+    const payDetail = resp.state.log.find(
+      (e) =>
+        e.key === 'log.actionDetail' &&
+        (e.params as { action?: string } | undefined)?.action ===
+          'actions.pay.name',
+    )
+    expect(payDetail).toBeDefined()
+    const payDetailParts = (payDetail!.params as {
+      detailParts?: {
+        costs?: Record<string, number>
+      }
+    }).detailParts!
+    expect(payDetailParts.costs?.clay).toBe(2)
+    expect(payDetailParts.costs?.reed).toBe(1)
   })
 
   it('does not duplicate renovation in the wrapper actionDetail when improvement is skipped', () => {
