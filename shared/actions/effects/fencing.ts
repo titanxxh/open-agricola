@@ -5,7 +5,6 @@ import type {
   ActionSpace,
   FenceSegment,
   GameState,
-  InternalActionChild,
   PlayerState,
   Resource,
 } from '../../contract/types'
@@ -18,7 +17,7 @@ import {
   canAffordTypedFlatCost,
   resolveTypedFlatPaymentSelection,
 } from '../payment/internal'
-import { buildPayChild, type PayChildOptions } from '../helpers/pay-child'
+import { buildInternalPayChild } from '../helpers/pay-child'
 import { playerBoard, normalizePlayerFarm } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { collectComputeCostsForFarmChoice } from '../../cards/card-listeners'
@@ -82,21 +81,6 @@ const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
     result[key as keyof Resource] = value
   })
   return result
-}
-
-const buildInternalPayChild = (
-  options: PayChildOptions & { paymentChoice?: string },
-): InternalActionChild => {
-  const payChild = buildPayChild(options)
-  if (payChild.type !== 'leaf') {
-    throw new Error('Expected pay child leaf')
-  }
-  return {
-    actionId: payChild.actionId,
-    sourceCard: payChild.sourceCard,
-    params: payChild.params,
-    resultKey: 'payment',
-  }
 }
 
 const computeFreeFenceTotal = (
