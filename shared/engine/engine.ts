@@ -200,7 +200,9 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
         action.beforePhaseResolved = data.beforePhaseResolved === true
         action.emittedRequest = data.emittedRequest as InteractionRequest | undefined
         action.deferredHostResult = data.deferredHostResult as ActionExecutionResult | undefined
+        action.deferredAfterHostCommitChildren = data.deferredAfterHostCommitChildren as ActionNode['deferredAfterHostCommitChildren']
         action.deferredAfterHostChildren = data.deferredAfterHostChildren as ActionNode['deferredAfterHostChildren']
+        action.deferredHostCommitCompleted = data.deferredHostCommitCompleted as boolean | undefined
         action.deferredHostTransactionEvents = data.deferredHostTransactionEvents as ActionNode['deferredHostTransactionEvents']
         action.deferredHostActionEvents = data.deferredHostActionEvents as ActionNode['deferredHostActionEvents']
         action.deferredHostChoice = data.deferredHostChoice as string | undefined

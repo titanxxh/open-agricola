@@ -101,7 +101,7 @@ describe('improvement trueAction context', () => {
         resultKey: 'payment',
       },
     ])
-    expect(result.internalChildren?.afterHostListeners).toMatchObject([
+    expect(result.internalChildren?.afterHostCommitListeners).toMatchObject([
       {
         actionId: 'activate-card-effect',
         params: { cardId: 'Major_ClayOven', hook: 'onBuy' },
@@ -128,7 +128,7 @@ describe('improvement trueAction context', () => {
         resultKey: 'payment',
       },
     ])
-    expect(result.internalChildren?.afterHostListeners).toMatchObject([
+    expect(result.internalChildren?.afterHostCommitListeners).toMatchObject([
       {
         actionId: 'activate-card-effect',
         actionContext: { trueAction: false },

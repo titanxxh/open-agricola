@@ -18,7 +18,7 @@ import { activateCardEffect } from './internal/activate-card-effect'
 import { resolvePaymentSolutionSelection } from '../payment/internal'
 import { collectComputeChoiceCandidates } from '../../cards/card-listeners'
 import { isMajorCardId } from '../../cards/helpers/card-type'
-import { buildPayChild, paymentInfoFromPayResult, type PayChildOptions } from '../helpers/pay-child'
+import { buildInternalPayChild, paymentInfoFromPayResult, type PayChildOptions } from '../helpers/pay-child'
 import {
   cardEffectHandChangedEvent,
   readPrivateHandChangeSourceCard,
@@ -300,17 +300,11 @@ const buildImprovementPayChild = (
   payActionContext: Record<string, unknown>,
   sourceCard: string,
 ): InternalActionChild => {
-  const payChild = buildPayChild(payParams)
-  if (payChild.type !== 'leaf') {
-    throw new Error('Expected pay child leaf')
-  }
-  return {
-    actionId: payChild.actionId,
+  return buildInternalPayChild({
+    ...payParams,
     sourceCard,
-    params: payChild.params,
     actionContext: payActionContext,
-    resultKey: 'payment',
-  }
+  })
 }
 
 const resolveImprovementPayment = (
@@ -594,7 +588,7 @@ const buildImprovementInternalChildren = (
     beforeHostListeners: [
       buildImprovementPayChild(payParams, payActionContext, id),
     ],
-    afterHostListeners: [
+    afterHostCommitListeners: [
       {
         actionId: 'activate-card-effect',
         sourceCard: id,
