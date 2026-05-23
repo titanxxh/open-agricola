@@ -1,6 +1,18 @@
-import type { ActionDefinition } from '../../../contract/types'
+import type { ActionDefinition, ActionExecutionResult, GameState, PlayerState } from '../../../contract/types'
 import { runCardEffectHook } from '../../../cards/card-effects'
 import type { CardEffectHook, PaymentInfo } from '../../../cards/card-effects'
+
+export const activateCardEffect = (
+  state: GameState,
+  player: PlayerState,
+  cardId: string,
+  hook: CardEffectHook,
+  paymentInfo?: PaymentInfo,
+): ActionExecutionResult => {
+  const flow = runCardEffectHook(state, player, cardId, hook, paymentInfo)
+  if (flow) return { type: 'flow', flow }
+  return { type: 'ok' }
+}
 
 export const activateCardEffectAction: ActionDefinition = {
   id: 'activate-card-effect',
@@ -16,8 +28,6 @@ export const activateCardEffectAction: ActionDefinition = {
       return { type: 'fail', errorKey: 'log.cardEffectFail' }
     }
     const paymentInfo = actionContext?.paymentInfo as PaymentInfo | undefined
-    const flow = runCardEffectHook(state, player, cardId, hook as CardEffectHook, paymentInfo)
-    if (flow) return { type: 'flow', flow }
-    return { type: 'ok' }
+    return activateCardEffect(state, player, cardId, hook as CardEffectHook, paymentInfo)
   },
 }

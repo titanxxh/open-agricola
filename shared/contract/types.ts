@@ -211,20 +211,6 @@ export type PlayerState = {
    * attributing the `log.actionDetail` entry to the triggering card.
    */
   _activeActionBonusSources?: string[]
-  /**
-   * Session-transient scratchpad written by the `pay` action leaf and
-   * consumed by the immediately-following `apply-improvement` leaf. Holds
-   * `resourcesPaid`, `feeIndex`, and `returnedCardId` for the pending
-   * improvement build so that `activateCard(... 'onBuy', paymentInfo)` keeps
-   * receiving the same `PaymentInfo` it did under the legacy
-   * `playMajorImprovement` / `playMinorImprovement` mutate-in-place flow.
-   * Cleared by `apply-improvement` after read.
-   */
-  _pendingImprovementPaymentInfo?: {
-    resourcesPaid: Partial<Resource>
-    feeIndex?: number
-    returnedCardId?: string
-  }
 }
 
 export type FarmTilePosition = {
