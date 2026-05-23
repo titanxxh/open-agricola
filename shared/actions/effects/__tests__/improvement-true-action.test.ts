@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { improvementAction } from '../improvement'
 import type {
   ActionExecutionContext,
-  ActionFlow,
   ActionSpace,
   GameState,
   PlayerState,
@@ -89,11 +88,10 @@ describe('improvement trueAction context', () => {
       trueAction: false,
     })
 
-    expect(result.type).toBe('flow')
-    const flow = (result as { type: 'flow'; flow: ActionFlow }).flow
-    expect(flow).toMatchObject({
-      type: 'seq',
-      children: [
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.internalChildren).toMatchObject({
+      beforeHostListeners: [
         {
           actionId: 'pay',
           actionContext: {
@@ -101,11 +99,13 @@ describe('improvement trueAction context', () => {
             improvementKind: 'major',
             trueAction: false,
           },
+          resultKey: 'payment',
         },
         {
           actionId: 'apply-improvement',
           params: { improvementId: 'Major_ClayOven', kind: 'major' },
           actionContext: { trueAction: false },
+          paymentInfoFrom: 'payment',
         },
       ],
     })
@@ -114,20 +114,21 @@ describe('improvement trueAction context', () => {
   it('propagates actionContext.trueAction=false to the generated payment and apply leaves', () => {
     const result = resolve({ allowedPurchases: ['Major_ClayOven'] }, { trueAction: false })
 
-    expect(result.type).toBe('flow')
-    const flow = (result as { type: 'flow'; flow: ActionFlow }).flow
-    expect(flow).toMatchObject({
-      type: 'seq',
-      children: [
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.internalChildren).toMatchObject({
+      beforeHostListeners: [
         {
           actionId: 'pay',
           actionContext: {
             trueAction: false,
           },
+          resultKey: 'payment',
         },
         {
           actionId: 'apply-improvement',
           actionContext: { trueAction: false },
+          paymentInfoFrom: 'payment',
         },
       ],
     })
