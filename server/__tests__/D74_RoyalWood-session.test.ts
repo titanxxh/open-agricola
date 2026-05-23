@@ -158,6 +158,54 @@ describe('D74_RoyalWood session', () => {
     expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.woodSpent).toBe(0)
   })
 
+  it('tracks beforeHost construct payment before refunding at end of action', () => {
+    const session = setup({ wood: 7 })
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.resources.reed = 2
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'farm-expansion')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+
+    const constructOption = resp.interaction.options?.find(
+      (option) => option.labelKey === 'actions.construct.name',
+    )
+    expect(constructOption).toBeDefined()
+
+    resp = session.resolveChoice(0, constructOption!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.farm.farmType).toBe('room')
+    if (resp.interaction.farm.farmType !== 'room') return
+
+    const room = resp.interaction.farm.selectableTiles[0]!
+    resp = session.resolveChoice(0, 'confirm', { rooms: [room] })
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.woodSpent).toBe(5)
+
+    resp = session.resolveChoice(0, '__done__')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.paid',
+        paymentFor: 'construct',
+        resources: expect.objectContaining({ wood: 5 }),
+      }),
+      expect.objectContaining({
+        type: 'resource.moved',
+        resources: expect.objectContaining({ wood: 2 }),
+        sourceCardId: CARD_ID,
+      }),
+    ]))
+    expect(resp.state.players[0]!.resources.wood).toBe(4)
+    expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.woodSpent).toBe(0)
+  })
+
   it('does not carry separate 1-wood payments across turns', () => {
     const session = setup({ wood: 10 })
 

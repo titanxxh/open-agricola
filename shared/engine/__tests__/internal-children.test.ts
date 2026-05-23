@@ -695,7 +695,7 @@ describe('engine internal children', () => {
     ])
   })
 
-  it('preserves host actionEvents when deferred host hooks run after internal children', () => {
+  it('includes beforeHost child events when deferred host hooks run after internal children', () => {
     let afterActionEventReasons: string[] | undefined
     let afterTransactionEventReasons: string[] | undefined
     const hostAction: ActionDefinition = {
@@ -761,8 +761,8 @@ describe('engine internal children', () => {
     const step = runUntilDone(engine, { state, player, space })
 
     expect(step.type).toBe('done')
-    expect(afterActionEventReasons).toEqual(['receive'])
-    expect(afterTransactionEventReasons).toEqual(['receive'])
+    expect(afterActionEventReasons).toEqual(['receive', 'cardEffect'])
+    expect(afterTransactionEventReasons).toEqual(['receive', 'cardEffect'])
   })
 
   it('does not run host finalizer, hooks, or afterHost children when required beforeHost result fails', () => {
