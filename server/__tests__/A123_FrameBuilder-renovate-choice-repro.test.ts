@@ -45,6 +45,9 @@ describe('A123_FrameBuilder renovation choice repro', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
+    expect(resp.state.players[0]!.houseType).toBe('clay')
+    expect(resp.state.players[0]!.resources.clay).toBe(2)
+    expect(resp.state.players[0]!.resources.reed).toBe(1)
     expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)
 
     // Confirm both options are present.
