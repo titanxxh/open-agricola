@@ -52,6 +52,8 @@ describe('passing-mechanism: basic pass to next', () => {
       cardId: 'A1_Shelter',
       fromPlayerId: after.players[0]!.id,
       toPlayerId: after.players[1]!.id,
+      sourceActionId: 'apply-improvement',
+      sourceCardId: 'A1_Shelter',
     })
 
     const playedForA1 = after.events.filter(

@@ -105,6 +105,7 @@ describe('improvement trueAction context', () => {
       {
         actionId: 'activate-card-effect',
         params: { cardId: 'Major_ClayOven', hook: 'onBuy' },
+        actionContext: { trueAction: false },
         paymentInfoFrom: 'payment',
       },
     ])
@@ -130,6 +131,7 @@ describe('improvement trueAction context', () => {
     expect(result.internalChildren?.afterHostListeners).toMatchObject([
       {
         actionId: 'activate-card-effect',
+        actionContext: { trueAction: false },
         paymentInfoFrom: 'payment',
       },
     ])

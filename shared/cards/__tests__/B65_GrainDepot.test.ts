@@ -65,5 +65,19 @@ describe('B65 Grain Depot', () => {
       { grain: 1 },
       { grain: 1 },
     ])
+    expect(resp.state.events).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'card.triggered', cardId: CARD_ID }),
+    ]))
+    expect(resp.state.log).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'log.cardTriggered' }),
+    ]))
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'card.played',
+        cardId: CARD_ID,
+        sourceActionId: 'apply-improvement',
+        sourceCardId: CARD_ID,
+      }),
+    ]))
   })
 })
