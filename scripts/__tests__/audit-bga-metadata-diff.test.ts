@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseBgaCard } from '../bga-metadata/parse-bga'
@@ -6,6 +7,7 @@ import { parseTsCard } from '../bga-metadata/parse-ts'
 import { diffCards, type FieldDiff } from '../bga-metadata/diff'
 import { renderReport } from '../bga-metadata/report'
 import { applySafeFix } from '../bga-metadata/apply-safe'
+import { resolveBgaRoot } from '../bga-metadata/resolve-bga-root'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const FIXTURE_DIR = path.resolve(__dirname, 'fixtures')
@@ -330,5 +332,65 @@ describe('loadBga canonical pick (integration with parseBgaCard fixtures)', () =
     const picked = tsMatch ?? cards.find(c => !c.banned) ?? cards[0]
     expect(picked.id).toBe('D11w_LawnFertilizer')
     expect(picked.banned).toBe(false)
+  })
+})
+
+// Guard for §6 infra todo #1: every `$this->field` BGA cards assign must be
+// either parsed (covered) or explicitly skipped (ignored). When BGA adds a new
+// metadata field, this test fails and tells the developer to either teach
+// parse-bga.ts about it or add it to IGNORED_FIELDS — preventing the audit
+// baseline from silently drifting.
+const COVERED_FIELDS = new Set([
+  'name', 'category', 'players', 'extraVp', 'vp',
+  'cost', 'costs', 'prerequisite', 'passing', 'banned',
+])
+
+const IGNORED_FIELDS = new Set([
+  // Derived from filename
+  'id', 'deck', 'number',
+  // BGA platform / workshop flags — not aligned (see §1 audit rule)
+  'implemented', 'bannedLiving', 'bannedWeak',
+  'isCorbariusOrDulcinaria', 'isArtifexOrBubulcus',
+  'isBakingImprovement', 'isCookery',
+  // BGA PHP runtime behaviour (flow / hooks / state holders)
+  'accumulation', 'animalHolder', 'holder', 'flow', 'exchanges',
+  'field', 'location', 'map', 'privateSpace', 'returnCards',
+  'scoresMap', 'sharedScoring', 'resMap', 'replacesCostFor',
+  'pId', 'fee', 'bonusStoneRoom',
+  // Free-form text / hints not subject to metadata literal diff
+  'costText', 'usedText', 'desc', 'rulings', 'author',
+  // Conditional / typed prerequisites — OA expresses via card-display schema
+  'conditionalCost', 'improvementPrerequisites', 'occupationPrerequisites',
+])
+
+describe('BGA metadata field coverage', () => {
+  it('every $this->field in BGA A-E card sources is parsed or explicitly ignored', () => {
+    let bgaRoot: string
+    try {
+      bgaRoot = resolveBgaRoot()
+    } catch {
+      console.warn('BGA repo not found; skipping field-coverage check')
+      return
+    }
+    const cardsRoot = path.join(bgaRoot, 'modules', 'php', 'Cards')
+    const fields = new Set<string>()
+    for (const deck of ['A', 'B', 'C', 'D', 'E']) {
+      const dir = path.join(cardsRoot, deck)
+      if (!fs.existsSync(dir)) continue
+      for (const f of fs.readdirSync(dir)) {
+        if (!/^[A-E]\d.*\.php$/.test(f)) continue
+        const src = fs.readFileSync(path.join(dir, f), 'utf8')
+        const re = /\$this->(\w+)\s*=/g
+        let m: RegExpExecArray | null
+        while ((m = re.exec(src))) fields.add(m[1])
+      }
+    }
+
+    const known = new Set([...COVERED_FIELDS, ...IGNORED_FIELDS])
+    const unknown = [...fields].filter(f => !known.has(f)).sort()
+    expect(
+      unknown,
+      `New BGA metadata field(s) detected: ${unknown.join(', ')}. Either parse them in scripts/bga-metadata/parse-bga.ts (and add to COVERED_FIELDS) or list them in IGNORED_FIELDS.`,
+    ).toEqual([])
   })
 })
