@@ -6,7 +6,6 @@ import {
   getPalisadeCount,
 } from '../../shared/actions/effects/fencing'
 import { setFencesForTest, setPalisadesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
-import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
 
 import '../../shared/cards/C/C1_Overhaul'
 
@@ -90,11 +89,10 @@ describe('C1 Overhaul session', () => {
     expect(getPalisadeCount(p0)).toBe(0)
   })
 
-  it('razes existing fences and lets player rebuild (C1 is passing: no free-rebuild discount after pass)', () => {
-    // C1 is a passing card: after purchase, buyer still executes onBuy fence flow,
-    // but the c1 fence-discount listener is inert because buyer no longer holds C1
-    // in minorPlayed (known gap). Buyer needs enough wood to pay for fence normally.
-    const session = setup({ wood: 10, fences: 2 })
+  it('razes existing fences and lets player rebuild for free (costOverride active)', () => {
+    // setup: buyer has 4 wood; C1 costs 1 wood to buy → 3 remaining.
+    // Rebuild 4 fences — if costOverride is active, fence cost = 0 → wood stays at 3.
+    const session = setup({ wood: 4, fences: 2 })
     const { resp } = playC1(session)
     expect(resp.ok).toBe(true)
 
@@ -103,7 +101,6 @@ describe('C1 Overhaul session', () => {
     const before = session.getState().state.players[0]!
     expect(getFenceCount(before)).toBe(0)
 
-    // Rebuild 4 fences (paid with wood, discount not active post-pass).
     const commit = session.resolveChoice(0, 'confirm', {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
@@ -113,6 +110,8 @@ describe('C1 Overhaul session', () => {
     const after = commit.state.players[0]!
     expect(getFenceCount(after)).toBe(4)
     expect(after.pastures).toHaveLength(1)
+    // wood: 4 (start) - 1 (C1 buy cost) - 0 (free rebuild) = 3
+    expect(after.resources.wood).toBe(3)
     // C1 passed to next player
     expect(after.minorPlayed).not.toContain(CARD_ID)
     expect(commit.state.players[1]!.minorHand).toContain(CARD_ID)
@@ -129,10 +128,9 @@ describe('C1 Overhaul session', () => {
     expect(getPalisadeCount(before)).toBe(2)
   })
 
-  it('fence rebuild completes (no free-rebuild discount post-pass; normal wood cost applies)', () => {
-    // C1 is a passing card: buyer still executes the fence rebuild flow,
-    // but without c1 discount (known gap). Enough wood given to rebuild normally.
-    const session = setup({ wood: 10, fences: 2 })
+  it('fence rebuild completes with 0 net wood cost (free rebuild via costOverride)', () => {
+    // 4 wood: 1 for C1 buy, 0 for free rebuild → 3 remaining
+    const session = setup({ wood: 4, fences: 2 })
     const { resp } = playC1(session)
     expect(resp.ok).toBe(true)
     const commit = session.resolveChoice(0, 'confirm', {
@@ -141,22 +139,6 @@ describe('C1 Overhaul session', () => {
       extraWood: 0,
     })
     expect(commit.ok).toBe(true)
-  })
-
-  it('after C1 fencing completes, the c1Active flag is cleared', () => {
-    const session = setup({ wood: 10, fences: 2 })
-    playC1(session)
-    let resp = session.resolveChoice(0, 'confirm', {
-      edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
-      palisadeEdges: [],
-      extraWood: 0,
-    })
-    expect(resp.ok).toBe(true)
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
-      resp = confirmPlayerSwitch(session)
-    }
-    const player = session.getState().state.players[0]!
-    const flag = player.cardStates?.[CARD_ID]?.extraData?.c1Active
-    expect(flag).toBeFalsy()
+    expect(commit.state.players[0]!.resources.wood).toBe(3)
   })
 })
