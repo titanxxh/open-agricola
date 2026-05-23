@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { ActionDefinition, ActionSpace, GameState, PlayerState } from '../../../contract/types'
+import type { ActionDefinition, ActionExecutionContext, ActionSpace, GameState, PlayerState } from '../../../contract/types'
 import { CardRegistry } from '../../../cards/registry'
 import { getActiveCardRegistry, setActiveCardRegistry } from '../../../cards/active-registry'
 import { B155_ArtTeacher_impl } from '../../../cards/B/B155_ArtTeacher'
+import { C116_FurnitureMaker_impl } from '../../../cards/C/C116_FurnitureMaker'
 import { Engine } from '../../../engine/engine'
 import { EngineTree } from '../../../engine/tree'
 import { HookDispatcher } from '../../../engine/dispatcher'
@@ -11,9 +12,11 @@ import { ActionNode, SequenceNode } from '../../../engine/nodes'
 import { ActionRegistry } from '../../../engine/registry'
 import { internalActionDefinitions } from '../../internal-actions'
 import { playOccupation } from '../occupation'
+import { clearActionHooks, registerActionHook } from '../../hooks'
 import { readCardResourceStats } from '../../../cards/helpers/card-state'
 import '../../../cards/A/A85_Homekeeper'
 import '../../../cards/C/C107_Baker'
+import '../../../cards-display/C/C116_FurnitureMaker'
 import '../../../cards-display/A/A123_FrameBuilder'
 
 const FLOW_CARD_ID = 'C107_Baker'
@@ -98,12 +101,13 @@ const buildEngine = (
   actions: ActionDefinition[],
   hostActionId: string,
   sourceCard?: string,
+  params?: Record<string, unknown>,
 ) => {
   const registry = new ActionRegistry()
   actions.forEach((action) => registry.register(action))
   return new Engine({
     tree: new EngineTree(new SequenceNode(`sequence-${hostActionId}`, [
-      new ActionNode(`action-${hostActionId}`, hostActionId, sourceCard),
+      new ActionNode(`action-${hostActionId}`, hostActionId, sourceCard, params),
     ])),
     registry,
     hooks: new HookDispatcher(),
@@ -111,9 +115,16 @@ const buildEngine = (
   })
 }
 
+type EngineTestContext = {
+  state: GameState
+  player: PlayerState
+  space: ActionSpace
+  emitPrivateEvent?: ActionExecutionContext['emitPrivateEvent']
+}
+
 const proceedUntilDone = (
   engine: Engine,
-  context: { state: GameState; player: PlayerState; space: ActionSpace },
+  context: EngineTestContext,
 ) => {
   let step = engine.proceed(context)
   let guard = 20
@@ -218,46 +229,95 @@ describe('occupation play result', () => {
       expect(player.occupationPlayed).toContain(SELF_AFTER_CARD_ID)
       expect(player.resources.wood).toBe(1)
       expect(player.resources.reed).toBe(1)
+      expect(state.events).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          type: 'card.played',
+          cardId: SELF_AFTER_CARD_ID,
+          sourceActionId: 'apply-occupation-play',
+          sourceCardId: SELF_AFTER_CARD_ID,
+        }),
+      ]))
     } finally {
       setActiveCardRegistry(previousRegistry)
     }
   })
 
-  it('does not record source-card gained occupation when pay child fails', () => {
-    const state = createState()
-    const player = createPlayer({
-      occupationHand: ['A123_FrameBuilder'],
-      resources: {
-        wood: 0,
-        clay: 0,
-        reed: 0,
-        stone: 0,
-        food: 0,
-        grain: 0,
-        vegetable: 0,
-        sheep: 0,
-        boar: 0,
-        cattle: 0,
-        begging: 0,
+  it('does not commit occupation host effects when source-card occupation pay child fails', () => {
+    const previousRegistry = getActiveCardRegistry()
+    const registry = new CardRegistry()
+    registry.loadImpl('C116_FurnitureMaker', C116_FurnitureMaker_impl)
+    setActiveCardRegistry(registry)
+    const afterCalls: string[] = []
+    const privateEvents: unknown[] = []
+    registerActionHook({
+      id: 'test-after-play-occupation-failed-pay',
+      actions: ['play-occupation'],
+      phases: ['after'],
+      handler: (context) => {
+        afterCalls.push(context.choice ?? 'missing')
       },
     })
-    state.players = [player]
-    const actions = internalActionDefinitions.filter((action) =>
-      ['play-occupation', 'pay'].includes(action.id),
-    )
-    const engine = buildEngine(actions, 'play-occupation', GRANT_SOURCE_CARD_ID)
-    const space = createSpace()
-    const context = { state, player, space }
+    try {
+      const state = createState()
+      const player = createPlayer({
+        occupationHand: ['C116_FurnitureMaker'],
+        resources: {
+          wood: 0,
+          clay: 0,
+          reed: 0,
+          stone: 0,
+          food: 1,
+          grain: 0,
+          vegetable: 0,
+          sheep: 0,
+          boar: 0,
+          cattle: 0,
+          begging: 0,
+        },
+      })
+      state.players = [player]
+      const actions = internalActionDefinitions.filter((action) =>
+        ['play-occupation', 'pay', 'gain', 'activate-card-effect'].includes(action.id),
+      )
+      const engine = buildEngine(
+        actions,
+        'play-occupation',
+        GRANT_SOURCE_CARD_ID,
+        { costOverride: { food: 1 } },
+      )
+      const space = createSpace()
+      const context: EngineTestContext = {
+        state,
+        player,
+        space,
+        emitPrivateEvent: (event) => {
+          privateEvents.push(event)
+        },
+      }
 
-    const choiceStep = engine.proceed(context)
-    expect(choiceStep.type).toBe('choice')
-    const resolved = engine.resolveChoice('A123_FrameBuilder', context)
-    expect(resolved.type).toBe('ok')
-    const payStep = engine.proceed(context)
+      const choiceStep = engine.proceed(context)
+      expect(choiceStep.type).toBe('choice')
+      player.resources.food = 0
+      const resolved = engine.resolveChoice('C116_FurnitureMaker', context)
+      expect(resolved.type).toBe('ok')
+      const finalStep = proceedUntilDone(engine, context)
 
-    expect(payStep.type).toBe('ok')
-    expect(player.occupationPlayed).not.toContain('A123_FrameBuilder')
-    expect(readCardResourceStats(player, GRANT_SOURCE_CARD_ID)).toBeUndefined()
-    expect(player.cardStates[GRANT_SOURCE_CARD_ID]).toBeUndefined()
+      expect(['done', 'blocked']).toContain(finalStep.type)
+      expect(player.occupationPlayed).not.toContain('C116_FurnitureMaker')
+      expect(player.resources.wood).toBe(0)
+      expect(privateEvents).toEqual([])
+      expect(afterCalls).toEqual([])
+      expect(state.events ?? []).not.toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          type: 'card.played',
+          cardId: 'C116_FurnitureMaker',
+        }),
+      ]))
+      expect(readCardResourceStats(player, GRANT_SOURCE_CARD_ID)).toBeUndefined()
+      expect(player.cardStates[GRANT_SOURCE_CARD_ID]).toBeUndefined()
+    } finally {
+      clearActionHooks()
+      setActiveCardRegistry(previousRegistry)
+    }
   })
 })

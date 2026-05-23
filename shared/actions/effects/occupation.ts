@@ -189,6 +189,8 @@ const commitOccupationPlay = (
     type: 'card.played',
     cardId: occupationId,
     cardType: 'occupation',
+    sourceActionId: 'apply-occupation-play',
+    sourceCardId: occupationId,
   })
   if (sourceCard && sourceCard !== occupationId) {
     addCardResourceGained(player, sourceCard, { occupation: 1 })
