@@ -89,6 +89,7 @@ const computeFreeFenceTotal = (
   newFenceEdges: string[],
   newPalisadeEdges: string[],
   space: ActionSpace | undefined,
+  actionContext: Record<string, unknown> | undefined,
 ): number => {
   const pendingFreeFences = readPendingFenceBonus(player)?.freeFences ?? 0
   const fenceOverride = collectComputeCostsForFarmChoice(
@@ -99,7 +100,9 @@ const computeFreeFenceTotal = (
     space,
   )
   const hookFreeFences = Math.max(0, Math.abs(fenceOverride.wood ?? 0))
-  return pendingFreeFences + hookFreeFences
+  const actionContextOverride = actionContext?.costOverride as Partial<Resource> | undefined
+  const actionContextFree = Math.max(0, Math.abs(actionContextOverride?.wood ?? 0))
+  return pendingFreeFences + hookFreeFences + actionContextFree
 }
 
 const finalizeFence = (
@@ -124,6 +127,7 @@ const finalizeFence = (
     newFenceEdgesPreview,
     newPalisadeEdgesPreview,
     ctx.space,
+    ctx.actionContext,
   )
   const idx = ctx.state.players.indexOf(ctx.player)
   const validated = playerBoard(ctx.state, idx).farmyard.canBuildFence({
@@ -269,6 +273,7 @@ export const fenceAction: ActionDefinition = {
         newFenceEdgesPreview,
         newPalisadeEdgesPreview,
         ctx.space,
+        ctx.actionContext,
       )
       const idx = ctx.state.players.indexOf(ctx.player)
       const validated = playerBoard(ctx.state, idx).farmyard.canBuildFence({
