@@ -15,7 +15,7 @@ import { getCardModifiers } from '../../cards/card-modifiers'
 import { activateCardEffect } from './internal/activate-card-effect'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { incOccupationBuilt, recordDraftPlayed } from '../../session/stats'
-import { paymentInfoFromPayResult } from '../helpers/pay-child'
+import { buildInternalPayChild, paymentInfoFromPayResult } from '../helpers/pay-child'
 import {
   cardEffectHandChangedEvent,
   readPrivateHandChangeSourceCard,
@@ -311,19 +311,15 @@ const buildOccupationPayChild = (
   cost: ComplexCost,
   occupationId: string,
   actionContext: Record<string, unknown> | undefined,
-): InternalActionChild => ({
-  actionId: 'pay',
+): InternalActionChild => buildInternalPayChild({
+  cost,
+  costType: 'occupation',
+  optionPrefix: `pay:occupation:${occupationId}`,
   sourceCard: occupationId,
-  params: {
-    cost,
-    costType: 'occupation',
-    optionPrefix: `pay:occupation:${occupationId}`,
-  },
   actionContext: {
     costType: 'occupation',
     ...(actionContext ?? {}),
   },
-  resultKey: 'payment',
 })
 
 const buildOccupationInternalChildren = (
@@ -334,7 +330,7 @@ const buildOccupationInternalChildren = (
   beforeHostListeners: [
     buildOccupationPayChild(cost, occupationId, actionContext),
   ],
-  afterHostListeners: [
+  afterHostCommitListeners: [
     {
       actionId: 'activate-card-effect',
       sourceCard: occupationId,

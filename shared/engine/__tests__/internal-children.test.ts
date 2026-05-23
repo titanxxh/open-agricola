@@ -195,6 +195,205 @@ describe('engine internal children', () => {
     ])
   })
 
+  it('runs afterHostCommitListeners children after host commit and before host after listeners', () => {
+    const events: string[] = []
+    const hostAction: ActionDefinition = {
+      id: 'host-commit-slot',
+      nameKey: 'test.hostCommit',
+      descriptionKey: 'test.hostCommit',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('host.execute')
+        return {
+          type: 'ok',
+          internalChildren: {
+            beforeHostListeners: [
+              { actionId: 'internal-pay-probe', resultKey: 'payment' },
+            ],
+            afterHostCommitListeners: [
+              { actionId: 'internal-onbuy-probe', paymentInfoFrom: 'payment' },
+            ],
+          },
+        }
+      },
+      completeInternalChildren: () => {
+        events.push('host.commit')
+        return { type: 'ok' }
+      },
+    }
+    const payProbe: ActionDefinition = {
+      id: 'internal-pay-probe',
+      nameKey: 'test.payProbe',
+      descriptionKey: 'test.payProbe',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('internal-pay-probe.execute')
+        return { type: 'ok', resourcesPaid: { food: 2 } }
+      },
+    }
+    const onBuyProbe: ActionDefinition = {
+      id: 'internal-onbuy-probe',
+      nameKey: 'test.onBuyProbe',
+      descriptionKey: 'test.onBuyProbe',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: ({ actionContext }) => {
+        const paymentInfo = actionContext?.paymentInfo as { resourcesPaid?: { food?: number } } | undefined
+        events.push(`internal-onbuy-probe.payment=${paymentInfo?.resourcesPaid?.food ?? 'missing'}`)
+        return { type: 'ok' }
+      },
+    }
+    registerActionHook({
+      id: 'host-commit-after',
+      actions: ['host-commit-slot'],
+      phases: ['after'],
+      handler: () => {
+        events.push('host.after')
+      },
+    })
+    const state = createState()
+    const player = createPlayer()
+    state.players = [player]
+    const space = createSpace(hostAction)
+    const engine = buildEngine([hostAction, payProbe, onBuyProbe], hostAction.id)
+
+    const step = runUntilDone(engine, { state, player, space })
+
+    expect(step.type).toBe('done')
+    expect(events).toEqual([
+      'host.execute',
+      'internal-pay-probe.execute',
+      'host.commit',
+      'internal-onbuy-probe.payment=2',
+      'host.after',
+    ])
+  })
+
+  it('waits for afterHostCommitListeners flow before host after listeners without repeating host commit', () => {
+    const events: string[] = []
+    let commitCount = 0
+    const hostAction: ActionDefinition = {
+      id: 'host-commit-flow-slot',
+      nameKey: 'test.hostCommitFlow',
+      descriptionKey: 'test.hostCommitFlow',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('host.execute')
+        return {
+          type: 'ok',
+          internalChildren: {
+            beforeHostListeners: [
+              { actionId: 'internal-pay-probe', resultKey: 'payment' },
+            ],
+            afterHostCommitListeners: [
+              { actionId: 'internal-onbuy-flow-probe', paymentInfoFrom: 'payment' },
+            ],
+          },
+        }
+      },
+      completeInternalChildren: () => {
+        commitCount += 1
+        events.push(`host.commit.${commitCount}`)
+        return { type: 'ok' }
+      },
+    }
+    const payProbe: ActionDefinition = {
+      id: 'internal-pay-probe',
+      nameKey: 'test.payProbe',
+      descriptionKey: 'test.payProbe',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('internal-pay-probe.execute')
+        return { type: 'ok', resourcesPaid: { food: 2 } }
+      },
+    }
+    const onBuyProbe: ActionDefinition = {
+      id: 'internal-onbuy-flow-probe',
+      nameKey: 'test.onBuyFlowProbe',
+      descriptionKey: 'test.onBuyFlowProbe',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: ({ actionContext }) => {
+        const paymentInfo = actionContext?.paymentInfo as { resourcesPaid?: { food?: number } } | undefined
+        events.push(`internal-onbuy-flow-probe.payment=${paymentInfo?.resourcesPaid?.food ?? 'missing'}`)
+        return { type: 'flow', flow: { type: 'leaf', actionId: 'internal-onbuy-choice-probe' } }
+      },
+    }
+    const choiceProbe: ActionDefinition = {
+      id: 'internal-onbuy-choice-probe',
+      nameKey: 'test.onBuyChoiceProbe',
+      descriptionKey: 'test.onBuyChoiceProbe',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('internal-onbuy-choice-probe.execute')
+        return {
+          type: 'request',
+          promptKey: 'test.choose',
+          request: {
+            kind: 'choice',
+            options: [{ value: 'selected', labelKey: 'test.selected' }],
+          },
+        }
+      },
+      resolveChoice: (_context, choice) => {
+        events.push(`internal-onbuy-choice-probe.resolve=${choice}`)
+        return { type: 'ok' }
+      },
+    }
+    registerActionHook({
+      id: 'host-commit-flow-after',
+      actions: ['host-commit-flow-slot'],
+      phases: ['after'],
+      handler: () => {
+        events.push(`host.after.commitCount=${commitCount}`)
+      },
+    })
+    const state = createState()
+    const player = createPlayer()
+    state.players = [player]
+    const space = createSpace(hostAction)
+    const engine = buildEngine([hostAction, payProbe, onBuyProbe, choiceProbe], hostAction.id)
+
+    const pendingStep = runUntilDone(engine, { state, player, space })
+
+    expect(pendingStep.type).toBe('choice')
+    expect(commitCount).toBe(1)
+    expect(events).toEqual([
+      'host.execute',
+      'internal-pay-probe.execute',
+      'host.commit.1',
+      'internal-onbuy-flow-probe.payment=2',
+      'internal-onbuy-choice-probe.execute',
+    ])
+
+    expect(engine.resolveChoice('selected', { state, player, space }).type).toBe('ok')
+    const finalStep = runUntilDone(engine, { state, player, space })
+
+    expect(finalStep.type).toBe('done')
+    expect(commitCount).toBe(1)
+    expect(events).toEqual([
+      'host.execute',
+      'internal-pay-probe.execute',
+      'host.commit.1',
+      'internal-onbuy-flow-probe.payment=2',
+      'internal-onbuy-choice-probe.execute',
+      'internal-onbuy-choice-probe.resolve=selected',
+      'host.after.commitCount=1',
+    ])
+  })
+
   it('runs afterHostListeners children after host after listeners', () => {
     const events: string[] = []
     const hostAction: ActionDefinition = {

@@ -513,6 +513,7 @@ export type InternalActionChild = {
 
 export type InternalActionChildren = {
   beforeHostListeners?: InternalActionChild[]
+  afterHostCommitListeners?: InternalActionChild[]
   afterHostListeners?: InternalActionChild[]
 }
 

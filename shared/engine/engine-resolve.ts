@@ -297,6 +297,8 @@ const buildDeferredHostNode = (
   node.ownerPlayerId = hostNode.ownerPlayerId
   node.internalHostNodeId = hostNode.id
   node.deferredHostResult = result
+  node.deferredAfterHostCommitChildren =
+    result.type === 'ok' ? result.internalChildren?.afterHostCommitListeners : undefined
   node.deferredAfterHostChildren =
     result.type === 'ok' ? result.internalChildren?.afterHostListeners : undefined
   node.deferredHostTransactionEvents = [...transactionEvents]
@@ -565,7 +567,10 @@ export function engineResolveChoice(
       ensureEventState(context.state)
       completedEvents = eventFrame.complete(context.state)
       recordEventLogDerivation(int, completedEvents, result)
-      if (result.type === 'ok' && result.internalChildren?.beforeHostListeners?.length) {
+      if (result.type === 'ok' && (
+        result.internalChildren?.beforeHostListeners?.length ||
+        result.internalChildren?.afterHostCommitListeners?.length
+      )) {
         const beforeHostNodes = buildInternalActionChildNodes(
           int,
           child.id,
@@ -889,7 +894,10 @@ export function engineResolveChoice(
   }
   if (
     result.type === 'ok' &&
-    result.internalChildren?.beforeHostListeners?.length &&
+    (
+      result.internalChildren?.beforeHostListeners?.length ||
+      result.internalChildren?.afterHostCommitListeners?.length
+    ) &&
     pendingHost instanceof ActionNode
   ) {
     const beforeHostNodes = buildInternalActionChildNodes(

@@ -417,6 +417,8 @@ const buildDeferredHostNode = (
   node.ownerPlayerId = hostNode.ownerPlayerId
   node.internalHostNodeId = hostNode.id
   node.deferredHostResult = result
+  node.deferredAfterHostCommitChildren =
+    result.type === 'ok' ? result.internalChildren?.afterHostCommitListeners : undefined
   node.deferredAfterHostChildren =
     result.type === 'ok' ? result.internalChildren?.afterHostListeners : undefined
   node.deferredHostTransactionEvents = [...transactionEvents]
@@ -424,6 +426,33 @@ const buildDeferredHostNode = (
   node.deferredHostChoice = choice
   node.deferredHostResultTargetNodeId = hostNode.internalHostNodeId
   node.deferredHostResultKey = hostNode.internalResultKey
+  return node
+}
+
+const buildDeferredHostContinuationNode = (
+  int: EngineInternals,
+  sourceNode: ActionNode,
+  result: ActionExecutionResult,
+): ActionNode => {
+  const node = new ActionNode(
+    `internal-host-continuation-${sourceNode.id}-${int.counterRef.value++}`,
+    sourceNode.actionId,
+    sourceNode.sourceCard,
+    sourceNode.params,
+    sourceNode.choiceLabelKey,
+    sourceNode.choiceLabelParams,
+    sourceNode.actionContext,
+  )
+  node.ownerPlayerId = sourceNode.ownerPlayerId
+  node.internalHostNodeId = sourceNode.internalHostNodeId
+  node.deferredHostResult = result
+  node.deferredAfterHostChildren = sourceNode.deferredAfterHostChildren
+  node.deferredHostCommitCompleted = true
+  node.deferredHostTransactionEvents = sourceNode.deferredHostTransactionEvents
+  node.deferredHostActionEvents = sourceNode.deferredHostActionEvents
+  node.deferredHostChoice = sourceNode.deferredHostChoice
+  node.deferredHostResultTargetNodeId = sourceNode.deferredHostResultTargetNodeId
+  node.deferredHostResultKey = sourceNode.deferredHostResultKey
   return node
 }
 
@@ -627,7 +656,7 @@ const executeDeferredHostAction = (
   }
   const action = int.registry.get(node.actionId)
   let completedEvents: GameEvent[] | undefined
-  if (result.type === 'ok' && action?.completeInternalChildren) {
+  if (result.type === 'ok' && action?.completeInternalChildren && !node.deferredHostCommitCompleted) {
     const eventFrame = int.events.beginFrame({
       actorPlayerId: executionContext.player.id,
       sourceActionId: node.actionId,
@@ -646,6 +675,20 @@ const executeDeferredHostAction = (
     ensureEventState(context.state)
     completedEvents = eventFrame.complete(context.state)
     recordEventLogDerivation(int, completedEvents, result)
+  }
+  if (result.type === 'ok' && !node.deferredHostCommitCompleted) {
+    const afterHostCommitNodes = buildInternalActionChildNodes(
+      int,
+      node.internalHostNodeId ?? node.id,
+      node.deferredAfterHostCommitChildren,
+      executionContext.player.id,
+    )
+    if (afterHostCommitNodes.length > 0) {
+      const continuationNode = buildDeferredHostContinuationNode(int, node, result)
+      node.resolve(result)
+      int.tree.insertAfter(node.id, [...afterHostCommitNodes, continuationNode])
+      return { type: 'ok', nodeId: node.id, actionId: node.actionId, result }
+    }
   }
   const eventReadContext = node.deferredHostTransactionEvents
     ? deferredHostEventReadContext(int, node)
@@ -1115,7 +1158,10 @@ export function engineProceed(
       node.resolve(result)
       return { type: 'ok', nodeId: node.id, actionId: replacedActionId, result }
     }
-    if (result.type === 'ok' && result.internalChildren?.beforeHostListeners?.length) {
+    if (result.type === 'ok' && (
+      result.internalChildren?.beforeHostListeners?.length ||
+      result.internalChildren?.afterHostCommitListeners?.length
+    )) {
       const beforeHostNodes = buildInternalActionChildNodes(
         int,
         node.id,
