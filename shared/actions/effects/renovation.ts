@@ -28,6 +28,28 @@ type RenovationPlan = {
   cost: ComplexCost
 }
 
+type PendingRenovation = {
+  from: PlayerState['houseType']
+  to: RenovationTarget
+  rooms: { row: number; col: number }[]
+}
+
+const readPendingRenovation = (
+  result: Extract<ActionExecutionResult, { type: 'ok' }>,
+): PendingRenovation | null => {
+  const raw = result.extraData?.renovation
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Partial<PendingRenovation>
+  if (r.from !== 'wood' && r.from !== 'clay') return null
+  if (r.to !== 'clay' && r.to !== 'stone') return null
+  if (!Array.isArray(r.rooms)) return null
+  return {
+    from: r.from,
+    to: r.to,
+    rooms: r.rooms,
+  }
+}
+
 const mergeRenovationCost = (
   baseCost: ComplexCost,
   costOverride?: Partial<Resource>,
@@ -197,7 +219,7 @@ export const renovateHouseAction: ActionDefinition = {
   noChoiceLogKey: 'log.renovationFail',
   emitLeafActionDetail: true,
   execute: () => ({ type: 'fail', errorKey: 'log.renovationFail' }),
-  resolveChoice: ({ player, params, costs, eventSink }, choice) => {
+  resolveChoice: ({ player, params, costs }, choice) => {
     const failure: ActionExecutionResult = { type: 'fail', errorKey: 'log.renovationFail' }
     const target: RenovationTarget | null =
       (choice === 'clay' || choice === 'stone' ? choice : null)
@@ -207,19 +229,31 @@ export const renovateHouseAction: ActionDefinition = {
     if (!plan) return failure
     const totalCost = mergeRenovationCost(plan.cost, costs)
     const from = player.houseType
-    player.houseType = plan.nextType
-    eventSink?.emit<'farm.renovated'>({
-      type: 'farm.renovated',
-      playerId: player.id,
-      from,
-      to: plan.nextType,
-      rooms: player.roomTiles.map(({ row, col }) => ({ row, col })),
-    })
     return {
       type: 'ok',
+      extraData: {
+        renovation: {
+          from,
+          to: plan.nextType,
+          rooms: player.roomTiles.map(({ row, col }) => ({ row, col })),
+        },
+      },
       internalChildren: {
         beforeHostListeners: [buildRenovationPayChild(totalCost)],
       },
     }
+  },
+  completeInternalChildren: ({ player, eventSink }, result) => {
+    const renovation = readPendingRenovation(result)
+    if (!renovation) return { type: 'ok' }
+    player.houseType = renovation.to
+    eventSink.emit<'farm.renovated'>({
+      type: 'farm.renovated',
+      playerId: player.id,
+      from: renovation.from,
+      to: renovation.to,
+      rooms: renovation.rooms,
+    })
+    return result
   },
 }

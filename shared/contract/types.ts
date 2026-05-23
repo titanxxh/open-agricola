@@ -594,6 +594,11 @@ export type ActionDefinition = {
     choice: string,
     payload?: Record<string, unknown>,
   ) => ActionExecutionResult
+  completeInternalChildren?: (
+    context: ActionMutationContext,
+    result: Extract<ActionExecutionResult, { type: 'ok' }>,
+    internalResults: Record<string, ActionExecutionResult>,
+  ) => Extract<ActionExecutionResult, { type: 'ok' }>
   /**
    * Opt-out: when true the engine builds a bare ActionNode instead of the
    * default pending-choice wrap that is normally

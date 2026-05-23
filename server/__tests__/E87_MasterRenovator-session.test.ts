@@ -108,7 +108,7 @@ describe('E87_MasterRenovator session — chooseOne renovation discount', () => 
     expect(e87Mods.length).toBe(1)
   })
 
-  it('renovation target choice mutates before the E87 payment prompt', () => {
+  it('renovation target choice waits for payment before mutating', () => {
     const { session, state, player } = setup(7)
     runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
     session.loadState(state)
@@ -122,7 +122,7 @@ describe('E87_MasterRenovator session — chooseOne renovation discount', () => 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
-    expect(resp.state.players[0]!.houseType).toBe('clay')
+    expect(resp.state.players[0]!.houseType).toBe('wood')
     expect(resp.state.players[0]!.resources.clay).toBe(2)
     expect(resp.state.players[0]!.resources.reed).toBe(1)
     expect(resp.state.players[0]!.activeModifiers.some((m) => m.cardId === CARD_ID)).toBe(true)

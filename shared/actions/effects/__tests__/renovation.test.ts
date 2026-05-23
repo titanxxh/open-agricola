@@ -187,24 +187,16 @@ describe('renovateHouseAction (engine opt-in choice flow)', () => {
     })
   })
 
-  it('resolveChoice("clay") mutates house type and returns a pay child', () => {
+  it('resolveChoice("clay") returns a pay child without mutating before payment', () => {
     const player = createPlayer({ resources: { clay: 2, reed: 1 } })
     player.roomTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }]
     const events: GameEvent[] = []
     const result = renovateHouseAction.resolveChoice!(buildExecutionContext(player, undefined, events), 'clay')
     expect(result.type).toBe('ok')
     if (result.type !== 'ok') return
-    expect(player.houseType).toBe('clay')
+    expect(player.houseType).toBe('wood')
     expect(player.resources.clay).toBe(2)
-    expect(events).toEqual([
-      {
-        type: 'farm.renovated',
-        playerId: 'p1',
-        from: 'wood',
-        to: 'clay',
-        rooms: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
-      },
-    ])
+    expect(events).toEqual([])
     expect(result.internalChildren?.beforeHostListeners).toEqual([
       {
         actionId: 'pay',
@@ -220,14 +212,19 @@ describe('renovateHouseAction (engine opt-in choice flow)', () => {
         resultKey: 'payment',
       },
     ])
+    expect(result.extraData?.renovation).toEqual({
+      from: 'wood',
+      to: 'clay',
+      rooms: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
+    })
   })
 
-  it('resolveChoice("stone") mutates to stone and returns a stone pay child (Conservator path)', () => {
+  it('resolveChoice("stone") returns a stone pay child without mutating before payment (Conservator path)', () => {
     const player = createPlayer({ resources: { stone: 2, reed: 1 } })
     const result = renovateHouseAction.resolveChoice!(buildExecutionContext(player), 'stone')
     expect(result.type).toBe('ok')
     if (result.type !== 'ok') return
-    expect(player.houseType).toBe('stone')
+    expect(player.houseType).toBe('wood')
     expect(result.internalChildren?.beforeHostListeners).toEqual([
       {
         actionId: 'pay',

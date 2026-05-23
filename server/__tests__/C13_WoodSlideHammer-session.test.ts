@@ -8,9 +8,11 @@ import {
 } from '../../shared/actions/payment/internal'
 import type { BonusModifier } from '../../shared/contract/types'
 
+import '../../shared/cards/A/A87_Conservator'
 import '../../shared/cards/C/C13_WoodSlideHammer'
 
 const CARD_ID = 'C13_WoodSlideHammer'
+const CONSERVATOR_ID = 'A87_Conservator'
 
 const setupOwner = () => {
   const session = new GameSession()
@@ -185,5 +187,32 @@ describe('C13_WoodSlideHammer — payment-outcome boundary (Sprint 5 mech-E foll
     const sols = computeAllBuyableCombinations(player, { fee: { stone: 5, reed: 1 } }, undefined, 'renovation')
     expect(sols.length).toBeGreaterThan(0)
     expect(sols.every((s) => (s.resourcesPaid.stone ?? 0) === 5)).toBe(true)
+  })
+
+  it('A87 direct wood→stone payment uses C13 while the house is still wooden', () => {
+    const { session, state, player } = setupOwner()
+    state.currentPlayerIndex = 0
+    state.round = 6
+    player.occupationPlayed.push(CONSERVATOR_ID)
+    player.houseType = 'wood'
+    player.rooms = 5
+    player.resources = {
+      ...player.resources,
+      clay: 0,
+      stone: 3,
+      reed: 1,
+    }
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'house-redevelopment')
+    expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionChooseRenovationTarget') {
+      resp = session.resolveChoice(0, 'stone')
+    }
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.houseType).toBe('stone')
+    expect(resp.state.players[0]!.resources.stone).toBe(0)
+    expect(resp.state.players[0]!.resources.reed).toBe(0)
   })
 })
