@@ -345,6 +345,7 @@ const buildDeferredHostNode = (
   executionContext: ActionExecutionContext,
   transactionEvents: readonly GameEvent[],
   actionEvents: readonly GameEvent[],
+  choice?: string,
 ): ActionNode => {
   const node = new ActionNode(
     `internal-host-${hostNode.id}-${int.counterRef.value++}`,
@@ -362,6 +363,7 @@ const buildDeferredHostNode = (
     result.type === 'ok' ? result.internalChildren?.afterHostListeners : undefined
   node.deferredHostTransactionEvents = [...transactionEvents]
   node.deferredHostActionEvents = [...actionEvents]
+  node.deferredHostChoice = choice
   return node
 }
 
@@ -596,11 +598,12 @@ const executeDeferredHostAction = (
   const immediatePhase = int.hooks.immediatelyAfter(
     { ...executionContext, ...eventReadContext, actionId: node.actionId },
     result,
+    node.deferredHostChoice,
   )
   const afterPhase = int.hooks.after(
     { ...executionContext, ...eventReadContext, actionId: node.actionId },
     result,
-    undefined,
+    node.deferredHostChoice,
   )
   const allActionHookResults = [
     ...immediatePhase.actionHookResults,
@@ -619,7 +622,10 @@ const executeDeferredHostAction = (
       ),
     )
     .filter((action) => action)
-  const proceedBaseEvent = buildListenerEvent(executionContext, { result })
+  const proceedBaseEvent = buildListenerEvent(executionContext, {
+    result,
+    choice: node.deferredHostChoice,
+  })
   const trailingTransactionEvents = result.type === 'flow' ? undefined : eventReadContext.transactionEvents
   const trailingActionEvents = result.type === 'flow' ? undefined : eventReadContext.actionEvents
   const duringActivateNodes = buildActivationActionNodes(
