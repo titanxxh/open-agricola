@@ -8,9 +8,9 @@ import { D74_RoyalWood } from '../../cards-display/D/D74_RoyalWood'
 
 const CARD_ID = D74_RoyalWood.id
 
-const TRACKED_PAIRED_ACTIONS = ['construct', 'stables']
-const TRACKED_PAIRED_PURPOSES = new Set(['construct', 'stables'])
-const TRACKED_PAY_PURPOSES = new Set(['major-improvement', 'minor-improvement'])
+const TRACKED_PAIRED_ACTIONS = ['construct']
+const TRACKED_PAIRED_PURPOSES = new Set(['construct'])
+const TRACKED_PAY_PURPOSES = new Set(['major-improvement', 'minor-improvement', 'stables'])
 
 const afterListener: CardListenerRegistration = {
   id: 'D74-royal-wood-after',
