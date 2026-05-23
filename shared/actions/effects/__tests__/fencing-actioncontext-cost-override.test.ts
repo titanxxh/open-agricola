@@ -1,8 +1,8 @@
 /**
- * Task 3: red tests — fence execute path should honour actionContext.costOverride.
+ * actionContext.costOverride end-to-end execute path for fencing.
  *
- * Case 1 (PASS after T2): canStartFencing respects costOverride directly.
- * Case 2/3 (RED until T4): computeFreeFenceTotal must read ctx.actionContext.costOverride.
+ * Case 1: canStartFencing respects costOverride directly.
+ * Case 2/3: computeFreeFenceTotal reads ctx.actionContext.costOverride.
  */
 import { describe, expect, it } from 'vitest'
 import { canStartFencing, fenceAction } from '../fencing'
@@ -65,20 +65,14 @@ const buildRealCtx = (
 
 // ─── Case 1: unit test on canStartFencing (PASS — T2 work already correct) ───
 
-describe('fence: canStartFencing with costOverride (unit, PASS after T2)', () => {
+describe('fence: canStartFencing with costOverride (unit)', () => {
   it('case 1: wood=0 + costOverride.wood=-4 → true (covers minimumFenceSegments=4)', () => {
     const player = createPlayer()
     expect(canStartFencing(fakeState, player, { wood: -4 })).toBe(true)
   })
 })
 
-// ─── Case 2/3: resolveChoice execute path (RED until T4) ─────────────────────
-//
-// These call fenceAction.resolveChoice(...) directly so ctx.actionContext.costOverride
-// is visible to finalizeFence. Once T4 threads it through computeFreeFenceTotal the
-// tests will turn green.
-
-describe('fence: actionContext.costOverride in resolveChoice execute path (RED until T4)', () => {
+describe('fence: actionContext.costOverride in resolveChoice execute path', () => {
   it('case 2: costOverride.wood=-4, wood=0, build 4 fences → ok=true, wood=0 (fully free)', () => {
     const ctx = buildRealCtx(0, { costOverride: { wood: -4 } })
 
@@ -88,8 +82,6 @@ describe('fence: actionContext.costOverride in resolveChoice execute path (RED u
       extraWood: 0,
     })
 
-    // T4 fix: computeFreeFenceTotal reads ctx.actionContext.costOverride → free=4 → pay 0
-    // Before T4: free=0 → tries to pay 4 wood → insufficient (wood=0) → type='fail'
     expect(result.type).toBe('ok')
     expect(ctx.player.resources.wood).toBe(0)
     expect(ctx.player.fenceSegments).toHaveLength(4)
@@ -104,8 +96,6 @@ describe('fence: actionContext.costOverride in resolveChoice execute path (RED u
       extraWood: 0,
     })
 
-    // T4 fix: free=2, pay max(0,4-2)=2 → wood=2-2=0
-    // Before T4: free=0 → pay 4 wood → 2-4=-2 → canBuildFence reject → type='fail'
     expect(result.type).toBe('ok')
     expect(ctx.player.resources.wood).toBe(0)
     expect(ctx.player.fenceSegments).toHaveLength(4)

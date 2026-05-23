@@ -26,7 +26,6 @@ const createPlayer = (id = 'p1'): PlayerState =>
     rooms: 2,
     houseType: 'wood',
     fields: [],
-    fences: 0,
     roomTiles: [],
     stableTiles: [],
     improvements: [],
