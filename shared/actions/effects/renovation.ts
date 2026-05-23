@@ -19,7 +19,7 @@ import {
   payTypedFlatCost,
 } from '../payment/internal'
 import { mergeResources } from '../../utils/resources'
-import { buildPayChild } from '../helpers/pay-child'
+import { buildInternalPayChild } from '../helpers/pay-child'
 
 type RenovationTarget = Exclude<PlayerState['houseType'], 'wood'>
 
@@ -189,20 +189,11 @@ const baseRenovationOptions = (player: PlayerState): ActionChoiceOption[] => {
 }
 
 const buildRenovationPayChild = (cost: ComplexCost): InternalActionChild => {
-  const payChild = buildPayChild({
+  return buildInternalPayChild({
     cost,
     costType: 'renovation',
     optionPrefix: 'renovation',
   })
-  if (payChild.type !== 'leaf') {
-    throw new Error('Expected pay child leaf')
-  }
-  return {
-    actionId: payChild.actionId,
-    sourceCard: payChild.sourceCard,
-    params: payChild.params,
-    resultKey: 'payment',
-  }
 }
 
 export const renovateHouseAction: ActionDefinition = {

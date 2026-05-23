@@ -14,17 +14,22 @@ export type PayChildOptions = {
   optionPrefix?: string
   paymentChoice?: string
   sourceCard?: string
+  actionContext?: Record<string, unknown>
   playedCards?: string[]
   includeReturnedCard?: boolean
   sourceActionId?: string
 }
 
-export const buildPayChild = (options: PayChildOptions): ActionFlow => ({
-  type: 'leaf',
-  actionId: 'pay',
-  sourceCard: options.sourceCard,
-  params: options,
-})
+export const buildPayChild = (options: PayChildOptions): ActionFlow => {
+  const { actionContext, ...params } = options
+  return {
+    type: 'leaf',
+    actionId: 'pay',
+    sourceCard: options.sourceCard,
+    actionContext,
+    params,
+  }
+}
 
 export const buildInternalPayChild = (options: PayChildOptions): InternalActionChild => {
   const payChild = buildPayChild(options)
@@ -35,6 +40,7 @@ export const buildInternalPayChild = (options: PayChildOptions): InternalActionC
     actionId: payChild.actionId,
     sourceCard: payChild.sourceCard,
     params: payChild.params,
+    actionContext: payChild.actionContext,
     resultKey: 'payment',
   }
 }

@@ -176,7 +176,7 @@ describe('A97_Freshman', () => {
         resultKey: 'payment',
       },
     ])
-    expect(resolved.internalChildren?.afterHostListeners).toMatchObject([
+    expect(resolved.internalChildren?.afterHostCommitListeners).toMatchObject([
       {
         actionId: 'activate-card-effect',
         sourceCard: 'A123_FrameBuilder',

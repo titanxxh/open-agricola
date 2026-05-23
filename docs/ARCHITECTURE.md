@@ -584,7 +584,7 @@ anytime                  额外注册的 anytime 行动
 7. 然后执行 strict `isDoable`：base `canBeExecutedByPlayer` → costPreview → action hook `isDoable` → card listener `isDoable`。这一步必须读取 `before` 已真实修改后的 state；如果仍不可达，不能继续原 action。
 8. 然后执行 `computeCosts`，把费用覆盖写入本次 `executionContext.costs`。因此 before unlocker / resource gain / exchange 可以先改变真实 state，再影响后续 strict doable 与费用枚举。
 9. 随后执行 action 本体：`getBaseChoiceOptions` opt-in path 先走 `computeChoiceCandidates`，否则走 `ActionDefinition.execute()`；`resolveChoice` continuation 也按同一条 public action 顺序恢复，先完成 pending 选择，再继续 host internal children / trailing phases。`execute()` 或 `resolveChoice()` 返回 request 时创建 pending；无 request 时继续 `during` / `immediatelyAfter` / `after`。
-10. `during` / `immediatelyAfter` / `after` 是 host action 成功后的 trailing phases；`beforeHostListeners` settlement 必须先完成，`afterHostListeners` settlement 则故意保留在 BGA slot 中，等 host `after` 之后再运行。
+10. `during` / `immediatelyAfter` / `after` 是 host action 成功后的 trailing phases；`beforeHostListeners` settlement 必须先完成，`afterHostCommitListeners` 在 host commit 后、trailing phases 前运行，`afterHostListeners` settlement 则故意保留在 BGA slot 中，等 host `after` 之后再运行。
 11. `activate-card` 是 internal leaf，绕过上述 public action 流水线：只执行指定 listener body，并把 listener 返回的 `flow` / `followUpActions` 交回 engine 插入执行。
 
 作用域 scope：`player` / `opponent` / `any`。card listener 匹配层按 listener id 确定性枚举；phase trailing node 构建层再按 owner 分组（global → active player → 其他玩家），组内按 legacy `order` 降序、卡牌 play order、匹配序稳定排序。需要玩家决定同组 trigger 顺序时，用 `dispatchMode: 'select'` 进入 trigger-select，而不是依赖隐式排序表达规则选择。
@@ -593,9 +593,10 @@ anytime                  额外注册的 anytime 行动
 
 `pay` 是 internal settlement child；public host action 负责业务 mutation、事件事实和 completion。不要把业务 mutation 放回 `pay`，也不要用 `seq:[pay, apply-*]` 或顶层 `apply-*` effect 表达同一件事。
 
-`beforeHostListeners` / `afterHostListeners` 是 host action 在 BGA pay slot 上的显式差异：
+`beforeHostListeners` / `afterHostCommitListeners` / `afterHostListeners` 是 host action 在 BGA pay slot 上的显式差异：
 
 - `renovation` / `improvement` / `occupation` / `construct` / `fencing` 在 `beforeHostListeners` 或主 action 内先完成 mandatory payment，再进入 trailing effects。
+- `improvement` / `occupation` 的 `onBuy` 使用 `afterHostCommitListeners`：先完成 mandatory payment，再由 host `completeInternalChildren` 提交卡牌，随后触发 onBuy，最后才进入 host `during` / `immediatelyAfter` / `after`。
 - `stables` 使用 `afterHostListeners`，保持 `farm.stableBuilt -> after-stables effects -> resource.paid(stables)`，让 after-stables 卡先看到已建 stable。
 - `fencing` 明确是 `beforeHostListeners`，避免 `A34_Loppers` 这类 after-fencing 效果先于 mandatory fence pay 结算而饿死支付。
 
@@ -820,7 +821,7 @@ OA 通过 `CardBase.passing?: boolean` 标记 BGA minor improvement 的"过手"�
 - 不进 buyer.minorPlayed；卡 push 进 `nextPlayer.minorHand`（按 `state.currentPlayerIndex` wrap）
 - 不累加 `totalMinorBuilt`、不注入 `activeModifiers`、不触发 `providesOccupation` / `isField` 路径
 - emit `card.passed`（`fromPlayerId` / `toPlayerId` / `cardId`）替代 `card.played`
-- onBuy 仍通过 internal `activate-card-effect` 执行——买家拿到效果，卡进入下家手牌等待下家自己回合再 actBuy
+- onBuy 仍通过 internal `activate-card-effect` 的 `afterHostCommitListeners` 执行——买家拿到效果，卡进入下家手牌等待下家自己回合再 actBuy
 
 listener 隔离自然成立：passing 卡不进 `minorPlayed` → `getPlayerCardIds` 自然不含 → "卡进场"反应 skip。
 无需 `apply-improvement` effect 或 `extraData.passing` scratchpad；BGA passing 行为由 improvement host action / pay child / `activate-card-effect` 三段承担。

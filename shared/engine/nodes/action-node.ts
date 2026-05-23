@@ -22,7 +22,9 @@ export class ActionNode extends BaseNode {
   public internalResultKey?: string
   public internalPaymentInfoFrom?: string
   public deferredHostResult?: ActionExecutionResult
+  public deferredAfterHostCommitChildren?: InternalActionChild[]
   public deferredAfterHostChildren?: InternalActionChild[]
+  public deferredHostCommitCompleted?: boolean
   public deferredHostTransactionEvents?: GameEvent[]
   public deferredHostActionEvents?: GameEvent[]
   public deferredHostChoice?: string
@@ -111,7 +113,9 @@ export class ActionNode extends BaseNode {
       internalResultKey: this.internalResultKey,
       internalPaymentInfoFrom: this.internalPaymentInfoFrom,
       deferredHostResult: this.deferredHostResult,
+      deferredAfterHostCommitChildren: this.deferredAfterHostCommitChildren,
       deferredAfterHostChildren: this.deferredAfterHostChildren,
+      deferredHostCommitCompleted: this.deferredHostCommitCompleted,
       deferredHostTransactionEvents: this.deferredHostTransactionEvents,
       deferredHostActionEvents: this.deferredHostActionEvents,
       deferredHostChoice: this.deferredHostChoice,
