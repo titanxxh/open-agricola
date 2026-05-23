@@ -5,7 +5,6 @@ import type {
   ActionExecutionResult,
   ComplexCost,
   FarmTilePosition,
-  InternalActionChild,
   PlayerState,
   Resource,
 } from '../../contract/types'
@@ -20,7 +19,7 @@ import {
   getMaxBuildableRooms,
   resolveRoomPaymentSelection,
 } from '../payment/internal'
-import { buildPayChild, type PayChildOptions } from '../helpers/pay-child'
+import { buildInternalPayChild } from '../helpers/pay-child'
 import { playerBoard } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
@@ -48,21 +47,6 @@ const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
     result[key as keyof Resource] = value
   })
   return result
-}
-
-const buildInternalPayChild = (
-  options: PayChildOptions & { paymentChoice?: string },
-): InternalActionChild => {
-  const payChild = buildPayChild(options)
-  if (payChild.type !== 'leaf') {
-    throw new Error('Expected pay child leaf')
-  }
-  return {
-    actionId: payChild.actionId,
-    sourceCard: payChild.sourceCard,
-    params: payChild.params,
-    resultKey: 'payment',
-  }
 }
 
 const buildConstructPayCost = (
