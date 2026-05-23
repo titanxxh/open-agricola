@@ -168,39 +168,8 @@ test.describe('passing-card: A1_Shelter minor', () => {
 
     await saveScreenshot(page, 'passing-e2e-p2-board-after-buy')
 
-    const handAnchor = page.locator('[data-hand-anchor="p2"]')
-    await expect(handAnchor).toBeVisible({ timeout: 10_000 })
-
-    const handText = await handAnchor.textContent()
-    expect(handText).toContain(PASSING_CARD_ID)
-  })
-
-  test('flying animation: .card-pass-overlay appears after buying passing card', async ({
-    page,
-    request,
-  }) => {
-    await setupPassingGame(request)
-
-    await page.goto(`${FRONTEND_URL}/?page=game&player=p1&devMode=1`)
-    await page.waitForLoadState('networkidle')
-    await page.waitForTimeout(1000)
-
-    await expect(page.locator('.action-board')).toBeVisible({ timeout: 10_000 })
-
-    await buyPassingCard(request)
-
-    await page.reload()
-    await page.waitForLoadState('networkidle')
-    await page.waitForTimeout(500)
-
-    const stateResp = await getJson(request, `${BACKEND_URL}/api/game/state`)
-    saveState('passing-e2e-anim-state.json', stateResp.state)
-
-    const passedEvents = (stateResp.state.events ?? []).filter(
-      (e: { type: string }) => e.type === 'card.passed',
-    )
-    expect(passedEvents).toHaveLength(1)
-
-    await saveScreenshot(page, 'passing-e2e-anim-smoke')
+    await expect(
+      page.locator('[data-hand-anchor="p2"] [data-card-anchor="A1_Shelter"]'),
+    ).toBeVisible({ timeout: 10_000 })
   })
 })

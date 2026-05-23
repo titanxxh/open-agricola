@@ -8,7 +8,7 @@
 |---|---:|
 | BGA A-E canonical 卡牌 | 888 |
 | OA A-E canonical 卡牌定义 | 888 |
-| 自动 metadata 脚本 literal mismatch | 5 |
+| 自动 metadata 脚本 literal mismatch | 0 |
 | 自动 metadata 脚本 complex mismatch | 5 |
 | 其中 schema-up 已接受差异 | 4 |
 | 需要实现复核的卡牌 | 10 |
@@ -57,7 +57,7 @@
 | 类别 | 卡牌 |
 |---|---|
 | 用 schema-up metadata 替代 BGA custom `isBuyable` | `A3_PaperKnife`, `B56_Brook`, `B74_ThickForest`, `B154_SheepKeeper` |
-| 旧文档已接受的简化实现 | `A22_Telegram`, `A136_DrudgeryReeve`, `B27_Toolbox`, `B33_Mantlepiece`, `B85_FarmHand`, `B129_Seatmate`, `C22_BasketChair`, `C24_BedintheGrainField`, `C25_SteamMachine`, `C27_Blueprint`, `C42_RavenousHunger`, `C52_HuntsmansHat`, `C67_MineralFeeder`, `C69_LandConsolidation`, `C72_FestivalPlanning`, `C93_InnerDistrictsDirector`, `C120_AgriculturalLabourer`, `C133_Soldier`, `C146_WorkshopAssistant`, `C154_TwinResearcher`, `D1_ZigzagHarrow`, `D36_BreedRegistry`, `D101_SugarBaker`, `D132_HideFarmer`, `D161_CabbageBuyer`, `E112_GrainThief`, `E149_MidnightFencer` |
+| 旧文档已接受的简化实现 | `A22_Telegram`, `A136_DrudgeryReeve`, `B27_Toolbox`, `B33_Mantlepiece`, `B85_FarmHand`, `B129_Seatmate`, `C22_BasketChair`, `C24_BedintheGrainField`, `C25_SteamMachine`, `C27_Blueprint`, `C42_RavenousHunger`, `C52_HuntsmansHat`, `C67_MineralFeeder`, `C69_LandConsolidation`, `C72_FestivalPlanning`, `C93_InnerDistrictsDirector`, `C120_AgriculturalLabourer`, `C133_Soldier`, `C146_WorkshopAssistant`, `C154_TwinResearcher`, `D1_ZigzagHarrow`（passing 已对齐；harrow target 仍为简化）, `D36_BreedRegistry`, `D101_SugarBaker`, `D132_HideFarmer`, `D161_CabbageBuyer`, `E112_GrainThief`, `E149_MidnightFencer` |
 | field/cardField 作物约束差异 | `E70_CropRotationField`, `E72_ArtichokeField` |
 | BGA 未实现，但 OA 有产品扩展/重写 | `A113_HeresyTeacher`, `D25_WitchesDanceFloor` |
 | BGA banned，但 OA 保留 | `A131_CraftTeacher`, `A133_Braggart`, `A14_CarpentersHammer`, `A33_BigCountry`, `A39_Chapel`, `A48_ShavingHorse`, `A82_WorkCertificate`, `A97_Freshman`, `B10_Caravan`, `B117_Informant`, `B132_EstateMaster`, `B151_LittlePeasant`, `B15_CarpentersBench`, `B161_Weakling`, `B22_WalkingBoots`, `C102_TreeGuard`, `C125_Nightworker`, `C28_TeachersDesk`, `C31_WritingChamber`, `C3_CarriageTrip`, `C60_SmallPottersOven`, `C63_CraftBrewery`, `C99_GardenDesigner`, `D137_TradeTeacher`, `D19_PulverizerPlow`, `D21_Recruitment`, `D33_SummerHouse`, `D4_CrossCutWood`, `D74_RoyalWood`, `D92_ChildOmbudsman`, `D97_BeggingStudent`, `E22_GuestRoom` |
