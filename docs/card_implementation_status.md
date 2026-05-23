@@ -113,6 +113,9 @@
 10. ~~继续扩大 gain/exchange/action-space provenance 覆盖；已覆盖 B21 exchange grain、E47 action-space gain、C162 player action space、E78 batch exchange，并补齐本轮 A2-A6 支付、动物、food、building-resource、farm metadata 卡牌对 `actionEvents` 优先、`transactionEvents` 回退的消费模型。本轮补齐 B21 HayloftBarn 与 E47 SyrupTap 的 action-frame 事件优先读取，防止同一 transaction 中较早资源事件误触发当前 listener；同时补上生产卡牌 `context.result` 资源事实 fallback 审计。~~ ✅ 已落地：生产卡牌 `context.result` 资源事实 fallback 已由 `shared/cards/__tests__/provenance-result-audit.test.ts` 和 `pnpm run check:provenance-result-audit` 守住；现存 `context.result` 用途仅限 A94/D50 的 request-shape 调整和 B18/C148 的 ok guard，不作为资源来源。
 11. ~~决定 BGA `implemented=false` data-only 卡是否进入 OA 发牌池。~~ ✅ 已落地：`shared/session/state-bootstrap.ts` `dealHands()` 使用 `implementedMinorImprovementCards` / `implementedOccupationCards`，两者基于 `isImplementedCard(card.implemented !== false)` 过滤；`A169_OffSiter` 等 `implemented=false` 卡已排除出发牌池。
 12. ~~扩展结构化 action event/log event~~ ✅ 已关闭：所有 public/private event type 由 `event-mapping-policy` 覆盖，log / public notification / highlight / resource animation / replay 的 mapped、conditional、silent 边界均由测试 fixture 守住；当前未进入 log mapper 的 card/farm/future/worker/lifecycle event 已补齐可读 log 或显式静默策略。后续更丰富动画属于 enhancement，不再是基础设施开放 umbrella。
+13. ~~BGA-style pay child / internal children 机制~~ ✅ 已落地：public host action 负责业务 mutation，mandatory payment 通过 internal `pay` child 结算；`beforeHostListeners` / `afterHostListeners` 保留 BGA pay slot 差异；public action 顺序已修正为 `computeReplace -> before -> strict isDoable -> computeCosts -> execute -> during -> immediatelyAfter -> after`；`activate-card-effect` 通过 internal result map 读取 `paymentInfo`；`architecture-guard` 守住 deleted apply effects，不允许新增 top-level `apply-*` effect 文件来堆叠多卡逻辑。
+
+影响回归覆盖：`B65_GrainDepot` paymentInfo fee index、before-phase cards、renovation、improvement、occupation、construct、stables、fencing、`A34_Loppers` exact-wood、stable paid/free log pairing。
 
 ## 7. Log 系统对比
 
@@ -705,15 +708,15 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B178_TagAlong` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B179_WildBoarHunter` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B180_GameTeaser` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `C1_Overhaul` | 已对齐 | BGA passing 行为已实装（improvement host completion） |
+| `C1_Overhaul` | 已对齐 | BGA passing 行为由 improvement host action / pay child / activate-card-effect 处理 |
 | `C2_Stable` | 已对齐 |  |
 | `C3_CarriageTrip` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `C4_WritingBoards` | 已对齐 |  |
 | `C5_Remodeling` | 已对齐 |  |
-| `C6_StoneClearing` | 已对齐 | BGA passing 行为已实装（improvement host completion） |
+| `C6_StoneClearing` | 已对齐 | BGA passing 行为由 improvement host action / pay child / activate-card-effect 处理 |
 | `C7_BladeShears` | 已对齐 |  |
 | `C8_PlantFertilizer` | 已对齐 |  |
-| `C9_AutomaticWaterTrough` | 已对齐 | BGA passing 行为已实装（improvement host completion） |
+| `C9_AutomaticWaterTrough` | 已对齐 | BGA passing 行为由 improvement host action / pay child / activate-card-effect 处理 |
 | `C10_BunkBeds` | 已对齐 |  |
 | `C11_WildlifeReserve` | 已对齐 |  |
 | `C12_CattleFarm` | 已对齐 |  |
@@ -885,7 +888,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C178_OnSiteReverend` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `C179_BovinePioneer` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `C180_Trapper` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `D1_ZigzagHarrow` | 已对齐 | BGA passing 行为已实装（improvement host completion） |
+| `D1_ZigzagHarrow` | 已对齐 | BGA passing 行为由 improvement host action / pay child / activate-card-effect 处理 |
 | `D2_DwellingPlan` | 已对齐 |  |
 | `D3_Furrows` | 已对齐 |  |
 | `D4_CrossCutWood` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
@@ -1069,7 +1072,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `E2_RenovationMaterials` | 已对齐 |  |
 | `E3_TeaTime` | 已对齐 |  |
 | `E4_Thunderbolt` | 已对齐 |  |
-| `E5_NightLoot` | 已对齐 | BGA passing 行为已实装（improvement host completion） |
+| `E5_NightLoot` | 已对齐 | BGA passing 行为由 improvement host action / pay child / activate-card-effect 处理 |
 | `E6_Recount` | 已对齐 |  |
 | `E7_Pumpernickel` | 已对齐 |  |
 | `E8_FarmersMarket` | 已对齐 |  |
