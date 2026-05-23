@@ -12,7 +12,7 @@ import {
 // room-payment / cost-modifier internals) remain on the shim through S3.
 import { PaymentSolver } from '../payment'
 import { getCardModifiers } from '../../cards/card-modifiers'
-import { activateCard } from './activate-card'
+import { activateCardEffect } from './internal/activate-card-effect'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { incOccupationBuilt, recordDraftPlayed } from '../../session/stats'
 import { paymentInfoFromPayResult } from '../helpers/pay-child'
@@ -137,7 +137,7 @@ export const playOccupation = (
   })
   // Trigger onBuy hook — if it returns a flow, propagate it to the engine
   if (state) {
-    const activation = activateCard(state, player, occupation.id, 'onBuy')
+    const activation = activateCardEffect(state, player, occupation.id, 'onBuy')
     if (activation.type === 'flow') {
       return activation
     }
