@@ -516,8 +516,22 @@ export type ActionChoiceOption = {
  * Writes are shallow: top-level keys are merged, nested objects replace (not deep-merge).
  * Use plain JSON-serializable values; Map/Set/Date are not preserved across snapshot/rehydrate.
  */
+export type InternalActionChild = {
+  actionId: string
+  params?: Record<string, unknown>
+  sourceCard?: string
+  actionContext?: Record<string, unknown>
+  resultKey?: string
+  paymentInfoFrom?: string
+}
+
+export type InternalActionChildren = {
+  beforeHostListeners?: InternalActionChild[]
+  afterHostListeners?: InternalActionChild[]
+}
+
 export type ActionExecutionResult =
-  | { type: 'ok'; resourcesGained?: Partial<Resource>; resourcesPaid?: Partial<Resource>; extraData?: Record<string, unknown> }
+  | { type: 'ok'; resourcesGained?: Partial<Resource>; resourcesPaid?: Partial<Resource>; extraData?: Record<string, unknown>; internalChildren?: InternalActionChildren }
   | { type: 'request'; request: InteractionRequest; promptKey?: PromptKey; promptParams?: Record<string, unknown>; sourceCard?: string; extraData?: Record<string, unknown> }
   | { type: 'fail'; errorKey: string; recoverable?: boolean }
   | { type: 'flow'; flow: ActionFlow; extraData?: Record<string, unknown> }

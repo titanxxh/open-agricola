@@ -57,6 +57,9 @@ type ChoiceDataSnapshot = {
   effectiveOwnerPlayerId?: string
   sourceCard?: string
   syntheticKind?: PendingEnvelope['syntheticKind']
+  internalHostNodeId?: string
+  internalResultKey?: string
+  internalPaymentInfoFrom?: string
 }
 
 const cloneSnapshotValue = <T>(value: T): T =>
@@ -169,9 +172,14 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
           data.choiceLabelParams as Record<string, unknown> | undefined,
           data.actionContext as Record<string, unknown> | undefined,
           data.effectPreview as ActionNode['effectPreview'],
+          data.internalHostNodeId as string | undefined,
+          data.internalResultKey as string | undefined,
+          data.internalPaymentInfoFrom as string | undefined,
         )
         action.beforePhaseResolved = data.beforePhaseResolved === true
         action.emittedRequest = data.emittedRequest as InteractionRequest | undefined
+        action.deferredHostResult = data.deferredHostResult as ActionExecutionResult | undefined
+        action.deferredAfterHostChildren = data.deferredAfterHostChildren as ActionNode['deferredAfterHostChildren']
         node = action
         break
       }
@@ -239,6 +247,7 @@ export class Engine {
   private log: LogStore
   private events = new EventStore()
   private eventLogDerivations: EngineInternals['eventLogDerivations'] = []
+  private internalChildResults: EngineInternals['internalChildResults'] = new Map()
   private _pendingNodeIdRef: { value: string | null } = { value: null }
   private _counterRef: { value: number } = { value: 0 }
   private beforePhaseFlowNodeIds = new Set<string>()
@@ -261,6 +270,7 @@ export class Engine {
       log: this.log,
       events: this.events,
       eventLogDerivations: this.eventLogDerivations,
+      internalChildResults: this.internalChildResults,
       counterRef: this._counterRef,
       beforePhaseFlowNodeIds: this.beforePhaseFlowNodeIds,
       pendingNodeIdRef: this._pendingNodeIdRef,
@@ -572,6 +582,9 @@ export class Engine {
           effectiveOwnerPlayerId: snapshot.choiceData.effectiveOwnerPlayerId,
           contextSnapshot: snapshot.choiceData.contextSnapshot,
           syntheticKind: snapshot.choiceData.syntheticKind,
+          internalHostNodeId: snapshot.choiceData.internalHostNodeId,
+          internalResultKey: snapshot.choiceData.internalResultKey,
+          internalPaymentInfoFrom: snapshot.choiceData.internalPaymentInfoFrom,
         })
         legacyChoicePendingNodeId = node.id
       }

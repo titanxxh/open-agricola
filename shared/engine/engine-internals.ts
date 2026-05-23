@@ -27,6 +27,7 @@ export interface EngineInternals {
     events: GameEvent[]
     result: ActionExecutionResult
   }>
+  internalChildResults: Map<string, Record<string, ActionExecutionResult>>
   counterRef: { value: number }
   beforePhaseFlowNodeIds: Set<string>
   pendingNodeIdRef: { value: string | null }
