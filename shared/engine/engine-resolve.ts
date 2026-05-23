@@ -1043,10 +1043,9 @@ export function engineResolveChoice(
       : []
   // 7b1: insert flow body BEFORE the trailing hook nodes (followUps,
   // immediatelyAfter / after activate) so wrapper actions returning a
-  // flow (renovate-house seq, occupation seq, improvement-any seq) emit
-  // their `after` listener events on the post-mutate state. Insertion
-  // order via insertAfter prepends each batch to insertionTargetId+1, so
-  // the resulting layout is:
+  // flow emit their `after` listener events on the post-flow state.
+  // Insertion order via insertAfter prepends each batch to
+  // insertionTargetId+1, so the resulting layout is:
   //   [..., insertionTarget, hookFlows..., flowNode, trailingHooks..., ...]
   if (insertionTargetId) {
     const trailingHookNodes = [

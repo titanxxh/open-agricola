@@ -15,19 +15,15 @@ const isApplyRenovationParams = (raw: unknown): raw is ApplyRenovationParams => 
 }
 
 /**
- * Finalize leaf for the renovation flow. Sits inside `seq:[pay, apply-renovation]`
- * so the player's `houseType` is only mutated after the pay leaf has successfully
- * deducted resources. Mirrors `apply-improvement` in shape — the seq pattern keeps
- * `_pendingImprovementPaymentInfo`-style stash fields out of the renovation path
- * because nothing downstream needs the paymentInfo (no onBuy effects keyed on it).
+ * Legacy renovation finalizer retained until Task 9 while the apply-effect
+ * registration and tests still exist. Current runtime renovation is finalized by
+ * `renovate-house.completeInternalChildren` after its before-host pay child
+ * succeeds; new flows should not schedule `apply-renovation`.
  */
 export const applyRenovationAction: ActionDefinition = {
   id: 'apply-renovation',
-  // Inherit the renovate-house label so `flushLeafActionDetail` emits a
-  // `log.actionDetail` with action='actions.renovate-house.name' — A123 /
-  // B107 / FrameBuilder etc. parse that string to attribute their bonus
-  // contribution. Apply-renovation is the leaf where the actual renovation
-  // mutation happens, so it's the natural carrier for the detail flush.
+  // Inherit the renovate-house label for legacy direct executions so
+  // `flushLeafActionDetail` emits the same action detail key as renovation.
   nameKey: 'actions.renovate-house.name',
   descriptionKey: 'actions.apply-renovation.description',
   roundAvailable: 1,
