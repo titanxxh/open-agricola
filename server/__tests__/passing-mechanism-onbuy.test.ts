@@ -19,7 +19,7 @@ describe('passing-mechanism: C1_Overhaul complex onBuy', () => {
     state.players[0]!.occupationHand = ['__test_placeholder__']
     state.players[1]!.occupationHand = ['__test_placeholder__']
     state.players[0]!.occupationPlayed = ['__test_occ_a__', '__test_occ_b__']
-    state.players[0]!.resources.wood = 5
+    state.players[0]!.resources.wood = 4
     setFencesForTest(state.players[0]!, 3)
     session.loadState(state)
 
@@ -46,8 +46,7 @@ describe('passing-mechanism: C1_Overhaul complex onBuy', () => {
     expect(seqResp.interaction.playerIndex).toBe(0)
     expect(seqResp.interaction.request?.kind).toBe('farm-select')
 
-    // 执行 fence rebuild（注：passing 后 buyer 不再持有 C1，c1 discount listener 不触发，
-    // 属已知 gap，此处只验证 fence action 本身可执行）
+    // fence rebuild（actionContext.costOverride 在 capacity 内 buyer wood 不消耗）
     const fenceResp = session.resolveChoice(0, 'confirm', {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
@@ -58,9 +57,7 @@ describe('passing-mechanism: C1_Overhaul complex onBuy', () => {
     const buyer = fenceResp.state.players[0]!
     expect(getFenceCount(buyer)).toBe(4)
     expect(buyer.pastures).toHaveLength(1)
-
-    // c1Active flag 已清除
-    expect(buyer.cardStates?.['C1_Overhaul']?.extraData?.c1Active).toBeFalsy()
+    expect(buyer.resources.wood).toBe(3)
 
     // card.passed event 存在
     const passedEvents = fenceResp.state.events.filter((e) => e.type === 'card.passed')
