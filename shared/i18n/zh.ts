@@ -510,16 +510,6 @@ export const zh = {
     'emit-choice': { name: '卡牌抉择', description: '卡牌触发的玩家抉择' },
     selection: { name: '选择', description: '从手牌或农场中选择位置或卡牌' },
     'set-first-player': { name: '设为先手', description: '将该玩家设为新的先手玩家' },
-      'apply-improvement': {
-      description: '打出 1 张改良',
-          name: '打出改良',
-},
-    'apply-occupation-play': {
-      description: '打出 1 张职业',
-    },
-    'apply-renovation': {
-      description: '翻修',
-    },
     'build-farmhand-room': {
       description: '建造帮工房',
           name: '建造帮工房',

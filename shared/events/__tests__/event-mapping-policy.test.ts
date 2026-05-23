@@ -333,7 +333,6 @@ describe('event mapping policy', () => {
       'shared/events/event-mapping-policy.ts',
       'shared/events/log-mapper.ts',
       'shared/events/__tests__/log-mapper.test.ts',
-      'shared/actions/effects/apply-improvement.ts',
       'shared/actions/effects/improvement.ts',
       'server/__tests__/passing-mechanism-session.test.ts',
       'server/__tests__/passing-mechanism-onbuy.test.ts',

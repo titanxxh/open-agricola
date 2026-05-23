@@ -233,7 +233,7 @@ describe('occupation play result', () => {
         expect.objectContaining({
           type: 'card.played',
           cardId: SELF_AFTER_CARD_ID,
-          sourceActionId: 'apply-occupation-play',
+          sourceActionId: 'play-occupation',
           sourceCardId: SELF_AFTER_CARD_ID,
         }),
       ]))
