@@ -254,10 +254,10 @@ describe('A3_PaperKnife session-tier: BGA-aligned flow', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.sourceCard).toBe(SESSION_CARD_ID)
 
-    // A3 must have moved from minorHand to minorPlayed (standard onBuy cost commitment)
     const p0 = resp.state.players[0]!
     expect(p0.minorHand).not.toContain(SESSION_CARD_ID)
-    expect(p0.minorPlayed).toContain(SESSION_CARD_ID)
+    expect(p0.minorPlayed).not.toContain(SESSION_CARD_ID)
+    expect(resp.state.players[1]!.minorHand).toContain(SESSION_CARD_ID)
 
     // Wood cost paid (1 wood → 0)
     expect(p0.resources.wood).toBe(0)
