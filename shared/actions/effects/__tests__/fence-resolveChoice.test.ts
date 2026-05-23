@@ -84,9 +84,18 @@ describe('fenceAction.resolveChoice', () => {
     expect(result.type).toBe('ok')
     if (result.type !== 'ok') return
     expect(result.resourcesPaid).toEqual({ wood: 4 })
-    expect(ctx.player.resources.wood).toBe(0)
+    expect(ctx.player.resources.wood).toBe(4)
     expect(ctx.player.fenceSegments).toHaveLength(4)
     expect(ctx.player.pastures).toHaveLength(1)
+    expect(result.internalChildren?.afterHostListeners).toMatchObject([
+      {
+        actionId: 'pay',
+        params: {
+          costType: 'fencing',
+          optionPrefix: 'pay:fence',
+        },
+      },
+    ])
   })
 
   it('first call with multi-combo payment returns choice + actionContextWrite', () => {

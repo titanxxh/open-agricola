@@ -42,6 +42,7 @@ describe('fence payment session', () => {
       stone: 2,
     }
     player.activeModifiers = [...fenceTradeModifiers]
+    player.occupationPlayed.push('E108_BlackberryFarmer')
     storePendingFenceBonus(player, {
       sourceCard: 'TestFenceBonus',
       counterKey: 'fences',
@@ -80,6 +81,17 @@ describe('fence payment session', () => {
     expect(resp.state.players[0]!.resources.clay).toBe(2)
     expect(resp.state.players[0]!.resources.stone).toBe(0)
     expect(resp.state.players[0]!.fenceSegments).toHaveLength(4)
+
+    const fenceBuiltIndex = resp.state.events.findIndex((event) => event.type === 'farm.fenceBuilt')
+    const afterFencingIndex = resp.state.events.findIndex(
+      (event) => event.type === 'futureMeeple.queued' && event.sourceCardId === 'E108_BlackberryFarmer',
+    )
+    const paidIndex = resp.state.events.findIndex((event) => event.type === 'resource.paid' && event.paymentFor === 'fencing')
+    expect(fenceBuiltIndex).toBeGreaterThanOrEqual(0)
+    expect(afterFencingIndex).toBeGreaterThanOrEqual(0)
+    expect(paidIndex).toBeGreaterThanOrEqual(0)
+    expect(fenceBuiltIndex).toBeLessThan(afterFencingIndex)
+    expect(afterFencingIndex).toBeLessThan(paidIndex)
   })
 
   it('preserves palisade selection across fence payment-choice resolution', () => {

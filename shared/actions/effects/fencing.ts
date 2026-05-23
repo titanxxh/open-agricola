@@ -5,6 +5,7 @@ import type {
   ActionSpace,
   FenceSegment,
   GameState,
+  InternalActionChild,
   PlayerState,
   Resource,
 } from '../../contract/types'
@@ -15,9 +16,9 @@ import type {
 // call sites exist here yet.
 import {
   canAffordTypedFlatCost,
-  executeResolvedTypedFlatPayment,
   resolveTypedFlatPaymentSelection,
 } from '../payment/internal'
+import { buildPayChild, type PayChildOptions } from '../helpers/pay-child'
 import { playerBoard, normalizePlayerFarm } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { collectComputeCostsForFarmChoice } from '../../cards/card-listeners'
@@ -81,6 +82,21 @@ const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
     result[key as keyof Resource] = value
   })
   return result
+}
+
+const buildInternalPayChild = (
+  options: PayChildOptions & { paymentChoice?: string },
+): InternalActionChild => {
+  const payChild = buildPayChild(options)
+  if (payChild.type !== 'leaf') {
+    throw new Error('Expected pay child leaf')
+  }
+  return {
+    actionId: payChild.actionId,
+    sourceCard: payChild.sourceCard,
+    params: payChild.params,
+    resultKey: 'payment',
+  }
 }
 
 const computeFreeFenceTotal = (
@@ -152,34 +168,22 @@ const finalizeFence = (
     return { type: 'fail', errorKey: 'log.fencingFail' }
   }
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
-  executeResolvedTypedFlatPayment(nextPlayer, payment, 'fencing')
   const consumed = consumePendingFenceBonus(nextPlayer, validated.newFenceEdges.length)
   applyPlayerMutation(ctx.player, nextPlayer)
   const paidResources = positiveResources(payment.solution.resourcesPaid)
-  if (Object.keys(paidResources).length > 0) {
-    ctx.eventSink?.emit<'resource.paid'>({
-      type: 'resource.paid',
-      resources: paidResources,
-      paymentFor: 'fencing',
-      paymentSources: [{
-        from: { kind: 'player', playerId: ctx.player.id },
-        resources: paidResources,
-      }],
-    })
-  }
   const builtFences = [
     ...validated.newFenceEdges.map((edge) => ({ edge, type: 'fence' })),
     ...validated.newPalisadeEdges.map((edge) => ({ edge, type: 'palisade' })),
   ]
-	  if (builtFences.length > 0) {
-	    ctx.eventSink?.emit<'farm.fenceBuilt'>({
-	      type: 'farm.fenceBuilt',
-	      fences: builtFences,
-	      newFenceEdges: validated.newFenceEdges,
-	      newPastures: validated.newPastures,
-	    })
-	  }
-	  const extraData: Record<string, unknown> = {
+  if (builtFences.length > 0) {
+    ctx.eventSink?.emit<'farm.fenceBuilt'>({
+      type: 'farm.fenceBuilt',
+      fences: builtFences,
+      newFenceEdges: validated.newFenceEdges,
+      newPastures: validated.newPastures,
+    })
+  }
+  const extraData: Record<string, unknown> = {
     newFenceEdges: validated.newFenceEdges,
     newPalisadeEdges: validated.newPalisadeEdges,
     newPastures: validated.newPastures,
@@ -199,6 +203,18 @@ const finalizeFence = (
     type: 'ok',
     resourcesPaid: paidResources,
     extraData,
+    internalChildren: {
+      afterHostListeners: [
+        buildInternalPayChild({
+          cost: { fee: { wood: validated.payableWoodCost } },
+          costType: 'fencing',
+          optionPrefix: 'pay:fence',
+          paymentChoice,
+          sourceCard: ctx.sourceCard,
+          sourceActionId: ctx.space.id,
+        }),
+      ],
+    },
   }
 }
 

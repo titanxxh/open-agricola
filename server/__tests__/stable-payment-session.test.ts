@@ -36,6 +36,7 @@ describe('stable payment session', () => {
       clay: 2,
       stone: 2,
     }
+    player.minorPlayed.push('A74_StableTree')
     player.activeModifiers = [...stableTradeModifiers]
 
     session.loadState(state)
@@ -62,8 +63,9 @@ describe('stable payment session', () => {
     expect(resp.interaction.farm.farmType).toBe('stable')
     if (resp.interaction.farm.farmType !== 'stable') return
 
-    const stable = resp.interaction.farm.selectableTiles[0]!
-    resp = session.resolveChoice(0, 'confirm', { stables: [stable] })
+    const stables = resp.interaction.farm.selectableTiles.slice(0, 1)
+    expect(stables).toHaveLength(1)
+    resp = session.resolveChoice(0, 'confirm', { stables })
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
@@ -76,9 +78,20 @@ describe('stable payment session', () => {
 
     resp = session.resolveChoice(0, stoneOption!.value)
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.stableTiles).toContainEqual(stable)
+    expect(resp.state.players[0]!.stableTiles).toEqual(expect.arrayContaining(stables))
     expect(resp.state.players[0]!.resources.clay).toBe(2)
     expect(resp.state.players[0]!.resources.stone).toBe(0)
+
+    const stableBuiltIndex = resp.state.events.findIndex((event) => event.type === 'farm.stableBuilt')
+    const afterStablesIndex = resp.state.events.findIndex(
+      (event) => event.type === 'futureMeeple.queued' && event.sourceCardId === 'A74_StableTree',
+    )
+    const paidIndex = resp.state.events.findIndex((event) => event.type === 'resource.paid' && event.paymentFor === 'stables')
+    expect(stableBuiltIndex).toBeGreaterThanOrEqual(0)
+    expect(afterStablesIndex).toBeGreaterThanOrEqual(0)
+    expect(paidIndex).toBeGreaterThanOrEqual(0)
+    expect(stableBuiltIndex).toBeLessThan(afterStablesIndex)
+    expect(afterStablesIndex).toBeLessThan(paidIndex)
   })
 
   it('rejects empty stable selection on farm-expansion', () => {

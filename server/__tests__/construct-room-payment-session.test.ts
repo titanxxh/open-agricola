@@ -15,11 +15,12 @@ describe('construct room payment session', () => {
     player.resources = {
       ...player.resources,
       wood: 1,
-      stone: 5,
+      clay: 5,
       reed: 2,
     }
-    player.houseType = 'stone'
+    player.houseType = 'clay'
     player.occupationPlayed.push('A123_FrameBuilder')
+    player.occupationPlayed.push('A110_Roughcaster')
     player.activeModifiers = [
       ...((A123_FrameBuilder as unknown as { modifiers: PlayerState['activeModifiers'] }).modifiers ?? []),
     ]
@@ -51,10 +52,10 @@ describe('construct room payment session', () => {
     const woodSwapOption = resp.interaction.options?.find(
       (option) =>
         typeof option.labelParams === 'object' &&
-        typeof (option.labelParams as { resourcesPaid?: { wood?: number; stone?: number } }).resourcesPaid?.stone === 'number' &&
-        typeof (option.labelParams as { resourcesPaid?: { wood?: number; stone?: number } }).resourcesPaid?.wood === 'number' &&
-        (option.labelParams as { resourcesPaid?: { wood?: number; stone?: number } }).resourcesPaid?.stone === 3 &&
-        (option.labelParams as { resourcesPaid?: { wood?: number; stone?: number } }).resourcesPaid?.wood === 1,
+        typeof (option.labelParams as { resourcesPaid?: { wood?: number; clay?: number } }).resourcesPaid?.clay === 'number' &&
+        typeof (option.labelParams as { resourcesPaid?: { wood?: number; clay?: number } }).resourcesPaid?.wood === 'number' &&
+        (option.labelParams as { resourcesPaid?: { wood?: number; clay?: number } }).resourcesPaid?.clay === 3 &&
+        (option.labelParams as { resourcesPaid?: { wood?: number; clay?: number } }).resourcesPaid?.wood === 1,
     )
     expect(woodSwapOption).toBeDefined()
 
@@ -62,9 +63,20 @@ describe('construct room payment session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.rooms).toBe(3)
     expect(resp.state.players[0]!.resources.wood).toBe(0)
-    expect(resp.state.players[0]!.resources.stone).toBe(2)
-    expect(resp.state.players[0]!.resources.clay).toBe(0)
+    expect(resp.state.players[0]!.resources.clay).toBe(2)
+    expect(resp.state.players[0]!.resources.stone).toBe(0)
     expect(resp.state.players[0]!.resources.reed).toBe(0)
+
+    const roomBuiltIndex = resp.state.events.findIndex((event) => event.type === 'farm.roomBuilt')
+    const paidIndex = resp.state.events.findIndex((event) => event.type === 'resource.paid' && event.paymentFor === 'construct')
+    const afterConstructIndex = resp.state.events.findIndex(
+      (event) => event.type === 'card.triggered' && event.sourceCardId === 'A110_Roughcaster',
+    )
+    expect(roomBuiltIndex).toBeGreaterThanOrEqual(0)
+    expect(paidIndex).toBeGreaterThanOrEqual(0)
+    expect(afterConstructIndex).toBeGreaterThanOrEqual(0)
+    expect(roomBuiltIndex).toBeLessThan(paidIndex)
+    expect(paidIndex).toBeLessThan(afterConstructIndex)
   })
 
   it('requires farm-expansion room mode to build at least one room', () => {
