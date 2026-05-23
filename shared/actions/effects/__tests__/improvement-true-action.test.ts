@@ -82,7 +82,7 @@ const resolve = (
 }
 
 describe('improvement trueAction context', () => {
-  it('propagates params.trueAction=false to the generated payment and apply leaves', () => {
+  it('propagates params.trueAction=false to the generated payment and activation leaves', () => {
     const result = resolve({
       allowedPurchases: ['Major_ClayOven'],
       trueAction: false,
@@ -90,47 +90,51 @@ describe('improvement trueAction context', () => {
 
     expect(result.type).toBe('ok')
     if (result.type !== 'ok') return
-    expect(result.internalChildren).toMatchObject({
-      beforeHostListeners: [
-        {
-          actionId: 'pay',
-          actionContext: {
-            costType: 'major-improvement',
-            improvementKind: 'major',
-            trueAction: false,
-          },
-          resultKey: 'payment',
+    expect(result.internalChildren?.beforeHostListeners).toMatchObject([
+      {
+        actionId: 'pay',
+        actionContext: {
+          costType: 'major-improvement',
+          improvementKind: 'major',
+          trueAction: false,
         },
-        {
-          actionId: 'apply-improvement',
-          params: { improvementId: 'Major_ClayOven', kind: 'major' },
-          actionContext: { trueAction: false },
-          paymentInfoFrom: 'payment',
-        },
-      ],
-    })
+        resultKey: 'payment',
+      },
+    ])
+    expect(result.internalChildren?.afterHostListeners).toMatchObject([
+      {
+        actionId: 'activate-card-effect',
+        params: { cardId: 'Major_ClayOven', hook: 'onBuy' },
+        paymentInfoFrom: 'payment',
+      },
+    ])
+    expect(result.internalChildren?.beforeHostListeners).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ actionId: 'apply-improvement' })]),
+    )
   })
 
-  it('propagates actionContext.trueAction=false to the generated payment and apply leaves', () => {
+  it('propagates actionContext.trueAction=false to the generated payment and activation leaves', () => {
     const result = resolve({ allowedPurchases: ['Major_ClayOven'] }, { trueAction: false })
 
     expect(result.type).toBe('ok')
     if (result.type !== 'ok') return
-    expect(result.internalChildren).toMatchObject({
-      beforeHostListeners: [
-        {
-          actionId: 'pay',
-          actionContext: {
-            trueAction: false,
-          },
-          resultKey: 'payment',
+    expect(result.internalChildren?.beforeHostListeners).toMatchObject([
+      {
+        actionId: 'pay',
+        actionContext: {
+          trueAction: false,
         },
-        {
-          actionId: 'apply-improvement',
-          actionContext: { trueAction: false },
-          paymentInfoFrom: 'payment',
-        },
-      ],
-    })
+        resultKey: 'payment',
+      },
+    ])
+    expect(result.internalChildren?.afterHostListeners).toMatchObject([
+      {
+        actionId: 'activate-card-effect',
+        paymentInfoFrom: 'payment',
+      },
+    ])
+    expect(result.internalChildren?.beforeHostListeners).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ actionId: 'apply-improvement' })]),
+    )
   })
 })
