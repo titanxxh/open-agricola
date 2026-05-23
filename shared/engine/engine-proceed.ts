@@ -1278,10 +1278,8 @@ export function engineProceed(
       : []
     // 7b1: when the action returns a `flow`, the wrapper action's `after`
     // / `immediatelyAfter` listeners (and follow-ups) must observe the
-    // post-flow state — for renovate-house → seq:[pay, apply-renovation],
-    // listeners that read `player.houseType` would otherwise see the
-    // pre-mutate snapshot. We therefore insert flow body FIRST (last call
-    // wins via insertAfter), and trailing hooks AFTER the flow.
+    // post-flow state. We therefore insert flow body FIRST (last call wins via
+    // insertAfter), and trailing hooks AFTER the flow.
     const trailingHookNodes = [
       ...buildFollowUpNodes(int, followUps, node.id, context.player, context.state),
       ...immediateActivateNodes,

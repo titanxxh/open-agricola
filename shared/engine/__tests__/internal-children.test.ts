@@ -354,6 +354,96 @@ describe('engine internal children', () => {
     ])
   })
 
+  it('runs a host finalizer after delayed internal child success before host after listeners', () => {
+    const events: string[] = []
+    const hostAction: ActionDefinition = {
+      id: 'host-finalizer-slot',
+      nameKey: 'test.hostFinalizer',
+      descriptionKey: 'test.hostFinalizer',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('host.execute')
+        return {
+          type: 'ok',
+          internalChildren: {
+            beforeHostListeners: [
+              { actionId: 'internal-pay-probe', resultKey: 'payment' },
+            ],
+          },
+        }
+      },
+      completeInternalChildren: ({ player }, result, internalResults) => {
+        const payment = internalResults.payment
+        const paidFood = payment?.type === 'ok' ? payment.resourcesPaid?.food : undefined
+        events.push(`host.finalizer.payment=${paidFood ?? 'missing'}`)
+        player.resources.wood = 7
+        return result
+      },
+    }
+    const payProbe: ActionDefinition = {
+      id: 'internal-pay-probe',
+      nameKey: 'test.payProbe',
+      descriptionKey: 'test.payProbe',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('internal-pay-probe.execute')
+        return {
+          type: 'request',
+          promptKey: 'prompt.selectPayment',
+          request: {
+            kind: 'choice',
+            options: [{ value: 'pay-two', labelKey: 'test.payTwo' }],
+          },
+        }
+      },
+      resolveChoice: () => {
+        events.push('internal-pay-probe.resolve')
+        return { type: 'ok', resourcesPaid: { food: 2 } }
+      },
+    }
+    registerActionHook({
+      id: 'host-finalizer-after',
+      actions: ['host-finalizer-slot'],
+      phases: ['after'],
+      handler: (context) => {
+        events.push(`host.after.wood=${context.player.resources.wood}`)
+      },
+    })
+    const state = createState()
+    const player = createPlayer()
+    state.players = [player]
+    const space = createSpace(hostAction)
+    const engine = buildEngine([hostAction, payProbe], hostAction.id)
+
+    expect(engine.proceed({ state, player, space }).type).toBe('ok')
+    const pendingStep = engine.proceed({ state, player, space })
+
+    expect(pendingStep.type).toBe('choice')
+    expect(player.resources.wood).toBe(0)
+    expect(events).toEqual([
+      'host.execute',
+      'internal-pay-probe.execute',
+    ])
+
+    expect(engine.resolveChoice('pay-two', { state, player, space }).type).toBe('ok')
+    expect(player.resources.wood).toBe(0)
+    const finalStep = runUntilDone(engine, { state, player, space })
+
+    expect(finalStep.type).toBe('done')
+    expect(player.resources.wood).toBe(7)
+    expect(events).toEqual([
+      'host.execute',
+      'internal-pay-probe.execute',
+      'internal-pay-probe.resolve',
+      'host.finalizer.payment=2',
+      'host.after.wood=7',
+    ])
+  })
+
   it('restores completed internal child results before executing following siblings', () => {
     const events: string[] = []
     const hostAction: ActionDefinition = {
