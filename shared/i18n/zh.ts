@@ -499,6 +499,7 @@ export const zh = {
     'scythe-harvest-field': { name: '镰刀收割', description: '一次收完一块田顶层的所有作物' },
     'swap-field-grain-to-veg': { name: '田地置换', description: '把一块满谷物田换成一格蔬菜' },
     'special-effect': { name: '卡牌效果', description: '触发来源卡牌的特殊状态变更' },
+    'activate-card-effect': { name: '触发卡牌效果', description: '执行内部卡牌效果 hook' },
     'recall-placed-worker': { name: '召回工人', description: '将一个已放置的工人收回家中' },
     'discard-from-hand': { name: '弃手牌', description: '从手牌中弃掉 1 张' },
     'reserve-fence-bonus': { name: '预留围栏优惠', description: '为当前围栏行动预留来源卡牌上的免费围栏' },
