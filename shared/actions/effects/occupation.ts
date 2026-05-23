@@ -169,6 +169,7 @@ const commitOccupationPlay = (
   state: GameState,
   player: PlayerState,
   occupationId: string,
+  sourceCard?: string,
   actionContext?: Record<string, unknown>,
   emitPrivateEvent?: (event: ReturnType<typeof cardEffectHandChangedEvent>) => void,
   eventSink?: EventSink,
@@ -189,6 +190,9 @@ const commitOccupationPlay = (
     cardId: occupationId,
     cardType: 'occupation',
   })
+  if (sourceCard && sourceCard !== occupationId) {
+    addCardResourceGained(player, sourceCard, { occupation: 1 })
+  }
   return { type: 'ok' }
 }
 
@@ -281,6 +285,7 @@ export const canAffordOccupationActionCost = (
 
 type OccupationCommitData = {
   occupationId: string
+  sourceCard?: string
   actionContext?: Record<string, unknown>
 }
 
@@ -293,6 +298,7 @@ const readOccupationCommitData = (
   if (typeof data.occupationId !== 'string') return null
   return {
     occupationId: data.occupationId,
+    sourceCard: typeof data.sourceCard === 'string' ? data.sourceCard : undefined,
     actionContext: data.actionContext && typeof data.actionContext === 'object'
       ? data.actionContext as Record<string, unknown>
       : undefined,
@@ -399,16 +405,6 @@ export const playOccupationAction: ActionDefinition = {
     const finalCost: ComplexCost = PaymentSolver.isComplexCost(resolvedCost)
       ? resolvedCost
       : { fee: resolvedCost as Partial<PlayerState['resources']> }
-    if (
-      sourceCard
-      && sourceCard !== choice
-    ) {
-      // BGA-style gained.occupation: when a card causes an occupation to be
-      // played as a side-effect, the sourceCard accumulates +1. Track here
-      // (pre-pay) so the credit is not lost if pay later fails — matches
-      // legacy mutate-in-place semantics.
-      addCardResourceGained(player, sourceCard, { occupation: 1 })
-    }
     const childContext = compactContext(privateHandChangeContext(
       sourceCard,
       choice,
@@ -419,6 +415,7 @@ export const playOccupationAction: ActionDefinition = {
       extraData: {
         occupationCommit: {
           occupationId: choice,
+          ...(sourceCard && sourceCard !== choice ? { sourceCard } : {}),
           ...(childContext ? { actionContext: childContext } : {}),
         },
       },
@@ -434,6 +431,7 @@ export const playOccupationAction: ActionDefinition = {
       state,
       player,
       data.occupationId,
+      data.sourceCard,
       data.actionContext,
       emitPrivateEvent,
       eventSink,
