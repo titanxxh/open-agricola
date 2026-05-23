@@ -584,7 +584,7 @@ anytime                  额外注册的 anytime 行动
 7. 然后执行 strict `isDoable`：base `canBeExecutedByPlayer` → costPreview → action hook `isDoable` → card listener `isDoable`。这一步必须读取 `before` 已真实修改后的 state；如果仍不可达，不能继续原 action。
 8. 然后执行 `computeCosts`，把费用覆盖写入本次 `executionContext.costs`。因此 before unlocker / resource gain / exchange 可以先改变真实 state，再影响后续 strict doable 与费用枚举。
 9. 随后执行 action 本体：`getBaseChoiceOptions` opt-in path 先走 `computeChoiceCandidates`，否则走 `ActionDefinition.execute()`；`resolveChoice` continuation 也按同一条 public action 顺序恢复，先完成 pending 选择，再继续 host internal children / trailing phases。`execute()` 或 `resolveChoice()` 返回 request 时创建 pending；无 request 时继续 `during` / `immediatelyAfter` / `after`。
-10. `during` / `immediatelyAfter` / `after` 是 host action 成功后的 trailing phases；它们只在 strict doable、costs、host mutation 和必要 internal settlement 都成功后运行。
+10. `during` / `immediatelyAfter` / `after` 是 host action 成功后的 trailing phases；`beforeHostListeners` settlement 必须先完成，`afterHostListeners` settlement 则故意保留在 BGA slot 中，等 host `after` 之后再运行。
 11. `activate-card` 是 internal leaf，绕过上述 public action 流水线：只执行指定 listener body，并把 listener 返回的 `flow` / `followUpActions` 交回 engine 插入执行。
 
 作用域 scope：`player` / `opponent` / `any`。card listener 匹配层按 listener id 确定性枚举；phase trailing node 构建层再按 owner 分组（global → active player → 其他玩家），组内按 legacy `order` 降序、卡牌 play order、匹配序稳定排序。需要玩家决定同组 trigger 顺序时，用 `dispatchMode: 'select'` 进入 trigger-select，而不是依赖隐式排序表达规则选择。
