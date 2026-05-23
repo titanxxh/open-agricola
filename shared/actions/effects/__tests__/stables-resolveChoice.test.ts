@@ -75,8 +75,16 @@ describe('stablesAction.resolveChoice', () => {
     if (result.type !== 'ok') return
     expect(result.resourcesPaid).toEqual({ wood: 2 })
     expect(ctx.player.stableTiles.some((t) => t.row === 0 && t.col === 0)).toBe(true)
-    // 2 wood paid (default cost) out of 4 wood available.
-    expect(ctx.player.resources.wood).toBe(2)
+    expect(ctx.player.resources.wood).toBe(4)
+    expect(result.internalChildren?.afterHostListeners).toMatchObject([
+      {
+        actionId: 'pay',
+        params: {
+          costType: 'stables',
+          optionPrefix: 'pay:stable',
+        },
+      },
+    ])
   })
 
   it('first call with multi-combo trade modifier returns choice + actionContextWrite', () => {

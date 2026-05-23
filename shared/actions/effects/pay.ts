@@ -40,6 +40,7 @@ export type PayParams = {
   costType?: CostModifierType
   optionPrefix?: string
   paymentChoice?: string
+  sourceActionId?: string
   includeReturnedCard?: boolean
   playedCards?: string[]
 }
@@ -83,6 +84,7 @@ const PAY_PARAM_KEYS = new Set([
   'costType',
   'optionPrefix',
   'paymentChoice',
+  'sourceActionId',
   'includeReturnedCard',
   'playedCards',
 ])
@@ -130,6 +132,7 @@ const emitPaidEvent = (
   resources: Partial<Resource>,
   costType: CostModifierType | undefined,
   sourceCard: string | undefined,
+  sourceActionId: string | undefined,
   provenance: {
     bonusUsed?: string
     bonusChoiceIndex?: Record<string, number>
@@ -146,6 +149,7 @@ const emitPaidEvent = (
   ) return
   eventSink?.emit<'resource.paid'>({
     type: 'resource.paid',
+    ...(sourceActionId ? { sourceActionId } : {}),
     resources: paid,
     to: { kind: 'supply' },
     paymentFor: paymentPurpose(costType),
@@ -167,6 +171,7 @@ const buildSelectedResult = (
   state: import('../../contract/types').GameState,
   includeReturnedCard?: boolean,
   eventSink?: EventSink,
+  sourceActionId?: string,
 ): ActionExecutionResult => {
   executePaymentSolution(player, solution, { costType, state })
   if (includeReturnedCard && solution.cardUsed) {
@@ -176,7 +181,7 @@ const buildSelectedResult = (
   if (sourceCard) {
     addCardResourcePaid(player, sourceCard, resourcesPaid)
   }
-  emitPaidEvent(eventSink, player, resourcesPaid, costType, sourceCard, {
+  emitPaidEvent(eventSink, player, resourcesPaid, costType, sourceCard, sourceActionId, {
     bonusUsed: solution.bonusUsed,
     bonusChoiceIndex: solution.bonusChoiceIndex,
     returnedCardId: solution.cardUsed,
@@ -268,6 +273,7 @@ export const payAction: ActionDefinition = {
         state,
         p.includeReturnedCard,
         eventSink,
+        p.sourceActionId,
       )
     }
     const flat = p.cost as Partial<Resource>
@@ -290,7 +296,7 @@ export const payAction: ActionDefinition = {
       if (detailed.cardUsed) extraData.returnedCardId = detailed.cardUsed
       if (detailed.feeIndex !== undefined) extraData.feeIndex = detailed.feeIndex
       if (detailed.bonusChoiceIndex) extraData.bonusChoiceIndex = detailed.bonusChoiceIndex
-      emitPaidEvent(eventSink, player, resourcesPaid, p.costType, sourceCard, {
+      emitPaidEvent(eventSink, player, resourcesPaid, p.costType, sourceCard, p.sourceActionId, {
         bonusUsed: detailed.bonusUsed,
         bonusChoiceIndex: detailed.bonusChoiceIndex,
         returnedCardId: detailed.cardUsed,
@@ -305,7 +311,7 @@ export const payAction: ActionDefinition = {
       return { type: 'fail', errorKey: 'log.payFail' }
     }
     payResources(player, flat)
-    emitPaidEvent(eventSink, player, flat, p.costType, sourceCard)
+    emitPaidEvent(eventSink, player, flat, p.costType, sourceCard, p.sourceActionId)
     if (sourceCard) {
       addCardResourcePaid(player, sourceCard, flat)
       return { type: 'ok', resourcesPaid: flat }
@@ -370,6 +376,7 @@ export const payAction: ActionDefinition = {
       state,
       p.includeReturnedCard,
       eventSink,
+      p.sourceActionId,
     )
   },
 }

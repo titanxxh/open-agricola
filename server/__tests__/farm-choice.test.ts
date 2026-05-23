@@ -72,17 +72,26 @@ describe('farm choice', () => {
     expect(interaction.farmType).toBe('room')
     if (interaction.farmType !== 'room') return
 
-    // Single combo (1 wood + 3 clay + 2 reed → 0 left of all) finalizes
-    // immediately; no payment-choice prompt needed.
+    // Single combo resolves immediately and schedules payment as a pay child.
     const result = constructAction.resolveChoice!(buildRoomCtx(player), 'confirm', {
       rooms: [interaction.selectableTiles[0]!],
     })
 
     expect(result.type).toBe('ok')
-    expect(player.resources.wood).toBe(0)
-    expect(player.resources.clay).toBe(0)
-    expect(player.resources.reed).toBe(0)
+    expect(player.resources.wood).toBe(1)
+    expect(player.resources.clay).toBe(3)
+    expect(player.resources.reed).toBe(2)
     expect(player.rooms).toBe(3)
+    if (result.type !== 'ok') return
+    expect(result.internalChildren?.beforeHostListeners).toMatchObject([
+      {
+        actionId: 'pay',
+        params: {
+          costType: 'construct',
+          optionPrefix: 'pay:room',
+        },
+      },
+    ])
   })
 
   it('requires an explicit payment choice when multiple room payments are legal', () => {
