@@ -778,81 +778,97 @@ export function engineResolveChoice(
       skipBeforeTriggers: true,
     }
   }
-  const skipBefore = pendingActionNode?.beforePhaseResolved === true
-  const beforeEventReadContext = currentEventReadContext(int)
-  const beforePhase = skipBefore
-    ? { matchedListeners: [] }
-    : int.hooks.before({ ...executionContext, ...beforeEventReadContext, actionId })
-  const beforeBaseEvent = buildListenerEvent(executionContext, {})
-  const beforeActivateNodes = buildPhaseTrailingNodes(
-    int,
-    beforePhase.matchedListeners,
-    'before',
-    actionId,
-    context.state,
-    beforeBaseEvent,
-    executionContext.player.id,
-    beforeEventReadContext.transactionEvents,
-  )
-  if (beforeActivateNodes.length > 0 && pendingActionNode && !pendingActionNode.beforePhaseResolved) {
-    pendingActionNode.beforePhaseResolved = true
-    int.tree.insertBefore(pendingActionNode.id, beforeActivateNodes)
-    return { type: 'ok' }
-  }
-  const doable = int.hooks.applyIsDoable(
-    { ...executionContext, ...currentEventReadContext(int), actionId },
-    action,
-    action.canBeExecutedByPlayer(
-      executionContext.state,
-      executionContext.player,
-      {
-        sourceCard: executionContext.sourceCard,
-        actionContext: executionContext.actionContext,
+  let committedActionId = actionId
+  let committedAction = action
+  if (choice !== 'cancel') {
+    const replaceResult = int.hooks.applyComputeReplace({
+      ...executionContext,
+      ...currentEventReadContext(int),
+      actionId,
+    })
+    committedActionId = replaceResult.actionId
+    executionContext.sourceCard = replaceResult.sourceCard ?? executionContext.sourceCard
+    const replacementAction = int.registry.get(committedActionId)
+    if (!replacementAction) {
+      return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
+    }
+    committedAction = replacementAction
+    const skipBefore = pendingActionNode?.beforePhaseResolved === true
+    const beforeEventReadContext = currentEventReadContext(int)
+    const beforePhase = skipBefore
+      ? { matchedListeners: [] }
+      : int.hooks.before({ ...executionContext, ...beforeEventReadContext, actionId: committedActionId })
+    const beforeBaseEvent = buildListenerEvent(executionContext, {})
+    const beforeActivateNodes = buildPhaseTrailingNodes(
+      int,
+      beforePhase.matchedListeners,
+      'before',
+      committedActionId,
+      context.state,
+      beforeBaseEvent,
+      executionContext.player.id,
+      beforeEventReadContext.transactionEvents,
+    )
+    if (beforeActivateNodes.length > 0 && pendingActionNode && !pendingActionNode.beforePhaseResolved) {
+      pendingActionNode.beforePhaseResolved = true
+      int.tree.insertBefore(pendingActionNode.id, beforeActivateNodes)
+      return { type: 'ok' }
+    }
+    const doable = int.hooks.applyIsDoable(
+      { ...executionContext, ...currentEventReadContext(int), actionId: committedActionId },
+      committedAction,
+      committedAction.canBeExecutedByPlayer(
+        executionContext.state,
+        executionContext.player,
+        {
+          sourceCard: executionContext.sourceCard,
+          actionContext: executionContext.actionContext,
+        },
+      ),
+    )
+    if (!doable) {
+      return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
+    }
+    const costResults = int.hooks.computeCosts({
+      ...executionContext,
+      ...currentEventReadContext(int),
+      actionId: committedActionId,
+    })
+    const costOverride = costResults.reduce<Partial<PlayerState['resources']>>(
+      (acc, entry) => {
+        if (!entry.costs) return acc
+        Object.entries(entry.costs).forEach(([key, value]) => {
+          if (typeof value !== 'number') return
+          const resourceKey = key as keyof PlayerState['resources']
+          acc[resourceKey] = (acc[resourceKey] ?? 0) + value
+        })
+        return acc
       },
-    ),
-  )
-  if (!doable) {
-    return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
+      {},
+    )
+    executionContext.costs =
+      Object.keys(costOverride).length > 0 ? costOverride : undefined
   }
-  const costResults = int.hooks.computeCosts({
-    ...executionContext,
-    ...currentEventReadContext(int),
-    actionId,
-  })
-  const costOverride = costResults.reduce<Partial<PlayerState['resources']>>(
-    (acc, entry) => {
-      if (!entry.costs) return acc
-      Object.entries(entry.costs).forEach(([key, value]) => {
-        if (typeof value !== 'number') return
-        const resourceKey = key as keyof PlayerState['resources']
-        acc[resourceKey] = (acc[resourceKey] ?? 0) + value
-      })
-      return acc
-    },
-    {},
-  )
-  executionContext.costs =
-    Object.keys(costOverride).length > 0 ? costOverride : undefined
   pendingHost?.clearPending()
   let result: ActionExecutionResult
   let eventFrame: ReturnType<EngineInternals['events']['beginFrame']> | null = null
   let completedEvents: GameEvent[] = []
-  if (action.resolveChoice) {
+  if (committedAction.resolveChoice) {
     eventFrame = int.events.beginFrame({
       actorPlayerId: executionContext.player.id,
-      sourceActionId: actionId,
+      sourceActionId: committedActionId,
       sourceCardId: executionContext.sourceCard,
     })
     const eventBuffer = createBufferedEventSink()
     result = withInjectedAnytimeResultFlag(
-      action.resolveChoice({
+      committedAction.resolveChoice({
         ...executionContext,
         eventSink: eventBuffer.sink,
       }, choice, payload),
       executionContext.actionContext,
     )
     if (result.type !== 'fail' && result.type !== 'request') {
-      emitCardTriggered(int, eventFrame.sink, executionContext, actionId)
+      emitCardTriggered(int, eventFrame.sink, executionContext, committedActionId)
     }
     if (result.type !== 'fail') {
       eventBuffer.flushTo(eventFrame.sink)
@@ -882,7 +898,7 @@ export function engineResolveChoice(
       int,
       pendingHost,
       result,
-      actionId,
+      committedActionId,
       executionContext,
       currentEventReadContext(int).transactionEvents,
       completedEvents,
@@ -903,7 +919,7 @@ export function engineResolveChoice(
     int.tree.insertAfter(insertAnchor, [...beforeHostNodes, deferredHostNode])
     return result
   }
-  int.hooks.during({ ...executionContext, ...currentEventReadContext(int, completedEvents), actionId }, result)
+  int.hooks.during({ ...executionContext, ...currentEventReadContext(int, completedEvents), actionId: committedActionId }, result)
   if (result.type === 'fail' && result.recoverable === true && pendingHost && pendingEnvelope) {
     const contextSnapshot = pendingEnvelope.contextSnapshot as InteractionContextSnapshot | undefined
     applyInteractionRequest(int, {
@@ -913,7 +929,7 @@ export function engineResolveChoice(
       promptKey: pendingEnvelope.promptKey,
       promptParams: pendingEnvelope.promptParams,
       choiceOptions: pendingEnvelopeChoices(pendingEnvelope),
-      actionId,
+      actionId: committedActionId,
       ownerNodeId: pendingEnvelope.ownerNodeId ?? null,
       preserveOwner: true,
       params: contextSnapshot?.params,
@@ -943,7 +959,7 @@ export function engineResolveChoice(
       promptKey: result.promptKey,
       promptParams: result.promptParams,
       choiceOptions: requestOptions,
-      actionId,
+      actionId: committedActionId,
       ownerNodeId: pendingEnvelope?.ownerNodeId ?? null,
       preserveOwner: true,
       params: executionContext.params,
@@ -958,12 +974,12 @@ export function engineResolveChoice(
   const insertionTargetId = pendingEnvelope?.ownerNodeId ?? pendingHost?.id ?? int.pendingNodeIdRef.value
   const eventReadContext = currentEventReadContext(int, completedEvents)
   const immediatePhase = int.hooks.immediatelyAfter(
-    { ...executionContext, ...eventReadContext, actionId, choice },
+    { ...executionContext, ...eventReadContext, actionId: committedActionId, choice },
     result,
     choice,
   )
   const afterPhase = int.hooks.after(
-    { ...executionContext, ...eventReadContext, actionId, choice },
+    { ...executionContext, ...eventReadContext, actionId: committedActionId, choice },
     result,
     choice,
   )
@@ -996,7 +1012,7 @@ export function engineResolveChoice(
     int,
     immediatePhase.matchedListeners,
     'immediatelyAfter',
-    actionId,
+    committedActionId,
     context.state,
     baseEvent2,
     executionContext.player.id,
@@ -1008,7 +1024,7 @@ export function engineResolveChoice(
     int,
     afterPhase.matchedListeners,
     'after',
-    actionId,
+    committedActionId,
     context.state,
     baseEvent2,
     executionContext.player.id,
