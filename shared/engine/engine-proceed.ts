@@ -305,6 +305,25 @@ const recordInternalChildResult = (
   int.internalChildResults.set(node.internalHostNodeId, hostResults)
 }
 
+const blockingBeforeHostChildResult = (
+  int: EngineInternals,
+  node: ActionNode,
+): Extract<ActionExecutionResult, { type: 'fail' }> | null => {
+  const result = node.deferredHostResult
+  if (result?.type !== 'ok') return null
+  const requiredChildren =
+    result.internalChildren?.beforeHostListeners?.filter((child) => child.resultKey) ?? []
+  if (requiredChildren.length === 0) return null
+  const hostResults = int.internalChildResults.get(node.internalHostNodeId ?? node.id) ?? {}
+  for (const child of requiredChildren) {
+    const childResult = hostResults[child.resultKey!]
+    if (!childResult) return { type: 'fail', errorKey: 'log.payFail' }
+    if (childResult.type === 'fail') return childResult
+    if (childResult.type !== 'ok') return { type: 'fail', errorKey: 'log.payFail' }
+  }
+  return null
+}
+
 const copyInternalMetadataToPending = (node: ActionNode): void => {
   const pending = node.getPending()
   if (!pending) return
@@ -549,6 +568,12 @@ const executeDeferredHostAction = (
 ): EngineStepResult => {
   let result = node.deferredHostResult
   if (!result) return { type: 'blocked', nodeId: node.id, actionId: node.actionId }
+  const blockedResult = blockingBeforeHostChildResult(int, node)
+  if (blockedResult) {
+    node.resolve(blockedResult)
+    commitIfEngineComplete(int, context, blockedResult)
+    return { type: 'ok', nodeId: node.id, actionId: node.actionId, result: blockedResult }
+  }
   const executionContext: ActionExecutionContext = {
     state: context.state,
     player: context.player,
@@ -1049,6 +1074,7 @@ export function engineProceed(
     if (result.type === 'fail') {
       int.events.rollbackTransaction()
       clearEventLogDerivations(int)
+      recordInternalChildResult(int, node, result)
       node.resolve(result)
       return { type: 'ok', nodeId: node.id, actionId: replacedActionId, result }
     }
