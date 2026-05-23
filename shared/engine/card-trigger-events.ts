@@ -15,8 +15,6 @@ const shouldSkipCardTriggered = (
   context: ActionExecutionContext,
   actionId: string,
 ): boolean =>
-  actionId === 'apply-improvement' ||
-  actionId === 'apply-occupation-play' ||
   actionId === 'activate-card-effect' ||
   (actionId === 'pay' && cardPlayPaymentCostTypes.has(String(readCostType(context))))
 

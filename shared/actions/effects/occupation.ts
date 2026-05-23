@@ -189,7 +189,7 @@ const commitOccupationPlay = (
     type: 'card.played',
     cardId: occupationId,
     cardType: 'occupation',
-    sourceActionId: 'apply-occupation-play',
+    sourceActionId: 'play-occupation',
     sourceCardId: occupationId,
   })
   if (sourceCard && sourceCard !== occupationId) {

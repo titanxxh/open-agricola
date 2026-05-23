@@ -529,16 +529,6 @@ export const en = {
     'emit-choice': { name: 'Emit Choice', description: 'Card-driven player choice' },
     selection: { name: 'Selection', description: 'Select positions or cards from hand' },
     'set-first-player': { name: 'Set First Player', description: 'Mark this player as the new starting player' },
-      'apply-improvement': {
-      description: 'Play 1 improvement',
-          name: 'Play Improvement',
-},
-    'apply-occupation-play': {
-      description: 'Play 1 occupation',
-    },
-    'apply-renovation': {
-      description: 'Renovate',
-    },
     'build-farmhand-room': {
       description: 'Build Farm Hand Room',
           name: 'Build Farm Hand Room',

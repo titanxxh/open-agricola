@@ -221,7 +221,7 @@ const commitImprovementPurchase = (
       cardId: improvementId,
       fromPlayerId: player.id,
       toPlayerId: passResult.nextPlayer.id,
-      sourceActionId: 'apply-improvement',
+      sourceActionId: 'improvement',
       sourceCardId: improvementId,
     })
   } else {
@@ -229,7 +229,7 @@ const commitImprovementPurchase = (
       type: 'card.played',
       cardId: improvementId,
       cardType: kind,
-      sourceActionId: 'apply-improvement',
+      sourceActionId: 'improvement',
       sourceCardId: improvementId,
     })
   }

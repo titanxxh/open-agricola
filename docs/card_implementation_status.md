@@ -705,15 +705,15 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B178_TagAlong` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B179_WildBoarHunter` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B180_GameTeaser` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `C1_Overhaul` | 已对齐 | BGA passing 行为已实装（apply-improvement.ts 分支） |
+| `C1_Overhaul` | 已对齐 | BGA passing 行为已实装（improvement host completion） |
 | `C2_Stable` | 已对齐 |  |
 | `C3_CarriageTrip` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `C4_WritingBoards` | 已对齐 |  |
 | `C5_Remodeling` | 已对齐 |  |
-| `C6_StoneClearing` | 已对齐 | BGA passing 行为已实装（apply-improvement.ts 分支） |
+| `C6_StoneClearing` | 已对齐 | BGA passing 行为已实装（improvement host completion） |
 | `C7_BladeShears` | 已对齐 |  |
 | `C8_PlantFertilizer` | 已对齐 |  |
-| `C9_AutomaticWaterTrough` | 已对齐 | BGA passing 行为已实装（apply-improvement.ts 分支） |
+| `C9_AutomaticWaterTrough` | 已对齐 | BGA passing 行为已实装（improvement host completion） |
 | `C10_BunkBeds` | 已对齐 |  |
 | `C11_WildlifeReserve` | 已对齐 |  |
 | `C12_CattleFarm` | 已对齐 |  |
@@ -885,7 +885,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C178_OnSiteReverend` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `C179_BovinePioneer` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `C180_Trapper` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `D1_ZigzagHarrow` | 已对齐 | BGA passing 行为已实装（apply-improvement.ts 分支） |
+| `D1_ZigzagHarrow` | 已对齐 | BGA passing 行为已实装（improvement host completion） |
 | `D2_DwellingPlan` | 已对齐 |  |
 | `D3_Furrows` | 已对齐 |  |
 | `D4_CrossCutWood` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
@@ -1069,7 +1069,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `E2_RenovationMaterials` | 已对齐 |  |
 | `E3_TeaTime` | 已对齐 |  |
 | `E4_Thunderbolt` | 已对齐 |  |
-| `E5_NightLoot` | 已对齐 | BGA passing 行为已实装（apply-improvement.ts 分支） |
+| `E5_NightLoot` | 已对齐 | BGA passing 行为已实装（improvement host completion） |
 | `E6_Recount` | 已对齐 |  |
 | `E7_Pumpernickel` | 已对齐 |  |
 | `E8_FarmersMarket` | 已对齐 |  |
