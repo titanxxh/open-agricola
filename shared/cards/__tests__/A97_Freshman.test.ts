@@ -162,22 +162,30 @@ describe('A97_Freshman', () => {
       'A123_FrameBuilder',
     )
 
-    // 7b1: play-occupation now returns seq:[pay, apply-occupation-play]; the
-    // engine drives the actual mutate, so the resolveChoice unit-level call
-    // returns a flow rather than mutating eagerly. The session-level test
-    // (A97_Freshman session) verifies the end-to-end path.
-    expect(resolved.type).toBe('flow')
-    if (resolved.type !== 'flow') return
-    const flow = resolved.flow as {
-      type: 'seq'
-      children: Array<{
-        type: 'leaf'
-        actionId: string
-        params: Record<string, unknown>
-      }>
-    }
-    expect(flow.type).toBe('seq')
-    expect(flow.children.map((c) => c.actionId)).toEqual(['pay', 'apply-occupation-play'])
-    expect(flow.children[1]!.params).toEqual({ occupationId: 'A123_FrameBuilder' })
+    expect(resolved.type).toBe('ok')
+    if (resolved.type !== 'ok') return
+    expect(resolved.internalChildren?.beforeHostListeners).toMatchObject([
+      {
+        actionId: 'pay',
+        sourceCard: 'A123_FrameBuilder',
+        params: {
+          cost: { fee: {} },
+          costType: 'occupation',
+          optionPrefix: 'pay:occupation:A123_FrameBuilder',
+        },
+        resultKey: 'payment',
+      },
+    ])
+    expect(resolved.internalChildren?.afterHostListeners).toMatchObject([
+      {
+        actionId: 'activate-card-effect',
+        sourceCard: 'A123_FrameBuilder',
+        params: { cardId: 'A123_FrameBuilder', hook: 'onBuy' },
+        paymentInfoFrom: 'payment',
+      },
+    ])
+    expect(resolved.internalChildren?.beforeHostListeners).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ actionId: 'apply-occupation-play' })]),
+    )
   })
 })

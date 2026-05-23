@@ -203,6 +203,7 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
         action.deferredAfterHostChildren = data.deferredAfterHostChildren as ActionNode['deferredAfterHostChildren']
         action.deferredHostTransactionEvents = data.deferredHostTransactionEvents as ActionNode['deferredHostTransactionEvents']
         action.deferredHostActionEvents = data.deferredHostActionEvents as ActionNode['deferredHostActionEvents']
+        action.deferredHostChoice = data.deferredHostChoice as string | undefined
         node = action
         break
       }
