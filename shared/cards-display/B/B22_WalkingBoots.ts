@@ -11,8 +11,7 @@ const CARD_ID = 'B22_WalkingBoots'
  *
  * The placed farmer is "marked for removal": at the start of the next
  * returning-home phase, BGA removes it from play (deactivates) and returns
- * it to the supply. Our previous implementation truncated to gainLeaf food:2
- * only and tagged the card `passing: true` to mask the missing behavior.
+ * it to the supply.
  *
  * Implementation:
  *   - onBuy emits SEQ(gain food:2, place-farmer fromSupply markForRemoval).

@@ -2,19 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import type { ActionFlow } from '../../shared/contract/types'
-import { getRegisteredMinorImprovement } from '../../shared/cards-display/types'
-
-import { C9_AutomaticWaterTrough } from '../../shared/cards-display/C/C9_AutomaticWaterTrough'
-
 const CARD_ID = 'C9_AutomaticWaterTrough'
 
 describe('C9_AutomaticWaterTrough session', () => {
-  it('passing flag is removed from card metadata', () => {
-    expect((C9_AutomaticWaterTrough as { passing?: boolean }).passing).toBeFalsy()
-    const card = getRegisteredMinorImprovement(CARD_ID)!
-    expect(card.passing).toBeFalsy()
-  })
-
   it('onBuy returns undefined when player has no zone that can hold any animal', () => {
     // BGA `getValidAnimals()` returns empty list when no zone can accommodate
     // sheep / boar / cattle. In that case `onBuy` returns void, so the player

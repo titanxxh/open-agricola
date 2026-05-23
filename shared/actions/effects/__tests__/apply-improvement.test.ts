@@ -92,14 +92,14 @@ describe('applyImprovementAction', () => {
   })
 
   it('minor: moves card from minorHand to minorPlayed', () => {
-    const player = makePlayer({ minorHand: ['A4_Baseboards', 'OtherMinor'] })
+    const player = makePlayer({ minorHand: ['A25_Bassinet', 'OtherMinor'] })
     const state = makeState()
     const result = applyImprovementAction.execute(
-      ctx(player, state, { improvementId: 'A4_Baseboards', kind: 'minor' }),
+      ctx(player, state, { improvementId: 'A25_Bassinet', kind: 'minor' }),
     )
     expect(result.type === 'ok' || result.type === 'flow').toBe(true)
-    expect(player.minorHand).not.toContain('A4_Baseboards')
-    expect(player.minorPlayed).toContain('A4_Baseboards')
+    expect(player.minorHand).not.toContain('A25_Bassinet')
+    expect(player.minorPlayed).toContain('A25_Bassinet')
   })
 
   it('returns fail when no params', () => {

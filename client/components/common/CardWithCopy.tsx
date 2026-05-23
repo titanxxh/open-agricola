@@ -12,6 +12,7 @@ type Props = {
   devMode?: boolean
   enablePreview?: boolean
   previewCard?: ReactNode
+  'data-card-anchor'?: string
 }
 
 const SHOW_DELAY_MS = 250
@@ -29,6 +30,7 @@ export const CardWithCopy = ({
   devMode = false,
   enablePreview = true,
   previewCard,
+  'data-card-anchor': dataCardAnchor,
 }: Props) => {
   const rootRef = useRef<HTMLDivElement>(null)
   const showTimerRef = useRef<number | null>(null)
@@ -197,6 +199,7 @@ export const CardWithCopy = ({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         aria-disabled={disabled}
+        data-card-anchor={dataCardAnchor}
       >
         {children}
       </div>

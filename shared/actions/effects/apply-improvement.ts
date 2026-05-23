@@ -29,16 +29,37 @@ const applyMajor = (state: GameState, player: PlayerState, improvementId: string
   incMajorBuilt(player)
 }
 
-const applyMinor = (state: GameState, player: PlayerState, improvementId: string) => {
+type ApplyMinorResult =
+  | { passing: true; nextPlayer: PlayerState }
+  | { passing: false }
+
+const applyMinor = (
+  state: GameState,
+  player: PlayerState,
+  improvementId: string,
+): ApplyMinorResult => {
   const handIdx = player.minorHand.indexOf(improvementId)
   if (handIdx >= 0) player.minorHand.splice(handIdx, 1)
+
+  const minor = getMinorImprovement(improvementId)
+  const passing = minor?.passing === true
+
+  if (passing) {
+    const idx = state.players.findIndex((p) => p.id === player.id)
+    const nextPlayer = state.players[(idx + 1) % state.players.length]
+    nextPlayer.minorHand = nextPlayer.minorHand ?? []
+    if (!nextPlayer.minorHand.includes(improvementId)) {
+      nextPlayer.minorHand.push(improvementId)
+    }
+    return { passing: true, nextPlayer }
+  }
+
   if (!player.minorPlayed.includes(improvementId)) {
     player.minorPlayed.push(improvementId)
   }
   incMinorBuilt(player)
   recordDraftPlayed(player, improvementId, state.round)
 
-  const minor = getMinorImprovement(improvementId)
   if (minor?.providesOccupation) {
     player.extraOccupationsFromCards = player.extraOccupationsFromCards ?? []
     if (!player.extraOccupationsFromCards.includes(improvementId)) {
@@ -52,6 +73,7 @@ const applyMinor = (state: GameState, player: PlayerState, improvementId: string
       player.activeModifiers.push(modifier)
     }
   })
+  return { passing: false }
 }
 
 export const applyImprovementAction: ActionDefinition = {
@@ -69,10 +91,11 @@ export const applyImprovementAction: ActionDefinition = {
     const paymentInfo = player._pendingImprovementPaymentInfo
     delete player._pendingImprovementPaymentInfo
     const wasMinorInHand = kind === 'minor' && player.minorHand.includes(improvementId)
+    let passResult: ApplyMinorResult | null = null // null when kind === 'major'
     if (kind === 'major') {
       applyMajor(state, player, improvementId)
     } else {
-      applyMinor(state, player, improvementId)
+      passResult = applyMinor(state, player, improvementId)
     }
     const handChangeSourceCard = readPrivateHandChangeSourceCard(actionContext, improvementId)
     if (wasMinorInHand && handChangeSourceCard) {
@@ -83,11 +106,20 @@ export const applyImprovementAction: ActionDefinition = {
         handChangeSourceCard,
       ))
     }
-    eventSink?.emit<'card.played'>({
-      type: 'card.played',
-      cardId: improvementId,
-      cardType: kind,
-    })
+    if (passResult && passResult.passing) {
+      eventSink?.emit<'card.passed'>({
+        type: 'card.passed',
+        cardId: improvementId,
+        fromPlayerId: player.id,
+        toPlayerId: passResult.nextPlayer.id,
+      })
+    } else {
+      eventSink?.emit<'card.played'>({
+        type: 'card.played',
+        cardId: improvementId,
+        cardType: kind,
+      })
+    }
     const activation = activateCard(state, player, improvementId, 'onBuy', paymentInfo)
     if (activation.type === 'flow') {
       return activation

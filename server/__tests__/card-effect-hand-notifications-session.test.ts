@@ -7,7 +7,7 @@ import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/play
 import { writeCardExtraData } from '../../shared/cards/helpers/card-state'
 import { B3_Moonshine_impl } from '../../shared/cards/B/B3_Moonshine'
 
-import '../../shared/cards/A/A6_StorageBarn'
+import '../../shared/cards/A/A16_RammedClay'
 import '../../shared/cards/A/A95_Angler'
 import '../../shared/cards/A/A116_WoodCutter'
 import '../../shared/cards/B/B3_Moonshine'
@@ -33,7 +33,7 @@ const responseEmitter = (session: GameSession): ResponsePrivateEventEmitter =>
 const B146_DISCARD_ACTION_ID = 'card_B146_Illusionist_discard-from-hand'
 const B3_CARD_ID = 'B3_Moonshine'
 const A95_CARD_ID = 'A95_Angler'
-const A6_MINOR_ID = 'A6_StorageBarn'
+const A6_MINOR_ID = 'A16_RammedClay'
 const TEST_OCCUPATION_ID = 'A116_WoodCutter'
 
 const makeSpace = (id = 'test-space'): ActionSpace => ({
