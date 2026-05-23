@@ -14,7 +14,7 @@ import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } f
 import { getMajorCard } from '../../cards/major'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
-import { activateCard } from './activate-card'
+import { activateCardEffect } from './internal/activate-card-effect'
 import { resolvePaymentSolutionSelection } from '../payment/internal'
 import { collectComputeChoiceCandidates } from '../../cards/card-listeners'
 import { isMajorCardId } from '../../cards/helpers/card-type'
@@ -246,7 +246,7 @@ const finalizeMajorImprovementPurchase = (
 ): ActionExecutionResult => {
   applyMajorImprovementPurchase(state, player, improvementId, returnedMajorId)
 
-  const activation = activateCard(state, player, improvementId, 'onBuy', paymentInfo)
+  const activation = activateCardEffect(state, player, improvementId, 'onBuy', paymentInfo)
   const result: SuccessfulImprovementResult =
     activation.type === 'flow' ? activation : { type: 'ok' }
 
@@ -263,7 +263,7 @@ const finalizeMinorImprovementPurchase = (
 ): ActionExecutionResult => {
   applyMinorImprovementPurchase(state, player, improvement, returnedCardId)
 
-  const activation = activateCard(state, player, improvement.id, 'onBuy', paymentInfo)
+  const activation = activateCardEffect(state, player, improvement.id, 'onBuy', paymentInfo)
   if (activation.type === 'flow') {
     return attachImprovementPayment(
       activation,

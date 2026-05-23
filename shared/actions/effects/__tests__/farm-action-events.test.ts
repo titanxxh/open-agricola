@@ -10,7 +10,7 @@ import { breedAction } from '../breed'
 import { reorganizeAction } from '../reorganize'
 import { placeFarmerAction } from '../place-farmer'
 import { setFirstPlayerAction } from '../first-player'
-import { applyRenovationAction } from '../apply-renovation'
+import { renovateHouseAction } from '../renovation'
 import type {
   ActionMutationContext,
   ActionSpace,
@@ -228,7 +228,7 @@ describe('farm action events', () => {
     }))
   })
 
-  it('emits events for place-farmer, first-player, and apply-renovation', () => {
+  it('emits events for place-farmer, first-player, and renovation completion', () => {
     const placeEvents: DraftGameEvent[] = []
     const placePlayer = player()
     const placeState = {
@@ -269,13 +269,22 @@ describe('farm action events', () => {
 
     const renovateEvents: DraftGameEvent[] = []
     const renovatePlayer = player({ houseType: 'wood' })
-    expect(applyRenovationAction.execute({
+    const renovationResult = {
+      type: 'ok' as const,
+      extraData: {
+        renovation: {
+          from: 'wood' as const,
+          to: 'clay' as const,
+          rooms: renovatePlayer.roomTiles.map(({ row, col }) => ({ row, col })),
+        },
+      },
+    }
+    expect(renovateHouseAction.completeInternalChildren!({
       state: { players: [renovatePlayer], actionSpaces: [], log: [] } as GameState,
       player: renovatePlayer,
-      space: space('apply-renovation'),
-      params: { nextType: 'clay' },
+      space: space('renovate-house'),
       eventSink: sink(renovateEvents),
-    }).type).toBe('ok')
+    }, renovationResult, {}).type).toBe('ok')
     expect(renovateEvents).toContainEqual(expect.objectContaining({
       type: 'farm.renovated',
       playerId: 'p1',
