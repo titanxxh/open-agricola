@@ -240,7 +240,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | listener | `after.renovate-house` | `A110_Roughcaster`, `A120_ClayHutBuilder`, `A37_Bucksaw`, `A45_FireProtectionPond`, `B107_Manservant`, `B134_HousebookMaster`, `B168_PastureMaster`, `B16_MiningHammer`, `B55_MaintenancePremium`, `B76_Ceilings`, `C119_SkillfulRenovator`, `C132_TimberShingleMaker`, `C149_ResourceRecycler`, `C153_PatternMaker`, `D111_InteriorDecorator`, `D161_CabbageBuyer`, `D163_JourneymanBricklayer`, `D27_Retraining`, `D77_RecycledBrick`, `D81_RoofLadder`, `E123_ResourceHoarder`, `E154_Margrave`, `E87_MasterRenovator` |
 | listener | `after.reorganize` | `C148_MudWallower` |
 | listener | `after.sow` | `A79_GardenHoe`, `B115_TinsmithMaster`, `B54_Tumbrel`, `C73_SeaweedFertilizer`, `D58_Gritter`, `E50_WildGreens`, `E71_CowPatty`, `E79_FieldSpade` |
-| listener | `after.stables` | `A167_BreederBuyer`, `A43_FarmyardManure`, `A73_AgriculturalFertilizers`, `A74_StableTree`, `B140_FarmyardWorker`, `B27_Toolbox`, `C56_FeedFence`, `D166_StableMilker`, `D168_Stockman`, `D74_RoyalWood`, `E114_ShedBuilder` |
+| listener | `after.stables` | `A167_BreederBuyer`, `A43_FarmyardManure`, `A73_AgriculturalFertilizers`, `A74_StableTree`, `B140_FarmyardWorker`, `B27_Toolbox`, `C56_FeedFence`, `D166_StableMilker`, `D168_Stockman`, `E114_ShedBuilder` |
 | listener | `after.store-on-card` | `E27_PiggyBank` |
 | listener | `after.take-from-card` | `E27_PiggyBank` |
 | listener | `after.wish-children` | `E113_Godmother` |
@@ -961,7 +961,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `D71_Changeover` | 已对齐 |  |
 | `D72_StableManure` | 已对齐 |  |
 | `D73_SupplyBoat` | 已对齐 |  |
-| `D74_RoyalWood` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
+| `D74_RoyalWood` | 已接受差异 | BGA banned，但 OA 按产品策略保留；stables 支付因 afterHost slot 通过 after-pay provenance 统计 |
 | `D75_WoodField` | 已对齐 |  |
 | `D76_SocialBenefits` | 已对齐 |  |
 | `D77_RecycledBrick` | 已对齐 |  |

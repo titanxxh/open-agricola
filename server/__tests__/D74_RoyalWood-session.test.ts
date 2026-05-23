@@ -74,7 +74,7 @@ describe('D74_RoyalWood session', () => {
     ['pay', 'major-improvement'],
     ['pay', 'minor-improvement'],
     ['construct', 'construct'],
-    ['stables', 'stables'],
+    ['pay', 'stables'],
   ])('reads paid wood from resource.paid events for %s/%s without legacy result payload', (actionId, paymentFor) => {
     const session = setup({ wood: 10 })
     const state = session.getState().state
@@ -106,7 +106,7 @@ describe('D74_RoyalWood session', () => {
     ['pay', 'major-improvement'],
     ['pay', 'minor-improvement'],
     ['construct', 'construct'],
-    ['stables', 'stables'],
+    ['pay', 'stables'],
   ])('only counts current actionEvents for %s/%s when transaction has prior paid wood', (actionId, paymentFor) => {
     const session = setup({ wood: 10 })
     const state = session.getState().state
@@ -199,6 +199,47 @@ describe('D74_RoyalWood session', () => {
       expect.objectContaining({
         type: 'resource.moved',
         resources: expect.objectContaining({ wood: 2 }),
+        sourceCardId: CARD_ID,
+      }),
+    ]))
+    expect(resp.state.players[0]!.resources.wood).toBe(4)
+    expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.woodSpent).toBe(0)
+  })
+
+  it('tracks afterHost stables payment before refunding at end of action', () => {
+    const session = setup({ wood: 5 })
+    const state = session.getState().state
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'farm-expansion')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+
+    const stableOption = resp.interaction.options?.find(
+      (option) => option.labelKey === 'actions.stables.name',
+    )
+    expect(stableOption).toBeDefined()
+
+    resp = session.resolveChoice(0, stableOption!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.farm.farmType).toBe('stable')
+    if (resp.interaction.farm.farmType !== 'stable') return
+
+    const stable = resp.interaction.farm.selectableTiles[0]!
+    resp = session.resolveChoice(0, 'confirm', { stables: [stable] })
+    expect(resp.ok).toBe(true)
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.paid',
+        paymentFor: 'stables',
+        resources: expect.objectContaining({ wood: 2 }),
+      }),
+      expect.objectContaining({
+        type: 'resource.moved',
+        resources: expect.objectContaining({ wood: 1 }),
         sourceCardId: CARD_ID,
       }),
     ]))
