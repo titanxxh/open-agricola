@@ -64,6 +64,9 @@ export type PendingEnvelope = {
   contextSnapshot?: unknown
   effectiveOwnerPlayerId?: string
   syntheticKind?: PendingSyntheticKind
+  internalHostNodeId?: string
+  internalResultKey?: string
+  internalPaymentInfoFrom?: string
 }
 
 export type InteractionContextSnapshot = Pick<
