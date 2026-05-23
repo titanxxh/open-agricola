@@ -1119,7 +1119,7 @@ export const FarmBoard = ({
     <div className="hand-cards">
       <h3>{t(locale, 'ui.handCards')}</h3>
       {displayPlayer.id === currentPlayer.id || devMode ? (
-        <div className="hand-sections">
+        <div className="hand-sections" data-hand-anchor={displayPlayer.id}>
           <div className="hand-section occupation">
             <div className="hand-section-title">{t(locale, 'ui.occupationCards')}</div>
             <div className="hand-row">
