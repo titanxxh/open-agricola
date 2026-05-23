@@ -4,6 +4,7 @@ import { confirmNextPlayer } from './_helpers/legacy-confirms'
 
 // 注册卡牌到 card registry（side-effect import，与项目其他 session 测试一致）
 import '../../shared/cards/A/A1_Shelter'
+import '../../shared/cards/C/C1_Overhaul'
 
 function setupPassingSession(opts: {
   playerCount?: number
@@ -109,5 +110,48 @@ describe('passing-mechanism: cycle and wrap', () => {
 
     expect(resp.state.players[0]!.minorHand).toContain('A1_Shelter')
     expect(resp.state.players[2]!.minorPlayed).not.toContain('A1_Shelter')
+  })
+})
+
+describe('passing-mechanism: receiver behavior', () => {
+  it('receiver 不选 passing 卡时卡仍留 minorHand', () => {
+    const { session } = setupPassingSession({ buyerMinorHand: ['A1_Shelter'] })
+
+    session.takeAction(0, 'meeting-place')
+    let resp = session.resolveChoice(0, 'minor:A1_Shelter')
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[1]!.minorHand).toContain('A1_Shelter')
+
+    resp = confirmNextPlayer(session)
+    expect(resp.ok).toBe(true)
+    expect(resp.state.currentPlayerIndex).toBe(1)
+
+    resp = session.takeAction(1, 'forest')
+    expect(resp.ok).toBe(true)
+
+    expect(session.getState().state.players[1]!.minorHand).toContain('A1_Shelter')
+  })
+
+  it('prerequisite 不满足时 receiver 的 minor candidate 不含该卡', () => {
+    const { session, state } = setupPassingSession({ buyerMinorHand: ['C1_Overhaul'] })
+    state.players[0]!.occupationPlayed = ['__test_occ_a__', '__test_occ_b__']
+    state.players[0]!.resources.wood = 1
+    session.loadState(state)
+
+    session.takeAction(0, 'meeting-place')
+    let resp = session.resolveChoice(0, 'minor:C1_Overhaul')
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[1]!.minorHand).toContain('C1_Overhaul')
+
+    resp = confirmNextPlayer(session)
+    expect(resp.ok).toBe(true)
+    expect(resp.state.currentPlayerIndex).toBe(1)
+
+    resp = session.takeAction(1, 'major-improvement')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    const options = (resp.interaction.options ?? []).map((o: { value: string }) => o.value)
+    expect(options).not.toContain('minor:C1_Overhaul')
+    expect(session.getState().state.players[1]!.minorHand).toContain('C1_Overhaul')
   })
 })
