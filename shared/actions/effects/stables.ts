@@ -5,7 +5,6 @@ import type {
   ActionExecutionResult,
   FarmTilePosition,
   GameState,
-  InternalActionChild,
   PlayerState,
   Resource,
 } from '../../contract/types'
@@ -21,7 +20,7 @@ import type { PaymentCtx } from '../payment'
 import {
   resolveTypedFlatPaymentSelection,
 } from '../payment/internal'
-import { buildPayChild, type PayChildOptions } from '../helpers/pay-child'
+import { buildInternalPayChild } from '../helpers/pay-child'
 import { playerBoard } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
@@ -85,21 +84,6 @@ const scaleCost = (
     total[key as keyof Resource] = value * count
   })
   return sanitizePayableCost(total)
-}
-
-const buildInternalPayChild = (
-  options: PayChildOptions & { paymentChoice?: string },
-): InternalActionChild => {
-  const payChild = buildPayChild(options)
-  if (payChild.type !== 'leaf') {
-    throw new Error('Expected pay child leaf')
-  }
-  return {
-    actionId: payChild.actionId,
-    sourceCard: payChild.sourceCard,
-    params: payChild.params,
-    resultKey: 'payment',
-  }
 }
 
 const applyPlayerMutation = (target: PlayerState, source: PlayerState) => {
