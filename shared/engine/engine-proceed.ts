@@ -545,7 +545,7 @@ const executeDeferredHostAction = (
   context: EngineContext,
   node: ActionNode,
 ): EngineStepResult => {
-  const result = node.deferredHostResult
+  let result = node.deferredHostResult
   if (!result) return { type: 'blocked', nodeId: node.id, actionId: node.actionId }
   const executionContext: ActionExecutionContext = {
     state: context.state,
@@ -556,7 +556,31 @@ const executeDeferredHostAction = (
     actionContext: actionContextForNode(node, int),
     emitPrivateEvent: context.emitPrivateEvent,
   }
-  const eventReadContext = node.deferredHostTransactionEvents
+  const action = int.registry.get(node.actionId)
+  let completedEvents: GameEvent[] | undefined
+  if (result.type === 'ok' && action?.completeInternalChildren) {
+    const eventFrame = int.events.beginFrame({
+      actorPlayerId: executionContext.player.id,
+      sourceActionId: node.actionId,
+      sourceCardId: executionContext.sourceCard,
+    })
+    const eventBuffer = createBufferedEventSink()
+    result = action.completeInternalChildren(
+      {
+        ...executionContext,
+        eventSink: eventBuffer.sink,
+      },
+      result,
+      int.internalChildResults.get(node.internalHostNodeId ?? node.id) ?? {},
+    )
+    eventBuffer.flushTo(eventFrame.sink)
+    ensureEventState(context.state)
+    completedEvents = eventFrame.complete(context.state)
+    recordEventLogDerivation(int, completedEvents, result)
+  }
+  const eventReadContext = completedEvents
+    ? currentEventReadContext(int, completedEvents)
+    : node.deferredHostTransactionEvents
     ? {
         transactionEvents: [...node.deferredHostTransactionEvents],
         actionEvents: node.deferredHostActionEvents

@@ -45,7 +45,7 @@ describe('A123_FrameBuilder renovation choice repro', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
-    expect(resp.state.players[0]!.houseType).toBe('clay')
+    expect(resp.state.players[0]!.houseType).toBe('wood')
     expect(resp.state.players[0]!.resources.clay).toBe(2)
     expect(resp.state.players[0]!.resources.reed).toBe(1)
     expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)
@@ -69,5 +69,43 @@ describe('A123_FrameBuilder renovation choice repro', () => {
     // Direct payment didn't use FrameBuilder; bonus payment did.
     expect(direct?.sourceCards ?? []).toEqual([])
     expect(bonus?.sourceCards).toEqual([CARD_ID])
+  })
+
+  it('keeps the house wooden when payment choice resolution fails', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 6
+
+    const owner = state.players[0]!
+    owner.occupationPlayed.push(CARD_ID)
+    owner.houseType = 'wood'
+    owner.rooms = 2
+    owner.resources = {
+      ...owner.resources,
+      wood: 4,
+      clay: 2,
+      stone: 0,
+      reed: 1,
+    }
+    setWorkersAtHome(state, owner, 2)
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'house-redevelopment')
+    expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionChooseRenovationTarget') {
+      resp = session.resolveChoice(0, 'clay')
+    }
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.state.players[0]!.houseType).toBe('wood')
+
+    const failed = session.resolveChoice(0, 'renovation:invalid')
+
+    expect(failed.ok).toBe(false)
+    expect(failed.state.players[0]!.houseType).toBe('wood')
+    expect(failed.state.players[0]!.resources.clay).toBe(2)
+    expect(failed.state.players[0]!.resources.reed).toBe(1)
+    expect(failed.state.events?.some((event) => event.type === 'farm.renovated')).toBe(false)
   })
 })
