@@ -336,6 +336,9 @@ describe('event mapping policy', () => {
       'shared/actions/effects/apply-improvement.ts',
       'server/__tests__/passing-mechanism-session.test.ts',
       'server/__tests__/passing-mechanism-onbuy.test.ts',
+      'client/components/effects/PublicEventCardPassAnimation.tsx',
+      'client/components/effects/__tests__/PublicEventCardPassAnimation.test.tsx',
+      'client/app/GameContainerApi.tsx',
     ]
     const unexpectedEmitters = findCardPassedReferences()
       .filter((line) => !allowedFiles.some((path) => line.startsWith(`${path}:`)))
