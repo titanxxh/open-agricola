@@ -86,7 +86,7 @@ const createSpace = (action: ActionDefinition): ActionSpace => ({
 
 const beforeGrantCard = 'BEFORE_GRANT_CARD'
 
-const registerBeforeGrant = (actionId: string) => {
+const registerBeforeGrant = (actionId: string, phases?: string[]) => {
   const cardRegistry = new CardRegistry()
   cardRegistry.registerListener({
     id: `before-grant-${actionId}`,
@@ -101,6 +101,7 @@ const registerBeforeGrant = (actionId: string) => {
       ) {
         return undefined
       }
+      phases?.push('before')
       return {
         flow: { type: 'leaf' as const, actionId: 'grant-before-resource' },
       }
@@ -125,6 +126,7 @@ const grantBeforeResourceAction: ActionDefinition = {
 const registerFoodSensitiveCost = (
   actionId: string,
   options: { onlyWhenPendingCommit?: boolean } = {},
+  phases?: string[],
 ) => {
   registerActionHook({
     id: `food-sensitive-cost-${actionId}`,
@@ -141,6 +143,7 @@ const registerFoodSensitiveCost = (
       if (ctx.player.resources.food < 1) {
         throw new Error('computeCosts ran before before grant')
       }
+      phases?.push('computeCosts')
       return { costs: { wood: -1 } }
     },
   })
@@ -509,6 +512,7 @@ describe('Engine pipeline phase order', () => {
   })
 
   it('runs before before committed isDoable and computeCosts after pending resolveChoice', () => {
+    const phases: string[] = []
     let committed = false
     let receivedCosts: unknown
     const action: ActionDefinition = {
@@ -517,8 +521,13 @@ describe('Engine pipeline phase order', () => {
       descriptionKey: 'test',
       roundAvailable: 1,
       gainPerRound: {},
-      canBeExecutedByPlayer: (_state, player, ctx) =>
-        ctx.actionContext?.pendingCommit === true ? player.resources.food >= 1 : true,
+      canBeExecutedByPlayer: (_state, player, ctx) => {
+        if (ctx.actionContext?.pendingCommit === true) {
+          phases.push('canBeExecutedByPlayer')
+          return player.resources.food >= 1
+        }
+        return true
+      },
       execute: () => ({
         type: 'request',
         request: { kind: 'choice', options: [{ value: 'commit', labelKey: 'Commit' }] },
@@ -535,8 +544,19 @@ describe('Engine pipeline phase order', () => {
       },
     }
 
-    registerBeforeGrant(action.id)
-    registerFoodSensitiveCost(action.id, { onlyWhenPendingCommit: true })
+    registerActionHook({
+      id: 'pending-compute-replace',
+      actions: [action.id],
+      phases: ['computeReplace'],
+      handler: (ctx) => {
+        if (ctx.params?.selectedOption === 'commit') {
+          phases.push('computeReplace')
+        }
+        return {}
+      },
+    })
+    registerBeforeGrant(action.id, phases)
+    registerFoodSensitiveCost(action.id, { onlyWhenPendingCommit: true }, phases)
 
     const registry = new ActionRegistry()
     registry.register(action)
@@ -563,5 +583,91 @@ describe('Engine pipeline phase order', () => {
 
     expect(committed).toBe(true)
     expect(receivedCosts).toEqual({ wood: -1 })
+    expect(phases).toEqual([
+      'computeReplace',
+      'before',
+      'computeReplace',
+      'canBeExecutedByPlayer',
+      'computeCosts',
+    ])
+  })
+
+  it('does not run committed preflight before pending cancel resolveChoice', () => {
+    const phases: string[] = []
+    const action: ActionDefinition = {
+      id: 'pending-cancel-no-preflight',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: (_state, _player, ctx) => {
+        if (ctx.actionContext?.pendingCommit === true) {
+          phases.push('canBeExecutedByPlayer')
+          throw new Error('preflight ran before cancel')
+        }
+        return true
+      },
+      execute: () => ({
+        type: 'request',
+        request: {
+          kind: 'choice',
+          options: [
+            { value: 'commit', labelKey: 'Commit' },
+            { value: 'cancel', labelKey: 'Cancel' },
+          ],
+        },
+        promptKey: 'choose',
+        extraData: { actionContextWrite: { pendingCommit: true } },
+      }),
+      resolveChoice: (_ctx, choice) => {
+        phases.push(`resolveChoice:${choice}`)
+        return { type: 'ok' }
+      },
+    }
+
+    registerActionHook({
+      id: 'cancel-compute-replace',
+      actions: [action.id],
+      phases: ['computeReplace'],
+      handler: (ctx) => {
+        if (ctx.params?.selectedOption === 'cancel') {
+          phases.push('computeReplace')
+          throw new Error('computeReplace ran before cancel')
+        }
+        return {}
+      },
+    })
+    registerActionHook({
+      id: 'cancel-compute-costs',
+      actions: [action.id],
+      phases: ['computeCosts'],
+      handler: (ctx) => {
+        if (ctx.params?.selectedOption === 'cancel') {
+          phases.push('computeCosts')
+          throw new Error('computeCosts ran before cancel')
+        }
+        return {}
+      },
+    })
+
+    const registry = new ActionRegistry()
+    registry.register(action)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('a', action.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    state.players = [player]
+    const space = createSpace(action)
+
+    const choice = runUntil(engine, { state, player, space }, () => false)
+    expect(choice.type).toBe('choice')
+    const result = engine.resolveChoice('cancel', { state, player, space })
+
+    expect(result.type).toBe('ok')
+    expect(phases).toEqual(['resolveChoice:cancel'])
   })
 })
