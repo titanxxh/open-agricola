@@ -35,7 +35,7 @@ const playedImprovementId = (context: CardListenerContext): string | undefined =
 }
 
 const paidReturnedFireplace = (context: CardListenerContext): boolean => {
-  const events = context.actionEvents ?? context.transactionEvents
+  const events = context.transactionEvents
   return (events ?? []).some((event) =>
     isResourcePaidEvent(event) && FIREPLACE_IDS.has(event.returnedCardId ?? ''),
   )
