@@ -1129,13 +1129,6 @@ export function engineProceed(
       { ...executionContext, ...eventReadContext, actionId: replacedActionId },
       result,
     )
-    const duringActivateNodes = buildActivationActionNodes(int,
-      duringPhase.matchedListeners, 'during', replacedActionId,
-      {},
-      executionContext.player.id,
-      eventReadContext.transactionEvents,
-      eventReadContext.actionEvents,
-    )
     if (result.type === 'request') {
       // Mirror the resolveChoice second-pass: ActionDef-declared
       // actionContext patches in result.extraData.actionContextWrite are
@@ -1256,9 +1249,6 @@ export function engineProceed(
       })
       copyInternalMetadataToPending(node)
       node.emittedRequest = updatedRequest
-      if (duringActivateNodes.length > 0) {
-        int.tree.insertAfter(node.id, [...duringActivateNodes])
-      }
       return {
         type: 'choice',
         nodeId: int.pendingNodeIdRef.value ?? node.id,
@@ -1269,6 +1259,13 @@ export function engineProceed(
         },
       }
     }
+    const duringActivateNodes = buildActivationActionNodes(int,
+      duringPhase.matchedListeners, 'during', replacedActionId,
+      {},
+      executionContext.player.id,
+      eventReadContext.transactionEvents,
+      eventReadContext.actionEvents,
+    )
     const immediatePhase = int.hooks.immediatelyAfter(
       { ...executionContext, ...eventReadContext, actionId: replacedActionId },
       result,

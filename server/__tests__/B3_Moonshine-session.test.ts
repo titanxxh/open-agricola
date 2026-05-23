@@ -98,9 +98,9 @@ describe('B3_Moonshine session', () => {
     const cachedOcc = p0.cardStates?.[CARD_ID]?.extraData?.occ
     expect(cachedOcc === OCC_A || cachedOcc === OCC_B).toBe(true)
 
-    // B3 should have moved from minorHand to minorPlayed
     expect(p0.minorHand).not.toContain(CARD_ID)
-    expect(p0.minorPlayed).toContain(CARD_ID)
+    expect(p0.minorPlayed).not.toContain(CARD_ID)
+    expect(resp.state.players[1]!.minorHand).toContain(CARD_ID)
 
     // Food should NOT be deducted yet (deduction happens on resolveChoice('play'))
     expect(p0.resources.food).toBe(3)
