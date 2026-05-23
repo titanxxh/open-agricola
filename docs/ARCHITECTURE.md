@@ -808,6 +808,17 @@ listener 隔离自然成立：passing 卡不进 `minorPlayed` → `getPlayerCard
 
 客户端：`PublicEventCardPassAnimation` 订阅 `card.passed` events 流，按 `data-card-anchor` / `data-hand-anchor` DOM 锚点播放卡片飞行动画；LogPanel 通过现有 `mapCardPassed` 派生 `log.cardPassed` i18n 条目。
 
+### actionContext.costOverride 通用机制
+
+ActionFlow 的 leaf 节点可挂 `actionContext: { costOverride: Partial<Resource> }`，在两条路径上注入到 action cost：
+
+- **doable 路径**：`shared/engine/dispatcher.ts` `applyCostPreviewDoable` 合并 `ctx.actionContext.costOverride` 与 listener `computeCosts` hook 输出，传给 `action.costPreview.canExecute(context, mergedOverride)`
+- **execute 路径**：action 自己在 execute 中读 `ctx.actionContext.costOverride`（例：`shared/actions/effects/fencing.ts` `computeFreeFenceTotal` 累加 actionContext free fence 数）
+
+首例：`C1_Overhaul` onBuy 的 fence leaf 挂 `costOverride: { wood: -(n+3) }`，让 fence rebuild 在 n+3 capacity 内全免费（passing 路径下 buyer 不持卡也能拿到 discount，对齐 BGA `'costs' => formatCost([WOOD => 0])`）。
+
+未来其他 passing 卡的 onBuy 若需要 cost discount 可复用此模式，不再依赖 owner-scoped listener。
+
 ---
 
 ## 9. shared/domain/ — 领域聚合层

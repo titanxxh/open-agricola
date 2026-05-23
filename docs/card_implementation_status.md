@@ -705,7 +705,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B178_TagAlong` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B179_WildBoarHunter` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B180_GameTeaser` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `C1_Overhaul` | 已对齐 | BGA passing 行为已实装（apply-improvement.ts 分支） |
+| `C1_Overhaul` | 已对齐 | BGA passing 行为已实装（apply-improvement.ts 分支）；fence discount 通过 actionContext.costOverride 对齐 BGA |
 | `C2_Stable` | 已对齐 |  |
 | `C3_CarriageTrip` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `C4_WritingBoards` | 已对齐 |  |
