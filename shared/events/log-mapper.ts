@@ -474,7 +474,7 @@ const stablePaymentForEvent = (
       candidate.actorPlayerId === event.actorPlayerId,
     )
     .sort((left, right) => left.seq - right.seq)[0]?.seq ?? Number.POSITIVE_INFINITY
-  const afterHostPayment = [...events]
+  return [...events]
     .filter((candidate): candidate is ResourcePaidEvent =>
       candidate.type === 'resource.paid' &&
       candidate.seq > event.seq &&
@@ -483,7 +483,6 @@ const stablePaymentForEvent = (
       candidate.paymentFor === 'stables',
     )
     .sort((left, right) => left.seq - right.seq)[0]
-  return afterHostPayment ?? paymentForEvent(events, event, 'stables')
 }
 
 const isNearestFollowingStablePayment = (
