@@ -55,11 +55,10 @@ const applyOccupation = (
 /**
  * Finalize leaf for the occupation flow. Mirrors apply-improvement: pay leaf
  * runs first inside `seq:[pay, apply-occupation-play]`, then apply-* mutates
- * occupation state. The pay leaf stashes paymentInfo via the seq-shared
- * `_pendingImprovementPaymentInfo` field; we don't read it here today but
- * the C116 listener (see C116_FurnitureMaker) reads `extraData.resourcesPaid`
- * straight off the pay leaf event, which is more accurate than the legacy
- * "reconstruct lessons cost" branch in occupation.ts.
+ * occupation state. Occupation onBuy effects do not currently consume payment
+ * info here; C116_FurnitureMaker reads `extraData.resourcesPaid` straight off
+ * the pay leaf event, which is more accurate than the legacy "reconstruct
+ * lessons cost" branch in occupation.ts.
  */
 export const applyOccupationPlayAction: ActionDefinition = {
   id: 'apply-occupation-play',
