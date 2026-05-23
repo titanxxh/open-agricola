@@ -12,4 +12,5 @@ export const C1_Overhaul = new MinorImprovement({
   cost: { wood: 1 },
   prerequisite: '2 Occupations',
   occupationPrerequisites: { min: 2 },
+  passing: true,
 })

@@ -21,15 +21,11 @@ const CARD_ID = 'C6_StoneClearing'
  * All main-path changes outside the F1 onBuy SEQ-truncation scope. Tracked in
  * docs/card_implementation_status.md.
  *
- * **Deliberate divergence (Sprint 7a):** we directly grant the stone to the
+ * **Deliberate divergence:** we directly grant the stone to the
  * player's supply at buy time rather than placing it on the field for the
  * next harvest. This compresses two turns of timing into one but yields
  * the same final stone count when there's no Field-related Hook-card in
  * play (~all real-game cases).
- *
- * For this sprint:
- *   - `passing: true` removed (per spec §决策点 1).
- *   - Behavior unchanged from previous Sprint 6 baseline.
  */
 export const C6_StoneClearing = new MinorImprovement({
   id: CARD_ID,
@@ -39,4 +35,5 @@ export const C6_StoneClearing = new MinorImprovement({
   category: "BUILDING_RESOURCE_PROVIDER",
   desc: ["Immediately place 1 <STONE> on each of your empty fields. Harvest them during the next field phase. These fields are considered planted until then."],
   cost: { food: 1 },
+  passing: true,
 })

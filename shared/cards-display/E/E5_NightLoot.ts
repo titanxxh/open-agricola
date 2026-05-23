@@ -10,4 +10,5 @@ export const E5_NightLoot = new MinorImprovement({
   category: 'PASSING_-_BUILDING_RESOURCES_',
   desc: ['Immediately remove 2 different building resources total from accumulation spaces and place them in your supply.'],
   cost: { food: 2 },
+  passing: true,
 })
