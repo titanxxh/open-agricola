@@ -1,7 +1,6 @@
 import type {
   ActionDefinition,
   ActionExecutionResult,
-  ActionFlow,
   GameState,
   PlayerState,
 } from '../../contract/types'
@@ -9,12 +8,6 @@ import { getOccupation } from '../../cards/registry-display'
 import { getCardModifiers } from '../../cards/card-modifiers'
 import { activateCard } from './activate-card'
 import { incOccupationBuilt, recordDraftPlayed } from '../../session/stats'
-import {
-  getRegisteredCardListeners,
-  type CardListenerContext,
-} from '../../cards/card-listeners'
-import { createEventQuery } from '../../events/query'
-import type { ActionHookPhase } from '../hooks'
 import {
   cardEffectHandChangedEvent,
   readPrivateHandChangeSourceCard,
@@ -101,52 +94,9 @@ export const applyOccupationPlayAction: ActionDefinition = {
       cardType: 'occupation',
     })
 
-    // Combine effect.onBuy (from card definitions) with the just-played
-    // card's own 'after play-occupation' listener. The outer engine collects
-    // 'after' listeners BEFORE the seq flow runs, so its scope check sees
-    // the pre-mutate occupationPlayed list and misses self-trigger cards
-    // (B155 ArtTeacher, E89 Stallwright, E101 Blighter etc.). We fire those
-    // listeners here, after mutate, mirroring BGA's onPlayerAfterPlayOccupation
-    // semantics on the just-played card.
     const activation = activateCard(state, player, occupationId, 'onBuy')
-    const selfFlows: ActionFlow[] = []
-    const baseListenerCtx: CardListenerContext = {
-      state,
-      player,
-      space: { id: '' } as never,
-      actionId: 'play-occupation',
-      phase: 'after' as ActionHookPhase,
-      transactionEvents: [],
-      eventQuery: createEventQuery([]),
-      choice: occupationId,
-    }
-    for (const reg of getRegisteredCardListeners()) {
-      if (!reg.cardIds || !reg.cardIds.includes(occupationId)) continue
-      if (reg.actions && !reg.actions.includes('play-occupation')) continue
-      if (reg.phases && !reg.phases.includes('after' as ActionHookPhase)) continue
-      const result = reg.handler(baseListenerCtx)
-      if (result?.flow) {
-        selfFlows.push(result.flow)
-      }
-    }
-    let combinedFlow: ActionFlow | null = null
-    if (activation.type === 'flow' && selfFlows.length > 0) {
-      combinedFlow = {
-        type: 'seq',
-        children: [activation.flow, ...selfFlows],
-      }
-    } else if (activation.type === 'flow') {
-      combinedFlow = activation.flow
-    } else if (selfFlows.length === 1) {
-      combinedFlow = selfFlows[0]!
-    } else if (selfFlows.length > 1) {
-      combinedFlow = { type: 'seq', children: selfFlows }
-    }
-    if (combinedFlow) {
-      return {
-        type: 'flow',
-        flow: combinedFlow,
-      }
+    if (activation.type === 'flow') {
+      return activation
     }
     return { type: 'ok' }
   },

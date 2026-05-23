@@ -1,4 +1,5 @@
-import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ComplexCost, GameState, PlayerState, Resource } from '../../contract/types'
+import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ComplexCost, GameState, InternalActionChild, InternalActionChildren, PlayerState, Resource } from '../../contract/types'
+import type { EventSink } from '../../contract/events'
 import { getOccupation } from '../../cards/registry-display'
 import {
   canAffordCardPreviewCostByProvider,
@@ -14,14 +15,37 @@ import { getCardModifiers } from '../../cards/card-modifiers'
 import { activateCard } from './activate-card'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { incOccupationBuilt, recordDraftPlayed } from '../../session/stats'
+import { paymentInfoFromPayResult } from '../helpers/pay-child'
+import {
+  cardEffectHandChangedEvent,
+  readPrivateHandChangeSourceCard,
+} from '../../session/private-hand-events'
 
 const privateHandChangeContext = (
   sourceCard: string | undefined,
   occupationId: string,
-): Record<string, unknown> | undefined =>
-  sourceCard && sourceCard !== occupationId
-    ? { privateHandChangeSourceCard: sourceCard }
+  trueAction?: boolean,
+): Record<string, unknown> =>
+  ({
+    ...(trueAction === false ? { trueAction: false } : {}),
+    ...(sourceCard && sourceCard !== occupationId
+      ? { privateHandChangeSourceCard: sourceCard }
+      : {}),
+  })
+
+const readTrueAction = (
+  params?: unknown,
+  actionContext?: Record<string, unknown>,
+) =>
+  ((params as { trueAction?: boolean } | undefined)?.trueAction === false ||
+    actionContext?.trueAction === false)
+    ? false
     : undefined
+
+const compactContext = (
+  context: Record<string, unknown>,
+): Record<string, unknown> | undefined =>
+  Object.keys(context).length > 0 ? context : undefined
 
 const buildOccupationCostProvider = (
   player: PlayerState,
@@ -121,6 +145,53 @@ export const playOccupation = (
   return { type: 'ok' }
 }
 
+const applyOccupationPlay = (
+  state: GameState,
+  player: PlayerState,
+  occupationId: string,
+) => {
+  player.occupationHand = player.occupationHand.filter(
+    (id) => id !== occupationId,
+  )
+  if (!player.occupationPlayed.includes(occupationId)) {
+    player.occupationPlayed.push(occupationId)
+    incOccupationBuilt(player)
+    recordDraftPlayed(player, occupationId, state.round)
+  }
+  getCardModifiers(occupationId).forEach((modifier) => {
+    if (!player.activeModifiers.some((m) => JSON.stringify(m) === JSON.stringify(modifier))) {
+      player.activeModifiers.push(modifier)
+    }
+  })
+}
+
+const commitOccupationPlay = (
+  state: GameState,
+  player: PlayerState,
+  occupationId: string,
+  actionContext?: Record<string, unknown>,
+  emitPrivateEvent?: (event: ReturnType<typeof cardEffectHandChangedEvent>) => void,
+  eventSink?: EventSink,
+): Extract<ActionExecutionResult, { type: 'ok' }> => {
+  const wasInHand = player.occupationHand.includes(occupationId)
+  applyOccupationPlay(state, player, occupationId)
+  const handChangeSourceCard = readPrivateHandChangeSourceCard(actionContext, occupationId)
+  if (wasInHand && handChangeSourceCard) {
+    emitPrivateEvent?.(cardEffectHandChangedEvent(
+      player.id,
+      [occupationId],
+      'occupation',
+      handChangeSourceCard,
+    ))
+  }
+  eventSink?.emit<'card.played'>({
+    type: 'card.played',
+    cardId: occupationId,
+    cardType: 'occupation',
+  })
+  return { type: 'ok' }
+}
+
 const getOccupationCost = (
   player: PlayerState,
   occupationId: string,
@@ -208,6 +279,64 @@ export const canAffordOccupationActionCost = (
     actionCardId,
   )
 
+type OccupationCommitData = {
+  occupationId: string
+  actionContext?: Record<string, unknown>
+}
+
+const readOccupationCommitData = (
+  result: Extract<ActionExecutionResult, { type: 'ok' }>,
+): OccupationCommitData | null => {
+  const raw = result.extraData?.occupationCommit
+  if (!raw || typeof raw !== 'object') return null
+  const data = raw as Record<string, unknown>
+  if (typeof data.occupationId !== 'string') return null
+  return {
+    occupationId: data.occupationId,
+    actionContext: data.actionContext && typeof data.actionContext === 'object'
+      ? data.actionContext as Record<string, unknown>
+      : undefined,
+  }
+}
+
+const buildOccupationPayChild = (
+  cost: ComplexCost,
+  occupationId: string,
+  actionContext: Record<string, unknown> | undefined,
+): InternalActionChild => ({
+  actionId: 'pay',
+  sourceCard: occupationId,
+  params: {
+    cost,
+    costType: 'occupation',
+    optionPrefix: `pay:occupation:${occupationId}`,
+  },
+  actionContext: {
+    costType: 'occupation',
+    ...(actionContext ?? {}),
+  },
+  resultKey: 'payment',
+})
+
+const buildOccupationInternalChildren = (
+  cost: ComplexCost,
+  occupationId: string,
+  actionContext: Record<string, unknown> | undefined,
+): InternalActionChildren => ({
+  beforeHostListeners: [
+    buildOccupationPayChild(cost, occupationId, actionContext),
+  ],
+  afterHostListeners: [
+    {
+      actionId: 'activate-card-effect',
+      sourceCard: occupationId,
+      params: { cardId: occupationId, hook: 'onBuy' },
+      actionContext,
+      paymentInfoFrom: 'payment',
+    },
+  ],
+})
+
 export const playOccupationAction: ActionDefinition = {
   id: 'play-occupation',
   nameKey: 'actions.lessons.name',
@@ -236,14 +365,7 @@ export const playOccupationAction: ActionDefinition = {
       promptKey: 'ui.interactionChooseOccupation',
     }
   },
-  // 7b1: rewrite as seq:[pay, apply-occupation-play]. The pay leaf wraps the
-  // typed-flat lessons cost as ComplexCost so multi-solution variants
-  // (Bonus modifiers, future card discounts) surface a prompt.selectPayment
-  // choice. apply-occupation-play then mutates occupationPlayed / activates
-  // onBuy. C116 FurnitureMaker now reads the real paid food off the pay
-  // leaf's extraData.resourcesPaid instead of reconstructing the lessons
-  // cost — see C116_FurnitureMaker.
-  resolveChoice: ({ player, space, params, state, sourceCard }, choice) => {
+  resolveChoice: ({ player, space, params, state, sourceCard, actionContext }, choice) => {
     const typed = params as { costOverride?: Partial<PlayerState['resources']>; allowedCards?: string[] } | undefined
     if (typed?.allowedCards && !typed.allowedCards.includes(choice)) {
       return { type: 'fail', errorKey: 'log.occupationFail' }
@@ -287,31 +409,34 @@ export const playOccupationAction: ActionDefinition = {
       // legacy mutate-in-place semantics.
       addCardResourceGained(player, sourceCard, { occupation: 1 })
     }
+    const childContext = compactContext(privateHandChangeContext(
+      sourceCard,
+      choice,
+      readTrueAction(params, actionContext),
+    ))
     return {
-      type: 'flow',
-      flow: {
-        type: 'seq',
-        children: [
-          {
-            type: 'leaf',
-            actionId: 'pay',
-            sourceCard: choice,
-            params: {
-              cost: finalCost,
-              costType: 'occupation',
-              optionPrefix: `pay:occupation:${choice}`,
-            },
-            actionContext: { costType: 'occupation' },
-          },
-          {
-            type: 'leaf',
-            actionId: 'apply-occupation-play',
-            sourceCard: choice,
-            params: { occupationId: choice },
-            actionContext: privateHandChangeContext(sourceCard, choice),
-          },
-        ],
+      type: 'ok',
+      extraData: {
+        occupationCommit: {
+          occupationId: choice,
+          ...(childContext ? { actionContext: childContext } : {}),
+        },
       },
+      internalChildren: buildOccupationInternalChildren(finalCost, choice, childContext),
     }
+  },
+  completeInternalChildren: ({ state, player, emitPrivateEvent, eventSink }, result, internalResults) => {
+    const data = readOccupationCommitData(result)
+    if (!data) return result
+    const paymentInfo = paymentInfoFromPayResult(internalResults.payment)
+    if (!paymentInfo) return result
+    return commitOccupationPlay(
+      state,
+      player,
+      data.occupationId,
+      data.actionContext,
+      emitPrivateEvent,
+      eventSink,
+    )
   },
 }
