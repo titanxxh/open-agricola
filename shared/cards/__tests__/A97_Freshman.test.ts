@@ -184,8 +184,8 @@ describe('A97_Freshman', () => {
         paymentInfoFrom: 'payment',
       },
     ])
-    expect(resolved.internalChildren?.beforeHostListeners).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ actionId: 'apply-occupation-play' })]),
+    expect(resolved.internalChildren?.beforeHostListeners.map((child) => child.actionId)).not.toContainEqual(
+      expect.stringMatching(/^apply-/),
     )
   })
 })

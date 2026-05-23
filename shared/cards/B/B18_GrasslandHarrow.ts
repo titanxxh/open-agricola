@@ -15,8 +15,8 @@ const TARGET_ROUND_KEY = 'targetRound'
  * after-listener gated on `sourceCard === CARD_ID` (only B18's own purchase
  * payment counts). Mirrors BGA `onPlayerAfterPay` semantics — reserve is
  * counted from supply *after* the play cost has been drained, matching the
- * legacy onBuy-time behaviour exactly because apply-improvement runs onBuy
- * after pay anyway.
+ * legacy onBuy-time behaviour exactly because host action completion runs
+ * internal `activate-card-effect` after pay.
  */
 const afterPayListener: CardListenerRegistration = {
   id: 'B18-grassland-harrow-after-pay',

@@ -75,7 +75,7 @@ describe('B65 Grain Depot', () => {
       expect.objectContaining({
         type: 'card.played',
         cardId: CARD_ID,
-        sourceActionId: 'apply-improvement',
+        sourceActionId: 'improvement',
         sourceCardId: CARD_ID,
       }),
     ]))

@@ -323,8 +323,7 @@ export const payAction: ActionDefinition = {
   // here so we can re-run the cost selection with `paymentChoice` set, this
   // time landing on the `selected` branch and actually mutating resources.
   // Without this hook the engine's fallthrough would return `{type:'ok'}`
-  // without paying, leaving downstream `seq` leaves (e.g. apply-improvement)
-  // running on un-paid state.
+  // without paying, leaving host action completion running on un-paid state.
   resolveChoice: ({ player, params, sourceCard, state, eventSink }, choice) => {
     const p = normalizePayParams(params)
     if (!p?.cost) return { type: 'fail', errorKey: 'log.payFail' }

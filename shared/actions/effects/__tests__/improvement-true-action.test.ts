@@ -109,8 +109,8 @@ describe('improvement trueAction context', () => {
         paymentInfoFrom: 'payment',
       },
     ])
-    expect(result.internalChildren?.beforeHostListeners).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ actionId: 'apply-improvement' })]),
+    expect(result.internalChildren?.beforeHostListeners.map((child) => child.actionId)).not.toContainEqual(
+      expect.stringMatching(/^apply-/),
     )
   })
 
@@ -135,8 +135,8 @@ describe('improvement trueAction context', () => {
         paymentInfoFrom: 'payment',
       },
     ])
-    expect(result.internalChildren?.beforeHostListeners).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ actionId: 'apply-improvement' })]),
+    expect(result.internalChildren?.beforeHostListeners.map((child) => child.actionId)).not.toContainEqual(
+      expect.stringMatching(/^apply-/),
     )
   })
 })
