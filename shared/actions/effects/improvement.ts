@@ -163,7 +163,9 @@ const applyMinorImprovementPurchase = (
     return { passing: true, nextPlayer }
   }
 
-  player.minorPlayed.push(improvement.id)
+  if (!player.minorPlayed.includes(improvement.id)) {
+    player.minorPlayed.push(improvement.id)
+  }
   incMinorBuilt(player)
   recordDraftPlayed(player, improvement.id, state.round)
 
@@ -219,12 +221,16 @@ const commitImprovementPurchase = (
       cardId: improvementId,
       fromPlayerId: player.id,
       toPlayerId: passResult.nextPlayer.id,
+      sourceActionId: 'apply-improvement',
+      sourceCardId: improvementId,
     })
   } else {
     eventSink?.emit<'card.played'>({
       type: 'card.played',
       cardId: improvementId,
       cardType: kind,
+      sourceActionId: 'apply-improvement',
+      sourceCardId: improvementId,
     })
   }
   return attachImprovementPayment({ type: 'ok' }, improvementId, costResources, paymentInfo.returnedCardId)
@@ -593,6 +599,7 @@ const buildImprovementInternalChildren = (
         actionId: 'activate-card-effect',
         sourceCard: id,
         params: { cardId: id, hook: 'onBuy' },
+        actionContext,
         paymentInfoFrom: 'payment',
       },
     ],
