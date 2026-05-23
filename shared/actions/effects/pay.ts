@@ -172,23 +172,6 @@ const buildSelectedResult = (
   if (includeReturnedCard && solution.cardUsed) {
     returnCardToBoard(player, solution.cardUsed, state)
   }
-  // Hand the wrapper-flow context to the next leaf (apply-improvement /
-  // apply-occupation-play) so its onBuy listener can still receive a real
-  // `PaymentInfo` and so apply-* can echo `resourcesPaid` back into
-  // the canonical `log.playOccupation` / `log.playImprovement` log entries
-  // (D95 SiteManager scoping, log-cost attribution tests).
-  if (
-    costType === 'major-improvement'
-    || costType === 'minor-improvement'
-    || costType === 'occupation'
-    || costType === 'renovation'
-  ) {
-    player._pendingImprovementPaymentInfo = {
-      resourcesPaid: solution.resourcesPaid,
-      feeIndex: solution.feeIndex,
-      returnedCardId: solution.cardUsed,
-    }
-  }
   const resourcesPaid = solution.resourcesPaid
   if (sourceCard) {
     addCardResourcePaid(player, sourceCard, resourcesPaid)
@@ -298,22 +281,6 @@ export const payAction: ActionDefinition = {
       const detailed = payTypedFlatCostDetailed(player, flat, p.costType, state)
       if (!detailed.ok) return { type: 'fail', errorKey: 'log.payFail' }
       const resourcesPaid = detailed.resourcesPaid
-      if (
-        p.costType === 'major-improvement'
-        || p.costType === 'minor-improvement'
-        || p.costType === 'occupation'
-        || p.costType === 'renovation'
-      ) {
-        // Stash the typed-flat resourcesPaid for the downstream apply-* leaf
-        // so log.playOccupation / log.playImprovement can echo the actual
-        // post-trade cost (D95 SiteManager scoping etc.). The
-        // ComplexCost branch sets the same field in buildSelectedResult.
-        player._pendingImprovementPaymentInfo = {
-          resourcesPaid,
-          feeIndex: detailed.feeIndex,
-          returnedCardId: detailed.cardUsed,
-        }
-      }
       const extraData: Record<string, unknown> = {
         resourcesPaid,
         bonusUsed: detailed.bonusUsed
