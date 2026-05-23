@@ -11,12 +11,12 @@
 | 自动 metadata 脚本 literal mismatch | 5 |
 | 自动 metadata 脚本 complex mismatch | 5 |
 | 其中 schema-up 已接受差异 | 4 |
-| 需要实现复核的卡牌 | 15 |
+| 需要实现复核的卡牌 | 10 |
 | 已接受 / 产品策略差异 | 65 |
 | 排除的 BGA legacy 或未实现行为目标 | 52 |
-| 本轮审计视为已对齐 | 756 |
+| 本轮审计视为已对齐 | 761 |
 
-说明：`scripts/audit-bga-metadata-diff.ts` 现在会解析 BGA `STABLE` 打印成本和 `passing`。当前 literal mismatch 是 5 个 `passing` 差异，均需要对齐 BGA：`C1_Overhaul`、`C6_StoneClearing`、`C9_AutomaticWaterTrough`、`D1_ZigzagHarrow`、`E5_NightLoot`。当前 complex mismatch 是 1 个 `cost` 差异（`C54_MarketBooth`）和 4 个已接受的 schema-up prerequisite 差异。
+说明：`scripts/audit-bga-metadata-diff.ts` 现在会解析 BGA `STABLE` 打印成本和 `passing`。当前 literal mismatch 0（passing 已全部对齐）。当前 complex mismatch 是 1 个 `cost` 差异（`C54_MarketBooth`）和 4 个已接受的 schema-up prerequisite 差异。
 
 审计规则：优先核对卡牌描述文本、custom description、cost、prerequisite、passing、职业/小改 metadata，以及游戏规则行为。BGA 平台/工坊字段如 `banned`、`implemented`、`isCorbariusOrDulcinaria`、`isArtifexOrBubulcus` 不作为对齐要求；如果它们影响产品策略，只记录为已接受差异或排除项，不记为实现 bug。
 
@@ -33,11 +33,6 @@
 | `E10_StrawHat` | 中 | mandatory 选择 | BGA 强制在移动或拿食物中选一项；OA 可以跳过。 | 移除 XOR 外层 optional。 |
 | `E68_CherryOrchard` | 低 | 描述文本 | OA desc 写成收获 wood；BGA 表达为像 grain 一样 sow 和 harvest wood。 | 恢复 BGA 文案语义。 |
 | `B34_SpecialFood` | 待验证 | 跨卡交互 | BGA 特判 A137；OA heuristic 可能覆盖，也可能遗漏。 | 增加 A137+B34 定向 session 测试。 |
-| `C1_Overhaul` | 低 | metadata/passing | BGA `passing=true`；OA 未声明 `passing`。 | 增加 `passing` 支持并补对齐测试。 |
-| `C6_StoneClearing` | 低 | metadata/passing | BGA `passing=true`；OA 未声明 `passing`。 | 增加 `passing` 支持并补对齐测试。 |
-| `C9_AutomaticWaterTrough` | 低 | metadata/passing | BGA `passing=true`；OA 未声明 `passing`。 | 增加 `passing` 支持并补对齐测试。 |
-| `D1_ZigzagHarrow` | 低 | metadata/passing | BGA `passing=true`；OA 未声明 `passing`。 | 增加 `passing` 支持并补对齐测试。 |
-| `E5_NightLoot` | 低 | metadata/passing | BGA `passing=true`；OA 未声明 `passing`。 | 增加 `passing` 支持并补对齐测试。 |
 
 ### 需复核卡牌证据索引
 
@@ -54,11 +49,6 @@
 | `E10_StrawHat` | `E/E10_StrawHat.php` | `shared/cards/E/E10_StrawHat.ts` | OA 将整个 flow 标为 optional，导致通用 XOR UI 包含 skip 路径。 |
 | `E68_CherryOrchard` | `E/E68_CherryOrchard.php` | `shared/cards-display/E/E68_CherryOrchard.ts` | 描述文本面向 UI；实现本身主要基于 cardField。 |
 | `B34_SpecialFood` | `B/B34_SpecialFood.php` | `shared/cards/B/B34_SpecialFood.ts`; `shared/cards/A/A137_RiverineShepherd.ts` | 需要 A137 交互的定向 session/UI 覆盖后，才能判断 UI 行为是否分歧。 |
-| `C1_Overhaul` | `C/C1_Overhaul.php` | `shared/cards-display/C/C1_Overhaul.ts`; `shared/cards/C/C1_Overhaul.ts` | metadata/passing 影响卡牌显示和可打出 metadata，而不是自定义 UI flow。 |
-| `C6_StoneClearing` | `C/C6_StoneClearing.php` | `shared/cards-display/C/C6_StoneClearing.ts`; `shared/cards/C/C6_StoneClearing.ts` | metadata/passing 影响卡牌显示和可打出 metadata，而不是自定义 UI flow。 |
-| `C9_AutomaticWaterTrough` | `C/C9_AutomaticWaterTrough.php` | `shared/cards-display/C/C9_AutomaticWaterTrough.ts`; `shared/cards/C/C9_AutomaticWaterTrough.ts` | metadata/passing 影响卡牌显示和可打出 metadata，而不是自定义 UI flow。 |
-| `D1_ZigzagHarrow` | `D/D1_ZigzagHarrow.php` | `shared/cards-display/D/D1_ZigzagHarrow.ts`; `shared/cards/D/D1_ZigzagHarrow.ts` | metadata/passing 影响卡牌显示和可打出 metadata，而不是自定义 UI flow。 |
-| `E5_NightLoot` | `E/E5_NightLoot.php` | `shared/cards-display/E/E5_NightLoot.ts`; `shared/cards/E/E5_NightLoot.ts` | metadata/passing 影响卡牌显示和可打出 metadata，而不是自定义 UI flow。 |
 
 ## 3. 已接受差异
 
@@ -715,15 +705,15 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B178_TagAlong` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B179_WildBoarHunter` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B180_GameTeaser` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `C1_Overhaul` | 需复核 | BGA passing=true 未声明，需对齐 |
+| `C1_Overhaul` | 已对齐 | BGA passing 行为已实装（apply-improvement.ts 分支） |
 | `C2_Stable` | 已对齐 |  |
 | `C3_CarriageTrip` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `C4_WritingBoards` | 已对齐 |  |
 | `C5_Remodeling` | 已对齐 |  |
-| `C6_StoneClearing` | 需复核 | BGA passing=true 未声明，需对齐；stone-field timing 仍为已接受差异 |
+| `C6_StoneClearing` | 已对齐 | BGA passing 行为已实装（apply-improvement.ts 分支） |
 | `C7_BladeShears` | 已对齐 |  |
 | `C8_PlantFertilizer` | 已对齐 |  |
-| `C9_AutomaticWaterTrough` | 需复核 | BGA passing=true 未声明，需对齐 |
+| `C9_AutomaticWaterTrough` | 已对齐 | BGA passing 行为已实装（apply-improvement.ts 分支） |
 | `C10_BunkBeds` | 已对齐 |  |
 | `C11_WildlifeReserve` | 已对齐 |  |
 | `C12_CattleFarm` | 已对齐 |  |
@@ -895,7 +885,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C178_OnSiteReverend` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `C179_BovinePioneer` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `C180_Trapper` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `D1_ZigzagHarrow` | 需复核 | BGA passing=true 未声明，需对齐；harrow target 限制为已接受简化 |
+| `D1_ZigzagHarrow` | 已对齐 | BGA passing 行为已实装（apply-improvement.ts 分支） |
 | `D2_DwellingPlan` | 已对齐 |  |
 | `D3_Furrows` | 已对齐 |  |
 | `D4_CrossCutWood` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
@@ -1079,7 +1069,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `E2_RenovationMaterials` | 已对齐 |  |
 | `E3_TeaTime` | 已对齐 |  |
 | `E4_Thunderbolt` | 已对齐 |  |
-| `E5_NightLoot` | 需复核 | BGA passing=true 未声明，需对齐；onBuy 使用共享 partial-take helper 从 accumulation space 移除资源 |
+| `E5_NightLoot` | 已对齐 | BGA passing 行为已实装（apply-improvement.ts 分支） |
 | `E6_Recount` | 已对齐 |  |
 | `E7_Pumpernickel` | 已对齐 |  |
 | `E8_FarmersMarket` | 已对齐 |  |
