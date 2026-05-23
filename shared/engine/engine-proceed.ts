@@ -162,6 +162,23 @@ const currentEventReadContext = (
   }
 }
 
+const deferredHostEventReadContext = (
+  int: EngineInternals,
+  node: ActionNode,
+) => {
+  const transactionEvents = [...int.events.currentTransactionEvents()]
+  const capturedTransactionEvents = node.deferredHostTransactionEvents ?? []
+  const actionEvents = [
+    ...(node.deferredHostActionEvents ?? []),
+    ...transactionEvents.slice(capturedTransactionEvents.length),
+  ]
+  return {
+    transactionEvents,
+    actionEvents,
+    eventQuery: createEventQuery(transactionEvents),
+  }
+}
+
 const eventReadContextForActivation = (
   int: EngineInternals,
   params: ActivateCardActionNode['params'],
@@ -630,17 +647,11 @@ const executeDeferredHostAction = (
     completedEvents = eventFrame.complete(context.state)
     recordEventLogDerivation(int, completedEvents, result)
   }
-  const eventReadContext = completedEvents
-    ? currentEventReadContext(int, completedEvents)
-    : node.deferredHostTransactionEvents
-    ? {
-        transactionEvents: [...node.deferredHostTransactionEvents],
-        actionEvents: node.deferredHostActionEvents
-          ? [...node.deferredHostActionEvents]
-          : undefined,
-        eventQuery: createEventQuery(node.deferredHostTransactionEvents),
-      }
-    : currentEventReadContext(int, node.deferredHostActionEvents)
+  const eventReadContext = node.deferredHostTransactionEvents
+    ? deferredHostEventReadContext(int, node)
+    : completedEvents
+      ? currentEventReadContext(int, completedEvents)
+      : currentEventReadContext(int, node.deferredHostActionEvents)
   const duringPhase = int.hooks.during(
     { ...executionContext, ...eventReadContext, actionId: node.actionId },
     result,
