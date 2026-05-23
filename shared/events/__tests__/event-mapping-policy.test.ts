@@ -326,7 +326,7 @@ describe('event mapping policy', () => {
     }
   })
 
-  it('keeps card.passed as schema-only until a public-safe emitter is added', () => {
+  it('card.passed is emitted only by apply-improvement passing branch', () => {
     const allowedFiles = [
       'shared/contract/events.ts',
       'shared/events/guards.ts',
@@ -335,6 +335,7 @@ describe('event mapping policy', () => {
       'shared/events/__tests__/log-mapper.test.ts',
       'shared/actions/effects/apply-improvement.ts',
       'server/__tests__/passing-mechanism-session.test.ts',
+      'server/__tests__/passing-mechanism-onbuy.test.ts',
     ]
     const unexpectedEmitters = findCardPassedReferences()
       .filter((line) => !allowedFiles.some((path) => line.startsWith(`${path}:`)))
