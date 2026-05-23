@@ -113,6 +113,28 @@ describe('passing-mechanism: cycle and wrap', () => {
   })
 })
 
+describe('passing-mechanism: undo', () => {
+  it('undoAction 后 buyer.minorHand 恢复 / next.minorHand 不含 / events 移除 card.passed', () => {
+    const { session, state } = setupPassingSession({ buyerMinorHand: ['A1_Shelter'] })
+    const woodBefore = state.players[0]!.resources.wood ?? 0
+
+    session.takeAction(0, 'meeting-place')
+    let resp = session.resolveChoice(0, 'minor:A1_Shelter')
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[1]!.minorHand).toContain('A1_Shelter')
+
+    resp = session.undoAction()
+    expect(resp.ok).toBe(true)
+
+    expect(resp.state.players[0]!.minorHand).toContain('A1_Shelter')
+    expect(resp.state.players[1]!.minorHand).not.toContain('A1_Shelter')
+    expect(resp.state.players[0]!.resources.wood ?? 0).toBe(woodBefore)
+
+    const passedActive = resp.state.events.filter((e) => e.type === 'card.passed')
+    expect(passedActive).toHaveLength(0)
+  })
+})
+
 describe('passing-mechanism: receiver behavior', () => {
   it('receiver 不选 passing 卡时卡仍留 minorHand', () => {
     const { session } = setupPassingSession({ buyerMinorHand: ['A1_Shelter'] })
