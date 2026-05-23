@@ -34,6 +34,7 @@ import { pushCardStackAction } from './effects/internal/push-to-card-stack'
 import { buildFarmhandRoomAction } from './effects/internal/build-farmhand-room'
 import { selectionAction } from './effects/internal/selection'
 import { spendWorkerAction } from './effects/internal/spend-worker'
+import { activateCardEffectAction } from './effects/internal/activate-card-effect'
 import { specialEffectAction } from './effects/special-effect'
 
 export const internalActionDefinitions: ActionDefinition[] = [
@@ -75,5 +76,6 @@ export const internalActionDefinitions: ActionDefinition[] = [
   pushCardStackAction,
   buildFarmhandRoomAction,
   selectionAction,
+  activateCardEffectAction,
   specialEffectAction,
 ]
