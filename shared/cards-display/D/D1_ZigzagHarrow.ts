@@ -15,17 +15,12 @@ const CARD_ID = 'D1_ZigzagHarrow'
  * driven by `getPlowableTiles(player)` which only filters by occupancy +
  * field-adjacency, not by an external allowlist.
  *
- * **Deliberate divergence (Sprint 7a deferred):** restricting plow to
+ * **Deliberate divergence (deferred):** restricting plow to
  * zigzag-completing positions requires:
  *   1. A board-geometry helper computing the zigzag-completing tile set
- *   2. Threading `actionContext.allowedTiles` through plow → plow-validation
- *      → farm-edit UI
- * Both are main-path changes outside the F1 onBuy SEQ-truncation scope.
- * Tracked in docs/card_implementation_status.md.
- *
- * Implementation:
- *   - Emit optional plow leaf (current behavior).
- *   - `passing: true` removed (per spec §决策点 1).
+ *   2. Threading `actionContext.allowedTiles` through plow -> plow-validation
+ *      -> farm-edit UI
+ * Both are main-path changes. Tracked in docs/card_implementation_status.md.
  */
 export const D1_ZigzagHarrow = new MinorImprovement({
   id: CARD_ID,
@@ -36,4 +31,5 @@ export const D1_ZigzagHarrow = new MinorImprovement({
   desc: ['You can immediately plow 1 field such that it completes a "zigzag" pattern.'],
   cost: { wood: 1 },
   prerequisite: '3 Fields in an "L" Shape',
+  passing: true,
 })
