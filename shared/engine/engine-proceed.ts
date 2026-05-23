@@ -921,6 +921,29 @@ export function engineProceed(
       actionContext: actionContextForNode(node, int),
       emitPrivateEvent: context.emitPrivateEvent,
     }
+    if (!int.beforePhaseFlowNodeIds.has(node.id)) {
+      const beforePhase = int.hooks.before({
+        ...executionContext,
+        ...currentEventReadContext(int),
+        actionId: replacedActionId,
+      })
+      const beforeBaseEvent = buildListenerEvent(executionContext, {})
+      const beforeActivateNodes = buildPhaseTrailingNodes(
+        int,
+        beforePhase.matchedListeners,
+        'before',
+        replacedActionId,
+        context.state,
+        beforeBaseEvent,
+        executionContext.player.id,
+      )
+      if (beforeActivateNodes.length > 0 && !node.beforePhaseResolved) {
+        node.beforePhaseResolved = true
+        enforceCompositeContinuationMandatory(node)
+        int.tree.insertBefore(node.id, beforeActivateNodes)
+        return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+      }
+    }
     const doable = int.hooks.applyIsDoable(
       { ...executionContext, ...currentEventReadContext(int), actionId: replacedActionId },
       action,
@@ -962,29 +985,6 @@ export function engineProceed(
     )
     executionContext.costs =
       Object.keys(costOverride).length > 0 ? costOverride : undefined
-    if (!int.beforePhaseFlowNodeIds.has(node.id)) {
-      const beforePhase = int.hooks.before({
-        ...executionContext,
-        ...currentEventReadContext(int),
-        actionId: replacedActionId,
-      })
-      const beforeBaseEvent = buildListenerEvent(executionContext, {})
-      const beforeActivateNodes = buildPhaseTrailingNodes(
-        int,
-        beforePhase.matchedListeners,
-        'before',
-        replacedActionId,
-        context.state,
-        beforeBaseEvent,
-        executionContext.player.id,
-      )
-      if (beforeActivateNodes.length > 0 && !node.beforePhaseResolved) {
-        node.beforePhaseResolved = true
-        enforceCompositeContinuationMandatory(node)
-        int.tree.insertBefore(node.id, beforeActivateNodes)
-        return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
-      }
-    }
     const eventFrame = int.events.beginFrame({
       actorPlayerId: executionContext.player.id,
       sourceActionId: replacedActionId,

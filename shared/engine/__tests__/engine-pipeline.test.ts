@@ -7,12 +7,12 @@ import type {
 } from '../../contract/types'
 import { ActionRegistry } from '../registry'
 import { CardRegistry } from '../../cards/registry'
-import { setActiveCardRegistry, requireActiveCardRegistry } from '../../cards/active-registry'
+import { setActiveCardRegistry } from '../../cards/active-registry'
 import { Engine } from '../engine'
 import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
-import { ActionNode, SequenceNode } from '../nodes'
+import { ActionNode, SequenceNode, XorNode } from '../nodes'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
 
 const createState = (): GameState =>
@@ -84,6 +84,80 @@ const createSpace = (action: ActionDefinition): ActionSpace => ({
   takenBy: [],
 })
 
+const beforeGrantCard = 'BEFORE_GRANT_CARD'
+
+const registerBeforeGrant = (actionId: string) => {
+  const cardRegistry = new CardRegistry()
+  cardRegistry.registerListener({
+    id: `before-grant-${actionId}`,
+    cardIds: [beforeGrantCard],
+    actions: [actionId],
+    phases: ['before'],
+    mandatory: true,
+    handler: (ctx) => {
+      if (
+        actionId === 'pending-before-cost' &&
+        (ctx as { pendingCommit?: boolean }).pendingCommit !== true
+      ) {
+        return undefined
+      }
+      return {
+        flow: { type: 'leaf' as const, actionId: 'grant-before-resource' },
+      }
+    },
+  })
+  setActiveCardRegistry(cardRegistry)
+}
+
+const grantBeforeResourceAction: ActionDefinition = {
+  id: 'grant-before-resource',
+  nameKey: 'test.grantBeforeResource',
+  descriptionKey: 'test.grantBeforeResource',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: () => true,
+  execute: (ctx) => {
+    ctx.player.resources.food += 1
+    return { type: 'ok' }
+  },
+}
+
+const registerFoodSensitiveCost = (
+  actionId: string,
+  options: { onlyWhenPendingCommit?: boolean } = {},
+) => {
+  registerActionHook({
+    id: `food-sensitive-cost-${actionId}`,
+    actions: [actionId],
+    phases: ['computeCosts'],
+    handler: (ctx) => {
+      if (
+        options.onlyWhenPendingCommit === true &&
+        ctx.params?.selectedOption === undefined &&
+        ctx.actionContext?.pendingCommit !== true
+      ) {
+        return undefined
+      }
+      if (ctx.player.resources.food < 1) {
+        throw new Error('computeCosts ran before before grant')
+      }
+      return { costs: { wood: -1 } }
+    },
+  })
+}
+
+const runUntil = (
+  engine: Engine,
+  context: { state: GameState; player: PlayerState; space: ActionSpace },
+  done: () => boolean,
+) => {
+  for (let i = 0; i < 10 && !done(); i += 1) {
+    const step = engine.proceed(context)
+    if (step.type === 'blocked' || step.type === 'choice' || step.type === 'done') return step
+  }
+  return engine.proceed(context)
+}
+
 describe('Engine pipeline phase order', () => {
   beforeEach(() => {
     clearActionHooks()
@@ -131,9 +205,9 @@ describe('Engine pipeline phase order', () => {
 
     expect(phases).toEqual([
       'computeReplace',
+      'before',
       'isDoable',
       'computeCosts',
-      'before',
       'execute',
       'during',
       'immediatelyAfter',
@@ -192,9 +266,9 @@ describe('Engine pipeline phase order', () => {
 
     expect(phases).toEqual([
       'computeReplace',
+      'before',
       'isDoable',
       'computeCosts',
-      'before',
       'execute',
       'during',
       'computeArgs',
@@ -342,5 +416,152 @@ describe('Engine pipeline phase order', () => {
     const second = engine.proceed({ state, player, space })
     expect(second.type).toBe('ok')
     expect(executed).toEqual(['main', 'bonus'])
+  })
+
+  it('runs before before committed isDoable and computeCosts in proceed', () => {
+    let committed = false
+    let receivedCosts: unknown
+    const action: ActionDefinition = {
+      id: 'proceed-before-cost',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: (_state, player) => player.resources.food >= 1,
+      execute: (ctx) => {
+        committed = true
+        receivedCosts = ctx.costs
+        return { type: 'ok' }
+      },
+    }
+
+    registerBeforeGrant(action.id)
+    registerFoodSensitiveCost(action.id)
+
+    const registry = new ActionRegistry()
+    registry.register(action)
+    registry.register(grantBeforeResourceAction)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('a', action.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    player.resources.food = 0
+    player.minorPlayed = [beforeGrantCard]
+    state.players = [player]
+    const space = createSpace(action)
+
+    runUntil(engine, { state, player, space }, () => committed)
+
+    expect(committed).toBe(true)
+    expect(receivedCosts).toEqual({ wood: -1 })
+  })
+
+  it('runs before before committed isDoable and computeCosts after xor choice', () => {
+    let committed = false
+    let receivedCosts: unknown
+    const action: ActionDefinition = {
+      id: 'xor-before-cost',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: (_state, player, ctx) =>
+        ctx.actionContext?.skipBeforeTriggers === true
+          ? player.resources.food >= 1
+          : true,
+      execute: (ctx) => {
+        committed = true
+        receivedCosts = ctx.costs
+        return { type: 'ok' }
+      },
+    }
+
+    registerBeforeGrant(action.id)
+    registerFoodSensitiveCost(action.id)
+
+    const registry = new ActionRegistry()
+    registry.register(action)
+    registry.register(grantBeforeResourceAction)
+    const engine = new Engine({
+      tree: new EngineTree(new XorNode('xor', [new ActionNode('a', action.id)])),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    player.resources.food = 0
+    player.minorPlayed = [beforeGrantCard]
+    state.players = [player]
+    const space = createSpace(action)
+
+    const choice = runUntil(engine, { state, player, space }, () => false)
+    expect(choice.type).toBe('choice')
+    engine.resolveChoice('a', { state, player, space })
+    runUntil(engine, { state, player, space }, () => committed)
+
+    expect(committed).toBe(true)
+    expect(receivedCosts).toEqual({ wood: -1 })
+  })
+
+  it('runs before before committed isDoable and computeCosts after pending resolveChoice', () => {
+    let committed = false
+    let receivedCosts: unknown
+    const action: ActionDefinition = {
+      id: 'pending-before-cost',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: (_state, player, ctx) =>
+        ctx.actionContext?.pendingCommit === true ? player.resources.food >= 1 : true,
+      execute: () => ({
+        type: 'request',
+        request: { kind: 'choice', options: [{ value: 'commit', labelKey: 'Commit' }] },
+        promptKey: 'choose',
+        extraData: { actionContextWrite: { pendingCommit: true } },
+      }),
+      resolveChoice: (ctx) => {
+        if (ctx.player.resources.food < 1 || ctx.costs?.wood !== -1) {
+          return { type: 'fail', errorKey: 'log.action' }
+        }
+        committed = true
+        receivedCosts = ctx.costs
+        return { type: 'ok' }
+      },
+    }
+
+    registerBeforeGrant(action.id)
+    registerFoodSensitiveCost(action.id, { onlyWhenPendingCommit: true })
+
+    const registry = new ActionRegistry()
+    registry.register(action)
+    registry.register(grantBeforeResourceAction)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('a', action.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    player.resources.food = 0
+    state.players = [player]
+    const space = createSpace(action)
+
+    const choice = runUntil(engine, { state, player, space }, () => false)
+    expect(choice.type).toBe('choice')
+    player.minorPlayed = [beforeGrantCard]
+    engine.resolveChoice('commit', { state, player, space })
+    const restoredChoice = runUntil(engine, { state, player, space }, () => false)
+    expect(restoredChoice.type).toBe('choice')
+    engine.resolveChoice('commit', { state, player, space })
+
+    expect(committed).toBe(true)
+    expect(receivedCosts).toEqual({ wood: -1 })
   })
 })
