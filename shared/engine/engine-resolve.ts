@@ -471,25 +471,6 @@ export function engineResolveChoice(
         int.pendingNodeIdRef.value = null
         return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
       }
-      const costResults = int.hooks.computeCosts({
-        ...executionContext,
-        ...currentEventReadContext(int),
-        actionId,
-      })
-      const costOverride = costResults.reduce<Partial<PlayerState['resources']>>(
-        (acc, entry) => {
-          if (!entry.costs) return acc
-          Object.entries(entry.costs).forEach(([key, value]) => {
-            if (typeof value !== 'number') return
-            const resourceKey = key as keyof PlayerState['resources']
-            acc[resourceKey] = (acc[resourceKey] ?? 0) + value
-          })
-          return acc
-        },
-        {},
-      )
-      executionContext.costs =
-        Object.keys(costOverride).length > 0 ? costOverride : undefined
       const skipBefore = int.beforePhaseFlowNodeIds.has(child.id)
       const beforeEventReadContext = currentEventReadContext(int)
       const beforePhase = skipBefore
@@ -521,6 +502,41 @@ export function engineResolveChoice(
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
+      const doable = int.hooks.applyIsDoable(
+        { ...executionContext, ...currentEventReadContext(int), actionId },
+        action,
+        action.canBeExecutedByPlayer(
+          executionContext.state,
+          executionContext.player,
+          {
+            sourceCard: executionContext.sourceCard,
+            actionContext: executionContext.actionContext,
+          },
+        ),
+      )
+      if (!doable) {
+        int.pendingNodeIdRef.value = null
+        return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
+      }
+      const costResults = int.hooks.computeCosts({
+        ...executionContext,
+        ...currentEventReadContext(int),
+        actionId,
+      })
+      const costOverride = costResults.reduce<Partial<PlayerState['resources']>>(
+        (acc, entry) => {
+          if (!entry.costs) return acc
+          Object.entries(entry.costs).forEach(([key, value]) => {
+            if (typeof value !== 'number') return
+            const resourceKey = key as keyof PlayerState['resources']
+            acc[resourceKey] = (acc[resourceKey] ?? 0) + value
+          })
+          return acc
+        },
+        {},
+      )
+      executionContext.costs =
+        Object.keys(costOverride).length > 0 ? costOverride : undefined
       const eventFrame = int.events.beginFrame({
         actorPlayerId: executionContext.player.id,
         sourceActionId: actionId,
@@ -755,6 +771,68 @@ export function engineResolveChoice(
     ...(executionContext.params ?? {}),
     selectedOption: choice,
   }
+  const pendingActionNode = pendingHost instanceof ActionNode ? pendingHost : null
+  if (pendingActionNode?.beforePhaseResolved === true) {
+    executionContext.actionContext = {
+      ...(executionContext.actionContext ?? {}),
+      skipBeforeTriggers: true,
+    }
+  }
+  const skipBefore = pendingActionNode?.beforePhaseResolved === true
+  const beforeEventReadContext = currentEventReadContext(int)
+  const beforePhase = skipBefore
+    ? { matchedListeners: [] }
+    : int.hooks.before({ ...executionContext, ...beforeEventReadContext, actionId })
+  const beforeBaseEvent = buildListenerEvent(executionContext, {})
+  const beforeActivateNodes = buildPhaseTrailingNodes(
+    int,
+    beforePhase.matchedListeners,
+    'before',
+    actionId,
+    context.state,
+    beforeBaseEvent,
+    executionContext.player.id,
+    beforeEventReadContext.transactionEvents,
+  )
+  if (beforeActivateNodes.length > 0 && pendingActionNode && !pendingActionNode.beforePhaseResolved) {
+    pendingActionNode.beforePhaseResolved = true
+    int.tree.insertBefore(pendingActionNode.id, beforeActivateNodes)
+    return { type: 'ok' }
+  }
+  const doable = int.hooks.applyIsDoable(
+    { ...executionContext, ...currentEventReadContext(int), actionId },
+    action,
+    action.canBeExecutedByPlayer(
+      executionContext.state,
+      executionContext.player,
+      {
+        sourceCard: executionContext.sourceCard,
+        actionContext: executionContext.actionContext,
+      },
+    ),
+  )
+  if (!doable) {
+    return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
+  }
+  const costResults = int.hooks.computeCosts({
+    ...executionContext,
+    ...currentEventReadContext(int),
+    actionId,
+  })
+  const costOverride = costResults.reduce<Partial<PlayerState['resources']>>(
+    (acc, entry) => {
+      if (!entry.costs) return acc
+      Object.entries(entry.costs).forEach(([key, value]) => {
+        if (typeof value !== 'number') return
+        const resourceKey = key as keyof PlayerState['resources']
+        acc[resourceKey] = (acc[resourceKey] ?? 0) + value
+      })
+      return acc
+    },
+    {},
+  )
+  executionContext.costs =
+    Object.keys(costOverride).length > 0 ? costOverride : undefined
   pendingHost?.clearPending()
   let result: ActionExecutionResult
   let eventFrame: ReturnType<EngineInternals['events']['beginFrame']> | null = null
