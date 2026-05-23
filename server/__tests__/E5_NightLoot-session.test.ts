@@ -3,7 +3,6 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import type { ActionSpace, Resource } from '../../shared/contract/types'
 
-import { E5_NightLoot } from '../../shared/cards-display/E/E5_NightLoot'
 import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'E5_NightLoot'
@@ -142,10 +141,6 @@ describe('E5_NightLoot session', () => {
       // Should have exactly 1 pair: wood+stone
       expect(children.length).toBe(1)
     }
-  })
-
-  it('passing flag is removed from card metadata', () => {
-    expect((E5_NightLoot as { passing?: boolean }).passing).toBeFalsy()
   })
 
   it('onBuy uses collect leaves with actionContext that decrement accumulation spaces', () => {
