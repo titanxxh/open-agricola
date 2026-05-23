@@ -343,6 +343,8 @@ const buildDeferredHostNode = (
   result: ActionExecutionResult,
   actionId: string,
   executionContext: ActionExecutionContext,
+  transactionEvents: readonly GameEvent[],
+  actionEvents: readonly GameEvent[],
 ): ActionNode => {
   const node = new ActionNode(
     `internal-host-${hostNode.id}-${int.counterRef.value++}`,
@@ -358,6 +360,8 @@ const buildDeferredHostNode = (
   node.deferredHostResult = result
   node.deferredAfterHostChildren =
     result.type === 'ok' ? result.internalChildren?.afterHostListeners : undefined
+  node.deferredHostTransactionEvents = [...transactionEvents]
+  node.deferredHostActionEvents = [...actionEvents]
   return node
 }
 
@@ -552,7 +556,15 @@ const executeDeferredHostAction = (
     actionContext: actionContextForNode(node, int),
     emitPrivateEvent: context.emitPrivateEvent,
   }
-  const eventReadContext = currentEventReadContext(int)
+  const eventReadContext = node.deferredHostTransactionEvents
+    ? {
+        transactionEvents: [...node.deferredHostTransactionEvents],
+        actionEvents: node.deferredHostActionEvents
+          ? [...node.deferredHostActionEvents]
+          : undefined,
+        eventQuery: createEventQuery(node.deferredHostTransactionEvents),
+      }
+    : currentEventReadContext(int, node.deferredHostActionEvents)
   const duringPhase = int.hooks.during(
     { ...executionContext, ...eventReadContext, actionId: node.actionId },
     result,
@@ -1023,6 +1035,8 @@ export function engineProceed(
         result,
         replacedActionId,
         executionContext,
+        currentEventReadContext(int).transactionEvents,
+        completedEvents,
       )
       node.resolve(result)
       int.tree.insertAfter(node.id, [...beforeHostNodes, deferredHostNode])

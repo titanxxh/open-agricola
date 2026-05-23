@@ -281,6 +281,8 @@ const buildDeferredHostNode = (
   result: ActionExecutionResult,
   actionId: string,
   executionContext: ActionExecutionContext,
+  transactionEvents: readonly GameEvent[],
+  actionEvents: readonly GameEvent[],
 ): ActionNode => {
   const node = new ActionNode(
     `internal-host-${hostNode.id}-${int.counterRef.value++}`,
@@ -296,6 +298,8 @@ const buildDeferredHostNode = (
   node.deferredHostResult = result
   node.deferredAfterHostChildren =
     result.type === 'ok' ? result.internalChildren?.afterHostListeners : undefined
+  node.deferredHostTransactionEvents = [...transactionEvents]
+  node.deferredHostActionEvents = [...actionEvents]
   return node
 }
 
@@ -554,6 +558,8 @@ export function engineResolveChoice(
           result,
           actionId,
           executionContext,
+          currentEventReadContext(int).transactionEvents,
+          completedEvents,
         )
         const insertAnchor = node instanceof XorNode ? node.id : child.id
         child.resolve(result)
@@ -799,6 +805,8 @@ export function engineResolveChoice(
       result,
       actionId,
       executionContext,
+      currentEventReadContext(int).transactionEvents,
+      completedEvents,
     )
     const insertAnchor = pendingEnvelope?.ownerNodeId ?? pendingHost.id
     pendingHost.resolve(result)

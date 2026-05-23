@@ -73,6 +73,27 @@ const cloneEventLogDerivations = (
     result: cloneSnapshotValue(entry.result),
   }))
 
+type InternalChildResultsSnapshot = Array<{
+  hostNodeId: string
+  results: Record<string, ActionExecutionResult>
+}>
+
+const cloneInternalChildResults = (
+  results: EngineInternals['internalChildResults'],
+): InternalChildResultsSnapshot =>
+  [...results.entries()].map(([hostNodeId, hostResults]) => ({
+    hostNodeId,
+    results: cloneSnapshotValue(hostResults),
+  }))
+
+const restoreInternalChildResults = (
+  snapshot?: InternalChildResultsSnapshot,
+): EngineInternals['internalChildResults'] =>
+  new Map((snapshot ?? []).map((entry) => [
+    entry.hostNodeId,
+    cloneSnapshotValue(entry.results),
+  ]))
+
 const setNodeState = (
   node: EngineNode,
   state: 'ready' | 'resolved' | 'blocked',
@@ -180,6 +201,8 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
         action.emittedRequest = data.emittedRequest as InteractionRequest | undefined
         action.deferredHostResult = data.deferredHostResult as ActionExecutionResult | undefined
         action.deferredAfterHostChildren = data.deferredAfterHostChildren as ActionNode['deferredAfterHostChildren']
+        action.deferredHostTransactionEvents = data.deferredHostTransactionEvents as ActionNode['deferredHostTransactionEvents']
+        action.deferredHostActionEvents = data.deferredHostActionEvents as ActionNode['deferredHostActionEvents']
         node = action
         break
       }
@@ -468,6 +491,7 @@ export class Engine {
       // the pending-choice host on rehydrate.
       compositeEmit: snapshotCompositeEmit(this._internals()),
       beforePhaseFlowNodeIds: [...this.beforePhaseFlowNodeIds],
+      internalChildResults: cloneInternalChildResults(this.internalChildResults),
       eventTransaction: this.events.snapshot(),
       eventLogDerivations: cloneEventLogDerivations(this.eventLogDerivations),
     }
@@ -530,10 +554,12 @@ export class Engine {
       request?: InteractionRequest
     } | null
     beforePhaseFlowNodeIds?: string[]
+    internalChildResults?: InternalChildResultsSnapshot
     eventTransaction?: ReturnType<Engine['events']['snapshot']>
     eventLogDerivations?: EngineInternals['eventLogDerivations']
   }) {
     this.beforePhaseFlowNodeIds = new Set(snapshot.beforePhaseFlowNodeIds ?? [])
+    this.internalChildResults = restoreInternalChildResults(snapshot.internalChildResults)
     this.events.restore(snapshot.eventTransaction)
     this.eventLogDerivations = cloneEventLogDerivations(snapshot.eventLogDerivations ?? [])
     const restoredRoot = snapshot.treeCursor ? restoreTreeFromCursor(snapshot.treeCursor) : null
