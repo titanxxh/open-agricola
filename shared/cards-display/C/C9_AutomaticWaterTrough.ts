@@ -10,4 +10,5 @@ export const C9_AutomaticWaterTrough = new MinorImprovement({
   category: 'LIVESTOCK_PROVIDER',
   desc: ['If you can accommodate the animal, you can immediately buy 1 <SHEEP>/<PIG>/<CATTLE> for 0/1/2 <FOOD>.'],
   cost: { wood: 1 },
+  passing: true,
 })

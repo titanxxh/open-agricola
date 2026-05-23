@@ -12,5 +12,6 @@ export const A3_PaperKnife = new MinorImprovement({
     'Select 3 occupations in your hand. Select one of them randomly, which you can play immediately without paying an occupation cost.',
   ],
   cost: { wood: 1 },
+  passing: true,
   prerequisite: '3 Occupations In Hand',
 })

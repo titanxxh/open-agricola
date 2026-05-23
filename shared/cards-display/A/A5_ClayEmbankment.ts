@@ -10,4 +10,5 @@ export const A5_ClayEmbankment = new MinorImprovement({
   category: 'BUILDING_RESOURCE_PROVIDER',
   desc: ['You immediately get 1 <CLAY> for every 2 <CLAY> you already have in your supply.'],
   cost: { food: 1 },
+  passing: true,
 })
