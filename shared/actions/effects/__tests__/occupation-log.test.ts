@@ -11,12 +11,15 @@ import { ActionNode, SequenceNode } from '../../../engine/nodes'
 import { ActionRegistry } from '../../../engine/registry'
 import { internalActionDefinitions } from '../../internal-actions'
 import { playOccupation } from '../occupation'
+import { readCardResourceStats } from '../../../cards/helpers/card-state'
 import '../../../cards/A/A85_Homekeeper'
 import '../../../cards/C/C107_Baker'
+import '../../../cards-display/A/A123_FrameBuilder'
 
 const FLOW_CARD_ID = 'C107_Baker'
 const OK_CARD_ID = 'A85_Homekeeper'
 const SELF_AFTER_CARD_ID = 'B155_ArtTeacher'
+const GRANT_SOURCE_CARD_ID = 'C152_Puppeteer'
 
 const createState = (): GameState => ({
   round: 1,
@@ -91,12 +94,16 @@ const createSpace = (id = 'lessons'): ActionSpace =>
     canBeExecutedByPlayer: () => true,
   }) as ActionSpace
 
-const buildEngine = (actions: ActionDefinition[], hostActionId: string) => {
+const buildEngine = (
+  actions: ActionDefinition[],
+  hostActionId: string,
+  sourceCard?: string,
+) => {
   const registry = new ActionRegistry()
   actions.forEach((action) => registry.register(action))
   return new Engine({
     tree: new EngineTree(new SequenceNode(`sequence-${hostActionId}`, [
-      new ActionNode(`action-${hostActionId}`, hostActionId),
+      new ActionNode(`action-${hostActionId}`, hostActionId, sourceCard),
     ])),
     registry,
     hooks: new HookDispatcher(),
@@ -214,5 +221,43 @@ describe('occupation play result', () => {
     } finally {
       setActiveCardRegistry(previousRegistry)
     }
+  })
+
+  it('does not record source-card gained occupation when pay child fails', () => {
+    const state = createState()
+    const player = createPlayer({
+      occupationHand: ['A123_FrameBuilder'],
+      resources: {
+        wood: 0,
+        clay: 0,
+        reed: 0,
+        stone: 0,
+        food: 0,
+        grain: 0,
+        vegetable: 0,
+        sheep: 0,
+        boar: 0,
+        cattle: 0,
+        begging: 0,
+      },
+    })
+    state.players = [player]
+    const actions = internalActionDefinitions.filter((action) =>
+      ['play-occupation', 'pay'].includes(action.id),
+    )
+    const engine = buildEngine(actions, 'play-occupation', GRANT_SOURCE_CARD_ID)
+    const space = createSpace()
+    const context = { state, player, space }
+
+    const choiceStep = engine.proceed(context)
+    expect(choiceStep.type).toBe('choice')
+    const resolved = engine.resolveChoice('A123_FrameBuilder', context)
+    expect(resolved.type).toBe('ok')
+    const payStep = engine.proceed(context)
+
+    expect(payStep.type).toBe('ok')
+    expect(player.occupationPlayed).not.toContain('A123_FrameBuilder')
+    expect(readCardResourceStats(player, GRANT_SOURCE_CARD_ID)).toBeUndefined()
+    expect(player.cardStates[GRANT_SOURCE_CARD_ID]).toBeUndefined()
   })
 })
