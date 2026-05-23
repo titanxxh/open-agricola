@@ -24,7 +24,7 @@ describe('passing-mechanism: C1_Overhaul complex onBuy', () => {
     session.loadState(state)
 
     session.takeAction(0, 'meeting-place')
-    let resp = session.resolveChoice(0, 'minor:C1_Overhaul')
+    const resp = session.resolveChoice(0, 'minor:C1_Overhaul')
     expect(resp.ok).toBe(true)
 
     // 卡已传给 P2（passing 核心行为）
