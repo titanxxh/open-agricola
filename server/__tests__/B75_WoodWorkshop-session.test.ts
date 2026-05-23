@@ -81,7 +81,7 @@ describe('B75_WoodWorkshop session', () => {
     expect(resp.interaction.promptKey).toBe('ui.confirmNextPlayer')
   })
 
-  it('uses real B75 wood then real A48 exchange to pay a food-cost minor', () => {
+  it('uses real B75 wood then real A48 exchange to pay and pass a food-cost minor', () => {
     const session = setup({
       wood: 4,
       food: 0,
@@ -108,7 +108,8 @@ describe('B75_WoodWorkshop session', () => {
     expect(exchange).toBeDefined()
     resp = session.resolveChoice(0, exchange!.value)
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.minorPlayed).toContain(FOOD_MINOR)
+    expect(resp.state.players[0]!.minorPlayed).not.toContain(FOOD_MINOR)
+    expect(resp.state.players[1]!.minorHand).toContain(FOOD_MINOR)
     expect(resp.state.players[0]!.resources.wood).toBe(4)
     expect(resp.state.players[0]!.resources.food).toBe(2)
     expect(resp.interaction.stateId).toBe('wait')
