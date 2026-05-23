@@ -3,7 +3,9 @@ import type {
   ActionDefinition,
   ActionMutationContext,
   ActionExecutionResult,
+  ComplexCost,
   FarmTilePosition,
+  InternalActionChild,
   PlayerState,
   Resource,
 } from '../../contract/types'
@@ -13,11 +15,12 @@ import type {
 // construct.ts only uses room-payment helpers (S4 domain aggregate scope),
 // so no PaymentSolver call sites exist here yet.
 import {
-  executeResolvedRoomPayment,
+  applyCostOverride,
   getBuildRoomCost,
   getMaxBuildableRooms,
   resolveRoomPaymentSelection,
 } from '../payment/internal'
+import { buildPayChild, type PayChildOptions } from '../helpers/pay-child'
 import { playerBoard } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
@@ -47,8 +50,29 @@ const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
   return result
 }
 
-const splitSourceIds = (csv: string | undefined): string[] =>
-  csv ? csv.split(',').map((source) => source.trim()).filter(Boolean) : []
+const buildInternalPayChild = (
+  options: PayChildOptions & { paymentChoice?: string },
+): InternalActionChild => {
+  const payChild = buildPayChild(options)
+  if (payChild.type !== 'leaf') {
+    throw new Error('Expected pay child leaf')
+  }
+  return {
+    actionId: payChild.actionId,
+    sourceCard: payChild.sourceCard,
+    params: payChild.params,
+    resultKey: 'payment',
+  }
+}
+
+const buildConstructPayCost = (
+  player: PlayerState,
+  costOverride: Partial<Resource> | undefined,
+  rooms: number,
+): ComplexCost => ({
+  unitFee: applyCostOverride(getBuildRoomCost(player.houseType), costOverride),
+  nb: rooms,
+})
 
 const finalizeRoom = (
   ctx: ActionMutationContext,
@@ -82,7 +106,6 @@ const finalizeRoom = (
   if (payment.type !== 'selected') return { type: 'fail', errorKey: 'log.buildRoomFail' }
 
   const nextPlayer = JSON.parse(JSON.stringify(ctx.player)) as PlayerState
-  executeResolvedRoomPayment(nextPlayer, payment)
   nextPlayer.roomTiles = [...nextPlayer.roomTiles, ...rooms]
   nextPlayer.rooms = nextPlayer.rooms + rooms.length
   applyPlayerMutation(ctx.player, nextPlayer)
@@ -106,26 +129,23 @@ const finalizeRoom = (
     })),
   })
   const resourcesPaid = positiveResources(payment.solution.resourcesPaid)
-  const bonusSources = splitSourceIds(payment.solution.bonusUsed)
-  if (
-    Object.keys(resourcesPaid).length > 0 ||
-    bonusSources.length > 0 ||
-    payment.solution.bonusChoiceIndex
-  ) {
-    ctx.eventSink?.emit<'resource.paid'>({
-      type: 'resource.paid',
-      resources: resourcesPaid,
-      paymentFor: 'construct',
-      paymentSources: [{ from: { kind: 'player', playerId: ctx.player.id }, resources: resourcesPaid }],
-      ...(bonusSources.length > 0 ? { bonusSources } : {}),
-      ...(payment.solution.bonusChoiceIndex ? { bonusChoiceIndex: payment.solution.bonusChoiceIndex } : {}),
-    })
-  }
 
   return {
     type: 'ok',
     resourcesPaid,
     extraData: { builtRooms: rooms },
+    internalChildren: {
+      beforeHostListeners: [
+        buildInternalPayChild({
+          cost: buildConstructPayCost(ctx.player, ctx.costs, rooms.length),
+          costType: 'construct',
+          optionPrefix: 'pay:room',
+          paymentChoice,
+          sourceCard: ctx.sourceCard,
+          sourceActionId: ctx.space.id,
+        }),
+      ],
+    },
   }
 }
 

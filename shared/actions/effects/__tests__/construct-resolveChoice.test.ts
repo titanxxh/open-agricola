@@ -77,8 +77,17 @@ describe('constructAction.resolveChoice', () => {
     expect(result.resourcesPaid).toEqual({ wood: 5, reed: 2 })
     expect(ctx.player.rooms).toBe(3)
     expect(ctx.player.roomTiles.some((t) => t.row === 0 && t.col === 0)).toBe(true)
-    expect(ctx.player.resources.wood).toBe(5)
-    expect(ctx.player.resources.reed).toBe(3)
+    expect(ctx.player.resources.wood).toBe(10)
+    expect(ctx.player.resources.reed).toBe(5)
+    expect(result.internalChildren?.beforeHostListeners).toMatchObject([
+      {
+        actionId: 'pay',
+        params: {
+          costType: 'construct',
+          optionPrefix: 'pay:room',
+        },
+      },
+    ])
   })
 
   it('fail when rooms array empty', () => {

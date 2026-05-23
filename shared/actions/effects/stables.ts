@@ -5,6 +5,7 @@ import type {
   ActionExecutionResult,
   FarmTilePosition,
   GameState,
+  InternalActionChild,
   PlayerState,
   Resource,
 } from '../../contract/types'
@@ -18,9 +19,9 @@ import { canExecuteWithCostPreview } from '../helpers/cost-preview'
 import { PaymentSolver } from '../payment'
 import type { PaymentCtx } from '../payment'
 import {
-  executeResolvedTypedFlatPayment,
   resolveTypedFlatPaymentSelection,
 } from '../payment/internal'
+import { buildPayChild, type PayChildOptions } from '../helpers/pay-child'
 import { playerBoard } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
@@ -86,6 +87,21 @@ const scaleCost = (
   return sanitizePayableCost(total)
 }
 
+const buildInternalPayChild = (
+  options: PayChildOptions & { paymentChoice?: string },
+): InternalActionChild => {
+  const payChild = buildPayChild(options)
+  if (payChild.type !== 'leaf') {
+    throw new Error('Expected pay child leaf')
+  }
+  return {
+    actionId: payChild.actionId,
+    sourceCard: payChild.sourceCard,
+    params: payChild.params,
+    resultKey: 'payment',
+  }
+}
+
 const applyPlayerMutation = (target: PlayerState, source: PlayerState) => {
   for (const key of Object.keys(target) as Array<keyof PlayerState>) {
     if (!(key in source)) {
@@ -117,25 +133,12 @@ const finalizeStables = (
   )
   if (payment.type !== 'selected') return { type: 'fail', errorKey: 'log.buildStableFail' }
   const nextPlayer = JSON.parse(JSON.stringify(ctx.player)) as PlayerState
-  executeResolvedTypedFlatPayment(nextPlayer, payment, 'stables')
   nextPlayer.stableTiles = [...nextPlayer.stableTiles, ...stables]
   applyPlayerMutation(ctx.player, nextPlayer)
   if (ctx.sourceCard) {
     addCardResourceGained(ctx.player, ctx.sourceCard, { stable: stables.length })
   }
   const resourcesPaid = sanitizePayableCost(payment.solution.resourcesPaid)
-  if (Object.keys(resourcesPaid).length > 0) {
-    ctx.eventSink?.emit<'resource.paid'>({
-      type: 'resource.paid',
-      sourceActionId: ctx.space.id,
-      resources: resourcesPaid,
-      to: { kind: 'supply' },
-      paymentFor: 'stables',
-      paymentSources: [
-        { from: { kind: 'player', playerId: ctx.player.id }, resources: resourcesPaid },
-      ],
-    })
-  }
   ctx.eventSink?.emit<'farm.stableBuilt'>({
     type: 'farm.stableBuilt',
     sourceActionId: ctx.space.id,
@@ -149,6 +152,18 @@ const finalizeStables = (
     type: 'ok',
     resourcesPaid,
     extraData: { builtStables: stables },
+    internalChildren: {
+      afterHostListeners: [
+        buildInternalPayChild({
+          cost: { fee: totalCost },
+          costType: 'stables',
+          optionPrefix: 'pay:stable',
+          paymentChoice,
+          sourceCard: ctx.sourceCard,
+          sourceActionId: ctx.space.id,
+        }),
+      ],
+    },
   }
 }
 

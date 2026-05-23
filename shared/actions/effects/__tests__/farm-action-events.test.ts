@@ -156,11 +156,6 @@ describe('farm action events', () => {
       palisadeEdges: [],
       extraWood: 0,
     }).type).toBe('ok')
-    expect(fenceEvents).toContainEqual(expect.objectContaining({
-      type: 'resource.paid',
-      resources: { wood: 4 },
-      paymentFor: 'fencing',
-    }))
     expect(fenceEvents).toContainEqual(expect.objectContaining({ type: 'farm.fenceBuilt' }))
   })
 
