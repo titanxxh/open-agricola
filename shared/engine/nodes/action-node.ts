@@ -5,6 +5,7 @@ import type {
   InternalActionChild,
   InteractionRequest,
 } from '../../contract/types'
+import type { GameEvent } from '../../contract/events'
 import type { EngineContext, NodeStepResult } from '../types'
 import { BaseNode } from './base'
 
@@ -22,6 +23,8 @@ export class ActionNode extends BaseNode {
   public internalPaymentInfoFrom?: string
   public deferredHostResult?: ActionExecutionResult
   public deferredAfterHostChildren?: InternalActionChild[]
+  public deferredHostTransactionEvents?: GameEvent[]
+  public deferredHostActionEvents?: GameEvent[]
   /**
    * S7 Batch 1 (Sprint S7) — when a leaf ActionNode is built from an
    * ActionDef without `resolveChoice`, its
@@ -106,6 +109,8 @@ export class ActionNode extends BaseNode {
       internalPaymentInfoFrom: this.internalPaymentInfoFrom,
       deferredHostResult: this.deferredHostResult,
       deferredAfterHostChildren: this.deferredAfterHostChildren,
+      deferredHostTransactionEvents: this.deferredHostTransactionEvents,
+      deferredHostActionEvents: this.deferredHostActionEvents,
     }
   }
 }

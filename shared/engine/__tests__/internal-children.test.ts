@@ -353,4 +353,143 @@ describe('engine internal children', () => {
       'host.after',
     ])
   })
+
+  it('restores completed internal child results before executing following siblings', () => {
+    const events: string[] = []
+    const hostAction: ActionDefinition = {
+      id: 'host-before-slot',
+      nameKey: 'test.hostBefore',
+      descriptionKey: 'test.hostBefore',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('host.execute')
+        return {
+          type: 'ok',
+          internalChildren: {
+            beforeHostListeners: [
+              { actionId: 'internal-pay-probe', resultKey: 'payment' },
+              { actionId: 'internal-onbuy-probe', paymentInfoFrom: 'payment' },
+            ],
+          },
+        }
+      },
+    }
+    const payProbe: ActionDefinition = {
+      id: 'internal-pay-probe',
+      nameKey: 'test.payProbe',
+      descriptionKey: 'test.payProbe',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('internal-pay-probe.execute')
+        return { type: 'ok', resourcesPaid: { food: 2 } }
+      },
+    }
+    const onBuyProbe: ActionDefinition = {
+      id: 'internal-onbuy-probe',
+      nameKey: 'test.onBuyProbe',
+      descriptionKey: 'test.onBuyProbe',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: ({ actionContext }) => {
+        const paymentInfo = actionContext?.paymentInfo as { resourcesPaid?: { food?: number } } | undefined
+        events.push(`internal-onbuy-probe.payment=${paymentInfo?.resourcesPaid?.food ?? 'missing'}`)
+        return { type: 'ok' }
+      },
+    }
+    const actions = [hostAction, payProbe, onBuyProbe]
+    const state = createState()
+    const player = createPlayer()
+    state.players = [player]
+    const space = createSpace(hostAction)
+    const engine = buildEngine(actions, hostAction.id)
+
+    expect(engine.proceed({ state, player, space }).type).toBe('ok')
+    expect(engine.proceed({ state, player, space }).type).toBe('ok')
+
+    const restored = buildEngine(actions, hostAction.id)
+    restored.restore(engine.snapshot())
+    const step = runUntilDone(restored, { state, player, space })
+
+    expect(step.type).toBe('done')
+    expect(events).toEqual([
+      'host.execute',
+      'internal-pay-probe.execute',
+      'internal-onbuy-probe.payment=2',
+    ])
+  })
+
+  it('preserves host actionEvents when deferred host hooks run after internal children', () => {
+    let afterActionEventReasons: string[] | undefined
+    let afterTransactionEventReasons: string[] | undefined
+    const hostAction: ActionDefinition = {
+      id: 'host-before-slot',
+      nameKey: 'test.hostBefore',
+      descriptionKey: 'test.hostBefore',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: ({ eventSink }) => {
+        eventSink.emit<'resource.moved'>({
+          type: 'resource.moved',
+          resources: { wood: 1 },
+          from: { kind: 'supply' },
+          to: { kind: 'player', playerId: 'p1' },
+          reason: 'receive',
+        })
+        return {
+          type: 'ok',
+          internalChildren: {
+            beforeHostListeners: [{ actionId: 'internal-pay-probe' }],
+          },
+        }
+      },
+    }
+    const payProbe: ActionDefinition = {
+      id: 'internal-pay-probe',
+      nameKey: 'test.payProbe',
+      descriptionKey: 'test.payProbe',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: ({ eventSink }) => {
+        eventSink.emit<'resource.moved'>({
+          type: 'resource.moved',
+          resources: { food: 1 },
+          from: { kind: 'supply' },
+          to: { kind: 'player', playerId: 'p1' },
+          reason: 'cardEffect',
+        })
+        return { type: 'ok', resourcesPaid: { food: 1 } }
+      },
+    }
+    registerActionHook({
+      id: 'host-before-after-events',
+      actions: ['host-before-slot'],
+      phases: ['after'],
+      handler: (context) => {
+        afterActionEventReasons = context.actionEvents
+          ?.filter((event) => event.type === 'resource.moved')
+          .map((event) => event.reason)
+        afterTransactionEventReasons = context.transactionEvents
+          .filter((event) => event.type === 'resource.moved')
+          .map((event) => event.reason)
+      },
+    })
+    const state = createState()
+    const player = createPlayer()
+    state.players = [player]
+    const space = createSpace(hostAction)
+    const engine = buildEngine([hostAction, payProbe], hostAction.id)
+
+    const step = runUntilDone(engine, { state, player, space })
+
+    expect(step.type).toBe('done')
+    expect(afterActionEventReasons).toEqual(['receive'])
+    expect(afterTransactionEventReasons).toEqual(['receive'])
+  })
 })
