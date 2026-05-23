@@ -664,4 +664,155 @@ describe('engine internal children', () => {
     expect(afterActionEventReasons).toEqual(['receive'])
     expect(afterTransactionEventReasons).toEqual(['receive'])
   })
+
+  it('does not run host finalizer, hooks, or afterHost children when required beforeHost result fails', () => {
+    const events: string[] = []
+    const hostAction: ActionDefinition = {
+      id: 'host-before-fail-slot',
+      nameKey: 'test.hostBeforeFail',
+      descriptionKey: 'test.hostBeforeFail',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('host.execute')
+        return {
+          type: 'ok',
+          internalChildren: {
+            beforeHostListeners: [
+              { actionId: 'internal-pay-probe', resultKey: 'payment' },
+            ],
+            afterHostListeners: [
+              { actionId: 'internal-onbuy-probe', paymentInfoFrom: 'payment' },
+            ],
+          },
+        }
+      },
+      completeInternalChildren: () => {
+        events.push('host.finalizer')
+        return { type: 'ok' }
+      },
+    }
+    const payProbe: ActionDefinition = {
+      id: 'internal-pay-probe',
+      nameKey: 'test.payProbe',
+      descriptionKey: 'test.payProbe',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('internal-pay-probe.execute')
+        return { type: 'fail', errorKey: 'log.payFail' }
+      },
+    }
+    const onBuyProbe: ActionDefinition = {
+      id: 'internal-onbuy-probe',
+      nameKey: 'test.onBuyProbe',
+      descriptionKey: 'test.onBuyProbe',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('internal-onbuy-probe.execute')
+        return { type: 'ok' }
+      },
+    }
+    registerActionHook({
+      id: 'host-before-fail-after',
+      actions: ['host-before-fail-slot'],
+      phases: ['after'],
+      handler: () => {
+        events.push('host.after')
+      },
+    })
+    const state = createState()
+    const player = createPlayer()
+    state.players = [player]
+    const space = createSpace(hostAction)
+    const engine = buildEngine([hostAction, payProbe, onBuyProbe], hostAction.id)
+
+    const step = runUntilDone(engine, { state, player, space })
+
+    expect(step.type).toBe('done')
+    expect(events).toEqual([
+      'host.execute',
+      'internal-pay-probe.execute',
+    ])
+  })
+
+  it('restores deferred host choice before dispatching host after hooks', () => {
+    const events: string[] = []
+    const hostAction: ActionDefinition = {
+      id: 'host-choice-slot',
+      nameKey: 'test.hostChoice',
+      descriptionKey: 'test.hostChoice',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('host.execute')
+        return {
+          type: 'request',
+          promptKey: 'test.choose',
+          request: {
+            kind: 'choice',
+            options: [{ value: 'selected-card', labelKey: 'test.selectedCard' }],
+          },
+        }
+      },
+      resolveChoice: (_context, choice) => {
+        events.push(`host.resolve=${choice}`)
+        return {
+          type: 'ok',
+          internalChildren: {
+            beforeHostListeners: [
+              { actionId: 'internal-pay-probe', resultKey: 'payment' },
+            ],
+          },
+        }
+      },
+    }
+    const payProbe: ActionDefinition = {
+      id: 'internal-pay-probe',
+      nameKey: 'test.payProbe',
+      descriptionKey: 'test.payProbe',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('internal-pay-probe.execute')
+        return { type: 'ok', resourcesPaid: { food: 1 } }
+      },
+    }
+    registerActionHook({
+      id: 'host-choice-after',
+      actions: ['host-choice-slot'],
+      phases: ['after'],
+      handler: (context) => {
+        events.push(`host.after.choice=${context.choice ?? 'missing'}`)
+      },
+    })
+    const actions = [hostAction, payProbe]
+    const state = createState()
+    const player = createPlayer()
+    state.players = [player]
+    const space = createSpace(hostAction)
+    const engine = buildEngine(actions, hostAction.id)
+
+    expect(engine.proceed({ state, player, space }).type).toBe('choice')
+    expect(engine.resolveChoice('selected-card', { state, player, space }).type).toBe('ok')
+    expect(engine.proceed({ state, player, space }).type).toBe('ok')
+
+    const restored = buildEngine(actions, hostAction.id)
+    restored.restore(engine.snapshot())
+    const step = runUntilDone(restored, { state, player, space })
+
+    expect(step.type).toBe('done')
+    expect(events).toEqual([
+      'host.execute',
+      'host.resolve=selected-card',
+      'internal-pay-probe.execute',
+      'host.after.choice=selected-card',
+    ])
+  })
 })
