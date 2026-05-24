@@ -10,6 +10,7 @@ import '../../shared/cards/B/B93_Confidant'
 import '../../shared/cards/B/B149_OpenAirFarmer'
 import '../../shared/cards/C/C2_Stable'
 import '../../shared/cards/E/E1_PoleBarns'
+import '../../shared/cards/E/E16_BriarHedge'
 import '../../shared/cards/E/E89_Stallwright'
 import '../../shared/cards/E/E97_Beneficiary'
 import '../../shared/cards/A/A114_SeasonalWorker'
@@ -353,6 +354,35 @@ describe('formatCost card session regressions', () => {
         entry.labelKey === 'actions.sow.name' ||
         entry.labelKey === 'actions.fencing.name'),
     ).toBe(true)
+  })
+
+  it('B93_Confidant future fence remains available when a fence discount covers the policy cost', () => {
+    const session = setupOccupation('B93_Confidant')
+    const state = session.getState().state
+    state.players[0]!.minorPlayed = ['E16_BriarHedge']
+    state.players[0]!.resources.wood = 0
+    session.loadState(state)
+
+    const played = playOccupation(session, 'B93_Confidant')
+    expect(played.interaction.stateId).toBe('wait')
+    if (played.interaction.stateId !== 'wait') return
+    const schedule = played.interaction.options?.[0]
+    expect(schedule).toBeDefined()
+
+    const scheduled = session.resolveChoice(0, schedule!.value)
+    expect(scheduled.ok).toBe(true)
+
+    const stateBeforeRoundStart = session.getState().state
+    for (const player of stateBeforeRoundStart.players) {
+      markAllWorkersUsed(stateBeforeRoundStart, player)
+    }
+    session.loadState(stateBeforeRoundStart)
+
+    const roundStarted = session.performRoundEnd()
+    expect(roundStarted.ok).toBe(true)
+    expect(roundStarted.interaction.stateId).toBe('wait')
+    if (roundStarted.interaction.stateId !== 'wait') return
+    expect(roundStarted.interaction.options?.some((entry) => entry.labelKey === 'actions.fencing.name')).toBe(true)
   })
 
   it('E97_Beneficiary offers Stallwright stable before the extra occupation branch', () => {
