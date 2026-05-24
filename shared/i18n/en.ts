@@ -1193,6 +1193,7 @@ export const en = {
     STUB_BeforeBakeGainClay: { name: 'STUB Before Bake Clay', desc: 'Test stub: before baking bread, gain 1 clay.' },
     D122_ClayCarrier: { anytime: 'Clay Carrier: Pay 2 Food → 2 Clay' },
     E86_PenBuilder: { anytime: 'Pen Builder: Pay 1 Wood → +2 Animal Capacity' },
+    E148_Lazybones: { name: 'Lazybones', choice: 'Reserve {spaces}' },
     A102_Grocer: { anytime: 'Grocer: Pay 1 Food → Buy top good' },
     B83_MuddyPuddles: { anytime: 'Muddy Puddles: Pay 1 Clay → Take top good' },
     A153_PigOwner: { anytime: 'Pig Owner: 5+ Pigs → 3 Bonus VP' },
