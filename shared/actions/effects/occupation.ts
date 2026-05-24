@@ -5,6 +5,7 @@ import { runCardListeners } from '../../cards/card-listeners'
 import {
   canAffordCardPreviewCostByProvider,
   payCardPreviewCostByProvider,
+  filterPaymentSolutionsByReserve,
   payTypedFlatCost,
   readExactCost,
   resolveCardPreviewCostByProvider,
@@ -257,6 +258,25 @@ const getOccupationActionBaseCost = (
   return getLessonsCost(player, spaceId)
 }
 
+type OccupationChoicePolicy = {
+  doable: boolean
+  reserveResources?: Partial<Resource>
+}
+
+const mergeResourceReserve = (
+  left: Partial<Resource> | undefined,
+  right: Partial<Resource> | undefined,
+): Partial<Resource> | undefined => {
+  if (!right) return left
+  const merged: Partial<Resource> = { ...(left ?? {}) }
+  Object.entries(right).forEach(([rawKey, rawValue]) => {
+    if (typeof rawValue !== 'number' || rawValue <= 0) return
+    const key = rawKey as keyof Resource
+    merged[key] = Math.max(merged[key] ?? 0, rawValue)
+  })
+  return merged
+}
+
 const buildPlayableOccupationOptions = (
   state: GameState,
   player: PlayerState,
@@ -279,23 +299,29 @@ const buildPlayableOccupationOptions = (
         actionCardId,
       ),
     )
-    .filter((occupation) =>
-      isOccupationChoiceDoable(state, player, space, occupation.id, cost, actionCardId),
-    )
+    .filter((occupation) => getOccupationChoicePolicy(
+      state,
+      player,
+      space,
+      occupation.id,
+      cost,
+      actionCardId,
+    ).doable)
     .map((occupation) => ({
       value: occupation.id,
       labelKey: `occupations.${occupation.id}.name`,
     }))
 
-const isOccupationChoiceDoable = (
+const getOccupationChoicePolicy = (
   state: GameState,
   player: PlayerState,
   space: ActionSpace,
   occupationId: string,
   baseCost: Partial<PlayerState['resources']>,
   actionCardId?: string,
-) => {
+): OccupationChoicePolicy => {
   let doable = true
+  let reserveResources: Partial<Resource> | undefined
   const results = runCardListeners({
     state,
     player,
@@ -312,8 +338,12 @@ const isOccupationChoiceDoable = (
     if (result.doable === false) {
       doable = false
     }
+    reserveResources = mergeResourceReserve(
+      reserveResources,
+      result.reserveResources,
+    )
   }
-  return doable
+  return { doable, reserveResources }
 }
 
 export const hasPlayableOccupationChoice = (
@@ -348,6 +378,7 @@ export const collectOccupationActionPaymentOptions = (
   occupationId: string,
   cost: Partial<PlayerState['resources']>,
   actionCardId?: string,
+  reserveResources?: Partial<Resource>,
 ): PaymentSolution[] => {
   const previewCost = resolveCardPreviewCostByProvider(
     state,
@@ -365,12 +396,16 @@ export const collectOccupationActionPaymentOptions = (
   const normalizedCost: ComplexCost = PaymentSolver.isComplexCost(previewCost)
     ? previewCost
     : { fee: previewCost }
-  return PaymentSolver.computeOptions(paymentState, paymentPlayerIndex, normalizedCost, {
-    actionId: 'pay',
-    costType: 'occupation',
-    sourceCard: occupationId,
-    spaceId: actionCardId,
-  })
+  return filterPaymentSolutionsByReserve(
+    player,
+    PaymentSolver.computeOptions(paymentState, paymentPlayerIndex, normalizedCost, {
+      actionId: 'pay',
+      costType: 'occupation',
+      sourceCard: occupationId,
+      spaceId: actionCardId,
+    }),
+    reserveResources,
+  )
 }
 
 type OccupationCommitData = {
@@ -399,11 +434,13 @@ const buildOccupationPayChild = (
   cost: ComplexCost,
   occupationId: string,
   actionContext: Record<string, unknown> | undefined,
+  reserveResources: Partial<Resource> | undefined,
 ): InternalActionChild => buildInternalPayChild({
   cost,
   costType: 'occupation',
   optionPrefix: `pay:occupation:${occupationId}`,
   sourceCard: occupationId,
+  reserveResources,
   actionContext: {
     costType: 'occupation',
     ...(actionContext ?? {}),
@@ -414,9 +451,10 @@ const buildOccupationInternalChildren = (
   cost: ComplexCost,
   occupationId: string,
   actionContext: Record<string, unknown> | undefined,
+  reserveResources: Partial<Resource> | undefined,
 ): InternalActionChildren => ({
   beforeHostListeners: [
-    buildOccupationPayChild(cost, occupationId, actionContext),
+    buildOccupationPayChild(cost, occupationId, actionContext, reserveResources),
   ],
   afterHostCommitListeners: [
     {
@@ -451,7 +489,7 @@ export const playOccupationAction: ActionDefinition = {
       playableOptions = playableOptions.filter(opt => typed.allowedCards!.includes(opt.value))
     }
     if (playableOptions.length === 0) {
-      return { type: 'ok' }
+      return { type: 'fail', errorKey: 'log.occupationFail' }
     }
     return {
       type: 'request',
@@ -470,7 +508,15 @@ export const playOccupationAction: ActionDefinition = {
     }
     const baseCost = getOccupationActionBaseCost(player, space.id, params)
     if (!baseCost) return { type: 'fail', errorKey: 'log.occupationFail' }
-    if (!isOccupationChoiceDoable(state, player, space, choice, baseCost, space.id)) {
+    const choicePolicy = getOccupationChoicePolicy(
+      state,
+      player,
+      space,
+      choice,
+      baseCost,
+      space.id,
+    )
+    if (!choicePolicy.doable) {
       return { type: 'fail', errorKey: 'log.occupationFail' }
     }
     // Apply computeCosts hook so card-driven trades (B109 PaperMaker
@@ -511,7 +557,12 @@ export const playOccupationAction: ActionDefinition = {
           ...(childContext ? { actionContext: childContext } : {}),
         },
       },
-      internalChildren: buildOccupationInternalChildren(finalCost, choice, childContext),
+      internalChildren: buildOccupationInternalChildren(
+        finalCost,
+        choice,
+        childContext,
+        choicePolicy.reserveResources,
+      ),
     }
   },
   completeInternalChildren: ({ state, player, emitPrivateEvent, eventSink }, result, internalResults) => {
