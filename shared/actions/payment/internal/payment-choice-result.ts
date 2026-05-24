@@ -14,9 +14,10 @@ import type {
   ActionExecutionResult,
   ComplexCost,
   CostModifierType,
+  GameState,
+  PaymentResourceMap,
   PaymentSolution,
   PlayerState,
-  Resource,
 } from '../../../contract/types'
 import { isComplexCost } from './affordability'
 import { computeAllBuyableCombinations, sortPaymentSolutions } from './enumerate'
@@ -135,11 +136,12 @@ type ResolveCostPaymentSelectionOptions = {
   costType?: CostModifierType
   includeReturnedCard?: boolean
   playedCards?: string[]
+  state?: GameState
 }
 
 export const resolveCostPaymentSelection = (
   player: PlayerState,
-  cost: Partial<Resource> | ComplexCost,
+  cost: PaymentResourceMap | ComplexCost,
   optionValuePrefix: string,
   paymentChoice: string | undefined,
   failure: ActionExecutionResult,
@@ -158,6 +160,7 @@ export const resolveCostPaymentSelection = (
     normalizedCost,
     options.playedCards,
     options.costType,
+    options.state,
   )
   return resolvePaymentSolutionSelection(
     solutions,

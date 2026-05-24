@@ -140,10 +140,26 @@ describe('event guards', () => {
 
     expect(() => assertKnownGameEventShape({
       ...baseEvent,
+      type: 'resource.moved',
+      resources: { stable: 1 },
+      from: { kind: 'supply' },
+      to: { kind: 'player', playerId: 'p1' },
+      reason: 'gain',
+    })).toThrow(/unknown resource stable/)
+
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
       type: 'action.accumulated',
       spaceId: 'forest',
       resources: { fence: 1 },
     })).toThrow(/unknown resource fence/)
+
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'action.accumulated',
+      spaceId: 'forest',
+      resources: { stable: 1 },
+    })).toThrow(/unknown resource stable/)
   })
 
   it.each([

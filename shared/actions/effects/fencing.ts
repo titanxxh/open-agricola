@@ -255,6 +255,7 @@ const finalizeFence = (
     paymentChoice,
     { type: 'fail', errorKey: 'log.fencingFail' },
     'fencing',
+    ctx.state,
   )
   if (payment.type !== 'selected') {
     return { type: 'fail', errorKey: 'log.fencingFail' }
@@ -419,6 +420,7 @@ export const fenceAction: ActionDefinition = {
         undefined,
         { type: 'fail', errorKey: 'log.fencingFail' },
         'fencing',
+        ctx.state,
       )
       if (payment.type === 'request') {
         const options = payment.request.kind === 'choice' ? payment.request.options : []

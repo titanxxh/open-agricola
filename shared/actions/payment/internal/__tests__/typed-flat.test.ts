@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { computeAllBuyableCombinations } from '../enumerate'
-import type { PlayerState, TradeModifier } from '../../../../contract/types'
+import {
+  executeResolvedTypedFlatPayment,
+  resolveTypedFlatPaymentSelection,
+} from '../typed-flat'
+import type { GameState, PlayerState, TradeModifier } from '../../../../contract/types'
 
 const mkPlayer = (
   resources: Partial<PlayerState['resources']>,
@@ -45,8 +49,13 @@ const mkPlayer = (
   startPlayer: false,
   activeModifiers: modifiers,
   cardStates: {},
+  supplyTokensConsumed: {},
   stats: {} as any,
 })
+
+const mkState = (player: PlayerState): GameState => ({
+  players: [player],
+} as unknown as GameState)
 
 describe('A88_HedgeKeeper fencing regression — scope:action default, max=3, nb absent', () => {
   const a88: TradeModifier = {
@@ -100,5 +109,46 @@ describe('A88_HedgeKeeper fencing regression — scope:action default, max=3, nb
       (s) => s.tradesUsed.find((t) => t.trade.sourceId === 'A88_HedgeKeeper')?.times ?? 0,
     )
     expect(Math.max(...swapCounts)).toBe(3)
+  })
+})
+
+describe('typed-flat supply token selection', () => {
+  const failure = { type: 'fail', errorKey: 'log.action' } as const
+
+  it('selects and executes supply-token payment when state is provided', () => {
+    const player = mkPlayer({}, [])
+    const state = mkState(player)
+
+    const selected = resolveTypedFlatPaymentSelection(
+      player,
+      { stable: 1 },
+      'pay:stable',
+      undefined,
+      failure,
+      'stables',
+      state,
+    )
+
+    expect(selected.type).toBe('selected')
+    if (selected.type !== 'selected') return
+    executeResolvedTypedFlatPayment(player, selected, 'stables', state)
+    expect(player.supplyTokensConsumed?.stable).toBe(1)
+    expect(player.stableTiles).toHaveLength(0)
+  })
+
+  it('does not select supply-token payment without state', () => {
+    const player = mkPlayer({}, [])
+
+    const selected = resolveTypedFlatPaymentSelection(
+      player,
+      { stable: 1 },
+      'pay:stable',
+      undefined,
+      failure,
+      'stables',
+    )
+
+    expect(selected).toEqual(failure)
+    expect(player.supplyTokensConsumed?.stable).toBeUndefined()
   })
 })
