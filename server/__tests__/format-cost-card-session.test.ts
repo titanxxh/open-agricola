@@ -4,6 +4,8 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import type { FenceSegment } from '../../shared/contract/types'
 
 import '../../shared/cards/B/B2_MiniPasture'
+import '../../shared/cards/B/B82_ValueAssets'
+import '../../shared/cards/B/B93_Confidant'
 import '../../shared/cards/B/B149_OpenAirFarmer'
 import '../../shared/cards/C/C2_Stable'
 import '../../shared/cards/E/E1_PoleBarns'
@@ -89,7 +91,7 @@ const playOccupation = (session: GameSession, cardId: string) => {
   return played
 }
 
-const setupBeneficiaryWithStallwright = () => {
+const setupBeneficiaryWithStallwright = (minorHand: string[] = [FILLER]) => {
   const session = new GameSession(undefined, undefined, { playerCount: 4 })
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -104,6 +106,7 @@ const setupBeneficiaryWithStallwright = () => {
   const player = state.players[0]!
   player.occupationPlayed = ['E89_Stallwright', 'A1_OtherOccupation']
   player.occupationHand = ['E97_Beneficiary', 'A114_SeasonalWorker']
+  player.minorHand = minorHand
   player.resources = {
     ...player.resources,
     food: 10,
@@ -124,6 +127,19 @@ const chooseByLabel = (
   const option = response.interaction.options?.find((entry) => entry.labelKey === labelKey)
   expect(option).toBeDefined()
   const next = session.resolveChoice(0, option!.value)
+  expect(next.ok).toBe(true)
+  return next
+}
+
+const chooseCardIfPrompted = (
+  session: GameSession,
+  response: ReturnType<GameSession['resolveChoice']> | ReturnType<GameSession['takeAction']>,
+  cardId: string,
+) => {
+  if (response.interaction.stateId !== 'wait') return response
+  const option = response.interaction.options?.find((entry) => entry.value === cardId)
+  if (!option) return response
+  const next = session.resolveChoice(0, option.value)
   expect(next.ok).toBe(true)
   return next
 }
@@ -271,6 +287,19 @@ describe('formatCost card session regressions', () => {
     expect(twoCells.state.players[0]!.pastures[0]?.tiles).toHaveLength(2)
   })
 
+  it('B93_Confidant requires choosing a future food schedule when played', () => {
+    const session = setupOccupation('B93_Confidant')
+
+    const played = playOccupation(session, 'B93_Confidant')
+    expect(played.interaction.stateId).toBe('wait')
+    if (played.interaction.stateId !== 'wait') return
+    expect(played.interaction.options?.some((entry) => entry.value === '__skip__')).toBe(false)
+
+    const skipped = session.resolveChoice(0, '__skip__')
+    expect(skipped.ok).toBe(false)
+    expect(skipped.interaction.stateId).toBe('wait')
+  })
+
   it('E97_Beneficiary offers Stallwright stable before the extra occupation branch', () => {
     const session = setupBeneficiaryWithStallwright()
 
@@ -299,5 +328,23 @@ describe('formatCost card session regressions', () => {
     expect(skipped.interaction.stateId).toBe('wait')
     if (skipped.interaction.stateId !== 'wait') return
     expect(skipped.interaction.options?.some((entry) => entry.labelKey === 'actions.stables.name')).toBe(true)
+  })
+
+  it('E89_Stallwright still triggers when E97_Beneficiary bonus plays a minor improvement', () => {
+    const session = setupBeneficiaryWithStallwright(['B82_ValueAssets'])
+
+    const played = playOccupation(session, 'E97_Beneficiary')
+    const acceptedMinorBranch = chooseByLabel(session, played, 'actions.improvement.name')
+    const playedMinor = chooseCardIfPrompted(session, acceptedMinorBranch, 'B82_ValueAssets')
+    expect(playedMinor.state.players[0]!.minorPlayed).toContain('B82_ValueAssets')
+    expect(playedMinor.interaction.stateId).toBe('wait')
+    if (playedMinor.interaction.stateId !== 'wait') return
+    expect(playedMinor.interaction.options?.some((entry) => entry.value === '__done__')).toBe(true)
+
+    const completedBonus = session.resolveChoice(0, '__done__')
+    expect(completedBonus.ok).toBe(true)
+    expect(completedBonus.interaction.stateId).toBe('wait')
+    if (completedBonus.interaction.stateId !== 'wait') return
+    expect(completedBonus.interaction.options?.some((entry) => entry.labelKey === 'actions.stables.name')).toBe(true)
   })
 })

@@ -622,7 +622,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B90_CooperativePlower` | 已对齐 |  |
 | `B91_AssistantTiller` | 已对齐 |  |
 | `B92_LittleStickKnitter` | 已对齐 |  |
-| `B93_Confidant` | 已对齐 | onBuy 提供 2/3/4 个未来 round 选择；future receive 后可选 `sow` 或 `fence`，其中 BGA `formatCost([WOOD => 1])` 通过 nested `fencePolicy.costPolicy` 显式表达。 |
+| `B93_Confidant` | 已对齐 | onBuy 必须选择 2/3/4 个未来 round 之一；future receive 后可选 `sow` 或 `fence`，其中 BGA `formatCost([WOOD => 1])` 通过 nested `fencePolicy.costPolicy` 显式表达。 |
 | `B94_StockProtector` | 已对齐 |  |
 | `B95_MasterBricklayer` | 已对齐 |  |
 | `B96_TreeFarmJoiner` | 已对齐 |  |
@@ -1158,7 +1158,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `E86_PenBuilder` | 已对齐 |  |
 | `E87_MasterRenovator` | 已对齐 |  |
 | `E88_MasterFencer` | 已对齐 | BGA `formatCost([WOOD => 0])` 通过 nested `fencePolicy` 表达付 2/3 wood 后最多 3/4 段总免费 fence。 |
-| `E89_Stallwright` | 已对齐 | BGA `formatCost(['max' => 1])` 通过 `stables` `actionContext.exactCost` 表达；E97 的额外 occupation 分支若执行会让职业数变为 4，避免第三职业 stable 重复；E97 bonus 被跳过时仍由 E89 自身触发。 |
+| `E89_Stallwright` | 已对齐 | BGA `formatCost(['max' => 1])` 通过 `stables` `actionContext.exactCost` 表达；E97 的额外 occupation 分支若执行会让职业数变为 4，避免第三职业 stable 重复；E97 bonus 被跳过或只执行 minor 分支后仍由 E89 自身触发。 |
 | `E90_DungCollector` | 已对齐 |  |
 | `E91_PlowBuilder` | 已对齐 |  |
 | `E92_FieldDoctor` | 已对齐 |  |
