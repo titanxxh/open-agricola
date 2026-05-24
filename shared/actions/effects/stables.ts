@@ -9,7 +9,7 @@ import type {
   PlayerState,
   Resource,
 } from '../../contract/types'
-import { getNextEmptyTileForPlayer } from '../../domain/farm'
+import { getNextEmptyTileForPlayer, positionKey } from '../../domain/farm'
 import {
   payResources,
   readExactCost,
@@ -102,6 +102,40 @@ const isWithinStableMax = (
   return max === undefined || count <= max
 }
 
+const forbidsStableCancel = (
+  actionContext?: Record<string, unknown>,
+): boolean => actionContext?.cancelPolicy === 'forbidCancel'
+
+const isWithinStableZoneFilter = (
+  player: PlayerState,
+  stables: FarmTilePosition[],
+  actionContext?: Record<string, unknown>,
+): boolean => {
+  if (actionContext?.zoneFilter !== 'pasture-1') return true
+  const oneSizePastureCells = new Set<string>()
+  for (const pasture of player.pastures ?? []) {
+    if (pasture.size !== 1) continue
+    for (const tile of pasture.tiles ?? []) {
+      oneSizePastureCells.add(positionKey(tile))
+    }
+  }
+  return stables.every((stable) => oneSizePastureCells.has(positionKey(stable)))
+}
+
+const validateStablePlacement = (
+  ctx: ActionMutationContext,
+  stables: FarmTilePosition[],
+): ActionExecutionResult | undefined => {
+  const lockedKeys = collectLockedFarmTileKeys(ctx.player)
+  const idx = ctx.state.players.indexOf(ctx.player)
+  const validated = playerBoard(ctx.state, idx).farmyard.canBuildStable(stables, lockedKeys)
+  if (!validated.ok) return { type: 'fail', errorKey: validated.code ?? 'log.buildStableFail' }
+  if (!isWithinStableZoneFilter(ctx.player, stables, ctx.actionContext)) {
+    return { type: 'fail', errorKey: 'log.buildStableFail' }
+  }
+  return undefined
+}
+
 const resolveStableTotalCost = (
   actionContext: Record<string, unknown> | undefined,
   costs: Partial<Resource> | undefined,
@@ -189,10 +223,8 @@ const finalizeStables = (
   if (stables.length > getAvailableStableSupplyCount(ctx.state, ctx.player)) {
     return { type: 'fail', errorKey: 'log.buildStableFail' }
   }
-  const lockedKeys = collectLockedFarmTileKeys(ctx.player)
-  const idx = ctx.state.players.indexOf(ctx.player)
-  const validated = playerBoard(ctx.state, idx).farmyard.canBuildStable(stables, lockedKeys)
-  if (!validated.ok) return { type: 'fail', errorKey: validated.code ?? 'log.buildStableFail' }
+  const placementError = validateStablePlacement(ctx, stables)
+  if (placementError) return placementError
   const totalCost = resolveStableTotalCost(ctx.actionContext, ctx.costs, stables.length)
   if (!totalCost) return { type: 'fail', errorKey: 'log.buildStableFail' }
   const payment = resolveTypedFlatPaymentSelection(
@@ -269,7 +301,16 @@ export const stablesAction: ActionDefinition = {
     }
   },
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
-    if (choice === 'cancel') return { type: 'ok' }
+    if (choice === 'cancel') {
+      if (forbidsStableCancel(ctx.actionContext)) {
+        return {
+          type: 'fail',
+          errorKey: 'log.buildStableFail',
+          recoverable: true,
+        }
+      }
+      return { type: 'ok' }
+    }
 
     // Second call: payment combo selected after multi-combo prompt.
     if (choice.startsWith('pay:stable:')) {
@@ -292,12 +333,8 @@ export const stablesAction: ActionDefinition = {
       if (stables.length > getAvailableStableSupplyCount(ctx.state, ctx.player)) {
         return { type: 'fail', errorKey: 'log.buildStableFail' }
       }
-      const lockedKeys = collectLockedFarmTileKeys(ctx.player)
-      const idx = ctx.state.players.indexOf(ctx.player)
-      const validated = playerBoard(ctx.state, idx).farmyard.canBuildStable(stables, lockedKeys)
-      if (!validated.ok) {
-        return { type: 'fail', errorKey: validated.code ?? 'log.buildStableFail' }
-      }
+      const placementError = validateStablePlacement(ctx, stables)
+      if (placementError) return placementError
       const totalCost = resolveStableTotalCost(ctx.actionContext, ctx.costs, stables.length)
       if (!totalCost) return { type: 'fail', errorKey: 'log.buildStableFail' }
       const payment = resolveTypedFlatPaymentSelection(

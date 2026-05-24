@@ -351,7 +351,11 @@ describe('formatCost migrated card flows', () => {
     const flow = getCardEffect('C2_Stable')!.onBuy!(gameState, actor)
     const leaf = expectLeaf(flow, 'stables')
     expect(leaf.params).toBeUndefined()
-    expect(leaf.actionContext).toMatchObject({ max: 1, exactCost: { wood: 0, max: 1 } })
+    expect(leaf.actionContext).toMatchObject({
+      max: 1,
+      exactCost: { wood: 0, max: 1 },
+      cancelPolicy: 'forbidCancel',
+    })
     expectNoLegacyCostFields(leaf)
   })
 
