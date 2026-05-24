@@ -48,7 +48,7 @@ const occupationListener: CardListenerRegistration = {
   id: 'E51-whale-oil-before-occupation',
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const foodCount = readCardExtraData<number>(context.player, CARD_ID, 'foodCount') ?? 0
     if (foodCount <= 0) return

@@ -1,5 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { CardPlayedEvent, DraftGameEvent } from '../../contract/events'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { B49_Scales } from '../../cards-display/B/B49_Scales'
@@ -17,6 +18,24 @@ const CARD_ID = B49_Scales.id
  * We count occupationPlayed.length vs (minorPlayed.length + improvements.length).
  */
 
+const hasPlayedCardForAction = (
+  context: CardListenerContext,
+  sourceActionId: 'occupation' | 'improvement',
+  cardTypes: readonly string[],
+) => {
+  const events = context.actionEvents ?? context.transactionEvents
+  type QueryableCardPlayedEvent = CardPlayedEvent | DraftGameEvent<'card.played'>
+  const isCardPlayedEvent = (
+    event: CardListenerContext['transactionEvents'][number],
+  ): event is QueryableCardPlayedEvent =>
+    event.type === 'card.played'
+  return events.some((event) =>
+    isCardPlayedEvent(event) &&
+    event.sourceActionId === sourceActionId &&
+    cardTypes.includes(event.cardType),
+  )
+}
+
 const checkBalance = (context: CardListenerContext): ActionHookResult | void => {
 
   const occCount = context.player.occupationPlayed.length
@@ -32,18 +51,20 @@ const occupationListener: CardListenerRegistration = {
   id: 'B49-scales-after-occupation',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['play-occupation'],
-  handler: checkBalance,
+  actions: ['occupation'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!hasPlayedCardForAction(context, 'occupation', ['occupation'])) return
+    return checkBalance(context)
+  },
 }
 
 const improvementListener: CardListenerRegistration = {
   id: 'B49-scales-after-improvement',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['play-improvement'],
+  actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    // Passing cards do not trigger Scales
-    if (context.extraData?.passing) return
+    if (!hasPlayedCardForAction(context, 'improvement', ['minor', 'major'])) return
     return checkBalance(context)
   },
 }

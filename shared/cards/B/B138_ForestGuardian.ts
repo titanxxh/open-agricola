@@ -20,7 +20,7 @@ const WOOD_SPACES = new Set(['forest', 'copse', 'grove'])
 const onBuyListener: CardListenerRegistration = {
   id: 'B138-forest-guardian-onbuy',
   cardIds: [CARD_ID],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return

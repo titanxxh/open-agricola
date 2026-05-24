@@ -18,7 +18,7 @@ export const A152_NightSchoolStudent_impl = {
     if (player.occupationHand.length === 0) return
     return {
       type: 'leaf',
-      actionId: 'play-occupation',
+      actionId: 'occupation',
       optional: true,
       sourceCard: CARD_ID,
       params: { costOverride: { food: 1 } },

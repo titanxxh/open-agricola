@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/A/A54_Credit'
 import '../../shared/cards/A/A96_TaskArtisan'
@@ -71,6 +72,10 @@ describe('B16_MiningHammer session', () => {
 
     const player = state.players[0]!
     player.minorPlayed.push('B16_MiningHammer')
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+    state.players[1]!.minorHand = ['__test_placeholder__']
+    state.players[1]!.occupationHand = ['__test_placeholder__']
     player.houseType = 'clay'
     player.resources.food = 10
     player.resources.wood = 5
@@ -80,10 +85,107 @@ describe('B16_MiningHammer session', () => {
     return session
   }
 
-  it('card is available and ready for renovation trigger', () => {
+  it('gains 1 food when bought through the improvement action', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    state.roundPhase = 'work'
+
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
+    setWorkersAtHome(state, state.players[1]!, 0)
+    player.minorHand = ['B16_MiningHammer', 'C69_LandConsolidation']
+    player.occupationHand = ['__test_placeholder__']
+    state.players[1]!.minorHand = ['__test_placeholder__']
+    state.players[1]!.occupationHand = ['__test_placeholder__']
+    player.resources = {
+      ...player.resources,
+      wood: 1,
+      food: 0,
+    }
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'meeting-place')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+
+    const improvement = resp.interaction.options?.find(
+      (option) => option.value === 'action-improvement-1',
+    )
+    expect(improvement).toBeDefined()
+
+    resp = session.resolveChoice(0, improvement!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+
+    resp = session.resolveChoice(0, 'B16_MiningHammer')
+    expect(resp.ok).toBe(true)
+
+    const after = resp.state.players[0]!
+    expect(after.minorPlayed).toContain('B16_MiningHammer')
+    expect(after.resources.wood).toBe(0)
+    expect(after.resources.food).toBe(1)
+    expect(resp.state.events).toContainEqual(expect.objectContaining({
+      type: 'card.played',
+      cardId: 'B16_MiningHammer',
+      cardType: 'minor',
+      sourceActionId: 'improvement',
+    }))
+    expect(resp.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.cardEffectGain',
+      params: expect.objectContaining({
+        cardId: 'B16_MiningHammer',
+        gain: { food: 1 },
+      }),
+    }))
+  })
+
+  it('builds one stable for free after renovation', () => {
     const session = setup()
-    const after = session.getState().state
-    expect(after.players[0]!.minorPlayed).toContain('B16_MiningHammer')
+    const state = session.getState().state
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
+    setWorkersAtHome(state, state.players[1]!, 0)
+    player.houseType = 'clay'
+    player.resources = {
+      ...player.resources,
+      wood: 5,
+      reed: 5,
+      stone: 5,
+    }
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'house-redevelopment')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+
+    const stableOption = resp.interaction.options?.find(
+      (option) => option.sourceCard === 'B16_MiningHammer' && option.value !== '__skip__',
+    )
+    expect(stableOption).toBeDefined()
+    resp = session.resolveChoice(0, stableOption!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('ui.interactionStableSelect')
+    expect(resp.interaction.sourceCard).toBe('B16_MiningHammer')
+    expect(resp.interaction.farm?.maxSelections).toBe(1)
+
+    const tile = resp.interaction.farm?.selectableTiles[0]
+    expect(tile).toBeDefined()
+    resp = session.resolveChoice(0, 'confirm', {
+      stables: [{ row: tile!.row, col: tile!.col }],
+    })
+    expect(resp.ok).toBe(true)
+
+    const after = resp.state.players[0]!
+    expect(after.stableTiles).toHaveLength(1)
+    expect(after.resources.wood).toBe(5)
   })
 })
 

@@ -10,7 +10,7 @@ const listener: CardListenerRegistration = {
   id: 'E163-patroness-after-occupation',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     // Do not trigger for this card itself
     if (context.choice === CARD_ID) return

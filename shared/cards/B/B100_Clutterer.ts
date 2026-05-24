@@ -43,7 +43,7 @@ const afterOccupationListener: CardListenerRegistration = {
   id: 'B100-clutterer-after-occupation',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const desc = getPlayedCardDesc(context.choice)
     if (!desc || !hasAccumulationText(desc)) return

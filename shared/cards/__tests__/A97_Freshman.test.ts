@@ -100,7 +100,7 @@ describe('A97_Freshman', () => {
         { type: 'leaf', actionId: 'special-effect', sourceCard: 'A97_Freshman', params: { kind: 'set-flag', flag: true } },
         {
           type: 'leaf',
-          actionId: 'play-occupation',
+          actionId: 'occupation',
           sourceCard: 'A97_Freshman',
           params: { costOverride: {} },
         },
@@ -135,7 +135,7 @@ describe('A97_Freshman', () => {
     })
   })
 
-  it('lets play-occupation ignore normal lessons cost when Freshman provides free play', () => {
+  it('lets occupation ignore normal lessons cost when Freshman provides free play', () => {
     const player = createPlayer()
     player.occupationPlayed.push('A55_JunkRoom')
     player.occupationHand = ['A123_FrameBuilder']

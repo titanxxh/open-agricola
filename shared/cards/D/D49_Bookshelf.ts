@@ -10,7 +10,7 @@ const beforeListener: CardListenerRegistration = {
   id: 'D49-bookshelf-before-occupation',
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   handler: (_context: CardListenerContext): ActionHookResult | void => {
     return { flow: gainLeaf(CARD_ID, { food: 3 }), sourceCard: CARD_ID }
   },
@@ -20,7 +20,7 @@ const isDoableListener: CardListenerRegistration = {
   id: 'D49-bookshelf-isdoable-occupation',
   cardIds: [CARD_ID],
   phases: ['isDoable' as ActionHookPhase],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
     if (context.actionContext?.skipBeforeTriggers === true) return

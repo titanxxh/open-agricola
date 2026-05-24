@@ -23,7 +23,7 @@ export const E28_Bookmark_impl = {
       children: [
         {
           type: 'leaf',
-          actionId: 'play-occupation',
+          actionId: 'occupation',
           sourceCard: CARD_ID,
           params: { costOverride: {} },
         },
