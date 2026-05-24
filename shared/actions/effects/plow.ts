@@ -114,10 +114,11 @@ const finalizePlow = (
     paymentChoice,
     { type: 'fail', errorKey: 'log.action' },
     'plow',
+    ctx.state,
   )
   if (payment.type !== 'selected') return { type: 'fail', errorKey: 'log.action' }
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
-  executeResolvedTypedFlatPayment(nextPlayer, payment, 'plow')
+  executeResolvedTypedFlatPayment(nextPlayer, payment, 'plow', ctx.state)
   applyPlayerMutation(ctx.player, nextPlayer)
   if (ctx.sourceCard) {
     addCardResourceGained(ctx.player, ctx.sourceCard, { field: 1 })
@@ -192,6 +193,7 @@ export const plowAction: ActionDefinition = {
         undefined,
         { type: 'fail', errorKey: 'log.action' },
         'plow',
+        ctx.state,
       )
       if (payment.type === 'request') {
         const options = payment.request.kind === 'choice' ? payment.request.options : []

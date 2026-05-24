@@ -114,6 +114,7 @@ const finalizeStables = (
     paymentChoice,
     { type: 'fail', errorKey: 'log.buildStableFail' },
     'stables',
+    ctx.state,
   )
   if (payment.type !== 'selected') return { type: 'fail', errorKey: 'log.buildStableFail' }
   const nextPlayer = JSON.parse(JSON.stringify(ctx.player)) as PlayerState
@@ -219,6 +220,7 @@ export const stablesAction: ActionDefinition = {
         undefined,
         { type: 'fail', errorKey: 'log.buildStableFail' },
         'stables',
+        ctx.state,
       )
       if (payment.type === 'request') {
         const options = payment.request.kind === 'choice' ? payment.request.options : []
