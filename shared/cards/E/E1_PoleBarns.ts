@@ -12,7 +12,7 @@ export const E1_PoleBarns_impl = {
     actionId: 'stables',
     sourceCard: CARD_ID,
     optional: true,
-    params: { max: 3, freeCost: true },
+    actionContext: { max: 3, exactCost: { wood: 0, max: 3 } },
   }),
 },
   reaches: [] as readonly string[],

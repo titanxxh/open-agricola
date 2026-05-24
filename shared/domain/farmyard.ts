@@ -88,6 +88,7 @@ export type FenceValidationError = {
     | 'PALISADE_NOT_ON_BORDER'
     | 'TOO_FEW_FENCES'
     | 'TOO_MANY_FENCES'
+    | 'PASTURE_BOUNDS_NOT_MET'
     | 'ANIMAL_CAPACITY_INSUFFICIENT'
   edges: string[]
   palisadeEdges: string[]
@@ -118,12 +119,17 @@ export type FenceSegmentBounds = {
   palisade?: Bounds
   total?: Bounds
 }
+export type FencePastureBounds = {
+  count?: Bounds
+  totalSize?: Bounds
+}
 export type FenceValidationOptions = {
   skipPayment?: boolean
   allowPalisades?: boolean
   allowedSegmentTypes?: FenceSegmentType[]
   sourcePolicy?: FenceSourcePolicy
   segmentBounds?: FenceSegmentBounds
+  newPastureBounds?: FencePastureBounds
   costPolicy?: FenceCostPolicy
   preserveAnimalTotals?: boolean
   ordinaryFenceBuildLimit?: number
@@ -881,6 +887,57 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
       },
     }
   }
+  const palisadeBounds = options.segmentBounds?.palisade
+  if (palisadeBounds?.min !== undefined && newPalisadeEdges.length < palisadeBounds.min) {
+    return {
+      ok: false,
+      error: {
+        code: 'TOO_FEW_FENCES',
+        edges,
+        palisadeEdges,
+        newFenceEdges,
+        newPalisadeEdges,
+      },
+    }
+  }
+  if (palisadeBounds?.max !== undefined && newPalisadeEdges.length > palisadeBounds.max) {
+    return {
+      ok: false,
+      error: {
+        code: 'TOO_MANY_FENCES',
+        edges,
+        palisadeEdges,
+        newFenceEdges,
+        newPalisadeEdges,
+      },
+    }
+  }
+  const totalBounds = options.segmentBounds?.total
+  const totalNewSegments = newFenceEdges.length + newPalisadeEdges.length
+  if (totalBounds?.min !== undefined && totalNewSegments < totalBounds.min) {
+    return {
+      ok: false,
+      error: {
+        code: 'TOO_FEW_FENCES',
+        edges,
+        palisadeEdges,
+        newFenceEdges,
+        newPalisadeEdges,
+      },
+    }
+  }
+  if (totalBounds?.max !== undefined && totalNewSegments > totalBounds.max) {
+    return {
+      ok: false,
+      error: {
+        code: 'TOO_MANY_FENCES',
+        edges,
+        palisadeEdges,
+        newFenceEdges,
+        newPalisadeEdges,
+      },
+    }
+  }
 
   if (newFenceEdges.length === 0 && newPalisadeEdges.length === 0) {
     return {
@@ -1096,6 +1153,30 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
         newFenceEdges,
         newPalisadeEdges,
       },
+    }
+  }
+
+  const newPastureBounds = options.newPastureBounds
+  if (newPastureBounds) {
+    const count = newPastures.length
+    const totalSize = newPastures.reduce((sum, pasture) => sum + pasture.size, 0)
+    const countBounds = newPastureBounds.count
+    const sizeBounds = newPastureBounds.totalSize
+    const countTooLow = countBounds?.min !== undefined && count < countBounds.min
+    const countTooHigh = countBounds?.max !== undefined && count > countBounds.max
+    const sizeTooLow = sizeBounds?.min !== undefined && totalSize < sizeBounds.min
+    const sizeTooHigh = sizeBounds?.max !== undefined && totalSize > sizeBounds.max
+    if (countTooLow || countTooHigh || sizeTooLow || sizeTooHigh) {
+      return {
+        ok: false,
+        error: {
+          code: 'PASTURE_BOUNDS_NOT_MET',
+          edges,
+          palisadeEdges,
+          newFenceEdges,
+          newPalisadeEdges,
+        },
+      }
     }
   }
 

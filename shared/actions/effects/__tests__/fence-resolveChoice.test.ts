@@ -146,6 +146,22 @@ describe('fenceAction.resolveChoice', () => {
     })
   })
 
+  it('cancel fails with recoverable error when policy requires total fence segments', () => {
+    const result = fenceAction.resolveChoice!(
+      makeCtx({
+        actionContext: {
+          fencePolicy: { segmentBounds: { total: { min: 1 } } },
+        },
+      }),
+      'cancel',
+    )
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'log.fencingFail',
+      recoverable: true,
+    })
+  })
+
   it('first call with payload + payable wood finalizes immediately', () => {
     const ctx = makeCtx()
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
@@ -196,6 +212,38 @@ describe('fenceAction.resolveChoice', () => {
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {
       edges: edgesForTile(0, 0),
       palisadeEdges: [],
+      extraWood: 0,
+    })
+    expect(result.type).toBe('fail')
+    if (result.type !== 'fail') return
+    expect(result.errorKey).toBe('TOO_MANY_FENCES')
+    expect(ctx.player.fenceSegments).toHaveLength(0)
+  })
+
+  it('fails when policy total maximum allows fewer mixed fence segments', () => {
+    const ctx = makeCtx({
+      player: {
+        resources: {
+          wood: 10,
+          clay: 0,
+          stone: 0,
+          reed: 0,
+          grain: 0,
+          vegetable: 0,
+          food: 0,
+          sheep: 0,
+          boar: 0,
+          cattle: 0,
+        },
+        minorPlayed: ['B30_WoodPalisades'],
+      },
+      actionContext: {
+        fencePolicy: { segmentBounds: { total: { max: 3 } } },
+      },
+    })
+    const result = fenceAction.resolveChoice!(ctx, 'confirm', {
+      edges: ['H-1-0', 'V-0-1'],
+      palisadeEdges: ['H-0-0', 'V-0-0'],
       extraWood: 0,
     })
     expect(result.type).toBe('fail')

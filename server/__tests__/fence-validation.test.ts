@@ -495,16 +495,16 @@ describe('validateFenceSelection — generic fence policy', () => {
     }
   })
 
-  it('rejects more total fence segments than the policy maximum', () => {
+  it('rejects more mixed fence segments than the policy total maximum', () => {
     const player = createPlayer()
 
     const result = validateFenceSelection(
       player,
-      twoCellPastureEdges,
-      ['H-0-0'],
+      ['H-1-0', 'V-0-1'],
+      ['H-0-0', 'V-0-0'],
       0,
       0,
-      { allowPalisades: true, segmentBounds: { total: { max: 6 } } },
+      { allowPalisades: true, segmentBounds: { total: { max: 3 } } },
     )
 
     expect(result.ok).toBe(false)
@@ -557,6 +557,38 @@ describe('validateFenceSelection — generic fence policy', () => {
     expect(result.ok).toBe(false)
     if (!result.ok) {
       expect(result.error.code).toBe('MAX_FENCES_EXCEEDED')
+    }
+  })
+
+  it('rejects a one-cell pasture when policy requires two new pasture cells', () => {
+    const player = createPlayer()
+
+    const result = validateFenceSelection(player, edgesForTile(0, 1), [], 0, 0, {
+      newPastureBounds: { count: { min: 1, max: 1 }, totalSize: { min: 2, max: 2 } },
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error.code).toBe('PASTURE_BOUNDS_NOT_MET')
+    }
+  })
+
+  it('accepts a two-cell pasture when policy requires two new pasture cells', () => {
+    const player = createPlayer()
+
+    const result = validateFenceSelection(
+      player,
+      ['H-0-0', 'H-0-1', 'H-1-0', 'H-1-1', 'V-0-0', 'V-0-2'],
+      [],
+      0,
+      0,
+      { newPastureBounds: { count: { min: 1, max: 1 }, totalSize: { min: 2, max: 2 } } },
+    )
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.newPastures).toHaveLength(1)
+      expect(result.newPastures[0]?.tiles).toHaveLength(2)
     }
   })
 
