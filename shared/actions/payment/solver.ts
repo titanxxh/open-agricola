@@ -10,7 +10,9 @@ import {
   computeAllBuyableCombinations,
   isComplexCost,
   canPayResources,
+  canPaySupplyTokens,
   payResources,
+  paySupplyTokens,
   executePaymentSolution,
   clearPaymentCache,
 } from './internal'
@@ -25,11 +27,11 @@ const computeOptions = (
   if (!player) return []
   if (!isComplexCost(cost)) {
     const simpleCost = cost as Parameters<typeof canPayResources>[1]
-    if (!canPayResources(player, simpleCost)) return []
+    if (!canPayResources(player, simpleCost) || !canPaySupplyTokens(state, player, simpleCost)) return []
     return [{ resourcesPaid: simpleCost, tradesUsed: [] }]
   }
   const costTypeArg = ctx.costType === 'none' ? undefined : ctx.costType
-  return computeAllBuyableCombinations(player, cost, ctx.playedCards, costTypeArg)
+  return computeAllBuyableCombinations(player, cost, ctx.playedCards, costTypeArg, state)
 }
 
 const canAfford = (
@@ -41,7 +43,8 @@ const canAfford = (
   const player = state.players[idx]
   if (!player) return false
   if (!isComplexCost(cost)) {
-    return canPayResources(player, cost as Parameters<typeof canPayResources>[1])
+    const simpleCost = cost as Parameters<typeof canPayResources>[1]
+    return canPayResources(player, simpleCost) && canPaySupplyTokens(state, player, simpleCost)
   }
   return computeOptions(state, idx, cost, ctx).length > 0
 }
@@ -70,8 +73,9 @@ const execute = (
   }
   if (!isComplexCost(cost)) {
     payResources(player, cost as Parameters<typeof payResources>[1])
+    paySupplyTokens(player, cost as Parameters<typeof payResources>[1])
   } else {
-    executePaymentSolution(player, selected)
+    executePaymentSolution(player, selected, { state })
   }
   return { ok: true, state }
 }

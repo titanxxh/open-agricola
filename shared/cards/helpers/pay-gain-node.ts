@@ -1,4 +1,4 @@
-import type { ChoiceEffectPreview, Resource } from '../../contract/types'
+import type { ChoiceEffectPreview, PaymentResourceMap } from '../../contract/types'
 import type { ActionFlow } from '../../contract/types'
 import type { PromptKey } from '../../contract/prompt-keys'
 import type { ActionHookResult } from '../../actions/hooks'
@@ -13,7 +13,7 @@ type SequenceFlow = {
 
 type PayGainNodeOptions = {
   cardId: string
-  cost: Partial<Resource>
+  cost: PaymentResourceMap
   gain?: CardGain
   promptKey?: PromptKey
   choiceLabelKey?: string
@@ -23,7 +23,7 @@ type PayGainNodeOptions = {
 
 type PayThenActionFlowOptions = {
   cardId: string
-  cost: Partial<Resource>
+  cost: PaymentResourceMap
   promptKey?: PromptKey
   action: ActionFlow
   choiceLabelKey?: string
@@ -32,7 +32,7 @@ type PayThenActionFlowOptions = {
 
 type ReturnToSpaceThenGainFlowOptions = {
   cardId: string
-  cost: Partial<Resource>
+  cost: PaymentResourceMap
   gain: CardGain
   promptKey?: PromptKey
   choiceLabelKey?: string
@@ -50,7 +50,7 @@ const buildSequenceNode = (
 })
 
 const resolveChoiceLabelParams = (
-  cost: Partial<Resource>,
+  cost: PaymentResourceMap,
   gain: CardGain | undefined,
   choiceLabelKey?: string,
   choiceLabelParams?: Record<string, unknown>,
@@ -68,7 +68,7 @@ const resolveChoiceLabelParams = (
 const resolveChoiceLabelKey = (choiceLabelKey?: string) => choiceLabelKey
 
 const buildEffectPreview = (
-  cost: Partial<Resource>,
+  cost: PaymentResourceMap,
   gain: CardGain | undefined,
 ): ChoiceEffectPreview => {
   const { resources, score } = splitCardGain(gain)

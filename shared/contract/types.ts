@@ -21,6 +21,7 @@ export type SupplyTokenCounts = Partial<Record<SupplyTokenKey, number>>
 export type PaymentResource = Resource & Record<SupplyTokenKey, number>
 export type PaymentResourceMap = Partial<PaymentResource>
 export type PaymentResourceKey = keyof PaymentResource
+export type FutureMeepleResourceMap = Partial<Resource> & Partial<Pick<PaymentResource, 'stable'>>
 
 // Pseudo-resource map — used ONLY by CardResourceStats.gained to record
 // BGA-style "Plows: N / Built: N rooms / Occupations played: N" lines via
@@ -136,17 +137,17 @@ export type BonusModifier = {
 export type CostModifier = TradeModifier | BonusModifier
 
 export type ComplexCost = {
-  fee?: Partial<Resource>
-  fees?: Partial<Resource>[]
-  unitFee?: Partial<Resource>      // per-unit cost; total fee += nb × unitFee
+  fee?: PaymentResourceMap
+  fees?: PaymentResourceMap[]
+  unitFee?: PaymentResourceMap      // per-unit cost; total fee += nb × unitFee
   nb?: number                       // unit count; construct=rooms, renovation=player.rooms
   trades?: Trade[]
-  cards?: { type: string; list: string[]; cost?: Partial<Resource>; required?: boolean }
+  cards?: { type: string; list: string[]; cost?: PaymentResourceMap; required?: boolean }
   bonuses?: Bonus[]
 }
 
 export type PaymentSolution = {
-  resourcesPaid: Partial<Resource>
+  resourcesPaid: PaymentResourceMap
   tradesUsed: { trade: Trade; times: number }[]
   cardUsed?: string
   bonusUsed?: string
@@ -296,7 +297,7 @@ export type FutureMeeple = {
   playerId: string
   round: number
   actionId: string | null
-  resources: Partial<Resource>
+  resources: FutureMeepleResourceMap
   roomType?: FutureMeepleRoomType
 }
 
@@ -320,7 +321,7 @@ export type FutureMeepleRequest =
       sourceSummary?: FutureMeepleSourceSummary
       startRound: number
       count: number
-      resources: Partial<Resource>
+      resources: FutureMeepleResourceMap
     }
   | {
       cardId: string
@@ -328,7 +329,7 @@ export type FutureMeepleRequest =
       sourceSummary?: FutureMeepleSourceSummary
       entries: {
         round: number
-        resources?: Partial<Resource>
+        resources?: FutureMeepleResourceMap
         roomType?: FutureMeepleRoomType
       }[]
     }
@@ -454,13 +455,13 @@ export type ActionCostPreview = {
 export type ChoiceEffectPreview =
   | {
       kind: 'resourceExchange'
-      resourcesPaid?: Partial<Resource>
+      resourcesPaid?: PaymentResourceMap
       resourcesGained?: Partial<Resource>
       bonusVp?: number
     }
   | {
       kind: 'payment'
-      resourcesPaid?: Partial<Resource>
+      resourcesPaid?: PaymentResourceMap
       cardUsed?: string
       /** Card ids whose modifiers contributed to this payment (bonus.sources + trade.sourceId). */
       sourceCards?: string[]
@@ -528,7 +529,7 @@ export type InternalActionChildren = {
 }
 
 export type ActionExecutionResult =
-  | { type: 'ok'; resourcesGained?: Partial<Resource>; resourcesPaid?: Partial<Resource>; extraData?: Record<string, unknown>; internalChildren?: InternalActionChildren }
+  | { type: 'ok'; resourcesGained?: Partial<Resource>; resourcesPaid?: PaymentResourceMap; extraData?: Record<string, unknown>; internalChildren?: InternalActionChildren }
   | { type: 'request'; request: InteractionRequest; promptKey?: PromptKey; promptParams?: Record<string, unknown>; sourceCard?: string; extraData?: Record<string, unknown> }
   | { type: 'fail'; errorKey: string; recoverable?: boolean }
   | { type: 'flow'; flow: ActionFlow; extraData?: Record<string, unknown> }

@@ -18,6 +18,7 @@ import type {
   ComplexCost,
   CostModifierType,
   GameState,
+  PaymentResourceMap,
   PlayerState,
   Resource,
   Trade,
@@ -34,14 +35,14 @@ export const resolveCardCostWithModifiers = (
   player: PlayerState,
   actionId: string,
   cardId: string,
-  baseCost: Partial<Resource> | ComplexCost,
+  baseCost: PaymentResourceMap | ComplexCost,
   actionCardId?: string,
-): Partial<Resource> | ComplexCost => {
+): PaymentResourceMap | ComplexCost => {
   const context = buildCardCostListenerContext(state, player, actionId)
   const matched = getMatchingListeners(context)
   const collectedBonuses: Bonus[] = []
   const collectedTrades: Trade[] = []
-  let cost: Partial<Resource> = isComplexCost(baseCost) ? {} : { ...baseCost }
+  let cost: PaymentResourceMap = isComplexCost(baseCost) ? {} : { ...baseCost }
 
   for (const entry of matched) {
     const listenerContext = {
@@ -98,9 +99,9 @@ const resolveCardPreviewCost = (
   player: PlayerState,
   actionId: string,
   cardId: string,
-  baseCost: Partial<Resource> | ComplexCost | null | undefined,
+  baseCost: PaymentResourceMap | ComplexCost | null | undefined,
   actionCardId?: string,
-): Partial<Resource> | ComplexCost | null => {
+): PaymentResourceMap | ComplexCost | null => {
   if (!baseCost) return null
   return resolveCardCostWithModifiers(
     state,
@@ -117,7 +118,7 @@ export const resolveCardPreviewCostByProvider = (
   player: PlayerState,
   actionId: string,
   cardId: string,
-  getBaseCost: () => Partial<Resource> | ComplexCost | null | undefined,
+  getBaseCost: () => PaymentResourceMap | ComplexCost | null | undefined,
   actionCardId?: string,
 ) =>
   resolveCardPreviewCost(
@@ -134,7 +135,7 @@ const canAffordCardPreviewCost = (
   player: PlayerState,
   actionId: string,
   cardId: string,
-  baseCost: Partial<Resource> | ComplexCost | null | undefined,
+  baseCost: PaymentResourceMap | ComplexCost | null | undefined,
   actionCardId?: string,
   costType?: CostModifierType,
 ) =>
@@ -149,9 +150,9 @@ const canAffordCardPreviewCost = (
     )
     if (!previewCost) return false
     if (!isComplexCost(previewCost)) {
-      return canAffordTypedFlatCost(player, previewCost, costType)
+      return canAffordTypedFlatCost(player, previewCost, costType, state)
     }
-    return canPayCost(player, previewCost, costType)
+    return canPayCost(player, previewCost, costType, state)
   })()
 
 export const canAffordCardPreviewCostByProvider = (
@@ -159,7 +160,7 @@ export const canAffordCardPreviewCostByProvider = (
   player: PlayerState,
   actionId: string,
   cardId: string,
-  getBaseCost: () => Partial<Resource> | ComplexCost | null | undefined,
+  getBaseCost: () => PaymentResourceMap | ComplexCost | null | undefined,
   actionCardId?: string,
   costType?: CostModifierType,
 ) =>
@@ -178,7 +179,7 @@ const payCardPreviewCost = (
   player: PlayerState,
   actionId: string,
   cardId: string,
-  baseCost: Partial<Resource> | ComplexCost | null | undefined,
+  baseCost: PaymentResourceMap | ComplexCost | null | undefined,
   actionCardId?: string,
   costType?: CostModifierType,
 ) => {
@@ -199,6 +200,7 @@ const payCardPreviewCost = (
     previewCost,
     undefined,
     costType,
+    state,
   )[0]
   if (!solution) return false
   executePaymentSolution(player, solution, { costType, state })
@@ -210,7 +212,7 @@ export const payCardPreviewCostByProvider = (
   player: PlayerState,
   actionId: string,
   cardId: string,
-  getBaseCost: () => Partial<Resource> | ComplexCost | null | undefined,
+  getBaseCost: () => PaymentResourceMap | ComplexCost | null | undefined,
   actionCardId?: string,
   costType?: CostModifierType,
 ) =>
@@ -238,12 +240,14 @@ export const canAffordActionPreviewCost = (
   canAffordCost(
     context.player,
     resolveActionPreviewCost(context, getBaseCost, costOverride),
+    context.state,
   )
 
 export const canAffordCost = (
   player: PlayerState,
-  cost: Partial<Resource> | ComplexCost | undefined,
+  cost: PaymentResourceMap | ComplexCost | undefined,
+  state?: GameState,
 ) => {
   if (!cost) return true
-  return canPayCost(player, cost)
+  return canPayCost(player, cost, undefined, state)
 }

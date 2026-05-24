@@ -1,6 +1,6 @@
 // Pure card-related types. Sourced from S6a split of shared/cards/types.ts.
 
-import type { Resource, CostModifier, TradeSideEffect, ComplexCost } from './types'
+import type { Resource, PaymentResourceMap, CostModifier, TradeSideEffect, ComplexCost } from './types'
 
 export type CardType = 'major' | 'minor' | 'occupation'
 
@@ -39,8 +39,8 @@ export type CardDefinition = {
   number: number
   category?: string
   desc: string[]
-  cost?: Partial<Resource> | ComplexCost
-  altCosts?: Partial<Resource>[]
+  cost?: PaymentResourceMap | ComplexCost
+  altCosts?: PaymentResourceMap[]
   vp?: number
   prerequisite?: string
   maxRound?: number

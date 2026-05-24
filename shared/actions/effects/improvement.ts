@@ -1,4 +1,4 @@
-import type { ActionDefinition, ActionExecutionResult, GameState, InternalActionChild, InternalActionChildren, PlayerState, ComplexCost } from '../../contract/types'
+import type { ActionDefinition, ActionExecutionResult, GameState, InternalActionChild, InternalActionChildren, PaymentResourceMap, PlayerState, ComplexCost } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
 import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../cards/registry-display'
@@ -8,7 +8,7 @@ import { getMinorImprovement } from '../../cards/registry-display'
 // migrate in S4 (preview-cost domain aggregation per Decision C).
 import { PaymentSolver } from '../payment'
 import type { PaymentCtx } from '../payment'
-import { payResources, executePaymentSolution } from '../payment/internal'
+import { executePaymentSolution } from '../payment/internal'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
 import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../session/stats'
 import { getMajorCard } from '../../cards/major'
@@ -311,7 +311,7 @@ const resolveImprovementPayment = (
   state: GameState,
   playerIndex: number,
   player: PlayerState,
-  cost: Partial<PlayerState['resources']> | ComplexCost,
+  cost: PaymentResourceMap | ComplexCost,
   actionId: 'improvement-major' | 'improvement-minor' | 'improvement-any',
   paymentChoice: string | undefined,
   optionValuePrefix: string,
@@ -323,7 +323,7 @@ const resolveImprovementPayment = (
   | ActionExecutionResult
   | {
       type: 'selected'
-      resourcesPaid: Partial<PlayerState['resources']>
+      resourcesPaid: PaymentResourceMap
       feeIndex?: number
       returnedCardId?: string
     } => {
@@ -335,14 +335,6 @@ const resolveImprovementPayment = (
     sourceCard: improvementId,
     playedCards,
   }
-  if (!PaymentSolver.isComplexCost(cost)) {
-    if (!PaymentSolver.canAfford(effectiveState, effectiveIndex, cost, ctx)) {
-      return failure
-    }
-    payResources(player, cost)
-    return { type: 'selected', resourcesPaid: cost }
-  }
-
   const solutions = PaymentSolver.computeOptions(effectiveState, effectiveIndex, cost, ctx)
   const resolved = resolvePaymentSolutionSelection(
     solutions,
@@ -355,7 +347,7 @@ const resolveImprovementPayment = (
     return resolved
   }
 
-  const returnedCardId = executePaymentSolution(player, resolved.solution)
+  const returnedCardId = executePaymentSolution(player, resolved.solution, { state: effectiveState })
   return {
     type: 'selected',
     resourcesPaid: resolved.solution.resourcesPaid,
