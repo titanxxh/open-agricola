@@ -244,6 +244,7 @@ export const normalizeState = (raw: GameState): GameState => {
           : createDefaultRoomTiles(player.rooms ?? 2),
       stableTiles: player.stableTiles ?? [],
       majorEffects: player.majorEffects ?? { wellRounds: 0 },
+      supplyTokensConsumed: player.supplyTokensConsumed ?? {},
     }
     const desiredRooms = normalized.rooms ?? normalized.roomTiles.length
     if (normalized.roomTiles.length < desiredRooms) {
@@ -459,6 +460,7 @@ const createInitialPlayers = (
       activeModifiers: [],
       cardStates: {},
       stats: createInitialPlayerStats({ isFirstPlayer: info.startPlayer }),
+      supplyTokensConsumed: {},
     }
     return player
   })
