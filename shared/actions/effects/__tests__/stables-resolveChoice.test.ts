@@ -112,6 +112,18 @@ describe('stablesAction.resolveChoice', () => {
     expect(result.type).toBe('ok')
   })
 
+  it('cancel fails recoverably when actionContext forbids cancel', () => {
+    const result = stablesAction.resolveChoice!(
+      makeCtx({ actionContext: { cancelPolicy: 'forbidCancel' } }),
+      'cancel',
+    )
+    expect(result).toMatchObject({
+      type: 'fail',
+      errorKey: 'log.buildStableFail',
+      recoverable: true,
+    })
+  })
+
   it('first call with payload + simple wood cost finalizes immediately', () => {
     const tile: FarmTilePosition = { row: 0, col: 0 }
     const ctx = makeCtx()
@@ -245,6 +257,44 @@ describe('stablesAction.resolveChoice', () => {
     })
     const result = stablesAction.resolveChoice!(ctx, 'confirm', { stables: [tileA, tileB] })
     expect(result.type).toBe('fail')
+  })
+
+  it('zoneFilter pasture-1 rejects backend submissions outside size-1 pastures', () => {
+    const ctx = makeCtx({
+      player: {
+        pastures: [{
+          id: 'p1',
+          size: 1,
+          tiles: [{ row: 2, col: 0 }],
+          stables: 0,
+          animalType: null,
+          animalCount: 0,
+        }],
+      },
+      actionContext: { max: 1, exactCost: { wood: 0 }, zoneFilter: 'pasture-1' },
+    })
+    const result = stablesAction.resolveChoice!(ctx, 'confirm', { stables: [{ row: 0, col: 1 }] })
+    expect(result.type).toBe('fail')
+  })
+
+  it('zoneFilter pasture-1 accepts backend submissions inside size-1 pastures', () => {
+    const tile: FarmTilePosition = { row: 2, col: 0 }
+    const ctx = makeCtx({
+      player: {
+        pastures: [{
+          id: 'p1',
+          size: 1,
+          tiles: [tile],
+          stables: 0,
+          animalType: null,
+          animalCount: 0,
+        }],
+      },
+      actionContext: { max: 1, exactCost: { wood: 0 }, zoneFilter: 'pasture-1' },
+    })
+    const result = stablesAction.resolveChoice!(ctx, 'confirm', { stables: [tile] })
+    expect(result.type).toBe('ok')
+    expect(ctx.player.stableTiles).toContainEqual(tile)
   })
 
   it('exactCost { wood: 1, max: 1 } pays exactly one wood, not default plus one', () => {
