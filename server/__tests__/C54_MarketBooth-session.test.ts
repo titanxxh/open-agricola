@@ -13,6 +13,7 @@ const CARD_ID = 'C54_MarketBooth'
 
 const setupForHarvestField = (options?: {
   builtFences?: number
+  consumedFences?: number
   e74HeldFences?: number
   grain?: number
 }) => {
@@ -31,6 +32,9 @@ const setupForHarvestField = (options?: {
   player.minorPlayed.push(CARD_ID)
   player.resources.grain = options?.grain ?? 1
   setFencesForTest(player, options?.builtFences ?? 4)
+  if (options?.consumedFences !== undefined) {
+    player.supplyTokensConsumed = { fence: options.consumedFences }
+  }
   if (options?.e74HeldFences) {
     player.cardStates = {
       ...player.cardStates,
@@ -191,6 +195,25 @@ describe('C54_MarketBooth session', () => {
     expect(after.resources.grain).toBe(grainBefore)
     expect(getFenceCount(after)).toBe(fenceBefore)
     expect(after.supplyTokensConsumed?.fence).toBeUndefined()
+  })
+
+  it('does not exchange when consumed fence tokens exhaust the reserve', () => {
+    const sessionAccept = setupForHarvestField({ builtFences: 0, consumedFences: 15 })
+    const before = sessionAccept.getState().state.players[0]!
+    const grainBefore = before.resources.grain
+    const fenceBefore = getFenceCount(before)
+
+    const sessionDecline = setupForHarvestField({ builtFences: 0, consumedFences: 15 })
+    const respDecline = drainPending(sessionDecline, /* accept */ false)
+    const afterDecline = respDecline.state.players[0]!
+
+    const respAccept = drainPending(sessionAccept, /* accept */ true)
+    const afterAccept = respAccept.state.players[0]!
+
+    expect(afterAccept.resources.grain).toBe(grainBefore)
+    expect(getFenceCount(afterAccept)).toBe(fenceBefore)
+    expect(afterAccept.supplyTokensConsumed?.fence).toBe(15)
+    expect(afterAccept.resources.food - afterDecline.resources.food).toBe(0)
   })
 
   it('does not trigger when player has 0 grain', () => {
