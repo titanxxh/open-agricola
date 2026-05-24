@@ -17,12 +17,13 @@ export const E97_Beneficiary_impl = {
         children: [
           {
             type: 'seq' as const,
+            choiceLabelKey: 'actions.lessons.name',
             children: [
               {
                 type: 'leaf' as const,
-                actionId: 'occupation',
+                actionId: 'occupation-gate',
                 sourceCard: CARD_ID,
-                params: { exactCost: { food: 1 } },
+                actionContext: { occupationParams: { exactCost: { food: 1 } } },
               },
               ...(player.occupationPlayed.includes(STALLWRIGHT_ID)
                 ? [{
@@ -33,6 +34,12 @@ export const E97_Beneficiary_impl = {
                     actionContext: { max: 1, exactCost: { max: 1 }, trueAction: false },
                   }]
                 : []),
+              {
+                type: 'leaf' as const,
+                actionId: 'occupation',
+                sourceCard: CARD_ID,
+                params: { exactCost: { food: 1 } },
+              },
             ],
           },
           {
