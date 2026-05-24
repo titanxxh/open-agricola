@@ -128,6 +128,19 @@ const minPerimeterForFarmCells = (cellCount: number): number => {
   return Number.isFinite(best) ? best : minimumFenceSegments
 }
 
+const minOrdinaryPerimeterForFarmCells = (cellCount: number): number => {
+  if (cellCount <= 0) return 0
+  let best = Number.POSITIVE_INFINITY
+  for (let rows = 1; rows <= FARM_ROWS; rows += 1) {
+    for (let cols = 1; cols <= FARM_COLS; cols += 1) {
+      if (rows * cols >= cellCount) {
+        best = Math.min(best, rows + cols)
+      }
+    }
+  }
+  return Number.isFinite(best) ? best : 0
+}
+
 const inferMinimumPolicySegments = (policy: FenceActionPolicy): number => {
   const segmentBounds = policy.segmentBounds
   const hasSegmentMin =
@@ -147,6 +160,14 @@ const inferMinimumPolicySegments = (policy: FenceActionPolicy): number => {
   return minimumFenceSegments
 }
 
+const inferMinimumPolicyOrdinarySegments = (policy: FenceActionPolicy): number => {
+  const minPastureSize = policy.pastureBounds?.newPastureSize?.min
+  if (minPastureSize !== undefined) {
+    return minOrdinaryPerimeterForFarmCells(minPastureSize)
+  }
+  return 0
+}
+
 const canStartWithFencePolicy = (
   player: PlayerState,
   policy: FenceActionPolicy,
@@ -164,6 +185,10 @@ const canStartWithFencePolicy = (
     (!policy.allowedSegmentTypes || policy.allowedSegmentTypes.includes('palisade')) &&
     playerCanBuildPalisades(player)
   const minFence = segmentBounds?.fence?.min ?? 0
+  const minOrdinaryForPasture = allowedPalisade
+    ? inferMinimumPolicyOrdinarySegments(policy)
+    : 0
+  const minOrdinary = Math.max(minFence, minOrdinaryForPasture)
   const minPalisade = segmentBounds?.palisade?.min ?? 0
   if ((minFence > 0 && !allowedFence) || (minPalisade > 0 && !allowedPalisade)) {
     return false
@@ -182,7 +207,7 @@ const canStartWithFencePolicy = (
   const costFreeFences =
     selectedFreeFences + Math.max(0, Math.abs(costOverride?.wood ?? 0))
 
-  for (let ordinary = minFence; ordinary <= maxFence; ordinary += 1) {
+  for (let ordinary = minOrdinary; ordinary <= maxFence; ordinary += 1) {
     for (let palisade = minPalisade; palisade <= maxPalisade; palisade += 1) {
       const total = ordinary + palisade
       if (total < minTotal || total > maxTotal) continue
