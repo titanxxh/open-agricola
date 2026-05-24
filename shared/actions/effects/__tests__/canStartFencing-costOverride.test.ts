@@ -89,6 +89,22 @@ describe('canStartFencing with costOverride', () => {
     ).toBe(true)
   })
 
+  it('applies costOverride discounts to nested fencePolicy costPolicy checks', () => {
+    const player = createPlayer({
+      resources: {
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
+        grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+      },
+    })
+    const actionContext = {
+      fencePolicy: {
+        costPolicy: { fence: { wood: 1 } },
+      },
+    }
+    expect(canStartFencing(fakeState, player, undefined, actionContext)).toBe(false)
+    expect(canStartFencing(fakeState, player, { wood: -4 }, actionContext)).toBe(true)
+  })
+
   it('allows explicit total max when supply only has fewer fences left', () => {
     const player = createPlayer({
       supplyTokensConsumed: { fence: 13 },

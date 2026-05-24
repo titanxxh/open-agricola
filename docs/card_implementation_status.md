@@ -95,7 +95,7 @@
 | Log / notification provenance | `shared/events/event-mapping-policy.ts` 覆盖全部 public/private event type；`shared/cards/__tests__/provenance-result-audit.test.ts` 守住生产卡牌的 `context.result` 资源事实 fallback | 结构化事件层是卡牌判定、UI log、private notification 和 replay 的统一来源；新增支付/资源/farm metadata 路径必须先 emit 事件再让 listener 消费，不要回退到 action result。 |
 | Fence segment source/type policy 已进入通用基础设施 | `FenceSegment.type` / `source`、`consume-fence` ownOnly、fencing `fencePolicy` | 普通 fence / palisade / borrowed source 不通过主路径卡牌分支表达；C1 rebuild、B30 palisade、未来 E149 borrowed fence 都走 segment type/source + generic policy。 |
 | Supply token payment 已进入通用资源基础设施 | `PaymentResourceMap`、`supplyTokensConsumed`、payment solver、`resource.paid` | fence / stable 作为支付资源处理；C54/A34 消耗 reserve fence，B149 消耗 stable supply，后续读取可建上限必须走 supply-token helper。 |
-| BGA `formatCost` exact/free/paid unit semantics 已进入通用基础设施 | `ExactCost`、`readExactCost()`、`resolveUnitCostWithDelta()`；construct / renovation / stables / plow / occupation 的 exact/free 单位成本回归 | 卡牌不再用 `costOverride`、`freeCost`、legacy `params.cost`、legacy `renovation` / `fencing` leaf 或 `-99` 表达精确免费/付费单位成本；`{ max: 1 }` 这类 BGA 语义用 `exactCost.max` / action policy 表达。 |
+| BGA `formatCost` exact/free/paid unit semantics 已进入通用基础设施 | `ExactCost`、`readExactCost()`、`resolveUnitCostWithDelta()`；construct / renovation / stables / plow / occupation / fencing policy 的 exact/free 单位成本回归 | 卡牌不再用 `costOverride`、`freeCost`、legacy `params.cost`、legacy `renovation` / `fencing` leaf 或 `-99` 表达精确免费/付费单位成本；`{ max: 1 }` 这类 BGA 语义用 `exactCost.max` / action policy 表达；nested `fencePolicy.costPolicy` 仍叠加 `computeCosts.fence` 折扣。 |
 | 注释里的非阻塞 card-id 示例 | `shared/actions/effects/breed.ts`、`shared/contract/types.ts` 仅把 `A165_PigBreeder` / `D95_SiteManager` 作为例子提到 | 除非附近代码变动，否则保留；它们不是可执行的单卡分支。 |
 | Legacy/fallback 术语残留 | 旧 bad-smell 文档发现的剩余 fallback/direct-path 术语，主要在已迁移支付 flow 和测试中 | 将直接运行时 fallback 视为重构债；测试/baseline 名称除非真实迁移触及，否则不动。 |
 
@@ -622,7 +622,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B90_CooperativePlower` | 已对齐 |  |
 | `B91_AssistantTiller` | 已对齐 |  |
 | `B92_LittleStickKnitter` | 已对齐 |  |
-| `B93_Confidant` | 已对齐 | onBuy 必须选择 2/3/4 个未来 round 之一；`isDoable.occupation` 按 occupation cost + 最低 2 food schedule 过滤不可支付的打出选项；future receive 后可选 `sow` 或 `fence`，其中 BGA `formatCost([WOOD => 1])` 通过 nested `fencePolicy.costPolicy` 显式表达。 |
+| `B93_Confidant` | 已对齐 | onBuy 必须选择 2/3/4 个未来 round 之一；`isDoable.occupation` 按 occupation cost + 最低 2 food schedule 过滤不可支付的打出选项；future receive 后可选 `sow` 或 `fence`，其中 BGA `formatCost([WOOD => 1])` 通过 nested `fencePolicy.costPolicy` 显式表达，并继续叠加 E16 / C16 等 `computeCosts.fence` 折扣。 |
 | `B94_StockProtector` | 已对齐 |  |
 | `B95_MasterBricklayer` | 已对齐 |  |
 | `B96_TreeFarmJoiner` | 已对齐 |  |

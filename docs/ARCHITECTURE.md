@@ -704,6 +704,8 @@ fencing 主路径不得按卡牌 id 或单卡开关分支：不要在 `fencing.t
 
 `segmentBounds.fence` / `segmentBounds.palisade` 限制各自类型的新建边段；`segmentBounds.total` 限制普通 fence + palisade 的总新建边段。B149 Open Air Farmer 这类 BGA `max => 6` 总段数约束必须用 `total.max` 表达，B30 palisade 也计入该上限。`canStartFencing` 只能做通用 policy 可行性估算；最终合法性仍由 `validateFenceSelection()` 原子校验并在失败时不支付。
 
+`fencePolicy.costPolicy` 只表达 BGA `formatCost` 的本次基础单位成本；entry guard 与最终校验仍要叠加 `computeCosts.fence` 折扣/加价，确保 B93 future fence 这类嵌套 action 可以继续吃 E16 / C16 等围栏折扣。
+
 C1 Overhaul 只计数、回收、重建 own ordinary fences：onBuy 先用 `consume-fence` + `sourcePolicy: 'ownOnly'` 返还自己的普通 fence，再用 `fencePolicy` 限制本次 rebuild 只能建 ordinary fence、只消耗 own ordinary supply、禁止 cancel、保留动物总量。
 
 ---
