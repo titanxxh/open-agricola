@@ -1,5 +1,5 @@
-import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 type FindingType = 'costOverride' | 'actionContextCosts' | 'negativeHugeDiscount'
@@ -72,24 +72,20 @@ const hasActionContextCosts = (text: string) => {
 }
 
 const listCardSourceFiles = () => {
-  const result = spawnSync(
-    'rg',
-    ['--files', 'shared/cards', '-g', '*.ts'],
-    { encoding: 'utf8' },
-  )
-  if (result.status !== 0 && result.status !== 1) {
-    throw new Error(result.stderr || 'failed to list shared/cards source files')
+  const files: string[] = []
+  const visit = (directory: string) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (entry.name === '__tests__' || entry.name === '__stubs__') continue
+      const file = join(directory, entry.name)
+      if (entry.isDirectory()) {
+        visit(file)
+        continue
+      }
+      if (entry.isFile() && file.endsWith('.ts')) files.push(file)
+    }
   }
-  return result.stdout
-    .split('\n')
-    .map(line => line.trim())
-    .filter(Boolean)
-    .filter((file) => {
-      const parts = file.split('/')
-      if (parts.includes('__tests__')) return false
-      if (parts.includes('__stubs__')) return false
-      return file.endsWith('.ts')
-    })
+  visit('shared/cards')
+  return files
 }
 
 const scanCardAuthoredCostHacks = () => {
