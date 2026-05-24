@@ -12,9 +12,6 @@ export const B89_Groom_impl = {
   },
   onBeforeStartOfTurn: (_state, player) => {
     if (player.houseType !== 'stone') return
-    // BGA L41-52: stables action with args costs={WOOD=>1, max=>1}; payability
-    // is checked when the player chooses to act, not at trigger emission, so
-    // we don't gate on `player.resources.wood < 1` here.
     return {
       type: 'leaf' as const,
       actionId: 'stables',
@@ -22,7 +19,7 @@ export const B89_Groom_impl = {
       optional: true,
       actionContext: {
         max: 1,
-        costOverride: { wood: 1 },
+        exactCost: { wood: 1, max: 1 },
       },
     }
   },

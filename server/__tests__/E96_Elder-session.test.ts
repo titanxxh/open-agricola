@@ -25,7 +25,7 @@ describe('E96_Elder session', () => {
       expect(children).toHaveLength(1)
       expect(children[0].actionId).toBe('occupation')
       expect(children[0].sourceCard).toBe(CARD_ID)
-      expect(children[0].params?.costOverride).toEqual({})
+      expect(children[0].params?.exactCost).toEqual({})
       expect(children[0].params?.allowedCards).toEqual([CARD_ID])
     }
   })

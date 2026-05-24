@@ -21,7 +21,7 @@ export const A152_NightSchoolStudent_impl = {
       actionId: 'occupation',
       optional: true,
       sourceCard: CARD_ID,
-      params: { costOverride: { food: 1 } },
+      params: { exactCost: { food: 1 } },
     }
   },
 },

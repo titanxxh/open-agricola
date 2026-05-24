@@ -59,7 +59,7 @@ export const A89_StablePlanner_impl = {
             type: 'leaf',
             actionId: 'stables',
             sourceCard: CARD_ID,
-            actionContext: { max: 1, costOverride: { wood: -99 }, trueAction: false },
+            actionContext: { max: 1, exactCost: { max: 1 }, trueAction: false },
           },
         ],
       } as ActionFlow

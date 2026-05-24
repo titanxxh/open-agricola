@@ -19,7 +19,7 @@ export const D97_BeggingStudent_impl = {
           type: 'leaf',
           actionId: 'occupation',
           sourceCard: CARD_ID,
-          params: { costOverride: {} },
+          params: { exactCost: {} },
         },
       ],
     }

@@ -21,7 +21,7 @@ const listener: CardListenerRegistration = {
         actionId: 'stables',
         optional: true,
         sourceCard: CARD_ID,
-        actionContext: { max: 1, costs: {}, trueAction: false },
+        actionContext: { max: 1, exactCost: { max: 1 }, trueAction: false },
       },
       sourceCard: CARD_ID,
     }

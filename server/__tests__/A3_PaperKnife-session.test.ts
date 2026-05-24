@@ -16,7 +16,7 @@
  *   resolveChoice('id1,id2,id3') → selection effect fires:
  *     • rollAndCacheCardPick → caches pick in cardStates[CARD_ID].extraData.pick
  *     • state.pendingUndoBoundary = true
- *     • returns occupation leaf { costOverride: {}, allowedCards: [pick] }
+ *     • returns occupation leaf { exactCost: {}, allowedCards: [pick] }
  *   occupation auto-resolves (single option) → occupation played for free + onBuy fires
  *
  * Current (simplified) impl: directly mutates occupationHand → occupationPlayed in onBuy,
@@ -299,7 +299,7 @@ describe('A3_PaperKnife session-tier: BGA-aligned flow', () => {
     expect(p0.occupationHand).toContain(OCC_D)
     expect(p0.occupationPlayed).not.toContain(OCC_D)
 
-    // No food paid (costOverride: {} = free play)
+    // No food paid (exactCost: {} = free play)
     expect(p0.resources.food).toBe(3)
 
     // cardStates must record the pick under extraData.pick
@@ -448,20 +448,20 @@ describe('A3_PaperKnife session-tier: BGA-aligned flow', () => {
   // ---------------------------------------------------------------------------
   // Case 7: Occupation with unpayable additional cost (skipped — not applicable)
   // ---------------------------------------------------------------------------
-  it.skip('case 7: occupation with unpayable additionalCost (not applicable with costOverride: {})', () => {
+  it.skip('case 7: occupation with unpayable additionalCost (not applicable with exactCost: {})', () => {
     // TODO (to revisit in Task 4.2 if needed):
     //
-    // A3's selectionEffect inserts a occupation leaf with costOverride: {}.
-    // In the current occupation action, costOverride completely replaces the
+    // A3's selectionEffect inserts a occupation leaf with exactCost: {}.
+    // In the current occupation action, exactCost completely replaces the
     // occupation's cost — there is no "additionalCost" field that survives the override.
     // Therefore, every A3-played occupation is free, regardless of its base cost.
     //
     // BGA spec §6 item 3: "BGA likely fails the play silently, leaving the occupation in
-    // hand, when the occupation cost is unpayable." With costOverride: {} this
+    // hand, when the occupation cost is unpayable." With exactCost: {} this
     // scenario cannot arise in our engine — the occupation is always affordable.
     //
     // If a future "additionalCost" concept is added to occupations (independent of
-    // costOverride), this test should be re-enabled and a suitable occupation used.
+    // exactCost), this test should be re-enabled and a suitable occupation used.
     // Until then, the scenario is untestable without modifying the type system.
   })
 })

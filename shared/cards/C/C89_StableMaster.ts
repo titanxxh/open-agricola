@@ -7,11 +7,6 @@ const CARD_ID = C89_StableMaster.id
 export const C89_StableMaster_impl = {
   effect: {
     id: CARD_ID,
-    /**
-     * BGA onBuy: optional STABLES action with max=1, costs={WOOD:1} (default
-     * stable cost is 2 wood, so override -1). Skipped automatically when no
-     * reserve stable / wood is available — engine resolves into a no-op.
-     */
     onBuy: (state, player) => {
       if (getAvailableStableSupplyCount(state, player) <= 0) return
       if ((player.resources.wood ?? 0) < 1) return
@@ -20,7 +15,7 @@ export const C89_StableMaster_impl = {
         actionId: 'stables',
         optional: true,
         sourceCard: CARD_ID,
-        actionContext: { max: 1, costOverride: { wood: -1 }, trueAction: false },
+        actionContext: { max: 1, exactCost: { wood: 1 }, trueAction: false },
       }
     },
     onComputeAnimalZones: (_player, zones, _state) => {

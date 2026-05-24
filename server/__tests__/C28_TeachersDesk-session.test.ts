@@ -34,7 +34,7 @@ describe('C28_TeachersDesk session', () => {
     const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('occupation')
     expect(leaf.optional).toBe(true)
-    expect(leaf.params).toEqual({ costOverride: { food: 1 } })
+    expect(leaf.params).toEqual({ exactCost: { food: 1 } })
     expect(leaf.sourceCard).toBe(CARD_ID)
   })
 

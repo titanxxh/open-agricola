@@ -17,7 +17,7 @@ export const E96_Elder_impl = {
           type: 'leaf',
           actionId: 'occupation',
           sourceCard: CARD_ID,
-          params: { costOverride: {}, allowedCards: [CARD_ID] },
+          params: { exactCost: {}, allowedCards: [CARD_ID] },
         },
       ],
     }
