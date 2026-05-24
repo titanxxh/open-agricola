@@ -317,6 +317,27 @@ describe('B149 Open Air Farmer session', () => {
     expect(updated.fenceSegments.filter((segment) => segment.type === 'palisade')).toHaveLength(3)
   })
 
+  it('does not enter B149 fencing when only two ordinary fence tokens remain', () => {
+    const session = setup({ wood: 20, woodPalisades: true })
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.supplyTokensConsumed = { fence: 13 }
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'lessons')
+    expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId === 'wait') {
+      const option = resp.interaction.options?.find((entry) => entry.value === CARD_ID)
+      if (option) {
+        resp = session.resolveChoice(0, option.value)
+      }
+    }
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.promptKey).not.toBe('ui.interactionFenceSelect')
+    expect(resp.interaction.sourceCard).not.toBe(CARD_ID)
+  })
+
   it('cancel does not consume fixed wood or complete the onBuy fencing sequence', () => {
     const session = setup({ wood: 2 })
     const pending = playB149ToFencing(session)
