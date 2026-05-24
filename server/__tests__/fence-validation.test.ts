@@ -74,7 +74,7 @@ const twoSinglePastureEdges = [
 
 const openAirPastureOptions = {
   sourcePolicy: 'ownOnly',
-  segmentBounds: { fence: { max: 6 } },
+  segmentBounds: { total: { max: 6 } },
   costPolicy: { fence: { wood: 0 }, fixedWood: 2 },
   pastureBounds: {
     newPastures: { min: 1, max: 1 },
@@ -488,6 +488,24 @@ describe('validateFenceSelection — generic fence policy', () => {
     const result = validateFenceSelection(player, edgesForTile(0, 1), [], 0, 0, {
       segmentBounds: { fence: { max: 3 } },
     })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error.code).toBe('TOO_MANY_FENCES')
+    }
+  })
+
+  it('rejects more total fence segments than the policy maximum', () => {
+    const player = createPlayer()
+
+    const result = validateFenceSelection(
+      player,
+      twoCellPastureEdges,
+      ['H-0-0'],
+      0,
+      0,
+      { allowPalisades: true, segmentBounds: { total: { max: 6 } } },
+    )
 
     expect(result.ok).toBe(false)
     if (!result.ok) {

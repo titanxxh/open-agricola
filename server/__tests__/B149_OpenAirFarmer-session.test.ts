@@ -13,6 +13,7 @@ import type {
 } from '../../shared/contract/types'
 
 import '../../shared/cards/B/B149_OpenAirFarmer'
+import '../../shared/cards/B/B30_WoodPalisades'
 
 const CARD_ID = 'B149_OpenAirFarmer'
 
@@ -69,6 +70,7 @@ const stableSpace = {
 type SetupOptions = {
   wood?: number
   existingPasture?: boolean
+  woodPalisades?: boolean
 }
 
 const ownFence = (player: PlayerState, edge: string): FenceSegment => ({
@@ -102,6 +104,7 @@ const setup = (options: SetupOptions = {}) => {
   player.occupationHand = [CARD_ID]
   player.occupationPlayed = []
   player.minorHand = ['__test_placeholder__']
+  player.minorPlayed = options.woodPalisades ? ['B30_WoodPalisades'] : []
   next.occupationHand = ['__test_placeholder__']
   next.minorHand = ['__test_placeholder__']
 
@@ -259,6 +262,23 @@ describe('B149 Open Air Farmer session', () => {
     expect(valid.ok).toBe(true)
     expect(valid.state.players[0]!.resources.wood).toBe(0)
     expect(fencingPayments(valid.state)).toHaveLength(1)
+  })
+
+  it('rejects a B30 palisade when six ordinary fences already fill the B149 limit', () => {
+    const session = setup({ wood: 4, woodPalisades: true })
+    const pending = playB149ToFencing(session)
+    const beforeInteraction = clone(pending.interaction)
+    const before = snapshotPending(session.getState().state)
+
+    const resp = session.resolveChoice(0, 'confirm', {
+      edges: TWO_CELL,
+      palisadeEdges: ['H-0-0'],
+      extraWood: 0,
+    })
+
+    expect(resp.ok).toBe(false)
+    expectFarmSelect(resp, beforeInteraction)
+    expectPendingSnapshot(resp.state, before)
   })
 
   it('cancel does not consume fixed wood or complete the onBuy fencing sequence', () => {
