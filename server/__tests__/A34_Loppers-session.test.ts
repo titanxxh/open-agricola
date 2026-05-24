@@ -54,6 +54,7 @@ const createPlayer = (): PlayerState =>
 
 const setupFencingSession = (options: {
   wood: number
+  consumedFences?: number
   existingFenceEdges?: string[]
   e74HeldFences?: number
 }) => {
@@ -79,6 +80,9 @@ const setupFencingSession = (options: {
       type: 'fence',
       source: { kind: 'own', ownerPlayerId: player.id },
     }))
+  }
+  if (options.consumedFences !== undefined) {
+    player.supplyTokensConsumed = { fence: options.consumedFences }
   }
   if (options.e74HeldFences) {
     player.minorPlayed.push('E74_AshTrees')
@@ -235,6 +239,50 @@ describe('A34 Loppers — supply fence payment', () => {
     expect(resp.state.players[0]!.resources.wood).toBe(1)
     expect(resp.state.players[0]!.resources.food).toBe(0)
     expect(resp.state.players[0]!.supplyTokensConsumed?.fence).toBeUndefined()
+    expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.counters?.bonusVp).toBeUndefined()
+  })
+
+  it('does not spend A34 when consumed fence supply removes the remaining reserve', () => {
+    const existing = widePastureEdges.slice(0, 10)
+    const build = widePastureEdges.slice(10)
+    const session = setupFencingSession({
+      wood: 1,
+      existingFenceEdges: existing,
+      consumedFences: 1,
+      e74HeldFences: 4,
+    })
+
+    let resp = session.takeAction(0, 'fencing')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const useAll = resp.interaction.options?.find(
+      (option) => option.labelParams?.count === 4,
+    )
+    expect(useAll).toBeDefined()
+
+    resp = session.resolveChoice(0, useAll!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+
+    resp = session.resolveChoice(0, 'confirm', {
+      edges: build,
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+
+    if (resp.interaction.stateId === 'wait') {
+      const accept = resp.interaction.options?.find((option) => option.value !== '__skip__')
+      if (accept) {
+        resp = session.resolveChoice(0, accept.value)
+      }
+    }
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.fenceSegments).toHaveLength(14)
+    expect(resp.state.players[0]!.resources.wood).toBe(1)
+    expect(resp.state.players[0]!.resources.food).toBe(0)
+    expect(resp.state.players[0]!.supplyTokensConsumed?.fence).toBe(1)
     expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.counters?.bonusVp).toBeUndefined()
   })
 })
