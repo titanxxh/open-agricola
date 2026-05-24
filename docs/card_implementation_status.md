@@ -303,7 +303,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | listener | `isDoable.fishing` | `C51_FishingNet` |
 | listener | `isDoable.improvement` | `B103_FieldMerchant`, `B75_WoodWorkshop`, `C140_PackagingArtist`, `D21_Recruitment` |
 | listener | `isDoable.place-farmer` | `E125_DelayedWayfarer` |
-| listener | `isDoable.occupation` | `D152_Patron`, `D49_Bookshelf`, `E101_Blighter` |
+| listener | `isDoable.occupation` | `B93_Confidant`, `D152_Patron`, `D49_Bookshelf`, `E101_Blighter` |
 | listener | `isDoable.renovate-house` | `A87_Conservator`, `D14_HammerCrusher` |
 | listener | `isDoable.sow` | `A65_SeedPellets`, `A94_LazySowman`, `B26_AgrarianFences`, `B72_LoveforAgriculture`, `C112_Thresher`, `D17_DrillHarrow` |
 | specialKind | `add-resource-to-space` | `C130_OutskirtsDirector`, `C93_InnerDistrictsDirector` |
@@ -622,7 +622,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B90_CooperativePlower` | 已对齐 |  |
 | `B91_AssistantTiller` | 已对齐 |  |
 | `B92_LittleStickKnitter` | 已对齐 |  |
-| `B93_Confidant` | 已对齐 | onBuy 必须选择 2/3/4 个未来 round 之一；future receive 后可选 `sow` 或 `fence`，其中 BGA `formatCost([WOOD => 1])` 通过 nested `fencePolicy.costPolicy` 显式表达。 |
+| `B93_Confidant` | 已对齐 | onBuy 必须选择 2/3/4 个未来 round 之一；`isDoable.occupation` 按 occupation cost + 最低 2 food schedule 过滤不可支付的打出选项；future receive 后可选 `sow` 或 `fence`，其中 BGA `formatCost([WOOD => 1])` 通过 nested `fencePolicy.costPolicy` 显式表达。 |
 | `B94_StockProtector` | 已对齐 |  |
 | `B95_MasterBricklayer` | 已对齐 |  |
 | `B96_TreeFarmJoiner` | 已对齐 |  |
