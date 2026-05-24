@@ -771,7 +771,7 @@ export const zh = {
     E130_Overachiever: { name: '奋进者', description: '每当你使用 __Wish for Children__ 行动位时，你可以额外打出 1 张改良，其费用减你选择的 1 个资源。' },
     E133_ChampionBreeder: { name: '冠军育种者', description: '每当你在收获繁殖阶段在农场放置 2 只或 3+ 只新生动物时，分别获得 1 或 2 额外 <SCORE>。' },
     E134_Omnifarmer: { name: '全能农夫', description: '每次收获，你可以将 1 个收获作物或 1 个新生动物不可回收地放在本牌上。本局一次，当本牌上有 2/3/4/5 种不同资源时，你获得 3/5/7/9 额外 <SCORE>。' },
-    E148_Lazybones: { name: '懒骨头', description: '在 __Grain Seeds__、__Farmland__、__Day Laborer__、__Farm Expansion__ 上各放（至多）1 个 <STABLE>。当其他玩家使用这些行动位时，你免费建造对应的 <STABLE>。' },
+    E148_Lazybones: { name: '懒骨头', description: '在 __Grain Seeds__、__Farmland__、__Day Laborer__、__Farm Expansion__ 上各放（至多）1 个 <STABLE>。当其他玩家使用这些行动位时，你免费建造对应的 <STABLE>。', choice: '预留 {spaces}' },
     E151_DeliveryNurse: { name: '接生护士', description: '本局一次，若你拥有所有类型的动物，你可以在没有房间的情况下使用任意 __Wish for Children__ 行动位。' },
     E153_StoneSculptor: { name: '石雕师', description: '每次收获，你可以用本牌将恰好 1 <STONE> 换成 1 额外 <SCORE> 和 1 <FOOD>。' },
     E155_Visionary: { name: '先知', description: '若你在第 4 回合或之前打出本牌，你获得 1 <STONE>、1 <VEGETABLE> 和 2 <PIG>。在第 11 回合之前你不能增长家庭，除非其他所有玩家已经增长过。' },
