@@ -8,6 +8,7 @@ import type {
   PaymentResourceMap,
   PaymentSolution,
   PlayerState,
+  Resource,
 } from '../../contract/types'
 import type { EventSink, PaymentPurpose } from '../../contract/events'
 import { addCardResourcePaid } from '../../cards/helpers/card-state'
@@ -23,7 +24,10 @@ import {
 } from '../payment/internal'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
 import {
+  filterPaymentSolutionsByReserve,
+  preservesResourceReserve,
   payTypedFlatCostDetailed,
+  resolveCostPaymentSelection,
   resolvePaymentSolutionSelection,
 } from '../payment/internal'
 
@@ -45,6 +49,7 @@ export type PayParams = {
   sourceActionId?: string
   includeReturnedCard?: boolean
   playedCards?: string[]
+  reserveResources?: Partial<Resource>
 }
 
 /**
@@ -91,6 +96,7 @@ const PAY_PARAM_KEYS = new Set([
   'sourceActionId',
   'includeReturnedCard',
   'playedCards',
+  'reserveResources',
 ])
 
 const looksLikeFlatResource = (
@@ -152,6 +158,7 @@ const resolvePayActionPaymentSelection = (
     costType?: CostModifierType
     includeReturnedCard?: boolean
     playedCards?: string[]
+    reserveResources?: Partial<Resource>
   } = {},
 ):
   | ActionExecutionResult
@@ -167,7 +174,11 @@ const resolvePayActionPaymentSelection = (
     costType: options.costType ?? 'none',
     playedCards: options.playedCards,
   }
-  const solutions = PaymentSolver.computeOptions(effectiveState, effectiveIndex, cost, ctx)
+  const solutions = filterPaymentSolutionsByReserve(
+    player,
+    PaymentSolver.computeOptions(effectiveState, effectiveIndex, cost, ctx),
+    options.reserveResources,
+  )
   return resolvePaymentSolutionSelection(
     solutions,
     normalizePaymentChoiceValue(paymentChoice, optionValuePrefix),
@@ -294,9 +305,20 @@ export const payAction: ActionDefinition = {
       const effectiveState = playerIndex >= 0 ? state : buildSingletonState(player)
       const effectiveIndex = playerIndex >= 0 ? playerIndex : 0
       if (!PaymentSolver.isComplexCost(p.cost)) {
+        if (p.costType || p.reserveResources) {
+          return filterPaymentSolutionsByReserve(
+            player,
+            PaymentSolver.computeOptions(effectiveState, effectiveIndex, { fee: p.cost }, ctx),
+            p.reserveResources,
+          ).length > 0
+        }
         return PaymentSolver.canAfford(effectiveState, effectiveIndex, p.cost, ctx)
       }
-      return PaymentSolver.computeOptions(effectiveState, effectiveIndex, p.cost, ctx).length > 0
+      return filterPaymentSolutionsByReserve(
+        player,
+        PaymentSolver.computeOptions(effectiveState, effectiveIndex, p.cost, ctx),
+        p.reserveResources,
+      ).length > 0
     },
   },
   execute: ({ player, params, sourceCard, state, eventSink }) => {
@@ -315,6 +337,7 @@ export const payAction: ActionDefinition = {
           costType: p.costType,
           includeReturnedCard: p.includeReturnedCard,
           playedCards: p.playedCards,
+          reserveResources: p.reserveResources,
         },
       )
       if (selection.type !== 'selected') {
@@ -339,6 +362,33 @@ export const payAction: ActionDefinition = {
     // attempt canPayResources(flat) and fail when the player can only
     // afford the cost via a trade swap.
     if (p.costType) {
+      if (p.reserveResources) {
+        const selection = resolveCostPaymentSelection(
+          player,
+          { fee: flat },
+          p.optionPrefix ?? 'pay:generic',
+          p.paymentChoice,
+          { type: 'fail', errorKey: 'log.payFail' },
+          {
+            costType: p.costType,
+            state,
+            reserveResources: p.reserveResources,
+          },
+        )
+        if (selection.type !== 'selected') {
+          return selection
+        }
+        return buildSelectedResult(
+          selection.solution,
+          sourceCard,
+          p.costType,
+          player,
+          state,
+          p.includeReturnedCard,
+          eventSink,
+          p.sourceActionId,
+        )
+      }
       const detailed = payTypedFlatCostDetailed(player, flat, p.costType, state)
       if (!detailed.ok) return { type: 'fail', errorKey: 'log.payFail' }
       const resourcesPaid = detailed.resourcesPaid
@@ -366,6 +416,9 @@ export const payAction: ActionDefinition = {
     const effectiveState = playerIndex >= 0 ? state : buildSingletonState(player)
     const effectiveIndex = playerIndex >= 0 ? playerIndex : 0
     if (!PaymentSolver.canAfford(effectiveState, effectiveIndex, flat, { actionId: 'pay', costType: 'none' })) {
+      return { type: 'fail', errorKey: 'log.payFail' }
+    }
+    if (!preservesResourceReserve(player.resources, flat, p.reserveResources)) {
       return { type: 'fail', errorKey: 'log.payFail' }
     }
     payResources(player, flat)
@@ -422,6 +475,7 @@ export const payAction: ActionDefinition = {
         costType: p.costType,
         includeReturnedCard: p.includeReturnedCard,
         playedCards: p.playedCards,
+        reserveResources: p.reserveResources,
       },
     )
     if (selection.type !== 'selected') {

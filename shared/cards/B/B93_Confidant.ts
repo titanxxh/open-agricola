@@ -1,5 +1,8 @@
 import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
-import { collectOccupationActionPaymentOptions } from '../../actions/effects/occupation'
+import {
+  collectOccupationActionPaymentOptions,
+  hasPlayableOccupationChoice,
+} from '../../actions/effects/occupation'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, GameState, PlayerState, Resource } from '../../contract/types'
@@ -11,6 +14,7 @@ import { B93_Confidant } from '../../cards-display/B/B93_Confidant'
 
 const CARD_ID = B93_Confidant.id
 const MIN_FUTURE_FOOD = 2
+const LESSON_ACTIONS = new Set(['lessons', 'lessons-3', 'lessons-4'])
 
 const readOccupationBaseCost = (context: CardListenerContext): Partial<Resource> => {
   const baseCost = context.extraData?.occupationBaseCost
@@ -35,11 +39,22 @@ const canAffordMinimumSchedule = (context: CardListenerContext) => {
 
 const minimumScheduleListener: CardListenerRegistration = {
   id: 'B93-confidant-isdoable-minimum-schedule',
-  actions: ['occupation'],
+  actions: ['occupation', 'lessons', 'lessons-3', 'lessons-4'],
   phases: ['isDoable' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.choice !== CARD_ID) return
-    if (canAffordMinimumSchedule(context)) return
+    if (context.choice !== CARD_ID) {
+      if (
+        LESSON_ACTIONS.has(context.actionId) &&
+        context.player.occupationHand.includes(CARD_ID) &&
+        !hasPlayableOccupationChoice(context.state, context.player, context.actionId)
+      ) {
+        return { doable: false }
+      }
+      return
+    }
+    if (canAffordMinimumSchedule(context)) {
+      return { reserveResources: { food: MIN_FUTURE_FOOD } }
+    }
     return { doable: false }
   },
 }
