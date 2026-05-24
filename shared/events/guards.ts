@@ -92,6 +92,11 @@ const resourceKeys = new Set([
   'stable',
 ])
 
+const paymentResourceKeys = new Set([
+  ...resourceKeys,
+  'fence',
+])
+
 const privatePayloadKeys = new Set([
   'hand',
   'minorHand',
@@ -222,6 +227,16 @@ const assertResourceMap = (value: unknown, path: string): void => {
   })
 }
 
+const assertPaymentResourceMap = (value: unknown, path: string): void => {
+  const record = assertRecord(value, path)
+  Object.entries(record).forEach(([key, entry]) => {
+    if (!paymentResourceKeys.has(key)) {
+      throw new Error(`GameEvent ${path} has unknown resource ${key}`)
+    }
+    assertFiniteNumberField(entry, `${path}.${key}`)
+  })
+}
+
 const assertResourceLocation = (value: unknown, path: string): void => {
   const record = assertRecord(value, path)
   const kind = record.kind
@@ -269,7 +284,7 @@ const assertPaymentSources = (value: unknown): void => {
     const record = assertRecord(entry, `paymentSources[${index}]`)
     assertOnlyKeys(record, ['from', 'resources'], `paymentSources[${index}]`)
     assertResourceLocation(record.from, `paymentSources[${index}].from`)
-    assertResourceMap(record.resources, `paymentSources[${index}].resources`)
+    assertPaymentResourceMap(record.resources, `paymentSources[${index}].resources`)
   })
 }
 
@@ -377,7 +392,7 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       assertResourceLocation(event.to, 'to')
       return
     case 'resource.paid':
-      assertResourceMap(event.resources, 'resources')
+      assertPaymentResourceMap(event.resources, 'resources')
       assertStringField(event.paymentFor, 'paymentFor')
       if (event.to !== undefined) assertResourceLocation(event.to, 'to')
       assertPaymentSources(event.paymentSources)

@@ -113,6 +113,39 @@ describe('event guards', () => {
     })).not.toThrow()
   })
 
+  it('accepts supply tokens in resource paid events', () => {
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'resource.paid',
+      resources: { fence: 1, stable: 1 },
+      paymentFor: 'cardEffect',
+      paymentSources: [
+        {
+          from: { kind: 'player', playerId: 'p1' },
+          resources: { fence: 1, stable: 1 },
+        },
+      ],
+    })).not.toThrow()
+  })
+
+  it('rejects supply tokens outside resource paid events', () => {
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'resource.moved',
+      resources: { fence: 1 },
+      from: { kind: 'supply' },
+      to: { kind: 'player', playerId: 'p1' },
+      reason: 'gain',
+    })).toThrow(/unknown resource fence/)
+
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'action.accumulated',
+      spaceId: 'forest',
+      resources: { fence: 1 },
+    })).toThrow(/unknown resource fence/)
+  })
+
   it.each([
     [
       'resource.moved resources',
