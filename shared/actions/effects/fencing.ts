@@ -219,16 +219,19 @@ const canStartWithFencePolicy = (
   const fenceWoodCost = policy.costPolicy?.fence?.wood ?? 1
   const palisadeWoodCost = policy.costPolicy?.palisade?.wood ?? 2
   const fixedWoodCost = Math.max(0, policy.costPolicy?.fixedWood ?? 0)
-  const costFreeFences =
-    selectedFreeFences + Math.max(0, Math.abs(costOverride?.wood ?? 0))
+  const costFreeFences = selectedFreeFences
 
   for (let ordinary = minOrdinary; ordinary <= maxFence; ordinary += 1) {
     for (let palisade = minPalisade; palisade <= maxPalisade; palisade += 1) {
       const total = ordinary + palisade
       if (total < minTotal || total > maxTotal) continue
       const payableFenceCount = Math.max(0, ordinary - costFreeFences)
+      const payableFenceWoodCost = applyWoodCostOverride(
+        payableFenceCount * fenceWoodCost,
+        costOverride,
+      )
       const woodCost =
-        payableFenceCount * fenceWoodCost +
+        payableFenceWoodCost +
         palisade * palisadeWoodCost +
         fixedWoodCost
       if (canAffordTypedFlatCost(player, { wood: woodCost }, 'fencing')) {
@@ -281,6 +284,11 @@ const fenceFail = (
   policy && hasFenceActionPolicy(policy)
     ? { type: 'fail', errorKey, recoverable: true }
     : { type: 'fail', errorKey }
+
+const applyWoodCostOverride = (
+  woodCost: number,
+  costOverride?: Partial<Resource>,
+): number => Math.max(0, woodCost + (costOverride?.wood ?? 0))
 
 export const getFenceCount = <T extends { fenceSegments: FenceSegment[] }>(
   p: T,
