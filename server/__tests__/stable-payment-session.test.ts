@@ -94,6 +94,25 @@ describe('stable payment session', () => {
     expect(afterStablesIndex).toBeLessThan(paidIndex)
   })
 
+  it('does not offer build stables when consumed stable tokens exhaust reserve', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    const player = state.players[0]!
+    player.resources = {
+      ...player.resources,
+      wood: 5,
+      reed: 0,
+    }
+    player.supplyTokensConsumed = { stable: 4 }
+    session.loadState(state)
+
+    const resp = session.takeAction(0, 'farm-expansion')
+    expect(resp.ok).toBe(true)
+    const options = resp.interaction.stateId === 'wait' ? resp.interaction.options ?? [] : []
+    expect(options.some((option) => option.labelKey === 'actions.stables.name')).toBe(false)
+  })
+
   it('rejects empty stable selection on farm-expansion', () => {
     const session = setup()
 

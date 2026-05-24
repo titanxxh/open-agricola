@@ -24,6 +24,7 @@ import { buildInternalPayChild } from '../helpers/pay-child'
 import { playerBoard } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
+import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 
 /**
  * Construct a minimal GameState wrapping a single player. Used by
@@ -51,7 +52,7 @@ export const buildStable = (player: PlayerState): ActionExecutionResult => {
 }
 
 const stablesCostPreview: ActionCostPreview = {
-  isStructurallyPossible: ({ player }) => player.stableTiles.length < 4,
+  isStructurallyPossible: ({ state, player }) => getAvailableStableSupplyCount(state, player) > 0,
   getBaseCost: () => ({ wood: stableWoodCost }),
 }
 
@@ -100,6 +101,9 @@ const finalizeStables = (
   stables: FarmTilePosition[],
   paymentChoice: string | undefined,
 ): ActionExecutionResult => {
+  if (stables.length > getAvailableStableSupplyCount(ctx.state, ctx.player)) {
+    return { type: 'fail', errorKey: 'log.buildStableFail' }
+  }
   const lockedKeys = collectLockedFarmTileKeys(ctx.player)
   const idx = ctx.state.players.indexOf(ctx.player)
   const validated = playerBoard(ctx.state, idx).farmyard.canBuildStable(stables, lockedKeys)
@@ -164,11 +168,13 @@ export const stablesAction: ActionDefinition = {
   execute: ({ state, player, costs, actionContext }): ActionExecutionResult => {
     const zoneFilter = actionContext?.zoneFilter
     const max = actionContext?.max
+    const reserve = getAvailableStableSupplyCount(state, player)
+    const selectionMax = typeof max === 'number' ? Math.min(max, reserve) : reserve
     const idx = state.players.indexOf(player)
     const farm = playerBoard(state, idx).farmyard.selectableTiles('stable', {
       costOverride: costs,
       zoneFilter: zoneFilter === 'pasture-1' ? 'pasture-1' : undefined,
-      max: typeof max === 'number' ? max : undefined,
+      max: selectionMax,
     })
     return {
       type: 'request',
@@ -203,6 +209,9 @@ export const stablesAction: ActionDefinition = {
       const stables = (payload as { stables?: FarmTilePosition[] }).stables
       if (!Array.isArray(stables) || stables.length === 0) {
         return { type: 'fail', errorKey: 'NO_SELECTION' }
+      }
+      if (stables.length > getAvailableStableSupplyCount(ctx.state, ctx.player)) {
+        return { type: 'fail', errorKey: 'log.buildStableFail' }
       }
       const lockedKeys = collectLockedFarmTileKeys(ctx.player)
       const idx = ctx.state.players.indexOf(ctx.player)

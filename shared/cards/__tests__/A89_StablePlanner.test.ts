@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../card-effects'
-import type { GameState, PlayerState } from '../../contract/types'
+import { specialEffectAction } from '../../actions/effects/special-effect'
+import { futureMeeplesAction } from '../../actions/effects/internal/future-meeples'
+import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
+import type { ActionFlow, ActionSpace, GameState, PlayerState } from '../../contract/types'
 
 import '../A/A89_StablePlanner'
 
@@ -39,52 +42,126 @@ const createState = (...players: PlayerState[]): GameState =>
     gameOver: false, workPhaseObtainedResources: {},
   }) as unknown as GameState
 
+const dummySpace = { id: 'test', type: 'test' } as unknown as ActionSpace
+
+const executeLeaf = (
+  flow: ActionFlow,
+  state: GameState,
+  player: PlayerState,
+) => {
+  if (flow.type === 'seq') {
+    flow.children.forEach((child) => executeLeaf(child, state, player))
+    return
+  }
+  if (flow.type !== 'leaf') return
+  if (flow.actionId === 'special-effect') {
+    specialEffectAction.execute({
+      state,
+      player,
+      space: dummySpace,
+      params: flow.params,
+      sourceCard: flow.sourceCard,
+      actionContext: flow.actionContext,
+      eventSink: undefined as never,
+    })
+  }
+  if (flow.actionId === 'future-meeples') {
+    futureMeeplesAction.execute({
+      state,
+      player,
+      space: dummySpace,
+      params: flow.params,
+      sourceCard: flow.sourceCard,
+      actionContext: flow.actionContext,
+      eventSink: undefined as never,
+    })
+  }
+}
+
 describe('A89_StablePlanner', () => {
-  it('onBuy queues future meeples at +3, +6, +9', () => {
+  it('onBuy offers prefix choices at +3, +6, +9 without reserving before acceptance', () => {
     const player = createPlayer()
     const state = createState(player)
     state.round = 2
     const effect = getCardEffect(CARD_ID)
-    effect!.onBuy!(state, player)
-    expect(state.pendingFutureMeeples.length).toBe(1)
-    const req = state.pendingFutureMeeples[0]!
-    if ('entries' in req) {
-      expect(req.entries.map((e) => e.round)).toEqual([5, 8, 11])
-    }
+    const flow = effect!.onBuy!(state, player)
+    expect(flow?.type).toBe('xor')
+    if (flow?.type !== 'xor') return
+    expect(flow.optional).toBe(true)
+    expect(flow.children).toHaveLength(3)
+    expect(player.cardStates?.[CARD_ID]?.extraData?.targetRounds).toBeUndefined()
   })
 
-  it('clamps future meeples to round 14', () => {
+  it('caps prefix choices by stable reserve', () => {
+    const player = createPlayer()
+    const state = createState(player)
+    state.round = 2
+    player.supplyTokensConsumed = { stable: 2 }
+    const effect = getCardEffect(CARD_ID)
+    const flow = effect!.onBuy!(state, player)
+    expect(flow?.type).toBe('xor')
+    if (flow?.type !== 'xor') return
+    expect(flow.children).toHaveLength(2)
+  })
+
+  it('clamps prefix choices to round 14', () => {
     const player = createPlayer()
     const state = createState(player)
     state.round = 10
     const effect = getCardEffect(CARD_ID)
-    effect!.onBuy!(state, player)
-    const req = state.pendingFutureMeeples[0]!
-    if ('entries' in req) {
-      // rounds 13, 16, 19 → only 13 stays (others filtered)
-      expect(req.entries.map((e) => e.round)).toEqual([13])
-    }
+    const flow = effect!.onBuy!(state, player)
+    expect(flow?.type).toBe('xor')
+    if (flow?.type !== 'xor') return
+    expect(flow.children).toHaveLength(1)
   })
 
-  it('onRoundStart offers free stable at target round', () => {
+  it('accepted prefix writes target rounds and queues stable future meeples', () => {
     const player = createPlayer()
     const state = createState(player)
     state.round = 2
-    const effect = getCardEffect(CARD_ID)
-    effect!.onBuy!(state, player)
+    const flow = getCardEffect(CARD_ID)!.onBuy!(state, player)
+    if (flow?.type !== 'xor') throw new Error('expected xor')
+
+    executeLeaf(flow.children[1]!, state, player)
+
+    expect(player.cardStates?.[CARD_ID]?.extraData?.targetRounds).toEqual([5, 8])
+    expect(state.futureMeeples.map((entry) => entry.round)).toEqual([5, 8])
+    expect(state.futureMeeples.map((entry) => entry.resources)).toEqual([
+      { stable: 1 },
+      { stable: 1 },
+    ])
+  })
+
+  it('onRoundStart offers free stable at target round and releases reserve before choice', () => {
+    const player = createPlayer()
+    const state = createState(player)
+    player.stableTiles = [
+      { row: 0, col: 0 },
+      { row: 0, col: 1 },
+    ]
+    player.cardStates = { [CARD_ID]: { extraData: { targetRounds: [5, 8] } } }
     state.round = 5
+    const effect = getCardEffect(CARD_ID)
+    expect(getAvailableStableSupplyCount(state, player)).toBe(0)
     const flow = effect!.onRoundStart!(state, player)
+    expect(player.cardStates?.[CARD_ID]?.extraData?.targetRounds).toEqual([8])
+    expect(getAvailableStableSupplyCount(state, player)).toBe(1)
     expect(flow).toBeTruthy()
     expect((flow as { type: string }).type).toBe('seq')
+    const leaf = (flow as Extract<ActionFlow, { type: 'seq' }>).children[0]!
+    expect(leaf.type).toBe('leaf')
+    if (leaf.type !== 'leaf') return
+    expect(leaf.actionId).toBe('stables')
+    expect(leaf.actionContext?.max).toBe(1)
+    expect((leaf.actionContext?.costOverride as { wood?: number } | undefined)?.wood).toBeLessThan(0)
   })
 
   it('onRoundStart returns nothing on non-target round', () => {
     const player = createPlayer()
     const state = createState(player)
-    state.round = 2
-    const effect = getCardEffect(CARD_ID)
-    effect!.onBuy!(state, player)
+    player.cardStates = { [CARD_ID]: { extraData: { targetRounds: [5] } } }
     state.round = 4
+    const effect = getCardEffect(CARD_ID)
     const flow = effect!.onRoundStart!(state, player)
     expect(flow).toBeFalsy()
   })

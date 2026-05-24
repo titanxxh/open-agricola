@@ -29,6 +29,7 @@ import { removeWorkerRef } from '../../domain/space'
 import { getNextEmptyTileForPlayer } from '../../domain/farm'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
 import { isOwnOrdinaryFenceSegment } from '../../domain/fence-segments'
+import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 
 export type PlantAdditionalGoodLocation =
   | { kind: 'field'; row: number; col: number }
@@ -470,6 +471,7 @@ export const specialEffectAction: ActionDefinition = {
         return { type: 'ok' }
       }
       case 'build-stable-on-first-empty-tile': {
+        if (!state || getAvailableStableSupplyCount(state, target) <= 0) return { type: 'ok' }
         const tile = getNextEmptyTileForPlayer(target)
         if (!tile) return { type: 'ok' }
         target.stableTiles.push(tile)
