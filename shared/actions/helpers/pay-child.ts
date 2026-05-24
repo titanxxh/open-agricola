@@ -16,6 +16,7 @@ export type PayChildOptions = {
   sourceCard?: string
   actionContext?: Record<string, unknown>
   playedCards?: string[]
+  reserveResources?: Partial<Resource>
   includeReturnedCard?: boolean
   sourceActionId?: string
 }

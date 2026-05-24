@@ -319,6 +319,20 @@ describe('formatCost card session regressions', () => {
     expect(action.state.futureMeeples.some((entry) => entry.cardId === 'B93_Confidant')).toBe(false)
   })
 
+  it('B93_Confidant does not consume the lessons action as the only unaffordable occupation', () => {
+    const session = setupOccupation('B93_Confidant')
+    const state = session.getState().state
+    state.players[0]!.occupationHand = ['B93_Confidant']
+    state.players[0]!.resources.food = 1
+    session.loadState(state)
+
+    const action = session.takeAction(0, 'lessons-4')
+    expect(action.ok).toBe(false)
+    expect(action.state.players[0]!.occupationPlayed).not.toContain('B93_Confidant')
+    expect(action.state.players[0]!.workers.some((worker) => worker.action === 'lessons-4')).toBe(false)
+    expect(action.state.futureMeeples.some((entry) => entry.cardId === 'B93_Confidant')).toBe(false)
+  })
+
   it('B93_Confidant is not playable when A28_ForestSchool only covers the occupation cost', () => {
     const session = setupOccupation('B93_Confidant')
     const state = session.getState().state
@@ -351,6 +365,45 @@ describe('formatCost card session regressions', () => {
     expect(action.interaction.stateId).toBe('wait')
     if (action.interaction.stateId !== 'wait') return
     expect(action.interaction.options?.some((entry) => entry.value === 'B93_Confidant')).toBe(true)
+
+    let response = session.resolveChoice(0, 'B93_Confidant')
+    expect(response.ok).toBe(true)
+    if (
+      response.interaction.stateId === 'wait' &&
+      response.interaction.promptKey === 'prompt.selectPayment'
+    ) {
+      const paymentOptions = response.interaction.options ?? []
+      const foodPayment = paymentOptions.find((option) => {
+        const resourcesPaid = (
+          (option.labelParams as { resourcesPaid?: Record<string, number> } | undefined)
+            ?.resourcesPaid ?? {}
+        )
+        return resourcesPaid.food === 1
+      })
+      expect(foodPayment).toBeUndefined()
+      const woodPayment = paymentOptions.find((option) => {
+        const resourcesPaid = (
+          (option.labelParams as { resourcesPaid?: Record<string, number> } | undefined)
+            ?.resourcesPaid ?? {}
+        )
+        return resourcesPaid.wood === 1
+      })
+      expect(woodPayment).toBeDefined()
+      response = session.resolveChoice(0, woodPayment!.value)
+      expect(response.ok).toBe(true)
+    }
+
+    let scheduled = response
+    if (response.interaction.stateId === 'wait' && response.interaction.options) {
+      expect(response.interaction.options?.some((entry) => entry.value === '__skip__')).toBe(false)
+      const schedule = response.interaction.options?.[0]
+      expect(schedule).toBeDefined()
+      scheduled = session.resolveChoice(0, schedule!.value)
+      expect(scheduled.ok).toBe(true)
+    }
+    expect(scheduled.state.players[0]!.resources.food).toBe(0)
+    expect(scheduled.state.players[0]!.resources.wood).toBe(4)
+    expect(scheduled.state.futureMeeples.filter((entry) => entry.cardId === 'B93_Confidant')).toHaveLength(2)
   })
 
   it('B93_Confidant returns future food and offers optional sow or fence at round start', () => {

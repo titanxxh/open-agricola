@@ -18,6 +18,7 @@ import type {
   PaymentResourceMap,
   PaymentSolution,
   PlayerState,
+  Resource,
 } from '../../../contract/types'
 import { isComplexCost } from './affordability'
 import { computeAllBuyableCombinations, sortPaymentSolutions } from './enumerate'
@@ -67,6 +68,32 @@ const describePaymentEffectPreview = (
     sourceCards: sourceCards.length > 0 ? sourceCards : undefined,
   }
 }
+
+export const preservesResourceReserve = (
+  resources: Partial<Resource>,
+  resourcesPaid: Partial<Resource>,
+  reserveResources: Partial<Resource> | undefined,
+) => {
+  if (!reserveResources) return true
+  return Object.entries(reserveResources).every(([rawKey, rawMinimum]) => {
+    if (typeof rawMinimum !== 'number' || rawMinimum <= 0) return true
+    const key = rawKey as keyof Resource
+    return (resources[key] ?? 0) - (resourcesPaid[key] ?? 0) >= rawMinimum
+  })
+}
+
+export const filterPaymentSolutionsByReserve = (
+  player: PlayerState,
+  solutions: PaymentSolution[],
+  reserveResources: Partial<Resource> | undefined,
+) =>
+  solutions.filter((solution) =>
+    preservesResourceReserve(
+      player.resources,
+      solution.resourcesPaid,
+      reserveResources,
+    ),
+  )
 
 export const buildPaymentChoiceResult = (
   solutions: PaymentSolution[],
@@ -137,6 +164,7 @@ type ResolveCostPaymentSelectionOptions = {
   includeReturnedCard?: boolean
   playedCards?: string[]
   state?: GameState
+  reserveResources?: Partial<Resource>
 }
 
 export const resolveCostPaymentSelection = (
@@ -155,12 +183,16 @@ export const resolveCostPaymentSelection = (
   const normalizedCost = isComplexCost(cost)
     ? cost
     : { fee: cost }
-  const solutions = computeAllBuyableCombinations(
+  const solutions = filterPaymentSolutionsByReserve(
     player,
-    normalizedCost,
-    options.playedCards,
-    options.costType,
-    options.state,
+    computeAllBuyableCombinations(
+      player,
+      normalizedCost,
+      options.playedCards,
+      options.costType,
+      options.state,
+    ),
+    options.reserveResources,
   )
   return resolvePaymentSolutionSelection(
     solutions,
