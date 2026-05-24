@@ -1,7 +1,7 @@
 import { Fragment, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import type { GameState, PlayerState, Resource } from '../../../shared/contract/types'
+import type { GameState, PaymentResourceMap, PlayerState, Resource } from '../../../shared/contract/types'
 import type { ActionDetailParts } from '../../../shared/contract/protocol/game'
 import { getCardMeta } from '../../services/card-meta'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
@@ -399,7 +399,7 @@ export const prepareLogEntry = (
     else params.improvements = joined
     params.returned = ''
     params.via = ''
-    const costResources = params.costResources as Partial<Resource> | undefined
+    const costResources = params.costResources as PaymentResourceMap | undefined
     if (costResources && typeof costResources === 'object') {
       richParams.cost = (
         <>
@@ -408,7 +408,7 @@ export const prepareLogEntry = (
             locale,
             'log.costs',
             {},
-            { resources: <ResourceLine locale={locale} resources={costResources} /> },
+            { resources: <ResourceLine locale={locale} mode="payment" resources={costResources} /> },
           )}
         </>
       )
@@ -473,7 +473,7 @@ export const prepareLogEntry = (
   }
   if (params && entry.key === 'log.cardEffectPay' && typeof params.cost === 'object') {
     richParams.cost = (
-      <ResourceLine locale={locale} resources={params.cost as Partial<Resource>} />
+      <ResourceLine locale={locale} mode="payment" resources={params.cost as PaymentResourceMap} />
     )
   }
   if (params && entry.key === 'log.bakeBread') {
@@ -656,7 +656,7 @@ export const prepareLogEntry = (
           locale,
           'log.costs',
           {},
-          { resources: <ResourceLine locale={locale} resources={detailParts.costs} /> },
+          { resources: <ResourceLine locale={locale} mode="payment" resources={detailParts.costs} /> },
         ),
       )
     }
