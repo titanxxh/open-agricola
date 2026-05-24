@@ -89,6 +89,21 @@ describe('canStartFencing with costOverride', () => {
     ).toBe(true)
   })
 
+  it('allows explicit total max when supply only has fewer fences left', () => {
+    const player = createPlayer({
+      supplyTokensConsumed: { fence: 13 },
+    })
+
+    expect(
+      canStartFencing(fakeState, player, undefined, {
+        fencePolicy: {
+          segmentBounds: { total: { max: 3 } },
+          costPolicy: { fence: { wood: 0 } },
+        },
+      }),
+    ).toBe(true)
+  })
+
   it('ignores flat segmentBounds and costPolicy actionContext fields', () => {
     const player = createPlayer({
       fenceSegments: createOrdinaryFenceSegments(12),
