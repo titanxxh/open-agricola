@@ -11,7 +11,7 @@ export const C2_Stable_impl = {
       type: 'leaf' as const,
       actionId: 'stables',
       sourceCard: CARD_ID,
-      params: { max: 1, freeCost: true },
+      actionContext: { max: 1, exactCost: { wood: 0, max: 1 } },
     }
   },
 },

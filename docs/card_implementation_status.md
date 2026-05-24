@@ -533,7 +533,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `A179_MountainShepherd` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `A180_AnimalBrander` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B1_UpscaleLifestyle` | 已对齐 |  |
-| `B2_MiniPasture` | 已对齐 |  |
+| `B2_MiniPasture` | 已对齐 | BGA `formatCost([WOOD => 0])` 通过 nested `fencePolicy` 表达免费 fence 和最多 4 段总 fence，不走 `fencing` wrapper 丢 params。 |
 | `B3_Moonshine` | 已对齐 |  |
 | `B4_WoodPile` | 已对齐 |  |
 | `B5_StoreofExperience` | 已对齐 |  |
@@ -713,7 +713,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B179_WildBoarHunter` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B180_GameTeaser` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `C1_Overhaul` | 已对齐 | BGA passing 行为由 improvement host action / pay child / activate-card-effect 处理；rebuild 只计数/回收/重建 own ordinary fences，走 `consume-fence` ownOnly + generic `fencePolicy` |
-| `C2_Stable` | 已对齐 |  |
+| `C2_Stable` | 已对齐 | BGA `formatCost([WOOD => 0])` 通过 `stables` `actionContext.exactCost` 表达免费 stable。 |
 | `C3_CarriageTrip` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `C4_WritingBoards` | 已对齐 |  |
 | `C5_Remodeling` | 已对齐 |  |
@@ -1072,7 +1072,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `D178_SubstituteTeacher` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `D179_Bullcatcher` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `D180_PartTimeWorker` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `E1_PoleBarns` | 已对齐 |  |
+| `E1_PoleBarns` | 已对齐 | BGA `formatCost([WOOD => 0])` 通过 `stables` `actionContext.exactCost` 表达最多 3 个免费 stable。 |
 | `E2_RenovationMaterials` | 已对齐 |  |
 | `E3_TeaTime` | 已对齐 |  |
 | `E4_Thunderbolt` | 已对齐 |  |

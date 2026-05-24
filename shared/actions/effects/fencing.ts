@@ -23,6 +23,7 @@ import { playerBoard, normalizePlayerFarm } from '../../domain'
 import { FARM_COLS, FARM_ROWS } from '../../domain/farm'
 import type {
   FenceCostPolicy,
+  FencePastureBounds,
   FenceSegmentBounds,
   FenceValidationOptions,
 } from '../../domain/farmyard'
@@ -51,6 +52,7 @@ export type FenceActionPolicy = {
   allowedSegmentTypes?: FenceSegmentType[]
   sourcePolicy?: 'ownOnly'
   segmentBounds?: FenceSegmentBounds
+  newPastureBounds?: FencePastureBounds
   costPolicy?: FenceCostPolicy
   pastureBounds?: FenceValidationOptions['pastureBounds']
   cancelPolicy?: 'allowCancel' | 'forbidCancel'
@@ -82,6 +84,9 @@ export function readFenceActionPolicy(
     segmentBounds: isRecord(source.segmentBounds)
       ? (source.segmentBounds as FenceSegmentBounds)
       : undefined,
+    newPastureBounds: isRecord(source.newPastureBounds)
+      ? (source.newPastureBounds as FencePastureBounds)
+      : undefined,
     costPolicy: isRecord(source.costPolicy)
       ? (source.costPolicy as FenceCostPolicy)
       : undefined,
@@ -104,6 +109,7 @@ const hasFenceActionPolicy = (policy: FenceActionPolicy): boolean =>
   policy.allowedSegmentTypes !== undefined ||
   policy.sourcePolicy !== undefined ||
   policy.segmentBounds !== undefined ||
+  policy.newPastureBounds !== undefined ||
   policy.costPolicy !== undefined ||
   policy.pastureBounds !== undefined ||
   policy.cancelPolicy !== undefined ||
@@ -112,6 +118,7 @@ const hasFenceActionPolicy = (policy: FenceActionPolicy): boolean =>
 const hasCanStartPolicy = (policy: FenceActionPolicy): boolean =>
   policy.sourcePolicy !== undefined ||
   policy.segmentBounds !== undefined ||
+  policy.newPastureBounds !== undefined ||
   policy.costPolicy !== undefined ||
   policy.pastureBounds !== undefined
 
@@ -153,7 +160,9 @@ const inferMinimumPolicySegments = (policy: FenceActionPolicy): number => {
       (segmentBounds?.fence?.min ?? 0) + (segmentBounds?.palisade?.min ?? 0),
     )
   }
-  const minPastureSize = policy.pastureBounds?.newPastureSize?.min
+  const minPastureSize =
+    policy.newPastureBounds?.totalSize?.min ??
+    policy.pastureBounds?.newPastureSize?.min
   if (minPastureSize !== undefined) {
     return minPerimeterForFarmCells(minPastureSize)
   }
@@ -165,7 +174,9 @@ const inferMinimumPolicySegments = (policy: FenceActionPolicy): number => {
 }
 
 const inferMinimumPolicyOrdinarySegments = (policy: FenceActionPolicy): number => {
-  const minPastureSize = policy.pastureBounds?.newPastureSize?.min
+  const minPastureSize =
+    policy.newPastureBounds?.totalSize?.min ??
+    policy.pastureBounds?.newPastureSize?.min
   if (minPastureSize !== undefined) {
     return minOrdinaryPerimeterForFarmCells(minPastureSize)
   }
@@ -228,6 +239,19 @@ const canStartWithFencePolicy = (
   return false
 }
 
+const hasPositiveMin = (value: number | undefined): boolean =>
+  typeof value === 'number' && value > 0
+
+const requiresFenceCommit = (policy: FenceActionPolicy): boolean =>
+  hasPositiveMin(policy.segmentBounds?.fence?.min) ||
+  hasPositiveMin(policy.segmentBounds?.palisade?.min) ||
+  hasPositiveMin(policy.segmentBounds?.total?.min) ||
+  hasPositiveMin(policy.newPastureBounds?.count?.min) ||
+  hasPositiveMin(policy.newPastureBounds?.totalSize?.min) ||
+  hasPositiveMin(policy.pastureBounds?.newPastures?.min) ||
+  hasPositiveMin(policy.pastureBounds?.changedPastures?.min) ||
+  hasPositiveMin(policy.pastureBounds?.newPastureSize?.min)
+
 const fenceValidationOptions = (
   player: PlayerState,
   allowPalisades: boolean,
@@ -240,6 +264,7 @@ const fenceValidationOptions = (
     allowedSegmentTypes: policy.allowedSegmentTypes,
     sourcePolicy: policy.sourcePolicy,
     segmentBounds: policy.segmentBounds,
+    newPastureBounds: policy.newPastureBounds,
     costPolicy: policy.costPolicy,
     pastureBounds: policy.pastureBounds,
     preserveAnimalTotals: policy.preserveAnimalTotals,
@@ -493,10 +518,10 @@ export const fenceAction: ActionDefinition = {
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
     const policy = readFenceActionPolicy(ctx.actionContext)
     if (choice === 'cancel') {
-      if (
-        policy.cancelPolicy === 'forbidCancel' ||
-        (policy.segmentBounds?.fence?.min ?? 0) > 0
-      ) {
+    if (
+      policy.cancelPolicy === 'forbidCancel' ||
+      requiresFenceCommit(policy)
+    ) {
         return {
           type: 'fail',
           errorKey: 'log.fencingFail',

@@ -8,8 +8,14 @@ export const B2_MiniPasture_impl = {
   id: CARD_ID,
   onBuy: (_state, _player) => ({
     type: 'leaf' as const,
-    actionId: 'fencing',
+    actionId: 'fence',
     sourceCard: CARD_ID,
+    actionContext: {
+      fencePolicy: {
+        segmentBounds: { total: { min: 1, max: 4 } },
+        costPolicy: { fence: { wood: 0 } },
+      },
+    },
   }),
 },
   reaches: [] as readonly string[],
