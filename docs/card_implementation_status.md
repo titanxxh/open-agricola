@@ -1157,7 +1157,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `E85_MasterTanner` | 已对齐 |  |
 | `E86_PenBuilder` | 已对齐 |  |
 | `E87_MasterRenovator` | 已对齐 |  |
-| `E88_MasterFencer` | 已对齐 |  |
+| `E88_MasterFencer` | 已对齐 | round-start 付 2/3 wood 后通过 `fencePolicy` 表达免费建至多 3/4 fences。 |
 | `E89_Stallwright` | 已对齐 |  |
 | `E90_DungCollector` | 已对齐 |  |
 | `E91_PlowBuilder` | 已对齐 |  |
