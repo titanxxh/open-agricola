@@ -18,6 +18,7 @@
 - **单一领域实现**：行动 / 引擎 / 卡牌 / 回合 / 收获 / 计分统一放 `shared/`，前后端共用同一套领域模型。
 - **三层物理边界**：`shared/` ⇄ `server/` ⇄ `client/` 由 ESLint `no-restricted-imports` 强制（CI error）。
 - **卡牌就地闭环**：卡牌特效写在卡牌文件内部，不向核心路径扩散。
+- **Supply token 也是支付资源**：fence / stable 这类玩家 supply 上限不能写死为 15 / 4；读取必须走 supply-token helper 或 payment resource pipeline。
 
 ---
 
@@ -174,6 +175,7 @@ Undo 的 runtime `publicEventCancellations` 是同步响应 metadata，不写入
 - 出牌：`improvements` / `minorPlayed` / `occupationPlayed`
 - 手牌：`minorHand` / `occupationHand`
 - 持续效果：`majorEffects` / `activeModifiers`
+- Supply token：`supplyTokensConsumed` 记录被永久消耗的 fence / stable 组件；可用上限由 helper 动态计算
 - **卡牌局部状态**：`cardStates`（见 §8.3）
 - **工人身份**：`workers: Worker[]`，固定 5 槽 id `'1'..'5'`，`isActive` / `isNewborn` 标记
 
@@ -608,6 +610,8 @@ anytime                  额外注册的 anytime 行动
 
 `activate-card-effect` 是 internal child，用 `paymentInfoFrom` 从 internal result map 读取 `paymentInfo`，再执行 `onBuy` 等 card-effect hook。卡牌购买的 onBuy / 多卡业务继续留在 card-effect 或 host action completion 中，不要塞回 top-level effect。
 
+`PaymentResourceMap` 覆盖真实资源和 supply token：`fence` / `stable` 与 `wood` / `food` 一样进入 `cost`、`payLeaf`、payment solver、`resourcesPaid`、`PaymentInfo` 和 `resource.paid`。支付 supply token 时只增加 `player.supplyTokensConsumed`，不修改已建 `fenceSegments` / `stableTiles`；所有“还能建多少 fence / stable”的读取必须走 `getOwnOrdinaryFenceBuildLimit()` / `getOwnOrdinaryFenceReserveCount()` / `getAvailableStableSupplyCount()`，不能再使用固定 15 / 4 上限。
+
 ### 7.6 阶段型 Hook（按触发顺序）
 
 ```
@@ -696,6 +700,8 @@ farmType 第一轮 payload 形态：`fence: {edges, palisadeEdges, extraWood}` /
 `FenceSegment.type` 与 `FenceSegment.source` 是独立维度：`type` 表示边段形态（普通 fence / B30 palisade），`source` 表示这段边来自谁。缺省普通 fence 视为 own ordinary source；B30 Wood Palisades 是不同 segment type；未来 E149 borrowed fence 应是 ordinary boundary with borrowed source，而不是新 segment type。
 
 fencing 主路径不得按卡牌 id 或单卡开关分支：不要在 `fencing.ts` / farmyard validation 里写 `C1` / `B30` / `E149`、`noWoodPalisades`、`midnightFencer` 这类分支。卡牌特殊行为统一通过 generic `fencePolicy` 表达：`allowedSegmentTypes`、`sourcePolicy`、`segmentBounds`、`costPolicy`、`cancelPolicy`、`preserveAnimalTotals`。
+
+`segmentBounds.fence` / `segmentBounds.palisade` 限制各自类型的新建边段；`segmentBounds.total` 限制普通 fence + palisade 的总新建边段。B149 Open Air Farmer 这类 BGA `max => 6` 总段数约束必须用 `total.max` 表达，B30 palisade 也计入该上限。`canStartFencing` 只能做通用 policy 可行性估算；最终合法性仍由 `validateFenceSelection()` 原子校验并在失败时不支付。
 
 C1 Overhaul 只计数、回收、重建 own ordinary fences：onBuy 先用 `consume-fence` + `sourcePolicy: 'ownOnly'` 返还自己的普通 fence，再用 `fencePolicy` 限制本次 rebuild 只能建 ordinary fence、只消耗 own ordinary supply、禁止 cancel、保留动物总量。
 
