@@ -9,14 +9,14 @@
 | BGA A-E canonical 卡牌 | 888 |
 | OA A-E canonical 卡牌定义 | 888 |
 | 自动 metadata 脚本 literal mismatch | 0 |
-| 自动 metadata 脚本 complex mismatch | 5 |
+| 自动 metadata 脚本 complex mismatch | 4 |
 | 其中 schema-up 已接受差异 | 4 |
-| 需要实现复核的卡牌 | 10 |
+| 需要实现复核的卡牌 | 9 |
 | 已接受 / 产品策略差异 | 65 |
 | 排除的 BGA legacy 或未实现行为目标 | 52 |
-| 本轮审计视为已对齐 | 761 |
+| 本轮审计视为已对齐 | 762 |
 
-说明：`scripts/audit-bga-metadata-diff.ts` 现在会解析 BGA `STABLE` 打印成本和 `passing`。当前 literal mismatch 0（passing 已全部对齐）。当前 complex mismatch 是 1 个 `cost` 差异（`C54_MarketBooth`）和 4 个已接受的 schema-up prerequisite 差异。
+说明：`scripts/audit-bga-metadata-diff.ts` 现在会解析 BGA `STABLE` 打印成本和 `passing`。当前 literal mismatch 0（passing 已全部对齐）。当前 complex mismatch 是 4 个已接受的 schema-up prerequisite 差异。
 
 审计规则：优先核对卡牌描述文本、custom description、cost、prerequisite、passing、职业/小改 metadata，以及游戏规则行为。BGA 平台/工坊字段如 `banned`、`implemented`、`isCorbariusOrDulcinaria`、`isArtifexOrBubulcus` 不作为对齐要求；如果它们影响产品策略，只记录为已接受差异或排除项，不记为实现 bug。
 
@@ -25,7 +25,6 @@
 | 卡牌 | 严重度 | 领域 | 差异 | 方向 |
 |---|---|---|---|---|
 | `B24_Lasso` | 高 | 额外放人 | BGA 任意第一次放人后都提供触发；OA 只有第一次放人在动物市场时才触发。 | 始终提供触发；仅当第一次不是动物市场时限制第二次必须去动物市场。 |
-| `C54_MarketBooth` | 高 | metadata/cost | BGA 成本是 1 个 stable；OA cost 为空，自动 metadata 脚本现在会报出该差异。 | 支持 stable-token cost，或明确记录为已接受差异。 |
 | `D155_Ebonist` | 高 | exchange 触发窗口 | BGA exchange 仅收获期；OA 暴露为 anytime exchange。 | 改为 harvest trigger 并补回归测试。 |
 | `B67_HandTruck` | 中 | bake 前 continuation | BGA 是 optional 拿谷物，然后 mandatory bake；OA 无条件给谷物。 | 建模 optional gain 分支，之后接 mandatory bake continuation。 |
 | `B124_Trimmer` | 中 | 触发频率 | BGA 每次牧场覆盖数增加都奖励；OA 每个工作阶段第一次奖励后打 flag。 | 若要严格对齐，移除 after-reward flag。 |
@@ -41,7 +40,6 @@
 | 卡牌 | BGA 证据 | OA 证据 | UI / 交互证据 |
 |---|---|---|---|
 | `B24_Lasso` | `B/B24_Lasso.php` | `shared/cards/B/B24_Lasso.ts` | 使用通用 extra-placement flow；遗漏的是后端触发条件，不是客户端渲染。 |
-| `C54_MarketBooth` | `C/C54_MarketBooth.php` | `shared/cards-display/C/C54_MarketBooth.ts` | OA 数据缺少 stable cost，因此 metadata/cost 渲染也受影响。 |
 | `D155_Ebonist` | `D/D155_Ebonist.php` | `shared/cards-display/D/D155_Ebonist.ts` | Harvest exchange 通过通用 exchange UI 暴露；OA 当前把它放进 anytime exchange UI。 |
 | `B67_HandTruck` | `B/B67_HandTruck.php` | `shared/cards/B/B67_HandTruck.ts` | OA 使用通用 bake continuation，但缺少 mandatory bake 前的 optional grain 分支。 |
 | `B124_Trimmer` | `B/B124_Trimmer.php` | `shared/cards/B/B124_Trimmer.ts` | 无特殊 UI gap；触发频率是后端 card state 问题。 |
@@ -311,7 +309,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | specialKind | `card-field` | `C8_PlantFertilizer` |
 | specialKind | `choice` | `B146_Illusionist`, `D23_PioneeringSpirit` |
 | specialKind | `clear-pending-fence-bonus` | `E74_AshTrees` |
-| specialKind | `consume-fence` | `C1_Overhaul`, `C54_MarketBooth` |
+| specialKind | `consume-fence` | `C1_Overhaul` |
 | specialKind | `field` | `C8_PlantFertilizer` |
 | specialKind | `grain` | `E112_GrainThief` |
 | specialKind | `increment-counter` | `B132_EstateMaster`, `C132_TimberShingleMaker` |
@@ -763,7 +761,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C51_FishingNet` | 已对齐 |  |
 | `C52_HuntsmansHat` | 已接受差异 | 已接受的简化实现 |
 | `C53_GypsysCrock` | 已对齐 |  |
-| `C54_MarketBooth` | 需复核 | BGA printed cost 是 1 stable；OA cost 为空 |
+| `C54_MarketBooth` | 已对齐 | printed cost 为 1 stable；收获 exchange 支付 grain + reserve fence |
 | `C55_Studio` | 已对齐 |  |
 | `C56_FeedFence` | 已对齐 |  |
 | `C57_Crudite` | 已对齐 |  |
