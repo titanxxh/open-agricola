@@ -63,7 +63,7 @@ const canAffordOccupationPreviewCost = (
   canAffordCardPreviewCostByProvider(
     state,
     player,
-    'play-occupation',
+    'occupation',
     occupationId,
     buildOccupationCostProvider(player, occupationId, costOverride),
     actionCardId,
@@ -107,7 +107,7 @@ export const playOccupation = (
     ? payCardPreviewCostByProvider(
         state,
         player,
-        'play-occupation',
+        'occupation',
         occupationId,
         () => cost,
         actionCardId,
@@ -189,7 +189,7 @@ const commitOccupationPlay = (
     type: 'card.played',
     cardId: occupationId,
     cardType: 'occupation',
-    sourceActionId: 'play-occupation',
+    sourceActionId: 'occupation',
     sourceCardId: occupationId,
   })
   if (sourceCard && sourceCard !== occupationId) {
@@ -342,7 +342,7 @@ const buildOccupationInternalChildren = (
 })
 
 export const playOccupationAction: ActionDefinition = {
-  id: 'play-occupation',
+  id: 'occupation',
   nameKey: 'actions.lessons.name',
   descriptionKey: 'actions.lessons.description',
   roundAvailable: 1,
@@ -386,7 +386,7 @@ export const playOccupationAction: ActionDefinition = {
     const previewCost = resolveCardPreviewCostByProvider(
       state,
       player,
-      'play-occupation',
+      'occupation',
       choice,
       () => baseCost,
       space.id,

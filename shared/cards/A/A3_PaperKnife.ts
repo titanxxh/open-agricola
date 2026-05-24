@@ -24,8 +24,8 @@ const EFFECT_ID = 'paper-knife-random-play'
  *   resolveChoice(3 ids) → selectionEffect fires:
  *     rollAndCacheCardPick → stores pick in cardStates[CARD_ID].extraData.pick
  *     state.pendingUndoBoundary = true
- *     returns play-occupation leaf { costOverride: {}, allowedCards: [pick] }
- *   play-occupation auto-resolves (single option) → occupation played for free + onBuy fires
+ *     returns occupation leaf { costOverride: {}, allowedCards: [pick] }
+ *   occupation auto-resolves (single option) → occupation played for free + onBuy fires
  *
  * Prerequisite: named "3 Occupations In Hand" — matches BGA's isBuyable
  * check `getHand(OCCUPATION) >= 3`.
@@ -39,7 +39,7 @@ registerSelectionEffect(EFFECT_ID, ({ state, player, positions, cards, sourceCar
   state.pendingUndoBoundary = true
   return {
     type: 'leaf',
-    actionId: 'play-occupation',
+    actionId: 'occupation',
     sourceCard: CARD_ID,
     params: { costOverride: {}, allowedCards: [pick] },
   }

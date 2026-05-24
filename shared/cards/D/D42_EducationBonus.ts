@@ -12,7 +12,7 @@ const listener: CardListenerRegistration = {
   id: 'D42-education-bonus-after-occupation',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const n = context.player.occupationPlayed.length
     if (n > 6) return

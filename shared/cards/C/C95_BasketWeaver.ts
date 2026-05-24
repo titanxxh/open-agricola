@@ -21,7 +21,7 @@ const TARGET_MAJOR = 'Major_Basket'
  *     trades to { stone: 1, reed: 1 }.
  *
  * Here:
- *   - play-occupation after-listener triggered when this card is played →
+ *   - occupation after-listener triggered when this card is played →
  *     offer optional improvement-any with allowedPurchases = [Major_Basket]
  *     and sourceCard = CARD_ID (so computeCosts listener can scope the
  *     discount via context.actionCardId).
@@ -34,7 +34,7 @@ const TARGET_MAJOR = 'Major_Basket'
 const onBuyListener: CardListenerRegistration = {
   id: 'C95-basket-weaver-onbuy',
   cardIds: [CARD_ID],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return

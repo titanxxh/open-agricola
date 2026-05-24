@@ -17,7 +17,7 @@ const CARD_ID = C80_RockyTerrain.id
  * generic `isField` metadata flag (Sprint 7d basis) plus three listeners:
  *   - after `plow`             — always fires (field tile plow)
  *   - after `improvement-any`  — fires when the built improvement isField
- *   - after `play-occupation`  — fires when the played occupation isField
+ *   - after `occupation`  — fires when the played occupation isField
  */
 
 const buyStoneForFood = (player: CardListenerContext['player']): ActionHookResult | void => {
@@ -55,7 +55,7 @@ const occupationFieldListener: CardListenerRegistration = {
   id: 'C80-rocky-terrain-after-occupation-field',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const playedId = context.choice
     if (!playedId || !isFieldCard(playedId)) return

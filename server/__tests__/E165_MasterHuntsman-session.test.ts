@@ -26,7 +26,7 @@ describe('E165_MasterHuntsman session', () => {
       state,
       player,
       space: mkActionSpace({ id: 'meeting-place' }),
-      actionId: 'play-occupation',
+      actionId: 'occupation',
       phase: 'after',
       choice: CARD_ID,
       result: { type: 'ok' },
@@ -53,7 +53,7 @@ describe('E165_MasterHuntsman session', () => {
       state,
       player,
       space: mkActionSpace({ id: 'meeting-place' }),
-      actionId: 'play-occupation',
+      actionId: 'occupation',
       phase: 'after',
       choice: 'A114_SeasonalWorker', // Different card
       result: { type: 'ok' },

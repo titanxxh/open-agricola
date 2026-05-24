@@ -15,7 +15,7 @@ const CARD_ID = A139_HollowWarden.id
  *      A60_OrientalFireplace). isListeningTo → isActionCardEvent(Hollow).
  *      onPlayerPlaceFarmer → gain 1 food.
  *
- * Occupation onBuy flows must use a play-occupation listener (engine does not
+ * Occupation onBuy flows must use a occupation listener (engine does not
  * process onBuy flows for occupations — only for improvements).
  */
 const FIREPLACE_IDS = ['Major_Fireplace1', 'Major_Fireplace2', 'A60_OrientalFireplace']
@@ -23,7 +23,7 @@ const FIREPLACE_IDS = ['Major_Fireplace1', 'Major_Fireplace2', 'A60_OrientalFire
 const onBuyListener: CardListenerRegistration = {
   id: 'A139-hollow-warden-onbuy',
   cardIds: [CARD_ID],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return

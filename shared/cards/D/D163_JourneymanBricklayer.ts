@@ -18,7 +18,7 @@ const CARD_ID = D163_JourneymanBricklayer.id
 const onBuyListener: CardListenerRegistration = {
   id: 'D163-journeyman-bricklayer-onbuy',
   cardIds: [CARD_ID],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return

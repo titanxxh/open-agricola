@@ -20,7 +20,7 @@ const CARD_ID = E116_FirCutter.id
  *
  * countPlacedFarmers = familySize - workersAvailable (after placing the current farmer).
  *
- * Occupation onBuy flows must use a play-occupation listener.
+ * Occupation onBuy flows must use a occupation listener.
  */
 const ANIMAL_MARKET_SPACES = new Set(['sheep-market', 'pig-market', 'cattle-market'])
 
@@ -29,7 +29,7 @@ const WOOD_BY_PLACEMENT = [0, 1, 1, 2, 2, 3]
 const onBuyListener: CardListenerRegistration = {
   id: 'E116-fir-cutter-onbuy',
   cardIds: [CARD_ID],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return

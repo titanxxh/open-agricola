@@ -112,7 +112,7 @@ describe('CardEffect.resolveChoice hook', () => {
 
     const session = makeSession()
 
-    // takeAction on lessons auto-resolves play-occupation when only one occupation
+    // takeAction on lessons auto-resolves occupation when only one occupation
     // is in hand (engine.maybeBuildChoiceCandidates short-circuits with 1 option).
     // That triggers onBuy, which returns our XOR flow.  The engine steps into the
     // XOR and blocks, leaving pending.type === 'choice' with sourceCard === TEST_CARD_ID.
@@ -152,7 +152,7 @@ describe('CardEffect.resolveChoice hook', () => {
 
     const session = makeSession()
 
-    // lessons auto-resolves the play-occupation (one card in hand) → onBuy XOR
+    // lessons auto-resolves the occupation (one card in hand) → onBuy XOR
     let resp = session.takeAction(0, 'lessons')
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')

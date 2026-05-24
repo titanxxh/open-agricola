@@ -19,7 +19,7 @@ export const E97_Beneficiary_impl = {
             children: [
               {
                 type: 'leaf' as const,
-                actionId: 'play-occupation',
+                actionId: 'occupation',
                 sourceCard: CARD_ID,
                 params: { cost: { food: 1 } },
               },

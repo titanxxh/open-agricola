@@ -660,7 +660,7 @@ describe('listener purity wave 2a', () => {
       cardStates: { [E51]: { extraData: { foodCount: 1 }, infobox: '1 Food' } },
     })
     const ctx = context(p, {
-      actionId: 'play-occupation',
+      actionId: 'occupation',
       phase: 'before',
       space: space('lessons'),
     })

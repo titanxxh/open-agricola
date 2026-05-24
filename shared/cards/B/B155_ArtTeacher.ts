@@ -18,8 +18,8 @@ const TRAVELING_PLAYERS = 'traveling-players'
  *     Traveling Players accumulation space).
  *
  * Implementation:
- *   - play-occupation after-listener (existing) triggers the wood+reed gain.
- *   - play-occupation computeCosts listener injects a Trade
+ *   - occupation after-listener (existing) triggers the wood+reed gain.
+ *   - occupation computeCosts listener injects a Trade
  *     {from:{}, to:{food:1}, max:tpFood, sideEffect:drainSpace(traveling-players,
  *     food)}. The standard payment solver enumerates 0..tpFood uses, the
  *     player picks via selectPayment, and applyTradeSideEffect drains TP food
@@ -30,7 +30,7 @@ const TRAVELING_PLAYERS = 'traveling-players'
 const onBuyListener: CardListenerRegistration = {
   id: 'B155-art-teacher-onbuy',
   cardIds: [CARD_ID],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return
@@ -41,7 +41,7 @@ const onBuyListener: CardListenerRegistration = {
 const computeCostsListener: CardListenerRegistration = {
   id: 'B155-art-teacher-compute-costs',
   cardIds: [CARD_ID],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   phases: ['computeCosts' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const tp = context.state.actionSpaces.find((s) => s.id === TRAVELING_PLAYERS)

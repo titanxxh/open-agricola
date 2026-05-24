@@ -26,7 +26,7 @@ const isOpenSpace = (state: GameState, space: ActionSpace) => {
 const onPlayListener: CardListenerRegistration = {
   id: 'B151-little-peasant-after-play',
   phases: ['after' as ActionHookPhase],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return
     return { flow: gainLeaf(CARD_ID, { stone: 1 }), sourceCard: CARD_ID }

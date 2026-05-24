@@ -304,7 +304,7 @@ const CARD_IMPL = {
 
 监听行动触发：可用 `phases` 包括 `before`、`during`、`immediatelyAfter`、`after`、`computeCosts`、`computeArgs`、`computeReplace`、`isDoable`、`anytime`、`computeChoiceCandidates`。
 
-可监听的 `actions`：`collect`、`gain`、`receive`、`plow`、`sow`、`construct`、`renovate-house`、`fence`、`stables`、`improvement-any`、`minor-improvement`、`play-occupation`、`place-farmer`、`wish-children`、`family-growth`、`bake-bread`。
+可监听的 `actions`：`collect`、`gain`、`receive`、`plow`、`sow`、`construct`、`renovate-house`、`fence`、`stables`、`improvement-any`、`minor-improvement`、`occupation`、`place-farmer`、`wish-children`、`family-growth`、`bake-bread`。
 
 #### 可用 actionId（ActionFlow leaf）
 

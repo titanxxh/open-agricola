@@ -11,7 +11,7 @@ const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
 
 describe('C28_TeachersDesk session', () => {
-  it('before-place-farmer on major-improvement offers optional play-occupation with 1 food cost', () => {
+  it('before-place-farmer on major-improvement offers optional occupation with 1 food cost', () => {
     const listener = findListener('C28-teachers-desk-before-place-farmer')!
     expect(listener).toBeDefined()
     const session = new GameSession()
@@ -32,7 +32,7 @@ describe('C28_TeachersDesk session', () => {
     } as unknown as CardListenerContext)
     expect(result).toBeDefined()
     const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
-    expect(leaf.actionId).toBe('play-occupation')
+    expect(leaf.actionId).toBe('occupation')
     expect(leaf.optional).toBe(true)
     expect(leaf.params).toEqual({ costOverride: { food: 1 } })
     expect(leaf.sourceCard).toBe(CARD_ID)
@@ -59,7 +59,7 @@ describe('C28_TeachersDesk session', () => {
       phase: 'before',
     } as unknown as CardListenerContext)
     expect(result).toBeDefined()
-    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('play-occupation')
+    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('occupation')
   })
 
   it('does not trigger when occupation hand is empty', () => {

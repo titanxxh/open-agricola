@@ -33,7 +33,7 @@ export const C97_SeedResearcher_impl = {
             { type: 'leaf', actionId: 'gain', params: { food: 2 }, sourceCard: CARD_ID },
             {
               type: 'leaf',
-              actionId: 'play-occupation',
+              actionId: 'occupation',
               sourceCard: CARD_ID,
               params: { costOverride: {} },
             },
