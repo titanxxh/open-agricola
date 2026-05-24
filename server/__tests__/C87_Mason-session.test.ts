@@ -6,6 +6,9 @@ import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import '../../shared/cards/C/C87_Mason'
 
 describe('C87_Mason session', () => {
+  const roomTiles = (count: number) =>
+    Array.from({ length: count }, (_, col) => ({ row: 0, col }))
+
   const setup = (options?: { houseType?: 'wood' | 'clay' | 'stone'; rooms?: number }) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -18,6 +21,7 @@ describe('C87_Mason session', () => {
     player.resources.food = 10
     player.houseType = options?.houseType ?? 'stone'
     player.rooms = options?.rooms ?? 4
+    player.roomTiles = roomTiles(player.rooms)
     session.loadState(state)
     session.devPlayCard(0, 'C87_Mason')
     return session
@@ -29,7 +33,7 @@ describe('C87_Mason session', () => {
     return resp
   }
 
-  it('available when stone house + 4 rooms + hasRoom → rooms becomes 5', () => {
+  it('available when stone house + 4 rooms + hasRoom → builds a real fifth room', () => {
     const session = setup({ houseType: 'stone', rooms: 4 })
     const state = session.getState().state
     const initialRooms = state.players[0]!.rooms
@@ -38,9 +42,18 @@ describe('C87_Mason session', () => {
 
     const resp = session.takeAnytimeAction(0, 'C87-mason-anytime')
     expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('farm-select')
 
-    const updatedPlayer = resp.state.players[0]!
+    const built = session.resolveChoice(0, 'confirm', {
+      rooms: [{ row: 0, col: 4 }],
+    })
+    expect(built.ok).toBe(true)
+
+    const updatedPlayer = built.state.players[0]!
     expect(updatedPlayer.rooms).toBe(initialRooms + 1)
+    expect(updatedPlayer.roomTiles).toContainEqual({ row: 0, col: 4 })
     expect(isCardFlagged(updatedPlayer, 'C87_Mason')).toBe(true)
   })
 
@@ -75,9 +88,13 @@ describe('C87_Mason session', () => {
 
     const resp1 = session.takeAnytimeAction(0, 'C87-mason-anytime')
     expect(resp1.ok).toBe(true)
+    const built = session.resolveChoice(0, 'confirm', {
+      rooms: [{ row: 0, col: 4 }],
+    })
+    expect(built.ok).toBe(true)
 
     // Should no longer be available
-    const anytimeIds = resp1.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
+    const anytimeIds = built.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('C87-mason-anytime')
   })
 

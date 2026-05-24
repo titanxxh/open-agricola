@@ -15,13 +15,19 @@ const CARD_ID = E127_DiligentFarmer.id
  * If 3+ categories have max score, offer optional free room.
  *
  * Implementation: compute scores at buy time, check the 8 standard categories,
- * and if 3+ have score == 4, offer a free room via build-farmhand-room.
+ * and if 3+ have score == 4, offer a free construct room.
  */
 
 const MAX_SCORE_CATEGORIES = [
   'fields', 'pastures', 'grains', 'vegetables',
   'sheeps', 'boars', 'cattles', 'stables',
 ]
+const FREE_SINGLE_ROOM_CONTEXT = {
+  maxRooms: 1,
+  exactCost: { max: 1 },
+  trueAction: false,
+  cancelPolicy: 'forbidCancel',
+}
 
 export const E127_DiligentFarmer_impl = {
   effect: {
@@ -48,8 +54,9 @@ export const E127_DiligentFarmer_impl = {
       children: [
         {
           type: 'leaf',
-          actionId: 'build-farmhand-room',
+          actionId: 'construct',
           sourceCard: CARD_ID,
+          actionContext: FREE_SINGLE_ROOM_CONTEXT,
         },
       ],
     }
