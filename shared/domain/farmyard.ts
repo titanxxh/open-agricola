@@ -7,13 +7,14 @@ import type {
   FarmTilePosition,
   InteractionFarmSelection,
   InteractionSelection,
+  ExactCost,
   Resource,
 } from '../contract/types.ts'
 import { isBorderEdge, getAllTilePositions, positionKey } from '../domain/farm.ts'
 import {
-  applyCostOverride,
   canAffordTypedFlatCost,
   getMaxBuildableRooms,
+  resolveUnitCostWithDelta,
 } from '../actions/payment/internal'
 import { readCardExtraData } from '../cards/helpers/card-state.ts'
 import {
@@ -1221,18 +1222,6 @@ const sanitizePayableCost = (
   return payable
 }
 
-const scaleCost = (
-  costPerUnit: Partial<Resource>,
-  count: number,
-): Partial<Resource> => {
-  const total: Partial<Resource> = {}
-  Object.entries(costPerUnit).forEach(([key, value]) => {
-    if (typeof value !== 'number') return
-    total[key as keyof Resource] = value * count
-  })
-  return sanitizePayableCost(total)
-}
-
 const roomNeighbors = (tile: FarmTilePosition) => [
   { row: tile.row - 1, col: tile.col },
   { row: tile.row + 1, col: tile.col },
@@ -1318,6 +1307,7 @@ export const buildStableFarmInteraction = (
      * the structural 4-stable cap if smaller). Used by A1 Shelter (max=1).
      */
     max?: number
+    exactCost?: ExactCost
   },
 ): InteractionFarmSelection => {
   const normalized = normalizePlayerFarm(player)
@@ -1342,7 +1332,6 @@ export const buildStableFarmInteraction = (
       oneSizePastureCells.has(positionKey(tile)),
     )
   }
-  const costPerStable = applyCostOverride({ wood: STABLE_WOOD_COST }, costOverride)
   const structuralMax = Math.min(
     selectableTiles.length,
     Math.max(0, 4 - normalized.stableTiles.length),
@@ -1350,10 +1339,13 @@ export const buildStableFarmInteraction = (
   )
   let resourceMax = 0
   for (let count = 1; count <= structuralMax; count += 1) {
-    if (
-      !canAffordTypedFlatCost(player, scaleCost(costPerStable, count), 'stables')
+    const totalCost = resolveUnitCostWithDelta(
+      { wood: STABLE_WOOD_COST },
+      options?.exactCost,
+      costOverride,
+      count,
     )
-      break
+    if (!totalCost || !canAffordTypedFlatCost(player, totalCost, 'stables')) break
     resourceMax = count
   }
   return {
@@ -1584,6 +1576,7 @@ export type FenceSpec = {
 
 export type SelectableTilesOpts = {
   costOverride?: Partial<Resource>
+  exactCost?: ExactCost
   actionContext?: Record<string, unknown>
   spaceId?: string
   zoneFilter?: 'pasture-1'
@@ -1707,11 +1700,16 @@ export class Farmyard {
       case 'fence':
         return buildFenceFarmInteraction(this.player, opts?.spaceId ?? '')
       case 'room':
-        return buildRoomFarmInteraction(this.player, cost, ctx)
+        return buildRoomFarmInteraction(
+          this.player,
+          cost,
+          opts?.exactCost ? { ...(ctx ?? {}), exactCost: opts.exactCost } : ctx,
+        )
       case 'stable':
         return buildStableFarmInteraction(this.player, cost, {
           zoneFilter: opts?.zoneFilter,
           max: opts?.max,
+          exactCost: opts?.exactCost,
         })
       case 'farm-position':
         return buildFarmPositionSelectionInteraction(this.player, ctx)

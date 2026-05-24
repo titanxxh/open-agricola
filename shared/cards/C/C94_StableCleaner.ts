@@ -13,12 +13,6 @@ const CARD_ID = C94_StableCleaner.id
  *
  * BGA: anytime + flagCardNode + STABLES action with costs={WOOD=>1, FOOD=>1}.
  *
- * Implementation: anytime listener emits SEQ
- *   set-flag → stables (with actionContext.costOverride { wood:-1, food:1 })
- *   → unset-flag.
- * `applyCostOverride` flips the base { wood:2 } to { wood:1, food:1 }; the
- * existing stables farm-interaction / payment paths read the override
- * naturally (no stables.ts changes needed).
  */
 const anytimeListener: CardListenerRegistration = {
   id: 'C94-stable-cleaner-anytime',
@@ -38,7 +32,7 @@ const anytimeListener: CardListenerRegistration = {
             type: 'leaf',
             actionId: 'stables',
             sourceCard: CARD_ID,
-            actionContext: { costOverride: { wood: -1, food: 1 }, trueAction: false },
+            actionContext: { exactCost: { wood: 1, food: 1 }, trueAction: false },
           },
           { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } },
         ],

@@ -5,7 +5,9 @@ import {
   canAffordCardPreviewCostByProvider,
   payCardPreviewCostByProvider,
   payTypedFlatCost,
+  readExactCost,
   resolveCardPreviewCostByProvider,
+  resolveExactUnitCost,
 } from '../payment/internal'
 // PaymentSolver namespace (S3 Task 7b): core payment APIs migrated to
 // the new payment module. Other helpers (preview-cost / typed-flat /
@@ -244,6 +246,16 @@ const getLessonsCost = (player: PlayerState, spaceId: string) => {
 
 export const getOccupationActionCost = getLessonsCost
 
+const getOccupationActionBaseCost = (
+  player: PlayerState,
+  spaceId: string,
+  params?: Record<string, unknown>,
+) => {
+  const exactCost = readExactCost(params)
+  if (exactCost) return resolveExactUnitCost(exactCost, 1)
+  return getLessonsCost(player, spaceId)
+}
+
 const buildPlayableOccupationOptions = (
   state: GameState,
   player: PlayerState,
@@ -349,8 +361,9 @@ export const playOccupationAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
   execute: ({ state, player, space, params }) => {
-    const typed = params as { costOverride?: Partial<PlayerState['resources']>; allowedCards?: string[] } | undefined
-    const cost = typed?.costOverride ?? getLessonsCost(player, space.id)
+    const typed = params as { allowedCards?: string[] } | undefined
+    const cost = getOccupationActionBaseCost(player, space.id, params)
+    if (!cost) return { type: 'ok' }
     let playableOptions = buildPlayableOccupationOptions(
       state,
       player,
@@ -370,7 +383,7 @@ export const playOccupationAction: ActionDefinition = {
     }
   },
   resolveChoice: ({ player, space, params, state, sourceCard, actionContext }, choice) => {
-    const typed = params as { costOverride?: Partial<PlayerState['resources']>; allowedCards?: string[] } | undefined
+    const typed = params as { allowedCards?: string[] } | undefined
     if (typed?.allowedCards && !typed.allowedCards.includes(choice)) {
       return { type: 'fail', errorKey: 'log.occupationFail' }
     }
@@ -378,7 +391,8 @@ export const playOccupationAction: ActionDefinition = {
     if (!occupation || !player.occupationHand.includes(occupation.id)) {
       return { type: 'fail', errorKey: 'log.occupationFail' }
     }
-    const baseCost = typed?.costOverride ?? getLessonsCost(player, space.id)
+    const baseCost = getOccupationActionBaseCost(player, space.id, params)
+    if (!baseCost) return { type: 'fail', errorKey: 'log.occupationFail' }
     // Apply computeCosts hook so card-driven trades (B109 PaperMaker
     // wood→food) and bonus modifiers participate in the pay leaf's
     // multi-solution enumeration. Without this the pay leaf only sees the

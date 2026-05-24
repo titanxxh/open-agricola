@@ -1,4 +1,5 @@
 import type {
+  ActionAvailabilityContext,
   ActionCostPreview,
   ActionDefinition,
   ActionMutationContext,
@@ -9,7 +10,11 @@ import type {
   Resource,
 } from '../../contract/types'
 import { getNextEmptyTileForPlayer } from '../../domain/farm'
-import { payResources, applyCostOverride } from '../payment/internal'
+import {
+  payResources,
+  readExactCost,
+  resolveUnitCostWithDelta,
+} from '../payment/internal'
 import { stableWoodCost } from './fencing'
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'
 // PaymentSolver namespace (S3 Task 7a): core payment APIs migrated to
@@ -37,6 +42,10 @@ import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 const buildSingletonState = (player: PlayerState): GameState =>
   ({ ...({} as GameState), players: [player] })
 
+type StableAvailabilityContext = ActionAvailabilityContext & {
+  actionContext?: Record<string, unknown>
+}
+
 export const buildStable = (player: PlayerState): ActionExecutionResult => {
   const next = getNextEmptyTileForPlayer(player)
   if (!next) {
@@ -51,17 +60,105 @@ export const buildStable = (player: PlayerState): ActionExecutionResult => {
   return { type: 'ok' }
 }
 
-const stablesCostPreview: ActionCostPreview = {
-  isStructurallyPossible: ({ state, player }) => getAvailableStableSupplyCount(state, player) > 0,
-  getBaseCost: () => ({ wood: stableWoodCost }),
-}
-
 const readCostOverride = (
   actionContext?: Record<string, unknown>,
 ): Partial<Resource> | undefined => {
   const override = actionContext?.costOverride
   if (!override || typeof override !== 'object') return undefined
   return override as Partial<Resource>
+}
+
+const readStableCostDelta = (
+  actionContext: Record<string, unknown> | undefined,
+  costs: Partial<Resource> | undefined,
+): Partial<Resource> | undefined => {
+  if (costs && Object.keys(costs).length > 0) return costs
+  return readExactCost(actionContext) ? undefined : readCostOverride(actionContext)
+}
+
+const readStableActionContext = (
+  context: ActionAvailabilityContext,
+): Record<string, unknown> | undefined => {
+  const actionContext = (context as StableAvailabilityContext).actionContext
+  if (actionContext) return actionContext
+  const paramsActionContext = context.params?.actionContext
+  if (!paramsActionContext || typeof paramsActionContext !== 'object') return undefined
+  return paramsActionContext as Record<string, unknown>
+}
+
+const readStableMax = (
+  actionContext?: Record<string, unknown>,
+): number | undefined => {
+  const max = actionContext?.max
+  if (typeof max !== 'number') return undefined
+  return Math.max(0, Math.floor(max))
+}
+
+const isWithinStableMax = (
+  actionContext: Record<string, unknown> | undefined,
+  count: number,
+) => {
+  const max = readStableMax(actionContext)
+  return max === undefined || count <= max
+}
+
+const resolveStableTotalCost = (
+  actionContext: Record<string, unknown> | undefined,
+  costs: Partial<Resource> | undefined,
+  count: number,
+) => {
+  if (!isWithinStableMax(actionContext, count)) return null
+  return resolveUnitCostWithDelta(
+    { wood: stableWoodCost },
+    readExactCost(actionContext),
+    readStableCostDelta(actionContext, costs),
+    count,
+  )
+}
+
+const buildStableFarmSelection = (
+  state: GameState,
+  player: PlayerState,
+  actionContext: Record<string, unknown> | undefined,
+  costs: Partial<Resource> | undefined,
+) => {
+  const zoneFilter = actionContext?.zoneFilter
+  const max = actionContext?.max
+  const reserve = getAvailableStableSupplyCount(state, player)
+  const selectionMax = typeof max === 'number' ? Math.min(max, reserve) : reserve
+  const idx = state.players.indexOf(player)
+  return playerBoard(state, idx).farmyard.selectableTiles('stable', {
+    costOverride: readStableCostDelta(actionContext, costs),
+    exactCost: readExactCost(actionContext),
+    zoneFilter: zoneFilter === 'pasture-1' ? 'pasture-1' : undefined,
+    max: selectionMax,
+  })
+}
+
+const isStableStructurallyPossible = ({ state, player }: ActionAvailabilityContext) =>
+  getAvailableStableSupplyCount(state, player) > 0
+
+const canExecuteStableCostPreview = (
+  context: ActionAvailabilityContext,
+  costs?: Partial<Resource>,
+) => {
+  if (!isStableStructurallyPossible(context)) return false
+  const farm = buildStableFarmSelection(
+    context.state,
+    context.player,
+    readStableActionContext(context),
+    costs,
+  )
+  return farm.farmType === 'stable' && farm.maxSelections > 0
+}
+
+const stablesCostPreview: ActionCostPreview = {
+  isStructurallyPossible: isStableStructurallyPossible,
+  getBaseCost: (context) => {
+    const actionContext = readStableActionContext(context)
+    return resolveStableTotalCost(actionContext, undefined, 1) ?? {}
+  },
+  canExecute: canExecuteStableCostPreview,
 }
 
 const sanitizePayableCost = (
@@ -73,18 +170,6 @@ const sanitizePayableCost = (
     payable[key as keyof Resource] = value
   })
   return payable
-}
-
-const scaleCost = (
-  costPerUnit: Partial<Resource>,
-  count: number,
-): Partial<Resource> => {
-  const total: Partial<Resource> = {}
-  Object.entries(costPerUnit).forEach(([key, value]) => {
-    if (typeof value !== 'number') return
-    total[key as keyof Resource] = value * count
-  })
-  return sanitizePayableCost(total)
 }
 
 const applyPlayerMutation = (target: PlayerState, source: PlayerState) => {
@@ -108,9 +193,8 @@ const finalizeStables = (
   const idx = ctx.state.players.indexOf(ctx.player)
   const validated = playerBoard(ctx.state, idx).farmyard.canBuildStable(stables, lockedKeys)
   if (!validated.ok) return { type: 'fail', errorKey: validated.code ?? 'log.buildStableFail' }
-  const costOverride = readCostOverride(ctx.actionContext) ?? ctx.costs
-  const costPerStable = applyCostOverride({ wood: stableWoodCost }, costOverride)
-  const totalCost = scaleCost(costPerStable, stables.length)
+  const totalCost = resolveStableTotalCost(ctx.actionContext, ctx.costs, stables.length)
+  if (!totalCost) return { type: 'fail', errorKey: 'log.buildStableFail' }
   const payment = resolveTypedFlatPaymentSelection(
     ctx.player,
     totalCost,
@@ -163,19 +247,14 @@ export const stablesAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (state, player, opts) =>
-    canExecuteWithCostPreview(stablesCostPreview, { state, player }, readCostOverride(opts?.actionContext)),
+    canExecuteWithCostPreview(
+      stablesCostPreview,
+      { state, player, actionContext: opts?.actionContext } as StableAvailabilityContext,
+      readStableCostDelta(opts?.actionContext, undefined),
+  ),
   costPreview: stablesCostPreview,
   execute: ({ state, player, costs, actionContext }): ActionExecutionResult => {
-    const zoneFilter = actionContext?.zoneFilter
-    const max = actionContext?.max
-    const reserve = getAvailableStableSupplyCount(state, player)
-    const selectionMax = typeof max === 'number' ? Math.min(max, reserve) : reserve
-    const idx = state.players.indexOf(player)
-    const farm = playerBoard(state, idx).farmyard.selectableTiles('stable', {
-      costOverride: costs,
-      zoneFilter: zoneFilter === 'pasture-1' ? 'pasture-1' : undefined,
-      max: selectionMax,
-    })
+    const farm = buildStableFarmSelection(state, player, actionContext, costs)
     return {
       type: 'request',
       request: {
@@ -219,9 +298,8 @@ export const stablesAction: ActionDefinition = {
       if (!validated.ok) {
         return { type: 'fail', errorKey: validated.code ?? 'log.buildStableFail' }
       }
-      const costOverride = readCostOverride(ctx.actionContext) ?? ctx.costs
-      const costPerStable = applyCostOverride({ wood: stableWoodCost }, costOverride)
-      const totalCost = scaleCost(costPerStable, stables.length)
+      const totalCost = resolveStableTotalCost(ctx.actionContext, ctx.costs, stables.length)
+      if (!totalCost) return { type: 'fail', errorKey: 'log.buildStableFail' }
       const payment = resolveTypedFlatPaymentSelection(
         ctx.player,
         totalCost,
@@ -253,4 +331,4 @@ export const stablesAction: ActionDefinition = {
 }
 
 // re-export for external callers building actionContext
-export { applyCostOverride }
+export { applyCostOverride } from '../payment/internal'

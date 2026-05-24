@@ -22,7 +22,7 @@ const listener: CardListenerRegistration = {
         actionId: 'occupation',
         optional: true,
         sourceCard: CARD_ID,
-        params: { costOverride: { food: 2 } },
+        params: { exactCost: { food: 2 } },
       },
       sourceCard: CARD_ID,
     }

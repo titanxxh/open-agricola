@@ -25,7 +25,7 @@ export const E28_Bookmark_impl = {
           type: 'leaf',
           actionId: 'occupation',
           sourceCard: CARD_ID,
-          params: { costOverride: {} },
+          params: { exactCost: {} },
         },
       ],
     }

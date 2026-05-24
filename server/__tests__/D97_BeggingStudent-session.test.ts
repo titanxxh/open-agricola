@@ -25,7 +25,7 @@ describe('D97_BeggingStudent session', () => {
     expect(player.resources.begging).toBe(beggingBefore + 1)
   })
 
-  it('onStartHarvest returns optional occupation with costOverride {} when player has occupations in hand', () => {
+  it('onStartHarvest returns optional occupation with exactCost {} when player has occupations in hand', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -47,7 +47,7 @@ describe('D97_BeggingStudent session', () => {
     expect(children).toHaveLength(1)
     expect(children[0].actionId).toBe('occupation')
     expect(children[0].sourceCard).toBe(CARD_ID)
-    expect(children[0].params).toEqual({ costOverride: {} })
+    expect(children[0].params).toEqual({ exactCost: {} })
   })
 
   it('onStartHarvest returns undefined when player has no occupations in hand', () => {

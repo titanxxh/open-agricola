@@ -1,0 +1,317 @@
+import { describe, expect, it } from 'vitest'
+import { executeCardListener, getRegisteredCardListeners } from '../card-listeners'
+import { getCardEffect, runCardEffectHook } from '../card-effects'
+import type { ActionFlow, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
+import type { DraftGameEvent } from '../../contract/events'
+
+import '../A/A15_CarpentersAxe'
+import '../A/A89_StablePlanner'
+import '../B/B16_MiningHammer'
+import '../B/B89_Groom'
+import '../C/C89_StableMaster'
+import '../C/C94_StableCleaner'
+import '../C/C149_ResourceRecycler'
+import '../D/D89_Stablehand'
+import '../D/D149_CasualWorker'
+import '../E/E89_Stallwright'
+
+type ListenerContextInput = Parameters<typeof executeCardListener>[1]
+type LeafFlow = Extract<ActionFlow, { type: 'leaf' }>
+
+const resources = (overrides: Partial<Resource> = {}): Resource => ({
+  wood: 0,
+  clay: 0,
+  reed: 0,
+  stone: 0,
+  food: 0,
+  grain: 0,
+  vegetable: 0,
+  sheep: 0,
+  boar: 0,
+  cattle: 0,
+  begging: 0,
+  ...overrides,
+})
+
+const player = (overrides: Partial<PlayerState> = {}): PlayerState =>
+  ({
+    id: 'p1',
+    name: 'P1',
+    color: 'red',
+    resources: resources(),
+    workers: [],
+    rooms: 2,
+    roomTiles: [
+      { row: 1, col: 0 },
+      { row: 1, col: 1 },
+    ],
+    stableTiles: [],
+    fields: [],
+    pastures: [],
+    fenceSegments: [],
+    improvements: [],
+    minorHand: [],
+    minorPlayed: [],
+    occupationHand: [],
+    occupationPlayed: [],
+    houseAnimalType: null,
+    houseAnimalCount: 0,
+    stableAnimals: {},
+    activeModifiers: [],
+    cardStates: {},
+    majorEffects: { wellRounds: 0 },
+    startPlayer: false,
+    ...overrides,
+  }) as unknown as PlayerState
+
+const space = (
+  id: string,
+  overrides: Partial<ActionSpace> = {},
+): ActionSpace =>
+  ({
+    id,
+    type: id,
+    position: 0,
+    players: [],
+    available: true,
+    gainPerRound: {},
+    ...overrides,
+  }) as unknown as ActionSpace
+
+const state = (...players: PlayerState[]): GameState =>
+  ({
+    round: 1,
+    phase: 'playing',
+    roundPhase: 'work',
+    draft: null,
+    currentPlayerIndex: 0,
+    players,
+    actionSpaces: [
+      space('forest', { gainPerRound: { wood: 1 } }),
+      space('eastern-quarry'),
+      space('house-redevelopment'),
+      space('occupation'),
+      space('fencing'),
+    ],
+    log: [],
+    events: [],
+    nextEventSeq: 1,
+    publicEventArchive: [],
+    nextPublicEventArchivePacketSeq: 1,
+    roundStartSnapshot: null,
+    roundActionOrder: Array.from({ length: 14 }).map(() => null),
+    gameSeed: 1,
+    availableMajorImprovements: [],
+    futureMeeples: [],
+    pendingFutureMeeples: [],
+    gameOver: false,
+    enableCommunityDeck: false,
+    workPhaseObtainedResources: {},
+    completedFeedingPhases: 0,
+  }) as unknown as GameState
+
+const listener = (id: string) => {
+  const found = getRegisteredCardListeners().find((entry) => entry.id === id)
+  expect(found).toBeDefined()
+  return found!
+}
+
+const findLeaf = (
+  flow: ActionFlow | undefined,
+  actionId: string,
+): LeafFlow | undefined => {
+  if (!flow) return undefined
+  if (flow.type === 'leaf') return flow.actionId === actionId ? flow : undefined
+  for (const child of flow.children) {
+    const found = findLeaf(child, actionId)
+    if (found) return found
+  }
+  return undefined
+}
+
+const expectLeaf = (flow: ActionFlow | undefined, actionId: string) => {
+  const leaf = findLeaf(flow, actionId)
+  expect(leaf).toBeDefined()
+  return leaf!
+}
+
+const expectNoLegacyCostFields = (leaf: LeafFlow) => {
+  expect(leaf.actionContext?.costOverride).toBeUndefined()
+  expect(leaf.actionContext?.costs).toBeUndefined()
+}
+
+const context = (
+  gameState: GameState,
+  actor: PlayerState,
+  overrides: Partial<ListenerContextInput> = {},
+): ListenerContextInput => ({
+  state: gameState,
+  player: actor,
+  space: space('test-space'),
+  actionId: 'test',
+  phase: 'after',
+  transactionEvents: [],
+  ...overrides,
+} as ListenerContextInput)
+
+const fenceBuilt = (): DraftGameEvent<'farm.fenceBuilt'> => ({
+  type: 'farm.fenceBuilt',
+  fences: [{ edge: 'H-0-0', type: 'fence' }],
+  newFenceEdges: ['H-0-0'],
+  newPastures: [{ tiles: [{ row: 0, col: 0 }] }],
+})
+
+describe('formatCost migrated card flows', () => {
+  it('A15_CarpentersAxe emits one stable at exact 1 wood', () => {
+    const actor = player({
+      resources: resources({ wood: 7 }),
+      minorPlayed: ['A15_CarpentersAxe'],
+    })
+    const gameState = state(actor)
+    const result = executeCardListener(listener('A15-carpenters-axe-after-collect'), context(gameState, actor, {
+      actionId: 'collect',
+      phase: 'after',
+      space: gameState.actionSpaces.find((entry) => entry.id === 'forest')!,
+    }))
+    const leaf = expectLeaf(result?.flow, 'stables')
+    expect(leaf.actionContext).toMatchObject({ max: 1, exactCost: { wood: 1, max: 1 } })
+    expectNoLegacyCostFields(leaf)
+  })
+
+  it('A89_StablePlanner emits one free stable from actionContext', () => {
+    const actor = player({ occupationPlayed: ['A89_StablePlanner'] })
+    const gameState = state(actor)
+    gameState.round = 2
+    getCardEffect('A89_StablePlanner')!.onBuy!(gameState, actor)
+    gameState.round = 5
+    const flow = getCardEffect('A89_StablePlanner')!.onRoundStart!(gameState, actor)
+    const leaf = expectLeaf(flow, 'stables')
+    expect(leaf.params).toBeUndefined()
+    expect(leaf.actionContext).toMatchObject({ max: 1, exactCost: { max: 1 } })
+    expectNoLegacyCostFields(leaf)
+  })
+
+  it('B16_MiningHammer emits one free stable after renovation', () => {
+    const actor = player({ minorPlayed: ['B16_MiningHammer'] })
+    const gameState = state(actor)
+    const result = executeCardListener(listener('B16-mining-hammer-after-renovate'), context(gameState, actor, {
+      actionId: 'renovate-house',
+      phase: 'after',
+    }))
+    const leaf = expectLeaf(result?.flow, 'stables')
+    expect(leaf.actionContext).toMatchObject({ max: 1, exactCost: { max: 1 } })
+    expectNoLegacyCostFields(leaf)
+  })
+
+  it('B89_Groom emits one stable at exact 1 wood', () => {
+    const actor = player({
+      houseType: 'stone',
+      occupationPlayed: ['B89_Groom'],
+    })
+    const gameState = state(actor)
+    const flow = runCardEffectHook(gameState, actor, 'B89_Groom', 'onBeforeStartOfTurn')
+    const leaf = expectLeaf(flow, 'stables')
+    expect(leaf.actionContext).toMatchObject({ max: 1, exactCost: { wood: 1, max: 1 } })
+    expectNoLegacyCostFields(leaf)
+  })
+
+  it('C89_StableMaster emits one stable at exact 1 wood', () => {
+    const actor = player({
+      resources: resources({ wood: 1 }),
+      occupationPlayed: ['C89_StableMaster'],
+    })
+    const gameState = state(actor)
+    const flow = runCardEffectHook(gameState, actor, 'C89_StableMaster', 'onBuy')
+    const leaf = expectLeaf(flow, 'stables')
+    expect(leaf.actionContext).toMatchObject({ max: 1, exactCost: { wood: 1 }, trueAction: false })
+    expectNoLegacyCostFields(leaf)
+  })
+
+  it('C94_StableCleaner emits stables at exact 1 wood and 1 food', () => {
+    const actor = player({
+      resources: resources({ wood: 1, food: 1 }),
+      occupationPlayed: ['C94_StableCleaner'],
+    })
+    const gameState = state(actor)
+    const result = executeCardListener(listener('C94-stable-cleaner-anytime'), context(gameState, actor, {
+      actionId: 'stables',
+      phase: 'anytime',
+    }))
+    const leaf = expectLeaf(result?.flow, 'stables')
+    expect(leaf.actionContext).toMatchObject({ exactCost: { wood: 1, food: 1 }, trueAction: false })
+    expectNoLegacyCostFields(leaf)
+  })
+
+  it('C149_ResourceRecycler emits one free construct room', () => {
+    const owner = player({
+      id: 'p1',
+      houseType: 'clay',
+      occupationPlayed: ['C149_ResourceRecycler'],
+    })
+    const trigger = player({
+      id: 'p2',
+      houseType: 'stone',
+    })
+    const gameState = state(owner, trigger)
+    const result = executeCardListener(listener('C149-resource-recycler-opponent-renovate-stone'), context(gameState, trigger, {
+      actionId: 'renovate-house',
+      phase: 'after',
+      space: gameState.actionSpaces.find((entry) => entry.id === 'house-redevelopment')!,
+      triggerPlayer: trigger,
+      ownerPlayer: owner,
+    }), { ownerPlayerId: owner.id })
+    const leaf = expectLeaf(result?.flow, 'construct')
+    expect(leaf.actionContext).toMatchObject({ maxRooms: 1, exactCost: {}, trueAction: false })
+    expectNoLegacyCostFields(leaf)
+  })
+
+  it('D89_Stablehand emits one free stable after new pasture fencing', () => {
+    const actor = player({ occupationPlayed: ['D89_Stablehand'] })
+    const gameState = state(actor)
+    const actionEvents = [fenceBuilt()]
+    const result = executeCardListener(listener('D89-stablehand-after-fencing'), context(gameState, actor, {
+      actionId: 'fence',
+      phase: 'after',
+      space: gameState.actionSpaces.find((entry) => entry.id === 'fencing')!,
+      transactionEvents: actionEvents,
+      actionEvents,
+    }))
+    const leaf = expectLeaf(result?.flow, 'stables')
+    expect(leaf.actionContext).toMatchObject({ max: 1, exactCost: { max: 1 }, trueAction: false })
+    expectNoLegacyCostFields(leaf)
+  })
+
+  it('D149_CasualWorker emits one free stable option', () => {
+    const owner = player({
+      id: 'p1',
+      occupationPlayed: ['D149_CasualWorker'],
+    })
+    const trigger = player({ id: 'p2' })
+    const gameState = state(owner, trigger)
+    const result = executeCardListener(listener('D149-casual-worker-opponent-quarry'), context(gameState, trigger, {
+      actionId: 'place-farmer',
+      phase: 'after',
+      space: gameState.actionSpaces.find((entry) => entry.id === 'eastern-quarry')!,
+      ownerPlayer: owner,
+      triggerPlayer: trigger,
+    }), { ownerPlayerId: owner.id })
+    const leaf = expectLeaf(result?.flow, 'stables')
+    expect(leaf.actionContext).toMatchObject({ max: 1, exactCost: { max: 1 } })
+    expectNoLegacyCostFields(leaf)
+  })
+
+  it('E89_Stallwright emits one free stable on configured occupation count', () => {
+    const actor = player({
+      occupationPlayed: ['E89_Stallwright', 'A1_OtherOccupation'],
+    })
+    const gameState = state(actor)
+    const result = executeCardListener(listener('E89-stallwright-after-occupation'), context(gameState, actor, {
+      actionId: 'occupation',
+      phase: 'after',
+      space: gameState.actionSpaces.find((entry) => entry.id === 'occupation')!,
+    }))
+    const leaf = expectLeaf(result?.flow, 'stables')
+    expect(leaf.actionContext).toMatchObject({ max: 1, exactCost: { max: 1 }, trueAction: false })
+    expectNoLegacyCostFields(leaf)
+  })
+})

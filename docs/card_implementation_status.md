@@ -1,6 +1,6 @@
 # 卡牌实现现状报告
 
-> 生成/更新日期：2026-05-23。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
+> 生成/更新日期：2026-05-24。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
 
 ## 1. 当前快照
 
@@ -95,6 +95,7 @@
 | Log / notification provenance | `shared/events/event-mapping-policy.ts` 覆盖全部 public/private event type；`shared/cards/__tests__/provenance-result-audit.test.ts` 守住生产卡牌的 `context.result` 资源事实 fallback | 结构化事件层是卡牌判定、UI log、private notification 和 replay 的统一来源；新增支付/资源/farm metadata 路径必须先 emit 事件再让 listener 消费，不要回退到 action result。 |
 | Fence segment source/type policy 已进入通用基础设施 | `FenceSegment.type` / `source`、`consume-fence` ownOnly、fencing `fencePolicy` | 普通 fence / palisade / borrowed source 不通过主路径卡牌分支表达；C1 rebuild、B30 palisade、未来 E149 borrowed fence 都走 segment type/source + generic policy。 |
 | Supply token payment 已进入通用资源基础设施 | `PaymentResourceMap`、`supplyTokensConsumed`、payment solver、`resource.paid` | fence / stable 作为支付资源处理；C54/A34 消耗 reserve fence，B149 消耗 stable supply，后续读取可建上限必须走 supply-token helper。 |
+| BGA `formatCost` exact/free/paid unit semantics 已进入通用基础设施 | `ExactCost`、`readExactCost()`、`resolveUnitCostWithDelta()`；construct / stables / plow / occupation 的 exact/free 单位成本回归 | 卡牌不再用 `costOverride` 或 `-99` 表达精确免费/付费单位成本；`{ max: 1 }` 这类 BGA 语义用 `exactCost.max` / action policy 表达。 |
 | 注释里的非阻塞 card-id 示例 | `shared/actions/effects/breed.ts`、`shared/contract/types.ts` 仅把 `A165_PigBreeder` / `D95_SiteManager` 作为例子提到 | 除非附近代码变动，否则保留；它们不是可执行的单卡分支。 |
 | Legacy/fallback 术语残留 | 旧 bad-smell 文档发现的剩余 fallback/direct-path 术语，主要在已迁移支付 flow 和测试中 | 将直接运行时 fallback 视为重构债；测试/baseline 名称除非真实迁移触及，否则不动。 |
 
@@ -116,6 +117,7 @@
 13. ~~BGA-style pay child / internal children 机制~~ ✅ 已落地：public host action 负责业务 mutation，mandatory payment 通过 internal `pay` child 结算；`beforeHostListeners` / `afterHostCommitListeners` / `afterHostListeners` 保留 BGA pay slot 差异，improvement/occupation 的 onBuy 在 host commit 后、host after 前运行；public action 顺序已修正为 `computeReplace -> before -> strict isDoable -> computeCosts -> execute -> during -> immediatelyAfter -> after`；`activate-card-effect` 通过 internal result map 读取 `paymentInfo`；`architecture-guard` 守住 deleted apply effects，不允许新增 top-level `apply-*` effect 文件来堆叠多卡逻辑。
 14. ~~Fence segment source/type + generic fencing policy~~ ✅ 已落地：`FenceSegment.type` 区分 ordinary fence / B30 palisade，`FenceSegment.source` 区分 own / borrowed；缺省普通 fence 视为 own ordinary source。fencing 主路径不按 `C1` / `B30` / `E149`、`noWoodPalisades`、`midnightFencer` 分支；卡牌通过 `fencePolicy` 表达 allowed segment types、source policy、bounds、cost、cancel、animal preservation；`segmentBounds.total` 表达普通 fence + palisade 的总段数上限。C1 rebuild 只计数/回收/重建 own ordinary fences，走 `consume-fence` ownOnly + generic `fencePolicy`。
 15. ~~Supply token payment / reserve cap~~ ✅ 已落地：`PaymentResourceMap` 支持 `fence` / `stable` supply token；payment solver、typed-flat、pay leaf、Card Definition cost、`PaymentInfo.resourcesPaid` 和 `resource.paid.resources` 都保留这些 token。支付 supply token 只增加 `player.supplyTokensConsumed`，不删除已建组件；fence / stable 可建上限统一由 `getOwnOrdinaryFenceBuildLimit()` / `getOwnOrdinaryFenceReserveCount()` / `getAvailableStableSupplyCount()` 计算，禁止回退到固定 15 / 4。C54 Market Booth、A34 Loppers、B149 Open Air Farmer、E148 Lazybones、A89 Stable Planner、E76 Lumber Pile 等回归已覆盖。
+16. ~~BGA `Utils::formatCost` exact/free/paid unit semantics~~ ✅ 已落地：`ExactCost` 统一表达精确单位成本和 `max`，construct / stables / plow / occupation 消费 `readExactCost()` / `resolveUnitCostWithDelta()`；卡牌侧静态审计 `shared/cards/__tests__/format-cost-exact-audit.test.ts` 禁止新增 `costOverride`、inline `actionContext.costs` 或 `-99` 精确成本 hack（保留 `E27_PiggyBank` computeCosts 折扣例外）。
 
 影响回归覆盖：`B65_GrainDepot` paymentInfo fee index、before-phase cards、renovation、improvement、occupation、construct、stables、fencing、`A34_Loppers` exact-wood、C54/A34 reserve fence payment、B149 stable supply + palisade bounds、stable paid/free log pairing。
 

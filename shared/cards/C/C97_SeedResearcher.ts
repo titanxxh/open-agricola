@@ -35,7 +35,7 @@ export const C97_SeedResearcher_impl = {
               type: 'leaf',
               actionId: 'occupation',
               sourceCard: CARD_ID,
-              params: { costOverride: {} },
+              params: { exactCost: {} },
             },
           ],
           choiceLabelKey: 'ui.interactionSeedResearcher',

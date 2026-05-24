@@ -39,7 +39,7 @@ const listener: CardListenerRegistration = {
             type: 'leaf',
             actionId: 'construct',
             sourceCard: CARD_ID,
-            actionContext: { maxRooms: 1, costOverride: { wood: -99, clay: -99, reed: -99, stone: -99 }, trueAction: false },
+            actionContext: { maxRooms: 1, exactCost: {}, trueAction: false },
           },
         ],
       },
