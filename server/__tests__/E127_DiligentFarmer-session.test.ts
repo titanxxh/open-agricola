@@ -50,8 +50,15 @@ describe('E127_DiligentFarmer session', () => {
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
-    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
-    expect((flow as Extract<ActionFlow, { type: 'seq' }>).children[0].actionId).toBe('build-farmhand-room')
+    const seq = flow as Extract<ActionFlow, { type: 'seq' }>
+    expect(seq.optional).toBe(true)
+    expect(seq.children[0]!.type).toBe('leaf')
+    expect(seq.children[0]!.actionId).toBe('construct')
+    expect(seq.children[0]!.actionContext).toMatchObject({
+      maxRooms: 1,
+      exactCost: { max: 1 },
+      trueAction: false,
+    })
   })
 
   it('onBuy returns undefined when player has fewer than 3 categories at max score', () => {

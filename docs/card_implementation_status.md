@@ -88,7 +88,7 @@
 | 风险 | 证据 / 卡牌 | 方向 |
 |---|---|---|
 | Metadata 审计覆盖需要随字段演进同步 | `scripts/audit-bga-metadata-diff.ts` 已覆盖 `STABLE` cost 和 `passing` | 新增 BGA metadata 字段时同步加 parser/diff fixture，避免统计口径回退。 |
-| ~~单卡 internal leaf~~ ✅ 已泛化 | `build-farmhand-room` 已被 `B85_FarmHand`、`E127_DiligentFarmer`、`C87_Mason`、`C85_DenBuilder`、`D87_MasterBuilder` 复用 | 共享 helper，无需再视为单卡 leaf。 |
+| ~~单卡 internal leaf~~ ✅ 已泛化 | `build-farmhand-room` 仅保留给 B85 / C85 这类“提供住人空间但不放真实房间 tile”的虚拟房间能力 | BGA `CONSTRUCT + formatCost(max:1)` 的真实房间奖励必须走 `construct` + `exactCost.max`，不能复用虚拟房间 helper。 |
 | 主路径 prefix namespace 检查 | 旧 bad-smell 文档中的 `CUSTOM_`、`card_` 模式 | 保留为 helper 常量/函数，避免散落的 startsWith 检查。 |
 | Payment fallback 仍需继续收敛到事件 provenance | construct/renovate bonus choice 已能通过 `resource.paid` 携带 selected index；后续关注其他 direct payment caller | 新增支付类卡时优先消费 `resource.paid` / `bonusChoiceIndex`，不要读 action result fallback。 |
 | 行动格生命周期已进入后端事件层 | `B23_FinalScenario` | 后端持有 reveal/exclusive-use 状态，round-start 统一清理并 emit `action.exclusiveUseCleared`。 |
@@ -796,14 +796,14 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C84_PerennialRye` | 已对齐 |  |
 | `C85_DenBuilder` | 已对齐 |  |
 | `C86_LivestockFeeder` | 已对齐 |  |
-| `C87_Mason` | 已对齐 |  |
+| `C87_Mason` | 已对齐 | BGA `CONSTRUCT + formatCost(['max'=>1])` 走真实 `construct` + `exactCost: { max: 1 }`，会放置 room tile，不再用 `build-farmhand-room` 虚拟房间。 |
 | `C88_CarpentersApprentice` | 已对齐 |  |
-| `C89_StableMaster` | 已对齐 |  |
+| `C89_StableMaster` | 已对齐 | onBuy 的 1 wood stable 走 `stables` exactCost，入口不做 raw wood gate，允许 C88 等 `computeCosts.stables` 折扣叠加。 |
 | `C90_FieldWatchman` | 已对齐 |  |
 | `C91_PlowHero` | 已对齐 |  |
 | `C92_AutumnMother` | 已对齐 |  |
 | `C93_InnerDistrictsDirector` | 已接受差异 | 已接受的简化实现 |
-| `C94_StableCleaner` | 已对齐 |  |
+| `C94_StableCleaner` | 已对齐 | anytime 入口用 stables preview + `computeCosts.stables` 判断可用性，1 wood + 1 food exactCost 可叠加 C88 等 stable cost modifier。 |
 | `C95_BasketWeaver` | 已对齐 |  |
 | `C96_Merchant` | 已对齐 |  |
 | `C97_SeedResearcher` | 已对齐 |  |
@@ -976,7 +976,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `D84_FeedPellets` | 已对齐 |  |
 | `D85_Reader` | 已对齐 |  |
 | `D86_SheepAgent` | 已对齐 |  |
-| `D87_MasterBuilder` | 已对齐 |  |
+| `D87_MasterBuilder` | 已对齐 | BGA `CONSTRUCT + formatCost(['max'=>1])` 走真实 `construct` + `exactCost: { max: 1 }`，会放置 room tile，不再用 `build-farmhand-room` 虚拟房间。 |
 | `D88_Millwright` | 已对齐 |  |
 | `D89_Stablehand` | 已对齐 |  |
 | `D90_PlowMaker` | 已对齐 |  |
@@ -1196,7 +1196,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `E124_MayorCandidate` | 已对齐 |  |
 | `E125_DelayedWayfarer` | 已对齐 |  |
 | `E126_TaxCollector` | 已对齐 |  |
-| `E127_DiligentFarmer` | 已对齐 |  |
+| `E127_DiligentFarmer` | 已对齐 | BGA `CONSTRUCT + formatCost(['max'=>1])` 走真实 `construct` + `exactCost: { max: 1 }`，会放置 room tile，不再用 `build-farmhand-room` 虚拟房间。 |
 | `E128_Saddler` | 已对齐 |  |
 | `E129_Imitator` | 已对齐 |  |
 | `E130_Overachiever` | 已对齐 |  |

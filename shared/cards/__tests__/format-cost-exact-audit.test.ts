@@ -11,6 +11,7 @@ type FindingType =
   | 'legacyRenovationAction'
   | 'legacyFencingAction'
   | 'legacyFencingListener'
+  | 'maxConstructRoomUsesFarmhandRoom'
 
 type Finding = {
   file: string
@@ -96,6 +97,12 @@ const listCardSourceFiles = () => {
   return files
 }
 
+const MAX_CONSTRUCT_ROOM_FILES = new Set([
+  'shared/cards/C/C87_Mason.ts',
+  'shared/cards/D/D87_MasterBuilder.ts',
+  'shared/cards/E/E127_DiligentFarmer.ts',
+])
+
 const scanCardAuthoredCostHacks = () => {
   const findings: Finding[] = []
   for (const file of listCardSourceFiles()) {
@@ -123,6 +130,9 @@ const scanCardAuthoredCostHacks = () => {
     }
     if (/actions\s*:\s*\[[^\]]*['"]fencing['"]/.test(text)) {
       findings.push({ file, type: 'legacyFencingListener' })
+    }
+    if (MAX_CONSTRUCT_ROOM_FILES.has(file) && /build-farmhand-room/.test(text)) {
+      findings.push({ file, type: 'maxConstructRoomUsesFarmhandRoom' })
     }
   }
   return findings.filter(
