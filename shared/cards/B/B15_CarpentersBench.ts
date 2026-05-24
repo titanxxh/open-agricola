@@ -33,16 +33,26 @@ const afterCollectListener: CardListenerRegistration = {
         children: [
           {
             type: 'leaf',
+            actionId: 'reserve-fence-bonus',
+            sourceCard: CARD_ID,
+            params: {
+              freeFences: 1,
+              counterKey: 'benchFreeFences',
+            },
+          },
+          {
+            type: 'leaf',
             actionId: 'fence',
             sourceCard: CARD_ID,
-            // BGA L55-59 args: { CarpentersBench: true, costs: { WOOD => 1 },
-            // max: n+1, benchWood: n }. We pass max + benchWood through
-            // actionContext for the fence interaction; trueAction=false so the
-            // engine treats this as a card-driven side flow.
             actionContext: {
               trueAction: false,
-              max: n + 1,
-              benchWood: n,
+              fencePolicy: {
+                allowedSegmentTypes: ['fence'],
+                segmentBounds: { total: { min: 1, max: n + 1 } },
+                newPastureBounds: { count: { min: 1, max: 1 } },
+                costPolicy: { fence: { wood: 1 } },
+                cancelPolicy: 'forbidCancel',
+              },
             },
           },
         ],

@@ -18,6 +18,12 @@ export const E97_Beneficiary_impl = {
           {
             type: 'seq' as const,
             children: [
+              {
+                type: 'leaf' as const,
+                actionId: 'occupation',
+                sourceCard: CARD_ID,
+                params: { exactCost: { food: 1 } },
+              },
               ...(player.occupationPlayed.includes(STALLWRIGHT_ID)
                 ? [{
                     type: 'leaf' as const,
@@ -27,12 +33,6 @@ export const E97_Beneficiary_impl = {
                     actionContext: { max: 1, exactCost: { max: 1 }, trueAction: false },
                   }]
                 : []),
-              {
-                type: 'leaf' as const,
-                actionId: 'occupation',
-                sourceCard: CARD_ID,
-                params: { exactCost: { food: 1 } },
-              },
             ],
           },
           {

@@ -95,7 +95,7 @@
 | Log / notification provenance | `shared/events/event-mapping-policy.ts` 覆盖全部 public/private event type；`shared/cards/__tests__/provenance-result-audit.test.ts` 守住生产卡牌的 `context.result` 资源事实 fallback | 结构化事件层是卡牌判定、UI log、private notification 和 replay 的统一来源；新增支付/资源/farm metadata 路径必须先 emit 事件再让 listener 消费，不要回退到 action result。 |
 | Fence segment source/type policy 已进入通用基础设施 | `FenceSegment.type` / `source`、`consume-fence` ownOnly、fencing `fencePolicy` | 普通 fence / palisade / borrowed source 不通过主路径卡牌分支表达；C1 rebuild、B30 palisade、未来 E149 borrowed fence 都走 segment type/source + generic policy。 |
 | Supply token payment 已进入通用资源基础设施 | `PaymentResourceMap`、`supplyTokensConsumed`、payment solver、`resource.paid` | fence / stable 作为支付资源处理；C54/A34 消耗 reserve fence，B149 消耗 stable supply，后续读取可建上限必须走 supply-token helper。 |
-| BGA `formatCost` exact/free/paid unit semantics 已进入通用基础设施 | `ExactCost`、`readExactCost()`、`resolveUnitCostWithDelta()`；construct / renovation / stables / plow / occupation 的 exact/free 单位成本回归 | 卡牌不再用 `costOverride`、`freeCost`、legacy `renovation` / `fencing` leaf 或 `-99` 表达精确免费/付费单位成本；`{ max: 1 }` 这类 BGA 语义用 `exactCost.max` / action policy 表达。 |
+| BGA `formatCost` exact/free/paid unit semantics 已进入通用基础设施 | `ExactCost`、`readExactCost()`、`resolveUnitCostWithDelta()`；construct / renovation / stables / plow / occupation 的 exact/free 单位成本回归 | 卡牌不再用 `costOverride`、`freeCost`、legacy `params.cost`、legacy `renovation` / `fencing` leaf 或 `-99` 表达精确免费/付费单位成本；`{ max: 1 }` 这类 BGA 语义用 `exactCost.max` / action policy 表达。 |
 | 注释里的非阻塞 card-id 示例 | `shared/actions/effects/breed.ts`、`shared/contract/types.ts` 仅把 `A165_PigBreeder` / `D95_SiteManager` 作为例子提到 | 除非附近代码变动，否则保留；它们不是可执行的单卡分支。 |
 | Legacy/fallback 术语残留 | 旧 bad-smell 文档发现的剩余 fallback/direct-path 术语，主要在已迁移支付 flow 和测试中 | 将直接运行时 fallback 视为重构债；测试/baseline 名称除非真实迁移触及，否则不动。 |
 
@@ -117,7 +117,7 @@
 13. ~~BGA-style pay child / internal children 机制~~ ✅ 已落地：public host action 负责业务 mutation，mandatory payment 通过 internal `pay` child 结算；`beforeHostListeners` / `afterHostCommitListeners` / `afterHostListeners` 保留 BGA pay slot 差异，improvement/occupation 的 onBuy 在 host commit 后、host after 前运行；public action 顺序已修正为 `computeReplace -> before -> strict isDoable -> computeCosts -> execute -> during -> immediatelyAfter -> after`；`activate-card-effect` 通过 internal result map 读取 `paymentInfo`；`architecture-guard` 守住 deleted apply effects，不允许新增 top-level `apply-*` effect 文件来堆叠多卡逻辑。
 14. ~~Fence segment source/type + generic fencing policy~~ ✅ 已落地：`FenceSegment.type` 区分 ordinary fence / B30 palisade，`FenceSegment.source` 区分 own / borrowed；缺省普通 fence 视为 own ordinary source。fencing 主路径不按 `C1` / `B30` / `E149`、`noWoodPalisades`、`midnightFencer` 分支；卡牌通过 `fencePolicy` 表达 allowed segment types、source policy、segment / pasture bounds、cost、cancel、animal preservation；`segmentBounds.total` 表达普通 fence + palisade 的总段数上限。C1 rebuild 只计数/回收/重建 own ordinary fences，走 `consume-fence` ownOnly + generic `fencePolicy`。
 15. ~~Supply token payment / reserve cap~~ ✅ 已落地：`PaymentResourceMap` 支持 `fence` / `stable` supply token；payment solver、typed-flat、pay leaf、Card Definition cost、`PaymentInfo.resourcesPaid` 和 `resource.paid.resources` 都保留这些 token。支付 supply token 只增加 `player.supplyTokensConsumed`，不删除已建组件；fence / stable 可建上限统一由 `getOwnOrdinaryFenceBuildLimit()` / `getOwnOrdinaryFenceReserveCount()` / `getAvailableStableSupplyCount()` 计算，禁止回退到固定 15 / 4。C54 Market Booth、A34 Loppers、B149 Open Air Farmer、E148 Lazybones、A89 Stable Planner、E76 Lumber Pile 等回归已覆盖。
-16. ~~BGA `Utils::formatCost` exact/free/paid unit semantics~~ ✅ 已落地：`ExactCost` 统一表达精确单位成本和 `max`，construct / renovation / stables / plow / occupation 消费 `readExactCost()` / `resolveUnitCostWithDelta()`；卡牌侧静态审计 `shared/cards/__tests__/format-cost-exact-audit.test.ts` 禁止新增 `costOverride`、`freeCost`、inline `actionContext.costs`、legacy `renovation` / `fencing` leaf 或 `-99` 精确成本 hack（保留 `E27_PiggyBank` computeCosts 折扣例外）。
+16. ~~BGA `Utils::formatCost` exact/free/paid unit semantics~~ ✅ 已落地：`ExactCost` 统一表达精确单位成本和 `max`，construct / renovation / stables / plow / occupation 消费 `readExactCost()` / `resolveUnitCostWithDelta()`；卡牌侧静态审计 `shared/cards/__tests__/format-cost-exact-audit.test.ts` 禁止新增 `costOverride`、`freeCost`、legacy `params.cost`、inline `actionContext.costs`、legacy `renovation` / `fencing` leaf 或 `-99` 精确成本 hack（保留 `E27_PiggyBank` computeCosts 折扣例外）。
 
 影响回归覆盖：`B65_GrainDepot` paymentInfo fee index、before-phase cards、renovation、improvement、occupation、construct、stables、fencing、`A34_Loppers` exact-wood、C54/A34 reserve fence payment、B149 stable supply + palisade bounds、stable paid/free log pairing。
 
@@ -213,7 +213,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | effect | `onHarvestFieldPhase` | `A104_WoodHarvester`, `A112_ScytheWorker`, `A118_Treegardener`, `B101_FurnitureCarpenter`, `B39_Loom`, `B50_ButterChurn`, `B72_LoveforAgriculture`, `C98_CubeCutter`, `D38_MilkingStool`, `E107_LandSurveyor`, `E112_GrainThief` |
 | effect | `onReturnHome` | `A29_AleBenches`, `A53_Claypipe`, `A70_LiftingMachine`, `A84_Silage`, `B124_Trimmer`, `B139_ForestScientist`, `B22_WalkingBoots`, `C51_FishingNet`, `C75_Firewood`, `D52_RollingPin` |
 | effect | `onRoundEnd` | `A54_Credit` |
-| effect | `onRoundStart` | `A19_Handplow`, `A76_Cob`, `A81_InterimStorage`, `A89_StablePlanner`, `A90_PlowDriver`, `A96_TaskArtisan`, `B110_Pavior`, `B114_Childless`, `B116_Shoreforester`, `B118_SmallscaleFarmer`, `B135_NutritionExpert`, `B18_GrasslandHarrow`, `B23_FinalScenario`, `B29_CookeryLesson`, `B57_Scullery`, `B69_PottersMarket`, `B81_Handcart`, `B97_Scholar`, `C103_GreenGrocer`, `C123_Freemason`, `C125_Nightworker`, `C159_FishermansFriend`, `C21_HeartofStone`, `C39_StudioBoat`, `D116_TreeInspector`, `D22_WorkPermit`, `D54_TroutPool`, `D69_SmallGreenhouse`, `D91_Plowman`, `D93_SheepInspector`, `E100_MuseumCaretaker`, `E102_Acquirer`, `E111_Recluse`, `E126_TaxCollector`, `E152_BargainHunter`, `E168_AnimalTamersApprentice`, `E88_MasterFencer` |
+| effect | `onRoundStart` | `A19_Handplow`, `A76_Cob`, `A81_InterimStorage`, `A89_StablePlanner`, `A90_PlowDriver`, `A96_TaskArtisan`, `B110_Pavior`, `B114_Childless`, `B116_Shoreforester`, `B118_SmallscaleFarmer`, `B135_NutritionExpert`, `B18_GrasslandHarrow`, `B23_FinalScenario`, `B29_CookeryLesson`, `B57_Scullery`, `B69_PottersMarket`, `B81_Handcart`, `B93_Confidant`, `B97_Scholar`, `C103_GreenGrocer`, `C123_Freemason`, `C125_Nightworker`, `C159_FishermansFriend`, `C21_HeartofStone`, `C39_StudioBoat`, `D116_TreeInspector`, `D22_WorkPermit`, `D54_TroutPool`, `D69_SmallGreenhouse`, `D91_Plowman`, `D93_SheepInspector`, `E100_MuseumCaretaker`, `E102_Acquirer`, `E111_Recluse`, `E126_TaxCollector`, `E152_BargainHunter`, `E168_AnimalTamersApprentice`, `E88_MasterFencer` |
 | effect | `onSowExtraField` | `B72_LoveforAgriculture` |
 | effect | `onStartHarvest` | `C24_BedintheGrainField`, `C62_CookeryExtension`, `D129_LumberVirtuoso`, `D153_WealthyMan`, `D61_BaleofStraw`, `D97_BeggingStudent`, `E110_Dentist`, `E111_Recluse`, `E117_PipeSmoker`, `E147_AnimalDriver`, `E149_MidnightFencer`, `E58_LunchtimeBeer`, `E61_RaisedBed` |
 | effect | `onStartHarvestFeedingPhase` | `C107_Baker`, `E52_Cubbyhole` |
@@ -544,7 +544,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B12_Stockyard` | 已对齐 |  |
 | `B13_CarpentersParlor` | 已对齐 |  |
 | `B14_Hawktower` | 已对齐 |  |
-| `B15_CarpentersBench` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
+| `B15_CarpentersBench` | 已接受差异 | BGA banned，但 OA 按产品策略保留；BGA `formatCost([WOOD => 1])` / `max` / `benchWood` 通过 `reserve-fence-bonus` + nested `fencePolicy` 表达：只建普通 fence、最多 `n+1` 段、恰好 1 个新牧场、1 段免费。 |
 | `B16_MiningHammer` | 已对齐 | onBuy 使用 CardEffect；翻修后仍监听 `after.renovate-house` 并免费建 1 个 stable |
 | `B17_ForestPlow` | 已对齐 |  |
 | `B18_GrasslandHarrow` | 已对齐 |  |
@@ -622,7 +622,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B90_CooperativePlower` | 已对齐 |  |
 | `B91_AssistantTiller` | 已对齐 |  |
 | `B92_LittleStickKnitter` | 已对齐 |  |
-| `B93_Confidant` | 已对齐 |  |
+| `B93_Confidant` | 已对齐 | onBuy 提供 2/3/4 个未来 round 选择；future receive 后可选 `sow` 或 `fence`，其中 BGA `formatCost([WOOD => 1])` 通过 nested `fencePolicy.costPolicy` 显式表达。 |
 | `B94_StockProtector` | 已对齐 |  |
 | `B95_MasterBricklayer` | 已对齐 |  |
 | `B96_TreeFarmJoiner` | 已对齐 |  |
@@ -1166,7 +1166,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `E94_Prophet` | 已对齐 | 即时翻修 / fencing 子行动使用当前 `renovate-house` / `fence` action id。 |
 | `E95_Miller` | 已对齐 |  |
 | `E96_Elder` | 已对齐 |  |
-| `E97_Beneficiary` | 已对齐 | 额外 occupation 用 `params.exactCost: { food: 1 }`；若已出 E89，则内嵌 BGA `formatCost(['max' => 1])` 免费 stable 分支；额外 occupation / minor improvement 使用 BGA `NODE_OR` 语义。 |
+| `E97_Beneficiary` | 已对齐 | 额外 occupation 用 `params.exactCost: { food: 1 }`；若已出 E89，则内嵌 BGA `formatCost(['max' => 1])` 免费 stable 分支；额外 occupation / minor improvement 使用 BGA `NODE_OR` 语义，occupation 作为分支首个节点避免 optional stable 影响 OR gating。 |
 | `E98_Prodigy` | 已对齐 |  |
 | `E99_UncaringParents` | 已对齐 |  |
 | `E100_MuseumCaretaker` | 已对齐 |  |

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ActionFlow, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
+import type { DraftGameEvent } from '../../contract/events'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import { A130_MummysBoy_impl } from '../A/A130_MummysBoy'
 import { A17_ReclamationPlow_impl } from '../A/A17_ReclamationPlow'
@@ -181,6 +182,13 @@ const expectCardStatesUnchanged = (
     cardStates: before,
   })
 }
+
+const fenceBuilt = (): DraftGameEvent<'farm.fenceBuilt'> => ({
+  type: 'farm.fenceBuilt',
+  fences: [{ edge: 'H-0-0', type: 'fence' }],
+  newFenceEdges: ['H-0-0'],
+  newPastures: [{ tiles: [{ row: 0, col: 0 }] }],
+})
 
 describe('listener purity wave 2a', () => {
   it('B21 HayloftBarn grain-gain listener returns state-update leaves before reward flow without mutating cardStates', () => {
@@ -398,7 +406,12 @@ describe('listener purity wave 2a', () => {
         },
       ],
     })
-    const ctx = context(p, { actionId: 'fence' })
+    const actionEvents = [fenceBuilt()]
+    const ctx = context(p, {
+      actionId: 'fence',
+      transactionEvents: actionEvents,
+      actionEvents,
+    })
     const before = snapshot(p)
 
     const result = listenerById(
@@ -420,6 +433,32 @@ describe('listener purity wave 2a', () => {
       },
       { actionId: 'gain', sourceCard: B124, params: { stone: 2 } },
     ])
+  })
+
+  it('B124 Trimmer ignores fence after-hook when no fence was built', () => {
+    const p = player(B124, {
+      cardStates: { [B124]: { extraData: { pastureArea: 1 }, flagged: false } },
+      pastures: [
+        {
+          id: 'p1',
+          size: 3,
+          tiles: [
+            { row: 0, col: 0 },
+            { row: 0, col: 1 },
+            { row: 0, col: 2 },
+          ],
+          stables: 0,
+          animalType: null,
+          animalCount: 0,
+        },
+      ],
+    })
+    const result = listenerById(
+      B124_Trimmer_impl.listeners,
+      'B124-trimmer-after-fencing',
+    ).handler(context(p, { actionId: 'fence', transactionEvents: [], actionEvents: [] }))
+
+    expect(result).toBeUndefined()
   })
 
   it('B132 EstateMaster saturation listener returns saturated leaf without mutating cardStates', () => {
