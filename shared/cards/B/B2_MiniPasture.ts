@@ -13,6 +13,10 @@ export const B2_MiniPasture_impl = {
     actionContext: {
       fencePolicy: {
         segmentBounds: { total: { min: 1, max: 4 } },
+        newPastureBounds: {
+          count: { min: 1, max: 1 },
+          totalSize: { min: 1, max: 1 },
+        },
         costPolicy: { fence: { wood: 0 } },
       },
     },

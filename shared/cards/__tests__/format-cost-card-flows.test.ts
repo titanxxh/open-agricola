@@ -14,9 +14,11 @@ import '../C/C2_Stable'
 import '../C/C89_StableMaster'
 import '../C/C94_StableCleaner'
 import '../C/C149_ResourceRecycler'
+import '../D/D16_WoodenWheyBucket'
 import '../D/D89_Stablehand'
 import '../D/D149_CasualWorker'
 import '../E/E1_PoleBarns'
+import '../E/E2_RenovationMaterials'
 import '../E/E88_MasterFencer'
 import '../E/E89_Stallwright'
 
@@ -343,9 +345,46 @@ describe('formatCost migrated card flows', () => {
     expect(leaf.actionContext).toMatchObject({
       fencePolicy: {
         segmentBounds: { total: { min: 1, max: 4 } },
+        newPastureBounds: {
+          count: { min: 1, max: 1 },
+          totalSize: { min: 1, max: 1 },
+        },
         costPolicy: { fence: { wood: 0 } },
       },
     })
+  })
+
+  it('D16_WoodenWheyBucket emits exactly one stable at the sheep/cattle market costs', () => {
+    const actor = player({ minorPlayed: ['D16_WoodenWheyBucket'] })
+    const gameState = state(actor)
+    const registration = listener('D16-wooden-whey-bucket-before-place-farmer')
+
+    const sheep = executeCardListener(registration, context(gameState, actor, {
+      actionId: 'place-farmer',
+      phase: 'before',
+      space: space('sheep-market'),
+    }))
+    const sheepLeaf = expectLeaf(sheep?.flow, 'stables')
+    expect(sheepLeaf.params).toBeUndefined()
+    expect(sheepLeaf.actionContext).toMatchObject({ max: 1, exactCost: { wood: 1, max: 1 } })
+
+    const cattle = executeCardListener(registration, context(gameState, actor, {
+      actionId: 'place-farmer',
+      phase: 'before',
+      space: space('cattle-market'),
+    }))
+    const cattleLeaf = expectLeaf(cattle?.flow, 'stables')
+    expect(cattleLeaf.params).toBeUndefined()
+    expect(cattleLeaf.actionContext).toMatchObject({ max: 1, exactCost: { max: 1 } })
+  })
+
+  it('E2_RenovationMaterials emits a free clay renovation through exactCost', () => {
+    const actor = player({ houseType: 'wood' })
+    const gameState = state(actor)
+    const flow = getCardEffect('E2_RenovationMaterials')!.onBuy!(gameState, actor)
+    const leaf = expectLeaf(flow, 'renovate-house')
+    expect(leaf.params).toEqual({ selectedOption: 'clay' })
+    expect(leaf.actionContext).toEqual({ exactCost: {} })
   })
 
   it('B149_OpenAirFarmer emits free fence policy directly to fence action after upfront cost', () => {

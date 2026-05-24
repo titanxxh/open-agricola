@@ -162,6 +162,28 @@ describe('formatCost card session regressions', () => {
     expect(fenced.state.players[1]!.minorHand).toContain('B2_MiniPasture')
   })
 
+  it('B2_MiniPasture rejects a two-cell pasture completed with existing fences', () => {
+    const session = setupMinor('B2_MiniPasture')
+    const state = session.getState().state
+    state.players[0]!.resources.food = 2
+    state.players[0]!.resources.wood = 0
+    state.players[0]!.fenceSegments = [
+      { edge: 'H-0-0', type: 'fence' },
+      { edge: 'H-1-0', type: 'fence' },
+    ]
+    session.loadState(state)
+
+    const played = playPassingMinor(session, 'B2_MiniPasture')
+    expect(played.interaction.stateId).toBe('wait')
+    if (played.interaction.stateId !== 'wait') return
+
+    const twoCells = session.resolveChoice(0, 'confirm', {
+      edges: ['H-0-1', 'H-1-1', 'V-0-0', 'V-0-2'],
+      extraWood: 0,
+    })
+    expect(twoCells.ok).toBe(false)
+  })
+
   it('B149_OpenAirFarmer rejects one-cell pasture and accepts two-cell pasture', () => {
     const session = setupOccupation('B149_OpenAirFarmer')
 

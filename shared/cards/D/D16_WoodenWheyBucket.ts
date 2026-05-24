@@ -13,8 +13,7 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id
     if (spaceId !== 'sheep-market' && spaceId !== 'cattle-market') return
-    // Sheep market: pay 1 wood; Cattle market: free
-    const freeCost = spaceId === 'cattle-market'
+    const isCattleMarket = spaceId === 'cattle-market'
     return {
       flow: {
         type: 'seq',
@@ -24,7 +23,9 @@ const listener: CardListenerRegistration = {
             type: 'leaf',
             actionId: 'stables',
             sourceCard: CARD_ID,
-            params: freeCost ? { max: 1, freeCost: true } : { max: 1 },
+            actionContext: isCattleMarket
+              ? { max: 1, exactCost: { max: 1 } }
+              : { max: 1, exactCost: { wood: 1, max: 1 } },
           },
         ],
       },
