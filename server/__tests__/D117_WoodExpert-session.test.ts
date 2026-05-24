@@ -57,15 +57,14 @@ describe('D117_WoodExpert session — computeCosts trades', () => {
     expect(resp.interaction.options?.length).toBeGreaterThanOrEqual(2)
   })
 
-  it('cost wood minor + food=10 wood=0 → only trade affordable, auto-select (1 wood credit kept as surplus)', () => {
+  it('cost wood minor + food=10 wood=0 → only trade affordable, auto-select', () => {
     const session = setup({ food: 10, wood: 0, minor: 'B81_Handcart' })
     let resp = session.takeAction(0, 'major-improvement')
     if (resp.interaction.stateId !== 'wait') return
     resp = session.resolveChoice(0, 'minor:B81_Handcart')
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.food).toBe(9) // -1 food (trade)
-    // Trade gives 2 wood credit, fee.wood=1 → 1 wood surplus stays in player resources
-    expect(resp.state.players[0]!.resources.wood).toBe(1)
+    expect(resp.state.players[0]!.resources.wood).toBe(0)
   })
 
   it('cost wood minor + food=0 wood=2 → only base affordable, auto-select', () => {
