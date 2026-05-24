@@ -77,7 +77,6 @@ export const B93_Confidant_impl = {
   onBuy: (state, player) => {
     return {
       type: 'xor' as const,
-      optional: true,
       children: countChoices(state, player),
     }
   },
