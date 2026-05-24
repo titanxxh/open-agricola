@@ -9,7 +9,7 @@ const computeCostsListener: CardListenerRegistration = {
   id: 'B109-paper-maker-compute-costs-occupation',
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const occupationCount = context.player.occupationPlayed.length
     if (occupationCount <= 0) return

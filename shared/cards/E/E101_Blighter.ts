@@ -11,7 +11,7 @@ const isDoableListener: CardListenerRegistration = {
   id: 'E101-blighter-isdoable-occupation',
   cardIds: [CARD_ID],
   phases: ['isDoable' as ActionHookPhase],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   handler: (_context: CardListenerContext): ActionHookResult | void => {
     return { doable: false }
   },
@@ -21,7 +21,7 @@ const onPlayListener: CardListenerRegistration = {
   id: 'E101-blighter-after-play',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return
     const remainingTurns = Math.max(0, 14 - context.state.round)

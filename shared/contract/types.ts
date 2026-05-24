@@ -173,7 +173,10 @@ export type WorkerRef = {
 }
 
 export type FenceSegmentType = 'fence' | 'palisade'
-export type FenceSegment = { edge: string; type: FenceSegmentType }
+export type FenceSegmentSource =
+  | { kind: 'own'; ownerPlayerId: string }
+  | { kind: 'borrowed'; ownerPlayerId: string }
+export type FenceSegment = { edge: string; type: FenceSegmentType; source?: FenceSegmentSource }
 
 export type PlayerState = {
   id: string
@@ -211,20 +214,6 @@ export type PlayerState = {
    * attributing the `log.actionDetail` entry to the triggering card.
    */
   _activeActionBonusSources?: string[]
-  /**
-   * Session-transient scratchpad written by the `pay` action leaf and
-   * consumed by the immediately-following `apply-improvement` leaf. Holds
-   * `resourcesPaid`, `feeIndex`, and `returnedCardId` for the pending
-   * improvement build so that `activateCard(... 'onBuy', paymentInfo)` keeps
-   * receiving the same `PaymentInfo` it did under the legacy
-   * `playMajorImprovement` / `playMinorImprovement` mutate-in-place flow.
-   * Cleared by `apply-improvement` after read.
-   */
-  _pendingImprovementPaymentInfo?: {
-    resourcesPaid: Partial<Resource>
-    feeIndex?: number
-    returnedCardId?: string
-  }
 }
 
 export type FarmTilePosition = {
@@ -516,8 +505,23 @@ export type ActionChoiceOption = {
  * Writes are shallow: top-level keys are merged, nested objects replace (not deep-merge).
  * Use plain JSON-serializable values; Map/Set/Date are not preserved across snapshot/rehydrate.
  */
+export type InternalActionChild = {
+  actionId: string
+  params?: Record<string, unknown>
+  sourceCard?: string
+  actionContext?: Record<string, unknown>
+  resultKey?: string
+  paymentInfoFrom?: string
+}
+
+export type InternalActionChildren = {
+  beforeHostListeners?: InternalActionChild[]
+  afterHostCommitListeners?: InternalActionChild[]
+  afterHostListeners?: InternalActionChild[]
+}
+
 export type ActionExecutionResult =
-  | { type: 'ok'; resourcesGained?: Partial<Resource>; resourcesPaid?: Partial<Resource>; extraData?: Record<string, unknown> }
+  | { type: 'ok'; resourcesGained?: Partial<Resource>; resourcesPaid?: Partial<Resource>; extraData?: Record<string, unknown>; internalChildren?: InternalActionChildren }
   | { type: 'request'; request: InteractionRequest; promptKey?: PromptKey; promptParams?: Record<string, unknown>; sourceCard?: string; extraData?: Record<string, unknown> }
   | { type: 'fail'; errorKey: string; recoverable?: boolean }
   | { type: 'flow'; flow: ActionFlow; extraData?: Record<string, unknown> }
@@ -580,6 +584,11 @@ export type ActionDefinition = {
     choice: string,
     payload?: Record<string, unknown>,
   ) => ActionExecutionResult
+  completeInternalChildren?: (
+    context: ActionMutationContext,
+    result: Extract<ActionExecutionResult, { type: 'ok' }>,
+    internalResults: Record<string, ActionExecutionResult>,
+  ) => Extract<ActionExecutionResult, { type: 'ok' }>
   /**
    * Opt-out: when true the engine builds a bare ActionNode instead of the
    * default pending-choice wrap that is normally

@@ -4,6 +4,7 @@ import type {
   ActionMutationContext,
   ActionSpace,
   FenceSegment,
+  FenceSegmentType,
   GameState,
   PlayerState,
   Resource,
@@ -15,10 +16,19 @@ import type {
 // call sites exist here yet.
 import {
   canAffordTypedFlatCost,
-  executeResolvedTypedFlatPayment,
   resolveTypedFlatPaymentSelection,
 } from '../payment/internal'
+import { buildInternalPayChild } from '../helpers/pay-child'
 import { playerBoard, normalizePlayerFarm } from '../../domain'
+import type {
+  FenceCostPolicy,
+  FenceSegmentBounds,
+  FenceValidationOptions,
+} from '../../domain/farmyard'
+import {
+  getAvailableOwnOrdinaryFenceCount,
+  MAX_ORDINARY_FENCE_PIECES,
+} from '../../domain/fence-segments'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { collectComputeCostsForFarmChoice } from '../../cards/card-listeners'
 import { playerCanBuildPalisades } from '../../cards/helpers/card-type'
@@ -27,10 +37,93 @@ import {
   readPendingFenceBonus,
 } from '../../cards/helpers/pending-fence-bonus'
 
-export const maxFences = 15
+export const maxFences = MAX_ORDINARY_FENCE_PIECES
 export const maxPastureCells = 15
 export const stableWoodCost = 2
 export const minimumFenceSegments = 4
+
+export type FenceActionPolicy = {
+  allowedSegmentTypes?: FenceSegmentType[]
+  sourcePolicy?: 'ownOnly'
+  segmentBounds?: FenceSegmentBounds
+  costPolicy?: FenceCostPolicy
+  cancelPolicy?: 'allowCancel' | 'forbidCancel'
+  preserveAnimalTotals?: boolean
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const isFenceSegmentType = (value: unknown): value is FenceSegmentType =>
+  value === 'fence' || value === 'palisade'
+
+export function readFenceActionPolicy(
+  actionContext: Record<string, unknown> | undefined,
+): FenceActionPolicy {
+  if (!actionContext) return {}
+  if (!isRecord(actionContext.fencePolicy)) return {}
+  const source = actionContext.fencePolicy
+  const allowedSegmentTypes = Array.isArray(source.allowedSegmentTypes)
+    ? source.allowedSegmentTypes.filter(isFenceSegmentType)
+    : undefined
+  return {
+    allowedSegmentTypes:
+      allowedSegmentTypes && allowedSegmentTypes.length > 0
+        ? allowedSegmentTypes
+        : undefined,
+    sourcePolicy:
+      source.sourcePolicy === 'ownOnly' ? 'ownOnly' : undefined,
+    segmentBounds: isRecord(source.segmentBounds)
+      ? (source.segmentBounds as FenceSegmentBounds)
+      : undefined,
+    costPolicy: isRecord(source.costPolicy)
+      ? (source.costPolicy as FenceCostPolicy)
+      : undefined,
+    cancelPolicy:
+      source.cancelPolicy === 'allowCancel' ||
+      source.cancelPolicy === 'forbidCancel'
+        ? source.cancelPolicy
+        : undefined,
+    preserveAnimalTotals:
+      typeof source.preserveAnimalTotals === 'boolean'
+        ? source.preserveAnimalTotals
+        : undefined,
+  }
+}
+
+const hasFenceActionPolicy = (policy: FenceActionPolicy): boolean =>
+  policy.allowedSegmentTypes !== undefined ||
+  policy.sourcePolicy !== undefined ||
+  policy.segmentBounds !== undefined ||
+  policy.costPolicy !== undefined ||
+  policy.cancelPolicy !== undefined ||
+  policy.preserveAnimalTotals !== undefined
+
+const hasCanStartPolicy = (policy: FenceActionPolicy): boolean =>
+  policy.sourcePolicy !== undefined ||
+  policy.segmentBounds !== undefined ||
+  policy.costPolicy !== undefined
+
+const fenceValidationOptions = (
+  allowPalisades: boolean,
+  policy: FenceActionPolicy,
+): FenceValidationOptions => ({
+  skipPayment: true,
+  allowPalisades,
+  allowedSegmentTypes: policy.allowedSegmentTypes,
+  sourcePolicy: policy.sourcePolicy,
+  segmentBounds: policy.segmentBounds,
+  costPolicy: policy.costPolicy,
+  preserveAnimalTotals: policy.preserveAnimalTotals,
+})
+
+const fenceFail = (
+  errorKey: string,
+  policy?: FenceActionPolicy,
+): ActionExecutionResult =>
+  policy && hasFenceActionPolicy(policy)
+    ? { type: 'fail', errorKey, recoverable: true }
+    : { type: 'fail', errorKey }
 
 export const getFenceCount = <T extends { fenceSegments: FenceSegment[] }>(
   p: T,
@@ -47,7 +140,24 @@ export const canStartFencing = (
   _state: GameState,
   player: PlayerState,
   costOverride?: Partial<Resource>,
+  actionContext?: Record<string, unknown>,
 ) => {
+  const policy = readFenceActionPolicy(actionContext)
+  if (hasCanStartPolicy(policy)) {
+    const minFenceCount = policy.segmentBounds?.fence?.min ?? minimumFenceSegments
+    const availableOwnOrdinary =
+      policy.sourcePolicy === 'ownOnly'
+        ? getAvailableOwnOrdinaryFenceCount(player)
+        : maxFences - getFenceCount(player)
+    if (availableOwnOrdinary < minFenceCount) return false
+    const fenceWoodCost = policy.costPolicy?.fence?.wood ?? 1
+    if (fenceWoodCost === 0) return true
+    return canAffordTypedFlatCost(
+      player,
+      { wood: minFenceCount * fenceWoodCost },
+      'fencing',
+    )
+  }
   if (getFenceCount(player) + minimumFenceSegments > maxFences) return false
   if (getTotalPastureCells(player) >= maxPastureCells) return false
   const pendingFreeFences = readPendingFenceBonus(player)?.freeFences ?? 0
@@ -108,6 +218,7 @@ const finalizeFence = (
   palisadeEdges: string[],
   extraWood: number,
   paymentChoice: string | undefined,
+  policy: FenceActionPolicy,
 ): ActionExecutionResult => {
   const lockedKeys = collectLockedFarmTileKeys(ctx.player)
   const normalized = normalizePlayerFarm(ctx.player)
@@ -131,14 +242,11 @@ const finalizeFence = (
     palisadeEdges,
     extraWood,
     freeFences,
-    options: {
-      skipPayment: true,
-      allowPalisades: playerCanBuildPalisades(normalized),
-    },
+    options: fenceValidationOptions(playerCanBuildPalisades(normalized), policy),
     lockedKeys,
   })
   if (!validated.ok) {
-    return { type: 'fail', errorKey: validated.error?.code ?? 'log.fencingFail' }
+    return fenceFail(validated.error?.code ?? 'log.fencingFail', policy)
   }
   const payment = resolveTypedFlatPaymentSelection(
     validated.player as unknown as PlayerState,
@@ -152,34 +260,22 @@ const finalizeFence = (
     return { type: 'fail', errorKey: 'log.fencingFail' }
   }
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
-  executeResolvedTypedFlatPayment(nextPlayer, payment, 'fencing')
   const consumed = consumePendingFenceBonus(nextPlayer, validated.newFenceEdges.length)
   applyPlayerMutation(ctx.player, nextPlayer)
   const paidResources = positiveResources(payment.solution.resourcesPaid)
-  if (Object.keys(paidResources).length > 0) {
-    ctx.eventSink?.emit<'resource.paid'>({
-      type: 'resource.paid',
-      resources: paidResources,
-      paymentFor: 'fencing',
-      paymentSources: [{
-        from: { kind: 'player', playerId: ctx.player.id },
-        resources: paidResources,
-      }],
-    })
-  }
   const builtFences = [
     ...validated.newFenceEdges.map((edge) => ({ edge, type: 'fence' })),
     ...validated.newPalisadeEdges.map((edge) => ({ edge, type: 'palisade' })),
   ]
-	  if (builtFences.length > 0) {
-	    ctx.eventSink?.emit<'farm.fenceBuilt'>({
-	      type: 'farm.fenceBuilt',
-	      fences: builtFences,
-	      newFenceEdges: validated.newFenceEdges,
-	      newPastures: validated.newPastures,
-	    })
-	  }
-	  const extraData: Record<string, unknown> = {
+  if (builtFences.length > 0) {
+    ctx.eventSink?.emit<'farm.fenceBuilt'>({
+      type: 'farm.fenceBuilt',
+      fences: builtFences,
+      newFenceEdges: validated.newFenceEdges,
+      newPastures: validated.newPastures,
+    })
+  }
+  const extraData: Record<string, unknown> = {
     newFenceEdges: validated.newFenceEdges,
     newPalisadeEdges: validated.newPalisadeEdges,
     newPastures: validated.newPastures,
@@ -199,6 +295,18 @@ const finalizeFence = (
     type: 'ok',
     resourcesPaid: paidResources,
     extraData,
+    internalChildren: {
+      beforeHostListeners: [
+        buildInternalPayChild({
+          cost: { fee: { wood: validated.payableWoodCost } },
+          costType: 'fencing',
+          optionPrefix: 'pay:fence',
+          paymentChoice,
+          sourceCard: ctx.sourceCard,
+          sourceActionId: ctx.space.id,
+        }),
+      ],
+    },
   }
 }
 
@@ -208,15 +316,24 @@ export const fenceAction: ActionDefinition = {
   descriptionKey: 'actions.fencing.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (state, player) => canStartFencing(state, player),
+  canBeExecutedByPlayer: (state, player, context) =>
+    canStartFencing(state, player, undefined, context?.actionContext),
   costPreview: {
     getBaseCost: () => ({ wood: minimumFenceSegments }),
     canExecute: (ctx, costOverride) =>
-      canStartFencing(ctx.state, ctx.player, costOverride),
+      canStartFencing(
+        ctx.state,
+        ctx.player,
+        costOverride,
+        (ctx as { actionContext?: Record<string, unknown> }).actionContext,
+      ),
   },
-  execute: ({ state, player, space }): ActionExecutionResult => {
+  execute: ({ state, player, space, actionContext }): ActionExecutionResult => {
     const idx = state.players.indexOf(player)
-    const farm = playerBoard(state, idx).farmyard.selectableTiles('fence', { spaceId: space.id })
+    const farm = playerBoard(state, idx).farmyard.selectableTiles('fence', {
+      spaceId: space.id,
+      actionContext,
+    })
     return {
       type: 'request',
       request: {
@@ -231,7 +348,20 @@ export const fenceAction: ActionDefinition = {
     }
   },
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
-    if (choice === 'cancel') return { type: 'ok' }
+    const policy = readFenceActionPolicy(ctx.actionContext)
+    if (choice === 'cancel') {
+      if (
+        policy.cancelPolicy === 'forbidCancel' ||
+        (policy.segmentBounds?.fence?.min ?? 0) > 0
+      ) {
+        return {
+          type: 'fail',
+          errorKey: 'log.fencingFail',
+          recoverable: true,
+        }
+      }
+      return { type: 'ok' }
+    }
 
     // Second call: payment combo selected after multi-combo prompt.
     if (choice.startsWith('pay:fence:')) {
@@ -244,7 +374,7 @@ export const fenceAction: ActionDefinition = {
         ? farmPayload.palisadeEdges
         : []
       const extraWood = farmPayload.extraWood ?? 0
-      return finalizeFence(ctx, edges, palisadeEdges, extraWood, choice)
+      return finalizeFence(ctx, edges, palisadeEdges, extraWood, choice, policy)
     }
 
     // First call: client submitted fence geometry alongside `confirm`.
@@ -276,14 +406,11 @@ export const fenceAction: ActionDefinition = {
         palisadeEdges,
         extraWood,
         freeFences,
-        options: {
-          skipPayment: true,
-          allowPalisades: playerCanBuildPalisades(normalized),
-        },
+        options: fenceValidationOptions(playerCanBuildPalisades(normalized), policy),
         lockedKeys,
       })
       if (!validated.ok) {
-        return { type: 'fail', errorKey: validated.error?.code ?? 'log.fencingFail' }
+        return fenceFail(validated.error?.code ?? 'log.fencingFail', policy)
       }
       const payment = resolveTypedFlatPaymentSelection(
         validated.player as unknown as PlayerState,
@@ -309,7 +436,7 @@ export const fenceAction: ActionDefinition = {
       if (payment.type === 'fail') {
         return { type: 'fail', errorKey: 'log.fencingFail' }
       }
-      return finalizeFence(ctx, edges, palisadeEdges, extraWood, undefined)
+      return finalizeFence(ctx, edges, palisadeEdges, extraWood, undefined, policy)
     }
 
     return { type: 'fail', errorKey: 'log.fencingFail' }

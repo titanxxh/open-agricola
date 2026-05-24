@@ -72,6 +72,20 @@ describe('improvement logging', () => {
     expect(player.resources.clay).toBe(2)
   })
 
+  it('does not duplicate an already-played minor improvement', () => {
+    const state = createState()
+    const player = createPlayer()
+    player.resources.clay = 1
+    player.minorHand = ['A53_Claypipe']
+    player.minorPlayed = ['A53_Claypipe']
+
+    const result = playImprovement(state, player, 'minor:A53_Claypipe', 'any')
+
+    expect(result.type).toBe('ok')
+    expect(player.minorPlayed).toEqual(['A53_Claypipe'])
+  })
+
+
   it('plays major improvement', () => {
     const state = createState()
     const player = createPlayer()

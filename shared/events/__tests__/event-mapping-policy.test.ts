@@ -326,14 +326,14 @@ describe('event mapping policy', () => {
     }
   })
 
-  it('card.passed is emitted only by apply-improvement passing branch', () => {
+  it('card.passed is emitted only by improvement migration branches', () => {
     const allowedFiles = [
       'shared/contract/events.ts',
       'shared/events/guards.ts',
       'shared/events/event-mapping-policy.ts',
       'shared/events/log-mapper.ts',
       'shared/events/__tests__/log-mapper.test.ts',
-      'shared/actions/effects/apply-improvement.ts',
+      'shared/actions/effects/improvement.ts',
       'server/__tests__/passing-mechanism-session.test.ts',
       'server/__tests__/passing-mechanism-onbuy.test.ts',
       'client/components/effects/PublicEventCardPassAnimation.tsx',

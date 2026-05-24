@@ -23,7 +23,7 @@ describe('E96_Elder session', () => {
       expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
       const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children as Extract<ActionFlow, { type: 'leaf' }>[]
       expect(children).toHaveLength(1)
-      expect(children[0].actionId).toBe('play-occupation')
+      expect(children[0].actionId).toBe('occupation')
       expect(children[0].sourceCard).toBe(CARD_ID)
       expect(children[0].params?.costOverride).toEqual({})
       expect(children[0].params?.allowedCards).toEqual([CARD_ID])

@@ -71,7 +71,7 @@ describe('A28_ForestSchool session', () => {
   it('surfaces a payment choice for the wood→food trade and honours it', () => {
     const session = setup(true)
 
-    // D152_Patron triggers `before` on play-occupation and grants +2 food.
+    // D152_Patron triggers `before` on occupation and grants +2 food.
     // After that hook the player holds {food: 2, wood: 1} and the lessons
     // cost (1 food) is payable two distinct ways: directly via 1 food, or
     // via A28 ForestSchool's wood→food trade (1 wood, 0 food). The pay

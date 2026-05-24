@@ -38,7 +38,7 @@ const onPlayListener: CardListenerRegistration = {
   id: 'B103-field-merchant-after-play',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return
     return { flow: gainLeaf(CARD_ID, { wood: 1, reed: 1 }), sourceCard: CARD_ID }

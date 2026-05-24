@@ -14,13 +14,13 @@ const CARD_ID = E165_MasterHuntsman.id
  *      isListeningTo → isActionEvent(Improvement) && cardId has type MAJOR.
  *      onPlayerAfterImprovement → gain 1 pig.
  *
- * Occupation onBuy flows must use a play-occupation listener (engine does not
+ * Occupation onBuy flows must use a occupation listener (engine does not
  * process onBuy flows for occupations).
  */
 const onBuyListener: CardListenerRegistration = {
   id: 'E165-master-huntsman-onbuy',
   cardIds: [CARD_ID],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return

@@ -15,7 +15,7 @@ const CARD_ID = C28_TeachersDesk.id
  * onPlayerPlaceFarmer → OCCUPATION action with cost [FOOD => 1].
  *
  * In open-agricola: before place-farmer on major-improvement or
- * house-redevelopment, offer optional play-occupation with costOverride
+ * house-redevelopment, offer optional occupation with costOverride
  * (food: 1). Same pattern as D28 Writing Desk (which uses 'lessons').
  * Requires at least 1 occupation in hand.
  */
@@ -34,7 +34,7 @@ const listener: CardListenerRegistration = {
     return {
       flow: {
         type: 'leaf',
-        actionId: 'play-occupation',
+        actionId: 'occupation',
         optional: true,
         sourceCard: CARD_ID,
         params: { costOverride: { food: 1 } },

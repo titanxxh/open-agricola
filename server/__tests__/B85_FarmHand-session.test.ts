@@ -68,7 +68,7 @@ describe('B85_FarmHand — anytime guard', () => {
 
   it('refuses outside `stables` (e.g. in farm-expansion top level, forest, etc.)', () => {
     const player = setupPlayer()
-    for (const spaceId of ['forest', 'farm-expansion', 'construct', 'play-occupation']) {
+    for (const spaceId of ['forest', 'farm-expansion', 'construct', 'occupation']) {
       const ctx = buildContext(player, { id: spaceId })
       const result = executeCardListener(getListener(LISTENER_ID), ctx)
       expect(result).toBeUndefined()

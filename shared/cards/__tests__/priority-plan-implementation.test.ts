@@ -236,8 +236,8 @@ describe('priority plan implementations', () => {
     const result = executeCardListener(listener!, {
       state: createState(player),
       player,
-      space: createSpace('play-occupation'),
-      actionId: 'play-occupation',
+      space: createSpace('occupation'),
+      actionId: 'occupation',
       phase: 'after',
       choice: 'B103_FieldMerchant',
     } as unknown as CardListenerContext)
@@ -257,8 +257,8 @@ describe('priority plan implementations', () => {
     const result = executeCardListener(listener!, {
       state: createState(player),
       player,
-      space: createSpace('play-occupation'),
-      actionId: 'play-occupation',
+      space: createSpace('occupation'),
+      actionId: 'occupation',
       phase: 'isDoable',
       doable: true,
     } as unknown as CardListenerContext)
@@ -276,8 +276,8 @@ describe('priority plan implementations', () => {
     const result = executeCardListener(listener!, {
       state,
       player,
-      space: createSpace('play-occupation'),
-      actionId: 'play-occupation',
+      space: createSpace('occupation'),
+      actionId: 'occupation',
       phase: 'after',
       choice: 'E101_Blighter',
     } as unknown as CardListenerContext)
@@ -454,8 +454,8 @@ describe('priority plan implementations', () => {
     const result = executeCardListener(listener!, {
       state: createState(player),
       player,
-      space: createSpace('play-occupation'),
-      actionId: 'play-occupation',
+      space: createSpace('occupation'),
+      actionId: 'occupation',
       phase: 'after',
       choice: 'C120_AgriculturalLabourer',
     } as unknown as CardListenerContext)

@@ -10,7 +10,7 @@ const listener: CardListenerRegistration = {
   id: 'C68-bookcase-after-occupation',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   handler: (_context: CardListenerContext): ActionHookResult | void => {
     return { flow: gainLeaf(CARD_ID, { vegetable: 1 }), sourceCard: CARD_ID }
   },

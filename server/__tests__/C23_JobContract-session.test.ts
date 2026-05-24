@@ -119,7 +119,7 @@ describe('C23_JobContract listener', () => {
     expect(lessonsSpace.takenBy.some((t) => t.playerId === player.id)).toBe(true)
   })
 
-  it('offers optional play-occupation flow and marks lessons as taken', () => {
+  it('offers optional occupation flow and marks lessons as taken', () => {
     const listener = findListener()!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
@@ -137,7 +137,7 @@ describe('C23_JobContract listener', () => {
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
-    expect(flow.children[0].actionId).toBe('play-occupation')
+    expect(flow.children[0].actionId).toBe('occupation')
     expect(flow.children[0].sourceCard).toBe(CARD_ID)
     // Lessons space is marked as occupied by this player (fake farmer)
     expect(lessonsSpace.takenBy.some((t) => t.playerId === player.id)).toBe(true)

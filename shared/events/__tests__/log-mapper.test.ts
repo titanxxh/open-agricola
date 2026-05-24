@@ -165,6 +165,141 @@ describe('eventsToLogEntries', () => {
     ])
   })
 
+  it('pairs repeated stable builds with their nearest following payment', () => {
+    const base = {
+      schemaVersion: 1,
+      round: 1,
+      phase: 'work',
+      visibility: 'public',
+      actorPlayerId: 'p1',
+      sourceActionId: 'farm-expansion',
+    } as const
+    const events = [
+      {
+        ...base,
+        id: '1',
+        seq: 1,
+        type: 'farm.stableBuilt',
+        stables: [{ playerId: 'p1', row: 0, col: 0 }],
+      },
+      {
+        ...base,
+        id: '2',
+        seq: 2,
+        type: 'resource.paid',
+        resources: { wood: 2 },
+        paymentFor: 'stables',
+      },
+      {
+        ...base,
+        id: '3',
+        seq: 3,
+        type: 'farm.stableBuilt',
+        stables: [{ playerId: 'p1', row: 0, col: 1 }],
+      },
+      {
+        ...base,
+        id: '4',
+        seq: 4,
+        type: 'resource.paid',
+        resources: { clay: 2 },
+        paymentFor: 'stables',
+      },
+    ] satisfies GameEvent[]
+
+    expect(eventsToLogEntries(events, {
+      playerNames: { p1: 'Alice' },
+      actionNames: { 'farm-expansion': 'Farm Expansion' },
+    })).toEqual([
+      {
+        key: 'log.actionDetail',
+        params: {
+          player: 'Alice',
+          action: 'Farm Expansion',
+          detailParts: {
+            costs: { clay: 2 },
+            effects: { buildStables: 1 },
+          },
+        },
+      },
+      {
+        key: 'log.actionDetail',
+        params: {
+          player: 'Alice',
+          action: 'Farm Expansion',
+          detailParts: {
+            costs: { wood: 2 },
+            effects: { buildStables: 1 },
+          },
+        },
+      },
+    ])
+  })
+
+  it('does not reuse a previous paid stable payment for a later free stable build', () => {
+    const base = {
+      schemaVersion: 1,
+      round: 1,
+      phase: 'work',
+      visibility: 'public',
+      actorPlayerId: 'p1',
+      sourceActionId: 'farm-expansion',
+    } as const
+    const events = [
+      {
+        ...base,
+        id: '1',
+        seq: 1,
+        type: 'farm.stableBuilt',
+        stables: [{ playerId: 'p1', row: 0, col: 0 }],
+      },
+      {
+        ...base,
+        id: '2',
+        seq: 2,
+        type: 'resource.paid',
+        resources: { wood: 2 },
+        paymentFor: 'stables',
+      },
+      {
+        ...base,
+        id: '3',
+        seq: 3,
+        type: 'farm.stableBuilt',
+        stables: [{ playerId: 'p1', row: 0, col: 1 }],
+        sourceCardId: 'A89_StablePlanner',
+      },
+    ] satisfies GameEvent[]
+
+    expect(eventsToLogEntries(events, {
+      playerNames: { p1: 'Alice' },
+      actionNames: { 'farm-expansion': 'Farm Expansion' },
+    })).toEqual([
+      {
+        key: 'log.actionDetail',
+        params: {
+          player: 'Alice',
+          action: 'Farm Expansion',
+          detailParts: {
+            costs: {},
+            effects: { buildStables: 1 },
+          },
+        },
+      },
+      {
+        key: 'log.actionDetail',
+        params: {
+          player: 'Alice',
+          action: 'Farm Expansion',
+          detailParts: {
+            costs: { wood: 2 },
+            effects: { buildStables: 1 },
+          },
+        },
+      },
+    ])
+  })
+
   it('maps action exclusive-use lifecycle events', () => {
     const events = [
       {

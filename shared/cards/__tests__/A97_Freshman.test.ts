@@ -100,7 +100,7 @@ describe('A97_Freshman', () => {
         { type: 'leaf', actionId: 'special-effect', sourceCard: 'A97_Freshman', params: { kind: 'set-flag', flag: true } },
         {
           type: 'leaf',
-          actionId: 'play-occupation',
+          actionId: 'occupation',
           sourceCard: 'A97_Freshman',
           params: { costOverride: {} },
         },
@@ -135,7 +135,7 @@ describe('A97_Freshman', () => {
     })
   })
 
-  it('lets play-occupation ignore normal lessons cost when Freshman provides free play', () => {
+  it('lets occupation ignore normal lessons cost when Freshman provides free play', () => {
     const player = createPlayer()
     player.occupationPlayed.push('A55_JunkRoom')
     player.occupationHand = ['A123_FrameBuilder']
@@ -162,22 +162,30 @@ describe('A97_Freshman', () => {
       'A123_FrameBuilder',
     )
 
-    // 7b1: play-occupation now returns seq:[pay, apply-occupation-play]; the
-    // engine drives the actual mutate, so the resolveChoice unit-level call
-    // returns a flow rather than mutating eagerly. The session-level test
-    // (A97_Freshman session) verifies the end-to-end path.
-    expect(resolved.type).toBe('flow')
-    if (resolved.type !== 'flow') return
-    const flow = resolved.flow as {
-      type: 'seq'
-      children: Array<{
-        type: 'leaf'
-        actionId: string
-        params: Record<string, unknown>
-      }>
-    }
-    expect(flow.type).toBe('seq')
-    expect(flow.children.map((c) => c.actionId)).toEqual(['pay', 'apply-occupation-play'])
-    expect(flow.children[1]!.params).toEqual({ occupationId: 'A123_FrameBuilder' })
+    expect(resolved.type).toBe('ok')
+    if (resolved.type !== 'ok') return
+    expect(resolved.internalChildren?.beforeHostListeners).toMatchObject([
+      {
+        actionId: 'pay',
+        sourceCard: 'A123_FrameBuilder',
+        params: {
+          cost: { fee: {} },
+          costType: 'occupation',
+          optionPrefix: 'pay:occupation:A123_FrameBuilder',
+        },
+        resultKey: 'payment',
+      },
+    ])
+    expect(resolved.internalChildren?.afterHostCommitListeners).toMatchObject([
+      {
+        actionId: 'activate-card-effect',
+        sourceCard: 'A123_FrameBuilder',
+        params: { cardId: 'A123_FrameBuilder', hook: 'onBuy' },
+        paymentInfoFrom: 'payment',
+      },
+    ])
+    expect(resolved.internalChildren?.beforeHostListeners.map((child) => child.actionId)).not.toContainEqual(
+      expect.stringMatching(/^apply-/),
+    )
   })
 })

@@ -10,7 +10,7 @@ const listener: CardListenerRegistration = {
   id: 'E157-usufructuary-after-occupation',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.player.occupationPlayed.length !== 1) return
     // Count occupations played by all other players

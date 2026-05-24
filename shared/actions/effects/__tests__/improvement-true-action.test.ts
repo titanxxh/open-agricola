@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { improvementAction } from '../improvement'
 import type {
   ActionExecutionContext,
-  ActionFlow,
   ActionSpace,
   GameState,
   PlayerState,
@@ -83,53 +82,61 @@ const resolve = (
 }
 
 describe('improvement trueAction context', () => {
-  it('propagates params.trueAction=false to the generated payment and apply leaves', () => {
+  it('propagates params.trueAction=false to the generated payment and activation leaves', () => {
     const result = resolve({
       allowedPurchases: ['Major_ClayOven'],
       trueAction: false,
     })
 
-    expect(result.type).toBe('flow')
-    const flow = (result as { type: 'flow'; flow: ActionFlow }).flow
-    expect(flow).toMatchObject({
-      type: 'seq',
-      children: [
-        {
-          actionId: 'pay',
-          actionContext: {
-            costType: 'major-improvement',
-            improvementKind: 'major',
-            trueAction: false,
-          },
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.internalChildren?.beforeHostListeners).toMatchObject([
+      {
+        actionId: 'pay',
+        actionContext: {
+          costType: 'major-improvement',
+          improvementKind: 'major',
+          trueAction: false,
         },
-        {
-          actionId: 'apply-improvement',
-          params: { improvementId: 'Major_ClayOven', kind: 'major' },
-          actionContext: { trueAction: false },
-        },
-      ],
-    })
+        resultKey: 'payment',
+      },
+    ])
+    expect(result.internalChildren?.afterHostCommitListeners).toMatchObject([
+      {
+        actionId: 'activate-card-effect',
+        params: { cardId: 'Major_ClayOven', hook: 'onBuy' },
+        actionContext: { trueAction: false },
+        paymentInfoFrom: 'payment',
+      },
+    ])
+    expect(result.internalChildren?.beforeHostListeners.map((child) => child.actionId)).not.toContainEqual(
+      expect.stringMatching(/^apply-/),
+    )
   })
 
-  it('propagates actionContext.trueAction=false to the generated payment and apply leaves', () => {
+  it('propagates actionContext.trueAction=false to the generated payment and activation leaves', () => {
     const result = resolve({ allowedPurchases: ['Major_ClayOven'] }, { trueAction: false })
 
-    expect(result.type).toBe('flow')
-    const flow = (result as { type: 'flow'; flow: ActionFlow }).flow
-    expect(flow).toMatchObject({
-      type: 'seq',
-      children: [
-        {
-          actionId: 'pay',
-          actionContext: {
-            trueAction: false,
-          },
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.internalChildren?.beforeHostListeners).toMatchObject([
+      {
+        actionId: 'pay',
+        actionContext: {
+          trueAction: false,
         },
-        {
-          actionId: 'apply-improvement',
-          actionContext: { trueAction: false },
-        },
-      ],
-    })
+        resultKey: 'payment',
+      },
+    ])
+    expect(result.internalChildren?.afterHostCommitListeners).toMatchObject([
+      {
+        actionId: 'activate-card-effect',
+        actionContext: { trueAction: false },
+        paymentInfoFrom: 'payment',
+      },
+    ])
+    expect(result.internalChildren?.beforeHostListeners.map((child) => child.actionId)).not.toContainEqual(
+      expect.stringMatching(/^apply-/),
+    )
   })
 })

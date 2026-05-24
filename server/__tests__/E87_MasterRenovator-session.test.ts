@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { computeAllBuyableCombinations } from '../../shared/actions/payment/internal'
+import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/E/E87_MasterRenovator'
 
 const CARD_ID = 'E87_MasterRenovator'
@@ -25,6 +26,7 @@ describe('E87_MasterRenovator session — chooseOne renovation discount', () => 
       reed: 1,
       food: 0,
     }
+    setWorkersAtHome(state, player, 2)
     session.loadState(state)
     return { session, state, player }
   }
@@ -104,6 +106,26 @@ describe('E87_MasterRenovator session — chooseOne renovation discount', () => 
     runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
     const e87Mods = player.activeModifiers.filter((m) => m.cardId === CARD_ID)
     expect(e87Mods.length).toBe(1)
+  })
+
+  it('renovation target choice waits for payment before mutating', () => {
+    const { session, state, player } = setup(7)
+    runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'house-redevelopment')
+    expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionChooseRenovationTarget') {
+      resp = session.resolveChoice(0, 'clay')
+    }
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
+    expect(resp.state.players[0]!.houseType).toBe('wood')
+    expect(resp.state.players[0]!.resources.clay).toBe(2)
+    expect(resp.state.players[0]!.resources.reed).toBe(1)
+    expect(resp.state.players[0]!.activeModifiers.some((m) => m.cardId === CARD_ID)).toBe(true)
   })
 
   it('onAfterRoundEnd cleans up the BonusModifier as a safety net', () => {

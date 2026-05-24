@@ -518,6 +518,7 @@ export const en = {
     'scythe-harvest-field': { name: 'Scythe Harvest', description: 'Harvest the entire top stack of one field at once' },
     'swap-field-grain-to-veg': { name: 'Swap Field Crop', description: 'Trade a fully sown grain field for 1 vegetable' },
     'special-effect': { name: 'Card Effect', description: 'Trigger a card-specific state mutation' },
+    'activate-card-effect': { name: 'Activate Card Effect', description: 'Run an internal card effect hook' },
     'recall-placed-worker': { name: 'Recall Placed Worker', description: 'Return one of your placed workers back home' },
     'discard-from-hand': { name: 'Discard From Hand', description: 'Discard 1 card from your hand' },
     'reserve-fence-bonus': { name: 'Reserve Fence Bonus', description: 'Reserve free fences from the source card for the current fence action' },
@@ -529,16 +530,6 @@ export const en = {
     'emit-choice': { name: 'Emit Choice', description: 'Card-driven player choice' },
     selection: { name: 'Selection', description: 'Select positions or cards from hand' },
     'set-first-player': { name: 'Set First Player', description: 'Mark this player as the new starting player' },
-      'apply-improvement': {
-      description: 'Play 1 improvement',
-          name: 'Play Improvement',
-},
-    'apply-occupation-play': {
-      description: 'Play 1 occupation',
-    },
-    'apply-renovation': {
-      description: 'Renovate',
-    },
     'build-farmhand-room': {
       description: 'Build Farm Hand Room',
           name: 'Build Farm Hand Room',
@@ -1299,6 +1290,7 @@ export const en = {
   fence: {
     error: {
       EDGE_TYPE_CONFLICT: 'Cannot select fence and palisade on the same segment',
+      SEGMENT_TYPE_NOT_ALLOWED: 'This fence type is not allowed for this action',
       PALISADES_NOT_UNLOCKED: 'Wood Palisades card not played',
     },
   },

@@ -1,5 +1,7 @@
 import type {
   ActionDefinition,
+  FenceSegment,
+  FenceSegmentType,
   GameState,
   PlayerState,
   Resource,
@@ -26,6 +28,7 @@ import { findFirstNewborn } from '../../domain/player'
 import { removeWorkerRef } from '../../domain/space'
 import { getNextEmptyTileForPlayer } from '../../domain/farm'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
+import { isOwnOrdinaryFenceSegment } from '../../domain/fence-segments'
 
 export type PlantAdditionalGoodLocation =
   | { kind: 'field'; row: number; col: number }
@@ -56,7 +59,12 @@ export type SpecialEffectParams =
       minRemaining?: number
       positions: Array<{ row: number; col: number }>
     }
-  | { kind: 'consume-fence'; count?: number }
+  | {
+      kind: 'consume-fence'
+      count?: number
+      segmentType?: FenceSegmentType
+      sourcePolicy?: 'ownOnly'
+    }
   | { kind: 'add-resource-to-space'; spaceId: string; resource: keyof Resource; amount: number }
   | { kind: 'add-resource-to-space'; target: ResourceAccumulationTarget; resource: keyof Resource; amount: number }
   | { kind: 'build-stable-on-first-empty-tile' }
@@ -380,20 +388,30 @@ export const specialEffectAction: ActionDefinition = {
       }
       case 'consume-fence': {
         const count = p.count ?? 1
-        let removed = 0
-        for (let i = target.fenceSegments.length - 1; i >= 0 && removed < count; i -= 1) {
-          if (target.fenceSegments[i]!.type === 'fence') {
-            target.fenceSegments.splice(i, 1)
-            removed += 1
+        const segmentType = p.segmentType ?? 'fence'
+        const sourcePolicy = p.sourcePolicy
+        const matches = (segment: FenceSegment) => {
+          if (segment.type !== segmentType) return false
+          if (sourcePolicy === 'ownOnly') return isOwnOrdinaryFenceSegment(segment, target.id)
+          return true
+        }
+        const matchingIndexes: number[] = []
+        for (let i = target.fenceSegments.length - 1; i >= 0; i -= 1) {
+          if (matches(target.fenceSegments[i]!)) {
+            matchingIndexes.push(i)
           }
         }
-        if (removed < count) {
+        if (matchingIndexes.length < count) {
           return { type: 'fail', errorKey: 'log.specialEffectFail' }
+        }
+        const indexesToRemove = matchingIndexes.slice(0, count)
+        for (const index of indexesToRemove) {
+          target.fenceSegments.splice(index, 1)
         }
         eventSink?.emit<'farm.fenceConsumed'>({
           type: 'farm.fenceConsumed',
           sourceCardId: sourceCard,
-          count: removed,
+          count: indexesToRemove.length,
           reason: 'cardEffect',
         })
         return { type: 'ok' }

@@ -17,7 +17,7 @@ export const D97_BeggingStudent_impl = {
       children: [
         {
           type: 'leaf',
-          actionId: 'play-occupation',
+          actionId: 'occupation',
           sourceCard: CARD_ID,
           params: { costOverride: {} },
         },

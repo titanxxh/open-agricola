@@ -460,8 +460,8 @@ shared/actions/
 ├── hooks.ts               Hook 注册 + 调度
 ├── hook-matrix.ts         buildHookMatrix() 优化矩阵
 ├── internal-actions.ts    引擎内部辅助 action（mark-card-trigger 等）
-├── effects/               74 个 base action 实现（一文件一 action）
-│   └── internal/          14 个内部 effect
+├── effects/               base action 实现（一文件一 action）
+│   └── internal/          内部 effect
 ├── factories/             行动工厂
 ├── helpers/               支付、动物、农场等共享 helper
 ├── payment/               PaymentSolver 与执行器
@@ -497,7 +497,7 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 
 ### 7.3 effects/ 自动发现
 
-`shared/actions/index.ts` 硬编码导入 base + internal effect 文件，构建 `actionDefinitionLookup`。每个文件一个 action。**禁止在单 effect 文件里堆叠多卡逻辑**（CLAUDE.md 明令）。
+`shared/actions/index.ts` 通过 allowlist 导入 top-level base effects 和 `effects/internal/` 内部 effects，构建 `actionDefinitionLookup`。`shared/actions/effects/__tests__/architecture-guard.test.ts` 守住 top-level effect 文件和 action id allowlist。**禁止新增 top-level effect 文件来堆叠多卡逻辑**；需要 host action 子步骤时使用 `internalChildren` 或把内部 effect 放在 `shared/actions/effects/internal/`。
 
 `collect` 是 accumulation-space partial-take 的统一入口，接受可选 `actionContext: { spaceId?, resource?, amount? }`。`spaceId` 用于指向非当前 action space（卡牌效果触发的偷取场景）；`resource` + `amount` 用于 partial-take（不全取空一格）。旧的 `take-from-space` internal action 已删除并迁移到 `collect`，相关 i18n key 一并清理。
 
@@ -573,20 +573,40 @@ anytime                  额外注册的 anytime 行动
 
 ### 7.5.1 Public ActionNode 执行顺序
 
-普通 public action leaf 进入 engine 后按以下顺序处理：
+普通 public action leaf 进入 engine 后按以下顺序处理：`computeReplace -> before -> strict isDoable -> computeCosts -> execute -> during -> immediatelyAfter -> after`。
 
-1. `computeReplace` 最先运行，早于 `isDoable` / `computeCosts` / `before`。`HookDispatcher.applyComputeReplace()` 先跑 action hook replacement，再跑匹配的 card listener `phase='computeReplace'`。
+1. `computeReplace` 最先运行，早于 `before` / strict `isDoable` / `computeCosts`。`HookDispatcher.applyComputeReplace()` 先跑 action hook replacement，再跑匹配的 card listener `phase='computeReplace'`。
 2. 如果 `computeReplace` 只替换 `actionId`，后续所有阶段都使用替换后的 `actionId` 继续。
 3. 如果 `computeReplace` 返回 `decline + alternativeFlow`，当前 leaf 立即 resolve；engine 在其后插入一个 `xor(replacement branches..., original fallback)`，本轮返回。此时 original action 的 `before` listener 尚未运行。
 4. 玩家选择 replacement 分支后，分支中的每个 leaf 都作为普通 action 重新进入本流水线。replacement 分支 leaf 只携带 `skipComputeReplaceListenerIds` 跳过产生该 replacement 的 listener，不携带 `checkedReplaceAction`，因此真实替代行动仍会触发普通 `before` / `during` / `after` listener。original fallback leaf 携带 `checkedReplaceAction=true`，表示该 root action 已经检查过 replacement。
-5. 没有 decline replacement 后，engine 执行 `isDoable`：base `canBeExecutedByPlayer` → costPreview → action hook `isDoable` → card listener `isDoable`。
-6. 然后执行 `computeCosts`，把费用覆盖写入本次 `executionContext.costs`。
-7. 然后才执行 `before` card listener dispatch。匹配到的 listener 被编译成 internal `activate-card` leaf，并插入在原 action leaf 前面；`dispatchMode: 'select'` 的同组 listener 会包成 `ParallelNode(mode='trigger-select')` 让玩家选择顺序。no-op listener 在 trigger-select 评估时直接 resolve，不制造 pass-only pending；结构适用但当前不可支付的 listener 仍显示为 disabled。
-8. 所有 `before` leaf 完成后，原 action leaf 恢复执行；`beforePhaseResolved` 防止同一个 action leaf 第二次插入同一批 before listener。
-9. 随后执行 action 本体：`getBaseChoiceOptions` opt-in path 先走 `computeChoiceCandidates`，否则走 `ActionDefinition.execute()`。`execute()` 返回 request 时创建 pending；无 request 时继续 `during` / `immediatelyAfter` / `after`。
-10. `activate-card` 是 internal leaf，绕过上述 public action 流水线：只执行指定 listener body，并把 listener 返回的 `flow` / `followUpActions` 交回 engine 插入执行。
+5. 没有 decline replacement 后，engine 先执行 `before` card listener dispatch。匹配到的 listener 被编译成 internal `activate-card` leaf，并插入在原 action leaf 前面；`dispatchMode: 'select'` 的同组 listener 会包成 `ParallelNode(mode='trigger-select')` 让玩家选择顺序。no-op listener 在 trigger-select 评估时直接 resolve，不制造 pass-only pending；结构适用但当前不可支付的 listener 仍显示为 disabled。
+6. 所有 `before` leaf 完成后，原 action leaf 恢复执行；`beforePhaseResolved` 防止同一个 action leaf 第二次插入同一批 before listener。
+7. 然后执行 strict `isDoable`：base `canBeExecutedByPlayer` → costPreview → action hook `isDoable` → card listener `isDoable`。这一步必须读取 `before` 已真实修改后的 state；如果仍不可达，不能继续原 action。
+8. 然后执行 `computeCosts`，把费用覆盖写入本次 `executionContext.costs`。因此 before unlocker / resource gain / exchange 可以先改变真实 state，再影响后续 strict doable 与费用枚举。
+9. 随后执行 action 本体：`getBaseChoiceOptions` opt-in path 先走 `computeChoiceCandidates`，否则走 `ActionDefinition.execute()`；`resolveChoice` continuation 也按同一条 public action 顺序恢复，先完成 pending 选择，再继续 host internal children / trailing phases。`execute()` 或 `resolveChoice()` 返回 request 时创建 pending；无 request 时继续 `during` / `immediatelyAfter` / `after`。
+10. `during` / `immediatelyAfter` / `after` 是 host action 成功后的 trailing phases；`beforeHostListeners` settlement 必须先完成，`afterHostCommitListeners` 在 host commit 后、trailing phases 前运行，`afterHostListeners` settlement 则故意保留在 BGA slot 中，等 host `after` 之后再运行。
+11. `activate-card` 是 internal leaf，绕过上述 public action 流水线：只执行指定 listener body，并把 listener 返回的 `flow` / `followUpActions` 交回 engine 插入执行。
 
 作用域 scope：`player` / `opponent` / `any`。card listener 匹配层按 listener id 确定性枚举；phase trailing node 构建层再按 owner 分组（global → active player → 其他玩家），组内按 legacy `order` 降序、卡牌 play order、匹配序稳定排序。需要玩家决定同组 trigger 顺序时，用 `dispatchMode: 'select'` 进入 trigger-select，而不是依赖隐式排序表达规则选择。
+
+### 7.5.2 Pay child 架构不变量
+
+`pay` 是 internal settlement child；public host action 负责业务 mutation、事件事实和 completion。不要把业务 mutation 放回 `pay`，也不要用 `seq:[pay, apply-*]` 或顶层 `apply-*` effect 表达同一件事。
+
+`beforeHostListeners` / `afterHostCommitListeners` / `afterHostListeners` 是 host action 在 BGA pay slot 上的显式差异：
+
+- `renovation` / `improvement` / `occupation` / `construct` / `fencing` 在 `beforeHostListeners` 或主 action 内先完成 mandatory payment，再进入 trailing effects。
+- `improvement` / `occupation` 的 `onBuy` 使用 `afterHostCommitListeners`：先完成 mandatory payment，再由 host `completeInternalChildren` 提交卡牌，随后触发 onBuy，最后才进入 host `during` / `immediatelyAfter` / `after`。
+- `stables` 使用 `afterHostListeners`，保持 `farm.stableBuilt -> after-stables effects -> resource.paid(stables)`，让 after-stables 卡先看到已建 stable。
+- `fencing` 明确是 `beforeHostListeners`，避免 `A34_Loppers` 这类 after-fencing 效果先于 mandatory fence pay 结算而饿死支付。
+
+禁止的形态：
+
+- `seq:[pay, apply-*]`。
+- 顶层 `apply-*` effect 文件。
+- `PlayerState` payment scratchpad 或跨 action 临时支付槽位。
+
+`activate-card-effect` 是 internal child，用 `paymentInfoFrom` 从 internal result map 读取 `paymentInfo`，再执行 `onBuy` 等 card-effect hook。卡牌购买的 onBuy / 多卡业务继续留在 card-effect 或 host action completion 中，不要塞回 top-level effect。
 
 ### 7.6 阶段型 Hook（按触发顺序）
 
@@ -670,6 +690,14 @@ OA 对齐规则：
 - **sow** (`sow.ts`)：validate + finalize（无 payment combo），含 extra-field card effect（`getPermittedExtraSowableFields` + `handleSowExtraField`）。
 
 farmType 第一轮 payload 形态：`fence: {edges, palisadeEdges, extraWood}` / `room: {rooms}` / `stable: {stables}` / `plow: {tile}` / `sow: {crops}`。WS `{type:'choice', value:'confirm', payload}` 经 `resolveChoice` 透传；二轮时由 `extraData.actionContextWrite: {farmPayload}` 持久化到 `pending.actionContext.farmPayload`，二轮 prompt 解析时 ActionDef 从 `ctx.actionContext.farmPayload` 读回。
+
+### 7.8.1 Fence segment / policy 不变量
+
+`FenceSegment.type` 与 `FenceSegment.source` 是独立维度：`type` 表示边段形态（普通 fence / B30 palisade），`source` 表示这段边来自谁。缺省普通 fence 视为 own ordinary source；B30 Wood Palisades 是不同 segment type；未来 E149 borrowed fence 应是 ordinary boundary with borrowed source，而不是新 segment type。
+
+fencing 主路径不得按卡牌 id 或单卡开关分支：不要在 `fencing.ts` / farmyard validation 里写 `C1` / `B30` / `E149`、`noWoodPalisades`、`midnightFencer` 这类分支。卡牌特殊行为统一通过 generic `fencePolicy` 表达：`allowedSegmentTypes`、`sourcePolicy`、`segmentBounds`、`costPolicy`、`cancelPolicy`、`preserveAnimalTotals`。
+
+C1 Overhaul 只计数、回收、重建 own ordinary fences：onBuy 先用 `consume-fence` + `sourcePolicy: 'ownOnly'` 返还自己的普通 fence，再用 `fencePolicy` 限制本次 rebuild 只能建 ordinary fence、只消耗 own ordinary supply、禁止 cancel、保留动物总量。
 
 ---
 
@@ -796,15 +824,15 @@ B113 / B141。
 ### 8.7 Minor improvement passing mechanism
 
 OA 通过 `CardBase.passing?: boolean` 标记 BGA minor improvement 的"过手"机制。
-`shared/actions/effects/apply-improvement.ts` 的 `applyMinor` 检测该字段，passing 卡：
+`shared/actions/effects/improvement.ts` 的 host action 先用 internal `pay` child 完成购买支付，再在 `completeInternalChildren` 阶段读取 payment result map 并提交卡牌购买。passing 卡：
 
 - 不进 buyer.minorPlayed；卡 push 进 `nextPlayer.minorHand`（按 `state.currentPlayerIndex` wrap）
 - 不累加 `totalMinorBuilt`、不注入 `activeModifiers`、不触发 `providesOccupation` / `isField` 路径
 - emit `card.passed`（`fromPlayerId` / `toPlayerId` / `cardId`）替代 `card.played`
-- onBuy 仍执行——买家拿到效果，卡进入下家手牌等待下家自己回合再 actBuy
+- onBuy 仍通过 internal `activate-card-effect` 的 `afterHostCommitListeners` 执行——买家拿到效果，卡进入下家手牌等待下家自己回合再 actBuy
 
 listener 隔离自然成立：passing 卡不进 `minorPlayed` → `getPlayerCardIds` 自然不含 → "卡进场"反应 skip。
-无需写 `extraData.passing`（activateCard 路径不收 listener context）。
+无需 `apply-improvement` effect 或 `extraData.passing` scratchpad；BGA passing 行为由 improvement host action / pay child / `activate-card-effect` 三段承担。
 
 客户端：`PublicEventCardPassAnimation` 订阅 `card.passed` events 流，按 `data-card-anchor` / `data-hand-anchor` DOM 锚点播放卡片飞行动画；LogPanel 通过现有 `mapCardPassed` 派生 `log.cardPassed` i18n 条目。
 

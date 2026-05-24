@@ -73,6 +73,9 @@ jobs:
       - name: Check direct session log writes
         run: pnpm run check:direct-session-log
 
+      - name: Check effects file list
+        run: pnpm run check:effects-file-list
+
       - name: Build (includes cards manifest)
         run: pnpm run build
 

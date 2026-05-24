@@ -27,15 +27,15 @@ const BAKING_IMPROVEMENT_IDS = [
 /**
  * Part 1: onBuy — when Miller is played, optionally purchase a baking improvement.
  *
- * This uses a card listener on play-occupation (after phase) rather than
+ * This uses a card listener on occupation (after phase) rather than
  * registerCardEffect.onBuy because the engine does not process onBuy flows
  * for occupation cards — only for improvements. Card listeners on
- * play-occupation are the standard pattern for occupation onBuy flows.
+ * occupation are the standard pattern for occupation onBuy flows.
  */
 const onBuyListener: CardListenerRegistration = {
   id: 'E95-miller-onbuy-improvement',
   cardIds: [CARD_ID],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     // Only trigger when the Miller card itself was just played

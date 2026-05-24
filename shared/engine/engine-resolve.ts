@@ -2,6 +2,7 @@ import type {
   ActionExecutionContext,
   ActionExecutionResult,
   ActionFlow,
+  InternalActionChild,
   PlayerState,
   ActionChoiceOption,
   InteractionRequest,
@@ -180,10 +181,133 @@ const withResourcePreview = (
 
 const actionContextForNode = (
   node: ActionNode,
+  int?: EngineInternals,
 ): ActionExecutionContext['actionContext'] =>
-  node.beforePhaseResolved
-    ? { ...(node.actionContext ?? {}), skipBeforeTriggers: true }
-    : node.actionContext
+  withInternalPaymentInfo(
+    node.beforePhaseResolved
+      ? { ...(node.actionContext ?? {}), skipBeforeTriggers: true }
+      : node.actionContext,
+    node,
+    int,
+  )
+
+const paymentInfoFromResult = (result: ActionExecutionResult): unknown => {
+  if (result.type !== 'ok') return result
+  const extraData = result.extraData ?? {}
+  const resourcesPaid = result.resourcesPaid ?? extraData.resourcesPaid
+  const paymentInfo: Record<string, unknown> = {}
+  if (resourcesPaid !== undefined) paymentInfo.resourcesPaid = resourcesPaid
+  if (extraData.feeIndex !== undefined) paymentInfo.feeIndex = extraData.feeIndex
+  if (extraData.returnedCardId !== undefined) paymentInfo.returnedCardId = extraData.returnedCardId
+  return Object.keys(paymentInfo).length > 0 ? paymentInfo : result
+}
+
+const withInternalPaymentInfo = (
+  actionContext: ActionExecutionContext['actionContext'],
+  node: ActionNode,
+  int?: EngineInternals,
+): ActionExecutionContext['actionContext'] => {
+  if (!int || !node.internalHostNodeId || !node.internalPaymentInfoFrom) return actionContext
+  const result = int.internalChildResults.get(node.internalHostNodeId)?.[node.internalPaymentInfoFrom]
+  if (!result) return actionContext
+  return {
+    ...(actionContext ?? {}),
+    paymentInfo: paymentInfoFromResult(result),
+  }
+}
+
+const recordInternalResult = (
+  int: EngineInternals,
+  hostNodeId: string | undefined,
+  resultKey: string | undefined,
+  result: ActionExecutionResult,
+): void => {
+  if (!hostNodeId || !resultKey) return
+  const hostResults = int.internalChildResults.get(hostNodeId) ?? {}
+  hostResults[resultKey] = result
+  int.internalChildResults.set(hostNodeId, hostResults)
+}
+
+const recordInternalChildResult = (
+  int: EngineInternals,
+  node: ActionNode,
+  result: ActionExecutionResult,
+): void => {
+  recordInternalResult(int, node.internalHostNodeId, node.internalResultKey, result)
+}
+
+const copyInternalMetadataToPending = (
+  node: ActionNode,
+  source?: {
+    internalHostNodeId?: string
+    internalResultKey?: string
+    internalPaymentInfoFrom?: string
+  },
+): void => {
+  const pending = node.getPending()
+  if (!pending) return
+  pending.internalHostNodeId = source?.internalHostNodeId ?? node.internalHostNodeId
+  pending.internalResultKey = source?.internalResultKey ?? node.internalResultKey
+  pending.internalPaymentInfoFrom = source?.internalPaymentInfoFrom ?? node.internalPaymentInfoFrom
+}
+
+const buildInternalActionChildNodes = (
+  int: EngineInternals,
+  hostNodeId: string,
+  children: InternalActionChild[] | undefined,
+  ownerPlayerId?: string,
+): ActionNode[] =>
+  (children ?? []).map((child) => {
+    const node = new ActionNode(
+      `internal-${hostNodeId}-${child.actionId}-${int.counterRef.value++}`,
+      child.actionId,
+      child.sourceCard,
+      child.params,
+      undefined,
+      undefined,
+      child.actionContext,
+      undefined,
+      hostNodeId,
+      child.resultKey,
+      child.paymentInfoFrom,
+    )
+    if (ownerPlayerId) node.ownerPlayerId = ownerPlayerId
+    return node
+  })
+
+const buildDeferredHostNode = (
+  int: EngineInternals,
+  hostNode: ActionNode,
+  result: ActionExecutionResult,
+  actionId: string,
+  executionContext: ActionExecutionContext,
+  transactionEvents: readonly GameEvent[],
+  actionEvents: readonly GameEvent[],
+  choice?: string,
+): ActionNode => {
+  const node = new ActionNode(
+    `internal-host-${hostNode.id}-${int.counterRef.value++}`,
+    actionId,
+    executionContext.sourceCard,
+    executionContext.params,
+    hostNode.choiceLabelKey,
+    hostNode.choiceLabelParams,
+    executionContext.actionContext,
+  )
+  node.ownerPlayerId = hostNode.ownerPlayerId
+  node.internalHostNodeId = hostNode.id
+  node.deferredHostResult = result
+  node.deferredAfterHostCommitChildren =
+    result.type === 'ok' ? result.internalChildren?.afterHostCommitListeners : undefined
+  node.deferredAfterHostChildren =
+    result.type === 'ok' ? result.internalChildren?.afterHostListeners : undefined
+  node.deferredHostTransactionEvents = [...transactionEvents]
+  node.deferredHostActionEvents = [...actionEvents]
+  node.deferredHostChoice = choice
+  node.deferredHostResultTargetNodeId = hostNode.internalHostNodeId
+  node.deferredHostResultKey = hostNode.internalResultKey
+  return node
+}
 
 /**
  * S4c PR5 — extracted from `Engine.resolveChoice`. Resolve a pending choice
@@ -317,7 +441,7 @@ export function engineResolveChoice(
         space: context.space,
         params: child.params,
         sourceCard: child.sourceCard,
-        actionContext: actionContextForNode(child),
+        actionContext: actionContextForNode(child, int),
         emitPrivateEvent: context.emitPrivateEvent,
       }
       const replaceResult = int.hooks.applyComputeReplace({
@@ -353,25 +477,6 @@ export function engineResolveChoice(
         int.pendingNodeIdRef.value = null
         return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
       }
-      const costResults = int.hooks.computeCosts({
-        ...executionContext,
-        ...currentEventReadContext(int),
-        actionId,
-      })
-      const costOverride = costResults.reduce<Partial<PlayerState['resources']>>(
-        (acc, entry) => {
-          if (!entry.costs) return acc
-          Object.entries(entry.costs).forEach(([key, value]) => {
-            if (typeof value !== 'number') return
-            const resourceKey = key as keyof PlayerState['resources']
-            acc[resourceKey] = (acc[resourceKey] ?? 0) + value
-          })
-          return acc
-        },
-        {},
-      )
-      executionContext.costs =
-        Object.keys(costOverride).length > 0 ? costOverride : undefined
       const skipBefore = int.beforePhaseFlowNodeIds.has(child.id)
       const beforeEventReadContext = currentEventReadContext(int)
       const beforePhase = skipBefore
@@ -403,6 +508,41 @@ export function engineResolveChoice(
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
+      const doable = int.hooks.applyIsDoable(
+        { ...executionContext, ...currentEventReadContext(int), actionId },
+        action,
+        action.canBeExecutedByPlayer(
+          executionContext.state,
+          executionContext.player,
+          {
+            sourceCard: executionContext.sourceCard,
+            actionContext: executionContext.actionContext,
+          },
+        ),
+      )
+      if (!doable) {
+        int.pendingNodeIdRef.value = null
+        return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
+      }
+      const costResults = int.hooks.computeCosts({
+        ...executionContext,
+        ...currentEventReadContext(int),
+        actionId,
+      })
+      const costOverride = costResults.reduce<Partial<PlayerState['resources']>>(
+        (acc, entry) => {
+          if (!entry.costs) return acc
+          Object.entries(entry.costs).forEach(([key, value]) => {
+            if (typeof value !== 'number') return
+            const resourceKey = key as keyof PlayerState['resources']
+            acc[resourceKey] = (acc[resourceKey] ?? 0) + value
+          })
+          return acc
+        },
+        {},
+      )
+      executionContext.costs =
+        Object.keys(costOverride).length > 0 ? costOverride : undefined
       const eventFrame = int.events.beginFrame({
         actorPlayerId: executionContext.player.id,
         sourceActionId: actionId,
@@ -427,6 +567,35 @@ export function engineResolveChoice(
       ensureEventState(context.state)
       completedEvents = eventFrame.complete(context.state)
       recordEventLogDerivation(int, completedEvents, result)
+      if (result.type === 'ok' && (
+        result.internalChildren?.beforeHostListeners?.length ||
+        result.internalChildren?.afterHostCommitListeners?.length
+      )) {
+        const beforeHostNodes = buildInternalActionChildNodes(
+          int,
+          child.id,
+          result.internalChildren.beforeHostListeners,
+          executionContext.player.id,
+        )
+        const deferredHostNode = buildDeferredHostNode(
+          int,
+          child,
+          result,
+          actionId,
+          executionContext,
+          currentEventReadContext(int).transactionEvents,
+          completedEvents,
+          choice,
+        )
+        const insertAnchor = node instanceof XorNode ? node.id : child.id
+        child.resolve(result)
+        if (node instanceof XorNode) {
+          node.resolve(choice)
+        }
+        int.pendingNodeIdRef.value = null
+        int.tree.insertAfter(insertAnchor, [...beforeHostNodes, deferredHostNode])
+        return { type: 'ok' }
+      }
       int.hooks.during({ ...executionContext, ...currentEventReadContext(int, completedEvents), actionId }, result)
       if (result.type === 'request' && (result.request.kind === 'choice' || result.request.kind === 'farm-select')) {
         // S2 Task 6: also accept farm-select kind emitted from an Or/Xor
@@ -481,6 +650,7 @@ export function engineResolveChoice(
           actionContext: executionContext.actionContext,
           contextWritePatch,
         })
+        copyInternalMetadataToPending(child)
         return extraOptions.length > 0
           ? { ...result, request: updatedRequest }
           : result
@@ -545,6 +715,14 @@ export function engineResolveChoice(
         trailingActionEvents,
         trailingActionEventStartIndex,
       )
+      const afterHostNodes = result.type === 'ok'
+        ? buildInternalActionChildNodes(
+            int,
+            child.id,
+            result.internalChildren?.afterHostListeners,
+            executionContext.player.id,
+          )
+        : []
       // 7b1: insert flow body BEFORE trailing hook nodes so wrapper-style
       // actions (renovate-house, occupation, improvement-any) emit their
       // `after` listeners on the post-mutate state. See top-level path
@@ -554,6 +732,7 @@ export function engineResolveChoice(
         ...buildFollowUpNodes(int, followUps, child.id, context.player, context.state),
         ...immediateActivateNodes,
         ...afterActivateNodes,
+        ...afterHostNodes,
       ]
       if (result.type === 'flow') {
         const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id)
@@ -570,6 +749,7 @@ export function engineResolveChoice(
           int.tree.insertAfter(insertAnchor, allInsertNodes)
         }
       }
+      recordInternalChildResult(int, child, result)
       child.resolve(result)
       if (node instanceof XorNode) {
         node.resolve(choice)
@@ -600,26 +780,104 @@ export function engineResolveChoice(
     ...(executionContext.params ?? {}),
     selectedOption: choice,
   }
+  const pendingActionNode = pendingHost instanceof ActionNode ? pendingHost : null
+  if (pendingActionNode?.beforePhaseResolved === true) {
+    executionContext.actionContext = {
+      ...(executionContext.actionContext ?? {}),
+      skipBeforeTriggers: true,
+    }
+  }
+  let committedActionId = actionId
+  let committedAction = action
+  if (choice !== 'cancel') {
+    const replaceResult = int.hooks.applyComputeReplace({
+      ...executionContext,
+      ...currentEventReadContext(int),
+      actionId,
+    })
+    committedActionId = replaceResult.actionId
+    executionContext.sourceCard = replaceResult.sourceCard ?? executionContext.sourceCard
+    const replacementAction = int.registry.get(committedActionId)
+    if (!replacementAction) {
+      return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
+    }
+    committedAction = replacementAction
+    const skipBefore = pendingActionNode?.beforePhaseResolved === true
+    const beforeEventReadContext = currentEventReadContext(int)
+    const beforePhase = skipBefore
+      ? { matchedListeners: [] }
+      : int.hooks.before({ ...executionContext, ...beforeEventReadContext, actionId: committedActionId })
+    const beforeBaseEvent = buildListenerEvent(executionContext, {})
+    const beforeActivateNodes = buildPhaseTrailingNodes(
+      int,
+      beforePhase.matchedListeners,
+      'before',
+      committedActionId,
+      context.state,
+      beforeBaseEvent,
+      executionContext.player.id,
+      beforeEventReadContext.transactionEvents,
+    )
+    if (beforeActivateNodes.length > 0 && pendingActionNode && !pendingActionNode.beforePhaseResolved) {
+      pendingActionNode.beforePhaseResolved = true
+      int.tree.insertBefore(pendingActionNode.id, beforeActivateNodes)
+      return { type: 'ok' }
+    }
+    const doable = int.hooks.applyIsDoable(
+      { ...executionContext, ...currentEventReadContext(int), actionId: committedActionId },
+      committedAction,
+      committedAction.canBeExecutedByPlayer(
+        executionContext.state,
+        executionContext.player,
+        {
+          sourceCard: executionContext.sourceCard,
+          actionContext: executionContext.actionContext,
+        },
+      ),
+    )
+    if (!doable) {
+      return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
+    }
+    const costResults = int.hooks.computeCosts({
+      ...executionContext,
+      ...currentEventReadContext(int),
+      actionId: committedActionId,
+    })
+    const costOverride = costResults.reduce<Partial<PlayerState['resources']>>(
+      (acc, entry) => {
+        if (!entry.costs) return acc
+        Object.entries(entry.costs).forEach(([key, value]) => {
+          if (typeof value !== 'number') return
+          const resourceKey = key as keyof PlayerState['resources']
+          acc[resourceKey] = (acc[resourceKey] ?? 0) + value
+        })
+        return acc
+      },
+      {},
+    )
+    executionContext.costs =
+      Object.keys(costOverride).length > 0 ? costOverride : undefined
+  }
   pendingHost?.clearPending()
   let result: ActionExecutionResult
   let eventFrame: ReturnType<EngineInternals['events']['beginFrame']> | null = null
   let completedEvents: GameEvent[] = []
-  if (action.resolveChoice) {
+  if (committedAction.resolveChoice) {
     eventFrame = int.events.beginFrame({
       actorPlayerId: executionContext.player.id,
-      sourceActionId: actionId,
+      sourceActionId: committedActionId,
       sourceCardId: executionContext.sourceCard,
     })
     const eventBuffer = createBufferedEventSink()
     result = withInjectedAnytimeResultFlag(
-      action.resolveChoice({
+      committedAction.resolveChoice({
         ...executionContext,
         eventSink: eventBuffer.sink,
       }, choice, payload),
       executionContext.actionContext,
     )
     if (result.type !== 'fail' && result.type !== 'request') {
-      emitCardTriggered(int, eventFrame.sink, executionContext, actionId)
+      emitCardTriggered(int, eventFrame.sink, executionContext, committedActionId)
     }
     if (result.type !== 'fail') {
       eventBuffer.flushTo(eventFrame.sink)
@@ -634,7 +892,45 @@ export function engineResolveChoice(
     completedEvents = eventFrame.complete(context.state)
     recordEventLogDerivation(int, completedEvents, result)
   }
-  int.hooks.during({ ...executionContext, ...currentEventReadContext(int, completedEvents), actionId }, result)
+  if (
+    result.type === 'ok' &&
+    (
+      result.internalChildren?.beforeHostListeners?.length ||
+      result.internalChildren?.afterHostCommitListeners?.length
+    ) &&
+    pendingHost instanceof ActionNode
+  ) {
+    const beforeHostNodes = buildInternalActionChildNodes(
+      int,
+      pendingHost.id,
+      result.internalChildren.beforeHostListeners,
+      executionContext.player.id,
+    )
+    const deferredHostNode = buildDeferredHostNode(
+      int,
+      pendingHost,
+      result,
+      committedActionId,
+      executionContext,
+      currentEventReadContext(int).transactionEvents,
+      completedEvents,
+      choice,
+    )
+    deferredHostNode.deferredHostResultTargetNodeId =
+      pendingEnvelope?.internalHostNodeId ?? pendingHost.internalHostNodeId
+    deferredHostNode.deferredHostResultKey =
+      pendingEnvelope?.internalResultKey ?? pendingHost.internalResultKey
+    const insertAnchor = pendingEnvelope?.ownerNodeId ?? pendingHost.id
+    pendingHost.resolve(result)
+    if (pendingEnvelope?.ownerNodeId) {
+      const ownerNode = int.tree.findNodeById(pendingEnvelope.ownerNodeId)
+      if (ownerNode instanceof XorNode) ownerNode.resolve()
+    }
+    int.pendingNodeIdRef.value = null
+    int.tree.insertAfter(insertAnchor, [...beforeHostNodes, deferredHostNode])
+    return result
+  }
+  int.hooks.during({ ...executionContext, ...currentEventReadContext(int, completedEvents), actionId: committedActionId }, result)
   if (result.type === 'fail' && result.recoverable === true && pendingHost && pendingEnvelope) {
     const contextSnapshot = pendingEnvelope.contextSnapshot as InteractionContextSnapshot | undefined
     applyInteractionRequest(int, {
@@ -644,7 +940,7 @@ export function engineResolveChoice(
       promptKey: pendingEnvelope.promptKey,
       promptParams: pendingEnvelope.promptParams,
       choiceOptions: pendingEnvelopeChoices(pendingEnvelope),
-      actionId,
+      actionId: committedActionId,
       ownerNodeId: pendingEnvelope.ownerNodeId ?? null,
       preserveOwner: true,
       params: contextSnapshot?.params,
@@ -652,6 +948,7 @@ export function engineResolveChoice(
       sourceCard: pendingEnvelope.sourceCard ?? contextSnapshot?.sourceCard,
       actionContext: contextSnapshot?.actionContext,
     })
+    if (pendingHost instanceof ActionNode) copyInternalMetadataToPending(pendingHost, pendingEnvelope)
     return result
   }
   if (result.type === 'fail') {
@@ -673,7 +970,7 @@ export function engineResolveChoice(
       promptKey: result.promptKey,
       promptParams: result.promptParams,
       choiceOptions: requestOptions,
-      actionId,
+      actionId: committedActionId,
       ownerNodeId: pendingEnvelope?.ownerNodeId ?? null,
       preserveOwner: true,
       params: executionContext.params,
@@ -682,17 +979,18 @@ export function engineResolveChoice(
       actionContext: executionContext.actionContext,
       contextWritePatch,
     })
+    if (pendingHost instanceof ActionNode) copyInternalMetadataToPending(pendingHost, pendingEnvelope ?? undefined)
     return result
   }
   const insertionTargetId = pendingEnvelope?.ownerNodeId ?? pendingHost?.id ?? int.pendingNodeIdRef.value
   const eventReadContext = currentEventReadContext(int, completedEvents)
   const immediatePhase = int.hooks.immediatelyAfter(
-    { ...executionContext, ...eventReadContext, actionId, choice },
+    { ...executionContext, ...eventReadContext, actionId: committedActionId, choice },
     result,
     choice,
   )
   const afterPhase = int.hooks.after(
-    { ...executionContext, ...eventReadContext, actionId, choice },
+    { ...executionContext, ...eventReadContext, actionId: committedActionId, choice },
     result,
     choice,
   )
@@ -725,7 +1023,7 @@ export function engineResolveChoice(
     int,
     immediatePhase.matchedListeners,
     'immediatelyAfter',
-    actionId,
+    committedActionId,
     context.state,
     baseEvent2,
     executionContext.player.id,
@@ -737,7 +1035,7 @@ export function engineResolveChoice(
     int,
     afterPhase.matchedListeners,
     'after',
-    actionId,
+    committedActionId,
     context.state,
     baseEvent2,
     executionContext.player.id,
@@ -745,18 +1043,27 @@ export function engineResolveChoice(
     trailingActionEvents,
     trailingActionEventStartIndex,
   )
+  const afterHostNodes =
+    result.type === 'ok' && pendingHost instanceof ActionNode
+      ? buildInternalActionChildNodes(
+          int,
+          pendingHost.id,
+          result.internalChildren?.afterHostListeners,
+          executionContext.player.id,
+        )
+      : []
   // 7b1: insert flow body BEFORE the trailing hook nodes (followUps,
   // immediatelyAfter / after activate) so wrapper actions returning a
-  // flow (renovate-house seq, occupation seq, improvement-any seq) emit
-  // their `after` listener events on the post-mutate state. Insertion
-  // order via insertAfter prepends each batch to insertionTargetId+1, so
-  // the resulting layout is:
+  // flow emit their `after` listener events on the post-flow state.
+  // Insertion order via insertAfter prepends each batch to
+  // insertionTargetId+1, so the resulting layout is:
   //   [..., insertionTarget, hookFlows..., flowNode, trailingHooks..., ...]
   if (insertionTargetId) {
     const trailingHookNodes = [
       ...buildFollowUpNodes(int, followUps, insertionTargetId, context.player, context.state),
       ...immediateActivateNodes,
       ...afterActivateNodes,
+      ...afterHostNodes,
     ]
     if (result.type === 'flow') {
       const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id)
@@ -775,6 +1082,12 @@ export function engineResolveChoice(
     }
   }
   if (pendingHost instanceof ActionNode) {
+    recordInternalResult(
+      int,
+      pendingEnvelope?.internalHostNodeId ?? pendingHost.internalHostNodeId,
+      pendingEnvelope?.internalResultKey ?? pendingHost.internalResultKey,
+      result,
+    )
     pendingHost.resolve(result)
   }
   const ownerNodeIdToResolve = pendingEnvelope?.ownerNodeId ?? null

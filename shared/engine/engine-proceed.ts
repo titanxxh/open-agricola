@@ -2,6 +2,7 @@ import type {
   ActionExecutionContext,
   ActionExecutionResult,
   ActionFlow,
+  InternalActionChild,
   PlayerState,
   ActionChoiceOption,
   InteractionRequest,
@@ -161,6 +162,23 @@ const currentEventReadContext = (
   }
 }
 
+const deferredHostEventReadContext = (
+  int: EngineInternals,
+  node: ActionNode,
+) => {
+  const transactionEvents = [...int.events.currentTransactionEvents()]
+  const capturedTransactionEvents = node.deferredHostTransactionEvents ?? []
+  const actionEvents = [
+    ...(node.deferredHostActionEvents ?? []),
+    ...transactionEvents.slice(capturedTransactionEvents.length),
+  ]
+  return {
+    transactionEvents,
+    actionEvents,
+    eventQuery: createEventQuery(transactionEvents),
+  }
+}
+
 const eventReadContextForActivation = (
   int: EngineInternals,
   params: ActivateCardActionNode['params'],
@@ -258,10 +276,185 @@ const withResourcePreview = (
 
 const actionContextForNode = (
   node: ActionNode,
+  int?: EngineInternals,
 ): ActionExecutionContext['actionContext'] =>
-  node.beforePhaseResolved
-    ? { ...(node.actionContext ?? {}), skipBeforeTriggers: true }
-    : node.actionContext
+  withInternalPaymentInfo(
+    node.beforePhaseResolved
+      ? { ...(node.actionContext ?? {}), skipBeforeTriggers: true }
+      : node.actionContext,
+    node,
+    int,
+  )
+
+const paymentInfoFromResult = (result: ActionExecutionResult): unknown => {
+  if (result.type !== 'ok') return result
+  const extraData = result.extraData ?? {}
+  const resourcesPaid = result.resourcesPaid ?? extraData.resourcesPaid
+  const paymentInfo: Record<string, unknown> = {}
+  if (resourcesPaid !== undefined) paymentInfo.resourcesPaid = resourcesPaid
+  if (extraData.feeIndex !== undefined) paymentInfo.feeIndex = extraData.feeIndex
+  if (extraData.returnedCardId !== undefined) paymentInfo.returnedCardId = extraData.returnedCardId
+  return Object.keys(paymentInfo).length > 0 ? paymentInfo : result
+}
+
+const withInternalPaymentInfo = (
+  actionContext: ActionExecutionContext['actionContext'],
+  node: ActionNode,
+  int?: EngineInternals,
+): ActionExecutionContext['actionContext'] => {
+  if (!int || !node.internalHostNodeId || !node.internalPaymentInfoFrom) return actionContext
+  const result = int.internalChildResults.get(node.internalHostNodeId)?.[node.internalPaymentInfoFrom]
+  if (!result) return actionContext
+  return {
+    ...(actionContext ?? {}),
+    paymentInfo: paymentInfoFromResult(result),
+  }
+}
+
+const recordInternalResult = (
+  int: EngineInternals,
+  hostNodeId: string | undefined,
+  resultKey: string | undefined,
+  result: ActionExecutionResult,
+): void => {
+  if (!hostNodeId || !resultKey) return
+  const hostResults = int.internalChildResults.get(hostNodeId) ?? {}
+  hostResults[resultKey] = result
+  int.internalChildResults.set(hostNodeId, hostResults)
+}
+
+const recordInternalChildResult = (
+  int: EngineInternals,
+  node: ActionNode,
+  result: ActionExecutionResult,
+): void => {
+  recordInternalResult(int, node.internalHostNodeId, node.internalResultKey, result)
+}
+
+const recordDeferredHostResult = (
+  int: EngineInternals,
+  node: ActionNode,
+  result: ActionExecutionResult,
+): void => {
+  recordInternalResult(
+    int,
+    node.deferredHostResultTargetNodeId,
+    node.deferredHostResultKey,
+    result,
+  )
+}
+
+const blockingBeforeHostChildResult = (
+  int: EngineInternals,
+  node: ActionNode,
+): Extract<ActionExecutionResult, { type: 'fail' }> | null => {
+  const result = node.deferredHostResult
+  if (result?.type !== 'ok') return null
+  const requiredChildren =
+    result.internalChildren?.beforeHostListeners?.filter((child) => child.resultKey) ?? []
+  if (requiredChildren.length === 0) return null
+  const hostResults = int.internalChildResults.get(node.internalHostNodeId ?? node.id) ?? {}
+  for (const child of requiredChildren) {
+    const childResult = hostResults[child.resultKey!]
+    if (!childResult) return { type: 'fail', errorKey: 'log.payFail' }
+    if (childResult.type === 'fail') return childResult
+    if (childResult.type !== 'ok') return { type: 'fail', errorKey: 'log.payFail' }
+  }
+  return null
+}
+
+const copyInternalMetadataToPending = (node: ActionNode): void => {
+  const pending = node.getPending()
+  if (!pending) return
+  pending.internalHostNodeId = node.internalHostNodeId
+  pending.internalResultKey = node.internalResultKey
+  pending.internalPaymentInfoFrom = node.internalPaymentInfoFrom
+}
+
+const buildInternalActionChildNodes = (
+  int: EngineInternals,
+  hostNodeId: string,
+  children: InternalActionChild[] | undefined,
+  ownerPlayerId?: string,
+): ActionNode[] =>
+  (children ?? []).map((child) => {
+    const node = new ActionNode(
+      `internal-${hostNodeId}-${child.actionId}-${int.counterRef.value++}`,
+      child.actionId,
+      child.sourceCard,
+      child.params,
+      undefined,
+      undefined,
+      child.actionContext,
+      undefined,
+      hostNodeId,
+      child.resultKey,
+      child.paymentInfoFrom,
+    )
+    if (ownerPlayerId) node.ownerPlayerId = ownerPlayerId
+    return node
+  })
+
+const buildDeferredHostNode = (
+  int: EngineInternals,
+  hostNode: ActionNode,
+  result: ActionExecutionResult,
+  actionId: string,
+  executionContext: ActionExecutionContext,
+  transactionEvents: readonly GameEvent[],
+  actionEvents: readonly GameEvent[],
+  choice?: string,
+): ActionNode => {
+  const node = new ActionNode(
+    `internal-host-${hostNode.id}-${int.counterRef.value++}`,
+    actionId,
+    executionContext.sourceCard,
+    executionContext.params,
+    hostNode.choiceLabelKey,
+    hostNode.choiceLabelParams,
+    executionContext.actionContext,
+  )
+  node.ownerPlayerId = hostNode.ownerPlayerId
+  node.internalHostNodeId = hostNode.id
+  node.deferredHostResult = result
+  node.deferredAfterHostCommitChildren =
+    result.type === 'ok' ? result.internalChildren?.afterHostCommitListeners : undefined
+  node.deferredAfterHostChildren =
+    result.type === 'ok' ? result.internalChildren?.afterHostListeners : undefined
+  node.deferredHostTransactionEvents = [...transactionEvents]
+  node.deferredHostActionEvents = [...actionEvents]
+  node.deferredHostChoice = choice
+  node.deferredHostResultTargetNodeId = hostNode.internalHostNodeId
+  node.deferredHostResultKey = hostNode.internalResultKey
+  return node
+}
+
+const buildDeferredHostContinuationNode = (
+  int: EngineInternals,
+  sourceNode: ActionNode,
+  result: ActionExecutionResult,
+): ActionNode => {
+  const node = new ActionNode(
+    `internal-host-continuation-${sourceNode.id}-${int.counterRef.value++}`,
+    sourceNode.actionId,
+    sourceNode.sourceCard,
+    sourceNode.params,
+    sourceNode.choiceLabelKey,
+    sourceNode.choiceLabelParams,
+    sourceNode.actionContext,
+  )
+  node.ownerPlayerId = sourceNode.ownerPlayerId
+  node.internalHostNodeId = sourceNode.internalHostNodeId
+  node.deferredHostResult = result
+  node.deferredAfterHostChildren = sourceNode.deferredAfterHostChildren
+  node.deferredHostCommitCompleted = true
+  node.deferredHostTransactionEvents = sourceNode.deferredHostTransactionEvents
+  node.deferredHostActionEvents = sourceNode.deferredHostActionEvents
+  node.deferredHostChoice = sourceNode.deferredHostChoice
+  node.deferredHostResultTargetNodeId = sourceNode.deferredHostResultTargetNodeId
+  node.deferredHostResultKey = sourceNode.deferredHostResultKey
+  return node
+}
 
 const pendingEnvelopeChoices = (envelope: PendingEnvelope): ActionChoiceOption[] => {
   if (envelope.choices) return envelope.choices
@@ -295,7 +488,7 @@ const buildOptionalPrompt = (
     space: context.space,
     params: actionNode.params,
     sourceCard: actionNode.sourceCard,
-    actionContext: actionContextForNode(actionNode),
+    actionContext: actionContextForNode(actionNode, int),
     emitPrivateEvent: context.emitPrivateEvent,
   }
   const doable = int.hooks.applyIsDoable(
@@ -344,7 +537,7 @@ const buildOptionalPrompt = (
       params: actionNode.params,
       costs: undefined,
       sourceCard: actionNode.sourceCard,
-      actionContext: actionContextForNode(actionNode),
+      actionContext: actionContextForNode(actionNode, int),
     },
     effectiveOwnerPlayerId: node.ownerPlayerId,
   })
@@ -438,6 +631,174 @@ const executeActivateCardAction = (
   return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
 }
 
+const executeDeferredHostAction = (
+  int: EngineInternals,
+  context: EngineContext,
+  node: ActionNode,
+): EngineStepResult => {
+  let result = node.deferredHostResult
+  if (!result) return { type: 'blocked', nodeId: node.id, actionId: node.actionId }
+  const blockedResult = blockingBeforeHostChildResult(int, node)
+  if (blockedResult) {
+    recordDeferredHostResult(int, node, blockedResult)
+    node.resolve(blockedResult)
+    commitIfEngineComplete(int, context, blockedResult)
+    return { type: 'ok', nodeId: node.id, actionId: node.actionId, result: blockedResult }
+  }
+  const executionContext: ActionExecutionContext = {
+    state: context.state,
+    player: context.player,
+    space: context.space,
+    params: node.params,
+    sourceCard: node.sourceCard,
+    actionContext: actionContextForNode(node, int),
+    emitPrivateEvent: context.emitPrivateEvent,
+  }
+  const action = int.registry.get(node.actionId)
+  let completedEvents: GameEvent[] | undefined
+  if (result.type === 'ok' && action?.completeInternalChildren && !node.deferredHostCommitCompleted) {
+    const eventFrame = int.events.beginFrame({
+      actorPlayerId: executionContext.player.id,
+      sourceActionId: node.actionId,
+      sourceCardId: executionContext.sourceCard,
+    })
+    const eventBuffer = createBufferedEventSink()
+    result = action.completeInternalChildren(
+      {
+        ...executionContext,
+        eventSink: eventBuffer.sink,
+      },
+      result,
+      int.internalChildResults.get(node.internalHostNodeId ?? node.id) ?? {},
+    )
+    eventBuffer.flushTo(eventFrame.sink)
+    ensureEventState(context.state)
+    completedEvents = eventFrame.complete(context.state)
+    recordEventLogDerivation(int, completedEvents, result)
+  }
+  if (result.type === 'ok' && !node.deferredHostCommitCompleted) {
+    const afterHostCommitNodes = buildInternalActionChildNodes(
+      int,
+      node.internalHostNodeId ?? node.id,
+      node.deferredAfterHostCommitChildren,
+      executionContext.player.id,
+    )
+    if (afterHostCommitNodes.length > 0) {
+      const continuationNode = buildDeferredHostContinuationNode(int, node, result)
+      node.resolve(result)
+      int.tree.insertAfter(node.id, [...afterHostCommitNodes, continuationNode])
+      return { type: 'ok', nodeId: node.id, actionId: node.actionId, result }
+    }
+  }
+  const eventReadContext = node.deferredHostTransactionEvents
+    ? deferredHostEventReadContext(int, node)
+    : completedEvents
+      ? currentEventReadContext(int, completedEvents)
+      : currentEventReadContext(int, node.deferredHostActionEvents)
+  const duringPhase = int.hooks.during(
+    { ...executionContext, ...eventReadContext, actionId: node.actionId },
+    result,
+  )
+  const immediatePhase = int.hooks.immediatelyAfter(
+    { ...executionContext, ...eventReadContext, actionId: node.actionId },
+    result,
+    node.deferredHostChoice,
+  )
+  const afterPhase = int.hooks.after(
+    { ...executionContext, ...eventReadContext, actionId: node.actionId },
+    result,
+    node.deferredHostChoice,
+  )
+  const allActionHookResults = [
+    ...immediatePhase.actionHookResults,
+    ...afterPhase.actionHookResults,
+  ]
+  const hookFlows = allActionHookResults
+    .map((entry) => entry.flow
+      ? applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
+      : null)
+    .filter((flow) => flow)
+    .map((flow) => buildOwnedFlowNode(int, flow as ActionFlow, context.player.id))
+  const followUps = allActionHookResults
+    .flatMap((entry) =>
+      (entry.followUpActions ?? []).map((followUp) =>
+        normalizeFollowUpAction(followUp, entry.sourceCard),
+      ),
+    )
+    .filter((action) => action)
+  const proceedBaseEvent = buildListenerEvent(executionContext, {
+    result,
+    choice: node.deferredHostChoice,
+  })
+  const trailingTransactionEvents = result.type === 'flow' ? undefined : eventReadContext.transactionEvents
+  const trailingActionEvents = result.type === 'flow' ? undefined : eventReadContext.actionEvents
+  const duringActivateNodes = buildActivationActionNodes(
+    int,
+    duringPhase.matchedListeners, 'during', node.actionId,
+    {},
+    executionContext.player.id,
+    eventReadContext.transactionEvents,
+    eventReadContext.actionEvents,
+  )
+  const immediateActivateNodes = buildPhaseTrailingNodes(
+    int,
+    immediatePhase.matchedListeners,
+    'immediatelyAfter',
+    node.actionId,
+    context.state,
+    proceedBaseEvent,
+    executionContext.player.id,
+    trailingTransactionEvents,
+    trailingActionEvents,
+  )
+  const afterActivateNodes = buildPhaseTrailingNodes(
+    int,
+    afterPhase.matchedListeners,
+    'after',
+    node.actionId,
+    context.state,
+    proceedBaseEvent,
+    executionContext.player.id,
+    trailingTransactionEvents,
+    trailingActionEvents,
+  )
+  const afterHostNodes = buildInternalActionChildNodes(
+    int,
+    node.internalHostNodeId ?? node.id,
+    node.deferredAfterHostChildren,
+    executionContext.player.id,
+  )
+  const trailingHookNodes = [
+    ...buildFollowUpNodes(int, followUps, node.id, context.player, context.state),
+    ...immediateActivateNodes,
+    ...afterActivateNodes,
+    ...afterHostNodes,
+  ]
+  const leadingNodes = [
+    ...duringActivateNodes,
+    ...hookFlows,
+  ]
+  if (result.type === 'flow') {
+    const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id)
+    if (trailingHookNodes.length > 0) {
+      int.tree.insertAfter(node.id, trailingHookNodes)
+    }
+    int.tree.insertAfter(node.id, [flowNode])
+    if (leadingNodes.length > 0) {
+      int.tree.insertAfter(node.id, leadingNodes)
+    }
+  } else {
+    const allInsertNodes = [...leadingNodes, ...trailingHookNodes]
+    if (allInsertNodes.length > 0) {
+      int.tree.insertAfter(node.id, allInsertNodes)
+    }
+  }
+  recordDeferredHostResult(int, node, result)
+  node.resolve(result)
+  commitIfEngineComplete(int, context, result)
+  return { type: 'ok', nodeId: node.id, actionId: node.actionId, result }
+}
+
 /**
  * S4c PR5 — extracted from `Engine.proceed`. Drives one step of the engine
  * tree. Mutates `int.tree` / `int.pendingNodeIdRef` / `int.beforePhaseFlowNodeIds`
@@ -493,7 +854,7 @@ export function engineProceed(
           space: context.space,
           params: entry.actionNode.params,
           sourceCard: entry.actionNode.sourceCard,
-          actionContext: actionContextForNode(entry.actionNode),
+          actionContext: actionContextForNode(entry.actionNode, int),
           emitPrivateEvent: context.emitPrivateEvent,
         }
         const action = int.registry.get(entry.actionNode.actionId)
@@ -651,12 +1012,15 @@ export function engineProceed(
     if (isActivateCardActionNode(node)) {
       return executeActivateCardAction(int, context, node)
     }
+    if (node.deferredHostResult) {
+      return executeDeferredHostAction(int, context, node)
+    }
     const replaceResult = int.hooks.applyComputeReplace({
       ...context,
       ...currentEventReadContext(int),
       params: node.params,
       sourceCard: node.sourceCard,
-      actionContext: node.actionContext,
+      actionContext: actionContextForNode(node, int),
       actionId: node.actionId,
     })
     const replacedActionId = replaceResult.actionId
@@ -689,8 +1053,31 @@ export function engineProceed(
       space: context.space,
       params: node.params,
       sourceCard: replaceSourceCard,
-      actionContext: actionContextForNode(node),
+      actionContext: actionContextForNode(node, int),
       emitPrivateEvent: context.emitPrivateEvent,
+    }
+    if (!int.beforePhaseFlowNodeIds.has(node.id)) {
+      const beforePhase = int.hooks.before({
+        ...executionContext,
+        ...currentEventReadContext(int),
+        actionId: replacedActionId,
+      })
+      const beforeBaseEvent = buildListenerEvent(executionContext, {})
+      const beforeActivateNodes = buildPhaseTrailingNodes(
+        int,
+        beforePhase.matchedListeners,
+        'before',
+        replacedActionId,
+        context.state,
+        beforeBaseEvent,
+        executionContext.player.id,
+      )
+      if (beforeActivateNodes.length > 0 && !node.beforePhaseResolved) {
+        node.beforePhaseResolved = true
+        enforceCompositeContinuationMandatory(node)
+        int.tree.insertBefore(node.id, beforeActivateNodes)
+        return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+      }
     }
     const doable = int.hooks.applyIsDoable(
       { ...executionContext, ...currentEventReadContext(int), actionId: replacedActionId },
@@ -733,29 +1120,6 @@ export function engineProceed(
     )
     executionContext.costs =
       Object.keys(costOverride).length > 0 ? costOverride : undefined
-    if (!int.beforePhaseFlowNodeIds.has(node.id)) {
-      const beforePhase = int.hooks.before({
-        ...executionContext,
-        ...currentEventReadContext(int),
-        actionId: replacedActionId,
-      })
-      const beforeBaseEvent = buildListenerEvent(executionContext, {})
-      const beforeActivateNodes = buildPhaseTrailingNodes(
-        int,
-        beforePhase.matchedListeners,
-        'before',
-        replacedActionId,
-        context.state,
-        beforeBaseEvent,
-        executionContext.player.id,
-      )
-      if (beforeActivateNodes.length > 0 && !node.beforePhaseResolved) {
-        node.beforePhaseResolved = true
-        enforceCompositeContinuationMandatory(node)
-        int.tree.insertBefore(node.id, beforeActivateNodes)
-        return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
-      }
-    }
     const eventFrame = int.events.beginFrame({
       actorPlayerId: executionContext.player.id,
       sourceActionId: replacedActionId,
@@ -790,20 +1154,37 @@ export function engineProceed(
     if (result.type === 'fail') {
       int.events.rollbackTransaction()
       clearEventLogDerivations(int)
+      recordInternalChildResult(int, node, result)
       node.resolve(result)
+      return { type: 'ok', nodeId: node.id, actionId: replacedActionId, result }
+    }
+    if (result.type === 'ok' && (
+      result.internalChildren?.beforeHostListeners?.length ||
+      result.internalChildren?.afterHostCommitListeners?.length
+    )) {
+      const beforeHostNodes = buildInternalActionChildNodes(
+        int,
+        node.id,
+        result.internalChildren.beforeHostListeners,
+        executionContext.player.id,
+      )
+      const deferredHostNode = buildDeferredHostNode(
+        int,
+        node,
+        result,
+        replacedActionId,
+        executionContext,
+        currentEventReadContext(int).transactionEvents,
+        completedEvents,
+      )
+      node.resolve(result)
+      int.tree.insertAfter(node.id, [...beforeHostNodes, deferredHostNode])
       return { type: 'ok', nodeId: node.id, actionId: replacedActionId, result }
     }
     const eventReadContext = currentEventReadContext(int, completedEvents)
     const duringPhase = int.hooks.during(
       { ...executionContext, ...eventReadContext, actionId: replacedActionId },
       result,
-    )
-    const duringActivateNodes = buildActivationActionNodes(int,
-      duringPhase.matchedListeners, 'during', replacedActionId,
-      {},
-      executionContext.player.id,
-      eventReadContext.transactionEvents,
-      eventReadContext.actionEvents,
     )
     if (result.type === 'request') {
       // Mirror the resolveChoice second-pass: ActionDef-declared
@@ -923,10 +1304,8 @@ export function engineProceed(
         actionContext: executionContext.actionContext,
         contextWritePatch,
       })
+      copyInternalMetadataToPending(node)
       node.emittedRequest = updatedRequest
-      if (duringActivateNodes.length > 0) {
-        int.tree.insertAfter(node.id, [...duringActivateNodes])
-      }
       return {
         type: 'choice',
         nodeId: int.pendingNodeIdRef.value ?? node.id,
@@ -937,6 +1316,13 @@ export function engineProceed(
         },
       }
     }
+    const duringActivateNodes = buildActivationActionNodes(int,
+      duringPhase.matchedListeners, 'during', replacedActionId,
+      {},
+      executionContext.player.id,
+      eventReadContext.transactionEvents,
+      eventReadContext.actionEvents,
+    )
     const immediatePhase = int.hooks.immediatelyAfter(
       { ...executionContext, ...eventReadContext, actionId: replacedActionId },
       result,
@@ -993,16 +1379,23 @@ export function engineProceed(
       trailingActionEvents,
       trailingActionEventStartIndex,
     )
+    const afterHostNodes = result.type === 'ok'
+      ? buildInternalActionChildNodes(
+          int,
+          node.id,
+          result.internalChildren?.afterHostListeners,
+          executionContext.player.id,
+        )
+      : []
     // 7b1: when the action returns a `flow`, the wrapper action's `after`
     // / `immediatelyAfter` listeners (and follow-ups) must observe the
-    // post-flow state — for renovate-house → seq:[pay, apply-renovation],
-    // listeners that read `player.houseType` would otherwise see the
-    // pre-mutate snapshot. We therefore insert flow body FIRST (last call
-    // wins via insertAfter), and trailing hooks AFTER the flow.
+    // post-flow state. We therefore insert flow body FIRST (last call wins via
+    // insertAfter), and trailing hooks AFTER the flow.
     const trailingHookNodes = [
       ...buildFollowUpNodes(int, followUps, node.id, context.player, context.state),
       ...immediateActivateNodes,
       ...afterActivateNodes,
+      ...afterHostNodes,
     ]
     const leadingNodes = [
       ...duringActivateNodes,
@@ -1027,6 +1420,7 @@ export function engineProceed(
         int.tree.insertAfter(node.id, allInsertNodes)
       }
     }
+    recordInternalChildResult(int, node, result)
     node.resolve(result)
     commitIfEngineComplete(int, context, result)
     return { type: 'ok', nodeId: node.id, actionId: replacedActionId, result }

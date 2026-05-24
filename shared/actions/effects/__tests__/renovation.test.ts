@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { PlayerState } from '../../../contract/types'
+import type { GameEvent, PlayerState } from '../../../contract/types'
 import {
   buildRenovationPlan,
   canRenovate,
@@ -145,11 +145,20 @@ describe('renovation', () => {
 })
 
 describe('renovateHouseAction (engine opt-in choice flow)', () => {
-  const buildExecutionContext = (player: PlayerState, params?: Record<string, unknown>) => ({
+  const buildExecutionContext = (
+    player: PlayerState,
+    params?: Record<string, unknown>,
+    events: GameEvent[] = [],
+  ) => ({
     state: { players: [player] } as never,
     player,
     space: { id: 'renovate-house' } as never,
     params,
+    eventSink: {
+      emit: (event: GameEvent) => {
+        events.push(event)
+      },
+    },
   })
 
   it('exposes a single base option matching the default next material', () => {
@@ -178,43 +187,59 @@ describe('renovateHouseAction (engine opt-in choice flow)', () => {
     })
   })
 
-  it('resolveChoice("clay") returns a seq:[pay, apply-renovation] flow', () => {
+  it('resolveChoice("clay") returns a pay child without mutating before payment', () => {
     const player = createPlayer({ resources: { clay: 2, reed: 1 } })
-    const result = renovateHouseAction.resolveChoice!(buildExecutionContext(player), 'clay')
-    expect(result.type).toBe('flow')
-    if (result.type !== 'flow') return
-    const flow = result.flow as { type: 'seq'; children: Array<{ type: 'leaf'; actionId: string; params: Record<string, unknown> }> }
-    expect(flow.type).toBe('seq')
-    expect(flow.children).toHaveLength(2)
-    expect(flow.children[0]!.actionId).toBe('pay')
-    expect(flow.children[0]!.params.cost).toEqual({
-      fees: [{ reed: 1 }],
-      unitFee: { clay: 1 },
-      nb: 2,
-    })
-    expect(flow.children[0]!.params.costType).toBe('renovation')
-    expect(flow.children[0]!.params.optionPrefix).toBe('pay:renovate:clay')
-    expect(flow.children[1]!.actionId).toBe('apply-renovation')
-    expect(flow.children[1]!.params).toEqual({ nextType: 'clay' })
-    // resolveChoice itself does not mutate — engine drives pay then apply-renovation.
+    player.roomTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }]
+    const events: GameEvent[] = []
+    const result = renovateHouseAction.resolveChoice!(buildExecutionContext(player, undefined, events), 'clay')
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
     expect(player.houseType).toBe('wood')
     expect(player.resources.clay).toBe(2)
+    expect(events).toEqual([])
+    expect(result.internalChildren?.beforeHostListeners).toEqual([
+      {
+        actionId: 'pay',
+        params: {
+          cost: {
+            fees: [{ reed: 1 }],
+            unitFee: { clay: 1 },
+            nb: 2,
+          },
+          costType: 'renovation',
+          optionPrefix: 'renovation',
+        },
+        resultKey: 'payment',
+      },
+    ])
+    expect(result.extraData?.renovation).toEqual({
+      from: 'wood',
+      to: 'clay',
+      rooms: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
+    })
   })
 
-  it('resolveChoice("stone") returns a flow targeting stone (Conservator path)', () => {
+  it('resolveChoice("stone") returns a stone pay child without mutating before payment (Conservator path)', () => {
     const player = createPlayer({ resources: { stone: 2, reed: 1 } })
     const result = renovateHouseAction.resolveChoice!(buildExecutionContext(player), 'stone')
-    expect(result.type).toBe('flow')
-    if (result.type !== 'flow') return
-    const flow = result.flow as { type: 'seq'; children: Array<{ type: 'leaf'; actionId: string; params: Record<string, unknown> }> }
-    expect(flow.children[0]!.params.cost).toEqual({
-      fees: [{ reed: 1 }],
-      unitFee: { stone: 1 },
-      nb: 2,
-    })
-    expect(flow.children[0]!.params.optionPrefix).toBe('pay:renovate:stone')
-    expect(flow.children[1]!.params).toEqual({ nextType: 'stone' })
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
     expect(player.houseType).toBe('wood')
+    expect(result.internalChildren?.beforeHostListeners).toEqual([
+      {
+        actionId: 'pay',
+        params: {
+          cost: {
+            fees: [{ reed: 1 }],
+            unitFee: { stone: 1 },
+            nb: 2,
+          },
+          costType: 'renovation',
+          optionPrefix: 'renovation',
+        },
+        resultKey: 'payment',
+      },
+    ])
   })
 
   it('resolveChoice fails when the chosen target is illegal for the current house', () => {

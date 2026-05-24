@@ -23,7 +23,7 @@ const LESSONS_SPACE_IDS = ['lessons', 'lessons-4'] as const
  *
  * Implementation:
  * - On place-farmer at `day-laborer`, if any lessons space is unoccupied,
- *   return an optional seq whose body is a `play-occupation` leaf for the
+ *   return an optional seq whose body is a `occupation` leaf for the
  *   lessons action cost, plus a selection-effect leaf that marks the lessons
  *   space as taken (so other players cannot use it this round).
  * - The fake-farmer return at end-of-round is implicit: our engine resets
@@ -59,7 +59,7 @@ const listener: CardListenerRegistration = {
 
     // BGA C23 does NOT gate on occupationHand: even with empty hand the fake
     // worker still occupies the lessons space (cascading lessons-listeners on
-    // other cards e.g. A113 / B155 still fire). The optional play-occupation
+    // other cards e.g. A113 / B155 still fire). The optional occupation
     // leaf is still safe to offer — the player can simply skip the seq.
 
     // Mark the lessons space as occupied by this player (fake-farmer).
@@ -81,7 +81,7 @@ const listener: CardListenerRegistration = {
       children: [
         {
           type: 'leaf',
-          actionId: 'play-occupation',
+          actionId: 'occupation',
           sourceCard: CARD_ID,
           params: { costOverride: lessonsCost },
         },

@@ -2,8 +2,10 @@ import type {
   ChoiceEffectPreview,
   ActionExecutionContext,
   ActionExecutionResult,
+  InternalActionChild,
   InteractionRequest,
 } from '../../contract/types'
+import type { GameEvent } from '../../contract/events'
 import type { EngineContext, NodeStepResult } from '../types'
 import { BaseNode } from './base'
 
@@ -16,6 +18,18 @@ export class ActionNode extends BaseNode {
   public choiceLabelKey?: string
   public choiceLabelParams?: Record<string, unknown>
   public beforePhaseResolved = false
+  public internalHostNodeId?: string
+  public internalResultKey?: string
+  public internalPaymentInfoFrom?: string
+  public deferredHostResult?: ActionExecutionResult
+  public deferredAfterHostCommitChildren?: InternalActionChild[]
+  public deferredAfterHostChildren?: InternalActionChild[]
+  public deferredHostCommitCompleted?: boolean
+  public deferredHostTransactionEvents?: GameEvent[]
+  public deferredHostActionEvents?: GameEvent[]
+  public deferredHostChoice?: string
+  public deferredHostResultTargetNodeId?: string
+  public deferredHostResultKey?: string
   /**
    * S7 Batch 1 (Sprint S7) — when a leaf ActionNode is built from an
    * ActionDef without `resolveChoice`, its
@@ -42,6 +56,9 @@ export class ActionNode extends BaseNode {
     choiceLabelParams?: Record<string, unknown>,
     actionContext?: Record<string, unknown>,
     effectPreview?: ChoiceEffectPreview,
+    internalHostNodeId?: string,
+    internalResultKey?: string,
+    internalPaymentInfoFrom?: string,
   ) {
     super(id, 'action')
     this.actionId = actionId
@@ -51,6 +68,9 @@ export class ActionNode extends BaseNode {
     this.choiceLabelParams = choiceLabelParams
     this.actionContext = actionContext
     this.effectPreview = effectPreview
+    this.internalHostNodeId = internalHostNodeId
+    this.internalResultKey = internalResultKey
+    this.internalPaymentInfoFrom = internalPaymentInfoFrom
   }
 
   execute(
@@ -89,6 +109,18 @@ export class ActionNode extends BaseNode {
       choiceLabelParams: this.choiceLabelParams,
       beforePhaseResolved: this.beforePhaseResolved,
       emittedRequest: this.emittedRequest,
+      internalHostNodeId: this.internalHostNodeId,
+      internalResultKey: this.internalResultKey,
+      internalPaymentInfoFrom: this.internalPaymentInfoFrom,
+      deferredHostResult: this.deferredHostResult,
+      deferredAfterHostCommitChildren: this.deferredAfterHostCommitChildren,
+      deferredAfterHostChildren: this.deferredAfterHostChildren,
+      deferredHostCommitCompleted: this.deferredHostCommitCompleted,
+      deferredHostTransactionEvents: this.deferredHostTransactionEvents,
+      deferredHostActionEvents: this.deferredHostActionEvents,
+      deferredHostChoice: this.deferredHostChoice,
+      deferredHostResultTargetNodeId: this.deferredHostResultTargetNodeId,
+      deferredHostResultKey: this.deferredHostResultKey,
     }
   }
 }

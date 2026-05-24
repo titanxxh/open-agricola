@@ -15,17 +15,6 @@ const CARD_ID = B16_MiningHammer.id
  *       afterRenovation → optional stables action (max 1, free cost).
  */
 
-const onBuyListener: CardListenerRegistration = {
-  id: 'B16-mining-hammer-onbuy',
-  cardIds: [CARD_ID],
-  actions: ['play-improvement'],
-  phases: ['after' as ActionHookPhase],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.choice !== `minor:${CARD_ID}` && context.choice !== CARD_ID) return
-    return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
-  },
-}
-
 const afterRenovateListener: CardListenerRegistration = {
   id: 'B16-mining-hammer-after-renovate',
   cardIds: [CARD_ID],
@@ -38,7 +27,7 @@ const afterRenovateListener: CardListenerRegistration = {
         actionId: 'stables',
         optional: true,
         sourceCard: CARD_ID,
-        actionContext: { max: 1, costOverride: {} },
+        actionContext: { max: 1, costOverride: { wood: -99 } },
       },
       sourceCard: CARD_ID,
     }
@@ -46,6 +35,10 @@ const afterRenovateListener: CardListenerRegistration = {
 }
 
 export const B16_MiningHammer_impl = {
-  listeners: [onBuyListener, afterRenovateListener],
+  listeners: [afterRenovateListener],
+  effect: {
+    id: CARD_ID,
+    onBuy: () => gainLeaf(CARD_ID, { food: 1 }),
+  },
   reaches: [] as readonly string[],
 } satisfies CardImpl

@@ -27,7 +27,7 @@ const listener: CardListenerRegistration = {
         children: [
           {
             type: 'leaf',
-            actionId: 'play-occupation',
+            actionId: 'occupation',
             sourceCard: CARD_ID,
             actionContext: { cost: {} },
           },
@@ -36,13 +36,13 @@ const listener: CardListenerRegistration = {
             children: [
               {
                 type: 'leaf',
-                actionId: 'play-occupation',
+                actionId: 'occupation',
                 sourceCard: CARD_ID,
                 actionContext: { cost: {} },
               },
               {
                 type: 'leaf',
-                actionId: 'play-occupation',
+                actionId: 'occupation',
                 optional: true,
                 sourceCard: CARD_ID,
                 actionContext: { cost: {} },

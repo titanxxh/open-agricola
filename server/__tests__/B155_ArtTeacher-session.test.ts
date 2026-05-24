@@ -74,7 +74,7 @@ describe('B155 ArtTeacher computeCosts (TP food trade)', () => {
     // computeCosts injects single trade {to:{food:1}, max:3, sideEffect}.
     // computeAllBuyableCombinations enumerates 0..3 trade times; only the
     // 1-trade-once solution covers the food:1 fee with player food=0.
-    // The lessons + play-occupation chain completes without any prompt — the
+    // The lessons + occupation chain completes without any prompt — the
     // single optimal solution is auto-applied by the engine.
     const { session } = setupSubsequent(3, 0)
     const resp = session.takeAction(0, 'lessons')

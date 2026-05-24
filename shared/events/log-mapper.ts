@@ -450,15 +450,51 @@ const paymentForEvent = (
   events: readonly GameEvent[],
   event: GameEvent,
   paymentFor: ResourcePaidEvent['paymentFor'],
+  direction: 'before' | 'after' = 'before',
 ): ResourcePaidEvent | undefined =>
   [...events]
     .filter((candidate): candidate is ResourcePaidEvent =>
       candidate.type === 'resource.paid' &&
-      candidate.seq < event.seq &&
+      (direction === 'before' ? candidate.seq < event.seq : candidate.seq > event.seq) &&
       candidate.actorPlayerId === event.actorPlayerId &&
       candidate.paymentFor === paymentFor,
     )
-    .sort((left, right) => right.seq - left.seq)[0]
+    .sort((left, right) =>
+      direction === 'before' ? right.seq - left.seq : left.seq - right.seq,
+    )[0]
+
+const stablePaymentForEvent = (
+  events: readonly GameEvent[],
+  event: FarmStableBuiltEvent,
+): ResourcePaidEvent | undefined => {
+  const nextStableBuiltSeq = [...events]
+    .filter((candidate): candidate is FarmStableBuiltEvent =>
+      candidate.type === 'farm.stableBuilt' &&
+      candidate.seq > event.seq &&
+      candidate.actorPlayerId === event.actorPlayerId,
+    )
+    .sort((left, right) => left.seq - right.seq)[0]?.seq ?? Number.POSITIVE_INFINITY
+  return [...events]
+    .filter((candidate): candidate is ResourcePaidEvent =>
+      candidate.type === 'resource.paid' &&
+      candidate.seq > event.seq &&
+      candidate.seq < nextStableBuiltSeq &&
+      candidate.actorPlayerId === event.actorPlayerId &&
+      candidate.paymentFor === 'stables',
+    )
+    .sort((left, right) => left.seq - right.seq)[0]
+}
+
+const isNearestFollowingStablePayment = (
+  events: readonly GameEvent[],
+  event: ResourcePaidEvent,
+): boolean =>
+  event.paymentFor === 'stables' &&
+  events.some((candidate): candidate is FarmStableBuiltEvent =>
+    candidate.type === 'farm.stableBuilt' &&
+    candidate.actorPlayerId === event.actorPlayerId &&
+    stablePaymentForEvent(events, candidate)?.seq === event.seq
+  )
 
 const mapCardPlayed = (
   event: CardPlayedEvent,
@@ -705,7 +741,7 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
       }
 
       if (event.type === 'farm.stableBuilt') {
-        const payment = paymentForEvent(events, event, 'stables')
+        const payment = stablePaymentForEvent(events, event)
         if (payment) consumedPaymentSeqs.add(payment.seq)
         return [mapStableBuilt(events, event, ctx, payment)]
       }
@@ -766,6 +802,7 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
 
       if (event.type === 'resource.paid') {
         if (consumedPaymentSeqs.has(event.seq)) return []
+        if (isNearestFollowingStablePayment(events, event)) return []
         const cost = positiveResources(event.resources)
         if (event.paymentFor === 'feeding' || event.paymentFor === 'begging') {
           return [{

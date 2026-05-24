@@ -30,7 +30,7 @@ const onPlayListener: CardListenerRegistration = {
   id: 'C120-agricultural-labourer-after-play',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return
     return {

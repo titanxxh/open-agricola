@@ -17,9 +17,6 @@ import { anytimeExchangeAction } from './effects/exchange'
 import { placeFarmerAction } from './effects/place-farmer'
 import { setFirstPlayerAction } from './effects/first-player'
 import { payAction } from './effects/pay'
-import { applyImprovementAction } from './effects/apply-improvement'
-import { applyRenovationAction } from './effects/apply-renovation'
-import { applyOccupationPlayAction } from './effects/apply-occupation-play'
 import { returnToSpaceAction } from './effects/internal/return-to-space'
 import { bonusVpAction } from './effects/bonus-vp'
 import { breedAction } from './effects/breed'
@@ -34,6 +31,7 @@ import { pushCardStackAction } from './effects/internal/push-to-card-stack'
 import { buildFarmhandRoomAction } from './effects/internal/build-farmhand-room'
 import { selectionAction } from './effects/internal/selection'
 import { spendWorkerAction } from './effects/internal/spend-worker'
+import { activateCardEffectAction } from './effects/internal/activate-card-effect'
 import { specialEffectAction } from './effects/special-effect'
 
 export const internalActionDefinitions: ActionDefinition[] = [
@@ -55,9 +53,6 @@ export const internalActionDefinitions: ActionDefinition[] = [
   reorganizeAction,
   anytimeExchangeAction,
   payAction,
-  applyImprovementAction,
-  applyRenovationAction,
-  applyOccupationPlayAction,
   returnToSpaceAction,
   bonusVpAction,
   breedAction,
@@ -75,5 +70,6 @@ export const internalActionDefinitions: ActionDefinition[] = [
   pushCardStackAction,
   buildFarmhandRoomAction,
   selectionAction,
+  activateCardEffectAction,
   specialEffectAction,
 ]

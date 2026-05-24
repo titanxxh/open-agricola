@@ -40,6 +40,7 @@ export type PayParams = {
   costType?: CostModifierType
   optionPrefix?: string
   paymentChoice?: string
+  sourceActionId?: string
   includeReturnedCard?: boolean
   playedCards?: string[]
 }
@@ -83,6 +84,7 @@ const PAY_PARAM_KEYS = new Set([
   'costType',
   'optionPrefix',
   'paymentChoice',
+  'sourceActionId',
   'includeReturnedCard',
   'playedCards',
 ])
@@ -130,6 +132,7 @@ const emitPaidEvent = (
   resources: Partial<Resource>,
   costType: CostModifierType | undefined,
   sourceCard: string | undefined,
+  sourceActionId: string | undefined,
   provenance: {
     bonusUsed?: string
     bonusChoiceIndex?: Record<string, number>
@@ -146,6 +149,7 @@ const emitPaidEvent = (
   ) return
   eventSink?.emit<'resource.paid'>({
     type: 'resource.paid',
+    ...(sourceActionId ? { sourceActionId } : {}),
     resources: paid,
     to: { kind: 'supply' },
     paymentFor: paymentPurpose(costType),
@@ -167,33 +171,17 @@ const buildSelectedResult = (
   state: import('../../contract/types').GameState,
   includeReturnedCard?: boolean,
   eventSink?: EventSink,
+  sourceActionId?: string,
 ): ActionExecutionResult => {
   executePaymentSolution(player, solution, { costType, state })
   if (includeReturnedCard && solution.cardUsed) {
     returnCardToBoard(player, solution.cardUsed, state)
   }
-  // Hand the wrapper-flow context to the next leaf (apply-improvement /
-  // apply-occupation-play) so its onBuy listener can still receive a real
-  // `PaymentInfo` and so apply-* can echo `resourcesPaid` back into
-  // the canonical `log.playOccupation` / `log.playImprovement` log entries
-  // (D95 SiteManager scoping, log-cost attribution tests).
-  if (
-    costType === 'major-improvement'
-    || costType === 'minor-improvement'
-    || costType === 'occupation'
-    || costType === 'renovation'
-  ) {
-    player._pendingImprovementPaymentInfo = {
-      resourcesPaid: solution.resourcesPaid,
-      feeIndex: solution.feeIndex,
-      returnedCardId: solution.cardUsed,
-    }
-  }
   const resourcesPaid = solution.resourcesPaid
   if (sourceCard) {
     addCardResourcePaid(player, sourceCard, resourcesPaid)
   }
-  emitPaidEvent(eventSink, player, resourcesPaid, costType, sourceCard, {
+  emitPaidEvent(eventSink, player, resourcesPaid, costType, sourceCard, sourceActionId, {
     bonusUsed: solution.bonusUsed,
     bonusChoiceIndex: solution.bonusChoiceIndex,
     returnedCardId: solution.cardUsed,
@@ -285,6 +273,7 @@ export const payAction: ActionDefinition = {
         state,
         p.includeReturnedCard,
         eventSink,
+        p.sourceActionId,
       )
     }
     const flat = p.cost as Partial<Resource>
@@ -298,22 +287,6 @@ export const payAction: ActionDefinition = {
       const detailed = payTypedFlatCostDetailed(player, flat, p.costType, state)
       if (!detailed.ok) return { type: 'fail', errorKey: 'log.payFail' }
       const resourcesPaid = detailed.resourcesPaid
-      if (
-        p.costType === 'major-improvement'
-        || p.costType === 'minor-improvement'
-        || p.costType === 'occupation'
-        || p.costType === 'renovation'
-      ) {
-        // Stash the typed-flat resourcesPaid for the downstream apply-* leaf
-        // so log.playOccupation / log.playImprovement can echo the actual
-        // post-trade cost (D95 SiteManager scoping etc.). The
-        // ComplexCost branch sets the same field in buildSelectedResult.
-        player._pendingImprovementPaymentInfo = {
-          resourcesPaid,
-          feeIndex: detailed.feeIndex,
-          returnedCardId: detailed.cardUsed,
-        }
-      }
       const extraData: Record<string, unknown> = {
         resourcesPaid,
         bonusUsed: detailed.bonusUsed
@@ -323,7 +296,7 @@ export const payAction: ActionDefinition = {
       if (detailed.cardUsed) extraData.returnedCardId = detailed.cardUsed
       if (detailed.feeIndex !== undefined) extraData.feeIndex = detailed.feeIndex
       if (detailed.bonusChoiceIndex) extraData.bonusChoiceIndex = detailed.bonusChoiceIndex
-      emitPaidEvent(eventSink, player, resourcesPaid, p.costType, sourceCard, {
+      emitPaidEvent(eventSink, player, resourcesPaid, p.costType, sourceCard, p.sourceActionId, {
         bonusUsed: detailed.bonusUsed,
         bonusChoiceIndex: detailed.bonusChoiceIndex,
         returnedCardId: detailed.cardUsed,
@@ -338,7 +311,7 @@ export const payAction: ActionDefinition = {
       return { type: 'fail', errorKey: 'log.payFail' }
     }
     payResources(player, flat)
-    emitPaidEvent(eventSink, player, flat, p.costType, sourceCard)
+    emitPaidEvent(eventSink, player, flat, p.costType, sourceCard, p.sourceActionId)
     if (sourceCard) {
       addCardResourcePaid(player, sourceCard, flat)
       return { type: 'ok', resourcesPaid: flat }
@@ -350,8 +323,7 @@ export const payAction: ActionDefinition = {
   // here so we can re-run the cost selection with `paymentChoice` set, this
   // time landing on the `selected` branch and actually mutating resources.
   // Without this hook the engine's fallthrough would return `{type:'ok'}`
-  // without paying, leaving downstream `seq` leaves (e.g. apply-improvement)
-  // running on un-paid state.
+  // without paying, leaving host action completion running on un-paid state.
   resolveChoice: ({ player, params, sourceCard, state, eventSink }, choice) => {
     const p = normalizePayParams(params)
     if (!p?.cost) return { type: 'fail', errorKey: 'log.payFail' }
@@ -403,6 +375,7 @@ export const payAction: ActionDefinition = {
       state,
       p.includeReturnedCard,
       eventSink,
+      p.sourceActionId,
     )
   },
 }

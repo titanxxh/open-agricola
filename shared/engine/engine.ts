@@ -57,6 +57,9 @@ type ChoiceDataSnapshot = {
   effectiveOwnerPlayerId?: string
   sourceCard?: string
   syntheticKind?: PendingEnvelope['syntheticKind']
+  internalHostNodeId?: string
+  internalResultKey?: string
+  internalPaymentInfoFrom?: string
 }
 
 const cloneSnapshotValue = <T>(value: T): T =>
@@ -69,6 +72,27 @@ const cloneEventLogDerivations = (
     events: entry.events.map((event) => cloneSnapshotValue(event)),
     result: cloneSnapshotValue(entry.result),
   }))
+
+type InternalChildResultsSnapshot = Array<{
+  hostNodeId: string
+  results: Record<string, ActionExecutionResult>
+}>
+
+const cloneInternalChildResults = (
+  results: EngineInternals['internalChildResults'],
+): InternalChildResultsSnapshot =>
+  [...results.entries()].map(([hostNodeId, hostResults]) => ({
+    hostNodeId,
+    results: cloneSnapshotValue(hostResults),
+  }))
+
+const restoreInternalChildResults = (
+  snapshot?: InternalChildResultsSnapshot,
+): EngineInternals['internalChildResults'] =>
+  new Map((snapshot ?? []).map((entry) => [
+    entry.hostNodeId,
+    cloneSnapshotValue(entry.results),
+  ]))
 
 const setNodeState = (
   node: EngineNode,
@@ -169,9 +193,21 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
           data.choiceLabelParams as Record<string, unknown> | undefined,
           data.actionContext as Record<string, unknown> | undefined,
           data.effectPreview as ActionNode['effectPreview'],
+          data.internalHostNodeId as string | undefined,
+          data.internalResultKey as string | undefined,
+          data.internalPaymentInfoFrom as string | undefined,
         )
         action.beforePhaseResolved = data.beforePhaseResolved === true
         action.emittedRequest = data.emittedRequest as InteractionRequest | undefined
+        action.deferredHostResult = data.deferredHostResult as ActionExecutionResult | undefined
+        action.deferredAfterHostCommitChildren = data.deferredAfterHostCommitChildren as ActionNode['deferredAfterHostCommitChildren']
+        action.deferredAfterHostChildren = data.deferredAfterHostChildren as ActionNode['deferredAfterHostChildren']
+        action.deferredHostCommitCompleted = data.deferredHostCommitCompleted as boolean | undefined
+        action.deferredHostTransactionEvents = data.deferredHostTransactionEvents as ActionNode['deferredHostTransactionEvents']
+        action.deferredHostActionEvents = data.deferredHostActionEvents as ActionNode['deferredHostActionEvents']
+        action.deferredHostChoice = data.deferredHostChoice as string | undefined
+        action.deferredHostResultTargetNodeId = data.deferredHostResultTargetNodeId as string | undefined
+        action.deferredHostResultKey = data.deferredHostResultKey as string | undefined
         node = action
         break
       }
@@ -239,6 +275,7 @@ export class Engine {
   private log: LogStore
   private events = new EventStore()
   private eventLogDerivations: EngineInternals['eventLogDerivations'] = []
+  private internalChildResults: EngineInternals['internalChildResults'] = new Map()
   private _pendingNodeIdRef: { value: string | null } = { value: null }
   private _counterRef: { value: number } = { value: 0 }
   private beforePhaseFlowNodeIds = new Set<string>()
@@ -261,6 +298,7 @@ export class Engine {
       log: this.log,
       events: this.events,
       eventLogDerivations: this.eventLogDerivations,
+      internalChildResults: this.internalChildResults,
       counterRef: this._counterRef,
       beforePhaseFlowNodeIds: this.beforePhaseFlowNodeIds,
       pendingNodeIdRef: this._pendingNodeIdRef,
@@ -458,6 +496,7 @@ export class Engine {
       // the pending-choice host on rehydrate.
       compositeEmit: snapshotCompositeEmit(this._internals()),
       beforePhaseFlowNodeIds: [...this.beforePhaseFlowNodeIds],
+      internalChildResults: cloneInternalChildResults(this.internalChildResults),
       eventTransaction: this.events.snapshot(),
       eventLogDerivations: cloneEventLogDerivations(this.eventLogDerivations),
     }
@@ -520,10 +559,12 @@ export class Engine {
       request?: InteractionRequest
     } | null
     beforePhaseFlowNodeIds?: string[]
+    internalChildResults?: InternalChildResultsSnapshot
     eventTransaction?: ReturnType<Engine['events']['snapshot']>
     eventLogDerivations?: EngineInternals['eventLogDerivations']
   }) {
     this.beforePhaseFlowNodeIds = new Set(snapshot.beforePhaseFlowNodeIds ?? [])
+    this.internalChildResults = restoreInternalChildResults(snapshot.internalChildResults)
     this.events.restore(snapshot.eventTransaction)
     this.eventLogDerivations = cloneEventLogDerivations(snapshot.eventLogDerivations ?? [])
     const restoredRoot = snapshot.treeCursor ? restoreTreeFromCursor(snapshot.treeCursor) : null
@@ -572,6 +613,9 @@ export class Engine {
           effectiveOwnerPlayerId: snapshot.choiceData.effectiveOwnerPlayerId,
           contextSnapshot: snapshot.choiceData.contextSnapshot,
           syntheticKind: snapshot.choiceData.syntheticKind,
+          internalHostNodeId: snapshot.choiceData.internalHostNodeId,
+          internalResultKey: snapshot.choiceData.internalResultKey,
+          internalPaymentInfoFrom: snapshot.choiceData.internalPaymentInfoFrom,
         })
         legacyChoicePendingNodeId = node.id
       }
