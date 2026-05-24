@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState } from '../../contract/types'
-import { setFencesForTest, setPalisadesForTest } from './__fixtures__/fence'
+import { C54_MarketBooth } from '../../cards-display/C/C54_MarketBooth'
 
 import '../C/C54_MarketBooth'
 
@@ -34,25 +34,37 @@ const createState = (...players: PlayerState[]): GameState =>
   }) as unknown as GameState
 
 describe('C54_MarketBooth', () => {
-  it('does not trigger when player has only palisades (no fences)', () => {
-    const player = createPlayer()
-    setPalisadesForTest(player, 4)
-    const effect = getCardEffect(CARD_ID)!
-
-    const result = effect.onEndHarvestFieldPhase!(createState(player), player)
-
-    expect(result).toBeUndefined()
+  it('prints a stable supply-token cost', () => {
+    expect(C54_MarketBooth.cost).toEqual({ stable: 1 })
   })
 
-  it('triggers when player has at least one fence', () => {
+  it('declares harvest exchange as grain + fence for 5 food', () => {
     const player = createPlayer()
-    setFencesForTest(player, 1)
-    setPalisadesForTest(player, 3)
     const effect = getCardEffect(CARD_ID)!
 
     const result = effect.onEndHarvestFieldPhase!(createState(player), player)
 
     expect(result).toBeDefined()
     expect(result?.type).toBe('seq')
+    expect(result?.type === 'seq' ? result.optional : undefined).toBe(true)
+    expect(result?.type === 'seq' ? result.children : undefined).toEqual([
+      {
+        type: 'leaf',
+        actionId: 'pay',
+        params: { grain: 1, fence: 1 },
+        sourceCard: CARD_ID,
+        choiceLabelKey: undefined,
+        choiceLabelParams: undefined,
+        effectPreview: undefined,
+      },
+      {
+        type: 'leaf',
+        actionId: 'gain',
+        params: { food: 5 },
+        sourceCard: CARD_ID,
+        choiceLabelKey: undefined,
+        choiceLabelParams: undefined,
+      },
+    ])
   })
 })
