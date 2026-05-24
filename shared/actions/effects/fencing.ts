@@ -157,6 +157,10 @@ const inferMinimumPolicySegments = (policy: FenceActionPolicy): number => {
   if (minPastureSize !== undefined) {
     return minPerimeterForFarmCells(minPastureSize)
   }
+  const maxTotal = segmentBounds?.total?.max
+  if (maxTotal !== undefined) {
+    return Math.max(1, Math.min(minimumFenceSegments, maxTotal))
+  }
   return minimumFenceSegments
 }
 
