@@ -9,6 +9,7 @@ type FindingType =
   | 'freeCost'
   | 'legacyRenovationAction'
   | 'legacyFencingAction'
+  | 'legacyFencingListener'
 
 type Finding = {
   file: string
@@ -115,6 +116,9 @@ const scanCardAuthoredCostHacks = () => {
     }
     if (/actionId\s*:\s*['"]fencing['"]/.test(text)) {
       findings.push({ file, type: 'legacyFencingAction' })
+    }
+    if (/actions\s*:\s*\[[^\]]*['"]fencing['"]/.test(text)) {
+      findings.push({ file, type: 'legacyFencingListener' })
     }
   }
   return findings.filter(
