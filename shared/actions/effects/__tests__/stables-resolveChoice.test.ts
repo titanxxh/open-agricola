@@ -62,6 +62,50 @@ const makeCtx = (
 }
 
 describe('stablesAction.resolveChoice', () => {
+  it('is not executable when consumed stable tokens exhaust the reserve', () => {
+    const ctx = makeCtx({
+      player: {
+        stableTiles: [],
+        supplyTokensConsumed: { stable: 4 },
+      } as Partial<PlayerState>,
+    })
+
+    expect(stablesAction.canBeExecutedByPlayer(ctx.state, ctx.player)).toBe(false)
+  })
+
+  it('caps stable selection max by dynamic reserve', () => {
+    const ctx = makeCtx({
+      player: {
+        supplyTokensConsumed: { stable: 3 },
+      } as Partial<PlayerState>,
+      actionContext: { max: 3 },
+    })
+
+    const result = stablesAction.execute(ctx)
+
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') return
+    expect(result.request.kind).toBe('farm-select')
+    if (result.request.kind !== 'farm-select') return
+    expect(result.request.farm.maxSelections).toBe(1)
+  })
+
+  it('rejects finalizing more stables than dynamic reserve', () => {
+    const ctx = makeCtx({
+      player: {
+        supplyTokensConsumed: { stable: 3 },
+      } as Partial<PlayerState>,
+    })
+    const result = stablesAction.resolveChoice!(ctx, 'confirm', {
+      stables: [
+        { row: 0, col: 0 },
+        { row: 0, col: 1 },
+      ],
+    })
+
+    expect(result.type).toBe('fail')
+  })
+
   it('cancel returns ok', () => {
     const result = stablesAction.resolveChoice!(makeCtx(), 'cancel')
     expect(result.type).toBe('ok')

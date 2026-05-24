@@ -31,6 +31,7 @@ describe('C94_StableCleaner — cost override 1 wood + 1 food', () => {
   const setupContext = (
     resources: { wood?: number; food?: number },
     stableTilesLength = 0,
+    consumedStables = 0,
   ) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -46,6 +47,7 @@ describe('C94_StableCleaner — cost override 1 wood + 1 food', () => {
       row: 1,
       col: i + 1,
     }))
+    player.supplyTokensConsumed = consumedStables > 0 ? { stable: consumedStables } : {}
     session.loadState(state)
     return {
       state,
@@ -92,6 +94,13 @@ describe('C94_StableCleaner — cost override 1 wood + 1 food', () => {
   it('does NOT emit when player already has 4 stables', () => {
     const listener = findListener(LISTENER_ID)!
     const ctx = setupContext({ wood: 5, food: 5 }, 4)
+    const result = executeCardListener(listener, ctx)
+    expect(result).toBeUndefined()
+  })
+
+  it('does NOT emit when consumed stable tokens exhaust reserve', () => {
+    const listener = findListener(LISTENER_ID)!
+    const ctx = setupContext({ wood: 5, food: 5 }, 0, 4)
     const result = executeCardListener(listener, ctx)
     expect(result).toBeUndefined()
   })

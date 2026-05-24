@@ -11,6 +11,7 @@ import {
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import type { CardImpl } from '../registry'
 import { B85_FarmHand } from '../../cards-display/B/B85_FarmHand'
+import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 
 const CARD_ID = B85_FarmHand.id
 
@@ -96,6 +97,7 @@ const anytimeListener: CardListenerRegistration = {
     if (isFarmHandUsed(context.player)) return
     // BGA ruling: only the exact Build Stables action qualifies.
     if (context.space?.id !== 'stables') return
+    if (getAvailableStableSupplyCount(context.state, context.player) <= 0) return
     // Pay 1 wood (matches BGA's `canAffordStablePlan(…, 1)` with the
     // standard 1-wood-per-stable cost).
     if ((context.player.resources.wood ?? 0) < 1) return
