@@ -94,6 +94,7 @@
 | 行动格生命周期已进入后端事件层 | `B23_FinalScenario` | 后端持有 reveal/exclusive-use 状态，round-start 统一清理并 emit `action.exclusiveUseCleared`。 |
 | Log / notification provenance | `shared/events/event-mapping-policy.ts` 覆盖全部 public/private event type；`shared/cards/__tests__/provenance-result-audit.test.ts` 守住生产卡牌的 `context.result` 资源事实 fallback | 结构化事件层是卡牌判定、UI log、private notification 和 replay 的统一来源；新增支付/资源/farm metadata 路径必须先 emit 事件再让 listener 消费，不要回退到 action result。 |
 | Fence segment source/type policy 已进入通用基础设施 | `FenceSegment.type` / `source`、`consume-fence` ownOnly、fencing `fencePolicy` | 普通 fence / palisade / borrowed source 不通过主路径卡牌分支表达；C1 rebuild、B30 palisade、未来 E149 borrowed fence 都走 segment type/source + generic policy。 |
+| Supply token payment 已进入通用资源基础设施 | `PaymentResourceMap`、`supplyTokensConsumed`、payment solver、`resource.paid` | fence / stable 作为支付资源处理；C54/A34 消耗 reserve fence，B149 消耗 stable supply，后续读取可建上限必须走 supply-token helper。 |
 | 注释里的非阻塞 card-id 示例 | `shared/actions/effects/breed.ts`、`shared/contract/types.ts` 仅把 `A165_PigBreeder` / `D95_SiteManager` 作为例子提到 | 除非附近代码变动，否则保留；它们不是可执行的单卡分支。 |
 | Legacy/fallback 术语残留 | 旧 bad-smell 文档发现的剩余 fallback/direct-path 术语，主要在已迁移支付 flow 和测试中 | 将直接运行时 fallback 视为重构债；测试/baseline 名称除非真实迁移触及，否则不动。 |
 
@@ -113,9 +114,10 @@
 11. ~~决定 BGA `implemented=false` data-only 卡是否进入 OA 发牌池。~~ ✅ 已落地：`shared/session/state-bootstrap.ts` `dealHands()` 使用 `implementedMinorImprovementCards` / `implementedOccupationCards`，两者基于 `isImplementedCard(card.implemented !== false)` 过滤；`A169_OffSiter` 等 `implemented=false` 卡已排除出发牌池。
 12. ~~扩展结构化 action event/log event~~ ✅ 已关闭：所有 public/private event type 由 `event-mapping-policy` 覆盖，log / public notification / highlight / resource animation / replay 的 mapped、conditional、silent 边界均由测试 fixture 守住；当前未进入 log mapper 的 card/farm/future/worker/lifecycle event 已补齐可读 log 或显式静默策略。后续更丰富动画属于 enhancement，不再是基础设施开放 umbrella。
 13. ~~BGA-style pay child / internal children 机制~~ ✅ 已落地：public host action 负责业务 mutation，mandatory payment 通过 internal `pay` child 结算；`beforeHostListeners` / `afterHostCommitListeners` / `afterHostListeners` 保留 BGA pay slot 差异，improvement/occupation 的 onBuy 在 host commit 后、host after 前运行；public action 顺序已修正为 `computeReplace -> before -> strict isDoable -> computeCosts -> execute -> during -> immediatelyAfter -> after`；`activate-card-effect` 通过 internal result map 读取 `paymentInfo`；`architecture-guard` 守住 deleted apply effects，不允许新增 top-level `apply-*` effect 文件来堆叠多卡逻辑。
-14. ~~Fence segment source/type + generic fencing policy~~ ✅ 已落地：`FenceSegment.type` 区分 ordinary fence / B30 palisade，`FenceSegment.source` 区分 own / borrowed；缺省普通 fence 视为 own ordinary source。fencing 主路径不按 `C1` / `B30` / `E149`、`noWoodPalisades`、`midnightFencer` 分支；卡牌通过 `fencePolicy` 表达 allowed segment types、source policy、bounds、cost、cancel、animal preservation。C1 rebuild 只计数/回收/重建 own ordinary fences，走 `consume-fence` ownOnly + generic `fencePolicy`。
+14. ~~Fence segment source/type + generic fencing policy~~ ✅ 已落地：`FenceSegment.type` 区分 ordinary fence / B30 palisade，`FenceSegment.source` 区分 own / borrowed；缺省普通 fence 视为 own ordinary source。fencing 主路径不按 `C1` / `B30` / `E149`、`noWoodPalisades`、`midnightFencer` 分支；卡牌通过 `fencePolicy` 表达 allowed segment types、source policy、bounds、cost、cancel、animal preservation；`segmentBounds.total` 表达普通 fence + palisade 的总段数上限。C1 rebuild 只计数/回收/重建 own ordinary fences，走 `consume-fence` ownOnly + generic `fencePolicy`。
+15. ~~Supply token payment / reserve cap~~ ✅ 已落地：`PaymentResourceMap` 支持 `fence` / `stable` supply token；payment solver、typed-flat、pay leaf、Card Definition cost、`PaymentInfo.resourcesPaid` 和 `resource.paid.resources` 都保留这些 token。支付 supply token 只增加 `player.supplyTokensConsumed`，不删除已建组件；fence / stable 可建上限统一由 `getOwnOrdinaryFenceBuildLimit()` / `getOwnOrdinaryFenceReserveCount()` / `getAvailableStableSupplyCount()` 计算，禁止回退到固定 15 / 4。C54 Market Booth、A34 Loppers、B149 Open Air Farmer、E148 Lazybones、A89 Stable Planner、E76 Lumber Pile 等回归已覆盖。
 
-影响回归覆盖：`B65_GrainDepot` paymentInfo fee index、before-phase cards、renovation、improvement、occupation、construct、stables、fencing、`A34_Loppers` exact-wood、stable paid/free log pairing。
+影响回归覆盖：`B65_GrainDepot` paymentInfo fee index、before-phase cards、renovation、improvement、occupation、construct、stables、fencing、`A34_Loppers` exact-wood、C54/A34 reserve fence payment、B149 stable supply + palisade bounds、stable paid/free log pairing。
 
 ## 7. Log 系统对比
 
@@ -676,7 +678,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B146_Illusionist` | 已对齐 |  |
 | `B147_Huntsman` | 已对齐 |  |
 | `B148_PetBroker` | 已对齐 |  |
-| `B149_OpenAirFarmer` | 已对齐 |  |
+| `B149_OpenAirFarmer` | 已对齐 | pay 3 stable supply token；fixed 2 wood 建一个 2格 pasture；`segmentBounds.total.max=6`，B30 palisade 计入总段数且可补足 ordinary fence supply |
 | `B150_LargeScaleFarmer` | 已对齐 |  |
 | `B151_LittlePeasant` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `B152_JuniorArtist` | 已对齐 |  |
@@ -1215,7 +1217,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `E145_Parvenu` | 已对齐 |  |
 | `E146_Reseller` | 已对齐 |  |
 | `E147_AnimalDriver` | 已对齐 |  |
-| `E148_Lazybones` | 已对齐 |  |
+| `E148_Lazybones` | 已对齐 | reserved stable action spaces 计入 stable supply helper；无空地时仍可清理 marker，不把 no-op 清理计为卡牌 use |
 | `E149_MidnightFencer` | 已接受差异 | 已接受的行为 / 产品差异 |
 | `E150_RockBeater` | 已对齐 |  |
 | `E151_DeliveryNurse` | 已对齐 |  |
