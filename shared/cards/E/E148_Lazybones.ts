@@ -47,8 +47,8 @@ const choiceOptions = (reserve: number): ActionChoiceOption[] => [
   { value: DECLINE_CHOICE, labelKey: 'ui.interactionOptionalSkip', sourceCard: CARD_ID },
   ...actionSpaceSubsets(reserve).map((spaces) => ({
     value: `${CHOICE_PREFIX}${spaces.join(',')}`,
-    labelKey: 'cards.E148_Lazybones.name',
-    labelParams: { count: spaces.length },
+    labelKey: 'cards.E148_Lazybones.choice',
+    labelParams: { spaces: spaces.join(', ') },
     sourceCard: CARD_ID,
   })),
 ]

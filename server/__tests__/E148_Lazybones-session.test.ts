@@ -5,7 +5,7 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { getAllTilePositions } from '../../shared/domain/farm'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
-import type { ActionFlow } from '../../shared/contract/types'
+import type { ActionChoiceOption, ActionFlow } from '../../shared/contract/types'
 import '../../shared/cards/E/E148_Lazybones'
 
 const CARD_ID = 'E148_Lazybones'
@@ -47,12 +47,24 @@ describe('E148_Lazybones session', () => {
     expect(flow?.type).toBe('leaf')
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('emit-choice')
-    const options = leaf.params?.options as Array<{ value: string }>
+    const options = leaf.params?.options as ActionChoiceOption[]
     expect(options.length).toBeGreaterThan(0)
-    expect(options.some((option) => option.value === CHOICE_PREFIX)).toBe(true)
+    const skip = options.find((option) => option.value === CHOICE_PREFIX)
+    expect(skip?.labelKey).toBe('ui.interactionOptionalSkip')
     expect(options.every((option) => selectedSpacesFromChoice(option.value).length <= 2)).toBe(true)
     expect(options.some((option) => selectedSpacesFromChoice(option.value).length === 2)).toBe(true)
     expect(options.some((option) => selectedSpacesFromChoice(option.value).length === 3)).toBe(false)
+    const reserveOptions = options.filter((option) => option.value !== CHOICE_PREFIX)
+    for (const option of reserveOptions) {
+      const spaces = selectedSpacesFromChoice(option.value)
+      expect(option.labelKey).toBe('cards.E148_Lazybones.choice')
+      expect(option.labelParams).toEqual({ spaces: spaces.join(', ') })
+    }
+    const optionLabels = new Set(reserveOptions.map((option) => JSON.stringify({
+      labelKey: option.labelKey,
+      labelParams: option.labelParams,
+    })))
+    expect(optionLabels.size).toBe(reserveOptions.length)
 
     effect.resolveChoice!(state, owner, CHOICE_PREFIX)
 
