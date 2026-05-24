@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
+import type { DraftGameEvent } from '../../shared/contract/events'
 import type { GameState, PlayerState } from '../../shared/contract/types'
 import { setFencesForTest, setPalisadesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
 
@@ -35,6 +36,14 @@ const widePastureEdges = [
   'V-1-5',
   'V-2-5',
 ]
+
+const fenceBuilt = (
+  newFenceEdges: string[],
+): DraftGameEvent<'farm.fenceBuilt'> => ({
+  type: 'farm.fenceBuilt',
+  fences: newFenceEdges.map((edge) => ({ edge, type: 'fence' })),
+  newFenceEdges,
+})
 
 const createPlayer = (): PlayerState =>
   ({
@@ -112,12 +121,15 @@ describe('A34 Loppers — supply fence payment', () => {
     setPalisadesForTest(player, 15) // well above maxFences
     setFencesForTest(player, 0)
     const listener = findListener('A34-loppers-after-fencing')!
+    const actionEvents = [fenceBuilt(['H-0-0'])]
 
     const result = executeCardListener(listener, {
       state: createState(player),
       player,
       actionId: 'fence',
       phase: 'after',
+      transactionEvents: actionEvents,
+      actionEvents,
     } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
@@ -134,15 +146,64 @@ describe('A34 Loppers — supply fence payment', () => {
     const player = createPlayer()
     setFencesForTest(player, 15)
     const listener = findListener('A34-loppers-after-fencing')!
+    const actionEvents = [fenceBuilt(['H-0-0'])]
 
     const result = executeCardListener(listener, {
       state: createState(player),
       player,
       actionId: 'fence',
       phase: 'after',
+      transactionEvents: actionEvents,
+      actionEvents,
     } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
+  })
+
+  it('does not offer the exchange when fencing is cancelled', () => {
+    const session = setupFencingSession({ wood: 5 })
+    let resp = session.takeAction(0, 'fencing')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+
+    resp = session.resolveChoice(0, 'cancel')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.promptKey).toBe('ui.confirmNextPlayer')
+    expect(resp.state.players[0]!.fenceSegments).toHaveLength(0)
+    expect(resp.state.players[0]!.resources.wood).toBe(5)
+    expect(resp.state.players[0]!.resources.food).toBe(0)
+    expect(resp.state.players[0]!.supplyTokensConsumed?.fence).toBeUndefined()
+    expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.counters?.bonusVp).toBeUndefined()
+    expect(resp.state.events).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'farm.fenceBuilt',
+        }),
+        expect.objectContaining({
+          type: 'resource.paid',
+          paymentFor: 'cardEffect',
+        }),
+      ]),
+    )
+  })
+
+  it('does not offer the exchange when the fence event has no ordinary fence edges', () => {
+    const player = createPlayer()
+    const listener = findListener('A34-loppers-after-fencing')!
+    const actionEvents = [fenceBuilt([])]
+
+    const result = executeCardListener(listener, {
+      state: createState(player),
+      player,
+      actionId: 'fence',
+      phase: 'after',
+      result: { type: 'ok', extraData: { newFenceEdges: ['H-0-0'] } },
+      transactionEvents: actionEvents,
+      actionEvents,
+    } as unknown as CardListenerContext)
+
+    expect(result).toBeUndefined()
   })
 
   it('after fencing, accepting pays wood + reserve fence for food and bonus VP', () => {
