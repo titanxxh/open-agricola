@@ -107,6 +107,22 @@ describe('formatCost card session regressions', () => {
     expect(built.state.players[1]!.minorHand).toContain('C2_Stable')
   })
 
+  it('C2_Stable does not allow cancelling the mandatory free stable', () => {
+    const session = setupMinor('C2_Stable')
+    const state = session.getState().state
+    state.players[0]!.resources.wood = 1
+    session.loadState(state)
+
+    const played = playPassingMinor(session, 'C2_Stable')
+    expect(played.interaction.stateId).toBe('wait')
+
+    const cancelled = session.resolveChoice(0, 'cancel')
+    expect(cancelled.ok).toBe(false)
+    expect(cancelled.interaction.stateId).toBe('wait')
+    expect(cancelled.state.players[0]!.stableTiles).toEqual([])
+    expect(cancelled.state.players[1]!.minorHand).toContain('C2_Stable')
+  })
+
   it('E1_PoleBarns offers free stables after the card cost consumes all wood', () => {
     const session = setupMinor('E1_PoleBarns')
     const state = session.getState().state
