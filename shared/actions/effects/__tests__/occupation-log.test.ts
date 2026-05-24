@@ -11,7 +11,7 @@ import { LogStore } from '../../../engine/log-store'
 import { ActionNode, SequenceNode } from '../../../engine/nodes'
 import { ActionRegistry } from '../../../engine/registry'
 import { internalActionDefinitions } from '../../internal-actions'
-import { playOccupation } from '../occupation'
+import { playOccupation, playOccupationAction } from '../occupation'
 import { clearActionHooks, registerActionHook } from '../../hooks'
 import { readCardResourceStats } from '../../../cards/helpers/card-state'
 import '../../../cards/A/A85_Homekeeper'
@@ -135,6 +135,43 @@ const proceedUntilDone = (
 }
 
 describe('occupation play result', () => {
+  it('uses exactCost to override lessons cost when listing occupations', () => {
+    const state = createState()
+    const player = createPlayer({
+      occupationHand: [OK_CARD_ID],
+      resources: {
+        wood: 0,
+        clay: 0,
+        reed: 0,
+        stone: 0,
+        food: 0,
+        grain: 0,
+        vegetable: 0,
+        sheep: 0,
+        boar: 0,
+        cattle: 0,
+        begging: 0,
+      },
+    })
+    state.players = [player]
+
+    const result = playOccupationAction.execute({
+      state,
+      player,
+      space: createSpace('lessons-3'),
+      params: { exactCost: {} },
+      eventSink: { emit: () => {} },
+    })
+
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') return
+    expect(result.request.kind).toBe('choice')
+    if (result.request.kind !== 'choice') return
+    expect(result.request.options).toEqual(expect.arrayContaining([
+      expect.objectContaining({ value: OK_CARD_ID }),
+    ]))
+  })
+
   it('plays plain occupation without legacy log payload', () => {
     const player = createPlayer({
       occupationHand: [OK_CARD_ID],
@@ -283,7 +320,7 @@ describe('occupation play result', () => {
         actions,
         'occupation',
         GRANT_SOURCE_CARD_ID,
-        { costOverride: { food: 1 } },
+        { exactCost: { food: 1 } },
       )
       const space = createSpace()
       const context: EngineTestContext = {

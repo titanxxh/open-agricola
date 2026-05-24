@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { plowAction } from '../plow'
 import type {
-  ActionExecutionContext,
+  ActionMutationContext,
   ActionSpace,
   FarmTilePosition,
   GameState,
@@ -17,7 +17,7 @@ const makeCtx = (
     actionContext?: Record<string, unknown>
     costs?: Partial<Resource>
   } = {},
-): ActionExecutionContext => {
+): ActionMutationContext => {
   const player = {
     id: 'p1',
     name: 'P1',
@@ -54,8 +54,67 @@ const makeCtx = (
     space: dummySpace,
     actionContext: opts.actionContext,
     costs: opts.costs,
-  } as ActionExecutionContext
+    eventSink: { emit: () => undefined } as unknown as ActionMutationContext['eventSink'],
+  } as ActionMutationContext
 }
+
+const executeSelectableTiles = (ctx: ActionMutationContext) => {
+  const result = plowAction.execute(ctx)
+  expect(result.type).toBe('request')
+  if (result.type !== 'request') return []
+  expect(result.request.kind).toBe('farm-select')
+  if (result.request.kind !== 'farm-select') return []
+  return result.request.farm.selectableTiles
+}
+
+describe('plowAction.execute', () => {
+  it('default free plow exposes selectable tiles', () => {
+    const tiles = executeSelectableTiles(makeCtx())
+    expect(tiles.length).toBeGreaterThan(0)
+  })
+
+  it('exactCost max 0 exposes no selectable tiles', () => {
+    const tiles = executeSelectableTiles(makeCtx({
+      actionContext: { exactCost: { max: 0 } },
+    }))
+    expect(tiles).toEqual([])
+  })
+
+  it('unaffordable exactCost exposes no selectable tiles', () => {
+    const tiles = executeSelectableTiles(makeCtx({
+      actionContext: { exactCost: { food: 1 } },
+    }))
+    expect(tiles).toEqual([])
+  })
+
+  it('affordable exactCost exposes selectable tiles', () => {
+    const tiles = executeSelectableTiles(makeCtx({
+      player: {
+        resources: {
+          wood: 0,
+          clay: 0,
+          stone: 0,
+          reed: 0,
+          grain: 0,
+          vegetable: 0,
+          food: 1,
+          sheep: 0,
+          boar: 0,
+          cattle: 0,
+        },
+      },
+      actionContext: { exactCost: { food: 1 } },
+    }))
+    expect(tiles.length).toBeGreaterThan(0)
+  })
+
+  it('unaffordable computeCosts delta exposes no selectable tiles', () => {
+    const tiles = executeSelectableTiles(makeCtx({
+      costs: { wood: 1 },
+    }))
+    expect(tiles).toEqual([])
+  })
+})
 
 describe('plowAction.resolveChoice', () => {
   it('cancel returns ok', () => {
@@ -97,6 +156,43 @@ describe('plowAction.resolveChoice', () => {
     expect(result.resourcesPaid).toEqual({ wood: 1 })
     expect(ctx.player.resources.wood).toBe(0)
     expect(ctx.player.fields.some((f) => f.row === 0 && f.col === 0)).toBe(true)
+  })
+
+  it('first call with payload + exactCost pays exact resources', () => {
+    const tile: FarmTilePosition = { row: 0, col: 0 }
+    const ctx = makeCtx({
+      player: {
+        resources: {
+          wood: 0,
+          clay: 0,
+          stone: 0,
+          reed: 0,
+          grain: 0,
+          vegetable: 0,
+          food: 1,
+          sheep: 0,
+          boar: 0,
+          cattle: 0,
+        },
+      },
+      actionContext: { exactCost: { food: 1 } },
+    })
+    const result = plowAction.resolveChoice!(ctx, 'confirm', { tile })
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.resourcesPaid).toEqual({ food: 1 })
+    expect(ctx.player.resources.food).toBe(0)
+    expect(ctx.player.fields.some((f) => f.row === 0 && f.col === 0)).toBe(true)
+  })
+
+  it('first call with payload + exactCost max 0 fails', () => {
+    const tile: FarmTilePosition = { row: 0, col: 0 }
+    const ctx = makeCtx({
+      actionContext: { exactCost: { max: 0 } },
+    })
+    const result = plowAction.resolveChoice!(ctx, 'confirm', { tile })
+    expect(result.type).toBe('fail')
+    expect(ctx.player.fields.some((f) => f.row === 0 && f.col === 0)).toBe(false)
   })
 
   it('first call with payload + multi-combo cost returns choice + actionContextWrite', () => {

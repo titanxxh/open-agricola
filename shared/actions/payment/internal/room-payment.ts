@@ -13,6 +13,7 @@
 import type {
   ActionExecutionResult,
   ComplexCost,
+  ExactCost,
   PaymentSolution,
   PlayerState,
   Resource,
@@ -20,8 +21,8 @@ import type {
 import { getAllTilePositions, positionKey } from '../../../domain/farm'
 import { resolveCostPaymentSelection } from './payment-choice-result'
 import { executeResolvedTypedFlatPayment } from './typed-flat'
-import { applyCostOverride } from './affordability'
 import { canPayCost } from './enumerate'
+import { readExactCost, resolveUnitCostWithDelta } from './exact-cost'
 
 export const getBuildRoomCost = (houseType: PlayerState['houseType']) => {
   if (houseType === 'clay') return { clay: 5, reed: 2 }
@@ -29,12 +30,49 @@ export const getBuildRoomCost = (houseType: PlayerState['houseType']) => {
   return { wood: 5, reed: 2 }
 }
 
-const buildConstructCost = (
+const readCostOverride = (
+  actionContext?: Record<string, unknown>,
+): Partial<Resource> | undefined => {
+  const override = actionContext?.costOverride
+  if (!override || typeof override !== 'object') return undefined
+  return override as Partial<Resource>
+}
+
+export const readConstructCostDelta = (
+  actionContext: Record<string, unknown> | undefined,
+  costs: Partial<Resource> | undefined,
+): Partial<Resource> | undefined => {
+  if (costs && Object.keys(costs).length > 0) return costs
+  return readExactCost(actionContext) ? undefined : readCostOverride(actionContext)
+}
+
+const resolveConstructUnitFee = (
   player: PlayerState,
-  costOverride: Partial<Resource> | undefined,
+  costDelta: Partial<Resource> | undefined,
+  exactCost: ExactCost | undefined,
   nb: number,
-): ComplexCost => {
-  const unitFee = applyCostOverride(getBuildRoomCost(player.houseType), costOverride)
+): Partial<Resource> | null => {
+  const defaultCost = getBuildRoomCost(player.houseType)
+  if (resolveUnitCostWithDelta(defaultCost, exactCost, costDelta, nb) === null) {
+    return null
+  }
+  return resolveUnitCostWithDelta(defaultCost, exactCost, costDelta, 1)
+}
+
+export const buildConstructCost = (
+  player: PlayerState,
+  costs: Partial<Resource> | undefined,
+  nb: number,
+  actionContext?: Record<string, unknown>,
+): ComplexCost | null => {
+  const costDelta = readConstructCostDelta(actionContext, costs)
+  const unitFee = resolveConstructUnitFee(
+    player,
+    costDelta,
+    readExactCost(actionContext),
+    nb,
+  )
+  if (unitFee === null) return null
   return { unitFee, nb }
 }
 
@@ -52,7 +90,7 @@ const countAvailableRoomTiles = (player: PlayerState) => {
 
 export const getMaxBuildableRooms = (
   player: PlayerState,
-  costOverride?: Partial<Resource>,
+  costs?: Partial<Resource>,
   actionContext?: Record<string, unknown>,
 ): number => {
   const argMax = typeof actionContext?.maxRooms === 'number'
@@ -60,7 +98,8 @@ export const getMaxBuildableRooms = (
     : 99
   const structuralMax = Math.min(countAvailableRoomTiles(player), argMax)
   for (let nb = 1; nb <= structuralMax; nb += 1) {
-    const cost = buildConstructCost(player, costOverride, nb)
+    const cost = buildConstructCost(player, costs, nb, actionContext)
+    if (!cost) return nb - 1
     if (!canPayCost(player, cost, 'construct')) return nb - 1
   }
   return structuralMax
@@ -82,11 +121,13 @@ const ROOM_PAYMENT_FAILURE: ActionExecutionResult = {
 
 export const resolveRoomPaymentSelection = (
   player: PlayerState,
-  costOverride: Partial<Resource> | undefined,
+  costs: Partial<Resource> | undefined,
   nb: number,
   paymentChoice?: string,
+  actionContext?: Record<string, unknown>,
 ): RoomPaymentSelectionResult => {
-  const cost = buildConstructCost(player, costOverride, nb)
+  const cost = buildConstructCost(player, costs, nb, actionContext)
+  if (!cost) return ROOM_PAYMENT_FAILURE
   const resolved = resolveCostPaymentSelection(
     player,
     cost,

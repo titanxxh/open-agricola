@@ -44,15 +44,13 @@ describe('B89_Groom session', () => {
 
     const flow = runCardEffectHook(state, player, 'B89_Groom', 'onBeforeStartOfTurn')
     expect(flow).not.toBeNull()
-    // Should be a single optional stables leaf with actionContext carrying the
-    // cost override (mirrors BGA `args.costs={WOOD=>1, max=>1}`), not a
-    // sequence of pay-resources + stables.
     expect(flow!.type).toBe('leaf')
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('stables')
     expect(leaf.optional).toBe(true)
     expect(leaf.actionContext?.max).toBe(1)
-    expect(leaf.actionContext?.costOverride).toEqual({ wood: 1 })
+    expect(leaf.actionContext?.exactCost).toEqual({ wood: 1, max: 1 })
+    expect(leaf.actionContext?.costOverride).toBeUndefined()
   })
 
   it('onBeforeStartOfTurn in stone house with 0 wood: still emits trigger (no upfront block)', () => {

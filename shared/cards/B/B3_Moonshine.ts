@@ -59,7 +59,7 @@ export const B3_Moonshine_impl = {
         type: 'leaf',
         actionId: 'occupation',
         sourceCard: CARD_ID,
-        params: { costOverride: { food: 2 }, allowedCards: [pick] },
+        params: { exactCost: { food: 2 }, allowedCards: [pick] },
       } satisfies ActionFlow
     }
 

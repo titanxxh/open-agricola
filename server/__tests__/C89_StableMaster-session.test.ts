@@ -83,7 +83,7 @@ describe('C89_StableMaster session', () => {
     expect(stableZone!.capacity).toBe(1) // default, no bonus
   })
 
-  it('onBuy returns optional stables flow with cost override -1 wood', () => {
+  it('onBuy returns optional stables flow with exact 1 wood cost', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -102,9 +102,10 @@ describe('C89_StableMaster session', () => {
     expect(leaf.optional).toBe(true)
     expect(leaf.actionContext).toMatchObject({
       max: 1,
-      costOverride: { wood: -1 },
+      exactCost: { wood: 1 },
       trueAction: false,
     })
+    expect(leaf.actionContext?.costOverride).toBeUndefined()
   })
 
   it('onBuy skipped if player has 4 stables built', () => {

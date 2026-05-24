@@ -16,7 +16,7 @@ export const B97_Scholar_impl = {
           type: 'leaf',
           actionId: 'occupation',
           sourceCard: CARD_ID,
-          params: { costOverride: { food: 1 } },
+          params: { exactCost: { food: 1 } },
         },
         {
           type: 'leaf',

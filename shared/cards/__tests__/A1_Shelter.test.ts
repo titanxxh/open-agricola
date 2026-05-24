@@ -36,7 +36,7 @@ const makePasture = (size: number, tiles: { row: number; col: number }[]): Pastu
 })
 
 describe('A1 Shelter onBuy → stables leaf', () => {
-  it('emits a stables leaf with max=1, free costOverride, zoneFilter=pasture-1', () => {
+  it('emits a stables leaf with max=1, free exactCost, zoneFilter=pasture-1', () => {
     const effect = getCardEffect(CARD_ID)!
     const flow = effect.onBuy!({} as never, {} as never, {} as never)
     expect(flow).toBeTruthy()
@@ -46,16 +46,15 @@ describe('A1 Shelter onBuy → stables leaf', () => {
     expect(flow.sourceCard).toBe(CARD_ID)
     expect(flow.actionContext?.max).toBe(1)
     expect(flow.actionContext?.zoneFilter).toBe('pasture-1')
-    // costOverride uses negative delta to bring wood cost to 0 (BGA "free stable")
-    const co = flow.actionContext?.costOverride as Record<string, number>
-    expect(co.wood).toBeLessThan(0)
+    expect(flow.actionContext?.exactCost).toEqual({ wood: 0 })
+    expect(flow.actionContext?.costOverride).toBeUndefined()
   })
 })
 
 describe('buildStableFarmInteraction with zoneFilter=pasture-1 and max=1', () => {
   it('returns 0 selectable tiles when player has no pastures', () => {
     const player = createPlayer({ pastures: [] })
-    const result = buildStableFarmInteraction(player, { wood: -99 }, { zoneFilter: 'pasture-1', max: 1 })
+    const result = buildStableFarmInteraction(player, undefined, { zoneFilter: 'pasture-1', max: 1, exactCost: { wood: 0 } })
     expect(result.selectableTiles).toEqual([])
     expect(result.maxSelections).toBe(0)
   })
@@ -66,7 +65,7 @@ describe('buildStableFarmInteraction with zoneFilter=pasture-1 and max=1', () =>
         makePasture(2, [{ row: 2, col: 0 }, { row: 2, col: 1 }]),
       ],
     })
-    const result = buildStableFarmInteraction(player, { wood: -99 }, { zoneFilter: 'pasture-1', max: 1 })
+    const result = buildStableFarmInteraction(player, undefined, { zoneFilter: 'pasture-1', max: 1, exactCost: { wood: 0 } })
     expect(result.selectableTiles).toEqual([])
     expect(result.maxSelections).toBe(0)
   })
@@ -77,7 +76,7 @@ describe('buildStableFarmInteraction with zoneFilter=pasture-1 and max=1', () =>
         makePasture(1, [{ row: 2, col: 0 }]),
       ],
     })
-    const result = buildStableFarmInteraction(player, { wood: -99 }, { zoneFilter: 'pasture-1', max: 1 })
+    const result = buildStableFarmInteraction(player, undefined, { zoneFilter: 'pasture-1', max: 1, exactCost: { wood: 0 } })
     expect(result.selectableTiles).toHaveLength(1)
     expect(result.selectableTiles[0]).toEqual({ row: 2, col: 0 })
     expect(result.maxSelections).toBe(1)
@@ -91,7 +90,7 @@ describe('buildStableFarmInteraction with zoneFilter=pasture-1 and max=1', () =>
         makePasture(1, [{ row: 2, col: 1 }]),
       ],
     })
-    const result = buildStableFarmInteraction(player, { wood: -99 }, { zoneFilter: 'pasture-1', max: 1 })
+    const result = buildStableFarmInteraction(player, undefined, { zoneFilter: 'pasture-1', max: 1, exactCost: { wood: 0 } })
     expect(result.selectableTiles).toHaveLength(2)
     expect(result.maxSelections).toBe(1)
   })

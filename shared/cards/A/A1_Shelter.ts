@@ -13,7 +13,7 @@ export const A1_Shelter_impl = {
     optional: true,
     actionContext: {
       max: 1,
-      costOverride: { wood: -99 },
+      exactCost: { wood: 0 },
       zoneFilter: 'pasture-1',
     },
   }),

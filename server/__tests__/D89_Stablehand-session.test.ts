@@ -48,6 +48,7 @@ describe('D89_Stablehand fence provenance', () => {
       actionId: 'stables',
       optional: true,
       sourceCard: CARD_ID,
+      actionContext: { max: 1, exactCost: { max: 1 }, trueAction: false },
     })
   })
 

@@ -15,7 +15,7 @@ const CARD_ID = C28_TeachersDesk.id
  * onPlayerPlaceFarmer → OCCUPATION action with cost [FOOD => 1].
  *
  * In open-agricola: before place-farmer on major-improvement or
- * house-redevelopment, offer optional occupation with costOverride
+ * house-redevelopment, offer optional occupation with exactCost
  * (food: 1). Same pattern as D28 Writing Desk (which uses 'lessons').
  * Requires at least 1 occupation in hand.
  */
@@ -37,7 +37,7 @@ const listener: CardListenerRegistration = {
         actionId: 'occupation',
         optional: true,
         sourceCard: CARD_ID,
-        params: { costOverride: { food: 1 } },
+        params: { exactCost: { food: 1 } },
       },
       sourceCard: CARD_ID,
     }

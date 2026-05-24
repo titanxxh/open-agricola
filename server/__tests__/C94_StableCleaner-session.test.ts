@@ -21,13 +21,8 @@ const findListener = (id: string) =>
  *
  * BGA: anytime + flagCardNode + STABLES action with costs={WOOD=>1, FOOD=>1}.
  *
- * Implementation: anytime listener emits a SEQ:
- *   set-flag → stables (with actionContext.costOverride { wood:-1, food:1 })
- *   → unset-flag.
- * The override flips base { wood:2 } to { wood:1, food:1 } via
- * applyCostOverride. Doable gate now requires 1 wood + 1 food.
  */
-describe('C94_StableCleaner — cost override 1 wood + 1 food', () => {
+describe('C94_StableCleaner — exact cost 1 wood + 1 food', () => {
   const setupContext = (
     resources: { wood?: number; food?: number },
     stableTilesLength = 0,
@@ -57,7 +52,7 @@ describe('C94_StableCleaner — cost override 1 wood + 1 food', () => {
     } as unknown as CardListenerContext
   }
 
-  it('emits stables flow with costOverride { wood:-1, food:1 } when player has 1 wood + 1 food', () => {
+  it('emits stables flow with exactCost { wood:1, food:1 } when player has 1 wood + 1 food', () => {
     const listener = findListener(LISTENER_ID)
     expect(listener).toBeDefined()
 
@@ -72,7 +67,8 @@ describe('C94_StableCleaner — cost override 1 wood + 1 food', () => {
     ) as Extract<ActionFlow, { type: 'leaf' }> | undefined
     expect(stablesLeaf).toBeDefined()
     expect(stablesLeaf!.actionContext).toBeDefined()
-    expect(stablesLeaf!.actionContext!.costOverride).toEqual({ wood: -1, food: 1 })
+    expect(stablesLeaf!.actionContext!.exactCost).toEqual({ wood: 1, food: 1 })
+    expect(stablesLeaf!.actionContext!.costOverride).toBeUndefined()
     expect(stablesLeaf!.actionContext!.trueAction).toBe(false)
     expect(stablesLeaf!.sourceCard).toBe(CARD_ID)
   })

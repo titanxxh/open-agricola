@@ -22,7 +22,7 @@ const listener: CardListenerRegistration = {
         actionId: 'stables',
         optional: true,
         sourceCard: CARD_ID,
-        actionContext: { max: 1, costOverride: { wood: 1 } },
+        actionContext: { max: 1, exactCost: { wood: 1, max: 1 } },
       },
       sourceCard: CARD_ID,
     }
