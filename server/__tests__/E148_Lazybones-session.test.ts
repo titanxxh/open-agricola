@@ -4,6 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { getAllTilePositions } from '../../shared/domain/farm'
 import { getCardEffect } from '../../shared/cards/card-effects'
+import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
 import type { ActionFlow } from '../../shared/contract/types'
 import '../../shared/cards/E/E148_Lazybones'
 
@@ -38,18 +39,25 @@ describe('E148_Lazybones session', () => {
     const state = session.getState().state
     const owner = state.players[0]!
     owner.stableTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }]
+    const reserveBefore = getAvailableStableSupplyCount(state, owner)
 
-    const flow = getCardEffect(CARD_ID)!.onBuy!(state, owner)
+    const effect = getCardEffect(CARD_ID)!
+    const flow = effect.onBuy!(state, owner)
 
     expect(flow?.type).toBe('leaf')
     const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.actionId).toBe('emit-choice')
     const options = leaf.params?.options as Array<{ value: string }>
     expect(options.length).toBeGreaterThan(0)
+    expect(options.some((option) => option.value === CHOICE_PREFIX)).toBe(true)
     expect(options.every((option) => selectedSpacesFromChoice(option.value).length <= 2)).toBe(true)
     expect(options.some((option) => selectedSpacesFromChoice(option.value).length === 2)).toBe(true)
     expect(options.some((option) => selectedSpacesFromChoice(option.value).length === 3)).toBe(false)
+
+    effect.resolveChoice!(state, owner, CHOICE_PREFIX)
+
     expect(owner.cardStates?.[CARD_ID]?.extraData?.reservedActionSpaces).toBeUndefined()
+    expect(getAvailableStableSupplyCount(state, owner)).toBe(reserveBefore)
   })
 
   it('onBuy returns nothing if dynamic reserve is empty', () => {
