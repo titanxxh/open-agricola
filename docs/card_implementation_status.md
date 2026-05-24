@@ -232,8 +232,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | listener | `after.construct` | `A110_Roughcaster`, `A111_WallBuilder`, `A167_BreederBuyer`, `A21_FamilyFriendHome`, `A73_AgriculturalFertilizers`, `A93_BedMaker`, `B111_Rustic`, `B140_FarmyardWorker`, `B163_Pastor`, `B27_Toolbox`, `D123_RenovationPreparer`, `D128_BuildingTycoon`, `D163_JourneymanBricklayer`, `D74_RoyalWood`, `D94_HenpeckedHusband`, `D96_Furnisher`, `E123_ResourceHoarder`, `E49_Twibil`, `E52_Cubbyhole` |
 | listener | `after.exchange` | `A48_ShavingHorse`, `B21_HayloftBarn`, `B29_CookeryLesson`, `C148_MudWallower`, `C53_GypsysCrock`, `D36_BreedRegistry`, `D56_FatstockStretcher`, `E85_MasterTanner` |
 | listener | `after.family-growth` | `D150_GodlySpouse`, `D157_PartyOrganizer`, `E113_Godmother` |
-| listener | `after.fence` | `A34_Loppers`, `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B94_StockProtector`, `D89_Stablehand`, `E108_BlackberryFarmer`, `E74_AshTrees` |
-| listener | `after.fencing` | `B124_Trimmer`, `B140_FarmyardWorker`, `B27_Toolbox` |
+| listener | `after.fence` | `A34_Loppers`, `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B124_Trimmer`, `B140_FarmyardWorker`, `B27_Toolbox`, `B94_StockProtector`, `D89_Stablehand`, `E108_BlackberryFarmer`, `E74_AshTrees` |
 | listener | `after.gain` | `A48_ShavingHorse`, `B21_HayloftBarn`, `C120_AgriculturalLabourer`, `E103_Wolf`, `E118_KindlingGatherer` |
 | listener | `after.improvement` | `A109_SmallTrader`, `A131_CraftTeacher`, `A41_VegetableSlicer`, `B100_Clutterer`, `B49_Scales`, `C115_Sower`, `C137_CharcoalBurner`, `C43_FarmBuilding`, `C75_Firewood`, `C80_RockyTerrain`, `D118_Bonehead`, `D161_CabbageBuyer`, `D80_BrickHammer`, `E156_ClaypitOwner`, `E165_MasterHuntsman`, `E18_SeedAlmanac`, `E31_Upholstery` |
 | listener | `after.pay` | `B18_GrasslandHarrow`, `C116_FurnitureMaker`, `C148_MudWallower`, `D74_RoyalWood`, `E122_Cottar`, `E123_ResourceHoarder`, `E128_Saddler`, `E54_Contraband` |
@@ -257,8 +256,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | listener | `before.exchange` | `D36_BreedRegistry`, `D56_FatstockStretcher`, `E85_MasterTanner` |
 | listener | `before.family-growth` | `E130_Overachiever` |
 | listener | `before.farmland` | `C112_Thresher` |
-| listener | `before.fence` | `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B94_StockProtector`, `D119_WoodBarterer`, `E74_AshTrees` |
-| listener | `before.fencing` | `A40_PottersYard` |
+| listener | `before.fence` | `A40_PottersYard`, `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B94_StockProtector`, `D119_WoodBarterer`, `E74_AshTrees` |
 | listener | `before.grain-utilization` | `C112_Thresher` |
 | listener | `before.improvement` | `B75_WoodWorkshop` |
 | listener | `before.meeting-place` | `D139_Chairman` |
@@ -1168,7 +1166,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `E94_Prophet` | 已对齐 | 即时翻修 / fencing 子行动使用当前 `renovate-house` / `fence` action id。 |
 | `E95_Miller` | 已对齐 |  |
 | `E96_Elder` | 已对齐 |  |
-| `E97_Beneficiary` | 已对齐 | 额外 occupation 用 `params.exactCost: { food: 1 }`；若已出 E89，则内嵌 BGA `formatCost(['max' => 1])` 免费 stable 分支。 |
+| `E97_Beneficiary` | 已对齐 | 额外 occupation 用 `params.exactCost: { food: 1 }`；若已出 E89，则内嵌 BGA `formatCost(['max' => 1])` 免费 stable 分支；额外 occupation / minor improvement 使用 BGA `NODE_OR` 语义。 |
 | `E98_Prodigy` | 已对齐 |  |
 | `E99_UncaringParents` | 已对齐 |  |
 | `E100_MuseumCaretaker` | 已对齐 |  |

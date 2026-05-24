@@ -11,7 +11,7 @@ const farmyardListener: CardListenerRegistration = {
   id: 'B140-farmyard-worker-after-farmyard',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['stables', 'fencing', 'construct'],
+  actions: ['stables', 'fence', 'construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
     return {
