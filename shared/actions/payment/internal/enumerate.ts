@@ -772,14 +772,18 @@ export const computeAllBuyableCombinations = (
     const eligibleCards = playedCards
       ? playedCards.filter((cardId) => cardMatchesCostList(cardId, cost.cards!.list))
       : []
+    const cardCost = cost.cards.cost ?? {}
+    const canPayCardCost = canPayResources(player, cardCost)
+      && canPaySupplyTokens(state, player, cardCost)
 
     if (cost.cards.required) {
       const requiredCardSolutions: PaymentSolution[] = []
-      if (eligibleCards.length > 0) {
+      if (eligibleCards.length > 0 && canPayCardCost) {
         paymentSolutions.forEach((solution) => {
           eligibleCards.forEach((cardId) => {
             requiredCardSolutions.push({
               ...solution,
+              resourcesPaid: mergePaymentResources(solution.resourcesPaid, cardCost),
               cardUsed: cardId,
             })
           })
@@ -787,10 +791,10 @@ export const computeAllBuyableCombinations = (
       }
       paymentSolutions.length = 0
       paymentSolutions.push(...requiredCardSolutions)
-    } else {
+    } else if (canPayCardCost) {
       eligibleCards.forEach((cardId) => {
         const cardSolution: PaymentSolution = {
-          resourcesPaid: cost.cards?.cost ?? {},
+          resourcesPaid: cardCost,
           tradesUsed: [],
           cardUsed: cardId,
         }
