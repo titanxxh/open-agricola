@@ -14,6 +14,7 @@ const CARD_ID = E148_Lazybones.id
 
 const TRIGGER_SPACES = ['grain-seeds', 'farmland', 'day-laborer', 'farm-expansion']
 const CHOICE_PREFIX = 'lazybones:'
+const DECLINE_CHOICE = CHOICE_PREFIX
 
 const ownerSpecialEffect = (
   ownerPlayerId: string,
@@ -42,13 +43,15 @@ const actionSpaceSubsets = (maxCount: number): string[][] => {
   return subsets
 }
 
-const choiceOptions = (reserve: number): ActionChoiceOption[] =>
-  actionSpaceSubsets(reserve).map((spaces) => ({
+const choiceOptions = (reserve: number): ActionChoiceOption[] => [
+  { value: DECLINE_CHOICE, labelKey: 'ui.interactionOptionalSkip', sourceCard: CARD_ID },
+  ...actionSpaceSubsets(reserve).map((spaces) => ({
     value: `${CHOICE_PREFIX}${spaces.join(',')}`,
     labelKey: 'cards.E148_Lazybones.name',
     labelParams: { count: spaces.length },
     sourceCard: CARD_ID,
-  }))
+  })),
+]
 
 const parseChoice = (choice: string): string[] => {
   if (!choice.startsWith(CHOICE_PREFIX)) return []
