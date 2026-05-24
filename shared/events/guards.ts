@@ -1,4 +1,4 @@
-import { REAL_RESOURCE_KEYS } from '../contract/resource-keys'
+import { PAYMENT_RESOURCE_KEYS, REAL_RESOURCE_KEYS } from '../contract/resource-keys'
 
 export const assertPublicGameEvent = (event: unknown): void => {
   const visibility = (event as { visibility?: unknown } | null)?.visibility
@@ -76,11 +76,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
 
 const resourceKeys = new Set<string>(REAL_RESOURCE_KEYS)
 
-const paymentResourceKeys = new Set([
-  ...REAL_RESOURCE_KEYS,
-  'fence',
-  'stable',
-])
+const paymentResourceKeys = new Set<string>(PAYMENT_RESOURCE_KEYS)
 
 const futureMeepleResourceKeys = new Set([
   ...REAL_RESOURCE_KEYS,

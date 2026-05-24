@@ -103,6 +103,16 @@ describe('event guards', () => {
     })).not.toThrow()
   })
 
+  it('accepts stable tokens in future meeple queued entries', () => {
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'futureMeeple.queued',
+      playerId: 'p1',
+      cardId: 'A89_StablePlanner',
+      entries: [{ round: 6, resources: { stable: 1 } }],
+    })).not.toThrow()
+  })
+
   it('accepts fence-built provenance metadata', () => {
     expect(() => assertKnownGameEventShape({
       ...baseEvent,
