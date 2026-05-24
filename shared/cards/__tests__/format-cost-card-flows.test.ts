@@ -4,10 +4,12 @@ import { getCardEffect, runCardEffectHook } from '../card-effects'
 import type { ActionFlow, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
 import type { DraftGameEvent } from '../../contract/events'
 
+import '../A/A13_RenovationCompany'
 import '../A/A15_CarpentersAxe'
 import '../A/A89_StablePlanner'
 import '../B/B2_MiniPasture'
 import '../B/B16_MiningHammer'
+import '../B/B88_EstablishedPerson'
 import '../B/B89_Groom'
 import '../B/B149_OpenAirFarmer'
 import '../C/C2_Stable'
@@ -21,6 +23,7 @@ import '../E/E1_PoleBarns'
 import '../E/E2_RenovationMaterials'
 import '../E/E88_MasterFencer'
 import '../E/E89_Stallwright'
+import '../E/E97_Beneficiary'
 
 type ListenerContextInput = Parameters<typeof executeCardListener>[1]
 type LeafFlow = Extract<ActionFlow, { type: 'leaf' }>
@@ -178,6 +181,16 @@ const fenceBuilt = (): DraftGameEvent<'farm.fenceBuilt'> => ({
 })
 
 describe('formatCost migrated card flows', () => {
+  it('A13_RenovationCompany emits a free optional renovation through exactCost', () => {
+    const actor = player({ houseType: 'wood', rooms: 2 })
+    const gameState = state(actor)
+    const flow = getCardEffect('A13_RenovationCompany')!.onBuy!(gameState, actor)
+    const leaf = expectLeaf(flow, 'renovate-house')
+    expect(leaf.optional).toBe(true)
+    expect(leaf.actionContext).toEqual({ exactCost: {} })
+    expectNoLegacyCostFields(leaf)
+  })
+
   it('A15_CarpentersAxe emits one stable at exact 1 wood', () => {
     const actor = player({
       resources: resources({ wood: 7 }),
@@ -217,6 +230,21 @@ describe('formatCost migrated card flows', () => {
     const leaf = expectLeaf(result?.flow, 'stables')
     expect(leaf.actionContext).toMatchObject({ max: 1, exactCost: { max: 1 } })
     expectNoLegacyCostFields(leaf)
+  })
+
+  it('B88_EstablishedPerson emits free renovation and ordinary fence action without upfront pay', () => {
+    const actor = player({
+      houseType: 'wood',
+      rooms: 2,
+      occupationPlayed: ['B88_EstablishedPerson'],
+    })
+    const gameState = state(actor)
+    const flow = getCardEffect('B88_EstablishedPerson')!.onBuy!(gameState, actor)
+    const renovation = expectLeaf(flow, 'renovate-house')
+    expect(renovation.actionContext).toEqual({ exactCost: {} })
+    expectNoLegacyCostFields(renovation)
+    expectLeaf(flow, 'fence')
+    expect(findLeaves(flow, 'pay')).toEqual([])
   })
 
   it('B89_Groom emits one stable at exact 1 wood', () => {
@@ -444,5 +472,38 @@ describe('formatCost migrated card flows', () => {
     const leaf = expectLeaf(result?.flow, 'stables')
     expect(leaf.actionContext).toMatchObject({ max: 1, exactCost: { max: 1 }, trueAction: false })
     expectNoLegacyCostFields(leaf)
+  })
+
+  it('E89_Stallwright does not duplicate the Beneficiary third-occupation stable', () => {
+    const actor = player({
+      occupationPlayed: ['E89_Stallwright', 'A1_OtherOccupation', 'E97_Beneficiary'],
+    })
+    const gameState = state(actor)
+    const result = executeCardListener(listener('E89-stallwright-after-occupation'), context(gameState, actor, {
+      actionId: 'occupation',
+      phase: 'after',
+      space: gameState.actionSpaces.find((entry) => entry.id === 'occupation')!,
+      transactionEvents: [{
+        type: 'card.played',
+        cardId: 'E97_Beneficiary',
+        cardType: 'occupation',
+      }],
+    }))
+    expect(result).toBeUndefined()
+  })
+
+  it('E97_Beneficiary emits one-food occupation and Stallwright free stable branch', () => {
+    const actor = player({
+      occupationPlayed: ['E89_Stallwright', 'A1_OtherOccupation', 'E97_Beneficiary'],
+      occupationHand: ['A114_SeasonalWorker'],
+    })
+    const gameState = state(actor)
+    const flow = getCardEffect('E97_Beneficiary')!.onBuy!(gameState, actor)
+    const stable = expectLeaf(flow, 'stables')
+    expect(stable.optional).toBe(true)
+    expect(stable.actionContext).toMatchObject({ max: 1, exactCost: { max: 1 } })
+    expectNoLegacyCostFields(stable)
+    const occupation = expectLeaf(flow, 'occupation')
+    expect(occupation.params).toEqual({ exactCost: { food: 1 } })
   })
 })
