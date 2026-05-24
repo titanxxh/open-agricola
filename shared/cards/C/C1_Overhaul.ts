@@ -1,14 +1,14 @@
 import type { ActionFlow } from '../../contract/types'
 import {
   getOwnOrdinaryFenceCount,
-  MAX_ORDINARY_FENCE_PIECES,
 } from '../../domain/fence-segments'
+import { getOwnOrdinaryFenceBuildLimit } from '../../domain/supply-tokens'
 import type { CardImpl } from '../registry'
 import { C1_Overhaul } from '../../cards-display/C/C1_Overhaul'
 
 const CARD_ID = C1_Overhaul.id
 
-const rebuildFlow = (count: number): ActionFlow => ({
+const rebuildFlow = (count: number, buildLimit: number): ActionFlow => ({
   type: 'seq',
   children: [
     {
@@ -34,7 +34,7 @@ const rebuildFlow = (count: number): ActionFlow => ({
           segmentBounds: {
             fence: {
               min: count,
-              max: Math.min(count + 3, MAX_ORDINARY_FENCE_PIECES),
+              max: Math.min(count + 3, buildLimit),
             },
           },
           costPolicy: { fence: { wood: 0 } },
@@ -52,7 +52,7 @@ export const C1_Overhaul_impl = {
     onBuy: (_state, player) => {
       const fenceCount = getOwnOrdinaryFenceCount(player)
       if (fenceCount === 0) return undefined
-      return rebuildFlow(fenceCount)
+      return rebuildFlow(fenceCount, getOwnOrdinaryFenceBuildLimit(player))
     },
   },
   reaches: [] as readonly string[],

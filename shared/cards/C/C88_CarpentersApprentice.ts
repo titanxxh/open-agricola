@@ -2,11 +2,11 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import {
   canStartFencing,
-  getFenceCount,
   getTotalPastureCells,
-  maxFences,
   maxPastureCells,
 } from '../../actions/effects/fencing'
+import { getOwnOrdinaryFenceCount } from '../../domain/fence-segments'
+import { getOwnOrdinaryFenceBuildLimit } from '../../domain/supply-tokens'
 import type { CardImpl } from '../registry'
 import { C88_CarpentersApprentice } from '../../cards-display/C/C88_CarpentersApprentice'
 
@@ -45,8 +45,10 @@ const fenceIsDoableListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
     const player = context.player
-    const before = getFenceCount(player)
-    if (before >= maxFences) return
+    const before = getOwnOrdinaryFenceCount(player)
+    const buildLimit = getOwnOrdinaryFenceBuildLimit(player)
+    if (before >= buildLimit) return
+    if (buildLimit < 13) return
     if (getTotalPastureCells(player) >= maxPastureCells) return
     const wood = player.resources.wood ?? 0
     // BGA Fencing.php:195-201: the free band unlocks only once the player
@@ -58,8 +60,7 @@ const fenceIsDoableListener: CardListenerRegistration = {
     // `getFenceCount+4>15` assumes building 4 segments at once, which
     // conflicts with the 1-3 segments remaining here.
     if (before >= 12) return { doable: true }
-    // before < 12: the free band (13th-15th fence) always offers exactly 3.
-    const freeFences = 3
+    const freeFences = Math.max(0, buildLimit - 12)
     const previewPlayer = {
       ...player,
       resources: { ...player.resources, wood: wood + freeFences },
@@ -79,10 +80,11 @@ const fenceCostListener: CardListenerRegistration = {
     const buildingNow = newFenceEdges?.length ?? 0
     if (buildingNow <= 0) return
     // BGA Fencing.php:595-601: the 13th-15th fence each cost 1 wood less.
-    const before = getFenceCount(context.player)
+    const before = getOwnOrdinaryFenceCount(context.player)
+    const buildLimit = getOwnOrdinaryFenceBuildLimit(context.player)
     const start = before + 1
     const end = before + buildingNow
-    const free = Math.max(0, Math.min(end, 15) - Math.max(start, 13) + 1)
+    const free = Math.max(0, Math.min(end, buildLimit) - Math.max(start, 13) + 1)
     if (free <= 0) return
     return { costs: { wood: -free } }
   },

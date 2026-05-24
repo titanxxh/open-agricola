@@ -82,11 +82,23 @@ describe('E74_AshTrees', () => {
   it('stores only available fences on buy', () => {
     const effect = getCardEffect('E74_AshTrees')
     const player = createPlayer()
+    delete player.cardStates.E74_AshTrees
     setFencesForTest(player, 13)
 
     effect?.onBuy?.(createState(player), player)
 
     expect(player.cardStates?.E74_AshTrees?.counters?.fences).toBe(2)
+  })
+
+  it('stores only reserve fences after consumed supply tokens', () => {
+    const effect = getCardEffect('E74_AshTrees')
+    const player = createPlayer()
+    delete player.cardStates.E74_AshTrees
+    player.supplyTokensConsumed = { fence: 12 }
+
+    effect?.onBuy?.(createState(player), player)
+
+    expect(player.cardStates?.E74_AshTrees?.counters?.fences).toBe(3)
   })
 
   it('offers free fence count choices before fencing', () => {

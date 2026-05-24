@@ -26,9 +26,13 @@ import type {
   FenceValidationOptions,
 } from '../../domain/farmyard'
 import {
-  getAvailableOwnOrdinaryFenceCount,
   MAX_ORDINARY_FENCE_PIECES,
+  getOwnOrdinaryFenceCount,
 } from '../../domain/fence-segments'
+import {
+  getOwnOrdinaryFenceBuildLimit,
+  getOwnOrdinaryFenceReserveCount,
+} from '../../domain/supply-tokens'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { collectComputeCostsForFarmChoice } from '../../cards/card-listeners'
 import { playerCanBuildPalisades } from '../../cards/helpers/card-type'
@@ -47,6 +51,7 @@ export type FenceActionPolicy = {
   sourcePolicy?: 'ownOnly'
   segmentBounds?: FenceSegmentBounds
   costPolicy?: FenceCostPolicy
+  pastureBounds?: FenceValidationOptions['pastureBounds']
   cancelPolicy?: 'allowCancel' | 'forbidCancel'
   preserveAnimalTotals?: boolean
 }
@@ -79,6 +84,9 @@ export function readFenceActionPolicy(
     costPolicy: isRecord(source.costPolicy)
       ? (source.costPolicy as FenceCostPolicy)
       : undefined,
+    pastureBounds: isRecord(source.pastureBounds)
+      ? (source.pastureBounds as FenceValidationOptions['pastureBounds'])
+      : undefined,
     cancelPolicy:
       source.cancelPolicy === 'allowCancel' ||
       source.cancelPolicy === 'forbidCancel'
@@ -96,26 +104,36 @@ const hasFenceActionPolicy = (policy: FenceActionPolicy): boolean =>
   policy.sourcePolicy !== undefined ||
   policy.segmentBounds !== undefined ||
   policy.costPolicy !== undefined ||
+  policy.pastureBounds !== undefined ||
   policy.cancelPolicy !== undefined ||
   policy.preserveAnimalTotals !== undefined
 
 const hasCanStartPolicy = (policy: FenceActionPolicy): boolean =>
   policy.sourcePolicy !== undefined ||
   policy.segmentBounds !== undefined ||
-  policy.costPolicy !== undefined
+  policy.costPolicy !== undefined ||
+  policy.pastureBounds !== undefined
 
 const fenceValidationOptions = (
+  player: PlayerState,
   allowPalisades: boolean,
   policy: FenceActionPolicy,
-): FenceValidationOptions => ({
-  skipPayment: true,
-  allowPalisades,
-  allowedSegmentTypes: policy.allowedSegmentTypes,
-  sourcePolicy: policy.sourcePolicy,
-  segmentBounds: policy.segmentBounds,
-  costPolicy: policy.costPolicy,
-  preserveAnimalTotals: policy.preserveAnimalTotals,
-})
+): FenceValidationOptions => {
+  const selectedFreeFences = readPendingFenceBonus(player)?.freeFences ?? 0
+  return {
+    skipPayment: true,
+    allowPalisades,
+    allowedSegmentTypes: policy.allowedSegmentTypes,
+    sourcePolicy: policy.sourcePolicy,
+    segmentBounds: policy.segmentBounds,
+    costPolicy: policy.costPolicy,
+    pastureBounds: policy.pastureBounds,
+    preserveAnimalTotals: policy.preserveAnimalTotals,
+    ordinaryFenceBuildLimit: getOwnOrdinaryFenceBuildLimit(player),
+    availableOrdinaryFenceTokens:
+      getOwnOrdinaryFenceReserveCount(player) + selectedFreeFences,
+  }
+}
 
 const fenceFail = (
   errorKey: string,
@@ -143,25 +161,35 @@ export const canStartFencing = (
   actionContext?: Record<string, unknown>,
 ) => {
   const policy = readFenceActionPolicy(actionContext)
+  const remainingBuildCapacity = Math.max(
+    0,
+    getOwnOrdinaryFenceBuildLimit(player) - getOwnOrdinaryFenceCount(player),
+  )
+  const selectedFreeFences = readPendingFenceBonus(player)?.freeFences ?? 0
+  const availableOrdinaryFenceTokens =
+    getOwnOrdinaryFenceReserveCount(player) + selectedFreeFences
   if (hasCanStartPolicy(policy)) {
     const minFenceCount = policy.segmentBounds?.fence?.min ?? minimumFenceSegments
-    const availableOwnOrdinary =
-      policy.sourcePolicy === 'ownOnly'
-        ? getAvailableOwnOrdinaryFenceCount(player)
-        : maxFences - getFenceCount(player)
-    if (availableOwnOrdinary < minFenceCount) return false
+    if (Math.min(remainingBuildCapacity, availableOrdinaryFenceTokens) < minFenceCount) {
+      return false
+    }
     const fenceWoodCost = policy.costPolicy?.fence?.wood ?? 1
-    if (fenceWoodCost === 0) return true
+    const fixedWoodCost = Math.max(0, policy.costPolicy?.fixedWood ?? 0)
+    if (fenceWoodCost === 0 && fixedWoodCost === 0) return true
+    const costFreeFences =
+      selectedFreeFences + Math.max(0, Math.abs(costOverride?.wood ?? 0))
+    const payableFenceCount = Math.max(0, minFenceCount - costFreeFences)
     return canAffordTypedFlatCost(
       player,
-      { wood: minFenceCount * fenceWoodCost },
+      { wood: payableFenceCount * fenceWoodCost + fixedWoodCost },
       'fencing',
     )
   }
-  if (getFenceCount(player) + minimumFenceSegments > maxFences) return false
+  if (Math.min(remainingBuildCapacity, availableOrdinaryFenceTokens) < minimumFenceSegments) {
+    return false
+  }
   if (getTotalPastureCells(player) >= maxPastureCells) return false
-  const pendingFreeFences = readPendingFenceBonus(player)?.freeFences ?? 0
-  const free = pendingFreeFences + Math.max(0, Math.abs(costOverride?.wood ?? 0))
+  const free = selectedFreeFences + Math.max(0, Math.abs(costOverride?.wood ?? 0))
   if (free > 0) {
     const woodCount = player.resources.wood ?? 0
     if (woodCount + free >= minimumFenceSegments) return true
@@ -242,7 +270,11 @@ const finalizeFence = (
     palisadeEdges,
     extraWood,
     freeFences,
-    options: fenceValidationOptions(playerCanBuildPalisades(normalized), policy),
+    options: fenceValidationOptions(
+      normalized,
+      playerCanBuildPalisades(normalized),
+      policy,
+    ),
     lockedKeys,
   })
   if (!validated.ok) {
@@ -407,7 +439,11 @@ export const fenceAction: ActionDefinition = {
         palisadeEdges,
         extraWood,
         freeFences,
-        options: fenceValidationOptions(playerCanBuildPalisades(normalized), policy),
+        options: fenceValidationOptions(
+          normalized,
+          playerCanBuildPalisades(normalized),
+          policy,
+        ),
         lockedKeys,
       })
       if (!validated.ok) {
