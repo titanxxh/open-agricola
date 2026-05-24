@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-type FindingType = 'costOverride' | 'actionContextCosts' | 'negativeHugeDiscount'
+type FindingType = 'costOverride' | 'actionContextCosts' | 'negativeHugeDiscount' | 'freeCost'
 
 type Finding = {
   file: string
@@ -81,7 +81,7 @@ const listCardSourceFiles = () => {
         visit(file)
         continue
       }
-      if (entry.isFile() && file.endsWith('.ts')) files.push(file)
+      if (entry.isFile() && file.endsWith('.ts')) files.push(file.split(/[\\/]/).join('/'))
     }
   }
   visit('shared/cards')
@@ -100,6 +100,9 @@ const scanCardAuthoredCostHacks = () => {
     }
     if (/\b(?:wood|clay|reed|stone|food|grain|vegetable)\s*:\s*-99\b/.test(text)) {
       findings.push({ file, type: 'negativeHugeDiscount' })
+    }
+    if (/\bfreeCost\b/.test(text)) {
+      findings.push({ file, type: 'freeCost' })
     }
   }
   return findings.filter(
