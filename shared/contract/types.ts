@@ -16,6 +16,12 @@ export type Resource = {
   begging: number
 }
 
+export type SupplyTokenKey = 'fence' | 'stable'
+export type SupplyTokenCounts = Partial<Record<SupplyTokenKey, number>>
+export type PaymentResource = Resource & Record<SupplyTokenKey, number>
+export type PaymentResourceMap = Partial<PaymentResource>
+export type PaymentResourceKey = keyof PaymentResource
+
 // Pseudo-resource map — used ONLY by CardResourceStats.gained to record
 // BGA-style "Plows: N / Built: N rooms / Occupations played: N" lines via
 // the same Partial<Resource>-shaped storage slot. These keys are NEVER
@@ -206,6 +212,7 @@ export type PlayerState = {
   activeModifiers: CostModifier[]
   cardStates: CardStates
   stats: PlayerStats
+  supplyTokensConsumed?: SupplyTokenCounts
   /**
    * Session-transient scratchpad: card ids of `BonusModifier` entries whose
    * `sources` fired during the currently-executing action. Initialised by
