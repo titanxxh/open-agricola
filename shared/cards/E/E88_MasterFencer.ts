@@ -7,12 +7,14 @@ const CARD_ID = E88_MasterFencer.id
 const freeFencingLeaf = (max: number) => ({
   type: 'leaf' as const,
   actionId: 'fencing',
+  expandFlow: true,
   sourceCard: CARD_ID,
   actionContext: {
     trueAction: false,
     fencePolicy: {
-      segmentBounds: { total: { max } },
+      segmentBounds: { total: { min: 1, max } },
       costPolicy: { fence: { wood: 0 } },
+      cancelPolicy: 'forbidCancel',
     },
   },
 })

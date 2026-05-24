@@ -6,13 +6,18 @@ import type { DraftGameEvent } from '../../contract/events'
 
 import '../A/A15_CarpentersAxe'
 import '../A/A89_StablePlanner'
+import '../B/B2_MiniPasture'
 import '../B/B16_MiningHammer'
 import '../B/B89_Groom'
+import '../B/B149_OpenAirFarmer'
+import '../C/C2_Stable'
 import '../C/C89_StableMaster'
 import '../C/C94_StableCleaner'
 import '../C/C149_ResourceRecycler'
 import '../D/D89_Stablehand'
 import '../D/D149_CasualWorker'
+import '../E/E1_PoleBarns'
+import '../E/E88_MasterFencer'
 import '../E/E89_Stallwright'
 
 type ListenerContextInput = Parameters<typeof executeCardListener>[1]
@@ -127,6 +132,15 @@ const findLeaf = (
     if (found) return found
   }
   return undefined
+}
+
+const findLeaves = (
+  flow: ActionFlow | undefined,
+  actionId: string,
+): LeafFlow[] => {
+  if (!flow) return []
+  if (flow.type === 'leaf') return flow.actionId === actionId ? [flow] : []
+  return flow.children.flatMap((child) => findLeaves(child, actionId))
 }
 
 const expectLeaf = (flow: ActionFlow | undefined, actionId: string) => {
@@ -298,6 +312,84 @@ describe('formatCost migrated card flows', () => {
     const leaf = expectLeaf(result?.flow, 'stables')
     expect(leaf.actionContext).toMatchObject({ max: 1, exactCost: { max: 1 } })
     expectNoLegacyCostFields(leaf)
+  })
+
+  it('C2_Stable emits one free stable from actionContext', () => {
+    const actor = player()
+    const gameState = state(actor)
+    const flow = getCardEffect('C2_Stable')!.onBuy!(gameState, actor)
+    const leaf = expectLeaf(flow, 'stables')
+    expect(leaf.params).toBeUndefined()
+    expect(leaf.actionContext).toMatchObject({ max: 1, exactCost: { wood: 0, max: 1 } })
+    expectNoLegacyCostFields(leaf)
+  })
+
+  it('E1_PoleBarns emits up to three free stables from actionContext', () => {
+    const actor = player()
+    const gameState = state(actor)
+    const flow = getCardEffect('E1_PoleBarns')!.onBuy!(gameState, actor)
+    const leaf = expectLeaf(flow, 'stables')
+    expect(leaf.params).toBeUndefined()
+    expect(leaf.actionContext).toMatchObject({ max: 3, exactCost: { wood: 0, max: 3 } })
+    expectNoLegacyCostFields(leaf)
+  })
+
+  it('B2_MiniPasture emits free fence policy directly to fence action', () => {
+    const actor = player()
+    const gameState = state(actor)
+    const flow = getCardEffect('B2_MiniPasture')!.onBuy!(gameState, actor)
+    const leaf = expectLeaf(flow, 'fence')
+    expect(leaf.params).toBeUndefined()
+    expect(leaf.actionContext).toMatchObject({
+      fencePolicy: {
+        segmentBounds: { total: { min: 1, max: 4 } },
+        costPolicy: { fence: { wood: 0 } },
+      },
+    })
+  })
+
+  it('B149_OpenAirFarmer emits free fence policy directly to fence action after upfront cost', () => {
+    const actor = player()
+    const gameState = state(actor)
+    const flow = getCardEffect('B149_OpenAirFarmer')!.onBuy!(gameState, actor)
+    const leaf = expectLeaf(flow, 'fence')
+    expect(leaf.params).toBeUndefined()
+    expect(leaf.actionContext).toMatchObject({
+      fencePolicy: {
+        segmentBounds: { total: { min: 1, max: 6 } },
+        newPastureBounds: {
+          count: { min: 1, max: 1 },
+          totalSize: { min: 2, max: 2 },
+        },
+        costPolicy: { fence: { wood: 0 } },
+      },
+    })
+  })
+
+  it('E88_MasterFencer emits free capped fence policies for both options', () => {
+    const actor = player({
+      houseType: 'stone',
+      resources: resources({ wood: 3 }),
+      occupationPlayed: ['E88_MasterFencer'],
+    })
+    const gameState = state(actor)
+    const flow = getCardEffect('E88_MasterFencer')!.onRoundStart!(gameState, actor)
+    const leaves = findLeaves(flow, 'fence')
+    expect(leaves).toHaveLength(2)
+    expect(leaves[0]!.params).toBeUndefined()
+    expect(leaves[0]!.actionContext).toMatchObject({
+      fencePolicy: {
+        segmentBounds: { total: { min: 1, max: 3 } },
+        costPolicy: { fence: { wood: 0 } },
+      },
+    })
+    expect(leaves[1]!.params).toBeUndefined()
+    expect(leaves[1]!.actionContext).toMatchObject({
+      fencePolicy: {
+        segmentBounds: { total: { min: 1, max: 4 } },
+        costPolicy: { fence: { wood: 0 } },
+      },
+    })
   })
 
   it('E89_Stallwright emits one free stable on configured occupation count', () => {
