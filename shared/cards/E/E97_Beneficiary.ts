@@ -29,7 +29,7 @@ export const E97_Beneficiary_impl = {
                 ? [{
                     type: 'leaf' as const,
                     actionId: 'stables',
-                    sourceCard: CARD_ID,
+                    sourceCard: STALLWRIGHT_ID,
                     optional: true,
                     actionContext: { max: 1, exactCost: { max: 1 }, trueAction: false },
                   }]
