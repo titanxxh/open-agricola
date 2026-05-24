@@ -38,6 +38,7 @@ export const resolveTypedFlatPaymentSelection = (
   paymentChoice: string | undefined,
   failure: ActionExecutionResult,
   costType?: CostModifierType,
+  state?: GameState,
 ): TypedFlatPaymentSelection => {
   const complex: ComplexCost = isComplexCost(baseCost)
     ? baseCost
@@ -50,6 +51,7 @@ export const resolveTypedFlatPaymentSelection = (
     failure,
     {
       costType,
+      state,
     },
   )
 }
