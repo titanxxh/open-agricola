@@ -6,13 +6,18 @@ import { A34_Loppers } from '../../cards-display/A/A34_Loppers'
 
 const CARD_ID = A34_Loppers.id
 
+type FenceBuiltLike = {
+  type: 'farm.fenceBuilt'
+  newFenceEdges?: unknown
+}
+
 const builtOrdinaryFence = (context: CardListenerContext): boolean => {
   const events = context.actionEvents ?? context.transactionEvents
-  return events.some((event) =>
-    event.type === 'farm.fenceBuilt' &&
-    Array.isArray(event.newFenceEdges) &&
-    event.newFenceEdges.length > 0,
-  )
+  return events.some((event): boolean => {
+    if (event.type !== 'farm.fenceBuilt') return false
+    const fenceEvent = event as FenceBuiltLike
+    return Array.isArray(fenceEvent.newFenceEdges) && fenceEvent.newFenceEdges.length > 0
+  })
 }
 
 const listener: CardListenerRegistration = {
