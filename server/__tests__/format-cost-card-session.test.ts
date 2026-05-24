@@ -301,6 +301,22 @@ describe('formatCost card session regressions', () => {
     expect(skipped.interaction.stateId).toBe('wait')
   })
 
+  it('B93_Confidant is not playable when the minimum future food schedule is unaffordable', () => {
+    const session = setupOccupation('B93_Confidant')
+    const state = session.getState().state
+    state.players[0]!.occupationHand = ['B93_Confidant', 'A114_SeasonalWorker']
+    state.players[0]!.resources.food = 1
+    session.loadState(state)
+
+    const action = session.takeAction(0, 'lessons-4')
+    expect(action.ok).toBe(true)
+    if (action.interaction.stateId === 'wait') {
+      expect(action.interaction.options?.some((entry) => entry.value === 'B93_Confidant') ?? false).toBe(false)
+    }
+    expect(action.state.players[0]!.occupationPlayed).not.toContain('B93_Confidant')
+    expect(action.state.futureMeeples.some((entry) => entry.cardId === 'B93_Confidant')).toBe(false)
+  })
+
   it('B93_Confidant returns future food and offers optional sow or fence at round start', () => {
     const session = setupOccupation('B93_Confidant')
     const state = session.getState().state
