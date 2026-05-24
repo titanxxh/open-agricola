@@ -11,6 +11,7 @@ import '../B/B2_MiniPasture'
 import '../B/B16_MiningHammer'
 import '../B/B88_EstablishedPerson'
 import '../B/B89_Groom'
+import '../B/B93_Confidant'
 import '../B/B149_OpenAirFarmer'
 import '../C/C2_Stable'
 import '../C/C89_StableMaster'
@@ -500,11 +501,49 @@ describe('formatCost migrated card flows', () => {
     const gameState = state(actor)
     const flow = getCardEffect('E97_Beneficiary')!.onBuy!(gameState, actor)
     expect(flow?.type).toBe('or')
+    if (flow?.type !== 'or') return
+    const occupationBranch = flow.children[0]
+    expect(occupationBranch?.type).toBe('seq')
+    if (occupationBranch?.type !== 'seq') return
+    expect(occupationBranch.children[0]).toMatchObject({
+      type: 'leaf',
+      actionId: 'occupation',
+      params: { exactCost: { food: 1 } },
+    })
     const stable = expectLeaf(flow, 'stables')
     expect(stable.optional).toBe(true)
     expect(stable.actionContext).toMatchObject({ max: 1, exactCost: { max: 1 } })
     expectNoLegacyCostFields(stable)
     const occupation = expectLeaf(flow, 'occupation')
     expect(occupation.params).toEqual({ exactCost: { food: 1 } })
+  })
+
+  it('B93_Confidant offers future receive sow/fence with explicit fence cost policy', () => {
+    const actor = player({ occupationPlayed: ['B93_Confidant'] })
+    const gameState = state(actor)
+    gameState.round = 4
+    gameState.events.push({
+      schemaVersion: 1,
+      id: 'event-b93',
+      seq: 1,
+      round: 4,
+      phase: 'preWork',
+      visibility: 'public',
+      type: 'futureMeeple.resolved',
+      playerId: actor.id,
+      cardId: 'B93_Confidant',
+      sourceCardId: 'B93_Confidant',
+      resources: { food: 1 },
+    })
+
+    const flow = getCardEffect('B93_Confidant')!.onRoundStart!(gameState, actor)
+    expect(flow?.type).toBe('seq')
+    const sow = expectLeaf(flow, 'sow')
+    expect(sow.actionContext).toMatchObject({ trueAction: false })
+    const fence = expectLeaf(flow, 'fence')
+    expect(fence.actionContext).toMatchObject({
+      trueAction: false,
+      fencePolicy: { costPolicy: { fence: { wood: 1 } } },
+    })
   })
 })
