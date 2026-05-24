@@ -1,4 +1,4 @@
-import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ActionSpace, ComplexCost, GameState, InternalActionChild, InternalActionChildren, PlayerState, Resource } from '../../contract/types'
+import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ActionSpace, ComplexCost, GameState, InternalActionChild, InternalActionChildren, PaymentSolution, PlayerState, Resource } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
 import { getOccupation } from '../../cards/registry-display'
 import { runCardListeners } from '../../cards/card-listeners'
@@ -334,13 +334,44 @@ export const canAffordOccupationActionCost = (
   cost: Partial<PlayerState['resources']>,
   actionCardId?: string,
 ) =>
-  canAffordOccupationPreviewCost(
+  collectOccupationActionPaymentOptions(
     state,
     player,
     occupationId,
     cost,
     actionCardId,
+  ).length > 0
+
+export const collectOccupationActionPaymentOptions = (
+  state: GameState,
+  player: PlayerState,
+  occupationId: string,
+  cost: Partial<PlayerState['resources']>,
+  actionCardId?: string,
+): PaymentSolution[] => {
+  const previewCost = resolveCardPreviewCostByProvider(
+    state,
+    player,
+    'occupation',
+    occupationId,
+    () => cost,
+    actionCardId,
   )
+  if (!previewCost) return []
+  const playerIndex = state.players.indexOf(player)
+  const paymentState =
+    playerIndex >= 0 ? state : ({ ...state, players: [player] } as GameState)
+  const paymentPlayerIndex = playerIndex >= 0 ? playerIndex : 0
+  const normalizedCost: ComplexCost = PaymentSolver.isComplexCost(previewCost)
+    ? previewCost
+    : { fee: previewCost }
+  return PaymentSolver.computeOptions(paymentState, paymentPlayerIndex, normalizedCost, {
+    actionId: 'pay',
+    costType: 'occupation',
+    sourceCard: occupationId,
+    spaceId: actionCardId,
+  })
+}
 
 type OccupationCommitData = {
   occupationId: string
