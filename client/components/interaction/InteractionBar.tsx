@@ -9,6 +9,7 @@ import type {
   AnytimeAction,
   ChoiceDescriptionPreview,
   ChoiceEffectPreview,
+  PaymentResourceMap,
   Resource,
 } from '../../../shared/contract/types'
 import { AnytimeBar } from './AnytimeBar'
@@ -17,7 +18,7 @@ import { ResourceQuantitySelectPanel } from './ResourceQuantitySelectPanel'
 import { ResourceBatchExchangePanel } from './ResourceBatchExchangePanel'
 
 type ResourceExchangeLabelParams = {
-  resourcesPaid?: Partial<Resource>
+  resourcesPaid?: PaymentResourceMap
   resourcesGained?: Partial<Resource>
   bonusVp?: number
 }
@@ -27,7 +28,7 @@ const isResourceExchangeLabelParams = (
 ): value is ResourceExchangeLabelParams =>
   !!value && typeof value === 'object'
 
-const hasPositiveResources = (resources?: Partial<Resource>) =>
+const hasPositiveResources = (resources?: Record<string, number | undefined>) =>
   !!resources && Object.values(resources).some((value) => (value ?? 0) > 0)
 
 const renderPaymentSourceCards = (
@@ -52,7 +53,7 @@ const renderEffectPreview = (
     return (
       <span className="payment-option-content">
         {hasPositiveResources(effectPreview.resourcesPaid) ? (
-          <ResourceLine locale={locale} resources={effectPreview.resourcesPaid ?? {}} hideZero />
+          <ResourceLine locale={locale} mode="payment" resources={effectPreview.resourcesPaid ?? {}} hideZero />
         ) : (
           <span>{t(locale, 'ui.interactionPaymentFree')}</span>
         )}
@@ -72,6 +73,7 @@ const renderEffectPreview = (
         {hasPositiveResources(effectPreview.resourcesPaid) ? (
           <ResourceLine
             locale={locale}
+            mode="payment"
             resources={effectPreview.resourcesPaid ?? {}}
             hideZero
           />
@@ -160,10 +162,10 @@ const renderOptionLabel = (
   ) {
     return (
       <span className="payment-option-content">
-        {Object.keys(option.labelParams.resourcesPaid as Partial<Resource>).filter(k => (option.labelParams?.resourcesPaid as Record<string, number>)[k] > 0).length === 0 ? (
+        {Object.keys(option.labelParams.resourcesPaid as PaymentResourceMap).filter(k => (option.labelParams?.resourcesPaid as Record<string, number>)[k] > 0).length === 0 ? (
           <span>{t(locale, 'ui.interactionPaymentFree')}</span>
         ) : (
-          <ResourceLine locale={locale} resources={option.labelParams.resourcesPaid as Partial<Resource>} hideZero />
+          <ResourceLine locale={locale} mode="payment" resources={option.labelParams.resourcesPaid as PaymentResourceMap} hideZero />
         )}
         {!!option.labelParams.cardUsed && (
           <span className="payment-option-card">
@@ -189,6 +191,7 @@ const renderOptionLabel = (
         {hasPositiveResources(option.labelParams.resourcesPaid) ? (
           <ResourceLine
             locale={locale}
+            mode="payment"
             resources={option.labelParams.resourcesPaid ?? {}}
             hideZero
           />
