@@ -9,6 +9,7 @@ import '../../shared/cards/B/B82_ValueAssets'
 import '../../shared/cards/B/B93_Confidant'
 import '../../shared/cards/B/B149_OpenAirFarmer'
 import '../../shared/cards/C/C2_Stable'
+import '../../shared/cards/A/A28_ForestSchool'
 import '../../shared/cards/E/E1_PoleBarns'
 import '../../shared/cards/E/E16_BriarHedge'
 import '../../shared/cards/E/E89_Stallwright'
@@ -318,6 +319,40 @@ describe('formatCost card session regressions', () => {
     expect(action.state.futureMeeples.some((entry) => entry.cardId === 'B93_Confidant')).toBe(false)
   })
 
+  it('B93_Confidant is not playable when A28_ForestSchool only covers the occupation cost', () => {
+    const session = setupOccupation('B93_Confidant')
+    const state = session.getState().state
+    state.players[0]!.occupationHand = ['B93_Confidant', 'A114_SeasonalWorker']
+    state.players[0]!.minorPlayed = ['A28_ForestSchool']
+    state.players[0]!.resources.food = 0
+    state.players[0]!.resources.wood = 5
+    session.loadState(state)
+
+    const action = session.takeAction(0, 'lessons-4')
+    expect(action.ok).toBe(true)
+    if (action.interaction.stateId === 'wait') {
+      expect(action.interaction.options?.some((entry) => entry.value === 'B93_Confidant') ?? false).toBe(false)
+    }
+    expect(action.state.players[0]!.occupationPlayed).not.toContain('B93_Confidant')
+    expect(action.state.futureMeeples.some((entry) => entry.cardId === 'B93_Confidant')).toBe(false)
+  })
+
+  it('B93_Confidant remains playable with A28_ForestSchool when food remains for the future schedule', () => {
+    const session = setupOccupation('B93_Confidant')
+    const state = session.getState().state
+    state.players[0]!.occupationHand = ['B93_Confidant', 'A114_SeasonalWorker']
+    state.players[0]!.minorPlayed = ['A28_ForestSchool']
+    state.players[0]!.resources.food = 2
+    state.players[0]!.resources.wood = 5
+    session.loadState(state)
+
+    const action = session.takeAction(0, 'lessons-4')
+    expect(action.ok).toBe(true)
+    expect(action.interaction.stateId).toBe('wait')
+    if (action.interaction.stateId !== 'wait') return
+    expect(action.interaction.options?.some((entry) => entry.value === 'B93_Confidant')).toBe(true)
+  })
+
   it('B93_Confidant returns future food and offers optional sow or fence at round start', () => {
     const session = setupOccupation('B93_Confidant')
     const state = session.getState().state
@@ -361,6 +396,11 @@ describe('formatCost card session regressions', () => {
     const state = session.getState().state
     state.players[0]!.minorPlayed = ['E16_BriarHedge']
     state.players[0]!.resources.wood = 0
+    state.players[0]!.fenceSegments = [
+      { edge: 'H-1-0', type: 'fence' },
+      { edge: 'V-0-0', type: 'fence' },
+      { edge: 'V-0-1', type: 'fence' },
+    ]
     session.loadState(state)
 
     const played = playOccupation(session, 'B93_Confidant')
@@ -383,6 +423,23 @@ describe('formatCost card session regressions', () => {
     expect(roundStarted.interaction.stateId).toBe('wait')
     if (roundStarted.interaction.stateId !== 'wait') return
     expect(roundStarted.interaction.options?.some((entry) => entry.labelKey === 'actions.fencing.name')).toBe(true)
+
+    const fenceOption = roundStarted.interaction.options?.find((entry) => entry.labelKey === 'actions.fencing.name')
+    expect(fenceOption).toBeDefined()
+    const fencePrompt = session.resolveChoice(0, fenceOption!.value)
+    expect(fencePrompt.ok).toBe(true)
+    expect(fencePrompt.interaction.stateId).toBe('wait')
+    if (fencePrompt.interaction.stateId !== 'wait') return
+    expect(fencePrompt.interaction.request.kind).toBe('farm-select')
+
+    const fenced = session.resolveChoice(0, 'confirm', {
+      edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
+      extraWood: 0,
+    })
+    expect(fenced.ok).toBe(true)
+    expect(fenced.state.players[0]!.resources.wood).toBe(0)
+    expect(fenced.state.players[0]!.fenceSegments).toHaveLength(4)
+    expect(fenced.state.players[0]!.pastures).toHaveLength(1)
   })
 
   it('E97_Beneficiary offers Stallwright stable before the extra occupation branch', () => {
