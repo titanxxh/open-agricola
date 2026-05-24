@@ -117,7 +117,7 @@
 13. ~~BGA-style pay child / internal children 机制~~ ✅ 已落地：public host action 负责业务 mutation，mandatory payment 通过 internal `pay` child 结算；`beforeHostListeners` / `afterHostCommitListeners` / `afterHostListeners` 保留 BGA pay slot 差异，improvement/occupation 的 onBuy 在 host commit 后、host after 前运行；public action 顺序已修正为 `computeReplace -> before -> strict isDoable -> computeCosts -> execute -> during -> immediatelyAfter -> after`；`activate-card-effect` 通过 internal result map 读取 `paymentInfo`；`architecture-guard` 守住 deleted apply effects，不允许新增 top-level `apply-*` effect 文件来堆叠多卡逻辑。
 14. ~~Fence segment source/type + generic fencing policy~~ ✅ 已落地：`FenceSegment.type` 区分 ordinary fence / B30 palisade，`FenceSegment.source` 区分 own / borrowed；缺省普通 fence 视为 own ordinary source。fencing 主路径不按 `C1` / `B30` / `E149`、`noWoodPalisades`、`midnightFencer` 分支；卡牌通过 `fencePolicy` 表达 allowed segment types、source policy、segment / pasture bounds、cost、cancel、animal preservation；`segmentBounds.total` 表达普通 fence + palisade 的总段数上限。C1 rebuild 只计数/回收/重建 own ordinary fences，走 `consume-fence` ownOnly + generic `fencePolicy`。
 15. ~~Supply token payment / reserve cap~~ ✅ 已落地：`PaymentResourceMap` 支持 `fence` / `stable` supply token；payment solver、typed-flat、pay leaf、Card Definition cost、`PaymentInfo.resourcesPaid` 和 `resource.paid.resources` 都保留这些 token。支付 supply token 只增加 `player.supplyTokensConsumed`，不删除已建组件；fence / stable 可建上限统一由 `getOwnOrdinaryFenceBuildLimit()` / `getOwnOrdinaryFenceReserveCount()` / `getAvailableStableSupplyCount()` 计算，禁止回退到固定 15 / 4。C54 Market Booth、A34 Loppers、B149 Open Air Farmer、E148 Lazybones、A89 Stable Planner、E76 Lumber Pile 等回归已覆盖。
-16. ~~BGA `Utils::formatCost` exact/free/paid unit semantics~~ ✅ 已落地：`ExactCost` 统一表达精确单位成本和 `max`，construct / renovation / stables / plow / occupation 消费 `readExactCost()` / `resolveUnitCostWithDelta()`；卡牌侧静态审计 `shared/cards/__tests__/format-cost-exact-audit.test.ts` 禁止新增 `costOverride`、`freeCost`、legacy `params.cost`、inline `actionContext.costs`、legacy `renovation` / `fencing` leaf 或 `-99` 精确成本 hack（保留 `E27_PiggyBank` computeCosts 折扣例外）。
+16. ~~BGA `Utils::formatCost` exact/free/paid unit semantics~~ ✅ 已落地：`ExactCost` 统一表达精确单位成本和 `max`，construct / renovation / stables / plow / occupation 消费 `readExactCost()` / `resolveUnitCostWithDelta()`；`occupation-gate` 支持 E97 这类“先执行 stable、但 OR 可执行性按 occupation 判断”的 flow；卡牌侧静态审计 `shared/cards/__tests__/format-cost-exact-audit.test.ts` 禁止新增 `costOverride`、`freeCost`、legacy `params.cost`、inline `actionContext.costs`、legacy `renovation` / `fencing` leaf 或 `-99` 精确成本 hack（保留 `E27_PiggyBank` computeCosts 折扣例外）。
 
 影响回归覆盖：`B65_GrainDepot` paymentInfo fee index、before-phase cards、renovation、improvement、occupation、construct、stables、fencing、`A34_Loppers` exact-wood、C54/A34 reserve fence payment、B149 stable supply + palisade bounds、stable paid/free log pairing。
 
@@ -1158,7 +1158,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `E86_PenBuilder` | 已对齐 |  |
 | `E87_MasterRenovator` | 已对齐 |  |
 | `E88_MasterFencer` | 已对齐 | BGA `formatCost([WOOD => 0])` 通过 nested `fencePolicy` 表达付 2/3 wood 后最多 3/4 段总免费 fence。 |
-| `E89_Stallwright` | 已对齐 | BGA `formatCost(['max' => 1])` 通过 `stables` `actionContext.exactCost` 表达；E97 第三职业分支由 E97 自身承接，避免重复触发。 |
+| `E89_Stallwright` | 已对齐 | BGA `formatCost(['max' => 1])` 通过 `stables` `actionContext.exactCost` 表达；E97 的额外 occupation 分支若执行会让职业数变为 4，避免第三职业 stable 重复；E97 bonus 被跳过时仍由 E89 自身触发。 |
 | `E90_DungCollector` | 已对齐 |  |
 | `E91_PlowBuilder` | 已对齐 |  |
 | `E92_FieldDoctor` | 已对齐 |  |
@@ -1166,7 +1166,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `E94_Prophet` | 已对齐 | 即时翻修 / fencing 子行动使用当前 `renovate-house` / `fence` action id。 |
 | `E95_Miller` | 已对齐 |  |
 | `E96_Elder` | 已对齐 |  |
-| `E97_Beneficiary` | 已对齐 | 额外 occupation 用 `params.exactCost: { food: 1 }`；若已出 E89，则内嵌 BGA `formatCost(['max' => 1])` 免费 stable 分支；额外 occupation / minor improvement 使用 BGA `NODE_OR` 语义，occupation 作为分支首个节点避免 optional stable 影响 OR gating。 |
+| `E97_Beneficiary` | 已对齐 | 额外 occupation 用 `params.exactCost: { food: 1 }`；若已出 E89，则内嵌 BGA `formatCost(['max' => 1])` 免费 stable 并排在额外 occupation 前；`occupation-gate` 只负责 OR 分支可执行性，避免 optional stable 影响 gating。 |
 | `E98_Prodigy` | 已对齐 |  |
 | `E99_UncaringParents` | 已对齐 |  |
 | `E100_MuseumCaretaker` | 已对齐 |  |

@@ -7,6 +7,9 @@ import '../../shared/cards/B/B2_MiniPasture'
 import '../../shared/cards/B/B149_OpenAirFarmer'
 import '../../shared/cards/C/C2_Stable'
 import '../../shared/cards/E/E1_PoleBarns'
+import '../../shared/cards/E/E89_Stallwright'
+import '../../shared/cards/E/E97_Beneficiary'
+import '../../shared/cards/A/A114_SeasonalWorker'
 
 const FILLER = '__test_placeholder__'
 
@@ -84,6 +87,45 @@ const playOccupation = (session: GameSession, cardId: string) => {
   const played = session.resolveChoice(0, option!.value)
   expect(played.ok).toBe(true)
   return played
+}
+
+const setupBeneficiaryWithStallwright = () => {
+  const session = new GameSession(undefined, undefined, { playerCount: 4 })
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  state.round = 1
+
+  for (const player of state.players) {
+    setWorkersAtHome(state, player, 2)
+    player.minorHand = [FILLER]
+    player.occupationHand = [FILLER]
+  }
+
+  const player = state.players[0]!
+  player.occupationPlayed = ['E89_Stallwright', 'A1_OtherOccupation']
+  player.occupationHand = ['E97_Beneficiary', 'A114_SeasonalWorker']
+  player.resources = {
+    ...player.resources,
+    food: 10,
+    wood: 0,
+  }
+
+  session.loadState(state)
+  return session
+}
+
+const chooseByLabel = (
+  session: GameSession,
+  response: ReturnType<GameSession['resolveChoice']> | ReturnType<GameSession['takeAction']>,
+  labelKey: string,
+) => {
+  expect(response.interaction.stateId).toBe('wait')
+  if (response.interaction.stateId !== 'wait') return response
+  const option = response.interaction.options?.find((entry) => entry.labelKey === labelKey)
+  expect(option).toBeDefined()
+  const next = session.resolveChoice(0, option!.value)
+  expect(next.ok).toBe(true)
+  return next
 }
 
 describe('formatCost card session regressions', () => {
@@ -227,5 +269,35 @@ describe('formatCost card session regressions', () => {
     expect(twoCells.state.players[0]!.resources.wood).toBe(0)
     expect(twoCells.state.players[0]!.pastures).toHaveLength(1)
     expect(twoCells.state.players[0]!.pastures[0]?.tiles).toHaveLength(2)
+  })
+
+  it('E97_Beneficiary offers Stallwright stable before the extra occupation branch', () => {
+    const session = setupBeneficiaryWithStallwright()
+
+    const played = playOccupation(session, 'E97_Beneficiary')
+    const acceptedOccupationBranch = chooseByLabel(session, played, 'actions.lessons.name')
+    const acceptedStable = chooseByLabel(session, acceptedOccupationBranch, 'actions.stables.name')
+    expect(acceptedStable.interaction.stateId).toBe('wait')
+    if (acceptedStable.interaction.stateId !== 'wait') return
+    expect(acceptedStable.interaction.request.kind).toBe('farm-select')
+
+    const builtStable = session.resolveChoice(0, 'confirm', {
+      stables: [{ row: 0, col: 0 }],
+    })
+    expect(builtStable.ok).toBe(true)
+    expect(builtStable.state.players[0]!.stableTiles).toContainEqual({ row: 0, col: 0 })
+    expect(builtStable.state.players[0]!.occupationPlayed).toContain('A114_SeasonalWorker')
+  })
+
+  it('E89_Stallwright still triggers when E97_Beneficiary bonus is skipped', () => {
+    const session = setupBeneficiaryWithStallwright()
+
+    const played = playOccupation(session, 'E97_Beneficiary')
+    expect(played.interaction.stateId).toBe('wait')
+    const skipped = session.resolveChoice(0, '__skip__')
+    expect(skipped.ok).toBe(true)
+    expect(skipped.interaction.stateId).toBe('wait')
+    if (skipped.interaction.stateId !== 'wait') return
+    expect(skipped.interaction.options?.some((entry) => entry.labelKey === 'actions.stables.name')).toBe(true)
   })
 })
