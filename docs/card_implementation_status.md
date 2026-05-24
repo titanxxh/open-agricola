@@ -1166,7 +1166,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `E94_Prophet` | 已对齐 | 即时翻修 / fencing 子行动使用当前 `renovate-house` / `fence` action id。 |
 | `E95_Miller` | 已对齐 |  |
 | `E96_Elder` | 已对齐 |  |
-| `E97_Beneficiary` | 已对齐 | 额外 occupation 用 `params.exactCost: { food: 1 }`；若已出 E89，则内嵌 BGA `formatCost(['max' => 1])` 免费 stable 并排在额外 occupation 前；`occupation-gate` 只负责 OR 分支可执行性，避免 optional stable 影响 gating。 |
+| `E97_Beneficiary` | 已对齐 | 额外 occupation 用 `params.exactCost: { food: 1 }`；若已出 E89，则内嵌 BGA `formatCost(['max' => 1])` 免费 stable 并排在额外 occupation 前，且 stable 归因到 `E89_Stallwright`；`occupation-gate` 只负责 OR 分支可执行性，避免 optional stable 影响 gating。 |
 | `E98_Prodigy` | 已对齐 |  |
 | `E99_UncaringParents` | 已对齐 |  |
 | `E100_MuseumCaretaker` | 已对齐 |  |

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { setWorkersAtHome } from '../../shared/domain/player'
-import type { FenceSegment } from '../../shared/contract/types'
+import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
+import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
+import type { FenceSegment, Field } from '../../shared/contract/types'
 
 import '../../shared/cards/B/B2_MiniPasture'
 import '../../shared/cards/B/B82_ValueAssets'
@@ -300,6 +301,44 @@ describe('formatCost card session regressions', () => {
     expect(skipped.interaction.stateId).toBe('wait')
   })
 
+  it('B93_Confidant returns future food and offers optional sow or fence at round start', () => {
+    const session = setupOccupation('B93_Confidant')
+    const state = session.getState().state
+    state.players[0]!.fields = [{ row: 0, col: 0, stacks: [] } satisfies Field]
+    state.players[0]!.resources.grain = 1
+    session.loadState(state)
+
+    const played = playOccupation(session, 'B93_Confidant')
+    expect(played.interaction.stateId).toBe('wait')
+    if (played.interaction.stateId !== 'wait') return
+    const schedule = played.interaction.options?.[0]
+    expect(schedule).toBeDefined()
+
+    const scheduled = session.resolveChoice(0, schedule!.value)
+    expect(scheduled.ok).toBe(true)
+    expect(scheduled.state.futureMeeples.filter((entry) => entry.cardId === 'B93_Confidant')).toHaveLength(2)
+    const foodAfterScheduling = scheduled.state.players[0]!.resources.food
+
+    const stateBeforeRoundStart = session.getState().state
+    for (const player of stateBeforeRoundStart.players) {
+      markAllWorkersUsed(stateBeforeRoundStart, player)
+    }
+    session.loadState(stateBeforeRoundStart)
+
+    const roundStarted = session.performRoundEnd()
+    expect(roundStarted.ok).toBe(true)
+    expect(roundStarted.state.round).toBe(2)
+    expect(roundStarted.state.players[0]!.resources.food).toBe(foodAfterScheduling + 1)
+    expect(roundStarted.interaction.stateId).toBe('wait')
+    if (roundStarted.interaction.stateId !== 'wait') return
+    expect(roundStarted.interaction.options?.some((entry) => entry.value === '__skip__')).toBe(true)
+    expect(
+      roundStarted.interaction.options?.some((entry) =>
+        entry.labelKey === 'actions.sow.name' ||
+        entry.labelKey === 'actions.fencing.name'),
+    ).toBe(true)
+  })
+
   it('E97_Beneficiary offers Stallwright stable before the extra occupation branch', () => {
     const session = setupBeneficiaryWithStallwright()
 
@@ -315,6 +354,8 @@ describe('formatCost card session regressions', () => {
     })
     expect(builtStable.ok).toBe(true)
     expect(builtStable.state.players[0]!.stableTiles).toContainEqual({ row: 0, col: 0 })
+    expect(readCardResourceStats(builtStable.state.players[0]!, 'E89_Stallwright')?.gained.stable).toBe(1)
+    expect(readCardResourceStats(builtStable.state.players[0]!, 'E97_Beneficiary')?.gained.stable ?? 0).toBe(0)
     expect(builtStable.state.players[0]!.occupationPlayed).toContain('A114_SeasonalWorker')
   })
 
