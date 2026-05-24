@@ -29,6 +29,7 @@ import type {
   TradeModifier,
 } from '../../../contract/types'
 import type { DraftGameEvent, EventSink } from '../../../contract/events'
+import { A28_ForestSchool } from '../../../cards-display/A/A28_ForestSchool'
 import { A88_HedgeKeeper } from '../../../cards-display/A/A88_HedgeKeeper'
 
 const hedgeKeeperModifier = A88_HedgeKeeper.modifier as TradeModifier
@@ -899,6 +900,24 @@ const callPay = (
   return { result, capturedEvents }
 }
 
+const callPayResolveChoice = (
+  player: PlayerState,
+  params: Record<string, unknown>,
+  choice: string,
+  extra: Partial<{ sourceCard: string; state: GameState }> = {},
+) => {
+  const capturedEvents: DraftGameEvent[] = []
+  const result = payAction.resolveChoice?.({
+    state: extra.state ?? { players: [player] } as GameState,
+    player,
+    space: { id: 'test', name: '', actionId: 'pay', round: 0 } as unknown as ActionSpace,
+    params,
+    sourceCard: extra.sourceCard,
+    eventSink: makeEventSink(capturedEvents),
+  } as ActionMutationContext, choice)
+  return { result, capturedEvents }
+}
+
 describe('payAction', () => {
   it('exists with id "pay"', () => {
     expect(payAction.id).toBe('pay')
@@ -1008,6 +1027,35 @@ describe('payAction: ComplexCost typed-flat single solution', () => {
         bonusChoiceIndex: { TestBonusCard: 0 },
       }),
     ])
+  })
+
+  it('typed-flat Partial<Resource> with reserve applies selected multi-solution payment', () => {
+    const player = createMockPlayer({ food: 3, wood: 1 })
+    player.activeModifiers = [A28_ForestSchool.modifier as TradeModifier]
+    const params = {
+      cost: { food: 1 },
+      costType: 'occupation',
+      optionPrefix: 'pay:reserve-test',
+      reserveResources: { food: 2 },
+    }
+
+    const { result: initial } = callPay(player, params)
+    expect(initial.type).toBe('request')
+    if (initial.type !== 'request') throw new Error('expected request')
+    if (initial.request.kind !== 'choice') throw new Error('expected choice kind')
+    const woodOption = initial.request.options.find((option) => {
+      const paid = (
+        (option.labelParams as { resourcesPaid?: Record<string, number> } | undefined)
+          ?.resourcesPaid ?? {}
+      )
+      return paid.wood === 1
+    })
+    expect(woodOption).toBeDefined()
+
+    const { result } = callPayResolveChoice(player, params, woodOption!.value)
+    expect(result?.type).toBe('ok')
+    expect(player.resources.food).toBe(3)
+    expect(player.resources.wood).toBe(0)
   })
 
 })
