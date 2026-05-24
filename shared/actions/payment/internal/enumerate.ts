@@ -781,9 +781,13 @@ export const computeAllBuyableCombinations = (
       if (eligibleCards.length > 0 && canPayCardCost) {
         paymentSolutions.forEach((solution) => {
           eligibleCards.forEach((cardId) => {
+            const resourcesPaid = mergePaymentResources(solution.resourcesPaid, cardCost)
+            if (!canPayResources(player, resourcesPaid) || !canPaySupplyTokens(state, player, resourcesPaid)) {
+              return
+            }
             requiredCardSolutions.push({
               ...solution,
-              resourcesPaid: mergePaymentResources(solution.resourcesPaid, cardCost),
+              resourcesPaid,
               cardUsed: cardId,
             })
           })
