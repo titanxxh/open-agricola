@@ -1173,6 +1173,7 @@ export const zh = {
     STUB_BeforeBakeGainClay: { name: '测试：烤面包前得黏土', desc: '测试 stub：烤面包前获得 1 黏土。' },
     D122_ClayCarrier: { anytime: '搬黏土工：付2食物 → 获2黏土' },
     E86_PenBuilder: { anytime: '围栏工：付1木材 → 动物容量+2' },
+    E148_Lazybones: { name: '懒骨头', choice: '预留 {spaces}' },
     A102_Grocer: { anytime: '杂货商：付1食物 → 购买顶部商品' },
     B83_MuddyPuddles: { anytime: '泥塘：付1黏土 → 取顶部商品' },
     B154_SheepKeeper: { anytime: '牧羊人：7+羊 → 3 分 + 2 食物' },
