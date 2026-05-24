@@ -499,6 +499,7 @@ describe('formatCost migrated card flows', () => {
     })
     const gameState = state(actor)
     const flow = getCardEffect('E97_Beneficiary')!.onBuy!(gameState, actor)
+    expect(flow?.type).toBe('or')
     const stable = expectLeaf(flow, 'stables')
     expect(stable.optional).toBe(true)
     expect(stable.actionContext).toMatchObject({ max: 1, exactCost: { max: 1 } })

@@ -47,7 +47,7 @@ const afterFencingListener: CardListenerRegistration = {
   id: 'B124-trimmer-after-fencing',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['fencing'],
+  actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
     const currentArea = countPastureTiles(context.player)

@@ -22,7 +22,7 @@ const setFlagHandler = (context: CardListenerContext): ActionHookResult | void =
 const setFlagListeners: CardListenerRegistration[] = [
   { id: 'B27-flag-construct', cardIds: [CARD_ID], phases: ['after' as ActionHookPhase], actions: ['construct'],     handler: setFlagHandler },
   { id: 'B27-flag-stables',   cardIds: [CARD_ID], phases: ['after' as ActionHookPhase], actions: ['stables'],       handler: setFlagHandler },
-  { id: 'B27-flag-fencing',   cardIds: [CARD_ID], phases: ['after' as ActionHookPhase], actions: ['fencing'],       handler: setFlagHandler },
+  { id: 'B27-flag-fencing',   cardIds: [CARD_ID], phases: ['after' as ActionHookPhase], actions: ['fence'],         handler: setFlagHandler },
 ]
 
 const builtSomethingThisAction = (player: PlayerState): boolean =>

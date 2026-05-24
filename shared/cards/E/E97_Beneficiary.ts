@@ -12,7 +12,7 @@ export const E97_Beneficiary_impl = {
       if (player.occupationPlayed.length !== 3) return
 
       return {
-        type: 'xor' as const,
+        type: 'or' as const,
         optional: true,
         children: [
           {

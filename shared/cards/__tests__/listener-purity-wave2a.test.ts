@@ -398,7 +398,7 @@ describe('listener purity wave 2a', () => {
         },
       ],
     })
-    const ctx = context(p, { actionId: 'fencing' })
+    const ctx = context(p, { actionId: 'fence' })
     const before = snapshot(p)
 
     const result = listenerById(
