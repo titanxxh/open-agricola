@@ -125,6 +125,22 @@ describe('C89_StableMaster session', () => {
     expect(flow).toBeNull()
   })
 
+  it('onBuy skipped if consumed stable tokens exhaust reserve', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    const player = state.players[0]!
+    player.occupationPlayed.push('C89_StableMaster')
+    player.resources.wood = 5
+    player.supplyTokensConsumed = { stable: 4 }
+    session.loadState(state)
+
+    const flow = runCardEffectHook(state, player, 'C89_StableMaster', 'onBuy')
+    expect(flow).toBeNull()
+  })
+
   it('onBuy skipped if player has no wood', () => {
     const session = new GameSession()
     const state = session.getState().state

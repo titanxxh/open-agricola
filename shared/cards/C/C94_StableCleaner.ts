@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { C94_StableCleaner } from '../../cards-display/C/C94_StableCleaner'
+import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 
 const CARD_ID = C94_StableCleaner.id
 
@@ -25,7 +26,7 @@ const anytimeListener: CardListenerRegistration = {
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
-    if (context.player.stableTiles.length >= 4) return
+    if (getAvailableStableSupplyCount(context.state, context.player) <= 0) return
     if ((context.player.resources.wood ?? 0) < 1) return
     if ((context.player.resources.food ?? 0) < 1) return
     return {

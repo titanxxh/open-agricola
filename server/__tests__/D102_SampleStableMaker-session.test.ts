@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { runSelectionEffect } from '../../shared/actions/helpers/selection-effect-registry'
+import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
 import type { GameState, PlayerState , ActionFlow } from '../../shared/contract/types'
 
 import '../../shared/cards/D/D102_SampleStableMaker'
@@ -163,5 +164,32 @@ describe('D102_SampleStableMaker card effect', () => {
     expect(player.resources.wood).toBe(initial.wood + 1)
     expect(player.resources.grain).toBe(initial.grain + 1)
     expect(player.resources.food).toBe(initial.food + 1)
+  })
+
+  it('returning the B85 FarmHand tile releases stable reserve', () => {
+    const player = createOwner()
+    player.stableTiles = [
+      { row: 0, col: 0 },
+      { row: 1, col: 0 },
+      { row: 2, col: 0 },
+    ]
+    player.cardStates = {
+      B85_FarmHand: {
+        flagged: true,
+        extraData: { position: { row: 2, col: 1 } },
+      },
+    }
+    const state = createState([player])
+    expect(getAvailableStableSupplyCount(state, player)).toBe(0)
+
+    runSelectionEffect(FIELD_EFFECT, {
+      player,
+      positions: ['2-1'],
+      sourceCard: CARD_ID,
+      state,
+      cards: [],
+    })
+
+    expect(getAvailableStableSupplyCount(state, player)).toBe(1)
   })
 })
