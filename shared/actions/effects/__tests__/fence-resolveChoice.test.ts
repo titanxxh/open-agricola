@@ -36,6 +36,26 @@ const widePastureEdges = [
   'V-2-5',
 ]
 
+const twoCellPastureEdges = [
+  'H-0-1',
+  'H-0-2',
+  'H-1-1',
+  'H-1-2',
+  'V-0-1',
+  'V-0-3',
+]
+
+const openAirPasturePolicy = {
+  sourcePolicy: 'ownOnly',
+  segmentBounds: { fence: { max: 6 } },
+  costPolicy: { fence: { wood: 0 }, fixedWood: 2 },
+  pastureBounds: {
+    newPastures: { min: 1, max: 1 },
+    changedPastures: { min: 1, max: 1 },
+    newPastureSize: { min: 2, max: 2 },
+  },
+} as const
+
 const makeCtx = (
   opts: {
     player?: Partial<PlayerState>
@@ -428,6 +448,138 @@ describe('fenceAction.resolveChoice', () => {
 
     expect(result.type).toBe('ok')
     expect(ctx.player.fenceSegments).toHaveLength(15)
+  })
+
+  it('applies fixedWood after accepting one changed size-two pasture', () => {
+    const ctx = makeCtx({
+      player: {
+        resources: {
+          wood: 2,
+          clay: 0,
+          stone: 0,
+          reed: 0,
+          grain: 0,
+          vegetable: 0,
+          food: 0,
+          sheep: 0,
+          boar: 0,
+          cattle: 0,
+        },
+        roomTiles: [
+          { row: 2, col: 0 },
+          { row: 2, col: 1 },
+        ],
+      },
+      actionContext: { fencePolicy: openAirPasturePolicy },
+    })
+
+    const result = fenceAction.resolveChoice!(ctx, 'confirm', {
+      edges: twoCellPastureEdges,
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.resourcesPaid).toEqual({ wood: 2 })
+    expect(ctx.player.resources.wood).toBe(2)
+    expect(ctx.player.fenceSegments).toHaveLength(6)
+    expect(ctx.player.pastures).toHaveLength(1)
+    expect(ctx.player.pastures[0]?.size).toBe(2)
+  })
+
+  it('rejects pastureBounds violations recoverably without fixedWood payment', () => {
+    const ctx = makeCtx({
+      player: {
+        resources: {
+          wood: 2,
+          clay: 0,
+          stone: 0,
+          reed: 0,
+          grain: 0,
+          vegetable: 0,
+          food: 0,
+          sheep: 0,
+          boar: 0,
+          cattle: 0,
+        },
+        roomTiles: [
+          { row: 2, col: 0 },
+          { row: 2, col: 1 },
+        ],
+      },
+      actionContext: { fencePolicy: openAirPasturePolicy },
+    })
+
+    const result = fenceAction.resolveChoice!(ctx, 'confirm', {
+      edges: edgesForTile(0, 1),
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'TOO_FEW_FENCES',
+      recoverable: true,
+    })
+    expect(ctx.player.resources.wood).toBe(2)
+    expect(ctx.player.fenceSegments).toHaveLength(0)
+  })
+
+  it('rejects final-pasture diffs that also change an existing pasture', () => {
+    const ctx = makeCtx({
+      player: {
+        resources: {
+          wood: 2,
+          clay: 0,
+          stone: 0,
+          reed: 0,
+          grain: 0,
+          vegetable: 0,
+          food: 0,
+          sheep: 0,
+          boar: 0,
+          cattle: 0,
+        },
+        roomTiles: [
+          { row: 2, col: 0 },
+          { row: 2, col: 1 },
+        ],
+        fenceSegments: twoCellPastureEdges.map((edge) => ({
+          edge,
+          type: 'fence',
+          source: { kind: 'own', ownerPlayerId: 'p1' },
+        })),
+        pastures: [
+          {
+            id: 'pasture-1',
+            size: 2,
+            tiles: [
+              { row: 0, col: 1 },
+              { row: 0, col: 2 },
+            ],
+            stables: 0,
+            animalType: null,
+            animalCount: 0,
+          },
+        ],
+      },
+      actionContext: { fencePolicy: openAirPasturePolicy },
+    })
+
+    const result = fenceAction.resolveChoice!(ctx, 'confirm', {
+      edges: ['V-0-2', 'H-2-1', 'H-2-2', 'V-1-1', 'V-1-3'],
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'TOO_MANY_FENCES',
+      recoverable: true,
+    })
+    expect(ctx.player.resources.wood).toBe(2)
+    expect(ctx.player.fenceSegments).toHaveLength(6)
   })
 
   it('first call with invalid edges returns fail', () => {
