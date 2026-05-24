@@ -159,7 +159,7 @@ const inferMinimumPolicySegments = (policy: FenceActionPolicy): number => {
   }
   const maxTotal = segmentBounds?.total?.max
   if (maxTotal !== undefined) {
-    return Math.max(1, Math.min(minimumFenceSegments, maxTotal))
+    return 1
   }
   return minimumFenceSegments
 }
