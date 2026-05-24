@@ -58,6 +58,16 @@ describe('fence segment helpers', () => {
     expect(getAvailableOwnOrdinaryFenceCount(player)).toBe(MAX_ORDINARY_FENCE_PIECES - 2)
   })
 
+  it('subtracts consumed fence supply tokens from available own ordinary count', () => {
+    const player = makePlayer([
+      { edge: 'H-0-0', type: 'fence', source: { kind: 'own', ownerPlayerId: 'p1' } },
+      { edge: 'H-0-1', type: 'fence', source: { kind: 'own', ownerPlayerId: 'p1' } },
+    ])
+    player.supplyTokensConsumed = { fence: 3 }
+
+    expect(getAvailableOwnOrdinaryFenceCount(player)).toBe(10)
+  })
+
   it('excludes consumed and E74-held ordinary fences from reserve count', () => {
     const player = makePlayer([
       { edge: 'H-0-0', type: 'fence', source: { kind: 'own', ownerPlayerId: 'p1' } },

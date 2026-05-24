@@ -13,5 +13,10 @@ export function getOwnOrdinaryFenceCount(player: PlayerState): number {
 }
 
 export function getAvailableOwnOrdinaryFenceCount(player: PlayerState): number {
-  return Math.max(0, MAX_ORDINARY_FENCE_PIECES - getOwnOrdinaryFenceCount(player))
+  return Math.max(
+    0,
+    MAX_ORDINARY_FENCE_PIECES -
+      Math.max(0, player.supplyTokensConsumed?.fence ?? 0) -
+      getOwnOrdinaryFenceCount(player),
+  )
 }
