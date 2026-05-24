@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import '../../../cards/B/B30_WoodPalisades'
 import { fenceAction } from '../fencing'
 import { storePendingFenceBonus } from '../../../cards/helpers/pending-fence-bonus'
 import type {
-  ActionExecutionContext,
+  ActionMutationContext,
   ActionSpace,
   GameState,
   PlayerState,
@@ -23,8 +24,9 @@ const makeCtx = (
     player?: Partial<PlayerState>
     actionContext?: Record<string, unknown>
     costs?: Partial<Resource>
+    events?: string[]
   } = {},
-): ActionExecutionContext => {
+): ActionMutationContext => {
   const player = {
     id: 'p1',
     name: 'P1',
@@ -65,13 +67,46 @@ const makeCtx = (
     space: dummySpace,
     actionContext: opts.actionContext,
     costs: opts.costs,
-  } as ActionExecutionContext
+    eventSink: {
+      emit: (event: { type: string }) => opts.events?.push(event.type),
+      emitMany: (events: Array<{ type: string }>) =>
+        events.forEach((event) => opts.events?.push(event.type)),
+    },
+  } as ActionMutationContext
 }
 
 describe('fenceAction.resolveChoice', () => {
   it('cancel returns ok', () => {
     const result = fenceAction.resolveChoice!(makeCtx(), 'cancel')
     expect(result.type).toBe('ok')
+  })
+
+  it('cancel fails with recoverable error when policy forbids cancel', () => {
+    const result = fenceAction.resolveChoice!(
+      makeCtx({ actionContext: { fencePolicy: { cancelPolicy: 'forbidCancel' } } }),
+      'cancel',
+    )
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'log.fencingFail',
+      recoverable: true,
+    })
+  })
+
+  it('cancel fails with recoverable error when policy requires ordinary fences', () => {
+    const result = fenceAction.resolveChoice!(
+      makeCtx({
+        actionContext: {
+          fencePolicy: { segmentBounds: { fence: { min: 1 } } },
+        },
+      }),
+      'cancel',
+    )
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'log.fencingFail',
+      recoverable: true,
+    })
   })
 
   it('first call with payload + payable wood finalizes immediately', () => {
@@ -96,6 +131,93 @@ describe('fenceAction.resolveChoice', () => {
         },
       },
     ])
+  })
+
+  it('fails when policy minimum requires more ordinary fences', () => {
+    const ctx = makeCtx({
+      actionContext: {
+        fencePolicy: { segmentBounds: { fence: { min: 5 } } },
+      },
+    })
+    const result = fenceAction.resolveChoice!(ctx, 'confirm', {
+      edges: edgesForTile(0, 0),
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+    expect(result.type).toBe('fail')
+    if (result.type !== 'fail') return
+    expect(result.errorKey).toBe('TOO_FEW_FENCES')
+    expect(ctx.player.fenceSegments).toHaveLength(0)
+  })
+
+  it('fails when policy maximum allows fewer ordinary fences', () => {
+    const ctx = makeCtx({
+      actionContext: {
+        fencePolicy: { segmentBounds: { fence: { max: 3 } } },
+      },
+    })
+    const result = fenceAction.resolveChoice!(ctx, 'confirm', {
+      edges: edgesForTile(0, 0),
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+    expect(result.type).toBe('fail')
+    if (result.type !== 'fail') return
+    expect(result.errorKey).toBe('TOO_MANY_FENCES')
+    expect(ctx.player.fenceSegments).toHaveLength(0)
+  })
+
+  it('fails when policy only allows ordinary fences and palisades are submitted', () => {
+    const ctx = makeCtx({
+      player: { minorPlayed: ['B30_WoodPalisades'] },
+      actionContext: {
+        fencePolicy: { allowedSegmentTypes: ['fence'] },
+      },
+    })
+    const result = fenceAction.resolveChoice!(ctx, 'confirm', {
+      edges: ['H-1-0', 'V-0-1'],
+      palisadeEdges: ['H-0-0', 'V-0-0'],
+      extraWood: 0,
+    })
+    expect(result.type).toBe('fail')
+    if (result.type !== 'fail') return
+    expect(result.errorKey).toBe('SEGMENT_TYPE_NOT_ALLOWED')
+    expect(ctx.player.fenceSegments).toHaveLength(0)
+  })
+
+  it('confirms policy free ordinary fences and emits fenceBuilt', () => {
+    const events: string[] = []
+    const ctx = makeCtx({
+      player: {
+        resources: {
+          wood: 0,
+          clay: 0,
+          stone: 0,
+          reed: 0,
+          grain: 0,
+          vegetable: 0,
+          food: 0,
+          sheep: 0,
+          boar: 0,
+          cattle: 0,
+        },
+      },
+      actionContext: {
+        fencePolicy: { costPolicy: { fence: { wood: 0 } } },
+      },
+      events,
+    })
+    const result = fenceAction.resolveChoice!(ctx, 'confirm', {
+      edges: edgesForTile(0, 0),
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.resourcesPaid).toEqual({})
+    expect(ctx.player.resources.wood).toBe(0)
+    expect(ctx.player.fenceSegments).toHaveLength(4)
+    expect(events).toContain('farm.fenceBuilt')
   })
 
   it('first call with multi-combo payment returns choice + actionContextWrite', () => {

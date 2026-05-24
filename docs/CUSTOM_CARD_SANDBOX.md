@@ -225,7 +225,9 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 | `computeLockedFarmTiles`                     | 返回锁定田地位置                                                         | 田地锁定                                                |
 | `handHooks`（meta）                            | `CardEffectHook[]`                                               | 声明哪些 hook 在卡牌还在手牌时也触发                               |
 
-> 围栏折扣（E16 BriarHedge / C16 FieldFences / C1 Overhaul）现走 listener `computeCosts` phase（actions: `['fence']`）；详见 ARCHITECTURE.md §15.7。
+> 围栏折扣（E16 BriarHedge / C16 FieldFences）现走 listener `computeCosts` phase（actions: `['fence']`）；详见 ARCHITECTURE.md §15.7。
+>
+> C1 Overhaul rebuild 只处理 own ordinary fences，走 `consume-fence` ownOnly + generic `fencePolicy`。
 
 
 ### 3.2 `CARD_IMPL.listeners[].phases` 可用 phase
@@ -277,7 +279,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 | 字段                        | 类型                                           | 用法                                                                |
 | ------------------------- | -------------------------------------------- | ----------------------------------------------------------------- |
 | `player.workers`          | `Worker[]` 即 `{ id, isActive, isNewborn }[]` | **数家庭成员要 `.filter(w => w.isActive).length`**（少数卡如 A127 会把工人置为非活跃） |
-| `player.fenceSegments`    | `string[]`                                   | **字段名是 `fenceSegments`，不是 `fences`**                              |
+| `player.fenceSegments`    | `FenceSegment[]`                            | **字段名是 `fenceSegments`，不是 `fences`**；`type` 表示 ordinary fence / palisade，`source` 表示 own / borrowed；旧 string shape 只属于 normalize legacy 输入，不是 runtime shape |
 | `player.fields`           | `Field[]`                                    | `.length` 得到田地数                                                   |
 | `player.pastures`         | `Pasture[]`                                  | `.length` 得到牧场数                                                   |
 | `player.rooms`            | `number`                                     | 房间数                                                               |

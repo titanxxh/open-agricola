@@ -1290,6 +1290,7 @@ export const en = {
   fence: {
     error: {
       EDGE_TYPE_CONFLICT: 'Cannot select fence and palisade on the same segment',
+      SEGMENT_TYPE_NOT_ALLOWED: 'This fence type is not allowed for this action',
       PALISADES_NOT_UNLOCKED: 'Wood Palisades card not played',
     },
   },

@@ -173,7 +173,10 @@ export type WorkerRef = {
 }
 
 export type FenceSegmentType = 'fence' | 'palisade'
-export type FenceSegment = { edge: string; type: FenceSegmentType }
+export type FenceSegmentSource =
+  | { kind: 'own'; ownerPlayerId: string }
+  | { kind: 'borrowed'; ownerPlayerId: string }
+export type FenceSegment = { edge: string; type: FenceSegmentType; source?: FenceSegmentSource }
 
 export type PlayerState = {
   id: string

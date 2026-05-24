@@ -12,7 +12,7 @@
 // `../cards/register-all`, `../actions/index`, or anything that transitively
 // reaches card implementations. Type-only imports from pure modules are fine.
 
-import type { FenceSegment, GameState, PlayerState, Resource } from '../contract/types'
+import type { FenceSegment, FenceSegmentSource, GameState, PlayerState, Resource } from '../contract/types'
 import type { DraftMode } from '../draft/types'
 import { createRng, shuffleWithRng } from '../utils/rng'
 import { tryAddRoomTile } from '../domain/farmyard'
@@ -25,15 +25,47 @@ import {
 
 export { emptyResources, resourceKeyList, harvestRounds, createRoundOpenById }
 
-export const normalizeFenceSegments = (input: unknown): FenceSegment[] => {
+const ownFenceSource = (ownerPlayerId: string): FenceSegmentSource => ({
+  kind: 'own',
+  ownerPlayerId,
+})
+
+const normalizeFenceSegmentSource = (
+  input: unknown,
+  ownerPlayerId: string,
+): FenceSegmentSource => {
+  if (!input || typeof input !== 'object') return ownFenceSource(ownerPlayerId)
+  const source = input as { kind?: unknown; ownerPlayerId?: unknown }
+  if (source.kind === 'borrowed' && typeof source.ownerPlayerId === 'string') {
+    return { kind: 'borrowed', ownerPlayerId: source.ownerPlayerId }
+  }
+  if (
+    source.kind === 'own' &&
+    source.ownerPlayerId === ownerPlayerId
+  ) {
+    return { kind: 'own', ownerPlayerId }
+  }
+  return ownFenceSource(ownerPlayerId)
+}
+
+export const normalizeFenceSegments = (
+  input: unknown,
+  ownerPlayerId: string,
+): FenceSegment[] => {
   if (!Array.isArray(input)) return []
   return input
     .map((entry): FenceSegment | null => {
-      if (typeof entry === 'string') return { edge: entry, type: 'fence' }
+      if (typeof entry === 'string') {
+        return { edge: entry, type: 'fence', source: ownFenceSource(ownerPlayerId) }
+      }
       if (entry && typeof entry === 'object' && 'edge' in entry) {
-        const e = entry as { edge: unknown; type?: unknown }
+        const e = entry as { edge: unknown; type?: unknown; source?: unknown }
         if (typeof e.edge === 'string') {
-          return { edge: e.edge, type: e.type === 'palisade' ? 'palisade' : 'fence' }
+          return {
+            edge: e.edge,
+            type: e.type === 'palisade' ? 'palisade' : 'fence',
+            source: normalizeFenceSegmentSource(e.source, ownerPlayerId),
+          }
         }
       }
       return null
