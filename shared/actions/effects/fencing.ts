@@ -20,6 +20,7 @@ import {
 } from '../payment/internal'
 import { buildInternalPayChild } from '../helpers/pay-child'
 import { playerBoard, normalizePlayerFarm } from '../../domain'
+import { FARM_COLS, FARM_ROWS } from '../../domain/farm'
 import type {
   FenceCostPolicy,
   FenceSegmentBounds,
@@ -114,6 +115,90 @@ const hasCanStartPolicy = (policy: FenceActionPolicy): boolean =>
   policy.costPolicy !== undefined ||
   policy.pastureBounds !== undefined
 
+const minPerimeterForFarmCells = (cellCount: number): number => {
+  if (cellCount <= 0) return 0
+  let best = Number.POSITIVE_INFINITY
+  for (let rows = 1; rows <= FARM_ROWS; rows += 1) {
+    for (let cols = 1; cols <= FARM_COLS; cols += 1) {
+      if (rows * cols >= cellCount) {
+        best = Math.min(best, 2 * (rows + cols))
+      }
+    }
+  }
+  return Number.isFinite(best) ? best : minimumFenceSegments
+}
+
+const inferMinimumPolicySegments = (policy: FenceActionPolicy): number => {
+  const segmentBounds = policy.segmentBounds
+  const hasSegmentMin =
+    segmentBounds?.fence?.min !== undefined ||
+    segmentBounds?.palisade?.min !== undefined ||
+    segmentBounds?.total?.min !== undefined
+  if (hasSegmentMin) {
+    return Math.max(
+      segmentBounds?.total?.min ?? 0,
+      (segmentBounds?.fence?.min ?? 0) + (segmentBounds?.palisade?.min ?? 0),
+    )
+  }
+  const minPastureSize = policy.pastureBounds?.newPastureSize?.min
+  if (minPastureSize !== undefined) {
+    return minPerimeterForFarmCells(minPastureSize)
+  }
+  return minimumFenceSegments
+}
+
+const canStartWithFencePolicy = (
+  player: PlayerState,
+  policy: FenceActionPolicy,
+  ordinaryCapacity: number,
+  selectedFreeFences: number,
+  costOverride?: Partial<Resource>,
+): boolean => {
+  const segmentBounds = policy.segmentBounds
+  const minTotal = inferMinimumPolicySegments(policy)
+  const maxTotal = segmentBounds?.total?.max ?? minTotal
+  if (minTotal > maxTotal) return false
+  const allowedFence =
+    !policy.allowedSegmentTypes || policy.allowedSegmentTypes.includes('fence')
+  const allowedPalisade =
+    (!policy.allowedSegmentTypes || policy.allowedSegmentTypes.includes('palisade')) &&
+    playerCanBuildPalisades(player)
+  const minFence = segmentBounds?.fence?.min ?? 0
+  const minPalisade = segmentBounds?.palisade?.min ?? 0
+  if ((minFence > 0 && !allowedFence) || (minPalisade > 0 && !allowedPalisade)) {
+    return false
+  }
+  const maxFence = Math.min(
+    allowedFence ? ordinaryCapacity : 0,
+    segmentBounds?.fence?.max ?? maxTotal,
+  )
+  const maxPalisade = Math.min(
+    allowedPalisade ? 2 * (FARM_ROWS + FARM_COLS) : 0,
+    segmentBounds?.palisade?.max ?? maxTotal,
+  )
+  const fenceWoodCost = policy.costPolicy?.fence?.wood ?? 1
+  const palisadeWoodCost = policy.costPolicy?.palisade?.wood ?? 2
+  const fixedWoodCost = Math.max(0, policy.costPolicy?.fixedWood ?? 0)
+  const costFreeFences =
+    selectedFreeFences + Math.max(0, Math.abs(costOverride?.wood ?? 0))
+
+  for (let ordinary = minFence; ordinary <= maxFence; ordinary += 1) {
+    for (let palisade = minPalisade; palisade <= maxPalisade; palisade += 1) {
+      const total = ordinary + palisade
+      if (total < minTotal || total > maxTotal) continue
+      const payableFenceCount = Math.max(0, ordinary - costFreeFences)
+      const woodCost =
+        payableFenceCount * fenceWoodCost +
+        palisade * palisadeWoodCost +
+        fixedWoodCost
+      if (canAffordTypedFlatCost(player, { wood: woodCost }, 'fencing')) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
 const fenceValidationOptions = (
   player: PlayerState,
   allowPalisades: boolean,
@@ -168,24 +253,20 @@ export const canStartFencing = (
   const selectedFreeFences = readPendingFenceBonus(player)?.freeFences ?? 0
   const availableOrdinaryFenceTokens =
     getOwnOrdinaryFenceReserveCount(player) + selectedFreeFences
+  const ordinaryCapacity = Math.min(
+    remainingBuildCapacity,
+    availableOrdinaryFenceTokens,
+  )
   if (hasCanStartPolicy(policy)) {
-    const minFenceCount = policy.segmentBounds?.fence?.min ?? minimumFenceSegments
-    if (Math.min(remainingBuildCapacity, availableOrdinaryFenceTokens) < minFenceCount) {
-      return false
-    }
-    const fenceWoodCost = policy.costPolicy?.fence?.wood ?? 1
-    const fixedWoodCost = Math.max(0, policy.costPolicy?.fixedWood ?? 0)
-    if (fenceWoodCost === 0 && fixedWoodCost === 0) return true
-    const costFreeFences =
-      selectedFreeFences + Math.max(0, Math.abs(costOverride?.wood ?? 0))
-    const payableFenceCount = Math.max(0, minFenceCount - costFreeFences)
-    return canAffordTypedFlatCost(
+    return canStartWithFencePolicy(
       player,
-      { wood: payableFenceCount * fenceWoodCost + fixedWoodCost },
-      'fencing',
+      policy,
+      ordinaryCapacity,
+      selectedFreeFences,
+      costOverride,
     )
   }
-  if (Math.min(remainingBuildCapacity, availableOrdinaryFenceTokens) < minimumFenceSegments) {
+  if (ordinaryCapacity < minimumFenceSegments) {
     return false
   }
   if (getTotalPastureCells(player) >= maxPastureCells) return false

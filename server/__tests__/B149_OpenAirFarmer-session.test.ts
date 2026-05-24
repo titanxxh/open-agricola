@@ -26,6 +26,18 @@ const TWO_CELL = [
   'V-0-3',
 ]
 
+const LEFT_EDGE_TWO_CELL_FENCES = [
+  'H-1-0',
+  'H-1-1',
+  'V-0-2',
+]
+
+const LEFT_EDGE_TWO_CELL_PALISADES = [
+  'H-0-0',
+  'H-0-1',
+  'V-0-0',
+]
+
 const ONE_CELL = ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2']
 
 const THREE_CELL = [
@@ -279,6 +291,30 @@ describe('B149 Open Air Farmer session', () => {
     expect(resp.ok).toBe(false)
     expectFarmSelect(resp, beforeInteraction)
     expectPendingSnapshot(resp.state, before)
+  })
+
+  it('can use B30 palisades to complete B149 when only three ordinary fence tokens remain', () => {
+    const session = setup({ wood: 8, woodPalisades: true })
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.supplyTokensConsumed = { fence: 12 }
+    session.loadState(state)
+
+    playB149ToFencing(session)
+
+    const resp = session.resolveChoice(0, 'confirm', {
+      edges: LEFT_EDGE_TWO_CELL_FENCES,
+      palisadeEdges: LEFT_EDGE_TWO_CELL_PALISADES,
+      extraWood: 0,
+    })
+
+    expect(resp.ok).toBe(true)
+    const updated = resp.state.players[0]!
+    expect(updated.supplyTokensConsumed?.stable).toBe(3)
+    expect(updated.resources.wood).toBe(0)
+    expect(updated.fenceSegments).toHaveLength(6)
+    expect(updated.fenceSegments.filter((segment) => segment.type === 'fence')).toHaveLength(3)
+    expect(updated.fenceSegments.filter((segment) => segment.type === 'palisade')).toHaveLength(3)
   })
 
   it('cancel does not consume fixed wood or complete the onBuy fencing sequence', () => {

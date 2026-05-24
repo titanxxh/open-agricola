@@ -143,4 +143,24 @@ describe('canStartFencing with costOverride', () => {
       }),
     ).toBe(false)
   })
+
+  it('allows a total-bound policy to start when palisades can cover missing ordinary fences', () => {
+    const player = createPlayer({
+      resources: {
+        wood: 8, clay: 0, reed: 0, stone: 0, food: 0,
+        grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+      },
+      minorPlayed: ['B30_WoodPalisades'],
+      supplyTokensConsumed: { fence: 12 },
+    })
+    expect(
+      canStartFencing(fakeState, player, undefined, {
+        fencePolicy: {
+          sourcePolicy: 'ownOnly',
+          segmentBounds: { total: { max: 6 } },
+          costPolicy: { fence: { wood: 0 }, fixedWood: 2 },
+        },
+      }),
+    ).toBe(true)
+  })
 })
