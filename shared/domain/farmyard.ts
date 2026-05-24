@@ -115,6 +115,7 @@ export type Bounds = { min?: number; max?: number }
 export type FenceSegmentBounds = {
   fence?: Bounds
   palisade?: Bounds
+  total?: Bounds
 }
 export type FenceValidationOptions = {
   skipPayment?: boolean
@@ -853,24 +854,25 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     }
   }
 
-  const fenceBounds = options.segmentBounds?.fence
-  if (fenceBounds?.min !== undefined && newFenceEdges.length < fenceBounds.min) {
-    return {
-      ok: false,
-      error: {
-        code: 'TOO_FEW_FENCES',
-        edges,
-        palisadeEdges,
-        newFenceEdges,
-        newPalisadeEdges,
-      },
-    }
+  const boundError = (
+    value: number,
+    bounds: Bounds | undefined,
+  ): 'TOO_FEW_FENCES' | 'TOO_MANY_FENCES' | undefined => {
+    if (bounds?.min !== undefined && value < bounds.min) return 'TOO_FEW_FENCES'
+    if (bounds?.max !== undefined && value > bounds.max) return 'TOO_MANY_FENCES'
+    return undefined
   }
-  if (fenceBounds?.max !== undefined && newFenceEdges.length > fenceBounds.max) {
+  const segmentBounds = options.segmentBounds
+  const totalNewSegments = newFenceEdges.length + newPalisadeEdges.length
+  const segmentError =
+    boundError(newFenceEdges.length, segmentBounds?.fence) ??
+    boundError(newPalisadeEdges.length, segmentBounds?.palisade) ??
+    boundError(totalNewSegments, segmentBounds?.total)
+  if (segmentError) {
     return {
       ok: false,
       error: {
-        code: 'TOO_MANY_FENCES',
+        code: segmentError,
         edges,
         palisadeEdges,
         newFenceEdges,
@@ -1060,19 +1062,11 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     const pastureKey = pasture.tiles.map(localPositionKey).sort().join('|')
     return !previousPastureKeys.has(pastureKey)
   })
-  const pastureBoundError = (
-    value: number,
-    bounds: Bounds | undefined,
-  ): 'TOO_FEW_FENCES' | 'TOO_MANY_FENCES' | undefined => {
-    if (bounds?.min !== undefined && value < bounds.min) return 'TOO_FEW_FENCES'
-    if (bounds?.max !== undefined && value > bounds.max) return 'TOO_MANY_FENCES'
-    return undefined
-  }
   const newPastureCount = Math.max(0, pastures.length - normalized.pastures.length)
   const pastureBounds = options.pastureBounds
   const pastureCountError =
-    pastureBoundError(newPastureCount, pastureBounds?.newPastures) ??
-    pastureBoundError(newPastures.length, pastureBounds?.changedPastures)
+    boundError(newPastureCount, pastureBounds?.newPastures) ??
+    boundError(newPastures.length, pastureBounds?.changedPastures)
   if (pastureCountError) {
     return {
       ok: false,
@@ -1089,7 +1083,7 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
   const pastureSizeError =
     sizeBounds &&
     newPastures
-      .map((pasture) => pastureBoundError(pasture.size, sizeBounds))
+      .map((pasture) => boundError(pasture.size, sizeBounds))
       .find((error): error is 'TOO_FEW_FENCES' | 'TOO_MANY_FENCES' => error !== undefined)
   if (pastureSizeError) {
     return {
