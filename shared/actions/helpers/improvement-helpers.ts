@@ -1,4 +1,4 @@
-import type { ComplexCost, GameState, PlayerState, Resource } from '../../contract/types'
+import type { ComplexCost, GameState, PaymentResourceMap, PlayerState } from '../../contract/types'
 import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../cards/registry-display'
 import { PaymentSolver } from '../payment'
@@ -69,7 +69,7 @@ export const getFireplaceReturnPool = (player: PlayerState): string[] => [
 
 export const getPlayedCardsForCost = (
   player: PlayerState,
-  cost: Partial<PlayerState['resources']> | ComplexCost | null,
+  cost: PaymentResourceMap | ComplexCost | null,
 ): string[] => {
   if (!cost || !PaymentSolver.isComplexCost(cost)) return player.improvements
   const list = cost.cards?.list
@@ -109,14 +109,14 @@ export const getMinorImprovementEffectiveCost = (
 }
 
 export const getPositiveResourceLog = (
-  resources?: Partial<Resource> | null,
-): Partial<Resource> | undefined => {
+  resources?: PaymentResourceMap | null,
+): PaymentResourceMap | undefined => {
   if (!resources) return undefined
   const positiveEntries = Object.entries(resources).filter(
     ([, amount]) => (amount ?? 0) > 0,
   )
   if (positiveEntries.length === 0) return undefined
-  return Object.fromEntries(positiveEntries) as Partial<Resource>
+  return Object.fromEntries(positiveEntries) as PaymentResourceMap
 }
 
 export const buildImprovementLogParams = (
@@ -164,7 +164,7 @@ export const buildImprovementImmediateLogs = (
 ]
 
 const attachRequiredReturnCards = (
-  cost: Partial<PlayerState['resources']> | ComplexCost | null,
+  cost: PaymentResourceMap | ComplexCost | null,
   returnCards?: string[],
 ) => {
   if (!cost || !returnCards || returnCards.length === 0) {

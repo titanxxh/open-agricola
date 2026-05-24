@@ -8,15 +8,67 @@
  * the public API instead.
  */
 
-import type { ComplexCost, PlayerState, Resource } from '../../../contract/types'
+import type {
+  ComplexCost,
+  GameState,
+  PaymentResourceMap,
+  PlayerState,
+  Resource,
+  SupplyTokenKey,
+} from '../../../contract/types'
+import {
+  addConsumedSupplyTokenCount,
+  getAvailableStableSupplyCount,
+  getOwnOrdinaryFenceReserveCount,
+} from '../../../domain/supply-tokens'
+
+const SUPPLY_TOKEN_KEYS = new Set<SupplyTokenKey>(['fence', 'stable'])
+
+export const splitSupplyTokenCost = (cost: PaymentResourceMap) => {
+  const resources: Partial<Resource> = {}
+  const supplyTokens: Partial<Record<SupplyTokenKey, number>> = {}
+  for (const [key, value] of Object.entries(cost)) {
+    if (typeof value !== 'number' || value <= 0) continue
+    if (SUPPLY_TOKEN_KEYS.has(key as SupplyTokenKey)) {
+      supplyTokens[key as SupplyTokenKey] = value
+    } else {
+      resources[key as keyof Resource] = value
+    }
+  }
+  return { resources, supplyTokens }
+}
+
+export const canPaySupplyTokens = (
+  state: GameState | undefined,
+  player: PlayerState,
+  cost: PaymentResourceMap,
+): boolean => {
+  const { supplyTokens } = splitSupplyTokenCost(cost)
+  const fence = supplyTokens.fence ?? 0
+  const stable = supplyTokens.stable ?? 0
+  if (fence <= 0 && stable <= 0) return true
+  if (!state) return false
+  return fence <= getOwnOrdinaryFenceReserveCount(player)
+    && stable <= getAvailableStableSupplyCount(state, player)
+}
+
+export const paySupplyTokens = (
+  player: PlayerState,
+  cost: PaymentResourceMap,
+): void => {
+  const { supplyTokens } = splitSupplyTokenCost(cost)
+  if (supplyTokens.fence) addConsumedSupplyTokenCount(player, 'fence', supplyTokens.fence)
+  if (supplyTokens.stable) addConsumedSupplyTokenCount(player, 'stable', supplyTokens.stable)
+}
 
 export const payResources = (
   player: PlayerState,
-  cost: Partial<PlayerState['resources']>,
+  cost: PaymentResourceMap,
 ) => {
-  Object.keys(cost).forEach((key) => {
+  const { resources } = splitSupplyTokenCost(cost)
+  Object.keys(resources).forEach((key) => {
     const resourceKey = key as keyof Resource
-    const amount = cost[resourceKey] ?? 0
+    const amount = resources[resourceKey] ?? 0
     if (amount > 0) {
       player.resources[resourceKey] -= amount
     }
@@ -24,14 +76,14 @@ export const payResources = (
 }
 
 export const applyCostOverride = (
-  base: Partial<PlayerState['resources']>,
-  override?: Partial<PlayerState['resources']>,
+  base: PaymentResourceMap,
+  override?: Partial<Resource>,
 ) => {
   if (!override) return base
-  const result: Partial<PlayerState['resources']> = { ...base }
+  const result: PaymentResourceMap = { ...base }
   Object.entries(override).forEach(([key, value]) => {
     if (typeof value !== 'number') return
-    const resourceKey = key as keyof PlayerState['resources']
+    const resourceKey = key as keyof Resource
     const current = result[resourceKey] ?? 0
     result[resourceKey] = Math.max(0, current + value)
   })
@@ -40,16 +92,16 @@ export const applyCostOverride = (
 
 export const canPayResources = (
   player: PlayerState,
-  cost: Partial<Resource>,
+  cost: PaymentResourceMap,
 ) =>
-  Object.keys(cost).every((key) => {
+  Object.keys(splitSupplyTokenCost(cost).resources).every((key) => {
     const resourceKey = key as keyof Resource
     const amount = cost[resourceKey] ?? 0
     return amount <= 0 || player.resources[resourceKey] >= amount
   })
 
 export const isComplexCost = (
-  cost: Partial<Resource> | ComplexCost | undefined,
+  cost: PaymentResourceMap | ComplexCost | undefined,
 ): cost is ComplexCost => {
   if (!cost) return false
   return (

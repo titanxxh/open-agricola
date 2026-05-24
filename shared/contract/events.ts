@@ -1,8 +1,10 @@
 import type {
   CostModifierType,
   FutureMeepleRoomType,
+  FutureMeepleResourceMap,
   FutureMeepleSourceSummary,
   GameState,
+  PaymentResourceMap,
   PlayerState,
   Resource,
 } from './types'
@@ -71,10 +73,10 @@ export type ResourceAccumulatedEvent = GameEventBase<'resource.accumulated'> & {
 }
 
 export type ResourcePaidEvent = GameEventBase<'resource.paid'> & {
-  resources: Partial<Resource>
+  resources: PaymentResourceMap
   to?: ResourceLocation
   paymentFor: PaymentPurpose
-  paymentSources?: Array<{ from: ResourceLocation; resources: Partial<Resource> }>
+  paymentSources?: Array<{ from: ResourceLocation; resources: PaymentResourceMap }>
   bonusSources?: string[]
   bonusChoiceIndex?: Record<string, number>
   returnedCardId?: string
@@ -275,7 +277,7 @@ export type CardPassedEvent = GameEventBase<'card.passed'> & {
 export type FutureMeepleQueuedEvent = GameEventBase<'futureMeeple.queued'> & {
   playerId: string
   cardId: string
-  entries: Array<{ round: number; resources?: Partial<Resource>; roomType?: FutureMeepleRoomType }>
+  entries: Array<{ round: number; resources?: FutureMeepleResourceMap; roomType?: FutureMeepleRoomType }>
   sourceSummary?: FutureMeepleSourceSummary
 }
 
@@ -289,7 +291,7 @@ export type FutureMeepleResolvedEvent = GameEventBase<'futureMeeple.resolved'> &
   playerId: string
   cardId: string
   round: number
-  resources?: Partial<Resource>
+  resources?: FutureMeepleResourceMap
   roomType?: FutureMeepleRoomType
 }
 
