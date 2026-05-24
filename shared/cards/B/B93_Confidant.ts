@@ -9,12 +9,12 @@ import type { ActionFlow, GameState, PlayerState, Resource } from '../../contrac
 import type { GameEvent } from '../../contract/events'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { readCardExtraData } from '../helpers/card-state'
+import { LESSONS_SPACE_IDS, isLessonsSpaceId } from '../helpers/lessons-spaces'
 import type { CardImpl } from '../registry'
 import { B93_Confidant } from '../../cards-display/B/B93_Confidant'
 
 const CARD_ID = B93_Confidant.id
 const MIN_FUTURE_FOOD = 2
-const LESSON_ACTIONS = new Set(['lessons', 'lessons-3', 'lessons-4'])
 
 const readOccupationBaseCost = (context: CardListenerContext): Partial<Resource> => {
   const baseCost = context.extraData?.occupationBaseCost
@@ -39,12 +39,12 @@ const canAffordMinimumSchedule = (context: CardListenerContext) => {
 
 const minimumScheduleListener: CardListenerRegistration = {
   id: 'B93-confidant-isdoable-minimum-schedule',
-  actions: ['occupation', 'lessons', 'lessons-3', 'lessons-4'],
+  actions: ['occupation', ...LESSONS_SPACE_IDS],
   phases: ['isDoable' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) {
       if (
-        LESSON_ACTIONS.has(context.actionId) &&
+        isLessonsSpaceId(context.actionId) &&
         context.player.occupationHand.includes(CARD_ID) &&
         !hasPlayableOccupationChoice(context.state, context.player, context.actionId)
       ) {

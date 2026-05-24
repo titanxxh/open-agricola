@@ -439,10 +439,49 @@ export const payAction: ActionDefinition = {
   resolveChoice: ({ player, params, sourceCard, state, eventSink }, choice) => {
     const p = normalizePayParams(params)
     if (!p?.cost) return { type: 'fail', errorKey: 'log.payFail' }
-    if (!PaymentSolver.isComplexCost(p.cost)) {
-      // Non-ComplexCost paths never reach resolveChoice (execute paid eagerly
-      // and returned `ok`). Treat any stray invocation as a no-op success.
+    const optionPrefix = p.optionPrefix ?? 'pay:generic'
+    const choiceLooksLikePayment =
+      choice.startsWith(`${optionPrefix}:`) || /^\d+$/.test(choice)
+    if (!PaymentSolver.isComplexCost(p.cost) && !(p.costType && p.reserveResources)) {
       return { type: 'ok' }
+    }
+    if (!PaymentSolver.isComplexCost(p.cost) && p.costType && p.reserveResources) {
+      if (!choiceLooksLikePayment) {
+        return payAction.execute({
+          player,
+          params,
+          sourceCard,
+          state,
+          space: undefined as never,
+          eventSink,
+        })
+      }
+      const selection = resolveCostPaymentSelection(
+        player,
+        { fee: p.cost },
+        optionPrefix,
+        choice,
+        { type: 'fail', errorKey: 'log.payFail' },
+        {
+          costType: p.costType,
+          includeReturnedCard: p.includeReturnedCard,
+          playedCards: p.playedCards,
+          reserveResources: p.reserveResources,
+        },
+      )
+      if (selection.type !== 'selected') {
+        return selection
+      }
+      return buildSelectedResult(
+        selection.solution,
+        sourceCard,
+        p.costType,
+        player,
+        state,
+        p.includeReturnedCard,
+        eventSink,
+        p.sourceActionId,
+      )
     }
     // If the value isn't one of the payment-prefix options the player saw,
     // assume it's a stale/improvement-level choice that landed here because
@@ -451,9 +490,6 @@ export const payAction: ActionDefinition = {
     // Re-emit the same selectPayment prompt by re-invoking execute so the
     // player can pick again, matching BGA's "missed the prompt → ask again"
     // UX and keeping legacy D83-style upper-flow tests compatible.
-    const optionPrefix = p.optionPrefix ?? 'pay:generic'
-    const choiceLooksLikePayment =
-      choice.startsWith(`${optionPrefix}:`) || /^\d+$/.test(choice)
     if (!choiceLooksLikePayment) {
       return payAction.execute({
         player,
