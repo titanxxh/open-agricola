@@ -75,7 +75,7 @@
 | `A173_ClayThief` | 中 | 一次性在工作阶段开始拿走 `hollow-4` 全部 clay | `onBeforeStartOfTurn` / `onRoundStart` + flagged card state；先例 `A139_HollowWarden`、`C22_BasketChair` | 最好抽一个 once-game / face-down helper |
 | `A174_MasterHora` | 中 | 用 extension meeple action 前，可 1 food 买 1 vegetable | before `place-farmer` + optional pay/gain；先例 `D138_PetLover` | 缺 extension meeple-space 列表和 `meeple symbol` metadata |
 | `A175_HollowGardener` | 低 | 从 `hollow-4` 拿 3/6 clay 时，额外 grain / vegetable | after `place-farmer` on hollow + `context.result.resourcesGained.clay`；先例 `A139_HollowWarden` | 无大缺口 |
-| `A176_Wheelmaker` | 低 | 打出时若木头多于其他玩家总和且已打过别的职业，则补到 15 wood | `play-occupation` after / on-play resource flow；先例常规 on-play gain cards | 无结构性缺口 |
+| `A176_Wheelmaker` | 低 | 打出时若木头多于其他玩家总和且已打过别的职业，则补到 15 wood | `occupation` after / on-play resource flow；先例常规 on-play gain cards | 无结构性缺口 |
 | `A177_Middleman` | 高 | 在 extension meeple spaces 放 food + stone，下次自己落位领走 | on-play seed per-space rewards + `place-farmer` after collect；先例 `C39_StudioBoat`、`A174_MasterHora` | 缺 extension meeple-space model；还需可复用的 “per-space per-owner attached goods” 语义 |
 | `A178_CarpentersBoy` | 低 | 他人建房时得 1 wood | `construct` after + opponent scope；先例 `D128_BuildingTycoon` | 无 |
 | `A179_MountainShepherd` | 低 | 用 quarry 时额外得 1 sheep | after `place-farmer` on `western-quarry` / `eastern-quarry`；先例 `A80_StoneTongs`、`D149_CasualWorker` | 无 |
@@ -127,7 +127,7 @@
 | `D174_LoessGardener` | 低 | `clay-pit` 后可 1 food 买 1 vegetable | after `clay-pit` + optional pay/gain；先例 `A174_MasterHora` 的付费购买模式 | 无 |
 | `D175_Countryman` | 中 | 任意玩家执行 renovation action 时，你可 sow exactly 1 field | any-scope after renovate + optional `sow`；先例 `D27_Retraining`、`B130_FullPeasant` | 需处理 `trueAction=false` / sow legality，但无硬 blocker |
 | `D176_Woodshacker` | 中 | 每轮第 1/2 次用 wood accumulation space 时，额外得 1/2 clay | local per-round counter + `onRoundStart` reset；先例 `C148_MudWallower` | 无 blocker |
-| `D177_Graduate` | 低 | on play 付 1 food，得 2 stone + 2 reed | `play-occupation` after + seq pay/gain | 无 |
+| `D177_Graduate` | 低 | on play 付 1 food，得 2 stone + 2 reed | `occupation` after + seq pay/gain | 无 |
 | `D178_SubstituteTeacher` | 中 | 当三个 Lessons 都被占用时，可把此牌当行动格用人领奖励 | owner `PlayerActionCard` + dynamic availability；先例 `D127_HardworkingMan` | 缺 `lessons-2` / third lessons space 建模 |
 | `D179_Bullcatcher` | 高 | 当 round spaces 3 和 6 上的两组行动格都被占满时，此牌变为可用行动格 | owner `PlayerActionCard` + stage occupancy check；先例 `C160_Outrider`、`D165_PigStalker` 的 `roundActionOrder` 用法 | 缺 5+ round-board topology；当前 `roundStageSlots` 的 stage 6 只有 1 个 slot |
 | `D180_PartTimeWorker` | 高 | 用恰好有 2/4/6 goods 的 accumulation space 时，可留 1/2/3 在格上并得 animal | before / replace collect or partial-collect flow；先例 `D138_PetLover`、`return-to-space` | 缺通用 partial collect / leave-on-space semantics |

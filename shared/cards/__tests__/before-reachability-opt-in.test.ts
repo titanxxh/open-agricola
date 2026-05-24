@@ -110,10 +110,10 @@ const cases = [
   ['C112-thresher-isdoable-sow', 'sow'],
   ['D14-hammer-crusher-isdoable-renovate', 'renovate-house'],
   ['D17-drill-harrow-isdoable-sow', 'sow'],
-  ['D49-bookshelf-isdoable-occupation', 'play-occupation'],
+  ['D49-bookshelf-isdoable-occupation', 'occupation'],
   ['D66-potter-ceramics-isdoable-bake', 'bake-bread'],
   ['D119-wood-barterer-isdoable', 'fence'],
-  ['D152-patron-isdoable-occupation', 'play-occupation'],
+  ['D152-patron-isdoable-occupation', 'occupation'],
   ['E74-ash-trees-isdoable-fence', 'fence'],
   ['STUB-before-bake-gain-clay-isdoable', 'bake-bread'],
 ] as const

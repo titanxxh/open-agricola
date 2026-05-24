@@ -16,8 +16,8 @@
  *   resolveChoice('id1,id2,id3') → selection effect fires:
  *     • rollAndCacheCardPick → caches pick in cardStates[CARD_ID].extraData.pick
  *     • state.pendingUndoBoundary = true
- *     • returns play-occupation leaf { costOverride: {}, allowedCards: [pick] }
- *   play-occupation auto-resolves (single option) → occupation played for free + onBuy fires
+ *     • returns occupation leaf { costOverride: {}, allowedCards: [pick] }
+ *   occupation auto-resolves (single option) → occupation played for free + onBuy fires
  *
  * Current (simplified) impl: directly mutates occupationHand → occupationPlayed in onBuy,
  * never emits a selection pending, and skips the played occupation's onBuy.
@@ -132,7 +132,7 @@ describe('A3_PaperKnife onBuy', () => {
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('selection')
 
-    // Hand must NOT be mutated by onBuy — mutation happens downstream via play-occupation
+    // Hand must NOT be mutated by onBuy — mutation happens downstream via occupation
     expect(player.occupationPlayed).toHaveLength(0)
     expect(player.occupationHand).toHaveLength(3)
 
@@ -402,7 +402,7 @@ describe('A3_PaperKnife session-tier: BGA-aligned flow', () => {
   it('case 6: the randomly picked occupation onBuy fires — A117 grants wood per improvement', () => {
     // A117_WoodCarrier onBuy: grants 1 wood per improvement (major + minor) already in play.
     // We pre-load a minor improvement so A117 grants >= 1 wood when played.
-    // This asserts that the full play-occupation path runs (fixing the pre-rewrite bypass).
+    // This asserts that the full occupation path runs (fixing the pre-rewrite bypass).
     const session = makeSession({ wood: 1, gameSeed: 42 })
     const state = session.getState().state
 
@@ -451,13 +451,13 @@ describe('A3_PaperKnife session-tier: BGA-aligned flow', () => {
   it.skip('case 7: occupation with unpayable additionalCost (not applicable with costOverride: {})', () => {
     // TODO (to revisit in Task 4.2 if needed):
     //
-    // A3's selectionEffect inserts a play-occupation leaf with costOverride: {}.
-    // In the current play-occupation action, costOverride completely replaces the
+    // A3's selectionEffect inserts a occupation leaf with costOverride: {}.
+    // In the current occupation action, costOverride completely replaces the
     // occupation's cost — there is no "additionalCost" field that survives the override.
     // Therefore, every A3-played occupation is free, regardless of its base cost.
     //
     // BGA spec §6 item 3: "BGA likely fails the play silently, leaving the occupation in
-    // hand, when the play-occupation cost is unpayable." With costOverride: {} this
+    // hand, when the occupation cost is unpayable." With costOverride: {} this
     // scenario cannot arise in our engine — the occupation is always affordable.
     //
     // If a future "additionalCost" concept is added to occupations (independent of

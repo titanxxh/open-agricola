@@ -11,7 +11,7 @@ const listener: CardListenerRegistration = {
   id: 'E89-stallwright-after-occupation',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const n = context.player.occupationPlayed.length
     if (!TRIGGER_COUNTS.has(n)) return

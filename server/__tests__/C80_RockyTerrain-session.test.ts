@@ -194,7 +194,7 @@ describe('C80_RockyTerrain', () => {
 
       const result = executeCardListener(listener!, {
         state, player, space: createSpace('lessons'),
-        actionId: 'play-occupation', phase: 'after',
+        actionId: 'occupation', phase: 'after',
         choice: 'B113_PatchCaregiver',
       } as unknown as CardListenerContext)
 
@@ -209,7 +209,7 @@ describe('C80_RockyTerrain', () => {
 
       const result = executeCardListener(listener!, {
         state, player, space: createSpace('lessons'),
-        actionId: 'play-occupation', phase: 'after',
+        actionId: 'occupation', phase: 'after',
         choice: 'E51_WhaleOil',
       } as unknown as CardListenerContext)
 
@@ -224,7 +224,7 @@ describe('C80_RockyTerrain', () => {
 
       const result = executeCardListener(listener!, {
         state, player, space: createSpace('lessons'),
-        actionId: 'play-occupation', phase: 'after',
+        actionId: 'occupation', phase: 'after',
         choice: 'B113_PatchCaregiver',
       } as unknown as CardListenerContext)
 

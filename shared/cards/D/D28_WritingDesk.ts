@@ -19,7 +19,7 @@ const listener: CardListenerRegistration = {
     return {
       flow: {
         type: 'leaf',
-        actionId: 'play-occupation',
+        actionId: 'occupation',
         optional: true,
         sourceCard: CARD_ID,
         params: { costOverride: { food: 2 } },

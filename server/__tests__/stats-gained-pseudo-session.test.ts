@@ -86,7 +86,7 @@ describe('gained.occupation pseudo-stat', () => {
     state.players.slice(2).forEach((extraPlayer) => setWorkersAtHome(state, extraPlayer, 0))
 
     session.loadState(state)
-    // Drive `play-occupation` via lessons action with the chosen card
+    // Drive `occupation` via lessons action with the chosen card
     const lessonsResp = session.takeAction(0, 'lessons')
     expect(lessonsResp.ok).toBe(true)
 

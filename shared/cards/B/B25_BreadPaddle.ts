@@ -10,7 +10,7 @@ const listener: CardListenerRegistration = {
   id: 'B25-bread-paddle-after-occupation',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   handler: (_context: CardListenerContext): ActionHookResult | void => {
     return {
       flow: {

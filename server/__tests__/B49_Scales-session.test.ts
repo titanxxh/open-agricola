@@ -1,144 +1,192 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
-import type { CardListenerContext } from '../../shared/cards/card-listeners'
+import { setWorkersAtHome } from '../../shared/domain/player'
 
+import '../../shared/cards/A/A1_Shelter'
+import '../../shared/cards/A/A37_Bucksaw'
+import '../../shared/cards/D/D152_Patron'
 import '../../shared/cards/B/B49_Scales'
-import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'B49_Scales'
+const PLACEHOLDER = '__test_placeholder__'
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const setup = (opts: {
+  minorHand?: string[]
+  occupationHand?: string[]
+  minorPlayed?: string[]
+  occupationPlayed?: string[]
+  availableMajorImprovements?: string[]
+  wood?: number
+  reed?: number
+  stone?: number
+  food?: number
+}) => {
+  const session = new GameSession()
+  const state = session.getState().state
+  state.players = state.players.slice(0, 2)
+  state.currentPlayerIndex = 0
+  state.round = 1
+  state.roundPhase = 'work'
 
-describe('B49_Scales session', () => {
-  const makePlayer = (minorPlayed: string[], occupationPlayed: string[], improvements: string[] = []) => {
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    player.minorPlayed = minorPlayed
-    player.occupationPlayed = occupationPlayed
-    player.improvements = improvements
-    return { state, player }
+  const player = state.players[0]!
+  setWorkersAtHome(state, player, 2)
+  setWorkersAtHome(state, state.players[1]!, 0)
+  player.minorPlayed = opts.minorPlayed ?? [CARD_ID]
+  player.occupationPlayed = opts.occupationPlayed ?? []
+  player.minorHand = opts.minorHand ?? [PLACEHOLDER]
+  player.occupationHand = opts.occupationHand ?? [PLACEHOLDER]
+  player.resources = {
+    ...player.resources,
+    wood: opts.wood ?? 0,
+    reed: opts.reed ?? 0,
+    stone: opts.stone ?? 0,
+    food: opts.food ?? 0,
+  }
+  state.players[1]!.minorHand = [PLACEHOLDER]
+  state.players[1]!.occupationHand = [PLACEHOLDER]
+  if (opts.availableMajorImprovements) {
+    state.availableMajorImprovements = opts.availableMajorImprovements
   }
 
-  it('gains 2 food when occ count equals improvement count after playing occupation', () => {
-    const listener = findListener('B49-scales-after-occupation')
-    expect(listener).toBeDefined()
+  session.loadState(state)
+  return session
+}
 
-    // 1 occ played, 1 minor (Scales) → equal → gain 2 food
-    const { state, player } = makePlayer([CARD_ID], ['STUB_OCC_1'])
+const playedEvents = (state: ReturnType<GameSession['getState']>['state'], cardId: string) =>
+  state.events.filter((event) => event.type === 'card.played' && event.cardId === cardId)
 
-    const result = executeCardListener(listener!, {
-      state,
-      player,
-      actionId: 'play-occupation',
-      phase: 'after',
-    } as CardListenerContext)
+const chooseMeetingPlaceMinor = (session: GameSession, cardId: string) => {
+  let resp = session.takeAction(0, 'meeting-place')
+  expect(resp.ok).toBe(true)
+  expect(resp.interaction.stateId).toBe('wait')
+  if (resp.interaction.stateId !== 'wait') return resp
 
-    expect(result).toBeDefined()
-    expect(result!.flow?.type).toBe('leaf')
-    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ food: 2 })
-  })
+  const improvement = resp.interaction.options?.find(
+    (option) => option.value === 'action-improvement-1',
+  )
+  expect(improvement).toBeDefined()
 
-  it('does NOT gain food when counts differ after playing occupation', () => {
-    const listener = findListener('B49-scales-after-occupation')
-    expect(listener).toBeDefined()
+  resp = session.resolveChoice(0, improvement!.value)
+  expect(resp.ok).toBe(true)
+  expect(resp.interaction.stateId).toBe('wait')
+  if (resp.interaction.stateId !== 'wait') return resp
 
-    // 2 occ vs 1 minor → not equal → no food
-    const { state, player } = makePlayer([CARD_ID], ['STUB_OCC_1', 'STUB_OCC_2'])
+  resp = session.resolveChoice(0, cardId)
+  expect(resp.ok).toBe(true)
+  return resp
+}
 
-    const result = executeCardListener(listener!, {
-      state,
-      player,
-      actionId: 'play-occupation',
-      phase: 'after',
-    } as CardListenerContext)
+const finishOptionalPrompts = (
+  session: GameSession,
+  response: ReturnType<GameSession['takeAction']>,
+) => {
+  let resp = response
+  let guard = 10
+  while (resp.interaction.stateId === 'wait' && guard > 0) {
+    guard -= 1
+    const skip = resp.interaction.options?.find(
+      (option) => option.value === '__skip__' || option.value === 'skip',
+    )
+    if (!skip) break
+    resp = session.resolveChoice(resp.interaction.playerIndex ?? 0, skip.value)
+    expect(resp.ok).toBe(true)
+  }
+  expect(guard).toBeGreaterThan(0)
+  return resp
+}
 
-    expect(result).toBeUndefined()
-  })
+describe('B49_Scales session', () => {
+  it('gains 2 food after a normal improvement makes occupation and improvement counts equal', () => {
+    const session = setup({
+      minorHand: ['A37_Bucksaw', 'C69_LandConsolidation'],
+      minorPlayed: [CARD_ID],
+      occupationPlayed: ['A123_FrameBuilder', 'D152_Patron'],
+      wood: 1,
+      food: 0,
+    })
 
-  it('gains 2 food when counts match after playing improvement', () => {
-    const listener = findListener('B49-scales-after-improvement')
-    expect(listener).toBeDefined()
-
-    // 2 occ, 2 minor (Scales + stub) → equal → gain 2 food
-    const { state, player } = makePlayer(
-      [CARD_ID, 'STUB_MINOR_1'],
-      ['STUB_OCC_1', 'STUB_OCC_2'],
+    const resp = finishOptionalPrompts(
+      session,
+      chooseMeetingPlaceMinor(session, 'A37_Bucksaw'),
     )
 
-    const result = executeCardListener(listener!, {
-      state,
-      player,
-      actionId: 'play-improvement',
-      phase: 'after',
-    } as CardListenerContext)
-
-    expect(result).toBeDefined()
-    expect(result!.flow?.type).toBe('leaf')
-    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ food: 2 })
+    const player = resp.state.players[0]!
+    expect(player.minorPlayed).toContain('A37_Bucksaw')
+    expect(player.resources.food).toBe(2)
+    expect(playedEvents(resp.state, 'A37_Bucksaw')).toContainEqual(expect.objectContaining({
+      type: 'card.played',
+      cardId: 'A37_Bucksaw',
+      cardType: 'minor',
+      sourceActionId: 'improvement',
+    }))
   })
 
-  it('does NOT gain food when counts differ after playing improvement', () => {
-    const listener = findListener('B49-scales-after-improvement')
-    expect(listener).toBeDefined()
+  it('does not gain food for a passing improvement even when counts remain equal', () => {
+    const session = setup({
+      minorHand: ['A1_Shelter', 'C69_LandConsolidation'],
+      minorPlayed: [CARD_ID],
+      occupationPlayed: ['A123_FrameBuilder'],
+      food: 0,
+    })
 
-    // 1 occ, 2 minor → not equal → no food
-    const { state, player } = makePlayer(
-      [CARD_ID, 'STUB_MINOR_1'],
-      ['STUB_OCC_1'],
+    const resp = finishOptionalPrompts(
+      session,
+      chooseMeetingPlaceMinor(session, 'A1_Shelter'),
     )
 
-    const result = executeCardListener(listener!, {
-      state,
-      player,
-      actionId: 'play-improvement',
-      phase: 'after',
-    } as CardListenerContext)
-
-    expect(result).toBeUndefined()
-  })
-
-  it('does NOT trigger for passing cards', () => {
-    const listener = findListener('B49-scales-after-improvement')
-    expect(listener).toBeDefined()
-
-    // Counts are equal but card is passing
-    const { state, player } = makePlayer([CARD_ID], ['STUB_OCC_1'])
-
-    const result = executeCardListener(listener!, {
-      state,
-      player,
-      actionId: 'play-improvement',
-      phase: 'after',
-      extraData: { passing: true },
-    } as CardListenerContext)
-
-    expect(result).toBeUndefined()
-  })
-
-  it('counts major improvements in the improvement total', () => {
-    const listener = findListener('B49-scales-after-occupation')
-    expect(listener).toBeDefined()
-
-    // 2 occ, 1 minor (Scales) + 1 major = 2 improvements total → equal → gain 2 food
-    const { state, player } = makePlayer(
-      [CARD_ID],
-      ['STUB_OCC_1', 'STUB_OCC_2'],
-      ['STUB_MAJOR'],
+    const player = resp.state.players[0]!
+    expect(player.minorPlayed).not.toContain('A1_Shelter')
+    expect(resp.state.players[1]!.minorHand).toContain('A1_Shelter')
+    expect(player.occupationPlayed.length).toBe(
+      player.minorPlayed.length + player.improvements.length,
     )
+    expect(player.resources.food).toBe(0)
+    expect(playedEvents(resp.state, 'A1_Shelter')).toHaveLength(0)
+  })
 
-    const result = executeCardListener(listener!, {
-      state,
-      player,
-      actionId: 'play-occupation',
-      phase: 'after',
-    } as CardListenerContext)
+  it('gains 2 food after a major improvement makes occupation and improvement counts equal', () => {
+    const session = setup({
+      minorPlayed: [CARD_ID],
+      occupationPlayed: ['A123_FrameBuilder', 'D152_Patron'],
+      availableMajorImprovements: ['Major_Basket'],
+      reed: 2,
+      stone: 2,
+      food: 0,
+    })
 
-    expect(result).toBeDefined()
-    expect(result!.flow?.type).toBe('leaf')
-    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ food: 2 })
+    const resp = session.takeAction(0, 'major-improvement')
+    expect(resp.ok).toBe(true)
+
+    const player = resp.state.players[0]!
+    expect(player.improvements).toContain('Major_Basket')
+    expect(player.resources.food).toBe(2)
+    expect(playedEvents(resp.state, 'Major_Basket')).toContainEqual(expect.objectContaining({
+      type: 'card.played',
+      cardId: 'Major_Basket',
+      cardType: 'major',
+      sourceActionId: 'improvement',
+    }))
+  })
+
+  it('gains 2 food after playing an occupation makes occupation and improvement counts equal', () => {
+    const session = setup({
+      minorPlayed: [CARD_ID],
+      occupationPlayed: [],
+      occupationHand: ['A123_FrameBuilder'],
+      food: 0,
+    })
+
+    const resp = session.takeAction(0, 'lessons')
+    expect(resp.ok).toBe(true)
+
+    const player = resp.state.players[0]!
+    expect(player.occupationPlayed).toContain('A123_FrameBuilder')
+    expect(player.resources.food).toBe(2)
+    expect(playedEvents(resp.state, 'A123_FrameBuilder')).toContainEqual(expect.objectContaining({
+      type: 'card.played',
+      cardId: 'A123_FrameBuilder',
+      cardType: 'occupation',
+      sourceActionId: 'occupation',
+    }))
   })
 })

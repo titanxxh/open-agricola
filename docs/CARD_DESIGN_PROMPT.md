@@ -110,7 +110,7 @@ registerCardListener({
 - 官方卡：`before` / `during` / `immediatelyAfter` / `after` / `computeCosts` / `computeArgs` / `computeChoiceCandidates` / `computeReplace` / `isDoable` / `anytime`
 - 自定义卡沙盒：仅 `before` / `during` / `immediatelyAfter` / `after` / `computeCosts` / `computeArgs` / `computeReplace` / `isDoable`（`computeChoiceCandidates` / `anytime` 会被沙盒过滤，详见 §7.4）
 
-**可用 actions**（常用项；完整集见 `shared/actions/index.ts`）: `collect`, `gain`, `receive`, `construct`, `renovate-house`, `fence`, `stables`, `plow`, `sow`, `play-occupation`, `improvement-any`, `minor-improvement`, `place-farmer`, `wish-children`, `bake-bread`, `reap`（合成 action，由 `dispatchReapListener` 派发，B132 EstateMaster 等用）
+**可用 actions**（常用项；完整集见 `shared/actions/index.ts`）: `collect`, `gain`, `receive`, `construct`, `renovate-house`, `fence`, `stables`, `plow`, `sow`, `occupation`, `improvement-any`, `minor-improvement`, `place-farmer`, `wish-children`, `bake-bread`, `reap`（合成 action，由 `dispatchReapListener` 派发，B132 EstateMaster 等用）
 
 ### 5. 可用 actionId（最常用项）
 

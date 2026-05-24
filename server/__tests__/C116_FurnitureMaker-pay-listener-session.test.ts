@@ -211,7 +211,7 @@ describe('C116 FurnitureMaker — actions:[\'pay\'] migration', () => {
     expect(resp.state.players[0]!.occupationPlayed).toContain(CARD_ID)
     // Lessons cost 0 food (first occupation), C116 itself onBuy gives 1 wood
     // (defined on the card). Furniture-maker after-pay listener should NOT
-    // double-fire from the same play-occupation pay step.
+    // double-fire from the same occupation pay step.
     expect(resp.state.players[0]!.resources.wood).toBe(1)
   })
 

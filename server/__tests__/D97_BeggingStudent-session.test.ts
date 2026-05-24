@@ -25,7 +25,7 @@ describe('D97_BeggingStudent session', () => {
     expect(player.resources.begging).toBe(beggingBefore + 1)
   })
 
-  it('onStartHarvest returns optional play-occupation with costOverride {} when player has occupations in hand', () => {
+  it('onStartHarvest returns optional occupation with costOverride {} when player has occupations in hand', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -45,7 +45,7 @@ describe('D97_BeggingStudent session', () => {
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
     const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
     expect(children).toHaveLength(1)
-    expect(children[0].actionId).toBe('play-occupation')
+    expect(children[0].actionId).toBe('occupation')
     expect(children[0].sourceCard).toBe(CARD_ID)
     expect(children[0].params).toEqual({ costOverride: {} })
   })

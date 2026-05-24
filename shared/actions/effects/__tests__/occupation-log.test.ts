@@ -189,7 +189,7 @@ describe('occupation play result', () => {
     expect(player.occupationPlayed).toContain(FLOW_CARD_ID)
   })
 
-  it('dispatches the just-played occupation after listener through play-occupation', () => {
+  it('dispatches the just-played occupation after listener through occupation', () => {
     const previousRegistry = getActiveCardRegistry()
     const registry = new CardRegistry()
     registry.loadImpl(SELF_AFTER_CARD_ID, B155_ArtTeacher_impl)
@@ -214,9 +214,9 @@ describe('occupation play result', () => {
       })
       state.players = [player]
       const actions = internalActionDefinitions.filter((action) =>
-        ['play-occupation', 'pay', 'gain', 'activate-card-effect'].includes(action.id),
+        ['occupation', 'pay', 'gain', 'activate-card-effect'].includes(action.id),
       )
-      const engine = buildEngine(actions, 'play-occupation')
+      const engine = buildEngine(actions, 'occupation')
       const space = createSpace()
 
       const choiceStep = engine.proceed({ state, player, space })
@@ -233,7 +233,7 @@ describe('occupation play result', () => {
         expect.objectContaining({
           type: 'card.played',
           cardId: SELF_AFTER_CARD_ID,
-          sourceActionId: 'play-occupation',
+          sourceActionId: 'occupation',
           sourceCardId: SELF_AFTER_CARD_ID,
         }),
       ]))
@@ -250,8 +250,8 @@ describe('occupation play result', () => {
     const afterCalls: string[] = []
     const privateEvents: unknown[] = []
     registerActionHook({
-      id: 'test-after-play-occupation-failed-pay',
-      actions: ['play-occupation'],
+      id: 'test-after-occupation-failed-pay',
+      actions: ['occupation'],
       phases: ['after'],
       handler: (context) => {
         afterCalls.push(context.choice ?? 'missing')
@@ -277,11 +277,11 @@ describe('occupation play result', () => {
       })
       state.players = [player]
       const actions = internalActionDefinitions.filter((action) =>
-        ['play-occupation', 'pay', 'gain', 'activate-card-effect'].includes(action.id),
+        ['occupation', 'pay', 'gain', 'activate-card-effect'].includes(action.id),
       )
       const engine = buildEngine(
         actions,
-        'play-occupation',
+        'occupation',
         GRANT_SOURCE_CARD_ID,
         { costOverride: { food: 1 } },
       )

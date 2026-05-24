@@ -233,11 +233,10 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | listener | `after.fence` | `A34_Loppers`, `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B94_StockProtector`, `D89_Stablehand`, `E108_BlackberryFarmer`, `E74_AshTrees` |
 | listener | `after.fencing` | `B124_Trimmer`, `B140_FarmyardWorker`, `B27_Toolbox` |
 | listener | `after.gain` | `A48_ShavingHorse`, `B21_HayloftBarn`, `C120_AgriculturalLabourer`, `E103_Wolf`, `E118_KindlingGatherer` |
-| listener | `after.improvement` | `A109_SmallTrader`, `A131_CraftTeacher`, `A41_VegetableSlicer`, `B100_Clutterer`, `C115_Sower`, `C137_CharcoalBurner`, `C43_FarmBuilding`, `C75_Firewood`, `C80_RockyTerrain`, `D118_Bonehead`, `D161_CabbageBuyer`, `D80_BrickHammer`, `E156_ClaypitOwner`, `E165_MasterHuntsman`, `E18_SeedAlmanac`, `E31_Upholstery` |
+| listener | `after.improvement` | `A109_SmallTrader`, `A131_CraftTeacher`, `A41_VegetableSlicer`, `B100_Clutterer`, `B49_Scales`, `C115_Sower`, `C137_CharcoalBurner`, `C43_FarmBuilding`, `C75_Firewood`, `C80_RockyTerrain`, `D118_Bonehead`, `D161_CabbageBuyer`, `D80_BrickHammer`, `E156_ClaypitOwner`, `E165_MasterHuntsman`, `E18_SeedAlmanac`, `E31_Upholstery` |
 | listener | `after.pay` | `B18_GrasslandHarrow`, `C116_FurnitureMaker`, `C148_MudWallower`, `D74_RoyalWood`, `E122_Cottar`, `E123_ResourceHoarder`, `E128_Saddler`, `E54_Contraband` |
 | listener | `after.place-farmer` | `A113_HeresyTeacher`, `A114_SeasonalWorker`, `A116_WoodCutter`, `A119_FirewoodCollector`, `A121_ClayPuncher`, `A122_PanBaker`, `A128_RiparianBuilder`, `A129_Swagman`, `A130_MummysBoy`, `A137_RiverineShepherd`, `A138_Harpooner`, `A139_HollowWarden`, `A140_ShovelBearer`, `A147_AnimalDealer`, `A149_HouseArtist`, `A150_Stagehand`, `A154_Paymaster`, `A155_Conjurer`, `A156_Buyer`, `A158_CulinaryArtist`, `A159_JoineroftheSea`, `A160_Lutenist`, `A161_PatchCaretaker`, `A163_BuildingExpert`, `A168_AnimalTeacher`, `A18_WheelPlow`, `A24_ThreshingBoard`, `A42_ForestLakeHut`, `A46_ClawKnife`, `A50_MilkJug`, `A51_DriftNetBoat`, `A66_FeedingDish`, `A67_CornScoop`, `A72_CalciumFertilizers`, `A77_Hod`, `A78_Canoe`, `A80_StoneTongs`, `A82_WorkCertificate`, `A92_AdoptiveParents`, `A97_Freshman`, `B108_OvenFiringBoy`, `B112_Silokeeper`, `B121_Geologist`, `B128_Plumber`, `B130_FullPeasant`, `B137_Wholesaler`, `B142_Greengrocer`, `B143_ClayWarden`, `B144_Collier`, `B150_LargeScaleFarmer`, `B151_LittlePeasant`, `B152_JuniorArtist`, `B156_StorehouseKeeper`, `B161_Weakling`, `B166_CattleFeeder`, `B19_MoldboardPlow`, `B24_Lasso`, `B28_ForestryStudies`, `B29_CookeryLesson`, `B40_BreweryPond`, `B43_Chophouse`, `B47_HerringPot`, `B56_Brook`, `B60_BrewingWater`, `B62_Pitchfork`, `B64_MillWheel`, `B77_LoamPit`, `B87_Cottager`, `B90_CooperativePlower`, `B91_AssistantTiller`, `B92_LittleStickKnitter`, `C117_Legworker`, `C121_ClayKneader`, `C126_Excavator`, `C130_OutskirtsDirector`, `C131_PrivateTeacher`, `C138_AnimalFeeder`, `C141_SheepProvider`, `C142_MarketCrier`, `C145_ForestReviewer`, `C147_Cowherd`, `C148_MudWallower`, `C150_ParrotBreeder`, `C151_SowingDirector`, `C152_Puppeteer`, `C164_GermanHeathKeeper`, `C167_CattleBuyer`, `C19_SwingPlow`, `C20_MolePlow`, `C23_JobContract`, `C26_Flail`, `C39_StudioBoat`, `C42_RavenousHunger`, `C45_Stew`, `C48_Farmstead`, `C51_FishingNet`, `C82_HardwareStore`, `C90_FieldWatchman`, `C91_PlowHero`, `C93_InnerDistrictsDirector`, `D101_SugarBaker`, `D103_CanalBoatman`, `D109_SowingMaster`, `D112_YoungFarmer`, `D134_OysterEater`, `D137_TradeTeacher`, `D141_SeedSeller`, `D144_WaterWorker`, `D149_CasualWorker`, `D151_SpinDoctor`, `D156_RetailDealer`, `D158_BeanCounter`, `D160_Midwife`, `D161_CabbageBuyer`, `D164_PetGrower`, `D165_PigStalker`, `D20_TurnwrestPlow`, `D27_Retraining`, `D39_TruffleSlicer`, `D55_NewMarket`, `D68_SmallBasket`, `D92_ChildOmbudsman`, `D93_SheepInspector`, `E105_Pioneer`, `E115_SeedServant`, `E116_FirCutter`, `E118_KindlingGatherer`, `E131_MarketMaster`, `E148_Lazybones`, `E160_KelpGatherer`, `E19_OxGoad`, `E40_BeeStatue`, `E66_BarnShed`, `E77_Mattock`, `E82_Profiteering`, `E95_Miller` |
-| listener | `after.play-improvement` | `B16_MiningHammer`, `B49_Scales` |
-| listener | `after.play-occupation` | `A139_HollowWarden`, `A96_TaskArtisan`, `B100_Clutterer`, `B103_FieldMerchant`, `B138_ForestGuardian`, `B151_LittlePeasant`, `B155_ArtTeacher`, `B25_BreadPaddle`, `B49_Scales`, `C120_AgriculturalLabourer`, `C68_Bookcase`, `C80_RockyTerrain`, `C95_BasketWeaver`, `D118_Bonehead`, `D163_JourneymanBricklayer`, `D42_EducationBonus`, `D95_SiteManager`, `E101_Blighter`, `E116_FirCutter`, `E157_Usufructuary`, `E163_Patroness`, `E165_MasterHuntsman`, `E89_Stallwright`, `E95_Miller` |
+| listener | `after.occupation` | `A139_HollowWarden`, `A96_TaskArtisan`, `B100_Clutterer`, `B103_FieldMerchant`, `B138_ForestGuardian`, `B151_LittlePeasant`, `B155_ArtTeacher`, `B25_BreadPaddle`, `B49_Scales`, `C120_AgriculturalLabourer`, `C68_Bookcase`, `C80_RockyTerrain`, `C95_BasketWeaver`, `D118_Bonehead`, `D163_JourneymanBricklayer`, `D42_EducationBonus`, `D95_SiteManager`, `E101_Blighter`, `E116_FirCutter`, `E157_Usufructuary`, `E163_Patroness`, `E165_MasterHuntsman`, `E89_Stallwright`, `E95_Miller` |
 | listener | `after.plow` | `A105_BarrowPusher`, `A17_ReclamationPlow`, `B159_LieutenantGeneral`, `C80_RockyTerrain`, `D104_Cultivator`, `E164_MountainPlowman` |
 | listener | `after.receive` | `A48_ShavingHorse`, `B21_HayloftBarn`, `C120_AgriculturalLabourer` |
 | listener | `after.renovate-house` | `A110_Roughcaster`, `A120_ClayHutBuilder`, `A37_Bucksaw`, `A45_FireProtectionPond`, `B107_Manservant`, `B134_HousebookMaster`, `B168_PastureMaster`, `B16_MiningHammer`, `B55_MaintenancePremium`, `B76_Ceilings`, `C119_SkillfulRenovator`, `C132_TimberShingleMaker`, `C149_ResourceRecycler`, `C153_PatternMaker`, `D111_InteriorDecorator`, `D161_CabbageBuyer`, `D163_JourneymanBricklayer`, `D27_Retraining`, `D77_RecycledBrick`, `D81_RoofLadder`, `E123_ResourceHoarder`, `E154_Margrave`, `E87_MasterRenovator` |
@@ -262,7 +261,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | listener | `before.improvement` | `B75_WoodWorkshop` |
 | listener | `before.meeting-place` | `D139_Chairman` |
 | listener | `before.place-farmer` | `A92_AdoptiveParents`, `C154_TwinResearcher`, `C158_ForestCampaigner`, `C15_Trellis`, `C160_Outrider`, `C28_TeachersDesk`, `C48_Farmstead`, `D110_FishFarmer`, `D147_TrapBuilder`, `D16_WoodenWheyBucket`, `D28_WritingDesk`, `D83_Pigswill`, `D90_PlowMaker`, `E121_HillCultivator`, `E137_FlaxFarmer`, `E141_VegetableVendor`, `E166_Roastmaster`, `E17_SkimmerPlow`, `E55_StoneWeir`, `E59_CombandCutter`, `E67_GrainBag` |
-| listener | `before.play-occupation` | `D152_Patron`, `D49_Bookshelf`, `E51_WhaleOil` |
+| listener | `before.occupation` | `D152_Patron`, `D49_Bookshelf`, `E51_WhaleOil` |
 | listener | `before.plow` | `A40_PottersYard` |
 | listener | `before.renovate-house` | `D14_HammerCrusher` |
 | listener | `before.sow` | `A132_Publican`, `A65_SeedPellets`, `D17_DrillHarrow` |
@@ -273,7 +272,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | listener | `computeCosts.construct` | `A128_RiparianBuilder`, `A149_HouseArtist`, `B126_Carpenter`, `B13_CarpentersParlor`, `C128_WoodenHutExtender`, `C88_CarpentersApprentice`, `D121_ClayPlasterer`, `E123_ResourceHoarder`, `E150_RockBeater` |
 | listener | `computeCosts.fence` | `C16_FieldFences`, `C88_CarpentersApprentice`, `D82_HuntingTrophy`, `E16_BriarHedge` |
 | listener | `computeCosts.improvement` | `A143_Stonecutter`, `A20_DoubleTurnPlow`, `A27_OvenSite`, `A75_LumberMill`, `B36_Bottles`, `B95_MasterBricklayer`, `C122_Bricklayer`, `C27_Blueprint`, `C95_BasketWeaver`, `D117_WoodExpert`, `D82_HuntingTrophy`, `D95_SiteManager`, `D96_Furnisher`, `E109_BraidMaker`, `E123_ResourceHoarder`, `E130_Overachiever`, `E27_PiggyBank` |
-| listener | `computeCosts.play-occupation` | `B109_PaperMaker`, `B155_ArtTeacher` |
+| listener | `computeCosts.occupation` | `B109_PaperMaker`, `B155_ArtTeacher` |
 | listener | `computeCosts.plow` | `C37_DwellingMound` |
 | listener | `computeCosts.renovate-house` | `B128_Plumber`, `D121_ClayPlasterer`, `D13_Trowel`, `D154_ChimneySweep`, `D81_RoofLadder`, `E123_ResourceHoarder` |
 | listener | `computeCosts.stables` | `C88_CarpentersApprentice` |
@@ -304,7 +303,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | listener | `isDoable.fishing` | `C51_FishingNet` |
 | listener | `isDoable.improvement` | `B103_FieldMerchant`, `B75_WoodWorkshop`, `C140_PackagingArtist`, `D21_Recruitment` |
 | listener | `isDoable.place-farmer` | `E125_DelayedWayfarer` |
-| listener | `isDoable.play-occupation` | `D152_Patron`, `D49_Bookshelf`, `E101_Blighter` |
+| listener | `isDoable.occupation` | `D152_Patron`, `D49_Bookshelf`, `E101_Blighter` |
 | listener | `isDoable.renovate-house` | `A87_Conservator`, `D14_HammerCrusher` |
 | listener | `isDoable.sow` | `A65_SeedPellets`, `A94_LazySowman`, `B26_AgrarianFences`, `B72_LoveforAgriculture`, `C112_Thresher`, `D17_DrillHarrow` |
 | specialKind | `add-resource-to-space` | `C130_OutskirtsDirector`, `C93_InnerDistrictsDirector` |
@@ -546,7 +545,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B13_CarpentersParlor` | 已对齐 |  |
 | `B14_Hawktower` | 已对齐 |  |
 | `B15_CarpentersBench` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
-| `B16_MiningHammer` | 已对齐 |  |
+| `B16_MiningHammer` | 已对齐 | onBuy 使用 CardEffect；翻修后仍监听 `after.renovate-house` 并免费建 1 个 stable |
 | `B17_ForestPlow` | 已对齐 |  |
 | `B18_GrasslandHarrow` | 已对齐 |  |
 | `B19_MoldboardPlow` | 需复核 | plow 成功前就消耗使用次数 |
@@ -579,7 +578,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B46_ClubHouse` | 已对齐 |  |
 | `B47_HerringPot` | 已对齐 |  |
 | `B48_ForestStone` | 已对齐 |  |
-| `B49_Scales` | 已对齐 |  |
+| `B49_Scales` | 已对齐 | 监听 `after.occupation` / `after.improvement`，仅在当前 action 产生匹配 `card.played` 时触发；passing minor 不触发 |
 | `B50_ButterChurn` | 已对齐 |  |
 | `B51_DiggingSpade` | 已对齐 |  |
 | `B52_GrowingFarm` | 已对齐 |  |

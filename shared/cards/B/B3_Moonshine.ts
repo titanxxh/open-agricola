@@ -57,7 +57,7 @@ export const B3_Moonshine_impl = {
       writeCardExtraData(player, CARD_ID, KEY_OCC, undefined)
       return {
         type: 'leaf',
-        actionId: 'play-occupation',
+        actionId: 'occupation',
         sourceCard: CARD_ID,
         params: { costOverride: { food: 2 }, allowedCards: [pick] },
       } satisfies ActionFlow

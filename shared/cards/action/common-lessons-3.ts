@@ -41,6 +41,6 @@ export const lessons3: ActionDefinition = {
   execute: () => ({ type: 'ok' }),
   flow: {
     type: 'seq',
-    children: [{ type: 'leaf', actionId: 'play-occupation' }],
+    children: [{ type: 'leaf', actionId: 'occupation' }],
   },
 }

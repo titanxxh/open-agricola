@@ -4,7 +4,7 @@
  * Target behavior (from spec docs/superpowers/specs/2026-04-19-align-bga-A3-B3-design.md §2.2):
  *   onBuy → rollAndCacheCardPick → pendingUndoBoundary = true
  *         → emit pending 'choice' with {play, pass} options
- *   resolveChoice('play') → insert play-occupation leaf (costOverride: { food: 2 })
+ *   resolveChoice('play') → insert occupation leaf (costOverride: { food: 2 })
  *   resolveChoice('pass') → passOccupationToNextPlayer
  *
  * Current (simplified) behavior: auto-resolves XOR, mutates hand directly,
@@ -107,9 +107,9 @@ describe('B3_Moonshine session', () => {
   })
 
   // ---------------------------------------------------------------------------
-  // Case 2: resolveChoice('play') routes through play-occupation, pays 2 food
+  // Case 2: resolveChoice('play') routes through occupation, pays 2 food
   // ---------------------------------------------------------------------------
-  it('case 2: resolveChoice(play) routes through play-occupation and deducts 2 food', () => {
+  it('case 2: resolveChoice(play) routes through occupation and deducts 2 food', () => {
     const session = makeSession({ food: 3 })
 
     const b3Resp = playB3(session)
@@ -319,7 +319,7 @@ describe('B3_Moonshine session', () => {
 
     const woodBefore = b3Resp.state.players[0]!.resources.wood
 
-    // Resolve 'play' -> play-occupation path -> A117 onBuy fires
+    // Resolve 'play' -> occupation path -> A117 onBuy fires
     const playResp = session.resolveChoice(0, 'play')
     expect(playResp.ok).toBe(true)
 

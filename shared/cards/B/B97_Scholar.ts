@@ -14,7 +14,7 @@ export const B97_Scholar_impl = {
       children: [
         {
           type: 'leaf',
-          actionId: 'play-occupation',
+          actionId: 'occupation',
           sourceCard: CARD_ID,
           params: { costOverride: { food: 1 } },
         },

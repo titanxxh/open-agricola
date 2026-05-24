@@ -7,13 +7,13 @@ import { D118_Bonehead } from '../../cards-display/D/D118_Bonehead'
 const CARD_ID = D118_Bonehead.id
 
 /**
- * After playing an occupation (play-occupation action), give 1 wood from stack.
+ * After playing an occupation (occupation action), give 1 wood from stack.
  */
 const afterOccupationListener: CardListenerRegistration = {
   id: 'D118-bonehead-after-occupation',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['play-occupation'],
+  actions: ['occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const stack = getCardStack(context.player, CARD_ID)
     if (stack.length === 0) return
