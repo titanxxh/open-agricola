@@ -1,6 +1,7 @@
-import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ComplexCost, GameState, InternalActionChild, InternalActionChildren, PlayerState, Resource } from '../../contract/types'
+import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ActionSpace, ComplexCost, GameState, InternalActionChild, InternalActionChildren, PlayerState, Resource } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
 import { getOccupation } from '../../cards/registry-display'
+import { runCardListeners } from '../../cards/card-listeners'
 import {
   canAffordCardPreviewCostByProvider,
   payCardPreviewCostByProvider,
@@ -260,6 +261,7 @@ const buildPlayableOccupationOptions = (
   state: GameState,
   player: PlayerState,
   cost: Partial<PlayerState['resources']>,
+  space: ActionSpace,
   actionCardId?: string,
 ): ActionChoiceOption[] =>
   player.occupationHand
@@ -277,10 +279,42 @@ const buildPlayableOccupationOptions = (
         actionCardId,
       ),
     )
+    .filter((occupation) =>
+      isOccupationChoiceDoable(state, player, space, occupation.id, cost, actionCardId),
+    )
     .map((occupation) => ({
       value: occupation.id,
       labelKey: `occupations.${occupation.id}.name`,
     }))
+
+const isOccupationChoiceDoable = (
+  state: GameState,
+  player: PlayerState,
+  space: ActionSpace,
+  occupationId: string,
+  baseCost: Partial<PlayerState['resources']>,
+  actionCardId?: string,
+) => {
+  let doable = true
+  const results = runCardListeners({
+    state,
+    player,
+    space,
+    actionId: 'occupation',
+    phase: 'isDoable',
+    doable,
+    choice: occupationId,
+    sourceCard: actionCardId,
+    actionCardId,
+    extraData: { occupationBaseCost: baseCost },
+  })
+  for (const result of results) {
+    if (result.doable === false) {
+      doable = false
+    }
+  }
+  return doable
+}
 
 export const hasPlayableOccupationChoice = (
   state: GameState,
@@ -290,7 +324,7 @@ export const hasPlayableOccupationChoice = (
 ) => {
   const cost = getOccupationActionBaseCost(player, spaceId, params)
   if (!cost) return false
-  return buildPlayableOccupationOptions(state, player, cost, spaceId).length > 0
+  return buildPlayableOccupationOptions(state, player, cost, { id: spaceId } as ActionSpace, spaceId).length > 0
 }
 
 export const canAffordOccupationActionCost = (
@@ -379,6 +413,7 @@ export const playOccupationAction: ActionDefinition = {
       state,
       player,
       cost,
+      space,
       space.id,
     )
     if (typed?.allowedCards) {
@@ -404,6 +439,9 @@ export const playOccupationAction: ActionDefinition = {
     }
     const baseCost = getOccupationActionBaseCost(player, space.id, params)
     if (!baseCost) return { type: 'fail', errorKey: 'log.occupationFail' }
+    if (!isOccupationChoiceDoable(state, player, space, choice, baseCost, space.id)) {
+      return { type: 'fail', errorKey: 'log.occupationFail' }
+    }
     // Apply computeCosts hook so card-driven trades (B109 PaperMaker
     // wood→food) and bonus modifiers participate in the pay leaf's
     // multi-solution enumeration. Without this the pay leaf only sees the

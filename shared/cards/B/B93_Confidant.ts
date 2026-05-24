@@ -1,5 +1,8 @@
 import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
-import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
+import { canAffordOccupationActionCost } from '../../actions/effects/occupation'
+import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionFlow, GameState, PlayerState, Resource } from '../../contract/types'
 import type { GameEvent } from '../../contract/events'
 import { payLeaf } from '../helpers/pay-gain-node'
 import { readCardExtraData } from '../helpers/card-state'
@@ -7,6 +10,38 @@ import type { CardImpl } from '../registry'
 import { B93_Confidant } from '../../cards-display/B/B93_Confidant'
 
 const CARD_ID = B93_Confidant.id
+const MIN_FUTURE_FOOD = 2
+
+const readOccupationBaseCost = (context: CardListenerContext): Partial<Resource> => {
+  const baseCost = context.extraData?.occupationBaseCost
+  if (!baseCost || typeof baseCost !== 'object') return {}
+  return baseCost as Partial<Resource>
+}
+
+const canAffordMinimumSchedule = (context: CardListenerContext) => {
+  const baseCost = readOccupationBaseCost(context)
+  return canAffordOccupationActionCost(
+    context.state,
+    context.player,
+    CARD_ID,
+    {
+      ...baseCost,
+      food: (baseCost.food ?? 0) + MIN_FUTURE_FOOD,
+    },
+    context.actionCardId,
+  )
+}
+
+const minimumScheduleListener: CardListenerRegistration = {
+  id: 'B93-confidant-isdoable-minimum-schedule',
+  actions: ['occupation'],
+  phases: ['isDoable' as ActionHookPhase],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.choice !== CARD_ID) return
+    if (canAffordMinimumSchedule(context)) return
+    return { doable: false }
+  },
+}
 
 const countChoices = (state: GameState, player: PlayerState): ActionFlow[] => {
   const max = Math.max(2, Math.min(14 - state.round, 4))
@@ -72,6 +107,7 @@ const receiveFlow = (round: number): ActionFlow => ({
 })
 
 export const B93_Confidant_impl = {
+  listeners: [minimumScheduleListener],
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
