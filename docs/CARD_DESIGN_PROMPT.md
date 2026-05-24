@@ -86,7 +86,9 @@ const card = new MinorImprovement({ ... })
 | `computeLockedFarmTiles` | 动态锁定农场格（B38 FutureBuildingSite） |
 | `handHooks` | 声明哪些 hook 在卡牌还在手牌时也触发（E96 Elder） |
 
-> 围栏支付折扣（E16 BriarHedge / C16 FieldFences / C1 Overhaul）现走 listener `computeCosts` phase（actions: `['fence']`），不再是独立 hook。详见 ARCHITECTURE.md §15.7。
+> 围栏支付折扣（E16 BriarHedge / C16 FieldFences）现走 listener `computeCosts` phase（actions: `['fence']`），不再是独立 hook。详见 ARCHITECTURE.md §15.7。
+>
+> C1 Overhaul rebuild 只处理 own ordinary fences，走 `consume-fence` ownOnly + generic `fencePolicy`。
 
 ### 4. registerCardListener 结构
 
@@ -135,7 +137,7 @@ registerCardListener({
 - `player.houseType` — `'wood' | 'clay' | 'stone'`
 - `player.minorPlayed[]` / `player.occupationPlayed[]` / `player.improvements[]` — 已打出卡牌
 - `player.workers[]` — Worker 身份模型，每个槽 `{ id, isActive, isNewborn }`；家庭成员数 = `workers.filter(w => w.isActive).length`
-- `player.fenceSegments[]` — `FenceSegment[]`（注意字段名是 `fenceSegments`，**不是** `fences`；用 `getFenceCount(player)` 取数更安全）
+- `player.fenceSegments[]` — `FenceSegment[]`（注意字段名是 `fenceSegments`，**不是** `fences`；普通 fence 总数可用 `getFenceCount(player)`，palisade 用 `getPalisadeCount(player)`，own ordinary / supply 相关必须用 own-only helper 或按 `FenceSegment.type/source` 过滤；fencing 差异走 `fencePolicy`）
 - `player.cardStates[CARD_ID]` — 卡牌局部状态 `{ counters?, flagged?, infobox?, stack?, extraData? }`
 - `player.extraOccupationsFromCards` — 卡牌提供的虚拟职业数
 - `state.round` — 当前轮次 (1-14)

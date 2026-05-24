@@ -631,6 +631,82 @@ describe('specialEffectAction — mutation dispatcher', () => {
     expect(events).toEqual([])
   })
 
+  describe('consume-fence', () => {
+    it('removes only own ordinary fences when sourcePolicy is ownOnly', () => {
+      const player = makePlayer()
+      player.fenceSegments = [
+        { edge: 'H-0-0', type: 'fence' },
+        { edge: 'H-0-1', type: 'fence', source: { kind: 'borrowed', ownerPlayerId: 'p2' } },
+        { edge: 'H-0-2', type: 'palisade', source: { kind: 'own', ownerPlayerId: player.id } },
+        { edge: 'H-0-3', type: 'fence', source: { kind: 'own', ownerPlayerId: player.id } },
+      ]
+
+      const result = specialEffectAction.execute(
+        makeCtx(
+          player,
+          { kind: 'consume-fence', count: 2, segmentType: 'fence', sourcePolicy: 'ownOnly' },
+          CARD_ID,
+        ),
+      )
+
+      expect(result.type).toBe('ok')
+      expect(player.fenceSegments).toEqual([
+        { edge: 'H-0-1', type: 'fence', source: { kind: 'borrowed', ownerPlayerId: 'p2' } },
+        { edge: 'H-0-2', type: 'palisade', source: { kind: 'own', ownerPlayerId: player.id } },
+      ])
+    })
+
+    it('fails atomically when ownOnly has fewer matching own ordinary fences than requested', () => {
+      const player = makePlayer()
+      player.fenceSegments = [
+        { edge: 'H-0-0', type: 'fence' },
+        { edge: 'H-0-1', type: 'fence', source: { kind: 'borrowed', ownerPlayerId: 'p2' } },
+        { edge: 'H-0-2', type: 'palisade', source: { kind: 'own', ownerPlayerId: player.id } },
+      ]
+      const before = structuredClone(player.fenceSegments)
+
+      const result = specialEffectAction.execute(
+        makeCtx(
+          player,
+          { kind: 'consume-fence', count: 2, segmentType: 'fence', sourcePolicy: 'ownOnly' },
+          CARD_ID,
+        ),
+      )
+
+      expect(result).toEqual({ type: 'fail', errorKey: 'log.specialEffectFail' })
+      expect(player.fenceSegments).toEqual(before)
+    })
+
+    it('uses the target player id for ownOnly filtering when targetPlayerId routes the mutation', () => {
+      const p1 = makePlayer()
+      const p2 = makePlayer()
+      p2.id = 'p2'
+      p2.name = 'P2'
+      p2.fenceSegments = [
+        { edge: 'H-0-0', type: 'fence', source: { kind: 'own', ownerPlayerId: p2.id } },
+        { edge: 'H-0-1', type: 'fence', source: { kind: 'borrowed', ownerPlayerId: p1.id } },
+        { edge: 'H-0-2', type: 'fence', source: { kind: 'own', ownerPlayerId: p1.id } },
+      ]
+      const state = { players: [p1, p2] } as unknown as GameState
+
+      const result = specialEffectAction.execute({
+        ...makeCtx(
+          p1,
+          { kind: 'consume-fence', count: 1, segmentType: 'fence', sourcePolicy: 'ownOnly' },
+          CARD_ID,
+          state,
+        ),
+        actionContext: { targetPlayerId: p2.id },
+      })
+
+      expect(result.type).toBe('ok')
+      expect(p2.fenceSegments).toEqual([
+        { edge: 'H-0-1', type: 'fence', source: { kind: 'borrowed', ownerPlayerId: p1.id } },
+        { edge: 'H-0-2', type: 'fence', source: { kind: 'own', ownerPlayerId: p1.id } },
+      ])
+    })
+  })
+
   // E166 Roastmaster relies on this SE kind. The plan (Task 9, F9) calls out
   // BGA's "actually move the food meeple" semantic — verify the source space
   // truly decrements and the destination truly increments.

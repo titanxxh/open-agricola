@@ -1,6 +1,7 @@
 import type {
   CropStack,
   FenceSegment,
+  FenceSegmentType,
   GameState,
   PlayerState,
   FarmTilePosition,
@@ -20,6 +21,7 @@ import {
   collectLockedFarmTileKeys,
 } from '../cards/card-effects.ts'
 import { computePasturesFromFences, type Pasture as PastureView } from './pasture.ts'
+import { isOwnOrdinaryFenceSegment } from './fence-segments.ts'
 
 // ---------------------------------------------------------------------------
 // Legacy types preserved for the inlined validators. These mirror the shapes
@@ -80,8 +82,12 @@ export type FenceValidationError = {
     | 'ENCLOSED_TILE_OCCUPIED'
     | 'LOCKED'
     | 'EDGE_TYPE_CONFLICT'
+    | 'SEGMENT_TYPE_NOT_ALLOWED'
     | 'PALISADES_NOT_UNLOCKED'
     | 'PALISADE_NOT_ON_BORDER'
+    | 'TOO_FEW_FENCES'
+    | 'TOO_MANY_FENCES'
+    | 'ANIMAL_CAPACITY_INSUFFICIENT'
   edges: string[]
   palisadeEdges: string[]
   newFenceEdges: string[]
@@ -99,9 +105,23 @@ export type FenceValidationResult<T extends PlayerFarmState = PlayerFarmState> =
     }
   | { ok: false; error: FenceValidationError }
 
-type FenceValidationOptions = {
+export type FenceSourcePolicy = 'ownOnly'
+export type FenceCostPolicy = {
+  fence?: { wood?: number }
+  palisade?: { wood?: number }
+}
+export type FenceSegmentBounds = {
+  fence?: { min?: number; max?: number }
+  palisade?: { min?: number; max?: number }
+}
+export type FenceValidationOptions = {
   skipPayment?: boolean
   allowPalisades?: boolean
+  allowedSegmentTypes?: FenceSegmentType[]
+  sourcePolicy?: FenceSourcePolicy
+  segmentBounds?: FenceSegmentBounds
+  costPolicy?: FenceCostPolicy
+  preserveAnimalTotals?: boolean
 }
 
 export type PlowValidationError = {
@@ -799,8 +819,56 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
   const existingEdgeIds = new Set(
     (normalized.fenceSegments ?? []).map((s) => s.edge),
   )
-  const newFenceEdges = edges.filter((e) => !existingEdgeIds.has(e))
-  const newPalisadeEdges = palisadeEdges.filter((e) => !existingEdgeIds.has(e))
+  const newFenceEdges = Array.from(
+    new Set(edges.filter((e) => !existingEdgeIds.has(e))),
+  )
+  const newPalisadeEdges = Array.from(
+    new Set(palisadeEdges.filter((e) => !existingEdgeIds.has(e))),
+  )
+
+  const allowedSegmentTypes = options.allowedSegmentTypes
+  if (
+    allowedSegmentTypes &&
+    ((newFenceEdges.length > 0 && !allowedSegmentTypes.includes('fence')) ||
+      (newPalisadeEdges.length > 0 && !allowedSegmentTypes.includes('palisade')))
+  ) {
+    return {
+      ok: false,
+      error: {
+        code: 'SEGMENT_TYPE_NOT_ALLOWED',
+        edges,
+        palisadeEdges,
+        newFenceEdges,
+        newPalisadeEdges,
+      },
+    }
+  }
+
+  const fenceBounds = options.segmentBounds?.fence
+  if (fenceBounds?.min !== undefined && newFenceEdges.length < fenceBounds.min) {
+    return {
+      ok: false,
+      error: {
+        code: 'TOO_FEW_FENCES',
+        edges,
+        palisadeEdges,
+        newFenceEdges,
+        newPalisadeEdges,
+      },
+    }
+  }
+  if (fenceBounds?.max !== undefined && newFenceEdges.length > fenceBounds.max) {
+    return {
+      ok: false,
+      error: {
+        code: 'TOO_MANY_FENCES',
+        edges,
+        palisadeEdges,
+        newFenceEdges,
+        newPalisadeEdges,
+      },
+    }
+  }
 
   if (newFenceEdges.length === 0 && newPalisadeEdges.length === 0) {
     return {
@@ -833,8 +901,14 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     0,
     newFenceEdges.length - freeFenceCount,
   )
+  const fenceWoodCost = options.costPolicy?.fence?.wood
+  const payableFenceWoodCost =
+    fenceWoodCost === undefined
+      ? payableFenceCount
+      : payableFenceCount * fenceWoodCost
+  const palisadeWoodCost = options.costPolicy?.palisade?.wood ?? 2
   const payableWoodCost =
-    payableFenceCount + 2 * newPalisadeEdges.length + extraCost
+    payableFenceWoodCost + palisadeWoodCost * newPalisadeEdges.length + extraCost
 
   if (
     !options.skipPayment &&
@@ -852,8 +926,10 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     }
   }
 
-  const existingFenceCount = (normalized.fenceSegments ?? []).filter(
-    (s) => s.type === 'fence',
+  const existingFenceCount = (normalized.fenceSegments ?? []).filter((s) =>
+    options.sourcePolicy === 'ownOnly'
+      ? isOwnOrdinaryFenceSegment(s, normalized.id)
+      : s.type === 'fence',
   ).length
   if (existingFenceCount + newFenceEdges.length > MAX_FENCES) {
     return {
@@ -976,9 +1052,22 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
   })
 
   const newSegments: FenceSegment[] = [
-    ...newFenceEdges.map((edge) => ({ edge, type: 'fence' as const })),
-    ...newPalisadeEdges.map((edge) => ({ edge, type: 'palisade' as const })),
+    ...newFenceEdges.map((edge) => ({
+      edge,
+      type: 'fence' as const,
+      source: { kind: 'own' as const, ownerPlayerId: normalized.id },
+    })),
+    ...newPalisadeEdges.map((edge) => ({
+      edge,
+      type: 'palisade' as const,
+      source: { kind: 'own' as const, ownerPlayerId: normalized.id },
+    })),
   ]
+  const animalTotalsBefore = {
+    sheep: normalized.resources?.sheep ?? 0,
+    boar: normalized.resources?.boar ?? 0,
+    cattle: normalized.resources?.cattle ?? 0,
+  }
 
   const updated: PlayerFarmState = {
     ...normalized,
@@ -992,6 +1081,29 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     pastures,
   }
   enforcePastureAnimalCapacity(updated)
+  if (options.preserveAnimalTotals) {
+    const animalTotalsAfter = {
+      sheep: updated.resources?.sheep ?? 0,
+      boar: updated.resources?.boar ?? 0,
+      cattle: updated.resources?.cattle ?? 0,
+    }
+    if (
+      animalTotalsBefore.sheep !== animalTotalsAfter.sheep ||
+      animalTotalsBefore.boar !== animalTotalsAfter.boar ||
+      animalTotalsBefore.cattle !== animalTotalsAfter.cattle
+    ) {
+      return {
+        ok: false,
+        error: {
+          code: 'ANIMAL_CAPACITY_INSUFFICIENT',
+          edges,
+          palisadeEdges,
+          newFenceEdges,
+          newPalisadeEdges,
+        },
+      }
+    }
+  }
   return {
     ok: true,
     player: updated as T,
@@ -1403,7 +1515,7 @@ export type FenceSpec = {
   palisadeEdges?: string[]
   extraWood?: number
   freeFences?: number
-  options?: { skipPayment?: boolean; allowPalisades?: boolean }
+  options?: FenceValidationOptions
   lockedKeys?: Set<string>
 }
 
