@@ -234,7 +234,7 @@ export const normalizeState = (raw: GameState): GameState => {
           ],
       stableAnimals: player.stableAnimals ?? {},
       pastures: player.pastures ?? [],
-      fenceSegments: normalizeFenceSegments(player.fenceSegments),
+      fenceSegments: normalizeFenceSegments(player.fenceSegments, player.id),
       stats:
         player.stats ??
         createInitialPlayerStats({ isFirstPlayer: !!player.startPlayer }),

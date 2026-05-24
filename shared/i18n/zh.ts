@@ -1300,6 +1300,7 @@ export const zh = {
   fence: {
     error: {
       EDGE_TYPE_CONFLICT: '同一段不能同时选为围栏和木桩',
+      SEGMENT_TYPE_NOT_ALLOWED: '此行动不能建造该类型的围栏',
       PALISADES_NOT_UNLOCKED: '尚未打出 Wood Palisades',
     },
   },

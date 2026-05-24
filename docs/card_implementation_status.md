@@ -95,6 +95,7 @@
 | Payment fallback 仍需继续收敛到事件 provenance | construct/renovate bonus choice 已能通过 `resource.paid` 携带 selected index；后续关注其他 direct payment caller | 新增支付类卡时优先消费 `resource.paid` / `bonusChoiceIndex`，不要读 action result fallback。 |
 | 行动格生命周期已进入后端事件层 | `B23_FinalScenario` | 后端持有 reveal/exclusive-use 状态，round-start 统一清理并 emit `action.exclusiveUseCleared`。 |
 | Log / notification provenance | `shared/events/event-mapping-policy.ts` 覆盖全部 public/private event type；`shared/cards/__tests__/provenance-result-audit.test.ts` 守住生产卡牌的 `context.result` 资源事实 fallback | 结构化事件层是卡牌判定、UI log、private notification 和 replay 的统一来源；新增支付/资源/farm metadata 路径必须先 emit 事件再让 listener 消费，不要回退到 action result。 |
+| Fence segment source/type policy 已进入通用基础设施 | `FenceSegment.type` / `source`、`consume-fence` ownOnly、fencing `fencePolicy` | 普通 fence / palisade / borrowed source 不通过主路径卡牌分支表达；C1 rebuild、B30 palisade、未来 E149 borrowed fence 都走 segment type/source + generic policy。 |
 | 注释里的非阻塞 card-id 示例 | `shared/actions/effects/breed.ts`、`shared/contract/types.ts` 仅把 `A165_PigBreeder` / `D95_SiteManager` 作为例子提到 | 除非附近代码变动，否则保留；它们不是可执行的单卡分支。 |
 | Legacy/fallback 术语残留 | 旧 bad-smell 文档发现的剩余 fallback/direct-path 术语，主要在已迁移支付 flow 和测试中 | 将直接运行时 fallback 视为重构债；测试/baseline 名称除非真实迁移触及，否则不动。 |
 
@@ -114,6 +115,7 @@
 11. ~~决定 BGA `implemented=false` data-only 卡是否进入 OA 发牌池。~~ ✅ 已落地：`shared/session/state-bootstrap.ts` `dealHands()` 使用 `implementedMinorImprovementCards` / `implementedOccupationCards`，两者基于 `isImplementedCard(card.implemented !== false)` 过滤；`A169_OffSiter` 等 `implemented=false` 卡已排除出发牌池。
 12. ~~扩展结构化 action event/log event~~ ✅ 已关闭：所有 public/private event type 由 `event-mapping-policy` 覆盖，log / public notification / highlight / resource animation / replay 的 mapped、conditional、silent 边界均由测试 fixture 守住；当前未进入 log mapper 的 card/farm/future/worker/lifecycle event 已补齐可读 log 或显式静默策略。后续更丰富动画属于 enhancement，不再是基础设施开放 umbrella。
 13. ~~BGA-style pay child / internal children 机制~~ ✅ 已落地：public host action 负责业务 mutation，mandatory payment 通过 internal `pay` child 结算；`beforeHostListeners` / `afterHostCommitListeners` / `afterHostListeners` 保留 BGA pay slot 差异，improvement/occupation 的 onBuy 在 host commit 后、host after 前运行；public action 顺序已修正为 `computeReplace -> before -> strict isDoable -> computeCosts -> execute -> during -> immediatelyAfter -> after`；`activate-card-effect` 通过 internal result map 读取 `paymentInfo`；`architecture-guard` 守住 deleted apply effects，不允许新增 top-level `apply-*` effect 文件来堆叠多卡逻辑。
+14. ~~Fence segment source/type + generic fencing policy~~ ✅ 已落地：`FenceSegment.type` 区分 ordinary fence / B30 palisade，`FenceSegment.source` 区分 own / borrowed；缺省普通 fence 视为 own ordinary source。fencing 主路径不按 `C1` / `B30` / `E149`、`noWoodPalisades`、`midnightFencer` 分支；卡牌通过 `fencePolicy` 表达 allowed segment types、source policy、bounds、cost、cancel、animal preservation。C1 rebuild 只计数/回收/重建 own ordinary fences，走 `consume-fence` ownOnly + generic `fencePolicy`。
 
 影响回归覆盖：`B65_GrainDepot` paymentInfo fee index、before-phase cards、renovation、improvement、occupation、construct、stables、fencing、`A34_Loppers` exact-wood、stable paid/free log pairing。
 
@@ -161,6 +163,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 
 - 中心化 `SpecialEffect.js` cardId dispatch 和单卡 JS 方法。OA 应保留 typed pending/action flow。
 - BGA 在 action/main path 中出现卡名或一次性逻辑，例如全局 Scythe-style flag 或 C88 stable/fence cost relocation。OA 应优先使用卡牌本地 hooks/helpers。
+- fencing 主路径不得为 C1 / B30 / E149 增加卡牌 id 分支或 `noWoodPalisades` / `midnightFencer` 一类单卡开关；用 `FenceSegment.type` / `source` 与 generic `fencePolicy` 表达差异。
 - BGA mutable PHP args 和原地 cost rewrite。OA 应保留结构化 modifiers 和 payment enumeration。
 - BGA 平台状态字段如 `banned`、`implemented` 不应自动驱动 OA 产品行为。
 
@@ -268,7 +271,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | listener | `computeChoiceCandidates.improvement` | `C27_Blueprint`, `D131_CraftsmanshipPromoter`, `E161_ElderBaker` |
 | listener | `computeChoiceCandidates.renovate-house` | `A87_Conservator`, `D13_Trowel` |
 | listener | `computeCosts.construct` | `A128_RiparianBuilder`, `A149_HouseArtist`, `B126_Carpenter`, `B13_CarpentersParlor`, `C128_WoodenHutExtender`, `C88_CarpentersApprentice`, `D121_ClayPlasterer`, `E123_ResourceHoarder`, `E150_RockBeater` |
-| listener | `computeCosts.fence` | `C16_FieldFences`, `C1_Overhaul`, `C88_CarpentersApprentice`, `D82_HuntingTrophy`, `E16_BriarHedge` |
+| listener | `computeCosts.fence` | `C16_FieldFences`, `C88_CarpentersApprentice`, `D82_HuntingTrophy`, `E16_BriarHedge` |
 | listener | `computeCosts.improvement` | `A143_Stonecutter`, `A20_DoubleTurnPlow`, `A27_OvenSite`, `A75_LumberMill`, `B36_Bottles`, `B95_MasterBricklayer`, `C122_Bricklayer`, `C27_Blueprint`, `C95_BasketWeaver`, `D117_WoodExpert`, `D82_HuntingTrophy`, `D95_SiteManager`, `D96_Furnisher`, `E109_BraidMaker`, `E123_ResourceHoarder`, `E130_Overachiever`, `E27_PiggyBank` |
 | listener | `computeCosts.play-occupation` | `B109_PaperMaker`, `B155_ArtTeacher` |
 | listener | `computeCosts.plow` | `C37_DwellingMound` |
@@ -325,7 +328,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | specialKind | `resourceExchange` | `E5_NightLoot` |
 | specialKind | `return-card-to-board` | `C60_SmallPottersOven` |
 | specialKind | `set-counter` | `A144_Sequestrator`, `B48_ForestStone`, `C148_MudWallower`, `D158_BeanCounter` |
-| specialKind | `set-extra-data` | `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B124_Trimmer`, `B132_EstateMaster`, `B137_Wholesaler`, `B18_GrasslandHarrow`, `B21_HayloftBarn`, `B34_SpecialFood`, `B48_ForestStone`, `B55_MaintenancePremium`, `C150_ParrotBreeder`, `C16_FieldFences`, `C1_Overhaul`, `C48_Farmstead`, `C53_GypsysCrock`, `D156_RetailDealer`, `D36_BreedRegistry`, `D56_FatstockStretcher`, `D74_RoyalWood`, `E148_Lazybones`, `E149_MidnightFencer`, `E51_WhaleOil`, `E53_BoarSpear`, `E58_LunchtimeBeer`, `E85_MasterTanner`, `E91_PlowBuilder` |
+| specialKind | `set-extra-data` | `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B124_Trimmer`, `B132_EstateMaster`, `B137_Wholesaler`, `B18_GrasslandHarrow`, `B21_HayloftBarn`, `B34_SpecialFood`, `B48_ForestStone`, `B55_MaintenancePremium`, `C150_ParrotBreeder`, `C16_FieldFences`, `C48_Farmstead`, `C53_GypsysCrock`, `D156_RetailDealer`, `D36_BreedRegistry`, `D56_FatstockStretcher`, `D74_RoyalWood`, `E148_Lazybones`, `E149_MidnightFencer`, `E51_WhaleOil`, `E53_BoarSpear`, `E58_LunchtimeBeer`, `E85_MasterTanner`, `E91_PlowBuilder` |
 | specialKind | `set-flag` | `A130_MummysBoy`, `A153_PigOwner`, `A17_ReclamationPlow`, `A18_WheelPlow`, `A45_FireProtectionPond`, `A92_AdoptiveParents`, `A97_Freshman`, `B124_Trimmer`, `B140_FarmyardWorker`, `B154_SheepKeeper`, `B163_Pastor`, `B24_Lasso`, `B34_SpecialFood`, `B35_HookKnife`, `B76_Ceilings`, `B85_FarmHand`, `C101_StallHolder`, `C143_StoneBuyer`, `C150_ParrotBreeder`, `C42_RavenousHunger`, `C46_Mandoline`, `C51_FishingNet`, `C64_CornSchnappsDistillery`, `C84_PerennialRye`, `C85_DenBuilder`, `C87_Mason`, `C94_StableCleaner`, `D122_ClayCarrier`, `D150_GodlySpouse`, `D157_PartyOrganizer`, `D27_Retraining`, `D46_PelletPress`, `D53_TeaHouse`, `D87_MasterBuilder`, `D93_SheepInspector`, `E13_StoneHouseReconstruction`, `E146_Reseller`, `E151_DeliveryNurse`, `E22_GuestRoom`, `E27_PiggyBank`, `E62_SourDough`, `E91_PlowBuilder`, `E92_FieldDoctor` |
 | specialKind | `set-infobox` | `A17_ReclamationPlow`, `B21_HayloftBarn`, `B48_ForestStone`, `B55_MaintenancePremium`, `C115_Sower`, `C148_MudWallower`, `D126_FieldCultivator`, `D36_BreedRegistry`, `E110_Dentist`, `E22_GuestRoom`, `E27_PiggyBank`, `E51_WhaleOil`, `E74_AshTrees` |
 | specialKind | `stone` | `C6_StoneClearing` |
@@ -708,7 +711,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B178_TagAlong` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B179_WildBoarHunter` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B180_GameTeaser` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `C1_Overhaul` | 已对齐 | BGA passing 行为由 improvement host action / pay child / activate-card-effect 处理 |
+| `C1_Overhaul` | 已对齐 | BGA passing 行为由 improvement host action / pay child / activate-card-effect 处理；rebuild 只计数/回收/重建 own ordinary fences，走 `consume-fence` ownOnly + generic `fencePolicy` |
 | `C2_Stable` | 已对齐 |  |
 | `C3_CarriageTrip` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `C4_WritingBoards` | 已对齐 |  |

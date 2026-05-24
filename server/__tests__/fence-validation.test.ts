@@ -330,3 +330,205 @@ describe('palisade must be on border', () => {
     expect(result.ok).toBe(true)
   })
 })
+
+describe('validateFenceSelection — generic fence policy', () => {
+  it('builds free own-source ordinary fences when fence wood cost is zero', () => {
+    const player = createPlayer()
+    player.resources.wood = 0
+    const edges = edgesForTile(0, 1)
+
+    const result = validateFenceSelection(player, edges, [], 0, 0, {
+      costPolicy: { fence: { wood: 0 } },
+    })
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.payableWoodCost).toBe(0)
+      expect(result.newFenceEdges).toHaveLength(4)
+      expect(result.player.resources.wood).toBe(0)
+      expect(result.player.fenceSegments).toEqual(
+        edges.map((edge) => ({
+          edge,
+          type: 'fence',
+          source: { kind: 'own', ownerPlayerId: 'p1' },
+        })),
+      )
+    }
+  })
+
+  it('charges custom ordinary fence wood cost per payable fence', () => {
+    const player = createPlayer()
+    player.resources.wood = 10
+    const edges = edgesForTile(0, 1)
+
+    const result = validateFenceSelection(player, edges, [], 0, 0, {
+      costPolicy: { fence: { wood: 2 } },
+    })
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.payableWoodCost).toBe(8)
+      expect(result.player.resources.wood).toBe(2)
+      expect(result.player.fenceSegments).toHaveLength(4)
+    }
+  })
+
+  it('counts duplicate ordinary fence input once for cost and segments', () => {
+    const player = createPlayer()
+    player.resources.wood = 10
+    const edges = [...edgesForTile(0, 1), 'H-0-1', 'V-0-1']
+
+    const result = validateFenceSelection(player, edges)
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.newFenceEdges).toEqual(edgesForTile(0, 1))
+      expect(result.payableWoodCost).toBe(4)
+      expect(result.player.resources.wood).toBe(6)
+      expect(result.player.fenceSegments).toHaveLength(4)
+    }
+  })
+
+  it('counts duplicate palisade input once for cost and segments', () => {
+    const player = createPlayer()
+    player.resources.wood = 10
+
+    const result = validateFenceSelection(
+      player,
+      ['H-1-0', 'V-0-1'],
+      ['H-0-0', 'V-0-0', 'H-0-0', 'V-0-0'],
+      0,
+      0,
+      { allowPalisades: true },
+    )
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.newPalisadeEdges).toEqual(['H-0-0', 'V-0-0'])
+      expect(result.payableWoodCost).toBe(6)
+      expect(result.player.resources.wood).toBe(4)
+      expect(result.player.fenceSegments).toHaveLength(4)
+    }
+  })
+
+  it('rejects fewer ordinary fences than the policy minimum', () => {
+    const player = createPlayer()
+
+    const result = validateFenceSelection(player, edgesForTile(0, 1), [], 0, 0, {
+      segmentBounds: { fence: { min: 5 } },
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error.code).toBe('TOO_FEW_FENCES')
+    }
+  })
+
+  it('rejects more ordinary fences than the policy maximum', () => {
+    const player = createPlayer()
+
+    const result = validateFenceSelection(player, edgesForTile(0, 1), [], 0, 0, {
+      segmentBounds: { fence: { max: 3 } },
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error.code).toBe('TOO_MANY_FENCES')
+    }
+  })
+
+  it('rejects new palisades when the policy only allows ordinary fences', () => {
+    const player = createPlayer()
+
+    const result = validateFenceSelection(
+      player,
+      ['H-1-0', 'V-0-1'],
+      ['H-0-0', 'V-0-0'],
+      0,
+      0,
+      { allowPalisades: true, allowedSegmentTypes: ['fence'] },
+    )
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error.code).toBe('SEGMENT_TYPE_NOT_ALLOWED')
+    }
+  })
+
+  it('rejects new ordinary fences when the policy only allows palisades', () => {
+    const player = createPlayer()
+
+    const result = validateFenceSelection(
+      player,
+      ['H-1-0', 'V-0-1'],
+      ['H-0-0', 'V-0-0'],
+      0,
+      0,
+      { allowPalisades: true, allowedSegmentTypes: ['palisade'] },
+    )
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error.code).toBe('SEGMENT_TYPE_NOT_ALLOWED')
+    }
+  })
+
+  it('ignores borrowed ordinary fences for ownOnly supply cap', () => {
+    const player = createPlayer()
+    player.resources.wood = 20
+    const borrowedEdges = [
+      'V-1-0',
+      'H-0-1',
+      'H-0-2',
+      'H-0-3',
+      'H-0-4',
+      'H-3-0',
+      'H-3-1',
+      'H-3-2',
+      'H-3-3',
+      'H-3-4',
+      'V-0-5',
+      'V-1-5',
+      'V-2-5',
+      'V-2-4',
+    ]
+    player.fenceSegments = borrowedEdges.map((edge) => ({
+      edge,
+      type: 'fence',
+      source: { kind: 'borrowed', ownerPlayerId: 'p2' },
+    }))
+
+    const result = validateFenceSelection(
+      player,
+      ['H-1-0', 'V-0-1'],
+      ['H-0-0', 'V-0-0'],
+      0,
+      0,
+      { allowPalisades: true, sourcePolicy: 'ownOnly' },
+    )
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.newFenceEdges).toHaveLength(2)
+      expect(
+        result.player.fenceSegments.filter(
+          (segment) => segment.source?.kind === 'borrowed',
+        ),
+      ).toHaveLength(14)
+    }
+  })
+
+  it('rejects builds that would reduce animal totals when preservation is required', () => {
+    const player = createPlayer()
+    player.resources.sheep = 3
+
+    const result = validateFenceSelection(player, edgesForTile(0, 1), [], 0, 0, {
+      preserveAnimalTotals: true,
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error.code).toBe('ANIMAL_CAPACITY_INSUFFICIENT')
+    }
+  })
+})

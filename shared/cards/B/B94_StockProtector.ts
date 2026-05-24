@@ -14,7 +14,8 @@ const beforeListener: CardListenerRegistration = {
   actions: ['fence'],
   dispatchMode: 'select',
   mandatory: true,
-  handler: (_context: CardListenerContext): ActionHookResult | void => {
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.trueAction === false) return
     return { flow: gainLeaf(CARD_ID, { wood: 2 }), sourceCard: CARD_ID }
   },
 }
@@ -25,6 +26,7 @@ const afterListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.trueAction === false) return
     if (workersAvailable(context.state, context.player) <= 0) return
     return {
       flow: { type: 'leaf', actionId: 'place-farmer', optional: true, promptKey: 'ui.interactionStockProtectorPlace' },
@@ -41,6 +43,7 @@ const isDoableListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
     if (context.actionContext?.skipBeforeTriggers === true) return
+    if (context.trueAction === false) return
     return { doable: true }
   },
 }
