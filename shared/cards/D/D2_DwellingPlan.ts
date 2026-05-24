@@ -5,18 +5,18 @@ const CARD_ID = D2_DwellingPlan.id
 
 export const D2_DwellingPlan_impl = {
   effect: {
-  id: CARD_ID,
-  onBuy: () => ({
-    type: 'seq' as const,
-    optional: true,
-    children: [
-      {
-        type: 'leaf' as const,
-        actionId: 'renovation',
-        sourceCard: CARD_ID,
-      },
-    ],
-  }),
-},
+    id: CARD_ID,
+    onBuy: () => ({
+      type: 'seq' as const,
+      optional: true,
+      children: [
+        {
+          type: 'leaf' as const,
+          actionId: 'renovate-house',
+          sourceCard: CARD_ID,
+        },
+      ],
+    }),
+  },
   reaches: [] as readonly string[],
 } satisfies CardImpl

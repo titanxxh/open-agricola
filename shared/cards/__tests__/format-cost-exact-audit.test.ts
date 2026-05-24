@@ -2,7 +2,13 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-type FindingType = 'costOverride' | 'actionContextCosts' | 'negativeHugeDiscount' | 'freeCost'
+type FindingType =
+  | 'costOverride'
+  | 'actionContextCosts'
+  | 'negativeHugeDiscount'
+  | 'freeCost'
+  | 'legacyRenovationAction'
+  | 'legacyFencingAction'
 
 type Finding = {
   file: string
@@ -103,6 +109,12 @@ const scanCardAuthoredCostHacks = () => {
     }
     if (/\bfreeCost\b/.test(text)) {
       findings.push({ file, type: 'freeCost' })
+    }
+    if (/actionId\s*:\s*['"]renovation['"]/.test(text)) {
+      findings.push({ file, type: 'legacyRenovationAction' })
+    }
+    if (/actionId\s*:\s*['"]fencing['"]/.test(text)) {
+      findings.push({ file, type: 'legacyFencingAction' })
     }
   }
   return findings.filter(

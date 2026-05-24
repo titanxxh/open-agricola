@@ -28,7 +28,7 @@ const anytimeListener: CardListenerRegistration = {
         type: 'seq',
         children: [
           { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
-          { type: 'leaf', actionId: 'renovation', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'renovate-house', sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } },
         ],
       },
