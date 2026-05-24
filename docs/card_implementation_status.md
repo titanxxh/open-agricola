@@ -622,7 +622,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B90_CooperativePlower` | 已对齐 |  |
 | `B91_AssistantTiller` | 已对齐 |  |
 | `B92_LittleStickKnitter` | 已对齐 |  |
-| `B93_Confidant` | 已对齐 | onBuy 必须选择 2/3/4 个未来 round 之一；`isDoable.occupation` 按 occupation cost + 最低 2 food schedule 过滤不可支付的打出选项；future receive 后可选 `sow` 或 `fence`，其中 BGA `formatCost([WOOD => 1])` 通过 nested `fencePolicy.costPolicy` 显式表达，并继续叠加 E16 / C16 等 `computeCosts.fence` 折扣。 |
+| `B93_Confidant` | 已对齐 | onBuy 必须选择 2/3/4 个未来 round 之一；`isDoable.occupation` 按可选 occupation 支付方案过滤，要求职业支付后仍有最低 2 个真实 food 支付 future schedule；future receive 后可选 `sow` 或 `fence`，其中 BGA `formatCost([WOOD => 1])` 通过 nested `fencePolicy.costPolicy` 显式表达，并继续叠加 E16 / C16 等 `computeCosts.fence` 折扣。 |
 | `B94_StockProtector` | 已对齐 |  |
 | `B95_MasterBricklayer` | 已对齐 |  |
 | `B96_TreeFarmJoiner` | 已对齐 |  |

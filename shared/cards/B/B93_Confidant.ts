@@ -1,5 +1,5 @@
 import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
-import { canAffordOccupationActionCost } from '../../actions/effects/occupation'
+import { collectOccupationActionPaymentOptions } from '../../actions/effects/occupation'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, GameState, PlayerState, Resource } from '../../contract/types'
@@ -20,15 +20,16 @@ const readOccupationBaseCost = (context: CardListenerContext): Partial<Resource>
 
 const canAffordMinimumSchedule = (context: CardListenerContext) => {
   const baseCost = readOccupationBaseCost(context)
-  return canAffordOccupationActionCost(
+  const options = collectOccupationActionPaymentOptions(
     context.state,
     context.player,
     CARD_ID,
-    {
-      ...baseCost,
-      food: (baseCost.food ?? 0) + MIN_FUTURE_FOOD,
-    },
+    baseCost,
     context.actionCardId,
+  )
+  const currentFood = context.player.resources.food ?? 0
+  return options.some((option) =>
+    currentFood - (option.resourcesPaid.food ?? 0) >= MIN_FUTURE_FOOD,
   )
 }
 
