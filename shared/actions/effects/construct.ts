@@ -78,6 +78,10 @@ const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
   return result
 }
 
+const forbidsConstructCancel = (
+  actionContext?: Record<string, unknown>,
+): boolean => actionContext?.cancelPolicy === 'forbidCancel'
+
 const buildConstructPayCost = (
   player: PlayerState,
   costs: Partial<Resource> | undefined,
@@ -195,7 +199,16 @@ export const constructAction: ActionDefinition = {
     }
   },
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
-    if (choice === 'cancel') return { type: 'ok' }
+    if (choice === 'cancel') {
+      if (forbidsConstructCancel(ctx.actionContext)) {
+        return {
+          type: 'fail',
+          errorKey: 'log.buildRoomFail',
+          recoverable: true,
+        }
+      }
+      return { type: 'ok' }
+    }
 
     // Second call: payment combo selected after multi-combo prompt.
     if (choice.startsWith('pay:room:')) {

@@ -689,7 +689,7 @@ OA 对齐规则：
 
 5 种 farmType 全在各自 ActionDef.resolveChoice 内闭环（`shared/actions/effects/`）：
 
-- **room** (`construct.ts`)：`room-payment.ts` 展开"每间房"费用变体；多解时二轮 `pay:room:*` prompt finalize。
+- **room** (`construct.ts`)：`room-payment.ts` 展开"每间房"费用变体；多解时二轮 `pay:room:*` prompt finalize；nested room reward 可用 `actionContext.cancelPolicy: 'forbidCancel'` 表达“选中奖励后必须放置房间”。
 - **stable / plow** (`stables.ts` / `plow.ts`)：typed flat payment 解析。
 - **fence** (`fencing.ts`)：校验选边/连通/封闭区域，得 `newEdges` 后计算 wood（考虑 `freeFences` / `extraWood` / fence-cost-unification 的 `collectComputeCostsForFarmChoice` Pass #2）；多解 `pay:fence:*` 二轮 prompt。
 - **sow** (`sow.ts`)：validate + finalize（无 payment combo），含 extra-field card effect（`getPermittedExtraSowableFields` + `handleSowExtraField`）。

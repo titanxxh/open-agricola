@@ -9,7 +9,6 @@ export const C89_StableMaster_impl = {
     id: CARD_ID,
     onBuy: (state, player) => {
       if (getAvailableStableSupplyCount(state, player) <= 0) return
-      if ((player.resources.wood ?? 0) < 1) return
       return {
         type: 'leaf',
         actionId: 'stables',

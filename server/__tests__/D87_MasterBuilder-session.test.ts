@@ -5,6 +5,11 @@ import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 import '../../shared/cards/D/D87_MasterBuilder'
 
 describe('D87_MasterBuilder session', () => {
+  const roomTiles = (count: number) => [
+    ...Array.from({ length: Math.min(count, 5) }, (_, col) => ({ row: 0, col })),
+    ...Array.from({ length: Math.max(0, count - 5) }, (_, col) => ({ row: 1, col })),
+  ]
+
   const setup = (options?: { rooms?: number }) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -16,6 +21,7 @@ describe('D87_MasterBuilder session', () => {
     player.occupationHand.push('D87_MasterBuilder')
     player.resources.food = 10
     player.rooms = options?.rooms ?? 5
+    player.roomTiles = roomTiles(player.rooms)
     session.loadState(state)
     session.devPlayCard(0, 'D87_MasterBuilder')
     return session
@@ -27,7 +33,7 @@ describe('D87_MasterBuilder session', () => {
     return resp
   }
 
-  it('available with 5 rooms → rooms becomes 6, card flagged', () => {
+  it('available with 5 rooms → builds a real sixth room, card flagged', () => {
     const session = setup({ rooms: 5 })
     const state = session.getState().state
     const initialRooms = state.players[0]!.rooms
@@ -36,9 +42,18 @@ describe('D87_MasterBuilder session', () => {
 
     const resp = session.takeAnytimeAction(0, 'D87-master-builder-anytime')
     expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('farm-select')
 
-    const updatedPlayer = resp.state.players[0]!
+    const built = session.resolveChoice(0, 'confirm', {
+      rooms: [{ row: 1, col: 0 }],
+    })
+    expect(built.ok).toBe(true)
+
+    const updatedPlayer = built.state.players[0]!
     expect(updatedPlayer.rooms).toBe(initialRooms + 1)
+    expect(updatedPlayer.roomTiles).toContainEqual({ row: 1, col: 0 })
     expect(isCardFlagged(updatedPlayer, 'D87_MasterBuilder')).toBe(true)
   })
 
@@ -57,9 +72,13 @@ describe('D87_MasterBuilder session', () => {
 
     const resp1 = session.takeAnytimeAction(0, 'D87-master-builder-anytime')
     expect(resp1.ok).toBe(true)
+    const built = session.resolveChoice(0, 'confirm', {
+      rooms: [{ row: 1, col: 0 }],
+    })
+    expect(built.ok).toBe(true)
 
     // Should no longer be available
-    const anytimeIds = resp1.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
+    const anytimeIds = built.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(anytimeIds).not.toContain('D87-master-builder-anytime')
   })
 })

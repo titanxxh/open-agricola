@@ -7,6 +7,12 @@ import type { CardImpl } from '../registry'
 import { C87_Mason } from '../../cards-display/C/C87_Mason'
 
 const CARD_ID = C87_Mason.id
+const FREE_SINGLE_ROOM_CONTEXT = {
+  maxRooms: 1,
+  exactCost: { max: 1 },
+  trueAction: false,
+  cancelPolicy: 'forbidCancel',
+}
 
 const anytimeListener: CardListenerRegistration = {
   id: 'C87-mason-anytime',
@@ -22,7 +28,12 @@ const anytimeListener: CardListenerRegistration = {
       flow: {
         type: 'seq',
         children: [
-          { type: 'leaf', actionId: 'build-farmhand-room', sourceCard: CARD_ID },
+          {
+            type: 'leaf',
+            actionId: 'construct',
+            sourceCard: CARD_ID,
+            actionContext: FREE_SINGLE_ROOM_CONTEXT,
+          },
           { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
         ],
       },
