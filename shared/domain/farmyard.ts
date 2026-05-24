@@ -109,10 +109,12 @@ export type FenceSourcePolicy = 'ownOnly'
 export type FenceCostPolicy = {
   fence?: { wood?: number }
   palisade?: { wood?: number }
+  fixedWood?: number
 }
+export type Bounds = { min?: number; max?: number }
 export type FenceSegmentBounds = {
-  fence?: { min?: number; max?: number }
-  palisade?: { min?: number; max?: number }
+  fence?: Bounds
+  palisade?: Bounds
 }
 export type FenceValidationOptions = {
   skipPayment?: boolean
@@ -122,6 +124,13 @@ export type FenceValidationOptions = {
   segmentBounds?: FenceSegmentBounds
   costPolicy?: FenceCostPolicy
   preserveAnimalTotals?: boolean
+  ordinaryFenceBuildLimit?: number
+  availableOrdinaryFenceTokens?: number
+  pastureBounds?: {
+    newPastures?: Bounds
+    changedPastures?: Bounds
+    newPastureSize?: Bounds
+  }
 }
 
 export type PlowValidationError = {
@@ -907,17 +916,21 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
       ? payableFenceCount
       : payableFenceCount * fenceWoodCost
   const palisadeWoodCost = options.costPolicy?.palisade?.wood ?? 2
+  const fixedWoodCost = Math.max(0, options.costPolicy?.fixedWood ?? 0)
   const payableWoodCost =
-    payableFenceWoodCost + palisadeWoodCost * newPalisadeEdges.length + extraCost
+    payableFenceWoodCost + palisadeWoodCost * newPalisadeEdges.length + extraCost + fixedWoodCost
 
-  if (
-    !options.skipPayment &&
-    (normalized.resources?.wood ?? 0) < payableWoodCost
-  ) {
+  const existingFenceCount = (normalized.fenceSegments ?? []).filter((s) =>
+    options.sourcePolicy === 'ownOnly'
+      ? isOwnOrdinaryFenceSegment(s, normalized.id)
+      : s.type === 'fence',
+  ).length
+  const ordinaryBuildLimit = options.ordinaryFenceBuildLimit ?? MAX_FENCES
+  if (existingFenceCount + newFenceEdges.length > ordinaryBuildLimit) {
     return {
       ok: false,
       error: {
-        code: 'NOT_ENOUGH_WOOD',
+        code: 'MAX_FENCES_EXCEEDED',
         edges,
         palisadeEdges,
         newFenceEdges,
@@ -925,13 +938,10 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
       },
     }
   }
-
-  const existingFenceCount = (normalized.fenceSegments ?? []).filter((s) =>
-    options.sourcePolicy === 'ownOnly'
-      ? isOwnOrdinaryFenceSegment(s, normalized.id)
-      : s.type === 'fence',
-  ).length
-  if (existingFenceCount + newFenceEdges.length > MAX_FENCES) {
+  if (
+    options.availableOrdinaryFenceTokens !== undefined &&
+    newFenceEdges.length > options.availableOrdinaryFenceTokens
+  ) {
     return {
       ok: false,
       error: {
@@ -1050,6 +1060,65 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     const pastureKey = pasture.tiles.map(localPositionKey).sort().join('|')
     return !previousPastureKeys.has(pastureKey)
   })
+  const pastureBoundError = (
+    value: number,
+    bounds: Bounds | undefined,
+  ): 'TOO_FEW_FENCES' | 'TOO_MANY_FENCES' | undefined => {
+    if (bounds?.min !== undefined && value < bounds.min) return 'TOO_FEW_FENCES'
+    if (bounds?.max !== undefined && value > bounds.max) return 'TOO_MANY_FENCES'
+    return undefined
+  }
+  const newPastureCount = Math.max(0, pastures.length - normalized.pastures.length)
+  const pastureBounds = options.pastureBounds
+  const pastureCountError =
+    pastureBoundError(newPastureCount, pastureBounds?.newPastures) ??
+    pastureBoundError(newPastures.length, pastureBounds?.changedPastures)
+  if (pastureCountError) {
+    return {
+      ok: false,
+      error: {
+        code: pastureCountError,
+        edges,
+        palisadeEdges,
+        newFenceEdges,
+        newPalisadeEdges,
+      },
+    }
+  }
+  const sizeBounds = pastureBounds?.newPastureSize
+  const pastureSizeError =
+    sizeBounds &&
+    newPastures
+      .map((pasture) => pastureBoundError(pasture.size, sizeBounds))
+      .find((error): error is 'TOO_FEW_FENCES' | 'TOO_MANY_FENCES' => error !== undefined)
+  if (pastureSizeError) {
+    return {
+      ok: false,
+      error: {
+        code: pastureSizeError,
+        edges,
+        palisadeEdges,
+        newFenceEdges,
+        newPalisadeEdges,
+      },
+    }
+  }
+
+  if (
+    !options.skipPayment &&
+    (normalized.resources?.wood ?? 0) < payableWoodCost
+  ) {
+    return {
+      ok: false,
+      error: {
+        code: 'NOT_ENOUGH_WOOD',
+        edges,
+        palisadeEdges,
+        newFenceEdges,
+        newPalisadeEdges,
+      },
+    }
+  }
 
   const newSegments: FenceSegment[] = [
     ...newFenceEdges.map((edge) => ({

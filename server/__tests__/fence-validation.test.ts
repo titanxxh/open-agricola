@@ -373,6 +373,22 @@ describe('validateFenceSelection — generic fence policy', () => {
     }
   })
 
+  it('adds fixed wood cost after validating the fence layout', () => {
+    const player = createPlayer()
+    player.resources.wood = 10
+    const edges = edgesForTile(0, 1)
+
+    const result = validateFenceSelection(player, edges, [], 0, 0, {
+      costPolicy: { fixedWood: 2 },
+    })
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.payableWoodCost).toBe(6)
+      expect(result.player.resources.wood).toBe(4)
+    }
+  })
+
   it('counts duplicate ordinary fence input once for cost and segments', () => {
     const player = createPlayer()
     player.resources.wood = 10
@@ -434,6 +450,53 @@ describe('validateFenceSelection — generic fence policy', () => {
     expect(result.ok).toBe(false)
     if (!result.ok) {
       expect(result.error.code).toBe('TOO_MANY_FENCES')
+    }
+  })
+
+  it('rejects ordinary fences beyond the dynamic build limit', () => {
+    const player = createPlayer()
+    player.resources.wood = 20
+    const existing = [
+      'H-0-1',
+      'H-0-2',
+      'H-0-3',
+      'H-0-4',
+      'H-3-1',
+      'H-3-2',
+      'H-3-3',
+      'H-3-4',
+      'V-0-1',
+      'V-1-1',
+    ]
+    player.roomTiles = []
+    player.fenceSegments = existing.map((edge) => ({ edge, type: 'fence' }))
+
+    const result = validateFenceSelection(
+      player,
+      ['V-2-1', 'V-0-5', 'V-1-5', 'V-2-5'],
+      [],
+      0,
+      0,
+      { ordinaryFenceBuildLimit: 13 },
+    )
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error.code).toBe('MAX_FENCES_EXCEEDED')
+    }
+  })
+
+  it('rejects ordinary fences beyond available reserve tokens', () => {
+    const player = createPlayer()
+    player.resources.wood = 20
+
+    const result = validateFenceSelection(player, edgesForTile(0, 1), [], 0, 0, {
+      availableOrdinaryFenceTokens: 3,
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error.code).toBe('MAX_FENCES_EXCEEDED')
     }
   })
 
@@ -529,6 +592,78 @@ describe('validateFenceSelection — generic fence policy', () => {
     expect(result.ok).toBe(false)
     if (!result.ok) {
       expect(result.error.code).toBe('ANIMAL_CAPACITY_INSUFFICIENT')
+    }
+  })
+
+  it('rejects too many final changed pastures by pastureBounds', () => {
+    const player = createPlayer()
+    player.resources.wood = 20
+    player.roomTiles = []
+    player.fenceSegments = [
+      'H-0-1',
+      'H-0-2',
+      'H-1-1',
+      'H-1-2',
+      'V-0-1',
+      'V-0-3',
+    ].map((edge) => ({ edge, type: 'fence' }))
+    player.pastures = [
+      {
+        id: 'pasture-1',
+        size: 2,
+        tiles: [
+          { row: 0, col: 1 },
+          { row: 0, col: 2 },
+        ],
+        stables: 0,
+        animalType: null,
+        animalCount: 0,
+      },
+    ]
+
+    const result = validateFenceSelection(player, ['V-0-2'], [], 0, 0, {
+      pastureBounds: { changedPastures: { max: 1 } },
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error.code).toBe('TOO_MANY_FENCES')
+    }
+  })
+
+  it('counts changedPastures as final-pasture diff only', () => {
+    const player = createPlayer()
+    player.resources.wood = 20
+    player.roomTiles = []
+    player.fenceSegments = [
+      'H-0-1',
+      'H-0-2',
+      'H-1-1',
+      'H-1-2',
+      'V-0-1',
+      'V-0-3',
+    ].map((edge) => ({ edge, type: 'fence' }))
+    player.pastures = [
+      {
+        id: 'pasture-1',
+        size: 2,
+        tiles: [
+          { row: 0, col: 1 },
+          { row: 0, col: 2 },
+        ],
+        stables: 0,
+        animalType: null,
+        animalCount: 0,
+      },
+    ]
+
+    const result = validateFenceSelection(player, ['V-0-2'], [], 0, 0, {
+      pastureBounds: { changedPastures: { max: 2 } },
+    })
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.newPastures).toHaveLength(2)
     }
   })
 })

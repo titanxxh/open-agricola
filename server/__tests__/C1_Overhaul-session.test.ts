@@ -42,6 +42,7 @@ type SetupOptions = {
   wood?: number
   ownFenceEdges?: string[]
   ownFenceCount?: number
+  consumedFences?: number
   palisadeEdges?: string[]
   borrowedFenceEdges?: string[]
   withB30?: boolean
@@ -102,6 +103,7 @@ const setup = (opts: SetupOptions = {}) => {
     ...(opts.palisadeEdges ?? []).map((edge) => ownPalisade(player, edge)),
     ...(opts.borrowedFenceEdges ?? []).map((edge) => borrowedFence(next, edge)),
   ]
+  player.supplyTokensConsumed = opts.consumedFences ? { fence: opts.consumedFences } : {}
 
   if (opts.animals) {
     player.resources.sheep = 2
@@ -384,6 +386,36 @@ describe('C1 Overhaul session', () => {
     expect(getFenceCount(player)).toBe(16)
     expect(getPalisadeCount(player)).toBe(1)
     expect(player.resources.wood).toBe(0)
+  })
+
+  it('caps rebuild at dynamic own ordinary build limit after consumed fence supply', () => {
+    const session = setup({
+      wood: 1,
+      ownFenceCount: 13,
+      consumedFences: 1,
+    })
+    const pending = buyC1(session)
+    expectFarmSelect(pending)
+    const beforeInteraction = cloneInteraction(pending)
+    const before = snapshotAfterRaze(session.getState().state)
+
+    const tooMany = session.resolveChoice(0, 'confirm', {
+      edges: TOP_ROW_15,
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+    expect(tooMany.ok).toBe(false)
+    expect(tooMany.error).toBe('TOO_MANY_FENCES')
+    expectFarmSelect(tooMany, beforeInteraction)
+    expectSnapshotUnchanged(tooMany.state, before)
+
+    const maxOk = session.resolveChoice(0, 'confirm', {
+      edges: TOP_ROW_15.slice(0, 14),
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+    expect(maxOk.ok).toBe(true)
+    expect(getOwnOrdinaryFenceCount(maxOk.state.players[0]!)).toBe(14)
   })
 
   it('rejects B30 palisade input during C1 rebuild and keeps pending state unchanged', () => {

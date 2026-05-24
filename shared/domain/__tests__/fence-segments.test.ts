@@ -6,6 +6,7 @@ import {
   getOwnOrdinaryFenceCount,
   isOwnOrdinaryFenceSegment,
 } from '../fence-segments'
+import { getOwnOrdinaryFenceReserveCount } from '../supply-tokens'
 
 const makePlayer = (fenceSegments: FenceSegment[]): PlayerState =>
   ({
@@ -55,5 +56,16 @@ describe('fence segment helpers', () => {
 
     expect(getOwnOrdinaryFenceCount(player)).toBe(2)
     expect(getAvailableOwnOrdinaryFenceCount(player)).toBe(MAX_ORDINARY_FENCE_PIECES - 2)
+  })
+
+  it('excludes consumed and E74-held ordinary fences from reserve count', () => {
+    const player = makePlayer([
+      { edge: 'H-0-0', type: 'fence', source: { kind: 'own', ownerPlayerId: 'p1' } },
+      { edge: 'H-0-1', type: 'fence', source: { kind: 'own', ownerPlayerId: 'p1' } },
+    ])
+    player.cardStates = { E74_AshTrees: { counters: { fences: 5 } } }
+    player.supplyTokensConsumed = { fence: 1 }
+
+    expect(getOwnOrdinaryFenceReserveCount(player)).toBe(7)
   })
 })

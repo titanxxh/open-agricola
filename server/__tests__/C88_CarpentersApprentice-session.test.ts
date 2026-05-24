@@ -167,6 +167,11 @@ describe('C88 — fenceCostListener 区间公式(第 13-15 个 fence 免费)', (
   it('before 12,造 3 个(第 13/14/15)→ -3', () => {
     expect(fenceCostWood(makeFencePlayer(12), fenceEdges(3))).toBe(-3)
   })
+  it('consumed fence supply removes the 15th fence from the free interval', () => {
+    const player = makeFencePlayer(12)
+    player.supplyTokensConsumed = { fence: 1 }
+    expect(fenceCostWood(player, fenceEdges(3))).toBe(-2)
+  })
   it('before 13,造 2 个(第 14/15)→ -2', () => {
     expect(fenceCostWood(makeFencePlayer(13), fenceEdges(2))).toBe(-2)
   })
@@ -224,6 +229,11 @@ describe('C88 — fenceIsDoableListener 精确 BGA doability', () => {
   })
   it('before 15,wood 0 → 不 doable(fence 已满)', () => {
     expect(fenceDoable(makeFencePlayer(15, 0))).toBe(false)
+  })
+  it('consumed fence supply makes the dynamic 14th fence the cap', () => {
+    const player = makeFencePlayer(14, 0)
+    player.supplyTokensConsumed = { fence: 1 }
+    expect(fenceDoable(player)).toBe(false)
   })
 })
 
