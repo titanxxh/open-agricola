@@ -479,7 +479,7 @@ describe('formatCost migrated card flows', () => {
     expectNoLegacyCostFields(leaf)
   })
 
-  it('E89_Stallwright does not duplicate the Beneficiary third-occupation stable', () => {
+  it('E89_Stallwright still offers the third-occupation stable when Beneficiary bonus is skipped', () => {
     const actor = player({
       occupationPlayed: ['E89_Stallwright', 'A1_OtherOccupation', 'E97_Beneficiary'],
     })
@@ -491,6 +491,29 @@ describe('formatCost migrated card flows', () => {
       transactionEvents: [{
         type: 'card.played',
         cardId: 'E97_Beneficiary',
+        cardType: 'occupation',
+      }],
+    }))
+    const leaf = expectLeaf(result?.flow, 'stables')
+    expect(leaf.actionContext).toMatchObject({ max: 1, exactCost: { max: 1 }, trueAction: false })
+  })
+
+  it('E89_Stallwright does not duplicate when Beneficiary already played the extra occupation branch', () => {
+    const actor = player({
+      occupationPlayed: ['E89_Stallwright', 'A1_OtherOccupation', 'E97_Beneficiary', 'A114_SeasonalWorker'],
+    })
+    const gameState = state(actor)
+    const result = executeCardListener(listener('E89-stallwright-after-occupation'), context(gameState, actor, {
+      actionId: 'occupation',
+      phase: 'after',
+      space: gameState.actionSpaces.find((entry) => entry.id === 'occupation')!,
+      transactionEvents: [{
+        type: 'card.played',
+        cardId: 'E97_Beneficiary',
+        cardType: 'occupation',
+      }, {
+        type: 'card.played',
+        cardId: 'A114_SeasonalWorker',
         cardType: 'occupation',
       }],
     }))
@@ -510,6 +533,15 @@ describe('formatCost migrated card flows', () => {
     expect(occupationBranch?.type).toBe('seq')
     if (occupationBranch?.type !== 'seq') return
     expect(occupationBranch.children[0]).toMatchObject({
+      type: 'leaf',
+      actionId: 'occupation-gate',
+    })
+    expect(occupationBranch.children[1]).toMatchObject({
+      type: 'leaf',
+      actionId: 'stables',
+      optional: true,
+    })
+    expect(occupationBranch.children[2]).toMatchObject({
       type: 'leaf',
       actionId: 'occupation',
       params: { exactCost: { food: 1 } },

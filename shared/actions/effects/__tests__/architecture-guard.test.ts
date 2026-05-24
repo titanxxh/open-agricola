@@ -60,6 +60,7 @@ describe('effects architecture guard', () => {
       'improvement',
       'move-farmer-to-space',
       'occupation',
+      'occupation-gate',
       'pay',
       'place-farmer',
       'plow',

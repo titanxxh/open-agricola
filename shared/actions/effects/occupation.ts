@@ -282,6 +282,17 @@ const buildPlayableOccupationOptions = (
       labelKey: `occupations.${occupation.id}.name`,
     }))
 
+export const hasPlayableOccupationChoice = (
+  state: GameState,
+  player: PlayerState,
+  spaceId: string,
+  params?: Record<string, unknown>,
+) => {
+  const cost = getOccupationActionBaseCost(player, spaceId, params)
+  if (!cost) return false
+  return buildPlayableOccupationOptions(state, player, cost, spaceId).length > 0
+}
+
 export const canAffordOccupationActionCost = (
   state: GameState,
   player: PlayerState,
