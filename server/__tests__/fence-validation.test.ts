@@ -41,6 +41,48 @@ const edgesForTile = (row: number, col: number) => [
   `V-${row}-${col + 1}`,
 ]
 
+const twoCellPastureEdges = [
+  'H-0-1',
+  'H-0-2',
+  'H-1-1',
+  'H-1-2',
+  'V-0-1',
+  'V-0-3',
+]
+
+const threeCellPastureEdges = [
+  'H-0-1',
+  'H-0-2',
+  'H-0-3',
+  'H-1-1',
+  'H-1-2',
+  'H-1-3',
+  'V-0-1',
+  'V-0-4',
+]
+
+const twoSinglePastureEdges = [
+  'H-0-1',
+  'H-1-1',
+  'V-0-1',
+  'V-0-2',
+  'H-0-3',
+  'H-1-3',
+  'V-0-3',
+  'V-0-4',
+]
+
+const openAirPastureOptions = {
+  sourcePolicy: 'ownOnly',
+  segmentBounds: { fence: { max: 6 } },
+  costPolicy: { fence: { wood: 0 }, fixedWood: 2 },
+  pastureBounds: {
+    newPastures: { min: 1, max: 1 },
+    changedPastures: { min: 1, max: 1 },
+    newPastureSize: { min: 2, max: 2 },
+  },
+} as const
+
 describe('fence validation', () => {
   it('accepts a closed square', () => {
     const player = createPlayer()
@@ -664,6 +706,134 @@ describe('validateFenceSelection — generic fence policy', () => {
     expect(result.ok).toBe(true)
     if (result.ok) {
       expect(result.newPastures).toHaveLength(2)
+    }
+  })
+
+  it('accepts exactly one changed size-two pasture with fixedWood', () => {
+    const player = createPlayer()
+    player.resources.wood = 2
+    player.roomTiles = [
+      { row: 2, col: 0 },
+      { row: 2, col: 1 },
+    ]
+
+    const result = validateFenceSelection(
+      player,
+      twoCellPastureEdges,
+      [],
+      0,
+      0,
+      openAirPastureOptions,
+    )
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.payableWoodCost).toBe(2)
+      expect(result.player.resources.wood).toBe(0)
+      expect(result.newPastures).toHaveLength(1)
+      expect(result.newPastures[0]?.size).toBe(2)
+    }
+  })
+
+  it('rejects a size-one pasture with open air pasture bounds', () => {
+    const player = createPlayer()
+    player.resources.wood = 2
+    player.roomTiles = [
+      { row: 2, col: 0 },
+      { row: 2, col: 1 },
+    ]
+
+    const result = validateFenceSelection(
+      player,
+      edgesForTile(0, 1),
+      [],
+      0,
+      0,
+      openAirPastureOptions,
+    )
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error.code).toBe('TOO_FEW_FENCES')
+    }
+  })
+
+  it('rejects a size-three pasture with open air pasture bounds', () => {
+    const player = createPlayer()
+    player.resources.wood = 2
+    player.roomTiles = [
+      { row: 2, col: 0 },
+      { row: 2, col: 1 },
+    ]
+
+    const result = validateFenceSelection(player, threeCellPastureEdges, [], 0, 0, {
+      ...openAirPastureOptions,
+      segmentBounds: undefined,
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error.code).toBe('TOO_MANY_FENCES')
+    }
+  })
+
+  it('rejects multiple new pastures with open air pasture bounds', () => {
+    const player = createPlayer()
+    player.resources.wood = 2
+    player.roomTiles = [
+      { row: 2, col: 0 },
+      { row: 2, col: 1 },
+    ]
+
+    const result = validateFenceSelection(player, twoSinglePastureEdges, [], 0, 0, {
+      ...openAirPastureOptions,
+      segmentBounds: undefined,
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error.code).toBe('TOO_MANY_FENCES')
+    }
+  })
+
+  it('rejects creating one pasture while changing an existing pasture', () => {
+    const player = createPlayer()
+    player.resources.wood = 2
+    player.roomTiles = [
+      { row: 2, col: 0 },
+      { row: 2, col: 1 },
+    ]
+    player.fenceSegments = twoCellPastureEdges.map((edge) => ({
+      edge,
+      type: 'fence',
+      source: { kind: 'own', ownerPlayerId: player.id },
+    }))
+    player.pastures = [
+      {
+        id: 'pasture-1',
+        size: 2,
+        tiles: [
+          { row: 0, col: 1 },
+          { row: 0, col: 2 },
+        ],
+        stables: 0,
+        animalType: null,
+        animalCount: 0,
+      },
+    ]
+
+    const result = validateFenceSelection(
+      player,
+      ['V-0-2', 'H-2-1', 'H-2-2', 'V-1-1', 'V-1-3'],
+      [],
+      0,
+      0,
+      openAirPastureOptions,
+    )
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error.code).toBe('TOO_MANY_FENCES')
     }
   })
 })
