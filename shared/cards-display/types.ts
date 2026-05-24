@@ -3,7 +3,7 @@
 // Production lookup is wired by `shared/cards/registry-runtime.ts` via
 // __setMinorLookup / __setOccupationLookup.
 
-import type { Resource, CostModifier, ComplexCost } from '../contract/types'
+import type { Resource, PaymentResourceMap, CostModifier, ComplexCost } from '../contract/types'
 import type {
   CardType,
   CardExchange,
@@ -45,8 +45,8 @@ export class CardBase {
   number!: number
   category?: string
   desc!: string[]
-  cost?: Partial<Resource> | ComplexCost
-  altCosts?: Partial<Resource>[]
+  cost?: PaymentResourceMap | ComplexCost
+  altCosts?: PaymentResourceMap[]
   vp?: number
   prerequisite?: string
   maxRound?: number

@@ -16,10 +16,10 @@ import type {
   PaymentSolution,
   PlayerState,
   Resource,
-  ResourceKey,
   TradeSideEffect,
 } from '../../../contract/types'
 import { recordPaymentStats } from '../../../cards/helpers/payment-stats'
+import { payResources, paySupplyTokens } from './affordability'
 
 const buildBonusReductions = (
   player: PlayerState,
@@ -99,11 +99,8 @@ export const executePaymentSolution = (
   solution: PaymentSolution,
   options: { trackStats?: boolean; costType?: CostModifierType; state?: GameState } = {},
 ): string | undefined => {
-  const paidKeys = Object.keys(solution.resourcesPaid) as ResourceKey[]
-  for (const key of paidKeys) {
-    const amount = solution.resourcesPaid[key] ?? 0
-    player.resources[key] -= amount
-  }
+  payResources(player, solution.resourcesPaid)
+  paySupplyTokens(player, solution.resourcesPaid)
   if (options.state) {
     for (const { trade, times } of solution.tradesUsed) {
       if (trade.sideEffect && times > 0) {

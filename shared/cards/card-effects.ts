@@ -1,4 +1,4 @@
-import type { ActionFlow, FarmTilePosition, GameState, PlayerState, Resource } from '../contract/types'
+import type { ActionFlow, FarmTilePosition, GameState, PaymentResourceMap, PlayerState, Resource } from '../contract/types'
 import type { PrivateGameEvent } from '../contract/private-events'
 import type { AnimalZone, PlayerScoreSummary, ScoreCategoryResult } from '../domain'
 import { getCurrentSessionContext } from './session-card-context'
@@ -29,7 +29,7 @@ export type Meeple = {
 }
 
 export type PaymentInfo = {
-  resourcesPaid: Partial<Resource>
+  resourcesPaid: PaymentResourceMap
   feeIndex?: number
   returnedCardId?: string
 }

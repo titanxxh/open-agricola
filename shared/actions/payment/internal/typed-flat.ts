@@ -15,9 +15,9 @@ import type {
   ComplexCost,
   CostModifierType,
   GameState,
+  PaymentResourceMap,
   PaymentSolution,
   PlayerState,
-  Resource,
 } from '../../../contract/types'
 import { isComplexCost } from './affordability'
 import { computeAllBuyableCombinations } from './enumerate'
@@ -33,7 +33,7 @@ type TypedFlatPaymentSelection =
 
 export const resolveTypedFlatPaymentSelection = (
   player: PlayerState,
-  baseCost: Partial<Resource> | ComplexCost,
+  baseCost: PaymentResourceMap | ComplexCost,
   optionValuePrefix: string,
   paymentChoice: string | undefined,
   failure: ActionExecutionResult,
@@ -41,7 +41,7 @@ export const resolveTypedFlatPaymentSelection = (
 ): TypedFlatPaymentSelection => {
   const complex: ComplexCost = isComplexCost(baseCost)
     ? baseCost
-    : { fee: baseCost as Partial<Resource> }
+    : { fee: baseCost }
   return resolveCostPaymentSelection(
     player,
     complex,
@@ -65,25 +65,26 @@ export const executeResolvedTypedFlatPayment = (
 
 export const canAffordTypedFlatCost = (
   player: PlayerState,
-  cost: Partial<Resource> | ComplexCost,
-  costType?: CostModifierType,
-): boolean => {
-  const complex: ComplexCost = isComplexCost(cost)
-    ? cost
-    : { fee: cost as Partial<Resource> }
-  return computeAllBuyableCombinations(player, complex, undefined, costType).length > 0
-}
-
-export const payTypedFlatCost = (
-  player: PlayerState,
-  cost: Partial<Resource> | ComplexCost,
+  cost: PaymentResourceMap | ComplexCost,
   costType?: CostModifierType,
   state?: GameState,
 ): boolean => {
   const complex: ComplexCost = isComplexCost(cost)
     ? cost
-    : { fee: cost as Partial<Resource> }
-  const solutions = computeAllBuyableCombinations(player, complex, undefined, costType)
+    : { fee: cost }
+  return computeAllBuyableCombinations(player, complex, undefined, costType, state).length > 0
+}
+
+export const payTypedFlatCost = (
+  player: PlayerState,
+  cost: PaymentResourceMap | ComplexCost,
+  costType?: CostModifierType,
+  state?: GameState,
+): boolean => {
+  const complex: ComplexCost = isComplexCost(cost)
+    ? cost
+    : { fee: cost }
+  const solutions = computeAllBuyableCombinations(player, complex, undefined, costType, state)
   if (solutions.length === 0) return false
   executePaymentSolution(player, solutions[0]!, { costType, state })
   return true
@@ -91,13 +92,13 @@ export const payTypedFlatCost = (
 
 export const payTypedFlatCostDetailed = (
   player: PlayerState,
-  cost: Partial<Resource> | ComplexCost,
+  cost: PaymentResourceMap | ComplexCost,
   costType?: CostModifierType,
   state?: GameState,
 ):
   | {
       ok: true
-      resourcesPaid: Partial<Resource>
+      resourcesPaid: PaymentResourceMap
       bonusUsed?: string
       bonusChoiceIndex?: Record<string, number>
       cardUsed?: string
@@ -106,8 +107,8 @@ export const payTypedFlatCostDetailed = (
   | { ok: false } => {
   const complex: ComplexCost = isComplexCost(cost)
     ? cost
-    : { fee: cost as Partial<Resource> }
-  const solutions = computeAllBuyableCombinations(player, complex, undefined, costType)
+    : { fee: cost }
+  const solutions = computeAllBuyableCombinations(player, complex, undefined, costType, state)
   if (solutions.length === 0) return { ok: false }
   const solution = solutions[0]!
   executePaymentSolution(player, solution, { costType, state })
