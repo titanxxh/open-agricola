@@ -1,5 +1,5 @@
 import { writeCardExtraData, readCardExtraData, writeCardInfobox, setCardFlag, isCardFlagged } from '../helpers/card-state'
-import { getFenceCount, maxFences } from '../../actions/effects/fencing'
+import { getOwnOrdinaryFenceReserveCount } from '../../domain/supply-tokens'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { A22_Telegram } from '../../cards-display/A/A22_Telegram'
@@ -10,7 +10,7 @@ export const A22_Telegram_impl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
-    const fencesInSupply = getFenceCount(player)
+    const fencesInSupply = getOwnOrdinaryFenceReserveCount(player)
     const targetRound = state.round + fencesInSupply
     if (targetRound <= 14) {
       writeCardExtraData(player, CARD_ID, 'triggerRound', targetRound)
@@ -41,6 +41,6 @@ export const A22_Telegram_impl = {
     }
   },
 },
-  prerequisiteCheck: (player) => maxFences - getFenceCount(player) >= 1,
+  prerequisiteCheck: (player) => getOwnOrdinaryFenceReserveCount(player) >= 1,
   reaches: [] as readonly string[],
 } satisfies CardImpl

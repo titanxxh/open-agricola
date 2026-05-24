@@ -24,4 +24,22 @@ describe('A22_Telegram prerequisite', () => {
     player.fenceSegments = []
     expect(meetsCardPrerequisites(player, A22_Telegram, state.round, state)).toBe(true)
   })
+
+  it('blocks when all unbuilt ordinary fences are held on E74', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.fenceSegments = []
+    player.cardStates = { E74_AshTrees: { counters: { fences: maxFences } } }
+    expect(meetsCardPrerequisites(player, A22_Telegram, state.round, state)).toBe(false)
+  })
+
+  it('blocks when supply fence tokens have all been consumed', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.fenceSegments = []
+    player.supplyTokensConsumed = { fence: maxFences }
+    expect(meetsCardPrerequisites(player, A22_Telegram, state.round, state)).toBe(false)
+  })
 })

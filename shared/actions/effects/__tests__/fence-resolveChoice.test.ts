@@ -19,6 +19,23 @@ const edgesForTile = (row: number, col: number) => [
   `V-${row}-${col + 1}`,
 ]
 
+const widePastureEdges = [
+  'H-0-1',
+  'H-0-2',
+  'H-0-3',
+  'H-0-4',
+  'H-3-1',
+  'H-3-2',
+  'H-3-3',
+  'H-3-4',
+  'V-0-1',
+  'V-1-1',
+  'V-2-1',
+  'V-0-5',
+  'V-1-5',
+  'V-2-5',
+]
+
 const makeCtx = (
   opts: {
     player?: Partial<PlayerState>
@@ -331,6 +348,86 @@ describe('fenceAction.resolveChoice', () => {
     expect(result.type).toBe('ok')
     expect(ctx.player.fenceSegments).toHaveLength(4)
     expect(ctx.player.resources.wood).toBe(0)
+  })
+
+  it('rejects ordinary fences beyond dynamic reserve and build cap', () => {
+    const existing = widePastureEdges.slice(0, 10)
+    const build = widePastureEdges.slice(10)
+    const ctx = makeCtx({
+      player: {
+        resources: {
+          wood: 4,
+          clay: 0,
+          stone: 0,
+          reed: 0,
+          grain: 0,
+          vegetable: 0,
+          food: 0,
+          sheep: 0,
+          boar: 0,
+          cattle: 0,
+        },
+        roomTiles: [],
+        fenceSegments: existing.map((edge) => ({
+          edge,
+          type: 'fence',
+          source: { kind: 'own', ownerPlayerId: 'p1' },
+        })),
+        supplyTokensConsumed: { fence: 2 },
+      },
+    })
+
+    const result = fenceAction.resolveChoice!(ctx, 'confirm', {
+      edges: build,
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+
+    expect(result.type).toBe('fail')
+    if (result.type !== 'fail') return
+    expect(result.errorKey).toBe('MAX_FENCES_EXCEEDED')
+  })
+
+  it('uses selected E74 free fences when reserve is zero but build cap remains', () => {
+    const existing = [...widePastureEdges.slice(0, 10), 'H-1-2']
+    const build = widePastureEdges.slice(10)
+    const ctx = makeCtx({
+      player: {
+        resources: {
+          wood: 0,
+          clay: 0,
+          stone: 0,
+          reed: 0,
+          grain: 0,
+          vegetable: 0,
+          food: 0,
+          sheep: 0,
+          boar: 0,
+          cattle: 0,
+        },
+        roomTiles: [],
+        fenceSegments: existing.map((edge) => ({
+          edge,
+          type: 'fence',
+          source: { kind: 'own', ownerPlayerId: 'p1' },
+        })),
+        cardStates: { E74_AshTrees: { counters: { fences: 4 } } },
+      },
+    })
+    storePendingFenceBonus(ctx.player, {
+      sourceCard: 'E74_AshTrees',
+      counterKey: 'fences',
+      freeFences: 4,
+    })
+
+    const result = fenceAction.resolveChoice!(ctx, 'confirm', {
+      edges: build,
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+
+    expect(result.type).toBe('ok')
+    expect(ctx.player.fenceSegments).toHaveLength(15)
   })
 
   it('first call with invalid edges returns fail', () => {

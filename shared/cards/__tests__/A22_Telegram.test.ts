@@ -34,20 +34,21 @@ const createState = (...players: PlayerState[]): GameState =>
   }) as unknown as GameState
 
 describe('A22_Telegram', () => {
-  it('computes target round from fence count, excluding palisades', () => {
+  it('computes target round from fence reserve, excluding palisades and E74-held fences', () => {
     const player = createPlayer()
     setFencesForTest(player, 4)
     setPalisadesForTest(player, 3)
+    player.cardStates = { E74_AshTrees: { counters: { fences: 5 } } }
+    player.supplyTokensConsumed = { fence: 1 }
     const state = createState(player)
     const effect = getCardEffect(CARD_ID)!
 
     effect.onBuy!(state, player)
 
-    // round 3 + 4 fences = 7 (palisades ignored)
-    expect(player.cardStates?.[CARD_ID]?.extraData?.triggerRound).toBe(7)
+    expect(player.cardStates?.[CARD_ID]?.extraData?.triggerRound).toBe(8)
   })
 
-  it('does not mark a target round when only palisades exist', () => {
+  it('does not mark a target round when the reserve target would exceed round 14', () => {
     const player = createPlayer()
     setPalisadesForTest(player, 5)
     const state = createState(player)
@@ -55,8 +56,7 @@ describe('A22_Telegram', () => {
 
     effect.onBuy!(state, player)
 
-    // 3 + 0 = 3 (current round). Still <= 14, so triggerRound = 3.
-    expect(player.cardStates?.[CARD_ID]?.extraData?.triggerRound).toBe(3)
+    expect(player.cardStates?.[CARD_ID]?.extraData?.triggerRound).toBeUndefined()
   })
 })
 
