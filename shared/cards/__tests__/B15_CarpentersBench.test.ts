@@ -88,12 +88,25 @@ describe('B15_CarpentersBench', () => {
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
     expect(flow.type).toBe('seq')
     expect(flow.optional).toBe(true)
-    const fenceLeaf = flow.children[0] as Extract<ActionFlow, { type: 'leaf' }>
+    const reserveLeaf = flow.children[0] as Extract<ActionFlow, { type: 'leaf' }>
+    expect(reserveLeaf).toMatchObject({
+      actionId: 'reserve-fence-bonus',
+      sourceCard: CARD_ID,
+      params: { freeFences: 1, counterKey: 'benchFreeFences' },
+    })
+    const fenceLeaf = flow.children[1] as Extract<ActionFlow, { type: 'leaf' }>
     expect(fenceLeaf.actionId).toBe('fence')
     expect(fenceLeaf.sourceCard).toBe(CARD_ID)
-    // BGA L58-59: max = n+1, benchWood = n
-    expect(fenceLeaf.actionContext?.max).toBe(4)
-    expect(fenceLeaf.actionContext?.benchWood).toBe(3)
+    expect(fenceLeaf.actionContext).toMatchObject({
+      trueAction: false,
+      fencePolicy: {
+        allowedSegmentTypes: ['fence'],
+        segmentBounds: { total: { min: 1, max: 4 } },
+        newPastureBounds: { count: { min: 1, max: 1 } },
+        costPolicy: { fence: { wood: 1 } },
+        cancelPolicy: 'forbidCancel',
+      },
+    })
   })
 
   it('uses actually-collected wood, not gainPerRound', () => {
@@ -116,9 +129,12 @@ describe('B15_CarpentersBench', () => {
     })
     expect(result).toBeDefined()
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
-    const fenceLeaf = flow.children[0] as Extract<ActionFlow, { type: 'leaf' }>
-    expect(fenceLeaf.actionContext?.max).toBe(2)
-    expect(fenceLeaf.actionContext?.benchWood).toBe(1)
+    const fenceLeaf = flow.children[1] as Extract<ActionFlow, { type: 'leaf' }>
+    expect(fenceLeaf.actionContext).toMatchObject({
+      fencePolicy: {
+        segmentBounds: { total: { min: 1, max: 2 } },
+      },
+    })
   })
 
   it('does not trigger when no wood was actually collected', () => {

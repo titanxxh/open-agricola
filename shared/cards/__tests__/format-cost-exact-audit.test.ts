@@ -7,6 +7,7 @@ type FindingType =
   | 'actionContextCosts'
   | 'negativeHugeDiscount'
   | 'freeCost'
+  | 'paramsCost'
   | 'legacyRenovationAction'
   | 'legacyFencingAction'
   | 'legacyFencingListener'
@@ -110,6 +111,9 @@ const scanCardAuthoredCostHacks = () => {
     }
     if (/\bfreeCost\b/.test(text)) {
       findings.push({ file, type: 'freeCost' })
+    }
+    if (/params\s*:\s*\{[^}]*\bcost\s*:/.test(text)) {
+      findings.push({ file, type: 'paramsCost' })
     }
     if (/actionId\s*:\s*['"]renovation['"]/.test(text)) {
       findings.push({ file, type: 'legacyRenovationAction' })

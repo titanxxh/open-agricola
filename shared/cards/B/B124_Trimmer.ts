@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag, writeCardExtraData, readCardExtraData } from '../helpers/card-state'
+import { hasFenceBuiltEvent } from '../helpers/fence-events'
 import type { CardImpl } from '../registry'
 import { B124_Trimmer } from '../../cards-display/B/B124_Trimmer'
 
@@ -49,6 +50,7 @@ const afterFencingListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!hasFenceBuiltEvent(context)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     const currentArea = countPastureTiles(context.player)
     const storedArea = getStoredArea(context.player)

@@ -59,8 +59,13 @@ describe('B15_CarpentersBench session', () => {
       actionId: 'fence',
       actionContext: {
         trueAction: false,
-        max: 4,
-        benchWood: 3,
+        fencePolicy: {
+          allowedSegmentTypes: ['fence'],
+          segmentBounds: { total: { min: 1, max: 4 } },
+          newPastureBounds: { count: { min: 1, max: 1 } },
+          costPolicy: { fence: { wood: 1 } },
+          cancelPolicy: 'forbidCancel',
+        },
       },
     })
   })
