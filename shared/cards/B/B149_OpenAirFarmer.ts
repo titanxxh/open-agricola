@@ -20,7 +20,7 @@ export const B149_OpenAirFarmer_impl = {
             trueAction: false,
             fencePolicy: {
               sourcePolicy: 'ownOnly',
-              segmentBounds: { fence: { max: 6 } },
+              segmentBounds: { total: { max: 6 } },
               costPolicy: { fence: { wood: 0 }, fixedWood: 2 },
               cancelPolicy: 'forbidCancel',
               pastureBounds: {
