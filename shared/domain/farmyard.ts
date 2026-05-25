@@ -887,58 +887,6 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
       },
     }
   }
-  const palisadeBounds = options.segmentBounds?.palisade
-  if (palisadeBounds?.min !== undefined && newPalisadeEdges.length < palisadeBounds.min) {
-    return {
-      ok: false,
-      error: {
-        code: 'TOO_FEW_FENCES',
-        edges,
-        palisadeEdges,
-        newFenceEdges,
-        newPalisadeEdges,
-      },
-    }
-  }
-  if (palisadeBounds?.max !== undefined && newPalisadeEdges.length > palisadeBounds.max) {
-    return {
-      ok: false,
-      error: {
-        code: 'TOO_MANY_FENCES',
-        edges,
-        palisadeEdges,
-        newFenceEdges,
-        newPalisadeEdges,
-      },
-    }
-  }
-  const totalBounds = options.segmentBounds?.total
-  const totalNewSegments = newFenceEdges.length + newPalisadeEdges.length
-  if (totalBounds?.min !== undefined && totalNewSegments < totalBounds.min) {
-    return {
-      ok: false,
-      error: {
-        code: 'TOO_FEW_FENCES',
-        edges,
-        palisadeEdges,
-        newFenceEdges,
-        newPalisadeEdges,
-      },
-    }
-  }
-  if (totalBounds?.max !== undefined && totalNewSegments > totalBounds.max) {
-    return {
-      ok: false,
-      error: {
-        code: 'TOO_MANY_FENCES',
-        edges,
-        palisadeEdges,
-        newFenceEdges,
-        newPalisadeEdges,
-      },
-    }
-  }
-
   if (newFenceEdges.length === 0 && newPalisadeEdges.length === 0) {
     return {
       ok: false,

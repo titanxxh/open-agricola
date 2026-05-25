@@ -46,19 +46,19 @@ describe('E88_MasterFencer', () => {
 
     expect(fencingLeaves).toEqual([
       expect.objectContaining({
-        actionId: 'fencing',
+        actionId: 'fence',
         actionContext: expect.objectContaining({
           fencePolicy: expect.objectContaining({
-            segmentBounds: { total: { max: 3 } },
+            segmentBounds: { total: { min: 1, max: 3 } },
             costPolicy: { fence: { wood: 0 } },
           }),
         }),
       }),
       expect.objectContaining({
-        actionId: 'fencing',
+        actionId: 'fence',
         actionContext: expect.objectContaining({
           fencePolicy: expect.objectContaining({
-            segmentBounds: { total: { max: 4 } },
+            segmentBounds: { total: { min: 1, max: 4 } },
             costPolicy: { fence: { wood: 0 } },
           }),
         }),

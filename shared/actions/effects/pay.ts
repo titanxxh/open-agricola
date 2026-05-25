@@ -464,6 +464,7 @@ export const payAction: ActionDefinition = {
         { type: 'fail', errorKey: 'log.payFail' },
         {
           costType: p.costType,
+          state,
           includeReturnedCard: p.includeReturnedCard,
           playedCards: p.playedCards,
           reserveResources: p.reserveResources,
@@ -482,6 +483,9 @@ export const payAction: ActionDefinition = {
         eventSink,
         p.sourceActionId,
       )
+    }
+    if (!PaymentSolver.isComplexCost(p.cost)) {
+      return { type: 'fail', errorKey: 'log.payFail' }
     }
     // If the value isn't one of the payment-prefix options the player saw,
     // assume it's a stale/improvement-level choice that landed here because
