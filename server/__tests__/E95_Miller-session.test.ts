@@ -4,7 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/E/E95_Miller'
 import type { ActionChoiceOption } from '../../shared/contract/types'
-import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 describe('E95_Miller session', () => {
   /**

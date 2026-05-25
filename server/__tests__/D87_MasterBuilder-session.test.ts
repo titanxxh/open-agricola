@@ -46,7 +46,7 @@ describe('D87_MasterBuilder session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('farm-select')
 
-    const built = session.resolveChoice(0, 'confirm', {
+    const built = session.commitSelectionChoice(0, {
       rooms: [{ row: 1, col: 0 }],
     })
     expect(built.ok).toBe(true)
@@ -72,7 +72,7 @@ describe('D87_MasterBuilder session', () => {
 
     const resp1 = session.takeAnytimeAction(0, 'D87-master-builder-anytime')
     expect(resp1.ok).toBe(true)
-    const built = session.resolveChoice(0, 'confirm', {
+    const built = session.commitSelectionChoice(0, {
       rooms: [{ row: 1, col: 0 }],
     })
     expect(built.ok).toBe(true)

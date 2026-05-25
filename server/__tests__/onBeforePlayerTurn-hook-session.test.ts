@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getActiveCardRegistry } from '../../shared/cards/active-registry'
 import type { CardEffect } from '../../shared/cards/card-effects'
-import { confirmNextPlayer } from './_helpers/legacy-confirms'
+import { confirmNextPlayer } from './_helpers/pending-confirms'
 
 const TEST_CARD = '__TEST_skipTurn__'
 

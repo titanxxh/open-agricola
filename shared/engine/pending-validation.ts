@@ -12,7 +12,7 @@ export const pendingEnvelopeChoices = (
   return []
 }
 
-const isLegacyStructuredChoiceValue = (
+const isStructuredChoiceValue = (
   envelope: PendingEnvelope,
   value: string,
 ): boolean => {
@@ -27,5 +27,5 @@ export const isPendingChoiceValueAllowed = (
   const choices = pendingEnvelopeChoices(envelope)
   if (choices.length === 0) return true
   return choices.some((option) => option.value === value && option.disabled !== true)
-    || isLegacyStructuredChoiceValue(envelope, value)
+    || isStructuredChoiceValue(envelope, value)
 }

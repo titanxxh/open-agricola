@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { confirmNextPlayer } from './_helpers/legacy-confirms'
+import { confirmNextPlayer } from './_helpers/pending-confirms'
 
 describe('undo history on player switch', () => {
   let session: GameSession

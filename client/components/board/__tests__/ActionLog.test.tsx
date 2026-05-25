@@ -68,8 +68,8 @@ const buckets: ActionLogTimelineBucket[] = [
         strikethrough: true,
       },
       {
-        kind: 'legacyLog',
-        key: 'legacy-1',
+        kind: 'stateLog',
+        key: 'state-log-1',
         logEntry: { key: 'log.startGame' },
         label: '',
         round: 2,
@@ -132,13 +132,13 @@ describe('ActionLog', () => {
     expect(screen.getByText(/游戏开始/)).toBeInTheDocument()
   })
 
-  it('uses strikethrough for canceled rows and keeps legacy rows non-replayable', () => {
+  it('uses strikethrough for canceled rows and keeps state log rows non-replayable', () => {
     render(<ActionLog locale="zh" currentRound={2} log={[]} timelineBuckets={buckets} />)
 
     expect(screen.getByTestId('action-log-row-event-canceled')).toHaveClass(
       'action-log__entry--canceled',
     )
-    expect(screen.getByTestId('action-log-row-legacy-1')).toHaveAttribute(
+    expect(screen.getByTestId('action-log-row-state-log-1')).toHaveAttribute(
       'aria-disabled',
       'true',
     )
@@ -157,7 +157,7 @@ describe('ActionLog', () => {
     )
 
     fireEvent.click(screen.getByTestId('action-log-row-event-active'))
-    fireEvent.click(screen.getByTestId('action-log-row-legacy-1'))
+    fireEvent.click(screen.getByTestId('action-log-row-state-log-1'))
 
     expect(onSelectReplayEntry).toHaveBeenCalledTimes(1)
     expect(onSelectReplayEntry.mock.calls[0]?.[0].key).toBe('event-active')

@@ -229,7 +229,7 @@ describe('B149 Open Air Farmer session', () => {
     const session = setup({ wood: 2 })
     playB149ToFencing(session)
 
-    const resp = session.resolveChoice(0, 'confirm', {
+    const resp = session.commitSelectionChoice(0, {
       edges: TWO_CELL,
       palisadeEdges: [],
       extraWood: 0,
@@ -255,7 +255,7 @@ describe('B149 Open Air Farmer session', () => {
     const beforeInteraction = clone(pending.interaction)
     const before = snapshotPending(session.getState().state)
 
-    const invalid = session.resolveChoice(0, 'confirm', {
+    const invalid = session.commitSelectionChoice(0, {
       edges: ONE_CELL,
       palisadeEdges: [],
       extraWood: 0,
@@ -265,7 +265,7 @@ describe('B149 Open Air Farmer session', () => {
     expectFarmSelect(invalid, beforeInteraction)
     expectPendingSnapshot(invalid.state, before)
 
-    const valid = session.resolveChoice(0, 'confirm', {
+    const valid = session.commitSelectionChoice(0, {
       edges: TWO_CELL,
       palisadeEdges: [],
       extraWood: 0,
@@ -282,7 +282,7 @@ describe('B149 Open Air Farmer session', () => {
     const beforeInteraction = clone(pending.interaction)
     const before = snapshotPending(session.getState().state)
 
-    const resp = session.resolveChoice(0, 'confirm', {
+    const resp = session.commitSelectionChoice(0, {
       edges: TWO_CELL,
       palisadeEdges: ['H-0-0'],
       extraWood: 0,
@@ -302,7 +302,7 @@ describe('B149 Open Air Farmer session', () => {
 
     playB149ToFencing(session)
 
-    const resp = session.resolveChoice(0, 'confirm', {
+    const resp = session.commitSelectionChoice(0, {
       edges: LEFT_EDGE_TWO_CELL_FENCES,
       palisadeEdges: LEFT_EDGE_TWO_CELL_PALISADES,
       extraWood: 0,
@@ -344,7 +344,7 @@ describe('B149 Open Air Farmer session', () => {
     const beforeInteraction = clone(pending.interaction)
     const before = snapshotPending(session.getState().state)
 
-    const cancel = session.resolveChoice(0, 'cancel')
+    const cancel = session.commitSelectionChoice(0, { cancel: true })
 
     expect(cancel.ok).toBe(false)
     expect(cancel.error).toBe('log.fencingFail')
@@ -362,7 +362,7 @@ describe('B149 Open Air Farmer session', () => {
     const beforeInteraction = clone(pending.interaction)
     const before = snapshotPending(session.getState().state)
 
-    const resp = session.resolveChoice(0, 'confirm', {
+    const resp = session.commitSelectionChoice(0, {
       edges,
       palisadeEdges: [],
       extraWood: 0,
@@ -379,7 +379,7 @@ describe('B149 Open Air Farmer session', () => {
     const beforeInteraction = clone(pending.interaction)
     const before = snapshotPending(session.getState().state)
 
-    const resp = session.resolveChoice(0, 'confirm', {
+    const resp = session.commitSelectionChoice(0, {
       edges: MODIFY_EXISTING_AND_CREATE_TWO,
       palisadeEdges: [],
       extraWood: 0,
@@ -393,7 +393,7 @@ describe('B149 Open Air Farmer session', () => {
   it('after B149 only one normal stable remains buildable', () => {
     const session = setup({ wood: 4 })
     playB149ToFencing(session)
-    const resp = session.resolveChoice(0, 'confirm', {
+    const resp = session.commitSelectionChoice(0, {
       edges: TWO_CELL,
       palisadeEdges: [],
       extraWood: 0,

@@ -160,7 +160,10 @@ describe('D131_CraftsmanshipPromoter session integration', () => {
     let resp = enterMinorChoice(session)
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
-    resp = session.resolveChoice(0, 'major:Major_Pottery')
+    if (resp.interaction.stateId !== 'wait') return
+    const potteryOption = resp.interaction.options?.find((option) => option.value === 'major:Major_Pottery')
+    expect(potteryOption).toBeDefined()
+    resp = session.resolveChoice(0, potteryOption!.value)
 
     // Drill through any payment / sub-choices until Pottery moves into
     // player.improvements (or we fall off a guard).

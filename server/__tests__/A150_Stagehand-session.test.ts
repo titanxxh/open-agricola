@@ -4,7 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A150_Stagehand'
 import type { ActionChoiceOption } from '../../shared/contract/types'
-import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 describe('A150_Stagehand session', () => {
   const setup = () => {
@@ -92,7 +92,7 @@ describe('A150_Stagehand session', () => {
     expect(resp.interaction.farm.maxSelections).toBeGreaterThan(1)
 
     // Build a room
-    resp = session.resolveChoice(0, 'confirm', { rooms: [{ row: 0, col: 0 }] })
+    resp = session.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }] })
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.rooms).toBe(3)
 

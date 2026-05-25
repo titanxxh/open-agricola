@@ -64,12 +64,23 @@ const makeSession = (opts: { food?: number; gameSeed?: number } = {}) => {
  *  the pending choice {play, pass} in the target implementation.
  */
 const playB3 = (session: GameSession) => {
-  const mpResp = session.takeAction(0, 'meeting-place')
-  expect(mpResp.ok).toBe(true)
+  let resp = session.takeAction(0, 'meeting-place')
+  expect(resp.ok).toBe(true)
   // meeting-place offers a choice of available minor improvements
-  expect(mpResp.interaction.stateId).toBe('wait')
+  expect(resp.interaction.stateId).toBe('wait')
+  if (resp.interaction.stateId !== 'wait') return resp
+  const improvementOption = resp.interaction.options?.find((option) => option.value.startsWith('action-improvement-'))
+  if (improvementOption) {
+    resp = session.resolveChoice(0, improvementOption.value)
+    expect(resp.ok).toBe(true)
+  }
+  if (resp.interaction.sourceCard === CARD_ID) return resp
+  expect(resp.interaction.stateId).toBe('wait')
+  if (resp.interaction.stateId !== 'wait') return resp
+  const cardOption = resp.interaction.options?.find((option) => option.value === `minor:${CARD_ID}`)
+  expect(cardOption).toBeDefined()
   // Choose to play B3_Moonshine
-  return session.resolveChoice(0, `minor:${CARD_ID}`)
+  return session.resolveChoice(0, cardOption!.value)
 }
 
 // ---------------------------------------------------------------------------
@@ -304,11 +315,7 @@ describe('B3_Moonshine session', () => {
 
     session.loadState(state)
 
-    const mpResp = session.takeAction(0, 'meeting-place')
-    expect(mpResp.ok).toBe(true)
-    expect(mpResp.interaction.stateId).toBe('wait')
-
-    const b3Resp = session.resolveChoice(0, `minor:${CARD_ID}`)
+    const b3Resp = playB3(session)
     // TARGET: must emit {play, pass} choice
     expect(b3Resp.interaction.stateId).toBe('wait')
     if (b3Resp.interaction.stateId !== 'wait') return

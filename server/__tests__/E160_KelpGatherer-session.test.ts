@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import '../../shared/cards/E/E160_KelpGatherer'
 
 describe('E160_KelpGatherer session', () => {

@@ -11,7 +11,7 @@ import type {
 
 import '../../shared/cards/D/D137_TradeTeacher'
 import type { SessionResponse } from '../../shared/session/session-core'
-import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 
 const CARD_ID = 'D137_TradeTeacher'

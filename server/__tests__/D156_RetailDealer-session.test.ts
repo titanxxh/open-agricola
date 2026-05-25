@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import { setWorkersAtHome } from '../../shared/domain/player'
-import { confirmNextPlayer } from './_helpers/legacy-confirms'
+import { confirmNextPlayer } from './_helpers/pending-confirms'
 
 import '../../shared/cards/D/D156_RetailDealer'
 
@@ -99,7 +99,7 @@ describe('D156_RetailDealer session', () => {
     resp = confirmNextPlayer(session)
     resp = session.takeAction(1, 'farmland')
     const tile = resp.interaction?.farm?.selectableTiles?.[0]
-    if (tile) resp = session.resolveChoice(1, 'confirm', { tile })
+    if (tile) resp = session.commitSelectionChoice(1, { tile })
     resp = confirmNextPlayer(session)
 
     // Reset resource-market-4 again

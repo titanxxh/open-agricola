@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 
 import '../../shared/cards/D/D134_OysterEater'
 import type { SessionResponse } from '../../shared/session/session-core'
-import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 describe('D134_OysterEater session', () => {
   const setup = (currentPlayerIndex: number) => {

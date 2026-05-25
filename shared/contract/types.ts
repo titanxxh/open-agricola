@@ -776,7 +776,6 @@ export type InteractionRequest =
 export type InteractionCommand =
   | 'takeAction'
   | 'resolveChoice'
-  | 'commitFarm'
   | 'commitSelection'
   | 'takeAnytimeAction'
   | 'undoStep'
@@ -865,8 +864,8 @@ export type InteractionState =
       sourceCard?: string
       request: InteractionRequest
       // Transitional kind-specific accessor fields (Task 4 → cleaned up in Task 13).
-      // Frontend / tests can read these directly while we migrate callers off
-      // the legacy stateId switches.
+      // Frontend / tests can read these directly while typed request handlers
+      // replace stateId-specific branching.
       options?: ActionChoiceOption[]
       costOverride?: Partial<Resource>
       farm?: InteractionFarmSelection

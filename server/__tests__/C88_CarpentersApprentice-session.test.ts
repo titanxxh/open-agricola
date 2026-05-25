@@ -88,7 +88,7 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       edges: ['H-1-0', 'V-0-1'],
       palisadeEdges: ['H-0-0', 'V-0-0'],
       extraWood: 0,
@@ -119,7 +119,7 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       edges: ['H-1-0', 'V-0-1'],
       palisadeEdges: ['H-0-0', 'V-0-0'],
       extraWood: 0,
@@ -286,7 +286,7 @@ describe('C88 — fence 折扣 Session 端到端(第 13-14 个免费)', () => {
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       edges: [
         'H-0-1', 'H-0-2', 'H-0-3', 'H-0-4',
         'H-3-1', 'H-3-2', 'H-3-3', 'H-3-4',

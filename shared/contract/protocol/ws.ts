@@ -2,6 +2,21 @@ import type { StateUpdateEnvelope } from './game'
 import type { DraftMode, DraftPickPayload } from '../../draft/types'
 import type { Resource, ResourceBatchExchangePayload } from '../types'
 
+type CommitSelectionPayload = {
+  cancel?: boolean
+  positions?: { row: number; col: number }[]
+  cardIds?: string[]
+  resourceCounts?: Partial<Record<keyof Resource, number>>
+  resourceBatchExchange?: ResourceBatchExchangePayload
+  edges?: string[]
+  palisadeEdges?: string[]
+  extraWood?: number
+  rooms?: { row: number; col: number }[]
+  stables?: { row: number; col: number }[]
+  tile?: { row: number; col: number }
+  crops?: { row: number; col: number; crop: 'grain' | 'vegetable' | 'wood' | 'stone' }[]
+}
+
 type ClientCommandBody =
   | { type: 'auth'; token: string }
   | { type: 'action'; spaceId: string }
@@ -10,12 +25,7 @@ type ClientCommandBody =
   | {
       type: 'commitSelection'
       playerIndex: number
-      payload: {
-        positions?: { row: number; col: number }[]
-        cardIds?: string[]
-        resourceCounts?: Partial<Record<keyof Resource, number>>
-        resourceBatchExchange?: ResourceBatchExchangePayload
-      }
+      payload: CommitSelectionPayload
     }
   | { type: 'roundEnd' }
   | { type: 'undoStep' }

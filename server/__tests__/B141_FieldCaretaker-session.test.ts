@@ -65,7 +65,7 @@ describe('B141 FieldCaretaker — cardField bug fix (4 crops)', () => {
         expect(cardField).toBeDefined()
         expect(cardField?.allowedCrops).toContain(crop)
       }
-      const next = session.resolveChoice(0, 'confirm', {
+      const next = session.commitSelectionChoice(0, {
         crops: [{ row: -1, col: VIRTUAL_COL, crop }],
       })
       expect(next.ok).toBe(true)

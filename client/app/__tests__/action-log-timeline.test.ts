@@ -111,14 +111,14 @@ const replayEntryForEvent = (
 })
 
 describe('buildActionLogTimelineRows', () => {
-  it('builds replay event rows and keeps legacy log rows', () => {
-    const legacyLog: LogEntry[] = [
+  it('builds replay event rows and keeps state log rows', () => {
+    const stateLog: LogEntry[] = [
       { key: 'log.startGame' },
     ]
 
     const buckets = buildActionLogTimelineRows({
       entries: [replayEntry()],
-      legacyLog,
+      stateLog,
       currentRound: 2,
       locale: 'en',
       playerNames: { p1: 'Alice' },
@@ -127,20 +127,20 @@ describe('buildActionLogTimelineRows', () => {
 
     expect(buckets).toHaveLength(1)
     expect(buckets[0]?.round).toBe(2)
-    expect(buckets[0]?.rows.map((row) => row.kind)).toEqual(['event', 'legacyLog'])
+    expect(buckets[0]?.rows.map((row) => row.kind)).toEqual(['event', 'stateLog'])
     expect(buckets[0]?.rows[0]).toMatchObject({
       kind: 'event',
       status: 'active',
       replayable: true,
       label: '',
     })
-    expect(buckets[0]?.rows[1]).toMatchObject({ kind: 'legacyLog', replayable: false })
+    expect(buckets[0]?.rows[1]).toMatchObject({ kind: 'stateLog', replayable: false })
   })
 
-  it('does not duplicate legacy log rows already derived from active replay events', () => {
+  it('does not duplicate state log rows already derived from active replay events', () => {
     const buckets = buildActionLogTimelineRows({
       entries: [replayEntry()],
-      legacyLog: [
+      stateLog: [
         {
           key: 'log.actionDetail',
           params: {
@@ -157,19 +157,19 @@ describe('buildActionLogTimelineRows', () => {
       actionNames: { forest: 'Forest' },
     })
 
-    expect(buckets[0]?.rows.map((row) => row.kind)).toEqual(['event', 'legacyLog'])
+    expect(buckets[0]?.rows.map((row) => row.kind)).toEqual(['event', 'stateLog'])
     expect(buckets[0]?.rows[1]).toMatchObject({
-      kind: 'legacyLog',
+      kind: 'stateLog',
       logEntry: { key: 'log.startGame' },
     })
   })
 
-  it('uses context-aware event logs for replay rows before removing derived legacy rows', () => {
+  it('uses context-aware event logs for replay rows before removing derived state log rows', () => {
     const paid = paidEvent('evt-pay', 1)
     const played = playedEvent('evt-play', 2)
     const buckets = buildActionLogTimelineRows({
       entries: [replayEntryForEvent(paid, 1, 0), replayEntryForEvent(played, 1, 1)],
-      legacyLog: [
+      stateLog: [
         {
           key: 'log.playMinorImprovement',
           params: {
@@ -198,14 +198,14 @@ describe('buildActionLogTimelineRows', () => {
       },
     })
     expect(rows.some((row) =>
-      row.kind === 'legacyLog' && row.logEntry.key === 'log.playMinorImprovement')).toBe(false)
+      row.kind === 'stateLog' && row.logEntry.key === 'log.playMinorImprovement')).toBe(false)
   })
 
   it('uses a structured fallback for replayable silent events without logs or notifications', () => {
     const event = silentReplayableEvent('evt-silent-replayable', 3)
     const buckets = buildActionLogTimelineRows({
       entries: [replayEntryForEvent(event, 1)],
-      legacyLog: [],
+      stateLog: [],
       currentRound: 2,
       locale: 'en',
       playerNames: { p1: 'Alice' },
@@ -227,7 +227,7 @@ describe('buildActionLogTimelineRows', () => {
     const event = cardStateChangedEvent('evt-card-state', 3)
     const buckets = buildActionLogTimelineRows({
       entries: [{ ...replayEntryForEvent(event, 1), replayable: false }],
-      legacyLog: [],
+      stateLog: [],
       currentRound: 2,
       locale: 'en',
       playerNames: { p1: 'Alice' },
@@ -242,7 +242,7 @@ describe('buildActionLogTimelineRows', () => {
     const played = playedEvent('evt-play', 2)
     const buckets = buildActionLogTimelineRows({
       entries: [replayEntryForEvent(paid, 1), replayEntryForEvent(played, 2)],
-      legacyLog: [],
+      stateLog: [],
       currentRound: 2,
       locale: 'en',
       playerNames: { p1: 'Alice' },
@@ -274,7 +274,7 @@ describe('buildActionLogTimelineRows', () => {
           canceledByPacketSeq: 2,
         }),
       ],
-      legacyLog: [],
+      stateLog: [],
       currentRound: 2,
       locale: 'zh',
       playerNames: { p1: '玩家A' },
@@ -289,10 +289,10 @@ describe('buildActionLogTimelineRows', () => {
     })
   })
 
-  it('keeps missing and legacy rows non-replayable', () => {
+  it('keeps missing and state log rows non-replayable', () => {
     const buckets = buildActionLogTimelineRows({
       entries: [replayEntry({ event: null, status: 'missing', payloadSource: 'missing', replayable: false })],
-      legacyLog: [{ key: 'log.startGame' }],
+      stateLog: [{ key: 'log.startGame' }],
       currentRound: 1,
       locale: 'en',
       playerNames: {},
@@ -304,7 +304,7 @@ describe('buildActionLogTimelineRows', () => {
       replayable: row.replayable,
     }))).toEqual([
       { kind: 'event', replayable: false },
-      { kind: 'legacyLog', replayable: false },
+      { kind: 'stateLog', replayable: false },
     ])
   })
 })

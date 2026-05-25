@@ -19,14 +19,10 @@ const driveAccepts = (
   while (maxIters-- > 0 && resp.interaction.stateId === 'wait') {
     const opts = resp.interaction.options ?? []
     const skip = opts.find((o) => o.value === '__skip__')
-    // Engine-driven farm prompts (room/stable/etc.) require a payload-bearing
-    // 'confirm' to actually commit; the legacy "no-op confirm" path is gone.
-    // For these placement-chain helpers we never want to commit a farm tile,
-    // so prefer 'cancel' when the current pending is a farm choice.
     const cancel = opts.find((o) => o.value === 'cancel')
     const nonSkip = opts.find((o) => o.value !== '__skip__' && o.value !== 'cancel' && o.value !== 'confirm')
     if (cancel && opts.some((o) => o.value === 'confirm')) {
-      resp = session.resolveChoice(0, cancel.value)
+      resp = session.commitSelectionChoice(0, { cancel: true })
     } else if (nonSkip) {
       resp = session.resolveChoice(0, nonSkip.value)
     } else if (skip) {

@@ -32,7 +32,7 @@ import {
   workersAvailable,
 } from '../../shared/domain/player'
 import { GameSession, type SessionResponse } from '../../server/game/authoritative-session'
-import { confirmNextPlayer, confirmPlayerSwitch } from '../../server/__tests__/_helpers/legacy-confirms'
+import { confirmNextPlayer, confirmPlayerSwitch } from '../../server/__tests__/_helpers/pending-confirms'
 
 export type CardType = 'minor' | 'occupation'
 

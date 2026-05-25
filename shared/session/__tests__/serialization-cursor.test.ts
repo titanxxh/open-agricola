@@ -5,6 +5,46 @@ import { rehydrateState, serializeState } from '../serialization'
 import { EngineStack } from '../../engine'
 
 describe('serialization cursor round-trip', () => {
+  const restoredChoiceSession = (options: { value: string; labelKey: string }[], promptKey = 'ui.cursorTestChoice') => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    state.roundPhase = 'work'
+
+    const flow = { type: 'leaf' as const, actionId: 'gain', params: { wood: 1 } }
+    const nodeId = 'action-gain-0'
+    const serialized = serializeState(state, { engineStack: new EngineStack() })
+    serialized.engineStack = {
+      frames: [{
+        source: { kind: 'flow', flow },
+        engineSnapshot: {
+          nodeStates: [{ id: nodeId, state: 'ready' }],
+          pendingData: [{
+            nodeId,
+            pending: {
+              hostNodeId: nodeId,
+              request: { kind: 'choice', options },
+              choices: options,
+              promptKey,
+              pendingActionId: 'gain',
+              effectiveOwnerPlayerId: state.players[0]!.id,
+            },
+          }],
+          compositeEmit: null,
+        },
+        ownerPlayerIndex: 0,
+        spaceId: 'day-laborer',
+        stageResume: null,
+        deferredPlayerSwitch: null,
+        reason: 'top-level',
+      }],
+    }
+
+    return new GameSession(rehydrateState(JSON.parse(JSON.stringify(serialized))))
+  }
+
   it('restored one-option ActionNode pending envelope remains pending', () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -22,17 +62,6 @@ describe('serialization cursor round-trip', () => {
         source: { kind: 'flow', flow },
         engineSnapshot: {
           nodeStates: [{ id: nodeId, state: 'ready' }],
-          choiceData: {
-            id: nodeId,
-            promptKey: 'ui.interactionOptionalAction',
-            choices: [{ value: 'confirm', labelKey: 'ui.cursorTestConfirm' }],
-            request: {
-              kind: 'choice',
-              options: [{ value: 'confirm', labelKey: 'ui.cursorTestConfirm' }],
-            },
-            pendingActionId: 'gain',
-            ownerNodeId: null,
-          },
           pendingData: [{
             nodeId,
             pending: {
@@ -87,7 +116,6 @@ describe('serialization cursor round-trip', () => {
         source: { kind: 'flow', flow },
         engineSnapshot: {
           nodeStates: [{ id: nodeId, state: 'ready' }],
-          choiceData: null,
           pendingData: [{
             nodeId,
             pending: {
@@ -120,6 +148,62 @@ describe('serialization cursor round-trip', () => {
     expect(restored.getEngineStack().peekPendingEnvelope()?.request.kind).toBe('choice')
   })
 
+  it('rejects ok shortcut when not advertised option', () => {
+    const restored = restoredChoiceSession([
+      { value: 'confirm', labelKey: 'ui.cursorTestConfirm' },
+    ])
+
+    const rejected = restored.resolveChoice(0, 'ok')
+
+    expect(rejected.ok).toBe(false)
+    expect(rejected.error).toBe('invalid choice value')
+    expect(restored.getEngineStack().peekPendingEnvelope()?.request.kind).toBe('choice')
+  })
+
+  it('rejects confirm string payload shortcut when not advertised option', () => {
+    const restored = restoredChoiceSession([
+      { value: 'action-sow-0', labelKey: 'actions.sow.name' },
+    ])
+
+    const rejected = restored.resolveChoice(0, 'confirm', 'sow' as unknown as Record<string, unknown>)
+
+    expect(rejected.ok).toBe(false)
+    expect(rejected.error).toBe('invalid choice value')
+    expect(restored.getEngineStack().peekPendingEnvelope()?.request.kind).toBe('choice')
+  })
+
+  it.each([
+    'minor:A1_Shelter',
+    'major:Major_Fireplace1',
+    'occupation:A123_FrameBuilder',
+  ])('rejects non-advertised card shortcut value %s', (value) => {
+    const restored = restoredChoiceSession([
+      { value: 'action-improvement-1', labelKey: 'actions.improvement.name' },
+    ])
+
+    const rejected = restored.resolveChoice(0, value)
+
+    expect(rejected.ok).toBe(false)
+    expect(rejected.error).toBe('invalid choice value')
+    expect(restored.getEngineStack().peekPendingEnvelope()?.request.kind).toBe('choice')
+  })
+
+  it.each([
+    'ui.interactionSelection',
+    'ui.interactionFenceSelect',
+  ])('rejects direct resolveChoice for plain choice %s prompt', (promptKey) => {
+    const restored = restoredChoiceSession([
+      { value: 'confirm', labelKey: 'ui.interactionSelectionConfirm' },
+      { value: 'cancel', labelKey: 'ui.interactionCancel' },
+    ], promptKey)
+
+    const rejected = restored.resolveChoice(0, 'cancel')
+
+    expect(rejected.ok).toBe(false)
+    expect(rejected.error).toBe('use commitSelectionChoice for selection')
+    expect(restored.getEngineStack().peekPendingEnvelope()?.request.kind).toBe('choice')
+  })
+
   it('rejects invalid select-trigger values before dispatch', () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -141,7 +225,6 @@ describe('serialization cursor round-trip', () => {
         source: { kind: 'flow', flow },
         engineSnapshot: {
           nodeStates: [{ id: nodeId, state: 'ready' }],
-          choiceData: null,
           pendingData: [{
             nodeId,
             pending: {
@@ -193,7 +276,6 @@ describe('serialization cursor round-trip', () => {
         source: { kind: 'flow', flow },
         engineSnapshot: {
           nodeStates: [{ id: nodeId, state: 'ready' }],
-          choiceData: null,
           pendingData: [{
             nodeId,
             pending: {
@@ -246,7 +328,6 @@ describe('serialization cursor round-trip', () => {
         source: { kind: 'flow', flow },
         engineSnapshot: {
           nodeStates: [{ id: nodeId, state: 'ready' }],
-          choiceData: null,
           pendingData: [{
             nodeId,
             pending: {
@@ -410,6 +491,24 @@ describe('serialization cursor round-trip', () => {
         beforeResp.interaction.options?.map((o) => o.value).sort(),
       )
     }
+
+    const rejected = restored.resolveChoice(0, '0-0,0-1')
+    expect(rejected.ok).toBe(false)
+    expect(rejected.error).toBe('invalid choice value')
+
+    const restoredFarmRequest = restoredEnvelope?.request
+    expect(restoredFarmRequest?.kind).toBe('farm-select')
+    expect(restoredFarmRequest?.farm.farmType).toBe('plow')
+    if (restoredFarmRequest?.kind !== 'farm-select' || restoredFarmRequest.farm.farmType !== 'plow') {
+      throw new Error('expected restored plow selection')
+    }
+    const selectedTile = restoredFarmRequest.farm.selectableTiles[0]!
+    const committed = restored.commitSelectionChoice(0, { tile: selectedTile })
+    expect(committed.ok).toBe(true)
+    expect(committed.state.players[0]!.fields).toContainEqual({
+      ...selectedTile,
+      stacks: [],
+    })
   })
 
   // ── confirm-next-player sub-flow (Task 9) ─────────────────────────────

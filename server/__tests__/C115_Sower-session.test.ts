@@ -117,7 +117,7 @@ describe('C115_Sower session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionSowSelect')
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       crops: [{ row: 0, col: 0, crop: 'grain' }],
     })
 
@@ -199,7 +199,7 @@ describe('C115_Sower session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionSowSelect')
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       crops: [{ row: 0, col: 0, crop: 'grain' }],
     })
     expect(resp.ok).toBe(true)
@@ -300,7 +300,7 @@ describe('C115_Sower session', () => {
     const stack = getCardStack(updatedPlayer, 'C115_Sower')
     expect(stack.length).toBe(0)
 
-    const resp3 = session.resolveChoice(0, 'confirm', {
+    const resp3 = session.commitSelectionChoice(0, {
       crops: [{ row: 0, col: 0, crop: 'grain' }],
     })
     expect(resp3.ok).toBe(true)

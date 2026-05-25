@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { getFenceCount } from '../../shared/actions/effects/fencing'
-import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 import '../../shared/cards/C/C16_FieldFences'
 
@@ -84,7 +84,7 @@ describe('C16 FieldFences session', () => {
     const session = setup({ wood: 3, withField: true })
     playC16(session)
 
-    const resp = session.resolveChoice(0, 'confirm', {
+    const resp = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
       extraWood: 0,
@@ -108,7 +108,7 @@ describe('C16 FieldFences session', () => {
 
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
       extraWood: 0,
@@ -138,7 +138,7 @@ describe('C16 FieldFences session', () => {
 
     playC16(session)
 
-    const resp = session.resolveChoice(0, 'confirm', {
+    const resp = session.commitSelectionChoice(0, {
       edges: ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'],
       palisadeEdges: [],
       extraWood: 0,
@@ -155,7 +155,7 @@ describe('C16 FieldFences session', () => {
     const session = setup({ wood: 5, withField: true })
     playC16(session)
 
-    let resp = session.resolveChoice(0, 'confirm', {
+    let resp = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
       extraWood: 0,

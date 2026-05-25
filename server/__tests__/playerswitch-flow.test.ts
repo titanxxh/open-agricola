@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import type { ActionDefinition, ActionFlow } from '../../shared/contract/types'
-import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { rehydrateState, serializeState } from '../../shared/session/serialization'
 
 /**

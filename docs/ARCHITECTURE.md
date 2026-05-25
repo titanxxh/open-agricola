@@ -193,7 +193,10 @@ type ClientCommand = (
   | { type: 'action'; spaceId }              // 放置工人 / 启动 anytime
   | { type: 'choice'; value; payload? }       // 统一的"选择"命令（含 farm/选格/分支）
   | { type: 'anytime'; actionId }
-  | { type: 'commitSelection'; playerIndex; payload: { positions?, cardIds?, resourceCounts?, resourceBatchExchange? } }
+  | { type: 'commitSelection'; playerIndex; payload: {
+      cancel?, positions?, cardIds?, resourceCounts?, resourceBatchExchange?,
+      edges?, palisadeEdges?, extraWood?, rooms?, stables?, tile?, crops?
+    } }
   | { type: 'roundEnd' }
   | { type: 'undoStep' } | { type: 'undoAction' }
   | { type: 'newGame'; seed? } | { type: 'loadGame'; state }
@@ -204,7 +207,7 @@ type ClientCommand = (
 
 注意：
 
-- 没有独立的 `reorg` / `feed` / `nextPlayer` / `confirmPlayerSwitch` / `commitFarm` 命令。这些等待形态全部归并到 `choice` 命令，由 `payload` 携带具体形状（按 `InteractionRequest.kind` 决定）。
+- 没有独立的 `reorg` / `feed` / `nextPlayer` / `confirmPlayerSwitch` 命令。这些等待形态全部归并到 `choice` 命令，由 `payload` 携带具体形状（按 `InteractionRequest.kind` 决定）。
 - `commitSelection` 只为 farm-position / occupation-hand / resource-quantity / resource-batch-exchange 这类带结构化 payload 的定向选择保留单独入口。
 
 ### 4.5 ServerEvent / StateUpdateEnvelope
@@ -272,7 +275,7 @@ type InteractionState =
 
 `InteractionCommand`（前端按 `allowedCommands` 决定 UI 启用的按钮）：
 ```
-takeAction | resolveChoice | commitFarm | commitSelection | takeAnytimeAction | undoStep | undoAction
+takeAction | resolveChoice | commitSelection | takeAnytimeAction | undoStep | undoAction
 ```
 
 注意 WS 协议名（`ClientCommand.type`）与 `InteractionCommand` 不完全同名：前端"现在能做什么"以 `allowedCommands` 为准；线上 WS 命令名归一到 `choice` / `commitSelection` / `action` 等。

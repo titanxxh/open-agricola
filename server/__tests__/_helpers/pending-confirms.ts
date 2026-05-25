@@ -2,11 +2,8 @@ import type { GameSession } from '../../game/authoritative-session'
 import type { SessionResponse } from '../../../shared/session/session-core'
 
 /**
- * Test helper: drive the synthetic `confirm-next-player` pending frame
- * forward by reading the current `nextPlayerIndex` off the active
- * `InteractionState.request` and resolving via `resolveChoice`. Replaces
- * the deprecated `GameSession.confirmNextPlayer()` shim (deleted in S2 Task
- * 13.7 part 2).
+ * Test helper: drive synthetic confirm pending frames through the public
+ * resolveChoice API by reading the active InteractionState.request.
  */
 export function confirmNextPlayer(session: GameSession): SessionResponse {
   const interaction = session.getState().interaction
@@ -16,13 +13,6 @@ export function confirmNextPlayer(session: GameSession): SessionResponse {
   return session.resolveChoice(interaction.request.nextPlayerIndex, 'confirm')
 }
 
-/**
- * Test helper: drive the synthetic `confirm-player-switch` pending frame
- * forward by reading the current `toPlayerIndex` off the active
- * `InteractionState.request` and resolving via `resolveChoice`. Replaces
- * the deprecated `GameSession.confirmPlayerSwitch()` shim (deleted in S2
- * Task 13.7 part 2).
- */
 export function confirmPlayerSwitch(session: GameSession): SessionResponse {
   const interaction = session.getState().interaction
   if (interaction.stateId !== 'wait' || interaction.request?.kind !== 'confirm-player-switch') {
@@ -30,4 +20,3 @@ export function confirmPlayerSwitch(session: GameSession): SessionResponse {
   }
   return session.resolveChoice(interaction.request.toPlayerIndex, 'confirm')
 }
-

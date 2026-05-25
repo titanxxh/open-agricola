@@ -84,7 +84,7 @@ describe('D75_WoodField session', () => {
       groupKey: CARD_ID,
     })
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       crops: [{ row: ROW, col: COL_BASE, crop: 'wood' }],
     })
     expect(resp.ok).toBe(true)
@@ -125,7 +125,7 @@ describe('D75_WoodField session', () => {
     expect(slot0!.groupKey).toBe(CARD_ID)
     expect(slot1!.groupKey).toBe(CARD_ID)
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       crops: [
         { row: ROW, col: COL_BASE, crop: 'wood' },
         { row: ROW, col: COL_BASE + 1, crop: 'wood' },

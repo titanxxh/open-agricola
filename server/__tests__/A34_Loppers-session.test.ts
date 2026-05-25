@@ -166,7 +166,7 @@ describe('A34 Loppers — supply fence payment', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
 
-    resp = session.resolveChoice(0, 'cancel')
+    resp = session.commitSelectionChoice(0, { cancel: true })
 
     expect(resp.ok).toBe(true)
     expect(resp.interaction.promptKey).toBe('ui.confirmNextPlayer')
@@ -212,7 +212,7 @@ describe('A34 Loppers — supply fence payment', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       edges: edgesForTile(1, 1),
       extraWood: 0,
     })
@@ -253,7 +253,7 @@ describe('A34 Loppers — supply fence payment', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       edges: edgesForTile(1, 1),
       extraWood: 0,
     })
@@ -288,7 +288,7 @@ describe('A34 Loppers — supply fence payment', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       edges: build,
       palisadeEdges: [],
       extraWood: 0,
@@ -326,7 +326,7 @@ describe('A34 Loppers — supply fence payment', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       edges: build,
       palisadeEdges: [],
       extraWood: 0,

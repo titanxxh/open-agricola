@@ -479,8 +479,8 @@ export const GameContainerApi = () => {
   }, [transport, handleSnapshot, isReady])
 
   const currentPlayer = state?.players[state.currentPlayerIndex] ?? null
-  const fallbackDevPlayerId = viewPlayerId ?? currentPlayer?.id ?? ''
-  const devPlayerId = devPlayerIdOverride ?? fallbackDevPlayerId
+  const defaultDevPlayerId = viewPlayerId ?? currentPlayer?.id ?? ''
+  const devPlayerId = devPlayerIdOverride ?? defaultDevPlayerId
   const setDevPlayerId = useCallback((value: string) => {
     setDevPlayerIdOverride(value)
   }, [])
@@ -588,7 +588,7 @@ export const GameContainerApi = () => {
     if (interaction.stateId === 'wait' && interaction.selection) {
       const pendingPlayerIndex = interaction.playerIndex
       if (value === 'cancel') {
-        void transport.resolveChoice(pendingPlayerIndex, value).catch((e) => console.error(e))
+        void transport.commitSelection(pendingPlayerIndex, { cancel: true }).catch((e) => console.error(e))
         return
       }
       const positions = [...pendingPositionSelections]
@@ -601,11 +601,11 @@ export const GameContainerApi = () => {
       const pendingPlayerIndex = interaction.playerIndex
       const farm = interaction.farm
       if (value === 'cancel') {
-        void transport.resolveChoice(pendingPlayerIndex, value).catch((e) => console.error(e))
+        void transport.commitSelection(pendingPlayerIndex, { cancel: true }).catch((e) => console.error(e))
         return
       }
       if (farm.farmType === 'fence') {
-        void transport.resolveChoice(pendingPlayerIndex, 'confirm', {
+        void transport.commitSelection(pendingPlayerIndex, {
           edges: pendingFenceEdges,
           palisadeEdges: pendingPalisadeEdges,
           extraWood: farm.extraWood ?? 0,
@@ -620,7 +620,7 @@ export const GameContainerApi = () => {
         return
       }
       if (farm.farmType === 'room') {
-        void transport.resolveChoice(pendingPlayerIndex, 'confirm', { rooms: pendingRoomTiles })
+        void transport.commitSelection(pendingPlayerIndex, { rooms: pendingRoomTiles })
           .then((resp) => {
             if (!resp.ok) setFarmCommitError('room', resp.error)
           })
@@ -635,7 +635,7 @@ export const GameContainerApi = () => {
           setStableError('NO_SELECTION')
           return
         }
-        void transport.resolveChoice(pendingPlayerIndex, 'confirm', { stables: pendingStableTiles })
+        void transport.commitSelection(pendingPlayerIndex, { stables: pendingStableTiles })
           .then((resp) => {
             if (!resp.ok) setFarmCommitError('stable', resp.error)
           })
@@ -650,7 +650,7 @@ export const GameContainerApi = () => {
           setPlowError('NO_SELECTION')
           return
         }
-        void transport.resolveChoice(pendingPlayerIndex, 'confirm', { tile: pendingPlowTile })
+        void transport.commitSelection(pendingPlayerIndex, { tile: pendingPlowTile })
           .then((resp) => {
             if (!resp.ok) setFarmCommitError('plow', resp.error)
           })
@@ -679,7 +679,7 @@ export const GameContainerApi = () => {
           setSowError('NO_SELECTION')
           return
         }
-        void transport.resolveChoice(pendingPlayerIndex, 'confirm', { crops })
+        void transport.commitSelection(pendingPlayerIndex, { crops })
           .then((resp) => {
             if (!resp.ok) setFarmCommitError('sow', resp.error)
           })
@@ -841,7 +841,7 @@ export const GameContainerApi = () => {
   const actionLogTimelineBuckets = useMemo(
     () => buildActionLogTimelineRows({
       entries: replayTimeline,
-      legacyLog: state?.log ?? [],
+      stateLog: state?.log ?? [],
       currentRound: state?.round ?? 1,
       locale,
       playerNames,

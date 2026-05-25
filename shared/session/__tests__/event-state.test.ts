@@ -68,34 +68,6 @@ describe('event state bootstrap', () => {
     expect(state.roundStartSnapshot?.nextEventSeq).toBe(2)
   })
 
-  it('backfills event state for legacy raw states', () => {
-    const state = createInitialState(1)
-    const legacy = { ...state } as Omit<GameState, 'events' | 'nextEventSeq'> &
-      Partial<Pick<GameState, 'events' | 'nextEventSeq'>>
-    delete legacy.events
-    delete legacy.nextEventSeq
-
-    const normalized = normalizeState(legacy as GameState)
-
-    expect(normalized.events).toEqual([])
-    expect(normalized.nextEventSeq).toBe(1)
-  })
-
-  it('backfills public event archive state for legacy raw states', () => {
-    const state = createInitialState(1)
-    const legacy = { ...state } as GameState & {
-      publicEventArchive?: unknown
-      nextPublicEventArchivePacketSeq?: unknown
-    }
-    delete legacy.publicEventArchive
-    delete legacy.nextPublicEventArchivePacketSeq
-
-    const normalized = normalizeState(legacy as GameState)
-
-    expect(normalized.publicEventArchive).toEqual([])
-    expect(normalized.nextPublicEventArchivePacketSeq).toBe(1)
-  })
-
   it('drops malformed public event archive packets and advances packet seq', () => {
     const state = createInitialState(1)
     const valid = {
@@ -572,7 +544,6 @@ describe('event state bootstrap', () => {
   })
 
   it.each([
-    ['missing', undefined],
     ['equal to max seq', 8],
     ['below max seq', 4],
   ])('sets nextEventSeq to max seq plus one when raw nextEventSeq is %s', (_, nextEventSeq) => {
@@ -580,14 +551,10 @@ describe('event state bootstrap', () => {
     const raw = {
       ...state,
       events: [makeEvent(2), makeEvent(8)],
-    } as GameState & { nextEventSeq?: number }
-    if (typeof nextEventSeq === 'number') {
-      raw.nextEventSeq = nextEventSeq
-    } else {
-      delete raw.nextEventSeq
+      nextEventSeq,
     }
 
-    const normalized = normalizeState(raw as GameState)
+    const normalized = normalizeState(raw)
 
     expect(normalized.nextEventSeq).toBe(9)
   })

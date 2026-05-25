@@ -51,7 +51,7 @@ describe('D70_StrawManure session', () => {
     if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
 
     // Select both vegetable fields: 0-0 and 0-1
-    resp = session.resolveChoice(0, '0-0,0-1')
+    resp = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 0 }, { row: 0, col: 1 }] })
     expect(resp.ok).toBe(true)
 
     // After resolving, continue through harvest phases (feed, breed)
