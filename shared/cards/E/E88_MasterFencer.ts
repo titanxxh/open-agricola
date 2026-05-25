@@ -6,7 +6,7 @@ const CARD_ID = E88_MasterFencer.id
 
 const freeFencingLeaf = (max: number) => ({
   type: 'leaf' as const,
-  actionId: 'fencing',
+  actionId: 'fence',
   expandFlow: true,
   sourceCard: CARD_ID,
   actionContext: {
