@@ -4,7 +4,7 @@ import { markAllWorkersUsed, setActiveWorkerCount, setNewbornCount } from '../..
 import { C105_BasketCarrier } from '../../shared/cards-display/C/C105_BasketCarrier'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
 import type { PlayerState, Resource } from '../../shared/contract/types'
-import { confirmNextPlayer } from './_helpers/legacy-confirms'
+import { confirmNextPlayer } from './_helpers/pending-confirms'
 
 const CARD_ID = 'C105_BasketCarrier'
 

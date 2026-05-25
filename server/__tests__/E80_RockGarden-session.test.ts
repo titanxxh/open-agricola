@@ -81,7 +81,7 @@ describe('E80_RockGarden session', () => {
       groupKey: CARD_ID,
     })
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       crops: [{ row: ROW, col: COL_BASE, crop: 'stone' }],
     })
     expect(resp.ok).toBe(true)
@@ -121,7 +121,7 @@ describe('E80_RockGarden session', () => {
     // (BGA "considered 1 field" semantics).
     for (const slot of slots) expect(slot!.groupKey).toBe(CARD_ID)
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       crops: [
         { row: ROW, col: COL_BASE, crop: 'stone' },
         { row: ROW, col: COL_BASE + 1, crop: 'stone' },

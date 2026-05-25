@@ -234,16 +234,15 @@ export const normalizeState = (raw: GameState): GameState => {
           ],
       stableAnimals: player.stableAnimals ?? {},
       pastures: player.pastures ?? [],
-      fenceSegments: normalizeFenceSegments(player.fenceSegments, player.id),
-      stats:
-        player.stats ??
-        createInitialPlayerStats({ isFirstPlayer: !!player.startPlayer }),
+      fenceSegments: normalizeFenceSegments(player.fenceSegments ?? [], player.id),
+      stats: player.stats,
       roomTiles:
         player.roomTiles && player.roomTiles.length > 0
           ? [...player.roomTiles]
           : createDefaultRoomTiles(player.rooms ?? 2),
       stableTiles: player.stableTiles ?? [],
       majorEffects: player.majorEffects ?? { wellRounds: 0 },
+      supplyTokensConsumed: player.supplyTokensConsumed ?? {},
     }
     const desiredRooms = normalized.rooms ?? normalized.roomTiles.length
     if (normalized.roomTiles.length < desiredRooms) {
@@ -340,9 +339,11 @@ export const normalizeState = (raw: GameState): GameState => {
   ).filter(
     (id) => majorImprovementIds.includes(id) && !takenImprovements.has(id),
   )
-  const events = Array.isArray(raw.events)
-    ? raw.events.filter(isPersistedGameEvent)
-    : []
+  const rawEvents = raw.events
+  if (!Array.isArray(rawEvents) || !Number.isSafeInteger(raw.nextEventSeq)) {
+    throw new Error('Invalid event state')
+  }
+  const events = rawEvents.filter(isPersistedGameEvent)
   const maxEventSeq = events.reduce(
     (max, event) =>
       Number.isSafeInteger(event.seq) && event.seq > 0 && event.seq > max
@@ -354,6 +355,12 @@ export const normalizeState = (raw: GameState): GameState => {
     Number.isSafeInteger(raw.nextEventSeq) && raw.nextEventSeq > maxEventSeq
       ? raw.nextEventSeq
       : maxEventSeq + 1
+  if (
+    !Array.isArray(raw.publicEventArchive) ||
+    !Number.isSafeInteger(raw.nextPublicEventArchivePacketSeq)
+  ) {
+    throw new Error('Invalid public event archive state')
+  }
   const archiveState = normalizePublicEventArchive(
     raw.publicEventArchive,
     raw.nextPublicEventArchivePacketSeq,
@@ -459,6 +466,7 @@ const createInitialPlayers = (
       activeModifiers: [],
       cardStates: {},
       stats: createInitialPlayerStats({ isFirstPlayer: info.startPlayer }),
+      supplyTokensConsumed: {},
     }
     return player
   })

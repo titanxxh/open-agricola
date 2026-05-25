@@ -24,6 +24,7 @@ import { takeFromCardAction } from './effects/internal/take-from-card'
 import { emitChoiceAction } from './effects/internal/emit-choice'
 import { recallPlacedWorkerAction } from './effects/internal/recall-placed-worker'
 import { reserveFenceBonusAction } from './effects/internal/reserve-fence-bonus'
+import { occupationGateAction } from './effects/internal/occupation-gate'
 import { storeOnCardAction } from './effects/internal/store-on-card'
 import { moveFarmerToSpaceAction } from './effects/internal/move-farmer-to-space'
 import { popCardStackAction } from './effects/internal/pop-card-stack'
@@ -60,6 +61,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
   emitChoiceAction,
   recallPlacedWorkerAction,
   reserveFenceBonusAction,
+  occupationGateAction,
   storeOnCardAction,
   moveFarmerToSpaceAction,
   constructAction,

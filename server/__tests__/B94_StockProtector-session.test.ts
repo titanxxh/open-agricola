@@ -39,7 +39,7 @@ describe('B94_StockProtector session', () => {
     expect(resp.state.players[0]!.resources.wood).toBe(8)
     expect(resp.interaction.stateId).toBe('wait')
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       edges: edgesForTile(1, 1),
       extraWood: 0,
     })

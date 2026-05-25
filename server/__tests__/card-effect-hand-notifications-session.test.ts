@@ -88,10 +88,30 @@ const setupTwoPlayerSession = () => {
   return session
 }
 
+const resolveMinorFromPrompt = (
+  session: GameSession,
+  resp: ReturnType<GameSession['takeAction']>,
+  cardId: string,
+) => {
+  expect(resp.interaction.stateId).toBe('wait')
+  if (resp.interaction.stateId !== 'wait') return resp
+  const improvementOption = resp.interaction.options?.find((option) => option.value.startsWith('action-improvement-'))
+  if (improvementOption) {
+    resp = session.resolveChoice(0, improvementOption.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return resp
+  }
+  if (resp.interaction.sourceCard === cardId) return resp
+  const cardOption = resp.interaction.options?.find((option) => option.value === `minor:${cardId}`)
+  expect(cardOption).toBeDefined()
+  return session.resolveChoice(0, cardOption!.value)
+}
+
 const playB3 = (session: GameSession) => {
   const resp = session.takeAction(0, 'meeting-place')
   expect(resp.ok).toBe(true)
-  return session.resolveChoice(0, `minor:${B3_CARD_ID}`)
+  return resolveMinorFromPrompt(session, resp, B3_CARD_ID)
 }
 
 const setupAnglerSession = () => {
@@ -303,11 +323,13 @@ describe('card effect hand notification events', () => {
     expect(accept).toBeDefined()
 
     resp = session.resolveChoice(0, accept!.value)
-    if (
-      resp.interaction.stateId === 'wait' &&
-      resp.interaction.options?.some((option) => option.value === `minor:${A6_MINOR_ID}`)
-    ) {
-      resp = session.resolveChoice(0, `minor:${A6_MINOR_ID}`)
+    if (resp.interaction.stateId === 'wait') {
+      const hasMinorChoice = resp.interaction.options?.some(
+        (option) => option.value.startsWith('action-improvement-') || option.value === `minor:${A6_MINOR_ID}`,
+      )
+      if (hasMinorChoice) {
+        resp = resolveMinorFromPrompt(session, resp, A6_MINOR_ID)
+      }
     }
 
     const player = resp.state.players[0]!
@@ -349,11 +371,13 @@ describe('card effect hand notification events', () => {
     const accept = resp.interaction.options?.find((option) => option.value !== '__skip__')
     expect(accept).toBeDefined()
     resp = minorSession.resolveChoice(0, accept!.value)
-    if (
-      resp.interaction.stateId === 'wait' &&
-      resp.interaction.options?.some((option) => option.value === `minor:${A6_MINOR_ID}`)
-    ) {
-      resp = minorSession.resolveChoice(0, `minor:${A6_MINOR_ID}`)
+    if (resp.interaction.stateId === 'wait') {
+      const hasMinorChoice = resp.interaction.options?.some(
+        (option) => option.value.startsWith('action-improvement-') || option.value === `minor:${A6_MINOR_ID}`,
+      )
+      if (hasMinorChoice) {
+        resp = resolveMinorFromPrompt(minorSession, resp, A6_MINOR_ID)
+      }
     }
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.minorPlayed).toContain(A6_MINOR_ID)

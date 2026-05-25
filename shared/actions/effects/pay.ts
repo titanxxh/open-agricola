@@ -4,6 +4,8 @@ import type {
   ComplexCost,
   CostModifierType,
   GameState,
+  PaymentResourceKey,
+  PaymentResourceMap,
   PaymentSolution,
   PlayerState,
   Resource,
@@ -18,11 +20,15 @@ import type { PaymentCtx } from '../payment'
 import {
   executePaymentSolution,
   payResources,
+  paySupplyTokens,
 } from '../payment/internal'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
 import {
+  filterPaymentSolutionsByReserve,
+  preservesResourceReserve,
   payTypedFlatCostDetailed,
   resolveCostPaymentSelection,
+  resolvePaymentSolutionSelection,
 } from '../payment/internal'
 
 /**
@@ -36,13 +42,14 @@ const buildSingletonState = (player: PlayerState): GameState =>
   ({ ...({} as GameState), players: [player] })
 
 export type PayParams = {
-  cost: Partial<Resource> | ComplexCost
+  cost: PaymentResourceMap | ComplexCost
   costType?: CostModifierType
   optionPrefix?: string
   paymentChoice?: string
   sourceActionId?: string
   includeReturnedCard?: boolean
   playedCards?: string[]
+  reserveResources?: Partial<Resource>
 }
 
 /**
@@ -58,9 +65,9 @@ export type PayParams = {
  * payment" — see E54_Contraband / E122_Cottar / E128_Saddler /
  * E123_ResourceHoarder for examples.
  *
- * Legacy note: `player._activeActionBonusSources` is still maintained by
+ * Current attribution note: `player._activeActionBonusSources` is still maintained by
  * `executePaymentSolution` for `log.actionDetail` attribution (read by
- * `GameCore.buildActionDetailParts`) and the legacy `playOccupation` /
+ * `GameCore.buildActionDetailParts`) and the direct `playOccupation` /
  * `playImprovement` HTTP entries that don't go through the `pay` leaf.
  * New listeners should not depend on it.
  */
@@ -77,6 +84,8 @@ const RESOURCE_KEYS = new Set([
   'boar',
   'cattle',
   'begging',
+  'fence',
+  'stable',
 ])
 
 const PAY_PARAM_KEYS = new Set([
@@ -87,6 +96,7 @@ const PAY_PARAM_KEYS = new Set([
   'sourceActionId',
   'includeReturnedCard',
   'playedCards',
+  'reserveResources',
 ])
 
 const looksLikeFlatResource = (
@@ -105,16 +115,16 @@ const normalizePayParams = (
   if (!raw) return undefined
   if ('cost' in raw) return raw as unknown as PayParams
   if (looksLikeFlatResource(raw)) {
-    return { cost: raw as Partial<Resource> }
+    return { cost: raw as PaymentResourceMap }
   }
   return undefined
 }
 
-const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
-  const out: Partial<Resource> = {}
+const positiveResources = (resources: PaymentResourceMap): PaymentResourceMap => {
+  const out: PaymentResourceMap = {}
   Object.entries(resources).forEach(([key, value]) => {
     if (typeof value !== 'number' || value <= 0) return
-    out[key as keyof Resource] = value
+    out[key as PaymentResourceKey] = value
   })
   return out
 }
@@ -126,10 +136,62 @@ const paymentPurpose = (
   costType: CostModifierType | undefined,
 ): PaymentPurpose => costType ?? 'cardEffect'
 
+const normalizePaymentChoiceValue = (
+  paymentChoice: string | undefined,
+  optionValuePrefix: string,
+) => {
+  if (!paymentChoice) return undefined
+  const prefix = `${optionValuePrefix}:`
+  return paymentChoice.startsWith(prefix)
+    ? paymentChoice.slice(prefix.length)
+    : paymentChoice
+}
+
+const resolvePayActionPaymentSelection = (
+  state: GameState,
+  player: PlayerState,
+  cost: ComplexCost,
+  optionValuePrefix: string,
+  paymentChoice: string | undefined,
+  failure: ActionExecutionResult,
+  options: {
+    costType?: CostModifierType
+    includeReturnedCard?: boolean
+    playedCards?: string[]
+    reserveResources?: Partial<Resource>
+  } = {},
+):
+  | ActionExecutionResult
+  | {
+      type: 'selected'
+      solution: PaymentSolution
+    } => {
+  const playerIndex = state.players.indexOf(player)
+  const effectiveState = playerIndex >= 0 ? state : buildSingletonState(player)
+  const effectiveIndex = playerIndex >= 0 ? playerIndex : 0
+  const ctx: PaymentCtx = {
+    actionId: 'pay',
+    costType: options.costType ?? 'none',
+    playedCards: options.playedCards,
+  }
+  const solutions = filterPaymentSolutionsByReserve(
+    player,
+    PaymentSolver.computeOptions(effectiveState, effectiveIndex, cost, ctx),
+    options.reserveResources,
+  )
+  return resolvePaymentSolutionSelection(
+    solutions,
+    normalizePaymentChoiceValue(paymentChoice, optionValuePrefix),
+    optionValuePrefix,
+    options.includeReturnedCard ?? false,
+    failure,
+  )
+}
+
 const emitPaidEvent = (
   eventSink: EventSink | undefined,
   player: PlayerState,
-  resources: Partial<Resource>,
+  resources: PaymentResourceMap,
   costType: CostModifierType | undefined,
   sourceCard: string | undefined,
   sourceActionId: string | undefined,
@@ -235,14 +297,28 @@ export const payAction: ActionDefinition = {
     // computeAllBuyableCombinations so multi-solution payments — including
     // ones that require returning a card via cards.list — stay doable
     // inside seq nodes.
-    canExecute: ({ player, params }) => {
+    canExecute: ({ state, player, params }) => {
       const p = normalizePayParams(params)
       if (!p?.cost) return false
       const ctx: PaymentCtx = { actionId: 'pay', costType: p.costType ?? 'none', playedCards: p.playedCards }
+      const playerIndex = state.players.indexOf(player)
+      const effectiveState = playerIndex >= 0 ? state : buildSingletonState(player)
+      const effectiveIndex = playerIndex >= 0 ? playerIndex : 0
       if (!PaymentSolver.isComplexCost(p.cost)) {
-        return PaymentSolver.canAfford(buildSingletonState(player), 0, p.cost, ctx)
+        if (p.costType || p.reserveResources) {
+          return filterPaymentSolutionsByReserve(
+            player,
+            PaymentSolver.computeOptions(effectiveState, effectiveIndex, { fee: p.cost }, ctx),
+            p.reserveResources,
+          ).length > 0
+        }
+        return PaymentSolver.canAfford(effectiveState, effectiveIndex, p.cost, ctx)
       }
-      return PaymentSolver.computeOptions(buildSingletonState(player), 0, p.cost, ctx).length > 0
+      return filterPaymentSolutionsByReserve(
+        player,
+        PaymentSolver.computeOptions(effectiveState, effectiveIndex, p.cost, ctx),
+        p.reserveResources,
+      ).length > 0
     },
   },
   execute: ({ player, params, sourceCard, state, eventSink }) => {
@@ -250,7 +326,8 @@ export const payAction: ActionDefinition = {
     if (!p?.cost) return { type: 'fail', errorKey: 'log.payFail' }
     if (PaymentSolver.isComplexCost(p.cost)) {
       const optionPrefix = p.optionPrefix ?? 'pay:generic'
-      const selection = resolveCostPaymentSelection(
+      const selection = resolvePayActionPaymentSelection(
+        state,
         player,
         p.cost,
         optionPrefix,
@@ -260,6 +337,7 @@ export const payAction: ActionDefinition = {
           costType: p.costType,
           includeReturnedCard: p.includeReturnedCard,
           playedCards: p.playedCards,
+          reserveResources: p.reserveResources,
         },
       )
       if (selection.type !== 'selected') {
@@ -276,7 +354,7 @@ export const payAction: ActionDefinition = {
         p.sourceActionId,
       )
     }
-    const flat = p.cost as Partial<Resource>
+    const flat = p.cost as PaymentResourceMap
     // 7b1: when a costType is set, route the flat cost through
     // payTypedFlatCost so trade modifiers (A28 ForestSchool wood→food etc.)
     // get the silent cost-replacement treatment they had in the legacy
@@ -284,6 +362,33 @@ export const payAction: ActionDefinition = {
     // attempt canPayResources(flat) and fail when the player can only
     // afford the cost via a trade swap.
     if (p.costType) {
+      if (p.reserveResources) {
+        const selection = resolveCostPaymentSelection(
+          player,
+          { fee: flat },
+          p.optionPrefix ?? 'pay:generic',
+          p.paymentChoice,
+          { type: 'fail', errorKey: 'log.payFail' },
+          {
+            costType: p.costType,
+            state,
+            reserveResources: p.reserveResources,
+          },
+        )
+        if (selection.type !== 'selected') {
+          return selection
+        }
+        return buildSelectedResult(
+          selection.solution,
+          sourceCard,
+          p.costType,
+          player,
+          state,
+          p.includeReturnedCard,
+          eventSink,
+          p.sourceActionId,
+        )
+      }
       const detailed = payTypedFlatCostDetailed(player, flat, p.costType, state)
       if (!detailed.ok) return { type: 'fail', errorKey: 'log.payFail' }
       const resourcesPaid = detailed.resourcesPaid
@@ -307,10 +412,17 @@ export const payAction: ActionDefinition = {
       }
       return { type: 'ok', resourcesPaid, extraData }
     }
-    if (!PaymentSolver.canAfford(buildSingletonState(player), 0, flat, { actionId: 'pay', costType: 'none' })) {
+    const playerIndex = state.players.indexOf(player)
+    const effectiveState = playerIndex >= 0 ? state : buildSingletonState(player)
+    const effectiveIndex = playerIndex >= 0 ? playerIndex : 0
+    if (!PaymentSolver.canAfford(effectiveState, effectiveIndex, flat, { actionId: 'pay', costType: 'none' })) {
+      return { type: 'fail', errorKey: 'log.payFail' }
+    }
+    if (!preservesResourceReserve(player.resources, flat, p.reserveResources)) {
       return { type: 'fail', errorKey: 'log.payFail' }
     }
     payResources(player, flat)
+    paySupplyTokens(player, flat)
     emitPaidEvent(eventSink, player, flat, p.costType, sourceCard, p.sourceActionId)
     if (sourceCard) {
       addCardResourcePaid(player, sourceCard, flat)
@@ -327,10 +439,53 @@ export const payAction: ActionDefinition = {
   resolveChoice: ({ player, params, sourceCard, state, eventSink }, choice) => {
     const p = normalizePayParams(params)
     if (!p?.cost) return { type: 'fail', errorKey: 'log.payFail' }
-    if (!PaymentSolver.isComplexCost(p.cost)) {
-      // Non-ComplexCost paths never reach resolveChoice (execute paid eagerly
-      // and returned `ok`). Treat any stray invocation as a no-op success.
+    const optionPrefix = p.optionPrefix ?? 'pay:generic'
+    const choiceLooksLikePayment =
+      choice.startsWith(`${optionPrefix}:`) || /^\d+$/.test(choice)
+    if (!PaymentSolver.isComplexCost(p.cost) && !(p.costType && p.reserveResources)) {
       return { type: 'ok' }
+    }
+    if (!PaymentSolver.isComplexCost(p.cost) && p.costType && p.reserveResources) {
+      if (!choiceLooksLikePayment) {
+        return payAction.execute({
+          player,
+          params,
+          sourceCard,
+          state,
+          space: undefined as never,
+          eventSink,
+        })
+      }
+      const selection = resolveCostPaymentSelection(
+        player,
+        { fee: p.cost },
+        optionPrefix,
+        choice,
+        { type: 'fail', errorKey: 'log.payFail' },
+        {
+          costType: p.costType,
+          state,
+          includeReturnedCard: p.includeReturnedCard,
+          playedCards: p.playedCards,
+          reserveResources: p.reserveResources,
+        },
+      )
+      if (selection.type !== 'selected') {
+        return selection
+      }
+      return buildSelectedResult(
+        selection.solution,
+        sourceCard,
+        p.costType,
+        player,
+        state,
+        p.includeReturnedCard,
+        eventSink,
+        p.sourceActionId,
+      )
+    }
+    if (!PaymentSolver.isComplexCost(p.cost)) {
+      return { type: 'fail', errorKey: 'log.payFail' }
     }
     // If the value isn't one of the payment-prefix options the player saw,
     // assume it's a stale/improvement-level choice that landed here because
@@ -339,9 +494,6 @@ export const payAction: ActionDefinition = {
     // Re-emit the same selectPayment prompt by re-invoking execute so the
     // player can pick again, matching BGA's "missed the prompt → ask again"
     // UX and keeping legacy D83-style upper-flow tests compatible.
-    const optionPrefix = p.optionPrefix ?? 'pay:generic'
-    const choiceLooksLikePayment =
-      choice.startsWith(`${optionPrefix}:`) || /^\d+$/.test(choice)
     if (!choiceLooksLikePayment) {
       return payAction.execute({
         player,
@@ -352,7 +504,8 @@ export const payAction: ActionDefinition = {
         eventSink,
       })
     }
-    const selection = resolveCostPaymentSelection(
+    const selection = resolvePayActionPaymentSelection(
+      state,
       player,
       p.cost,
       optionPrefix,
@@ -362,6 +515,7 @@ export const payAction: ActionDefinition = {
         costType: p.costType,
         includeReturnedCard: p.includeReturnedCard,
         playedCards: p.playedCards,
+        reserveResources: p.reserveResources,
       },
     )
     if (selection.type !== 'selected') {

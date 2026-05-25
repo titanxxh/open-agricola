@@ -1,0 +1,100 @@
+import { describe, expect, it } from 'vitest'
+import type { PlayerState } from '../../contract/types'
+import {
+  getAvailableStableSupplyCount,
+  getOwnOrdinaryFenceBuildLimit,
+  getOwnOrdinaryFenceReserveCount,
+  MAX_STABLE_PIECES,
+} from '../supply-tokens'
+
+const stats = (): PlayerState['stats'] => ({
+  placedFarmers: 0,
+  firstPlayerCount: 0,
+  totalRoomsBuilt: 0,
+  totalMajorBuilt: 0,
+  totalMinorBuilt: 0,
+  totalOccupationBuilt: 0,
+  harvestedGrain: 0,
+  harvestedVegetable: 0,
+  resourcesFromBoard: {},
+  resourcesFromCards: {},
+  resourcesConverted: {},
+  foodFromConversion: {},
+  draftHistory: [],
+  draftDiscarded: [],
+})
+
+const player = (overrides: Partial<PlayerState> = {}): PlayerState => ({
+  id: 'p1',
+  name: 'Alice',
+  color: 'red',
+  resources: {
+    wood: 0,
+    clay: 0,
+    reed: 0,
+    stone: 0,
+    food: 0,
+    grain: 0,
+    vegetable: 0,
+    sheep: 0,
+    boar: 0,
+    cattle: 0,
+    begging: 0,
+  },
+  workers: [],
+  rooms: 2,
+  houseType: 'wood',
+  fields: [],
+  roomTiles: [],
+  stableTiles: [],
+  improvements: [],
+  minorHand: [],
+  minorPlayed: [],
+  occupationHand: [],
+  occupationPlayed: [],
+  extraOccupationsFromCards: [],
+  playedCards: [],
+  houseAnimalType: null,
+  houseAnimalCount: 0,
+  stableAnimals: {},
+  pastures: [],
+  fenceSegments: [],
+  majorEffects: { wellRounds: 0 },
+  startPlayer: false,
+  activeModifiers: [],
+  cardStates: {},
+  stats: stats(),
+  supplyTokensConsumed: {},
+  ...overrides,
+})
+
+describe('supply token helpers', () => {
+  it('separates fence reserve from build limit and card-held fences', () => {
+    const p = player({
+      fenceSegments: [
+        { edge: '0,0-H', type: 'fence', source: { kind: 'own', ownerPlayerId: 'p1' } },
+        { edge: '0,1-H', type: 'palisade', source: { kind: 'own', ownerPlayerId: 'p1' } },
+      ],
+      cardStates: { E74_AshTrees: { counters: { fences: 5 } } },
+      supplyTokensConsumed: { fence: 1 },
+    })
+
+    expect(getOwnOrdinaryFenceBuildLimit(p)).toBe(14)
+    expect(getOwnOrdinaryFenceReserveCount(p)).toBe(8)
+  })
+
+  it('counts stable reserve after consumed, built, future, lazybones, and farmhand reservations', () => {
+    const p = player({
+      stableTiles: [{ row: 0, col: 1 }],
+      supplyTokensConsumed: { stable: 1 },
+      cardStates: {
+        A89_StablePlanner: { extraData: { targetRounds: [6] } },
+        E148_Lazybones: { extraData: { reservedActionSpaces: ['grain-seeds'] } },
+        B85_FarmHand: { extraData: { position: { row: 1, col: 1 } } },
+      },
+    })
+
+    expect(getAvailableStableSupplyCount({ players: [p] } as never, p)).toBe(0)
+    expect(MAX_STABLE_PIECES).toBe(4)
+  })
+})

@@ -3,6 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag, writeCardExtraData, readCardExtraData } from '../helpers/card-state'
+import { hasFenceBuiltEvent } from '../helpers/fence-events'
 import type { CardImpl } from '../registry'
 import { B124_Trimmer } from '../../cards-display/B/B124_Trimmer'
 
@@ -47,14 +48,14 @@ const afterFencingListener: CardListenerRegistration = {
   id: 'B124-trimmer-after-fencing',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['fencing'],
+  actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!hasFenceBuiltEvent(context)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     const currentArea = countPastureTiles(context.player)
     const storedArea = getStoredArea(context.player)
     const children: ActionFlow[] = [
       specialEffect({ kind: 'set-extra-data', key: 'pastureArea', value: currentArea }),
-      specialEffect({ kind: 'set-flag', flag: true }),
     ]
     if (currentArea > storedArea) {
       children.push(gainLeaf(CARD_ID, { stone: 2 }))

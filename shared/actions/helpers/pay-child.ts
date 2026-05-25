@@ -4,18 +4,20 @@ import type {
   ComplexCost,
   CostModifierType,
   InternalActionChild,
+  PaymentResourceMap,
   Resource,
 } from '../../contract/types'
 import type { PaymentInfo } from '../../cards/card-effects'
 
 export type PayChildOptions = {
-  cost: Partial<Resource> | ComplexCost
+  cost: PaymentResourceMap | ComplexCost
   costType?: CostModifierType
   optionPrefix?: string
   paymentChoice?: string
   sourceCard?: string
   actionContext?: Record<string, unknown>
   playedCards?: string[]
+  reserveResources?: Partial<Resource>
   includeReturnedCard?: boolean
   sourceActionId?: string
 }
@@ -48,7 +50,7 @@ export const buildInternalPayChild = (options: PayChildOptions): InternalActionC
 export const paymentInfoFromPayResult = (result: ActionExecutionResult | undefined): PaymentInfo | undefined => {
   if (!result || result.type !== 'ok') return undefined
   const extra = result.extraData ?? {}
-  const resourcesPaid = (extra.resourcesPaid ?? result.resourcesPaid) as Partial<Resource> | undefined
+  const resourcesPaid = (extra.resourcesPaid ?? result.resourcesPaid) as PaymentResourceMap | undefined
   if (!resourcesPaid) return undefined
   return {
     resourcesPaid,

@@ -5,7 +5,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import '../../shared/cards/D/D109_SowingMaster'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { ActionFlow } from '../../shared/contract/types'
-import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 const CARD_ID = 'D109_SowingMaster'
 
@@ -64,7 +64,7 @@ describe('D109_SowingMaster session', () => {
     }
     // Submit the sow selection.
     if (resp.interaction?.stateId === 'wait') {
-      resp = session.resolveChoice(0, 'confirm', { crops: [{ row: 0, col: 0, crop: 'grain' }] })
+      resp = session.commitSelectionChoice(0, { crops: [{ row: 0, col: 0, crop: 'grain' }] })
     }
 
     while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { setCardFlag, isCardFlagged } from '../../shared/cards/helpers/card-state'
-import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
+import type { ActionChoiceOption, GameState, PlayerState, ActionSpace, Resource } from '../../shared/contract/types'
 
-import { markAllWorkersUsed } from '../../shared/domain/player'
+import { GameSession } from '../game/authoritative-session'
+import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/C/C42_RavenousHunger'
 import type { ActionFlow } from '../../shared/contract/types'
 
@@ -53,13 +54,74 @@ const createSpace = (id: string, gainPerRound: Partial<Record<string, number>> =
 
 const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
 
+const resources = (values: Partial<Resource> = {}): Resource => ({
+  wood: 0,
+  clay: 0,
+  reed: 0,
+  stone: 0,
+  food: 0,
+  grain: 0,
+  vegetable: 0,
+  sheep: 0,
+  boar: 0,
+  cattle: 0,
+  begging: 0,
+  ...values,
+})
+
+const setupSession = () => {
+  const session = new GameSession(undefined, undefined, { playerCount: 2 })
+  const state = session.getState().state
+  state.players = state.players.slice(0, 2)
+  state.currentPlayerIndex = 0
+  state.round = 14
+  state.roundPhase = 'work'
+
+  for (const player of state.players) {
+    setWorkersAtHome(state, player, 2)
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+  }
+
+  const player = state.players[0]!
+  player.minorPlayed.push(CARD_ID)
+  player.resources = resources()
+
+  for (const space of state.actionSpaces) {
+    space.takenBy = []
+    space.roundAvailable = Math.min(space.roundAvailable, 14)
+  }
+
+  const forest = state.actionSpaces.find((space) => space.id === 'forest')!
+  forest.resources.wood = 3
+  const fishing = state.actionSpaces.find((space) => space.id === 'fishing')!
+  fishing.resources.food = 2
+
+  session.loadState(state)
+  return session
+}
+
+const waitOptions = (resp: ReturnType<GameSession['getState']>): ActionChoiceOption[] => {
+  expect(resp.interaction.stateId).toBe('wait')
+  if (resp.interaction.stateId !== 'wait') return []
+  expect(resp.interaction.request.kind).toBe('choice')
+  return resp.interaction.options ?? []
+}
+
+const acceptOptional = (session: GameSession, resp: ReturnType<GameSession['getState']>) => {
+  const accept = waitOptions(resp).find((option) => option.value !== '__skip__')
+  expect(accept).toBeDefined()
+  return session.resolveChoice(0, accept!.value)
+}
+
 describe('C42_RavenousHunger', () => {
-  it('after vegetable-seeds: offers place-farmer with flag/unflag sequence', () => {
+  it('after vegetable-seeds: offers place-farmer with flag/unflag sequence and accumulation constraints', () => {
     const listener = findListener('C42-ravenous-hunger-after-place-farmer')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
     const state = createState(player)
+    state.actionSpaces = [createSpace('forest', { wood: 3 })]
 
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('vegetable-seeds'),
@@ -69,10 +131,10 @@ describe('C42_RavenousHunger', () => {
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('seq')
     const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
-    expect(children).toHaveLength(3)
+    expect(children).toHaveLength(2)
     expect(children[0]).toMatchObject({ actionId: 'special-effect', params: { kind: 'set-flag', flag: true } })
     expect(children[1].actionId).toBe('place-farmer')
-    expect(children[2]).toMatchObject({ actionId: 'special-effect', params: { kind: 'set-flag', flag: false } })
+    expect(children[1].actionContext).toMatchObject({ constraints: expect.arrayContaining(['forest']) })
   })
 
   it('does not trigger on non-vegetable-seeds spaces', () => {
@@ -121,9 +183,10 @@ describe('C42_RavenousHunger', () => {
     } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
-    expect(result!.flow!.type).toBe('leaf')
-    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
-    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 1 })
+    expect(result!.flow!.type).toBe('seq')
+    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
+    expect(children[0]).toMatchObject({ actionId: 'gain', params: { wood: 1 } })
+    expect(children[1]).toMatchObject({ actionId: 'special-effect', params: { kind: 'set-flag', flag: false } })
   })
 
   it('after collect when not flagged: no bonus', () => {
@@ -141,5 +204,54 @@ describe('C42_RavenousHunger', () => {
     } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
+  })
+
+  it('after vegetable-seeds offers optional second placement restricted to accumulation spaces', () => {
+    const session = setupSession()
+
+    let resp = session.takeAction(0, 'vegetable-seeds')
+    expect(resp.ok).toBe(true)
+    expect(waitOptions(resp).map((option) => option.value)).toContain('__skip__')
+
+    resp = acceptOptional(session, resp)
+    const optionValues = waitOptions(resp).map((option) => option.value)
+    const state = session.getState().state
+
+    expect(optionValues).toContain('forest')
+    expect(optionValues).toContain('fishing')
+    expect(optionValues).not.toContain('farmland')
+    expect(optionValues).not.toContain('day-laborer')
+    expect(optionValues.every((spaceId) => {
+      const space = state.actionSpaces.find((candidate) => candidate.id === spaceId)
+      return !!space && Object.values(space.gainPerRound).some((amount) => (amount ?? 0) > 0)
+    })).toBe(true)
+  })
+
+  it('second placement on an accumulation space collects and gains one extra accumulating resource', () => {
+    const session = setupSession()
+
+    let resp = session.takeAction(0, 'vegetable-seeds')
+    expect(resp.ok).toBe(true)
+    resp = acceptOptional(session, resp)
+    resp = session.resolveChoice(0, 'forest')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.vegetable).toBe(1)
+    expect(resp.state.players[0]!.resources.wood).toBe(4)
+    expect(resp.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(0)
+    expect(isCardFlagged(resp.state.players[0]!, CARD_ID)).toBe(false)
+  })
+
+  it('skip leaves no flag and grants no accumulation bonus', () => {
+    const session = setupSession()
+
+    const resp = session.takeAction(0, 'vegetable-seeds')
+    expect(resp.ok).toBe(true)
+    const skipped = session.resolveChoice(0, '__skip__')
+
+    expect(skipped.ok).toBe(true)
+    expect(skipped.state.players[0]!.resources.vegetable).toBe(1)
+    expect(skipped.state.players[0]!.resources.wood).toBe(0)
+    expect(isCardFlagged(skipped.state.players[0]!, CARD_ID)).toBe(false)
   })
 })

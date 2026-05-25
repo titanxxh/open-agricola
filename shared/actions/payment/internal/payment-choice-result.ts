@@ -14,6 +14,8 @@ import type {
   ActionExecutionResult,
   ComplexCost,
   CostModifierType,
+  GameState,
+  PaymentResourceMap,
   PaymentSolution,
   PlayerState,
   Resource,
@@ -66,6 +68,32 @@ const describePaymentEffectPreview = (
     sourceCards: sourceCards.length > 0 ? sourceCards : undefined,
   }
 }
+
+export const preservesResourceReserve = (
+  resources: Partial<Resource>,
+  resourcesPaid: Partial<Resource>,
+  reserveResources: Partial<Resource> | undefined,
+) => {
+  if (!reserveResources) return true
+  return Object.entries(reserveResources).every(([rawKey, rawMinimum]) => {
+    if (typeof rawMinimum !== 'number' || rawMinimum <= 0) return true
+    const key = rawKey as keyof Resource
+    return (resources[key] ?? 0) - (resourcesPaid[key] ?? 0) >= rawMinimum
+  })
+}
+
+export const filterPaymentSolutionsByReserve = (
+  player: PlayerState,
+  solutions: PaymentSolution[],
+  reserveResources: Partial<Resource> | undefined,
+) =>
+  solutions.filter((solution) =>
+    preservesResourceReserve(
+      player.resources,
+      solution.resourcesPaid,
+      reserveResources,
+    ),
+  )
 
 export const buildPaymentChoiceResult = (
   solutions: PaymentSolution[],
@@ -135,11 +163,13 @@ type ResolveCostPaymentSelectionOptions = {
   costType?: CostModifierType
   includeReturnedCard?: boolean
   playedCards?: string[]
+  state?: GameState
+  reserveResources?: Partial<Resource>
 }
 
 export const resolveCostPaymentSelection = (
   player: PlayerState,
-  cost: Partial<Resource> | ComplexCost,
+  cost: PaymentResourceMap | ComplexCost,
   optionValuePrefix: string,
   paymentChoice: string | undefined,
   failure: ActionExecutionResult,
@@ -153,11 +183,16 @@ export const resolveCostPaymentSelection = (
   const normalizedCost = isComplexCost(cost)
     ? cost
     : { fee: cost }
-  const solutions = computeAllBuyableCombinations(
+  const solutions = filterPaymentSolutionsByReserve(
     player,
-    normalizedCost,
-    options.playedCards,
-    options.costType,
+    computeAllBuyableCombinations(
+      player,
+      normalizedCost,
+      options.playedCards,
+      options.costType,
+      options.state,
+    ),
+    options.reserveResources,
   )
   return resolvePaymentSolutionSelection(
     solutions,

@@ -4,6 +4,12 @@ import { addCardResourceGained } from '../../../cards/helpers/card-state'
 import { gainResources } from '../gain'
 import { trackWorkPhaseBuildingResources } from '../../../session/work-phase-resources'
 import { addResourcesFromCards } from '../../../session/stats'
+import { REAL_RESOURCE_KEYS } from '../../../contract/resource-keys'
+
+const realResourceKeys = new Set<string>(REAL_RESOURCE_KEYS)
+
+const isRealResourceKey = (resource: string): resource is keyof Resource =>
+  realResourceKeys.has(resource)
 
 export const popCardStackAction: ActionDefinition = {
   id: 'pop-card-stack',
@@ -18,6 +24,16 @@ export const popCardStackAction: ActionDefinition = {
     }
     const resource = popFromCardStack(player, sourceCard)
     if (!resource) {
+      return { type: 'ok' }
+    }
+    if (!isRealResourceKey(resource)) {
+      eventSink?.emit<'card.stackChanged'>({
+        type: 'card.stackChanged',
+        cardId: sourceCard,
+        targetPlayerId: player.id,
+        delta: -1,
+        reason: 'take',
+      })
       return { type: 'ok' }
     }
     const gain: Partial<Resource> = { [resource]: 1 }

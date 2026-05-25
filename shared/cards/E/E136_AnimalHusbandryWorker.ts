@@ -14,23 +14,23 @@ const roundsLeftWoodBonus = (state: { round: number }): number => {
 
 export const E136_AnimalHusbandryWorker_impl = {
   effect: {
-  id: CARD_ID,
-  onBuy: (state) => {
-    const wood = roundsLeftWoodBonus(state)
-    if (wood <= 0) return
-    return {
-      type: 'seq' as const,
-      children: [
-        gainLeaf(CARD_ID, { wood }),
-        { type: 'leaf' as const, actionId: 'fencing', sourceCard: CARD_ID, optional: true },
-      ],
-    }
+    id: CARD_ID,
+    onBuy: (state) => {
+      const wood = roundsLeftWoodBonus(state)
+      if (wood <= 0) return
+      return {
+        type: 'seq' as const,
+        children: [
+          gainLeaf(CARD_ID, { wood }),
+          { type: 'leaf' as const, actionId: 'fence', sourceCard: CARD_ID, optional: true },
+        ],
+      }
+    },
+    computeBonusScore: (state, player) => {
+      const myPastures = player.pastures.length
+      const maxPastures = Math.max(...state.players.map((p) => p.pastures.length))
+      return myPastures === maxPastures && myPastures > 0 ? 2 : 0
+    },
   },
-  computeBonusScore: (state, player) => {
-    const myPastures = player.pastures.length
-    const maxPastures = Math.max(...state.players.map((p) => p.pastures.length))
-    return myPastures === maxPastures && myPastures > 0 ? 2 : 0
-  },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl

@@ -1,21 +1,44 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { PaymentSolver } from '../index'
 import type { PaymentCtx } from '../index'
+import { computeAllBuyableCombinations } from '../internal'
 import type { GameState, PlayerState } from '../../../contract/types'
 
 const makePlayerWithResources = (res: Partial<Record<string, number>>): PlayerState => {
   return {
     id: 'p1',
     resources: res,
+    stableTiles: [],
+    fenceSegments: [],
     minorHand: [],
     cardStates: {},
     activeModifiers: [],
+    supplyTokensConsumed: {},
   } as unknown as PlayerState
 }
 
 const makeState = (player: PlayerState): GameState => ({
   players: [player],
 } as unknown as GameState)
+
+const fullStableTiles = () => [
+  { row: 0, col: 0 },
+  { row: 0, col: 1 },
+  { row: 1, col: 0 },
+  { row: 1, col: 1 },
+]
+
+const setStableReserve = (player: PlayerState, reserve: number): void => {
+  player.stableTiles = fullStableTiles().slice(0, 4 - reserve)
+}
+
+const setFenceReserve = (player: PlayerState, reserve: number): void => {
+  player.fenceSegments = Array.from({ length: 15 - reserve }, (_, index) => ({
+    edge: `H-${index}-0`,
+    type: 'fence' as const,
+    source: { kind: 'own' as const, ownerPlayerId: player.id },
+  }))
+}
 
 const ctx: PaymentCtx = { actionId: 'test-action', costType: 'none' }
 
@@ -35,6 +58,149 @@ describe('PaymentSolver', () => {
       const state = makeState(makePlayerWithResources({ wood: 5 }))
       const options = PaymentSolver.computeOptions(state, 0, { wood: 3 }, ctx)
       expect(options.length).toBe(1)
+    })
+
+    it('merges required returned-card cost into resourcesPaid and executes supply token payment', () => {
+      const player = makePlayerWithResources({ wood: 2 })
+      const state = makeState(player)
+      const cardCtx: PaymentCtx = {
+        ...ctx,
+        playedCards: ['Major_Fireplace1'],
+      }
+      const cost = {
+        fee: { wood: 2 },
+        cards: {
+          type: 'Major',
+          list: ['Major_Fireplace1'],
+          cost: { stable: 1 },
+          required: true,
+        },
+      }
+
+      const options = PaymentSolver.computeOptions(state, 0, cost, cardCtx)
+      expect(options).toHaveLength(1)
+      expect(options[0]).toMatchObject({
+        cardUsed: 'Major_Fireplace1',
+        resourcesPaid: { wood: 2, stable: 1 },
+      })
+
+      const result = PaymentSolver.execute(state, 0, cost, { optionIndex: 0 }, cardCtx)
+      expect(result.ok).toBe(true)
+      expect(player.resources.wood).toBe(0)
+      expect(player.supplyTokensConsumed?.stable).toBe(1)
+      expect(player.stableTiles).toHaveLength(0)
+
+      const noReservePlayer = makePlayerWithResources({ wood: 2 })
+      noReservePlayer.stableTiles = fullStableTiles()
+      const noReserveState = makeState(noReservePlayer)
+      const noReserveOptions = PaymentSolver.computeOptions(noReserveState, 0, cost, cardCtx)
+      expect(noReserveOptions).toEqual([])
+    })
+
+    it('requires stable reserve for optional returned-card supply-token cost', () => {
+      const player = makePlayerWithResources({ clay: 0 })
+      const state = makeState(player)
+      const cardCtx: PaymentCtx = {
+        ...ctx,
+        playedCards: ['Major_Fireplace1'],
+      }
+      const cost = {
+        fee: { clay: 4 },
+        cards: {
+          type: 'Major',
+          list: ['Major_Fireplace1'],
+          cost: { stable: 1 },
+        },
+      }
+
+      const options = PaymentSolver.computeOptions(state, 0, cost, cardCtx)
+      const cardOptionIndex = options.findIndex((option) => option.cardUsed === 'Major_Fireplace1')
+      expect(cardOptionIndex).toBeGreaterThanOrEqual(0)
+      expect(options[cardOptionIndex]?.resourcesPaid).toEqual({ stable: 1 })
+
+      const result = PaymentSolver.execute(state, 0, cost, { optionIndex: cardOptionIndex }, cardCtx)
+      expect(result.ok).toBe(true)
+      expect(player.supplyTokensConsumed?.stable).toBe(1)
+      expect(player.stableTiles).toHaveLength(0)
+
+      const noReservePlayer = makePlayerWithResources({ clay: 0 })
+      noReservePlayer.stableTiles = fullStableTiles()
+      const noReserveState = makeState(noReservePlayer)
+      const noReserveOptions = PaymentSolver.computeOptions(noReserveState, 0, cost, cardCtx)
+      expect(noReserveOptions.some((option) => option.cardUsed === 'Major_Fireplace1')).toBe(false)
+    })
+
+    it('checks required returned-card stable cost against combined reserve', () => {
+      const cardCtx: PaymentCtx = {
+        ...ctx,
+        playedCards: ['Major_Fireplace1'],
+      }
+      const cost = {
+        fee: { stable: 1 },
+        cards: {
+          type: 'Major',
+          list: ['Major_Fireplace1'],
+          cost: { stable: 1 },
+          required: true,
+        },
+      }
+
+      const overReservePlayer = makePlayerWithResources({})
+      setStableReserve(overReservePlayer, 1)
+      expect(PaymentSolver.computeOptions(makeState(overReservePlayer), 0, cost, cardCtx)).toEqual([])
+
+      const exactReservePlayer = makePlayerWithResources({})
+      setStableReserve(exactReservePlayer, 2)
+      const options = PaymentSolver.computeOptions(makeState(exactReservePlayer), 0, cost, cardCtx)
+      expect(options).toHaveLength(1)
+      expect(options[0]).toMatchObject({
+        cardUsed: 'Major_Fireplace1',
+        resourcesPaid: { stable: 2 },
+      })
+    })
+
+    it('checks required returned-card fence cost against combined reserve', () => {
+      const cardCtx: PaymentCtx = {
+        ...ctx,
+        playedCards: ['Major_Fireplace1'],
+      }
+      const cost = {
+        fee: { fence: 1 },
+        cards: {
+          type: 'Major',
+          list: ['Major_Fireplace1'],
+          cost: { fence: 1 },
+          required: true,
+        },
+      }
+
+      const overReservePlayer = makePlayerWithResources({})
+      setFenceReserve(overReservePlayer, 1)
+      expect(PaymentSolver.computeOptions(makeState(overReservePlayer), 0, cost, cardCtx)).toEqual([])
+
+      const exactReservePlayer = makePlayerWithResources({})
+      setFenceReserve(exactReservePlayer, 2)
+      const options = PaymentSolver.computeOptions(makeState(exactReservePlayer), 0, cost, cardCtx)
+      expect(options).toHaveLength(1)
+      expect(options[0]).toMatchObject({
+        cardUsed: 'Major_Fireplace1',
+        resourcesPaid: { fence: 2 },
+      })
+    })
+
+    it('does not pay required returned-card supply-token cost without state', () => {
+      const player = makePlayerWithResources({ wood: 1 })
+      const cost = {
+        fee: { wood: 1 },
+        cards: {
+          type: 'Major',
+          list: ['Major_Fireplace1'],
+          cost: { stable: 1 },
+          required: true,
+        },
+      }
+      const options = computeAllBuyableCombinations(player, cost, ['Major_Fireplace1'])
+      expect(options).toEqual([])
     })
   })
 

@@ -41,7 +41,7 @@ describe('E108 Blackberry Farmer — session (palisades excluded)', () => {
 
     // Tile (0,0) fenced with 2 fences + 2 palisades
     // Palisades on border: H-0-0 (top), V-0-0 (left). Fences on internal: H-1-0, V-0-1.
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       edges: ['H-1-0', 'V-0-1'],
       palisadeEdges: ['H-0-0', 'V-0-0'],
       extraWood: 0,

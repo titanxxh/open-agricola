@@ -103,6 +103,16 @@ describe('event guards', () => {
     })).not.toThrow()
   })
 
+  it('accepts stable tokens in future meeple queued entries', () => {
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'futureMeeple.queued',
+      playerId: 'p1',
+      cardId: 'A89_StablePlanner',
+      entries: [{ round: 6, resources: { stable: 1 } }],
+    })).not.toThrow()
+  })
+
   it('accepts fence-built provenance metadata', () => {
     expect(() => assertKnownGameEventShape({
       ...baseEvent,
@@ -111,6 +121,55 @@ describe('event guards', () => {
       newFenceEdges: ['H-0-0'],
       newPastures: [{ tiles: [{ row: 0, col: 0 }] }],
     })).not.toThrow()
+  })
+
+  it('accepts supply tokens in resource paid events', () => {
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'resource.paid',
+      resources: { fence: 1, stable: 1 },
+      paymentFor: 'cardEffect',
+      paymentSources: [
+        {
+          from: { kind: 'player', playerId: 'p1' },
+          resources: { fence: 1, stable: 1 },
+        },
+      ],
+    })).not.toThrow()
+  })
+
+  it('rejects supply tokens outside resource paid events', () => {
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'resource.moved',
+      resources: { fence: 1 },
+      from: { kind: 'supply' },
+      to: { kind: 'player', playerId: 'p1' },
+      reason: 'gain',
+    })).toThrow(/unknown resource fence/)
+
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'resource.moved',
+      resources: { stable: 1 },
+      from: { kind: 'supply' },
+      to: { kind: 'player', playerId: 'p1' },
+      reason: 'gain',
+    })).toThrow(/unknown resource stable/)
+
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'action.accumulated',
+      spaceId: 'forest',
+      resources: { fence: 1 },
+    })).toThrow(/unknown resource fence/)
+
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'action.accumulated',
+      spaceId: 'forest',
+      resources: { stable: 1 },
+    })).toThrow(/unknown resource stable/)
   })
 
   it.each([

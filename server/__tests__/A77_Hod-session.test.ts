@@ -5,7 +5,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A77_Hod'
 import type { ActionFlow } from '../../shared/contract/types'
-import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 describe('A77_Hod session', () => {
   const setup = (currentPlayerIndex = 0) => {

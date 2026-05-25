@@ -2,6 +2,7 @@ import type { CardImpl } from '../registry'
 import { E97_Beneficiary } from '../../cards-display/E/E97_Beneficiary'
 
 const CARD_ID = E97_Beneficiary.id
+const STALLWRIGHT_ID = 'E89_Stallwright'
 
 export const E97_Beneficiary_impl = {
   effect: {
@@ -11,17 +12,33 @@ export const E97_Beneficiary_impl = {
       if (player.occupationPlayed.length !== 3) return
 
       return {
-        type: 'xor' as const,
+        type: 'or' as const,
         optional: true,
         children: [
           {
             type: 'seq' as const,
+            choiceLabelKey: 'actions.lessons.name',
             children: [
+              {
+                type: 'leaf' as const,
+                actionId: 'occupation-gate',
+                sourceCard: CARD_ID,
+                actionContext: { occupationParams: { exactCost: { food: 1 } } },
+              },
+              ...(player.occupationPlayed.includes(STALLWRIGHT_ID)
+                ? [{
+                    type: 'leaf' as const,
+                    actionId: 'stables',
+                    sourceCard: STALLWRIGHT_ID,
+                    optional: true,
+                    actionContext: { max: 1, exactCost: { max: 1 }, trueAction: false },
+                  }]
+                : []),
               {
                 type: 'leaf' as const,
                 actionId: 'occupation',
                 sourceCard: CARD_ID,
-                params: { cost: { food: 1 } },
+                params: { exactCost: { food: 1 } },
               },
             ],
           },

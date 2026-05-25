@@ -10,11 +10,30 @@ export const B149_OpenAirFarmer_impl = {
   onBuy: (_state, _player) => ({
     type: 'seq' as const,
     children: [
-      payLeaf({ cardId: CARD_ID, cost: { wood: 2 } }),
+      payLeaf({ cardId: CARD_ID, cost: { stable: 3 } }),
       {
         type: 'leaf' as const,
-        actionId: 'fencing',
+        actionId: 'fence',
+        expandFlow: true,
         sourceCard: CARD_ID,
+        actionContext: {
+          trueAction: false,
+          fencePolicy: {
+            sourcePolicy: 'ownOnly',
+            segmentBounds: { total: { min: 1, max: 6 } },
+            newPastureBounds: {
+              count: { min: 1, max: 1 },
+              totalSize: { min: 2, max: 2 },
+            },
+            costPolicy: { fence: { wood: 0 }, fixedWood: 2 },
+            cancelPolicy: 'forbidCancel',
+            pastureBounds: {
+              newPastures: { min: 1, max: 1 },
+              changedPastures: { min: 1, max: 1 },
+              newPastureSize: { min: 2, max: 2 },
+            },
+          },
+        },
       },
     ],
   }),

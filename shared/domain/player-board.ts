@@ -13,7 +13,7 @@ type AnimalType = 'sheep' | 'boar' | 'cattle'
  * `totalAnimalCapacity`, `familySize`) never mutate. The single
  * exception is `animals.enforceCapacity()`, which intentionally
  * mutates `player.pastures` / `player.resources` / `player.houseAnimal*`
- * / `player.stableAnimals` for legacy compatibility (see
+   * / `player.stableAnimals` to keep the current flat state in sync (see
  * `AnimalZones.enforceCapacity` docblock).
  */
 export class PlayerBoard {

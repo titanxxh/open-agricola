@@ -76,7 +76,7 @@ describe('E91_PlowBuilder session', () => {
     // Commit the plow choice
     const tile = resp.interaction.farm.selectableTiles[0]
     expect(tile).toBeDefined()
-    resp = session.resolveChoice(0, 'confirm', { tile })
+    resp = session.commitSelectionChoice(0, { tile })
     expect(resp.ok).toBe(true)
 
     const p = resp.state.players[0]!
@@ -216,7 +216,7 @@ describe('E91_PlowBuilder session', () => {
     // Complete the plow
     const tile = resp.interaction.farm.selectableTiles[0]
     expect(tile).toBeDefined()
-    resp = session.resolveChoice(0, 'confirm', { tile })
+    resp = session.commitSelectionChoice(0, { tile })
     expect(resp.ok).toBe(true)
 
     // Card should now be flagged

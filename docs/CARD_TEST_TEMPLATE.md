@@ -164,12 +164,7 @@
 | `takeAction(playerIndex, spaceId)` | `takeAction` | `action` | 放工人 / 触发主行动 |
 | `takeAnytimeAction(playerIndex, actionId)` | `takeAnytimeAction` | `anytime` | 触发 anytime 卡牌效果 |
 | `resolveChoice(playerIndex, value)` | `resolveChoice` | `choice` | 在 `interaction.stateId === 'choice'` 时回应 |
-| `commitFarmChoice(playerIndex, farmType, payload)` | `commitFarm` | `commitFarm` | 围栏 / 房间 / 马厩 / 犁地 / 播种 提交 |
-| `commitSelectionChoice(playerIndex, payload)` | `commitSelection` | `commitSelection` | `selection` 类（farm-position）交互提交 |
-| `confirmAnimalReorg(playerIndex, zones)` | `confirmReorg` | `reorg` | 动物重整 |
-| `confirmHarvestFeed(playerIndex, selections)` | `confirmFeed` | `feed` | 喂食 |
-| `confirmNextPlayer()` | `confirmNextPlayer` | `nextPlayer` | 下一玩家确认 |
-| `confirmPlayerSwitch()` | `confirmPlayerSwitch` | `confirmPlayerSwitch` | 多人轮转 / PlayerSwitch 节点 |
+| `commitSelectionChoice(playerIndex, payload)` | `commitSelection` | `commitSelection` | 围栏 / 房间 / 马厩 / 犁地 / 播种 / farm-position / occupation-hand / resource selection 提交 |
 | `performRoundEnd()` | — | `roundEnd` | 推进回合（一般由引擎自动触发） |
 | `undoStep()` / `undoAction()` | `undoStep` / `undoAction` | `undoStep` / `undoAction` | 单步 / 整动作回退 |
 
@@ -182,9 +177,8 @@
 - `createRoom` / `joinRoom` / `dissolveRoom`
 - `getState`
 - `action` / `choice` / `anytime`
-- `reorg` / `feed`
-- `nextPlayer` / `confirmPlayerSwitch` / `roundEnd`
-- `commitFarm` / `commitSelection`
+- `roundEnd`
+- `commitSelection`
 - `undoStep` / `undoAction`
 - `newGame` / `loadGame`
 - `devSetResources` / `devSetRound` / `devDrawCard` / `devPlayCard` / `devCreatePasture`
@@ -304,7 +298,7 @@ state.players[0].resources = {
 按需要补充：
 
 - 行动格占用：`state.actionSpaces[k].takenBy.push({ playerIndex: X, workerId: state.players[X].workers[i].id })`
-- 圈地 / 田地 / 马厩 / 房间：直接 mutate `pastures` / `fields` / `stableTiles` / `roomTiles`，或调 `commitFarmChoice` 走真实路径
+- 圈地 / 田地 / 马厩 / 房间：直接 mutate `pastures` / `fields` / `stableTiles` / `roomTiles`，或调 `commitSelectionChoice` 走真实路径
 - 预置 `cardStates`：`state.players[X].cardStates[CARD_ID] = { flags: {...}, counts: {...}, extraData: {...} }`
 - 预设回合 / 阶段：`state.round = R` + `performRoundEnd()`
 
@@ -347,10 +341,9 @@ const resp = session.takeAction(X, 'ACTION_ID')
 // stateId === 'choice'
 session.resolveChoice(X, 'CHOICE_VALUE')
 
-// stateId === 'farmSelect'
-session.commitFarmChoice(X, 'fence', { edges: [...] })
-
-// stateId === 'selection'
+// farm-select / selection / resource selection
+session.commitSelectionChoice(X, { edges: [...] })
+session.commitSelectionChoice(X, { tile: { row, col } })
 session.commitSelectionChoice(X, { positions: [{ row, col }, ...] })
 ```
 

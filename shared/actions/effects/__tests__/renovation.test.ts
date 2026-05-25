@@ -149,11 +149,13 @@ describe('renovateHouseAction (engine opt-in choice flow)', () => {
     player: PlayerState,
     params?: Record<string, unknown>,
     events: GameEvent[] = [],
+    actionContext?: Record<string, unknown>,
   ) => ({
     state: { players: [player] } as never,
     player,
     space: { id: 'renovate-house' } as never,
     params,
+    actionContext,
     eventSink: {
       emit: (event: GameEvent) => {
         events.push(event)
@@ -217,6 +219,32 @@ describe('renovateHouseAction (engine opt-in choice flow)', () => {
       to: 'clay',
       rooms: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
     })
+  })
+
+  it('resolveChoice uses exactCost from actionContext for free renovation', () => {
+    const player = createPlayer()
+    const result = renovateHouseAction.resolveChoice!(
+      buildExecutionContext(player, undefined, [], { exactCost: {} }),
+      'clay',
+    )
+
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.internalChildren?.beforeHostListeners?.[0]?.params).toMatchObject({
+      cost: { fee: {} },
+      costType: 'renovation',
+      optionPrefix: 'renovation',
+    })
+  })
+
+  it('canBeExecutedByPlayer sees exactCost from actionContext', () => {
+    const player = createPlayer()
+
+    expect(renovateHouseAction.canBeExecutedByPlayer(
+      { players: [player] } as never,
+      player,
+      { actionContext: { exactCost: {} } },
+    )).toBe(true)
   })
 
   it('resolveChoice("stone") returns a stone pay child without mutating before payment (Conservator path)', () => {

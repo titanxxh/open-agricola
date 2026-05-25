@@ -64,7 +64,7 @@ describe('B27 Toolbox session', () => {
       // actually build (B27 needs a real construct to trigger onEndTurn).
       if (promptKey === 'ui.interactionRoomSelect' && resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'room') {
         const tile = resp.interaction.farm.selectableTiles[0]!
-        resp = session.resolveChoice(0, 'confirm', { rooms: [tile] })
+        resp = session.commitSelectionChoice(0, { rooms: [tile] })
         continue
       }
       // 若进入 farm-expansion OR 第二轮（含 __done__），选 done 结束
@@ -136,7 +136,7 @@ describe('B27 Toolbox session', () => {
       // actually build (test asserts construct → setFlag flow).
       if (promptKey === 'ui.interactionRoomSelect' && resp.interaction.stateId === 'wait' && resp.interaction.farm.farmType === 'room') {
         const tile = resp.interaction.farm.selectableTiles[0]!
-        resp = session.resolveChoice(0, 'confirm', { rooms: [tile] })
+        resp = session.commitSelectionChoice(0, { rooms: [tile] })
         continue
       }
       if (resp.interaction.request.kind !== 'choice') break

@@ -37,7 +37,7 @@ describe('D20_TurnwrestPlow session', () => {
     expect(resp.interaction.stateId).toBe('wait')
 
     const tile1 = resp.interaction.farm.selectableTiles[0]
-    resp = session.resolveChoice(0, 'confirm', { tile: tile1 })
+    resp = session.commitSelectionChoice(0, { tile: tile1 })
     expect(resp.ok).toBe(true)
 
     // First optional plow
@@ -49,7 +49,7 @@ describe('D20_TurnwrestPlow session', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     const tile2 = resp.interaction.farm.selectableTiles[0]
-    resp = session.resolveChoice(0, 'confirm', { tile: tile2 })
+    resp = session.commitSelectionChoice(0, { tile: tile2 })
     expect(resp.ok).toBe(true)
 
     // Second optional plow
@@ -61,7 +61,7 @@ describe('D20_TurnwrestPlow session', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     const tile3 = resp.interaction.farm.selectableTiles[0]
-    resp = session.resolveChoice(0, 'confirm', { tile: tile3 })
+    resp = session.commitSelectionChoice(0, { tile: tile3 })
     expect(resp.ok).toBe(true)
 
     // Stack should be empty (2 - 2)
@@ -92,7 +92,7 @@ describe('D20_TurnwrestPlow session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     const tile1 = resp.interaction.farm?.selectableTiles[0]
     expect(tile1).toBeDefined()
-    resp = session.resolveChoice(0, 'confirm', { tile: tile1 })
+    resp = session.commitSelectionChoice(0, { tile: tile1 })
     expect(resp.ok).toBe(true)
 
     // After D20 plow, the cultivation OrNode 'plow vs sow' choice surfaces.
@@ -109,7 +109,7 @@ describe('D20_TurnwrestPlow session', () => {
       expect(resp.ok).toBe(true)
       if (resp.interaction.stateId === 'wait' && resp.interaction.farm) {
         const tile2 = resp.interaction.farm.selectableTiles[0]
-        resp = session.resolveChoice(0, 'confirm', { tile: tile2 })
+        resp = session.commitSelectionChoice(0, { tile: tile2 })
         expect(resp.ok).toBe(true)
       }
     }
@@ -124,7 +124,7 @@ describe('D20_TurnwrestPlow session', () => {
 
     let resp = session.takeAction(0, 'farmland')
     const tile1 = resp.interaction.farm.selectableTiles[0]
-    resp = session.resolveChoice(0, 'confirm', { tile: tile1 })
+    resp = session.commitSelectionChoice(0, { tile: tile1 })
 
     // Skip optional
     expect(resp.interaction.stateId).toBe('wait')

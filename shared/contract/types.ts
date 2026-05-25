@@ -16,6 +16,13 @@ export type Resource = {
   begging: number
 }
 
+export type SupplyTokenKey = 'fence' | 'stable'
+export type SupplyTokenCounts = Partial<Record<SupplyTokenKey, number>>
+export type PaymentResource = Resource & Record<SupplyTokenKey, number>
+export type PaymentResourceMap = Partial<PaymentResource>
+export type PaymentResourceKey = keyof PaymentResource
+export type FutureMeepleResourceMap = Partial<Resource> & Partial<Pick<PaymentResource, 'stable'>>
+
 // Pseudo-resource map — used ONLY by CardResourceStats.gained to record
 // BGA-style "Plows: N / Built: N rooms / Occupations played: N" lines via
 // the same Partial<Resource>-shaped storage slot. These keys are NEVER
@@ -36,6 +43,10 @@ export type PseudoResourceMap = {
 export type CardStatGained = Partial<Resource> & PseudoResourceMap
 
 export type ResourceKey = keyof Resource
+
+export type ExactCost = Partial<Resource> & {
+  max?: number
+}
 
 export type TradeSideEffect =
   | { type: 'drainSpace'; spaceId: string; resource: ResourceKey }
@@ -130,17 +141,17 @@ export type BonusModifier = {
 export type CostModifier = TradeModifier | BonusModifier
 
 export type ComplexCost = {
-  fee?: Partial<Resource>
-  fees?: Partial<Resource>[]
-  unitFee?: Partial<Resource>      // per-unit cost; total fee += nb × unitFee
+  fee?: PaymentResourceMap
+  fees?: PaymentResourceMap[]
+  unitFee?: PaymentResourceMap      // per-unit cost; total fee += nb × unitFee
   nb?: number                       // unit count; construct=rooms, renovation=player.rooms
   trades?: Trade[]
-  cards?: { type: string; list: string[]; cost?: Partial<Resource>; required?: boolean }
+  cards?: { type: string; list: string[]; cost?: PaymentResourceMap; required?: boolean }
   bonuses?: Bonus[]
 }
 
 export type PaymentSolution = {
-  resourcesPaid: Partial<Resource>
+  resourcesPaid: PaymentResourceMap
   tradesUsed: { trade: Trade; times: number }[]
   cardUsed?: string
   bonusUsed?: string
@@ -206,6 +217,7 @@ export type PlayerState = {
   activeModifiers: CostModifier[]
   cardStates: CardStates
   stats: PlayerStats
+  supplyTokensConsumed?: SupplyTokenCounts
   /**
    * Session-transient scratchpad: card ids of `BonusModifier` entries whose
    * `sources` fired during the currently-executing action. Initialised by
@@ -289,7 +301,7 @@ export type FutureMeeple = {
   playerId: string
   round: number
   actionId: string | null
-  resources: Partial<Resource>
+  resources: FutureMeepleResourceMap
   roomType?: FutureMeepleRoomType
 }
 
@@ -313,7 +325,7 @@ export type FutureMeepleRequest =
       sourceSummary?: FutureMeepleSourceSummary
       startRound: number
       count: number
-      resources: Partial<Resource>
+      resources: FutureMeepleResourceMap
     }
   | {
       cardId: string
@@ -321,7 +333,7 @@ export type FutureMeepleRequest =
       sourceSummary?: FutureMeepleSourceSummary
       entries: {
         round: number
-        resources?: Partial<Resource>
+        resources?: FutureMeepleResourceMap
         roomType?: FutureMeepleRoomType
       }[]
     }
@@ -447,13 +459,13 @@ export type ActionCostPreview = {
 export type ChoiceEffectPreview =
   | {
       kind: 'resourceExchange'
-      resourcesPaid?: Partial<Resource>
+      resourcesPaid?: PaymentResourceMap
       resourcesGained?: Partial<Resource>
       bonusVp?: number
     }
   | {
       kind: 'payment'
-      resourcesPaid?: Partial<Resource>
+      resourcesPaid?: PaymentResourceMap
       cardUsed?: string
       /** Card ids whose modifiers contributed to this payment (bonus.sources + trade.sourceId). */
       sourceCards?: string[]
@@ -521,7 +533,7 @@ export type InternalActionChildren = {
 }
 
 export type ActionExecutionResult =
-  | { type: 'ok'; resourcesGained?: Partial<Resource>; resourcesPaid?: Partial<Resource>; extraData?: Record<string, unknown>; internalChildren?: InternalActionChildren }
+  | { type: 'ok'; resourcesGained?: Partial<Resource>; resourcesPaid?: PaymentResourceMap; extraData?: Record<string, unknown>; internalChildren?: InternalActionChildren }
   | { type: 'request'; request: InteractionRequest; promptKey?: PromptKey; promptParams?: Record<string, unknown>; sourceCard?: string; extraData?: Record<string, unknown> }
   | { type: 'fail'; errorKey: string; recoverable?: boolean }
   | { type: 'flow'; flow: ActionFlow; extraData?: Record<string, unknown> }
@@ -764,7 +776,6 @@ export type InteractionRequest =
 export type InteractionCommand =
   | 'takeAction'
   | 'resolveChoice'
-  | 'commitFarm'
   | 'commitSelection'
   | 'takeAnytimeAction'
   | 'undoStep'
@@ -853,8 +864,8 @@ export type InteractionState =
       sourceCard?: string
       request: InteractionRequest
       // Transitional kind-specific accessor fields (Task 4 → cleaned up in Task 13).
-      // Frontend / tests can read these directly while we migrate callers off
-      // the legacy stateId switches.
+      // Frontend / tests can read these directly while typed request handlers
+      // replace stateId-specific branching.
       options?: ActionChoiceOption[]
       costOverride?: Partial<Resource>
       farm?: InteractionFarmSelection

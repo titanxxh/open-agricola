@@ -4,6 +4,21 @@ import { E88_MasterFencer } from '../../cards-display/E/E88_MasterFencer'
 
 const CARD_ID = E88_MasterFencer.id
 
+const freeFencingLeaf = (max: number) => ({
+  type: 'leaf' as const,
+  actionId: 'fence',
+  expandFlow: true,
+  sourceCard: CARD_ID,
+  actionContext: {
+    trueAction: false,
+    fencePolicy: {
+      segmentBounds: { total: { min: 1, max } },
+      costPolicy: { fence: { wood: 0 } },
+      cancelPolicy: 'forbidCancel',
+    },
+  },
+})
+
 export const E88_MasterFencer_impl = {
   effect: {
   id: CARD_ID,
@@ -20,7 +35,7 @@ export const E88_MasterFencer_impl = {
         type: 'seq' as const,
         children: [
           payLeaf({ cardId: CARD_ID, cost: { wood: 2 } }),
-          { type: 'leaf' as const, actionId: 'fencing', params: { maxFences: 3, freeFencing: true }, sourceCard: CARD_ID },
+          freeFencingLeaf(3),
         ],
         choiceLabelKey: 'ui.interactionMasterFencer2',
       })
@@ -31,7 +46,7 @@ export const E88_MasterFencer_impl = {
         type: 'seq' as const,
         children: [
           payLeaf({ cardId: CARD_ID, cost: { wood: 3 } }),
-          { type: 'leaf' as const, actionId: 'fencing', params: { maxFences: 4, freeFencing: true }, sourceCard: CARD_ID },
+          freeFencingLeaf(4),
         ],
         choiceLabelKey: 'ui.interactionMasterFencer3',
       })

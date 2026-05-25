@@ -54,7 +54,7 @@ describe('D71_Changeover session', () => {
     if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
 
     // Select field 0-2 (grain with remaining 1)
-    resp = session.resolveChoice(0, '0-2')
+    resp = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }] })
     expect(resp.ok).toBe(true)
 
     // After selection, verify the field was discarded
@@ -79,7 +79,7 @@ describe('D71_Changeover session', () => {
       if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionSowSelect') {
         expect(resp.interaction.stateId).toBe('wait')
         // Sow grain into the empty field 0-2
-        resp = session.resolveChoice(0, 'confirm', {
+        resp = session.commitSelectionChoice(0, {
           crops: [{ row: 0, col: 2, crop: 'grain' }],
         })
         expect(resp.ok).toBe(true)

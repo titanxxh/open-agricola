@@ -3,87 +3,88 @@ import { GameSession } from '../game/authoritative-session'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { getAllTilePositions } from '../../shared/domain/farm'
+import { getCardEffect } from '../../shared/cards/card-effects'
+import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
+import type { ActionChoiceOption, ActionFlow } from '../../shared/contract/types'
 import '../../shared/cards/E/E148_Lazybones'
 
+const CARD_ID = 'E148_Lazybones'
+const TRIGGER_SPACES = ['grain-seeds', 'farmland', 'day-laborer', 'farm-expansion']
+const CHOICE_PREFIX = 'lazybones:'
+
+const selectedSpacesFromChoice = (value: string) =>
+  value.startsWith(CHOICE_PREFIX) ? value.slice(CHOICE_PREFIX.length).split(',').filter(Boolean) : []
+
 describe('E148_Lazybones session', () => {
-  /**
-   * Setup: 2-player game.
-   * p0 = Lazybones owner (has all 4 stables in reserve).
-   * p1 = opponent, will use marked action spaces.
-   */
-  const setup = () => {
+  const setup = (reservedActionSpaces = TRIGGER_SPACES) => {
     const session = new GameSession()
     const state = session.getState().state
-    state.currentPlayerIndex = 1 // opponent's turn
+    state.currentPlayerIndex = 1
 
     const owner = state.players[0]!
-    // Play Lazybones via devPlayCard so onBuy fires
-    owner.occupationHand.push('E148_Lazybones')
-    session.loadState(state)
-    session.devPlayCard(0, 'E148_Lazybones')
+    owner.occupationPlayed.push(CARD_ID)
+    owner.cardStates = {
+      ...owner.cardStates,
+      [CARD_ID]: { extraData: { reservedActionSpaces } },
+    }
 
-    // Reload state after devPlayCard
-    const updatedState = session.getState().state
-    updatedState.currentPlayerIndex = 1
-
-    const opponent = updatedState.players[1]!
+    const opponent = state.players[1]!
     setWorkersAtHome(state, opponent, 2)
-    session.loadState(updatedState)
+    session.loadState(state)
     return session
   }
 
-  it('stables placed on spaces during onBuy', () => {
-    const session = setup()
-    const state = session.getState().state
-    const owner = state.players[0]!
-
-    expect(owner.occupationPlayed).toContain('E148_Lazybones')
-    const spaces = owner.cardStates?.['E148_Lazybones']?.extraData?.reservedActionSpaces as string[]
-    expect(spaces).toBeDefined()
-    expect(spaces).toEqual(['grain-seeds', 'farmland', 'day-laborer', 'farm-expansion'])
-    // Owner started with 0 stables on farm — 4 are now on action spaces
-    expect(owner.stableTiles.length).toBe(0)
-  })
-
-  it('respects stable reserve limit on onBuy', () => {
+  it('onBuy offers selectable action-space choices up to dynamic reserve', () => {
     const session = new GameSession()
     const state = session.getState().state
-
     const owner = state.players[0]!
-    // Pre-place 2 stables on the farm so only 2 remain in reserve
     owner.stableTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }]
-    owner.occupationHand.push('E148_Lazybones')
-    session.loadState(state)
-    session.devPlayCard(0, 'E148_Lazybones')
+    const reserveBefore = getAvailableStableSupplyCount(state, owner)
 
-    const updatedState = session.getState().state
-    const updatedOwner = updatedState.players[0]!
-    const spaces = updatedOwner.cardStates?.['E148_Lazybones']?.extraData?.reservedActionSpaces as string[]
-    expect(spaces).toBeDefined()
-    expect(spaces.length).toBe(2)
-    // Only the first 2 target spaces should have stables
-    expect(spaces).toEqual(['grain-seeds', 'farmland'])
+    const effect = getCardEffect(CARD_ID)!
+    const flow = effect.onBuy!(state, owner)
+
+    expect(flow?.type).toBe('leaf')
+    const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
+    expect(leaf.actionId).toBe('emit-choice')
+    const options = leaf.params?.options as ActionChoiceOption[]
+    expect(options.length).toBeGreaterThan(0)
+    const skip = options.find((option) => option.value === CHOICE_PREFIX)
+    expect(skip?.labelKey).toBe('ui.interactionOptionalSkip')
+    expect(options.every((option) => selectedSpacesFromChoice(option.value).length <= 2)).toBe(true)
+    expect(options.some((option) => selectedSpacesFromChoice(option.value).length === 2)).toBe(true)
+    expect(options.some((option) => selectedSpacesFromChoice(option.value).length === 3)).toBe(false)
+    const reserveOptions = options.filter((option) => option.value !== CHOICE_PREFIX)
+    for (const option of reserveOptions) {
+      const spaces = selectedSpacesFromChoice(option.value)
+      expect(option.labelKey).toBe('cards.E148_Lazybones.choice')
+      expect(option.labelParams).toEqual({ spaces: spaces.join(', ') })
+    }
+    const optionLabels = new Set(reserveOptions.map((option) => JSON.stringify({
+      labelKey: option.labelKey,
+      labelParams: option.labelParams,
+    })))
+    expect(optionLabels.size).toBe(reserveOptions.length)
+
+    effect.resolveChoice!(state, owner, CHOICE_PREFIX)
+
+    expect(owner.cardStates?.[CARD_ID]?.extraData?.reservedActionSpaces).toBeUndefined()
+    expect(getAvailableStableSupplyCount(state, owner)).toBe(reserveBefore)
   })
 
-  it('no stables placed if reserve is empty', () => {
+  it('onBuy returns nothing if dynamic reserve is empty', () => {
     const session = new GameSession()
     const state = session.getState().state
 
     const owner = state.players[0]!
-    // All 4 stables already on the farm
     owner.stableTiles = [
       { row: 0, col: 0 }, { row: 0, col: 1 },
       { row: 0, col: 2 }, { row: 0, col: 3 },
     ]
-    owner.occupationHand.push('E148_Lazybones')
-    session.loadState(state)
-    session.devPlayCard(0, 'E148_Lazybones')
 
-    const updatedState = session.getState().state
-    const updatedOwner = updatedState.players[0]!
-    const spaces = updatedOwner.cardStates?.['E148_Lazybones']?.extraData?.reservedActionSpaces as string[]
-    // No stables available to place
-    expect(spaces ?? []).toEqual([])
+    const flow = getCardEffect(CARD_ID)!.onBuy!(state, owner)
+
+    expect(flow).toBeUndefined()
   })
 
   it('owner receives free stable when opponent uses grain-seeds', () => {
@@ -92,12 +93,10 @@ describe('E148_Lazybones session', () => {
     const resp = session.takeAction(1, 'grain-seeds')
     expect(resp.ok).toBe(true)
 
-    // The owner should have gained a stable on their farm
     const owner = resp.state.players[0]!
     expect(owner.stableTiles.length).toBe(1)
 
-    // grain-seeds should be removed from the spaces list
-    const spaces = owner.cardStates?.['E148_Lazybones']?.extraData?.reservedActionSpaces as string[]
+    const spaces = owner.cardStates?.[CARD_ID]?.extraData?.reservedActionSpaces as string[]
     expect(spaces).not.toContain('grain-seeds')
     expect(spaces.length).toBe(3)
   })
@@ -111,21 +110,7 @@ describe('E148_Lazybones session', () => {
     const owner = resp.state.players[0]!
     expect(owner.stableTiles.length).toBe(1)
 
-    const spaces = owner.cardStates?.['E148_Lazybones']?.extraData?.reservedActionSpaces as string[]
-    expect(spaces).not.toContain('day-laborer')
-    expect(spaces.length).toBe(3)
-  })
-
-  it('owner receives free stable when opponent uses day-laborer', () => {
-    const session = setup()
-
-    const resp = session.takeAction(1, 'day-laborer')
-    expect(resp.ok).toBe(true)
-
-    const owner = resp.state.players[0]!
-    expect(owner.stableTiles.length).toBe(1)
-
-    const spaces = owner.cardStates?.['E148_Lazybones']?.extraData?.reservedActionSpaces as string[]
+    const spaces = owner.cardStates?.[CARD_ID]?.extraData?.reservedActionSpaces as string[]
     expect(spaces).not.toContain('day-laborer')
     expect(spaces.length).toBe(3)
   })
@@ -137,25 +122,20 @@ describe('E148_Lazybones session', () => {
     expect(resp.ok).toBe(true)
 
     const owner = resp.state.players[0]!
-    // No stable should have been built
     expect(owner.stableTiles.length).toBe(0)
-    // All 4 spaces should still be marked
-    const spaces = owner.cardStates?.['E148_Lazybones']?.extraData?.reservedActionSpaces as string[]
+    const spaces = owner.cardStates?.[CARD_ID]?.extraData?.reservedActionSpaces as string[]
     expect(spaces.length).toBe(4)
   })
 
   it('no trigger after stable already collected from a space', () => {
     const session = setup()
 
-    // First use of grain-seeds by opponent
     let resp = session.takeAction(1, 'grain-seeds')
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.stableTiles.length).toBe(1)
 
-    // Advance to next round so the space can be reused
     const state = session.getState().state
     state.round += 1
-    // Reset action spaces
     for (const space of state.actionSpaces) {
       space.takenBy = []
     }
@@ -163,12 +143,10 @@ describe('E148_Lazybones session', () => {
     state.players[1]!.workersAvailable = 2
     session.loadState(state)
 
-    // Second use of grain-seeds by opponent — no more stable on this space
     resp = session.takeAction(1, 'grain-seeds')
     expect(resp.ok).toBe(true)
 
     const owner = resp.state.players[0]!
-    // Still only 1 stable from the first trigger
     expect(owner.stableTiles.length).toBe(1)
   })
 
@@ -183,10 +161,8 @@ describe('E148_Lazybones session', () => {
     expect(resp.ok).toBe(true)
 
     const owner = resp.state.players[0]!
-    // Owner using the space should NOT trigger (scope: opponent)
     expect(owner.stableTiles.length).toBe(0)
-    // Stable should still be on the space
-    const spaces = owner.cardStates?.['E148_Lazybones']?.extraData?.reservedActionSpaces as string[]
+    const spaces = owner.cardStates?.[CARD_ID]?.extraData?.reservedActionSpaces as string[]
     expect(spaces).toContain('grain-seeds')
   })
 
@@ -205,12 +181,12 @@ describe('E148_Lazybones session', () => {
 
     const owner = resp.state.players[0]!
     expect(owner.stableTiles.length).toBe(0)
-    const spaces = owner.cardStates?.['E148_Lazybones']?.extraData?.reservedActionSpaces as string[]
+    const spaces = owner.cardStates?.[CARD_ID]?.extraData?.reservedActionSpaces as string[]
     expect(spaces).not.toContain('grain-seeds')
-    expect(owner.cardStates?.['E148_Lazybones']?.resourceStats?.used ?? 0).toBe(0)
+    expect(owner.cardStates?.[CARD_ID]?.resourceStats?.used ?? 0).toBe(0)
     expect(resp.state.log.some((entry) =>
       entry.key === 'log.cardEffectGain' &&
-      entry.params?.cardId === 'E148_Lazybones',
+      entry.params?.cardId === CARD_ID,
     )).toBe(false)
   })
 })

@@ -18,6 +18,7 @@
 - **单一领域实现**：行动 / 引擎 / 卡牌 / 回合 / 收获 / 计分统一放 `shared/`，前后端共用同一套领域模型。
 - **三层物理边界**：`shared/` ⇄ `server/` ⇄ `client/` 由 ESLint `no-restricted-imports` 强制（CI error）。
 - **卡牌就地闭环**：卡牌特效写在卡牌文件内部，不向核心路径扩散。
+- **Supply token 也是支付资源**：fence / stable 这类玩家 supply 上限不能写死为 15 / 4；读取必须走 supply-token helper 或 payment resource pipeline。
 
 ---
 
@@ -174,6 +175,7 @@ Undo 的 runtime `publicEventCancellations` 是同步响应 metadata，不写入
 - 出牌：`improvements` / `minorPlayed` / `occupationPlayed`
 - 手牌：`minorHand` / `occupationHand`
 - 持续效果：`majorEffects` / `activeModifiers`
+- Supply token：`supplyTokensConsumed` 记录被永久消耗的 fence / stable 组件；可用上限由 helper 动态计算
 - **卡牌局部状态**：`cardStates`（见 §8.3）
 - **工人身份**：`workers: Worker[]`，固定 5 槽 id `'1'..'5'`，`isActive` / `isNewborn` 标记
 
@@ -191,7 +193,10 @@ type ClientCommand = (
   | { type: 'action'; spaceId }              // 放置工人 / 启动 anytime
   | { type: 'choice'; value; payload? }       // 统一的"选择"命令（含 farm/选格/分支）
   | { type: 'anytime'; actionId }
-  | { type: 'commitSelection'; playerIndex; payload: { positions?, cardIds?, resourceCounts?, resourceBatchExchange? } }
+  | { type: 'commitSelection'; playerIndex; payload: {
+      cancel?, positions?, cardIds?, resourceCounts?, resourceBatchExchange?,
+      edges?, palisadeEdges?, extraWood?, rooms?, stables?, tile?, crops?
+    } }
   | { type: 'roundEnd' }
   | { type: 'undoStep' } | { type: 'undoAction' }
   | { type: 'newGame'; seed? } | { type: 'loadGame'; state }
@@ -202,7 +207,7 @@ type ClientCommand = (
 
 注意：
 
-- 没有独立的 `reorg` / `feed` / `nextPlayer` / `confirmPlayerSwitch` / `commitFarm` 命令。这些等待形态全部归并到 `choice` 命令，由 `payload` 携带具体形状（按 `InteractionRequest.kind` 决定）。
+- 没有独立的 `reorg` / `feed` / `nextPlayer` / `confirmPlayerSwitch` 命令。这些等待形态全部归并到 `choice` 命令，由 `payload` 携带具体形状（按 `InteractionRequest.kind` 决定）。
 - `commitSelection` 只为 farm-position / occupation-hand / resource-quantity / resource-batch-exchange 这类带结构化 payload 的定向选择保留单独入口。
 
 ### 4.5 ServerEvent / StateUpdateEnvelope
@@ -270,7 +275,7 @@ type InteractionState =
 
 `InteractionCommand`（前端按 `allowedCommands` 决定 UI 启用的按钮）：
 ```
-takeAction | resolveChoice | commitFarm | commitSelection | takeAnytimeAction | undoStep | undoAction
+takeAction | resolveChoice | commitSelection | takeAnytimeAction | undoStep | undoAction
 ```
 
 注意 WS 协议名（`ClientCommand.type`）与 `InteractionCommand` 不完全同名：前端"现在能做什么"以 `allowedCommands` 为准；线上 WS 命令名归一到 `choice` / `commitSelection` / `action` 等。
@@ -493,7 +498,7 @@ type ActionDefinition = {
 
 Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内部）。
 
-`getBaseChoiceOptions` opt-in 选项流：base + `computeChoiceCandidates` 注入 → 按 `value` 去重 → `costPreview.canExecute` 过滤 → 0 候选 fail / 1 直跳 `resolveChoice` / ≥2 标准 prompt。当前消费者：`renovate-house` + `A87_Conservator`。与传统 `execute()→choice→computeArgs.extraOptions` 路径互斥。
+`getBaseChoiceOptions` opt-in 选项流：base + `computeChoiceCandidates` 注入 → 按 `value` 去重 → `costPreview.canExecute` 过滤 → 0 候选 fail / 1 直跳 `resolveChoice` / ≥2 标准 prompt。当前消费者：`renovate-house` + `A87_Conservator`。与传统 `execute()→choice→computeArgs.extraOptions` 路径互斥。`renovate-house` 的 card-authored exact/free cost 通过 `actionContext.exactCost` 表达，和 construct / stables / plow 的 BGA `formatCost` 语义一致。
 
 ### 7.3 effects/ 自动发现
 
@@ -565,7 +570,7 @@ anytime                  额外注册的 anytime 行动
 
 卡牌 listener 通过 `CardListenerContext.transactionEvents` 和 `eventQuery` 读取当前 action frame 的事件。普通 listener 看到的是已经 emit 的当前 frame 事件；`trade-applied` 这类合成 listener 可以读取当前 exchange 的 `DraftGameEvent`，但不能依赖尚未提交的全局 `state.events`。listener handler 仍必须是 state-pure flow builder，状态修改只能通过返回 flow/leaf 进入 engine。
 
-`ActionHookResult { doable?, actionId?, extraOptions?, followUpActions?, flow?, costs?, sourceCard? }`。规则事实写入 `GameState.events`，不要再为单卡补日志字段。
+`ActionHookResult { doable?, actionId?, extraOptions?, followUpActions?, flow?, costs?, reserveResources?, sourceCard? }`。`reserveResources` 用于让选项级 `isDoable` 声明“本次 payment 结算后仍需保留的真实资源下限”，由 host action 传给 internal `pay` child 过滤 payment solutions；规则事实写入 `GameState.events`，不要再为单卡补日志字段。
 
 当前事件覆盖已包括资源主干（collect/gain/pay/exchange）、农场主干（sow/plow/construct/stables/fencing/reap/breed/reorganize）、worker 放置/返家/新生儿、round/work/return-home/harvest phase、action reveal/accumulate、future meeple、legacy action detail 以及 `special-effect` mutation 分支。`state.log` 作为 UI 缓存保留，由事件 mapper 和 session cache writer 派生；业务代码不再通过旧日志字段记录规则事实。
 
@@ -582,6 +587,7 @@ anytime                  额外注册的 anytime 行动
 5. 没有 decline replacement 后，engine 先执行 `before` card listener dispatch。匹配到的 listener 被编译成 internal `activate-card` leaf，并插入在原 action leaf 前面；`dispatchMode: 'select'` 的同组 listener 会包成 `ParallelNode(mode='trigger-select')` 让玩家选择顺序。no-op listener 在 trigger-select 评估时直接 resolve，不制造 pass-only pending；结构适用但当前不可支付的 listener 仍显示为 disabled。
 6. 所有 `before` leaf 完成后，原 action leaf 恢复执行；`beforePhaseResolved` 防止同一个 action leaf 第二次插入同一批 before listener。
 7. 然后执行 strict `isDoable`：base `canBeExecutedByPlayer` → costPreview → action hook `isDoable` → card listener `isDoable`。这一步必须读取 `before` 已真实修改后的 state；如果仍不可达，不能继续原 action。
+   `occupation` 的手牌选项构建与 forged choice 校验也会用 `choice=<occupationId>` 跑选项级 `isDoable` card listener；这用于 B93 这类“打出后必须支付 onBuy 最低后续成本”的前置过滤。listener 返回的 `reserveResources` 会继续传入 occupation payment leaf，确保后续必付成本不能被职业付款选项提前花掉。
 8. 然后执行 `computeCosts`，把费用覆盖写入本次 `executionContext.costs`。因此 before unlocker / resource gain / exchange 可以先改变真实 state，再影响后续 strict doable 与费用枚举。
 9. 随后执行 action 本体：`getBaseChoiceOptions` opt-in path 先走 `computeChoiceCandidates`，否则走 `ActionDefinition.execute()`；`resolveChoice` continuation 也按同一条 public action 顺序恢复，先完成 pending 选择，再继续 host internal children / trailing phases。`execute()` 或 `resolveChoice()` 返回 request 时创建 pending；无 request 时继续 `during` / `immediatelyAfter` / `after`。
 10. `during` / `immediatelyAfter` / `after` 是 host action 成功后的 trailing phases；`beforeHostListeners` settlement 必须先完成，`afterHostCommitListeners` 在 host commit 后、trailing phases 前运行，`afterHostListeners` settlement 则故意保留在 BGA slot 中，等 host `after` 之后再运行。
@@ -606,7 +612,9 @@ anytime                  额外注册的 anytime 行动
 - 顶层 `apply-*` effect 文件。
 - `PlayerState` payment scratchpad 或跨 action 临时支付槽位。
 
-`activate-card-effect` 是 internal child，用 `paymentInfoFrom` 从 internal result map 读取 `paymentInfo`，再执行 `onBuy` 等 card-effect hook。卡牌购买的 onBuy / 多卡业务继续留在 card-effect 或 host action completion 中，不要塞回 top-level effect。
+`activate-card-effect` 是 internal child，用 `paymentInfoFrom` 从 internal result map 读取 `paymentInfo`，再执行 `onBuy` 等 card-effect hook。`occupation-gate` 是 no-op internal gate，只给需要先展示/执行其他节点、但 OR 分支可执行性仍必须按 occupation 判断的 flow 使用。卡牌购买的 onBuy / 多卡业务继续留在 card-effect 或 host action completion 中，不要塞回 top-level effect。
+
+`PaymentResourceMap` 覆盖真实资源和 supply token：`fence` / `stable` 与 `wood` / `food` 一样进入 `cost`、`payLeaf`、payment solver、`resourcesPaid`、`PaymentInfo` 和 `resource.paid`。支付 supply token 时只增加 `player.supplyTokensConsumed`，不修改已建 `fenceSegments` / `stableTiles`；所有“还能建多少 fence / stable”的读取必须走 `getOwnOrdinaryFenceBuildLimit()` / `getOwnOrdinaryFenceReserveCount()` / `getAvailableStableSupplyCount()`，不能再使用固定 15 / 4 上限。
 
 ### 7.6 阶段型 Hook（按触发顺序）
 
@@ -684,7 +692,7 @@ OA 对齐规则：
 
 5 种 farmType 全在各自 ActionDef.resolveChoice 内闭环（`shared/actions/effects/`）：
 
-- **room** (`construct.ts`)：`room-payment.ts` 展开"每间房"费用变体；多解时二轮 `pay:room:*` prompt finalize。
+- **room** (`construct.ts`)：`room-payment.ts` 展开"每间房"费用变体；多解时二轮 `pay:room:*` prompt finalize；nested room reward 可用 `actionContext.cancelPolicy: 'forbidCancel'` 表达“选中奖励后必须放置房间”。
 - **stable / plow** (`stables.ts` / `plow.ts`)：typed flat payment 解析。
 - **fence** (`fencing.ts`)：校验选边/连通/封闭区域，得 `newEdges` 后计算 wood（考虑 `freeFences` / `extraWood` / fence-cost-unification 的 `collectComputeCostsForFarmChoice` Pass #2）；多解 `pay:fence:*` 二轮 prompt。
 - **sow** (`sow.ts`)：validate + finalize（无 payment combo），含 extra-field card effect（`getPermittedExtraSowableFields` + `handleSowExtraField`）。
@@ -695,7 +703,11 @@ farmType 第一轮 payload 形态：`fence: {edges, palisadeEdges, extraWood}` /
 
 `FenceSegment.type` 与 `FenceSegment.source` 是独立维度：`type` 表示边段形态（普通 fence / B30 palisade），`source` 表示这段边来自谁。缺省普通 fence 视为 own ordinary source；B30 Wood Palisades 是不同 segment type；未来 E149 borrowed fence 应是 ordinary boundary with borrowed source，而不是新 segment type。
 
-fencing 主路径不得按卡牌 id 或单卡开关分支：不要在 `fencing.ts` / farmyard validation 里写 `C1` / `B30` / `E149`、`noWoodPalisades`、`midnightFencer` 这类分支。卡牌特殊行为统一通过 generic `fencePolicy` 表达：`allowedSegmentTypes`、`sourcePolicy`、`segmentBounds`、`costPolicy`、`cancelPolicy`、`preserveAnimalTotals`。
+fencing 主路径不得按卡牌 id 或单卡开关分支：不要在 `fencing.ts` / farmyard validation 里写 `C1` / `B30` / `E149`、`noWoodPalisades`、`midnightFencer` 这类分支。卡牌特殊行为统一通过 generic `fencePolicy` 表达：`allowedSegmentTypes`、`sourcePolicy`、`segmentBounds`、`newPastureBounds`、`costPolicy`、`cancelPolicy`、`preserveAnimalTotals`。
+
+`segmentBounds.fence` / `segmentBounds.palisade` 限制各自类型的新建边段；`segmentBounds.total` 限制普通 fence + palisade 的总新建边段。B149 Open Air Farmer 这类 BGA `max => 6` 总段数约束必须用 `total.max` 表达，B30 palisade 也计入该上限。`canStartFencing` 只能做通用 policy 可行性估算；最终合法性仍由 `validateFenceSelection()` 原子校验并在失败时不支付。
+
+`fencePolicy.costPolicy` 只表达 BGA `formatCost` 的本次基础单位成本；entry guard 与最终校验仍要叠加 `computeCosts.fence` 折扣/加价，确保 B93 future fence 这类嵌套 action 可以继续吃 E16 / C16 等围栏折扣。
 
 C1 Overhaul 只计数、回收、重建 own ordinary fences：onBuy 先用 `consume-fence` + `sourcePolicy: 'ownOnly'` 返还自己的普通 fence，再用 `fencePolicy` 限制本次 rebuild 只能建 ordinary fence、只消耗 own ordinary supply、禁止 cancel、保留动物总量。
 

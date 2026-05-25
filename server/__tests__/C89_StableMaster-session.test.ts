@@ -5,6 +5,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import type { ActionFlow } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C89_StableMaster'
+import '../../shared/cards/C/C88_CarpentersApprentice'
 
 describe('C89_StableMaster session', () => {
   const setup = () => {
@@ -83,7 +84,7 @@ describe('C89_StableMaster session', () => {
     expect(stableZone!.capacity).toBe(1) // default, no bonus
   })
 
-  it('onBuy returns optional stables flow with cost override -1 wood', () => {
+  it('onBuy returns optional stables flow with exact 1 wood cost', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -102,9 +103,10 @@ describe('C89_StableMaster session', () => {
     expect(leaf.optional).toBe(true)
     expect(leaf.actionContext).toMatchObject({
       max: 1,
-      costOverride: { wood: -1 },
+      exactCost: { wood: 1 },
       trueAction: false,
     })
+    expect(leaf.actionContext?.costOverride).toBeUndefined()
   })
 
   it('onBuy skipped if player has 4 stables built', () => {
@@ -125,7 +127,7 @@ describe('C89_StableMaster session', () => {
     expect(flow).toBeNull()
   })
 
-  it('onBuy skipped if player has no wood', () => {
+  it('onBuy skipped if consumed stable tokens exhaust reserve', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -133,10 +135,66 @@ describe('C89_StableMaster session', () => {
     state.round = 1
     const player = state.players[0]!
     player.occupationPlayed.push('C89_StableMaster')
-    player.resources.wood = 0
+    player.resources.wood = 5
+    player.supplyTokensConsumed = { stable: 4 }
     session.loadState(state)
 
     const flow = runCardEffectHook(state, player, 'C89_StableMaster', 'onBuy')
     expect(flow).toBeNull()
+  })
+
+  it('onBuy returns stables flow even when wood is paid by a stables cost modifier', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    const player = state.players[0]!
+    player.occupationPlayed.push('C89_StableMaster')
+    player.occupationPlayed.push('C88_CarpentersApprentice')
+    player.stableTiles = [{ row: 0, col: 3 }, { row: 0, col: 4 }]
+    player.resources.wood = 0
+    session.loadState(state)
+
+    const flow = runCardEffectHook(state, player, 'C89_StableMaster', 'onBuy')
+    expect(flow).not.toBeNull()
+  })
+
+  it('onBuy stable can be built with C88 discount and no wood', () => {
+    const session = new GameSession(undefined, undefined, { playerCount: 4 })
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 1
+    for (const player of state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    }
+    const player = state.players[0]!
+    player.occupationPlayed = ['C88_CarpentersApprentice']
+    player.occupationHand = ['C89_StableMaster']
+    player.resources.food = 10
+    player.resources.wood = 0
+    player.stableTiles = [{ row: 0, col: 3 }, { row: 0, col: 4 }]
+    session.loadState(state)
+
+    const action = session.takeAction(0, 'lessons-4')
+    expect(action.ok).toBe(true)
+    expect(action.interaction.stateId).toBe('wait')
+    if (action.interaction.stateId !== 'wait') return
+    const stableOption = action.interaction.options?.find((entry) => entry.labelKey === 'actions.stables.name')
+    expect(stableOption).toBeDefined()
+
+    const prompt = session.resolveChoice(0, stableOption!.value)
+    expect(prompt.ok).toBe(true)
+    expect(prompt.interaction.stateId).toBe('wait')
+    if (prompt.interaction.stateId !== 'wait') return
+    expect(prompt.interaction.request.kind).toBe('farm-select')
+
+    const built = session.commitSelectionChoice(0, {
+      stables: [{ row: 1, col: 4 }],
+    })
+    expect(built.ok).toBe(true)
+    expect(built.state.players[0]!.resources.wood).toBe(0)
+    expect(built.state.players[0]!.stableTiles).toHaveLength(3)
   })
 })

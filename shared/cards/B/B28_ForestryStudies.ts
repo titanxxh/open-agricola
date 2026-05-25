@@ -27,7 +27,7 @@ const listener: CardListenerRegistration = {
             type: 'leaf',
             actionId: 'occupation',
             sourceCard: CARD_ID,
-            params: { costOverride: {} },
+            params: { exactCost: {} },
           },
         ],
       },

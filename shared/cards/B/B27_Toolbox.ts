@@ -7,6 +7,7 @@ import {
   getStableTilesBuiltThisAction,
   getFencesBuiltThisAction,
 } from '../helpers/action-snapshot'
+import { hasFenceBuiltEvent } from '../helpers/fence-events'
 import type { CardImpl } from '../registry'
 import { B27_Toolbox } from '../../cards-display/B/B27_Toolbox'
 
@@ -16,13 +17,14 @@ const ALLOWED_MAJORS = ['Major_Joinery', 'Major_Pottery', 'Major_Basket']
 
 const setFlagHandler = (context: CardListenerContext): ActionHookResult | void => {
   if (context.state.roundPhase !== 'work') return
+  if (context.actionId === 'fence' && !hasFenceBuiltEvent(context)) return
   setCardFlag(context.player, CARD_ID, true)
 }
 
 const setFlagListeners: CardListenerRegistration[] = [
   { id: 'B27-flag-construct', cardIds: [CARD_ID], phases: ['after' as ActionHookPhase], actions: ['construct'],     handler: setFlagHandler },
   { id: 'B27-flag-stables',   cardIds: [CARD_ID], phases: ['after' as ActionHookPhase], actions: ['stables'],       handler: setFlagHandler },
-  { id: 'B27-flag-fencing',   cardIds: [CARD_ID], phases: ['after' as ActionHookPhase], actions: ['fencing'],       handler: setFlagHandler },
+  { id: 'B27-flag-fencing',   cardIds: [CARD_ID], phases: ['after' as ActionHookPhase], actions: ['fence'],         handler: setFlagHandler },
 ]
 
 const builtSomethingThisAction = (player: PlayerState): boolean =>

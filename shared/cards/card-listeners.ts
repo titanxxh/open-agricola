@@ -39,7 +39,7 @@ export type CardListenerRegistration = {
   scope?: CardListenerScope
   mandatory?: boolean
   /**
-   * Legacy listener priority. Higher values execute earlier; default is 0.
+   * Listener priority. Higher values execute earlier; default is 0.
    */
   order?: number
   /**
@@ -346,7 +346,7 @@ const makeDummySpace = (actionId: string): ActionSpace => ({
 
 /**
  * Run `computeCosts` phase listeners (action hooks + card listeners) for a
- * farm-choice commit pass. Used by `commitFarmChoice` / `applyFarmChoice` to
+ * farm-choice commit pass. Used by the farm selection commit path to
  * obtain a cost override that includes farm-payload-aware listeners (e.g.
  * E16 BriarHedge sees `params.newFenceEdges`).
  *

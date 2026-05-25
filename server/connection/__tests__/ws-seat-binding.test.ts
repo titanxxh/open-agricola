@@ -7,7 +7,7 @@
  * run dev mutations, or submit draft picks on seat 1 (or any other seat).
  *
  * Covers:
- *   • `commitFarm` / `commitSelection` — explicit playerIndex in payload
+ *   • `commitSelection` — explicit playerIndex in payload
  *   • `devSetResources` / `devDrawCard` / `devPlayCard` — dev channel
  *   • `draftSubmit` — playerId-based identity
  *   • Happy path: own-seat commands are accepted

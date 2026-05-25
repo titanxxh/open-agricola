@@ -9,21 +9,22 @@ import { C42_RavenousHunger } from '../../cards-display/C/C42_RavenousHunger'
 
 const CARD_ID = C42_RavenousHunger.id
 
-/**
- * C42 Ravenous Hunger:
- * Immediately after each time you use Vegetable Seeds, you can place another person
- * on an accumulation space and get 1 additional good of the accumulating type.
- *
- * BGA: After Vegetable Seeds -> flag card -> place farmer on accumulation space ->
- * unflag card. On collect (while flagged) -> gain 1 extra of each accumulating type.
- *
- * Implementation:
- * 1. After place-farmer on vegetable-seeds: flag card, offer place-farmer (any space),
- *    then unflag. Note: BGA constrains to accumulation spaces only, but our
- *    place-farmer action does not support constraints; the collect bonus is still
- *    correctly gated to accumulation spaces via gainPerRound check.
- * 2. After collect: if flagged, gain 1 extra of each accumulating resource type.
- */
+const accumulationSpaceIds = (context: CardListenerContext) =>
+  context.state.actionSpaces
+    .filter((space) => Object.values(space.gainPerRound).some((amount) => (amount ?? 0) > 0))
+    .map((space) => space.id)
+
+const collectedSpaceId = (context: CardListenerContext) => {
+  const events = [...(context.actionEvents ?? []), ...(context.transactionEvents ?? [])]
+  for (const event of events) {
+    const entry = event as { type?: string; reason?: string; from?: { kind?: string; spaceId?: string } }
+    if (entry.type === 'resource.moved' && entry.reason === 'collect' && entry.from?.kind === 'actionSpace') {
+      return entry.from.spaceId
+    }
+  }
+  return undefined
+}
+
 const afterPlaceFarmerListener: CardListenerRegistration = {
   id: 'C42-ravenous-hunger-after-place-farmer',
   cardIds: [CARD_ID],
@@ -32,6 +33,8 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'vegetable-seeds') return
     if (workersAvailable(context.state, context.player) <= 0) return
+    const constraints = accumulationSpaceIds(context)
+    if (constraints.length === 0) return
 
     return {
       flow: {
@@ -43,8 +46,8 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
             type: 'leaf',
             actionId: 'place-farmer',
             sourceCard: CARD_ID,
+            actionContext: { constraints },
           },
-          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } },
         ],
       } as ActionFlow,
       sourceCard: CARD_ID,
@@ -60,8 +63,12 @@ const afterCollectListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isCardFlagged(context.player, CARD_ID)) return
 
-    // Gain 1 additional good of each accumulating type from the space
-    const gainPerRound = context.space?.gainPerRound
+    const targetSpaceId = context.actionContext?.targetSpaceId as string | undefined
+    const spaceId = targetSpaceId ?? collectedSpaceId(context)
+    const targetSpace = spaceId
+      ? context.state.actionSpaces.find((space) => space.id === spaceId)
+      : undefined
+    const gainPerRound = (targetSpace ?? context.space)?.gainPerRound
     if (!gainPerRound) return
 
     const gain: Partial<Resource> = {}
@@ -70,8 +77,20 @@ const afterCollectListener: CardListenerRegistration = {
         gain[key as keyof Resource] = 1
       }
     }
-    if (Object.keys(gain).length === 0) return
-    return { flow: gainLeaf(CARD_ID, gain), sourceCard: CARD_ID }
+    const unflag: Extract<ActionFlow, { type: 'leaf' }> = {
+      type: 'leaf',
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'set-flag', flag: false },
+    }
+    if (Object.keys(gain).length === 0) return { flow: unflag, sourceCard: CARD_ID }
+    return {
+      flow: {
+        type: 'seq',
+        children: [gainLeaf(CARD_ID, gain), unflag],
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 

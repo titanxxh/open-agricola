@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { GameSession } from '../game/authoritative-session'
 import type { PlayerState } from '../../shared/contract/types.ts'
 import {
   buildFarmPositionSelectionInteraction,
@@ -9,6 +10,7 @@ import {
 } from '../../shared/domain/farmyard'
 import { A14_CarpentersHammer } from '../../shared/cards-display/A/A14_CarpentersHammer'
 import { A123_FrameBuilder } from '../../shared/cards-display/A/A123_FrameBuilder'
+import { setWorkersAtHome } from '../../shared/domain/player'
 
 const stableTradeModifiers: PlayerState['activeModifiers'] = [
   {
@@ -176,6 +178,46 @@ describe('farm interaction builders', () => {
     expect(interaction.selectableTiles).toEqual([])
   })
 
+  it('rebuilds stable interaction with exactCost from pending action context', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players[0] = createPlayer()
+    session.loadState(state)
+    const player = session.getState().state.players[0]!
+
+    const interaction = (session as unknown as {
+      buildStableInteraction: (
+        player: PlayerState,
+        costOverride: undefined,
+        actionContext: Record<string, unknown>,
+      ) => ReturnType<typeof buildStableFarmInteraction>
+    }).buildStableInteraction(player, undefined, { max: 1, exactCost: { max: 1 } })
+
+    expect(interaction.farmType).toBe('stable')
+    if (interaction.farmType !== 'stable') return
+    expect(interaction.maxSelections).toBe(1)
+  })
+
+  it('rebuilds plow interaction with exactCost from pending action context', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players[0] = createPlayer()
+    session.loadState(state)
+    const player = session.getState().state.players[0]!
+
+    const interaction = (session as unknown as {
+      buildPlowInteraction: (
+        player: PlayerState,
+        costOverride: undefined,
+        actionContext: Record<string, unknown>,
+      ) => ReturnType<typeof buildPlowFarmInteraction>
+    }).buildPlowInteraction(player, undefined, { exactCost: { max: 0 } })
+
+    expect(interaction.farmType).toBe('plow')
+    if (interaction.farmType !== 'plow') return
+    expect(interaction.selectableTiles).toEqual([])
+  })
+
   it('limits sow selectable fields using maxSelections and exclusions', () => {
     const player = createPlayer()
     player.resources.grain = 3
@@ -222,5 +264,46 @@ describe('farm interaction builders', () => {
     expect(interaction.selectablePositions).toEqual([{ row: 0, col: 0 }])
     expect(interaction.maxSelections).toBe(1)
     expect(interaction.minSelections).toBe(0)
+  })
+
+  it('commitSelectionChoice commits farmland plow', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    state.roundPhase = 'work'
+    setWorkersAtHome(state, state.players[0]!, 2)
+    session.loadState(state)
+
+    const pending = session.takeAction(0, 'farmland')
+    expect(pending.ok).toBe(true)
+    expect(pending.interaction.stateId === 'wait' ? pending.interaction.request.kind : null).toBe('farm-select')
+
+    const resp = session.commitSelectionChoice(0, { tile: { row: 0, col: 0 } })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.fields).toContainEqual({ row: 0, col: 0, stacks: [] })
+  })
+
+  it('rejects direct resolveChoice farm payload on farm-select', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    state.roundPhase = 'work'
+    setWorkersAtHome(state, state.players[0]!, 2)
+    session.loadState(state)
+
+    const pending = session.takeAction(0, 'farmland')
+    expect(pending.ok).toBe(true)
+    expect(pending.interaction.stateId === 'wait' ? pending.interaction.request.kind : null).toBe('farm-select')
+
+    const payload = { tile: { row: 0, col: 0 } }
+    const rejected = session.resolveChoice(0, 'confirm', payload)
+
+    expect(rejected.ok).toBe(false)
+    expect(rejected.error).toBe('use commitSelectionChoice for selection')
   })
 })

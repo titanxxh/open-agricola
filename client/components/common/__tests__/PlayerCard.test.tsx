@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { PlayerCard } from '../PlayerCard'
 import { clearCustomCards, registerCustomCard } from '../../../../shared/cards/custom-registry'
+import { loadCardsManifest } from '../../../services/card-meta'
 // Cards-manifest is preloaded by `client/__tests__/setup-card-manifest.ts`.
 
 describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
@@ -92,5 +93,22 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).toContain('Debug Mallet')
     expect(html).toContain('Gain 1 wood.')
     expect(html).toContain('data-id="CUSTOM_DebugMallet"')
+  })
+
+  it('renders C54 stable printed cost from card metadata', async () => {
+    const manifest = await loadCardsManifest()
+    const originalCost = manifest.C54_MarketBooth?.cost
+    manifest.C54_MarketBooth.cost = { stable: 1 }
+
+    try {
+      const html = renderToStaticMarkup(
+        <PlayerCard locale="en" cardId="C54_MarketBooth" cardType="minor" />,
+      )
+
+      expect(html).toContain('card-cost')
+      expect(html).toContain('res-icon-barn')
+    } finally {
+      manifest.C54_MarketBooth.cost = originalCost
+    }
   })
 })

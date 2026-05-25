@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import type { ComplexCost, Resource } from '../../../shared/contract/types'
+import type { ComplexCost, PaymentResourceMap } from '../../../shared/contract/types'
 import { emptyResources } from '../../../shared/contract/state-constants'
 import { getCustomCardArtUrl, getCustomCardNumbering } from '../../../shared/cards/custom-registry'
 import { getCardMeta } from '../../services/card-meta'
@@ -82,7 +82,7 @@ const getMajorIconPosition = (cardId: string): { x: string; y: string } => {
 const isComplexCost = (cost: unknown): cost is ComplexCost =>
   !!cost && typeof cost === 'object' && ('fee' in cost || 'fees' in cost || 'trades' in cost || 'cards' in cost || 'bonuses' in cost)
 
-const extractMajorDisplayCost = (cost: Partial<Resource> | ComplexCost): { baseCost: Partial<Resource>; upgradeCost?: Partial<Resource> } => {
+const extractMajorDisplayCost = (cost: PaymentResourceMap | ComplexCost): { baseCost: PaymentResourceMap; upgradeCost?: PaymentResourceMap } => {
   if (!isComplexCost(cost)) return { baseCost: cost }
   const fees = cost.fees ?? (cost.fee ? [cost.fee] : [{}])
   // First fee is the base (full) price; if cards exist, the card-return cost is cards.cost
@@ -91,7 +91,7 @@ const extractMajorDisplayCost = (cost: Partial<Resource> | ComplexCost): { baseC
   return { baseCost, upgradeCost }
 }
 
-const renderCost = (cost: Partial<Resource>, locale: Locale) => {
+const renderCost = (cost: PaymentResourceMap, locale: Locale) => {
   const parts = []
   if (cost.wood) parts.push(<div key="wood" className="card-cost-item">{cost.wood} <span className="card-res-icon wood" title={t(locale, 'resources.wood')}/></div>)
   if (cost.clay) parts.push(<div key="clay" className="card-cost-item">{cost.clay} <span className="card-res-icon clay" title={t(locale, 'resources.clay')}/></div>)
@@ -100,6 +100,8 @@ const renderCost = (cost: Partial<Resource>, locale: Locale) => {
   if (cost.grain) parts.push(<div key="grain" className="card-cost-item">{cost.grain} <span className="card-res-icon grain" title={t(locale, 'resources.grain')}/></div>)
   if (cost.vegetable) parts.push(<div key="vegetable" className="card-cost-item">{cost.vegetable} <span className="card-res-icon vegetable" title={t(locale, 'resources.vegetable')}/></div>)
   if (cost.food) parts.push(<div key="food" className="card-cost-item">{cost.food} <span className="card-res-icon food" title={t(locale, 'resources.food')}/></div>)
+  if (cost.fence) parts.push(<div key="fence" className="card-cost-item">{cost.fence} <span className="card-res-icon fence res-icon-fence-icon" title="fence"/></div>)
+  if (cost.stable) parts.push(<div key="stable" className="card-cost-item">{cost.stable} <span className="card-res-icon stable res-icon-barn" title="stable"/></div>)
   return parts.length > 0 ? <div className="card-cost-text">{parts}</div> : null
 }
 
@@ -121,7 +123,7 @@ export const PlayerCard = ({
     const meta = getCardMeta(cardId)
     if (cardType === 'major') {
       if (!meta) return null
-      const rawCost = (meta.cost ?? {}) as Partial<Resource> | ComplexCost
+      const rawCost = (meta.cost ?? {}) as PaymentResourceMap | ComplexCost
       const { baseCost } = extractMajorDisplayCost(rawCost)
       return {
         name: t(locale, `improvements.${cardId}.name`),

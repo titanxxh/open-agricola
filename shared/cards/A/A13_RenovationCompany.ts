@@ -5,25 +5,26 @@ const CARD_ID = A13_RenovationCompany.id
 
 export const A13_RenovationCompany_impl = {
   effect: {
-  id: CARD_ID,
-  onBuy: () => ({
-    type: 'seq' as const,
-    children: [
-      {
-        type: 'leaf' as const,
-        actionId: 'gain',
-        sourceCard: CARD_ID,
-        params: { clay: 3 },
-      },
-      {
-        type: 'leaf' as const,
-        actionId: 'renovate-house',
-        sourceCard: CARD_ID,
-        optional: true,
-      },
-    ],
-  }),
-},
+    id: CARD_ID,
+    onBuy: () => ({
+      type: 'seq' as const,
+      children: [
+        {
+          type: 'leaf' as const,
+          actionId: 'gain',
+          sourceCard: CARD_ID,
+          params: { clay: 3 },
+        },
+        {
+          type: 'leaf' as const,
+          actionId: 'renovate-house',
+          sourceCard: CARD_ID,
+          optional: true,
+          actionContext: { exactCost: {} },
+        },
+      ],
+    }),
+  },
   prerequisiteCheck: (player) => player.houseType === 'wood' && player.rooms === 2,
   reaches: [] as readonly string[],
 } satisfies CardImpl

@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import type { ActionDetailParts } from '../../shared/contract/protocol/game'
 
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
-import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/pending-confirms'
 import '../../shared/cards/C/C51_FishingNet'
 
 describe('C51_FishingNet session', () => {

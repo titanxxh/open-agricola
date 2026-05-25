@@ -76,6 +76,50 @@ describe('canStartFencing with costOverride', () => {
     ).toBe(true)
   })
 
+  it('allows explicit total max below the normal action minimum', () => {
+    const player = createPlayer()
+
+    expect(
+      canStartFencing(fakeState, player, undefined, {
+        fencePolicy: {
+          segmentBounds: { total: { max: 3 } },
+          costPolicy: { fence: { wood: 0 } },
+        },
+      }),
+    ).toBe(true)
+  })
+
+  it('applies costOverride discounts to nested fencePolicy costPolicy checks', () => {
+    const player = createPlayer({
+      resources: {
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
+        grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+      },
+    })
+    const actionContext = {
+      fencePolicy: {
+        costPolicy: { fence: { wood: 1 } },
+      },
+    }
+    expect(canStartFencing(fakeState, player, undefined, actionContext)).toBe(false)
+    expect(canStartFencing(fakeState, player, { wood: -4 }, actionContext)).toBe(true)
+  })
+
+  it('allows explicit total max when supply only has fewer fences left', () => {
+    const player = createPlayer({
+      supplyTokensConsumed: { fence: 13 },
+    })
+
+    expect(
+      canStartFencing(fakeState, player, undefined, {
+        fencePolicy: {
+          segmentBounds: { total: { max: 3 } },
+          costPolicy: { fence: { wood: 0 } },
+        },
+      }),
+    ).toBe(true)
+  })
+
   it('ignores flat segmentBounds and costPolicy actionContext fields', () => {
     const player = createPlayer({
       fenceSegments: createOrdinaryFenceSegments(12),
@@ -139,6 +183,51 @@ describe('canStartFencing with costOverride', () => {
           sourcePolicy: 'ownOnly',
           segmentBounds: { fence: { min: 2 } },
           costPolicy: { fence: { wood: 0 } },
+        },
+      }),
+    ).toBe(false)
+  })
+
+  it('allows a total-bound policy to start when palisades can cover missing ordinary fences', () => {
+    const player = createPlayer({
+      resources: {
+        wood: 8, clay: 0, reed: 0, stone: 0, food: 0,
+        grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+      },
+      minorPlayed: ['B30_WoodPalisades'],
+      supplyTokensConsumed: { fence: 12 },
+    })
+    expect(
+      canStartFencing(fakeState, player, undefined, {
+        fencePolicy: {
+          sourcePolicy: 'ownOnly',
+          segmentBounds: { total: { max: 6 } },
+          costPolicy: { fence: { wood: 0 }, fixedWood: 2 },
+        },
+      }),
+    ).toBe(true)
+  })
+
+  it('rejects a total-bound pasture policy when palisades cannot make a legal pasture', () => {
+    const player = createPlayer({
+      resources: {
+        wood: 20, clay: 0, reed: 0, stone: 0, food: 0,
+        grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+      },
+      minorPlayed: ['B30_WoodPalisades'],
+      supplyTokensConsumed: { fence: 13 },
+    })
+    expect(
+      canStartFencing(fakeState, player, undefined, {
+        fencePolicy: {
+          sourcePolicy: 'ownOnly',
+          segmentBounds: { total: { max: 6 } },
+          costPolicy: { fence: { wood: 0 }, fixedWood: 2 },
+          pastureBounds: {
+            newPastures: { min: 1, max: 1 },
+            changedPastures: { min: 1, max: 1 },
+            newPastureSize: { min: 2, max: 2 },
+          },
         },
       }),
     ).toBe(false)

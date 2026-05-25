@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { confirmNextPlayer } from './_helpers/legacy-confirms'
+import { confirmNextPlayer } from './_helpers/pending-confirms'
 
 // 注册卡牌到 card registry（side-effect import，与项目其他 session 测试一致）
 import '../../shared/cards/A/A1_Shelter'
@@ -29,6 +29,31 @@ function setupPassingSession(opts: {
   return { session, state }
 }
 
+const buyMinor = (
+  session: GameSession,
+  playerIndex: number,
+  response: ReturnType<GameSession['takeAction']> | ReturnType<GameSession['getState']>,
+  cardId: string,
+) => {
+  expect(response.interaction.stateId).toBe('wait')
+  if (response.interaction.stateId !== 'wait') return response
+  let cardPrompt = response
+  const directOption = cardPrompt.interaction.options?.find((option) => option.value === `minor:${cardId}`)
+  if (!directOption) {
+    const improvementOption = cardPrompt.interaction.options?.find((option) => option.value.startsWith('action-improvement-'))
+    expect(improvementOption).toBeDefined()
+    cardPrompt = session.resolveChoice(playerIndex, improvementOption!.value)
+    expect(cardPrompt.ok).toBe(true)
+    if (cardPrompt.interaction.stateId !== 'wait') return cardPrompt
+    if (!cardPrompt.interaction.options?.some((option) => option.value === `minor:${cardId}`)) {
+      return cardPrompt
+    }
+  }
+  const cardOption = cardPrompt.interaction.options?.find((option) => option.value === `minor:${cardId}`)
+  expect(cardOption).toBeDefined()
+  return session.resolveChoice(playerIndex, cardOption!.value)
+}
+
 describe('passing-mechanism: basic pass to next', () => {
   it('passing 卡购买后 next.minorHand 含且 buyer.minorPlayed 不含；emit card.passed 而非 card.played；totalMinorBuilt 不变', () => {
     const { session } = setupPassingSession({ buyerMinorHand: ['A1_Shelter'] })
@@ -37,7 +62,7 @@ describe('passing-mechanism: basic pass to next', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
 
-    resp = session.resolveChoice(0, 'minor:A1_Shelter')
+    resp = buyMinor(session, 0, resp, 'A1_Shelter')
     expect(resp.ok).toBe(true)
 
     const after = resp.state
@@ -72,7 +97,7 @@ describe('passing-mechanism: cycle and wrap', () => {
     // P1 用 meeting-place 买 A1 → A1 传到 P2.minorHand
     let resp = session.takeAction(0, 'meeting-place')
     expect(resp.ok).toBe(true)
-    resp = session.resolveChoice(0, 'minor:A1_Shelter')
+    resp = buyMinor(session, 0, resp, 'A1_Shelter')
     expect(resp.ok).toBe(true)
     expect(resp.state.players[1]!.minorHand).toContain('A1_Shelter')
 
@@ -107,7 +132,7 @@ describe('passing-mechanism: cycle and wrap', () => {
     // P3（index 2）用 meeting-place 买 → (2 + 1) % 3 === 0 → 传到 P1
     let resp = session.takeAction(2, 'meeting-place')
     expect(resp.ok).toBe(true)
-    resp = session.resolveChoice(2, 'minor:A1_Shelter')
+    resp = buyMinor(session, 2, resp, 'A1_Shelter')
     expect(resp.ok).toBe(true)
 
     expect(resp.state.players[0]!.minorHand).toContain('A1_Shelter')
@@ -121,7 +146,7 @@ describe('passing-mechanism: undo', () => {
     const woodBefore = state.players[0]!.resources.wood ?? 0
 
     session.takeAction(0, 'meeting-place')
-    let resp = session.resolveChoice(0, 'minor:A1_Shelter')
+    let resp = buyMinor(session, 0, session.getState(), 'A1_Shelter')
     expect(resp.ok).toBe(true)
     expect(resp.state.players[1]!.minorHand).toContain('A1_Shelter')
 
@@ -142,7 +167,7 @@ describe('passing-mechanism: receiver behavior', () => {
     const { session } = setupPassingSession({ buyerMinorHand: ['A1_Shelter'] })
 
     session.takeAction(0, 'meeting-place')
-    let resp = session.resolveChoice(0, 'minor:A1_Shelter')
+    let resp = buyMinor(session, 0, session.getState(), 'A1_Shelter')
     expect(resp.ok).toBe(true)
     expect(resp.state.players[1]!.minorHand).toContain('A1_Shelter')
 
@@ -163,7 +188,7 @@ describe('passing-mechanism: receiver behavior', () => {
     session.loadState(state)
 
     session.takeAction(0, 'meeting-place')
-    let resp = session.resolveChoice(0, 'minor:C1_Overhaul')
+    let resp = buyMinor(session, 0, session.getState(), 'C1_Overhaul')
     expect(resp.ok).toBe(true)
     expect(resp.state.players[1]!.minorHand).toContain('C1_Overhaul')
 

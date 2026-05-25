@@ -4,7 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import '../../shared/cards/A/A132_Publican'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { SessionResponse } from '../../shared/session/session-core'
-import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 describe('stats: gain with recipientPlayerId records resourcesFromCards on target', () => {
   const advancePastPlayerSwitches = (
@@ -80,7 +80,7 @@ describe('stats: gain with recipientPlayerId records resourcesFromCards on targe
       resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined,
     ).toBe('ui.interactionSowSelect')
 
-    resp = session.resolveChoice(1, 'confirm', {
+    resp = session.commitSelectionChoice(1, {
       crops: [{ row: 0, col: 0, crop: 'grain' }],
     })
     expect(resp.ok).toBe(true)

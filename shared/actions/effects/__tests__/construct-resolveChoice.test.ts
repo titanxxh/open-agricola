@@ -68,6 +68,30 @@ describe('constructAction.resolveChoice', () => {
     expect(result.type).toBe('ok')
   })
 
+  it('cancel returns ok when forbidCancel has no reachable room selection', () => {
+    const result = constructAction.resolveChoice!(
+      makeCtx({
+        player: {
+          resources: { wood: 0, clay: 0, stone: 0, reed: 0, grain: 0, vegetable: 0, food: 0, sheep: 0, boar: 0, cattle: 0 } as Resource,
+          roomTiles: [
+            { row: 0, col: 0 },
+            { row: 0, col: 4 },
+          ],
+          fields: [
+            { row: 0, col: 1, stacks: [] },
+            { row: 1, col: 0, stacks: [] },
+            { row: 0, col: 3, stacks: [] },
+            { row: 1, col: 4, stacks: [] },
+          ],
+        },
+        actionContext: { cancelPolicy: 'forbidCancel', maxRooms: 1, exactCost: { max: 1 } },
+      }),
+      'cancel',
+    )
+
+    expect(result.type).toBe('ok')
+  })
+
   it('first call with payload + single payment combo finalizes immediately', () => {
     const room: FarmTilePosition = { row: 0, col: 0 }
     const ctx = makeCtx()
@@ -123,6 +147,69 @@ describe('constructAction.resolveChoice', () => {
     })
     const result = constructAction.resolveChoice!(ctx, 'confirm', { rooms: [roomA, roomB] })
     expect(result.type).toBe('fail')
+  })
+
+  it('exactCost { max: 1 } builds one room for free', () => {
+    const room: FarmTilePosition = { row: 0, col: 0 }
+    const ctx = makeCtx({
+      player: { resources: { wood: 0, clay: 0, stone: 0, reed: 0, grain: 0, vegetable: 0, food: 0, sheep: 0, boar: 0, cattle: 0 } as Resource },
+      actionContext: { maxRooms: 1, exactCost: { max: 1 } },
+    })
+    const result = constructAction.resolveChoice!(ctx, 'confirm', { rooms: [room] })
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.resourcesPaid).toEqual({})
+    expect(ctx.player.rooms).toBe(3)
+  })
+
+  it('execute exposes one selectable room tile for free exactCost max', () => {
+    const ctx = makeCtx({
+      player: { resources: { wood: 0, clay: 0, stone: 0, reed: 0, grain: 0, vegetable: 0, food: 0, sheep: 0, boar: 0, cattle: 0 } as Resource },
+      actionContext: { maxRooms: 1, exactCost: { max: 1 } },
+    })
+    const result = constructAction.execute(ctx)
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') return
+    expect(result.request.kind).toBe('farm-select')
+    if (result.request.kind !== 'farm-select') return
+    expect(result.request.farm.maxSelections).toBe(1)
+    expect(result.request.farm.selectableTiles.length).toBeGreaterThan(0)
+  })
+
+  it('keeps legacy actionContext costOverride for free room builds', () => {
+    const room: FarmTilePosition = { row: 0, col: 0 }
+    const ctx = makeCtx({
+      player: { resources: { wood: 0, clay: 0, stone: 0, reed: 0, grain: 0, vegetable: 0, food: 0, sheep: 0, boar: 0, cattle: 0 } as Resource },
+      actionContext: { costOverride: { wood: -99, reed: -99 }, maxRooms: 1 },
+    })
+    const result = constructAction.resolveChoice!(ctx, 'confirm', { rooms: [room] })
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.resourcesPaid).toEqual({})
+  })
+
+  it('exactCost max rejects building two rooms', () => {
+    const roomA: FarmTilePosition = { row: 0, col: 0 }
+    const roomB: FarmTilePosition = { row: 2, col: 0 }
+    const ctx = makeCtx({
+      player: { resources: { wood: 20, clay: 0, stone: 0, reed: 10, grain: 0, vegetable: 0, food: 0, sheep: 0, boar: 0, cattle: 0 } as Resource },
+      actionContext: { exactCost: { max: 1 } },
+    })
+    const result = constructAction.resolveChoice!(ctx, 'confirm', { rooms: [roomA, roomB] })
+    expect(result.type).toBe('fail')
+  })
+
+  it('applies computeCosts delta after exact base', () => {
+    const room: FarmTilePosition = { row: 0, col: 0 }
+    const ctx = makeCtx({
+      player: { resources: { wood: 1, clay: 0, stone: 0, reed: 0, grain: 0, vegetable: 0, food: 1, sheep: 0, boar: 0, cattle: 0 } as Resource },
+      actionContext: { exactCost: { wood: 1 } },
+      costs: { food: 1 },
+    })
+    const result = constructAction.resolveChoice!(ctx, 'confirm', { rooms: [room] })
+    expect(result.type).toBe('ok')
+    if (result.type !== 'ok') return
+    expect(result.resourcesPaid).toEqual({ wood: 1, food: 1 })
   })
 
   it('credits sourceCard stats with roomWood when wooden house', () => {

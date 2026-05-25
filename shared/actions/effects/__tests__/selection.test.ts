@@ -61,7 +61,8 @@ describe('selectionAction', () => {
           selectionEffect: 'test-selection',
         },
       } as never,
-      '0-0,1-1',
+      'confirm',
+      { positions: ['0-0', '1-1'] },
     )
 
     expect(result).toEqual({
@@ -91,7 +92,33 @@ describe('selectionAction', () => {
       'cancel',
     )
 
-    expect(result).toEqual({ type: 'fail', errorKey: 'not enough selection positions',
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'not enough selection positions',
+      recoverable: true,
+    })
+  })
+
+  it('does not parse direct choice values as farm-position selections without structured payload', () => {
+    const player = createMockPlayer()
+
+    const result = selectionAction.resolveChoice!(
+      {
+        player,
+        sourceCard: 'Test_Card',
+        actionContext: {
+          selectionKind: 'farm-position',
+          minSelections: 1,
+          maxSelections: 2,
+          selectableTiles: [{ row: 0, col: 0 }],
+        },
+      } as never,
+      '0-0',
+    )
+
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'not enough selection positions',
       recoverable: true,
     })
   })
@@ -116,10 +143,18 @@ describe('selectionAction', () => {
       },
     } as never
 
-    expect(selectionAction.resolveChoice!(context, '0-0,0-0')).toEqual({ type: 'fail', errorKey: 'duplicate selection position',
+    expect(
+      selectionAction.resolveChoice!(context, 'confirm', { positions: ['0-0', '0-0'] }),
+    ).toEqual({
+      type: 'fail',
+      errorKey: 'duplicate selection position',
       recoverable: true,
     })
-    expect(selectionAction.resolveChoice!(context, '0-1')).toEqual({ type: 'fail', errorKey: 'invalid selection position',
+    expect(
+      selectionAction.resolveChoice!(context, 'confirm', { positions: ['0-1'] }),
+    ).toEqual({
+      type: 'fail',
+      errorKey: 'invalid selection position',
       recoverable: true,
     })
     expect(received).toBeNull()
@@ -149,7 +184,8 @@ describe('selectionAction', () => {
           selectionEffect: 'test-selection-count-validation',
         },
       } as never,
-      '0-0,0-1',
+      'confirm',
+      { positions: ['0-0', '0-1'] },
     )
 
     expect(result).toEqual({
@@ -195,15 +231,22 @@ describe('selection action with occupation-hand kind', () => {
       {
         player,
         sourceCard: 'TEST',
-        actionContext: { selectionEffect: 'test-flow-effect' },
+        actionContext: {
+          selectionKind: 'occupation-hand',
+          selectionEffect: 'test-flow-effect',
+        },
       } as never,
-      'id1,id2',
+      'confirm',
+      { cards: ['id1', 'id2'] },
     )
 
     expect(result.type).toBe('flow')
     if (result.type === 'flow') {
       expect(result.flow).toEqual(testFlow)
-      expect(result.extraData).toEqual({ selectedPositions: ['id1', 'id2'] })
+      expect(result.extraData).toEqual({
+        selectedPositions: [],
+        selectedCards: ['id1', 'id2'],
+      })
     }
   })
 
@@ -216,14 +259,21 @@ describe('selection action with occupation-hand kind', () => {
       {
         player,
         sourceCard: 'VOID_CARD',
-        actionContext: { selectionEffect: 'test-void-effect' },
+        actionContext: {
+          selectionKind: 'occupation-hand',
+          selectionEffect: 'test-void-effect',
+        },
       } as never,
-      'pos1,pos2',
+      'confirm',
+      { cards: ['id1', 'id2'] },
     )
 
     expect(result.type).toBe('ok')
     if (result.type === 'ok') {
-      expect(result.extraData).toEqual({ selectedPositions: ['pos1', 'pos2'] })
+      expect(result.extraData).toEqual({
+        selectedPositions: [],
+        selectedCards: ['id1', 'id2'],
+      })
     }
   })
 })

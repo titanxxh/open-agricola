@@ -73,7 +73,7 @@ describe('C70_LettucePatch session', () => {
       }
 
       // Sow vegetable in the card's field
-      resp = session.resolveChoice(0, 'confirm', {
+      resp = session.commitSelectionChoice(0, {
         crops: [{ row: -1, col: 3070, crop: 'vegetable' }],
       })
       expect(resp.ok).toBe(true)
@@ -101,7 +101,7 @@ describe('C70_LettucePatch session', () => {
       expect(resp.ok).toBe(true)
       expect(resp.ok).toBe(true)
 
-      resp = session.resolveChoice(0, 'confirm', {
+      resp = session.commitSelectionChoice(0, {
         crops: [{ row: -1, col: 3070, crop: 'vegetable' }],
       })
       expect(resp.ok).toBe(true)

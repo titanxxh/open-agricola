@@ -1,6 +1,6 @@
 import type { GameSession } from '../../server/game/authoritative-session'
 import type { FixtureContext } from './fixtures/types'
-import { confirmNextPlayer, confirmPlayerSwitch } from '../../server/__tests__/_helpers/legacy-confirms'
+import { confirmNextPlayer, confirmPlayerSwitch } from '../../server/__tests__/_helpers/pending-confirms'
 import { autoAdvanceRoundEnd } from './session-helpers'
 
 export interface DriverStep {

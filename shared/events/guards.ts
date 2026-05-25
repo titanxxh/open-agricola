@@ -1,3 +1,5 @@
+import { PAYMENT_RESOURCE_KEYS, REAL_RESOURCE_KEYS } from '../contract/resource-keys'
+
 export const assertPublicGameEvent = (event: unknown): void => {
   const visibility = (event as { visibility?: unknown } | null)?.visibility
   if (visibility !== 'public') {
@@ -72,23 +74,12 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'game.ended': [],
 }
 
-const resourceKeys = new Set([
-  'wood',
-  'clay',
-  'reed',
-  'stone',
-  'food',
-  'grain',
-  'vegetable',
-  'sheep',
-  'boar',
-  'cattle',
-  'begging',
-  'occupation',
-  'field',
-  'roomWood',
-  'roomClay',
-  'roomStone',
+const resourceKeys = new Set<string>(REAL_RESOURCE_KEYS)
+
+const paymentResourceKeys = new Set<string>(PAYMENT_RESOURCE_KEYS)
+
+const futureMeepleResourceKeys = new Set([
+  ...REAL_RESOURCE_KEYS,
   'stable',
 ])
 
@@ -212,15 +203,29 @@ const assertNoPrivatePayload = (value: unknown, path: string): void => {
   })
 }
 
-const assertResourceMap = (value: unknown, path: string): void => {
+const assertResourceMapForKeys = (
+  value: unknown,
+  path: string,
+  allowedKeys: ReadonlySet<string>,
+): void => {
   const record = assertRecord(value, path)
   Object.entries(record).forEach(([key, entry]) => {
-    if (!resourceKeys.has(key)) {
+    if (!allowedKeys.has(key)) {
       throw new Error(`GameEvent ${path} has unknown resource ${key}`)
     }
     assertFiniteNumberField(entry, `${path}.${key}`)
   })
 }
+
+const assertResourceMap = (value: unknown, path: string): void =>
+  assertResourceMapForKeys(value, path, resourceKeys)
+
+const assertPaymentResourceMap = (value: unknown, path: string): void => {
+  assertResourceMapForKeys(value, path, paymentResourceKeys)
+}
+
+const assertFutureMeepleResourceMap = (value: unknown, path: string): void =>
+  assertResourceMapForKeys(value, path, futureMeepleResourceKeys)
 
 const assertResourceLocation = (value: unknown, path: string): void => {
   const record = assertRecord(value, path)
@@ -269,7 +274,7 @@ const assertPaymentSources = (value: unknown): void => {
     const record = assertRecord(entry, `paymentSources[${index}]`)
     assertOnlyKeys(record, ['from', 'resources'], `paymentSources[${index}]`)
     assertResourceLocation(record.from, `paymentSources[${index}].from`)
-    assertResourceMap(record.resources, `paymentSources[${index}].resources`)
+    assertPaymentResourceMap(record.resources, `paymentSources[${index}].resources`)
   })
 }
 
@@ -377,7 +382,7 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       assertResourceLocation(event.to, 'to')
       return
     case 'resource.paid':
-      assertResourceMap(event.resources, 'resources')
+      assertPaymentResourceMap(event.resources, 'resources')
       assertStringField(event.paymentFor, 'paymentFor')
       if (event.to !== undefined) assertResourceLocation(event.to, 'to')
       assertPaymentSources(event.paymentSources)
@@ -549,7 +554,7 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       event.entries.forEach((entry, index) => {
         const record = assertRecord(entry, `entries[${index}]`)
         assertFiniteNumberField(record.round, `entries[${index}].round`)
-        if (record.resources !== undefined) assertResourceMap(record.resources, `entries[${index}].resources`)
+        if (record.resources !== undefined) assertFutureMeepleResourceMap(record.resources, `entries[${index}].resources`)
         assertOptionalStringField(record.roomType, `entries[${index}].roomType`)
       })
       assertFutureMeepleSourceSummary(event.sourceSummary)
@@ -563,7 +568,7 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       assertStringField(event.playerId, 'playerId')
       assertStringField(event.cardId, 'cardId')
       assertFiniteNumberField(event.round, 'round')
-      if (event.resources !== undefined) assertResourceMap(event.resources, 'resources')
+      if (event.resources !== undefined) assertFutureMeepleResourceMap(event.resources, 'resources')
       assertOptionalStringField(event.roomType, 'roomType')
       return
     case 'round.started':

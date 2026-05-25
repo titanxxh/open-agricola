@@ -1,4 +1,5 @@
 import type {
+  ActionAvailabilityContext,
   ActionCostPreview,
   ActionDefinition,
   ActionMutationContext,
@@ -18,7 +19,10 @@ import { addCardResourceGained } from '../../cards/helpers/card-state'
 // plow.ts only uses typed-flat helpers (shim scope), so no PaymentSolver
 // call sites exist here yet.
 import {
+  canAffordTypedFlatCost,
   executeResolvedTypedFlatPayment,
+  readExactCost,
+  resolveUnitCostWithDelta,
   resolveTypedFlatPaymentSelection,
 } from '../payment/internal'
 
@@ -74,7 +78,40 @@ export const getPlowableTiles = (player: PlayerState) => {
 
 const plowCostPreview: ActionCostPreview = {
   isStructurallyPossible: ({ player }) => getPlowableTiles(player).length > 0,
-  getBaseCost: () => ({}),
+  getBaseCost: (context) =>
+    resolvePlowCost(readPlowActionContext(context), undefined) ?? {},
+  canExecute: (context, costs) => {
+    if (getPlowableTiles(context.player).length === 0) return false
+    return canPayPlowCost(context.player, readPlowActionContext(context), costs)
+  },
+}
+
+type PlowAvailabilityContext = ActionAvailabilityContext & {
+  actionContext?: Record<string, unknown>
+}
+
+const readPlowActionContext = (
+  context: ActionAvailabilityContext,
+): Record<string, unknown> | undefined => {
+  const actionContext = (context as PlowAvailabilityContext).actionContext
+  if (actionContext) return actionContext
+  const paramsActionContext = context.params?.actionContext
+  if (!paramsActionContext || typeof paramsActionContext !== 'object') return undefined
+  return paramsActionContext as Record<string, unknown>
+}
+
+const resolvePlowCost = (
+  actionContext: Record<string, unknown> | undefined,
+  costs: Partial<Resource> | undefined,
+) => resolveUnitCostWithDelta({}, readExactCost(actionContext), costs, 1)
+
+const canPayPlowCost = (
+  player: PlayerState,
+  actionContext: Record<string, unknown> | undefined,
+  costs: Partial<Resource> | undefined,
+) => {
+  const cost = resolvePlowCost(actionContext, costs)
+  return !!cost && canAffordTypedFlatCost(player, cost, 'plow')
 }
 
 const sanitizePayableCost = (
@@ -106,7 +143,9 @@ const finalizePlow = (
   const idx = ctx.state.players.indexOf(ctx.player)
   const validated = playerBoard(ctx.state, idx).farmyard.canPlow(tile, lockedKeys)
   if (!validated.ok) return { type: 'fail', errorKey: validated.error?.code ?? 'log.action' }
-  const plowCost = sanitizePayableCost(ctx.costs)
+  const resolvedCost = resolvePlowCost(ctx.actionContext, ctx.costs)
+  if (!resolvedCost) return { type: 'fail', errorKey: 'log.action' }
+  const plowCost = sanitizePayableCost(resolvedCost)
   const payment = resolveTypedFlatPaymentSelection(
     validated.player as unknown as PlayerState,
     plowCost,
@@ -114,10 +153,11 @@ const finalizePlow = (
     paymentChoice,
     { type: 'fail', errorKey: 'log.action' },
     'plow',
+    ctx.state,
   )
   if (payment.type !== 'selected') return { type: 'fail', errorKey: 'log.action' }
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
-  executeResolvedTypedFlatPayment(nextPlayer, payment, 'plow')
+  executeResolvedTypedFlatPayment(nextPlayer, payment, 'plow', ctx.state)
   applyPlayerMutation(ctx.player, nextPlayer)
   if (ctx.sourceCard) {
     addCardResourceGained(ctx.player, ctx.sourceCard, { field: 1 })
@@ -139,11 +179,16 @@ export const plowAction: ActionDefinition = {
   descriptionKey: 'actions.plow.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (state, player) =>
-    canExecuteWithCostPreview(plowCostPreview, { state, player }),
+  canBeExecutedByPlayer: (state, player, context) =>
+    canExecuteWithCostPreview(
+      plowCostPreview,
+      { state, player, actionContext: context?.actionContext } as PlowAvailabilityContext,
+    ),
   costPreview: plowCostPreview,
-  execute: ({ player }): ActionExecutionResult => {
-    const selectableTiles = getPlowableTiles(player)
+  execute: ({ player, actionContext, costs }): ActionExecutionResult => {
+    const selectableTiles = canPayPlowCost(player, actionContext, costs)
+      ? getPlowableTiles(player)
+      : []
     return {
       type: 'request',
       request: {
@@ -185,13 +230,16 @@ export const plowAction: ActionDefinition = {
         return { type: 'fail', errorKey: validated.error?.code ?? 'log.action' }
       }
       const selectedTile = tile as FarmTilePosition
+      const resolvedCost = resolvePlowCost(ctx.actionContext, ctx.costs)
+      if (!resolvedCost) return { type: 'fail', errorKey: 'log.action' }
       const payment = resolveTypedFlatPaymentSelection(
         validated.player as unknown as PlayerState,
-        sanitizePayableCost(ctx.costs),
+        sanitizePayableCost(resolvedCost),
         'pay:plow',
         undefined,
         { type: 'fail', errorKey: 'log.action' },
         'plow',
+        ctx.state,
       )
       if (payment.type === 'request') {
         const options = payment.request.kind === 'choice' ? payment.request.options : []

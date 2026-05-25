@@ -1,6 +1,6 @@
-import type { ComplexCost, CostModifierType, GameState, PaymentSolution, Resource } from '../../contract/types'
+import type { ComplexCost, CostModifierType, GameState, PaymentResourceMap, PaymentSolution } from '../../contract/types'
 
-export type Cost = Partial<Resource> | ComplexCost
+export type Cost = PaymentResourceMap | ComplexCost
 
 export type Option = PaymentSolution
 

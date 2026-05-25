@@ -7,6 +7,7 @@ import type {
   ActionChoiceOption,
   InteractionRequest,
   Resource,
+  ActionSpace,
 } from '../contract/types'
 import type { InteractionContextSnapshot } from './types'
 import {
@@ -23,7 +24,7 @@ import {
 } from './pending-validation'
 import { evaluateTriggerSelect, type TriggerSelectEvaluationOptions } from './trigger-select'
 import {
-  applyFallbackSourceCardToFlow,
+  applyDefaultSourceCardToFlow,
   applyInteractionRequest,
   buildPhaseTrailingNodes,
   buildChoiceExecutionContext,
@@ -52,7 +53,17 @@ type EngineContext = {
   emitPrivateEvent?: ActionExecutionContext['emitPrivateEvent']
 }
 
-const hasLegacyLogSurface = (result: ActionExecutionResult): boolean => {
+const resolveExecutionSpace = (
+  state: EngineContext['state'],
+  fallback: ActionSpace,
+  actionContext?: Record<string, unknown>,
+): ActionSpace => {
+  const targetSpaceId = actionContext?.targetSpaceId
+  if (typeof targetSpaceId !== 'string') return fallback
+  return state.actionSpaces.find((space) => space.id === targetSpaceId) ?? fallback
+}
+
+const hasStateLogSurface = (result: ActionExecutionResult): boolean => {
   if (result.type === 'fail') return true
   return false
 }
@@ -63,7 +74,7 @@ const appendDerivedLogsForEventOnlyResult = (
   committed: readonly GameEvent[],
   result: ActionExecutionResult,
 ): void => {
-  if (committed.length === 0 || hasLegacyLogSurface(result)) return
+  if (committed.length === 0 || hasStateLogSurface(result)) return
   const playerNames = Object.fromEntries(
     context.state.players.map((player) => [player.id, player.name]),
   )
@@ -435,13 +446,14 @@ export function engineResolveChoice(
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
+      const actionContext = actionContextForNode(child, int)
       const executionContext: ActionExecutionContext = {
         state: context.state,
         player: context.player,
-        space: context.space,
+        space: resolveExecutionSpace(context.state, context.space, actionContext),
         params: child.params,
         sourceCard: child.sourceCard,
-        actionContext: actionContextForNode(child, int),
+        actionContext,
         emitPrivateEvent: context.emitPrivateEvent,
       }
       const replaceResult = int.hooks.applyComputeReplace({
@@ -455,7 +467,7 @@ export function engineResolveChoice(
         const flowNode = buildOwnedFlowNode(int,
           buildReplaceChoiceFlow(
             child,
-            applyFallbackSourceCardToFlow(
+            applyDefaultSourceCardToFlow(
               replaceResult.alternativeFlow,
               replaceResult.sourceCard,
             ),
@@ -637,7 +649,7 @@ export function engineResolveChoice(
             : undefined
         applyInteractionRequest(int, {
           targetNode: child,
-          fallbackNodeId: child.id,
+          hostNodeId: child.id,
           request: updatedRequest,
           promptKey: result.promptKey,
           promptParams: result.promptParams,
@@ -674,7 +686,7 @@ export function engineResolveChoice(
 
       const hookFlows = allResults
         .map((entry) => entry.flow
-          ? applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
+          ? applyDefaultSourceCardToFlow(entry.flow, entry.sourceCard)
           : null)
         .filter((flow) => flow)
         .map((flow) => buildOwnedFlowNode(int, flow as ActionFlow, context.player.id))
@@ -787,6 +799,11 @@ export function engineResolveChoice(
       skipBeforeTriggers: true,
     }
   }
+  executionContext.space = resolveExecutionSpace(
+    context.state,
+    executionContext.space,
+    executionContext.actionContext,
+  )
   let committedActionId = actionId
   let committedAction = action
   if (choice !== 'cancel') {
@@ -876,6 +893,21 @@ export function engineResolveChoice(
       }, choice, payload),
       executionContext.actionContext,
     )
+    const contextWritePatch =
+      'extraData' in result && result.extraData && typeof result.extraData === 'object'
+        ? (result.extraData.actionContextWrite as Record<string, unknown> | undefined)
+        : undefined
+    if (contextWritePatch) {
+      executionContext.actionContext = {
+        ...(executionContext.actionContext ?? {}),
+        ...contextWritePatch,
+      }
+      executionContext.space = resolveExecutionSpace(
+        context.state,
+        executionContext.space,
+        executionContext.actionContext,
+      )
+    }
     if (result.type !== 'fail' && result.type !== 'request') {
       emitCardTriggered(int, eventFrame.sink, executionContext, committedActionId)
     }
@@ -935,7 +967,7 @@ export function engineResolveChoice(
     const contextSnapshot = pendingEnvelope.contextSnapshot as InteractionContextSnapshot | undefined
     applyInteractionRequest(int, {
       targetNode: pendingHost,
-      fallbackNodeId: pendingEnvelope.hostNodeId,
+      hostNodeId: pendingEnvelope.hostNodeId,
       request: pendingEnvelope.request,
       promptKey: pendingEnvelope.promptKey,
       promptParams: pendingEnvelope.promptParams,
@@ -965,7 +997,7 @@ export function engineResolveChoice(
     const requestOptions = result.request.options
     applyInteractionRequest(int, {
       targetNode: pendingHost,
-      fallbackNodeId: pendingHost?.id ?? null,
+      hostNodeId: pendingHost?.id ?? null,
       request: result.request,
       promptKey: result.promptKey,
       promptParams: result.promptParams,
@@ -1002,7 +1034,7 @@ export function engineResolveChoice(
 
   const hookFlows = allResults
     .map((entry) => entry.flow
-      ? applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
+      ? applyDefaultSourceCardToFlow(entry.flow, entry.sourceCard)
       : null)
     .filter((flow) => flow)
     .map((flow) => buildOwnedFlowNode(int, flow as ActionFlow, context.player.id))

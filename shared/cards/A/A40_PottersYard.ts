@@ -117,7 +117,7 @@ const beforeFencingListener: CardListenerRegistration = {
   id: 'A40-potters-yard-before-fencing',
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
-  actions: ['fencing'],
+  actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (getClayRemaining(context.player) <= 0) return
     setUsedCountBefore(context.player, getUsedTiles(context.player).size)
@@ -154,7 +154,7 @@ const createAfterHandler = (actionName: string): CardListenerRegistration => ({
 })
 
 export const A40_PottersYard_impl = {
-  listeners: [beforePlowListener, beforeConstructListener, beforeFencingListener, beforeStablesListener, createAfterHandler('plow'), createAfterHandler('construct'), createAfterHandler('fencing'), createAfterHandler('stables')],
+  listeners: [beforePlowListener, beforeConstructListener, beforeFencingListener, beforeStablesListener, createAfterHandler('plow'), createAfterHandler('construct'), createAfterHandler('fence'), createAfterHandler('stables')],
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {

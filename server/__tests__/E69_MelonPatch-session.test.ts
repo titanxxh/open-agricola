@@ -90,7 +90,7 @@ describe('E69_MelonPatch session', () => {
       expect(resp.ok).toBe(true)
       expect(resp.interaction.stateId).toBe('wait')
 
-      resp = session.resolveChoice(0, 'confirm', {
+      resp = session.commitSelectionChoice(0, {
         crops: [{ row: -1, col: 5069, crop: 'vegetable' }],
       })
       expect(resp.ok).toBe(true)

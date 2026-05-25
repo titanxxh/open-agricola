@@ -12,6 +12,6 @@ export const D155_Ebonist = new Occupation({
   cost: {},
   players: '4+',
   exchanges: [
-    { from: { wood: 1 }, to: { food: 1, grain: 1 }, max: 1, triggers: ['anytime'] },
+    { from: { wood: 1 }, to: { food: 1, grain: 1 }, max: 1, sourceId: CARD_ID, triggers: ['harvest'] },
   ],
 })

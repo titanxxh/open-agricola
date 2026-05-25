@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Codemod: replace session.confirmNextPlayer() / session.confirmPlayerSwitch()
-# with helper invocations from server/__tests__/_helpers/legacy-confirms.ts.
+# with helper invocations from server/__tests__/_helpers/pending-confirms.ts.
 # Auto-injects the import line near other relative imports.
 
 set -euo pipefail
@@ -23,11 +23,11 @@ for f in $FILES; do
     else imports="confirmPlayerSwitch"; fi
   fi
 
-  # Compute relative path: from $f back to server/__tests__/_helpers/legacy-confirms
+  # Compute relative path: from $f back to server/__tests__/_helpers/pending-confirms
   # All target files are either in server/__tests__/*.test.ts (depth 2) or
   # shared/**/*.test.ts (depth 3+). We need the path relative to $(dirname $f).
   dir=$(dirname "$f")
-  rel=$(realpath --relative-to="$dir" "server/__tests__/_helpers/legacy-confirms.ts")
+  rel=$(realpath --relative-to="$dir" "server/__tests__/_helpers/pending-confirms.ts")
   rel="${rel%.ts}"
   # Ensure leading ./
   case "$rel" in
@@ -38,7 +38,7 @@ for f in $FILES; do
   import_line="import { $imports } from '$rel'"
 
   # Skip if helper already imported.
-  if grep -q "_helpers/legacy-confirms" "$f"; then
+  if grep -q "_helpers/pending-confirms" "$f"; then
     echo "skip-import (already imported): $f"
   else
     # Insert after the last `import { ... } from '...'` line.

@@ -1,4 +1,4 @@
-import type { Resource } from '../contract/types'
+import type { PaymentResourceKey, Resource } from '../contract/types'
 
 // Real resources actually held in player.resources / space.resources.
 // `begging` is included as a real key because it tracks begging-card count.
@@ -8,6 +8,12 @@ export const REAL_RESOURCE_KEYS = [
   'sheep', 'boar', 'cattle',
   'begging',
 ] as const satisfies ReadonlyArray<keyof Resource>
+
+export const PAYMENT_RESOURCE_KEYS = [
+  ...REAL_RESOURCE_KEYS,
+  'fence',
+  'stable',
+] as const satisfies ReadonlyArray<PaymentResourceKey>
 
 // Pseudo keys are NEVER stored in player.resources. They live exclusively in
 // CardResourceStats.gained to record BGA-style "Plows: N / Built: N rooms"

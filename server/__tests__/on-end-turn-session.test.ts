@@ -5,7 +5,7 @@ import { incCounter } from '../../shared/cards/__stubs__/helpers'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A128_RiparianBuilder'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
-import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 const TEST_END_TURN_CARD = 'TEST_OnEndTurnCounter'
 

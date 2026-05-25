@@ -36,7 +36,7 @@ const listener: CardListenerRegistration = {
             type: 'leaf',
             actionId: 'stables',
             sourceCard: CARD_ID,
-            actionContext: { max: 1, costOverride: {} },
+            actionContext: { max: 1, exactCost: { max: 1 } },
           },
         ],
       },

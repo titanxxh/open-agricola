@@ -2,7 +2,12 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { initCardState } from '../__stubs__/helpers'
 import { writeCardInfobox } from '../helpers/card-state'
-import { getFenceCount, getTotalPastureCells, maxFences, maxPastureCells, minimumFenceSegments } from '../../actions/effects/fencing'
+import { getTotalPastureCells, maxPastureCells, minimumFenceSegments } from '../../actions/effects/fencing'
+import { getOwnOrdinaryFenceCount } from '../../domain/fence-segments'
+import {
+  getOwnOrdinaryFenceBuildLimit,
+  getOwnOrdinaryFenceReserveCount,
+} from '../../domain/supply-tokens'
 import type { CardImpl } from '../registry'
 import { E74_AshTrees } from '../../cards-display/E/E74_AshTrees'
 
@@ -21,7 +26,10 @@ const isDoableListener: CardListenerRegistration = {
     const stored = context.player.cardStates?.[CARD_ID]?.counters?.fences ?? 0
     if (stored <= 0) return
     if ((context.player.resources.wood ?? 0) + stored < minimumFenceSegments) return
-    if (getFenceCount(context.player) + minimumFenceSegments > maxFences) return
+    const remainingBuildCapacity =
+      getOwnOrdinaryFenceBuildLimit(context.player) -
+      getOwnOrdinaryFenceCount(context.player)
+    if (remainingBuildCapacity < minimumFenceSegments) return
     if (getTotalPastureCells(context.player) >= maxPastureCells) return
     return { doable: true }
   },
@@ -96,8 +104,8 @@ export const E74_AshTrees_impl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
+    const initial = Math.min(MAX_FREE_FENCES, getOwnOrdinaryFenceReserveCount(player))
     const counters = initCardState(player, CARD_ID)
-    const initial = Math.min(MAX_FREE_FENCES, Math.max(0, maxFences - getFenceCount(player)))
     counters['fences'] = initial
     writeCardInfobox(player, CARD_ID, `${initial} / ${MAX_FREE_FENCES}`)
   },

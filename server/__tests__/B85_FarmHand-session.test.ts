@@ -14,6 +14,7 @@ import {
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { getExtraRoomCapacity } from '../../shared/cards/card-effects'
 import { getFarmHandCandidates } from '../../shared/cards/B/B85_FarmHand'
+import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
 
 import '../../shared/cards/B/B85_FarmHand'
 import type { ActionSpace, FarmTilePosition, GameState, PlayerState } from '../../shared/contract/types'
@@ -96,6 +97,12 @@ describe('B85_FarmHand — anytime guard', () => {
     const ctx = buildContext(player, { id: 'stables' })
     expect(executeCardListener(getListener(LISTENER_ID), ctx)).toBeUndefined()
   })
+
+  it('refuses when consumed stable tokens exhaust reserve', () => {
+    const player = setupPlayer({ supplyTokensConsumed: { stable: 4 } })
+    const ctx = buildContext(player, { id: 'stables' })
+    expect(executeCardListener(getListener(LISTENER_ID), ctx)).toBeUndefined()
+  })
 })
 
 describe('B85_FarmHand — housing contribution', () => {
@@ -112,6 +119,22 @@ describe('B85_FarmHand — housing contribution', () => {
     expect(getExtraRoomCapacity(player)).toBe(1)
     delete player.cardStates![CARD_ID]!.extraData!.position
     expect(getExtraRoomCapacity(player)).toBe(0)
+  })
+
+  it('FarmHand position consumes and releases dynamic stable reserve', () => {
+    const player = setupPlayer({
+      stableTiles: [
+        { row: 0, col: 0 },
+        { row: 0, col: 1 },
+        { row: 0, col: 2 },
+      ],
+    })
+    const state = buildContext(player, { id: 'stables' }).state
+    expect(getAvailableStableSupplyCount(state, player)).toBe(1)
+    writeCardExtraData(player, CARD_ID, 'position', { row: 0, col: 2 })
+    expect(getAvailableStableSupplyCount(state, player)).toBe(0)
+    delete player.cardStates![CARD_ID]!.extraData!.position
+    expect(getAvailableStableSupplyCount(state, player)).toBe(1)
   })
 
   it('once-per-game flag stays true after position is cleared (blocks second build)', () => {

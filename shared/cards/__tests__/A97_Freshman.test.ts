@@ -102,7 +102,7 @@ describe('A97_Freshman', () => {
           type: 'leaf',
           actionId: 'occupation',
           sourceCard: 'A97_Freshman',
-          params: { costOverride: {} },
+          params: { exactCost: {} },
         },
       ],
     })
@@ -144,7 +144,7 @@ describe('A97_Freshman', () => {
       state: createState(player),
       player,
       space: createSpace('lessons'),
-      params: { costOverride: {} } as unknown as ActionExecutionContext,
+      params: { exactCost: {} } as unknown as ActionExecutionContext,
     })
 
     expect(result.type).toBe('request')
@@ -157,7 +157,7 @@ describe('A97_Freshman', () => {
         state: createState(player),
         player,
         space: createSpace('lessons'),
-        params: { costOverride: {} } as unknown as ActionExecutionContext,
+        params: { exactCost: {} } as unknown as ActionExecutionContext,
       },
       'A123_FrameBuilder',
     )

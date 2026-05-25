@@ -1,4 +1,5 @@
 import type {
+  ActionAvailabilityContext,
   ActionChoiceOption,
   ActionCostPreview,
   ActionDefinition,
@@ -17,6 +18,8 @@ import { canExecuteWithCostPreview } from '../helpers/cost-preview'
 import {
   canAffordTypedFlatCost,
   payTypedFlatCost,
+  readExactCost,
+  resolveUnitCostWithDelta,
 } from '../payment/internal'
 import { mergeResources } from '../../utils/resources'
 import { buildInternalPayChild } from '../helpers/pay-child'
@@ -66,6 +69,19 @@ const mergeRenovationCost = (
     ...baseCost,
     fees: [mergeResources(baseCost.fees?.[0] ?? {}, costOverride)],
   }
+}
+
+const resolveRenovationActionCost = (
+  baseCost: ComplexCost,
+  actionContext?: Record<string, unknown>,
+  costOverride?: Partial<Resource>,
+): ComplexCost | null => {
+  const exactCost = readExactCost(actionContext)
+  if (exactCost) {
+    const resolved = resolveUnitCostWithDelta({}, exactCost, costOverride, 1)
+    return resolved ? { fee: resolved } : null
+  }
+  return mergeRenovationCost(baseCost, costOverride)
 }
 
 /**
@@ -163,13 +179,21 @@ const flattenRenovationCost = (cost: ComplexCost): Partial<Resource> => {
 const renovateHouseCostPreview: ActionCostPreview = {
   isStructurallyPossible: ({ player }) =>
     player.houseType === 'wood' || player.houseType === 'clay',
-  canExecute: ({ player, params }, costOverride) => {
+  canExecute: (context, costOverride) => {
+    const { player, params } = context
     const plan = planForContext(player, params)
-    return canRenovate(player, costOverride, plan)
+    if (!plan) return false
+    const actionContext = (context as { actionContext?: Record<string, unknown> }).actionContext
+    const cost = resolveRenovationActionCost(plan.cost, actionContext, costOverride)
+    return cost ? canAffordTypedFlatCost(player, cost, 'renovation') : false
   },
-  getBaseCost: ({ player, params }) => {
+  getBaseCost: (context) => {
+    const { player, params } = context
     const plan = planForContext(player, params)
     if (!plan) return {}
+    const actionContext = (context as { actionContext?: Record<string, unknown> }).actionContext
+    const exactCost = readExactCost(actionContext)
+    if (exactCost) return resolveUnitCostWithDelta({}, exactCost, undefined, 1) ?? {}
     return flattenRenovationCost(plan.cost)
   },
 }
@@ -202,15 +226,20 @@ export const renovateHouseAction: ActionDefinition = {
   descriptionKey: 'actions.renovate-house.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (state, player) =>
-    canExecuteWithCostPreview(renovateHouseCostPreview, { state, player }),
+  canBeExecutedByPlayer: (state, player, opts) =>
+    canExecuteWithCostPreview(
+      renovateHouseCostPreview,
+      { state, player, actionContext: opts?.actionContext } as ActionAvailabilityContext & {
+        actionContext?: Record<string, unknown>
+      },
+    ),
   costPreview: renovateHouseCostPreview,
   getBaseChoiceOptions: ({ player }) => baseRenovationOptions(player),
   choicePromptKey: 'ui.interactionChooseRenovationTarget',
   noChoiceLogKey: 'log.renovationFail',
   emitLeafActionDetail: true,
   execute: () => ({ type: 'fail', errorKey: 'log.renovationFail' }),
-  resolveChoice: ({ player, params, costs }, choice) => {
+  resolveChoice: ({ player, params, costs, actionContext }, choice) => {
     const failure: ActionExecutionResult = { type: 'fail', errorKey: 'log.renovationFail' }
     const target: RenovationTarget | null =
       (choice === 'clay' || choice === 'stone' ? choice : null)
@@ -218,7 +247,8 @@ export const renovateHouseAction: ActionDefinition = {
     if (!target) return failure
     const plan = buildRenovationPlan(player, target)
     if (!plan) return failure
-    const totalCost = mergeRenovationCost(plan.cost, costs)
+    const totalCost = resolveRenovationActionCost(plan.cost, actionContext, costs)
+    if (!totalCost) return failure
     const from = player.houseType
     return {
       type: 'ok',

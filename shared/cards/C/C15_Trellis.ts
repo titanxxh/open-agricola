@@ -19,7 +19,7 @@ const listener: CardListenerRegistration = {
         children: [
           {
             type: 'leaf',
-            actionId: 'fencing',
+            actionId: 'fence',
             sourceCard: CARD_ID,
           },
         ],

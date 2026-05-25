@@ -63,7 +63,18 @@ const playOneWoodMinorTurn = (session: GameSession, minorId: string) => {
   expect(resp.ok).toBe(true)
   expect(resp.interaction.stateId).toBe('wait')
 
-  resp = session.resolveChoice(0, `minor:${minorId}`)
+  const improvementOption = resp.interaction.options?.find((option) => option.value.startsWith('action-improvement-'))
+  if (improvementOption) {
+    resp = session.resolveChoice(0, improvementOption.value)
+    expect(resp.ok).toBe(true)
+  }
+  if (resp.interaction.sourceCard !== minorId) {
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return resp
+    const minorOption = resp.interaction.options?.find((option) => option.value === `minor:${minorId}`)
+    expect(minorOption).toBeDefined()
+    resp = session.resolveChoice(0, minorOption!.value)
+  }
   expect(resp.ok).toBe(true)
   expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   return resp
@@ -144,7 +155,10 @@ describe('D74_RoyalWood session', () => {
     let resp = session.takeAction(0, 'major-improvement')
     expect(resp.interaction.stateId).toBe('wait')
 
-    resp = session.resolveChoice(0, 'major:Major_Joinery')
+    if (resp.interaction.stateId !== 'wait') return
+    const joineryOption = resp.interaction.options?.find((option) => option.value === 'major:Major_Joinery')
+    expect(joineryOption).toBeDefined()
+    resp = session.resolveChoice(0, joineryOption!.value)
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.events).toEqual(expect.arrayContaining([
@@ -183,7 +197,7 @@ describe('D74_RoyalWood session', () => {
     if (resp.interaction.farm.farmType !== 'room') return
 
     const room = resp.interaction.farm.selectableTiles[0]!
-    resp = session.resolveChoice(0, 'confirm', { rooms: [room] })
+    resp = session.commitSelectionChoice(0, { rooms: [room] })
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.woodSpent).toBe(5)
 
@@ -229,7 +243,7 @@ describe('D74_RoyalWood session', () => {
     if (resp.interaction.farm.farmType !== 'stable') return
 
     const stable = resp.interaction.farm.selectableTiles[0]!
-    resp = session.resolveChoice(0, 'confirm', { stables: [stable] })
+    resp = session.commitSelectionChoice(0, { stables: [stable] })
     expect(resp.ok).toBe(true)
     expect(resp.state.events).toEqual(expect.arrayContaining([
       expect.objectContaining({

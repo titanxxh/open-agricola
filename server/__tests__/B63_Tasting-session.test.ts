@@ -5,7 +5,7 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/B/B63_Tasting'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { SessionResponse } from '../../shared/session/session-core'
-import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 const CARD_ID = 'B63_Tasting'
 

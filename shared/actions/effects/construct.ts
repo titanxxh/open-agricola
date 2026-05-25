@@ -1,4 +1,5 @@
 import type {
+  ActionAvailabilityContext,
   ActionCostPreview,
   ActionDefinition,
   ActionMutationContext,
@@ -14,9 +15,11 @@ import type {
 // construct.ts only uses room-payment helpers (S4 domain aggregate scope),
 // so no PaymentSolver call sites exist here yet.
 import {
-  applyCostOverride,
+  buildConstructCost,
   getBuildRoomCost,
   getMaxBuildableRooms,
+  readConstructCostDelta,
+  readExactCost,
   resolveRoomPaymentSelection,
 } from '../payment/internal'
 import { buildInternalPayChild } from '../helpers/pay-child'
@@ -25,10 +28,36 @@ import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { incRoomsBuilt } from '../../session/stats'
 
+type ConstructAvailabilityContext = ActionAvailabilityContext & {
+  actionContext?: Record<string, unknown>
+}
+
+const readConstructActionContext = (
+  context: ActionAvailabilityContext,
+): Record<string, unknown> | undefined => {
+  const actionContext = (context as ConstructAvailabilityContext).actionContext
+  if (actionContext) return actionContext
+  const paramsActionContext = context.params?.actionContext
+  if (!paramsActionContext || typeof paramsActionContext !== 'object') return undefined
+  return paramsActionContext as Record<string, unknown>
+}
+
 const constructCostPreview: ActionCostPreview = {
-  getBaseCost: ({ player }) => getBuildRoomCost(player.houseType),
-  canExecute: (context, costOverride) =>
-    getMaxBuildableRooms(context.player, costOverride) > 0,
+  getBaseCost: (context) => {
+    const cost = buildConstructCost(
+      context.player,
+      undefined,
+      1,
+      readConstructActionContext(context),
+    )
+    return cost?.unitFee ?? getBuildRoomCost(context.player.houseType)
+  },
+  canExecute: (context, costs) =>
+    getMaxBuildableRooms(
+      context.player,
+      costs,
+      readConstructActionContext(context),
+    ) > 0,
 }
 
 const applyPlayerMutation = (target: PlayerState, source: PlayerState) => {
@@ -49,14 +78,27 @@ const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
   return result
 }
 
+const forbidsConstructCancel = (
+  actionContext?: Record<string, unknown>,
+): boolean => actionContext?.cancelPolicy === 'forbidCancel'
+
+const hasReachableConstructSelection = (ctx: ActionMutationContext): boolean => {
+  const idx = ctx.state.players.indexOf(ctx.player)
+  const costDelta = readConstructCostDelta(ctx.actionContext, ctx.costs)
+  const farm = playerBoard(ctx.state, idx).farmyard.selectableTiles('room', {
+    costOverride: costDelta,
+    exactCost: readExactCost(ctx.actionContext),
+    actionContext: ctx.actionContext,
+  })
+  return farm.farmType === 'room' && farm.maxSelections > 0
+}
+
 const buildConstructPayCost = (
   player: PlayerState,
-  costOverride: Partial<Resource> | undefined,
+  costs: Partial<Resource> | undefined,
+  actionContext: Record<string, unknown> | undefined,
   rooms: number,
-): ComplexCost => ({
-  unitFee: applyCostOverride(getBuildRoomCost(player.houseType), costOverride),
-  nb: rooms,
-})
+): ComplexCost | null => buildConstructCost(player, costs, rooms, actionContext)
 
 const finalizeRoom = (
   ctx: ActionMutationContext,
@@ -68,14 +110,10 @@ const finalizeRoom = (
   const selection = playerBoard(ctx.state, idx).farmyard.canBuildRoom(rooms, lockedKeys)
   if (!selection.ok) return { type: 'fail', errorKey: selection.code ?? 'log.action' }
 
-  const maxUnits =
-    typeof ctx.actionContext?.maxRooms === 'number'
-      ? ctx.actionContext.maxRooms
-      : undefined
   const maxBuildableRooms = getMaxBuildableRooms(
     ctx.player,
     ctx.costs,
-    typeof maxUnits === 'number' ? { maxRooms: maxUnits } : undefined,
+    ctx.actionContext,
   )
   if (rooms.length > maxBuildableRooms) {
     return { type: 'fail', errorKey: 'log.buildRoomFail' }
@@ -86,8 +124,16 @@ const finalizeRoom = (
     ctx.costs,
     rooms.length,
     paymentChoice,
+    ctx.actionContext,
   )
   if (payment.type !== 'selected') return { type: 'fail', errorKey: 'log.buildRoomFail' }
+  const payCost = buildConstructPayCost(
+    ctx.player,
+    ctx.costs,
+    ctx.actionContext,
+    rooms.length,
+  )
+  if (!payCost) return { type: 'fail', errorKey: 'log.buildRoomFail' }
 
   const nextPlayer = JSON.parse(JSON.stringify(ctx.player)) as PlayerState
   nextPlayer.roomTiles = [...nextPlayer.roomTiles, ...rooms]
@@ -121,7 +167,7 @@ const finalizeRoom = (
     internalChildren: {
       beforeHostListeners: [
         buildInternalPayChild({
-          cost: buildConstructPayCost(ctx.player, ctx.costs, rooms.length),
+          cost: payCost,
           costType: 'construct',
           optionPrefix: 'pay:room',
           paymentChoice,
@@ -139,12 +185,15 @@ export const constructAction: ActionDefinition = {
   descriptionKey: 'actions.construct.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: (_state, player) => getMaxBuildableRooms(player) > 0,
+  canBeExecutedByPlayer: (_state, player, context) =>
+    getMaxBuildableRooms(player, undefined, context?.actionContext) > 0,
   costPreview: constructCostPreview,
   execute: ({ state, player, costs, actionContext }): ActionExecutionResult => {
     const idx = state.players.indexOf(player)
+    const costDelta = readConstructCostDelta(actionContext, costs)
     const farm = playerBoard(state, idx).farmyard.selectableTiles('room', {
-      costOverride: costs,
+      costOverride: costDelta,
+      exactCost: readExactCost(actionContext),
       actionContext,
     })
     return {
@@ -161,7 +210,19 @@ export const constructAction: ActionDefinition = {
     }
   },
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
-    if (choice === 'cancel') return { type: 'ok' }
+    if (choice === 'cancel') {
+      if (
+        forbidsConstructCancel(ctx.actionContext) &&
+        hasReachableConstructSelection(ctx)
+      ) {
+        return {
+          type: 'fail',
+          errorKey: 'log.buildRoomFail',
+          recoverable: true,
+        }
+      }
+      return { type: 'ok' }
+    }
 
     // Second call: payment combo selected after multi-combo prompt.
     if (choice.startsWith('pay:room:')) {
@@ -188,14 +249,10 @@ export const constructAction: ActionDefinition = {
         return { type: 'fail', errorKey: selection.code ?? 'log.buildRoomFail' }
       }
 
-      const maxUnits =
-        typeof ctx.actionContext?.maxRooms === 'number'
-          ? ctx.actionContext.maxRooms
-          : undefined
       const maxBuildableRooms = getMaxBuildableRooms(
         ctx.player,
         ctx.costs,
-        typeof maxUnits === 'number' ? { maxRooms: maxUnits } : undefined,
+        ctx.actionContext,
       )
       if (rooms.length > maxBuildableRooms) {
         return { type: 'fail', errorKey: 'log.buildRoomFail' }
@@ -205,6 +262,8 @@ export const constructAction: ActionDefinition = {
         ctx.player,
         ctx.costs,
         rooms.length,
+        undefined,
+        ctx.actionContext,
       )
       if (payment.type === 'request') {
         const options = payment.request.kind === 'choice' ? payment.request.options : []

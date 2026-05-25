@@ -42,6 +42,7 @@ type SetupOptions = {
   wood?: number
   ownFenceEdges?: string[]
   ownFenceCount?: number
+  consumedFences?: number
   palisadeEdges?: string[]
   borrowedFenceEdges?: string[]
   withB30?: boolean
@@ -102,6 +103,7 @@ const setup = (opts: SetupOptions = {}) => {
     ...(opts.palisadeEdges ?? []).map((edge) => ownPalisade(player, edge)),
     ...(opts.borrowedFenceEdges ?? []).map((edge) => borrowedFence(next, edge)),
   ]
+  player.supplyTokensConsumed = opts.consumedFences ? { fence: opts.consumedFences } : {}
 
   if (opts.animals) {
     player.resources.sheep = 2
@@ -122,9 +124,21 @@ const setup = (opts: SetupOptions = {}) => {
 }
 
 const buyC1 = (session: GameSession) => {
-  const action = session.takeAction(0, 'meeting-place')
-  expect(action.ok).toBe(true)
-  const resp = session.resolveChoice(0, `minor:${CARD_ID}`)
+  let resp = session.takeAction(0, 'meeting-place')
+  expect(resp.ok).toBe(true)
+  expect(resp.interaction.stateId).toBe('wait')
+  if (resp.interaction.stateId !== 'wait') return resp
+  const improvementOption = resp.interaction.options?.find((option) => option.value.startsWith('action-improvement-'))
+  if (improvementOption) {
+    resp = session.resolveChoice(0, improvementOption.value)
+    expect(resp.ok).toBe(true)
+  }
+  if (resp.interaction.sourceCard === CARD_ID) return resp
+  expect(resp.interaction.stateId).toBe('wait')
+  if (resp.interaction.stateId !== 'wait') return resp
+  const cardOption = resp.interaction.options?.find((option) => option.value === `minor:${CARD_ID}`)
+  if (!cardOption) return resp
+  resp = session.resolveChoice(0, cardOption!.value)
   expect(resp.ok).toBe(true)
   return resp
 }
@@ -188,7 +202,7 @@ describe('C1 Overhaul session', () => {
     expect(resp.state.players[1]!.minorHand).toContain(CARD_ID)
     expect(getOwnOrdinaryFenceCount(afterBuy)).toBe(0)
 
-    const rebuild = session.resolveChoice(0, 'confirm', {
+    const rebuild = session.commitSelectionChoice(0, {
       edges: TILE_00,
       palisadeEdges: [],
       extraWood: 0,
@@ -210,7 +224,7 @@ describe('C1 Overhaul session', () => {
     const pending = buyC1(session)
     expectFarmSelect(pending)
 
-    const resp = session.resolveChoice(0, 'confirm', {
+    const resp = session.commitSelectionChoice(0, {
       edges: TILE_00,
       palisadeEdges: [],
       extraWood: 0,
@@ -248,7 +262,7 @@ describe('C1 Overhaul session', () => {
     const pending = buyC1(session)
     expectFarmSelect(pending)
 
-    const resp = session.resolveChoice(0, 'confirm', {
+    const resp = session.commitSelectionChoice(0, {
       edges: TILE_00,
       palisadeEdges: [],
       extraWood: 0,
@@ -308,7 +322,7 @@ describe('C1 Overhaul session', () => {
     const beforeInteraction = cloneInteraction(pending)
     const before = snapshotAfterRaze(session.getState().state)
 
-    const cancel = session.resolveChoice(0, 'cancel')
+    const cancel = session.commitSelectionChoice(0, { cancel: true })
     expect(cancel.ok).toBe(false)
     expect(cancel.error).toBe('log.fencingFail')
     expectFarmSelect(cancel, beforeInteraction)
@@ -322,7 +336,7 @@ describe('C1 Overhaul session', () => {
     const beforeInteraction = cloneInteraction(pending)
     const before = snapshotAfterRaze(session.getState().state)
 
-    const resp = session.resolveChoice(0, 'confirm', {
+    const resp = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-1-0', 'V-0-0'],
       palisadeEdges: [],
       extraWood: 0,
@@ -340,7 +354,7 @@ describe('C1 Overhaul session', () => {
     const beforeInteraction = cloneInteraction(pending)
     const before = snapshotAfterRaze(session.getState().state)
 
-    const resp = session.resolveChoice(0, 'confirm', {
+    const resp = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-0-1', 'H-0-2', 'H-0-3', 'H-1-0', 'H-1-1', 'H-1-2', 'H-1-3'],
       palisadeEdges: [],
       extraWood: 0,
@@ -363,7 +377,7 @@ describe('C1 Overhaul session', () => {
     const beforeInteraction = cloneInteraction(pending)
     const before = snapshotAfterRaze(session.getState().state)
 
-    const tooMany = session.resolveChoice(0, 'confirm', {
+    const tooMany = session.commitSelectionChoice(0, {
       edges: TOP_ROW_16,
       palisadeEdges: [],
       extraWood: 0,
@@ -373,7 +387,7 @@ describe('C1 Overhaul session', () => {
     expectFarmSelect(tooMany, beforeInteraction)
     expectSnapshotUnchanged(tooMany.state, before)
 
-    const maxOk = session.resolveChoice(0, 'confirm', {
+    const maxOk = session.commitSelectionChoice(0, {
       edges: TOP_ROW_15,
       palisadeEdges: [],
       extraWood: 0,
@@ -384,6 +398,36 @@ describe('C1 Overhaul session', () => {
     expect(getFenceCount(player)).toBe(16)
     expect(getPalisadeCount(player)).toBe(1)
     expect(player.resources.wood).toBe(0)
+  })
+
+  it('caps rebuild at dynamic own ordinary build limit after consumed fence supply', () => {
+    const session = setup({
+      wood: 1,
+      ownFenceCount: 13,
+      consumedFences: 1,
+    })
+    const pending = buyC1(session)
+    expectFarmSelect(pending)
+    const beforeInteraction = cloneInteraction(pending)
+    const before = snapshotAfterRaze(session.getState().state)
+
+    const tooMany = session.commitSelectionChoice(0, {
+      edges: TOP_ROW_15,
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+    expect(tooMany.ok).toBe(false)
+    expect(tooMany.error).toBe('TOO_MANY_FENCES')
+    expectFarmSelect(tooMany, beforeInteraction)
+    expectSnapshotUnchanged(tooMany.state, before)
+
+    const maxOk = session.commitSelectionChoice(0, {
+      edges: TOP_ROW_15.slice(0, 14),
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+    expect(maxOk.ok).toBe(true)
+    expect(getOwnOrdinaryFenceCount(maxOk.state.players[0]!)).toBe(14)
   })
 
   it('rejects B30 palisade input during C1 rebuild and keeps pending state unchanged', () => {
@@ -398,7 +442,7 @@ describe('C1 Overhaul session', () => {
     const beforeInteraction = cloneInteraction(pending)
     const before = snapshotAfterRaze(session.getState().state)
 
-    const resp = session.resolveChoice(0, 'confirm', {
+    const resp = session.commitSelectionChoice(0, {
       edges: ['H-1-0', 'V-0-1'],
       palisadeEdges: ['H-0-0', 'V-0-0'],
       extraWood: 0,
@@ -413,7 +457,7 @@ describe('C1 Overhaul session', () => {
     const session = setup({ wood: 1, ownFenceEdges: TILE_00, animals: true })
     buyC1(session)
 
-    const resp = session.resolveChoice(0, 'confirm', {
+    const resp = session.commitSelectionChoice(0, {
       edges: TILE_00,
       palisadeEdges: [],
       extraWood: 0,

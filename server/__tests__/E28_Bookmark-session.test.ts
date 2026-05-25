@@ -61,7 +61,7 @@ describe('E28_Bookmark session', () => {
       expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
       const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children as Extract<ActionFlow, { type: 'leaf' }>[]
       expect(children[0].actionId).toBe('occupation')
-      expect(children[0].params?.costOverride).toEqual({})
+      expect(children[0].params?.exactCost).toEqual({})
     }
   })
 

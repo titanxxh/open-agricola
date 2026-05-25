@@ -1,6 +1,6 @@
 # 卡牌实现现状报告
 
-> 生成/更新日期：2026-05-23。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
+> 生成/更新日期：2026-05-25。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
 
 ## 1. 当前快照
 
@@ -9,55 +9,58 @@
 | BGA A-E canonical 卡牌 | 888 |
 | OA A-E canonical 卡牌定义 | 888 |
 | 自动 metadata 脚本 literal mismatch | 0 |
-| 自动 metadata 脚本 complex mismatch | 5 |
+| 自动 metadata 脚本 complex mismatch | 4 |
 | 其中 schema-up 已接受差异 | 4 |
-| 需要实现复核的卡牌 | 10 |
-| 已接受 / 产品策略差异 | 65 |
+| 需要实现复核的卡牌 | 24 |
+| 已接受 / 产品策略差异 | 40 |
 | 排除的 BGA legacy 或未实现行为目标 | 52 |
-| 本轮审计视为已对齐 | 761 |
+| 本轮审计视为已对齐 | 772 |
 
-说明：`scripts/audit-bga-metadata-diff.ts` 现在会解析 BGA `STABLE` 打印成本和 `passing`。当前 literal mismatch 0（passing 已全部对齐）。当前 complex mismatch 是 1 个 `cost` 差异（`C54_MarketBooth`）和 4 个已接受的 schema-up prerequisite 差异。
+说明：`scripts/audit-bga-metadata-diff.ts` 现在会解析 BGA `STABLE` 打印成本和 `passing`。当前 literal mismatch 0（passing 已全部对齐）。当前 complex mismatch 是 4 个已接受的 schema-up prerequisite 差异。
 
 审计规则：优先核对卡牌描述文本、custom description、cost、prerequisite、passing、职业/小改 metadata，以及游戏规则行为。BGA 平台/工坊字段如 `banned`、`implemented`、`isCorbariusOrDulcinaria`、`isArtifexOrBubulcus` 不作为对齐要求；如果它们影响产品策略，只记录为已接受差异或排除项，不记为实现 bug。
 
 ## 2. 问题优先汇总
 
-| 卡牌 | 严重度 | 领域 | 差异 | 方向 |
-|---|---|---|---|---|
-| `B24_Lasso` | 高 | 额外放人 | BGA 任意第一次放人后都提供触发；OA 只有第一次放人在动物市场时才触发。 | 始终提供触发；仅当第一次不是动物市场时限制第二次必须去动物市场。 |
-| `C54_MarketBooth` | 高 | metadata/cost | BGA 成本是 1 个 stable；OA cost 为空，自动 metadata 脚本现在会报出该差异。 | 支持 stable-token cost，或明确记录为已接受差异。 |
-| `D155_Ebonist` | 高 | exchange 触发窗口 | BGA exchange 仅收获期；OA 暴露为 anytime exchange。 | 改为 harvest trigger 并补回归测试。 |
-| `B67_HandTruck` | 中 | bake 前 continuation | BGA 是 optional 拿谷物，然后 mandatory bake；OA 无条件给谷物。 | 建模 optional gain 分支，之后接 mandatory bake continuation。 |
-| `B124_Trimmer` | 中 | 触发频率 | BGA 每次牧场覆盖数增加都奖励；OA 每个工作阶段第一次奖励后打 flag。 | 若要严格对齐，移除 after-reward flag。 |
-| `B19_MoldboardPlow` | 中 | 成功顺序 | OA 在 plow 成功前消耗使用次数。 | plow 成功后再消耗使用次数。 |
-| `E10_StrawHat` | 中 | mandatory 选择 | BGA 强制在移动或拿食物中选一项；OA 可以跳过。 | 移除 XOR 外层 optional。 |
-| `E68_CherryOrchard` | 低 | 描述文本 | OA desc 写成收获 wood；BGA 表达为像 grain 一样 sow 和 harvest wood。 | 恢复 BGA 文案语义。 |
-| `B34_SpecialFood` | 待验证 | 跨卡交互 | BGA 特判 A137；OA heuristic 可能覆盖，也可能遗漏。 | 增加 A137+B34 定向 session 测试。 |
+BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards`；OA 路径默认相对本仓库。
 
-### 需复核卡牌证据索引
-
-下表记录每个差异核对过的位置。BGA PHP 路径默认位于 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards`；BGA JS 路径默认位于 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules/js`。
-
-| 卡牌 | BGA 证据 | OA 证据 | UI / 交互证据 |
-|---|---|---|---|
-| `B24_Lasso` | `B/B24_Lasso.php` | `shared/cards/B/B24_Lasso.ts` | 使用通用 extra-placement flow；遗漏的是后端触发条件，不是客户端渲染。 |
-| `C54_MarketBooth` | `C/C54_MarketBooth.php` | `shared/cards-display/C/C54_MarketBooth.ts` | OA 数据缺少 stable cost，因此 metadata/cost 渲染也受影响。 |
-| `D155_Ebonist` | `D/D155_Ebonist.php` | `shared/cards-display/D/D155_Ebonist.ts` | Harvest exchange 通过通用 exchange UI 暴露；OA 当前把它放进 anytime exchange UI。 |
-| `B67_HandTruck` | `B/B67_HandTruck.php` | `shared/cards/B/B67_HandTruck.ts` | OA 使用通用 bake continuation，但缺少 mandatory bake 前的 optional grain 分支。 |
-| `B124_Trimmer` | `B/B124_Trimmer.php` | `shared/cards/B/B124_Trimmer.ts` | 无特殊 UI gap；触发频率是后端 card state 问题。 |
-| `B19_MoldboardPlow` | `B/B19_MoldboardPlow.php` | `shared/cards/B/B19_MoldboardPlow.ts` | OA 已消耗存储次数后，UI 仍可能取消或失败 plow 选择。 |
-| `E10_StrawHat` | `E/E10_StrawHat.php` | `shared/cards/E/E10_StrawHat.ts` | OA 将整个 flow 标为 optional，导致通用 XOR UI 包含 skip 路径。 |
-| `E68_CherryOrchard` | `E/E68_CherryOrchard.php` | `shared/cards-display/E/E68_CherryOrchard.ts` | 描述文本面向 UI；实现本身主要基于 cardField。 |
-| `B34_SpecialFood` | `B/B34_SpecialFood.php` | `shared/cards/B/B34_SpecialFood.ts`; `shared/cards/A/A137_RiverineShepherd.ts` | 需要 A137 交互的定向 session/UI 覆盖后，才能判断 UI 行为是否分歧。 |
+| 卡牌 | 严重度 | 领域 | 差异 | 证据 | 方向 |
+|---|---|---|---|---|---|
+| `A136_DrudgeryReeve` | 高 | shared scoring | BGA `sharedScoring`，每位玩家可选 0..max sets 并 reserve 资源；OA 仅持卡玩家自动最优计分。 | BGA `A/A136_DrudgeryReeve.php`; OA `shared/cards/A/A136_DrudgeryReeve.ts`, `shared/domain/scoring.ts` | 支持 shared costed scoring / before-end choice。 |
+| `C72_FestivalPlanning` | 高 | onBuy private field phase | OA 返回 `reap` leaf，但 `reap` 不是注册 action，BGA 的 private field phase 基本不可执行。 | BGA `C/C72_FestivalPlanning.php`; OA `shared/cards/C/C72_FestivalPlanning.ts`, `shared/actions/internal-actions.ts` | 建模 private field/reap 子行动，再接 optional improvement。 |
+| `C146_WorkshopAssistant` | 高 | 延迟资源对 | BGA onBuy 把选择的 resource pairs 放卡上，其他玩家 renovation 后 owner 可取 1 pair；OA 直接得资源。 | BGA `C/C146_WorkshopAssistant.php`; OA `shared/cards/C/C146_WorkshopAssistant.ts` | 改为卡上暂存 + opponent renovation 触发取回。 |
+| `D1_ZigzagHarrow` | 高 | plow target | BGA `onBuy` 限制 plow 到 zigzag 目标；OA unrestricted plow。 | BGA `D/D1_ZigzagHarrow.php`; OA `shared/cards/D/D1_ZigzagHarrow.ts`, `server/__tests__/D1_ZigzagHarrow-session.test.ts` | 透传 allowedTiles 到 plow / farm-edit。 |
+| `D36_BreedRegistry` | 高 | sheep 统计口径 | BGA 统计整局 board/card sheep 并在买入时初始化；OA 只累计后续 action-space collect/exchange。 | BGA `D/D36_BreedRegistry.php`, `Core/Stats.php`; OA `shared/cards/D/D36_BreedRegistry.ts` | 改用统一 sheep stats 或补 board/card sheep 统计。 |
+| `E149_MidnightFencer` | 高 | free fencing | BGA 最后 harvest 执行免费 `FENCING`，上限受对手 reserve fence 限制；OA 只记录选择数为 VP。 | BGA `E/E149_MidnightFencer.php`; OA `shared/cards/E/E149_MidnightFencer.ts` | 改成真实 fence 子行动，并按对手可用 fence 限制 max。 |
+| `B67_HandTruck` | 中 | bake 前 continuation | BGA 是 optional 拿谷物，然后 mandatory bake；OA 无条件给谷物。 | BGA `B/B67_HandTruck.php`; OA `shared/cards/B/B67_HandTruck.ts` | 建模 optional gain 分支，之后接 mandatory bake continuation。 |
+| `B85_FarmHand` | 中 | stable 体系 | BGA farmhand stable 进入 stable built/listener/count 体系；OA 主要作为 extraData position + room capacity。 | BGA `B/B85_FarmHand.php`, `Actions/Stables.php`, `Models/PlayerBoard.php`; OA `shared/cards/B/B85_FarmHand.ts`, `shared/domain/supply-tokens.ts` | 让 FarmHand stable 进入通用 stable 统计/事件。 |
+| `B129_Seatmate` | 中 | 4 人座位限制 | BGA 4 人局只在对座未占 round 13 时允许；OA 只要 round 13 被 opponent 占就允许。 | BGA `B/B129_Seatmate.php`; OA `shared/cards/B/B129_Seatmate.ts` | 建模座位/对座限制，或限制 4p 行为。 |
+| `C22_BasketChair` | 中 | Job Contract 交互 | BGA 回收 Day Laborer 工人时清理 C23 fake worker；OA 只 recall worker + place farmer。 | BGA `C/C22_BasketChair.php`; OA `shared/cards/C/C22_BasketChair.ts`, `shared/cards/C/C23_JobContract.ts` | 补 C23 fake cleanup。 |
+| `C25_SteamMachine` | 中 | adoptive worker | BGA adoptive worker 场景会追加 forceSkip/end turn；OA 只有基础 optional bake。 | BGA `C/C25_SteamMachine.php`; OA `shared/cards/C/C25_SteamMachine.ts` | 补 adoptive/forceSkip 分支或定向确认不适用。 |
+| `C67_MineralFeeder` | 中 | reorganize 前置 | BGA 可先 optional reorganize，再检查羊是否在牧场；OA 只直接检查 pasture sheep。 | BGA `C/C67_MineralFeeder.php`; OA `shared/cards/C/C67_MineralFeeder.ts` | 增加 reorganize continuation 后再判定奖励。 |
+| `C69_LandConsolidation` | 中 | pending guard | BGA 在 Tinsmith Master / Cow Patty extra-crop pending 时禁用；OA anytime 可用即给 swap flow。 | BGA `C/C69_LandConsolidation.php`; OA `shared/cards/C/C69_LandConsolidation.ts` | 增加对应 pending guard。 |
+| `C93_InnerDistrictsDirector` | 中 | optional 范围 | BGA 整段“放石 + 可选再放人”是 optional；OA 强制先放石。 | BGA `C/C93_InnerDistrictsDirector.php`; OA `shared/cards/C/C93_InnerDistrictsDirector.ts` | 把 add-stone 也纳入 optional 序列。 |
+| `C120_AgriculturalLabourer` | 中 | exchange grain | BGA Gain/Receive/Reap/Exchange 转换 grain 都触发；OA 缺 exchange 转换路径。 | BGA `C/C120_AgriculturalLabourer.php`; OA `shared/cards/C/C120_AgriculturalLabourer.ts` | 监听 exchange 事件中转换出的 grain。 |
+| `C154_TwinResearcher` | 中 | 行动格覆盖 | BGA 覆盖 CopseAdd / Hollow / Hollow4 等；OA 只覆盖当前 subset。 | BGA `C/C154_TwinResearcher.php`; OA `shared/cards/C/C154_TwinResearcher.ts` | 补齐对应 action-space id。 |
+| `D132_HideFarmer` | 中 | 终局选择/支付 | BGA 终局前玩家选择数量、真实支付 food 并隐藏空地；OA scoring solver 自动最优。 | BGA `D/D132_HideFarmer.php`; OA `shared/cards/D/D132_HideFarmer.ts`, `shared/domain/scoring.ts` | 建模 before-end choice + hiddenSpaces。 |
+| `D161_CabbageBuyer` | 中 | renovation 触发范围 | BGA 监听任意 Renovation/Improvement；OA 只跟踪 `house-redevelopment` 的 `renovate-house`。 | BGA `D/D161_CabbageBuyer.php`; OA `shared/cards/D/D161_CabbageBuyer.ts` | 覆盖非 work-phase / 跨卡 renovation。 |
+| `E68_CherryOrchard` | 低 | 描述文本 | OA desc 写成收获 wood；BGA 表达为像 grain 一样 sow 和 harvest wood。 | BGA `E/E68_CherryOrchard.php`; OA `shared/cards-display/E/E68_CherryOrchard.ts` | 恢复 BGA 文案语义。 |
+| 通用 `plow` | 低 | cancel 语义 | BGA `PLOW` 本身无 cancel；跳过只由 optional node 的 `actPassOptionalAction` 提供。OA `plow` 默认提供 cancel 且 cancel 返回 ok。 | BGA `Actions/Plow.php`, `States/ActionTrait.php`; OA `shared/actions/effects/plow.ts` | 后续考虑让所有 plow 默认无 cancel；本轮修复不改全局默认。 |
+| `A22_Telegram` | 低 | turn-start 放人时序 | BGA 先 flag，再在普通放人选择中加入 fromSupply 选项；OA turn start 直接给 optional extraPlacement。 | BGA `A/A22_Telegram.php`; OA `shared/cards/A/A22_Telegram.ts` | 增加 session 覆盖确认跳过/使用时序等价，必要时并入普通放人选择。 |
+| `C27_Blueprint` | 低 | payment trade | BGA clone stone-cost trade，保留原支付路径；OA 对三张 major 直接 `stone: -1`。 | BGA `C/C27_Blueprint.php`; OA `shared/cards/C/C27_Blueprint.ts` | 保留原 trade + 额外 discounted trade。 |
+| `C133_Soldier` | 低 | 终局计分选择 | BGA 玩家选择 0..max 对并 reserve wood/stone；OA 自动最优。 | BGA `C/C133_Soldier.php`; OA `shared/cards/C/C133_Soldier.ts`, `shared/domain/scoring.ts` | 若要严格对齐，改成 before-end choice。 |
+| `E112_GrainThief` | 低 | harvest 时机 | BGA start 选择多个 grain zones，reap 时减少 harvestCount，end 再 gain grain；OA 接受时立即 pop/gain，end restore。 | BGA `E/E112_GrainThief.php`; OA `shared/cards/E/E112_GrainThief.ts` | 补跨卡顺序测试，必要时改成 BGA 时机。 |
+| `B34_SpecialFood` | 待验证 | 跨卡交互 | BGA 特判 A137；OA heuristic 可能覆盖，也可能遗漏。 | BGA `B/B34_SpecialFood.php`; OA `shared/cards/B/B34_SpecialFood.ts`, `shared/cards/A/A137_RiverineShepherd.ts` | 增加 A137+B34 定向 session 测试。 |
 
 ## 3. 已接受差异
 
 除非产品方向改变，以下内容不算当前 bug。
 
+2026-05-25 重审后，旧 `docs/card_progress.md` §5/§6 的“已接受简化 / 刻意行为差异”不再作为接受依据；相关卡牌已改列 §2 / §11，或在重审后改为已对齐。
+
 | 类别 | 卡牌 |
 |---|---|
 | 用 schema-up metadata 替代 BGA custom `isBuyable` | `A3_PaperKnife`, `B56_Brook`, `B74_ThickForest`, `B154_SheepKeeper` |
-| 旧文档已接受的简化实现 | `A22_Telegram`, `A136_DrudgeryReeve`, `B27_Toolbox`, `B33_Mantlepiece`, `B85_FarmHand`, `B129_Seatmate`, `C22_BasketChair`, `C24_BedintheGrainField`, `C25_SteamMachine`, `C27_Blueprint`, `C42_RavenousHunger`, `C52_HuntsmansHat`, `C67_MineralFeeder`, `C69_LandConsolidation`, `C72_FestivalPlanning`, `C93_InnerDistrictsDirector`, `C120_AgriculturalLabourer`, `C133_Soldier`, `C146_WorkshopAssistant`, `C154_TwinResearcher`, `D1_ZigzagHarrow`（passing 已对齐；harrow target 仍为简化）, `D36_BreedRegistry`, `D101_SugarBaker`, `D132_HideFarmer`, `D161_CabbageBuyer`, `E112_GrainThief`, `E149_MidnightFencer` |
 | field/cardField 作物约束差异 | `E70_CropRotationField`, `E72_ArtichokeField` |
 | BGA 未实现，但 OA 有产品扩展/重写 | `A113_HeresyTeacher`, `D25_WitchesDanceFloor` |
 | BGA banned，但 OA 保留 | `A131_CraftTeacher`, `A133_Braggart`, `A14_CarpentersHammer`, `A33_BigCountry`, `A39_Chapel`, `A48_ShavingHorse`, `A82_WorkCertificate`, `A97_Freshman`, `B10_Caravan`, `B117_Informant`, `B132_EstateMaster`, `B151_LittlePeasant`, `B15_CarpentersBench`, `B161_Weakling`, `B22_WalkingBoots`, `C102_TreeGuard`, `C125_Nightworker`, `C28_TeachersDesk`, `C31_WritingChamber`, `C3_CarriageTrip`, `C60_SmallPottersOven`, `C63_CraftBrewery`, `C99_GardenDesigner`, `D137_TradeTeacher`, `D19_PulverizerPlow`, `D21_Recruitment`, `D33_SummerHouse`, `D4_CrossCutWood`, `D74_RoyalWood`, `D92_ChildOmbudsman`, `D97_BeggingStudent`, `E22_GuestRoom` |
@@ -90,34 +93,24 @@
 | 风险 | 证据 / 卡牌 | 方向 |
 |---|---|---|
 | Metadata 审计覆盖需要随字段演进同步 | `scripts/audit-bga-metadata-diff.ts` 已覆盖 `STABLE` cost 和 `passing` | 新增 BGA metadata 字段时同步加 parser/diff fixture，避免统计口径回退。 |
-| ~~单卡 internal leaf~~ ✅ 已泛化 | `build-farmhand-room` 已被 `B85_FarmHand`、`E127_DiligentFarmer`、`C87_Mason`、`C85_DenBuilder`、`D87_MasterBuilder` 复用 | 共享 helper，无需再视为单卡 leaf。 |
 | 主路径 prefix namespace 检查 | 旧 bad-smell 文档中的 `CUSTOM_`、`card_` 模式 | 保留为 helper 常量/函数，避免散落的 startsWith 检查。 |
-| Payment fallback 仍需继续收敛到事件 provenance | construct/renovate bonus choice 已能通过 `resource.paid` 携带 selected index；后续关注其他 direct payment caller | 新增支付类卡时优先消费 `resource.paid` / `bonusChoiceIndex`，不要读 action result fallback。 |
+| Payment provenance 守卫已落地 | construct/renovate bonus choice 已通过 `resource.paid` 携带 selected index；`shared/cards/__tests__/provenance-result-audit.test.ts` 禁止生产卡牌从 `context.result` 读取资源事实 | 新增支付类卡时优先消费 `resource.paid` / `bonusChoiceIndex`，不要读 action result。 |
 | 行动格生命周期已进入后端事件层 | `B23_FinalScenario` | 后端持有 reveal/exclusive-use 状态，round-start 统一清理并 emit `action.exclusiveUseCleared`。 |
-| Log / notification provenance | `shared/events/event-mapping-policy.ts` 覆盖全部 public/private event type；`shared/cards/__tests__/provenance-result-audit.test.ts` 守住生产卡牌的 `context.result` 资源事实 fallback | 结构化事件层是卡牌判定、UI log、private notification 和 replay 的统一来源；新增支付/资源/farm metadata 路径必须先 emit 事件再让 listener 消费，不要回退到 action result。 |
+| Log / notification provenance | `shared/events/event-mapping-policy.ts` 覆盖全部 public/private event type；`shared/cards/__tests__/provenance-result-audit.test.ts` 守住生产卡牌的 `context.result` 资源事实读取 | 结构化事件层是卡牌判定、UI log、private notification 和 replay 的统一来源；新增支付/资源/farm metadata 路径必须先 emit 事件再让 listener 消费，不要回退到 action result。 |
 | Fence segment source/type policy 已进入通用基础设施 | `FenceSegment.type` / `source`、`consume-fence` ownOnly、fencing `fencePolicy` | 普通 fence / palisade / borrowed source 不通过主路径卡牌分支表达；C1 rebuild、B30 palisade、未来 E149 borrowed fence 都走 segment type/source + generic policy。 |
+| Supply token payment 已进入通用资源基础设施 | `PaymentResourceMap`、`supplyTokensConsumed`、payment solver、`resource.paid` | fence / stable 作为支付资源处理；C54/A34 消耗 reserve fence，B149 消耗 stable supply，后续读取可建上限必须走 supply-token helper。 |
+| BGA `formatCost` exact/free/paid unit semantics 已进入通用基础设施 | `ExactCost`、`readExactCost()`、`resolveUnitCostWithDelta()`、`reserveResources`；construct / renovation / stables / plow / occupation / fencing policy 的 exact/free 单位成本回归 | 卡牌不再用 `costOverride`、`freeCost`、old `params.cost` path、old `renovation` / `fencing` leaf 表达精确免费/付费单位成本；除已登记 allowlist 的 `E27_PiggyBank` 外，不新增 `-99` 免费成本表达；`{ max: 1 }` 这类 BGA 语义用 `exactCost.max` / action policy 表达；B93 这类“先付职业费、随后强制 future schedule”的支付后资源保留用 `reserveResources` 过滤 payment solutions；nested `fencePolicy.costPolicy` 仍叠加 `computeCosts.fence` 折扣。 |
+| 额外放人目标行动语义已进入通用基础设施 | `place-farmer` constraints / `targetSpaceId` actionContext、ActionNode `expandFlow`、`move-farmer-to-space` relocation | B24/C42 额外放人不在卡牌内手写目标行动；选择目标格后由通用 flow 执行目标 action，并让 downstream hooks 用真实目标 space。E10/D51 的 worker relocation 也走同一目标行动 flow。 |
+| 旧兼容路径清理 | old engine choice snapshot/restore、encoded choice shortcut、old field/state backfill、old fence `string[]` coercion 已移除；current farm/selection flow 走 `commitSelection`/structured payload | 不维护旧 pending cursor / old state shape；后续新增交互必须通过 `allowedCommands` / `options` 显式暴露并验证 current typed request，不再把非广告 choice value 当便捷入口。 |
 | 注释里的非阻塞 card-id 示例 | `shared/actions/effects/breed.ts`、`shared/contract/types.ts` 仅把 `A165_PigBreeder` / `D95_SiteManager` 作为例子提到 | 除非附近代码变动，否则保留；它们不是可执行的单卡分支。 |
-| Legacy/fallback 术语残留 | 旧 bad-smell 文档发现的剩余 fallback/direct-path 术语，主要在已迁移支付 flow 和测试中 | 将直接运行时 fallback 视为重构债；测试/baseline 名称除非真实迁移触及，否则不动。 |
+
+注：React/Suspense、CDN、browser fallback 等属于平台/浏览器正常术语，不视为卡牌架构风险。
 
 ## 6. 基础设施待办
 
-1. ~~维护 metadata 审计 fixture 覆盖：`STABLE` cost 和 `passing` 已覆盖，后续新增 BGA metadata 字段时必须同步 parser/diff 测试。~~ ✅ 已落地：`scripts/__tests__/audit-bga-metadata-diff.test.ts` 的 "BGA metadata field coverage" 测试扫所有 BGA A-E 卡 PHP 中的 `$this->xxx =` 字段，对比 `COVERED_FIELDS`（parser 已识别）与 `IGNORED_FIELDS`（平台/runtime/typed-prerequisite 显式跳过），出现未分类新字段即 fail，强制更新 parser 或显式登记 ignored。
-2. ~~增加精确 eligible farm-position selection，支持 selectableTiles、数量约束和非法选择原子失败。~~ ✅ 已落地：`selection` action / session commit 支持 `allowedSelectionCounts`，`B115_TinsmithMaster`、`E71_CowPatty` 基于 `farm.sown` event 计算本次 eligible 田，`B165_GameProvider` 使用当前 grain fields；三者均使用精确 `selectableTiles`，非法选择在 effect 前 recoverable fail。
-3. ~~增加 batch resource exchange / resource quantity selection，用于 BGA SPECIAL_EFFECT 风格的 discard/receive 交互。~~ ✅ 已落地：`resource-batch-exchange-select` 支持私有 prompt redaction、HTTP/WS commit、E78 原子 discard/receive、UI 面板和 replay 回放。
-4. ~~为“从多个替换中选一个”的卡增加 TradeModifier group 限制。~~ ✅ 已落地：`Trade` / `TradeModifier` 支持 `groupId` + `groupMax`，payment 枚举在 action-scope、unit-scope 和最终组合合并时按组累计 `times`，`E60_WorkingGloves` 的四个职业支付替代共享 `groupMax: 1`，避免一次职业支付内叠加多个替换。
-5. ~~增加后端权威的 action-space reveal/exclusive-use 支持。~~ ✅ 已落地：ActionSpace 持有 `exclusiveUse`，round start 统一 emit `action.revealed` / `action.exclusiveUseCleared`，B23 使用该机制。
-6. ~~扩大 accumulation-space partial-take 语义的复用范围；当前 `collect` 已支持指定行动格、资源和数量，`B81_Handcart` 已从行动格移除资源。~~ ✅ 已落地：新增 `createPartialTakeFromSpaceLeaf`，统一生成 `collect` partial-take leaf、choice label metadata 和可选 effect preview；`A82_WorkCertificate`、`B81_Handcart`、`E5_NightLoot` 已迁移到共享 helper，`collect` 执行语义不变。
-7. ~~为 room/action bonus 增加 scope，避免 per-room 和 total-room cost modifier 双重应用~~ ✅ 已落地：`ComplexCost` 统一形状（`fees / unitFee + nb / trades / bonuses`），`Trade.scope: 'action' \| 'unit'` + `TradeModifier.scope` 区分 per-action 资源池转换和 per-unit cost row 有序替换（A123_FrameBuilder construct、D15_ClaySupports、B145_BrushwoodCollector construct 分支已迁移，B145 使用 `replaceUpTo` 覆盖 1/2 reed 行）；construct / renovation / fencing / plow / occupation / pay 全部走单一 `computeAllBuyableCombinations`；条件评估拆成 `evaluateStaticConditions` + `evaluateConditions(_, _, nb)` 两层（`getModifiersForCostType` static-only，nb-aware gate 延后到 enumerate）。
-8. ~~增加通用处理：“before trigger 给资源后，原行动可能变得可达/mandatory”。~~ ✅ 已落地：before listener unlocker 通过 scoped `isDoable` opt-in 启动原本不可达的 action，`skipBeforeTriggers` continuation 不把 unlocker 自己当作可跳过依据；所有 before/after/optional 分支真实执行后，原 action 重新 strict doable，失败时进入 engine-blocked / undo-only。
-9. ~~增加共享 lessons action-space id helper，覆盖 `lessons`、`lessons-3`、`lessons-4`。~~ ✅ 已落地：共享 helper 覆盖标准 lessons action-space id，并已用于 lessons identity 判定。
-   Follow-up / exclusion：`C23_JobContract`、`B152_JuniorArtist`、`C117_Legworker` 与 space-pairing 的 cost / jump / adjacency 语义相关，不属于本 helper 关闭范围。
-10. ~~继续扩大 gain/exchange/action-space provenance 覆盖；已覆盖 B21 exchange grain、E47 action-space gain、C162 player action space、E78 batch exchange，并补齐本轮 A2-A6 支付、动物、food、building-resource、farm metadata 卡牌对 `actionEvents` 优先、`transactionEvents` 回退的消费模型。本轮补齐 B21 HayloftBarn 与 E47 SyrupTap 的 action-frame 事件优先读取，防止同一 transaction 中较早资源事件误触发当前 listener；同时补上生产卡牌 `context.result` 资源事实 fallback 审计。~~ ✅ 已落地：生产卡牌 `context.result` 资源事实 fallback 已由 `shared/cards/__tests__/provenance-result-audit.test.ts` 和 `pnpm run check:provenance-result-audit` 守住；现存 `context.result` 用途仅限 A94/D50 的 request-shape 调整和 B18/C148 的 ok guard，不作为资源来源。
-11. ~~决定 BGA `implemented=false` data-only 卡是否进入 OA 发牌池。~~ ✅ 已落地：`shared/session/state-bootstrap.ts` `dealHands()` 使用 `implementedMinorImprovementCards` / `implementedOccupationCards`，两者基于 `isImplementedCard(card.implemented !== false)` 过滤；`A169_OffSiter` 等 `implemented=false` 卡已排除出发牌池。
-12. ~~扩展结构化 action event/log event~~ ✅ 已关闭：所有 public/private event type 由 `event-mapping-policy` 覆盖，log / public notification / highlight / resource animation / replay 的 mapped、conditional、silent 边界均由测试 fixture 守住；当前未进入 log mapper 的 card/farm/future/worker/lifecycle event 已补齐可读 log 或显式静默策略。后续更丰富动画属于 enhancement，不再是基础设施开放 umbrella。
-13. ~~BGA-style pay child / internal children 机制~~ ✅ 已落地：public host action 负责业务 mutation，mandatory payment 通过 internal `pay` child 结算；`beforeHostListeners` / `afterHostCommitListeners` / `afterHostListeners` 保留 BGA pay slot 差异，improvement/occupation 的 onBuy 在 host commit 后、host after 前运行；public action 顺序已修正为 `computeReplace -> before -> strict isDoable -> computeCosts -> execute -> during -> immediatelyAfter -> after`；`activate-card-effect` 通过 internal result map 读取 `paymentInfo`；`architecture-guard` 守住 deleted apply effects，不允许新增 top-level `apply-*` effect 文件来堆叠多卡逻辑。
-14. ~~Fence segment source/type + generic fencing policy~~ ✅ 已落地：`FenceSegment.type` 区分 ordinary fence / B30 palisade，`FenceSegment.source` 区分 own / borrowed；缺省普通 fence 视为 own ordinary source。fencing 主路径不按 `C1` / `B30` / `E149`、`noWoodPalisades`、`midnightFencer` 分支；卡牌通过 `fencePolicy` 表达 allowed segment types、source policy、bounds、cost、cancel、animal preservation。C1 rebuild 只计数/回收/重建 own ordinary fences，走 `consume-fence` ownOnly + generic `fencePolicy`。
+当前没有开放的基础设施 umbrella 待办。已完成的历史条目已从本节移除；仍需持续关注的通用机制记录在 §5 架构审阅。
 
-影响回归覆盖：`B65_GrainDepot` paymentInfo fee index、before-phase cards、renovation、improvement、occupation、construct、stables、fencing、`A34_Loppers` exact-wood、stable paid/free log pairing。
+保留的后续边界：`C23_JobContract`、`B152_JuniorArtist`、`C117_Legworker` 与 space-pairing 的 cost / jump / adjacency 语义相关，不属于 shared lessons action-space id helper 关闭范围。
 
 ## 7. Log 系统对比
 
@@ -136,7 +129,7 @@ OA 没有照抄 notification-as-rule-source，而是建了一个比 `GameState.l
 
 ### 卡牌判定
 
-Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（整个工作事务的事件）、`actionEvents`（当前行动/阶段切片）和类型化 `eventQuery`（`has` / `find` / `filter`）。资源类卡牌优先读 `actionEvents`、回退 `transactionEvents`。`resource.paid` 携带 `paymentFor` / `paymentSources` / `bonusSources` / `bonusChoiceIndex` / `returnedCardId`，支付折扣 / 退卡类卡牌据此判定，不依赖 action result fallback。
+Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（整个工作事务的事件）、`actionEvents`（当前行动/阶段切片）和类型化 `eventQuery`（`has` / `find` / `filter`）。资源类卡牌优先读 `actionEvents`、回退 `transactionEvents`。`resource.paid` 携带 `paymentFor` / `paymentSources` / `bonusSources` / `bonusChoiceIndex` / `returnedCardId`，支付折扣 / 退卡类卡牌据此判定，不依赖 action result 资源事实。
 
 ### 客户端消费
 
@@ -179,7 +172,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 
 ## 10. Hook 点清单
 
-下表从 `shared/cards/A-E` 机械抽取。`$dynamic` 表示 action id 来自本地常量/表达式，重构前需要回到对应卡牌文件确认。
+下表从 `shared/cards/A-E` 和当前 `ALL_CARD_IMPLS` 机械抽取。`*` 表示 action id 通配；动态 listener 已按运行时 `actions` 展开。
 
 | 类型 | Hook 点 | 卡牌 |
 |---|---|---|
@@ -200,72 +193,71 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | effect | `onBeforePlayerTurn` | `D134_OysterEater` |
 | effect | `onBeforeReturnHome` | `B117_Informant`, `B140_FarmyardWorker`, `B158_DistrictManager`, `B160_PubOwner`, `D130_RecreationalCarpenter`, `D142_PotatoPlanter`, `D51_Archway`, `E10_StrawHat`, `E143_Hewer`, `E158_StoneCustodian`, `E23_Apiary`, `E26_Sundial`, `E27_PiggyBank` |
 | effect | `onBeforeStartOfTurn` | `A130_MummysBoy`, `A22_Telegram`, `A49_NestSite`, `B106_MoralCrusader`, `B124_Trimmer`, `B140_FarmyardWorker`, `B70_NewPurchase`, `B89_Groom`, `C101_StallHolder`, `C111_SmallAnimalBreeder`, `C143_StoneBuyer`, `C150_ParrotBreeder`, `C157_ResourceAnalyzer`, `C46_Mandoline`, `C64_CornSchnappsDistillery`, `C67_MineralFeeder`, `C84_PerennialRye`, `D122_ClayCarrier`, `D150_GodlySpouse`, `D46_PelletPress`, `D48_CivicFacade`, `D53_TeaHouse`, `E162_Entrepreneur`, `E22_GuestRoom`, `E28_Bookmark`, `E56_RomanPot`, `E62_SourDough`, `E93_Motivator`, `E96_Elder` |
-| effect | `onBuy` | `A102_Grocer`, `A112_ScytheWorker`, `A117_WoodCarrier`, `A11_MudPatch`, `A120_ClayHutBuilder`, `A121_ClayPuncher`, `A125_Priest`, `A127_Lodger`, `A134_FullFarmer`, `A135_AnimalReeve`, `A136_DrudgeryReeve`, `A13_RenovationCompany`, `A144_Sequestrator`, `A162_ForestTallyman`, `A165_PigBreeder`, `A167_BreederBuyer`, `A16_RammedClay`, `A19_Handplow`, `A1_Shelter`, `A20_DoubleTurnPlow`, `A22_Telegram`, `A27_OvenSite`, `A2_ShiftingCultivation`, `A33_BigCountry`, `A36_FacadesCarving`, `A39_Chapel`, `A3_PaperKnife`, `A40_PottersYard`, `A43_FarmyardManure`, `A44_PondHut`, `A47_Trellises`, `A4_Baseboards`, `A53_Claypipe`, `A54_Credit`, `A57_MilkingParlor`, `A5_ClayEmbankment`, `A69_LargeGreenhouse`, `A6_StorageBarn`, `A74_StableTree`, `A77_Hod`, `A7_GardenersKnife`, `A86_AnimalTamer`, `A89_StablePlanner`, `A8_FoodBasket`, `A9_YoungAnimalMarket`, `B102_Consultant`, `B105_CaseBuilder`, `B107_Manservant`, `B113_PatchCaregiver`, `B116_Shoreforester`, `B117_Informant`, `B119_Lumberjack`, `B123_RoofBallaster`, `B124_Trimmer`, `B125_EstateWorker`, `B127_Seducer`, `B136_HouseSteward`, `B137_Wholesaler`, `B141_FieldCaretaker`, `B148_PetBroker`, `B149_OpenAirFarmer`, `B14_Hawktower`, `B160_PubOwner`, `B163_Pastor`, `B164_SheepWhisperer`, `B167_StableSergeant`, `B18_GrasslandHarrow`, `B19_MoldboardPlow`, `B1_UpscaleLifestyle`, `B20_ChainFloat`, `B21_HayloftBarn`, `B22_WalkingBoots`, `B23_FinalScenario`, `B25_BreadPaddle`, `B27_Toolbox`, `B29_CookeryLesson`, `B2_MiniPasture`, `B33_Mantlepiece`, `B37_Grange`, `B38_FutureBuildingSite`, `B3_Moonshine`, `B41_Hauberg`, `B42_ForestInn`, `B44_ChickStable`, `B45_StrawberryPatch`, `B46_ClubHouse`, `B48_ForestStone`, `B4_WoodPile`, `B52_GrowingFarm`, `B54_Tumbrel`, `B55_MaintenancePremium`, `B58_CrackWeeder`, `B59_FoodChest`, `B5_StoreofExperience`, `B65_GrainDepot`, `B66_SackCart`, `B6_ExcursiontotheQuarry`, `B71_HarvestHouse`, `B73_GiftBasket`, `B74_ThickForest`, `B76_Ceilings`, `B78_ReedBelt`, `B7_Wage`, `B83_MuddyPuddles`, `B84_AcornsBasket`, `B88_EstablishedPerson`, `B89_Groom`, `B8_MarketStall`, `B93_Confidant`, `B96_TreeFarmJoiner`, `B99_Tutor`, `B9_BeatingRod`, `C104_Collector`, `C106_PotatoHarvester`, `C107_Baker`, `C108_Layabout`, `C113_WinterCaretaker`, `C116_FurnitureMaker`, `C118_WoodCollector`, `C119_SkillfulRenovator`, `C121_ClayKneader`, `C127_Lover`, `C135_Constable`, `C136_RanchProvost`, `C139_BasketmakersWife`, `C140_PackagingArtist`, `C143_StoneBuyer`, `C144_ReedRoofRenovator`, `C146_WorkshopAssistant`, `C148_MudWallower`, `C155_FoodDistributor`, `C156_HoofCaregiver`, `C161_PotatoDigger`, `C162_ForestOwner`, `C165_GameCatcher`, `C166_CattleWhisperer`, `C16_FieldFences`, `C17_NewlyPlowedField`, `C19_SwingPlow`, `C1_Overhaul`, `C22_BasketChair`, `C24_BedintheGrainField`, `C26_Flail`, `C2_Stable`, `C38_Christianity`, `C39_StudioBoat`, `C3_CarriageTrip`, `C40_CanvasSack`, `C44_ChickenCoop`, `C47_GardenClaw`, `C4_WritingBoards`, `C50_StableYard`, `C57_Crudite`, `C5_Remodeling`, `C60_SmallPottersOven`, `C65_Granary`, `C6_StoneClearing`, `C72_FestivalPlanning`, `C74_PrivateForest`, `C77_ClaySupply`, `C78_ReedHattedToad`, `C79_StoneCart`, `C7_BladeShears`, `C81_MaterialHub`, `C83_EarlyCattle`, `C86_LivestockFeeder`, `C87_Mason`, `C89_StableMaster`, `C8_PlantFertilizer`, `C98_CubeCutter`, `C9_AutomaticWaterTrough`, `D109_SowingMaster`, `D114_SeedTrader`, `D116_TreeInspector`, `D117_WoodExpert`, `D118_Bonehead`, `D120_ClayDeliveryman`, `D122_ClayCarrier`, `D126_FieldCultivator`, `D127_HardworkingMan`, `D131_CraftsmanshipPromoter`, `D135_GardeningHeadOfficial`, `D136_AnimalActivist`, `D141_SeedSeller`, `D145_RoofExaminer`, `D156_RetailDealer`, `D162_ClayFirer`, `D166_StableMilker`, `D167_PureBreeder`, `D1_ZigzagHarrow`, `D20_TurnwrestPlow`, `D22_WorkPermit`, `D23_PioneeringSpirit`, `D2_DwellingPlan`, `D3_Furrows`, `D40_Cesspit`, `D41_HorseDrawnBoat`, `D43_Hutch`, `D44_ForestWell`, `D45_SheepWell`, `D47_Churchyard`, `D4_CrossCutWood`, `D50_ForeignAid`, `D51_Archway`, `D57_WholesaleMarket`, `D5_FieldClay`, `D60_LargePottery`, `D62_BeerTap`, `D67_ReapHook`, `D69_SmallGreenhouse`, `D6_PetrifiedWood`, `D74_RoyalWood`, `D78_ReedPond`, `D7_Trident`, `D84_FeedPellets`, `D88_Millwright`, `D8_FernSeeds`, `D91_Plowman`, `D96_Furnisher`, `D97_BeggingStudent`, `D99_EarthenwarePotter`, `D9_GameTrade`, `E103_Wolf`, `E104_SpiceTrader`, `E105_Pioneer`, `E106_EmergencySeller`, `E119_LandHeir`, `E120_ScrapCollector`, `E123_ResourceHoarder`, `E125_DelayedWayfarer`, `E127_DiligentFarmer`, `E135_Pickler`, `E136_AnimalHusbandryWorker`, `E138_LivestockExpert`, `E139_BunnyBreeder`, `E140_Carter`, `E145_Parvenu`, `E148_Lazybones`, `E155_Visionary`, `E161_ElderBaker`, `E167_DairyCrier`, `E1_PoleBarns`, `E22_GuestRoom`, `E25_BumperCrop`, `E28_Bookmark`, `E2_RenovationMaterials`, `E33_BeaverColony`, `E3_TeaTime`, `E40_BeeStatue`, `E41_MuddyWaters`, `E42_WaterGully`, `E43_BarnCats`, `E44_FodderBeets`, `E45_FruitLadder`, `E46_WaterlilyPond`, `E4_Thunderbolt`, `E51_WhaleOil`, `E56_RomanPot`, `E5_NightLoot`, `E60_WorkingGloves`, `E63_IronOven`, `E64_SimpleOven`, `E65_Almsbag`, `E6_Recount`, `E74_AshTrees`, `E76_LumberPile`, `E78_SleightofHand`, `E7_Pumpernickel`, `E81_AlchemistsLab`, `E82_Profiteering`, `E8_FarmersMarket`, `E94_Prophet`, `E97_Beneficiary`, `E98_Prodigy`, `E9_BarteringHut` |
+| effect | `onBuy` | `A102_Grocer`, `A112_ScytheWorker`, `A117_WoodCarrier`, `A11_MudPatch`, `A120_ClayHutBuilder`, `A121_ClayPuncher`, `A125_Priest`, `A127_Lodger`, `A134_FullFarmer`, `A135_AnimalReeve`, `A136_DrudgeryReeve`, `A13_RenovationCompany`, `A144_Sequestrator`, `A162_ForestTallyman`, `A165_PigBreeder`, `A167_BreederBuyer`, `A16_RammedClay`, `A19_Handplow`, `A1_Shelter`, `A20_DoubleTurnPlow`, `A22_Telegram`, `A27_OvenSite`, `A2_ShiftingCultivation`, `A33_BigCountry`, `A36_FacadesCarving`, `A39_Chapel`, `A3_PaperKnife`, `A40_PottersYard`, `A43_FarmyardManure`, `A44_PondHut`, `A47_Trellises`, `A4_Baseboards`, `A53_Claypipe`, `A54_Credit`, `A57_MilkingParlor`, `A5_ClayEmbankment`, `A69_LargeGreenhouse`, `A6_StorageBarn`, `A74_StableTree`, `A77_Hod`, `A7_GardenersKnife`, `A86_AnimalTamer`, `A89_StablePlanner`, `A8_FoodBasket`, `A9_YoungAnimalMarket`, `B102_Consultant`, `B105_CaseBuilder`, `B107_Manservant`, `B113_PatchCaregiver`, `B116_Shoreforester`, `B117_Informant`, `B119_Lumberjack`, `B123_RoofBallaster`, `B124_Trimmer`, `B125_EstateWorker`, `B127_Seducer`, `B136_HouseSteward`, `B137_Wholesaler`, `B141_FieldCaretaker`, `B148_PetBroker`, `B149_OpenAirFarmer`, `B14_Hawktower`, `B160_PubOwner`, `B163_Pastor`, `B164_SheepWhisperer`, `B167_StableSergeant`, `B16_MiningHammer`, `B18_GrasslandHarrow`, `B19_MoldboardPlow`, `B1_UpscaleLifestyle`, `B20_ChainFloat`, `B21_HayloftBarn`, `B22_WalkingBoots`, `B23_FinalScenario`, `B25_BreadPaddle`, `B27_Toolbox`, `B29_CookeryLesson`, `B2_MiniPasture`, `B33_Mantlepiece`, `B37_Grange`, `B38_FutureBuildingSite`, `B3_Moonshine`, `B41_Hauberg`, `B42_ForestInn`, `B44_ChickStable`, `B45_StrawberryPatch`, `B46_ClubHouse`, `B48_ForestStone`, `B4_WoodPile`, `B52_GrowingFarm`, `B54_Tumbrel`, `B55_MaintenancePremium`, `B58_CrackWeeder`, `B59_FoodChest`, `B5_StoreofExperience`, `B65_GrainDepot`, `B66_SackCart`, `B6_ExcursiontotheQuarry`, `B71_HarvestHouse`, `B73_GiftBasket`, `B74_ThickForest`, `B76_Ceilings`, `B78_ReedBelt`, `B7_Wage`, `B83_MuddyPuddles`, `B84_AcornsBasket`, `B88_EstablishedPerson`, `B89_Groom`, `B8_MarketStall`, `B93_Confidant`, `B96_TreeFarmJoiner`, `B99_Tutor`, `B9_BeatingRod`, `C104_Collector`, `C106_PotatoHarvester`, `C107_Baker`, `C108_Layabout`, `C113_WinterCaretaker`, `C116_FurnitureMaker`, `C118_WoodCollector`, `C119_SkillfulRenovator`, `C121_ClayKneader`, `C127_Lover`, `C135_Constable`, `C136_RanchProvost`, `C139_BasketmakersWife`, `C140_PackagingArtist`, `C143_StoneBuyer`, `C144_ReedRoofRenovator`, `C146_WorkshopAssistant`, `C148_MudWallower`, `C155_FoodDistributor`, `C156_HoofCaregiver`, `C161_PotatoDigger`, `C162_ForestOwner`, `C165_GameCatcher`, `C166_CattleWhisperer`, `C16_FieldFences`, `C17_NewlyPlowedField`, `C19_SwingPlow`, `C1_Overhaul`, `C22_BasketChair`, `C24_BedintheGrainField`, `C26_Flail`, `C2_Stable`, `C38_Christianity`, `C39_StudioBoat`, `C3_CarriageTrip`, `C40_CanvasSack`, `C44_ChickenCoop`, `C47_GardenClaw`, `C4_WritingBoards`, `C50_StableYard`, `C57_Crudite`, `C5_Remodeling`, `C60_SmallPottersOven`, `C65_Granary`, `C6_StoneClearing`, `C72_FestivalPlanning`, `C74_PrivateForest`, `C77_ClaySupply`, `C78_ReedHattedToad`, `C79_StoneCart`, `C7_BladeShears`, `C81_MaterialHub`, `C83_EarlyCattle`, `C86_LivestockFeeder`, `C87_Mason`, `C89_StableMaster`, `C8_PlantFertilizer`, `C98_CubeCutter`, `C9_AutomaticWaterTrough`, `D109_SowingMaster`, `D114_SeedTrader`, `D116_TreeInspector`, `D117_WoodExpert`, `D118_Bonehead`, `D120_ClayDeliveryman`, `D122_ClayCarrier`, `D126_FieldCultivator`, `D127_HardworkingMan`, `D131_CraftsmanshipPromoter`, `D135_GardeningHeadOfficial`, `D136_AnimalActivist`, `D141_SeedSeller`, `D145_RoofExaminer`, `D156_RetailDealer`, `D162_ClayFirer`, `D166_StableMilker`, `D167_PureBreeder`, `D1_ZigzagHarrow`, `D20_TurnwrestPlow`, `D22_WorkPermit`, `D23_PioneeringSpirit`, `D2_DwellingPlan`, `D3_Furrows`, `D40_Cesspit`, `D41_HorseDrawnBoat`, `D43_Hutch`, `D44_ForestWell`, `D45_SheepWell`, `D47_Churchyard`, `D4_CrossCutWood`, `D50_ForeignAid`, `D51_Archway`, `D57_WholesaleMarket`, `D5_FieldClay`, `D60_LargePottery`, `D62_BeerTap`, `D67_ReapHook`, `D69_SmallGreenhouse`, `D6_PetrifiedWood`, `D74_RoyalWood`, `D78_ReedPond`, `D7_Trident`, `D84_FeedPellets`, `D88_Millwright`, `D8_FernSeeds`, `D91_Plowman`, `D96_Furnisher`, `D97_BeggingStudent`, `D99_EarthenwarePotter`, `D9_GameTrade`, `E103_Wolf`, `E104_SpiceTrader`, `E105_Pioneer`, `E106_EmergencySeller`, `E119_LandHeir`, `E120_ScrapCollector`, `E123_ResourceHoarder`, `E125_DelayedWayfarer`, `E127_DiligentFarmer`, `E135_Pickler`, `E136_AnimalHusbandryWorker`, `E138_LivestockExpert`, `E139_BunnyBreeder`, `E140_Carter`, `E145_Parvenu`, `E148_Lazybones`, `E155_Visionary`, `E161_ElderBaker`, `E167_DairyCrier`, `E1_PoleBarns`, `E22_GuestRoom`, `E25_BumperCrop`, `E28_Bookmark`, `E2_RenovationMaterials`, `E33_BeaverColony`, `E3_TeaTime`, `E40_BeeStatue`, `E41_MuddyWaters`, `E42_WaterGully`, `E43_BarnCats`, `E44_FodderBeets`, `E45_FruitLadder`, `E46_WaterlilyPond`, `E4_Thunderbolt`, `E51_WhaleOil`, `E56_RomanPot`, `E5_NightLoot`, `E60_WorkingGloves`, `E63_IronOven`, `E64_SimpleOven`, `E65_Almsbag`, `E6_Recount`, `E74_AshTrees`, `E76_LumberPile`, `E78_SleightofHand`, `E7_Pumpernickel`, `E81_AlchemistsLab`, `E82_Profiteering`, `E8_FarmersMarket`, `E94_Prophet`, `E97_Beneficiary`, `E98_Prodigy`, `E9_BarteringHut` |
 | effect | `onComputeAnimalZones` | `A11_MudPatch`, `A12_DrinkingTrough`, `A148_Woolgrower`, `A86_AnimalTamer`, `B115_TinsmithMaster`, `B11_Feedyard`, `B12_Stockyard`, `B148_PetBroker`, `B72_LoveforAgriculture`, `B86_TruffleSearcher`, `C11_WildlifeReserve`, `C12_CattleFarm`, `C148_MudWallower`, `C86_LivestockFeeder`, `C89_StableMaster`, `D11_LawnFertilizer`, `D12_MilkingPlace`, `D148_DomesticianExpert`, `D86_SheepAgent`, `E11_PettingZoo`, `E12_AnimalBedding`, `E33_BeaverColony`, `E36_HerbalGarden`, `E86_PenBuilder` |
-| effect | `onComputeSowableFields` | `B72_LoveforAgriculture` |
+| effect | `onComputeSowableFields` | `B113_PatchCaregiver`, `B141_FieldCaretaker`, `B68_Beanfield`, `B72_LoveforAgriculture`, `C70_LettucePatch`, `D25_WitchesDanceFloor`, `D75_WoodField`, `E68_CherryOrchard`, `E69_MelonPatch`, `E70_CropRotationField`, `E72_ArtichokeField`, `E80_RockGarden` |
 | effect | `onEndHarvest` | `A145_Ropemaker`, `B11_Feedyard`, `C113_WinterCaretaker`, `C124_StoneImporter`, `C71_Slurry`, `D115_FodderPlanter`, `E133_ChampionBreeder`, `E84_DollysMother`, `E90_DungCollector`, `E99_UncaringParents` |
 | effect | `onEndHarvestFeedingPhase` | `C41_FarmStore`, `D76_SocialBenefits`, `E83_ShepherdsWhistle`, `E84_DollysMother` |
 | effect | `onEndHarvestFieldPhase` | `A61_WinnowingFan`, `C110_HomeBrewer`, `C29_BeerTable`, `C54_MarketBooth`, `E112_GrainThief` |
 | effect | `onEndTurn` | `B27_Toolbox`, `D74_RoyalWood` |
 | effect | `onHarvestFeedingPhase` | `A62_BeerKeg`, `C49_BeerStall`, `C55_Studio`, `C63_CraftBrewery`, `D12_MilkingPlace`, `D133_BeerTentOperator`, `D84_FeedPellets`, `E110_Dentist`, `E132_VeggieLover`, `E134_Omnifarmer`, `E142_Smuggler`, `E39_Paintbrush`, `E48_TownHall` |
-| effect | `onHarvestFieldPhase` | `A104_WoodHarvester`, `A112_ScytheWorker`, `A118_Treegardener`, `B101_FurnitureCarpenter`, `B39_Loom`, `B50_ButterChurn`, `B72_LoveforAgriculture`, `C98_CubeCutter`, `D38_MilkingStool`, `E107_LandSurveyor`, `E112_GrainThief` |
+| effect | `onHarvestFieldPhase` | `A104_WoodHarvester`, `A112_ScytheWorker`, `A118_Treegardener`, `B101_FurnitureCarpenter`, `B113_PatchCaregiver`, `B141_FieldCaretaker`, `B39_Loom`, `B50_ButterChurn`, `B68_Beanfield`, `B72_LoveforAgriculture`, `C70_LettucePatch`, `C98_CubeCutter`, `D25_WitchesDanceFloor`, `D38_MilkingStool`, `D75_WoodField`, `E107_LandSurveyor`, `E112_GrainThief`, `E68_CherryOrchard`, `E69_MelonPatch`, `E70_CropRotationField`, `E72_ArtichokeField`, `E80_RockGarden` |
 | effect | `onReturnHome` | `A29_AleBenches`, `A53_Claypipe`, `A70_LiftingMachine`, `A84_Silage`, `B124_Trimmer`, `B139_ForestScientist`, `B22_WalkingBoots`, `C51_FishingNet`, `C75_Firewood`, `D52_RollingPin` |
 | effect | `onRoundEnd` | `A54_Credit` |
-| effect | `onRoundStart` | `A19_Handplow`, `A76_Cob`, `A81_InterimStorage`, `A89_StablePlanner`, `A90_PlowDriver`, `A96_TaskArtisan`, `B110_Pavior`, `B114_Childless`, `B116_Shoreforester`, `B118_SmallscaleFarmer`, `B135_NutritionExpert`, `B18_GrasslandHarrow`, `B23_FinalScenario`, `B29_CookeryLesson`, `B57_Scullery`, `B69_PottersMarket`, `B81_Handcart`, `B97_Scholar`, `C103_GreenGrocer`, `C123_Freemason`, `C125_Nightworker`, `C159_FishermansFriend`, `C21_HeartofStone`, `C39_StudioBoat`, `D116_TreeInspector`, `D22_WorkPermit`, `D54_TroutPool`, `D69_SmallGreenhouse`, `D91_Plowman`, `D93_SheepInspector`, `E100_MuseumCaretaker`, `E102_Acquirer`, `E111_Recluse`, `E126_TaxCollector`, `E152_BargainHunter`, `E168_AnimalTamersApprentice`, `E88_MasterFencer` |
-| effect | `onSowExtraField` | `B72_LoveforAgriculture` |
+| effect | `onRoundStart` | `A19_Handplow`, `A76_Cob`, `A81_InterimStorage`, `A89_StablePlanner`, `A90_PlowDriver`, `A96_TaskArtisan`, `B110_Pavior`, `B114_Childless`, `B116_Shoreforester`, `B118_SmallscaleFarmer`, `B135_NutritionExpert`, `B18_GrasslandHarrow`, `B23_FinalScenario`, `B29_CookeryLesson`, `B57_Scullery`, `B69_PottersMarket`, `B81_Handcart`, `B93_Confidant`, `B97_Scholar`, `C103_GreenGrocer`, `C123_Freemason`, `C125_Nightworker`, `C159_FishermansFriend`, `C21_HeartofStone`, `C39_StudioBoat`, `D116_TreeInspector`, `D22_WorkPermit`, `D54_TroutPool`, `D69_SmallGreenhouse`, `D91_Plowman`, `D93_SheepInspector`, `E100_MuseumCaretaker`, `E102_Acquirer`, `E111_Recluse`, `E126_TaxCollector`, `E152_BargainHunter`, `E168_AnimalTamersApprentice`, `E88_MasterFencer` |
+| effect | `onSowExtraField` | `B113_PatchCaregiver`, `B141_FieldCaretaker`, `B68_Beanfield`, `B72_LoveforAgriculture`, `C70_LettucePatch`, `D25_WitchesDanceFloor`, `D75_WoodField`, `E68_CherryOrchard`, `E69_MelonPatch`, `E70_CropRotationField`, `E72_ArtichokeField`, `E80_RockGarden` |
 | effect | `onStartHarvest` | `C24_BedintheGrainField`, `C62_CookeryExtension`, `D129_LumberVirtuoso`, `D153_WealthyMan`, `D61_BaleofStraw`, `D97_BeggingStudent`, `E110_Dentist`, `E111_Recluse`, `E117_PipeSmoker`, `E147_AnimalDriver`, `E149_MidnightFencer`, `E58_LunchtimeBeer`, `E61_RaisedBed` |
 | effect | `onStartHarvestFeedingPhase` | `C107_Baker`, `E52_Cubbyhole` |
 | effect | `onStartHarvestFieldPhase` | `B165_GameProvider`, `B61_ThreeFieldRotation`, `C57_Crudite`, `D70_StrawManure`, `D72_StableManure`, `E73_Scythe` |
 | effect | `onStartReturnHome` | `A100_Curator`, `A127_Lodger`, `A141_TurnipFarmer`, `A151_Minstrel`, `A152_NightSchoolStudent`, `A157_Bohemian`, `A35_SwimmingClass`, `A58_AsparagusKnife`, `C155_FoodDistributor`, `C97_SeedResearcher`, `D102_SampleStableMaker`, `D107_Bellfounder`, `D10_StorksNest`, `D18_SteamPlow`, `E20_IronHoe`, `E87_MasterRenovator` |
-| effect | `resolveChoice` | `B146_Illusionist`, `B157_Salter`, `B3_Moonshine`, `C104_Collector`, `C146_WorkshopAssistant`, `D23_PioneeringSpirit`, `E134_Omnifarmer`, `E149_MidnightFencer` |
-| exchange | `anytime` | `A60_OrientalFireplace`, `B80_HardPorcelain`, `D155_Ebonist`, `D59_EarthOven` |
-| exchange | `bake-bread` | `A60_OrientalFireplace`, `D59_EarthOven` |
-| exchange | `harvest` | `C105_BasketCarrier`, `C109_SchnappsDistiller`, `C62_CookeryExtension`, `D108_StoneCarver` |
+| effect | `resolveChoice` | `B146_Illusionist`, `B157_Salter`, `B3_Moonshine`, `C104_Collector`, `C146_WorkshopAssistant`, `D23_PioneeringSpirit`, `E134_Omnifarmer`, `E148_Lazybones`, `E149_MidnightFencer` |
+| exchange | `anytime` | `A60_OrientalFireplace`, `B104_SheepWalker`, `B32_Kettle`, `B80_HardPorcelain`, `C139_BasketmakersWife`, `C50_StableYard`, `D162_ClayFirer`, `D25_WitchesDanceFloor`, `D59_EarthOven`, `D60_LargePottery`, `E109_BraidMaker` |
+| exchange | `bake-bread` | `A60_OrientalFireplace`, `D25_WitchesDanceFloor`, `D59_EarthOven`, `D64_BakingCourse`, `E63_IronOven`, `E64_SimpleOven` |
+| exchange | `harvest` | `C105_BasketCarrier`, `C109_SchnappsDistiller`, `C59_SchnappsDistillery`, `D108_StoneCarver`, `D155_Ebonist`, `D62_BeerTap`, `E153_StoneSculptor` |
 | handHooks | `onBeforeStartOfTurn` | `E96_Elder` |
-| listener | `after.$actionName` | `A40_PottersYard` |
-| listener | `after.$dynamic` | `A144_Sequestrator`, `C52_HuntsmansHat`, `E53_BoarSpear` |
-| listener | `after.*` | `E47_SyrupTap`, `E144_WaresSalesman` |
+| listener | `after.*` | `E47_SyrupTap` |
 | listener | `after.bake-bread` | `A30_BakingSheet`, `A63_DutchWindmill`, `C61_BeerStein`, `E57_CheeseFondue` |
-| listener | `after.collect` | `A103_Portmonger`, `A142_Cordmaker`, `A146_StorehouseSteward`, `A15_CarpentersAxe`, `A164_WoodWorker`, `A17_ReclamationPlow`, `A23_StoneCompany`, `A48_ShavingHorse`, `A95_Angler`, `B131_Equipper`, `B147_Huntsman`, `B15_CarpentersBench`, `B162_ForestClearer`, `B17_ForestPlow`, `B21_HayloftBarn`, `B34_SpecialFood`, `B48_ForestStone`, `B55_MaintenancePremium`, `B79_Corf`, `C102_TreeGuard`, `C114_SoilScientist`, `C163_MaterialDeliveryman`, `C42_RavenousHunger`, `C81_MaterialHub`, `D140_Loudmouth`, `D143_TreeCutter`, `D144_WaterWorker`, `D146_Porter`, `D19_PulverizerPlow`, `D36_BreedRegistry`, `D73_SupplyBoat`, `E103_Wolf`, `E118_KindlingGatherer`, `E140_Carter`, `E15_NailBasket`, `E38_RodCollection`, `E51_WhaleOil`, `E77_Mattock` |
-| listener | `after.construct` | `A110_Roughcaster`, `A111_WallBuilder`, `A167_BreederBuyer`, `A21_FamilyFriendHome`, `A73_AgriculturalFertilizers`, `A93_BedMaker`, `B111_Rustic`, `B140_FarmyardWorker`, `B163_Pastor`, `B27_Toolbox`, `D123_RenovationPreparer`, `D128_BuildingTycoon`, `D163_JourneymanBricklayer`, `D74_RoyalWood`, `D94_HenpeckedHusband`, `D96_Furnisher`, `E123_ResourceHoarder`, `E49_Twibil`, `E52_Cubbyhole` |
-| listener | `after.exchange` | `A48_ShavingHorse`, `B21_HayloftBarn`, `B29_CookeryLesson`, `C148_MudWallower`, `C53_GypsysCrock`, `D36_BreedRegistry`, `D56_FatstockStretcher`, `E85_MasterTanner` |
+| listener | `after.collect` | `A103_Portmonger`, `A142_Cordmaker`, `A146_StorehouseSteward`, `A15_CarpentersAxe`, `A164_WoodWorker`, `A17_ReclamationPlow`, `A23_StoneCompany`, `A48_ShavingHorse`, `A95_Angler`, `B131_Equipper`, `B147_Huntsman`, `B15_CarpentersBench`, `B162_ForestClearer`, `B17_ForestPlow`, `B21_HayloftBarn`, `B34_SpecialFood`, `B48_ForestStone`, `B55_MaintenancePremium`, `B79_Corf`, `C102_TreeGuard`, `C114_SoilScientist`, `C163_MaterialDeliveryman`, `C42_RavenousHunger`, `C52_HuntsmansHat`, `C81_MaterialHub`, `D140_Loudmouth`, `D143_TreeCutter`, `D144_WaterWorker`, `D146_Porter`, `D19_PulverizerPlow`, `D36_BreedRegistry`, `D73_SupplyBoat`, `E103_Wolf`, `E118_KindlingGatherer`, `E140_Carter`, `E15_NailBasket`, `E38_RodCollection`, `E51_WhaleOil`, `E53_BoarSpear`, `E77_Mattock` |
+| listener | `after.construct` | `A110_Roughcaster`, `A111_WallBuilder`, `A167_BreederBuyer`, `A21_FamilyFriendHome`, `A40_PottersYard`, `A73_AgriculturalFertilizers`, `A93_BedMaker`, `B111_Rustic`, `B140_FarmyardWorker`, `B163_Pastor`, `B27_Toolbox`, `D123_RenovationPreparer`, `D128_BuildingTycoon`, `D163_JourneymanBricklayer`, `D74_RoyalWood`, `D94_HenpeckedHusband`, `D96_Furnisher`, `E123_ResourceHoarder`, `E49_Twibil`, `E52_Cubbyhole` |
+| listener | `after.exchange` | `A48_ShavingHorse`, `B21_HayloftBarn`, `B29_CookeryLesson`, `C148_MudWallower`, `C53_GypsysCrock`, `D36_BreedRegistry`, `D56_FatstockStretcher`, `E103_Wolf`, `E53_BoarSpear`, `E85_MasterTanner` |
 | listener | `after.family-growth` | `D150_GodlySpouse`, `D157_PartyOrganizer`, `E113_Godmother` |
-| listener | `after.fence` | `A34_Loppers`, `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B94_StockProtector`, `D89_Stablehand`, `E108_BlackberryFarmer`, `E74_AshTrees` |
-| listener | `after.fencing` | `B124_Trimmer`, `B140_FarmyardWorker`, `B27_Toolbox` |
-| listener | `after.gain` | `A48_ShavingHorse`, `B21_HayloftBarn`, `C120_AgriculturalLabourer`, `E103_Wolf`, `E118_KindlingGatherer` |
-| listener | `after.improvement` | `A109_SmallTrader`, `A131_CraftTeacher`, `A41_VegetableSlicer`, `B100_Clutterer`, `B49_Scales`, `C115_Sower`, `C137_CharcoalBurner`, `C43_FarmBuilding`, `C75_Firewood`, `C80_RockyTerrain`, `D118_Bonehead`, `D161_CabbageBuyer`, `D80_BrickHammer`, `E156_ClaypitOwner`, `E165_MasterHuntsman`, `E18_SeedAlmanac`, `E31_Upholstery` |
+| listener | `after.fence` | `A144_Sequestrator`, `A34_Loppers`, `A40_PottersYard`, `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B124_Trimmer`, `B140_FarmyardWorker`, `B27_Toolbox`, `B94_StockProtector`, `D89_Stablehand`, `E108_BlackberryFarmer`, `E74_AshTrees` |
+| listener | `after.gain` | `A48_ShavingHorse`, `B21_HayloftBarn`, `C120_AgriculturalLabourer`, `C52_HuntsmansHat`, `E103_Wolf`, `E118_KindlingGatherer`, `E53_BoarSpear` |
+| listener | `after.improvement` | `A109_SmallTrader`, `A131_CraftTeacher`, `A41_VegetableSlicer`, `B100_Clutterer`, `B49_Scales`, `C115_Sower`, `C137_CharcoalBurner`, `C43_FarmBuilding`, `C75_Firewood`, `C80_RockyTerrain`, `D118_Bonehead`, `D161_CabbageBuyer`, `D80_BrickHammer`, `E144_WaresSalesman`, `E156_ClaypitOwner`, `E165_MasterHuntsman`, `E18_SeedAlmanac`, `E31_Upholstery` |
+| listener | `after.occupation` | `A139_HollowWarden`, `A96_TaskArtisan`, `B100_Clutterer`, `B103_FieldMerchant`, `B138_ForestGuardian`, `B151_LittlePeasant`, `B155_ArtTeacher`, `B25_BreadPaddle`, `B49_Scales`, `C120_AgriculturalLabourer`, `C68_Bookcase`, `C80_RockyTerrain`, `C95_BasketWeaver`, `D118_Bonehead`, `D163_JourneymanBricklayer`, `D42_EducationBonus`, `D95_SiteManager`, `E101_Blighter`, `E116_FirCutter`, `E144_WaresSalesman`, `E157_Usufructuary`, `E163_Patroness`, `E165_MasterHuntsman`, `E89_Stallwright`, `E95_Miller` |
 | listener | `after.pay` | `B18_GrasslandHarrow`, `C116_FurnitureMaker`, `C148_MudWallower`, `D74_RoyalWood`, `E122_Cottar`, `E123_ResourceHoarder`, `E128_Saddler`, `E54_Contraband` |
-| listener | `after.place-farmer` | `A113_HeresyTeacher`, `A114_SeasonalWorker`, `A116_WoodCutter`, `A119_FirewoodCollector`, `A121_ClayPuncher`, `A122_PanBaker`, `A128_RiparianBuilder`, `A129_Swagman`, `A130_MummysBoy`, `A137_RiverineShepherd`, `A138_Harpooner`, `A139_HollowWarden`, `A140_ShovelBearer`, `A147_AnimalDealer`, `A149_HouseArtist`, `A150_Stagehand`, `A154_Paymaster`, `A155_Conjurer`, `A156_Buyer`, `A158_CulinaryArtist`, `A159_JoineroftheSea`, `A160_Lutenist`, `A161_PatchCaretaker`, `A163_BuildingExpert`, `A168_AnimalTeacher`, `A18_WheelPlow`, `A24_ThreshingBoard`, `A42_ForestLakeHut`, `A46_ClawKnife`, `A50_MilkJug`, `A51_DriftNetBoat`, `A66_FeedingDish`, `A67_CornScoop`, `A72_CalciumFertilizers`, `A77_Hod`, `A78_Canoe`, `A80_StoneTongs`, `A82_WorkCertificate`, `A92_AdoptiveParents`, `A97_Freshman`, `B108_OvenFiringBoy`, `B112_Silokeeper`, `B121_Geologist`, `B128_Plumber`, `B130_FullPeasant`, `B137_Wholesaler`, `B142_Greengrocer`, `B143_ClayWarden`, `B144_Collier`, `B150_LargeScaleFarmer`, `B151_LittlePeasant`, `B152_JuniorArtist`, `B156_StorehouseKeeper`, `B161_Weakling`, `B166_CattleFeeder`, `B19_MoldboardPlow`, `B24_Lasso`, `B28_ForestryStudies`, `B29_CookeryLesson`, `B40_BreweryPond`, `B43_Chophouse`, `B47_HerringPot`, `B56_Brook`, `B60_BrewingWater`, `B62_Pitchfork`, `B64_MillWheel`, `B77_LoamPit`, `B87_Cottager`, `B90_CooperativePlower`, `B91_AssistantTiller`, `B92_LittleStickKnitter`, `C117_Legworker`, `C121_ClayKneader`, `C126_Excavator`, `C130_OutskirtsDirector`, `C131_PrivateTeacher`, `C138_AnimalFeeder`, `C141_SheepProvider`, `C142_MarketCrier`, `C145_ForestReviewer`, `C147_Cowherd`, `C148_MudWallower`, `C150_ParrotBreeder`, `C151_SowingDirector`, `C152_Puppeteer`, `C164_GermanHeathKeeper`, `C167_CattleBuyer`, `C19_SwingPlow`, `C20_MolePlow`, `C23_JobContract`, `C26_Flail`, `C39_StudioBoat`, `C42_RavenousHunger`, `C45_Stew`, `C48_Farmstead`, `C51_FishingNet`, `C82_HardwareStore`, `C90_FieldWatchman`, `C91_PlowHero`, `C93_InnerDistrictsDirector`, `D101_SugarBaker`, `D103_CanalBoatman`, `D109_SowingMaster`, `D112_YoungFarmer`, `D134_OysterEater`, `D137_TradeTeacher`, `D141_SeedSeller`, `D144_WaterWorker`, `D149_CasualWorker`, `D151_SpinDoctor`, `D156_RetailDealer`, `D158_BeanCounter`, `D160_Midwife`, `D161_CabbageBuyer`, `D164_PetGrower`, `D165_PigStalker`, `D20_TurnwrestPlow`, `D27_Retraining`, `D39_TruffleSlicer`, `D55_NewMarket`, `D68_SmallBasket`, `D92_ChildOmbudsman`, `D93_SheepInspector`, `E105_Pioneer`, `E115_SeedServant`, `E116_FirCutter`, `E118_KindlingGatherer`, `E131_MarketMaster`, `E148_Lazybones`, `E160_KelpGatherer`, `E19_OxGoad`, `E40_BeeStatue`, `E66_BarnShed`, `E77_Mattock`, `E82_Profiteering`, `E95_Miller` |
-| listener | `after.occupation` | `A139_HollowWarden`, `A96_TaskArtisan`, `B100_Clutterer`, `B103_FieldMerchant`, `B138_ForestGuardian`, `B151_LittlePeasant`, `B155_ArtTeacher`, `B25_BreadPaddle`, `B49_Scales`, `C120_AgriculturalLabourer`, `C68_Bookcase`, `C80_RockyTerrain`, `C95_BasketWeaver`, `D118_Bonehead`, `D163_JourneymanBricklayer`, `D42_EducationBonus`, `D95_SiteManager`, `E101_Blighter`, `E116_FirCutter`, `E157_Usufructuary`, `E163_Patroness`, `E165_MasterHuntsman`, `E89_Stallwright`, `E95_Miller` |
-| listener | `after.plow` | `A105_BarrowPusher`, `A17_ReclamationPlow`, `B159_LieutenantGeneral`, `C80_RockyTerrain`, `D104_Cultivator`, `E164_MountainPlowman` |
-| listener | `after.receive` | `A48_ShavingHorse`, `B21_HayloftBarn`, `C120_AgriculturalLabourer` |
+| listener | `after.place-farmer` | `A113_HeresyTeacher`, `A114_SeasonalWorker`, `A116_WoodCutter`, `A119_FirewoodCollector`, `A121_ClayPuncher`, `A122_PanBaker`, `A128_RiparianBuilder`, `A129_Swagman`, `A130_MummysBoy`, `A137_RiverineShepherd`, `A138_Harpooner`, `A139_HollowWarden`, `A140_ShovelBearer`, `A147_AnimalDealer`, `A149_HouseArtist`, `A150_Stagehand`, `A154_Paymaster`, `A155_Conjurer`, `A156_Buyer`, `A158_CulinaryArtist`, `A159_JoineroftheSea`, `A160_Lutenist`, `A161_PatchCaretaker`, `A163_BuildingExpert`, `A168_AnimalTeacher`, `A18_WheelPlow`, `A24_ThreshingBoard`, `A42_ForestLakeHut`, `A46_ClawKnife`, `A50_MilkJug`, `A51_DriftNetBoat`, `A66_FeedingDish`, `A67_CornScoop`, `A72_CalciumFertilizers`, `A77_Hod`, `A78_Canoe`, `A80_StoneTongs`, `A82_WorkCertificate`, `A92_AdoptiveParents`, `A97_Freshman`, `B108_OvenFiringBoy`, `B112_Silokeeper`, `B121_Geologist`, `B128_Plumber`, `B130_FullPeasant`, `B137_Wholesaler`, `B142_Greengrocer`, `B143_ClayWarden`, `B144_Collier`, `B150_LargeScaleFarmer`, `B152_JuniorArtist`, `B156_StorehouseKeeper`, `B161_Weakling`, `B166_CattleFeeder`, `B19_MoldboardPlow`, `B24_Lasso`, `B28_ForestryStudies`, `B29_CookeryLesson`, `B40_BreweryPond`, `B43_Chophouse`, `B47_HerringPot`, `B56_Brook`, `B60_BrewingWater`, `B62_Pitchfork`, `B64_MillWheel`, `B77_LoamPit`, `B87_Cottager`, `B90_CooperativePlower`, `B91_AssistantTiller`, `B92_LittleStickKnitter`, `C117_Legworker`, `C121_ClayKneader`, `C126_Excavator`, `C130_OutskirtsDirector`, `C131_PrivateTeacher`, `C138_AnimalFeeder`, `C141_SheepProvider`, `C142_MarketCrier`, `C145_ForestReviewer`, `C147_Cowherd`, `C148_MudWallower`, `C150_ParrotBreeder`, `C151_SowingDirector`, `C152_Puppeteer`, `C164_GermanHeathKeeper`, `C167_CattleBuyer`, `C19_SwingPlow`, `C20_MolePlow`, `C23_JobContract`, `C26_Flail`, `C39_StudioBoat`, `C42_RavenousHunger`, `C45_Stew`, `C48_Farmstead`, `C82_HardwareStore`, `C90_FieldWatchman`, `C91_PlowHero`, `C93_InnerDistrictsDirector`, `D101_SugarBaker`, `D103_CanalBoatman`, `D109_SowingMaster`, `D112_YoungFarmer`, `D134_OysterEater`, `D137_TradeTeacher`, `D141_SeedSeller`, `D144_WaterWorker`, `D149_CasualWorker`, `D151_SpinDoctor`, `D156_RetailDealer`, `D158_BeanCounter`, `D160_Midwife`, `D161_CabbageBuyer`, `D164_PetGrower`, `D165_PigStalker`, `D20_TurnwrestPlow`, `D27_Retraining`, `D39_TruffleSlicer`, `D55_NewMarket`, `D68_SmallBasket`, `D92_ChildOmbudsman`, `D93_SheepInspector`, `E105_Pioneer`, `E115_SeedServant`, `E116_FirCutter`, `E118_KindlingGatherer`, `E131_MarketMaster`, `E148_Lazybones`, `E160_KelpGatherer`, `E19_OxGoad`, `E40_BeeStatue`, `E66_BarnShed`, `E82_Profiteering`, `E95_Miller` |
+| listener | `after.plow` | `A105_BarrowPusher`, `A144_Sequestrator`, `A17_ReclamationPlow`, `A40_PottersYard`, `B159_LieutenantGeneral`, `C80_RockyTerrain`, `D104_Cultivator`, `E164_MountainPlowman` |
+| listener | `after.receive` | `A48_ShavingHorse`, `B21_HayloftBarn`, `C120_AgriculturalLabourer`, `C52_HuntsmansHat`, `E53_BoarSpear` |
 | listener | `after.renovate-house` | `A110_Roughcaster`, `A120_ClayHutBuilder`, `A37_Bucksaw`, `A45_FireProtectionPond`, `B107_Manservant`, `B134_HousebookMaster`, `B168_PastureMaster`, `B16_MiningHammer`, `B55_MaintenancePremium`, `B76_Ceilings`, `C119_SkillfulRenovator`, `C132_TimberShingleMaker`, `C149_ResourceRecycler`, `C153_PatternMaker`, `D111_InteriorDecorator`, `D161_CabbageBuyer`, `D163_JourneymanBricklayer`, `D27_Retraining`, `D77_RecycledBrick`, `D81_RoofLadder`, `E123_ResourceHoarder`, `E154_Margrave`, `E87_MasterRenovator` |
 | listener | `after.reorganize` | `C148_MudWallower` |
 | listener | `after.sow` | `A79_GardenHoe`, `B115_TinsmithMaster`, `B54_Tumbrel`, `C73_SeaweedFertilizer`, `D58_Gritter`, `E50_WildGreens`, `E71_CowPatty`, `E79_FieldSpade` |
-| listener | `after.stables` | `A167_BreederBuyer`, `A43_FarmyardManure`, `A73_AgriculturalFertilizers`, `A74_StableTree`, `B140_FarmyardWorker`, `B27_Toolbox`, `C56_FeedFence`, `D166_StableMilker`, `D168_Stockman`, `E114_ShedBuilder` |
+| listener | `after.stables` | `A167_BreederBuyer`, `A40_PottersYard`, `A43_FarmyardManure`, `A73_AgriculturalFertilizers`, `A74_StableTree`, `B140_FarmyardWorker`, `B27_Toolbox`, `C56_FeedFence`, `D166_StableMilker`, `D168_Stockman`, `E114_ShedBuilder` |
 | listener | `after.store-on-card` | `E27_PiggyBank` |
 | listener | `after.take-from-card` | `E27_PiggyBank` |
 | listener | `after.wish-children` | `E113_Godmother` |
 | listener | `anytime.*` | `A102_Grocer`, `A153_PigOwner`, `A71_ClearingSpade`, `B154_SheepKeeper`, `B157_Salter`, `B35_HookKnife`, `B69_PottersMarket`, `B83_MuddyPuddles`, `B85_FarmHand`, `C101_StallHolder`, `C115_Sower`, `C143_StoneBuyer`, `C150_ParrotBreeder`, `C18_RollOverPlow`, `C46_Mandoline`, `C57_Crudite`, `C64_CornSchnappsDistillery`, `C69_LandConsolidation`, `C84_PerennialRye`, `C85_DenBuilder`, `C87_Mason`, `C94_StableCleaner`, `D106_WhiskyDistiller`, `D114_SeedTrader`, `D122_ClayCarrier`, `D124_Emissary`, `D13_Trowel`, `D46_PelletPress`, `D53_TeaHouse`, `D71_Changeover`, `D87_MasterBuilder`, `E13_StoneHouseReconstruction`, `E14_WoodSaw`, `E22_GuestRoom`, `E27_PiggyBank`, `E62_SourDough`, `E86_PenBuilder`, `E91_PlowBuilder` |
-| listener | `before.*` | `A124_Knapper`, `A126_MasterWorkman`, `B120_Sweep`, `B63_Tasting` |
+| listener | `before.*` | `A124_Knapper`, `A126_MasterWorkman`, `B120_Sweep` |
 | listener | `before.bake-bread` | `B67_HandTruck`, `C60_SmallPottersOven`, `D66_PotterCeramics` |
-| listener | `before.collect` | `A107_Catcher`, `A115_ChiefForester`, `A52_ThrowingAxe`, `A81_InterimStorage`, `A91_ShiftingCultivator`, `B122_Mineralogist`, `B138_ForestGuardian`, `B146_Illusionist`, `B34_SpecialFood`, `B51_DiggingSpade`, `C76_WoodCart`, `D105_Sculptor`, `D125_ForestTrader` |
-| listener | `before.construct` | `A40_PottersYard`, `A73_AgriculturalFertilizers`, `D119_WoodBarterer`, `D74_RoyalWood` |
+| listener | `before.collect` | `A107_Catcher`, `A115_ChiefForester`, `A52_ThrowingAxe`, `A81_InterimStorage`, `A91_ShiftingCultivator`, `B122_Mineralogist`, `B138_ForestGuardian`, `B146_Illusionist`, `B34_SpecialFood`, `B51_DiggingSpade`, `C51_FishingNet`, `C76_WoodCart`, `D105_Sculptor`, `D125_ForestTrader` |
+| listener | `before.construct` | `A40_PottersYard`, `A73_AgriculturalFertilizers`, `D119_WoodBarterer` |
 | listener | `before.cultivation` | `C112_Thresher` |
-| listener | `before.exchange` | `D36_BreedRegistry`, `D56_FatstockStretcher`, `E85_MasterTanner` |
+| listener | `before.exchange` | `D56_FatstockStretcher`, `E85_MasterTanner` |
 | listener | `before.family-growth` | `E130_Overachiever` |
 | listener | `before.farmland` | `C112_Thresher` |
-| listener | `before.fence` | `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B94_StockProtector`, `D119_WoodBarterer`, `E74_AshTrees` |
-| listener | `before.fencing` | `A40_PottersYard` |
+| listener | `before.fence` | `A40_PottersYard`, `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B94_StockProtector`, `D119_WoodBarterer`, `E74_AshTrees` |
 | listener | `before.grain-utilization` | `C112_Thresher` |
 | listener | `before.improvement` | `B75_WoodWorkshop` |
+| listener | `before.lessons` | `B63_Tasting` |
+| listener | `before.lessons-3` | `B63_Tasting` |
+| listener | `before.lessons-4` | `B63_Tasting` |
 | listener | `before.meeting-place` | `D139_Chairman` |
-| listener | `before.place-farmer` | `A92_AdoptiveParents`, `C154_TwinResearcher`, `C158_ForestCampaigner`, `C15_Trellis`, `C160_Outrider`, `C28_TeachersDesk`, `C48_Farmstead`, `D110_FishFarmer`, `D147_TrapBuilder`, `D16_WoodenWheyBucket`, `D28_WritingDesk`, `D83_Pigswill`, `D90_PlowMaker`, `E121_HillCultivator`, `E137_FlaxFarmer`, `E141_VegetableVendor`, `E166_Roastmaster`, `E17_SkimmerPlow`, `E55_StoneWeir`, `E59_CombandCutter`, `E67_GrainBag` |
 | listener | `before.occupation` | `D152_Patron`, `D49_Bookshelf`, `E51_WhaleOil` |
+| listener | `before.place-farmer` | `A92_AdoptiveParents`, `C154_TwinResearcher`, `C158_ForestCampaigner`, `C15_Trellis`, `C160_Outrider`, `C28_TeachersDesk`, `C48_Farmstead`, `D110_FishFarmer`, `D147_TrapBuilder`, `D16_WoodenWheyBucket`, `D28_WritingDesk`, `D83_Pigswill`, `D90_PlowMaker`, `E121_HillCultivator`, `E137_FlaxFarmer`, `E141_VegetableVendor`, `E166_Roastmaster`, `E17_SkimmerPlow`, `E55_StoneWeir`, `E59_CombandCutter`, `E67_GrainBag` |
 | listener | `before.plow` | `A40_PottersYard` |
 | listener | `before.renovate-house` | `D14_HammerCrusher` |
 | listener | `before.sow` | `A132_Publican`, `A65_SeedPellets`, `D17_DrillHarrow` |
-| listener | `before.stables` | `A40_PottersYard`, `A73_AgriculturalFertilizers`, `D74_RoyalWood` |
+| listener | `before.stables` | `A40_PottersYard`, `A73_AgriculturalFertilizers` |
 | listener | `computeArgs.place-farmer` | `A130_MummysBoy`, `A25_Bassinet`, `A26_SleepingCorner`, `A28_ForestSchool`, `A94_LazySowman`, `B129_Seatmate`, `B151_LittlePeasant`, `C129_SecondSpouse`, `C150_ParrotBreeder`, `D112_YoungFarmer`, `D24_BrotherlyLove`, `D50_ForeignAid`, `E129_Imitator`, `E150_RockBeater`, `E21_SheepRug` |
 | listener | `computeChoiceCandidates.improvement` | `C27_Blueprint`, `D131_CraftsmanshipPromoter`, `E161_ElderBaker` |
 | listener | `computeChoiceCandidates.renovate-house` | `A87_Conservator`, `D13_Trowel` |
@@ -285,14 +277,17 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | listener | `computeReplace.sow` | `A94_LazySowman`, `B26_AgrarianFences` |
 | listener | `during.improvement` | `A55_JunkRoom` |
 | listener | `during.place-farmer` | `D112_YoungFarmer`, `E77_Mattock` |
-| listener | `immediatelyAfter.$actionId` | `B132_EstateMaster` |
 | listener | `immediatelyAfter.*` | `C25_SteamMachine` |
 | listener | `immediatelyAfter.collect` | `A108_MushroomCollector`, `A56_Basket`, `C36_ClayDeposit`, `C58_Woodcraft`, `E33_BeaverColony`, `E75_StoneAxe` |
-| listener | `immediatelyAfter.fence` | `A83_ShepherdsCrook` |
+| listener | `immediatelyAfter.construct` | `B132_EstateMaster` |
+| listener | `immediatelyAfter.fence` | `A83_ShepherdsCrook`, `B132_EstateMaster` |
+| listener | `immediatelyAfter.fencing` | `B132_EstateMaster` |
 | listener | `immediatelyAfter.gain` | `A92_AdoptiveParents`, `E33_BeaverColony` |
 | listener | `immediatelyAfter.improvement` | `C96_Merchant`, `D26_CarpentersYard`, `E146_Reseller` |
+| listener | `immediatelyAfter.plow` | `B132_EstateMaster` |
 | listener | `immediatelyAfter.reap` | `B132_EstateMaster` |
 | listener | `immediatelyAfter.renovate-house` | `C144_ReedRoofRenovator` |
+| listener | `immediatelyAfter.stables` | `B132_EstateMaster` |
 | listener | `immediatelyAfter.trade-applied` | `C53_GypsysCrock`, `E91_PlowBuilder` |
 | listener | `isDoable.*` | `A126_MasterWorkman` |
 | listener | `isDoable.bake-bread` | `A97_Freshman`, `B26_AgrarianFences`, `B67_HandTruck`, `C60_SmallPottersOven`, `D66_PotterCeramics` |
@@ -302,16 +297,19 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | listener | `isDoable.fence` | `B94_StockProtector`, `C88_CarpentersApprentice`, `D119_WoodBarterer`, `D82_HuntingTrophy`, `E74_AshTrees` |
 | listener | `isDoable.fishing` | `C51_FishingNet` |
 | listener | `isDoable.improvement` | `B103_FieldMerchant`, `B75_WoodWorkshop`, `C140_PackagingArtist`, `D21_Recruitment` |
+| listener | `isDoable.lessons` | `B93_Confidant` |
+| listener | `isDoable.lessons-3` | `B93_Confidant` |
+| listener | `isDoable.lessons-4` | `B93_Confidant` |
+| listener | `isDoable.occupation` | `B93_Confidant`, `D152_Patron`, `D49_Bookshelf`, `E101_Blighter` |
 | listener | `isDoable.place-farmer` | `E125_DelayedWayfarer` |
-| listener | `isDoable.occupation` | `D152_Patron`, `D49_Bookshelf`, `E101_Blighter` |
 | listener | `isDoable.renovate-house` | `A87_Conservator`, `D14_HammerCrusher` |
-| listener | `isDoable.sow` | `A65_SeedPellets`, `A94_LazySowman`, `B26_AgrarianFences`, `B72_LoveforAgriculture`, `C112_Thresher`, `D17_DrillHarrow` |
-| specialKind | `add-resource-to-space` | `C130_OutskirtsDirector`, `C93_InnerDistrictsDirector` |
+| listener | `isDoable.sow` | `A65_SeedPellets`, `A94_LazySowman`, `B113_PatchCaregiver`, `B141_FieldCaretaker`, `B26_AgrarianFences`, `B68_Beanfield`, `B72_LoveforAgriculture`, `C112_Thresher`, `C70_LettucePatch`, `D17_DrillHarrow`, `D25_WitchesDanceFloor`, `D75_WoodField`, `E68_CherryOrchard`, `E69_MelonPatch`, `E70_CropRotationField`, `E72_ArtichokeField`, `E80_RockGarden` |
+| specialKind | `add-resource-to-space` | `C130_OutskirtsDirector`, `C93_InnerDistrictsDirector`, `D101_SugarBaker` |
 | specialKind | `build-stable-on-first-empty-tile` | `E148_Lazybones` |
 | specialKind | `card-field` | `C8_PlantFertilizer` |
-| specialKind | `choice` | `B146_Illusionist`, `D23_PioneeringSpirit` |
+| specialKind | `choice` | `B146_Illusionist`, `C104_Collector`, `C146_WorkshopAssistant`, `D23_PioneeringSpirit` |
 | specialKind | `clear-pending-fence-bonus` | `E74_AshTrees` |
-| specialKind | `consume-fence` | `C1_Overhaul`, `C54_MarketBooth` |
+| specialKind | `consume-fence` | `C1_Overhaul` |
 | specialKind | `field` | `C8_PlantFertilizer` |
 | specialKind | `grain` | `E112_GrainThief` |
 | specialKind | `increment-counter` | `B132_EstateMaster`, `C132_TimberShingleMaker` |
@@ -327,7 +325,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | specialKind | `resourceExchange` | `E5_NightLoot` |
 | specialKind | `return-card-to-board` | `C60_SmallPottersOven` |
 | specialKind | `set-counter` | `A144_Sequestrator`, `B48_ForestStone`, `C148_MudWallower`, `D158_BeanCounter` |
-| specialKind | `set-extra-data` | `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B124_Trimmer`, `B132_EstateMaster`, `B137_Wholesaler`, `B18_GrasslandHarrow`, `B21_HayloftBarn`, `B34_SpecialFood`, `B48_ForestStone`, `B55_MaintenancePremium`, `C150_ParrotBreeder`, `C16_FieldFences`, `C48_Farmstead`, `C53_GypsysCrock`, `D156_RetailDealer`, `D36_BreedRegistry`, `D56_FatstockStretcher`, `D74_RoyalWood`, `E148_Lazybones`, `E149_MidnightFencer`, `E51_WhaleOil`, `E53_BoarSpear`, `E58_LunchtimeBeer`, `E85_MasterTanner`, `E91_PlowBuilder` |
+| specialKind | `set-extra-data` | `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `A89_StablePlanner`, `B124_Trimmer`, `B132_EstateMaster`, `B137_Wholesaler`, `B18_GrasslandHarrow`, `B21_HayloftBarn`, `B34_SpecialFood`, `B48_ForestStone`, `B55_MaintenancePremium`, `B93_Confidant`, `C150_ParrotBreeder`, `C16_FieldFences`, `C48_Farmstead`, `C53_GypsysCrock`, `D156_RetailDealer`, `D36_BreedRegistry`, `D56_FatstockStretcher`, `D74_RoyalWood`, `E148_Lazybones`, `E149_MidnightFencer`, `E51_WhaleOil`, `E53_BoarSpear`, `E58_LunchtimeBeer`, `E85_MasterTanner`, `E91_PlowBuilder` |
 | specialKind | `set-flag` | `A130_MummysBoy`, `A153_PigOwner`, `A17_ReclamationPlow`, `A18_WheelPlow`, `A45_FireProtectionPond`, `A92_AdoptiveParents`, `A97_Freshman`, `B124_Trimmer`, `B140_FarmyardWorker`, `B154_SheepKeeper`, `B163_Pastor`, `B24_Lasso`, `B34_SpecialFood`, `B35_HookKnife`, `B76_Ceilings`, `B85_FarmHand`, `C101_StallHolder`, `C143_StoneBuyer`, `C150_ParrotBreeder`, `C42_RavenousHunger`, `C46_Mandoline`, `C51_FishingNet`, `C64_CornSchnappsDistillery`, `C84_PerennialRye`, `C85_DenBuilder`, `C87_Mason`, `C94_StableCleaner`, `D122_ClayCarrier`, `D150_GodlySpouse`, `D157_PartyOrganizer`, `D27_Retraining`, `D46_PelletPress`, `D53_TeaHouse`, `D87_MasterBuilder`, `D93_SheepInspector`, `E13_StoneHouseReconstruction`, `E146_Reseller`, `E151_DeliveryNurse`, `E22_GuestRoom`, `E27_PiggyBank`, `E62_SourDough`, `E91_PlowBuilder`, `E92_FieldDoctor` |
 | specialKind | `set-infobox` | `A17_ReclamationPlow`, `B21_HayloftBarn`, `B48_ForestStone`, `B55_MaintenancePremium`, `C115_Sower`, `C148_MudWallower`, `D126_FieldCultivator`, `D36_BreedRegistry`, `E110_Dentist`, `E22_GuestRoom`, `E27_PiggyBank`, `E51_WhaleOil`, `E74_AshTrees` |
 | specialKind | `stone` | `C6_StoneClearing` |
@@ -348,6 +346,8 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 
 状态值：`已对齐`、`已接受差异`、`需复核`、`排除`。
 
+`需复核` 表示未对齐：已经发现 BGA 差异或高置信行为风险，需要修复或补测试确认后才能改为 `已对齐`；它不是“已接受差异”。
+
 | 卡牌 | 状态 | 备注 |
 |---|---|---|
 | `A1_Shelter` | 已对齐 |  |
@@ -362,7 +362,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `A10_WoodenShed` | 已对齐 |  |
 | `A11_MudPatch` | 已对齐 |  |
 | `A12_DrinkingTrough` | 已对齐 |  |
-| `A13_RenovationCompany` | 已对齐 |  |
+| `A13_RenovationCompany` | 已对齐 | BGA `formatCost([])` 通过 `renovate-house` `actionContext.exactCost` 表达免费翻修。 |
 | `A14_CarpentersHammer` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `A15_CarpentersAxe` | 已对齐 |  |
 | `A16_RammedClay` | 已对齐 |  |
@@ -371,7 +371,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `A19_Handplow` | 已对齐 |  |
 | `A20_DoubleTurnPlow` | 已对齐 |  |
 | `A21_FamilyFriendHome` | 已对齐 |  |
-| `A22_Telegram` | 已接受差异 | 已接受的行为 / 产品差异 |
+| `A22_Telegram` | 需复核 | BGA turn start flag 后并入普通放人选择；OA turn start 直接给 optional extraPlacement，需确认跳过/使用时序等价 |
 | `A23_StoneCompany` | 已对齐 |  |
 | `A24_ThreshingBoard` | 已对齐 |  |
 | `A25_Bassinet` | 已对齐 |  |
@@ -485,7 +485,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `A133_Braggart` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `A134_FullFarmer` | 已对齐 |  |
 | `A135_AnimalReeve` | 已对齐 |  |
-| `A136_DrudgeryReeve` | 已接受差异 | 已接受的行为 / 产品差异 |
+| `A136_DrudgeryReeve` | 需复核 | BGA sharedScoring 每位玩家可选 0..max sets 并 reserve 资源；OA 仅持卡玩家自动最优计分 |
 | `A137_RiverineShepherd` | 已对齐 |  |
 | `A138_Harpooner` | 已对齐 |  |
 | `A139_HollowWarden` | 已对齐 |  |
@@ -530,8 +530,8 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `A178_CarpentersBoy` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `A179_MountainShepherd` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `A180_AnimalBrander` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `B1_UpscaleLifestyle` | 已对齐 |  |
-| `B2_MiniPasture` | 已对齐 |  |
+| `B1_UpscaleLifestyle` | 已对齐 | 即时翻修子行动使用当前 `renovate-house` action id。 |
+| `B2_MiniPasture` | 已对齐 | BGA `formatCost([WOOD => 0])` / `miniPasture` 通过 nested `fencePolicy` 表达免费 fence、最多 4 段总 fence、恰好 1 个 1 格新牧场，不走 `fencing` wrapper 丢 params。 |
 | `B3_Moonshine` | 已对齐 |  |
 | `B4_WoodPile` | 已对齐 |  |
 | `B5_StoreofExperience` | 已对齐 |  |
@@ -544,25 +544,25 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B12_Stockyard` | 已对齐 |  |
 | `B13_CarpentersParlor` | 已对齐 |  |
 | `B14_Hawktower` | 已对齐 |  |
-| `B15_CarpentersBench` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
+| `B15_CarpentersBench` | 已接受差异 | BGA banned，但 OA 按产品策略保留；BGA `formatCost([WOOD => 1])` / `max` / `benchWood` 通过 `reserve-fence-bonus` + nested `fencePolicy` 表达：只建普通 fence、最多 `n+1` 段、恰好 1 个新牧场、1 段免费。 |
 | `B16_MiningHammer` | 已对齐 | onBuy 使用 CardEffect；翻修后仍监听 `after.renovate-house` 并免费建 1 个 stable |
 | `B17_ForestPlow` | 已对齐 |  |
 | `B18_GrasslandHarrow` | 已对齐 |  |
-| `B19_MoldboardPlow` | 需复核 | plow 成功前就消耗使用次数 |
+| `B19_MoldboardPlow` | 已对齐 | optional extra plow 先执行 `plow`，成功后再 `pop-card-stack`；通用 `plow` cancel 语义另列 §2 跟踪 |
 | `B20_ChainFloat` | 已对齐 |  |
 | `B21_HayloftBarn` | 已对齐 | 通过 resource exchange 获得的 grain 已由 provenance helper 触发 |
 | `B22_WalkingBoots` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `B23_FinalScenario` | 已对齐 | 第 14 轮行动 reveal / exclusive gate / clear event 已由后端权威建模 |
-| `B24_Lasso` | 需复核 | 只在动物市场后触发，漏掉非动物市场首次放人路径 |
+| `B24_Lasso` | 已对齐 | 任意首次放人后提供 optional second placement；非动物市场首放时第二人限制动物市场，动物市场首放时可去任意合法格，并经通用 target action flow 执行目标行动 |
 | `B25_BreadPaddle` | 已对齐 |  |
 | `B26_AgrarianFences` | 已对齐 |  |
-| `B27_Toolbox` | 已接受差异 | 已接受的简化实现 |
+| `B27_Toolbox` | 已对齐 | 重审未见实质行为差异；建 room/stable/fence 后可买 Joinery/Pottery/Basket，子行动 `trueAction=false` |
 | `B28_ForestryStudies` | 已对齐 |  |
 | `B29_CookeryLesson` | 已对齐 | lessons-3 行动格覆盖已由共享 lessons-space helper 对齐 |
 | `B30_WoodPalisades` | 已对齐 |  |
 | `B31_PotteryYard` | 已对齐 |  |
 | `B32_Kettle` | 已对齐 |  |
-| `B33_Mantlepiece` | 已接受差异 | 已接受的简化实现 |
+| `B33_Mantlepiece` | 已对齐 | desc/cost/vp/prereq/onBuy 得分对齐；BGA/OA 均未见 runtime 禁止 renovate 逻辑 |
 | `B34_SpecialFood` | 需复核 | A137 Riverine Shepherd 交互需要定向验证 |
 | `B35_HookKnife` | 已对齐 |  |
 | `B36_Bottles` | 已对齐 |  |
@@ -614,15 +614,15 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B82_ValueAssets` | 已对齐 |  |
 | `B83_MuddyPuddles` | 已对齐 |  |
 | `B84_AcornsBasket` | 已对齐 |  |
-| `B85_FarmHand` | 已接受差异 | 已接受的行为 / 产品差异 |
+| `B85_FarmHand` | 需复核 | FarmHand stable 未进入通用 `stableTiles` / stables flow 统计，跨卡 stable 数和 after-stables 互动可能遗漏 |
 | `B86_TruffleSearcher` | 已对齐 |  |
 | `B87_Cottager` | 已对齐 |  |
-| `B88_EstablishedPerson` | 已对齐 |  |
+| `B88_EstablishedPerson` | 已对齐 | BGA `formatCost([])` 通过 `renovate-house` `actionContext.exactCost` 表达免费翻修；后续 ordinary fence 直接走 `fence`。 |
 | `B89_Groom` | 已对齐 |  |
 | `B90_CooperativePlower` | 已对齐 |  |
 | `B91_AssistantTiller` | 已对齐 |  |
 | `B92_LittleStickKnitter` | 已对齐 |  |
-| `B93_Confidant` | 已对齐 |  |
+| `B93_Confidant` | 已对齐 | onBuy 必须选择 2/3/4 个未来 round 之一；`isDoable.occupation` 按可选 occupation 支付方案过滤，并通过 `reserveResources` 要求职业支付后仍有最低 2 个真实 food 支付 future schedule；`isDoable.lessons*` 在 B93 是唯一且不可支付的职业时 veto lessons action space，避免占格后无职业可打；future receive 后可选 `sow` 或 `fence`，其中 BGA `formatCost([WOOD => 1])` 通过 nested `fencePolicy.costPolicy` 显式表达，并继续叠加 E16 / C16 等 `computeCosts.fence` 折扣。 |
 | `B94_StockProtector` | 已对齐 |  |
 | `B95_MasterBricklayer` | 已对齐 |  |
 | `B96_TreeFarmJoiner` | 已对齐 |  |
@@ -653,12 +653,12 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B121_Geologist` | 已对齐 |  |
 | `B122_Mineralogist` | 已对齐 |  |
 | `B123_RoofBallaster` | 已对齐 |  |
-| `B124_Trimmer` | 需复核 | 限制每工作阶段奖励一次；BGA 每次覆盖数增加都奖励 |
+| `B124_Trimmer` | 已对齐 | after fence 不再写本工作阶段奖励 flag；每次牧场覆盖面积增加都可得 2 stone，return-home flag 仍阻止非工作阶段误触 |
 | `B125_EstateWorker` | 已对齐 |  |
 | `B126_Carpenter` | 已对齐 |  |
 | `B127_Seducer` | 已对齐 |  |
 | `B128_Plumber` | 已对齐 |  |
-| `B129_Seatmate` | 已接受差异 | 已接受的简化实现 |
+| `B129_Seatmate` | 需复核 | 4 人局缺 BGA 对座未占 round 13 的座位限制 |
 | `B130_FullPeasant` | 已对齐 |  |
 | `B131_Equipper` | 已对齐 |  |
 | `B132_EstateMaster` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
@@ -678,7 +678,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B146_Illusionist` | 已对齐 |  |
 | `B147_Huntsman` | 已对齐 |  |
 | `B148_PetBroker` | 已对齐 |  |
-| `B149_OpenAirFarmer` | 已对齐 |  |
+| `B149_OpenAirFarmer` | 已对齐 | pay 3 stable supply token；fixed 2 wood 建一个 2格 pasture；`segmentBounds.total.max=6`，B30 palisade 计入总段数且可补足 ordinary fence supply |
 | `B150_LargeScaleFarmer` | 已对齐 |  |
 | `B151_LittlePeasant` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `B152_JuniorArtist` | 已对齐 |  |
@@ -711,7 +711,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B179_WildBoarHunter` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `B180_GameTeaser` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `C1_Overhaul` | 已对齐 | BGA passing 行为由 improvement host action / pay child / activate-card-effect 处理；rebuild 只计数/回收/重建 own ordinary fences，走 `consume-fence` ownOnly + generic `fencePolicy` |
-| `C2_Stable` | 已对齐 |  |
+| `C2_Stable` | 已对齐 | BGA `formatCost([WOOD => 0])` 通过 `stables` `actionContext.exactCost` 表达免费 stable。 |
 | `C3_CarriageTrip` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `C4_WritingBoards` | 已对齐 |  |
 | `C5_Remodeling` | 已对齐 |  |
@@ -724,19 +724,19 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C12_CattleFarm` | 已对齐 |  |
 | `C13_WoodSlideHammer` | 已对齐 |  |
 | `C14_StrawThatchedRoof` | 已对齐 |  |
-| `C15_Trellis` | 已对齐 |  |
+| `C15_Trellis` | 已对齐 | BGA ordinary `FENCING` 子行动映射到内部 `fence` leaf。 |
 | `C16_FieldFences` | 已对齐 |  |
 | `C17_NewlyPlowedField` | 已对齐 |  |
 | `C18_RollOverPlow` | 已对齐 |  |
 | `C19_SwingPlow` | 已对齐 |  |
 | `C20_MolePlow` | 已对齐 |  |
 | `C21_HeartofStone` | 已对齐 |  |
-| `C22_BasketChair` | 已接受差异 | 已接受的行为 / 产品差异 |
+| `C22_BasketChair` | 需复核 | 缺 Day Laborer + C23 Job Contract fake worker cleanup |
 | `C23_JobContract` | 已对齐 |  |
-| `C24_BedintheGrainField` | 已接受差异 | 已接受的简化实现 |
-| `C25_SteamMachine` | 已接受差异 | 已接受的简化实现 |
+| `C24_BedintheGrainField` | 已对齐 | 下一次 harvest 有空房时提供 optional `family-growth`，skip/accept 后都清理一次性 marker；无空房也消费 marker |
+| `C25_SteamMachine` | 需复核 | 缺 BGA adoptive worker 场景下的 forceSkip/end-turn 分支 |
 | `C26_Flail` | 已对齐 |  |
-| `C27_Blueprint` | 已接受差异 | 已接受的简化实现 |
+| `C27_Blueprint` | 需复核 | BGA clone stone-cost payment trade 并保留原路径；OA 对三张 major 直接 `stone: -1` |
 | `C28_TeachersDesk` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `C29_BeerTable` | 已对齐 |  |
 | `C30_HalfTimberedHouse` | 已对齐 |  |
@@ -751,7 +751,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C39_StudioBoat` | 已对齐 |  |
 | `C40_CanvasSack` | 已对齐 |  |
 | `C41_FarmStore` | 已对齐 |  |
-| `C42_RavenousHunger` | 已接受差异 | 已接受的简化实现 |
+| `C42_RavenousHunger` | 已对齐 | Vegetable Seeds 后 optional second placement 只列累积格；目标 collect 通过 `after.collect` flag 追加对应累积资源 +1，并在结算后 unflag |
 | `C43_FarmBuilding` | 已对齐 |  |
 | `C44_ChickenCoop` | 已对齐 |  |
 | `C45_Stew` | 已对齐 |  |
@@ -761,9 +761,9 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C49_BeerStall` | 已对齐 |  |
 | `C50_StableYard` | 已对齐 |  |
 | `C51_FishingNet` | 已对齐 |  |
-| `C52_HuntsmansHat` | 已接受差异 | 已接受的简化实现 |
+| `C52_HuntsmansHat` | 已对齐 | cooking prerequisite 与 action-space boar/pig gain 得 food 路径对齐；未见当前 OA action-space 差异 |
 | `C53_GypsysCrock` | 已对齐 |  |
-| `C54_MarketBooth` | 需复核 | BGA printed cost 是 1 stable；OA cost 为空 |
+| `C54_MarketBooth` | 已对齐 | printed cost 为 1 stable；收获 exchange 支付 grain + reserve fence |
 | `C55_Studio` | 已对齐 |  |
 | `C56_FeedFence` | 已对齐 |  |
 | `C57_Crudite` | 已对齐 |  |
@@ -776,12 +776,12 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C64_CornSchnappsDistillery` | 已对齐 |  |
 | `C65_Granary` | 已对齐 |  |
 | `C66_EternalRyeCultivation` | 已对齐 |  |
-| `C67_MineralFeeder` | 已接受差异 | 已接受的简化实现 |
+| `C67_MineralFeeder` | 需复核 | 缺 BGA 先 optional reorganize 再检查 pasture sheep 的触发路径 |
 | `C68_Bookcase` | 已对齐 |  |
-| `C69_LandConsolidation` | 已接受差异 | 已接受的简化实现 |
+| `C69_LandConsolidation` | 需复核 | 缺 Tinsmith Master / Cow Patty extra-crop pending guard |
 | `C70_LettucePatch` | 已对齐 |  |
 | `C71_Slurry` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `C72_FestivalPlanning` | 已接受差异 | 已接受的简化实现 |
+| `C72_FestivalPlanning` | 需复核 | OA 使用未注册 `reap` action，BGA private field phase 基本不可执行 |
 | `C73_SeaweedFertilizer` | 已对齐 |  |
 | `C74_PrivateForest` | 已对齐 |  |
 | `C75_Firewood` | 已对齐 |  |
@@ -796,14 +796,14 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C84_PerennialRye` | 已对齐 |  |
 | `C85_DenBuilder` | 已对齐 |  |
 | `C86_LivestockFeeder` | 已对齐 |  |
-| `C87_Mason` | 已对齐 |  |
+| `C87_Mason` | 已对齐 | BGA `CONSTRUCT + formatCost(['max'=>1])` 走真实 `construct` + `exactCost: { max: 1 }`，会放置 room tile，不再用 `build-farmhand-room` 虚拟房间。 |
 | `C88_CarpentersApprentice` | 已对齐 |  |
-| `C89_StableMaster` | 已对齐 |  |
+| `C89_StableMaster` | 已对齐 | onBuy 的 1 wood stable 走 `stables` exactCost，入口不做 raw wood gate，允许 C88 等 `computeCosts.stables` 折扣叠加。 |
 | `C90_FieldWatchman` | 已对齐 |  |
 | `C91_PlowHero` | 已对齐 |  |
 | `C92_AutumnMother` | 已对齐 |  |
-| `C93_InnerDistrictsDirector` | 已接受差异 | 已接受的简化实现 |
-| `C94_StableCleaner` | 已对齐 |  |
+| `C93_InnerDistrictsDirector` | 需复核 | BGA 整段能力 optional；OA 强制先给另一行动格加 stone |
+| `C94_StableCleaner` | 已对齐 | anytime 入口用 stables preview + `computeCosts.stables` 判断可用性，1 wood + 1 food exactCost 可叠加 C88 等 stable cost modifier。 |
 | `C95_BasketWeaver` | 已对齐 |  |
 | `C96_Merchant` | 已对齐 |  |
 | `C97_SeedResearcher` | 已对齐 |  |
@@ -829,7 +829,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C117_Legworker` | 已对齐 |  |
 | `C118_WoodCollector` | 已对齐 |  |
 | `C119_SkillfulRenovator` | 已对齐 |  |
-| `C120_AgriculturalLabourer` | 已接受差异 | 已接受的简化实现 |
+| `C120_AgriculturalLabourer` | 需复核 | 缺 BGA exchange 转换 grain 后从卡上取 clay 的路径 |
 | `C121_ClayKneader` | 已对齐 |  |
 | `C122_Bricklayer` | 已对齐 |  |
 | `C123_Freemason` | 已对齐 |  |
@@ -842,7 +842,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C130_OutskirtsDirector` | 已对齐 |  |
 | `C131_PrivateTeacher` | 已对齐 |  |
 | `C132_TimberShingleMaker` | 已对齐 |  |
-| `C133_Soldier` | 已接受差异 | 已接受的行为 / 产品差异 |
+| `C133_Soldier` | 需复核 | BGA 终局前玩家选择 0..max 对并 reserve wood/stone；OA scoring solver 自动最优 |
 | `C134_CowPrince` | 已对齐 |  |
 | `C135_Constable` | 已对齐 |  |
 | `C136_RanchProvost` | 已对齐 |  |
@@ -855,7 +855,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C143_StoneBuyer` | 已对齐 |  |
 | `C144_ReedRoofRenovator` | 已对齐 |  |
 | `C145_ForestReviewer` | 已对齐 |  |
-| `C146_WorkshopAssistant` | 已接受差异 | 已接受的简化实现 |
+| `C146_WorkshopAssistant` | 需复核 | BGA 把 resource pairs 放卡上并在 opponent renovation 后取回；OA 直接把 pairs 加到 supply |
 | `C147_Cowherd` | 已对齐 |  |
 | `C148_MudWallower` | 已对齐 |  |
 | `C149_ResourceRecycler` | 已对齐 |  |
@@ -863,7 +863,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C151_SowingDirector` | 已对齐 |  |
 | `C152_Puppeteer` | 已对齐 |  |
 | `C153_PatternMaker` | 已对齐 |  |
-| `C154_TwinResearcher` | 已接受差异 | 已接受的简化实现 |
+| `C154_TwinResearcher` | 需复核 | BGA 覆盖 CopseAdd / Hollow / Hollow4 等行动格；OA 只覆盖 subset |
 | `C155_FoodDistributor` | 已对齐 |  |
 | `C156_HoofCaregiver` | 已对齐 |  |
 | `C157_ResourceAnalyzer` | 已对齐 |  |
@@ -890,8 +890,8 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C178_OnSiteReverend` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `C179_BovinePioneer` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `C180_Trapper` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `D1_ZigzagHarrow` | 已对齐 | BGA passing 行为由 improvement host action / pay child / activate-card-effect 处理 |
-| `D2_DwellingPlan` | 已对齐 |  |
+| `D1_ZigzagHarrow` | 需复核 | BGA `onBuy` 限制 plow 到 zigzag 目标；OA 未透传 `actionContext.allowedTiles` 到 plow / farm-edit |
+| `D2_DwellingPlan` | 已对齐 | 即时翻修子行动使用当前 `renovate-house` action id。 |
 | `D3_Furrows` | 已对齐 |  |
 | `D4_CrossCutWood` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `D5_FieldClay` | 已对齐 |  |
@@ -905,7 +905,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `D13_Trowel` | 已对齐 |  |
 | `D14_HammerCrusher` | 已对齐 |  |
 | `D15_ClaySupports` | 已对齐 |  |
-| `D16_WoodenWheyBucket` | 已对齐 |  |
+| `D16_WoodenWheyBucket` | 已对齐 | BGA `formatCost(['max' => 1, WOOD => 1])` / `formatCost(['max' => 1])` 通过 `stables` `actionContext.exactCost` 表达羊市场 1 wood、牛市场免费，且最多 1 个 stable。 |
 | `D17_DrillHarrow` | 已对齐 |  |
 | `D18_SteamPlow` | 已对齐 |  |
 | `D19_PulverizerPlow` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
@@ -925,7 +925,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `D33_SummerHouse` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `D34_LuxuriousHostel` | 已对齐 |  |
 | `D35_FodderChamber` | 已对齐 |  |
-| `D36_BreedRegistry` | 已接受差异 | 已接受的简化实现 |
+| `D36_BreedRegistry` | 需复核 | BGA 统计整局 board/card sheep 并在买入时初始化；OA 只累计后续 action-space collect/exchange |
 | `D37_Sculpture` | 已对齐 |  |
 | `D38_MilkingStool` | 已对齐 |  |
 | `D39_TruffleSlicer` | 已对齐 |  |
@@ -976,7 +976,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `D84_FeedPellets` | 已对齐 |  |
 | `D85_Reader` | 已对齐 |  |
 | `D86_SheepAgent` | 已对齐 |  |
-| `D87_MasterBuilder` | 已对齐 |  |
+| `D87_MasterBuilder` | 已对齐 | BGA `CONSTRUCT + formatCost(['max'=>1])` 走真实 `construct` + `exactCost: { max: 1 }`，会放置 room tile，不再用 `build-farmhand-room` 虚拟房间。 |
 | `D88_Millwright` | 已对齐 |  |
 | `D89_Stablehand` | 已对齐 |  |
 | `D90_PlowMaker` | 已对齐 |  |
@@ -990,7 +990,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `D98_Transactor` | 已对齐 |  |
 | `D99_EarthenwarePotter` | 已对齐 |  |
 | `D100_LordoftheManor` | 已对齐 |  |
-| `D101_SugarBaker` | 已接受差异 | 已接受的简化实现 |
+| `D101_SugarBaker` | 已对齐 | Grain Utilization 后 optional pay 1 food 得 1 bonus VP，并通过 `add-resource-to-space` 把该 food 放回 Grain Utilization |
 | `D102_SampleStableMaker` | 已对齐 |  |
 | `D103_CanalBoatman` | 已对齐 |  |
 | `D104_Cultivator` | 已对齐 |  |
@@ -1021,7 +1021,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `D129_LumberVirtuoso` | 已对齐 |  |
 | `D130_RecreationalCarpenter` | 已对齐 |  |
 | `D131_CraftsmanshipPromoter` | 已对齐 |  |
-| `D132_HideFarmer` | 已接受差异 | 已接受的行为 / 产品差异 |
+| `D132_HideFarmer` | 需复核 | BGA 终局前玩家选择数量、真实支付 food 并隐藏空地；OA scoring solver 自动最优 |
 | `D133_BeerTentOperator` | 已对齐 |  |
 | `D134_OysterEater` | 已对齐 |  |
 | `D135_GardeningHeadOfficial` | 已对齐 |  |
@@ -1044,13 +1044,13 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `D152_Patron` | 已对齐 |  |
 | `D153_WealthyMan` | 已对齐 |  |
 | `D154_ChimneySweep` | 已对齐 |  |
-| `D155_Ebonist` | 需复核 | BGA exchange 仅 harvest；OA 暴露为 anytime exchange |
+| `D155_Ebonist` | 已对齐 | runtime/display exchange 都为 harvest window，`sourceId=D155_Ebonist`，不再暴露为 anytime exchange |
 | `D156_RetailDealer` | 已对齐 |  |
 | `D157_PartyOrganizer` | 已对齐 |  |
 | `D158_BeanCounter` | 已对齐 |  |
 | `D159_ReedSeller` | 排除 | BGA implemented=false；OA 保留 data-only 定义 |
 | `D160_Midwife` | 已对齐 |  |
-| `D161_CabbageBuyer` | 已接受差异 | 已接受的行为 / 产品差异 |
+| `D161_CabbageBuyer` | 需复核 | BGA 监听任意 Renovation/Improvement；OA 只跟踪 `house-redevelopment` 的 `renovate-house` |
 | `D162_ClayFirer` | 已对齐 |  |
 | `D163_JourneymanBricklayer` | 已对齐 |  |
 | `D164_PetGrower` | 已对齐 |  |
@@ -1070,8 +1070,8 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `D178_SubstituteTeacher` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `D179_Bullcatcher` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `D180_PartTimeWorker` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `E1_PoleBarns` | 已对齐 |  |
-| `E2_RenovationMaterials` | 已对齐 |  |
+| `E1_PoleBarns` | 已对齐 | BGA `formatCost([WOOD => 0])` 通过 `stables` `actionContext.exactCost` 表达最多 3 个免费 stable。 |
+| `E2_RenovationMaterials` | 已对齐 | BGA `formatCost([])` 通过 `renovate-house` `actionContext.exactCost` 表达免费翻修到 clay。 |
 | `E3_TeaTime` | 已对齐 |  |
 | `E4_Thunderbolt` | 已对齐 |  |
 | `E5_NightLoot` | 已对齐 | BGA passing 行为由 improvement host action / pay child / activate-card-effect 处理 |
@@ -1079,10 +1079,10 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `E7_Pumpernickel` | 已对齐 |  |
 | `E8_FarmersMarket` | 已对齐 |  |
 | `E9_BarteringHut` | 已对齐 |  |
-| `E10_StrawHat` | 需复核 | BGA 要求选择移动或食物；OA 允许跳过整个 XOR |
+| `E10_StrawHat` | 已对齐 | 第 3/6 轮 return-home 返回 mandatory XOR；food 分支始终存在，有 Farmland worker 且有合法目标时追加 move 分支，move 真实移走 Farmland worker 并执行目标行动 flow |
 | `E11_PettingZoo` | 已对齐 |  |
 | `E12_AnimalBedding` | 已对齐 |  |
-| `E13_StoneHouseReconstruction` | 已对齐 |  |
+| `E13_StoneHouseReconstruction` | 已对齐 | anytime 翻修子行动使用当前 `renovate-house` action id。 |
 | `E14_WoodSaw` | 已对齐 |  |
 | `E15_NailBasket` | 已对齐 |  |
 | `E16_BriarHedge` | 已对齐 |  |
@@ -1157,16 +1157,16 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `E85_MasterTanner` | 已对齐 |  |
 | `E86_PenBuilder` | 已对齐 |  |
 | `E87_MasterRenovator` | 已对齐 |  |
-| `E88_MasterFencer` | 已对齐 |  |
-| `E89_Stallwright` | 已对齐 |  |
+| `E88_MasterFencer` | 已对齐 | BGA `formatCost([WOOD => 0])` 通过 nested `fencePolicy` 表达付 2/3 wood 后最多 3/4 段总免费 fence。 |
+| `E89_Stallwright` | 已对齐 | BGA `formatCost(['max' => 1])` 通过 `stables` `actionContext.exactCost` 表达；E97 的额外 occupation 分支若执行会让职业数变为 4，避免第三职业 stable 重复；E97 bonus 被跳过或只执行 minor 分支后仍由 E89 自身触发。 |
 | `E90_DungCollector` | 已对齐 |  |
 | `E91_PlowBuilder` | 已对齐 |  |
 | `E92_FieldDoctor` | 已对齐 |  |
 | `E93_Motivator` | 已对齐 |  |
-| `E94_Prophet` | 已对齐 |  |
+| `E94_Prophet` | 已对齐 | 即时翻修 / fencing 子行动使用当前 `renovate-house` / `fence` action id。 |
 | `E95_Miller` | 已对齐 |  |
 | `E96_Elder` | 已对齐 |  |
-| `E97_Beneficiary` | 已对齐 |  |
+| `E97_Beneficiary` | 已对齐 | 额外 occupation 用 `params.exactCost: { food: 1 }`；若已出 E89，则内嵌 BGA `formatCost(['max' => 1])` 免费 stable 并排在额外 occupation 前，且 stable 归因到 `E89_Stallwright`；`occupation-gate` 只负责 OR 分支可执行性，避免 optional stable 影响 gating。 |
 | `E98_Prodigy` | 已对齐 |  |
 | `E99_UncaringParents` | 已对齐 |  |
 | `E100_MuseumCaretaker` | 已对齐 |  |
@@ -1181,7 +1181,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `E109_BraidMaker` | 已对齐 |  |
 | `E110_Dentist` | 已对齐 |  |
 | `E111_Recluse` | 已对齐 |  |
-| `E112_GrainThief` | 已接受差异 | 已接受的简化实现 |
+| `E112_GrainThief` | 需复核 | BGA start 选 grain zones、reap 减 harvestCount、end gain；OA 接受时立即 pop/gain，end restore |
 | `E113_Godmother` | 已对齐 |  |
 | `E114_ShedBuilder` | 已对齐 |  |
 | `E115_SeedServant` | 已对齐 |  |
@@ -1196,7 +1196,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `E124_MayorCandidate` | 已对齐 |  |
 | `E125_DelayedWayfarer` | 已对齐 |  |
 | `E126_TaxCollector` | 已对齐 |  |
-| `E127_DiligentFarmer` | 已对齐 |  |
+| `E127_DiligentFarmer` | 已对齐 | BGA `CONSTRUCT + formatCost(['max'=>1])` 走真实 `construct` + `exactCost: { max: 1 }`，会放置 room tile，不再用 `build-farmhand-room` 虚拟房间。 |
 | `E128_Saddler` | 已对齐 |  |
 | `E129_Imitator` | 已对齐 |  |
 | `E130_Overachiever` | 已对齐 |  |
@@ -1205,7 +1205,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `E133_ChampionBreeder` | 已对齐 |  |
 | `E134_Omnifarmer` | 已对齐 |  |
 | `E135_Pickler` | 已对齐 |  |
-| `E136_AnimalHusbandryWorker` | 已对齐 |  |
+| `E136_AnimalHusbandryWorker` | 已对齐 | BGA ordinary `FENCING` 子行动映射到内部 `fence` leaf。 |
 | `E137_FlaxFarmer` | 已对齐 |  |
 | `E138_LivestockExpert` | 已对齐 |  |
 | `E139_BunnyBreeder` | 已对齐 |  |
@@ -1217,8 +1217,8 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `E145_Parvenu` | 已对齐 |  |
 | `E146_Reseller` | 已对齐 |  |
 | `E147_AnimalDriver` | 已对齐 |  |
-| `E148_Lazybones` | 已对齐 |  |
-| `E149_MidnightFencer` | 已接受差异 | 已接受的行为 / 产品差异 |
+| `E148_Lazybones` | 已对齐 | reserved stable action spaces 计入 stable supply helper；无空地时仍可清理 marker，不把 no-op 清理计为卡牌 use |
+| `E149_MidnightFencer` | 需复核 | BGA 最后 harvest 执行免费 `FENCING`；OA 只按选择数记 VP，不改 farm |
 | `E150_RockBeater` | 已对齐 |  |
 | `E151_DeliveryNurse` | 已对齐 |  |
 | `E152_BargainHunter` | 已对齐 |  |

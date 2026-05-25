@@ -1,5 +1,6 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import { hasFenceBuiltEvent } from '../helpers/fence-events'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
@@ -11,8 +12,9 @@ const farmyardListener: CardListenerRegistration = {
   id: 'B140-farmyard-worker-after-farmyard',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['stables', 'fencing', 'construct'],
+  actions: ['stables', 'fence', 'construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.actionId === 'fence' && !hasFenceBuiltEvent(context)) return
     if (isCardFlagged(context.player, CARD_ID)) return
     return {
       flow: { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },

@@ -35,7 +35,7 @@ const completeFarmland = (session: GameSession) => {
   if (resp.interaction.stateId !== 'wait') throw new Error('expected farmland tile selection')
   const tile = resp.interaction.farm.selectableTiles[0]
   expect(tile).toBeDefined()
-  resp = session.resolveChoice(0, 'confirm', { tile })
+  resp = session.commitSelectionChoice(0, { tile })
   expect(resp.ok).toBe(true)
   return resp
 }

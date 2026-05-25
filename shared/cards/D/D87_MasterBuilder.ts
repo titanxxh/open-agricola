@@ -5,6 +5,12 @@ import type { CardImpl } from '../registry'
 import { D87_MasterBuilder } from '../../cards-display/D/D87_MasterBuilder'
 
 const CARD_ID = D87_MasterBuilder.id
+const FREE_SINGLE_ROOM_CONTEXT = {
+  maxRooms: 1,
+  exactCost: { max: 1 },
+  trueAction: false,
+  cancelPolicy: 'forbidCancel',
+}
 
 const anytimeListener: CardListenerRegistration = {
   id: 'D87-master-builder-anytime',
@@ -17,7 +23,12 @@ const anytimeListener: CardListenerRegistration = {
       flow: {
         type: 'seq',
         children: [
-          { type: 'leaf', actionId: 'build-farmhand-room', sourceCard: CARD_ID },
+          {
+            type: 'leaf',
+            actionId: 'construct',
+            sourceCard: CARD_ID,
+            actionContext: FREE_SINGLE_ROOM_CONTEXT,
+          },
           { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
         ],
       },

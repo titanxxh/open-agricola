@@ -143,7 +143,7 @@ describe('C23_JobContract listener', () => {
     expect(lessonsSpace.takenBy.some((t) => t.playerId === player.id)).toBe(true)
   })
 
-  it('passes costOverride with 0 food when the player has no occupations played', () => {
+  it('passes exactCost with 0 food when the player has no occupations played', () => {
     const listener = findListener()!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
@@ -157,10 +157,10 @@ describe('C23_JobContract listener', () => {
       state, player, space: daySpace, actionId: 'place-farmer', phase: 'after',
     } as unknown as CardListenerContext)
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
-    expect(flow.children[0].params.costOverride).toEqual({})
+    expect(flow.children[0].params.exactCost).toEqual({})
   })
 
-  it('passes costOverride with 1 food when the player has played occupations', () => {
+  it('passes exactCost with 1 food when the player has played occupations', () => {
     const listener = findListener()!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
@@ -174,6 +174,6 @@ describe('C23_JobContract listener', () => {
       state, player, space: daySpace, actionId: 'place-farmer', phase: 'after',
     } as unknown as CardListenerContext)
     const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
-    expect(flow.children[0].params.costOverride).toEqual({ food: 1 })
+    expect(flow.children[0].params.exactCost).toEqual({ food: 1 })
   })
 })

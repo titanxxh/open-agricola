@@ -7,13 +7,14 @@ import type {
   FarmTilePosition,
   InteractionFarmSelection,
   InteractionSelection,
+  ExactCost,
   Resource,
 } from '../contract/types.ts'
 import { isBorderEdge, getAllTilePositions, positionKey } from '../domain/farm.ts'
 import {
-  applyCostOverride,
   canAffordTypedFlatCost,
   getMaxBuildableRooms,
+  resolveUnitCostWithDelta,
 } from '../actions/payment/internal'
 import { readCardExtraData } from '../cards/helpers/card-state.ts'
 import {
@@ -24,8 +25,8 @@ import { computePasturesFromFences, type Pasture as PastureView } from './pastur
 import { isOwnOrdinaryFenceSegment } from './fence-segments.ts'
 
 // ---------------------------------------------------------------------------
-// Legacy types preserved for the inlined validators. These mirror the shapes
-// previously exported from `shared/logic/farm/fence-validation.ts`. We keep
+// Local farm validation types for the inlined validators. These mirror the
+// shapes previously exported from `shared/logic/farm/fence-validation.ts`. We keep
 // `PlayerFarmState` separate from `PlayerState` because validators are
 // generic over `T extends PlayerFarmState` and several callers pass
 // stripped-down farm-only objects (rather than full `PlayerState`).
@@ -87,6 +88,7 @@ export type FenceValidationError = {
     | 'PALISADE_NOT_ON_BORDER'
     | 'TOO_FEW_FENCES'
     | 'TOO_MANY_FENCES'
+    | 'PASTURE_BOUNDS_NOT_MET'
     | 'ANIMAL_CAPACITY_INSUFFICIENT'
   edges: string[]
   palisadeEdges: string[]
@@ -109,10 +111,17 @@ export type FenceSourcePolicy = 'ownOnly'
 export type FenceCostPolicy = {
   fence?: { wood?: number }
   palisade?: { wood?: number }
+  fixedWood?: number
 }
+export type Bounds = { min?: number; max?: number }
 export type FenceSegmentBounds = {
-  fence?: { min?: number; max?: number }
-  palisade?: { min?: number; max?: number }
+  fence?: Bounds
+  palisade?: Bounds
+  total?: Bounds
+}
+export type FencePastureBounds = {
+  count?: Bounds
+  totalSize?: Bounds
 }
 export type FenceValidationOptions = {
   skipPayment?: boolean
@@ -120,8 +129,16 @@ export type FenceValidationOptions = {
   allowedSegmentTypes?: FenceSegmentType[]
   sourcePolicy?: FenceSourcePolicy
   segmentBounds?: FenceSegmentBounds
+  newPastureBounds?: FencePastureBounds
   costPolicy?: FenceCostPolicy
   preserveAnimalTotals?: boolean
+  ordinaryFenceBuildLimit?: number
+  availableOrdinaryFenceTokens?: number
+  pastureBounds?: {
+    newPastures?: Bounds
+    changedPastures?: Bounds
+    newPastureSize?: Bounds
+  }
 }
 
 export type PlowValidationError = {
@@ -844,12 +861,25 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     }
   }
 
-  const fenceBounds = options.segmentBounds?.fence
-  if (fenceBounds?.min !== undefined && newFenceEdges.length < fenceBounds.min) {
+  const boundError = (
+    value: number,
+    bounds: Bounds | undefined,
+  ): 'TOO_FEW_FENCES' | 'TOO_MANY_FENCES' | undefined => {
+    if (bounds?.min !== undefined && value < bounds.min) return 'TOO_FEW_FENCES'
+    if (bounds?.max !== undefined && value > bounds.max) return 'TOO_MANY_FENCES'
+    return undefined
+  }
+  const segmentBounds = options.segmentBounds
+  const totalNewSegments = newFenceEdges.length + newPalisadeEdges.length
+  const segmentError =
+    boundError(newFenceEdges.length, segmentBounds?.fence) ??
+    boundError(newPalisadeEdges.length, segmentBounds?.palisade) ??
+    boundError(totalNewSegments, segmentBounds?.total)
+  if (segmentError) {
     return {
       ok: false,
       error: {
-        code: 'TOO_FEW_FENCES',
+        code: segmentError,
         edges,
         palisadeEdges,
         newFenceEdges,
@@ -857,19 +887,6 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
       },
     }
   }
-  if (fenceBounds?.max !== undefined && newFenceEdges.length > fenceBounds.max) {
-    return {
-      ok: false,
-      error: {
-        code: 'TOO_MANY_FENCES',
-        edges,
-        palisadeEdges,
-        newFenceEdges,
-        newPalisadeEdges,
-      },
-    }
-  }
-
   if (newFenceEdges.length === 0 && newPalisadeEdges.length === 0) {
     return {
       ok: false,
@@ -907,17 +924,21 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
       ? payableFenceCount
       : payableFenceCount * fenceWoodCost
   const palisadeWoodCost = options.costPolicy?.palisade?.wood ?? 2
+  const fixedWoodCost = Math.max(0, options.costPolicy?.fixedWood ?? 0)
   const payableWoodCost =
-    payableFenceWoodCost + palisadeWoodCost * newPalisadeEdges.length + extraCost
+    payableFenceWoodCost + palisadeWoodCost * newPalisadeEdges.length + extraCost + fixedWoodCost
 
-  if (
-    !options.skipPayment &&
-    (normalized.resources?.wood ?? 0) < payableWoodCost
-  ) {
+  const existingFenceCount = (normalized.fenceSegments ?? []).filter((s) =>
+    options.sourcePolicy === 'ownOnly'
+      ? isOwnOrdinaryFenceSegment(s, normalized.id)
+      : s.type === 'fence',
+  ).length
+  const ordinaryBuildLimit = options.ordinaryFenceBuildLimit ?? MAX_FENCES
+  if (existingFenceCount + newFenceEdges.length > ordinaryBuildLimit) {
     return {
       ok: false,
       error: {
-        code: 'NOT_ENOUGH_WOOD',
+        code: 'MAX_FENCES_EXCEEDED',
         edges,
         palisadeEdges,
         newFenceEdges,
@@ -925,13 +946,10 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
       },
     }
   }
-
-  const existingFenceCount = (normalized.fenceSegments ?? []).filter((s) =>
-    options.sourcePolicy === 'ownOnly'
-      ? isOwnOrdinaryFenceSegment(s, normalized.id)
-      : s.type === 'fence',
-  ).length
-  if (existingFenceCount + newFenceEdges.length > MAX_FENCES) {
+  if (
+    options.availableOrdinaryFenceTokens !== undefined &&
+    newFenceEdges.length > options.availableOrdinaryFenceTokens
+  ) {
     return {
       ok: false,
       error: {
@@ -1050,6 +1068,81 @@ export const validateFenceSelection = <T extends PlayerFarmState>(
     const pastureKey = pasture.tiles.map(localPositionKey).sort().join('|')
     return !previousPastureKeys.has(pastureKey)
   })
+  const newPastureCount = Math.max(0, pastures.length - normalized.pastures.length)
+  const pastureBounds = options.pastureBounds
+  const pastureCountError =
+    boundError(newPastureCount, pastureBounds?.newPastures) ??
+    boundError(newPastures.length, pastureBounds?.changedPastures)
+  if (pastureCountError) {
+    return {
+      ok: false,
+      error: {
+        code: pastureCountError,
+        edges,
+        palisadeEdges,
+        newFenceEdges,
+        newPalisadeEdges,
+      },
+    }
+  }
+  const sizeBounds = pastureBounds?.newPastureSize
+  const pastureSizeError =
+    sizeBounds &&
+    newPastures
+      .map((pasture) => boundError(pasture.size, sizeBounds))
+      .find((error): error is 'TOO_FEW_FENCES' | 'TOO_MANY_FENCES' => error !== undefined)
+  if (pastureSizeError) {
+    return {
+      ok: false,
+      error: {
+        code: pastureSizeError,
+        edges,
+        palisadeEdges,
+        newFenceEdges,
+        newPalisadeEdges,
+      },
+    }
+  }
+
+  const newPastureBounds = options.newPastureBounds
+  if (newPastureBounds) {
+    const count = newPastures.length
+    const totalSize = newPastures.reduce((sum, pasture) => sum + pasture.size, 0)
+    const countBounds = newPastureBounds.count
+    const sizeBounds = newPastureBounds.totalSize
+    const countTooLow = countBounds?.min !== undefined && count < countBounds.min
+    const countTooHigh = countBounds?.max !== undefined && count > countBounds.max
+    const sizeTooLow = sizeBounds?.min !== undefined && totalSize < sizeBounds.min
+    const sizeTooHigh = sizeBounds?.max !== undefined && totalSize > sizeBounds.max
+    if (countTooLow || countTooHigh || sizeTooLow || sizeTooHigh) {
+      return {
+        ok: false,
+        error: {
+          code: 'PASTURE_BOUNDS_NOT_MET',
+          edges,
+          palisadeEdges,
+          newFenceEdges,
+          newPalisadeEdges,
+        },
+      }
+    }
+  }
+
+  if (
+    !options.skipPayment &&
+    (normalized.resources?.wood ?? 0) < payableWoodCost
+  ) {
+    return {
+      ok: false,
+      error: {
+        code: 'NOT_ENOUGH_WOOD',
+        edges,
+        palisadeEdges,
+        newFenceEdges,
+        newPalisadeEdges,
+      },
+    }
+  }
 
   const newSegments: FenceSegment[] = [
     ...newFenceEdges.map((edge) => ({
@@ -1147,29 +1240,6 @@ export const tryAddRoomTile = (
 // Farm-interaction builders (formerly `shared/logic/farm/farm-interaction.ts`).
 // ---------------------------------------------------------------------------
 
-const sanitizePayableCost = (
-  costOverride?: Partial<Resource>,
-): Partial<Resource> => {
-  const payable: Partial<Resource> = {}
-  Object.entries(costOverride ?? {}).forEach(([key, value]) => {
-    if (typeof value !== 'number' || value <= 0) return
-    payable[key as keyof Resource] = value
-  })
-  return payable
-}
-
-const scaleCost = (
-  costPerUnit: Partial<Resource>,
-  count: number,
-): Partial<Resource> => {
-  const total: Partial<Resource> = {}
-  Object.entries(costPerUnit).forEach(([key, value]) => {
-    if (typeof value !== 'number') return
-    total[key as keyof Resource] = value * count
-  })
-  return sanitizePayableCost(total)
-}
-
 const roomNeighbors = (tile: FarmTilePosition) => [
   { row: tile.row - 1, col: tile.col },
   { row: tile.row + 1, col: tile.col },
@@ -1255,6 +1325,7 @@ export const buildStableFarmInteraction = (
      * the structural 4-stable cap if smaller). Used by A1 Shelter (max=1).
      */
     max?: number
+    exactCost?: ExactCost
   },
 ): InteractionFarmSelection => {
   const normalized = normalizePlayerFarm(player)
@@ -1279,7 +1350,6 @@ export const buildStableFarmInteraction = (
       oneSizePastureCells.has(positionKey(tile)),
     )
   }
-  const costPerStable = applyCostOverride({ wood: STABLE_WOOD_COST }, costOverride)
   const structuralMax = Math.min(
     selectableTiles.length,
     Math.max(0, 4 - normalized.stableTiles.length),
@@ -1287,10 +1357,13 @@ export const buildStableFarmInteraction = (
   )
   let resourceMax = 0
   for (let count = 1; count <= structuralMax; count += 1) {
-    if (
-      !canAffordTypedFlatCost(player, scaleCost(costPerStable, count), 'stables')
+    const totalCost = resolveUnitCostWithDelta(
+      { wood: STABLE_WOOD_COST },
+      options?.exactCost,
+      costOverride,
+      count,
     )
-      break
+    if (!totalCost || !canAffordTypedFlatCost(player, totalCost, 'stables')) break
     resourceMax = count
   }
   return {
@@ -1303,14 +1376,13 @@ export const buildStableFarmInteraction = (
 export const buildPlowFarmInteraction = (
   player: PlayerState,
   costOverride?: Partial<Resource>,
+  exactCost?: ExactCost,
 ): InteractionFarmSelection => {
   const normalized = normalizePlayerFarm(player)
-  const payableCost = sanitizePayableCost(costOverride)
-  const canAffordPlow = canAffordTypedFlatCost(
-    normalized as PlayerState,
-    payableCost,
-    'plow',
-  )
+  const payableCost = resolveUnitCostWithDelta({}, exactCost, costOverride, 1)
+  const canAffordPlow =
+    payableCost !== null &&
+    canAffordTypedFlatCost(normalized as PlayerState, payableCost, 'plow')
   const lockedKeys = collectLockedFarmTileKeys(player)
   const selectableTiles = canAffordPlow
     ? getAllTilePositions().filter(
@@ -1521,6 +1593,7 @@ export type FenceSpec = {
 
 export type SelectableTilesOpts = {
   costOverride?: Partial<Resource>
+  exactCost?: ExactCost
   actionContext?: Record<string, unknown>
   spaceId?: string
   zoneFilter?: 'pasture-1'
@@ -1638,17 +1711,22 @@ export class Farmyard {
     const cost = opts?.costOverride
     switch (kind) {
       case 'plow':
-        return buildPlowFarmInteraction(this.player, cost)
+        return buildPlowFarmInteraction(this.player, cost, opts?.exactCost)
       case 'sow':
         return buildSowFarmInteraction(this.player, ctx)
       case 'fence':
         return buildFenceFarmInteraction(this.player, opts?.spaceId ?? '')
       case 'room':
-        return buildRoomFarmInteraction(this.player, cost, ctx)
+        return buildRoomFarmInteraction(
+          this.player,
+          cost,
+          opts?.exactCost ? { ...(ctx ?? {}), exactCost: opts.exactCost } : ctx,
+        )
       case 'stable':
         return buildStableFarmInteraction(this.player, cost, {
           zoneFilter: opts?.zoneFilter,
           max: opts?.max,
+          exactCost: opts?.exactCost,
         })
       case 'farm-position':
         return buildFarmPositionSelectionInteraction(this.player, ctx)

@@ -15,6 +15,9 @@
 import type {
   ComplexCost,
   CostModifierType,
+  GameState,
+  PaymentResourceKey,
+  PaymentResourceMap,
   PaymentSolution,
   PlayerState,
   Resource,
@@ -27,7 +30,12 @@ import {
 } from '../../effects/exchange'
 import { isFireplaceIdentityCard } from '../../../cards/helpers/card-type'
 import { solutionCache, makeCacheKey } from './cache'
-import { isComplexCost, canPayResources } from './affordability'
+import {
+  canPayResources,
+  canPaySupplyTokens,
+  isComplexCost,
+  splitSupplyTokenCost,
+} from './affordability'
 import {
   applyCostModifiers,
   evaluateConditions,
@@ -35,23 +43,35 @@ import {
   validateBonus,
   validateComplexCost,
 } from './cost-modifiers'
-import { mergeResources } from '../../../utils/resources'
 import type { InternalSolution } from './types'
 
-const scaleResources = (r: Partial<Resource>, n: number): Partial<Resource> => {
-  const out: Partial<Resource> = {}
+const scaleResources = (r: PaymentResourceMap, n: number): PaymentResourceMap => {
+  const out: PaymentResourceMap = {}
   for (const [k, v] of Object.entries(r)) {
-    if (typeof v === 'number') out[k as keyof Resource] = v * n
+    if (typeof v === 'number') out[k as PaymentResourceKey] = v * n
+  }
+  return out
+}
+
+const mergePaymentResources = (
+  a: PaymentResourceMap,
+  b: PaymentResourceMap,
+): PaymentResourceMap => {
+  const out: PaymentResourceMap = { ...a }
+  for (const [key, value] of Object.entries(b)) {
+    const paymentKey = key as PaymentResourceKey
+    out[paymentKey] = (out[paymentKey] ?? 0) + (value ?? 0)
   }
   return out
 }
 
 const RESOURCE_ID: Record<string, number> = {
   wood: 1, food: 2, reed: 3, clay: 4, stone: 5,
-  sheep: 6, pig: 7, cattle: 8, grain: 9, vegetable: 10
+  sheep: 6, pig: 7, cattle: 8, grain: 9, vegetable: 10,
+  begging: 11, fence: 12, stable: 13,
 }
 
-const PAYMENT_RESOURCE_ORDER: ResourceKey[] = [
+const PAYMENT_RESOURCE_ORDER: PaymentResourceKey[] = [
   'wood',
   'clay',
   'reed',
@@ -63,6 +83,8 @@ const PAYMENT_RESOURCE_ORDER: ResourceKey[] = [
   'boar',
   'cattle',
   'begging',
+  'fence',
+  'stable',
 ]
 
 const hashSolution = (solution: PaymentSolution): number => {
@@ -98,11 +120,11 @@ const hashSolution = (solution: PaymentSolution): number => {
 }
 
 const subtractResources = (
-  a: Partial<Resource>,
-  b: Partial<Resource>,
-): Partial<Resource> => {
-  const result: Partial<Resource> = { ...a }
-  const keys = Object.keys(b) as ResourceKey[]
+  a: PaymentResourceMap,
+  b: PaymentResourceMap,
+): PaymentResourceMap => {
+  const result: PaymentResourceMap = { ...a }
+  const keys = Object.keys(b) as PaymentResourceKey[]
   for (const key of keys) {
     result[key] = (result[key] ?? 0) - (b[key] ?? 0)
   }
@@ -113,8 +135,8 @@ const dominates = (a: PaymentSolution, b: PaymentSolution): boolean => {
   const aPaid = a.resourcesPaid
   const bPaid = b.resourcesPaid
   const allKeys = new Set([
-    ...(Object.keys(aPaid) as ResourceKey[]),
-    ...(Object.keys(bPaid) as ResourceKey[]),
+    ...(Object.keys(aPaid) as PaymentResourceKey[]),
+    ...(Object.keys(bPaid) as PaymentResourceKey[]),
   ])
 
   let hasStrictlyLess = false
@@ -225,10 +247,10 @@ export const sortPaymentSolutions = (
 }
 
 const applyBonus = (
-  cost: Partial<Resource>,
+  cost: PaymentResourceMap,
   discount: Partial<Resource>,
-): Partial<Resource> => {
-  const result = { ...cost }
+): PaymentResourceMap => {
+  const result: PaymentResourceMap = { ...cost }
   const discountKeys = Object.keys(discount) as ResourceKey[]
   for (const key of discountKeys) {
     const discountAmount = discount[key] ?? 0
@@ -264,21 +286,21 @@ type TradeCombo = {
 }
 
 type UnitCostOption = {
-  cost: Partial<Resource>
+  cost: PaymentResourceMap
   tradesUsed: { trade: Trade; times: number }[]
 }
 
-const normalizePositiveResources = (resources: Partial<Resource>): Partial<Resource> => {
-  const out: Partial<Resource> = {}
+const normalizePositiveResources = (resources: PaymentResourceMap): PaymentResourceMap => {
+  const out: PaymentResourceMap = {}
   for (const [key, value] of Object.entries(resources)) {
     if (typeof value === 'number' && value > 0) {
-      out[key as ResourceKey] = value
+      out[key as PaymentResourceKey] = value
     }
   }
   return out
 }
 
-const resourceSignature = (resources: Partial<Resource>) =>
+const resourceSignature = (resources: PaymentResourceMap) =>
   PAYMENT_RESOURCE_ORDER
     .map((key) => `${key}:${resources[key] ?? 0}`)
     .join('|')
@@ -370,14 +392,14 @@ const isWithinTradeGroupLimits = (
 }
 
 const applyUnitTradeToCost = (
-  cost: Partial<Resource>,
+  cost: PaymentResourceMap,
   trade: Trade,
-): Partial<Resource> | null => {
+): PaymentResourceMap | null => {
   const toEntries = (Object.entries(trade.to) as [ResourceKey, number][])
     .filter(([, amount]) => amount > 0)
   if (toEntries.length === 0) return null
 
-  const next: Partial<Resource> = { ...cost }
+  const next: PaymentResourceMap = { ...cost }
   for (const [key, amount] of toEntries) {
     const current = next[key] ?? 0
     const removed = trade.replaceUpTo ? Math.min(current, amount) : amount
@@ -408,7 +430,7 @@ const dedupeUnitCostOptions = (options: UnitCostOption[]) => {
 }
 
 const buildUnitCostOptions = (
-  unitFee: Partial<Resource>,
+  unitFee: PaymentResourceMap,
   unitTrades: Trade[],
 ): UnitCostOption[] => {
   const sortedTrades = [...unitTrades].sort((left, right) => (left.order ?? 0) - (right.order ?? 0))
@@ -438,7 +460,7 @@ const buildUnitCostOptions = (
 }
 
 const buildUnitTotalOptions = (
-  unitFee: Partial<Resource>,
+  unitFee: PaymentResourceMap,
   unitTrades: Trade[],
   nb?: number,
 ): UnitCostOption[] => {
@@ -459,7 +481,7 @@ const buildUnitTotalOptions = (
         const tradesUsed = mergeTradeUsage(total.tradesUsed, unitOption.tradesUsed)
         if (!isWithinTradeGroupLimits(tradesUsed)) continue
         nextTotals.push({
-          cost: normalizePositiveResources(mergeResources(total.cost, unitOption.cost)),
+          cost: normalizePositiveResources(mergePaymentResources(total.cost, unitOption.cost)),
           tradesUsed,
         })
       }
@@ -526,11 +548,22 @@ const cardMatchesCostList = (
   return false
 }
 
+const hasSupplyTokenCost = (cost: ComplexCost): boolean => {
+  const maps = [
+    cost.fee,
+    ...(cost.fees ?? []),
+    cost.unitFee,
+    cost.cards?.cost,
+  ].filter(Boolean) as PaymentResourceMap[]
+  return maps.some((map) => (map.fence ?? 0) > 0 || (map.stable ?? 0) > 0)
+}
+
 export const computeAllBuyableCombinations = (
   player: PlayerState,
   cost: ComplexCost,
   playedCards?: string[],
   costType?: CostModifierType,
+  state?: GameState,
 ): PaymentSolution[] => {
   validateComplexCost(cost)
   const effectiveCost = costType
@@ -538,15 +571,16 @@ export const computeAllBuyableCombinations = (
     : cost
   validateComplexCost(effectiveCost)
 
-  const cacheKey = makeCacheKey(player, effectiveCost, costType, playedCards)
-  const cached = solutionCache.get(cacheKey)
+  const canUseCache = !hasSupplyTokenCost(effectiveCost)
+  const cacheKey = canUseCache ? makeCacheKey(player, effectiveCost, costType, playedCards) : ''
+  const cached = canUseCache ? solutionCache.get(cacheKey) : undefined
   if (cached) return cached
 
-  const playerResources: Partial<Resource> = { ...player.resources }
+  const playerResources: PaymentResourceMap = { ...player.resources }
   const rawSolutions: InternalSolution[] = []
   const nb = effectiveCost.nb
 
-  const baseFeesRaw: Partial<Resource>[] = effectiveCost.fees && effectiveCost.fees.length > 0
+  const baseFeesRaw: PaymentResourceMap[] = effectiveCost.fees && effectiveCost.fees.length > 0
     ? effectiveCost.fees
     : effectiveCost.fee
       ? [effectiveCost.fee]
@@ -556,11 +590,11 @@ export const computeAllBuyableCombinations = (
   // against the matching positive amount in unitFee×nb. They MUST NOT remain
   // negative — otherwise canCoverCost / resourcesPaid leak a phantom refund
   // on resources the player isn't actually paying (per spec §6.2 trace).
-  const clampNonNegative = (fee: Partial<Resource>): Partial<Resource> => {
-    const out: Partial<Resource> = {}
+  const clampNonNegative = (fee: PaymentResourceMap): PaymentResourceMap => {
+    const out: PaymentResourceMap = {}
     for (const [k, v] of Object.entries(fee)) {
       const value = v ?? 0
-      if (value > 0) out[k as keyof Resource] = value
+      if (value > 0) out[k as PaymentResourceKey] = value
     }
     return out
   }
@@ -575,7 +609,7 @@ export const computeAllBuyableCombinations = (
   }
 
   const costBoundsSatisfied = (
-    currentCost: Partial<Resource>,
+    currentCost: PaymentResourceMap,
     minCost?: Partial<Resource>,
     maxCost?: Partial<Resource>,
   ) => {
@@ -591,7 +625,7 @@ export const computeAllBuyableCombinations = (
   for (let feeIdx = 0; feeIdx < baseFeesRaw.length; feeIdx++) {
     const baseFeeRaw = baseFeesRaw[feeIdx]
     for (const unitTotal of unitTotals) {
-      const baseFee = clampNonNegative(mergeResources(baseFeeRaw, unitTotal.cost))
+      const baseFee = clampNonNegative(mergePaymentResources(baseFeeRaw, unitTotal.cost))
       const tradeCombos = actionTrades.length > 0
         ? generateTradeCombinations(actionTrades, playerResources)
         : [{ tradesUsed: [], result: { ...playerResources } }]
@@ -600,7 +634,7 @@ export const computeAllBuyableCombinations = (
         const tradesUsed = mergeTradeUsage(unitTotal.tradesUsed, tradeCombo.tradesUsed)
         if (!isWithinTradeGroupLimits(tradesUsed)) continue
         type BonusPath = {
-          cost: Partial<Resource>
+          cost: PaymentResourceMap
           sources: string[]
           choiceIndices: Record<string, number>
         }
@@ -681,10 +715,17 @@ export const computeAllBuyableCombinations = (
         }
 
         for (const { cost: effectiveCostFee, sources, choiceIndices } of bonusPaths) {
-          if (canCoverCost(tradeCombo.result, effectiveCostFee)) {
-            const remaining = subtractResources(tradeCombo.result, effectiveCostFee)
+          const { resources: realCost, supplyTokens } = splitSupplyTokenCost(effectiveCostFee)
+          if (canCoverCost(tradeCombo.result, realCost) && canPaySupplyTokens(state, player, effectiveCostFee)) {
+            const remaining = subtractResources(tradeCombo.result, realCost)
+            const remainingWithSupplyTokens = {
+              ...remaining,
+              ...Object.fromEntries(
+                Object.entries(supplyTokens).map(([key, value]) => [key, -(value ?? 0)]),
+              ),
+            } as PaymentResourceMap
             rawSolutions.push({
-              resourcesRemaining: remaining,
+              resourcesRemaining: remainingWithSupplyTokens as Partial<Resource>,
               tradesUsed,
               bonusUsed: sources.length > 0 ? sources.join(',') : undefined,
               bonusChoiceIndex:
@@ -731,14 +772,22 @@ export const computeAllBuyableCombinations = (
     const eligibleCards = playedCards
       ? playedCards.filter((cardId) => cardMatchesCostList(cardId, cost.cards!.list))
       : []
+    const cardCost = cost.cards.cost ?? {}
+    const canPayCardCost = canPayResources(player, cardCost)
+      && canPaySupplyTokens(state, player, cardCost)
 
     if (cost.cards.required) {
       const requiredCardSolutions: PaymentSolution[] = []
-      if (eligibleCards.length > 0) {
+      if (eligibleCards.length > 0 && canPayCardCost) {
         paymentSolutions.forEach((solution) => {
           eligibleCards.forEach((cardId) => {
+            const resourcesPaid = mergePaymentResources(solution.resourcesPaid, cardCost)
+            if (!canPayResources(player, resourcesPaid) || !canPaySupplyTokens(state, player, resourcesPaid)) {
+              return
+            }
             requiredCardSolutions.push({
               ...solution,
+              resourcesPaid,
               cardUsed: cardId,
             })
           })
@@ -746,10 +795,10 @@ export const computeAllBuyableCombinations = (
       }
       paymentSolutions.length = 0
       paymentSolutions.push(...requiredCardSolutions)
-    } else {
+    } else if (canPayCardCost) {
       eligibleCards.forEach((cardId) => {
         const cardSolution: PaymentSolution = {
-          resourcesPaid: cost.cards?.cost ?? {},
+          resourcesPaid: cardCost,
           tradesUsed: [],
           cardUsed: cardId,
         }
@@ -759,19 +808,19 @@ export const computeAllBuyableCombinations = (
   }
 
   const result = sortPaymentSolutions(keepOnlyOptimals(paymentSolutions))
-  solutionCache.set(cacheKey, result)
+  if (canUseCache) solutionCache.set(cacheKey, result)
   return result
 }
 
 export const canPayCost = (
   player: PlayerState,
-  cost: Partial<Resource> | ComplexCost,
+  cost: PaymentResourceMap | ComplexCost,
   costType?: CostModifierType,
+  state?: GameState,
 ): boolean => {
-  // Fast path: simple cost, no modifier injection
   if (!isComplexCost(cost) && !costType) {
-    return canPayResources(player, cost as Partial<Resource>)
+    return canPayResources(player, cost) && canPaySupplyTokens(state, player, cost)
   }
-  const complex: ComplexCost = isComplexCost(cost) ? cost : { fee: cost as Partial<Resource> }
-  return computeAllBuyableCombinations(player, complex, undefined, costType).length > 0
+  const complex: ComplexCost = isComplexCost(cost) ? cost : { fee: cost }
+  return computeAllBuyableCombinations(player, complex, undefined, costType, state).length > 0
 }

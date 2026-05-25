@@ -100,7 +100,7 @@ describe('PlayerStats action tracking', () => {
       throw new Error('expected farm type room')
     }
     const tile = resp.interaction.farm.selectableTiles[0]!
-    resp = session.resolveChoice(0, 'confirm', { rooms: [tile] })
+    resp = session.commitSelectionChoice(0, { rooms: [tile] })
     expect(resp.ok).toBe(true)
     expect(session.getState().state.players[0]!.rooms).toBe(3)
     expect(session.getState().state.players[0]!.stats.totalRoomsBuilt).toBe(1)
