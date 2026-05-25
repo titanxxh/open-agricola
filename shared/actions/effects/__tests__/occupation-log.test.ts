@@ -15,6 +15,7 @@ import { playOccupation, playOccupationAction } from '../occupation'
 import { clearActionHooks, registerActionHook } from '../../hooks'
 import { readCardResourceStats } from '../../../cards/helpers/card-state'
 import '../../../cards/A/A85_Homekeeper'
+import '../../../cards/B/B93_Confidant'
 import '../../../cards/C/C107_Baker'
 import '../../../cards-display/C/C116_FurnitureMaker'
 import '../../../cards-display/A/A123_FrameBuilder'
@@ -170,6 +171,38 @@ describe('occupation play result', () => {
     expect(result.request.options).toEqual(expect.arrayContaining([
       expect.objectContaining({ value: OK_CARD_ID }),
     ]))
+  })
+
+  it('returns ok when a card-driven occupation prompt has no playable options', () => {
+    const state = createState()
+    const player = createPlayer({
+      occupationHand: ['B93_Confidant'],
+      resources: {
+        wood: 0,
+        clay: 0,
+        reed: 0,
+        stone: 0,
+        food: 0,
+        grain: 0,
+        vegetable: 0,
+        sheep: 0,
+        boar: 0,
+        cattle: 0,
+        begging: 0,
+      },
+    })
+    state.players = [player]
+
+    const result = playOccupationAction.execute({
+      state,
+      player,
+      space: createSpace('lessons'),
+      params: { exactCost: {} },
+      eventSink: { emit: () => {} },
+    })
+
+    expect(result.type).toBe('ok')
+    expect(player.occupationPlayed).not.toContain('B93_Confidant')
   })
 
   it('plays plain occupation without legacy log payload', () => {

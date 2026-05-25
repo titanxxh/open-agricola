@@ -489,7 +489,7 @@ export const playOccupationAction: ActionDefinition = {
       playableOptions = playableOptions.filter(opt => typed.allowedCards!.includes(opt.value))
     }
     if (playableOptions.length === 0) {
-      return { type: 'fail', errorKey: 'log.occupationFail' }
+      return { type: 'ok' }
     }
     return {
       type: 'request',
