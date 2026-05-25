@@ -7,6 +7,7 @@ import type {
   ActionChoiceOption,
   InteractionRequest,
   Resource,
+  ActionSpace,
 } from '../contract/types'
 import type { InteractionContextSnapshot } from './types'
 import {
@@ -50,6 +51,16 @@ type EngineContext = {
   player: ActionExecutionContext['player']
   space: ActionExecutionContext['space']
   emitPrivateEvent?: ActionExecutionContext['emitPrivateEvent']
+}
+
+const resolveExecutionSpace = (
+  state: EngineContext['state'],
+  fallback: ActionSpace,
+  actionContext?: Record<string, unknown>,
+): ActionSpace => {
+  const targetSpaceId = actionContext?.targetSpaceId
+  if (typeof targetSpaceId !== 'string') return fallback
+  return state.actionSpaces.find((space) => space.id === targetSpaceId) ?? fallback
 }
 
 const hasLegacyLogSurface = (result: ActionExecutionResult): boolean => {
@@ -435,13 +446,14 @@ export function engineResolveChoice(
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
+      const actionContext = actionContextForNode(child, int)
       const executionContext: ActionExecutionContext = {
         state: context.state,
         player: context.player,
-        space: context.space,
+        space: resolveExecutionSpace(context.state, context.space, actionContext),
         params: child.params,
         sourceCard: child.sourceCard,
-        actionContext: actionContextForNode(child, int),
+        actionContext,
         emitPrivateEvent: context.emitPrivateEvent,
       }
       const replaceResult = int.hooks.applyComputeReplace({
@@ -787,6 +799,11 @@ export function engineResolveChoice(
       skipBeforeTriggers: true,
     }
   }
+  executionContext.space = resolveExecutionSpace(
+    context.state,
+    executionContext.space,
+    executionContext.actionContext,
+  )
   let committedActionId = actionId
   let committedAction = action
   if (choice !== 'cancel') {
@@ -876,6 +893,21 @@ export function engineResolveChoice(
       }, choice, payload),
       executionContext.actionContext,
     )
+    const contextWritePatch =
+      'extraData' in result && result.extraData && typeof result.extraData === 'object'
+        ? (result.extraData.actionContextWrite as Record<string, unknown> | undefined)
+        : undefined
+    if (contextWritePatch) {
+      executionContext.actionContext = {
+        ...(executionContext.actionContext ?? {}),
+        ...contextWritePatch,
+      }
+      executionContext.space = resolveExecutionSpace(
+        context.state,
+        executionContext.space,
+        executionContext.actionContext,
+      )
+    }
     if (result.type !== 'fail' && result.type !== 'request') {
       emitCardTriggered(int, eventFrame.sink, executionContext, committedActionId)
     }

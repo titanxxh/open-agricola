@@ -1,6 +1,8 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionFlow } from '../../contract/types'
 import { isCardFlagged } from '../helpers/card-state'
+import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { B24_Lasso } from '../../cards-display/B/B24_Lasso'
 
@@ -15,17 +17,23 @@ const listener: CardListenerRegistration = {
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
+    if (workersAvailable(context.state, context.player) <= 0) return
     const usedMarket = MARKET_SPACES.includes(context.space?.id ?? '')
-    if (!usedMarket) return
-    // The first farmer used a market: allow placing a second farmer anywhere.
-    // Flag the card to prevent recursion.
+    const placeFarmer: Extract<ActionFlow, { type: 'leaf' }> = {
+      type: 'leaf',
+      actionId: 'place-farmer',
+      sourceCard: CARD_ID,
+    }
+    if (!usedMarket) {
+      placeFarmer.actionContext = { constraints: MARKET_SPACES }
+    }
     return {
       flow: {
         type: 'seq',
         optional: true,
         children: [
           { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
-          { type: 'leaf', actionId: 'place-farmer', sourceCard: CARD_ID },
+          placeFarmer,
           { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } },
         ],
       },

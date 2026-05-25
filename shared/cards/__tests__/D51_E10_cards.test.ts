@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { getCardEffect } from '../card-effects'
 import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
 import {
@@ -176,7 +176,25 @@ describe('D51_Archway', () => {
 })
 
 describe('E10_StrawHat', () => {
-  it('triggers on round 3 with worker on farmland', () => {
+  it('round 3 with no farmland worker returns mandatory food-only xor', () => {
+    const effect = getCardEffect('E10_StrawHat')!
+    const player = createPlayer()
+    player.minorPlayed = ['E10_StrawHat']
+    const farmland = createSpace('farmland')
+    const target = createSpace('day-laborer')
+    const state = createState([player], [farmland, target])
+    state.round = 3
+    const flow = effect.onBeforeReturnHome!(state, player)
+    expect(flow).toBeDefined()
+    expect(flow!.type).toBe('xor')
+    if (flow!.type === 'xor') {
+      expect(flow!.optional).not.toBe(true)
+      expect(flow!.children.length).toBe(1)
+      expect((flow!.children[0] as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    }
+  })
+
+  it('round 3 with farmland worker returns mandatory food then move xor', () => {
     const effect = getCardEffect('E10_StrawHat')!
     const player = createPlayer()
     player.minorPlayed = ['E10_StrawHat']
@@ -188,10 +206,11 @@ describe('E10_StrawHat', () => {
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('xor')
     if (flow!.type === 'xor') {
+      expect(flow!.optional).not.toBe(true)
       expect(flow!.children.length).toBe(2)
-      expect((flow!.children[0] as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('move-farmer-to-space')
-      expect((flow!.children[0] as Extract<ActionFlow, { type: 'leaf' }>).params.excludeSpaceId).toBe('farmland')
-      expect((flow!.children[1] as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+      expect((flow!.children[0] as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+      expect((flow!.children[1] as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('move-farmer-to-space')
+      expect((flow!.children[1] as Extract<ActionFlow, { type: 'leaf' }>).params.excludeSpaceId).toBe('farmland')
     }
   })
 
@@ -206,6 +225,9 @@ describe('E10_StrawHat', () => {
     const flow = effect.onBeforeReturnHome!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('xor')
+    if (flow!.type === 'xor') {
+      expect(flow!.optional).not.toBe(true)
+    }
   })
 
   it('does not trigger on round 4', () => {
@@ -219,26 +241,22 @@ describe('E10_StrawHat', () => {
     expect(flow).toBeUndefined()
   })
 
-  it('does not trigger when worker not on farmland', () => {
+  it('only offers food when player worker is not on farmland', () => {
     const effect = getCardEffect('E10_StrawHat')!
     const player = createPlayer()
     player.minorPlayed = ['E10_StrawHat']
     const farmland = createSpace('farmland', { takenBy: [{ playerId: 'p2', workerId: '1' }] })
-    const state = createState([player], [farmland])
+    const target = createSpace('day-laborer')
+    const state = createState([player], [farmland, target])
     state.round = 3
     const flow = effect.onBeforeReturnHome!(state, player)
-    expect(flow).toBeUndefined()
-  })
-
-  it('does not trigger when farmland has no worker', () => {
-    const effect = getCardEffect('E10_StrawHat')!
-    const player = createPlayer()
-    player.minorPlayed = ['E10_StrawHat']
-    const farmland = createSpace('farmland')
-    const state = createState([player], [farmland])
-    state.round = 3
-    const flow = effect.onBeforeReturnHome!(state, player)
-    expect(flow).toBeUndefined()
+    expect(flow).toBeDefined()
+    expect(flow!.type).toBe('xor')
+    if (flow!.type === 'xor') {
+      expect(flow!.optional).not.toBe(true)
+      expect(flow!.children.length).toBe(1)
+      expect((flow!.children[0] as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    }
   })
 
   it('only offers food when no available spaces', () => {
@@ -253,8 +271,41 @@ describe('E10_StrawHat', () => {
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('xor')
     if (flow!.type === 'xor') {
+      expect(flow!.optional).not.toBe(true)
       expect(flow!.children.length).toBe(1)
       expect((flow!.children[0] as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
+    }
+  })
+
+  it('does not offer move when target is unopened', () => {
+    const effect = getCardEffect('E10_StrawHat')!
+    const player = createPlayer()
+    player.minorPlayed = ['E10_StrawHat']
+    const farmland = createSpace('farmland', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
+    const unopened = createSpace('vegetable-seeds', { roundAvailable: 8 })
+    const state = createState([player], [farmland, unopened])
+    state.round = 3
+    const flow = effect.onBeforeReturnHome!(state, player)
+    expect(flow).toBeDefined()
+    expect(flow!.type).toBe('xor')
+    if (flow!.type === 'xor') {
+      expect(flow!.children.map(child => (child as Extract<ActionFlow, { type: 'leaf' }>).actionId)).toEqual(['gain'])
+    }
+  })
+
+  it('does not offer move when target is unreachable', () => {
+    const effect = getCardEffect('E10_StrawHat')!
+    const player = createPlayer()
+    player.minorPlayed = ['E10_StrawHat']
+    const farmland = createSpace('farmland', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
+    const unreachable = createSpace('day-laborer', { canBeExecutedByPlayer: () => false })
+    const state = createState([player], [farmland, unreachable])
+    state.round = 3
+    const flow = effect.onBeforeReturnHome!(state, player)
+    expect(flow).toBeDefined()
+    expect(flow!.type).toBe('xor')
+    if (flow!.type === 'xor') {
+      expect(flow!.children.map(child => (child as Extract<ActionFlow, { type: 'leaf' }>).actionId)).toEqual(['gain'])
     }
   })
 
@@ -306,18 +357,25 @@ describe('move-farmer-to-space action', () => {
     }
   })
 
-  it('resolveChoice executes target space and marks takenBy', () => {
-    const executeSpy = vi.fn(() => ({ type: 'ok' as const }))
+  it('resolveChoice moves worker from source to target and returns target action flow', () => {
     const player = createPlayer()
-    const target = createSpace('day-laborer', { execute: executeSpy } as any)
-    const state = createState([player], [target])
+    const source = createSpace('farmland', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
+    const target = createSpace('day-laborer')
+    const state = createState([player], [source, target])
     const result = moveFarmerToSpaceAction.resolveChoice!(
-      { state, player, space: createSpace('source') } as unknown as ActionExecutionContext,
+      { state, player, space: source, params: { excludeSpaceId: 'farmland' } } as unknown as ActionExecutionContext,
       'day-laborer',
     )
-    expect(result.type).toBe('ok')
-    expect(target.takenBy[0]?.playerId).toBe('p1')
-    expect(executeSpy).toHaveBeenCalled()
+    expect(result.type).toBe('flow')
+    expect(source.takenBy).toEqual([])
+    expect(target.takenBy).toEqual([{ playerId: 'p1', workerId: '1' }])
+    if (result.type === 'flow') {
+      expect(result.flow).toMatchObject({
+        type: 'leaf',
+        actionId: 'day-laborer',
+        expandFlow: true,
+      })
+    }
   })
 
   it('resolveChoice returns fail for invalid choice', () => {

@@ -242,7 +242,7 @@ describe('farm action events', () => {
       player: placePlayer,
       space: placeState.actionSpaces[0]!,
       eventSink: sink(placeEvents),
-    }, 'forest').type).toBe('ok')
+    }, 'forest').type).toBe('flow')
     expect(placeEvents).toContainEqual(expect.objectContaining({
       type: 'worker.placed',
       workerId: '1',
