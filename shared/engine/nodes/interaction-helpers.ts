@@ -148,9 +148,9 @@ export function getFlowSourceCard(flow: ActionFlow): string | undefined {
 
 /**
  * Mark the original declined action as having been processed by
- * `computeReplace`. The original fallback keeps the broad legacy marker
- * because card-local replacement listeners use it to avoid re-wrapping the
- * declined root action.
+ * `computeReplace`. The original-action branch keeps the broad
+ * `checkedReplaceAction` marker because card-local replacement listeners use
+ * it to avoid re-wrapping the declined root action.
  */
 function markCheckedReplaceAction(
   actionContext?: Record<string, unknown>,
@@ -220,24 +220,19 @@ export function buildReplaceChoiceFlow(
  * accounting for the `computeReplace` hook. When the hook declines, the
  * label flips to `ui.interactionActionOrReplace` so the player sees a
  * "do action OR alternative" prompt; otherwise the original label stands.
- * Always returns a `sourceCard` field so callers don't need to fall back
- * to `getNodeSourceCard` themselves.
+ * Always returns a `sourceCard` field so callers don't need to derive it from
+ * `getNodeSourceCard` themselves.
  *
- * Needs the `HookDispatcher` to invoke `computeReplace`. The
- * `applyFallbackSourceCardToFlow` parameter is injected because that helper
- * still lives on Engine in PR3 (it manipulates flow trees rather than nodes
- * and may move in PR4/5 if/when followUp wiring also relocates).
- *
- * TODO(PR5): When `applyFallbackSourceCardToFlow` and the rest of the flow
- * helpers move out of Engine (alongside the followUp / hookFlow wiring),
- * collapse this parameter and read the helper directly from the new home.
+ * Needs the `HookDispatcher` to invoke `computeReplace`. The default-source
+ * helper is injected so this label helper stays focused on choice metadata
+ * while the caller owns flow-tree normalization.
  */
 export function getReplaceAwareChoiceLabel(
   actionNode: ActionNode,
   executionContext: ActionExecutionContext,
   defaultLabel: { labelKey: string; labelParams?: Record<string, unknown> },
   hooks: HookDispatcher,
-  applyFallbackSourceCardToFlow: (flow: ActionFlow, sourceCard?: string) => ActionFlow,
+  applyDefaultSourceCardToFlow: (flow: ActionFlow, sourceCard?: string) => ActionFlow,
 ): { labelKey: string; labelParams?: Record<string, unknown>; sourceCard?: string } {
   const replaceResult = hooks.applyComputeReplace({
     ...executionContext,
@@ -248,7 +243,7 @@ export function getReplaceAwareChoiceLabel(
   if (!replaceResult.declined || !replaceResult.alternativeFlow) {
     return { ...defaultLabel, sourceCard: replaceSourceCard }
   }
-  const alternativeFlow = applyFallbackSourceCardToFlow(
+  const alternativeFlow = applyDefaultSourceCardToFlow(
     replaceResult.alternativeFlow,
     replaceResult.sourceCard,
   )

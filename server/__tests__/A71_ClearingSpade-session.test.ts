@@ -56,7 +56,7 @@ describe('A71_ClearingSpade session', () => {
     if (resp.interaction.stateId !== 'wait') throw new Error('expected choice')
 
     // Select the source field (0-2) which has grain remaining=3
-    resp = session.resolveChoice(0, '0-2')
+    resp = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }] })
     expect(resp.ok).toBe(true)
 
     // Step 2: second selection choice for target
@@ -64,7 +64,7 @@ describe('A71_ClearingSpade session', () => {
     if (resp.interaction.stateId !== 'wait') throw new Error('expected choice')
 
     // Select the target field (0-3) which is empty
-    resp = session.resolveChoice(0, '0-3')
+    resp = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 3 }] })
     expect(resp.ok).toBe(true)
 
     // Verify results
@@ -115,12 +115,12 @@ describe('A71_ClearingSpade session', () => {
     expect(resp.interaction.stateId).toBe('wait')
 
     // Select source
-    resp = session.resolveChoice(0, '0-2')
+    resp = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }] })
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
 
     // Select target
-    resp = session.resolveChoice(0, '0-3')
+    resp = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 3 }] })
     expect(resp.ok).toBe(true)
 
     const player = resp.state.players[0]!

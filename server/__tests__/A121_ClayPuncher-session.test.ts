@@ -6,7 +6,7 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/A/A121_ClayPuncher'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { ActionFlow } from '../../shared/contract/types'
-import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 describe('A121_ClayPuncher session', () => {
   const setup = (playerCount: number = 2) => {

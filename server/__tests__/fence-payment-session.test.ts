@@ -62,7 +62,7 @@ describe('fence payment session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.farm.farmType).toBe('fence')
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       edges: edgesForTile(1, 1),
       extraWood: 0,
     })
@@ -121,7 +121,7 @@ describe('fence payment session', () => {
 
     // Enclose tile (0,1) using 3 fences + 1 palisade on the top (border) edge.
     // H-0-1 is row=0 (border). H-1-1, V-0-1, V-0-2 are internal fences.
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       edges: ['H-1-1', 'V-0-1', 'V-0-2'],
       palisadeEdges: ['H-0-1'],
       extraWood: 0,

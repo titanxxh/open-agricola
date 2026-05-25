@@ -5,12 +5,12 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/A/A116_WoodCutter'
 
-// Plow positive test driven via direct commitFarmChoice on a pending choice
+// Plow positive test driven via commitSelectionChoice on a pending farm choice
 // that carries a sourceCard. We assemble the pending state manually rather
 // than running a full card scenario, since most "free plow" cards need a
 // long lead-in (round / stage / occupation conditions).
 describe('gained.field pseudo-stat', () => {
-  it('writes gained.field to sourceCard when commitFarmChoice plows', () => {
+  it('writes gained.field to sourceCard when commitSelectionChoice plows', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 4 })
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -32,7 +32,7 @@ describe('gained.field pseudo-stat', () => {
       | undefined
     if (ctx) ctx.sourceCard = 'TEST_PlowCard'
 
-    const farmResp = session.resolveChoice(0, 'confirm', { tile: { row: 0, col: 0 } })
+    const farmResp = session.commitSelectionChoice(0, { tile: { row: 0, col: 0 } })
     expect(farmResp.ok).toBe(true)
 
     const stats = readCardResourceStats(session.getState().state.players[0]!, 'TEST_PlowCard')
@@ -60,7 +60,7 @@ describe('gained.stable pseudo-stat', () => {
       | undefined
     if (ctx) ctx.sourceCard = 'TEST_StableCard'
 
-    const farmResp = session.resolveChoice(0, 'confirm', { stables: [{ row: 0, col: 0 }] })
+    const farmResp = session.commitSelectionChoice(0, { stables: [{ row: 0, col: 0 }] })
     expect(farmResp.ok).toBe(true)
 
     const stats = readCardResourceStats(session.getState().state.players[0]!, 'TEST_StableCard')

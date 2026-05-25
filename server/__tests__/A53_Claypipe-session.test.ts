@@ -4,7 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import { playImprovement } from '../../shared/actions/effects/improvement'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
-import { confirmNextPlayer } from './_helpers/legacy-confirms'
+import { confirmNextPlayer } from './_helpers/pending-confirms'
 describe('A53_Claypipe session flow', () => {
   it('triggers Claypipe at round 7 round-end after being played mid-work phase', () => {
     const session = new GameSession()
@@ -82,8 +82,18 @@ describe('A53_Claypipe session flow', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
 
-    resp = session.resolveChoice(0, 'minor:A53_Claypipe')
+    if (resp.interaction.stateId !== 'wait') return
+    const improvementOption = resp.interaction.options?.find((option) => option.value.startsWith('action-improvement-'))
+    expect(improvementOption).toBeDefined()
+    resp = session.resolveChoice(0, improvementOption!.value)
     expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId === 'wait') {
+      const claypipeOption = resp.interaction.options?.find((option) => option.value === 'minor:A53_Claypipe')
+      if (claypipeOption) {
+        resp = session.resolveChoice(0, claypipeOption.value)
+        expect(resp.ok).toBe(true)
+      }
+    }
     expect(resp.state.players[0]!.cardStates?.A53_Claypipe?.infobox).toBe('8 / 7')
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
 

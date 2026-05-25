@@ -46,7 +46,7 @@ describe('C87_Mason session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('farm-select')
 
-    const built = session.resolveChoice(0, 'confirm', {
+    const built = session.commitSelectionChoice(0, {
       rooms: [{ row: 0, col: 4 }],
     })
     expect(built.ok).toBe(true)
@@ -88,7 +88,7 @@ describe('C87_Mason session', () => {
 
     const resp1 = session.takeAnytimeAction(0, 'C87-mason-anytime')
     expect(resp1.ok).toBe(true)
-    const built = session.resolveChoice(0, 'confirm', {
+    const built = session.commitSelectionChoice(0, {
       rooms: [{ row: 0, col: 4 }],
     })
     expect(built.ok).toBe(true)

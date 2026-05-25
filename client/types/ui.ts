@@ -39,11 +39,6 @@ export type EngineSnapshot = {
   }[]
   pendingChoiceNodeId: string | null
   pendingChoiceActionId: string | null
-  choiceData: {
-    id: string
-    promptKey?: string
-    choices: ActionChoiceOption[]
-  } | null
 }
 
 export type HistorySnapshot = {

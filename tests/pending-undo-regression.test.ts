@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach } from 'vitest'
 import { GameSession } from '../server/game/authoritative-session'
 import { createInitialState } from '../shared/session/state-bootstrap'
 import { getAllTilePositions } from '../shared/domain/farm'
-import { confirmNextPlayer } from '../server/__tests__/_helpers/legacy-confirms'
+import { confirmNextPlayer } from '../server/__tests__/_helpers/pending-confirms'
 
 describe('pending choice types + undo regression', () => {
   let session: GameSession
@@ -200,7 +200,7 @@ describe('pending choice types + undo regression', () => {
         allowedCrops: ['grain'],
       })
 
-      resp = session.resolveChoice(0, 'confirm', {
+      resp = session.commitSelectionChoice(0, {
         crops: [{ row: 0, col: 0, crop: 'grain' }],
       })
       expect(resp.ok).toBe(true)
@@ -281,7 +281,7 @@ describe('pending choice types + undo regression', () => {
       const state = session.getState()
       if (state.interaction.stateId !== 'wait') return
 
-      const resp = session.resolveChoice(0, 'cancel')
+      const resp = session.commitSelectionChoice(0, { cancel: true })
       expect(resp.ok).toBe(true)
     })
 
@@ -466,12 +466,12 @@ describe('pending choice types + undo regression', () => {
     })
   })
 
-  describe('commitFarmChoice with undo', () => {
+  describe('commitSelectionChoice with undo', () => {
     beforeEach(() => {
       session = new GameSession(createInitialState(42))
     })
 
-    it('resolveChoice for plow then undo restores field count', () => {
+    it('commitSelectionChoice for plow then undo restores field count', () => {
       const farmland = findAvailableAction(session, (a) => a.spaceId === 'farmland')
       if (!farmland) return
 
@@ -480,7 +480,7 @@ describe('pending choice types + undo regression', () => {
 
       const fieldsBefore = takeResp.state.players[0]!.fields.length
 
-      const commit = session.resolveChoice(0, 'confirm', {
+      const commit = session.commitSelectionChoice(0, {
         tile: { row: 0, col: 3 },
       })
       if (!commit.ok) return
@@ -492,7 +492,7 @@ describe('pending choice types + undo regression', () => {
     })
 
     it('resolveChoice rejects when no pending choice', () => {
-      const resp = session.resolveChoice(0, 'confirm', { tile: { row: 0, col: 3 } })
+      const resp = session.commitSelectionChoice(0, { tile: { row: 0, col: 3 } })
       expect(resp.ok).toBe(false)
     })
   })

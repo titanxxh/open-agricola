@@ -4,7 +4,7 @@ import { A123_FrameBuilder } from '../../shared/cards-display/A/A123_FrameBuilde
 import type { ActionChoiceOption,  PlayerState } from '../../shared/contract/types.ts'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import '../../shared/cards/A/A128_RiparianBuilder'
 import '../../shared/cards/__stubs__/Stub_Construct_TrueAction'
 
@@ -102,7 +102,7 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.interaction.farm.maxSelections).toBe(1)
 
     // Build a room
-    resp = session.resolveChoice(0, 'confirm', { rooms: [{ row: 0, col: 0 }] })
+    resp = session.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }] })
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.rooms).toBe(3)
     expect(resp.state.players[1]!.rooms).toBe(2)
@@ -129,7 +129,7 @@ describe('A128_RiparianBuilder session', () => {
     resp = session.resolveChoice(0, constructOption!.value)
     expect(resp.interaction.stateId).toBe('wait')
 
-    resp = session.resolveChoice(0, 'confirm', { rooms: [{ row: 0, col: 0 }] })
+    resp = session.commitSelectionChoice(0, { rooms: [{ row: 0, col: 0 }] })
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.cardStates?.Stub_Construct_TrueAction?.counters?.observedCount).toBeUndefined()
   })
@@ -170,7 +170,7 @@ describe('A128_RiparianBuilder session', () => {
     expect(resp.interaction.farm.maxSelections).toBe(1)
 
     const room = resp.interaction.farm.selectableTiles[0]!
-    resp = session.resolveChoice(0, 'confirm', { rooms: [room] })
+    resp = session.commitSelectionChoice(0, { rooms: [room] })
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return

@@ -40,14 +40,30 @@ const setup = (opts?: { food?: number; grain?: number }) => {
   return session
 }
 
+const enterImprovementChoice = (session: GameSession) => {
+  let resp = session.takeAction(0, 'major-improvement')
+  expect(resp.ok).toBe(true)
+  if (resp.interaction.stateId !== 'wait') return resp
+  const improvementOption = resp.interaction.options?.find((o) => o.value.startsWith('action-improvement-'))
+  if (improvementOption) {
+    resp = session.resolveChoice(0, improvementOption.value)
+    expect(resp.ok).toBe(true)
+  }
+  return resp
+}
+
+const playA4 = (session: GameSession) => {
+  const resp = enterImprovementChoice(session)
+  if (resp.interaction.stateId !== 'wait') return resp
+  const a4Option = resp.interaction.options?.find((o) => o.value === `minor:${CARD_ID}`)
+  expect(a4Option).toBeDefined()
+  return session.resolveChoice(0, a4Option!.value)
+}
+
 describe('A4_Baseboards session — altCosts', () => {
   it('food=2, grain=0 → auto-pay food (single solution, no choice prompt)', () => {
     const session = setup({ food: 2, grain: 0 })
-    let resp = session.takeAction(0, 'major-improvement')
-    expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') return
-    resp = session.resolveChoice(0, `minor:${CARD_ID}`)
+    const resp = playA4(session)
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.food).toBe(0)
@@ -56,10 +72,7 @@ describe('A4_Baseboards session — altCosts', () => {
 
   it('food=0, grain=1 → auto-pay grain (single solution)', () => {
     const session = setup({ food: 0, grain: 1 })
-    let resp = session.takeAction(0, 'major-improvement')
-    expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId !== 'wait') return
-    resp = session.resolveChoice(0, `minor:${CARD_ID}`)
+    const resp = playA4(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.food).toBe(0)
     expect(resp.state.players[0]!.resources.grain).toBe(0)
@@ -67,9 +80,7 @@ describe('A4_Baseboards session — altCosts', () => {
 
   it('food=2, grain=1 → multi-solution → selectPayment choice', () => {
     const session = setup({ food: 2, grain: 1 })
-    let resp = session.takeAction(0, 'major-improvement')
-    if (resp.interaction.stateId !== 'wait') return
-    resp = session.resolveChoice(0, `minor:${CARD_ID}`)
+    let resp = playA4(session)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
@@ -89,7 +100,7 @@ describe('A4_Baseboards session — altCosts', () => {
 
   it('food=1, grain=0 → not buyable (cannot afford either alt)', () => {
     const session = setup({ food: 1, grain: 0 })
-    const resp = session.takeAction(0, 'major-improvement')
+    const resp = enterImprovementChoice(session)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     const a4Option = resp.interaction.options?.find((o) => o.value === `minor:${CARD_ID}`)

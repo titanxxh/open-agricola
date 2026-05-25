@@ -25,8 +25,8 @@ import { computePasturesFromFences, type Pasture as PastureView } from './pastur
 import { isOwnOrdinaryFenceSegment } from './fence-segments.ts'
 
 // ---------------------------------------------------------------------------
-// Legacy types preserved for the inlined validators. These mirror the shapes
-// previously exported from `shared/logic/farm/fence-validation.ts`. We keep
+// Local farm validation types for the inlined validators. These mirror the
+// shapes previously exported from `shared/logic/farm/fence-validation.ts`. We keep
 // `PlayerFarmState` separate from `PlayerState` because validators are
 // generic over `T extends PlayerFarmState` and several callers pass
 // stripped-down farm-only objects (rather than full `PlayerState`).

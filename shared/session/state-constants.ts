@@ -55,9 +55,6 @@ export const normalizeFenceSegments = (
   if (!Array.isArray(input)) return []
   return input
     .map((entry): FenceSegment | null => {
-      if (typeof entry === 'string') {
-        return { edge: entry, type: 'fence', source: ownFenceSource(ownerPlayerId) }
-      }
       if (entry && typeof entry === 'object' && 'edge' in entry) {
         const e = entry as { edge: unknown; type?: unknown; source?: unknown }
         if (typeof e.edge === 'string') {

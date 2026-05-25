@@ -5,8 +5,8 @@
  * Custom cards are registered into a per-session SessionCardContext.
  *
  * The lookup functions here check the current session context first
- * (via getCurrentSessionContext), then fall back to the legacy global maps
- * for backward compatibility with tests that don't use session contexts.
+ * (via getCurrentSessionContext), then fall back to the explicit global maps
+ * for tests and frontend paths that don't use session contexts.
  *
  * catalog.ts lookup functions fall back to this registry when
  * the id starts with "CUSTOM_".
@@ -64,11 +64,11 @@ export function registerCustomCard(
   if (!options.allowGlobal) {
     console.warn(
       `[custom-registry] registering ${data.cardJson.id} without an active session context; ` +
-      'this should be limited to explicit legacy/frontend paths',
+      'this should be limited to explicit global/frontend paths',
     )
   }
 
-  // Legacy global path (for tests without session context, and frontend)
+  // Explicit global path (for tests without session context, and frontend)
   const { cardType, cardJson, artUrl } = data
 
   const card = cardType === 'minor'

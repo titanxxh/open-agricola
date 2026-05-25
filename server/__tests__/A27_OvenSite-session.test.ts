@@ -38,22 +38,32 @@ describe('A27_OvenSite session', () => {
       state.availableMajorImprovements.push('Major_StoneOven')
     }
     session.loadState(state)
-    return session.takeAction(0, 'major-improvement')
-  }
 
-  it('gains 2 wood on play and offers Clay/Stone Oven at discount', () => {
-    const session = new GameSession()
-    let resp = playA27(session)
+    let resp = session.takeAction(0, 'major-improvement')
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') return
-
+    if (resp.interaction.stateId !== 'wait') return resp
+    const improvementOption = resp.interaction.options?.find(
+      (o) => o.value.startsWith('action-improvement-'),
+    )
+    if (improvementOption) {
+      resp = session.resolveChoice(0, improvementOption.value)
+      expect(resp.ok).toBe(true)
+      if (resp.interaction.sourceCard === CARD_ID) return resp
+      expect(resp.interaction.stateId).toBe('wait')
+      if (resp.interaction.stateId !== 'wait') return resp
+    }
     const a27Option = resp.interaction.options?.find(
       (o) => o.value === `minor:${CARD_ID}`,
     )
     expect(a27Option).toBeDefined()
 
-    resp = session.resolveChoice(0, a27Option!.value)
+    return session.resolveChoice(0, a27Option!.value)
+  }
+
+  it('gains 2 wood on play and offers Clay/Stone Oven at discount', () => {
+    const session = new GameSession()
+    const resp = playA27(session)
     expect(resp.ok).toBe(true)
     // After playing A27: should have 2 wood from onBuy gain
     const player = resp.state.players[0]!
@@ -64,7 +74,6 @@ describe('A27_OvenSite session', () => {
   it('lets player skip the optional oven purchase', () => {
     const session = new GameSession()
     let resp = playA27(session)
-    resp = session.resolveChoice(0, `minor:${CARD_ID}`)
     // Walk pending choices until either oven purchase offer or done
     const maxSteps = 10
     let steps = 0
@@ -89,7 +98,6 @@ describe('A27_OvenSite session', () => {
   it('buys Clay Oven for 1 clay + 1 stone via the A27 discount', () => {
     const session = new GameSession()
     let resp = playA27(session)
-    resp = session.resolveChoice(0, `minor:${CARD_ID}`)
 
     const clayBefore = resp.state.players[0]!.resources.clay
     const stoneBefore = resp.state.players[0]!.resources.stone
@@ -133,7 +141,6 @@ describe('A27_OvenSite session', () => {
     setupState.players[0]!.resources.grain = 1
     session.loadState(setupState)
     let resp = playA27(session)
-    resp = session.resolveChoice(0, `minor:${CARD_ID}`)
 
     const maxSteps = 12
     let steps = 0

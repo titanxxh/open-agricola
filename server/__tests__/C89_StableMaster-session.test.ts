@@ -190,7 +190,7 @@ describe('C89_StableMaster session', () => {
     if (prompt.interaction.stateId !== 'wait') return
     expect(prompt.interaction.request.kind).toBe('farm-select')
 
-    const built = session.resolveChoice(0, 'confirm', {
+    const built = session.commitSelectionChoice(0, {
       stables: [{ row: 1, col: 4 }],
     })
     expect(built.ok).toBe(true)

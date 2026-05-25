@@ -69,7 +69,7 @@ describe('D72_StableManure session', () => {
     if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
 
     // Select grain at 0-0 and vegetable at 0-1
-    resp = session.resolveChoice(0, '0-0,0-1')
+    resp = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 0 }, { row: 0, col: 1 }] })
     expect(resp.ok).toBe(true)
 
     // Continue through harvest phases
@@ -98,7 +98,7 @@ describe('D72_StableManure session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
 
-    resp = session.resolveChoice(0, '0-0')
+    resp = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 0 }] })
     expect(resp.ok).toBe(true)
 
     // Continue through harvest

@@ -308,10 +308,10 @@ const getPastureTileKeys = (player: PlayerState) => {
   player.pastures.forEach((pasture) => {
     pasture.tiles?.forEach((tile) => keys.add(positionKey(tile)))
   })
-  const needsFallback = player.pastures.some(
+  const needsDerivedPastureTiles = player.pastures.some(
     (pasture) => !pasture.tiles || pasture.tiles.length === 0,
   )
-  if (needsFallback && player.fenceSegments.length > 0) {
+  if (needsDerivedPastureTiles && player.fenceSegments.length > 0) {
     const edgeSet = new Set(player.fenceSegments.map((s) => s.edge))
     computeFencedRegions(edgeSet)
       .filter((region) => region.fenced)

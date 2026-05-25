@@ -16,7 +16,7 @@
  */
 import { describe, expect, it, beforeEach } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { confirmNextPlayer } from './_helpers/legacy-confirms'
+import { confirmNextPlayer } from './_helpers/pending-confirms'
 
 describe('state.pendingUndoBoundary consumed by pushHistory', () => {
   let session: GameSession

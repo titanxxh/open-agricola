@@ -132,7 +132,7 @@ describe('B38 FutureBuildingSite — session', () => {
     // Try to directly plow a locked tile — plowAction.resolveChoice returns
     // fail, which surfaces as ok=false with pending cleared and no field added.
     const fieldsBefore = resp.state.players[0]!.fields.length
-    resp = session.resolveChoice(0, 'confirm', { tile: { row: 0, col: 0 } })
+    resp = session.commitSelectionChoice(0, { tile: { row: 0, col: 0 } })
     expect(resp.ok).toBe(false)
     expect(resp.state.players[0]!.fields.length).toBe(fieldsBefore)
   })
@@ -149,7 +149,7 @@ describe('B38 FutureBuildingSite — session', () => {
     const selectableKeys = new Set(selectableTiles.map(positionKey))
     expect(selectableKeys.has(positionKey(tile))).toBe(true)
 
-    resp = session.resolveChoice(0, 'confirm', { tile })
+    resp = session.commitSelectionChoice(0, { tile })
     expect(resp.ok).toBe(true)
   })
 
@@ -177,7 +177,7 @@ describe('B38 FutureBuildingSite — session', () => {
     }
 
     // Try building room on locked tile (2,1) — engine path returns fail.
-    resp = session.resolveChoice(0, 'confirm', { rooms: [{ row: 2, col: 1 }] })
+    resp = session.commitSelectionChoice(0, { rooms: [{ row: 2, col: 1 }] })
     expect(resp.ok).toBe(false)
   })
 
@@ -209,7 +209,7 @@ describe('B38 FutureBuildingSite — session', () => {
     // returns fail, surfaced as ok=false with pending cleared and no stable
     // added.
     const stablesBefore = resp.state.players[0]!.stableTiles.length
-    resp = session.resolveChoice(0, 'confirm', { stables: [{ row: 0, col: 0 }] })
+    resp = session.commitSelectionChoice(0, { stables: [{ row: 0, col: 0 }] })
     expect(resp.ok).toBe(false)
     expect(resp.state.players[0]!.stableTiles.length).toBe(stablesBefore)
   })
@@ -222,7 +222,7 @@ describe('B38 FutureBuildingSite — session', () => {
 
     // Try to fence tile (0,0) which is locked
     // Edges around (0,0): H-0-0 (top), H-1-0 (bottom), V-0-0 (left), V-0-1 (right)
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
       extraWood: 0,
@@ -267,7 +267,7 @@ describe('B38 FutureBuildingSite — session', () => {
     expect(resp.ok).toBe(true)
 
     // Try to fence locked tile (0,0) — should succeed now
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
       extraWood: 0,

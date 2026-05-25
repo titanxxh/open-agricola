@@ -16,29 +16,8 @@ import type { GameState } from '../../shared/contract/types'
  * invariants), so the serialized payload already contains every field the UI
  * reads — including `activeModifiers`, dynamic `PlayerActionCard` action spaces,
  * normalized pastures / fence segments / room tiles, etc.
- *
- * The one client-side migration we still perform is the legacy Field shape
- * (`{crop, remaining}` → `{stacks}`). It's defensive — modern server state
- * already uses `stacks` — but costs nothing and protects against stale
- * persisted JSON making its way to a newer client.
  */
 export function rehydrateStateForClient(raw: SerializedGameState): GameState {
-  /* eslint-disable @typescript-eslint/no-explicit-any */
-  const players = (raw as any).players ?? []
-  for (const player of players) {
-    const fields = player?.fields ?? []
-    for (const field of fields) {
-      if (field.stacks === undefined) {
-        const crop = field.crop
-        const remaining = field.remaining ?? 0
-        field.stacks =
-          crop && remaining > 0 ? [{ kind: crop, remaining }] : []
-        delete field.crop
-        delete field.remaining
-      }
-    }
-  }
-  /* eslint-enable @typescript-eslint/no-explicit-any */
   // Callbacks on ActionSpace (flow/canBeExecutedByPlayer/execute/resolveChoice)
   // are undefined after the cast. The client never invokes them.
   return raw as unknown as GameState

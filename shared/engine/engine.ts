@@ -44,24 +44,6 @@ type MutableNodeState = EngineNode & {
   setState?: (state: 'ready' | 'resolved' | 'blocked') => void
 }
 
-type ChoiceDataSnapshot = {
-  id: string
-  hostNodeId?: string
-  promptKey?: PromptKey
-  promptParams?: Record<string, unknown>
-  choices?: ActionChoiceOption[]
-  request?: InteractionRequest
-  pendingActionId?: string
-  ownerNodeId?: string | null
-  contextSnapshot?: unknown
-  effectiveOwnerPlayerId?: string
-  sourceCard?: string
-  syntheticKind?: PendingEnvelope['syntheticKind']
-  internalHostNodeId?: string
-  internalResultKey?: string
-  internalPaymentInfoFrom?: string
-}
-
 const cloneSnapshotValue = <T>(value: T): T =>
   JSON.parse(JSON.stringify(value)) as T
 
@@ -113,30 +95,6 @@ const nextCounterValueFromIds = (nodes: EngineNode[]): number =>
     const parsed = Number(match[1])
     return Number.isSafeInteger(parsed) ? Math.max(next, parsed + 1) : next
   }, 0)
-
-const findChoiceRestoreNode = (
-  choiceData: ChoiceDataSnapshot,
-  nodes: EngineNode[],
-  nodeMap: Map<string, EngineNode>,
-): EngineNode | null => {
-  const byChoiceId = nodeMap.get(choiceData.id)
-  if (byChoiceId) return byChoiceId
-
-  const byHostId = choiceData.hostNodeId ? nodeMap.get(choiceData.hostNodeId) : null
-  if (byHostId) return byHostId
-
-  if (choiceData.pendingActionId) {
-    const actionCandidates = nodes.filter((node): node is ActionNode =>
-      node instanceof ActionNode &&
-      node.actionId === choiceData.pendingActionId &&
-      node.getState() !== 'resolved',
-    )
-    if (actionCandidates.length === 1) return actionCandidates[0]
-  }
-
-  const unresolvedCandidates = nodes.filter((node) => node.getState() !== 'resolved')
-  return unresolvedCandidates.length === 1 ? unresolvedCandidates[0]! : null
-}
 
 const restoreSharedCursorData = (node: EngineNode, data: Record<string, unknown>): void => {
   if (typeof data.ownerPlayerId === 'string') node.ownerPlayerId = data.ownerPlayerId
@@ -353,7 +311,7 @@ export class Engine {
 
   /**
    * PendingEnvelope compatibility API. New runtime nodes can host
-   * `node.pending` directly; while legacy wrapper/composite nodes still exist,
+   * `node.pending` directly; while wrapper/composite nodes still exist,
    * this adapts their existing emitted choice fields into the same shape.
    *
    * @internal Package-internal coordination surface for EngineStack.
@@ -477,18 +435,9 @@ export class Engine {
         return pending ? { nodeId: node.id, pending } : null
       })
       .filter((item): item is { nodeId: string; pending: PendingEnvelope } => item !== null)
-    const choiceNode =
-      this._pendingNodeIdRef.value !== null
-        ? this.tree.findNodeById(this._pendingNodeIdRef.value)
-        : null
-    const pendingChoice = choiceNode?.getPending()
-    const choiceData: ChoiceDataSnapshot | null = choiceNode && pendingChoice
-      ? { id: choiceNode.id, ...pendingChoice }
-      : null
     return {
       treeCursor: nodes.map((node) => (node as EngineNode & { toCursor: () => NodeCursor }).toCursor()),
       nodeStates,
-      choiceData,
       pendingData,
       // S2 Task 8: composite (Or/Xor) emit metadata is now stored
       // on the node itself instead of an engine-level cache. We still need
@@ -541,7 +490,6 @@ export class Engine {
       id: string
       state: 'ready' | 'resolved' | 'blocked'
     }[]
-    choiceData: ChoiceDataSnapshot | null
     pendingData?: {
       nodeId: string
       pending: PendingEnvelope
@@ -592,37 +540,8 @@ export class Engine {
         node.setState(state)
       }
     })
-    let legacyChoicePendingNodeId: string | null = null
-    if (snapshot.choiceData) {
-      const node = findChoiceRestoreNode(snapshot.choiceData, nodes, nodeMap)
-      if (node && !node.getPending() && snapshot.choiceData.request) {
-        const storedHostStillExists = snapshot.choiceData.hostNodeId
-          ? nodeMap.has(snapshot.choiceData.hostNodeId)
-          : true
-        node.setPending({
-          hostNodeId: storedHostStillExists
-            ? (snapshot.choiceData.hostNodeId ?? node.id)
-            : node.id,
-          request: snapshot.choiceData.request,
-          choices: snapshot.choiceData.choices,
-          promptKey: snapshot.choiceData.promptKey,
-          promptParams: snapshot.choiceData.promptParams,
-          sourceCard: snapshot.choiceData.sourceCard,
-          pendingActionId: snapshot.choiceData.pendingActionId,
-          ownerNodeId: snapshot.choiceData.ownerNodeId ?? null,
-          effectiveOwnerPlayerId: snapshot.choiceData.effectiveOwnerPlayerId,
-          contextSnapshot: snapshot.choiceData.contextSnapshot,
-          syntheticKind: snapshot.choiceData.syntheticKind,
-          internalHostNodeId: snapshot.choiceData.internalHostNodeId,
-          internalResultKey: snapshot.choiceData.internalResultKey,
-          internalPaymentInfoFrom: snapshot.choiceData.internalPaymentInfoFrom,
-        })
-        legacyChoicePendingNodeId = node.id
-      }
-    }
     const restoredPendingNodeId =
       explicitPendingNodeId ??
-      legacyChoicePendingNodeId ??
       this.tree.allNodes().find((node) => node.getPending() !== null)?.id ??
       null
     this._pendingNodeIdRef.value =

@@ -41,7 +41,7 @@ describe('C19_SwingPlow session', () => {
 
     // Complete farmland plow
     const tile1 = resp.interaction.farm.selectableTiles[0]
-    resp = session.resolveChoice(0, 'confirm', { tile: tile1 })
+    resp = session.commitSelectionChoice(0, { tile: tile1 })
     expect(resp.ok).toBe(true)
 
     // First optional plow from card
@@ -54,7 +54,7 @@ describe('C19_SwingPlow session', () => {
     // pop-card-stack runs, then plow tile selection
     expect(resp.interaction.stateId).toBe('wait')
     const tile2 = resp.interaction.farm.selectableTiles[0]
-    resp = session.resolveChoice(0, 'confirm', { tile: tile2 })
+    resp = session.commitSelectionChoice(0, { tile: tile2 })
     expect(resp.ok).toBe(true)
 
     // Second optional plow from card
@@ -66,7 +66,7 @@ describe('C19_SwingPlow session', () => {
 
     expect(resp.interaction.stateId).toBe('wait')
     const tile3 = resp.interaction.farm.selectableTiles[0]
-    resp = session.resolveChoice(0, 'confirm', { tile: tile3 })
+    resp = session.commitSelectionChoice(0, { tile: tile3 })
     expect(resp.ok).toBe(true)
 
     // Stack should have 2 fields left (4 - 2)
@@ -82,13 +82,13 @@ describe('C19_SwingPlow session', () => {
 
     let resp = session.takeAction(0, 'farmland')
     const tile1 = resp.interaction.farm.selectableTiles[0]
-    resp = session.resolveChoice(0, 'confirm', { tile: tile1 })
+    resp = session.commitSelectionChoice(0, { tile: tile1 })
 
     // Accept first optional plow
     const accept1 = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     resp = session.resolveChoice(0, accept1!.value)
     const tile2 = resp.interaction.farm.selectableTiles[0]
-    resp = session.resolveChoice(0, 'confirm', { tile: tile2 })
+    resp = session.commitSelectionChoice(0, { tile: tile2 })
 
     // Skip second optional plow
     expect(resp.interaction.stateId).toBe('wait')
@@ -107,7 +107,7 @@ describe('C19_SwingPlow session', () => {
 
     let resp = session.takeAction(0, 'farmland')
     const tile1 = resp.interaction.farm.selectableTiles[0]
-    resp = session.resolveChoice(0, 'confirm', { tile: tile1 })
+    resp = session.commitSelectionChoice(0, { tile: tile1 })
 
     // Skip first optional plow
     expect(resp.interaction.stateId).toBe('wait')
@@ -126,14 +126,14 @@ describe('C19_SwingPlow session', () => {
 
     let resp = session.takeAction(0, 'farmland')
     const tile1 = resp.interaction.farm.selectableTiles[0]
-    resp = session.resolveChoice(0, 'confirm', { tile: tile1 })
+    resp = session.commitSelectionChoice(0, { tile: tile1 })
 
     // Accept the single optional plow
     expect(resp.interaction.stateId).toBe('wait')
     const accept1 = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
     resp = session.resolveChoice(0, accept1!.value)
     const tile2 = resp.interaction.farm.selectableTiles[0]
-    resp = session.resolveChoice(0, 'confirm', { tile: tile2 })
+    resp = session.commitSelectionChoice(0, { tile: tile2 })
 
     // Should not get another optional choice (stack is now empty)
     // Action should complete (no second plow offered)
@@ -147,7 +147,7 @@ describe('C19_SwingPlow session', () => {
 
     let resp = session.takeAction(0, 'farmland')
     const tile1 = resp.interaction.farm.selectableTiles[0]
-    resp = session.resolveChoice(0, 'confirm', { tile: tile1 })
+    resp = session.commitSelectionChoice(0, { tile: tile1 })
 
     // No optional choice
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')

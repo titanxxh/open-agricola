@@ -86,7 +86,7 @@ describe('E71_CowPatty session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.ok).toBe(true)
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       crops: [{ row: 0, col: 2, crop: 'grain' }],
     })
     expect(resp.ok).toBe(true)
@@ -120,7 +120,7 @@ describe('E71_CowPatty session', () => {
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       crops: [{ row: 0, col: 2, crop: 'grain' }],
     })
     expect(resp.ok).toBe(true)
@@ -152,7 +152,7 @@ describe('E71_CowPatty session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.ok).toBe(true)
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       crops: [{ row: 0, col: 2, crop: 'grain' }],
     })
     expect(resp.ok).toBe(true)
@@ -192,7 +192,7 @@ describe('E71_CowPatty session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.ok).toBe(true)
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       crops: [{ row: 0, col: 2, crop: 'grain' }],
     })
     expect(resp.ok).toBe(true)
@@ -221,7 +221,7 @@ describe('E71_CowPatty session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.ok).toBe(true)
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       crops: [{ row: 0, col: 2, crop: 'grain' }],
     })
     expect(resp.ok).toBe(true)
@@ -260,7 +260,7 @@ describe('E71_CowPatty session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.ok).toBe(true)
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       crops: [{ row: 0, col: 2, crop: 'vegetable' }],
     })
     expect(resp.ok).toBe(true)
@@ -299,7 +299,7 @@ describe('E71_CowPatty session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.ok).toBe(true)
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       crops: [
         { row: 0, col: 2, crop: 'grain' },
         { row: 2, col: 4, crop: 'grain' },
@@ -346,7 +346,7 @@ describe('E71_CowPatty session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.ok).toBe(true)
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       crops: [
         { row: 0, col: 2, crop: 'grain' },
         { row: 0, col: 4, crop: 'grain' },
@@ -391,7 +391,7 @@ describe('E71_CowPatty session', () => {
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       crops: [{ row: 0, col: 2, crop: 'grain' }],
     })
     expect(resp.ok).toBe(true)

@@ -240,7 +240,22 @@ describe('B18 GrasslandHarrow — after-pay listener', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
 
-    resp = session.resolveChoice(0, `minor:${CARD_ID}`)
+    const improvementOption = resp.interaction.options?.find((option) => option.value.startsWith('action-improvement-'))
+    if (improvementOption) {
+      resp = session.resolveChoice(0, improvementOption.value)
+      expect(resp.ok).toBe(true)
+    }
+    if (resp.interaction.sourceCard !== CARD_ID) {
+      if (resp.state.players[0]!.minorPlayed.includes(CARD_ID)) {
+        expect(resp.ok).toBe(true)
+      } else {
+        expect(resp.interaction.stateId).toBe('wait')
+        if (resp.interaction.stateId !== 'wait') return
+        const cardOption = resp.interaction.options?.find((option) => option.value === `minor:${CARD_ID}`)
+        expect(cardOption).toBeDefined()
+        resp = session.resolveChoice(0, cardOption!.value)
+      }
+    }
     expect(resp.ok).toBe(true)
     const p0 = resp.state.players[0]!
     expect(p0.minorPlayed).toContain(CARD_ID)

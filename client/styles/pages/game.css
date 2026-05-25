@@ -3588,7 +3588,7 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
 .action-log__entry--event {
   cursor: pointer;
 }
-.action-log__entry--legacy,
+.action-log__entry--state-log,
 .action-log__entry--missing {
   cursor: default;
 }

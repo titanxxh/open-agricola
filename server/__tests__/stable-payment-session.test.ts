@@ -65,7 +65,7 @@ describe('stable payment session', () => {
 
     const stables = resp.interaction.farm.selectableTiles.slice(0, 1)
     expect(stables).toHaveLength(1)
-    resp = session.resolveChoice(0, 'confirm', { stables })
+    resp = session.commitSelectionChoice(0, { stables })
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
@@ -135,7 +135,7 @@ describe('stable payment session', () => {
     // Engine path: empty stables triggers stablesAction.resolveChoice fail.
     // Surfaces as ok=false; pending is cleared and no stable is placed.
     const stablesBefore = resp.state.players[0]!.stableTiles.length
-    const commitResp = session.resolveChoice(0, 'confirm', { stables: [] })
+    const commitResp = session.commitSelectionChoice(0, { stables: [] })
     expect(commitResp.ok).toBe(false)
     expect(commitResp.state.players[0]!.stableTiles.length).toBe(stablesBefore)
   })

@@ -133,6 +133,23 @@ describe('HTTP privacy + seat binding', () => {
       // Should succeed (200) or fail with a rule error (400) — but NOT 403.
       expect(res.statusCode).not.toBe(403)
     })
+
+    it.each([
+      [{ cancel: true, unknown: 1 }],
+      [{ cancel: false }],
+      [{ positions: [{ row: 0, col: '0' }] }],
+      [{ crops: [{ row: 0, col: 0, crop: 'reed' }] }],
+      [{ resourceCounts: null }],
+    ])('rejects invalid commit-selection payload %j', async (payload) => {
+      const req = mockReq('POST', '/api/game/commit-selection', {
+        playerIndex: 0,
+        payload,
+      })
+      const res = mockRes()
+      await handleGameRoute(req, res)
+      expect(res.statusCode).toBe(400)
+      expect(JSON.parse(res.body).error).toBe('invalid payload')
+    })
   })
 
   describe('viewer set via X-Viewer-Player header — filtered + seat-bound', () => {

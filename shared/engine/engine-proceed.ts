@@ -32,7 +32,7 @@ import { incCardUsed } from '../cards/helpers/card-state'
 import type { ReorganizeTrigger } from '../actions/effects/reorganize'
 import type { EngineInternals } from './engine-internals'
 import {
-  applyFallbackSourceCardToFlow,
+  applyDefaultSourceCardToFlow,
   applyInteractionRequest,
   buildActivationActionNodes,
   buildPhaseTrailingNodes,
@@ -76,7 +76,7 @@ const resolveExecutionSpace = (
   return state.actionSpaces.find((space) => space.id === targetSpaceId) ?? fallback
 }
 
-const hasLegacyLogSurface = (result: ActionExecutionResult): boolean => {
+const hasStateLogSurface = (result: ActionExecutionResult): boolean => {
   if (result.type === 'fail') return true
   return false
 }
@@ -99,7 +99,7 @@ const appendDerivedLogsForEventOnlyResult = (
   committed: readonly GameEvent[],
   result: ActionExecutionResult,
 ): void => {
-  if (committed.length === 0 || hasLegacyLogSurface(result)) return
+  if (committed.length === 0 || hasStateLogSurface(result)) return
   const entries = eventsToLogEntries(committed, {
     playerNames: playerNamesForLog(context),
     actionNames: actionNamesForLog(int, context),
@@ -625,7 +625,7 @@ const executeActivateCardAction = (
   if (result?.flow || normalizedFollowUps.length > 0) {
     const insertedNodes: EngineNode[] = []
     if (result?.flow) {
-      const flow = applyFallbackSourceCardToFlow(result.flow, result.sourceCard)
+      const flow = applyDefaultSourceCardToFlow(result.flow, result.sourceCard)
       recordGrantedActionsFromFlow(int, flow, effectPlayer, context.state, flowSourceCard(flow) ?? result.sourceCard)
       insertedNodes.push(buildOwnedFlowNode(int, flow, effectPlayer.id))
     }
@@ -728,7 +728,7 @@ const executeDeferredHostAction = (
   ]
   const hookFlows = allActionHookResults
     .map((entry) => entry.flow
-      ? applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
+      ? applyDefaultSourceCardToFlow(entry.flow, entry.sourceCard)
       : null)
     .filter((flow) => flow)
     .map((flow) => buildOwnedFlowNode(int, flow as ActionFlow, context.player.id))
@@ -893,7 +893,7 @@ export function engineProceed(
           { ...executionContext, ...currentEventReadContext(int) },
           baseLabel,
           int.hooks,
-          (flow, sc) => applyFallbackSourceCardToFlow(flow, sc),
+          (flow, sc) => applyDefaultSourceCardToFlow(flow, sc),
         )
         return {
           value: entry.nodeId,
@@ -1043,7 +1043,7 @@ export function engineProceed(
       const flowNode = buildOwnedFlowNode(int,
         buildReplaceChoiceFlow(
           node,
-          applyFallbackSourceCardToFlow(
+          applyDefaultSourceCardToFlow(
             replaceResult.alternativeFlow,
             replaceResult.sourceCard,
           ),
@@ -1306,7 +1306,7 @@ export function engineProceed(
       }
       applyInteractionRequest(int, {
         targetNode: node,
-        fallbackNodeId: node.id,
+        hostNodeId: node.id,
         request: updatedRequest,
         promptKey: result.promptKey,
         promptParams: result.promptParams,
@@ -1353,7 +1353,7 @@ export function engineProceed(
     ]
     const hookFlows = allActionHookResults
       .map((entry) => entry.flow
-        ? applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
+        ? applyDefaultSourceCardToFlow(entry.flow, entry.sourceCard)
         : null)
       .filter((flow) => flow)
       .map((flow) => buildOwnedFlowNode(int, flow as ActionFlow, context.player.id))

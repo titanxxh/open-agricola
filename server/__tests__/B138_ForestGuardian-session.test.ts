@@ -9,7 +9,7 @@ import type { ActionDetailParts } from '../../shared/contract/protocol/game'
 import { mkActionSpace } from '../../shared/cards/__tests__/fixtures'
 import { gainAction } from '../../shared/actions/effects/gain'
 import { setWorkersAtHome } from '../../shared/domain/player'
-import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 import '../../shared/cards/B/B138_ForestGuardian'
 

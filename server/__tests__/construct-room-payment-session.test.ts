@@ -42,7 +42,7 @@ describe('construct room payment session', () => {
 
     const room = resp.interaction.farm.selectableTiles[0]!
 
-    resp = session.resolveChoice(0, 'confirm', { rooms: [room] })
+    resp = session.commitSelectionChoice(0, { rooms: [room] })
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
@@ -88,11 +88,11 @@ describe('construct room payment session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.farm.farmType).toBe('room')
 
-    const commitResp = session.resolveChoice(0, 'confirm', { rooms: [] })
+    const commitResp = session.commitSelectionChoice(0, { rooms: [] })
     expect(commitResp.ok).toBe(false)
     // Engine path: empty rooms triggers NO_SELECTION (validateRoomSelection),
     // surfacing as a fail. The previous "farm-expansion requires …" message
-    // came from commitFarmChoice's farm-expansion guard; that guard is now
+    // came from the farm-expansion guard; that guard is now
     // covered by the same NO_SELECTION rejection at the listener layer.
   })
 
@@ -185,7 +185,7 @@ describe('construct room payment session', () => {
     expect(roomB).toBeDefined()
     if (!roomA || !roomB) return
 
-    resp = session.resolveChoice(0, 'confirm', { rooms: [roomA, roomB] })
+    resp = session.commitSelectionChoice(0, { rooms: [roomA, roomB] })
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.rooms).toBe(4)
@@ -225,7 +225,7 @@ describe('construct room payment session', () => {
     if (resp.interaction.farm.farmType !== 'room') return
 
     const room = resp.interaction.farm.selectableTiles[0]!
-    resp = session.resolveChoice(0, 'confirm', { rooms: [room] })
+    resp = session.commitSelectionChoice(0, { rooms: [room] })
 
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')

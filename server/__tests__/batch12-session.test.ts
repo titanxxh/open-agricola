@@ -9,7 +9,7 @@ import '../../shared/cards/B/B16_MiningHammer'
 import '../../shared/cards/B/B124_Trimmer'
 import '../../shared/cards/A/A82_WorkCertificate'
 import type { ActionChoiceOption } from '../../shared/contract/types'
-import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 // ===== A54 Credit session tests =====
 describe('A54_Credit session', () => {
@@ -178,7 +178,7 @@ describe('B16_MiningHammer session', () => {
 
     const tile = resp.interaction.farm?.selectableTiles[0]
     expect(tile).toBeDefined()
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       stables: [{ row: tile!.row, col: tile!.col }],
     })
     expect(resp.ok).toBe(true)
@@ -262,7 +262,11 @@ describe('A129_Swagman session', () => {
         resp = session.resolveChoice(0, '__skip__')
       } else if (cancelOpt) {
         // Stable/room/plow farm-select prompts: cancel out of irrelevant choices.
-        resp = session.resolveChoice(0, 'cancel')
+        if (resp.interaction.request.kind === 'farm-select' || resp.interaction.selection) {
+          resp = session.commitSelectionChoice(0, { cancel: true })
+        } else {
+          resp = session.resolveChoice(0, cancelOpt.value)
+        }
       } else if (opts.length > 0) {
         // unrecognized mandatory choice (e.g. construct/stables OR) — pick first
         resp = session.resolveChoice(0, opts[0]!.value)

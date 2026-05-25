@@ -250,6 +250,27 @@ export type FeedSelection = {
 }
 export type FeedSelections = FeedSelection[]
 
+type SowSelectionPayload = {
+  row: number
+  col: number
+  crop: 'grain' | 'vegetable' | 'wood' | 'stone'
+}
+
+type SelectionCommitPayload = {
+  cancel?: boolean
+  positions?: FarmTilePosition[]
+  cardIds?: string[]
+  resourceCounts?: Partial<Record<keyof Resource, number>>
+  resourceBatchExchange?: ResourceBatchExchangePayload
+  edges?: string[]
+  palisadeEdges?: string[]
+  extraWood?: number
+  rooms?: FarmTilePosition[]
+  stables?: FarmTilePosition[]
+  tile?: FarmTilePosition
+  crops?: SowSelectionPayload[]
+}
+
 type HistoryEntry = {
   state: GameState
   /**
@@ -379,7 +400,7 @@ export interface GameCoreOptions {
   /**
    * Optional pre-built per-session card registry. When omitted, `GameCore`
    * constructs a new `CardRegistry` and populates it from `ALL_CARD_IMPLS`.
-   * The registry is published via `setActiveCardRegistry` so that any legacy
+   * The registry is published via `setActiveCardRegistry` so that any global
    * `registerCardListener` / `registerCardEffect` calls issued later (e.g.
    * custom-code cards at runtime) forward into this session's registry.
    */
@@ -680,14 +701,14 @@ export class GameCore {
       }
     }
     // Sync modifier definitions from catalog into per-session registry.
-    // Replaces the legacy card-modifiers.ts catalog-direct-query path; downstream
+    // Replaces the former card-modifiers.ts catalog-direct-query path; downstream
     // callers (`getCardModifiers`) read from `active.getModifiers` only.
     this.cardRegistry.syncModifiersFromCatalog(
       allOccupationCards,
       allMinorImprovementCards,
     )
     // Register majors as effect bundles so getCardEffect resolves them after
-    // the legacy getMajorCardEffect fallback is removed.
+    // the older getMajorCardEffect path is removed.
     this.cardRegistry.registerEffects(majorCardDefinitions)
     setActiveCardRegistry(this.cardRegistry)
 
@@ -753,9 +774,9 @@ export class GameCore {
     // request. The assert is a cheap canary — it has no production cost
     // because the comparison is a string equality.
     const preRestoreNodeId = this.engineStack.peekPendingHost()?.id ?? null
-    // Task 10: `this.pending` is gone — every consumer derives the legacy
-    // PendingAction shape from the current pending envelope. No dual-write
-    // rebuild is needed; the envelope survived the cursor round-trip with its
+    // Task 10: the previous GameCore pending field is gone — every consumer
+    // derives the PendingAction response shape from the current pending
+    // envelope. No dual-write rebuild is needed; the envelope survived the cursor round-trip with its
     // `request` and `choices` intact, which is the single source of truth.
     //
     // Re-run engine steps so the freshly-restored frame proceeds through any
@@ -1319,8 +1340,8 @@ export class GameCore {
 
   /**
    * Read-through helper for the pending envelope's context snapshot on the
-   * current engine-stack frame. Replaces the legacy `this.pending.actionContext`
-   * and host-node-specific context readers.
+   * current engine-stack frame. Replaces the previous GameCore pending field's
+   * `actionContext` and host-node-specific context readers.
    */
   private getActionContextFromTopFrame(): Record<string, unknown> | undefined {
     return this.peekHostContextSnapshot()?.actionContext
@@ -1537,7 +1558,7 @@ export class GameCore {
           options: choiceOptions,
           costOverride,
           farm: request.farm,
-          allowedCommands: buildCmds(['resolveChoice', 'commitFarm', 'undoStep', 'undoAction']),
+          allowedCommands: buildCmds(['commitSelection', 'undoStep', 'undoAction']),
           anytimeActions: anytimeDescriptors,
         }
       case 'resource-quantity-select':
@@ -1622,13 +1643,13 @@ export class GameCore {
             options: choiceOptions,
             costOverride,
             selection: this.buildSelectionInteractionFromNode(player),
-            allowedCommands: buildCmds(['resolveChoice', 'commitSelection', 'undoStep', 'undoAction']),
+            allowedCommands: buildCmds(['commitSelection', 'undoStep', 'undoAction']),
             anytimeActions: anytimeDescriptors,
           }
         }
         const farm = pendingHost && player ? this.buildFarmInteractionFromNode(promptKey, player) : null
         const allowedCommands: InteractionCommand[] = farm
-          ? buildCmds(['resolveChoice', 'commitFarm', 'undoStep', 'undoAction'])
+          ? buildCmds(['commitSelection', 'undoStep', 'undoAction'])
           : buildCmds(['resolveChoice', 'undoStep', 'undoAction'])
         if (farm) {
           return {
@@ -1820,9 +1841,9 @@ export class GameCore {
   }
 
   /**
-   * Whether the current engine-stack state is a "legacy choice" — i.e. the
+   * Whether the current engine-stack state is an engine choice — i.e. the
    * top-of-stack pending envelope has a `choice` / `animal-reorg` /
-   * `farm-select` / `selection` request, OR a composite-fallback pending
+   * `farm-select` / `selection` request, OR a composite pending
    * choice from OrNode / XorNode or an optional metadata host. Used by `pushHistory()`
    * to populate `HistoryEntry.hadChoicePending`, which `undoStep()`
    * consults via the `canRestorePriorChoice` branch.
@@ -1847,8 +1868,8 @@ export class GameCore {
     }
     const entry: HistoryEntry = {
       state: cloneState(this.state),
-      // Task 10/11: `this.pending` field is gone; derive the snapshot from
-      // the pending envelope. S2 Task 13.6 contracted the
+      // Task 10/11: the previous GameCore pending field is gone; derive the
+      // snapshot from the pending envelope. S2 Task 13.6 contracted the
       // HistoryEntry pending snapshot down to a single boolean — `undoStep()`
       // only consults the 'choice' discriminator (see `canRestorePriorChoice`).
       hadChoicePending: this.currentIsChoicePending(),
@@ -1871,8 +1892,8 @@ export class GameCore {
 
   private restoreHistory(entry: HistoryEntry) {
     this.state = cloneState(entry.state)
-    // Task 10/11: `this.pending` field deleted from `GameState`. S2 Task
-    // 13.6 collapsed the HistoryEntry pending snapshot to a single boolean
+    // Task 10/11: the previous GameCore pending field was deleted from
+    // `GameState`. S2 Task 13.6 collapsed the HistoryEntry pending snapshot to a single boolean
     // (`hadChoicePending`) consumed by `undoStep()`'s `canRestorePriorChoice`
     // branch. Live pending/interaction shape is rederived from
     // the pending envelope after the stack is restored below.
@@ -2702,7 +2723,7 @@ export class GameCore {
         stageResume.extra?.originPlayerIndex ?? null,
       )
     }
-    // Fall-through: delegate to the legacy stage flow resolver for hooks
+    // Fall-through: delegate to the stage flow resolver for hooks
     // that have not (yet) been migrated to the sub-flow umbrella model.
     this.resumeStageFlow(stageResume)
   }
@@ -2818,7 +2839,7 @@ export class GameCore {
         // 'animal-reorg' } } — the engine wraps it in the new 'request'
         // branch and surfaces it as step.type === 'choice', losing the
         // direct kind discriminator. Detect it via the host node's request
-        // field and pivot to the same anytime sub-flow path the legacy
+        // field and pivot to the same anytime sub-flow path the previous
         // 'animalReorg' result took. After Task 6 we leave the parent
         // frame on the stack and push a reorganize sub-flow frame.
         // Task 2: read the request discriminator through PendingEnvelope.
@@ -2851,7 +2872,7 @@ export class GameCore {
         // loop. The pending envelope itself is the source of truth;
         // yield to the client and wait for the matching resolveChoice
         // command. Predicate `isSyntheticInteractionFrame` (S-2) replaces
-        // the legacy hard-coded kind list so future synthetic frames
+        // the previous hard-coded kind list so future synthetic frames
         // (Task 11+) inherit the right behaviour automatically.
         if (isSyntheticInteractionFrame(frame)) {
           return
@@ -2908,8 +2929,8 @@ export class GameCore {
                 continue
               }
               // The follow-up pending host now lives on the engine's tree
-              // (applyInteractionRequest -> pending envelope). The
-              // legacy `this.pending = { ... }` mirror is gone (Task 10): every
+              // (applyInteractionRequest -> pending envelope). The previous
+              // GameCore pending-field mirror is gone (Task 10): every
               // consumer reads the live pending envelope.
               return
             }
@@ -2920,7 +2941,7 @@ export class GameCore {
             }
             if (this.getAnimalCount(player) > this.getAnimalCount(before)) {
               const pIdx = effectivePlayerIndex
-              // Match legacy behaviour: this is a fall-through reorganize
+              // Match previous behavior: this is a fall-through reorganize
               // detour from auto-resolved choice — the parent frame is
               // discarded (no resume) before the sub-flow starts.
               this.engineStack.pop()
@@ -2961,7 +2982,7 @@ export class GameCore {
         this.flushLeafActionDetail(step.actionId, false)
       }
 
-      // NOTE: the legacy `step.result.type === 'animalReorg'` block lived
+      // NOTE: the previous `step.result.type === 'animalReorg'` block lived
       // here, used to handle `breed` returning that variant explicitly when
       // animal count did not change (B104 last-harvest enforcement). Since
       // Task 5 migrated breed to emit `'request' + kind: 'animal-reorg'`,
@@ -3165,7 +3186,7 @@ export class GameCore {
     return roundPhase.takeAnytimeAction(this, playerIndex, actionId)
   }
 
-  private resolvePendingChoice(
+  private resolveEngineChoice(
     playerIndex: number,
     value: string,
     pushHistoryEntry: boolean,
@@ -3182,7 +3203,7 @@ export class GameCore {
     const pendingActionContext = pendingSnapshot?.actionContext
     const pendingSourceCard =
       envelope?.sourceCard ?? pendingSnapshot?.sourceCard ?? choicesSourceCard(pendingOptions)
-    // 'choice' (typed), 'animal-reorg' (legacy commit pathway), and any
+    // 'choice' (typed), 'animal-reorg' (pending-envelope commit pathway), and any
     // ChoiceNode-emitted untyped request all flow through the engine's
     // resolveChoice path. Composite-node and optional-host emissions are
     // also accepted: those don't carry a special node but the engine
@@ -3194,8 +3215,6 @@ export class GameCore {
     const isResolveChoiceTarget =
       requestKind === 'choice' ||
       requestKind === 'animal-reorg' ||
-      requestKind === 'farm-select' ||
-      requestKind === 'selection' ||
       requestKind === 'select-trigger'
     if (!isResolveChoiceTarget || pendingPlayerIndex !== playerIndex) {
       return this.respond(false, 'no pending choice for this player')
@@ -3208,7 +3227,8 @@ export class GameCore {
     }
     if (!this.engine) {
       if (pendingPromptKey === 'ui.interactionFenceSelect' && value === 'cancel') {
-        // Engine already absent; nothing to clear (Task 10 deleted `this.pending`).
+        // Engine already absent; nothing to clear (Task 10 deleted the
+        // previous GameCore pending field).
         return this.respond()
       }
       return this.respond(false, 'no active engine')
@@ -3256,7 +3276,7 @@ export class GameCore {
     if (result.type === 'request' && result.request.kind === 'choice') {
       // The engine's `applyInteractionRequest` already wired the follow-up
       // pending envelope (with promptKey + promptParams + options) onto the
-      // tree; no `this.pending` mirror is needed (Task 10).
+      // tree; no previous GameCore pending-field mirror is needed (Task 10).
       return this.respond()
     }
     if (result.type === 'fail') {
@@ -3282,11 +3302,10 @@ export class GameCore {
   /**
    * Unified entry-point for resolving any pending envelope hosted on the
    * engineStack. Dispatches on the top-of-stack InteractionRequest's `kind`
-   * discriminator so the legacy `confirmNextPlayer` / `confirmPlayerSwitch` /
+   * discriminator so the previous `confirmNextPlayer` / `confirmPlayerSwitch` /
    * `confirmHarvestFeed` / `commitAnimalReorg` paths collapse into one
-   * client-facing call. Falls back to the legacy `state.pending`-driven
-   * `resolvePendingChoice` for plain `choice` interactions (still the path
-   * for ChoiceNode emissions that haven't been promoted to typed requests).
+   * client-facing call. Plain `choice` interactions still route through
+   * `resolveEngineChoice` after finite option validation.
    */
   resolveChoice(
     playerIndex: number,
@@ -3300,9 +3319,13 @@ export class GameCore {
         const disabled = pendingEnvelopeChoices(envelope)
           .some((option) => option.value === value && option.disabled === true)
         if (disabled && String(envelope.promptKey) === 'cards.B3_Moonshine.choice') return this.respond(false, 'choice disabled')
-        const legacy = this.resolveLegacyChoiceValue(playerIndex, value, payload)
-        if (legacy) return legacy
         return this.respond(false, 'invalid choice value')
+      }
+      if (
+        request.kind === 'choice' &&
+        (this.isFarmPromptKey(envelope.promptKey) || this.isSelectionPromptKey(envelope.promptKey))
+      ) {
+        return this.respond(false, 'use commitSelectionChoice for selection')
       }
       switch (request.kind) {
         case 'confirm-next-player':
@@ -3316,23 +3339,17 @@ export class GameCore {
         }
         case 'animal-reorg':
         case 'choice':
-          // animal-reorg today still flows through the legacy commit pathway;
-          // plain choices follow the existing engine pending model after the
-          // finite envelope choices have been validated above.
-          return this.resolvePendingChoice(playerIndex, value, true, payload)
+          return this.resolveEngineChoice(playerIndex, value, true, payload)
         case 'farm-select':
         case 'selection':
+          return this.respond(false, 'use commitSelectionChoice for selection')
         case 'select-trigger':
-          // S2 Task 2 introduced these kinds ahead of their dedicated
-          // resolvers. Until those tasks wire dedicated handlers, fall back to
-          // the legacy pending-options path so tests/UX continue working
-          // through PendingEnvelope choice validation.
-          return this.resolvePendingChoice(playerIndex, value, true, payload)
+          return this.resolveEngineChoice(playerIndex, value, true, payload)
         case 'resource-quantity-select':
           // B157_Salter-style mixed resource panel. The dedicated commit pathway
           // is commitSelectionChoice (see Task C1); resolveChoice is rejected
           // explicitly so future callers cannot silently route through the
-          // legacy pending-options path.
+          // typed commit path.
           return this.respond(false, 'use commitSelectionChoice for resource-quantity-select')
         case 'resource-batch-exchange-select':
           return this.respond(false, 'use commitSelectionChoice for resource-batch-exchange-select')
@@ -3346,60 +3363,7 @@ export class GameCore {
         }
       }
     }
-    return this.resolvePendingChoice(playerIndex, value, true, payload)
-  }
-
-  private resolveLegacyChoiceValue(
-    playerIndex: number,
-    value: string,
-    payload?: Record<string, unknown>,
-  ): SessionResponse | null {
-    const envelope = this.engineStack.peekPendingEnvelope()
-    const options = pendingEnvelopeChoices(envelope)
-    if ((value === 'ok' || value === 'confirm') && typeof payload === 'string') {
-      const action = options.find((option) => option.value.startsWith(`action-${payload}-`))
-      if (action) return this.resolveChoice(playerIndex, action.value)
-    }
-    if (value === 'ok') {
-      const action = options.filter((option) => option.value !== '__skip__' && option.value !== 'skip')
-      if (action.length === 1) return this.resolveChoice(playerIndex, action[0]!.value)
-    }
-    const promptKey = envelope?.promptKey
-    if (promptKey && this.isSelectionPromptKey(promptKey)) {
-      const interactionContext = this.peekHostContextSnapshot()?.actionContext
-      const selectionKind = (interactionContext?.selectionKind as string | undefined) ?? 'farm-position'
-      if (selectionKind === 'occupation-hand') {
-        const cardIds = value.split(',').map((id) => id.trim()).filter(Boolean)
-        if (cardIds.length > 0) {
-          return this.commitSelectionChoice(playerIndex, { cardIds })
-        }
-      }
-      const positions = value
-        .split(',')
-        .map((part) => {
-          const [row, col] = part.trim().split('-').map((n) => Number(n))
-          return Number.isInteger(row) && Number.isInteger(col) ? { row, col } : null
-        })
-      if (positions.length > 0 && positions.every((pos): pos is FarmTilePosition => pos !== null)) {
-        return this.commitSelectionChoice(playerIndex, { positions })
-      }
-      return null
-    }
-
-    if (/^(minor|major|occupation):/.test(value)) {
-      const action = options.filter((option) => option.value !== '__skip__' && option.value !== 'skip')
-      if (action.length === 1 && /^action-(improvement|occupation)-/.test(action[0]!.value)) {
-        const first = this.resolveChoice(playerIndex, action[0]!.value)
-        if (!first.ok || first.interaction.stateId !== 'wait') return first
-        const nextEnvelope = this.engineStack.peekPendingEnvelope()
-        if (!nextEnvelope || !isPendingChoiceValueAllowed(nextEnvelope, value)) {
-          return first
-        }
-        return this.resolveChoice(playerIndex, value, payload)
-      }
-    }
-
-    return null
+    return this.resolveEngineChoice(playerIndex, value, true, payload)
   }
 
   startDevFenceSelect(playerIndex: number): SessionResponse {
@@ -3796,7 +3760,7 @@ export class GameCore {
 
     if (result.type === 'request' && result.request.kind === 'choice') {
       // Engine wired the new pending envelope (with promptKey + promptParams);
-      // no `this.pending` mirror needed (Task 10).
+      // no previous GameCore pending-field mirror needed (Task 10).
       return this.respond()
     }
     if (result.type === 'fail') {
@@ -3809,29 +3773,117 @@ export class GameCore {
     return this.respond()
   }
 
+  private resolveFarmSelectionChoice(
+    playerIndex: number,
+    payload: SelectionCommitPayload,
+    pushHistoryEntry: boolean,
+  ): SessionResponse {
+    const envelope = this.engineStack.peekPendingEnvelope()
+    const frame = this.engineStack.current()
+    const farmType = this.isFarmPromptKey(envelope?.promptKey)
+    const pendingPlayerIndex = frame && envelope
+      ? this.effectiveOwnerIndexForFrame(frame, envelope.hostNodeId, envelope)
+      : -1
+    if (!farmType || pendingPlayerIndex !== playerIndex) {
+      return this.respond(false, 'no pending selection/resource choice for this player')
+    }
+    if (!this.engine) return this.respond(false, 'no active engine')
+    const player = this.state.players[playerIndex]
+    const space = this.getSpaceById(this.activeSpaceId)
+    if (!player || !space) return this.respond(false, 'invalid state')
+
+    const choiceValue = payload.cancel === true ? 'cancel' : 'confirm'
+    let farmPayload: Record<string, unknown> | undefined
+    if (choiceValue === 'confirm') {
+      switch (farmType) {
+        case 'fence':
+          farmPayload = {
+            edges: payload.edges ?? [],
+            palisadeEdges: payload.palisadeEdges ?? [],
+            extraWood: payload.extraWood ?? 0,
+          }
+          break
+        case 'room':
+          farmPayload = { rooms: payload.rooms ?? [] }
+          break
+        case 'stable':
+          farmPayload = { stables: payload.stables ?? [] }
+          break
+        case 'plow':
+          farmPayload = { tile: payload.tile }
+          break
+        case 'sow':
+          farmPayload = { crops: payload.crops ?? [] }
+          break
+      }
+    }
+
+    if (pushHistoryEntry) {
+      this.pushHistory()
+    }
+    const result = this.engine.resolveChoice(
+      choiceValue,
+      this.buildEngineExecutionContext(player, space),
+      farmPayload,
+    )
+    this.flushEngineLog()
+
+    if (result.type === 'request') {
+      return this.respond()
+    }
+    if (result.type === 'fail') {
+      if (result.recoverable === true) {
+        return this.respond(false, result.errorKey ?? 'action failed')
+      }
+      this.engineStack.pop()
+      this.actionStartIndex = null
+      this.actionStartPlayerSnapshot = null
+      delete player._activeActionBonusSources
+      this.turnOwnerPlayerIndex = null
+      return this.respond(false, result.errorKey ?? 'action failed')
+    }
+    if (result.type === 'ok') {
+      this.recordActionResultDetails(
+        result,
+        this.currentFrameOwnerPlayerId(player.id),
+        player.id,
+      )
+    }
+
+    this.deferPrivateEventDrainDepth += 1
+    try {
+      this.runEngineSteps()
+    } finally {
+      this.deferPrivateEventDrainDepth -= 1
+    }
+    if (this.engineStack.peekPendingEnvelope()) return this.respond()
+    return this.continueAfterResolvedFarmChoice(playerIndex)
+  }
+
   commitSelectionChoice(
     playerIndex: number,
-    payload: {
-      positions?: FarmTilePosition[]
-      cardIds?: string[]
-      resourceCounts?: Partial<Record<keyof Resource, number>>
-      resourceBatchExchange?: ResourceBatchExchangePayload
-    },
+    payload: SelectionCommitPayload,
   ): SessionResponse {
     const envelope = this.engineStack.peekPendingEnvelope()
     const frame = this.engineStack.current()
     const envelopeKind = envelope?.request.kind
     const isPlainChoice = envelopeKind === 'choice'
+    const isFarmSelection = envelopeKind === 'farm-select' || (isPlainChoice && !!this.isFarmPromptKey(envelope?.promptKey))
+    const isGenericSelection = envelopeKind === 'selection' || (isPlainChoice && !!this.isSelectionPromptKey(envelope?.promptKey))
     const isResourceQuantity = envelopeKind === 'resource-quantity-select'
     const isResourceBatchExchange = envelopeKind === 'resource-batch-exchange-select'
     const pendingPlayerIndex = frame && envelope
       ? this.effectiveOwnerIndexForFrame(frame, envelope.hostNodeId, envelope)
       : -1
-    if ((!isPlainChoice && !isResourceQuantity && !isResourceBatchExchange) || pendingPlayerIndex !== playerIndex) {
+    if ((!isFarmSelection && !isGenericSelection && !isResourceQuantity && !isResourceBatchExchange) || pendingPlayerIndex !== playerIndex) {
       return this.respond(false, 'no pending selection/resource choice for this player')
     }
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
+
+    if (isFarmSelection) {
+      return this.resolveFarmSelectionChoice(playerIndex, payload, true)
+    }
 
     // resource-quantity-select 分支：包装 resourceCounts 到 payload，透传到 action.resolveChoice。
     // 与 occupation-hand path `{cards: cardIds}` / farm-position path `{positions: positionStrings}` 风格一致。
@@ -3943,6 +3995,40 @@ export class GameCore {
     const maxSelections = (interactionContext?.maxSelections as number) ?? 1
     const minSelections = (interactionContext?.minSelections as number) ?? 0
 
+    if (payload.cancel === true) {
+      if (!this.engine) return this.respond(false, 'no active engine')
+      this.pushHistory()
+      const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('selection')
+      const result = this.engine.resolveChoice('cancel', {
+        ...this.buildEngineExecutionContext(this.state.players[playerIndex]!, space),
+      })
+      if (result.type === 'ok') {
+        this.recordActionResultDetails(
+          result,
+          this.currentFrameOwnerPlayerId(player.id),
+          player.id,
+        )
+      }
+      this.flushEngineLog()
+      if (result.type === 'request') {
+        return this.respond()
+      }
+      if (result.type === 'fail') {
+        if (result.recoverable === true) {
+          return this.respond(false, result.errorKey ?? 'action failed')
+        }
+        this.engineStack.pop()
+        this.actionStartIndex = null
+        this.actionStartPlayerSnapshot = null
+        delete player._activeActionBonusSources
+        this.turnOwnerPlayerIndex = null
+        return this.respond(false, result.errorKey ?? 'action failed')
+      }
+      this.runEngineSteps()
+      if (this.engineStack.peekPendingEnvelope()) return this.respond()
+      return this.continueAfterResolvedFarmChoice(playerIndex)
+    }
+
     // occupation-hand: validate card IDs
     if (selectionKind === 'occupation-hand') {
       const cardIds = payload.cardIds ?? []
@@ -3957,8 +4043,8 @@ export class GameCore {
       this.pushHistory()
       // S2 Task 7: forward structured payload via engine.resolveChoice's
       // `payload` arg; selection.resolveChoice now reads `payload.cards` first
-      // and falls back to splitting the legacy `cardIds.join(',')` choice
-      // string only when payload is absent.
+      // and only splits the previous comma-joined `cardIds` choice string
+      // when payload is absent.
       const choiceValue = cardIds.length > 0 ? 'confirm' : 'cancel'
       const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('selection')
       const result = this.engine?.resolveChoice(choiceValue, {
@@ -4153,7 +4239,7 @@ export class GameCore {
     const interactionFrame = this.engineStack.current()
     // S2 Task 5/6 — farm-select kind also flows through the
     // farm-prompt undo special-cancel path (it carries the same
-    // promptKey shape as the legacy 'choice' farm-prompts).
+    // promptKey shape as the previous 'choice' farm-prompts).
     const isPlainChoiceOrFarmSelect =
       envelope &&
       (envelope.request.kind === 'choice' ||
@@ -4202,7 +4288,7 @@ export class GameCore {
         this.recomputeActionStartIndex()
         return this.applyPreparedPublicEventCancellation(beforeArchive, cancellationPlan)
       }
-      const cancelResult = this.resolvePendingChoice(currentPlayerIndex, 'cancel', false)
+      const cancelResult = this.resolveFarmSelectionChoice(currentPlayerIndex, { cancel: true }, false)
       const stillOnSameFarmPrompt =
         cancelResult.ok &&
         cancelResult.interaction.stateId === 'wait' &&

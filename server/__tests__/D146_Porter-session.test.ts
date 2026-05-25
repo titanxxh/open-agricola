@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { D146_Porter_impl } from '../../shared/cards/D/D146_Porter'
 import type { DraftGameEvent } from '../../shared/contract/events'

@@ -191,7 +191,7 @@ describe('A58_AsparagusKnife session', () => {
           return sess.resolveChoice(intx.playerIndex, acceptOption.value)
         }
         if (intx.promptKey === 'ui.interactionSelection') {
-          return sess.resolveChoice(intx.playerIndex, '0-0')
+          return sess.commitSelectionChoice(intx.playerIndex, { positions: [{ row: 0, col: 0 }] })
         }
         return sess.resolveChoice(intx.playerIndex, intx.options?.[0]?.value ?? 'ok')
       },

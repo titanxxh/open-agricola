@@ -53,7 +53,18 @@ const setupMinor = (cardId: string) => {
 const playPassingMinor = (session: GameSession, cardId: string) => {
   const action = session.takeAction(0, 'meeting-place')
   expect(action.ok).toBe(true)
-  const played = session.resolveChoice(0, `minor:${cardId}`)
+  expect(action.interaction.stateId).toBe('wait')
+  if (action.interaction.stateId !== 'wait') return action
+  const actionOption = action.interaction.options?.find((entry) => entry.value.startsWith('action-improvement-'))
+  expect(actionOption).toBeDefined()
+  const cardPrompt = session.resolveChoice(0, actionOption!.value)
+  expect(cardPrompt.ok).toBe(true)
+  expect(cardPrompt.interaction.stateId).toBe('wait')
+  if (cardPrompt.interaction.stateId !== 'wait') return cardPrompt
+  if (cardPrompt.interaction.sourceCard === cardId) return cardPrompt
+  const cardOption = cardPrompt.interaction.options?.find((entry) => entry.value === `minor:${cardId}`)
+  expect(cardOption).toBeDefined()
+  const played = session.resolveChoice(0, cardOption!.value)
   expect(played.ok).toBe(true)
   return played
 }
@@ -159,7 +170,7 @@ describe('formatCost card session regressions', () => {
     if (played.interaction.stateId !== 'wait') return
     expect(played.interaction.request.kind).toBe('farm-select')
 
-    const built = session.resolveChoice(0, 'confirm', {
+    const built = session.commitSelectionChoice(0, {
       stables: [{ row: 0, col: 0 }],
     })
     expect(built.ok).toBe(true)
@@ -177,7 +188,7 @@ describe('formatCost card session regressions', () => {
     const played = playPassingMinor(session, 'C2_Stable')
     expect(played.interaction.stateId).toBe('wait')
 
-    const cancelled = session.resolveChoice(0, 'cancel')
+    const cancelled = session.commitSelectionChoice(0, { cancel: true })
     expect(cancelled.ok).toBe(false)
     expect(cancelled.interaction.stateId).toBe('wait')
     expect(cancelled.state.players[0]!.stableTiles).toEqual([])
@@ -207,7 +218,7 @@ describe('formatCost card session regressions', () => {
     if (prompt.interaction.stateId !== 'wait') return
     expect(prompt.interaction.request.kind).toBe('farm-select')
 
-    const built = session.resolveChoice(0, 'confirm', {
+    const built = session.commitSelectionChoice(0, {
       stables: [{ row: 0, col: 0 }],
     })
     expect(built.ok).toBe(true)
@@ -228,7 +239,7 @@ describe('formatCost card session regressions', () => {
     expect(played.interaction.request.kind).toBe('farm-select')
     expect(played.interaction.farm.farmType).toBe('fence')
 
-    const fenced = session.resolveChoice(0, 'confirm', {
+    const fenced = session.commitSelectionChoice(0, {
       edges: edgesForTile(0, 0),
       extraWood: 0,
     })
@@ -254,7 +265,7 @@ describe('formatCost card session regressions', () => {
     expect(played.interaction.stateId).toBe('wait')
     if (played.interaction.stateId !== 'wait') return
 
-    const twoCells = session.resolveChoice(0, 'confirm', {
+    const twoCells = session.commitSelectionChoice(0, {
       edges: ['H-0-1', 'H-1-1', 'V-0-0', 'V-0-2'],
       extraWood: 0,
     })
@@ -270,16 +281,16 @@ describe('formatCost card session regressions', () => {
     expect(played.interaction.request.kind).toBe('farm-select')
     expect(played.interaction.farm.farmType).toBe('fence')
 
-    const cancel = session.resolveChoice(0, 'cancel')
+    const cancel = session.commitSelectionChoice(0, { cancel: true })
     expect(cancel.ok).toBe(false)
 
-    const oneCell = session.resolveChoice(0, 'confirm', {
+    const oneCell = session.commitSelectionChoice(0, {
       edges: edgesForTile(0, 0),
       extraWood: 0,
     })
     expect(oneCell.ok).toBe(false)
 
-    const twoCells = session.resolveChoice(0, 'confirm', {
+    const twoCells = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-0-1', 'H-1-0', 'H-1-1', 'V-0-0', 'V-0-2'],
       extraWood: 0,
     })
@@ -485,7 +496,7 @@ describe('formatCost card session regressions', () => {
     if (fencePrompt.interaction.stateId !== 'wait') return
     expect(fencePrompt.interaction.request.kind).toBe('farm-select')
 
-    const fenced = session.resolveChoice(0, 'confirm', {
+    const fenced = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       extraWood: 0,
     })
@@ -505,7 +516,7 @@ describe('formatCost card session regressions', () => {
     if (acceptedStable.interaction.stateId !== 'wait') return
     expect(acceptedStable.interaction.request.kind).toBe('farm-select')
 
-    const builtStable = session.resolveChoice(0, 'confirm', {
+    const builtStable = session.commitSelectionChoice(0, {
       stables: [{ row: 0, col: 0 }],
     })
     expect(builtStable.ok).toBe(true)

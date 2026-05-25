@@ -275,7 +275,7 @@ describe('C57_Crudite', () => {
     expect(resp.error).toBe('duplicate selection position')
     expectC57Selection(resp)
 
-    resp = session.resolveChoice(0, 'cancel')
+    resp = session.commitSelectionChoice(0, { cancel: true })
     expect(resp.ok).toBe(false)
     expect(resp.error).toBe('not enough selection positions')
     expectC57Selection(resp)

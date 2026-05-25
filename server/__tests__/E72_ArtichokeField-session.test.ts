@@ -84,7 +84,7 @@ describe('E72_ArtichokeField session', () => {
       expect(resp.interaction.stateId).toBe('wait')
 
       // Sow grain into virtual card tile
-      resp = session.resolveChoice(0, 'confirm', {
+      resp = session.commitSelectionChoice(0, {
         crops: [{ row: ROW, col: COL, crop: 'grain' }],
       })
       expect(resp.ok).toBe(true)
@@ -104,7 +104,7 @@ describe('E72_ArtichokeField session', () => {
       expect(resp.ok).toBe(true)
       expect(resp.ok).toBe(true)
 
-      resp = session.resolveChoice(0, 'confirm', {
+      resp = session.commitSelectionChoice(0, {
         crops: [{ row: ROW, col: COL, crop: 'vegetable' }],
       })
       expect(resp.ok).toBe(true)
