@@ -1240,17 +1240,6 @@ export const tryAddRoomTile = (
 // Farm-interaction builders (formerly `shared/logic/farm/farm-interaction.ts`).
 // ---------------------------------------------------------------------------
 
-const sanitizePayableCost = (
-  costOverride?: Partial<Resource>,
-): Partial<Resource> => {
-  const payable: Partial<Resource> = {}
-  Object.entries(costOverride ?? {}).forEach(([key, value]) => {
-    if (typeof value !== 'number' || value <= 0) return
-    payable[key as keyof Resource] = value
-  })
-  return payable
-}
-
 const roomNeighbors = (tile: FarmTilePosition) => [
   { row: tile.row - 1, col: tile.col },
   { row: tile.row + 1, col: tile.col },
@@ -1387,14 +1376,13 @@ export const buildStableFarmInteraction = (
 export const buildPlowFarmInteraction = (
   player: PlayerState,
   costOverride?: Partial<Resource>,
+  exactCost?: ExactCost,
 ): InteractionFarmSelection => {
   const normalized = normalizePlayerFarm(player)
-  const payableCost = sanitizePayableCost(costOverride)
-  const canAffordPlow = canAffordTypedFlatCost(
-    normalized as PlayerState,
-    payableCost,
-    'plow',
-  )
+  const payableCost = resolveUnitCostWithDelta({}, exactCost, costOverride, 1)
+  const canAffordPlow =
+    payableCost !== null &&
+    canAffordTypedFlatCost(normalized as PlayerState, payableCost, 'plow')
   const lockedKeys = collectLockedFarmTileKeys(player)
   const selectableTiles = canAffordPlow
     ? getAllTilePositions().filter(
@@ -1723,7 +1711,7 @@ export class Farmyard {
     const cost = opts?.costOverride
     switch (kind) {
       case 'plow':
-        return buildPlowFarmInteraction(this.player, cost)
+        return buildPlowFarmInteraction(this.player, cost, opts?.exactCost)
       case 'sow':
         return buildSowFarmInteraction(this.player, ctx)
       case 'fence':

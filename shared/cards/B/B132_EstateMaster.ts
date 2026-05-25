@@ -80,6 +80,7 @@ export const B132_EstateMaster_impl = {
     saturationCheckListener('construct'),
     saturationCheckListener('stables'),
     saturationCheckListener('fencing'),
+    saturationCheckListener('fence'),
     saturationCheckListener('plow'),
     reapListener,
   ],

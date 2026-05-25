@@ -162,6 +162,44 @@ describe('fenceAction.resolveChoice', () => {
     })
   })
 
+  it('cancel returns ok when a mandatory pasture policy has no possible layout', () => {
+    const occupiedFields = Array.from({ length: 3 }, (_, row) =>
+      Array.from({ length: 5 }, (_, col) => ({ row, col, stacks: [] })),
+    ).flat().filter((tile) => !(tile.row === 1 && (tile.col === 0 || tile.col === 1)))
+    const result = fenceAction.resolveChoice!(
+      makeCtx({
+        player: {
+          resources: {
+            wood: 0,
+            clay: 0,
+            stone: 0,
+            reed: 0,
+            grain: 0,
+            vegetable: 0,
+            food: 0,
+            sheep: 0,
+            boar: 0,
+            cattle: 0,
+          },
+          fields: occupiedFields,
+        },
+        actionContext: {
+          fencePolicy: {
+            segmentBounds: { total: { min: 1, max: 4 } },
+            newPastureBounds: {
+              count: { min: 1, max: 1 },
+              totalSize: { min: 1, max: 1 },
+            },
+            costPolicy: { fence: { wood: 0 } },
+          },
+        },
+      }),
+      'cancel',
+    )
+
+    expect(result.type).toBe('ok')
+  })
+
   it('first call with payload + payable wood finalizes immediately', () => {
     const ctx = makeCtx()
     const result = fenceAction.resolveChoice!(ctx, 'confirm', {

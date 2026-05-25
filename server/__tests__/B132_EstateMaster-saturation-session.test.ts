@@ -64,7 +64,7 @@ const findListenersByAction = (actionId: string) =>
   )
 
 describe('B132_EstateMaster — saturation flag listeners', () => {
-  for (const action of ['construct', 'stables', 'fencing', 'plow']) {
+  for (const action of ['construct', 'stables', 'fencing', 'fence', 'plow']) {
     it(`registers an immediatelyAfter listener for action=${action}`, () => {
       const matched = findListenersByAction(action)
       expect(matched.length).toBeGreaterThan(0)
