@@ -33,32 +33,45 @@ const setup = (opts?: { food?: number; grain?: number }) => {
   return session
 }
 
+const enterImprovementChoice = (session: GameSession) => {
+  let resp = session.takeAction(0, 'major-improvement')
+  expect(resp.ok).toBe(true)
+  if (resp.interaction.stateId !== 'wait') return resp
+  const improvementOption = resp.interaction.options?.find((o) => o.value.startsWith('action-improvement-'))
+  if (improvementOption) {
+    resp = session.resolveChoice(0, improvementOption.value)
+    expect(resp.ok).toBe(true)
+  }
+  return resp
+}
+
+const playD83 = (session: GameSession) => {
+  const resp = enterImprovementChoice(session)
+  if (resp.state.players[0]!.minorPlayed.includes(CARD_ID)) return resp
+  if (resp.interaction.stateId !== 'wait') return resp
+  const d83Option = resp.interaction.options?.find((o) => o.value === `minor:${CARD_ID}`)
+  expect(d83Option).toBeDefined()
+  return session.resolveChoice(0, d83Option!.value)
+}
+
 describe('D83_Pigswill session — altCosts', () => {
   it('food=2, grain=0 → auto-pay food (single solution)', () => {
     const session = setup({ food: 2, grain: 0 })
-    let resp = session.takeAction(0, 'major-improvement')
-    expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId !== 'wait') return
-    resp = session.resolveChoice(0, `minor:${CARD_ID}`)
+    const resp = playD83(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.food).toBe(0)
   })
 
   it('food=0, grain=1 → auto-pay grain', () => {
     const session = setup({ food: 0, grain: 1 })
-    let resp = session.takeAction(0, 'major-improvement')
-    expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId !== 'wait') return
-    resp = session.resolveChoice(0, `minor:${CARD_ID}`)
+    const resp = playD83(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.grain).toBe(0)
   })
 
   it('food=2, grain=1 → multi-solution → selectPayment choice', () => {
     const session = setup({ food: 2, grain: 1 })
-    let resp = session.takeAction(0, 'major-improvement')
-    if (resp.interaction.stateId !== 'wait') return
-    resp = session.resolveChoice(0, `minor:${CARD_ID}`)
+    const resp = playD83(session)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('prompt.selectPayment')
@@ -67,7 +80,7 @@ describe('D83_Pigswill session — altCosts', () => {
 
   it('food=1, grain=0 → not buyable', () => {
     const session = setup({ food: 1, grain: 0 })
-    const resp = session.takeAction(0, 'major-improvement')
+    const resp = enterImprovementChoice(session)
     if (resp.interaction.stateId !== 'wait') return
     const d83Option = resp.interaction.options?.find((o) => o.value === `minor:${CARD_ID}`)
     expect(d83Option).toBeUndefined()

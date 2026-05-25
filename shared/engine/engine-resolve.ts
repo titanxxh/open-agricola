@@ -24,7 +24,7 @@ import {
 } from './pending-validation'
 import { evaluateTriggerSelect, type TriggerSelectEvaluationOptions } from './trigger-select'
 import {
-  applyFallbackSourceCardToFlow,
+  applyDefaultSourceCardToFlow,
   applyInteractionRequest,
   buildPhaseTrailingNodes,
   buildChoiceExecutionContext,
@@ -63,7 +63,7 @@ const resolveExecutionSpace = (
   return state.actionSpaces.find((space) => space.id === targetSpaceId) ?? fallback
 }
 
-const hasLegacyLogSurface = (result: ActionExecutionResult): boolean => {
+const hasStateLogSurface = (result: ActionExecutionResult): boolean => {
   if (result.type === 'fail') return true
   return false
 }
@@ -74,7 +74,7 @@ const appendDerivedLogsForEventOnlyResult = (
   committed: readonly GameEvent[],
   result: ActionExecutionResult,
 ): void => {
-  if (committed.length === 0 || hasLegacyLogSurface(result)) return
+  if (committed.length === 0 || hasStateLogSurface(result)) return
   const playerNames = Object.fromEntries(
     context.state.players.map((player) => [player.id, player.name]),
   )
@@ -467,7 +467,7 @@ export function engineResolveChoice(
         const flowNode = buildOwnedFlowNode(int,
           buildReplaceChoiceFlow(
             child,
-            applyFallbackSourceCardToFlow(
+            applyDefaultSourceCardToFlow(
               replaceResult.alternativeFlow,
               replaceResult.sourceCard,
             ),
@@ -649,7 +649,7 @@ export function engineResolveChoice(
             : undefined
         applyInteractionRequest(int, {
           targetNode: child,
-          fallbackNodeId: child.id,
+          hostNodeId: child.id,
           request: updatedRequest,
           promptKey: result.promptKey,
           promptParams: result.promptParams,
@@ -686,7 +686,7 @@ export function engineResolveChoice(
 
       const hookFlows = allResults
         .map((entry) => entry.flow
-          ? applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
+          ? applyDefaultSourceCardToFlow(entry.flow, entry.sourceCard)
           : null)
         .filter((flow) => flow)
         .map((flow) => buildOwnedFlowNode(int, flow as ActionFlow, context.player.id))
@@ -967,7 +967,7 @@ export function engineResolveChoice(
     const contextSnapshot = pendingEnvelope.contextSnapshot as InteractionContextSnapshot | undefined
     applyInteractionRequest(int, {
       targetNode: pendingHost,
-      fallbackNodeId: pendingEnvelope.hostNodeId,
+      hostNodeId: pendingEnvelope.hostNodeId,
       request: pendingEnvelope.request,
       promptKey: pendingEnvelope.promptKey,
       promptParams: pendingEnvelope.promptParams,
@@ -997,7 +997,7 @@ export function engineResolveChoice(
     const requestOptions = result.request.options
     applyInteractionRequest(int, {
       targetNode: pendingHost,
-      fallbackNodeId: pendingHost?.id ?? null,
+      hostNodeId: pendingHost?.id ?? null,
       request: result.request,
       promptKey: result.promptKey,
       promptParams: result.promptParams,
@@ -1034,7 +1034,7 @@ export function engineResolveChoice(
 
   const hookFlows = allResults
     .map((entry) => entry.flow
-      ? applyFallbackSourceCardToFlow(entry.flow, entry.sourceCard)
+      ? applyDefaultSourceCardToFlow(entry.flow, entry.sourceCard)
       : null)
     .filter((flow) => flow)
     .map((flow) => buildOwnedFlowNode(int, flow as ActionFlow, context.player.id))

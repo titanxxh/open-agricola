@@ -13,7 +13,7 @@
  *   onBuy → emit a pending 'selection' (interaction.stateId='selection') with:
  *     { kind: 'occupation-hand', selectableCards: player.occupationHand, min=3, max=3,
  *       selectionEffect: 'paper-knife-random-play' }
- *   resolveChoice('id1,id2,id3') → selection effect fires:
+ *   commitSelectionChoice({ cardIds }) → selection effect fires:
  *     • rollAndCacheCardPick → caches pick in cardStates[CARD_ID].extraData.pick
  *     • state.pendingUndoBoundary = true
  *     • returns occupation leaf { exactCost: {}, allowedCards: [pick] }
@@ -224,7 +224,25 @@ const playA3 = (session: GameSession) => {
   const mpResp = session.takeAction(0, 'meeting-place')
   expect(mpResp.ok).toBe(true)
   expect(mpResp.interaction.stateId).toBe('wait')
-  return session.resolveChoice(0, `minor:${SESSION_CARD_ID}`)
+  if (mpResp.interaction.stateId !== 'wait') return mpResp
+  const improvementOption = mpResp.interaction.options?.find(
+    (option) => option.value.startsWith('action-improvement-'),
+  )
+  let cardPrompt = mpResp
+  if (improvementOption) {
+    cardPrompt = session.resolveChoice(0, improvementOption.value)
+    expect(cardPrompt.ok).toBe(true)
+  }
+  expect(cardPrompt.interaction.stateId).toBe('wait')
+  if (cardPrompt.interaction.stateId !== 'wait') return cardPrompt
+  if (cardPrompt.interaction.selection?.kind === 'occupation-hand') {
+    return cardPrompt
+  }
+  const cardOption = cardPrompt.interaction.options?.find(
+    (option) => option.value === `minor:${SESSION_CARD_ID}`,
+  )
+  expect(cardOption).toBeDefined()
+  return session.resolveChoice(0, cardOption!.value)
 }
 
 // ---------------------------------------------------------------------------
@@ -275,8 +293,8 @@ describe('A3_PaperKnife session-tier: BGA-aligned flow', () => {
     if (a3Resp.interaction.stateId !== 'wait') return
 
     // Commit OCC_A, OCC_B, OCC_C; OCC_D is excluded
-    const commitValue = [OCC_A, OCC_B, OCC_C].join(',')
-    const commitResp = session.resolveChoice(0, commitValue)
+    const cardIds = [OCC_A, OCC_B, OCC_C]
+    const commitResp = session.commitSelectionChoice(0, { cardIds })
 
     expect(commitResp.ok).toBe(true)
 
@@ -318,9 +336,9 @@ describe('A3_PaperKnife session-tier: BGA-aligned flow', () => {
     playA3(session1)
     playA3(session2)
 
-    const commitValue = [OCC_A, OCC_B, OCC_C].join(',')
-    const resp1 = session1.resolveChoice(0, commitValue)
-    const resp2 = session2.resolveChoice(0, commitValue)
+    const cardIds = [OCC_A, OCC_B, OCC_C]
+    const resp1 = session1.commitSelectionChoice(0, { cardIds })
+    const resp2 = session2.commitSelectionChoice(0, { cardIds })
 
     expect(resp1.ok).toBe(true)
     expect(resp2.ok).toBe(true)
@@ -345,7 +363,7 @@ describe('A3_PaperKnife session-tier: BGA-aligned flow', () => {
     if (a3Resp.interaction.stateId !== 'wait') return
 
     // Commit — triggers the roll, sets pendingUndoBoundary, auto-plays the occupation
-    const commitResp = session.resolveChoice(0, [OCC_A, OCC_B, OCC_C].join(','))
+    const commitResp = session.commitSelectionChoice(0, { cardIds: [OCC_A, OCC_B, OCC_C] })
     expect(commitResp.ok).toBe(true)
 
     // The pick must be cached after commit
@@ -385,14 +403,23 @@ describe('A3_PaperKnife session-tier: BGA-aligned flow', () => {
       return
     }
 
-    const a3Option = mpResp.interaction.options?.find(o => o.value === `minor:${SESSION_CARD_ID}`)
+    const improvementOption = mpResp.interaction.options?.find(o => o.value.startsWith('action-improvement-'))
+    const cardPrompt = improvementOption
+      ? session.resolveChoice(0, improvementOption.value)
+      : mpResp
+    expect(cardPrompt.ok).toBe(true)
+    if (cardPrompt.interaction.stateId !== 'wait') {
+      return
+    }
+
+    const a3Option = cardPrompt.interaction.options?.find(o => o.value === `minor:${SESSION_CARD_ID}`)
     if (!a3Option) {
       // A3 was correctly excluded from the choice options — prerequisite enforced at offer time
       return
     }
 
     // If A3 is offered despite the prerequisite, resolving must fail at execution time
-    const resp = session.resolveChoice(0, `minor:${SESSION_CARD_ID}`)
+    const resp = session.resolveChoice(0, a3Option.value)
     expect(resp.ok).toBe(false)
   })
 
@@ -415,9 +442,7 @@ describe('A3_PaperKnife session-tier: BGA-aligned flow', () => {
 
     session.loadState(state)
 
-    const mpResp = session.takeAction(0, 'meeting-place')
-    expect(mpResp.ok).toBe(true)
-    const a3Resp = session.resolveChoice(0, `minor:${SESSION_CARD_ID}`)
+    const a3Resp = playA3(session)
     // TARGET: selection pending emitted
     expect(a3Resp.interaction.stateId).toBe('wait')
     if (a3Resp.interaction.stateId !== 'wait') return
@@ -426,7 +451,7 @@ describe('A3_PaperKnife session-tier: BGA-aligned flow', () => {
     const woodAfterA3Pay = a3Resp.state.players[0]!.resources.wood
 
     // Commit OCC_A, OCC_B, OCC_C — may include OCC_B (A117) as one of the 3
-    const commitResp = session.resolveChoice(0, [OCC_A, OCC_B, OCC_C].join(','))
+    const commitResp = session.commitSelectionChoice(0, { cardIds: [OCC_A, OCC_B, OCC_C] })
     expect(commitResp.ok).toBe(true)
 
     const p0After = commitResp.state.players[0]!

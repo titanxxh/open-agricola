@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-import { confirmNextPlayer } from './_helpers/legacy-confirms'
+import { confirmNextPlayer } from './_helpers/pending-confirms'
 import '../../shared/cards/B/B48_ForestStone'
 
 const CARD_ID = 'B48_ForestStone'

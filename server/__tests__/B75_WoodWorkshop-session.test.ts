@@ -138,8 +138,9 @@ describe('B75_WoodWorkshop session', () => {
     expect(wait.interaction.allowedCommands).toEqual(['undoStep', 'undoAction'])
     expect(wait.interaction.promptKey).toBe('ui.interactionEngineBlocked')
 
-    const invalidResolve = session.resolveChoice(0, `minor:${FOOD_MINOR}`)
+    const invalidResolve = session.resolveChoice(0, 'not-advertised-choice')
     expect(invalidResolve.ok).toBe(false)
+    expect(invalidResolve.error).toBe('engine-blocked cannot resolve')
 
     const undoResp = session.undoStep()
     expect(undoResp.ok).toBe(true)

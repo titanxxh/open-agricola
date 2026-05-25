@@ -4,7 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import '../../shared/cards/A/A132_Publican'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { SessionResponse } from '../../shared/session/session-core'
-import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 describe('A132_Publican session', () => {
   const setup = (currentPlayerIndex: number) => {
@@ -81,7 +81,7 @@ describe('A132_Publican session', () => {
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined).toBe('ui.interactionSowSelect')
 
     // Commit the sow with 1 grain crop
-    resp = session.resolveChoice(1, 'confirm', {
+    resp = session.commitSelectionChoice(1, {
       crops: [{ row: 0, col: 0, crop: 'grain' }],
     })
     expect(resp.ok).toBe(true)
@@ -132,7 +132,7 @@ describe('A132_Publican session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined).toBe('ui.interactionSowSelect')
 
-    resp = session.resolveChoice(1, 'confirm', {
+    resp = session.commitSelectionChoice(1, {
       crops: [{ row: 0, col: 0, crop: 'grain' }],
     })
     expect(resp.ok).toBe(true)
@@ -179,7 +179,7 @@ describe('A132_Publican session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined).toBe('ui.interactionSowSelect')
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       crops: [{ row: 0, col: 0, crop: 'grain' }],
     })
     expect(resp.ok).toBe(true)

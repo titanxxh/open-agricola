@@ -18,7 +18,7 @@ export type ActionLogTimelineRow =
       strikethrough: boolean
     }
   | {
-      kind: 'legacyLog'
+      kind: 'stateLog'
       key: string
       logEntry: LogEntry
       label: string
@@ -34,7 +34,7 @@ export type ActionLogTimelineBucket = {
 
 type BuildActionLogTimelineRowsInput = {
   entries: readonly ReplayTimelineEntry[]
-  legacyLog: readonly LogEntry[]
+  stateLog: readonly LogEntry[]
   currentRound: number
   locale: Locale
   playerNames: Record<string, string>
@@ -45,7 +45,7 @@ type ResourcePaidEvent = Extract<GameEvent, { type: 'resource.paid' }>
 
 const minorImprovementPaymentPurpose = ['minor', 'improvement'].join('-') as ResourcePaidEvent['paymentFor']
 
-const groupLegacyLog = (
+const groupStateLog = (
   log: readonly LogEntry[],
   currentRound: number,
 ): ActionLogTimelineBucket[] => {
@@ -65,8 +65,8 @@ const groupLegacyLog = (
     }
 
     rows.push({
-      kind: 'legacyLog',
-      key: `legacy:${index}:${logEntry.key}`,
+      kind: 'stateLog',
+      key: `state-log:${index}:${logEntry.key}`,
       logEntry,
       label: '',
       round,
@@ -197,13 +197,13 @@ const visibleReplayDerivedLogCounts = (
   return counts
 }
 
-const removeReplayDerivedLegacyRows = (
-  legacyLog: readonly LogEntry[],
+const removeReplayDerivedStateLogRows = (
+  stateLog: readonly LogEntry[],
   contextualLogEntries: ReadonlyMap<string, LogEntry>,
 ): LogEntry[] => {
   const counts = visibleReplayDerivedLogCounts(contextualLogEntries)
-  if (counts.size === 0) return [...legacyLog]
-  return legacyLog.filter((entry) => {
+  if (counts.size === 0) return [...stateLog]
+  return stateLog.filter((entry) => {
     if (entry.key === 'log.enterRound') return true
     const key = logEntryIdentity(entry)
     const remaining = counts.get(key) ?? 0
@@ -264,7 +264,7 @@ const mergeBuckets = (rows: ActionLogTimelineRow[]): ActionLogTimelineBucket[] =
 
 export const buildActionLogTimelineRows = ({
   entries,
-  legacyLog,
+  stateLog,
   currentRound,
   locale,
   playerNames,
@@ -296,8 +296,8 @@ export const buildActionLogTimelineRows = ({
         strikethrough: entry.status === 'canceled',
       }]
     })
-  const visibleLegacyLog = removeReplayDerivedLegacyRows(legacyLog, contextualLogEntries)
-  const legacyRows = groupLegacyLog(visibleLegacyLog, currentRound).flatMap((bucket) => bucket.rows)
+  const visibleStateLog = removeReplayDerivedStateLogRows(stateLog, contextualLogEntries)
+  const stateLogRows = groupStateLog(visibleStateLog, currentRound).flatMap((bucket) => bucket.rows)
 
-  return mergeBuckets([...eventRows, ...legacyRows])
+  return mergeBuckets([...eventRows, ...stateLogRows])
 }

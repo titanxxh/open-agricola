@@ -8,6 +8,31 @@ import type { ActionSpace } from '../../shared/contract/types'
 import '../../shared/cards/C/C1_Overhaul'
 import '../../shared/cards/E/E5_NightLoot'
 
+const buyMinor = (
+  session: GameSession,
+  playerIndex: number,
+  response: ReturnType<GameSession['takeAction']>,
+  cardId: string,
+) => {
+  expect(response.interaction.stateId).toBe('wait')
+  if (response.interaction.stateId !== 'wait') return response
+  let cardPrompt = response
+  const directOption = cardPrompt.interaction.options?.find((option) => option.value === `minor:${cardId}`)
+  if (!directOption) {
+    const improvementOption = cardPrompt.interaction.options?.find((option) => option.value.startsWith('action-improvement-'))
+    expect(improvementOption).toBeDefined()
+    cardPrompt = session.resolveChoice(playerIndex, improvementOption!.value)
+    expect(cardPrompt.ok).toBe(true)
+    if (cardPrompt.interaction.stateId !== 'wait') return cardPrompt
+    if (!cardPrompt.interaction.options?.some((option) => option.value === `minor:${cardId}`)) {
+      return cardPrompt
+    }
+  }
+  const cardOption = cardPrompt.interaction.options?.find((option) => option.value === `minor:${cardId}`)
+  expect(cardOption).toBeDefined()
+  return session.resolveChoice(playerIndex, cardOption!.value)
+}
+
 describe('passing-mechanism: C1_Overhaul complex onBuy', () => {
   it('buyer 执行强制免费 rebuild，pending owner 是 buyer，卡传入 next.minorHand', () => {
     const session = new GameSession()
@@ -24,8 +49,8 @@ describe('passing-mechanism: C1_Overhaul complex onBuy', () => {
     setFencesForTest(state.players[0]!, 3)
     session.loadState(state)
 
-    session.takeAction(0, 'meeting-place')
-    const resp = session.resolveChoice(0, 'minor:C1_Overhaul')
+    const action = session.takeAction(0, 'meeting-place')
+    const resp = buyMinor(session, 0, action, 'C1_Overhaul')
     expect(resp.ok).toBe(true)
     expect(resp.state.players[1]!.minorHand).toContain('C1_Overhaul')
     expect(resp.state.players[0]!.minorPlayed).not.toContain('C1_Overhaul')
@@ -36,7 +61,7 @@ describe('passing-mechanism: C1_Overhaul complex onBuy', () => {
     expect(resp.interaction.playerIndex).toBe(0)
     expect(resp.interaction.request.kind).toBe('farm-select')
 
-    const fenceResp = session.resolveChoice(0, 'confirm', {
+    const fenceResp = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       palisadeEdges: [],
       extraWood: 0,
@@ -71,8 +96,8 @@ describe('passing-mechanism: C1_Overhaul complex onBuy', () => {
     state.players[0]!.resources.wood = 1
     session.loadState(state)
 
-    session.takeAction(0, 'meeting-place')
-    const resp = session.resolveChoice(0, 'minor:C1_Overhaul')
+    const action = session.takeAction(0, 'meeting-place')
+    const resp = buyMinor(session, 0, action, 'C1_Overhaul')
     expect(resp.ok).toBe(true)
     expect(resp.state.players[1]!.minorHand).toContain('C1_Overhaul')
     expect(resp.state.players[0]!.minorPlayed).not.toContain('C1_Overhaul')
@@ -109,8 +134,8 @@ describe('passing-mechanism: E5_NightLoot complex onBuy', () => {
 
     session.loadState(state)
 
-    session.takeAction(0, 'meeting-place')
-    const buyResp = session.resolveChoice(0, 'minor:E5_NightLoot')
+    const action = session.takeAction(0, 'meeting-place')
+    const buyResp = buyMinor(session, 0, action, 'E5_NightLoot')
     expect(buyResp.ok).toBe(true)
 
     // 卡已传给 P2（passing 核心行为）

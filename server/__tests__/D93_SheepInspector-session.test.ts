@@ -13,7 +13,7 @@ import type {
 import '../../shared/cards/D/D93_SheepInspector'
 import type { ActionChoiceOption , ActionFlow } from '../../shared/contract/types'
 import type { SessionResponse } from '../../shared/session/session-core'
-import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 const CARD_ID = 'D93_SheepInspector'
 

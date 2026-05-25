@@ -1,185 +1,136 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { giveResource, advanceRound } from './fixtures';
+
+const actionCard = (page: Page, name: string) =>
+  page.locator('.action-card', { hasText: name });
+
+async function resetGame(page: Page) {
+  await page.getByRole('button', { name: 'Reset' }).click();
+  await expect(actionCard(page, 'Farmland')).toBeEnabled();
+}
+
+async function expectInteraction(page: Page, text: string) {
+  await expect(page.locator('.interaction-bar__body')).toContainText(text);
+}
+
+async function selectFirstTile(page: Page) {
+  const tile = page.locator('.farm-tile.selectable').first();
+  await expect(tile).toBeVisible();
+  await tile.click();
+  return tile;
+}
+
+async function selectFenceEdges(page: Page, edgeIndexes: number[]) {
+  const edges = page.locator('.farm-fence-h.selectable, .farm-fence-v.selectable');
+  for (const edgeIndex of edgeIndexes) {
+    const edge = edges.nth(edgeIndex);
+    await expect(edge).toBeVisible();
+    await edge.click();
+  }
+}
+
+async function confirm(page: Page, name: string | RegExp = 'Confirm') {
+  const button = page.getByRole('button', { name }).last();
+  await expect(button).toBeEnabled();
+  await button.click();
+}
+
+async function plowField(page: Page) {
+  const farmlandCard = actionCard(page, 'Farmland');
+  await expect(farmlandCard).toBeEnabled();
+  await farmlandCard.click();
+  await expectInteraction(page, 'Select a tile to plow');
+  await selectFirstTile(page);
+  await confirm(page, 'Confirm plow');
+  await expect(page.locator('.farm-tile.field').first()).toBeVisible();
+}
 
 test.describe('FarmSelect Interactions End-to-End Tests', () => {
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/?player=p1');
-    // Dev mode is enabled by default
+    await page.addInitScript(() => {
+      window.localStorage.setItem('open-agricola-locale-v2', 'en');
+    });
+    await page.goto('/?page=game&player=p1&embedded=1&devMode=1');
     await page.waitForTimeout(500);
+    await resetGame(page);
   });
 
   test('plow: creates field via farmland action', async ({ page }) => {
-    // 1. Find and click Farmland action card
-    const farmlandCard = page.locator('.action-card', { hasText: 'Farmland' });
-    await expect(farmlandCard).toBeVisible();
-    await farmlandCard.click();
-
-    // 2. Wait for farm select overlay
-    const farmOverlay = page.locator('.farm-select-overlay');
-    await expect(farmOverlay).toBeVisible();
-
-    // 3. Click on an empty tile to plow (e.g., tile at position 1,0)
-    const emptyTile = page.locator('.farm-tile.empty, .farm-tile[data-type="empty"]').first();
-    await emptyTile.click();
-
-    // 4. Verify field was created
-    await expect(page.locator('.farm-tile.field, .farm-tile[data-type="field"]').first()).toBeVisible();
-
-    // 5. Verify no pending state
-    await expect(farmOverlay).not.toBeVisible();
+    await plowField(page);
   });
 
   test('plow: undo restores previous state', async ({ page }) => {
-    // 1. Execute plow action
-    const farmlandCard = page.locator('.action-card', { hasText: 'Farmland' });
-    await farmlandCard.click();
-
-    const farmOverlay = page.locator('.farm-select-overlay');
-    await expect(farmOverlay).toBeVisible();
-
-    const emptyTile = page.locator('.farm-tile.empty, .farm-tile[data-type="empty"]').first();
-    await emptyTile.click();
-
-    // Wait for action to complete
-    await expect(farmOverlay).not.toBeVisible();
-
-    // 2. Count fields before undo
-    const fieldsBeforeUndo = await page.locator('.farm-tile.field, .farm-tile[data-type="field"]').count();
-
-    // 3. Undo the action
+    await plowField(page);
+    const fieldsBeforeUndo = await page.locator('.farm-tile.field').count();
     const undoButton = page.getByRole('button', { name: 'Undo Step' }).first();
     await undoButton.click();
     await page.waitForTimeout(500);
-
-    // 4. Verify field was removed (count decreased)
-    const fieldsAfterUndo = await page.locator('.farm-tile.field, .farm-tile[data-type="field"]').count();
+    const fieldsAfterUndo = await page.locator('.farm-tile.field').count();
     expect(fieldsAfterUndo).toBe(fieldsBeforeUndo - 1);
   });
 
   test('sow: sow grain into empty field', async ({ page }) => {
-    // 1. Advance to round 2 to give player workers
-    await advanceRound(page, 2);
-
-    // 2. First plow a field
-    const farmlandCard = page.locator('.action-card', { hasText: 'Farmland' });
-    await farmlandCard.click();
-
-    let farmOverlay = page.locator('.farm-select-overlay');
-    await expect(farmOverlay).toBeVisible();
-
-    const emptyTile = page.locator('.farm-tile.empty, .farm-tile[data-type="empty"]').first();
-    await emptyTile.click();
-    await expect(farmOverlay).not.toBeVisible();
-
-    // 3. Give player grain
+    await advanceRound(page, 14);
     await giveResource(page, 'grain', 1);
-
-    // 4. Click Sow action card
-    const sowCard = page.locator('.action-card', { hasText: 'Sow' });
-    await expect(sowCard).toBeVisible();
-    await sowCard.click();
-
-    // 5. Select the field to sow
-    farmOverlay = page.locator('.farm-select-overlay');
-    await expect(farmOverlay).toBeVisible();
-
-    const fieldTile = page.locator('.farm-tile.field, .farm-tile[data-type="field"]').first();
-    await fieldTile.click();
-
-    // 6. Verify grain was sown (check for grain on field)
-    await expect(fieldTile.locator('.grain, [data-grain]')).toBeVisible();
+    const cultivationCard = actionCard(page, 'Cultivation');
+    await expect(cultivationCard).toBeEnabled();
+    await cultivationCard.click();
+    await expectInteraction(page, 'Select a tile to plow');
+    await selectFirstTile(page);
+    await confirm(page, 'Confirm plow');
+    await expectInteraction(page, 'Choose plow and/or sow');
+    await page.getByRole('button', { name: 'Sow' }).click();
+    await expectInteraction(page, 'Select crops for each empty field');
+    await page.locator('.farm-tile.field .sow-choice-button[title="Grain"]').first().click();
+    await confirm(page, 'Confirm sowing');
+    await expect(page.locator('.farm-tile.field .field-crop-grain').first()).toBeVisible();
   });
 
   test('room: build room requires resources', async ({ page }) => {
-    // 1. Give player resources: 5 wood + 5 reed for room
     await giveResource(page, 'wood', 5);
     await giveResource(page, 'reed', 5);
-
-    // 2. Find Farm Expansion action card (contains room option)
-    const farmExpansionCard = page.locator('.action-card', { hasText: 'Farm Expansion' });
-    await expect(farmExpansionCard).toBeVisible();
+    const farmExpansionCard = actionCard(page, 'Farm Expansion');
+    await expect(farmExpansionCard).toBeEnabled();
     await farmExpansionCard.click();
-
-    // 3. Wait for farm select overlay
-    const farmOverlay = page.locator('.farm-select-overlay');
-    await expect(farmOverlay).toBeVisible();
-
-    // 4. Select room option if available
-    const roomOption = page.locator('button, .option', { hasText: 'Room' });
-    if (await roomOption.isVisible()) {
-      await roomOption.click();
-    }
-
-    // 5. Click on an adjacent empty tile to build room
-    const emptyTile = page.locator('.farm-tile.empty, .farm-tile[data-type="empty"]').first();
-    await emptyTile.click();
-
-    // 6. Verify room was built
-    await expect(page.locator('.farm-tile.room, .farm-tile[data-type="room"]').first()).toBeVisible();
+    await expectInteraction(page, 'Choose expansion actions');
+    await page.getByRole('button', { name: 'Build Rooms' }).click();
+    await expectInteraction(page, 'Select room expansion tiles');
+    await selectFirstTile(page);
+    await confirm(page, 'Confirm expansion');
+    await expect(page.locator('.farm-tile.room').nth(2)).toBeVisible();
   });
 
   test('stable: build stable on empty tile', async ({ page }) => {
-    // 1. Give player wood for stable
     await giveResource(page, 'wood', 2);
-
-    // 2. Find Farm Expansion action card (contains stable option)
-    const farmExpansionCard = page.locator('.action-card', { hasText: 'Farm Expansion' });
-    await expect(farmExpansionCard).toBeVisible();
+    const farmExpansionCard = actionCard(page, 'Farm Expansion');
+    await expect(farmExpansionCard).toBeEnabled();
     await farmExpansionCard.click();
-
-    // 3. Wait for farm select overlay
-    const farmOverlay = page.locator('.farm-select-overlay');
-    await expect(farmOverlay).toBeVisible();
-
-    // 4. Select stable option if available
-    const stableOption = page.locator('button, .option', { hasText: 'Stable' });
-    if (await stableOption.isVisible()) {
-      await stableOption.click();
-    }
-
-    // 5. Click on an empty tile to build stable
-    const emptyTile = page.locator('.farm-tile.empty, .farm-tile[data-type="empty"]').first();
-    await emptyTile.click();
-
-    // 6. Verify stable was built
-    await expect(page.locator('.farm-tile.stable, .farm-tile[data-type="stable"]').first()).toBeVisible();
+    await expectInteraction(page, 'Select stable tiles');
+    await selectFirstTile(page);
+    await confirm(page, 'Confirm stables');
+    await expect(page.locator('.farm-tile.stable').first()).toBeVisible();
   });
 
   test('fence: build fence requires wood', async ({ page }) => {
-    // 1. Advance to round 4 to reveal Fencing action and give player workers
     await advanceRound(page, 4);
-
-    // 2. Give player wood for fences
     await giveResource(page, 'wood', 5);
-
-    // 3. Find Fencing action card
-    const fencingCard = page.locator('.action-card', { hasText: 'Fencing' });
-    await expect(fencingCard).toBeVisible();
+    const fencingCard = actionCard(page, 'Fencing');
+    await expect(fencingCard).toBeEnabled();
     await fencingCard.click();
-
-    // 4. Wait for farm select overlay
-    const farmOverlay = page.locator('.farm-select-overlay');
-    await expect(farmOverlay).toBeVisible();
-
-    // 5. Click on an empty tile to build fence
-    const emptyTile = page.locator('.farm-tile.empty, .farm-tile[data-type="empty"]').first();
-    await emptyTile.click();
-
-    // 6. Verify fence was built
-    await expect(page.locator('.fence, [data-fence]').first()).toBeVisible();
+    await expectInteraction(page, 'Select fences on the farm and confirm');
+    await selectFenceEdges(page, [0, 5, 6, 11]);
+    await confirm(page, 'Confirm fences');
+    await expect(page.locator('.farm-fence-h.active, .farm-fence-v.active').first()).toBeVisible();
   });
 
   test('plow: cannot plow without available tiles', async ({ page }) => {
-    // 1. Find Farmland action card
-    const farmlandCard = page.locator('.action-card', { hasText: 'Farmland' });
-    await expect(farmlandCard).toBeVisible();
-
-    // 2. Check that there are empty tiles available to plow
-    const emptyTiles = page.locator('.farm-tile.empty, .farm-tile[data-type="empty"]');
+    const farmlandCard = actionCard(page, 'Farmland');
+    await expect(farmlandCard).toBeEnabled();
+    await farmlandCard.click();
+    await expectInteraction(page, 'Select a tile to plow');
+    const emptyTiles = page.locator('.farm-tile.selectable');
     const count = await emptyTiles.count();
-
-    // In a fresh game, there should be empty tiles available
     expect(count).toBeGreaterThan(0);
   });
 });

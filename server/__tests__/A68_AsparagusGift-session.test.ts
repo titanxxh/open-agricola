@@ -45,7 +45,7 @@ describe('A68 Asparagus Gift — session', () => {
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       edges: tile00InternalFences,
       palisadeEdges: tile00BorderPalisades,
       extraWood: 0,
@@ -62,7 +62,7 @@ describe('A68 Asparagus Gift — session', () => {
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       edges: tile00Fences,
       palisadeEdges: [],
       extraWood: 0,

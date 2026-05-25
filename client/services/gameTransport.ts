@@ -10,6 +10,21 @@ export type ValidateResult = {
 
 export type SnapshotListener = (payload: GameSyncPayload) => void
 
+type CommitSelectionPayload = {
+  cancel?: boolean
+  positions?: { row: number; col: number }[]
+  cardIds?: string[]
+  resourceCounts?: Partial<Record<keyof Resource, number>>
+  resourceBatchExchange?: ResourceBatchExchangePayload
+  edges?: string[]
+  palisadeEdges?: string[]
+  extraWood?: number
+  rooms?: { row: number; col: number }[]
+  stables?: { row: number; col: number }[]
+  tile?: { row: number; col: number }
+  crops?: { row: number; col: number; crop: 'grain' | 'vegetable' | 'wood' | 'stone' }[]
+}
+
 export interface GameTransport {
   getState(): Promise<GameSyncPayload>
   takeAction(playerIndex: number, spaceId: string): Promise<GameSyncPayload>
@@ -19,12 +34,7 @@ export interface GameTransport {
     payload?: Record<string, unknown>,
   ): Promise<GameSyncPayload>
   takeAnytimeAction(playerIndex: number, actionId: string): Promise<GameSyncPayload>
-  commitSelection(playerIndex: number, payload: {
-    positions?: { row: number; col: number }[]
-    cardIds?: string[]
-    resourceCounts?: Partial<Record<keyof Resource, number>>
-    resourceBatchExchange?: ResourceBatchExchangePayload
-  }): Promise<GameSyncPayload>
+  commitSelection(playerIndex: number, payload: CommitSelectionPayload): Promise<GameSyncPayload>
   confirmFeed(playerIndex: number, selections: {
     count: number;
     sourceName?: string;
@@ -136,12 +146,7 @@ export class HttpGameTransport implements GameTransport {
 
   commitSelection(
     playerIndex: number,
-    payload: {
-      positions?: { row: number; col: number }[]
-      cardIds?: string[]
-      resourceCounts?: Partial<Record<keyof Resource, number>>
-      resourceBatchExchange?: ResourceBatchExchangePayload
-    },
+    payload: CommitSelectionPayload,
   ) {
     return this.send(() => post('/api/game/commit-selection', { playerIndex, payload }))
   }
@@ -355,12 +360,7 @@ export class WsGameTransport implements GameTransport {
 
   async commitSelection(
     playerIndex: number,
-    payload: {
-      positions?: { row: number; col: number }[]
-      cardIds?: string[]
-      resourceCounts?: Partial<Record<keyof Resource, number>>
-      resourceBatchExchange?: ResourceBatchExchangePayload
-    },
+    payload: CommitSelectionPayload,
   ): Promise<GameSyncPayload> {
     return this.sendCommand({ type: 'commitSelection', playerIndex, payload })
   }

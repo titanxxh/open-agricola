@@ -40,7 +40,7 @@ describe('A→A self-jump recursion guard', () => {
       if (swagmanOpt) {
         resp = session.resolveChoice(0, swagmanOpt.value)
       } else if (cancel && hasConfirm) {
-        resp = session.resolveChoice(0, cancel.value)
+        resp = session.commitSelectionChoice(0, { cancel: true })
       } else if (skip) {
         resp = session.resolveChoice(0, '__skip__')
       } else if (cancel) {
@@ -84,7 +84,7 @@ describe('A→A self-jump recursion guard', () => {
       if (swagmanOpt) {
         resp = session.resolveChoice(0, swagmanOpt.value)
       } else if (cancel && hasConfirm) {
-        resp = session.resolveChoice(0, cancel.value)
+        resp = session.commitSelectionChoice(0, { cancel: true })
       } else if (skip) {
         resp = session.resolveChoice(0, '__skip__')
       } else if (cancel) {
@@ -133,7 +133,7 @@ describe('place-farmer jump runs full ActionNode path (parity smoke)', () => {
       if (b150Opt) {
         resp = session.resolveChoice(0, b150Opt.value)
       } else if (cancel && hasConfirm) {
-        resp = session.resolveChoice(0, cancel.value)
+        resp = session.commitSelectionChoice(0, { cancel: true })
       } else if (skip) {
         resp = session.resolveChoice(0, '__skip__')
       } else if (cancel) {

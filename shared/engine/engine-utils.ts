@@ -54,7 +54,7 @@ export function parseFollowUpAction(
   return followUp
 }
 
-export function applyFallbackSourceCardToFlow(
+export function applyDefaultSourceCardToFlow(
   flow: ActionFlow,
   sourceCard?: string,
 ): ActionFlow {
@@ -64,7 +64,7 @@ export function applyFallbackSourceCardToFlow(
   }
   return {
     ...flow,
-    children: flow.children.map((child) => applyFallbackSourceCardToFlow(child, sourceCard)),
+    children: flow.children.map((child) => applyDefaultSourceCardToFlow(child, sourceCard)),
   }
 }
 
@@ -888,7 +888,7 @@ export const canActionContinueWithoutBeforeTriggers = (
   return canStartFlowWithoutBeforeTriggers(
     int,
     scopedContext,
-    applyFallbackSourceCardToFlow(replaceResult.alternativeFlow, replaceResult.sourceCard),
+    applyDefaultSourceCardToFlow(replaceResult.alternativeFlow, replaceResult.sourceCard),
   )
 }
 
@@ -902,7 +902,7 @@ export function applyInteractionRequest(
   int: EngineInternals,
   args: {
     targetNode: EngineNode | null
-    fallbackNodeId: string | null
+    hostNodeId: string | null
     request: InteractionRequest
     promptKey?: PromptKey
     promptParams?: Record<string, unknown>
@@ -923,10 +923,10 @@ export function applyInteractionRequest(
     preserveOwner?: boolean
   },
 ): void {
-  const { targetNode, fallbackNodeId, request, promptKey, promptParams, choiceOptions, actionId, ownerNodeId } = args
-  const host = targetNode ?? (fallbackNodeId ? int.tree.findNodeById(fallbackNodeId) : null)
+  const { targetNode, hostNodeId, request, promptKey, promptParams, choiceOptions, actionId, ownerNodeId } = args
+  const host = targetNode ?? (hostNodeId ? int.tree.findNodeById(hostNodeId) : null)
   if (!host) {
-    int.pendingNodeIdRef.value = fallbackNodeId
+    int.pendingNodeIdRef.value = hostNodeId
     return
   }
   const existingOwnerNodeId = host.getPending()?.ownerNodeId

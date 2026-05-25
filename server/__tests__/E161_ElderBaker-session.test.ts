@@ -146,7 +146,9 @@ describe('E161_ElderBaker session integration', () => {
     let resp = enterMinorChoice(session)
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
-    resp = session.resolveChoice(0, `major:${STONE_OVEN_ID}`)
+    const stoneOvenOption = resp.interaction.options?.find((o) => o.value === `major:${STONE_OVEN_ID}`)
+    expect(stoneOvenOption).toBeDefined()
+    resp = session.resolveChoice(0, stoneOvenOption!.value)
 
     let steps = 0
     while (resp.interaction.stateId === 'wait' && steps < 20) {

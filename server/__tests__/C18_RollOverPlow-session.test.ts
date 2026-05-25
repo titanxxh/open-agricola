@@ -59,7 +59,7 @@ describe('C18_RollOverPlow session', () => {
     expect((resp.interaction as { sourceCard?: string }).sourceCard).toBe(CARD_ID)
 
     // Select field 0-2 (grain with remaining 3)
-    resp = session.resolveChoice(0, '0-2')
+    resp = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }] })
     expect(resp.ok).toBe(true)
 
     // After selection resolves, plow action should start
@@ -80,7 +80,7 @@ describe('C18_RollOverPlow session', () => {
     // Commit the plow choice
     const tile = resp.interaction.farm.selectableTiles[0]
     expect(tile).toBeDefined()
-    resp = session.resolveChoice(0, 'confirm', { tile })
+    resp = session.commitSelectionChoice(0, { tile })
     expect(resp.ok).toBe(true)
 
     // Should have gained a new field from plowing

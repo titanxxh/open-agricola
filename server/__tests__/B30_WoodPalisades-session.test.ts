@@ -43,7 +43,7 @@ describe('B30 Wood Palisades — session', () => {
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       edges: tile00Fences,
       palisadeEdges: tile00Palisades,
       extraWood: 0,
@@ -64,7 +64,7 @@ describe('B30 Wood Palisades — session', () => {
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       edges: ['V-0-1', 'H-1-0'],
       palisadeEdges: ['V-0-0', 'H-0-0'],
       extraWood: 0,
@@ -85,7 +85,7 @@ describe('B30 Wood Palisades — session', () => {
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       edges: [],
       palisadeEdges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
       extraWood: 0,
@@ -100,7 +100,7 @@ describe('B30 Wood Palisades — session', () => {
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
 
-    resp = session.resolveChoice(0, 'confirm', {
+    resp = session.commitSelectionChoice(0, {
       edges: ['H-0-0', 'V-0-0'],
       palisadeEdges: ['H-1-0'], // internal
       extraWood: 0,

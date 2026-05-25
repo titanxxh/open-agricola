@@ -73,15 +73,13 @@ export const selectionAction: ActionDefinition = {
     }
   },
   resolveChoice: ({ player, sourceCard, actionContext, state }, choice, payload) => {
-    // Prefer structured payload (S2 Task 7); fall back to legacy split-comma
-    // string encoding from `commitSelectionChoice` for unmigrated callsites.
     const payloadPositions = (payload as { positions?: string[] } | undefined)?.positions
     const payloadCards = (payload as { cards?: string[] } | undefined)?.cards
     const positions = choice === 'cancel'
       ? []
       : Array.isArray(payloadPositions)
       ? payloadPositions
-      : choice.split(',').filter(Boolean)
+      : []
     const cards = Array.isArray(payloadCards) ? payloadCards : []
     const kind = (actionContext?.selectionKind as string | undefined) ?? 'farm-position'
     if (kind === 'farm-position') {
@@ -91,9 +89,8 @@ export const selectionAction: ActionDefinition = {
     if (choice === 'cancel') return { type: 'ok' }
 
     if (sourceCard) {
-      // farm-position selectedPositions stored as "r-c" strings (legacy);
-      // occupation-hand picks store the card-id list under the same key for
-      // any effect that wants to inspect the selection.
+      // selectedPositions keeps the existing extra-data key:
+      // positions for board selections, card ids for card selections.
       const stored = cards.length > 0 ? cards : positions
       writeCardExtraData(player, sourceCard, 'selectedPositions', stored)
     }

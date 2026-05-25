@@ -8,7 +8,7 @@ import {
 } from '../shared/domain/index.ts'
 import { playerCanBuildPalisades } from '../shared/cards/helpers/card-type.ts'
 import { collectLockedFarmTileKeys } from '../shared/cards/card-effects.ts'
-import type { FarmTilePosition, Resource } from '../shared/contract/types.ts'
+import type { FarmTilePosition } from '../shared/contract/types.ts'
 import { getDb } from './db.ts'
 import { validateSession, extractToken } from './auth.ts'
 import type { CustomCardData } from '../shared/cards/session-card-context.ts'
@@ -21,7 +21,7 @@ import {
 
 /**
  * Per-user HTTP game sessions, keyed by user ID.
- * 'anonymous' is the fallback for unauthenticated requests (dev mode).
+ * 'anonymous' is the default for unauthenticated requests (dev mode).
  * This prevents multiple logged-in users from sharing a single game state.
  */
 const userSessions = new Map<string, GameSession>()
@@ -153,6 +153,53 @@ const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
   res.end(JSON.stringify(payload))
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const isFarmTilePositionPayload = (value: unknown): value is FarmTilePosition =>
+  isRecord(value) &&
+  typeof value.row === 'number' &&
+  typeof value.col === 'number'
+
+const isFarmTilePositionArray = (value: unknown): value is FarmTilePosition[] =>
+  Array.isArray(value) && value.every(isFarmTilePositionPayload)
+
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((entry) => typeof entry === 'string')
+
+const isSowSelectionPayload = (value: unknown): value is SowSelection => {
+  if (!isFarmTilePositionPayload(value)) return false
+  const crop = (value as { crop?: unknown }).crop
+  return crop === 'grain' || crop === 'vegetable' || crop === 'wood' || crop === 'stone'
+}
+
+const commitSelectionPayloadValidators: Record<string, (value: unknown) => boolean> = {
+  cancel: (value) => value === true,
+  positions: isFarmTilePositionArray,
+  cardIds: isStringArray,
+  resourceCounts: isRecord,
+  resourceBatchExchange: isRecord,
+  edges: isStringArray,
+  palisadeEdges: isStringArray,
+  extraWood: (value) => typeof value === 'number',
+  rooms: isFarmTilePositionArray,
+  stables: isFarmTilePositionArray,
+  tile: isFarmTilePositionPayload,
+  crops: (value) => Array.isArray(value) && value.every(isSowSelectionPayload),
+}
+
+const isValidCommitSelectionPayload = (
+  payload: unknown,
+): payload is Parameters<GameSession['commitSelectionChoice']>[1] => {
+  if (!isRecord(payload)) return false
+  const keys = Object.keys(payload)
+  if (keys.length === 0) return false
+  return keys.every((key) => {
+    const validate = commitSelectionPayloadValidators[key]
+    return validate ? validate(payload[key]) : false
+  })
+}
+
 const respondWith = (
   resp: import('./game/authoritative-session.ts').SessionResponse,
   session: GameSession,
@@ -252,20 +299,12 @@ export const handleGameRoute = async (
   if (req.method === 'POST' && req.url === '/api/game/commit-selection') {
     const body = JSON.parse(await readBody(req)) as {
       playerIndex?: number
-      payload?: {
-        positions?: unknown[]
-        cardIds?: unknown[]
-        resourceCounts?: Partial<Record<keyof Resource, number>>
-        resourceBatchExchange?: unknown
-      }
+      payload?: unknown
     }
+    const payload = body.payload
     if (
       typeof body.playerIndex !== 'number' ||
-      !body.payload ||
-      (!Array.isArray(body.payload.positions) &&
-        !Array.isArray(body.payload.cardIds) &&
-        typeof body.payload.resourceCounts !== 'object' &&
-        typeof body.payload.resourceBatchExchange !== 'object')
+      !isValidCommitSelectionPayload(payload)
     ) {
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
@@ -274,7 +313,7 @@ export const handleGameRoute = async (
     const { resp, result } = callAndRespond(req, (s) =>
       s.commitSelectionChoice(
         body.playerIndex!,
-        body.payload as Parameters<GameSession['commitSelectionChoice']>[1],
+        payload,
       ))
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
@@ -363,7 +402,7 @@ export const handleGameRoute = async (
     }
     const player = normalizePlayerFarm(state.players[playerIndex]!)
     // Validate against the normalized player by swapping it into a
-    // shallow state clone — preserves the legacy router behavior of
+    // shallow state clone — preserves the current router behavior of
     // running validators on the normalized view, not the raw state.
     const normalizedPlayers = state.players.slice()
     normalizedPlayers[playerIndex] = player

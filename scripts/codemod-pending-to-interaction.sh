@@ -13,8 +13,8 @@ FILES=$(grep -rln "pending\.type\s*===\s*'confirmNextPlayer'\|pending\.type\s*==
 
 count=0
 for f in $FILES; do
-  # Skip the legacy-confirms helper file
-  if [[ "$f" == *legacy-confirms.ts ]]; then continue; fi
+  # Skip the pending-confirms helper file
+  if [[ "$f" == *pending-confirms.ts ]]; then continue; fi
 
   # Use perl for atomic replacements. Capture group $1 is the receiver
   # expression (typically `resp`, `resp2`, `cancelResult`, etc).

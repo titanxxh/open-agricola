@@ -61,12 +61,12 @@ const groupByRound = (log: GameState['log'], currentRound: number): RoundBucket[
   return buckets
 }
 
-const legacyBucketsToTimeline = (buckets: RoundBucket[]): ActionLogTimelineBucket[] =>
+const stateLogBucketsToTimeline = (buckets: RoundBucket[]): ActionLogTimelineBucket[] =>
   buckets.map((bucket, bucketIndex) => ({
     round: bucket.round,
     rows: bucket.entries.map((logEntry, entryIndex) => ({
-      kind: 'legacyLog',
-      key: `legacy-${bucketIndex}-${entryIndex}`,
+      kind: 'stateLog',
+      key: `state-log-${bucketIndex}-${entryIndex}`,
       logEntry,
       label: '',
       round: bucket.round,
@@ -91,7 +91,7 @@ const filterRows = (
 
 const rowClassName = (row: ActionLogTimelineRow, selectedReplayKey?: string | null) => [
   'action-log__entry',
-  row.kind === 'event' ? 'action-log__entry--event' : 'action-log__entry--legacy',
+  row.kind === 'event' ? 'action-log__entry--event' : 'action-log__entry--state-log',
   row.kind === 'event' && row.status === 'canceled' ? 'action-log__entry--canceled' : '',
   row.kind === 'event' && row.status === 'missing' ? 'action-log__entry--missing' : '',
   selectedReplayKey === row.key ? 'is-current' : '',
@@ -114,16 +114,16 @@ export function ActionLog({
   isReplayPlaying = false,
 }: Props) {
   const isTimelineMode = !!timelineBuckets
-  const legacyBuckets = useMemo(
+  const stateLogBuckets = useMemo(
     () => groupByRound(log.slice(0, limit), currentRound),
     [log, currentRound, limit],
   )
   const buckets = useMemo(
     () => {
-      if (!timelineBuckets) return legacyBucketsToTimeline(legacyBuckets)
+      if (!timelineBuckets) return stateLogBucketsToTimeline(stateLogBuckets)
       return filterRows(timelineBuckets, replayFilter)
     },
-    [legacyBuckets, replayFilter, timelineBuckets],
+    [stateLogBuckets, replayFilter, timelineBuckets],
   )
   const filters: ReplayTimelineFilter[] = ['all', 'active', 'canceled']
 

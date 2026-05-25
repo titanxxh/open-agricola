@@ -65,9 +65,9 @@ export type PayParams = {
  * payment" — see E54_Contraband / E122_Cottar / E128_Saddler /
  * E123_ResourceHoarder for examples.
  *
- * Legacy note: `player._activeActionBonusSources` is still maintained by
+ * Current attribution note: `player._activeActionBonusSources` is still maintained by
  * `executePaymentSolution` for `log.actionDetail` attribution (read by
- * `GameCore.buildActionDetailParts`) and the legacy `playOccupation` /
+ * `GameCore.buildActionDetailParts`) and the direct `playOccupation` /
  * `playImprovement` HTTP entries that don't go through the `pay` leaf.
  * New listeners should not depend on it.
  */

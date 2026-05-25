@@ -5,7 +5,7 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/D/D160_Midwife'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import type { ActionChoiceOption } from '../../shared/contract/types'
-import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 describe('D160_Midwife session', () => {
   const setup = (currentPlayerIndex = 0) => {

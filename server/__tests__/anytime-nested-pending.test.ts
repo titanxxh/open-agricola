@@ -131,7 +131,7 @@ describe('anytime nesting — sync card listener inside pending', () => {
     if (resp.interaction.farm.farmType !== 'stable') throw new Error('expected stable prompt')
 
     const stable = resp.interaction.farm.selectableTiles[0]!
-    resp = session.resolveChoice(0, 'confirm', { stables: [stable] })
+    resp = session.commitSelectionChoice(0, { stables: [stable] })
     expect(resp.ok).toBe(true)
 
     const actionDetail = resp.state.log.find((entry) =>

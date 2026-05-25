@@ -115,7 +115,7 @@ describe('E70_CropRotationField session', () => {
       expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined).toBe('ui.interactionSowSelect')
 
       // Sow grain on the virtual tile
-      resp = session.resolveChoice(0, 'confirm', {
+      resp = session.commitSelectionChoice(0, {
         crops: [{ row: -1, col: 5070, crop: 'grain' }],
       })
       expect(resp.ok).toBe(true)
@@ -138,7 +138,7 @@ describe('E70_CropRotationField session', () => {
       expect(resp.ok).toBe(true)
       expect(resp.ok).toBe(true)
 
-      resp = session.resolveChoice(0, 'confirm', {
+      resp = session.commitSelectionChoice(0, {
         crops: [{ row: -1, col: 5070, crop: 'vegetable' }],
       })
       expect(resp.ok).toBe(true)
@@ -199,12 +199,16 @@ describe('E70_CropRotationField session', () => {
       expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
         .toBe('ui.interactionOptionalAction')
 
-      resp = session.resolveChoice(0, 'confirm', 'sow')
+      const sowOption = resp.interaction.stateId === 'wait'
+        ? resp.interaction.options?.find((option) => option.value.startsWith('action-sow-'))
+        : undefined
+      expect(sowOption).toBeDefined()
+      resp = session.resolveChoice(0, sowOption!.value)
       expect(resp.ok).toBe(true)
       expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
         .toBe('ui.interactionSowSelect')
 
-      resp = session.resolveChoice(0, 'confirm', {
+      resp = session.commitSelectionChoice(0, {
         crops: [{ row: -1, col: 5069, crop: 'vegetable' }],
       })
 

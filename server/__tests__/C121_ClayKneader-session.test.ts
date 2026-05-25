@@ -4,7 +4,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/C/C121_ClayKneader'
 import type { ActionFlow } from '../../shared/contract/types'
-import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 const CARD_ID = 'C121_ClayKneader'
 

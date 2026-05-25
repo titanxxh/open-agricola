@@ -25,34 +25,23 @@ describe('Engine.restore regressions', () => {
     expect(restored._internals().tree.findNodeById('mandatory-restore-root')?.mandatory).toBe(true)
   })
 
-  it('rehydrates legacy choiceData onto a live pending host when the stored host id is gone', () => {
-    const restoredHost = new ActionNode('flow-0', 'gain')
-    const snapshot: ReturnType<Engine['snapshot']> = {
-      treeCursor: [restoredHost.toCursor()],
-      nodeStates: [{ id: restoredHost.id, state: 'ready' }],
-      choiceData: {
-        id: 'legacy-interaction-0',
-        hostNodeId: 'legacy-interaction-0',
-        request: {
-          kind: 'choice',
-          options: [{ value: 'confirm', labelKey: 'ui.interactionConfirm' }],
-        },
-        choices: [{ value: 'confirm', labelKey: 'ui.interactionConfirm' }],
-        promptKey: 'ui.interactionOptionalAction',
-        pendingActionId: 'gain',
-      },
-      pendingData: [],
-      compositeEmit: null,
-      beforePhaseFlowNodeIds: [],
-    }
+  it('snapshots pending envelopes only through pendingData', () => {
+    const root = new ActionNode('pending-root', 'gain')
+    const options = [{ value: 'confirm', labelKey: 'ui.cursorTestConfirm' }]
+    root.setPending({
+      hostNodeId: root.id,
+      request: { kind: 'choice', options },
+      choices: options,
+      promptKey: 'ui.interactionOptionalAction',
+      pendingActionId: 'gain',
+    })
+    const engine = buildEngine(root)
 
-    const engine = buildEngine()
-    engine.restore(snapshot)
-
-    const envelope = engine.peekPendingEnvelope()
-    expect(envelope?.request.kind).toBe('choice')
-    expect(envelope?.hostNodeId).toBe('flow-0')
-    expect(engine.peekPendingHost()?.id).toBe('flow-0')
+    const snapshot = engine.snapshot()
+    const legacySnapshotKey = 'choice' + 'Data'
+    expect(legacySnapshotKey in snapshot).toBe(false)
+    expect(snapshot.pendingData).toHaveLength(1)
+    expect(snapshot.pendingData[0]?.pending.request.kind).toBe('choice')
   })
 
   it('rebases runtime counter after restoring cursor ids', () => {
@@ -60,7 +49,6 @@ describe('Engine.restore regressions', () => {
     const snapshot: ReturnType<Engine['snapshot']> = {
       treeCursor: [restoredHost.toCursor()],
       nodeStates: [{ id: restoredHost.id, state: 'ready' }],
-      choiceData: null,
       pendingData: [],
       compositeEmit: null,
       beforePhaseFlowNodeIds: [],

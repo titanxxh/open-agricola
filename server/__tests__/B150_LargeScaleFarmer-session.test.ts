@@ -114,7 +114,7 @@ describe('B150_LargeScaleFarmer session', () => {
         const done = resp.interaction.options?.find((o) => o.value === '__done__')
         const hasConfirm = resp.interaction.options?.some((o) => o.value === 'confirm')
         if (cancel && hasConfirm) {
-          resp = session.resolveChoice(0, cancel.value)
+          resp = session.commitSelectionChoice(0, { cancel: true })
         } else if (done) {
           resp = session.resolveChoice(0, done.value)
         } else {

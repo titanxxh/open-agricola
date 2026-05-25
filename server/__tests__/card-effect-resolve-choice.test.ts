@@ -19,7 +19,7 @@ import { occupations } from '../../shared/cards-display/_lookup'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import type { ActionFlow } from '../../shared/contract/types'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
-import { confirmPlayerSwitch } from './_helpers/legacy-confirms'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 const TEST_CARD_ID = '__TEST_RC_CARD__'
 
