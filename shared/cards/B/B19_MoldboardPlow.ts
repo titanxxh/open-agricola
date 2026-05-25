@@ -20,8 +20,8 @@ const listener: CardListenerRegistration = {
         type: 'seq',
         optional: true,
         children: [
-          { type: 'leaf', actionId: 'pop-card-stack', sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'plow', sourceCard: CARD_ID },
+          { type: 'leaf', actionId: 'pop-card-stack', sourceCard: CARD_ID },
         ],
       },
       sourceCard: CARD_ID,

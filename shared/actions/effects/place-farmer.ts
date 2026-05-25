@@ -6,7 +6,6 @@ import type {
   GameState,
   PlayerState,
 } from '../../contract/types'
-import type { EventSink } from '../../contract/events'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement'
 import { addWorkerRef, removeWorkerRef } from '../../domain/space'
 import { smallestAvailableWorker } from '../../domain/player'
@@ -17,16 +16,6 @@ import { executeCardListener, getMatchingListeners } from '../../cards/card-list
 import { writeCardExtraData } from '../../cards/helpers/card-state'
 
 export { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
-
-const withForwardedActionSource = (
-  eventSink: EventSink,
-  sourceActionId: string,
-): EventSink => ({
-  emit: (event) => eventSink.emit({ sourceActionId, ...event }),
-  emitMany: (events) => {
-    events.forEach((event) => eventSink.emit({ sourceActionId, ...event }))
-  },
-})
 
 /**
  * Low-level helper: place a worker belonging to `player` onto `space`.
@@ -58,7 +47,7 @@ export const placeFarmerAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: (state, player) =>
     smallestAvailableWorker(state, player) !== null,
-  execute: ({ state, player, actionContext, eventSink }) => {
+  execute: ({ state, player, sourceCard, actionContext, eventSink }) => {
     // viaCardJump branch (Sprint 5 mech-A): move farmer + return flow leaf so
     // the engine runs the second placement through the standard ActionNode path.
     if (actionContext?.viaCardJump) {
@@ -90,7 +79,7 @@ export const placeFarmerAction: ActionDefinition = {
       // Reachability check only applies to worker mode (worker-less is invoked
       // by cards that have already verified the space is unoccupied / valid).
       if (!isWorkerless) {
-        const allowed = computeAllowedPlacementSpaces(state, player)
+        const allowed = computeAllowedPlacementSpaces(state, player, { sourceCard, actionContext })
         if (!allowed.some(a => a.spaceId === targetSpaceId)) {
           return { type: 'fail', errorKey: 'log.placeFarmerFail' }
         }
@@ -176,7 +165,7 @@ export const placeFarmerAction: ActionDefinition = {
       if (!supply) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
       supply.isActive = true
     }
-    let allowed = computeAllowedPlacementSpaces(state, player)
+    let allowed = computeAllowedPlacementSpaces(state, player, { sourceCard, actionContext })
     // BGA `constraints` (e.g. C125 Nightworker restricts to building-resource
     // accumulation spaces of types the player has 0 of). Caller passes a
     // string[] of space ids via `actionContext.constraints`; we intersect it
@@ -191,7 +180,13 @@ export const placeFarmerAction: ActionDefinition = {
       const space = state.actionSpaces.find((s) => s.id === a.spaceId)!
       return {
         value: a.allowOccupied ? `${OCCUPIED_SPACE_CHOICE_PREFIX}${a.spaceId}` : a.spaceId,
-        labelKey: space.nameKey,
+        labelKey: a.option?.labelKey ?? space.nameKey,
+        labelParams: a.option?.labelParams,
+        sourceCard: a.option?.sourceCard,
+        effectPreview: a.option?.effectPreview,
+        descriptionPreview: a.option?.descriptionPreview,
+        disabled: a.option?.disabled,
+        disabledReasonKey: a.option?.disabledReasonKey,
       }
     })
     return {
@@ -207,6 +202,18 @@ export const placeFarmerAction: ActionDefinition = {
       : choice
     const targetSpace = state.actionSpaces.find((s) => s.id === targetSpaceId)
     if (!targetSpace) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
+
+    let allowed = computeAllowedPlacementSpaces(state, player, { sourceCard, actionContext })
+    const constraints = actionContext?.constraints as string[] | undefined
+    if (Array.isArray(constraints) && constraints.length > 0) {
+      const allowSet = new Set(constraints)
+      allowed = allowed.filter((placement) => allowSet.has(placement.spaceId))
+    }
+    const allowedPlacement = allowed.find((placement) => placement.spaceId === targetSpaceId)
+    if (!allowedPlacement || allowedPlacement.allowOccupied !== allowOccupied) {
+      return { type: 'fail', errorKey: 'log.placeFarmerFail' }
+    }
+
     const placeResult = placeFarmer(state, player, targetSpace)
     if (placeResult.type === 'fail') return placeResult
     eventSink?.emit<'worker.placed'>({
@@ -227,13 +234,19 @@ export const placeFarmerAction: ActionDefinition = {
     ) {
       writeCardExtraData(player, sourceCard, 'markedSpaceId', targetSpaceId)
     }
-    const execResult = targetSpace.execute({
-      state,
-      player,
-      space: targetSpace,
-      eventSink: withForwardedActionSource(eventSink, targetSpace.id),
-    })
-    if (execResult.type === 'flow') return execResult
-    return execResult
+    const targetActionContext = { ...(actionContext ?? {}), targetSpaceId }
+    if (actionContext) actionContext.targetSpaceId = targetSpaceId
+    const targetLeaf: ActionFlow = {
+      type: 'leaf',
+      actionId: targetSpaceId,
+      expandFlow: true,
+      sourceCard,
+      actionContext: targetActionContext,
+    }
+    return {
+      type: 'flow',
+      flow: targetLeaf,
+      extraData: { actionContextWrite: { targetSpaceId } },
+    }
   },
 }

@@ -1,7 +1,8 @@
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
-import { isSpaceOccupied, spaceHasPlayer } from '../../domain/space'
+import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
+import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability'
 
 const CARD_ID = 'E10_StrawHat'
 
@@ -14,15 +15,12 @@ export const E10_StrawHat_impl = {
   id: CARD_ID,
   onBeforeReturnHome: (state, player) => {
     if (!TRIGGER_ROUNDS.includes(state.round)) return
-    // Check if player has a worker on Farmland
     const farmland = state.actionSpaces.find((s) => s.id === FARMLAND_SPACE_ID)
-    if (!farmland || !spaceHasPlayer(farmland, player.id)) return
-    // Check if unoccupied spaces are available (excluding Farmland)
-    const hasAvailable = state.actionSpaces.some(
-      (s) => !isSpaceOccupied(s) && s.id !== FARMLAND_SPACE_ID && s.canBeExecutedByPlayer(state, player),
-    )
-    const children: ActionFlow[] = []
-    if (hasAvailable) {
+    const hasFarmlandWorker = farmland ? spaceHasPlayer(farmland, player.id) : false
+    const hasMoveTarget = hasFarmlandWorker && computeAllowedPlacementSpaces(state, player)
+      .some((placement) => placement.spaceId !== FARMLAND_SPACE_ID)
+    const children: ActionFlow[] = [gainLeaf(CARD_ID, { food: 1 })]
+    if (hasMoveTarget) {
       children.push({
         type: 'leaf',
         actionId: 'move-farmer-to-space',
@@ -30,8 +28,7 @@ export const E10_StrawHat_impl = {
         sourceCard: CARD_ID,
       })
     }
-    children.push(gainLeaf(CARD_ID, { food: 1 }))
-    return { type: 'xor', optional: true, children }
+    return { type: 'xor', children }
   },
 },
   reaches: [] as readonly string[],

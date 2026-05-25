@@ -17,6 +17,17 @@ const listener: CardListenerRegistration = {
       cardId: CARD_ID,
       cost: { food: 1 },
       gain: { score: 1 },
+      followUp: [{
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: {
+          kind: 'add-resource-to-space',
+          spaceId: 'grain-utilization',
+          resource: 'food',
+          amount: 1,
+        },
+      }],
     })
   },
 }

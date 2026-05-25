@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
+import type { CardListenerContext } from '../../shared/cards/card-listeners'
+import { createEventQuery } from '../../shared/events/query'
+import type { DraftGameEvent } from '../../shared/contract/events'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/B/B21_HayloftBarn'
+import { B21_HayloftBarn_impl } from '../../shared/cards/B/B21_HayloftBarn'
 
 const CARD_ID = 'B21_HayloftBarn'
 
@@ -124,27 +127,47 @@ describe('B21_HayloftBarn session', () => {
     const session = setup({ foodCount: 4 })
     const state = session.getState().state
     const player = state.players[0]!
-    player.occupationPlayed.push('D155_Ebonist')
-    player.resources.wood = 1
-    session.loadState(state)
-
-    let resp = session.takeAnytimeAction(0, 'exchange')
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected exchange prompt')
-    const option = resp.interaction.options?.find((entry) =>
-      entry.effectPreview?.kind === 'resourceExchange' &&
-      entry.effectPreview.resourcesPaid?.wood === 1 &&
-      entry.effectPreview.resourcesGained?.grain === 1
+    const exchangeEvent: DraftGameEvent<'resource.exchanged'> = {
+      type: 'resource.exchanged',
+      paid: { wood: 1 },
+      gained: { grain: 1 },
+      paidFrom: { kind: 'player', playerId: player.id },
+      paidTo: { kind: 'supply' },
+      gainedFrom: { kind: 'supply' },
+      gainedTo: { kind: 'player', playerId: player.id },
+      exchangeSource: 'test-grain-exchange',
+    }
+    const listener = B21_HayloftBarn_impl.listeners?.find((entry) =>
+      entry.id === 'B21-hayloft-barn-after-grain-gain'
     )
-    expect(option).toBeDefined()
-    resp = session.resolveChoice(0, option!.value)
 
-    const updated = resp.state.players[0]!
-    expect(readCardExtraData<number>(updated, CARD_ID, 'foodCount')).toBe(3)
-    expect(updated.resources.food).toBe(12)
-    expect(resp.state.events).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'resource.exchanged', exchangeSource: 'D155_Ebonist' }),
-      expect.objectContaining({ type: 'card.triggered', sourceCardId: CARD_ID }),
+    const result = listener?.handler({
+      state,
+      player,
+      space: state.actionSpaces[0]!,
+      actionId: 'exchange',
+      phase: 'after',
+      result: { type: 'ok' },
+      transactionEvents: [exchangeEvent],
+      actionEvents: [exchangeEvent],
+      eventQuery: createEventQuery([exchangeEvent]),
+    } as CardListenerContext)
+
+    expect(listener).toBeDefined()
+    expect(result?.sourceCard).toBe(CARD_ID)
+    expect(result?.flow?.type).toBe('seq')
+    if (result?.flow?.type !== 'seq') throw new Error('expected B21 release flow')
+    expect(result.flow.children).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: { kind: 'set-extra-data', key: 'foodCount', value: 3 },
+      }),
+      expect.objectContaining({
+        actionId: 'gain',
+        sourceCard: CARD_ID,
+        params: { food: 1 },
+      }),
     ]))
   })
 

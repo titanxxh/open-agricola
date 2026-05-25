@@ -56,7 +56,6 @@ const afterFencingListener: CardListenerRegistration = {
     const storedArea = getStoredArea(context.player)
     const children: ActionFlow[] = [
       specialEffect({ kind: 'set-extra-data', key: 'pastureArea', value: currentArea }),
-      specialEffect({ kind: 'set-flag', flag: true }),
     ]
     if (currentArea > storedArea) {
       children.push(gainLeaf(CARD_ID, { stone: 2 }))
