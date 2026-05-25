@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { GameSession } from '../game/authoritative-session'
 import type { PlayerState } from '../../shared/contract/types.ts'
 import {
   buildFarmPositionSelectionInteraction,
@@ -170,6 +171,46 @@ describe('farm interaction builders', () => {
     player.resources.food = 0
 
     const interaction = buildPlowFarmInteraction(player, { food: 1 })
+
+    expect(interaction.farmType).toBe('plow')
+    if (interaction.farmType !== 'plow') return
+    expect(interaction.selectableTiles).toEqual([])
+  })
+
+  it('rebuilds stable interaction with exactCost from pending action context', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players[0] = createPlayer()
+    session.loadState(state)
+    const player = session.getState().state.players[0]!
+
+    const interaction = (session as unknown as {
+      buildStableInteraction: (
+        player: PlayerState,
+        costOverride: undefined,
+        actionContext: Record<string, unknown>,
+      ) => ReturnType<typeof buildStableFarmInteraction>
+    }).buildStableInteraction(player, undefined, { max: 1, exactCost: { max: 1 } })
+
+    expect(interaction.farmType).toBe('stable')
+    if (interaction.farmType !== 'stable') return
+    expect(interaction.maxSelections).toBe(1)
+  })
+
+  it('rebuilds plow interaction with exactCost from pending action context', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players[0] = createPlayer()
+    session.loadState(state)
+    const player = session.getState().state.players[0]!
+
+    const interaction = (session as unknown as {
+      buildPlowInteraction: (
+        player: PlayerState,
+        costOverride: undefined,
+        actionContext: Record<string, unknown>,
+      ) => ReturnType<typeof buildPlowFarmInteraction>
+    }).buildPlowInteraction(player, undefined, { exactCost: { max: 0 } })
 
     expect(interaction.farmType).toBe('plow')
     if (interaction.farmType !== 'plow') return
