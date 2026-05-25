@@ -13,7 +13,7 @@ export const B149_OpenAirFarmer_impl = {
       payLeaf({ cardId: CARD_ID, cost: { stable: 3 } }),
       {
         type: 'leaf' as const,
-        actionId: 'fencing',
+        actionId: 'fence',
         expandFlow: true,
         sourceCard: CARD_ID,
         actionContext: {

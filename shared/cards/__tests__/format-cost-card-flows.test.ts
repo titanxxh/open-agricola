@@ -209,10 +209,11 @@ describe('formatCost migrated card flows', () => {
   })
 
   it('A89_StablePlanner emits one free stable from actionContext', () => {
-    const actor = player({ occupationPlayed: ['A89_StablePlanner'] })
+    const actor = player({
+      occupationPlayed: ['A89_StablePlanner'],
+      cardStates: { A89_StablePlanner: { extraData: { targetRounds: [5] } } },
+    })
     const gameState = state(actor)
-    gameState.round = 2
-    getCardEffect('A89_StablePlanner')!.onBuy!(gameState, actor)
     gameState.round = 5
     const flow = getCardEffect('A89_StablePlanner')!.onRoundStart!(gameState, actor)
     const leaf = expectLeaf(flow, 'stables')

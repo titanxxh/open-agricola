@@ -5,6 +5,7 @@ import type {
   CostModifierType,
   InternalActionChild,
   PaymentResourceMap,
+  Resource,
 } from '../../contract/types'
 import type { PaymentInfo } from '../../cards/card-effects'
 

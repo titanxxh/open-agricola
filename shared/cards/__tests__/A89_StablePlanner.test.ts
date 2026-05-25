@@ -153,7 +153,8 @@ describe('A89_StablePlanner', () => {
     if (leaf.type !== 'leaf') return
     expect(leaf.actionId).toBe('stables')
     expect(leaf.actionContext?.max).toBe(1)
-    expect((leaf.actionContext?.costOverride as { wood?: number } | undefined)?.wood).toBeLessThan(0)
+    expect(leaf.actionContext?.exactCost).toEqual({ max: 1 })
+    expect(leaf.actionContext?.costOverride).toBeUndefined()
   })
 
   it('onRoundStart returns nothing on non-target round', () => {
