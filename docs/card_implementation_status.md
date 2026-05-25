@@ -11,10 +11,10 @@
 | 自动 metadata 脚本 literal mismatch | 0 |
 | 自动 metadata 脚本 complex mismatch | 4 |
 | 其中 schema-up 已接受差异 | 4 |
-| 需要实现复核的卡牌 | 8 |
-| 已接受 / 产品策略差异 | 67 |
+| 需要实现复核的卡牌 | 32 |
+| 已接受 / 产品策略差异 | 40 |
 | 排除的 BGA legacy 或未实现行为目标 | 52 |
-| 本轮审计视为已对齐 | 761 |
+| 本轮审计视为已对齐 | 764 |
 
 说明：`scripts/audit-bga-metadata-diff.ts` 现在会解析 BGA `STABLE` 打印成本和 `passing`。当前 literal mismatch 0（passing 已全部对齐）。当前 complex mismatch 是 4 个已接受的 schema-up prerequisite 差异。
 
@@ -22,40 +22,52 @@
 
 ## 2. 问题优先汇总
 
-| 卡牌 | 严重度 | 领域 | 差异 | 方向 |
-|---|---|---|---|---|
-| `B24_Lasso` | 高 | 额外放人 | BGA 任意第一次放人后都提供触发；OA 只有第一次放人在动物市场时才触发。 | 始终提供触发；仅当第一次不是动物市场时限制第二次必须去动物市场。 |
-| `D155_Ebonist` | 高 | exchange 触发窗口 | BGA exchange 仅收获期；OA 暴露为 anytime exchange。 | 改为 harvest trigger 并补回归测试。 |
-| `B67_HandTruck` | 中 | bake 前 continuation | BGA 是 optional 拿谷物，然后 mandatory bake；OA 无条件给谷物。 | 建模 optional gain 分支，之后接 mandatory bake continuation。 |
-| `B124_Trimmer` | 中 | 触发频率 | BGA 每次牧场覆盖数增加都奖励；OA 每个工作阶段第一次奖励后打 flag。 | 若要严格对齐，移除 after-reward flag。 |
-| `B19_MoldboardPlow` | 中 | 成功顺序 | OA 在 plow 成功前消耗使用次数。 | plow 成功后再消耗使用次数。 |
-| `E10_StrawHat` | 中 | mandatory 选择 | BGA 强制在移动或拿食物中选一项；OA 可以跳过。 | 移除 XOR 外层 optional。 |
-| `E68_CherryOrchard` | 低 | 描述文本 | OA desc 写成收获 wood；BGA 表达为像 grain 一样 sow 和 harvest wood。 | 恢复 BGA 文案语义。 |
-| `B34_SpecialFood` | 待验证 | 跨卡交互 | BGA 特判 A137；OA heuristic 可能覆盖，也可能遗漏。 | 增加 A137+B34 定向 session 测试。 |
+BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards`；OA 路径默认相对本仓库。
 
-### 需复核卡牌证据索引
-
-下表记录每个差异核对过的位置。BGA PHP 路径默认位于 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards`；BGA JS 路径默认位于 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules/js`。
-
-| 卡牌 | BGA 证据 | OA 证据 | UI / 交互证据 |
-|---|---|---|---|
-| `B24_Lasso` | `B/B24_Lasso.php` | `shared/cards/B/B24_Lasso.ts` | 使用通用 extra-placement flow；遗漏的是后端触发条件，不是客户端渲染。 |
-| `D155_Ebonist` | `D/D155_Ebonist.php` | `shared/cards-display/D/D155_Ebonist.ts` | Harvest exchange 通过通用 exchange UI 暴露；OA 当前把它放进 anytime exchange UI。 |
-| `B67_HandTruck` | `B/B67_HandTruck.php` | `shared/cards/B/B67_HandTruck.ts` | OA 使用通用 bake continuation，但缺少 mandatory bake 前的 optional grain 分支。 |
-| `B124_Trimmer` | `B/B124_Trimmer.php` | `shared/cards/B/B124_Trimmer.ts` | 无特殊 UI gap；触发频率是后端 card state 问题。 |
-| `B19_MoldboardPlow` | `B/B19_MoldboardPlow.php` | `shared/cards/B/B19_MoldboardPlow.ts` | OA 已消耗存储次数后，UI 仍可能取消或失败 plow 选择。 |
-| `E10_StrawHat` | `E/E10_StrawHat.php` | `shared/cards/E/E10_StrawHat.ts` | OA 将整个 flow 标为 optional，导致通用 XOR UI 包含 skip 路径。 |
-| `E68_CherryOrchard` | `E/E68_CherryOrchard.php` | `shared/cards-display/E/E68_CherryOrchard.ts` | 描述文本面向 UI；实现本身主要基于 cardField。 |
-| `B34_SpecialFood` | `B/B34_SpecialFood.php` | `shared/cards/B/B34_SpecialFood.ts`; `shared/cards/A/A137_RiverineShepherd.ts` | 需要 A137 交互的定向 session/UI 覆盖后，才能判断 UI 行为是否分歧。 |
+| 卡牌 | 严重度 | 领域 | 差异 | 证据 | 方向 |
+|---|---|---|---|---|---|
+| `B24_Lasso` | 高 | 额外放人 | BGA 任意第一次放人后都提供触发；OA 只有第一次放人在动物市场时才触发。 | BGA `B/B24_Lasso.php`; OA `shared/cards/B/B24_Lasso.ts` | 始终提供触发；仅当第一次不是动物市场时限制第二次必须去动物市场。 |
+| `A136_DrudgeryReeve` | 高 | shared scoring | BGA `sharedScoring`，每位玩家可选 0..max sets 并 reserve 资源；OA 仅持卡玩家自动最优计分。 | BGA `A/A136_DrudgeryReeve.php`; OA `shared/cards/A/A136_DrudgeryReeve.ts`, `shared/domain/scoring.ts` | 支持 shared costed scoring / before-end choice。 |
+| `C24_BedintheGrainField` | 高 | harvest family growth | BGA 下一次 harvest 是 optional WishChildren；OA 有空房时强制 `family-growth`。 | BGA `C/C24_BedintheGrainField.php`; OA `shared/cards/C/C24_BedintheGrainField.ts` | 改成 optional，并确认空房约束。 |
+| `C42_RavenousHunger` | 高 | 额外放人目标 | BGA 额外放人限制到累积格；OA `place-farmer` 未传 constraints，可去任意合法格。 | BGA `C/C42_RavenousHunger.php`; OA `shared/cards/C/C42_RavenousHunger.ts`, `shared/actions/effects/place-farmer.ts` | 给 follow-up `place-farmer` 透传累积格限制。 |
+| `C72_FestivalPlanning` | 高 | onBuy private field phase | OA 返回 `reap` leaf，但 `reap` 不是注册 action，BGA 的 private field phase 基本不可执行。 | BGA `C/C72_FestivalPlanning.php`; OA `shared/cards/C/C72_FestivalPlanning.ts`, `shared/actions/internal-actions.ts` | 建模 private field/reap 子行动，再接 optional improvement。 |
+| `C146_WorkshopAssistant` | 高 | 延迟资源对 | BGA onBuy 把选择的 resource pairs 放卡上，其他玩家 renovation 后 owner 可取 1 pair；OA 直接得资源。 | BGA `C/C146_WorkshopAssistant.php`; OA `shared/cards/C/C146_WorkshopAssistant.ts` | 改为卡上暂存 + opponent renovation 触发取回。 |
+| `D1_ZigzagHarrow` | 高 | plow target | BGA `onBuy` 限制 plow 到 zigzag 目标；OA unrestricted plow。 | BGA `D/D1_ZigzagHarrow.php`; OA `shared/cards/D/D1_ZigzagHarrow.ts`, `server/__tests__/D1_ZigzagHarrow-session.test.ts` | 透传 allowedTiles 到 plow / farm-edit。 |
+| `D36_BreedRegistry` | 高 | sheep 统计口径 | BGA 统计整局 board/card sheep 并在买入时初始化；OA 只累计后续 action-space collect/exchange。 | BGA `D/D36_BreedRegistry.php`, `Core/Stats.php`; OA `shared/cards/D/D36_BreedRegistry.ts` | 改用统一 sheep stats 或补 board/card sheep 统计。 |
+| `D101_SugarBaker` | 高 | 行动格累积 | BGA 支付 1 food 得 1VP 后，把 food 放到 Grain Utilization；OA 只 pay/gain。 | BGA `D/D101_SugarBaker.php`; OA `shared/cards/D/D101_SugarBaker.ts` | 增加 placeFood 到行动格的 special effect。 |
+| `D155_Ebonist` | 高 | exchange 触发窗口 | BGA exchange 仅收获期；OA 暴露为 anytime exchange。 | BGA `D/D155_Ebonist.php`; OA `shared/cards-display/D/D155_Ebonist.ts` | 改为 harvest trigger 并补回归测试。 |
+| `E149_MidnightFencer` | 高 | free fencing | BGA 最后 harvest 执行免费 `FENCING`，上限受对手 reserve fence 限制；OA 只记录选择数为 VP。 | BGA `E/E149_MidnightFencer.php`; OA `shared/cards/E/E149_MidnightFencer.ts` | 改成真实 fence 子行动，并按对手可用 fence 限制 max。 |
+| `B67_HandTruck` | 中 | bake 前 continuation | BGA 是 optional 拿谷物，然后 mandatory bake；OA 无条件给谷物。 | BGA `B/B67_HandTruck.php`; OA `shared/cards/B/B67_HandTruck.ts` | 建模 optional gain 分支，之后接 mandatory bake continuation。 |
+| `B124_Trimmer` | 中 | 触发频率 | BGA 每次牧场覆盖数增加都奖励；OA 每个工作阶段第一次奖励后打 flag。 | BGA `B/B124_Trimmer.php`; OA `shared/cards/B/B124_Trimmer.ts` | 若要严格对齐，移除 after-reward flag。 |
+| `B19_MoldboardPlow` | 中 | 成功顺序 | OA 在 plow 成功前消耗使用次数。 | BGA `B/B19_MoldboardPlow.php`; OA `shared/cards/B/B19_MoldboardPlow.ts` | plow 成功后再消耗使用次数。 |
+| `B85_FarmHand` | 中 | stable 体系 | BGA farmhand stable 进入 stable built/listener/count 体系；OA 主要作为 extraData position + room capacity。 | BGA `B/B85_FarmHand.php`, `Actions/Stables.php`, `Models/PlayerBoard.php`; OA `shared/cards/B/B85_FarmHand.ts`, `shared/domain/supply-tokens.ts` | 让 FarmHand stable 进入通用 stable 统计/事件。 |
+| `B129_Seatmate` | 中 | 4 人座位限制 | BGA 4 人局只在对座未占 round 13 时允许；OA 只要 round 13 被 opponent 占就允许。 | BGA `B/B129_Seatmate.php`; OA `shared/cards/B/B129_Seatmate.ts` | 建模座位/对座限制，或限制 4p 行为。 |
+| `C22_BasketChair` | 中 | Job Contract 交互 | BGA 回收 Day Laborer 工人时清理 C23 fake worker；OA 只 recall worker + place farmer。 | BGA `C/C22_BasketChair.php`; OA `shared/cards/C/C22_BasketChair.ts`, `shared/cards/C/C23_JobContract.ts` | 补 C23 fake cleanup。 |
+| `C25_SteamMachine` | 中 | adoptive worker | BGA adoptive worker 场景会追加 forceSkip/end turn；OA 只有基础 optional bake。 | BGA `C/C25_SteamMachine.php`; OA `shared/cards/C/C25_SteamMachine.ts` | 补 adoptive/forceSkip 分支或定向确认不适用。 |
+| `C67_MineralFeeder` | 中 | reorganize 前置 | BGA 可先 optional reorganize，再检查羊是否在牧场；OA 只直接检查 pasture sheep。 | BGA `C/C67_MineralFeeder.php`; OA `shared/cards/C/C67_MineralFeeder.ts` | 增加 reorganize continuation 后再判定奖励。 |
+| `C69_LandConsolidation` | 中 | pending guard | BGA 在 Tinsmith Master / Cow Patty extra-crop pending 时禁用；OA anytime 可用即给 swap flow。 | BGA `C/C69_LandConsolidation.php`; OA `shared/cards/C/C69_LandConsolidation.ts` | 增加对应 pending guard。 |
+| `C93_InnerDistrictsDirector` | 中 | optional 范围 | BGA 整段“放石 + 可选再放人”是 optional；OA 强制先放石。 | BGA `C/C93_InnerDistrictsDirector.php`; OA `shared/cards/C/C93_InnerDistrictsDirector.ts` | 把 add-stone 也纳入 optional 序列。 |
+| `C120_AgriculturalLabourer` | 中 | exchange grain | BGA Gain/Receive/Reap/Exchange 转换 grain 都触发；OA 缺 exchange 转换路径。 | BGA `C/C120_AgriculturalLabourer.php`; OA `shared/cards/C/C120_AgriculturalLabourer.ts` | 监听 exchange 事件中转换出的 grain。 |
+| `C154_TwinResearcher` | 中 | 行动格覆盖 | BGA 覆盖 CopseAdd / Hollow / Hollow4 等；OA 只覆盖当前 subset。 | BGA `C/C154_TwinResearcher.php`; OA `shared/cards/C/C154_TwinResearcher.ts` | 补齐对应 action-space id。 |
+| `D132_HideFarmer` | 中 | 终局选择/支付 | BGA 终局前玩家选择数量、真实支付 food 并隐藏空地；OA scoring solver 自动最优。 | BGA `D/D132_HideFarmer.php`; OA `shared/cards/D/D132_HideFarmer.ts`, `shared/domain/scoring.ts` | 建模 before-end choice + hiddenSpaces。 |
+| `D161_CabbageBuyer` | 中 | renovation 触发范围 | BGA 监听任意 Renovation/Improvement；OA 只跟踪 `house-redevelopment` 的 `renovate-house`。 | BGA `D/D161_CabbageBuyer.php`; OA `shared/cards/D/D161_CabbageBuyer.ts` | 覆盖非 work-phase / 跨卡 renovation。 |
+| `E10_StrawHat` | 中 | mandatory 选择 | BGA 强制在移动或拿食物中选一项；OA 可以跳过。 | BGA `E/E10_StrawHat.php`; OA `shared/cards/E/E10_StrawHat.ts` | 移除 XOR 外层 optional。 |
+| `E68_CherryOrchard` | 低 | 描述文本 | OA desc 写成收获 wood；BGA 表达为像 grain 一样 sow 和 harvest wood。 | BGA `E/E68_CherryOrchard.php`; OA `shared/cards-display/E/E68_CherryOrchard.ts` | 恢复 BGA 文案语义。 |
+| `A22_Telegram` | 低 | turn-start 放人时序 | BGA 先 flag，再在普通放人选择中加入 fromSupply 选项；OA turn start 直接给 optional extraPlacement。 | BGA `A/A22_Telegram.php`; OA `shared/cards/A/A22_Telegram.ts` | 增加 session 覆盖确认跳过/使用时序等价，必要时并入普通放人选择。 |
+| `C27_Blueprint` | 低 | payment trade | BGA clone stone-cost trade，保留原支付路径；OA 对三张 major 直接 `stone: -1`。 | BGA `C/C27_Blueprint.php`; OA `shared/cards/C/C27_Blueprint.ts` | 保留原 trade + 额外 discounted trade。 |
+| `C133_Soldier` | 低 | 终局计分选择 | BGA 玩家选择 0..max 对并 reserve wood/stone；OA 自动最优。 | BGA `C/C133_Soldier.php`; OA `shared/cards/C/C133_Soldier.ts`, `shared/domain/scoring.ts` | 若要严格对齐，改成 before-end choice。 |
+| `E112_GrainThief` | 低 | harvest 时机 | BGA start 选择多个 grain zones，reap 时减少 harvestCount，end 再 gain grain；OA 接受时立即 pop/gain，end restore。 | BGA `E/E112_GrainThief.php`; OA `shared/cards/E/E112_GrainThief.ts` | 补跨卡顺序测试，必要时改成 BGA 时机。 |
+| `B34_SpecialFood` | 待验证 | 跨卡交互 | BGA 特判 A137；OA heuristic 可能覆盖，也可能遗漏。 | BGA `B/B34_SpecialFood.php`; OA `shared/cards/B/B34_SpecialFood.ts`, `shared/cards/A/A137_RiverineShepherd.ts` | 增加 A137+B34 定向 session 测试。 |
 
 ## 3. 已接受差异
 
 除非产品方向改变，以下内容不算当前 bug。
 
+2026-05-25 重审后，旧 `docs/card_progress.md` §5/§6 的“已接受简化 / 刻意行为差异”不再作为接受依据；相关卡牌已改列 §2 / §11，或在重审后改为已对齐。
+
 | 类别 | 卡牌 |
 |---|---|
 | 用 schema-up metadata 替代 BGA custom `isBuyable` | `A3_PaperKnife`, `B56_Brook`, `B74_ThickForest`, `B154_SheepKeeper` |
-| 旧文档已接受的简化实现 | `A22_Telegram`, `A136_DrudgeryReeve`, `B27_Toolbox`, `B33_Mantlepiece`, `B85_FarmHand`, `B129_Seatmate`, `C22_BasketChair`, `C24_BedintheGrainField`, `C25_SteamMachine`, `C27_Blueprint`, `C42_RavenousHunger`, `C52_HuntsmansHat`, `C67_MineralFeeder`, `C69_LandConsolidation`, `C72_FestivalPlanning`, `C93_InnerDistrictsDirector`, `C120_AgriculturalLabourer`, `C133_Soldier`, `C146_WorkshopAssistant`, `C154_TwinResearcher`, `D1_ZigzagHarrow`（passing 已对齐；harrow target 仍为简化）, `D36_BreedRegistry`, `D101_SugarBaker`, `D132_HideFarmer`, `D161_CabbageBuyer`, `E112_GrainThief`, `E149_MidnightFencer` |
 | field/cardField 作物约束差异 | `E70_CropRotationField`, `E72_ArtichokeField` |
 | BGA 未实现，但 OA 有产品扩展/重写 | `A113_HeresyTeacher`, `D25_WitchesDanceFloor` |
 | BGA banned，但 OA 保留 | `A131_CraftTeacher`, `A133_Braggart`, `A14_CarpentersHammer`, `A33_BigCountry`, `A39_Chapel`, `A48_ShavingHorse`, `A82_WorkCertificate`, `A97_Freshman`, `B10_Caravan`, `B117_Informant`, `B132_EstateMaster`, `B151_LittlePeasant`, `B15_CarpentersBench`, `B161_Weakling`, `B22_WalkingBoots`, `C102_TreeGuard`, `C125_Nightworker`, `C28_TeachersDesk`, `C31_WritingChamber`, `C3_CarriageTrip`, `C60_SmallPottersOven`, `C63_CraftBrewery`, `C99_GardenDesigner`, `D137_TradeTeacher`, `D19_PulverizerPlow`, `D21_Recruitment`, `D33_SummerHouse`, `D4_CrossCutWood`, `D74_RoyalWood`, `D92_ChildOmbudsman`, `D97_BeggingStudent`, `E22_GuestRoom` |
@@ -338,6 +350,8 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 
 状态值：`已对齐`、`已接受差异`、`需复核`、`排除`。
 
+`需复核` 表示未对齐：已经发现 BGA 差异或高置信行为风险，需要修复或补测试确认后才能改为 `已对齐`；它不是“已接受差异”。
+
 | 卡牌 | 状态 | 备注 |
 |---|---|---|
 | `A1_Shelter` | 已对齐 |  |
@@ -361,7 +375,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `A19_Handplow` | 已对齐 |  |
 | `A20_DoubleTurnPlow` | 已对齐 |  |
 | `A21_FamilyFriendHome` | 已对齐 |  |
-| `A22_Telegram` | 已接受差异 | 已接受的行为 / 产品差异 |
+| `A22_Telegram` | 需复核 | BGA turn start flag 后并入普通放人选择；OA turn start 直接给 optional extraPlacement，需确认跳过/使用时序等价 |
 | `A23_StoneCompany` | 已对齐 |  |
 | `A24_ThreshingBoard` | 已对齐 |  |
 | `A25_Bassinet` | 已对齐 |  |
@@ -475,7 +489,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `A133_Braggart` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `A134_FullFarmer` | 已对齐 |  |
 | `A135_AnimalReeve` | 已对齐 |  |
-| `A136_DrudgeryReeve` | 已接受差异 | 已接受的行为 / 产品差异 |
+| `A136_DrudgeryReeve` | 需复核 | BGA sharedScoring 每位玩家可选 0..max sets 并 reserve 资源；OA 仅持卡玩家自动最优计分 |
 | `A137_RiverineShepherd` | 已对齐 |  |
 | `A138_Harpooner` | 已对齐 |  |
 | `A139_HollowWarden` | 已对齐 |  |
@@ -546,13 +560,13 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B24_Lasso` | 需复核 | 只在动物市场后触发，漏掉非动物市场首次放人路径 |
 | `B25_BreadPaddle` | 已对齐 |  |
 | `B26_AgrarianFences` | 已对齐 |  |
-| `B27_Toolbox` | 已接受差异 | 已接受的简化实现 |
+| `B27_Toolbox` | 已对齐 | 重审未见实质行为差异；建 room/stable/fence 后可买 Joinery/Pottery/Basket，子行动 `trueAction=false` |
 | `B28_ForestryStudies` | 已对齐 |  |
 | `B29_CookeryLesson` | 已对齐 | lessons-3 行动格覆盖已由共享 lessons-space helper 对齐 |
 | `B30_WoodPalisades` | 已对齐 |  |
 | `B31_PotteryYard` | 已对齐 |  |
 | `B32_Kettle` | 已对齐 |  |
-| `B33_Mantlepiece` | 已接受差异 | 已接受的简化实现 |
+| `B33_Mantlepiece` | 已对齐 | desc/cost/vp/prereq/onBuy 得分对齐；BGA/OA 均未见 runtime 禁止 renovate 逻辑 |
 | `B34_SpecialFood` | 需复核 | A137 Riverine Shepherd 交互需要定向验证 |
 | `B35_HookKnife` | 已对齐 |  |
 | `B36_Bottles` | 已对齐 |  |
@@ -604,7 +618,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B82_ValueAssets` | 已对齐 |  |
 | `B83_MuddyPuddles` | 已对齐 |  |
 | `B84_AcornsBasket` | 已对齐 |  |
-| `B85_FarmHand` | 已接受差异 | 已接受的行为 / 产品差异 |
+| `B85_FarmHand` | 需复核 | FarmHand stable 未进入通用 `stableTiles` / stables flow 统计，跨卡 stable 数和 after-stables 互动可能遗漏 |
 | `B86_TruffleSearcher` | 已对齐 |  |
 | `B87_Cottager` | 已对齐 |  |
 | `B88_EstablishedPerson` | 已对齐 | BGA `formatCost([])` 通过 `renovate-house` `actionContext.exactCost` 表达免费翻修；后续 ordinary fence 直接走 `fence`。 |
@@ -648,7 +662,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B126_Carpenter` | 已对齐 |  |
 | `B127_Seducer` | 已对齐 |  |
 | `B128_Plumber` | 已对齐 |  |
-| `B129_Seatmate` | 已接受差异 | 已接受的简化实现 |
+| `B129_Seatmate` | 需复核 | 4 人局缺 BGA 对座未占 round 13 的座位限制 |
 | `B130_FullPeasant` | 已对齐 |  |
 | `B131_Equipper` | 已对齐 |  |
 | `B132_EstateMaster` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
@@ -721,12 +735,12 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C19_SwingPlow` | 已对齐 |  |
 | `C20_MolePlow` | 已对齐 |  |
 | `C21_HeartofStone` | 已对齐 |  |
-| `C22_BasketChair` | 已接受差异 | 已接受的行为 / 产品差异 |
+| `C22_BasketChair` | 需复核 | 缺 Day Laborer + C23 Job Contract fake worker cleanup |
 | `C23_JobContract` | 已对齐 |  |
-| `C24_BedintheGrainField` | 已接受差异 | 已接受的简化实现 |
-| `C25_SteamMachine` | 已接受差异 | 已接受的简化实现 |
+| `C24_BedintheGrainField` | 需复核 | BGA 下一次 harvest 是 optional WishChildren；OA 有空房时强制 `family-growth` |
+| `C25_SteamMachine` | 需复核 | 缺 BGA adoptive worker 场景下的 forceSkip/end-turn 分支 |
 | `C26_Flail` | 已对齐 |  |
-| `C27_Blueprint` | 已接受差异 | 已接受的简化实现 |
+| `C27_Blueprint` | 需复核 | BGA clone stone-cost payment trade 并保留原路径；OA 对三张 major 直接 `stone: -1` |
 | `C28_TeachersDesk` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `C29_BeerTable` | 已对齐 |  |
 | `C30_HalfTimberedHouse` | 已对齐 |  |
@@ -741,7 +755,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C39_StudioBoat` | 已对齐 |  |
 | `C40_CanvasSack` | 已对齐 |  |
 | `C41_FarmStore` | 已对齐 |  |
-| `C42_RavenousHunger` | 已接受差异 | 已接受的简化实现 |
+| `C42_RavenousHunger` | 需复核 | 额外 `place-farmer` 未限制到 BGA 累积格列表 |
 | `C43_FarmBuilding` | 已对齐 |  |
 | `C44_ChickenCoop` | 已对齐 |  |
 | `C45_Stew` | 已对齐 |  |
@@ -751,7 +765,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C49_BeerStall` | 已对齐 |  |
 | `C50_StableYard` | 已对齐 |  |
 | `C51_FishingNet` | 已对齐 |  |
-| `C52_HuntsmansHat` | 已接受差异 | 已接受的简化实现 |
+| `C52_HuntsmansHat` | 已对齐 | cooking prerequisite 与 action-space boar/pig gain 得 food 路径对齐；未见当前 OA action-space 差异 |
 | `C53_GypsysCrock` | 已对齐 |  |
 | `C54_MarketBooth` | 已对齐 | printed cost 为 1 stable；收获 exchange 支付 grain + reserve fence |
 | `C55_Studio` | 已对齐 |  |
@@ -766,12 +780,12 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C64_CornSchnappsDistillery` | 已对齐 |  |
 | `C65_Granary` | 已对齐 |  |
 | `C66_EternalRyeCultivation` | 已对齐 |  |
-| `C67_MineralFeeder` | 已接受差异 | 已接受的简化实现 |
+| `C67_MineralFeeder` | 需复核 | 缺 BGA 先 optional reorganize 再检查 pasture sheep 的触发路径 |
 | `C68_Bookcase` | 已对齐 |  |
-| `C69_LandConsolidation` | 已接受差异 | 已接受的简化实现 |
+| `C69_LandConsolidation` | 需复核 | 缺 Tinsmith Master / Cow Patty extra-crop pending guard |
 | `C70_LettucePatch` | 已对齐 |  |
 | `C71_Slurry` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `C72_FestivalPlanning` | 已接受差异 | 已接受的简化实现 |
+| `C72_FestivalPlanning` | 需复核 | OA 使用未注册 `reap` action，BGA private field phase 基本不可执行 |
 | `C73_SeaweedFertilizer` | 已对齐 |  |
 | `C74_PrivateForest` | 已对齐 |  |
 | `C75_Firewood` | 已对齐 |  |
@@ -792,7 +806,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C90_FieldWatchman` | 已对齐 |  |
 | `C91_PlowHero` | 已对齐 |  |
 | `C92_AutumnMother` | 已对齐 |  |
-| `C93_InnerDistrictsDirector` | 已接受差异 | 已接受的简化实现 |
+| `C93_InnerDistrictsDirector` | 需复核 | BGA 整段能力 optional；OA 强制先给另一行动格加 stone |
 | `C94_StableCleaner` | 已对齐 | anytime 入口用 stables preview + `computeCosts.stables` 判断可用性，1 wood + 1 food exactCost 可叠加 C88 等 stable cost modifier。 |
 | `C95_BasketWeaver` | 已对齐 |  |
 | `C96_Merchant` | 已对齐 |  |
@@ -819,7 +833,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C117_Legworker` | 已对齐 |  |
 | `C118_WoodCollector` | 已对齐 |  |
 | `C119_SkillfulRenovator` | 已对齐 |  |
-| `C120_AgriculturalLabourer` | 已接受差异 | 已接受的简化实现 |
+| `C120_AgriculturalLabourer` | 需复核 | 缺 BGA exchange 转换 grain 后从卡上取 clay 的路径 |
 | `C121_ClayKneader` | 已对齐 |  |
 | `C122_Bricklayer` | 已对齐 |  |
 | `C123_Freemason` | 已对齐 |  |
@@ -832,7 +846,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C130_OutskirtsDirector` | 已对齐 |  |
 | `C131_PrivateTeacher` | 已对齐 |  |
 | `C132_TimberShingleMaker` | 已对齐 |  |
-| `C133_Soldier` | 已接受差异 | 已接受的行为 / 产品差异 |
+| `C133_Soldier` | 需复核 | BGA 终局前玩家选择 0..max 对并 reserve wood/stone；OA scoring solver 自动最优 |
 | `C134_CowPrince` | 已对齐 |  |
 | `C135_Constable` | 已对齐 |  |
 | `C136_RanchProvost` | 已对齐 |  |
@@ -845,7 +859,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C143_StoneBuyer` | 已对齐 |  |
 | `C144_ReedRoofRenovator` | 已对齐 |  |
 | `C145_ForestReviewer` | 已对齐 |  |
-| `C146_WorkshopAssistant` | 已接受差异 | 已接受的简化实现 |
+| `C146_WorkshopAssistant` | 需复核 | BGA 把 resource pairs 放卡上并在 opponent renovation 后取回；OA 直接把 pairs 加到 supply |
 | `C147_Cowherd` | 已对齐 |  |
 | `C148_MudWallower` | 已对齐 |  |
 | `C149_ResourceRecycler` | 已对齐 |  |
@@ -853,7 +867,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C151_SowingDirector` | 已对齐 |  |
 | `C152_Puppeteer` | 已对齐 |  |
 | `C153_PatternMaker` | 已对齐 |  |
-| `C154_TwinResearcher` | 已接受差异 | 已接受的简化实现 |
+| `C154_TwinResearcher` | 需复核 | BGA 覆盖 CopseAdd / Hollow / Hollow4 等行动格；OA 只覆盖 subset |
 | `C155_FoodDistributor` | 已对齐 |  |
 | `C156_HoofCaregiver` | 已对齐 |  |
 | `C157_ResourceAnalyzer` | 已对齐 |  |
@@ -880,7 +894,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `C178_OnSiteReverend` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `C179_BovinePioneer` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `C180_Trapper` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `D1_ZigzagHarrow` | 已接受差异 | passing 已对齐；harrow target 仍为简化，plow target 限制仍未透传到 farm-edit UI |
+| `D1_ZigzagHarrow` | 需复核 | BGA `onBuy` 限制 plow 到 zigzag 目标；OA 未透传 `actionContext.allowedTiles` 到 plow / farm-edit |
 | `D2_DwellingPlan` | 已对齐 | 即时翻修子行动使用当前 `renovate-house` action id。 |
 | `D3_Furrows` | 已对齐 |  |
 | `D4_CrossCutWood` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
@@ -915,7 +929,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `D33_SummerHouse` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `D34_LuxuriousHostel` | 已对齐 |  |
 | `D35_FodderChamber` | 已对齐 |  |
-| `D36_BreedRegistry` | 已接受差异 | 已接受的简化实现 |
+| `D36_BreedRegistry` | 需复核 | BGA 统计整局 board/card sheep 并在买入时初始化；OA 只累计后续 action-space collect/exchange |
 | `D37_Sculpture` | 已对齐 |  |
 | `D38_MilkingStool` | 已对齐 |  |
 | `D39_TruffleSlicer` | 已对齐 |  |
@@ -980,7 +994,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `D98_Transactor` | 已对齐 |  |
 | `D99_EarthenwarePotter` | 已对齐 |  |
 | `D100_LordoftheManor` | 已对齐 |  |
-| `D101_SugarBaker` | 已接受差异 | 已接受的简化实现 |
+| `D101_SugarBaker` | 需复核 | BGA 支付 food 得 VP 后还把 food 放到 Grain Utilization；OA 只 pay/gain |
 | `D102_SampleStableMaker` | 已对齐 |  |
 | `D103_CanalBoatman` | 已对齐 |  |
 | `D104_Cultivator` | 已对齐 |  |
@@ -1011,7 +1025,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `D129_LumberVirtuoso` | 已对齐 |  |
 | `D130_RecreationalCarpenter` | 已对齐 |  |
 | `D131_CraftsmanshipPromoter` | 已对齐 |  |
-| `D132_HideFarmer` | 已接受差异 | 已接受的行为 / 产品差异 |
+| `D132_HideFarmer` | 需复核 | BGA 终局前玩家选择数量、真实支付 food 并隐藏空地；OA scoring solver 自动最优 |
 | `D133_BeerTentOperator` | 已对齐 |  |
 | `D134_OysterEater` | 已对齐 |  |
 | `D135_GardeningHeadOfficial` | 已对齐 |  |
@@ -1040,7 +1054,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `D158_BeanCounter` | 已对齐 |  |
 | `D159_ReedSeller` | 排除 | BGA implemented=false；OA 保留 data-only 定义 |
 | `D160_Midwife` | 已对齐 |  |
-| `D161_CabbageBuyer` | 已接受差异 | 已接受的行为 / 产品差异 |
+| `D161_CabbageBuyer` | 需复核 | BGA 监听任意 Renovation/Improvement；OA 只跟踪 `house-redevelopment` 的 `renovate-house` |
 | `D162_ClayFirer` | 已对齐 |  |
 | `D163_JourneymanBricklayer` | 已对齐 |  |
 | `D164_PetGrower` | 已对齐 |  |
@@ -1171,7 +1185,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `E109_BraidMaker` | 已对齐 |  |
 | `E110_Dentist` | 已对齐 |  |
 | `E111_Recluse` | 已对齐 |  |
-| `E112_GrainThief` | 已接受差异 | 已接受的简化实现 |
+| `E112_GrainThief` | 需复核 | BGA start 选 grain zones、reap 减 harvestCount、end gain；OA 接受时立即 pop/gain，end restore |
 | `E113_Godmother` | 已对齐 |  |
 | `E114_ShedBuilder` | 已对齐 |  |
 | `E115_SeedServant` | 已对齐 |  |
@@ -1208,7 +1222,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `E146_Reseller` | 已对齐 |  |
 | `E147_AnimalDriver` | 已对齐 |  |
 | `E148_Lazybones` | 已对齐 | reserved stable action spaces 计入 stable supply helper；无空地时仍可清理 marker，不把 no-op 清理计为卡牌 use |
-| `E149_MidnightFencer` | 已接受差异 | 已接受的行为 / 产品差异 |
+| `E149_MidnightFencer` | 需复核 | BGA 最后 harvest 执行免费 `FENCING`；OA 只按选择数记 VP，不改 farm |
 | `E150_RockBeater` | 已对齐 |  |
 | `E151_DeliveryNurse` | 已对齐 |  |
 | `E152_BargainHunter` | 已对齐 |  |
