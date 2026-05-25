@@ -68,6 +68,30 @@ describe('constructAction.resolveChoice', () => {
     expect(result.type).toBe('ok')
   })
 
+  it('cancel returns ok when forbidCancel has no reachable room selection', () => {
+    const result = constructAction.resolveChoice!(
+      makeCtx({
+        player: {
+          resources: { wood: 0, clay: 0, stone: 0, reed: 0, grain: 0, vegetable: 0, food: 0, sheep: 0, boar: 0, cattle: 0 } as Resource,
+          roomTiles: [
+            { row: 0, col: 0 },
+            { row: 0, col: 4 },
+          ],
+          fields: [
+            { row: 0, col: 1, stacks: [] },
+            { row: 1, col: 0, stacks: [] },
+            { row: 0, col: 3, stacks: [] },
+            { row: 1, col: 4, stacks: [] },
+          ],
+        },
+        actionContext: { cancelPolicy: 'forbidCancel', maxRooms: 1, exactCost: { max: 1 } },
+      }),
+      'cancel',
+    )
+
+    expect(result.type).toBe('ok')
+  })
+
   it('first call with payload + single payment combo finalizes immediately', () => {
     const room: FarmTilePosition = { row: 0, col: 0 }
     const ctx = makeCtx()

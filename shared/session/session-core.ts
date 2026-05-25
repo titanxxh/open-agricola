@@ -20,6 +20,7 @@ import type {
   Resource,
   ResourceBatchExchangePayload,
   InteractionAnimalReorgZone,
+  ExactCost,
 } from '../contract/types.ts'
 import type { ActionDetailParts, PublicEventCancellation } from '../contract/protocol/game.ts'
 import type { PrivateGameEvent } from '../contract/private-events.ts'
@@ -1225,6 +1226,11 @@ export class GameCore {
     })
   }
 
+  private readExactCost(actionContext?: Record<string, unknown>): ExactCost | undefined {
+    const exactCost = actionContext?.exactCost
+    return exactCost && typeof exactCost === 'object' ? exactCost as ExactCost : undefined
+  }
+
   private buildStableInteraction(
     player: PlayerState,
     costOverride?: Partial<Resource>,
@@ -1235,14 +1241,22 @@ export class GameCore {
     const idx = this.state.players.indexOf(player)
     return playerBoard(this.state, idx).farmyard.selectableTiles('stable', {
       costOverride,
+      exactCost: this.readExactCost(actionContext),
       zoneFilter: zoneFilter === 'pasture-1' ? 'pasture-1' : undefined,
       max: typeof max === 'number' ? max : undefined,
     })
   }
 
-  private buildPlowInteraction(player: PlayerState, costOverride?: Partial<Resource>): InteractionFarmSelection {
+  private buildPlowInteraction(
+    player: PlayerState,
+    costOverride?: Partial<Resource>,
+    actionContext?: Record<string, unknown>,
+  ): InteractionFarmSelection {
     const idx = this.state.players.indexOf(player)
-    return playerBoard(this.state, idx).farmyard.selectableTiles('plow', { costOverride })
+    return playerBoard(this.state, idx).farmyard.selectableTiles('plow', {
+      costOverride,
+      exactCost: this.readExactCost(actionContext),
+    })
   }
 
   private buildSowInteraction(player: PlayerState): InteractionFarmSelection {
@@ -1295,7 +1309,7 @@ export class GameCore {
       case 'stable':
         return this.buildStableInteraction(player, costOverride, ctx)
       case 'plow':
-        return this.buildPlowInteraction(player, costOverride)
+        return this.buildPlowInteraction(player, costOverride, ctx)
       case 'sow':
         return this.buildSowInteraction(player)
       default:
