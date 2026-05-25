@@ -57,9 +57,8 @@ describe('B19_MoldboardPlow session', () => {
     resp = session.resolveChoice(0, acceptOption!.value)
     expect(resp.ok).toBe(true)
 
-    // pop-card-stack runs, then plow interaction starts
-    // Should now be in farmSelect for the extra plow
     expect(resp.interaction.stateId).toBe('wait')
+    expect(getCardStack(resp.state.players[0]!, 'B19_MoldboardPlow').length).toBe(2)
     const tile2 = resp.interaction.farm.selectableTiles[0]
     expect(tile2).toBeDefined()
     resp = session.resolveChoice(0, 'confirm', { tile: tile2 })

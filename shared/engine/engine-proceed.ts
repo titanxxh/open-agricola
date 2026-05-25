@@ -7,6 +7,7 @@ import type {
   ActionChoiceOption,
   InteractionRequest,
   Resource,
+  ActionSpace,
 } from '../contract/types'
 import {
   ActionNode,
@@ -63,6 +64,16 @@ type EngineContext = {
   player: ActionExecutionContext['player']
   space: ActionExecutionContext['space']
   emitPrivateEvent?: ActionExecutionContext['emitPrivateEvent']
+}
+
+const resolveExecutionSpace = (
+  state: EngineContext['state'],
+  fallback: ActionSpace,
+  actionContext?: Record<string, unknown>,
+): ActionSpace => {
+  const targetSpaceId = actionContext?.targetSpaceId
+  if (typeof targetSpaceId !== 'string') return fallback
+  return state.actionSpaces.find((space) => space.id === targetSpaceId) ?? fallback
 }
 
 const hasLegacyLogSurface = (result: ActionExecutionResult): boolean => {
@@ -482,13 +493,14 @@ const buildOptionalPrompt = (
     resolveSubtree(node)
     return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
   }
+  const actionContext = actionContextForNode(actionNode, int)
   const executionContext: ActionExecutionContext = {
     state: context.state,
     player: context.player,
-    space: context.space,
+    space: resolveExecutionSpace(context.state, context.space, actionContext),
     params: actionNode.params,
     sourceCard: actionNode.sourceCard,
-    actionContext: actionContextForNode(actionNode, int),
+    actionContext,
     emitPrivateEvent: context.emitPrivateEvent,
   }
   const doable = int.hooks.applyIsDoable(
@@ -645,13 +657,14 @@ const executeDeferredHostAction = (
     commitIfEngineComplete(int, context, blockedResult)
     return { type: 'ok', nodeId: node.id, actionId: node.actionId, result: blockedResult }
   }
+  const actionContext = actionContextForNode(node, int)
   const executionContext: ActionExecutionContext = {
     state: context.state,
     player: context.player,
-    space: context.space,
+    space: resolveExecutionSpace(context.state, context.space, actionContext),
     params: node.params,
     sourceCard: node.sourceCard,
-    actionContext: actionContextForNode(node, int),
+    actionContext,
     emitPrivateEvent: context.emitPrivateEvent,
   }
   const action = int.registry.get(node.actionId)
@@ -848,13 +861,14 @@ export function engineProceed(
     }[]
     const options = availableActions
       .map((entry) => {
+        const actionContext = actionContextForNode(entry.actionNode, int)
         const executionContext: ActionExecutionContext = {
           state: context.state,
           player: context.player,
-          space: context.space,
+          space: resolveExecutionSpace(context.state, context.space, actionContext),
           params: entry.actionNode.params,
           sourceCard: entry.actionNode.sourceCard,
-          actionContext: actionContextForNode(entry.actionNode, int),
+          actionContext,
           emitPrivateEvent: context.emitPrivateEvent,
         }
         const action = int.registry.get(entry.actionNode.actionId)
@@ -1047,13 +1061,14 @@ export function engineProceed(
     if (!action) {
       return { type: 'blocked', nodeId: node.id }
     }
+    const actionContext = actionContextForNode(node, int)
     const executionContext: ActionExecutionContext = {
       state: context.state,
       player: context.player,
-      space: context.space,
+      space: resolveExecutionSpace(context.state, context.space, actionContext),
       params: node.params,
       sourceCard: replaceSourceCard,
-      actionContext: actionContextForNode(node, int),
+      actionContext,
       emitPrivateEvent: context.emitPrivateEvent,
     }
     if (!int.beforePhaseFlowNodeIds.has(node.id)) {

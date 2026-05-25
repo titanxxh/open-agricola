@@ -18,6 +18,7 @@ export const C24_BedintheGrainField_impl = {
     return {
       type: 'leaf',
       actionId: 'family-growth',
+      optional: true,
       sourceCard: CARD_ID,
     }
   },

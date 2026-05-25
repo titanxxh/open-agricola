@@ -197,20 +197,21 @@ describe('engine event transactions', () => {
   })
 
   it('keeps eventSink when place-farmer forwards to the target action space', () => {
-    const target = action('target-space-event-action', (context) => {
+    const target = action('target-space', (context) => {
       emitWoodGain(context, 4)
       return { type: 'ok' }
     })
     const state = makeEventTestState()
     const player = state.players[0]!
     const targetSpace = asActionSpace(target)
-    targetSpace.id = 'target-space'
     state.actionSpaces = [targetSpace]
     const { engine } = makeEventTestEngine([placeFarmerAction, target])
     const space = asActionSpace(placeFarmerAction)
 
     expect(engine.proceed({ state, player, space }).type).toBe('choice')
-    expect(engine.resolveChoice('target-space', { state, player, space }).type).toBe('ok')
+    expect(engine.resolveChoice('target-space', { state, player, space }).type).toBe('flow')
+    expect(engine.proceed({ state, player, space }).type).toBe('ok')
+    expect(engine.proceed({ state, player, space }).type).toBe('done')
 
     expect(state.events).toMatchObject([
       {

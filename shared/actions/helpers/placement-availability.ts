@@ -1,10 +1,4 @@
-import type {
-  ActionExecutionContext,
-  ActionSpace,
-  GameState,
-  PlayerState,
-  Resource,
-} from '../../contract/types'
+import type { ActionChoiceOption, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
 import type { CardListenerContextInput } from '../../cards/card-listeners'
 import { isSpaceOccupied } from '../../domain/space'
 import { getMatchingListeners, executeCardListener } from '../../cards/card-listeners'
@@ -14,6 +8,7 @@ import { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'
 export type AllowedPlacement = {
   spaceId: string
   allowOccupied: boolean
+  option?: ActionChoiceOption
 }
 
 const createPlaceFarmerVirtualSpace = (): ActionSpace => ({
@@ -39,7 +34,7 @@ export const exclusiveOwnerOverride = (space: ActionSpace, player: PlayerState, 
   space.exclusiveUse?.playerId === player.id && state.round < space.exclusiveUse.untilRound
 
 export const openRoundForSpace = (state: GameState, space: ActionSpace): number => {
-  const roundIndex = state.roundActionOrder.indexOf(space.id)
+  const roundIndex = state.roundActionOrder?.indexOf(space.id) ?? -1
   return roundIndex === -1 ? space.roundAvailable : roundIndex + 1
 }
 
@@ -53,6 +48,7 @@ export const canEnterSpace = (space: ActionSpace, player: PlayerState, state: Ga
 export function computeAllowedPlacementSpaces(
   state: GameState,
   player: PlayerState,
+  contextOverrides: Partial<CardListenerContextInput> = {},
 ): AllowedPlacement[] {
   const base: AllowedPlacement[] = state.actionSpaces
     .filter((s) => {
@@ -61,15 +57,35 @@ export function computeAllowedPlacementSpaces(
     })
     .map(s => ({ spaceId: s.id, allowOccupied: false }))
 
-  const context: ActionExecutionContext & { actionId: string } = {
+  const baseOptions = base.map((entry) => {
+    const space = state.actionSpaces.find((s) => s.id === entry.spaceId)!
+    return { value: entry.spaceId, labelKey: space.nameKey }
+  })
+  const result = contextOverrides.result ?? {
+    type: 'request' as const,
+    request: { kind: 'choice' as const, options: baseOptions },
+  }
+  const actionResults = runActionHooks({
     state,
     player,
     space: createPlaceFarmerVirtualSpace(),
     actionId: 'place-farmer',
+    phase: 'computeArgs',
+    sourceCard: contextOverrides.sourceCard,
+    params: contextOverrides.params,
+    costs: contextOverrides.costs,
+    actionContext: contextOverrides.actionContext,
+    result,
+  })
+  const listenerContext: CardListenerContextInput = {
+    ...contextOverrides,
+    state,
+    player,
+    space: createPlaceFarmerVirtualSpace(),
+    actionId: 'place-farmer',
+    phase: 'computeArgs',
+    result,
   }
-
-  const actionResults = runActionHooks({ ...context, phase: 'computeArgs' })
-  const listenerContext: CardListenerContextInput = { ...context, phase: 'computeArgs' }
   const matched = getMatchingListeners(listenerContext)
   const listenerResults = matched
     .map(entry =>
@@ -88,7 +104,7 @@ export function computeAllowedPlacementSpaces(
       if (!space) continue
       if (!canEnterSpace(space, player, state)) continue
       if (!space.canBeExecutedByPlayer(state, player)) continue
-      extra.push({ spaceId, allowOccupied: true })
+      extra.push({ spaceId, allowOccupied: true, option: opt })
     }
   }
 
