@@ -480,7 +480,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A134_FullFarmer` | 已对齐 |  |
 | `A135_AnimalReeve` | 已对齐 |  |
 | `A136_DrudgeryReeve` | 需复核 | BGA sharedScoring 每位玩家可选 0..max sets 并 reserve 资源；OA 仅持卡玩家自动最优计分 |
-| `A137_RiverineShepherd` | 已对齐 |  |
+| `A137_RiverineShepherd` | 已对齐 | optional extra good 使用另一个累积格的 partial collect，会扣除来源格并保留 action-space provenance |
 | `A138_Harpooner` | 已对齐 |  |
 | `A139_HollowWarden` | 已对齐 |  |
 | `A140_ShovelBearer` | 已对齐 |  |
@@ -557,7 +557,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B31_PotteryYard` | 已对齐 |  |
 | `B32_Kettle` | 已对齐 |  |
 | `B33_Mantlepiece` | 已对齐 | desc/cost/vp/prereq/onBuy 得分对齐；BGA/OA 均未见 runtime 禁止 renovate 逻辑 |
-| `B34_SpecialFood` | 已对齐 | A137/Riverine Shepherd 式行动格动物移动 provenance 已有定向 session 覆盖，bonus VP 只记一次 |
+| `B34_SpecialFood` | 已对齐 | A137/Riverine Shepherd 式行动格动物移动 provenance 已有定向 session 覆盖，bonus VP 只记一次并在牌面显示累计值 |
 | `B35_HookKnife` | 已对齐 |  |
 | `B36_Bottles` | 已对齐 |  |
 | `B37_Grange` | 已对齐 |  |

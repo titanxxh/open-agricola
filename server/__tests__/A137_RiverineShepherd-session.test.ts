@@ -47,6 +47,7 @@ describe('A137_RiverineShepherd session', () => {
     const session = setup()
     const state = session.getState().state
     const reedBefore = state.players[0]!.resources.reed
+    const reedBankBefore = state.actionSpaces.find((s) => s.id === 'reed-bank')!.resources.reed
     session.loadState(state)
 
     // Use sheep-market; sheep collection triggers animalReorg first
@@ -81,12 +82,14 @@ describe('A137_RiverineShepherd session', () => {
     }
 
     expect(resp.state.players[0]!.resources.reed).toBe(reedBefore + 1)
+    expect(resp.state.actionSpaces.find((s) => s.id === 'reed-bank')!.resources.reed).toBe(reedBankBefore - 1)
   })
 
   it('offers optional sheep when using reed-bank (sheep-market has sheep)', () => {
     const session = setup()
     const state = session.getState().state
     const sheepBefore = state.players[0]!.resources.sheep
+    const sheepMarketBefore = state.actionSpaces.find((s) => s.id === 'sheep-market')!.resources.sheep
     session.loadState(state)
 
     // Use reed-bank
@@ -113,6 +116,7 @@ describe('A137_RiverineShepherd session', () => {
     }
 
     expect(resp.state.players[0]!.resources.sheep).toBe(sheepBefore + 1)
+    expect(resp.state.actionSpaces.find((s) => s.id === 'sheep-market')!.resources.sheep).toBe(sheepMarketBefore - 1)
   })
 
   it('does NOT offer reed when using sheep-market if reed-bank has no reed', () => {
