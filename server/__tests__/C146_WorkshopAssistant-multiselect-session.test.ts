@@ -324,6 +324,26 @@ describe('C146 — multi-select pairs (onBuy)', () => {
     expect(resp.interaction.options?.some((option) => option.value !== '__skip__')).toBe(true)
   })
 
+  it('opponent renovation owner prompt cannot undo past the player-switch boundary', () => {
+    const { session } = setupRenovationWithStoredPairs(['WC'])
+    const resp = driveOpponentRenovationToC146(session)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.playerIndex).toBe(0)
+    expect(resp.interaction.sourceCard).toBe(CARD_ID)
+    expect(resp.interaction.allowedCommands).not.toContain('undoStep')
+    expect(resp.interaction.allowedCommands).not.toContain('undoAction')
+    expect(resp.historyLength).toBe(0)
+    expect(resp.hasActionStartSnapshot).toBe(false)
+
+    const undoStep = session.undoStep()
+    expect(undoStep.ok).toBe(false)
+    expect(undoStep.ok ? '' : undoStep.error).toBe('cannot undo past boundary')
+
+    const undoAction = session.undoAction()
+    expect(undoAction.ok).toBe(false)
+    expect(undoAction.ok ? '' : undoAction.error).toBe('cannot undo past boundary')
+  })
+
   it('opponent renovation confirms before returning from owner choice to acting player choice', () => {
     const { session } = setupRenovationWithStoredPairs(['WC', 'RS'])
     let resp = session.takeAction(1, 'house-redevelopment')

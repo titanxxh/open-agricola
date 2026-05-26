@@ -1463,11 +1463,12 @@ export class GameCore {
 
     if (!frame || !envelope) {
       const anytimeActions = this.buildAnytimeEntries().map((entry) => entry.descriptor)
+      const baseCommands: InteractionCommand[] = anytimeActions.length > 0
+        ? ['takeAction', 'undoStep', 'undoAction', 'takeAnytimeAction']
+        : ['takeAction', 'undoStep', 'undoAction']
       return {
         stateId: 'idle',
-        allowedCommands: anytimeActions.length > 0
-          ? ['takeAction', 'undoStep', 'undoAction', 'takeAnytimeAction']
-          : ['takeAction', 'undoStep', 'undoAction'],
+        allowedCommands: this.filterUndoCommands(baseCommands),
         anytimeActions,
       }
     }
@@ -1489,8 +1490,8 @@ export class GameCore {
     const buildCmds = (
       base: ReadonlyArray<InteractionCommand>,
     ): InteractionCommand[] => {
-      if (!includeAnytimeCmd) return [...base]
-      return [...base, 'takeAnytimeAction']
+      const commands: InteractionCommand[] = includeAnytimeCmd ? [...base, 'takeAnytimeAction'] : [...base]
+      return this.filterUndoCommands(commands)
     }
     const anytimeDescriptors = anytimeEntries.map((entry) => entry.descriptor)
 
@@ -1630,7 +1631,7 @@ export class GameCore {
           sourceCard,
           request,
           options: [],
-          allowedCommands: ['undoStep', 'undoAction'],
+          allowedCommands: this.filterUndoCommands(['undoStep', 'undoAction']),
           anytimeActions: [],
         }
       case 'choice':
@@ -1718,8 +1719,8 @@ export class GameCore {
       ok,
       state: this.state,
       interaction,
-      historyLength: this.history.length,
-      hasActionStartSnapshot: this.actionStartIndex !== null,
+      historyLength: this.canUndoStepNow() ? this.history.length : 0,
+      hasActionStartSnapshot: this.canUndoActionNow(),
       scores: Scoring.computeAll(this.state),
       pastureCapacities: this.getPastureCapacities(),
     }
@@ -1944,6 +1945,34 @@ export class GameCore {
       }
     }
     this.actionStartIndex = null
+  }
+
+  private latestUndoBoundaryIndex(): number {
+    for (let i = this.history.length - 1; i >= 0; i -= 1) {
+      if (this.history[i]?.undoBoundary) return i
+    }
+    return -1
+  }
+
+  private canUndoStepNow(): boolean {
+    if (this.state.pendingUndoBoundary === true) return false
+    const entry = this.history[this.history.length - 1]
+    return !!entry && entry.undoBoundary !== true
+  }
+
+  private canUndoActionNow(): boolean {
+    if (this.state.pendingUndoBoundary === true) return false
+    if (this.actionStartIndex === null) return false
+    return this.actionStartIndex > this.latestUndoBoundaryIndex()
+  }
+
+  private filterUndoCommands(base: ReadonlyArray<InteractionCommand>): InteractionCommand[] {
+    const canUndoStep = this.canUndoStepNow()
+    const canUndoAction = this.canUndoActionNow()
+    return base.filter((command) =>
+      (command !== 'undoStep' || canUndoStep) &&
+      (command !== 'undoAction' || canUndoAction),
+    )
   }
 
   private buildRoundSnapshot(state: GameState): GameState {
@@ -4315,14 +4344,17 @@ export class GameCore {
   }
 
   undoAction(): SessionResponse {
-    if (this.actionStartIndex === null) return this.respond(false, 'no action snapshot')
-    let targetIndex = this.actionStartIndex
-    for (let i = this.history.length - 1; i > this.actionStartIndex; i -= 1) {
-      if (this.history[i]?.undoBoundary) {
-        targetIndex = i
-        break
+    if (!this.canUndoActionNow()) {
+      if (
+        this.state.pendingUndoBoundary === true ||
+        (this.actionStartIndex !== null && this.latestUndoBoundaryIndex() > this.actionStartIndex)
+      ) {
+        return this.respond(false, 'cannot undo past boundary')
       }
+      return this.respond(false, 'no action snapshot')
     }
+    const targetIndex = this.actionStartIndex
+    if (targetIndex === null) return this.respond(false, 'no action snapshot')
     const entry = this.history[targetIndex]
     if (!entry) return this.respond(false, 'no action snapshot')
     const beforeEvents = [...this.state.events]
@@ -4335,11 +4367,7 @@ export class GameCore {
     )
     this.restoreHistory(entry)
     this.history = this.history.slice(0, targetIndex)
-    if (targetIndex === this.actionStartIndex) {
-      this.actionStartIndex = null
-    } else {
-      this.recomputeActionStartIndex()
-    }
+    this.actionStartIndex = null
     return this.applyPreparedPublicEventCancellation(beforeArchive, cancellationPlan)
   }
 }
