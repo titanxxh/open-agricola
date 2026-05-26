@@ -52,7 +52,7 @@ const completeGrainUtilizationSow = (session: GameSession) => {
   }
 
   expect(resp.interaction.promptKey).toBe('ui.interactionSowSelect')
-  resp = session.resolveChoice(0, 'confirm', {
+  resp = session.commitSelectionChoice(0, {
     crops: [{ row: 0, col: 0, crop: 'grain' }],
   })
   expect(resp.ok).toBe(true)
