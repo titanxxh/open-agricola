@@ -356,9 +356,9 @@ const PlayedCardStats = ({
     Object.entries(displayCounters).filter(([key]) => key !== 'bonusVp'),
   )
   const hasCardStacks = !!cardStacks && cardStacks.some((s) => s.remaining > 0)
-  const hasCounters = Object.keys(visibleCounters).length > 0 || stack.length > 0 || hasCardStacks
+  const hasCounters = Object.keys(visibleCounters).length > 0 || bonusVp > 0 || stack.length > 0 || hasCardStacks
   const statsLines = formatCardStatsLines(resourceStats, rawId, locale)
-  const hasResourceStats = statsLines.length > 0 || bonusVp > 0
+  const hasResourceStats = statsLines.length > 0
 
   useLayoutEffect(() => {
     if (!open || !hasResourceStats) return
@@ -414,6 +414,15 @@ const PlayedCardStats = ({
       />
       {futureEntries.length > 0 || hasCounters ? (
         <div className="card-future">
+          {bonusVp > 0 ? (
+            <div
+              className="resource-chip resource-bonusVp"
+              title={t(locale, 'ui.cardStats.bonusVp')}
+            >
+              <span className="res-icon res-icon-bonusVp" />
+              <span className="resource-chip-count">{bonusVp}</span>
+            </div>
+          ) : null}
           {Object.entries(visibleCounters).map(([resKey, count]) => {
             if (count <= 0) return null
             const isKnownResource = resKey in emptyResources
@@ -519,17 +528,6 @@ const PlayedCardStats = ({
               ) : null}
             </div>
           ))}
-          {bonusVp > 0 ? (
-            <div className="played-card-stats-section">
-              <div className="played-card-stats-label">{t(locale, 'ui.cardStats.bonusVp')}</div>
-              <ResourceLine
-                locale={locale}
-                resources={{}}
-                bonusVp={bonusVp}
-                className="played-card-stats-line"
-              />
-            </div>
-          ) : null}
         </div>
       ) : null}
     </div>

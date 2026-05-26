@@ -1461,6 +1461,11 @@
   border-color: #cfcfcf;
   color: #4f4f4f;
 }
+.resource-chip.resource-bonusVp {
+  background: #fff0b8;
+  border-color: #d7b956;
+  color: #5d4a08;
+}
 .resource-owner {
   width: 8px;
   height: 8px;

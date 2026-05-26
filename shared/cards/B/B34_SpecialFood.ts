@@ -101,6 +101,7 @@ const beforeListener: CardListenerRegistration = {
         },
       },
       sourceCard: CARD_ID,
+      countCardUse: false,
     }
   },
 }

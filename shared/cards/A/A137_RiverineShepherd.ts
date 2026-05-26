@@ -1,6 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { gainLeaf } from '../helpers/pay-gain-node'
+import { createPartialTakeFromSpaceLeaf } from '../helpers/partial-take'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { A137_RiverineShepherd } from '../../cards-display/A/A137_RiverineShepherd'
@@ -19,9 +19,8 @@ const CARD_ID = A137_RiverineShepherd.id
  * resources. If the other space has resources of the matching type, the player may
  * optionally take 1.
  *
- * Implementation note: We give from general supply (consistent with A82_WorkCertificate
- * pattern) but check the other space's accumulated resources as a condition for
- * whether the option is offered.
+ * Implementation note: The optional good is collected from the other action space,
+ * preserving action-space provenance for listeners that care about the source.
  */
 const listener: CardListenerRegistration = {
   id: 'A137-riverine-shepherd-after-place-farmer',
@@ -53,7 +52,15 @@ const listener: CardListenerRegistration = {
       flow: {
         type: 'seq',
         optional: true,
-        children: [gainLeaf(CARD_ID, { [resourceType]: 1 })],
+        children: [
+          createPartialTakeFromSpaceLeaf({
+            sourceCard: CARD_ID,
+            spaceId: otherSpace.id,
+            spaceName: otherSpace.nameKey,
+            resource: resourceType,
+            includeEffectPreview: true,
+          }),
+        ],
       } as ActionFlow,
       sourceCard: CARD_ID,
     }
