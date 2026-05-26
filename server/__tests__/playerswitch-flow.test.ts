@@ -371,6 +371,10 @@ describe('ActionFlow targetPlayerId', () => {
     expect(pendingResp.interaction.playerIndex).toBe(1)
     expect(pendingResp.interaction.farm).toBeDefined()
 
+    const directCancel = session.commitSelectionChoice(1, { cancel: true })
+    expect(directCancel.ok).toBe(false)
+    expect(directCancel.ok ? '' : directCancel.error).toBe('action cancel is not allowed')
+
     const undoResp = session.undoStep()
     expect(undoResp.ok).toBe(false)
     expect(undoResp.ok ? '' : undoResp.error).toBe('cannot undo past boundary')
