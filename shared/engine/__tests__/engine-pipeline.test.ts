@@ -744,4 +744,100 @@ describe('Engine pipeline phase order', () => {
       'after',
     ])
   })
+
+  it('preserves protected cancel transaction after before listener flow events', () => {
+    const beforeEventCard = 'BEFORE_PROTECTED_CANCEL_EVENT_CARD'
+    const beforeEventAction: ActionDefinition = {
+      id: 'before-protected-cancel-event',
+      nameKey: 'test.beforeProtectedCancelEvent',
+      descriptionKey: 'test.beforeProtectedCancelEvent',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: (ctx) => {
+        ctx.eventSink.emit<'resource.moved'>({
+          type: 'resource.moved',
+          resources: { wood: 1 },
+          from: { kind: 'supply' },
+          to: { kind: 'player', playerId: ctx.player.id },
+          reason: 'gain',
+        })
+        return { type: 'ok' }
+      },
+    }
+    const action: ActionDefinition = {
+      id: 'plow',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({
+        type: 'request',
+        request: {
+          kind: 'choice',
+          options: [
+            { value: 'confirm', labelKey: 'Confirm' },
+            { value: 'cancel', labelKey: 'Cancel' },
+          ],
+        },
+        promptKey: 'choose',
+      }),
+      resolveChoice: (ctx) => {
+        ctx.eventSink.emit<'resource.moved'>({
+          type: 'resource.moved',
+          resources: { wood: 2 },
+          from: { kind: 'supply' },
+          to: { kind: 'player', playerId: ctx.player.id },
+          reason: 'gain',
+        })
+        return { type: 'ok' }
+      },
+    }
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'before-protected-cancel-event-listener',
+      cardIds: [beforeEventCard],
+      actions: [action.id],
+      phases: ['before'],
+      mandatory: true,
+      handler: () => ({
+        flow: { type: 'leaf' as const, actionId: beforeEventAction.id },
+      }),
+    })
+    setActiveCardRegistry(cardRegistry)
+
+    const registry = new ActionRegistry()
+    registry.register(action)
+    registry.register(beforeEventAction)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('a', action.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    player.minorPlayed = [beforeEventCard]
+    state.players = [player]
+    const space = createSpace(action)
+
+    const choice = runUntil(engine, { state, player, space }, () => false)
+    expect(choice.type).toBe('choice')
+    expect(state.events).toEqual([])
+
+    const cancelResult = engine.resolveChoice('cancel', { state, player, space })
+
+    expect(cancelResult).toEqual({ type: 'fail', errorKey: 'log.action', recoverable: true })
+    expect(state.events).toEqual([])
+
+    const confirmResult = engine.resolveChoice('confirm', { state, player, space })
+
+    expect(confirmResult.type).toBe('ok')
+    expect(state.events?.map((event) => event.resources)).toEqual([
+      { wood: 1 },
+      { wood: 2 },
+    ])
+    expect(state.nextEventSeq).toBe(3)
+  })
 })
