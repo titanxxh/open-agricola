@@ -454,7 +454,7 @@ export const canStartFencing = (
     remainingBuildCapacity,
     availableOrdinaryFenceTokens,
   )
-  const canCheckLayout = Array.isArray(state.players) && state.players.includes(player)
+  const canCheckLayout = Array.isArray(state.players) && state.players.length > 0
   if (hasCanStartPolicy(policy)) {
     if (!canStartWithFencePolicy(
       player,
