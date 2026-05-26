@@ -45,6 +45,23 @@ const validateFarmPositions = (
   return null
 }
 
+const validateOccupationCards = (
+  cards: string[],
+  playerHand: string[],
+  actionContext: Record<string, unknown> | undefined,
+) => {
+  const minSelections = (actionContext?.minSelections as number | undefined) ?? 0
+  const maxSelections = actionContext?.maxSelections as number | undefined
+  if (cards.length < minSelections) return 'not enough card selections'
+  if (maxSelections !== undefined && cards.length > maxSelections) {
+    return 'too many card selections'
+  }
+  for (const card of cards) {
+    if (!playerHand.includes(card)) return `card ${card} not in occupation hand`
+  }
+  return null
+}
+
 export const selectionAction: ActionDefinition = {
   id: 'selection',
   nameKey: 'actions.selection.name',
@@ -65,7 +82,6 @@ export const selectionAction: ActionDefinition = {
         kind: 'choice',
         options: [
           { value: 'confirm', labelKey: 'ui.interactionSelectionConfirm' },
-          { value: 'cancel', labelKey: 'ui.interactionCancel' },
         ],
       },
       promptKey,
@@ -73,11 +89,11 @@ export const selectionAction: ActionDefinition = {
     }
   },
   resolveChoice: ({ player, sourceCard, actionContext, state }, choice, payload) => {
+    if (choice === 'cancel') return { type: 'fail', errorKey: 'log.action', recoverable: true }
+
     const payloadPositions = (payload as { positions?: string[] } | undefined)?.positions
     const payloadCards = (payload as { cards?: string[] } | undefined)?.cards
-    const positions = choice === 'cancel'
-      ? []
-      : Array.isArray(payloadPositions)
+    const positions = Array.isArray(payloadPositions)
       ? payloadPositions
       : []
     const cards = Array.isArray(payloadCards) ? payloadCards : []
@@ -86,7 +102,10 @@ export const selectionAction: ActionDefinition = {
       const validationError = validateFarmPositions(positions, actionContext)
       if (validationError) return { type: 'fail', errorKey: validationError, recoverable: true }
     }
-    if (choice === 'cancel') return { type: 'ok' }
+    if (kind === 'occupation-hand') {
+      const validationError = validateOccupationCards(cards, player.occupationHand, actionContext)
+      if (validationError) return { type: 'fail', errorKey: validationError, recoverable: true }
+    }
 
     if (sourceCard) {
       // selectedPositions keeps the existing extra-data key:
@@ -97,7 +116,7 @@ export const selectionAction: ActionDefinition = {
 
     const effect = actionContext?.selectionEffect as string | undefined
     const extraData: Record<string, unknown> = { selectedPositions: positions }
-    if (cards.length > 0) extraData.selectedCards = cards
+    if (kind === 'occupation-hand' || cards.length > 0) extraData.selectedCards = cards
     if (effect) {
       const followup = runSelectionEffect(effect, { player, positions, cards, sourceCard, state })
       if (followup) {

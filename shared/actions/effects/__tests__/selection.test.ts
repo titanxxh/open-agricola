@@ -77,6 +77,11 @@ describe('selectionAction', () => {
 
   it('rejects cancel when farm-position selection requires at least one position', () => {
     const player = createMockPlayer()
+    let received: string[] | null = null
+
+    registerSelectionEffect('test-selection-cancel', ({ positions }) => {
+      received = positions
+    })
 
     const result = selectionAction.resolveChoice!(
       {
@@ -87,6 +92,7 @@ describe('selectionAction', () => {
           minSelections: 1,
           maxSelections: 2,
           selectableTiles: [{ row: 0, col: 0 }],
+          selectionEffect: 'test-selection-cancel',
         },
       } as never,
       'cancel',
@@ -94,9 +100,13 @@ describe('selectionAction', () => {
 
     expect(result).toEqual({
       type: 'fail',
-      errorKey: 'not enough selection positions',
+      errorKey: 'log.action',
       recoverable: true,
     })
+    expect(received).toBeNull()
+    expect(
+      readCardExtraData<string[]>(player, 'Test_Card', 'selectedPositions'),
+    ).toBeUndefined()
   })
 
   it('does not parse direct choice values as farm-position selections without structured payload', () => {
@@ -206,6 +216,7 @@ describe('selection action with occupation-hand kind', () => {
     expect(result.type).toBe('request')
     if (result.type !== 'request') return
     expect(result.request.kind).toBe('choice')
+    expect(result.request.options.map((option) => option.value)).toEqual(['confirm'])
     expect(result.promptKey).toBe('ui.interactionOccupationHand')
     expect(result.promptParams).toEqual({ maxSelections: 3 })
   })
@@ -218,11 +229,13 @@ describe('selection action with occupation-hand kind', () => {
     expect(result.type).toBe('request')
     if (result.type !== 'request') return
     expect(result.request.kind).toBe('choice')
+    expect(result.request.options.map((option) => option.value)).toEqual(['confirm'])
     expect(result.promptKey).toBe('ui.interactionSelection')
   })
 
   it('resolveChoice propagates a flow returned by the effect handler', () => {
     const player = createMockPlayer()
+    player.occupationHand = ['id1', 'id2']
     const testFlow = { type: 'leaf' as const, actionId: 'special-effect', sourceCard: 'TEST' }
 
     registerSelectionEffect('test-flow-effect', () => testFlow)
@@ -252,6 +265,7 @@ describe('selection action with occupation-hand kind', () => {
 
   it('resolveChoice returns ok when effect handler returns void (no flow)', () => {
     const player = createMockPlayer()
+    player.occupationHand = ['id1', 'id2']
 
     registerSelectionEffect('test-void-effect', () => undefined)
 
@@ -275,5 +289,49 @@ describe('selection action with occupation-hand kind', () => {
         selectedCards: ['id1', 'id2'],
       })
     }
+  })
+
+  it('validates occupation cards against min max and hand before effects run', () => {
+    const player = createMockPlayer()
+    player.occupationHand = ['id1', 'id2', 'id3']
+    let received: string[] | null = null
+
+    registerSelectionEffect('test-occupation-validation', ({ cards }) => {
+      received = cards
+    })
+
+    const context = {
+      player,
+      sourceCard: 'VALIDATE_CARD',
+      actionContext: {
+        selectionKind: 'occupation-hand',
+        minSelections: 1,
+        maxSelections: 2,
+        selectionEffect: 'test-occupation-validation',
+      },
+    } as never
+
+    expect(
+      selectionAction.resolveChoice!(context, 'confirm', { cards: [] }),
+    ).toEqual({
+      type: 'fail',
+      errorKey: 'not enough card selections',
+      recoverable: true,
+    })
+    expect(
+      selectionAction.resolveChoice!(context, 'confirm', { cards: ['id1', 'id2', 'id3'] }),
+    ).toEqual({
+      type: 'fail',
+      errorKey: 'too many card selections',
+      recoverable: true,
+    })
+    expect(
+      selectionAction.resolveChoice!(context, 'confirm', { cards: ['missing'] }),
+    ).toEqual({
+      type: 'fail',
+      errorKey: 'card missing not in occupation hand',
+      recoverable: true,
+    })
+    expect(received).toBeNull()
   })
 })

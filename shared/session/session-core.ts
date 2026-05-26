@@ -2883,6 +2883,13 @@ export class GameCore {
         if (hostRequestKind === 'animal-reorg') {
           return
         }
+        if (
+          hostRequestKind === 'farm-select' ||
+          hostRequestKind === 'selection' ||
+          !!this.isSelectionPromptKey(pendingEnvelope?.promptKey)
+        ) {
+          return
+        }
         // Lazy confirmation: if we silently switched players and now hit a choice,
         // show confirmPlayerSwitch first. The parent pending host stays unresolved in the engine.
         if (frame.deferredPlayerSwitch && !frame.deferredPlayerSwitch.confirmed) {
@@ -3791,38 +3798,38 @@ export class GameCore {
     const player = this.state.players[playerIndex]
     const space = this.getSpaceById(this.activeSpaceId)
     if (!player || !space) return this.respond(false, 'invalid state')
+    if (payload.cancel === true) {
+      return this.respond(false, 'action cancel is not allowed')
+    }
 
-    const choiceValue = payload.cancel === true ? 'cancel' : 'confirm'
     let farmPayload: Record<string, unknown> | undefined
-    if (choiceValue === 'confirm') {
-      switch (farmType) {
-        case 'fence':
-          farmPayload = {
-            edges: payload.edges ?? [],
-            palisadeEdges: payload.palisadeEdges ?? [],
-            extraWood: payload.extraWood ?? 0,
-          }
-          break
-        case 'room':
-          farmPayload = { rooms: payload.rooms ?? [] }
-          break
-        case 'stable':
-          farmPayload = { stables: payload.stables ?? [] }
-          break
-        case 'plow':
-          farmPayload = { tile: payload.tile }
-          break
-        case 'sow':
-          farmPayload = { crops: payload.crops ?? [] }
-          break
-      }
+    switch (farmType) {
+      case 'fence':
+        farmPayload = {
+          edges: payload.edges ?? [],
+          palisadeEdges: payload.palisadeEdges ?? [],
+          extraWood: payload.extraWood ?? 0,
+        }
+        break
+      case 'room':
+        farmPayload = { rooms: payload.rooms ?? [] }
+        break
+      case 'stable':
+        farmPayload = { stables: payload.stables ?? [] }
+        break
+      case 'plow':
+        farmPayload = { tile: payload.tile }
+        break
+      case 'sow':
+        farmPayload = { crops: payload.crops ?? [] }
+        break
     }
 
     if (pushHistoryEntry) {
       this.pushHistory()
     }
     const result = this.engine.resolveChoice(
-      choiceValue,
+      'confirm',
       this.buildEngineExecutionContext(player, space),
       farmPayload,
     )
@@ -3880,6 +3887,9 @@ export class GameCore {
     }
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
+    if (payload.cancel === true && (isFarmSelection || isGenericSelection)) {
+      return this.respond(false, 'action cancel is not allowed')
+    }
 
     if (isFarmSelection) {
       return this.resolveFarmSelectionChoice(playerIndex, payload, true)
@@ -3995,43 +4005,12 @@ export class GameCore {
     const maxSelections = (interactionContext?.maxSelections as number) ?? 1
     const minSelections = (interactionContext?.minSelections as number) ?? 0
 
-    if (payload.cancel === true) {
-      if (!this.engine) return this.respond(false, 'no active engine')
-      this.pushHistory()
-      const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('selection')
-      const result = this.engine.resolveChoice('cancel', {
-        ...this.buildEngineExecutionContext(this.state.players[playerIndex]!, space),
-      })
-      if (result.type === 'ok') {
-        this.recordActionResultDetails(
-          result,
-          this.currentFrameOwnerPlayerId(player.id),
-          player.id,
-        )
-      }
-      this.flushEngineLog()
-      if (result.type === 'request') {
-        return this.respond()
-      }
-      if (result.type === 'fail') {
-        if (result.recoverable === true) {
-          return this.respond(false, result.errorKey ?? 'action failed')
-        }
-        this.engineStack.pop()
-        this.actionStartIndex = null
-        this.actionStartPlayerSnapshot = null
-        delete player._activeActionBonusSources
-        this.turnOwnerPlayerIndex = null
-        return this.respond(false, result.errorKey ?? 'action failed')
-      }
-      this.runEngineSteps()
-      if (this.engineStack.peekPendingEnvelope()) return this.respond()
-      return this.continueAfterResolvedFarmChoice(playerIndex)
-    }
-
     // occupation-hand: validate card IDs
     if (selectionKind === 'occupation-hand') {
       const cardIds = payload.cardIds ?? []
+      if (cardIds.length < minSelections) {
+        return this.respond(false, 'not enough card selections')
+      }
       if (cardIds.length > maxSelections) {
         return this.respond(false, 'too many card selections')
       }
@@ -4045,9 +4024,8 @@ export class GameCore {
       // `payload` arg; selection.resolveChoice now reads `payload.cards` first
       // and only splits the previous comma-joined `cardIds` choice string
       // when payload is absent.
-      const choiceValue = cardIds.length > 0 ? 'confirm' : 'cancel'
       const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('selection')
-      const result = this.engine?.resolveChoice(choiceValue, {
+      const result = this.engine?.resolveChoice('confirm', {
         ...this.buildEngineExecutionContext(this.state.players[playerIndex]!, space),
       }, { cards: cardIds })
       if (result?.type === 'ok') {
@@ -4100,9 +4078,8 @@ export class GameCore {
 
     this.pushHistory()
     const positionStrings = positions.map((p) => `${p.row}-${p.col}`)
-    const choiceValue = positions.length > 0 ? 'confirm' : 'cancel'
     const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('selection')
-    const result = this.engine?.resolveChoice(choiceValue, {
+    const result = this.engine?.resolveChoice('confirm', {
       ...this.buildEngineExecutionContext(this.state.players[playerIndex]!, space),
     }, { positions: positionStrings })
     if (result?.type === 'ok') {
