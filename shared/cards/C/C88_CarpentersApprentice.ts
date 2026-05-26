@@ -55,11 +55,20 @@ const fenceIsDoableListener: CardListenerRegistration = {
     // can self-pay up to the 12th fence.
     const neededToReach12 = Math.max(0, 12 - before)
     if (wood < neededToReach12) return
-    // before >= 12: the 13th-15th fences are all free, wood is not a
-    // constraint. Do not call canStartFencing — its first line
-    // `getFenceCount+4>15` assumes building 4 segments at once, which
-    // conflicts with the 1-3 segments remaining here.
-    if (before >= 12) return { doable: true }
+    if (before >= 12) {
+      const remainingFreeFences = buildLimit - before
+      if (!canStartFencing(context.state, player, undefined, {
+        fencePolicy: {
+          allowedSegmentTypes: ['fence'],
+          segmentBounds: {
+            fence: { min: 1, max: remainingFreeFences },
+            total: { min: 1, max: remainingFreeFences },
+          },
+          costPolicy: { fence: { wood: 0 } },
+        },
+      })) return
+      return { doable: true }
+    }
     const freeFences = Math.max(0, buildLimit - 12)
     const previewPlayer = {
       ...player,
