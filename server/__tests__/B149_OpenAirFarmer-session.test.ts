@@ -347,7 +347,7 @@ describe('B149 Open Air Farmer session', () => {
     const cancel = session.commitSelectionChoice(0, { cancel: true })
 
     expect(cancel.ok).toBe(false)
-    expect(cancel.error).toBe('log.fencingFail')
+    expect(cancel.error).toBe('action cancel is not allowed')
     expectFarmSelect(cancel, beforeInteraction)
     expectPendingSnapshot(cancel.state, before)
   })

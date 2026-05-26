@@ -157,7 +157,6 @@ const expectFarmSelect = (
   expect(resp.interaction.request.kind).toBe('farm-select')
   expect(resp.interaction.options).toEqual([
     { value: 'confirm', labelKey: 'ui.interactionFenceConfirm' },
-    { value: 'cancel', labelKey: 'ui.interactionFenceCancel' },
   ])
   expect(resp.interaction.farm?.farmType).toBe('fence')
   if (expected) {
@@ -324,7 +323,7 @@ describe('C1 Overhaul session', () => {
 
     const cancel = session.commitSelectionChoice(0, { cancel: true })
     expect(cancel.ok).toBe(false)
-    expect(cancel.error).toBe('log.fencingFail')
+    expect(cancel.error).toBe('action cancel is not allowed')
     expectFarmSelect(cancel, beforeInteraction)
     expectSnapshotUnchanged(cancel.state, before)
   })
