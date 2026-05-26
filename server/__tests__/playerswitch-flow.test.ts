@@ -349,7 +349,7 @@ describe('ActionFlow targetPlayerId', () => {
     expect(resolved.state.players[1]!.resources.wood).toBe(p2.resources.wood)
   })
 
-  it('undoStep cancels a targeted farm prompt as the effective owner', () => {
+  it('undoStep restores a targeted farm prompt without action cancel', () => {
     const session = setupSession()
     const state = session.getState().state
     const p2 = state.players[1]!
@@ -372,8 +372,12 @@ describe('ActionFlow targetPlayerId', () => {
     expect(pendingResp.interaction.farm).toBeDefined()
 
     const undoResp = session.undoStep()
-    expect(undoResp.ok).toBe(true)
-    expect(undoResp.ok ? '' : undoResp.error).not.toBe('no pending choice for this player')
+    expect(undoResp.ok).toBe(false)
+    expect(undoResp.ok ? '' : undoResp.error).toBe('cannot undo past boundary')
+    expect(undoResp.interaction.stateId).toBe('wait')
+    if (undoResp.interaction.stateId !== 'wait') throw new Error('expected targeted farm prompt')
+    expect(undoResp.interaction.request.kind).toBe('farm-select')
+    expect(undoResp.interaction.request.options.map(option => option.value)).toEqual(['confirm'])
   })
 
   it('targeted action dynamic flow executes as the target owner', () => {

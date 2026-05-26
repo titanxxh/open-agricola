@@ -277,7 +277,7 @@ describe('C57_Crudite', () => {
 
     resp = session.commitSelectionChoice(0, { cancel: true })
     expect(resp.ok).toBe(false)
-    expect(resp.error).toBe('not enough selection positions')
+    expect(resp.error).toBe('action cancel is not allowed')
     expectC57Selection(resp)
 
     const player = resp.state.players[0]!

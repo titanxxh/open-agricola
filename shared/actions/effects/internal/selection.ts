@@ -76,6 +76,7 @@ export const selectionAction: ActionDefinition = {
         ? 'ui.interactionOccupationHand'
         : 'ui.interactionSelection'
     const maxSelections = (actionContext?.maxSelections as number) ?? 1
+    const minSelections = (actionContext?.minSelections as number) ?? 0
     return {
       type: 'request',
       request: {
@@ -85,7 +86,7 @@ export const selectionAction: ActionDefinition = {
         ],
       },
       promptKey,
-      promptParams: { maxSelections },
+      promptParams: { maxSelections, minSelections },
     }
   },
   resolveChoice: ({ player, sourceCard, actionContext, state }, choice, payload) => {

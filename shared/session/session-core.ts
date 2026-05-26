@@ -2883,13 +2883,6 @@ export class GameCore {
         if (hostRequestKind === 'animal-reorg') {
           return
         }
-        if (
-          hostRequestKind === 'farm-select' ||
-          hostRequestKind === 'selection' ||
-          !!this.isSelectionPromptKey(pendingEnvelope?.promptKey)
-        ) {
-          return
-        }
         // Lazy confirmation: if we silently switched players and now hit a choice,
         // show confirmPlayerSwitch first. The parent pending host stays unresolved in the engine.
         if (frame.deferredPlayerSwitch && !frame.deferredPlayerSwitch.confirmed) {
@@ -2898,6 +2891,13 @@ export class GameCore {
           frame.engine.flushEventTransaction({ state: this.state, player, space })
           this.flushEngineLog()
           this.startConfirmPlayerSwitch(fromPlayerIndex, toPlayerIndex)
+          return
+        }
+        if (
+          hostRequestKind === 'farm-select' ||
+          hostRequestKind === 'selection' ||
+          !!this.isSelectionPromptKey(pendingEnvelope?.promptKey)
+        ) {
           return
         }
         const pendingHost = this.engineStack.peekPendingHost()
@@ -4223,13 +4223,6 @@ export class GameCore {
         envelope.request.kind === 'farm-select')
     const farmPrompt = isPlainChoiceOrFarmSelect ? this.isFarmPromptKey(envelope.promptKey) : null
     if (isPlainChoiceOrFarmSelect && farmPrompt && interactionFrame) {
-      const currentPromptKey = envelope.promptKey
-      const currentSpaceId = interactionFrame.spaceId
-      const currentPlayerIndex = this.effectiveOwnerIndexForFrame(
-        interactionFrame,
-        envelope.hostNodeId,
-        envelope,
-      )
       const entry = this.history[this.history.length - 1]
       const canRestorePriorChoice =
         !!entry &&
@@ -4264,16 +4257,6 @@ export class GameCore {
         this.restoreHistory(entry)
         this.recomputeActionStartIndex()
         return this.applyPreparedPublicEventCancellation(beforeArchive, cancellationPlan)
-      }
-      const cancelResult = this.resolveFarmSelectionChoice(currentPlayerIndex, { cancel: true }, false)
-      const stillOnSameFarmPrompt =
-        cancelResult.ok &&
-        cancelResult.interaction.stateId === 'wait' &&
-        cancelResult.interaction.farm !== undefined &&
-        cancelResult.interaction.promptKey === currentPromptKey &&
-        cancelResult.interaction.spaceId === currentSpaceId
-      if (!stillOnSameFarmPrompt) {
-        return cancelResult
       }
     }
     // Task 0.6 introduced `state.pendingUndoBoundary` to signal an undo-blocker from a
