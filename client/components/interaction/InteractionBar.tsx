@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import { resourceKeyList } from '../../../shared/contract/state-constants'
 import type { AnimalReorgState, PendingChoice, PendingAnimalReorg } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
 import { ResourceText } from '../common/ResourceText'
@@ -33,27 +32,10 @@ const isResourceExchangeLabelParams = (
 const hasPositiveResources = (resources?: Record<string, number | undefined>) =>
   !!resources && Object.values(resources).some((value) => (value ?? 0) > 0)
 
-const resourceOptionValues = new Set<string>(resourceKeyList)
-
-const hasResourceTokens = (text: string): boolean =>
-  /<[A-Z0-9_-]+>/.test(text)
-
 const renderResourceAwareText = (text: string): ReactNode =>
-  hasResourceTokens(text) ? (
+  text.includes('<') ? (
     <ResourceText text={text} className="interaction-option-resource-text" />
   ) : text
-
-const optionLabelHasResourceTokens = (
-  locale: Locale,
-  option: ActionChoiceOption,
-): boolean => {
-  const label = translateCardText(
-    locale,
-    option.labelKey,
-    option.labelParams as Record<string, string | number> | undefined,
-  )
-  return hasResourceTokens(label)
-}
 
 const renderPaymentSourceCards = (
   locale: Locale,
@@ -317,7 +299,8 @@ function CollectorMultiSelect({ locale, options, needed, resolveChoice, isIntera
       </div>
       <div className="collector-options">
         {options.map((option) => {
-          const showValueIcon = resourceOptionValues.has(option.value) && !optionLabelHasResourceTokens(locale, option)
+          const content = renderOptionContent(locale, option)
+          const showValueIcon = typeof content === 'string'
           return (
             <label key={option.value} className={`collector-option ${selected.has(option.value) ? 'selected' : ''}`}>
               <input
@@ -327,7 +310,7 @@ function CollectorMultiSelect({ locale, options, needed, resolveChoice, isIntera
                 disabled={!isInteractive || (!selected.has(option.value) && selected.size >= needed)}
               />
               {showValueIcon ? <span className={`res-icon res-icon-${option.value}`} /> : null}
-              {renderOptionContent(locale, option)}
+              {content}
             </label>
           )
         })}

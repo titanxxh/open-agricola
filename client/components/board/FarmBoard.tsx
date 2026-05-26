@@ -99,21 +99,18 @@ const FieldCropStack = ({
 }
 
 const CardStackItem = ({
-  locale,
   item,
   index,
   stackSize,
 }: {
-  locale: Locale
   item: string
   index: number
   stackSize: number
 }) => {
   const pairResources = C146_PAIR_STACK_RESOURCES[item]
   if (pairResources) {
-    const title = pairResources.map((resource) => t(locale, `resources.${resource}`)).join(' + ')
     return (
-      <span className="card-stack-pair" title={`#${stackSize - index}: ${title}`}>
+      <span className="card-stack-pair">
         {pairResources.map((resource) => (
           <span key={resource} className={`res-icon res-icon-${resource}`} />
         ))}
@@ -444,7 +441,6 @@ const PlayedCardStats = ({
               {[...stack].reverse().map((res, i) => (
                 <CardStackItem
                   key={`stack-${i}`}
-                  locale={locale}
                   item={res}
                   index={i}
                   stackSize={stack.length}

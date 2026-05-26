@@ -529,8 +529,8 @@ describe('InteractionBar', () => {
           promptKey: 'ui.interactionWorkshopAssistantSelect',
           promptParams: { needed: 2 },
           options: [
-            { value: 'WC', labelKey: 'cards.C146_WorkshopAssistant.pair.WC' },
-            { value: 'WR', labelKey: 'cards.C146_WorkshopAssistant.pair.WR' },
+            { value: 'WC', labelKey: 'ui.interactionResourcePair', labelParams: { left: 'WOOD', right: 'CLAY' } },
+            { value: 'WR', labelKey: 'ui.interactionResourcePair', labelParams: { left: 'WOOD', right: 'REED' } },
           ],
           playerIndex: 0,
           spaceId: 'card_C146_WorkshopAssistant_choosePairs',
@@ -592,10 +592,12 @@ describe('InteractionBar', () => {
           options: [
             {
               value: 'flow-1',
-              labelKey: 'cards.C146_WorkshopAssistant.pair.WR',
+              labelKey: 'ui.interactionResourcePair',
+              labelParams: { left: 'WOOD', right: 'REED' },
               descriptionPreview: {
                 kind: 'action',
-                labelKey: 'cards.C146_WorkshopAssistant.pair.WR',
+                labelKey: 'ui.interactionResourcePair',
+                labelParams: { left: 'WOOD', right: 'REED' },
               },
             },
             { value: '__skip__', labelKey: 'ui.interactionOptionalSkip' },
