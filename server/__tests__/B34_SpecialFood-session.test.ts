@@ -91,6 +91,17 @@ describe('B34_SpecialFood action-space provenance', () => {
     expect(flow.children.filter((child) => child.type === 'leaf' && child.actionId === 'bonus-vp')).toHaveLength(1)
   })
 
+  it('awards bonus VP for reed-bank style action-space animal movement provenance', () => {
+    const { player } = setup()
+    const events = [
+      moved({ sheep: 1 }, player.id, { kind: 'actionSpace', spaceId: 'reed-bank' }),
+    ]
+    const flow = runListener(events, { sheep: 1 })
+    expect(flow?.type).toBe('seq')
+    if (flow?.type !== 'seq') throw new Error('expected sequence flow')
+    expect(flow.children.filter((child) => child.type === 'leaf' && child.actionId === 'bonus-vp')).toHaveLength(1)
+  })
+
   it('does not award bonus VP for animals moved from supply or a card', () => {
     const { player } = setup()
 

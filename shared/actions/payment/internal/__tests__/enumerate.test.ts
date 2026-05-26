@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { canPayCost, computeAllBuyableCombinations } from '../enumerate'
-import type { PaymentSolution, PlayerState, Resource, Trade } from '../../../../contract/types'
+import type { ComplexCost, PaymentSolution, PlayerState, Resource, Trade } from '../../../../contract/types'
 
 const nonZeroPaid = (sol: PaymentSolution): Partial<Resource> => {
   const out: Partial<Resource> = {}
@@ -156,6 +156,30 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
     // nb=2: with discount, fee = (4-2) reed + 10 wood = 2 reed + 10 wood
     expect(sols2[0]?.resourcesPaid.reed).toBe(2)
     expect(sols2[0]?.resourcesPaid.wood).toBe(10)
+  })
+
+  it('optional bonus with preserveOriginal keeps original and discounted paths', () => {
+    const player = baseTestPlayer({ wood: 2, stone: 2 })
+    const cost: ComplexCost = {
+      fee: { wood: 2, stone: 2 },
+      bonuses: [{
+        discount: { stone: 1 },
+        optional: true,
+        sources: ['C27_Blueprint'],
+        preserveOriginal: true,
+      }],
+    }
+
+    const sols = computeAllBuyableCombinations(player, cost)
+
+    expect(sols.some((s) => {
+      const paid = nonZeroPaid(s)
+      return paid.wood === 2 && paid.stone === 2 && !s.bonusUsed
+    })).toBe(true)
+    expect(sols.some((s) => {
+      const paid = nonZeroPaid(s)
+      return paid.wood === 2 && paid.stone === 1 && s.bonusUsed === 'C27_Blueprint'
+    })).toBe(true)
   })
 
   it('B145 renovation can replace 2 reed with 1 wood', () => {

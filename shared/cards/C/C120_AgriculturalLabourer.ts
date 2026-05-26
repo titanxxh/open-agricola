@@ -3,10 +3,18 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getStoredResource } from '../helpers/card-storage'
 import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import { fieldHasCrop } from '../../domain/field'
+import type { DraftGameEvent, ResourceExchangedEvent } from '../../contract/events'
 import type { CardImpl } from '../registry'
 import { C120_AgriculturalLabourer } from '../../cards-display/C/C120_AgriculturalLabourer'
 
 const CARD_ID = C120_AgriculturalLabourer.id
+
+type QueryableResourceExchangedEvent = ResourceExchangedEvent | DraftGameEvent<'resource.exchanged'>
+
+const isResourceExchangedEvent = (
+  event: CardListenerContext['transactionEvents'][number],
+): event is QueryableResourceExchangedEvent =>
+  event.type === 'resource.exchanged'
 
 const grainRewardFlow = (
   context: CardListenerContext,
@@ -49,11 +57,16 @@ const gainListener: CardListenerRegistration = {
   id: 'C120-agricultural-labourer-after-gain',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['gain', 'receive'],
+  actions: ['gain', 'receive', 'exchange'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const events = context.actionEvents ?? context.transactionEvents
-    const grainCount = sumResourceMovedToPlayer(events, 'grain', context.player.id)
-    return grainRewardFlow(context, grainCount)
+    const movedGrain = sumResourceMovedToPlayer(events, 'grain', context.player.id)
+    const exchangedGrain = events.reduce((sum, event) => {
+      if (!isResourceExchangedEvent(event)) return sum
+      if (event.gainedTo.kind !== 'player' || event.gainedTo.playerId !== context.player.id) return sum
+      return sum + (event.gained.grain ?? 0)
+    }, 0)
+    return grainRewardFlow(context, movedGrain + exchangedGrain)
   },
 }
 

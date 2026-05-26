@@ -22,7 +22,7 @@ const moved = (
 })
 
 const directContext = (
-  transactionEvents: DraftGameEvent<'resource.moved'>[],
+  transactionEvents: CardListenerContext['transactionEvents'],
 ): CardListenerContext => {
   const session = new GameSession()
   const state = session.getState().state
@@ -72,5 +72,30 @@ describe('C120_AgriculturalLabourer session', () => {
     const result = executeCardListener(GAIN_LISTENER, ctx)
 
     expect(result).toBeUndefined()
+  })
+
+  it('takes clay from the card for grain gained through exchange events', () => {
+    const ctx = directContext([])
+    const player = ctx.player
+    const event = {
+      type: 'resource.exchanged',
+      paid: { food: 1 },
+      gained: { grain: 2 },
+      paidFrom: { kind: 'player', playerId: player.id },
+      paidTo: { kind: 'supply' },
+      gainedFrom: { kind: 'supply' },
+      gainedTo: { kind: 'player', playerId: player.id },
+      exchangeSource: 'TestExchange',
+      times: 1,
+    } as any
+
+    const result = GAIN_LISTENER.handler(directContext([event]))
+
+    expect(result?.flow).toMatchObject({
+      type: 'leaf',
+      actionId: 'take-from-card',
+      params: { clay: 2 },
+      sourceCard: CARD_ID,
+    })
   })
 })

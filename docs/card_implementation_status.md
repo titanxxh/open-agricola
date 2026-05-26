@@ -1,6 +1,6 @@
 # 卡牌实现现状报告
 
-> 生成/更新日期：2026-05-25。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
+> 生成/更新日期：2026-05-26。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
 
 ## 1. 当前快照
 
@@ -11,10 +11,10 @@
 | 自动 metadata 脚本 literal mismatch | 0 |
 | 自动 metadata 脚本 complex mismatch | 4 |
 | 其中 schema-up 已接受差异 | 4 |
-| 需要实现复核的卡牌 | 24 |
+| 需要实现复核的卡牌 | 11 |
 | 已接受 / 产品策略差异 | 40 |
 | 排除的 BGA legacy 或未实现行为目标 | 52 |
-| 本轮审计视为已对齐 | 772 |
+| 本轮审计视为已对齐 | 785 |
 
 说明：`scripts/audit-bga-metadata-diff.ts` 现在会解析 BGA `STABLE` 打印成本和 `passing`。当前 literal mismatch 0（passing 已全部对齐）。当前 complex mismatch 是 4 个已接受的 schema-up prerequisite 差异。
 
@@ -28,28 +28,16 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 |---|---|---|---|---|---|
 | `A136_DrudgeryReeve` | 高 | shared scoring | BGA `sharedScoring`，每位玩家可选 0..max sets 并 reserve 资源；OA 仅持卡玩家自动最优计分。 | BGA `A/A136_DrudgeryReeve.php`; OA `shared/cards/A/A136_DrudgeryReeve.ts`, `shared/domain/scoring.ts` | 支持 shared costed scoring / before-end choice。 |
 | `C72_FestivalPlanning` | 高 | onBuy private field phase | OA 返回 `reap` leaf，但 `reap` 不是注册 action，BGA 的 private field phase 基本不可执行。 | BGA `C/C72_FestivalPlanning.php`; OA `shared/cards/C/C72_FestivalPlanning.ts`, `shared/actions/internal-actions.ts` | 建模 private field/reap 子行动，再接 optional improvement。 |
-| `C146_WorkshopAssistant` | 高 | 延迟资源对 | BGA onBuy 把选择的 resource pairs 放卡上，其他玩家 renovation 后 owner 可取 1 pair；OA 直接得资源。 | BGA `C/C146_WorkshopAssistant.php`; OA `shared/cards/C/C146_WorkshopAssistant.ts` | 改为卡上暂存 + opponent renovation 触发取回。 |
 | `D1_ZigzagHarrow` | 高 | plow target | BGA `onBuy` 限制 plow 到 zigzag 目标；OA unrestricted plow。 | BGA `D/D1_ZigzagHarrow.php`; OA `shared/cards/D/D1_ZigzagHarrow.ts`, `server/__tests__/D1_ZigzagHarrow-session.test.ts` | 透传 allowedTiles 到 plow / farm-edit。 |
 | `D36_BreedRegistry` | 高 | sheep 统计口径 | BGA 统计整局 board/card sheep 并在买入时初始化；OA 只累计后续 action-space collect/exchange。 | BGA `D/D36_BreedRegistry.php`, `Core/Stats.php`; OA `shared/cards/D/D36_BreedRegistry.ts` | 改用统一 sheep stats 或补 board/card sheep 统计。 |
 | `E149_MidnightFencer` | 高 | free fencing | BGA 最后 harvest 执行免费 `FENCING`，上限受对手 reserve fence 限制；OA 只记录选择数为 VP。 | BGA `E/E149_MidnightFencer.php`; OA `shared/cards/E/E149_MidnightFencer.ts` | 改成真实 fence 子行动，并按对手可用 fence 限制 max。 |
-| `B67_HandTruck` | 中 | bake 前 continuation | BGA 是 optional 拿谷物，然后 mandatory bake；OA 无条件给谷物。 | BGA `B/B67_HandTruck.php`; OA `shared/cards/B/B67_HandTruck.ts` | 建模 optional gain 分支，之后接 mandatory bake continuation。 |
 | `B85_FarmHand` | 中 | stable 体系 | BGA farmhand stable 进入 stable built/listener/count 体系；OA 主要作为 extraData position + room capacity。 | BGA `B/B85_FarmHand.php`, `Actions/Stables.php`, `Models/PlayerBoard.php`; OA `shared/cards/B/B85_FarmHand.ts`, `shared/domain/supply-tokens.ts` | 让 FarmHand stable 进入通用 stable 统计/事件。 |
 | `B129_Seatmate` | 中 | 4 人座位限制 | BGA 4 人局只在对座未占 round 13 时允许；OA 只要 round 13 被 opponent 占就允许。 | BGA `B/B129_Seatmate.php`; OA `shared/cards/B/B129_Seatmate.ts` | 建模座位/对座限制，或限制 4p 行为。 |
-| `C22_BasketChair` | 中 | Job Contract 交互 | BGA 回收 Day Laborer 工人时清理 C23 fake worker；OA 只 recall worker + place farmer。 | BGA `C/C22_BasketChair.php`; OA `shared/cards/C/C22_BasketChair.ts`, `shared/cards/C/C23_JobContract.ts` | 补 C23 fake cleanup。 |
 | `C25_SteamMachine` | 中 | adoptive worker | BGA adoptive worker 场景会追加 forceSkip/end turn；OA 只有基础 optional bake。 | BGA `C/C25_SteamMachine.php`; OA `shared/cards/C/C25_SteamMachine.ts` | 补 adoptive/forceSkip 分支或定向确认不适用。 |
-| `C67_MineralFeeder` | 中 | reorganize 前置 | BGA 可先 optional reorganize，再检查羊是否在牧场；OA 只直接检查 pasture sheep。 | BGA `C/C67_MineralFeeder.php`; OA `shared/cards/C/C67_MineralFeeder.ts` | 增加 reorganize continuation 后再判定奖励。 |
-| `C69_LandConsolidation` | 中 | pending guard | BGA 在 Tinsmith Master / Cow Patty extra-crop pending 时禁用；OA anytime 可用即给 swap flow。 | BGA `C/C69_LandConsolidation.php`; OA `shared/cards/C/C69_LandConsolidation.ts` | 增加对应 pending guard。 |
-| `C93_InnerDistrictsDirector` | 中 | optional 范围 | BGA 整段“放石 + 可选再放人”是 optional；OA 强制先放石。 | BGA `C/C93_InnerDistrictsDirector.php`; OA `shared/cards/C/C93_InnerDistrictsDirector.ts` | 把 add-stone 也纳入 optional 序列。 |
-| `C120_AgriculturalLabourer` | 中 | exchange grain | BGA Gain/Receive/Reap/Exchange 转换 grain 都触发；OA 缺 exchange 转换路径。 | BGA `C/C120_AgriculturalLabourer.php`; OA `shared/cards/C/C120_AgriculturalLabourer.ts` | 监听 exchange 事件中转换出的 grain。 |
-| `C154_TwinResearcher` | 中 | 行动格覆盖 | BGA 覆盖 CopseAdd / Hollow / Hollow4 等；OA 只覆盖当前 subset。 | BGA `C/C154_TwinResearcher.php`; OA `shared/cards/C/C154_TwinResearcher.ts` | 补齐对应 action-space id。 |
 | `D132_HideFarmer` | 中 | 终局选择/支付 | BGA 终局前玩家选择数量、真实支付 food 并隐藏空地；OA scoring solver 自动最优。 | BGA `D/D132_HideFarmer.php`; OA `shared/cards/D/D132_HideFarmer.ts`, `shared/domain/scoring.ts` | 建模 before-end choice + hiddenSpaces。 |
-| `D161_CabbageBuyer` | 中 | renovation 触发范围 | BGA 监听任意 Renovation/Improvement；OA 只跟踪 `house-redevelopment` 的 `renovate-house`。 | BGA `D/D161_CabbageBuyer.php`; OA `shared/cards/D/D161_CabbageBuyer.ts` | 覆盖非 work-phase / 跨卡 renovation。 |
-| `E68_CherryOrchard` | 低 | 描述文本 | OA desc 写成收获 wood；BGA 表达为像 grain 一样 sow 和 harvest wood。 | BGA `E/E68_CherryOrchard.php`; OA `shared/cards-display/E/E68_CherryOrchard.ts` | 恢复 BGA 文案语义。 |
-| `A22_Telegram` | 低 | turn-start 放人时序 | BGA 先 flag，再在普通放人选择中加入 fromSupply 选项；OA turn start 直接给 optional extraPlacement。 | BGA `A/A22_Telegram.php`; OA `shared/cards/A/A22_Telegram.ts` | 增加 session 覆盖确认跳过/使用时序等价，必要时并入普通放人选择。 |
-| `C27_Blueprint` | 低 | payment trade | BGA clone stone-cost trade，保留原支付路径；OA 对三张 major 直接 `stone: -1`。 | BGA `C/C27_Blueprint.php`; OA `shared/cards/C/C27_Blueprint.ts` | 保留原 trade + 额外 discounted trade。 |
+| 通用 `plow` | 低 | cancel 语义 | BGA `PLOW` 本身无 cancel；跳过只由 optional node 的 `actPassOptionalAction` 提供。OA `plow` 默认提供 cancel 且 cancel 返回 ok。 | BGA `Actions/Plow.php`, `States/ActionTrait.php`; OA `shared/actions/effects/plow.ts` | 后续考虑让所有 plow 默认无 cancel；本轮修复不改全局默认。 |
 | `C133_Soldier` | 低 | 终局计分选择 | BGA 玩家选择 0..max 对并 reserve wood/stone；OA 自动最优。 | BGA `C/C133_Soldier.php`; OA `shared/cards/C/C133_Soldier.ts`, `shared/domain/scoring.ts` | 若要严格对齐，改成 before-end choice。 |
 | `E112_GrainThief` | 低 | harvest 时机 | BGA start 选择多个 grain zones，reap 时减少 harvestCount，end 再 gain grain；OA 接受时立即 pop/gain，end restore。 | BGA `E/E112_GrainThief.php`; OA `shared/cards/E/E112_GrainThief.ts` | 补跨卡顺序测试，必要时改成 BGA 时机。 |
-| `B34_SpecialFood` | 待验证 | 跨卡交互 | BGA 特判 A137；OA heuristic 可能覆盖，也可能遗漏。 | BGA `B/B34_SpecialFood.php`; OA `shared/cards/B/B34_SpecialFood.ts`, `shared/cards/A/A137_RiverineShepherd.ts` | 增加 A137+B34 定向 session 测试。 |
 
 ## 3. 已接受差异
 
@@ -233,7 +221,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | listener | `after.place-farmer` | `A113_HeresyTeacher`, `A114_SeasonalWorker`, `A116_WoodCutter`, `A119_FirewoodCollector`, `A121_ClayPuncher`, `A122_PanBaker`, `A128_RiparianBuilder`, `A129_Swagman`, `A130_MummysBoy`, `A137_RiverineShepherd`, `A138_Harpooner`, `A139_HollowWarden`, `A140_ShovelBearer`, `A147_AnimalDealer`, `A149_HouseArtist`, `A150_Stagehand`, `A154_Paymaster`, `A155_Conjurer`, `A156_Buyer`, `A158_CulinaryArtist`, `A159_JoineroftheSea`, `A160_Lutenist`, `A161_PatchCaretaker`, `A163_BuildingExpert`, `A168_AnimalTeacher`, `A18_WheelPlow`, `A24_ThreshingBoard`, `A42_ForestLakeHut`, `A46_ClawKnife`, `A50_MilkJug`, `A51_DriftNetBoat`, `A66_FeedingDish`, `A67_CornScoop`, `A72_CalciumFertilizers`, `A77_Hod`, `A78_Canoe`, `A80_StoneTongs`, `A82_WorkCertificate`, `A92_AdoptiveParents`, `A97_Freshman`, `B108_OvenFiringBoy`, `B112_Silokeeper`, `B121_Geologist`, `B128_Plumber`, `B130_FullPeasant`, `B137_Wholesaler`, `B142_Greengrocer`, `B143_ClayWarden`, `B144_Collier`, `B150_LargeScaleFarmer`, `B152_JuniorArtist`, `B156_StorehouseKeeper`, `B161_Weakling`, `B166_CattleFeeder`, `B19_MoldboardPlow`, `B24_Lasso`, `B28_ForestryStudies`, `B29_CookeryLesson`, `B40_BreweryPond`, `B43_Chophouse`, `B47_HerringPot`, `B56_Brook`, `B60_BrewingWater`, `B62_Pitchfork`, `B64_MillWheel`, `B77_LoamPit`, `B87_Cottager`, `B90_CooperativePlower`, `B91_AssistantTiller`, `B92_LittleStickKnitter`, `C117_Legworker`, `C121_ClayKneader`, `C126_Excavator`, `C130_OutskirtsDirector`, `C131_PrivateTeacher`, `C138_AnimalFeeder`, `C141_SheepProvider`, `C142_MarketCrier`, `C145_ForestReviewer`, `C147_Cowherd`, `C148_MudWallower`, `C150_ParrotBreeder`, `C151_SowingDirector`, `C152_Puppeteer`, `C164_GermanHeathKeeper`, `C167_CattleBuyer`, `C19_SwingPlow`, `C20_MolePlow`, `C23_JobContract`, `C26_Flail`, `C39_StudioBoat`, `C42_RavenousHunger`, `C45_Stew`, `C48_Farmstead`, `C82_HardwareStore`, `C90_FieldWatchman`, `C91_PlowHero`, `C93_InnerDistrictsDirector`, `D101_SugarBaker`, `D103_CanalBoatman`, `D109_SowingMaster`, `D112_YoungFarmer`, `D134_OysterEater`, `D137_TradeTeacher`, `D141_SeedSeller`, `D144_WaterWorker`, `D149_CasualWorker`, `D151_SpinDoctor`, `D156_RetailDealer`, `D158_BeanCounter`, `D160_Midwife`, `D161_CabbageBuyer`, `D164_PetGrower`, `D165_PigStalker`, `D20_TurnwrestPlow`, `D27_Retraining`, `D39_TruffleSlicer`, `D55_NewMarket`, `D68_SmallBasket`, `D92_ChildOmbudsman`, `D93_SheepInspector`, `E105_Pioneer`, `E115_SeedServant`, `E116_FirCutter`, `E118_KindlingGatherer`, `E131_MarketMaster`, `E148_Lazybones`, `E160_KelpGatherer`, `E19_OxGoad`, `E40_BeeStatue`, `E66_BarnShed`, `E82_Profiteering`, `E95_Miller` |
 | listener | `after.plow` | `A105_BarrowPusher`, `A144_Sequestrator`, `A17_ReclamationPlow`, `A40_PottersYard`, `B159_LieutenantGeneral`, `C80_RockyTerrain`, `D104_Cultivator`, `E164_MountainPlowman` |
 | listener | `after.receive` | `A48_ShavingHorse`, `B21_HayloftBarn`, `C120_AgriculturalLabourer`, `C52_HuntsmansHat`, `E53_BoarSpear` |
-| listener | `after.renovate-house` | `A110_Roughcaster`, `A120_ClayHutBuilder`, `A37_Bucksaw`, `A45_FireProtectionPond`, `B107_Manservant`, `B134_HousebookMaster`, `B168_PastureMaster`, `B16_MiningHammer`, `B55_MaintenancePremium`, `B76_Ceilings`, `C119_SkillfulRenovator`, `C132_TimberShingleMaker`, `C149_ResourceRecycler`, `C153_PatternMaker`, `D111_InteriorDecorator`, `D161_CabbageBuyer`, `D163_JourneymanBricklayer`, `D27_Retraining`, `D77_RecycledBrick`, `D81_RoofLadder`, `E123_ResourceHoarder`, `E154_Margrave`, `E87_MasterRenovator` |
+| listener | `after.renovate-house` | `A110_Roughcaster`, `A120_ClayHutBuilder`, `A37_Bucksaw`, `A45_FireProtectionPond`, `B107_Manservant`, `B134_HousebookMaster`, `B168_PastureMaster`, `B16_MiningHammer`, `B55_MaintenancePremium`, `B76_Ceilings`, `C119_SkillfulRenovator`, `C132_TimberShingleMaker`, `C146_WorkshopAssistant`, `C149_ResourceRecycler`, `C153_PatternMaker`, `D111_InteriorDecorator`, `D161_CabbageBuyer`, `D163_JourneymanBricklayer`, `D27_Retraining`, `D77_RecycledBrick`, `D81_RoofLadder`, `E123_ResourceHoarder`, `E154_Margrave`, `E87_MasterRenovator` |
 | listener | `after.reorganize` | `C148_MudWallower` |
 | listener | `after.sow` | `A79_GardenHoe`, `B115_TinsmithMaster`, `B54_Tumbrel`, `C73_SeaweedFertilizer`, `D58_Gritter`, `E50_WildGreens`, `E71_CowPatty`, `E79_FieldSpade` |
 | listener | `after.stables` | `A167_BreederBuyer`, `A40_PottersYard`, `A43_FarmyardManure`, `A73_AgriculturalFertilizers`, `A74_StableTree`, `B140_FarmyardWorker`, `B27_Toolbox`, `C56_FeedFence`, `D166_StableMilker`, `D168_Stockman`, `E114_ShedBuilder` |
@@ -375,7 +363,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A19_Handplow` | 已对齐 |  |
 | `A20_DoubleTurnPlow` | 已对齐 |  |
 | `A21_FamilyFriendHome` | 已对齐 |  |
-| `A22_Telegram` | 需复核 | BGA turn start flag 后并入普通放人选择；OA turn start 直接给 optional extraPlacement，需确认跳过/使用时序等价 |
+| `A22_Telegram` | 已对齐 | turn-start optional extraPlacement 的 skip/use session 路径已覆盖，行为等价于 BGA flag 后并入放人选择 |
 | `A23_StoneCompany` | 已对齐 |  |
 | `A24_ThreshingBoard` | 已对齐 |  |
 | `A25_Bassinet` | 已对齐 |  |
@@ -567,7 +555,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B31_PotteryYard` | 已对齐 |  |
 | `B32_Kettle` | 已对齐 |  |
 | `B33_Mantlepiece` | 已对齐 | desc/cost/vp/prereq/onBuy 得分对齐；BGA/OA 均未见 runtime 禁止 renovate 逻辑 |
-| `B34_SpecialFood` | 需复核 | A137 Riverine Shepherd 交互需要定向验证 |
+| `B34_SpecialFood` | 已对齐 | A137/Riverine Shepherd 式行动格动物移动 provenance 已有定向 session 覆盖，bonus VP 只记一次 |
 | `B35_HookKnife` | 已对齐 |  |
 | `B36_Bottles` | 已对齐 |  |
 | `B37_Grange` | 已对齐 |  |
@@ -600,7 +588,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B64_MillWheel` | 已对齐 |  |
 | `B65_GrainDepot` | 已对齐 |  |
 | `B66_SackCart` | 已对齐 |  |
-| `B67_HandTruck` | 需复核 | bake 前 optional grain 被建模为无条件 gain |
+| `B67_HandTruck` | 已对齐 | bake 前先 optional gain grain，随后保留 mandatory bake continuation；skip 不阻断 bake |
 | `B68_Beanfield` | 已对齐 |  |
 | `B69_PottersMarket` | 已对齐 |  |
 | `B70_NewPurchase` | 已对齐 |  |
@@ -735,12 +723,12 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C19_SwingPlow` | 已对齐 |  |
 | `C20_MolePlow` | 已对齐 |  |
 | `C21_HeartofStone` | 已对齐 |  |
-| `C22_BasketChair` | 需复核 | 缺 Day Laborer + C23 Job Contract fake worker cleanup |
+| `C22_BasketChair` | 已对齐 | 回收工人后清理 C23 fake lessons worker，并保留真实 lessons 放置工人 |
 | `C23_JobContract` | 已对齐 |  |
 | `C24_BedintheGrainField` | 已对齐 | 下一次 harvest 有空房时提供 optional `family-growth`，skip/accept 后都清理一次性 marker；无空房也消费 marker |
 | `C25_SteamMachine` | 需复核 | 缺 BGA adoptive worker 场景下的 forceSkip/end-turn 分支 |
 | `C26_Flail` | 已对齐 |  |
-| `C27_Blueprint` | 需复核 | BGA clone stone-cost payment trade 并保留原路径；OA 对三张 major 直接 `stone: -1` |
+| `C27_Blueprint` | 已对齐 | 三张 workshop major 保留原支付 trade，并追加 Blueprint 折扣 trade；minor-improvement 入口维持 listener 模式 |
 | `C28_TeachersDesk` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `C29_BeerTable` | 已对齐 |  |
 | `C30_HalfTimberedHouse` | 已对齐 |  |
@@ -780,9 +768,9 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C64_CornSchnappsDistillery` | 已对齐 |  |
 | `C65_Granary` | 已对齐 |  |
 | `C66_EternalRyeCultivation` | 已对齐 |  |
-| `C67_MineralFeeder` | 需复核 | 缺 BGA 先 optional reorganize 再检查 pasture sheep 的触发路径 |
+| `C67_MineralFeeder` | 已对齐 | turn start 先提供 optional reorganize，再按 reorganize 后 pasture sheep 状态发放奖励 |
 | `C68_Bookcase` | 已对齐 |  |
-| `C69_LandConsolidation` | 需复核 | 缺 Tinsmith Master / Cow Patty extra-crop pending guard |
+| `C69_LandConsolidation` | 已对齐 | Tinsmith Master / Cow Patty extra-crop pending 期间禁用 anytime，避免嵌套 swap |
 | `C70_LettucePatch` | 已对齐 |  |
 | `C71_Slurry` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `C72_FestivalPlanning` | 需复核 | OA 使用未注册 `reap` action，BGA private field phase 基本不可执行 |
@@ -806,7 +794,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C90_FieldWatchman` | 已对齐 |  |
 | `C91_PlowHero` | 已对齐 |  |
 | `C92_AutumnMother` | 已对齐 |  |
-| `C93_InnerDistrictsDirector` | 需复核 | BGA 整段能力 optional；OA 强制先给另一行动格加 stone |
+| `C93_InnerDistrictsDirector` | 已对齐 | 放 stone 与可选额外放人已作为整段 optional，skip 不再强制放 stone |
 | `C94_StableCleaner` | 已对齐 | anytime 入口用 stables preview + `computeCosts.stables` 判断可用性，1 wood + 1 food exactCost 可叠加 C88 等 stable cost modifier。 |
 | `C95_BasketWeaver` | 已对齐 |  |
 | `C96_Merchant` | 已对齐 |  |
@@ -833,7 +821,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C117_Legworker` | 已对齐 |  |
 | `C118_WoodCollector` | 已对齐 |  |
 | `C119_SkillfulRenovator` | 已对齐 |  |
-| `C120_AgriculturalLabourer` | 需复核 | 缺 BGA exchange 转换 grain 后从卡上取 clay 的路径 |
+| `C120_AgriculturalLabourer` | 已对齐 | gain/receive/reap/exchange 转换 grain 均触发从卡上取 clay 的路径 |
 | `C121_ClayKneader` | 已对齐 |  |
 | `C122_Bricklayer` | 已对齐 |  |
 | `C123_Freemason` | 已对齐 |  |
@@ -859,7 +847,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C143_StoneBuyer` | 已对齐 |  |
 | `C144_ReedRoofRenovator` | 已对齐 |  |
 | `C145_ForestReviewer` | 已对齐 |  |
-| `C146_WorkshopAssistant` | 需复核 | BGA 把 resource pairs 放卡上并在 opponent renovation 后取回；OA 直接把 pairs 加到 supply |
+| `C146_WorkshopAssistant` | 已对齐 | onBuy 将 pair key 存入 cardStates；其他玩家 renovation 后 owner 可 optional 取回一对并记录 used/gained |
 | `C147_Cowherd` | 已对齐 |  |
 | `C148_MudWallower` | 已对齐 |  |
 | `C149_ResourceRecycler` | 已对齐 |  |
@@ -867,7 +855,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C151_SowingDirector` | 已对齐 |  |
 | `C152_Puppeteer` | 已对齐 |  |
 | `C153_PatternMaker` | 已对齐 |  |
-| `C154_TwinResearcher` | 需复核 | BGA 覆盖 CopseAdd / Hollow / Hollow4 等行动格；OA 只覆盖 subset |
+| `C154_TwinResearcher` | 已对齐 | pair 映射补齐 hollow / copse-add 等 BGA 行动格覆盖 |
 | `C155_FoodDistributor` | 已对齐 |  |
 | `C156_HoofCaregiver` | 已对齐 |  |
 | `C157_ResourceAnalyzer` | 已对齐 |  |
@@ -1054,7 +1042,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D158_BeanCounter` | 已对齐 |  |
 | `D159_ReedSeller` | 排除 | BGA implemented=false；OA 保留 data-only 定义 |
 | `D160_Midwife` | 已对齐 |  |
-| `D161_CabbageBuyer` | 需复核 | BGA 监听任意 Renovation/Improvement；OA 只跟踪 `house-redevelopment` 的 `renovate-house` |
+| `D161_CabbageBuyer` | 已对齐 | renovation tracker 覆盖 renovate-house 与后续 major/minor improvement，不再只限 house-redevelopment |
 | `D162_ClayFirer` | 已对齐 |  |
 | `D163_JourneymanBricklayer` | 已对齐 |  |
 | `D164_PetGrower` | 已对齐 |  |
@@ -1141,7 +1129,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E65_Almsbag` | 已对齐 |  |
 | `E66_BarnShed` | 已对齐 |  |
 | `E67_GrainBag` | 已对齐 |  |
-| `E68_CherryOrchard` | 需复核 | desc 弱化了 BGA sow/harvest-as-grain 文案 |
+| `E68_CherryOrchard` | 已对齐 | 描述恢复 BGA sow/harvest-as-grain 语义，session 覆盖 wood field harvest |
 | `E69_MelonPatch` | 已对齐 |  |
 | `E70_CropRotationField` | 已接受差异 | 已接受的行为 / 产品差异 |
 | `E71_CowPatty` | 已对齐 | 单个 eligible 也走 optional selection，多田使用精确 selectableTiles |

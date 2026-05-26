@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
-import '../../shared/cards/D/D161_CabbageBuyer'
+import { D161_CabbageBuyer_impl } from '../../shared/cards/D/D161_CabbageBuyer'
 import '../../shared/cards/A/A55_JunkRoom'
+import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'D161_CabbageBuyer'
 
@@ -65,6 +66,57 @@ const setup = (options?: {
 
   session.loadState(state)
   return session
+}
+
+const setupD161DirectListeners = () => {
+  const session = setup()
+  const state = session.getState().state
+  const owner = state.players[0]!
+  const actor = state.players[1]!
+  const open = D161_CabbageBuyer_impl.listeners.find((l) => l.id === 'D161-cabbage-buyer-open-tracker')!
+  const tagImprovement = D161_CabbageBuyer_impl.listeners.find((l) => l.id === 'D161-cabbage-buyer-tag-improvement')!
+  const offer = D161_CabbageBuyer_impl.listeners.find((l) => l.id === 'D161-cabbage-buyer-drain-offer')!
+  return { state, owner, actor, open, tagImprovement, offer }
+}
+
+const getD161OfferCost = (flow: ActionFlow | undefined) => {
+  if (!flow || flow.type !== 'seq') return undefined
+  const pay = flow.children[0]
+  if (!pay || pay.type !== 'leaf' || pay.actionId !== 'pay') return undefined
+  return (pay.params as { food?: number } | undefined)?.food
+}
+
+const openDirectD161Tracker = (
+  setupResult: ReturnType<typeof setupD161DirectListeners>,
+  options?: { spaceId?: string; food?: number; choice?: string },
+) => {
+  const { state, owner, actor, open, tagImprovement, offer } = setupResult
+  if (options?.food !== undefined) owner.resources.food = options.food
+  open.handler({
+    state,
+    player: actor,
+    ownerPlayer: owner,
+    space: { id: options?.spaceId ?? 'house-redevelopment' } as never,
+    actionId: 'renovate-house',
+    phase: 'after',
+  } as never)
+  if (options?.choice) {
+    tagImprovement.handler({
+      state,
+      player: actor,
+      ownerPlayer: owner,
+      actionId: 'improvement',
+      phase: 'after',
+      choice: options.choice,
+    } as never)
+  }
+  return offer.handler({
+    state,
+    player: actor,
+    ownerPlayer: owner,
+    actionId: 'place-farmer',
+    phase: 'after',
+  } as never)
 }
 
 /**
@@ -196,6 +248,29 @@ const walkPlayerSwitch = (session: GameSession, resp: ReturnType<GameSession['ta
 // ─── Test cases ──────────────────────────────────────────────────────────────
 
 describe('D161_CabbageBuyer session', () => {
+  it('direct tracker opens for non-house renovation action spaces', () => {
+    const result = openDirectD161Tracker(setupD161DirectListeners(), {
+      spaceId: 'B1_UpscaleLifestyle',
+    })
+
+    expect(getD161OfferCost(result?.flow)).toBe(3)
+  })
+
+  it.each([
+    ['no improvement', undefined, 3],
+    ['minor improvement', 'minor:A55_JunkRoom', 2],
+    ['major improvement', 'major:Major_Fireplace1', 1],
+  ] as const)('direct price branch: %s costs %s food', (_label, choice, expectedCost) => {
+    const result = openDirectD161Tracker(setupD161DirectListeners(), { choice })
+
+    expect(getD161OfferCost(result?.flow)).toBe(expectedCost)
+  })
+
+  it('direct price branch: no food emits no offer', () => {
+    const result = openDirectD161Tracker(setupD161DirectListeners(), { food: 0 })
+
+    expect(result).toBeUndefined()
+  })
 
   // ── Case 1: no improvement → cost = 3 food ──────────────────────────────
 
@@ -321,42 +396,32 @@ describe('D161_CabbageBuyer session', () => {
     expect(after.players[0]!.resources.vegetable).toBe(ownerVegBefore + 1)
   })
 
-  // ── Case 5: farm-redevelopment does NOT trigger D161 ────────────────────
+  // ── Case 5: farm-redevelopment triggers D161 ────────────────────────────
 
-  it('T5: farm-redevelopment action does not trigger D161 offer', () => {
+  it('T5: farm-redevelopment action triggers D161 offer after renovation', () => {
     const session = setup()
     const state = session.getState().state
-    // Enable farm-redevelopment for round 10
     state.round = 10
-    // Ensure farm-redevelopment is in the action order
     const farmRedevIdx = state.roundActionOrder.indexOf('farm-redevelopment')
     if (farmRedevIdx === -1) {
-      // Inject it into the first null slot
       const nullIdx = state.roundActionOrder.indexOf(null)
       if (nullIdx !== -1) state.roundActionOrder[nullIdx] = 'farm-redevelopment'
     }
-    // Make the action space available
     const farmRedevSpace = state.actionSpaces.find((s) => s.id === 'farm-redevelopment')
-    if (!farmRedevSpace) {
-      // If space doesn't exist, skip test
-      return
-    }
+    expect(farmRedevSpace).toBeDefined()
     state.currentPlayerIndex = 1
     session.loadState(state)
 
-    const ownerFoodBefore = session.getState().state.players[0]!.resources.food
-    const ownerVegBefore = session.getState().state.players[0]!.resources.vegetable ?? 0
-
     let resp = session.takeAction(1, 'farm-redevelopment')
-    if (!resp.ok) return // Space not available in this round
+    expect(resp.ok).toBe(true)
 
-    // Walk through any intermediate choices / player switches
     let safety = 15
     while (
-      (resp.interaction.stateId === 'wait' || resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') &&
+      resp.interaction.stateId === 'wait' &&
       safety-- > 0
     ) {
-      if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      if (resp.interaction.playerIndex === 0 && resp.interaction.sourceCard === CARD_ID) break
+      if (resp.interaction.request.kind === 'confirm-player-switch') {
         resp = confirmPlayerSwitch(session)
         continue
       }
@@ -371,10 +436,9 @@ describe('D161_CabbageBuyer session', () => {
       }
     }
 
-    const after = session.getState().state
-    // D161 should NOT have triggered
-    expect(after.players[0]!.resources.food).toBe(ownerFoodBefore)
-    expect(after.players[0]!.resources.vegetable).toBe(ownerVegBefore)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.playerIndex).toBe(0)
+    expect(resp.interaction.sourceCard).toBe(CARD_ID)
   })
 
   // ── Case 6: owner has 0 food → no offer ─────────────────────────────────
