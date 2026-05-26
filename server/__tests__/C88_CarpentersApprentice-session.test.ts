@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, collectComputeCostsForFarmChoice } from '../../shared/cards/card-listeners'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 import type { PlayerState, GameState } from '../../shared/contract/types'
+import { getAllTilePositions, positionKey } from '../../shared/domain/farm'
 
 import '../../shared/cards/C/C88_CarpentersApprentice'
 import '../../shared/cards/B/B30_WoodPalisades'
@@ -186,7 +187,7 @@ describe('C88 — fenceCostListener 区间公式(第 13-15 个 fence 免费)', (
   })
 })
 
-const fenceDoable = (player: PlayerState): boolean => {
+const fenceDoable = (player: PlayerState, state = {} as GameState): boolean => {
   const listener = getRegisteredCardListeners().find(
     (l) =>
       l.cardIds?.includes('C88_CarpentersApprentice') &&
@@ -194,10 +195,8 @@ const fenceDoable = (player: PlayerState): boolean => {
       l.phases?.includes('isDoable'),
   )
   if (!listener) throw new Error('C88 fenceIsDoableListener (isDoable/fence) not registered')
-  // state 用空对象:fenceIsDoableListener 的 before>=12 分支不读 state,
-  // before<12 分支调的 canStartFencing 形参 `_state` 也不读。
   const ctx = {
-    state: {} as GameState,
+    state,
     player,
     space: {} as never,
     actionId: 'fence',
@@ -214,6 +213,30 @@ describe('C88 — fenceIsDoableListener 精确 BGA doability', () => {
   })
   it('before 13,wood 0 → doable', () => {
     expect(fenceDoable(makeFencePlayer(13, 0))).toBe(true)
+  })
+  it('12 fences,no legal commit → not doable', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    const player = state.players[0]!
+    const roomTiles = [
+      { row: 1, col: 0 },
+      { row: 1, col: 1 },
+    ]
+    const roomKeys = new Set(roomTiles.map(positionKey))
+    player.occupationPlayed.push('C88_CarpentersApprentice')
+    player.resources.wood = 0
+    player.roomTiles = roomTiles
+    player.fields = getAllTilePositions()
+      .filter((tile) => !roomKeys.has(positionKey(tile)))
+      .map((tile) => ({ ...tile, stacks: [] }))
+    player.fenceSegments = [
+      'H-0-1', 'H-0-2', 'H-0-3', 'H-0-4',
+      'H-3-1', 'H-3-2', 'H-3-3', 'H-3-4',
+      'V-0-1', 'V-1-1', 'V-2-1', 'V-0-5',
+    ].map((edge) => ({ edge, type: 'fence' as const }))
+
+    expect(fenceDoable(player, state)).toBe(false)
   })
   it('before 10,wood 1 → 不 doable(自费撑不到第 12 个)', () => {
     expect(fenceDoable(makeFencePlayer(10, 1))).toBe(false)
