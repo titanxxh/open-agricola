@@ -455,7 +455,7 @@ export const InteractionBar = ({
     pendingStableTilesLength === 0
   const isSelectionConfirmDisabled =
     pendingChoice?.promptKey === 'ui.interactionSelection' &&
-    pendingPositionSelectionsLength < ((pendingChoice.promptParams?.minSelections as number | undefined) ?? 0)
+    pendingPositionSelectionsLength < ((pendingChoice.promptParams?.minSelections as number | undefined) ?? 1)
   const hasBodyContent = !!(
     pendingAnimalReorg ||
     resourceBatchExchangeSelect ||
