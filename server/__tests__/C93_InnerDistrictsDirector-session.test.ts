@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
 
-import { markAllWorkersUsed } from '../../shared/domain/player'
+import { GameSession } from '../game/authoritative-session'
+import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 import '../../shared/cards/C/C93_InnerDistrictsDirector'
 import type { ActionFlow } from '../../shared/contract/types'
@@ -77,7 +78,9 @@ describe('C93_InnerDistrictsDirector', () => {
     expect(clayPitSpace.resources.stone).toBe(0)
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('seq')
-    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
+    expect(flow.optional).toBe(true)
+    const children = flow.children
     expect(children[0]).toMatchObject({
       actionId: 'special-effect',
       sourceCard: CARD_ID,
@@ -113,7 +116,9 @@ describe('C93_InnerDistrictsDirector', () => {
 
     expect(forestSpace.resources.stone).toBe(0)
     expect(result?.flow?.type).toBe('seq')
-    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
+    expect(flow.optional).toBe(true)
+    const children = flow.children
     expect(children[0]).toMatchObject({
       actionId: 'special-effect',
       sourceCard: CARD_ID,
@@ -135,12 +140,17 @@ describe('C93_InnerDistrictsDirector', () => {
       actionId: 'place-farmer', phase: 'after',
     } as unknown as CardListenerContext)
 
-    expect(result?.flow).toMatchObject({
-      type: 'leaf',
-      actionId: 'special-effect',
-      sourceCard: CARD_ID,
-      params: { kind: 'add-resource-to-space', spaceId: 'clay-pit', resource: 'stone', amount: 1 },
-    })
+    expect(result?.flow?.type).toBe('seq')
+    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
+    expect(flow.optional).toBe(true)
+    expect(flow.children).toEqual([
+      expect.objectContaining({
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: { kind: 'add-resource-to-space', spaceId: 'clay-pit', resource: 'stone', amount: 1 },
+      }),
+    ])
     expect(state.actionSpaces.find(s => s.id === 'clay-pit')!.resources.stone).toBe(0)
   })
 
@@ -157,5 +167,42 @@ describe('C93_InnerDistrictsDirector', () => {
     } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
+  })
+
+  it('skipping the outer optional leaves paired action space stone unchanged', () => {
+    const session = new GameSession(undefined, undefined, { playerCount: 2 })
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    state.roundPhase = 'work'
+    for (const player of state.players) {
+      setWorkersAtHome(state, player, 2)
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    }
+    const player = state.players[0]!
+    player.occupationPlayed.push(CARD_ID)
+    const forest = state.actionSpaces.find((s) => s.id === 'forest')!
+    const clayPit = state.actionSpaces.find((s) => s.id === 'clay-pit')!
+    forest.resources.wood = 3
+    clayPit.resources.stone = 0
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'forest')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
+    if (resp.interaction.request.kind === 'select-trigger') {
+      const trigger = resp.interaction.options?.find((option) => option.value !== '__skip__')
+      expect(trigger).toBeDefined()
+      resp = session.resolveChoice(0, trigger!.value)
+    }
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected optional choice')
+    expect(resp.interaction.options?.map((option) => option.value)).toContain('__skip__')
+
+    resp = session.resolveChoice(0, '__skip__')
+
+    expect(resp.state.actionSpaces.find((s) => s.id === 'clay-pit')!.resources.stone ?? 0).toBe(0)
   })
 })

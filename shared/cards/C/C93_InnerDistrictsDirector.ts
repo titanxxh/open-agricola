@@ -14,9 +14,6 @@ const CARD_ID = C93_InnerDistrictsDirector.id
  *
  * BGA: After PlaceFarmer on Forest → place 1 stone on Clay Pit (and vice versa),
  * then optionally place another farmer.
- *
- * OA behavior: the stone placement is mandatory after the trigger and is not
- * declined together with the optional extra placement.
  */
 const PAIRED_SPACE: Record<string, string> = {
   forest: 'clay-pit',
@@ -52,7 +49,11 @@ const listener: CardListenerRegistration = {
 
     if (workersAvailable(context.state, context.player) <= 0) {
       return {
-        flow: addResourceFlow,
+        flow: {
+          type: 'seq',
+          optional: true,
+          children: [addResourceFlow],
+        } as ActionFlow,
         sourceCard: CARD_ID,
       }
     }
@@ -60,6 +61,7 @@ const listener: CardListenerRegistration = {
     return {
       flow: {
         type: 'seq',
+        optional: true,
         children: [
           addResourceFlow,
           {
