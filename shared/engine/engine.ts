@@ -355,6 +355,18 @@ export class Engine {
     context.state.events ??= []
     context.state.nextEventSeq ??= 1
     const committed = this.events.commitTransaction(context.state)
+    const pendingHost = this.peekPendingHost()
+    if (pendingHost instanceof ActionNode && committed.length > 0) {
+      const preserved = committed.map((event) => cloneSnapshotValue(event))
+      pendingHost.deferredHostTransactionEvents = [
+        ...(pendingHost.deferredHostTransactionEvents ?? []),
+        ...preserved,
+      ]
+      pendingHost.deferredHostActionEvents = [
+        ...(pendingHost.deferredHostActionEvents ?? []),
+        ...preserved,
+      ]
+    }
     this.eventLogDerivations = []
     const playerNames = Object.fromEntries(
       context.state.players.map((player) => [player.id, player.name]),
