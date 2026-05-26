@@ -4055,15 +4055,16 @@ export class GameCore {
       const exists = player.fields.some((f) => f.row === pos.row && f.col === pos.col)
       if (!exists) return this.respond(false, 'invalid field position')
     }
-    const selectableTiles = Array.isArray(interactionContext?.selectableTiles)
-      ? interactionContext.selectableTiles as FarmTilePosition[]
-      : null
-    if (selectableTiles) {
-      const selectableKeys = new Set(selectableTiles.map((pos) => `${pos.row}-${pos.col}`))
-      for (const pos of positions) {
-        if (!selectableKeys.has(`${pos.row}-${pos.col}`)) {
-          return this.respond(false, 'invalid selection position')
-        }
+    const selectionInteraction = playerBoard(this.state, playerIndex)
+      .farmyard
+      .selectableTiles('farm-position', { actionContext: interactionContext })
+    const selectablePositions = selectionInteraction.kind === 'farm-position'
+      ? selectionInteraction.selectablePositions
+      : []
+    const selectableKeys = new Set(selectablePositions.map(positionKey))
+    for (const pos of positions) {
+      if (!selectableKeys.has(positionKey(pos))) {
+        return this.respond(false, 'invalid selection position')
       }
     }
     const allowedSelectionCounts = Array.isArray(interactionContext?.allowedSelectionCounts)
