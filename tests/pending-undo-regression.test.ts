@@ -273,7 +273,7 @@ describe('pending choice types + undo regression', () => {
       }
     })
 
-    it('cancel resolves the choice', () => {
+    it('cancel is rejected for protected farm choice', () => {
       const farmland = findAvailableAction(session, (a) => a.spaceId === 'farmland')
       if (!farmland) return
 
@@ -282,7 +282,8 @@ describe('pending choice types + undo regression', () => {
       if (state.interaction.stateId !== 'wait') return
 
       const resp = session.commitSelectionChoice(0, { cancel: true })
-      expect(resp.ok).toBe(true)
+      expect(resp.ok).toBe(false)
+      expect(resp.interaction.stateId).toBe('wait')
     })
 
     it('farm-expansion offers or-choice', () => {
@@ -421,7 +422,7 @@ describe('pending choice types + undo regression', () => {
       expect(resp.ok).toBe(false)
     })
 
-    it('undoStep on direct farm selection cancels the substep before undoing the action', () => {
+    it('undoStep on direct farm selection restores action start', () => {
       const farmland = findAvailableAction(session, (a) => a.spaceId === 'farmland')
       if (!farmland) return
 
@@ -431,15 +432,10 @@ describe('pending choice types + undo regression', () => {
 
       const undo1 = session.undoStep()
       expect(undo1.ok).toBe(true)
-      expect(undo1.interaction.stateId === 'wait' ? undo1.interaction.request.kind : undo1.interaction.stateId).toBe('confirm-next-player')
+      expect(undo1.interaction.stateId).toBe('idle')
       expect(
         undo1.state.actionSpaces.find((space) => space.id === farmland.spaceId)?.takenBy[0]?.playerId,
-      ).toBe(undo1.state.players[0]!.id)
-
-      const undo2 = session.undoStep()
-      expect(undo2.ok).toBe(true)
-      expect(undo2.interaction.stateId).toBe('idle')
-      expect(undo2.state.actionSpaces.find((space) => space.id === farmland.spaceId)?.takenBy).toEqual([])
+      ).toBeUndefined()
     })
   })
 

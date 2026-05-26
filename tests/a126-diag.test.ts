@@ -58,7 +58,6 @@ describe('A126 MasterWorkman integration', () => {
     expect(resp.interaction.promptKey).toBe('ui.interactionPlowSelect')
     expect(resp.interaction.options).toEqual([
       { value: 'confirm', labelKey: 'ui.interactionPlowConfirm' },
-      { value: 'cancel', labelKey: 'ui.interactionPlowCancel' },
     ])
   })
 })
