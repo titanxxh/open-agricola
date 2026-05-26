@@ -102,7 +102,7 @@ describe('reorganizeAction engine sub-flow integration', () => {
 
     const resp = session.resolveChoice(0, 'cancel')
     expect(resp.ok).toBe(false)
-    expect(resp.error).toBe('invalid choice value')
+    expect(resp.error).toBe('log.reorganizeFail')
     expect(resp.state.players[0]!.resources.boar).toBe(1)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')

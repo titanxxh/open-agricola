@@ -22,6 +22,7 @@ import {
   isPendingChoiceValueAllowed,
   pendingEnvelopeChoices,
 } from './pending-validation'
+import { rejectProtectedActionCancel } from './protected-action-cancel'
 import { evaluateTriggerSelect, type TriggerSelectEvaluationOptions } from './trigger-select'
 import {
   applyDefaultSourceCardToFlow,
@@ -66,26 +67,6 @@ const resolveExecutionSpace = (
 const hasStateLogSurface = (result: ActionExecutionResult): boolean => {
   if (result.type === 'fail') return true
   return false
-}
-
-const protectedActionCancelErrorKeys: Record<string, string> = {
-  plow: 'log.action',
-  sow: 'log.action',
-  selection: 'log.action',
-  construct: 'log.buildRoomFail',
-  stables: 'log.buildStableFail',
-  fence: 'log.fencingFail',
-  reorganize: 'log.reorganizeFail',
-}
-
-const rejectProtectedActionCancel = (
-  actionId: string | null | undefined,
-  choice: string,
-): ActionExecutionResult | null => {
-  if (choice !== 'cancel' || !actionId) return null
-  const errorKey = protectedActionCancelErrorKeys[actionId]
-  if (!errorKey) return null
-  return { type: 'fail', errorKey, recoverable: true }
 }
 
 const appendDerivedLogsForEventOnlyResult = (
