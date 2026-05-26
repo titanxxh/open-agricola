@@ -75,7 +75,7 @@ describe('C148_MudWallower reorg-after sync (zone-based)', () => {
     resp = session.resolveChoice(0, 'cancel')
 
     expect(resp.ok).toBe(false)
-    expect(resp.error).toBe('invalid choice value')
+    expect(resp.error).toBe('log.reorganizeFail')
     expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.counters?.held).toBe(3)
   })
 })

@@ -51,6 +51,7 @@ import {
   isPendingChoiceValueAllowed,
   pendingEnvelopeChoices,
 } from '../engine/pending-validation.ts'
+import { isProtectedActionCancel } from '../engine/protected-action-cancel.ts'
 import type { PendingEnvelope } from '../engine/types.ts'
 import type { ReorganizeTrigger } from '../actions/effects/reorganize.ts'
 import {
@@ -3236,13 +3237,16 @@ export class GameCore {
     const space = this.getSpaceById(this.activeSpaceId)
     if (!player || !space) return this.respond(false, 'invalid state')
 
-    if (pushHistoryEntry) {
+    const resolvedActionId = this.peekHostPendingActionId()
+    const protectedDirectCancel = isProtectedActionCancel(resolvedActionId, value)
+
+    if (pushHistoryEntry && !protectedDirectCancel) {
       this.pushHistory()
     }
     // Card-effect resolveChoice hook: if the pending choice has a sourceCard with a
     // registered CardEffect.resolveChoice, give the card a chance to produce a follow-up
     // ActionFlow that runs after the engine's own choice resolution.
-    if (pendingSourceCard) {
+    if (pendingSourceCard && !protectedDirectCancel) {
       const cardEffect = getCardEffect(pendingSourceCard)
       if (cardEffect?.resolveChoice) {
         const cardFlow = cardEffect.resolveChoice(this.state, player, value, {
@@ -3257,7 +3261,6 @@ export class GameCore {
         }
       }
     }
-    const resolvedActionId = this.peekHostPendingActionId()
     const result = this.engine.resolveChoice(
       value,
       this.buildEngineExecutionContext(player, space),
@@ -3314,7 +3317,8 @@ export class GameCore {
     const envelope = this.engineStack.peekPendingEnvelope()
     const request = envelope?.request
     if (request) {
-      if (!isPendingChoiceValueAllowed(envelope, value)) {
+      const protectedDirectCancel = isProtectedActionCancel(envelope.pendingActionId, value)
+      if (!protectedDirectCancel && !isPendingChoiceValueAllowed(envelope, value)) {
         const disabled = pendingEnvelopeChoices(envelope)
           .some((option) => option.value === value && option.disabled === true)
         if (disabled && String(envelope.promptKey) === 'cards.B3_Moonshine.choice') return this.respond(false, 'choice disabled')
