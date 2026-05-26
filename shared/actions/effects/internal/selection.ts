@@ -1,13 +1,17 @@
-import type { ActionDefinition } from '../../../contract/types'
+import type { ActionDefinition, GameState, PlayerState } from '../../../contract/types'
 import { writeCardExtraData } from '../../../cards/helpers/card-state'
+import { playerBoard } from '../../../domain'
 import { runSelectionEffect } from '../../helpers/selection-effect-registry'
 
 const validateFarmPositions = (
   positions: string[],
   actionContext: Record<string, unknown> | undefined,
+  state: GameState | undefined,
+  player: PlayerState,
 ) => {
   const hasSelectionBounds = actionContext?.minSelections !== undefined
     || actionContext?.maxSelections !== undefined
+    || actionContext?.positionFilter !== undefined
     || Array.isArray(actionContext?.selectableTiles)
   if (!hasSelectionBounds) return null
 
@@ -24,13 +28,27 @@ const validateFarmPositions = (
     selected.add(position)
   }
 
-  const selectableTiles = Array.isArray(actionContext?.selectableTiles)
-    ? actionContext.selectableTiles as Array<{ row: number; col: number }>
-    : null
-  if (selectableTiles) {
-    const selectable = new Set(selectableTiles.map((pos) => `${pos.row}-${pos.col}`))
+  const playerIndex = state?.players.indexOf(player) ?? -1
+  if (state && playerIndex >= 0) {
+    const selectionInteraction = playerBoard(state, playerIndex)
+      .farmyard
+      .selectableTiles('farm-position', { actionContext })
+    const selectablePositions = selectionInteraction.kind === 'farm-position'
+      ? selectionInteraction.selectablePositions
+      : []
+    const selectable = new Set(selectablePositions.map((pos) => `${pos.row}-${pos.col}`))
     for (const position of positions) {
       if (!selectable.has(position)) return 'invalid selection position'
+    }
+  } else {
+    const selectableTiles = Array.isArray(actionContext?.selectableTiles)
+      ? actionContext.selectableTiles as Array<{ row: number; col: number }>
+      : null
+    if (selectableTiles) {
+      const selectable = new Set(selectableTiles.map((pos) => `${pos.row}-${pos.col}`))
+      for (const position of positions) {
+        if (!selectable.has(position)) return 'invalid selection position'
+      }
     }
   }
 
@@ -100,7 +118,7 @@ export const selectionAction: ActionDefinition = {
     const cards = Array.isArray(payloadCards) ? payloadCards : []
     const kind = (actionContext?.selectionKind as string | undefined) ?? 'farm-position'
     if (kind === 'farm-position') {
-      const validationError = validateFarmPositions(positions, actionContext)
+      const validationError = validateFarmPositions(positions, actionContext, state, player)
       if (validationError) return { type: 'fail', errorKey: validationError, recoverable: true }
     }
     if (kind === 'occupation-hand') {
