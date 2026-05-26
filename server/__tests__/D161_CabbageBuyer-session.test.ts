@@ -4,6 +4,7 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { D161_CabbageBuyer_impl } from '../../shared/cards/D/D161_CabbageBuyer'
 import '../../shared/cards/A/A55_JunkRoom'
+import '../../shared/cards/D/D13_Trowel'
 import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'D161_CabbageBuyer'
@@ -516,5 +517,39 @@ describe('D161_CabbageBuyer session', () => {
     const after = session.getState().state
     // Owner food and vegetable untouched
     expect(after.players[0]!.resources.vegetable ?? 0).toBe(0)
+  })
+
+  it('T9: anytime renovation without worker placement still presents the D161 offer', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+
+    const player = state.players[0]!
+    player.minorPlayed.push('D13_Trowel')
+    player.occupationPlayed.push(CARD_ID)
+    player.playedCards = player.playedCards ?? []
+    player.playedCards.push(`occupation:${CARD_ID}`)
+    player.resources.food = 10
+    player.resources.reed = 10
+    player.resources.stone = 10
+    player.houseType = 'wood'
+    player.rooms = 2
+    session.loadState(state)
+
+    const resp = session.takeAnytimeAction(0, 'D13-trowel-anytime')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.playerIndex : -1).toBe(0)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).toBe(CARD_ID)
+    const acceptOpt = resp.interaction.stateId === 'wait'
+      ? resp.interaction.options?.find((o) => o.value !== '__skip__')
+      : undefined
+    expect(acceptOpt?.effectPreview).toEqual({
+      kind: 'resourceExchange',
+      resourcesPaid: { food: 3 },
+      resourcesGained: { vegetable: 1 },
+    })
   })
 })
