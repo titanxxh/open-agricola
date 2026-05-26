@@ -153,32 +153,18 @@ describe('B38 FutureBuildingSite — session', () => {
     expect(resp.ok).toBe(true)
   })
 
-  it('room on locked tile is rejected', () => {
+  it('does not offer room building when locked tiles leave no reachable room', () => {
     const session = setup()
 
-    let resp = session.takeAction(0, 'farm-expansion')
+    const resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
 
-    // Select room building (or-leaf value is engine-generated like 'seq-construct-N').
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     const roomOpt = resp.interaction.options?.find((o: ActionChoiceOption) =>
       o.labelKey === 'actions.construct.name',
     )
-    expect(roomOpt).toBeDefined()
-    resp = session.resolveChoice(0, roomOpt!.value)
-
-    // Locked tiles should not be in selectable tiles for room
-    if (resp.interaction?.farm?.selectableTiles) {
-      const selectableKeys = new Set(resp.interaction.farm.selectableTiles.map(positionKey))
-      for (const lt of DEFAULT_LOCKED) {
-        expect(selectableKeys.has(positionKey(lt))).toBe(false)
-      }
-    }
-
-    // Try building room on locked tile (2,1) — engine path returns fail.
-    resp = session.commitSelectionChoice(0, { rooms: [{ row: 2, col: 1 }] })
-    expect(resp.ok).toBe(false)
+    expect(roomOpt).toBeUndefined()
   })
 
   it('stable on locked tile is rejected', () => {
