@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import '../../../cards/B/B38_FutureBuildingSite'
 import { constructAction } from '../construct'
 import type {
   ActionExecutionContext,
@@ -10,6 +11,14 @@ import type {
 } from '../../../contract/types'
 
 const dummySpace: ActionSpace = { id: 'construct', type: 'construct' } as unknown as ActionSpace
+
+const b38LockedAdjacentRooms: FarmTilePosition[] = [
+  { row: 0, col: 0 },
+  { row: 0, col: 1 },
+  { row: 1, col: 2 },
+  { row: 2, col: 0 },
+  { row: 2, col: 1 },
+]
 
 const makeCtx = (
   opts: {
@@ -63,6 +72,20 @@ const makeCtx = (
 }
 
 describe('constructAction.resolveChoice', () => {
+  it('is not executable when locked tiles leave no reachable room selection', () => {
+    const ctx = makeCtx({
+      player: {
+        minorPlayed: ['B38_FutureBuildingSite'],
+        cardStates: {
+          B38_FutureBuildingSite: { extraData: { locked: b38LockedAdjacentRooms } },
+        },
+      },
+    })
+
+    expect(constructAction.canBeExecutedByPlayer(ctx.state, ctx.player)).toBe(false)
+    expect(constructAction.costPreview?.canExecute?.(ctx)).toBe(false)
+  })
+
   it('cancel returns recoverable fail', () => {
     const result = constructAction.resolveChoice!(makeCtx(), 'cancel')
     expect(result).toEqual({

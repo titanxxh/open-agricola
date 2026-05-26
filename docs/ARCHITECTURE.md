@@ -580,7 +580,7 @@ anytime                  额外注册的 anytime 行动
 
 普通 public action leaf 进入 engine 后按以下顺序处理：`computeReplace -> before -> strict isDoable -> computeCosts -> execute -> during -> immediatelyAfter -> after`。
 
-Direct `cancel` 不是 protected atomic action 的成功路径。`plow` / `sow` / `construct` / `stables` / `fence` / `reorganize` / internal `selection` 的 direct `cancel` 会在 option validation、`resolveChoice` 和 hooks 之前被 recoverable reject，pending 保持 active，因此不会触发 `before` / `during` / `immediatelyAfter` / `after`。Optionality 由父级 ActionFlow optional metadata 和 `__skip__` 表达；undo / BGA `actRestart` 类回退走 history rollback。`exchange` 与 `bake-bread` 暂按各自 legacy 窗口保留例外语义。
+Direct `cancel` 不是 protected atomic action 的成功路径。`plow` / `sow` / `construct` / `stables` / `fence` / `reorganize` / internal `selection` 的 direct `cancel` 会在 option validation、`resolveChoice` 和 hooks 之前被 recoverable reject，pending 保持 active，因此不会触发 `before` / `during` / `immediatelyAfter` / `after`。Optionality 由父级 ActionFlow optional metadata 和 `__skip__` 表达；undo / BGA `actRestart` 类回退走 history rollback。`construct` / `fence` 的 entry doability 必须先排除无 reachable room / 无 legal fence commit 的真实 state，避免 confirm-only pending 没有正常提交路径。`exchange` 与 `bake-bread` 暂按各自 legacy 窗口保留例外语义。
 
 1. `computeReplace` 最先运行，早于 `before` / strict `isDoable` / `computeCosts`。`HookDispatcher.applyComputeReplace()` 先跑 action hook replacement，再跑匹配的 card listener `phase='computeReplace'`。
 2. 如果 `computeReplace` 只替换 `actionId`，后续所有阶段都使用替换后的 `actionId` 继续。
@@ -694,7 +694,7 @@ OA 对齐规则：
 
 5 种 farmType 全在各自 ActionDef.resolveChoice 内闭环（`shared/actions/effects/`）：
 
-- **room** (`construct.ts`)：`room-payment.ts` 展开"每间房"费用变体；多解时二轮 `pay:room:*` prompt finalize；direct cancel 由通用 protected-action guard 拒绝，nested room reward 仍可用 `actionContext.cancelPolicy: 'forbidCancel'` 表达“选中奖励后必须放置房间”的本地 policy 约束。
+- **room** (`construct.ts`)：`room-payment.ts` 展开"每间房"费用变体；多解时二轮 `pay:room:*` prompt finalize；doability 同时检查支付上限和 reachable room selection；direct cancel 由通用 protected-action guard 拒绝。
 - **stable / plow** (`stables.ts` / `plow.ts`)：typed flat payment 解析。
 - **fence** (`fencing.ts`)：校验选边/连通/封闭区域，得 `newEdges` 后计算 wood（考虑 `freeFences` / `extraWood` / fence-cost-unification 的 `collectComputeCostsForFarmChoice` Pass #2）；多解 `pay:fence:*` 二轮 prompt。
 - **sow** (`sow.ts`)：validate + finalize（无 payment combo），含 extra-field card effect（`getPermittedExtraSowableFields` + `handleSowExtraField`）。
@@ -707,7 +707,7 @@ farmType 第一轮 payload 形态：`fence: {edges, palisadeEdges, extraWood}` /
 
 fencing 主路径不得按卡牌 id 或单卡开关分支：不要在 `fencing.ts` / farmyard validation 里写 `C1` / `B30` / `E149`、`noWoodPalisades`、`midnightFencer` 这类分支。卡牌特殊行为统一通过 generic `fencePolicy` 表达：`allowedSegmentTypes`、`sourcePolicy`、`segmentBounds`、`newPastureBounds`、`costPolicy`、`cancelPolicy`、`preserveAnimalTotals`。
 
-`segmentBounds.fence` / `segmentBounds.palisade` 限制各自类型的新建边段；`segmentBounds.total` 限制普通 fence + palisade 的总新建边段。B149 Open Air Farmer 这类 BGA `max => 6` 总段数约束必须用 `total.max` 表达，B30 palisade 也计入该上限。`canStartFencing` 只能做通用 policy 可行性估算；最终合法性仍由 `validateFenceSelection()` 原子校验并在失败时不支付。
+`segmentBounds.fence` / `segmentBounds.palisade` 限制各自类型的新建边段；`segmentBounds.total` 限制普通 fence + palisade 的总新建边段。B149 Open Air Farmer 这类 BGA `max => 6` 总段数约束必须用 `total.max` 表达，B30 palisade 也计入该上限。`canStartFencing` 先做通用 policy 资源 / supply 可行性估算；在真实 state 中还会用 `validateFenceSelection()` 预检至少一个 legal fence commit，避免 confirm-only pending 无法完成。最终合法性仍由 `validateFenceSelection()` 原子校验并在失败时不支付。
 
 `fencePolicy.costPolicy` 只表达 BGA `formatCost` 的本次基础单位成本；entry guard 与最终校验仍要叠加 `computeCosts.fence` 折扣/加价，确保 B93 future fence 这类嵌套 action 可以继续吃 E16 / C16 等围栏折扣。
 
