@@ -53,6 +53,14 @@ export const C22_BasketChair_impl = {
     // isDoable propagation.
     if (workersAvailable(state, player) < 1) return
 
+    const cleanupFlow = first.spaceId === 'day-laborer'
+      ? [{
+          type: 'leaf' as const,
+          actionId: CLEANUP_JOB_CONTRACT_FAKE_ACTION_ID,
+          sourceCard: CARD_ID,
+        }]
+      : []
+
     return {
       type: 'seq',
       optional: true,
@@ -63,11 +71,7 @@ export const C22_BasketChair_impl = {
           params: { workerId: first.workerId, targetCardHold: CARD_ID },
           sourceCard: CARD_ID,
         },
-        {
-          type: 'leaf',
-          actionId: CLEANUP_JOB_CONTRACT_FAKE_ACTION_ID,
-          sourceCard: CARD_ID,
-        },
+        ...cleanupFlow,
         {
           type: 'leaf',
           actionId: 'place-farmer',

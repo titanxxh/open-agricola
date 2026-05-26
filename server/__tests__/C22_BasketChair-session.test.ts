@@ -316,4 +316,35 @@ describe('C22_BasketChair session', () => {
     expect(forest.takenBy.some((t) => t.playerId === 'p1')).toBe(false)
     expect(lessons.takenBy.some((t) => t.playerId === 'p1' && t.workerId === '2')).toBe(true)
   })
+
+  it('case 10 — C23 fake lessons worker stays when C22 recalls a non-day-laborer worker', () => {
+    const session = setup({ activeWorkers: 5 })
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.minorPlayed.push('C23_JobContract')
+    session.loadState(state)
+
+    simulatePlacement(session, 0, 'forest', '1')
+    simulatePlacement(session, 0, 'day-laborer', '2')
+    const withDayLaborer = session.getState().state
+    const lessons = withDayLaborer.actionSpaces.find((s) => s.id === 'lessons')!
+    addWorkerRef(lessons, player.id, '4')
+    session.loadState(withDayLaborer)
+
+    let resp = buyC22ViaMeetingPlace(session)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const acceptOption = resp.interaction.options?.find((o) => o.value !== '__skip__')
+    expect(acceptOption).toBeDefined()
+
+    resp = session.resolveChoice(0, acceptOption!.value)
+    expect(resp.ok).toBe(true)
+
+    const forest = resp.state.actionSpaces.find((s) => s.id === 'forest')!
+    const dayLaborer = resp.state.actionSpaces.find((s) => s.id === 'day-laborer')!
+    const lessonsAfter = resp.state.actionSpaces.find((s) => s.id === 'lessons')!
+    expect(forest.takenBy.some((t) => t.playerId === 'p1')).toBe(false)
+    expect(dayLaborer.takenBy.some((t) => t.playerId === 'p1' && t.workerId === '2')).toBe(true)
+    expect(lessonsAfter.takenBy.some((t) => t.playerId === 'p1' && t.workerId === '4')).toBe(true)
+  })
 })

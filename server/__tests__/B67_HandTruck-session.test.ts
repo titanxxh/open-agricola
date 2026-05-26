@@ -60,4 +60,27 @@ describe('B67_HandTruck session', () => {
     expect(resp.interaction.promptKey).toMatch(/^ui\.interactionBakeBread/)
     expect(resp.interaction.sourceCard).not.toBe(CARD_ID)
   })
+
+  it('does not offer grain before bake-bread without a bake provider', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    const player = state.players[0]!
+    player.occupationPlayed.push(CARD_ID)
+    player.resources.grain = 0
+    player.improvements = []
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+    const forest = state.actionSpaces.find((space) => space.id === 'forest')!
+    forest.takenBy = [{ playerId: player.id, workerId: '1' }]
+    session.loadState(state)
+
+    const resp = session.takeAction(0, 'grain-utilization')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).not.toBe(CARD_ID)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined).not.toBe('ui.interactionEngineBlocked')
+    expect(resp.state.players[0]!.resources.grain).toBe(0)
+  })
 })
