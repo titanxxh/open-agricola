@@ -112,10 +112,26 @@ const makeCtx = (
   } as ActionMutationContext
 }
 
+describe('fenceAction.execute', () => {
+  it('only exposes confirm option', () => {
+    const result = fenceAction.execute(makeCtx())
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') return
+    expect(result.request.kind).toBe('farm-select')
+    if (result.request.kind !== 'farm-select') return
+    const optionValues = result.request.options.map((option) => option.value)
+    expect(optionValues).toEqual(['confirm'])
+  })
+})
+
 describe('fenceAction.resolveChoice', () => {
-  it('cancel returns ok', () => {
+  it('cancel returns recoverable fail', () => {
     const result = fenceAction.resolveChoice!(makeCtx(), 'cancel')
-    expect(result.type).toBe('ok')
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'log.fencingFail',
+      recoverable: true,
+    })
   })
 
   it('cancel fails with recoverable error when policy forbids cancel', () => {
@@ -162,7 +178,7 @@ describe('fenceAction.resolveChoice', () => {
     })
   })
 
-  it('cancel returns ok when a mandatory pasture policy has no possible layout', () => {
+  it('cancel returns recoverable fail when a mandatory pasture policy has no possible layout', () => {
     const occupiedFields = Array.from({ length: 3 }, (_, row) =>
       Array.from({ length: 5 }, (_, col) => ({ row, col, stacks: [] })),
     ).flat().filter((tile) => !(tile.row === 1 && (tile.col === 0 || tile.col === 1)))
@@ -197,7 +213,11 @@ describe('fenceAction.resolveChoice', () => {
       'cancel',
     )
 
-    expect(result.type).toBe('ok')
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'log.fencingFail',
+      recoverable: true,
+    })
   })
 
   it('first call with payload + payable wood finalizes immediately', () => {

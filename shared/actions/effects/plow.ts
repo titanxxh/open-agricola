@@ -196,14 +196,15 @@ export const plowAction: ActionDefinition = {
         farm: { farmType: 'plow', selectableTiles },
         options: [
           { value: 'confirm', labelKey: 'ui.interactionPlowConfirm' },
-          { value: 'cancel', labelKey: 'ui.interactionPlowCancel' },
         ],
       },
       promptKey: 'ui.interactionPlowSelect',
     }
   },
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
-    if (choice === 'cancel') return { type: 'ok' }
+    if (choice === 'cancel') {
+      return { type: 'fail', errorKey: 'log.action', recoverable: true }
+    }
 
     const lockedKeys = collectLockedFarmTileKeys(ctx.player)
 
