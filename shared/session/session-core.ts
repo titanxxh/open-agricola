@@ -1372,6 +1372,9 @@ export class GameCore {
     const blockedIds = new Set(policy.blockedIds)
     const { player, space } = context
     const anytimeEntries: { descriptor: AnytimeAction; flow: ActionFlow }[] = []
+    const pendingEnvelope = this.engineStack.peekPendingEnvelope()
+    const pendingSnapshot = this.peekHostContextSnapshot()
+    const pendingSourceCard = pendingEnvelope?.sourceCard ?? pendingSnapshot?.sourceCard
     for (const action of this.registry.values()) {
       if (!action.anytime) continue
       if (blockedIds.has(action.id)) continue
@@ -1397,6 +1400,7 @@ export class GameCore {
       space,
       actionId: 'anytime',
       phase: 'anytime',
+      pendingSourceCard,
     }
     const matchedAnytime = getMatchingListeners(anytimeContext)
     for (const entry of matchedAnytime) {

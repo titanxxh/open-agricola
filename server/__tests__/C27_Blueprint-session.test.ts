@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { resolveCardCostWithModifiers } from '../../shared/actions/payment/internal'
+import { computeAllBuyableCombinations, resolveCardCostWithModifiers } from '../../shared/actions/payment/internal'
 import { isComplexCost } from '../../shared/actions/payment/internal'
 import {
+  collectComputeChoiceCandidates,
   executeCardListener,
   getRegisteredCardListeners,
   type CardListenerContext,
 } from '../../shared/cards/card-listeners'
 import '../../shared/cards/C/C27_Blueprint'
+import '../../shared/cards/B/B131_Equipper'
 
 const CARD_ID = 'C27_Blueprint'
 const ROUTING_LISTENER_ID = 'C27-blueprint-compute-choice-candidates'
@@ -38,10 +40,8 @@ describe('C27_Blueprint session — verify chooseOne aligned to BGA majors', () 
 
   const ALLOWED_MAJORS = ['Major_Joinery', 'Major_Pottery', 'Major_Basket'] as const
 
-  it.each(ALLOWED_MAJORS)('reduces stone cost by 1 for %s', (majorId) => {
+  it.each(ALLOWED_MAJORS)('adds optional stone discount bonus for %s', (majorId) => {
     const { state, player } = setup()
-    // Joinery cost: { wood: 2, stone: 2 }. Pottery / Basket also include stone.
-    // The listener subtracts stone:-1, mutating cost in place via applyCostOverride.
     const baseCost = { wood: 2, stone: 2 }
     const resolved = resolveCardCostWithModifiers(
       state,
@@ -50,10 +50,45 @@ describe('C27_Blueprint session — verify chooseOne aligned to BGA majors', () 
       majorId,
       baseCost,
     )
-    expect(isComplexCost(resolved)).toBe(false)
-    if (isComplexCost(resolved)) return
-    expect(resolved.stone).toBe(1)
-    expect(resolved.wood).toBe(2)
+    expect(isComplexCost(resolved)).toBe(true)
+    if (!isComplexCost(resolved)) return
+    expect(resolved.fee).toEqual(baseCost)
+    expect(resolved.bonuses).toEqual([{
+      discount: { stone: 1 },
+      optional: true,
+      sources: [CARD_ID],
+      preserveOriginal: true,
+    }])
+  })
+
+  it('preserves original and discounted payment paths for allowed majors', () => {
+    const { state, player } = setup()
+    player.resources = {
+      ...player.resources,
+      wood: 5,
+      stone: 5,
+    }
+    const resolved = resolveCardCostWithModifiers(
+      state,
+      player,
+      'improvement',
+      'Major_Joinery',
+      { wood: 2, stone: 2 },
+    )
+    expect(isComplexCost(resolved)).toBe(true)
+    if (!isComplexCost(resolved)) return
+
+    const options = computeAllBuyableCombinations(player, resolved)
+    expect(options.some((option) =>
+      option.resourcesPaid.wood === 2 &&
+      option.resourcesPaid.stone === 2 &&
+      !option.bonusUsed,
+    )).toBe(true)
+    expect(options.some((option) =>
+      option.resourcesPaid.wood === 2 &&
+      option.resourcesPaid.stone === 1 &&
+      option.bonusUsed === CARD_ID,
+    )).toBe(true)
   })
 
   it('does NOT reduce cost for non-listed majors (e.g. Major_Fireplace)', () => {
@@ -174,5 +209,19 @@ describe('C27_Blueprint session — minor-improvement routing for 3 majors', () 
     } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
+  })
+
+  it('does not inject majors into B131 card-derived minor improvement choices', () => {
+    const { state, player } = setupWithResources()
+
+    const extras = collectComputeChoiceCandidates(
+      state,
+      player,
+      'improvement',
+      { types: ['minor'], trueAction: false },
+      'B131_Equipper',
+    )
+
+    expect(extras.some((option) => option.value === 'major:Major_Joinery')).toBe(false)
   })
 })

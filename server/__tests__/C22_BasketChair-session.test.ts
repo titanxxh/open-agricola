@@ -16,6 +16,7 @@ import {
 import { addWorkerRef } from '../../shared/domain/space'
 
 import '../../shared/cards/C/C22_BasketChair'
+import '../../shared/cards/C/C23_JobContract'
 // Import a second, cheap minor so the minor-selection choice never has exactly
 // one option (which would otherwise auto-resolve past the choice state the
 // tests need to observe).
@@ -263,5 +264,56 @@ describe('C22_BasketChair session', () => {
     // All 3 active workers are home again (the 3 action-space takenBy lists
     // are cleared as part of the same hook).
     expect(workersAvailable(afterState, afterState.players[0]!)).toBe(3)
+  })
+
+  it('case 8 — buying C22 after C23 day-laborer removes the fake lessons worker', () => {
+    const session = setup({ activeWorkers: 4 })
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.minorPlayed.push('C23_JobContract')
+    session.loadState(state)
+    simulatePlacement(session, 0, 'day-laborer', '1')
+    const withDayLaborer = session.getState().state
+    const lessons = withDayLaborer.actionSpaces.find((s) => s.id === 'lessons')!
+    addWorkerRef(lessons, player.id, '3')
+    session.loadState(withDayLaborer)
+
+    let resp = buyC22ViaMeetingPlace(session)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const acceptOption = resp.interaction.options?.find((o) => o.value !== '__skip__')
+    expect(acceptOption).toBeDefined()
+
+    resp = session.resolveChoice(0, acceptOption!.value)
+    expect(resp.ok).toBe(true)
+
+    const dayLaborer = resp.state.actionSpaces.find((s) => s.id === 'day-laborer')!
+    const lessonsAfter = resp.state.actionSpaces.find((s) => s.id === 'lessons')!
+    expect(dayLaborer.takenBy.some((t) => t.playerId === 'p1')).toBe(false)
+    expect(lessonsAfter.takenBy.some((t) => t.playerId === 'p1')).toBe(false)
+  })
+
+  it('case 9 — C23 cleanup preserves a real lessons worker', () => {
+    const session = setup({ activeWorkers: 4 })
+    const state = session.getState().state
+    state.players[0]!.minorPlayed.push('C23_JobContract')
+    session.loadState(state)
+
+    simulatePlacement(session, 0, 'forest', '1')
+    simulatePlacement(session, 0, 'lessons', '2')
+
+    let resp = buyC22ViaMeetingPlace(session)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const acceptOption = resp.interaction.options?.find((o) => o.value !== '__skip__')
+    expect(acceptOption).toBeDefined()
+
+    resp = session.resolveChoice(0, acceptOption!.value)
+    expect(resp.ok).toBe(true)
+
+    const forest = resp.state.actionSpaces.find((s) => s.id === 'forest')!
+    const lessons = resp.state.actionSpaces.find((s) => s.id === 'lessons')!
+    expect(forest.takenBy.some((t) => t.playerId === 'p1')).toBe(false)
+    expect(lessons.takenBy.some((t) => t.playerId === 'p1' && t.workerId === '2')).toBe(true)
   })
 })

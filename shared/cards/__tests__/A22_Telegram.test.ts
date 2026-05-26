@@ -81,6 +81,23 @@ describe('A22_Telegram onBeforeStartOfTurn', () => {
     expect(flow!.type).toBe('seq')
   })
 
+  it('marks used when the trigger round offers the optional extra placement', () => {
+    const { player, state } = setupTriggerable()
+    const effect = getCardEffect(CARD_ID)!
+    const flow = effect.onBeforeStartOfTurn!(state, player)
+    expect(flow?.type).toBe('seq')
+    expect(player.cardStates?.[CARD_ID]?.flagged).toBe(true)
+  })
+
+  it('does not mark used before the trigger round', () => {
+    const { player, state } = setupTriggerable()
+    state.round -= 1
+    const effect = getCardEffect(CARD_ID)!
+    const flow = effect.onBeforeStartOfTurn!(state, player)
+    expect(flow).toBeFalsy()
+    expect(player.cardStates?.[CARD_ID]?.flagged).toBeUndefined()
+  })
+
   it('does NOT fire when all workers are placed (workersAvailable === 0)', () => {
     const { player, state } = setupTriggerable()
     state.actionSpaces = [

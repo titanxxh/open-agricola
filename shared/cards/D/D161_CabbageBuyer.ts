@@ -16,7 +16,7 @@ const CARD_ID = D161_CabbageBuyer.id
  * major improvement was built.
  *
  * Implementation:
- *  (a) after:renovate-house — if inside house-redevelopment, set tracker
+ *  (a) after:renovate-house — set tracker
  *  (b) after:improvement-any/minor-improvement — tag improvement kind
  *  (c) after:place-farmer — drain tracker, emit offer to owner
  */
@@ -47,9 +47,6 @@ const openTrackerListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   scope: 'any',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    // Only trigger when inside house-redevelopment action space
-    if (context.space?.id !== 'house-redevelopment') return
-
     const owner = context.ownerPlayer
     if (!owner) return
 

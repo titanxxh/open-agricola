@@ -18,6 +18,7 @@ export type CardListenerContext = ActionExecutionContext & {
   extraData?: Record<string, unknown>
   cardId?: string
   actionCardId?: string
+  pendingSourceCard?: string
   triggerPlayer?: PlayerState
   ownerPlayer?: PlayerState
   effectPlayer?: PlayerState
@@ -278,6 +279,7 @@ export const collectComputeChoiceCandidates = (
   player: PlayerState,
   actionId: string,
   actionContext?: Record<string, unknown>,
+  sourceCard?: string,
 ): import('../contract/types').ActionChoiceOption[] => {
   const baseCtx: CardListenerContextInput = {
     state,
@@ -286,6 +288,7 @@ export const collectComputeChoiceCandidates = (
     actionId,
     phase: 'computeChoiceCandidates' as ActionHookPhase,
     actionContext,
+    sourceCard,
   }
   const out: import('../contract/types').ActionChoiceOption[] = []
   for (const matched of getMatchingListeners(baseCtx)) {

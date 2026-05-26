@@ -22,7 +22,16 @@ const listener: CardListenerRegistration = {
     )
     const workerCount = accumulationSpaces.length
     if (workerCount <= 0) return
-    return { flow: gainLeaf(CARD_ID, { grain: workerCount }), sourceCard: CARD_ID }
+    return {
+      flow: {
+        type: 'seq',
+        optional: true,
+        children: [
+          gainLeaf(CARD_ID, { grain: workerCount }),
+        ],
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 
