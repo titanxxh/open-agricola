@@ -308,15 +308,20 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px;
-  border-radius: 6px;
-  background: #f0f0f0;
-  color: #2a1a00;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 247, 230, 0.14);
+  color: #fdf6e3;
   cursor: pointer;
   font-size: 13px;
+  font-weight: 600;
   user-select: none;
-  border: 2px solid transparent;
+  border: 1px solid rgba(255, 247, 230, 0.3);
   transition: border-color 0.15s, background 0.15s;
+}
+.collector-option:hover {
+  background: rgba(255, 247, 230, 0.24);
+  border-color: rgba(212, 160, 23, 0.7);
 }
 .collector-option .interaction-option-resource-text {
   display: inline-flex;
@@ -324,11 +329,11 @@
   gap: 3px;
 }
 .collector-option.selected {
-  border-color: var(--color-primary);
-  background: #e8f5e2;
+  border-color: rgba(212, 160, 23, 0.9);
+  background: rgba(212, 160, 23, 0.28);
 }
 .collector-option input[type="checkbox"] {
-  accent-color: var(--color-primary);
+  accent-color: #d4a017;
 }
 .collector-option input[type="checkbox"]:disabled {
   cursor: not-allowed;

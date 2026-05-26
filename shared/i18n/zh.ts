@@ -851,6 +851,7 @@ export const zh = {
     cardTriggerDeclined: '已拒绝',
     cardInfoboxChanged: '{cardId}：{text}',
     cardStackChanged: '{cardId} 卡上资源变化 {resources}',
+    cardResourcePairsStored: '{player} 将 {pairs} 放到 {cardId} 上',
     cardSwappedWithBoard: '{player} 将 {fromCardId} 与 {toCardId} 交换',
     cardReturnedToBoard: '{player} 将 {cardId} 放回牌堆',
     cardDestroyed: '{player} 移除 {cardId}',

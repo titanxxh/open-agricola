@@ -5,6 +5,7 @@ import type {
   PlayerState,
   Resource,
 } from '../../contract/types'
+import type { EventSink } from '../../contract/events'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
@@ -66,6 +67,18 @@ const sumPairs = (selected: string[]): Partial<Resource> => {
   return totals
 }
 
+const pairResourceList = (selected: string[]): Partial<Resource>[] =>
+  selected.map((key) => ({ ...(PAIR_RESOURCES[key] ?? {}) }))
+
+const emitStoredPairs = (eventSink: EventSink | undefined, player: PlayerState, selected: string[]) => {
+  eventSink?.emit<'card.resourcePairsStored'>({
+    type: 'card.resourcePairsStored',
+    cardId: CARD_ID,
+    targetPlayerId: player.id,
+    pairs: pairResourceList(selected),
+  })
+}
+
 const buildSelectionChoice = (needed: number) => ({
   type: 'request' as const,
   request: {
@@ -84,7 +97,7 @@ const choosePairsAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ player }) => {
+  execute: ({ player, eventSink }) => {
     const n = Math.min(6, countAllImprovements(player))
     if (n <= 0) {
       return { type: 'ok', resourcesGained: {} }
@@ -92,6 +105,7 @@ const choosePairsAction: ActionDefinition = {
     if (n >= 6) {
       const selected = PAIRS.map(([k]) => k)
       writeStoredPairs(player, selected)
+      emitStoredPairs(eventSink, player, selected)
       return {
         type: 'ok',
         extraData: { pairs: selected },
@@ -99,7 +113,7 @@ const choosePairsAction: ActionDefinition = {
     }
     return buildSelectionChoice(n)
   },
-  resolveChoice: ({ player }, choice) => {
+  resolveChoice: ({ player, eventSink }, choice) => {
     const tokens = choice.split(',').filter((s) => VALID_PAIR_KEYS.has(s))
     const selected = [...new Set(tokens)]
     const n = Math.min(6, countAllImprovements(player))
@@ -110,6 +124,7 @@ const choosePairsAction: ActionDefinition = {
       return buildSelectionChoice(n)
     }
     writeStoredPairs(player, selected)
+    emitStoredPairs(eventSink, player, selected)
     return {
       type: 'ok',
       extraData: { pairs: selected },

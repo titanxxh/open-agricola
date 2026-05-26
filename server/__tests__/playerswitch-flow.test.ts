@@ -290,6 +290,53 @@ describe('ActionFlow targetPlayerId', () => {
     expect(resp2.interaction.stateId).toBe('wait')
   })
 
+  it('choice after returning from a confirmed target player switch asks for confirmation', () => {
+    const session = setupSession()
+    const state = session.getState().state
+    const p2 = state.players[1]!
+
+    const flow: ActionFlow = {
+      type: 'seq',
+      children: [
+        {
+          type: 'xor',
+          targetPlayerId: p2.id,
+          children: [
+            { type: 'leaf', actionId: 'gain', params: { sheep: 1 }, sourceCard: 'TestReturnSwitch', choiceLabelKey: 'sheep' },
+            { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: 'TestReturnSwitch', choiceLabelKey: 'food' },
+          ],
+        },
+        {
+          type: 'xor',
+          children: [
+            { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: 'TestReturnSwitch', choiceLabelKey: 'wood' },
+            { type: 'leaf', actionId: 'gain', params: { clay: 1 }, sourceCard: 'TestReturnSwitch', choiceLabelKey: 'clay' },
+          ],
+        },
+      ],
+    }
+
+    startFlowEngine(session, flow, 0)
+
+    let resp = session.getState()
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-player-switch')
+
+    resp = confirmPlayerSwitch(session)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.playerIndex).toBe(1)
+
+    const targetOption = resp.interaction.options?.[0]
+    expect(targetOption).toBeDefined()
+    resp = session.resolveChoice(1, targetOption!.value)
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+    expect(resp.interaction.fromPlayerIndex).toBe(1)
+    expect(resp.interaction.toPlayerIndex).toBe(0)
+  })
+
   it('restores dynamic targeted pending flow and resumes unowned sibling as frame owner', () => {
     const session = setupSession()
     const state = session.getState().state

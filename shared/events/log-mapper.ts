@@ -5,6 +5,7 @@ import type {
   CardInfoboxChangedEvent,
   CardPassedEvent,
   CardPlayedEvent,
+  CardResourcePairsStoredEvent,
   CardReturnedToBoardEvent,
   CardStackChangedEvent,
   CardSwappedWithBoardEvent,
@@ -320,6 +321,18 @@ const mapFutureMeepleResolved = (
   },
 })
 
+const mapCardResourcePairsStored = (
+  event: CardResourcePairsStoredEvent,
+  ctx: EventLogMapperContext,
+): LogEntry => ({
+  key: 'log.cardResourcePairsStored',
+  params: {
+    player: playerName(ctx, event.targetPlayerId),
+    cardId: event.cardId,
+    pairs: event.pairs.map(resourceSuffix),
+  },
+})
+
 const mapCardInfoboxChanged = (event: CardInfoboxChangedEvent): LogEntry => ({
   key: 'log.cardInfoboxChanged',
   params: {
@@ -575,6 +588,10 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
 
       if (event.type === 'card.stackChanged') {
         return [mapCardStackChanged(event)]
+      }
+
+      if (event.type === 'card.resourcePairsStored') {
+        return [mapCardResourcePairsStored(event, ctx)]
       }
 
       if (event.type === 'card.swappedWithBoard') {

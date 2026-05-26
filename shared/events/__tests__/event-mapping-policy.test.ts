@@ -18,6 +18,7 @@ const expectedPublicEventTypes = [
   'card.passed',
   'card.played',
   'card.returnedToBoard',
+  'card.resourcePairsStored',
   'card.stackChanged',
   'card.stateChanged',
   'card.swappedWithBoard',
