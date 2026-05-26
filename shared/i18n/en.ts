@@ -870,6 +870,7 @@ export const en = {
     cardTriggerDeclined: 'declined',
     cardInfoboxChanged: '{cardId}: {text}',
     cardStackChanged: '{cardId} stack changed {resources}',
+    cardResourcePairsStored: '{player} stores {pairs} on {cardId}',
     cardSwappedWithBoard: '{player} swaps {fromCardId} with {toCardId}',
     cardReturnedToBoard: '{player} returns {cardId} to the board',
     cardDestroyed: '{player} removes {cardId}',

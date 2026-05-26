@@ -233,6 +233,14 @@ describe('ActionLog', () => {
             params: { cardId: 'C81_MaterialHub', resources: { wood: 2 } },
           },
           {
+            key: 'log.cardResourcePairsStored',
+            params: {
+              player: 'Alice',
+              cardId: 'C146_WorkshopAssistant',
+              pairs: [{ wood: 1, clay: 1 }, { reed: 1, stone: 1 }],
+            },
+          },
+          {
             key: 'log.futureMeepleResolved',
             params: {
               player: 'Alice',
@@ -262,10 +270,14 @@ describe('ActionLog', () => {
     expect(text).toContain('Food: 3')
     expect(text).toContain('Hayloft Barn')
     expect(text).toContain('Material Hub')
+    expect(text).toContain('Workshop Assistant')
     expect(text).toContain('Salter')
     expect(text).not.toContain('[object Object]')
     expect(text).not.toContain('log.cardInfoboxChanged')
     expect(container.querySelector('b')).toBeNull()
+    expect(container.querySelector('[data-resource="clay"][data-amount="1"]')).not.toBeNull()
+    expect(container.querySelector('[data-resource="reed"][data-amount="1"]')).not.toBeNull()
+    expect(container.querySelector('[data-resource="stone"][data-amount="1"]')).not.toBeNull()
     expect(container.querySelector('[data-resource="wood"][data-amount="2"]')).not.toBeNull()
     expect(container.querySelector('[data-resource="food"][data-amount="2"]')).not.toBeNull()
     expect(container.querySelector('[data-resource="grain"][data-amount="1"]')).not.toBeNull()

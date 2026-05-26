@@ -2773,8 +2773,15 @@ export class GameCore {
       const frameOwnerPlayer = this.state.players[frame.ownerPlayerIndex]
       const player = this.state.players[effectivePlayerIndex]
       if (!frameOwnerPlayer || !player) return
-      if (effectivePlayerIndex !== frame.ownerPlayerIndex) {
-        const existing = frame.deferredPlayerSwitch
+      const existing = frame.deferredPlayerSwitch
+      if (existing && !existing.confirmed && existing.toPlayerIndex === effectivePlayerIndex) {
+        frame.deferredPlayerSwitch = existing
+      } else if (existing?.confirmed && existing.toPlayerIndex !== effectivePlayerIndex) {
+        frame.deferredPlayerSwitch = {
+          fromPlayerIndex: existing.toPlayerIndex,
+          toPlayerIndex: effectivePlayerIndex,
+        }
+      } else if (effectivePlayerIndex !== frame.ownerPlayerIndex) {
         if (
           !existing ||
           existing.fromPlayerIndex !== frame.ownerPlayerIndex ||

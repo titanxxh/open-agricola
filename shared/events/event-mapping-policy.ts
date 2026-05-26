@@ -214,6 +214,13 @@ export const publicEventMappingPolicy = {
     resourceAnimation: silent('card stack endpoints are not stable public animation anchors'),
     replay: 'replayable',
   },
+  'card.resourcePairsStored': {
+    log: mapped(),
+    notification: silent('resource-pair storage is represented by action log only'),
+    highlight: silent('resource-pair storage has no stable board target'),
+    resourceAnimation: silent('resource-pair storage does not move resources between supported endpoints'),
+    replay: 'replayable',
+  },
   'card.swappedWithBoard': {
     log: mapped(),
     notification: mapped(),

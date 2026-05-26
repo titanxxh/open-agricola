@@ -303,6 +303,16 @@ describe('C146 — multi-select pairs (onBuy)', () => {
     expect(livePlayer.resources.clay).toBe(0)
     expect(livePlayer.resources.reed).toBe(0)
     expect(livePlayer.resources.stone).toBe(0)
+    expect(resp.state.log).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        key: 'log.cardResourcePairsStored',
+        params: expect.objectContaining({
+          player: 'PlayerA',
+          cardId: CARD_ID,
+          pairs: [{ wood: 1, clay: 1 }, { clay: 1, stone: 1 }, { reed: 1, stone: 1 }],
+        }),
+      }),
+    ]))
   })
 
   it('opponent renovation lets owner take one stored pair', () => {
@@ -312,6 +322,43 @@ describe('C146 — multi-select pairs (onBuy)', () => {
     expect(resp.interaction.playerIndex).toBe(0)
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
     expect(resp.interaction.options?.some((option) => option.value !== '__skip__')).toBe(true)
+  })
+
+  it('opponent renovation confirms before returning from owner choice to acting player choice', () => {
+    const { session } = setupRenovationWithStoredPairs(['WC', 'RS'])
+    let resp = session.takeAction(1, 'house-redevelopment')
+    let safety = 20
+    while (resp.interaction.stateId === 'wait' && safety-- > 0) {
+      if (resp.interaction.request.kind === 'confirm-player-switch') {
+        resp = confirmPlayerSwitch(session)
+        continue
+      }
+      if (resp.interaction.sourceCard === CARD_ID) break
+      const options = resp.interaction.options ?? []
+      const skip = options.find((option) => option.value === '__skip__')
+      if (skip) {
+        resp = session.resolveChoice(resp.interaction.playerIndex, '__skip__')
+        continue
+      }
+      const clay = options.find((option) => option.value === 'clay')
+      const first = clay ?? options[0]
+      if (!first) break
+      resp = session.resolveChoice(resp.interaction.playerIndex, first.value)
+    }
+
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.playerIndex).toBe(0)
+    expect(resp.interaction.sourceCard).toBe(CARD_ID)
+    const accept = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+
+    resp = session.resolveChoice(0, accept!.value)
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+    expect(resp.interaction.fromPlayerIndex).toBe(0)
+    expect(resp.interaction.toPlayerIndex).toBe(1)
   })
 
   it('opponent farm-redevelopment renovation also lets owner take one stored pair', () => {

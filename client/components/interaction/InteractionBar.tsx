@@ -116,7 +116,7 @@ const renderEffectPreview = (
       </span>
     )
   }
-  return effectPreview.text
+  return renderResourceAwareText(effectPreview.text)
 }
 
 const renderDescriptionAction = (
@@ -128,13 +128,13 @@ const renderDescriptionAction = (
     preview.labelKey,
     preview.labelParams as Record<string, string | number> | undefined,
   )
-  if (!preview.effectPreview) return label
+  if (!preview.effectPreview) return renderResourceAwareText(label)
   return (
     <span className="interaction-description-action">
       <span className="interaction-description-action-main">
         {renderEffectPreview(locale, preview.effectPreview)}
       </span>
-      <span className="interaction-option-subtitle">{label}</span>
+      <span className="interaction-option-subtitle">{renderResourceAwareText(label)}</span>
     </span>
   )
 }

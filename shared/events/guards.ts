@@ -55,6 +55,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'card.stateChanged': ['cardId', 'key', 'value', 'targetPlayerId'],
   'card.infoboxChanged': ['cardId', 'text', 'targetPlayerId'],
   'card.stackChanged': ['cardId', 'targetPlayerId', 'resources', 'delta', 'reason'],
+  'card.resourcePairsStored': ['cardId', 'targetPlayerId', 'pairs'],
   'card.swappedWithBoard': ['playerId', 'fromPlayerCardId', 'toPlayerCardId'],
   'card.returnedToBoard': ['playerId', 'cardId'],
   'card.destroyed': ['playerId', 'cardId', 'reason'],
@@ -219,6 +220,13 @@ const assertResourceMapForKeys = (
 
 const assertResourceMap = (value: unknown, path: string): void =>
   assertResourceMapForKeys(value, path, resourceKeys)
+
+const assertResourceMapArray = (value: unknown, path: string): void => {
+  if (!Array.isArray(value)) {
+    throw new Error(`GameEvent ${path} must be an array`)
+  }
+  value.forEach((entry, index) => assertResourceMap(entry, `${path}[${index}]`))
+}
 
 const assertPaymentResourceMap = (value: unknown, path: string): void => {
   assertResourceMapForKeys(value, path, paymentResourceKeys)
@@ -527,6 +535,11 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       assertOptionalStringField(event.targetPlayerId, 'targetPlayerId')
       if (event.resources !== undefined) assertResourceMap(event.resources, 'resources')
       assertOptionalFiniteNumberField(event.delta, 'delta')
+      return
+    case 'card.resourcePairsStored':
+      assertStringField(event.cardId, 'cardId')
+      assertStringField(event.targetPlayerId, 'targetPlayerId')
+      assertResourceMapArray(event.pairs, 'pairs')
       return
     case 'card.swappedWithBoard':
       assertStringField(event.playerId, 'playerId')

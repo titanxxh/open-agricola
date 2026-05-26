@@ -537,6 +537,19 @@ export const prepareLogEntry = (
       richParams.target = resolveAccumulationTarget(locale, params)
     }
   }
+  if (params && entry.key === 'log.cardResourcePairsStored' && Array.isArray(params.pairs)) {
+    const pairResources = params.pairs.filter(isRecord) as Array<Partial<Resource>>
+    richParams.pairs = (
+      <>
+        {pairResources.map((resources, index) => (
+          <Fragment key={`pair-${index}`}>
+            {index > 0 ? ' · ' : null}
+            <ResourceLine locale={locale} resources={resources} />
+          </Fragment>
+        ))}
+      </>
+    )
+  }
   if (params) {
     richResourceParamKeys.forEach((key) => {
       if (isRecord(params[key])) {

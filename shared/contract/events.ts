@@ -251,6 +251,12 @@ export type CardStackChangedEvent = GameEventBase<'card.stackChanged'> & {
   reason: 'store' | 'take' | 'discard' | 'accumulate' | 'cardEffect'
 }
 
+export type CardResourcePairsStoredEvent = GameEventBase<'card.resourcePairsStored'> & {
+  cardId: string
+  targetPlayerId: string
+  pairs: Partial<Resource>[]
+}
+
 export type CardSwappedWithBoardEvent = GameEventBase<'card.swappedWithBoard'> & {
   playerId: string
   fromPlayerCardId: string
@@ -392,6 +398,7 @@ export type GameEvent =
   | CardStateChangedEvent
   | CardInfoboxChangedEvent
   | CardStackChangedEvent
+  | CardResourcePairsStoredEvent
   | CardSwappedWithBoardEvent
   | CardReturnedToBoardEvent
   | CardDestroyedEvent
