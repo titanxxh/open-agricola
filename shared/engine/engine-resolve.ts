@@ -68,6 +68,26 @@ const hasStateLogSurface = (result: ActionExecutionResult): boolean => {
   return false
 }
 
+const protectedActionCancelErrorKeys: Record<string, string> = {
+  plow: 'log.action',
+  sow: 'log.action',
+  selection: 'log.action',
+  construct: 'log.buildRoomFail',
+  stables: 'log.buildStableFail',
+  fence: 'log.fencingFail',
+  reorganize: 'log.reorganizeFail',
+}
+
+const rejectProtectedActionCancel = (
+  actionId: string | null | undefined,
+  choice: string,
+): ActionExecutionResult | null => {
+  if (choice !== 'cancel' || !actionId) return null
+  const errorKey = protectedActionCancelErrorKeys[actionId]
+  if (!errorKey) return null
+  return { type: 'fail', errorKey, recoverable: true }
+}
+
 const appendDerivedLogsForEventOnlyResult = (
   int: EngineInternals,
   context: EngineContext,
@@ -339,6 +359,12 @@ export function engineResolveChoice(
     const explicitPending = node?.getPending()
     if (node && explicitPending) {
       const envelope = pendingEnvelopeFromHostNode(node)
+      const pendingActionId = envelope?.pendingActionId
+        ?? (node instanceof ActionNode ? node.actionId : null)
+      const protectedCancelFailure = rejectProtectedActionCancel(pendingActionId, choice)
+      if (protectedCancelFailure) {
+        return rollbackAndReturn(int, protectedCancelFailure)
+      }
       if (envelope && !isPendingChoiceValueAllowed(envelope, choice)) {
         return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
       }
@@ -779,6 +805,10 @@ export function engineResolveChoice(
     ?? (pendingHost instanceof ActionNode ? pendingHost.actionId : null)
   if (!actionId) {
     return { type: 'ok' }
+  }
+  const protectedCancelFailure = rejectProtectedActionCancel(actionId, choice)
+  if (protectedCancelFailure) {
+    return rollbackAndReturn(int, protectedCancelFailure)
   }
   const action = int.registry.get(actionId)
   if (!action) {
