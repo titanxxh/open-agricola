@@ -143,4 +143,29 @@ describe('canStartFencing entry-guard', () => {
       }),
     ).toBe(false)
   })
+
+  it('returns false for a cloned player when the real board has no legal fence commit', () => {
+    const roomTiles = [
+      { row: 1, col: 0 },
+      { row: 1, col: 1 },
+    ]
+    const roomKeys = new Set(roomTiles.map(positionKey))
+    const player = createPlayer({
+      resources: {
+        wood: 10, clay: 0, reed: 0, stone: 0, food: 0,
+        grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+      },
+      roomTiles,
+      fields: getAllTilePositions()
+        .filter((tile) => !roomKeys.has(positionKey(tile)))
+        .map((tile) => ({ ...tile, stacks: [] })),
+    })
+    const state = { actionSpaces: [], players: [player] } as unknown as GameState
+    const previewPlayer = {
+      ...player,
+      resources: { ...player.resources, wood: 14 },
+    } as PlayerState
+
+    expect(canStartFencing(state, previewPlayer)).toBe(false)
+  })
 })
