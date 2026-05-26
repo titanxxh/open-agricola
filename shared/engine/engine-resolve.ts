@@ -363,7 +363,7 @@ export function engineResolveChoice(
         ?? (node instanceof ActionNode ? node.actionId : null)
       const protectedCancelFailure = rejectProtectedActionCancel(pendingActionId, choice)
       if (protectedCancelFailure) {
-        return rollbackAndReturn(int, protectedCancelFailure)
+        return protectedCancelFailure
       }
       if (envelope && !isPendingChoiceValueAllowed(envelope, choice)) {
         return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
@@ -808,7 +808,7 @@ export function engineResolveChoice(
   }
   const protectedCancelFailure = rejectProtectedActionCancel(actionId, choice)
   if (protectedCancelFailure) {
-    return rollbackAndReturn(int, protectedCancelFailure)
+    return protectedCancelFailure
   }
   const action = int.registry.get(actionId)
   if (!action) {
