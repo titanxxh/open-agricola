@@ -45,7 +45,6 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | `D132_HideFarmer` | 中 | 终局选择/支付 | BGA 终局前玩家选择数量、真实支付 food 并隐藏空地；OA scoring solver 自动最优。 | BGA `D/D132_HideFarmer.php`; OA `shared/cards/D/D132_HideFarmer.ts`, `shared/domain/scoring.ts` | 建模 before-end choice + hiddenSpaces。 |
 | `D161_CabbageBuyer` | 中 | renovation 触发范围 | BGA 监听任意 Renovation/Improvement；OA 只跟踪 `house-redevelopment` 的 `renovate-house`。 | BGA `D/D161_CabbageBuyer.php`; OA `shared/cards/D/D161_CabbageBuyer.ts` | 覆盖非 work-phase / 跨卡 renovation。 |
 | `E68_CherryOrchard` | 低 | 描述文本 | OA desc 写成收获 wood；BGA 表达为像 grain 一样 sow 和 harvest wood。 | BGA `E/E68_CherryOrchard.php`; OA `shared/cards-display/E/E68_CherryOrchard.ts` | 恢复 BGA 文案语义。 |
-| 通用 `plow` | 低 | cancel 语义 | BGA `PLOW` 本身无 cancel；跳过只由 optional node 的 `actPassOptionalAction` 提供。OA `plow` 默认提供 cancel 且 cancel 返回 ok。 | BGA `Actions/Plow.php`, `States/ActionTrait.php`; OA `shared/actions/effects/plow.ts` | 后续考虑让所有 plow 默认无 cancel；本轮修复不改全局默认。 |
 | `A22_Telegram` | 低 | turn-start 放人时序 | BGA 先 flag，再在普通放人选择中加入 fromSupply 选项；OA turn start 直接给 optional extraPlacement。 | BGA `A/A22_Telegram.php`; OA `shared/cards/A/A22_Telegram.ts` | 增加 session 覆盖确认跳过/使用时序等价，必要时并入普通放人选择。 |
 | `C27_Blueprint` | 低 | payment trade | BGA clone stone-cost trade，保留原支付路径；OA 对三张 major 直接 `stone: -1`。 | BGA `C/C27_Blueprint.php`; OA `shared/cards/C/C27_Blueprint.ts` | 保留原 trade + 额外 discounted trade。 |
 | `C133_Soldier` | 低 | 终局计分选择 | BGA 玩家选择 0..max 对并 reserve wood/stone；OA 自动最优。 | BGA `C/C133_Soldier.php`; OA `shared/cards/C/C133_Soldier.ts`, `shared/domain/scoring.ts` | 若要严格对齐，改成 before-end choice。 |
@@ -101,6 +100,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | Supply token payment 已进入通用资源基础设施 | `PaymentResourceMap`、`supplyTokensConsumed`、payment solver、`resource.paid` | fence / stable 作为支付资源处理；C54/A34 消耗 reserve fence，B149 消耗 stable supply，后续读取可建上限必须走 supply-token helper。 |
 | BGA `formatCost` exact/free/paid unit semantics 已进入通用基础设施 | `ExactCost`、`readExactCost()`、`resolveUnitCostWithDelta()`、`reserveResources`；construct / renovation / stables / plow / occupation / fencing policy 的 exact/free 单位成本回归 | 卡牌不再用 `costOverride`、`freeCost`、old `params.cost` path、old `renovation` / `fencing` leaf 表达精确免费/付费单位成本；除已登记 allowlist 的 `E27_PiggyBank` 外，不新增 `-99` 免费成本表达；`{ max: 1 }` 这类 BGA 语义用 `exactCost.max` / action policy 表达；B93 这类“先付职业费、随后强制 future schedule”的支付后资源保留用 `reserveResources` 过滤 payment solutions；nested `fencePolicy.costPolicy` 仍叠加 `computeCosts.fence` 折扣。 |
 | 额外放人目标行动语义已进入通用基础设施 | `place-farmer` constraints / `targetSpaceId` actionContext、ActionNode `expandFlow`、`move-farmer-to-space` relocation | B24/C42 额外放人不在卡牌内手写目标行动；选择目标格后由通用 flow 执行目标 action，并让 downstream hooks 用真实目标 space。E10/D51 的 worker relocation 也走同一目标行动 flow。 |
+| Action-level cancel policy 已进入通用基础设施 | `shared/engine/engine-resolve.ts`、farm-select actions、`reorganize`、internal `selection` | 非 `exchange` / `bake-bread` 的 protected atomic action 直接 `cancel` 会在 hook / action resolve 前被 recoverable reject，pending 保持；optional 只走 parent node 的 `__skip__`。当前 protected set 是 `plow` / `sow` / `construct` / `stables` / `fence` / `reorganize` / `selection`。 |
 | 旧兼容路径清理 | old engine choice snapshot/restore、encoded choice shortcut、old field/state backfill、old fence `string[]` coercion 已移除；current farm/selection flow 走 `commitSelection`/structured payload | 不维护旧 pending cursor / old state shape；后续新增交互必须通过 `allowedCommands` / `options` 显式暴露并验证 current typed request，不再把非广告 choice value 当便捷入口。 |
 | 注释里的非阻塞 card-id 示例 | `shared/actions/effects/breed.ts`、`shared/contract/types.ts` 仅把 `A165_PigBreeder` / `D95_SiteManager` 作为例子提到 | 除非附近代码变动，否则保留；它们不是可执行的单卡分支。 |
 
@@ -109,6 +109,8 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 ## 6. 基础设施待办
 
 当前没有开放的基础设施 umbrella 待办。已完成的历史条目已从本节移除；仍需持续关注的通用机制记录在 §5 架构审阅。
+
+本轮新增已完成基础设施：Action-level cancel policy。`plow` / `sow` / `construct` / `stables` / `fence` / `reorganize` / internal `selection` 均不再把 direct `cancel` 当 action-level success path；可选跳过由父级 optional node 的 `__skip__` 表达。
 
 保留的后续边界：`C23_JobContract`、`B152_JuniorArtist`、`C117_Legworker` 与 space-pairing 的 cost / jump / adjacency 语义相关，不属于 shared lessons action-space id helper 关闭范围。
 
@@ -173,6 +175,8 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 ## 10. Hook 点清单
 
 下表从 `shared/cards/A-E` 和当前 `ALL_CARD_IMPLS` 机械抽取。`*` 表示 action id 通配；动态 listener 已按运行时 `actions` 展开。
+
+Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前被拒绝，不触发 `before` / `during` / `immediatelyAfter` / `after` listener；本表只描述真实成功路径和 guard 之后的 recoverable failure。
 
 | 类型 | Hook 点 | 卡牌 |
 |---|---|---|
@@ -548,7 +552,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | `B16_MiningHammer` | 已对齐 | onBuy 使用 CardEffect；翻修后仍监听 `after.renovate-house` 并免费建 1 个 stable |
 | `B17_ForestPlow` | 已对齐 |  |
 | `B18_GrasslandHarrow` | 已对齐 |  |
-| `B19_MoldboardPlow` | 已对齐 | optional extra plow 先执行 `plow`，成功后再 `pop-card-stack`；通用 `plow` cancel 语义另列 §2 跟踪 |
+| `B19_MoldboardPlow` | 已对齐 | optional extra plow 先执行 `plow`，成功后再 `pop-card-stack`；optional 跳过走 `__skip__`，接受后 `plow` confirm-only 且 direct `cancel` 被通用 guard 拒绝 |
 | `B20_ChainFloat` | 已对齐 |  |
 | `B21_HayloftBarn` | 已对齐 | 通过 resource exchange 获得的 grain 已由 provenance helper 触发 |
 | `B22_WalkingBoots` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
