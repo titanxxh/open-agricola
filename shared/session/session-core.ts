@@ -2899,6 +2899,8 @@ export class GameCore {
           hostRequestKind === 'selection' ||
           !!this.isSelectionPromptKey(pendingEnvelope?.promptKey)
         ) {
+          frame.engine.flushEventTransaction({ state: this.state, player, space })
+          this.flushEngineLog()
           return
         }
         const pendingHost = this.engineStack.peekPendingHost()
