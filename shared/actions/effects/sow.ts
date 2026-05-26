@@ -139,14 +139,15 @@ export const sowAction: ActionDefinition = {
         farm,
         options: [
           { value: 'confirm', labelKey: 'ui.interactionSowConfirm' },
-          { value: 'cancel', labelKey: 'ui.interactionSowCancel' },
         ],
       },
       promptKey: 'ui.interactionSowSelect',
     }
   },
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
-    if (choice === 'cancel') return { type: 'ok' }
+    if (choice === 'cancel') {
+      return { type: 'fail', errorKey: 'log.action', recoverable: true }
+    }
     if (choice === 'confirm' && payload) {
       const crops = (payload as { crops?: SowSelection[] }).crops
       if (!Array.isArray(crops)) return { type: 'fail', errorKey: 'log.action' }

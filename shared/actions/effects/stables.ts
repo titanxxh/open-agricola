@@ -102,10 +102,6 @@ const isWithinStableMax = (
   return max === undefined || count <= max
 }
 
-const forbidsStableCancel = (
-  actionContext?: Record<string, unknown>,
-): boolean => actionContext?.cancelPolicy === 'forbidCancel'
-
 const isWithinStableZoneFilter = (
   player: PlayerState,
   stables: FarmTilePosition[],
@@ -294,7 +290,6 @@ export const stablesAction: ActionDefinition = {
         farm,
         options: [
           { value: 'confirm', labelKey: 'ui.interactionStableConfirm' },
-          { value: 'cancel', labelKey: 'ui.interactionStableCancel' },
         ],
       },
       promptKey: 'ui.interactionStableSelect',
@@ -302,14 +297,11 @@ export const stablesAction: ActionDefinition = {
   },
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
     if (choice === 'cancel') {
-      if (forbidsStableCancel(ctx.actionContext)) {
-        return {
-          type: 'fail',
-          errorKey: 'log.buildStableFail',
-          recoverable: true,
-        }
+      return {
+        type: 'fail',
+        errorKey: 'log.buildStableFail',
+        recoverable: true,
       }
-      return { type: 'ok' }
     }
 
     // Second call: payment combo selected after multi-combo prompt.

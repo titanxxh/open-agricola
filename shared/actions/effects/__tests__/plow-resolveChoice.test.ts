@@ -64,6 +64,8 @@ const executeSelectableTiles = (ctx: ActionMutationContext) => {
   if (result.type !== 'request') return []
   expect(result.request.kind).toBe('farm-select')
   if (result.request.kind !== 'farm-select') return []
+  const optionValues = result.request.options.map((option) => option.value)
+  expect(optionValues).toEqual(['confirm'])
   return result.request.farm.selectableTiles
 }
 
@@ -117,9 +119,13 @@ describe('plowAction.execute', () => {
 })
 
 describe('plowAction.resolveChoice', () => {
-  it('cancel returns ok', () => {
+  it('cancel returns recoverable fail', () => {
     const result = plowAction.resolveChoice!(makeCtx(), 'cancel')
-    expect(result.type).toBe('ok')
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'log.action',
+      recoverable: true,
+    })
   })
 
   it('first call with payload + no payment cost finalizes immediately', () => {
