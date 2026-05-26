@@ -1520,7 +1520,7 @@ export const buildFarmPositionSelectionInteraction = (
     : null
   const filter = actionContext?.positionFilter as string | undefined
   const maxSelections = (actionContext?.maxSelections as number) ?? 1
-  const minSelections = (actionContext?.minSelections as number) ?? 0
+  const minSelections = (actionContext?.minSelections as number) ?? 1
   const allowedSelectionCounts = Array.isArray(actionContext?.allowedSelectionCounts)
     ? actionContext.allowedSelectionCounts
         .filter((count): count is number => typeof count === 'number' && Number.isInteger(count))
