@@ -91,5 +91,6 @@ export type PromptParams<K extends PromptKey> =
   : K extends 'ui.interactionFence' | 'ui.interactionFenceSelect'     ? { extraWood?: number }
   : K extends 'ui.interactionSelection'   ? { maxSelections: number; minSelections?: number }
   : K extends 'ui.interactionOccupationHand' ? { maxSelections: number; minSelections: number }
+  : K extends 'ui.interactionCollectorSelect' | 'ui.interactionWorkshopAssistantSelect' ? { needed: number }
   : K extends `ui.cards.${string}`        ? Record<string, unknown>
   : Record<string, never>
