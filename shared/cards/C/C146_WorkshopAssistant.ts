@@ -24,16 +24,20 @@ const CHOOSE_PAIRS_ACTION_ID = 'card_C146_WorkshopAssistant_choosePairs'
 const TAKE_PAIR_ACTION_ID = 'card_C146_WorkshopAssistant_takePair'
 
 const PAIRS = [
-  ['WC', { wood: 1, clay: 1 }],
-  ['WR', { wood: 1, reed: 1 }],
-  ['WS', { wood: 1, stone: 1 }],
-  ['CR', { clay: 1, reed: 1 }],
-  ['CS', { clay: 1, stone: 1 }],
-  ['RS', { reed: 1, stone: 1 }],
+  ['WC', { wood: 1, clay: 1 }, 'WOOD', 'CLAY'],
+  ['WR', { wood: 1, reed: 1 }, 'WOOD', 'REED'],
+  ['WS', { wood: 1, stone: 1 }, 'WOOD', 'STONE'],
+  ['CR', { clay: 1, reed: 1 }, 'CLAY', 'REED'],
+  ['CS', { clay: 1, stone: 1 }, 'CLAY', 'STONE'],
+  ['RS', { reed: 1, stone: 1 }, 'REED', 'STONE'],
 ] as const
 
 const PAIR_RESOURCES: Record<string, Partial<Resource>> = Object.fromEntries(
   PAIRS.map(([k, res]) => [k, res]),
+)
+
+const PAIR_LABEL_PARAMS: Record<string, { left: string; right: string }> = Object.fromEntries(
+  PAIRS.map(([k, , left, right]) => [k, { left, right }]),
 )
 
 const VALID_PAIR_KEYS = new Set<string>(PAIRS.map(([k]) => k))
@@ -45,9 +49,10 @@ const writeStoredPairs = (player: PlayerState, pairs: string[]) =>
   writeCardExtraData(player, CARD_ID, 'pairs', pairs)
 
 const buildOptions = (): ActionChoiceOption[] =>
-  PAIRS.map(([k]) => ({
+  PAIRS.map(([k, , left, right]) => ({
     value: k,
-    labelKey: `cards.${CARD_ID}.pair.${k}`,
+    labelKey: 'ui.interactionResourcePair',
+    labelParams: { left, right },
     sourceCard: CARD_ID,
   }))
 
@@ -194,7 +199,8 @@ const opponentRenovationListener: CardListenerRegistration = {
           actionId: TAKE_PAIR_ACTION_ID,
           params: { pair },
           sourceCard: CARD_ID,
-          choiceLabelKey: `cards.${CARD_ID}.pair.${pair}`,
+          choiceLabelKey: 'ui.interactionResourcePair',
+          choiceLabelParams: PAIR_LABEL_PARAMS[pair],
         })),
       },
       sourceCard: CARD_ID,
