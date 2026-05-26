@@ -22,6 +22,18 @@ import { formatCardStatsLines } from '../common/cardStatsFormat'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
 
 type AnimalType = 'sheep' | 'boar' | 'cattle'
+type BuildingResource = 'wood' | 'clay' | 'reed' | 'stone'
+
+const C146_WORKSHOP_ASSISTANT_ID = 'C146_WorkshopAssistant'
+
+const C146_PAIR_STACK_RESOURCES: Record<string, readonly BuildingResource[]> = {
+  WC: ['wood', 'clay'],
+  WR: ['wood', 'reed'],
+  WS: ['wood', 'stone'],
+  CR: ['clay', 'reed'],
+  CS: ['clay', 'stone'],
+  RS: ['reed', 'stone'],
+}
 
 const AnimalCount = ({
   count,
@@ -83,6 +95,36 @@ const FieldCropStack = ({
         </span>
       ))}
     </div>
+  )
+}
+
+const CardStackItem = ({
+  locale,
+  item,
+  index,
+  stackSize,
+}: {
+  locale: Locale
+  item: string
+  index: number
+  stackSize: number
+}) => {
+  const pairResources = C146_PAIR_STACK_RESOURCES[item]
+  if (pairResources) {
+    const title = pairResources.map((resource) => t(locale, `resources.${resource}`)).join(' + ')
+    return (
+      <span className="card-stack-pair" title={`#${stackSize - index}: ${title}`}>
+        {pairResources.map((resource) => (
+          <span key={resource} className={`res-icon res-icon-${resource}`} />
+        ))}
+      </span>
+    )
+  }
+  return (
+    <span
+      className={`res-icon res-icon-${item}`}
+      title={`#${stackSize - index}: ${item}`}
+    />
   )
 }
 
@@ -400,10 +442,12 @@ const PlayedCardStats = ({
           {stack.length > 0 && (
             <div className="card-stack">
               {[...stack].reverse().map((res, i) => (
-                <span
+                <CardStackItem
                   key={`stack-${i}`}
-                  className={`res-icon res-icon-${res}`}
-                  title={`#${stack.length - i}: ${res}`}
+                  locale={locale}
+                  item={res}
+                  index={i}
+                  stackSize={stack.length}
                 />
               ))}
             </div>
@@ -1072,7 +1116,11 @@ export const FarmBoard = ({
           const cardInfobox = displayPlayer.cardStates?.[rawId]?.infobox
           const cardStateCounters = displayPlayer.cardStates?.[rawId]?.counters ?? {}
           const resourceStats = readCardResourceStats(displayPlayer, rawId)
-          const cardStack = displayPlayer.cardStates?.[rawId]?.stack ?? []
+          const rawExtraData = displayPlayer.cardStates?.[rawId]?.extraData
+          const c146Pairs = rawId === C146_WORKSHOP_ASSISTANT_ID && Array.isArray(rawExtraData?.pairs)
+            ? rawExtraData.pairs.filter((pair): pair is string => typeof pair === 'string')
+            : null
+          const cardStack = c146Pairs ?? displayPlayer.cardStates?.[rawId]?.stack ?? []
           const rawCardCrop = displayPlayer.cardStates?.[rawId]?.extraData?.cardCrop as
             | { crop: 'grain' | 'vegetable' | 'wood'; remaining: number }
             | undefined

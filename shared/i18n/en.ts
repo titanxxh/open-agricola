@@ -1180,12 +1180,12 @@ export const en = {
     C104_Collector: { name: 'Collector', desc: 'Get 1 begging + choose 6/7/8/9 different goods (max 4 uses).' },
     C146_WorkshopAssistant: {
       pair: {
-        WC: '1 wood + 1 clay',
-        WR: '1 wood + 1 reed',
-        WS: '1 wood + 1 stone',
-        CR: '1 clay + 1 reed',
-        CS: '1 clay + 1 stone',
-        RS: '1 reed + 1 stone',
+        WC: '1 <WOOD> + 1 <CLAY>',
+        WR: '1 <WOOD> + 1 <REED>',
+        WS: '1 <WOOD> + 1 <STONE>',
+        CR: '1 <CLAY> + 1 <REED>',
+        CS: '1 <CLAY> + 1 <STONE>',
+        RS: '1 <REED> + 1 <STONE>',
       },
     },
     A39_Chapel: { name: 'Chapel', desc: 'Get 3 bonus VP. Others pay 1 grain to owner.' },
