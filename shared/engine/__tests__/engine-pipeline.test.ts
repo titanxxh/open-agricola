@@ -670,4 +670,78 @@ describe('Engine pipeline phase order', () => {
     expect(result.type).toBe('ok')
     expect(phases).toEqual(['resolveChoice:cancel'])
   })
+
+  it('rejects direct cancel for protected action before hooks and action resolve', () => {
+    const phases: string[] = []
+    const action: ActionDefinition = {
+      id: 'plow',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => {
+        phases.push('canBeExecutedByPlayer')
+        return true
+      },
+      execute: () => ({
+        type: 'request',
+        request: {
+          kind: 'choice',
+          options: [
+            { value: 'confirm', labelKey: 'Confirm' },
+            { value: 'cancel', labelKey: 'Cancel' },
+          ],
+        },
+        promptKey: 'choose',
+      }),
+      resolveChoice: (_ctx, choice) => {
+        phases.push(`resolveChoice:${choice}`)
+        return { type: 'ok' }
+      },
+    }
+
+    registerActionHook({
+      id: 'track-protected-cancel-phases',
+      actions: [action.id],
+      phases: ['before', 'during', 'immediatelyAfter', 'after'],
+      handler: (ctx) => {
+        phases.push(ctx.phase)
+        return {}
+      },
+    })
+
+    const registry = new ActionRegistry()
+    registry.register(action)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('a', action.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    state.players = [player]
+    const space = createSpace(action)
+
+    const choice = runUntil(engine, { state, player, space }, () => false)
+    expect(choice.type).toBe('choice')
+    phases.length = 0
+
+    const cancelResult = engine.resolveChoice('cancel', { state, player, space })
+
+    expect(cancelResult).toEqual({ type: 'fail', errorKey: 'log.action', recoverable: true })
+    expect(phases).toEqual([])
+
+    const confirmResult = engine.resolveChoice('confirm', { state, player, space })
+
+    expect(confirmResult.type).toBe('ok')
+    expect(phases).toEqual([
+      'before',
+      'canBeExecutedByPlayer',
+      'resolveChoice:confirm',
+      'during',
+      'immediatelyAfter',
+      'after',
+    ])
+  })
 })
