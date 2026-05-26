@@ -337,6 +337,32 @@ describe('ActionFlow targetPlayerId', () => {
     expect(resp.interaction.toPlayerIndex).toBe(0)
   })
 
+  it('confirmed target player switch exposes no undo before the target acts', () => {
+    const session = setupSession()
+    const state = session.getState().state
+    const p2 = state.players[1]!
+
+    const flow: ActionFlow = {
+      type: 'xor',
+      targetPlayerId: p2.id,
+      children: [
+        { type: 'leaf', actionId: 'gain', params: { sheep: 1 }, sourceCard: 'TestNoUndoAtSwitch', choiceLabelKey: 'sheep' },
+        { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: 'TestNoUndoAtSwitch', choiceLabelKey: 'food' },
+      ],
+    }
+
+    startFlowEngine(session, flow, 0)
+    const resp = confirmPlayerSwitch(session)
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.playerIndex).toBe(1)
+    expect(resp.interaction.allowedCommands).not.toContain('undoStep')
+    expect(resp.interaction.allowedCommands).not.toContain('undoAction')
+    expect(resp.historyLength).toBe(0)
+    expect(resp.hasActionStartSnapshot).toBe(false)
+  })
+
   it('restores dynamic targeted pending flow and resumes unowned sibling as frame owner', () => {
     const session = setupSession()
     const state = session.getState().state
