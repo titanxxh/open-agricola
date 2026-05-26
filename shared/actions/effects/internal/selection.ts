@@ -11,7 +11,7 @@ const validateFarmPositions = (
     || Array.isArray(actionContext?.selectableTiles)
   if (!hasSelectionBounds) return null
 
-  const minSelections = (actionContext?.minSelections as number | undefined) ?? 0
+  const minSelections = (actionContext?.minSelections as number | undefined) ?? 1
   const maxSelections = actionContext?.maxSelections as number | undefined
   if (positions.length < minSelections) return 'not enough selection positions'
   if (maxSelections !== undefined && positions.length > maxSelections) {
@@ -50,7 +50,7 @@ const validateOccupationCards = (
   playerHand: string[],
   actionContext: Record<string, unknown> | undefined,
 ) => {
-  const minSelections = (actionContext?.minSelections as number | undefined) ?? 0
+  const minSelections = (actionContext?.minSelections as number | undefined) ?? 1
   const maxSelections = actionContext?.maxSelections as number | undefined
   if (cards.length < minSelections) return 'not enough card selections'
   if (maxSelections !== undefined && cards.length > maxSelections) {
@@ -76,7 +76,7 @@ export const selectionAction: ActionDefinition = {
         ? 'ui.interactionOccupationHand'
         : 'ui.interactionSelection'
     const maxSelections = (actionContext?.maxSelections as number) ?? 1
-    const minSelections = (actionContext?.minSelections as number) ?? 0
+    const minSelections = (actionContext?.minSelections as number) ?? 1
     return {
       type: 'request',
       request: {

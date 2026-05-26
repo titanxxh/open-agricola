@@ -285,7 +285,11 @@ const connected = (tiles: Array<{ row: number; col: number }>): boolean => {
   return remaining.size === 0
 }
 
+const connectedTileSetCache = new Map<number, Array<Array<{ row: number; col: number }>>>()
+
 const connectedTileSets = (size: number): Array<Array<{ row: number; col: number }>> => {
+  const cached = connectedTileSetCache.get(size)
+  if (cached) return cached
   const all = farmTiles()
   const results: Array<Array<{ row: number; col: number }>> = []
   const choose = (start: number, picked: Array<{ row: number; col: number }>) => {
@@ -300,6 +304,7 @@ const connectedTileSets = (size: number): Array<Array<{ row: number; col: number
     }
   }
   choose(0, [])
+  connectedTileSetCache.set(size, results)
   return results
 }
 

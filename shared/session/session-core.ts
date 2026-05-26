@@ -4001,7 +4001,7 @@ export class GameCore {
     const interactionContext = this.peekHostContextSnapshot()?.actionContext
     const selectionKind = (interactionContext?.selectionKind as string | undefined) ?? 'farm-position'
     const maxSelections = (interactionContext?.maxSelections as number) ?? 1
-    const minSelections = (interactionContext?.minSelections as number) ?? 0
+    const minSelections = (interactionContext?.minSelections as number) ?? 1
 
     // occupation-hand: validate card IDs
     if (selectionKind === 'occupation-hand') {
