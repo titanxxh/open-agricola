@@ -944,6 +944,15 @@ export const en = {
   },
   platform: {
     loading: 'Loading...',
+    loadStep: {
+      manifest: 'Loading card data…',
+      appShell: 'Loading game UI…',
+      auth: 'Checking session…',
+      wsConnecting: 'Connecting to server…',
+      wsCreating: 'Creating room…',
+      wsJoining: 'Joining room…',
+      fetchingState: 'Syncing game state…',
+    },
     loginTitle: 'Open Agricola',
     loginSubtitle: 'Sign in to continue',
     registerSubtitle: 'Create a new account',

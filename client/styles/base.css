@@ -61,6 +61,18 @@ a:focus-visible,
   color: var(--color-text-secondary);
   background: var(--color-bg-warm);
 }
+.game-load-progress {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-border-light);
+  overflow: hidden;
+}
+.game-load-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--color-primary);
+  transition: width 0.3s ease;
+}
 /* ── Page transitions ─────────────────── */
 @keyframes fadeSlideIn {
   from {
