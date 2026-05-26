@@ -160,7 +160,7 @@ describe('A34 Loppers — supply fence payment', () => {
     expect(result).toBeDefined()
   })
 
-  it('does not offer the exchange when fencing is cancelled', () => {
+  it('rejects direct fencing cancel without offering the exchange', () => {
     const session = setupFencingSession({ wood: 5 })
     let resp = session.takeAction(0, 'fencing')
     expect(resp.ok).toBe(true)
@@ -168,8 +168,11 @@ describe('A34 Loppers — supply fence payment', () => {
 
     resp = session.commitSelectionChoice(0, { cancel: true })
 
-    expect(resp.ok).toBe(true)
-    expect(resp.interaction.promptKey).toBe('ui.confirmNextPlayer')
+    expect(resp.ok).toBe(false)
+    expect(resp.error).toBe('action cancel is not allowed')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected fencing prompt')
+    expect(resp.interaction.request.kind).toBe('farm-select')
     expect(resp.state.players[0]!.fenceSegments).toHaveLength(0)
     expect(resp.state.players[0]!.resources.wood).toBe(5)
     expect(resp.state.players[0]!.resources.food).toBe(0)

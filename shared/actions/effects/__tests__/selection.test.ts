@@ -210,7 +210,7 @@ describe('selectionAction', () => {
 describe('selection action with occupation-hand kind', () => {
   it("execute() emits promptKey 'ui.interactionOccupationHand' when selectionKind is occupation-hand", () => {
     const result = selectionAction.execute({
-      actionContext: { selectionKind: 'occupation-hand', maxSelections: 3 },
+      actionContext: { selectionKind: 'occupation-hand', minSelections: 2, maxSelections: 3 },
     } as never)
 
     expect(result.type).toBe('request')
@@ -218,7 +218,7 @@ describe('selection action with occupation-hand kind', () => {
     expect(result.request.kind).toBe('choice')
     expect(result.request.options.map((option) => option.value)).toEqual(['confirm'])
     expect(result.promptKey).toBe('ui.interactionOccupationHand')
-    expect(result.promptParams).toEqual({ maxSelections: 3 })
+    expect(result.promptParams).toEqual({ maxSelections: 3, minSelections: 2 })
   })
 
   it("execute() keeps farm-position promptKey when selectionKind is absent", () => {
