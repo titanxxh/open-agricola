@@ -35,7 +35,6 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | `B129_Seatmate` | 中 | 4 人座位限制 | BGA 4 人局只在对座未占 round 13 时允许；OA 只要 round 13 被 opponent 占就允许。 | BGA `B/B129_Seatmate.php`; OA `shared/cards/B/B129_Seatmate.ts` | 建模座位/对座限制，或限制 4p 行为。 |
 | `C25_SteamMachine` | 中 | adoptive worker | BGA adoptive worker 场景会追加 forceSkip/end turn；OA 只有基础 optional bake。 | BGA `C/C25_SteamMachine.php`; OA `shared/cards/C/C25_SteamMachine.ts` | 补 adoptive/forceSkip 分支或定向确认不适用。 |
 | `D132_HideFarmer` | 中 | 终局选择/支付 | BGA 终局前玩家选择数量、真实支付 food 并隐藏空地；OA scoring solver 自动最优。 | BGA `D/D132_HideFarmer.php`; OA `shared/cards/D/D132_HideFarmer.ts`, `shared/domain/scoring.ts` | 建模 before-end choice + hiddenSpaces。 |
-| 通用 `plow` | 低 | cancel 语义 | BGA `PLOW` 本身无 cancel；跳过只由 optional node 的 `actPassOptionalAction` 提供。OA `plow` 默认提供 cancel 且 cancel 返回 ok。 | BGA `Actions/Plow.php`, `States/ActionTrait.php`; OA `shared/actions/effects/plow.ts` | 后续考虑让所有 plow 默认无 cancel；本轮修复不改全局默认。 |
 | `C133_Soldier` | 低 | 终局计分选择 | BGA 玩家选择 0..max 对并 reserve wood/stone；OA 自动最优。 | BGA `C/C133_Soldier.php`; OA `shared/cards/C/C133_Soldier.ts`, `shared/domain/scoring.ts` | 若要严格对齐，改成 before-end choice。 |
 | `E112_GrainThief` | 低 | harvest 时机 | BGA start 选择多个 grain zones，reap 时减少 harvestCount，end 再 gain grain；OA 接受时立即 pop/gain，end restore。 | BGA `E/E112_GrainThief.php`; OA `shared/cards/E/E112_GrainThief.ts` | 补跨卡顺序测试，必要时改成 BGA 时机。 |
 
