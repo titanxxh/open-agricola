@@ -521,6 +521,67 @@ describe('InteractionBar', () => {
     expect(html).toContain('Please choose an option')
   })
 
+  it('renders multi-select prompt params and resource labels as icons', () => {
+    const html = renderToStaticMarkup(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={{
+          promptKey: 'ui.interactionWorkshopAssistantSelect',
+          promptParams: { needed: 2 },
+          options: [
+            { value: 'WC', labelKey: 'cards.C146_WorkshopAssistant.pair.WC' },
+            { value: 'WR', labelKey: 'cards.C146_WorkshopAssistant.pair.WR' },
+          ],
+          playerIndex: 0,
+          spaceId: 'card_C146_WorkshopAssistant_choosePairs',
+        }}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={0}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+      />,
+    )
+
+    expect(html).toContain('Choose 2 pair(s) of building resources')
+    expect(html).not.toContain('{needed}')
+    expect(html).toContain('res-icon-wood')
+    expect(html).toContain('res-icon-clay')
+    expect(html).toContain('res-icon-reed')
+    expect(html).not.toContain('1 wood + 1 clay')
+  })
+
   it('renders engine-blocked prompt without choice action buttons', () => {
     const html = renderToStaticMarkup(
       <InteractionBar

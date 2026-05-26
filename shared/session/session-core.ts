@@ -4144,34 +4144,53 @@ export class GameCore {
   devDrawCard(playerIndex: number, cardId: string): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
-    const isOccupation = this.isOccupationCard(cardId)
-    // Remove from all players' hands first
+    const isMajor = !!getMajorCard(cardId)
+    const isOccupation = !isMajor && this.isOccupationCard(cardId)
     for (const p of this.state.players) {
       p.minorHand = p.minorHand.filter(id => id !== cardId)
       p.occupationHand = p.occupationHand.filter(id => id !== cardId)
+      p.minorPlayed = p.minorPlayed.filter(id => id !== cardId)
+      p.occupationPlayed = p.occupationPlayed.filter(id => id !== cardId)
+      p.improvements = p.improvements.filter(id => id !== cardId)
+      if (p.cardStates?.[cardId]) {
+        delete p.cardStates[cardId]
+      }
     }
-    if (isOccupation) {
+    if (isMajor) {
+      if (!this.state.availableMajorImprovements.includes(cardId)) {
+        this.state.availableMajorImprovements.push(cardId)
+      }
+    } else if (isOccupation) {
       player.occupationHand.push(cardId)
     } else {
       player.minorHand.push(cardId)
     }
-    return this.respond(true, undefined, [
+    const events = isMajor ? [] : [
       {
-        schemaVersion: 1,
-        type: 'private.handChanged',
+        schemaVersion: 1 as const,
+        type: 'private.handChanged' as const,
         recipientPlayerId: player.id,
         cardIds: [cardId],
-        cardType: isOccupation ? 'occupation' : 'minor',
-        reason: 'dev-draw-card',
+        cardType: isOccupation ? 'occupation' as const : 'minor' as const,
+        reason: 'dev-draw-card' as const,
       },
-    ])
+    ]
+    return this.respond(true, undefined, events)
   }
 
   devPlayCard(playerIndex: number, cardId: string): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
+    const isMajor = !!getMajorCard(cardId)
     const isOccupation = this.isOccupationCard(cardId)
-    if (isOccupation) {
+    if (isMajor) {
+      player.minorHand = player.minorHand.filter((id) => id !== cardId)
+      player.occupationHand = player.occupationHand.filter((id) => id !== cardId)
+      if (!player.improvements.includes(cardId)) {
+        player.improvements.push(cardId)
+      }
+      this.state.availableMajorImprovements = this.state.availableMajorImprovements.filter((id) => id !== cardId)
+    } else if (isOccupation) {
       player.occupationHand = player.occupationHand.filter((id) => id !== cardId)
       if (!player.occupationPlayed.includes(cardId)) {
         player.occupationPlayed.push(cardId)

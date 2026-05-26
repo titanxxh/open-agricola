@@ -1160,12 +1160,12 @@ export const zh = {
     C104_Collector: { name: '收藏家', desc: '获得 1 乞讨 + 选择 6/7/8/9 种不同资源（最多 4 次）。' },
     C146_WorkshopAssistant: {
       pair: {
-        WC: '1 木 + 1 黏土',
-        WR: '1 木 + 1 芦苇',
-        WS: '1 木 + 1 石',
-        CR: '1 黏土 + 1 芦苇',
-        CS: '1 黏土 + 1 石',
-        RS: '1 芦苇 + 1 石',
+        WC: '1 <WOOD> + 1 <CLAY>',
+        WR: '1 <WOOD> + 1 <REED>',
+        WS: '1 <WOOD> + 1 <STONE>',
+        CR: '1 <CLAY> + 1 <REED>',
+        CS: '1 <CLAY> + 1 <STONE>',
+        RS: '1 <REED> + 1 <STONE>',
       },
     },
     A39_Chapel: { name: '教堂', desc: '获得 3 额外分。其他人需付 1 谷物给主人。' },

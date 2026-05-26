@@ -1,8 +1,10 @@
 import { useState, type ReactNode } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
+import { resourceKeyList } from '../../../shared/contract/state-constants'
 import type { AnimalReorgState, PendingChoice, PendingAnimalReorg } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
+import { ResourceText } from '../common/ResourceText'
 import { formatAnimalCounts } from '../../utils/format'
 import type {
   ActionChoiceOption,
@@ -30,6 +32,28 @@ const isResourceExchangeLabelParams = (
 
 const hasPositiveResources = (resources?: Record<string, number | undefined>) =>
   !!resources && Object.values(resources).some((value) => (value ?? 0) > 0)
+
+const resourceOptionValues = new Set<string>(resourceKeyList)
+
+const hasResourceTokens = (text: string): boolean =>
+  /<[A-Z0-9_-]+>/.test(text)
+
+const renderResourceAwareText = (text: string): ReactNode =>
+  hasResourceTokens(text) ? (
+    <ResourceText text={text} className="interaction-option-resource-text" />
+  ) : text
+
+const optionLabelHasResourceTokens = (
+  locale: Locale,
+  option: ActionChoiceOption,
+): boolean => {
+  const label = translateCardText(
+    locale,
+    option.labelKey,
+    option.labelParams as Record<string, string | number> | undefined,
+  )
+  return hasResourceTokens(label)
+}
 
 const renderPaymentSourceCards = (
   locale: Locale,
@@ -228,11 +252,12 @@ const renderOptionLabel = (
       card: translateCardText(locale, option.labelParams.cardNameKey),
     })
   }
-  return translateCardText(
+  const label = translateCardText(
     locale,
     option.labelKey,
     option.labelParams as Record<string, string | number> | undefined,
   )
+  return renderResourceAwareText(label)
 }
 
 const renderOptionContent = (
@@ -266,7 +291,7 @@ const renderOptionContent = (
 
 function CollectorMultiSelect({ locale, options, needed, resolveChoice, isInteractive }: {
   locale: Locale
-  options: { value: string; labelKey: string }[]
+  options: ActionChoiceOption[]
   needed: number
   resolveChoice: (value: string) => void
   isInteractive: boolean
@@ -291,18 +316,21 @@ function CollectorMultiSelect({ locale, options, needed, resolveChoice, isIntera
         {t(locale, 'ui.interactionCollectorCount', { selected: selected.size, needed })}
       </div>
       <div className="collector-options">
-        {options.map((option) => (
-          <label key={option.value} className={`collector-option ${selected.has(option.value) ? 'selected' : ''}`}>
-            <input
-              type="checkbox"
-              checked={selected.has(option.value)}
-              onChange={() => toggle(option.value)}
-              disabled={!isInteractive || (!selected.has(option.value) && selected.size >= needed)}
-            />
-            <span className={`res-icon res-icon-${option.value}`} />
-            {translateCardText(locale, option.labelKey)}
-          </label>
-        ))}
+        {options.map((option) => {
+          const showValueIcon = resourceOptionValues.has(option.value) && !optionLabelHasResourceTokens(locale, option)
+          return (
+            <label key={option.value} className={`collector-option ${selected.has(option.value) ? 'selected' : ''}`}>
+              <input
+                type="checkbox"
+                checked={selected.has(option.value)}
+                onChange={() => toggle(option.value)}
+                disabled={!isInteractive || (!selected.has(option.value) && selected.size >= needed)}
+              />
+              {showValueIcon ? <span className={`res-icon res-icon-${option.value}`} /> : null}
+              {renderOptionContent(locale, option)}
+            </label>
+          )
+        })}
       </div>
       <button
         className="collector-confirm"
@@ -591,7 +619,11 @@ export const InteractionBar = ({
           ) : pendingChoice && isInteractive ? (
             <>
               <div className="interaction-title">
-                {t(locale, pendingChoice.promptKey as string ?? 'ui.interactionChooseOne')}
+                {t(
+                  locale,
+                  pendingChoice.promptKey ?? 'ui.interactionChooseOne',
+                  pendingChoice.promptParams as Record<string, string | number> | undefined,
+                )}
               </div>
               {triggerCardName ? (
                 <div className="interaction-subtitle">
