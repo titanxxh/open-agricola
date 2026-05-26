@@ -88,6 +88,8 @@ describe('stablesAction.resolveChoice', () => {
     if (result.type !== 'request') return
     expect(result.request.kind).toBe('farm-select')
     if (result.request.kind !== 'farm-select') return
+    const optionValues = result.request.options.map((option) => option.value)
+    expect(optionValues).toEqual(['confirm'])
     expect(result.request.farm.maxSelections).toBe(1)
   })
 
@@ -107,9 +109,13 @@ describe('stablesAction.resolveChoice', () => {
     expect(result.type).toBe('fail')
   })
 
-  it('cancel returns ok', () => {
+  it('cancel returns recoverable fail', () => {
     const result = stablesAction.resolveChoice!(makeCtx(), 'cancel')
-    expect(result.type).toBe('ok')
+    expect(result).toMatchObject({
+      type: 'fail',
+      errorKey: 'log.buildStableFail',
+      recoverable: true,
+    })
   })
 
   it('cancel fails recoverably when actionContext forbids cancel', () => {

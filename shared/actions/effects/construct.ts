@@ -78,21 +78,6 @@ const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
   return result
 }
 
-const forbidsConstructCancel = (
-  actionContext?: Record<string, unknown>,
-): boolean => actionContext?.cancelPolicy === 'forbidCancel'
-
-const hasReachableConstructSelection = (ctx: ActionMutationContext): boolean => {
-  const idx = ctx.state.players.indexOf(ctx.player)
-  const costDelta = readConstructCostDelta(ctx.actionContext, ctx.costs)
-  const farm = playerBoard(ctx.state, idx).farmyard.selectableTiles('room', {
-    costOverride: costDelta,
-    exactCost: readExactCost(ctx.actionContext),
-    actionContext: ctx.actionContext,
-  })
-  return farm.farmType === 'room' && farm.maxSelections > 0
-}
-
 const buildConstructPayCost = (
   player: PlayerState,
   costs: Partial<Resource> | undefined,
@@ -203,7 +188,6 @@ export const constructAction: ActionDefinition = {
         farm,
         options: [
           { value: 'confirm', labelKey: 'ui.interactionRoomConfirm' },
-          { value: 'cancel', labelKey: 'ui.interactionRoomCancel' },
         ],
       },
       promptKey: 'ui.interactionRoomSelect',
@@ -211,17 +195,11 @@ export const constructAction: ActionDefinition = {
   },
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
     if (choice === 'cancel') {
-      if (
-        forbidsConstructCancel(ctx.actionContext) &&
-        hasReachableConstructSelection(ctx)
-      ) {
-        return {
-          type: 'fail',
-          errorKey: 'log.buildRoomFail',
-          recoverable: true,
-        }
+      return {
+        type: 'fail',
+        errorKey: 'log.buildRoomFail',
+        recoverable: true,
       }
-      return { type: 'ok' }
     }
 
     // Second call: payment combo selected after multi-combo prompt.

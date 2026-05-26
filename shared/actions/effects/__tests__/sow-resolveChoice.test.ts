@@ -56,10 +56,26 @@ const makeCtx = (
   } as ActionExecutionContext
 }
 
+describe('sowAction.execute', () => {
+  it('only exposes confirm option', () => {
+    const result = sowAction.execute(makeCtx())
+    expect(result.type).toBe('request')
+    if (result.type !== 'request') return
+    expect(result.request.kind).toBe('farm-select')
+    if (result.request.kind !== 'farm-select') return
+    const optionValues = result.request.options.map((option) => option.value)
+    expect(optionValues).toEqual(['confirm'])
+  })
+})
+
 describe('sowAction.resolveChoice', () => {
-  it('cancel returns ok', () => {
+  it('cancel returns recoverable fail', () => {
     const result = sowAction.resolveChoice!(makeCtx(), 'cancel')
-    expect(result.type).toBe('ok')
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'log.action',
+      recoverable: true,
+    })
   })
 
   it('first call with crops payload sows the selected fields', () => {
