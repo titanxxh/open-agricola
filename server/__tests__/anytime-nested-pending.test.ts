@@ -51,7 +51,7 @@ describe('anytime nesting — sync card listener inside pending', () => {
     expect(done.state.players[0]!.resources.food).toBe(3)
   })
 
-  it('animal-reorg sub-flow → D106 → animal-reorg resumes; cancel completes flow', () => {
+  it('animal-reorg sub-flow → D106 → animal-reorg resumes; confirm completes flow', () => {
     const session = setupExchangeReady()
     const p0 = session.getState().state.players[0]!
     p0.resources = { ...p0.resources, sheep: 3 }
@@ -67,8 +67,12 @@ describe('anytime nesting — sync card listener inside pending', () => {
     expect(whisky.state.players[0]!.resources.grain).toBe(grainBefore - 1)
     expect((whisky.interaction as { promptKey?: string }).promptKey).toBe('ui.interactionAnimalReorg')
 
-    const cancel = session.resolveChoice(0, 'cancel')
-    expect(cancel.ok).toBe(true)
+    const done = session.resolveChoice(0, 'confirm', {
+      zones: [
+        { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      ],
+    })
+    expect(done.ok).toBe(true)
   })
 
   it('exchange pending → C115 xor anytime → sub-choice completes → exchange resumes', () => {

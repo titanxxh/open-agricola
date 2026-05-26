@@ -93,12 +93,19 @@ describe('reorganizeAction.resolveChoice', () => {
     expect(result.errorKey).toBe('log.reorganizeFail')
   })
 
-  it('cancel returns ok without mutation', () => {
+  it('cancel returns recoverable fail without mutation', () => {
     const ctx = makeCtx({ player: { resources: { sheep: 3 } as never } })
     ctx.player.resources.sheep = 3
+    const before = JSON.parse(JSON.stringify(ctx.player))
+
     const result = reorganizeAction.resolveChoice!(ctx, 'cancel')
-    expect(result.type).toBe('ok')
-    expect(ctx.player.resources.sheep).toBe(3)
+
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'log.reorganizeFail',
+      recoverable: true,
+    })
+    expect(ctx.player).toEqual(before)
   })
 
   it('confirm with zones reduces reserve sheep when assigned to pasture', () => {

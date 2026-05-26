@@ -4214,9 +4214,8 @@ export class GameCore {
   undoStep(): SessionResponse {
     const envelope = this.engineStack.peekPendingEnvelope()
     const interactionFrame = this.engineStack.current()
-    // S2 Task 5/6 — farm-select kind also flows through the
-    // farm-prompt undo special-cancel path (it carries the same
-    // promptKey shape as the previous 'choice' farm-prompts).
+    // Farm-select kind carries the same promptKey shape as the previous
+    // choice farm prompts, so the history-restore undo path applies to both.
     const isPlainChoiceOrFarmSelect =
       envelope &&
       (envelope.request.kind === 'choice' ||
