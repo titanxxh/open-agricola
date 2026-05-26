@@ -588,7 +588,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B64_MillWheel` | 已对齐 |  |
 | `B65_GrainDepot` | 已对齐 |  |
 | `B66_SackCart` | 已对齐 |  |
-| `B67_HandTruck` | 已对齐 | bake 前先 optional gain grain，随后保留 mandatory bake continuation；skip 不阻断 bake |
+| `B67_HandTruck` | 已对齐 | bake 前先 optional gain grain，随后保留 mandatory bake continuation；无 bake provider 时不触发 |
 | `B68_Beanfield` | 已对齐 |  |
 | `B69_PottersMarket` | 已对齐 |  |
 | `B70_NewPurchase` | 已对齐 |  |
@@ -723,7 +723,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C19_SwingPlow` | 已对齐 |  |
 | `C20_MolePlow` | 已对齐 |  |
 | `C21_HeartofStone` | 已对齐 |  |
-| `C22_BasketChair` | 已对齐 | 回收工人后清理 C23 fake lessons worker，并保留真实 lessons 放置工人 |
+| `C22_BasketChair` | 已对齐 | 回收 Day Laborer 工人后清理 C23 fake lessons worker，并保留真实 lessons 放置工人 |
 | `C23_JobContract` | 已对齐 |  |
 | `C24_BedintheGrainField` | 已对齐 | 下一次 harvest 有空房时提供 optional `family-growth`，skip/accept 后都清理一次性 marker；无空房也消费 marker |
 | `C25_SteamMachine` | 需复核 | 缺 BGA adoptive worker 场景下的 forceSkip/end-turn 分支 |
@@ -1042,7 +1042,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D158_BeanCounter` | 已对齐 |  |
 | `D159_ReedSeller` | 排除 | BGA implemented=false；OA 保留 data-only 定义 |
 | `D160_Midwife` | 已对齐 |  |
-| `D161_CabbageBuyer` | 已对齐 | renovation tracker 覆盖 renovate-house 与后续 major/minor improvement，不再只限 house-redevelopment |
+| `D161_CabbageBuyer` | 已对齐 | renovation tracker 覆盖 renovate-house 与后续 major/minor improvement；无 worker placement 的卡牌 renovation 直接给 3f offer |
 | `D162_ClayFirer` | 已对齐 |  |
 | `D163_JourneymanBricklayer` | 已对齐 |  |
 | `D164_PetGrower` | 已对齐 |  |
