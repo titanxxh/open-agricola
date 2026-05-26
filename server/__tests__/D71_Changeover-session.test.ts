@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/D/D71_Changeover'
-import type { ActionChoiceOption,  AnytimeAction } from '../../shared/contract/types';
+import type { ActionChoiceOption, AnytimeAction } from '../../shared/contract/types'
 
 describe('D71_Changeover session', () => {
   const setup = () => {
@@ -11,8 +12,14 @@ describe('D71_Changeover session', () => {
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
     state.round = 2
+    state.roundPhase = 'work'
+    for (const player of state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    }
 
     const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
     player.minorPlayed.push('D71_Changeover')
 
     // One eligible field (remaining === 1), one not eligible (remaining === 2)
@@ -63,34 +70,36 @@ describe('D71_Changeover session', () => {
     expect(f.stacks[0]?.kind ?? null).toBeNull()
     expect(f.stacks[0]?.remaining ?? 0).toBe(0)
 
-    // The sow action is optional. If it produces a choice, we should see sow select.
-    // The player has grain=2 and there's an empty field (0-2 was just cleared),
-    // so sow should be offered.
-    if (resp.interaction.stateId === 'wait') {
-      // Could be sow select or an optional skip
-      const promptKey = resp.interaction.promptKey
-      if (promptKey === 'ui.interactionOptionalAction') {
-        // Accept the optional sow
-        const acceptOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
-        if (acceptOption) {
-          resp = session.resolveChoice(0, acceptOption.value)
-        }
-      }
-      if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionSowSelect') {
-        expect(resp.interaction.stateId).toBe('wait')
-        // Sow grain into the empty field 0-2
-        resp = session.commitSelectionChoice(0, {
-          crops: [{ row: 0, col: 2, crop: 'grain' }],
-        })
-        expect(resp.ok).toBe(true)
-        // Grain deducted: 2 - 1 = 1
-        expect(resp.state.players[0]!.resources.grain).toBe(1)
-        // Field should now have grain sown
-        const sownField = resp.state.players[0]!.fields.find(f => f.row === 0 && f.col === 2)!
-        expect(sownField.stacks[0]?.kind).toBe('grain')
-        expect(sownField.stacks[0]?.remaining ?? 0).toBe(3)
-      }
-    }
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected optional sow prompt')
+    expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
+    expect(resp.interaction.options?.map((o) => o.value)).toContain('__skip__')
+
+    const acceptOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
+    expect(acceptOption).toBeDefined()
+    resp = session.resolveChoice(0, acceptOption!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
+      .toBe('ui.interactionSowSelect')
+    expect(resp.interaction.stateId === 'wait'
+      ? resp.interaction.options?.map((option) => option.value)
+      : [],
+    ).toEqual(['confirm'])
+
+    const rejected = session.commitSelectionChoice(0, { cancel: true })
+    expect(rejected.ok).toBe(false)
+    expect(rejected.ok ? '' : rejected.error).toBe('action cancel is not allowed')
+    expect(rejected.interaction.stateId === 'wait' ? rejected.interaction.promptKey : undefined)
+      .toBe('ui.interactionSowSelect')
+
+    resp = session.commitSelectionChoice(0, {
+      crops: [{ row: 0, col: 2, crop: 'grain' }],
+    })
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.grain).toBe(1)
+    const sownField = resp.state.players[0]!.fields.find(f => f.row === 0 && f.col === 2)!
+    expect(sownField.stacks[0]?.kind).toBe('grain')
+    expect(sownField.stacks[0]?.remaining ?? 0).toBe(3)
   })
 
   it('NOT available when no field has exactly 1 remaining', () => {
@@ -99,8 +108,14 @@ describe('D71_Changeover session', () => {
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
     state.round = 2
+    state.roundPhase = 'work'
+    for (const player of state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    }
 
     const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
     player.minorPlayed.push('D71_Changeover')
 
     // No field with remaining === 1

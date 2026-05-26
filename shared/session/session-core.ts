@@ -3204,7 +3204,6 @@ export class GameCore {
     const pendingPlayerIndex = frame
       ? this.effectiveOwnerIndexForFrame(frame, envelope?.hostNodeId, envelope)
       : -1
-    const pendingPromptKey = envelope?.promptKey
     const pendingOptions = pendingEnvelopeChoices(envelope)
     const pendingSnapshot = pendingContextSnapshot(envelope)
     const pendingActionContext = pendingSnapshot?.actionContext
@@ -3232,14 +3231,7 @@ export class GameCore {
     if (chosenOption?.disabled) {
       return this.respond(false, 'option disabled')
     }
-    if (!this.engine) {
-      if (pendingPromptKey === 'ui.interactionFenceSelect' && value === 'cancel') {
-        // Engine already absent; nothing to clear (Task 10 deleted the
-        // previous GameCore pending field).
-        return this.respond()
-      }
-      return this.respond(false, 'no active engine')
-    }
+    if (!this.engine) return this.respond(false, 'no active engine')
     const player = this.state.players[pendingPlayerIndex]
     const space = this.getSpaceById(this.activeSpaceId)
     if (!player || !space) return this.respond(false, 'invalid state')

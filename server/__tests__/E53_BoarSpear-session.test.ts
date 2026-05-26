@@ -124,15 +124,10 @@ const driveToCompletion = (
         continue
       }
     } else {
-      // Reject path: pick __skip__ or cancel
+      // Reject path: skip optional prompts only.
       const skip = opts.find((o) => o.value === '__skip__')
       if (skip) {
         resp = session.resolveChoice(0, skip.value)
-        continue
-      }
-      const cancel = opts.find((o) => o.value === 'cancel')
-      if (cancel) {
-        resp = session.resolveChoice(0, cancel.value)
         continue
       }
     }
@@ -142,7 +137,7 @@ const driveToCompletion = (
       resp = session.resolveChoice(0, nonSkip.value)
       continue
     }
-    const skipOrCancel = opts.find((o) => o.value === '__skip__' || o.value === 'cancel')
+    const skipOrCancel = opts.find((o) => o.value === '__skip__')
     if (skipOrCancel) {
       resp = session.resolveChoice(0, skipOrCancel.value)
       continue

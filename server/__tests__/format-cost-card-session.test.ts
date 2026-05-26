@@ -190,6 +190,7 @@ describe('formatCost card session regressions', () => {
 
     const cancelled = session.commitSelectionChoice(0, { cancel: true })
     expect(cancelled.ok).toBe(false)
+    expect(cancelled.error).toBe('action cancel is not allowed')
     expect(cancelled.interaction.stateId).toBe('wait')
     expect(cancelled.state.players[0]!.stableTiles).toEqual([])
     expect(cancelled.state.players[1]!.minorHand).toContain('C2_Stable')
@@ -283,6 +284,7 @@ describe('formatCost card session regressions', () => {
 
     const cancel = session.commitSelectionChoice(0, { cancel: true })
     expect(cancel.ok).toBe(false)
+    expect(cancel.error).toBe('action cancel is not allowed')
 
     const oneCell = session.commitSelectionChoice(0, {
       edges: edgesForTile(0, 0),
