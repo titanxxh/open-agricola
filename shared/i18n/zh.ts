@@ -924,6 +924,15 @@ export const zh = {
   },
   platform: {
     loading: '加载中...',
+    loadStep: {
+      manifest: '加载卡牌数据…',
+      appShell: '加载游戏界面…',
+      auth: '验证登录…',
+      wsConnecting: '连接服务器…',
+      wsCreating: '创建房间…',
+      wsJoining: '加入房间…',
+      fetchingState: '同步游戏状态…',
+    },
     loginTitle: 'Open Agricola',
     loginSubtitle: '登录以继续',
     registerSubtitle: '创建新账户',

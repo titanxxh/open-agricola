@@ -1,12 +1,24 @@
-import { Suspense, useEffect, useState, type ReactElement } from 'react'
+import { lazy, Suspense, useEffect, useState, type ReactElement } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { LoginPage } from './LoginPage'
 import { LobbyPage } from './LobbyPage'
 import { SettingsPage } from './SettingsPage'
-import { GameContainerApi } from './GameContainerApi'
 import { MobileTabBar } from '../components/common/MobileTabBar'
+import { GameLoadScreen } from '../components/common/GameLoadScreen'
+import { getGameLoadProgress } from './game-load-progress'
 import { SandboxAppLazy } from '../sandbox'
+import '../App.css'
+
+const GameContainerApiLazy = lazy(() =>
+  import('./GameContainerApi').then((m) => ({ default: m.GameContainerApi })),
+)
+
+function GameShellFallback() {
+  const { t } = useLocale()
+  const { percent, labelKey } = getGameLoadProgress('appShell')
+  return <GameLoadScreen percent={percent} label={t(labelKey)} />
+}
 
 type Page = 'login' | 'lobby' | 'workshop' | 'game' | 'settings'
 
@@ -67,7 +79,8 @@ export function PageRouter() {
   }, [])
 
   if (loading) {
-    return <div className="loading-screen">{t('platform.loading')}</div>
+    const { percent, labelKey } = getGameLoadProgress('auth')
+    return <GameLoadScreen percent={percent} label={t(labelKey)} />
   }
 
   if (!user) {
@@ -79,7 +92,11 @@ export function PageRouter() {
   let pageNode: ReactElement
   switch (page) {
     case 'game':
-      pageNode = <GameContainerApi />
+      pageNode = (
+        <Suspense fallback={<GameShellFallback />}>
+          <GameContainerApiLazy />
+        </Suspense>
+      )
       break
     case 'workshop':
       pageNode = (
