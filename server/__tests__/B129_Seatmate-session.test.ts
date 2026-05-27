@@ -19,12 +19,12 @@ const setup = (opts: { playerCount: 2 | 3 | 4; round?: number; takenByR13?: Role
     p.occupationHand = [...PLACEHOLDER_HAND]
   }
   state.round = opts.round ?? 13
-  const owner = state.players[0]!
-  owner.occupationPlayed.push(CARD_ID)
+  const ownerIdx = 0
+  const ownerId = state.players[ownerIdx]!.id
+  state.players[ownerIdx]!.occupationPlayed.push(CARD_ID)
   const r13Id = state.roundActionOrder[12]!
   const r13Setup = state.actionSpaces.find((s) => s.id === r13Id)!
   const n = state.players.length
-  const ownerIdx = 0
   // Direction follows C150_ParrotBreeder convention: right neighbour = (idx - 1 + n) % n.
   const idxMap: Record<RoleAtR13, number> = {
     owner: ownerIdx,
@@ -37,9 +37,11 @@ const setup = (opts: { playerCount: 2 | 3 | 4; round?: number; takenByR13?: Role
     workerId: `seed-${role}-${i + 1}`,
   }))
   session.loadState(state)
+  // 注意：loadState 会经 normalizeState 重新构造 players / actionSpaces；只 return
+  // 稳定 id（string）与下标映射，不要 return pre-loadState 的 player / space 引用。
   return {
     session,
-    owner,
+    ownerId,
     r13Id,
     idxMap,
     playerIds: state.players.map((p) => p.id),
@@ -53,7 +55,7 @@ describe('B129_Seatmate session', () => {
   it.each<[RoleAtR13]>([['left'], ['right']])(
     'Test 1: 3p neighbour-only occupies r13, owner enters OK (%s)',
     (neighbour) => {
-      const { session, owner, r13Id, playerIds, idxMap } = setup({
+      const { session, ownerId, r13Id, playerIds, idxMap } = setup({
         playerCount: 3,
         takenByR13: [neighbour],
       })
@@ -63,7 +65,7 @@ describe('B129_Seatmate session', () => {
       expect(resp.ok).toBe(true)
 
       const takenByIds = readR13(session, r13Id).takenBy.map((t) => t.playerId)
-      expect(takenByIds).toEqual(expect.arrayContaining([neighbourId, owner.id]))
+      expect(takenByIds).toEqual(expect.arrayContaining([neighbourId, ownerId]))
       expect(session.getActionAvailability(0)[r13Id]).toBe(true)
     },
   )
@@ -71,7 +73,7 @@ describe('B129_Seatmate session', () => {
   it.each<[RoleAtR13]>([['left'], ['right']])(
     'Test 2: 4p neighbour-only occupies r13, opposite empty, owner enters OK (%s)',
     (neighbour) => {
-      const { session, owner, r13Id, playerIds, idxMap } = setup({
+      const { session, ownerId, r13Id, playerIds, idxMap } = setup({
         playerCount: 4,
         takenByR13: [neighbour],
       })
@@ -82,7 +84,7 @@ describe('B129_Seatmate session', () => {
       expect(resp.ok).toBe(true)
 
       const takenByIds = readR13(session, r13Id).takenBy.map((t) => t.playerId)
-      expect(takenByIds).toEqual(expect.arrayContaining([neighbourId, owner.id]))
+      expect(takenByIds).toEqual(expect.arrayContaining([neighbourId, ownerId]))
       expect(takenByIds).not.toContain(oppositeId)
       expect(session.getActionAvailability(0)[r13Id]).toBe(true)
     },
@@ -135,7 +137,7 @@ describe('B129_Seatmate session', () => {
   })
 
   it('Test 5(b): r13 occupied by owner only, listener short-circuits owner-only', () => {
-    const { session, owner, r13Id } = setup({
+    const { session, ownerId, r13Id } = setup({
       playerCount: 4,
       takenByR13: ['owner'],
     })
@@ -144,7 +146,7 @@ describe('B129_Seatmate session', () => {
     expect(resp.ok).toBe(false)
 
     const r13After = readR13(session, r13Id).takenBy.map((t) => t.playerId)
-    expect(r13After).toEqual([owner.id])
+    expect(r13After).toEqual([ownerId])
     expect(session.getActionAvailability(0)[r13Id]).toBe(false)
   })
 
