@@ -1,6 +1,7 @@
 import type {
   DraftGameEvent,
   EventSink,
+  GameEvent,
 } from '../contract/events.ts'
 import type {
   ActionChoiceOption,
@@ -96,11 +97,12 @@ import { getCardEffect } from '../cards/card-effects.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
 import { runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks } from '../cards/card-effects.ts'
 import { positionKey } from '../domain/farm.ts'
-import { getMatchingListeners, executeCardListener } from '../cards/card-listeners.ts'
+import { getMatchingListeners, executeCardListener, listenerOwnerOptions, runCardListeners } from '../cards/card-listeners.ts'
 import { buildPhaseTrailingNodes, markOptional, stampOwner } from '../engine/engine-utils.ts'
 import { Scoring, playerBoard, type PlayerScoreSummary } from '../domain'
 import { reap } from '../actions/effects/reap.ts'
 import { breedLeaf } from '../actions/effects/breed'
+import { executeImmediateSpecialEffectFlows } from '../actions/effects/internal/immediate-special-effect-flow.ts'
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { resetRoundPlacements } from '../cards/helpers/round-placement.ts'
 import { familySize, newbornCount, workersAvailable } from '../domain/player.ts'
@@ -113,6 +115,7 @@ import {
   getBasicConversionExchange,
 } from '../cards/basic-conversion.ts'
 import { appendImmediateEvents, type ImmediateEventDraft } from '../events/append.ts'
+import { EventStore } from '../events/store.ts'
 import { prependDerivedLogEntries } from '../events/log-cache.ts'
 import {
   appendPublicEventCanceledPacket,
@@ -1407,9 +1410,7 @@ export class GameCore {
       if (!entry.cardId) continue
       if (entry.ownerPlayerId !== player.id) continue
       if (blockedIds.has(entry.registration.id)) continue
-      const result = executeCardListener(entry.registration, anytimeContext, {
-        ownerPlayerId: entry.ownerPlayerId,
-      })
+      const result = executeCardListener(entry.registration, anytimeContext, listenerOwnerOptions(entry))
       if (!result?.flow) continue
       // anytime listeners are queried during build (idempotent peek), not
       // fire — do not increment used here. The increment is done when the
@@ -2542,6 +2543,49 @@ export class GameCore {
     return this.finalizeRound()
   }
 
+  private dispatchFutureMeepleResolvedListeners(
+    events: readonly GameEvent[],
+  ): void {
+    const resolvedEvents = events.filter((event) => event.type === 'futureMeeple.resolved')
+    if (resolvedEvents.length === 0) return
+    const space = this.createSyntheticSpace('future-meeple-resolved')
+    for (const player of this.state.players) {
+      const transactionEvents = resolvedEvents.filter((event) => event.playerId === player.id)
+      if (transactionEvents.length === 0) continue
+      const results = runCardListeners({
+        state: this.state,
+        player,
+        space,
+        actionId: 'future-meeple-resolved',
+        phase: 'immediatelyAfter',
+        transactionEvents,
+      })
+      if (results.length === 0) continue
+      if (!Array.isArray(this.state.events)) this.state.events = []
+      if (!Number.isSafeInteger(this.state.nextEventSeq) || this.state.nextEventSeq < 1) {
+        this.state.nextEventSeq = 1
+      }
+      const store = new EventStore()
+      const frame = store.beginFrame({
+        actorPlayerId: player.id,
+        sourceActionId: 'future-meeple-resolved',
+      })
+      executeImmediateSpecialEffectFlows({
+        state: this.state,
+        player,
+        space,
+        eventSink: frame.sink,
+        results,
+      })
+      const completed = frame.complete(this.state)
+      if (completed.length > 0) {
+        store.commitTransaction(this.state)
+      } else {
+        store.rollbackTransaction()
+      }
+    }
+  }
+
   private continueBeforeStartOfTurn(playerIndex = 0, cardIndex = 0): SessionResponse {
     if (this.continueStageHook('onBeforeStartOfTurn', playerIndex, cardIndex)) {
       return this.respond()
@@ -2604,11 +2648,12 @@ export class GameCore {
     })
     applyRoundGrowth(this.state)
     applyFutureMeeples(this.state)
-    appendImmediateEvents(this.state, [
+    const committedStartEvents = appendImmediateEvents(this.state, [
       { type: 'round.started' },
       ...futureResolvedEvents,
       ...actionEvents,
     ])
+    this.dispatchFutureMeepleResolvedListeners(committedStartEvents)
     if (this.continueStageHook('onRoundStart')) {
       return this.respond()
     }
@@ -3081,9 +3126,7 @@ export class GameCore {
     }
     const matched = getMatchingListeners(ctx)
     for (const entry of matched) {
-      const result = executeCardListener(entry.registration, ctx, {
-        ownerPlayerId: entry.ownerPlayerId,
-      })
+      const result = executeCardListener(entry.registration, ctx, listenerOwnerOptions(entry))
       if (result && result.doable === false) return true
     }
     return false
@@ -3136,9 +3179,7 @@ export class GameCore {
       }
       const matched = getMatchingListeners(listenerContext)
       for (const entry of matched) {
-        const r = executeCardListener(entry.registration, listenerContext, {
-          ownerPlayerId: entry.ownerPlayerId,
-        })
+        const r = executeCardListener(entry.registration, listenerContext, listenerOwnerOptions(entry))
         if (!r?.extraOptions) continue
         for (const opt of r.extraOptions) {
           if (opt.value.startsWith(OCCUPIED_SPACE_CHOICE_PREFIX)) {
@@ -3443,6 +3484,44 @@ export class GameCore {
     return this.respond()
   }
 
+  private dispatchHarvestFeedConversionListeners(
+    player: PlayerState,
+    transactionEvents: readonly (GameEvent | DraftGameEvent)[],
+  ): void {
+    const space = this.createSyntheticSpace('harvest-feed-conversion')
+    const results = runCardListeners({
+      state: this.state,
+      player,
+      space,
+      actionId: 'harvest-feed-conversion',
+      phase: 'immediatelyAfter',
+      transactionEvents,
+    })
+    if (results.length === 0) return
+    if (!Array.isArray(this.state.events)) this.state.events = []
+    if (!Number.isSafeInteger(this.state.nextEventSeq) || this.state.nextEventSeq < 1) {
+      this.state.nextEventSeq = 1
+    }
+    const store = new EventStore()
+    const frame = store.beginFrame({
+      actorPlayerId: player.id,
+      sourceActionId: 'harvest-feed-conversion',
+    })
+    executeImmediateSpecialEffectFlows({
+      state: this.state,
+      player,
+      space,
+      eventSink: frame.sink,
+      results,
+    })
+    const completed = frame.complete(this.state)
+    if (completed.length > 0) {
+      store.commitTransaction(this.state)
+    } else {
+      store.rollbackTransaction()
+    }
+  }
+
   private handleFeedResolved(
     playerIndex: number,
     selections: FeedSelections,
@@ -3549,13 +3628,14 @@ export class GameCore {
             if (fromKey0) addFoodFromConversion(player, fromKey0, total)
           }
         }
-        appendImmediateEvents(this.state, [{
+        const feedConvertedEvents = appendImmediateEvents(this.state, [{
           type: 'harvest.feedConverted',
           playerId: player.id,
           source: sel.sourceName ?? 'Harvest conversion',
           cost: costMap,
           food: gainMap,
         }], { actorPlayerId: player.id })
+        this.dispatchHarvestFeedConversionListeners(player, feedConvertedEvents)
         // Dispatch CardExchange.sideEffect (e.g. E153 StoneSculptor bonusVp).
         if (exchange.sideEffect && times > 0) {
           applyTradeSideEffect(

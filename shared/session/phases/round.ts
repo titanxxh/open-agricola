@@ -21,7 +21,7 @@ import {
 import { incPlacedFarmers } from '../../session/stats.ts'
 import { recordActionSnapshot } from '../../cards/helpers/action-snapshot.ts'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement.ts'
-import { executeCardListener, getMatchingListeners } from '../../cards/card-listeners.ts'
+import { executeCardListener, getMatchingListeners, listenerOwnerOptions } from '../../cards/card-listeners.ts'
 import { runRoundEndHooks, shouldSkipPlayerTurn } from '../../cards/card-effects.ts'
 import { tagInjectedAnytimeFlow } from '../../engine/action-context-flags.ts'
 import { appendImmediateEvents } from '../../events/append.ts'
@@ -136,9 +136,7 @@ export const takeAction = (
   const matched = getMatchingListeners(beforeListenerContext)
   const beforeFlows: ActionFlow[] = []
   for (const entry of matched) {
-    const result = executeCardListener(entry.registration, beforeListenerContext, {
-      ownerPlayerId: entry.ownerPlayerId,
-    })
+    const result = executeCardListener(entry.registration, beforeListenerContext, listenerOwnerOptions(entry))
     if (result?.flow) beforeFlows.push(result.flow)
   }
   if (beforeFlows.length > 0) {

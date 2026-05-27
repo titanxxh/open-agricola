@@ -12,7 +12,7 @@ import { smallestAvailableWorker } from '../../domain/player'
 import { incPlacedFarmers } from '../../session/stats'
 import { computeAllowedPlacementSpaces } from '../helpers/placement-availability'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
-import { executeCardListener, getMatchingListeners } from '../../cards/card-listeners'
+import { executeCardListener, getMatchingListeners, listenerOwnerOptions } from '../../cards/card-listeners'
 import { writeCardExtraData } from '../../cards/helpers/card-state'
 
 export { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
@@ -125,9 +125,11 @@ export const placeFarmerAction: ActionDefinition = {
       const matchedCascade = getMatchingListeners(cascadeListenerContext)
       const cascadeFlows: ActionFlow[] = []
       for (const entry of matchedCascade) {
-        const lresult = executeCardListener(entry.registration, cascadeListenerContext, {
-          ownerPlayerId: entry.ownerPlayerId,
-        })
+        const lresult = executeCardListener(
+          entry.registration,
+          cascadeListenerContext,
+          listenerOwnerOptions(entry),
+        )
         if (lresult?.flow) {
           cascadeFlows.push(lresult.flow)
         }

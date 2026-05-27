@@ -1,4 +1,5 @@
 import type { ActionHookPhase } from '../actions/hooks'
+import type { CardListenerZone } from '../cards/card-listeners'
 import type { GameEvent } from '../contract/events'
 import { ActionNode } from './nodes/action-node'
 import type { EngineNode } from './types'
@@ -12,6 +13,7 @@ export type ActivateCardActionParams = {
   actionId: string
   event: Record<string, unknown>
   ownerPlayerId?: string
+  ownerCardZone?: CardListenerZone
   triggerPlayerId?: string
   mandatory?: boolean
   countCardUse?: boolean

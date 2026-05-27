@@ -49,7 +49,11 @@ type TriggerSelectContext = ActionExecutionContext &
 const previewContextForChild = (
   child: ActivateCardActionNode,
   context: TriggerSelectContext,
-): { listenerContext: CardListenerContextInput; ownerPlayerId?: string } => {
+): {
+  listenerContext: CardListenerContextInput
+  ownerPlayerId?: string
+  ownerCardZone?: ActivateCardActionNode['params']['ownerCardZone']
+} => {
   const params = child.params
   const ownerPlayerId = params.ownerPlayerId ?? child.ownerPlayerId
   const triggerPlayerId = params.triggerPlayerId
@@ -77,11 +81,14 @@ const previewContextForChild = (
     ...params.event,
     triggerPlayerId,
     ownerPlayerId,
+    ownerCardId: params.cardId,
+    ownerCardZone: params.ownerCardZone,
     mandatory: params.mandatory,
   }
   if (params.countCardUse !== undefined) event.countCardUse = params.countCardUse
   return {
     ownerPlayerId,
+    ownerCardZone: params.ownerCardZone,
     listenerContext: {
       state: previewState,
       player: triggerPlayer,
@@ -192,7 +199,11 @@ export const evaluateTriggerSelect = (
     const listener = getListenerById(child.params.listenerId)
     const preview = listener ? previewContextForChild(child, context) : null
     const result = listener && preview
-      ? executeCardListener(listener, preview.listenerContext, { ownerPlayerId: preview.ownerPlayerId })
+      ? executeCardListener(listener, preview.listenerContext, {
+        ownerPlayerId: preview.ownerPlayerId,
+        ownerCardId: metadata?.cardId ?? child.params.cardId,
+        ownerCardZone: preview.ownerCardZone,
+      })
       : undefined
     const applicable = child.params.phase !== 'isDoable' && resultHasApplicabilitySignal(result)
     const doable = applicable ? evaluateChildDoable(result, context) : false
