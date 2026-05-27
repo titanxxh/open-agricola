@@ -9,6 +9,7 @@ import type {
 import { payAction } from '../../actions/effects/pay'
 import { gainAction } from '../../actions/effects/gain'
 import { bonusVpAction } from '../../actions/effects/bonus-vp'
+import { plowAction } from '../../actions/effects/plow'
 import { ActionRegistry } from '../registry'
 import { CardRegistry } from '../../cards/registry'
 import { setActiveCardRegistry, requireActiveCardRegistry } from '../../cards/active-registry'
@@ -1408,6 +1409,52 @@ describe('Engine flow nodes', () => {
     const space = createSpace(action)
 
     const step = engine.proceed({ state, player, space })
+    expect(step.type).toBe('ok')
+    expect(optional.getState()).toBe('resolved')
+  })
+
+  it('optional plow leaf auto-skips when allowed tiles have no plowable intersection', () => {
+    const registry = new ActionRegistry()
+    registry.register(plowAction)
+    const optional = new ActionNode(
+      'action-d1-plow',
+      'plow',
+      'D1_ZigzagHarrow',
+      undefined,
+      undefined,
+      undefined,
+      {
+        allowedTiles: [
+          { row: 1, col: 4 },
+          { row: -1, col: 2 },
+        ],
+      },
+    )
+    optional.optional = true
+    optional.optionalActive = false
+    optional.optionalPromptKey = 'ui.interactionOptionalAction'
+    const engine = new Engine({
+      tree: new EngineTree(optional),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    player.fields = [
+      { row: 0, col: 2, stacks: [] },
+      { row: 0, col: 3, stacks: [] },
+      { row: 1, col: 3, stacks: [] },
+    ]
+    player.roomTiles = [
+      { row: 2, col: 0 },
+      { row: 1, col: 0 },
+    ]
+    player.stableTiles = [{ row: 1, col: 4 }]
+    const space = createSpace(plowAction)
+
+    const step = engine.proceed({ state, player, space })
+
     expect(step.type).toBe('ok')
     expect(optional.getState()).toBe('resolved')
   })
