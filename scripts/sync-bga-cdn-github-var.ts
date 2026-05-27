@@ -219,10 +219,28 @@ async function fetchCdnCapturesFromPlaywright(): Promise<TableCdnCapture[]> {
     })
 
     const listPage = await context.newPage()
-    await listPage.goto(BGA_AGRICOLA_TABLES_URL, {
-      waitUntil: 'load',
-      timeout: Math.max(DEFAULT_TABLE_WAIT_MS, 60_000),
-    })
+    const listGotoTimeout = Math.max(DEFAULT_TABLE_WAIT_MS, 60_000)
+    const listGotoAttempts = 3
+    let lastGotoError: unknown
+    for (let attempt = 1; attempt <= listGotoAttempts; attempt++) {
+      try {
+        await listPage.goto(BGA_AGRICOLA_TABLES_URL, {
+          waitUntil: 'domcontentloaded',
+          timeout: listGotoTimeout,
+        })
+        lastGotoError = undefined
+        break
+      } catch (err) {
+        lastGotoError = err
+        console.warn(
+          `[sync-bga-cdn] 列表页加载第 ${attempt}/${listGotoAttempts} 次失败：${(err as Error).message || err}`,
+        )
+        if (attempt < listGotoAttempts) {
+          await listPage.waitForTimeout(3_000)
+        }
+      }
+    }
+    if (lastGotoError) throw lastGotoError
     await listPage.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {})
     await listPage
       .getByRole('button', { name: /accept all cookies|accept all|tout accepter/i })
