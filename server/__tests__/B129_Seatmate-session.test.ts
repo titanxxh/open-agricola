@@ -32,10 +32,13 @@ const setup = (opts: { playerCount: 2 | 3 | 4; round?: number; takenByR13?: Role
     left: (ownerIdx + 1) % n,
     opposite: (ownerIdx + Math.floor(n / 2)) % n,
   }
-  r13Setup.takenBy = (opts.takenByR13 ?? []).map((role, i) => ({
-    playerId: state.players[idxMap[role]]!.id,
-    workerId: `seed-${role}-${i + 1}`,
-  }))
+  r13Setup.takenBy = (opts.takenByR13 ?? []).map((role, i) => {
+    const player = state.players[idxMap[role]]!
+    return {
+      playerId: player.id,
+      workerId: player.workers[i]?.id ?? `seed-${role}-${i + 1}`,
+    }
+  })
   session.loadState(state)
   // 注意：loadState 会经 normalizeState 重新构造 players / actionSpaces；只 return
   // 稳定 id（string）与下标映射，不要 return pre-loadState 的 player / space 引用。
@@ -61,12 +64,13 @@ describe('B129_Seatmate session', () => {
       })
       const neighbourId = playerIds[idxMap[neighbour]]!
 
+      expect(session.getActionAvailability(0)[r13Id]).toBe(true)
       const resp = session.takeAction(0, r13Id)
       expect(resp.ok).toBe(true)
 
       const takenByIds = readR13(session, r13Id).takenBy.map((t) => t.playerId)
       expect(takenByIds).toEqual(expect.arrayContaining([neighbourId, ownerId]))
-      expect(session.getActionAvailability(0)[r13Id]).toBe(true)
+      expect(session.getActionAvailability(0)[r13Id]).toBe(false)
     },
   )
 
@@ -80,13 +84,14 @@ describe('B129_Seatmate session', () => {
       const neighbourId = playerIds[idxMap[neighbour]]!
       const oppositeId = playerIds[idxMap.opposite]!
 
+      expect(session.getActionAvailability(0)[r13Id]).toBe(true)
       const resp = session.takeAction(0, r13Id)
       expect(resp.ok).toBe(true)
 
       const takenByIds = readR13(session, r13Id).takenBy.map((t) => t.playerId)
       expect(takenByIds).toEqual(expect.arrayContaining([neighbourId, ownerId]))
       expect(takenByIds).not.toContain(oppositeId)
-      expect(session.getActionAvailability(0)[r13Id]).toBe(true)
+      expect(session.getActionAvailability(0)[r13Id]).toBe(false)
     },
   )
 
@@ -150,7 +155,28 @@ describe('B129_Seatmate session', () => {
     expect(session.getActionAvailability(0)[r13Id]).toBe(false)
   })
 
-  it('Test 5(c): 2-player falls through to "other player counts" defensive return', () => {
+  it.each<[2 | 3 | 4, RoleAtR13]>([
+    [3, 'left'],
+    [4, 'left'],
+  ])(
+    'Test 5(c): %ip owner plus neighbour occupy r13, owner entry BLOCKED (%s)',
+    (playerCount, neighbour) => {
+      const { session, ownerId, r13Id, playerIds, idxMap } = setup({
+        playerCount,
+        takenByR13: ['owner', neighbour],
+      })
+      const expectedIds = [ownerId, playerIds[idxMap[neighbour]]!].sort()
+
+      const resp = session.takeAction(0, r13Id)
+      expect(resp.ok).toBe(false)
+
+      const r13After = readR13(session, r13Id).takenBy.map((t) => t.playerId).sort()
+      expect(r13After).toEqual(expectedIds)
+      expect(session.getActionAvailability(0)[r13Id]).toBe(false)
+    },
+  )
+
+  it('Test 5(d): 2-player falls through to "other player counts" defensive return', () => {
     const { session, r13Id, playerIds, idxMap } = setup({
       playerCount: 2,
       takenByR13: ['left'],
@@ -165,7 +191,7 @@ describe('B129_Seatmate session', () => {
     expect(session.getActionAvailability(0)[r13Id]).toBe(false)
   })
 
-  it('Test 5(d): B129 does not affect non-r13 spaces', () => {
+  it('Test 5(e): B129 does not affect non-r13 spaces', () => {
     const { session, r13Id, playerIds, idxMap } = setup({
       playerCount: 4,
       takenByR13: ['left'],
