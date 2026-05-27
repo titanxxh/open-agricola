@@ -69,6 +69,22 @@ const executeSelectableTiles = (ctx: ActionMutationContext) => {
   return result.request.farm.selectableTiles
 }
 
+const toKeys = (tiles: FarmTilePosition[]) =>
+  tiles.map((tile) => `${tile.row}-${tile.col}`).sort()
+
+const zigzagFixturePlayer = (): Partial<PlayerState> => ({
+  fields: [
+    { row: 0, col: 2, stacks: [] },
+    { row: 0, col: 3, stacks: [] },
+    { row: 1, col: 3, stacks: [] },
+  ],
+  roomTiles: [
+    { row: 2, col: 0 },
+    { row: 1, col: 0 },
+  ],
+  stableTiles: [],
+})
+
 describe('plowAction.execute', () => {
   it('default free plow exposes selectable tiles', () => {
     const tiles = executeSelectableTiles(makeCtx())
@@ -115,6 +131,57 @@ describe('plowAction.execute', () => {
       costs: { wood: 1 },
     }))
     expect(tiles).toEqual([])
+  })
+
+  it('filters selectable tiles by actionContext.allowedTiles', () => {
+    const ctx = makeCtx({
+      player: zigzagFixturePlayer(),
+      actionContext: {
+        allowedTiles: [
+          { row: 1, col: 4 },
+          { row: -1, col: 2 },
+        ],
+      },
+    })
+
+    const tiles = executeSelectableTiles(ctx)
+
+    expect(toKeys(tiles)).toEqual(['1-4'])
+  })
+
+  it('is not executable when allowedTiles has no plowable intersection', () => {
+    const ctx = makeCtx({
+      player: {
+        ...zigzagFixturePlayer(),
+        stableTiles: [{ row: 1, col: 4 }],
+      },
+      actionContext: {
+        allowedTiles: [
+          { row: 1, col: 4 },
+          { row: -1, col: 2 },
+        ],
+      },
+    })
+
+    expect(plowAction.canBeExecutedByPlayer(ctx.state, ctx.player, {
+      actionContext: ctx.actionContext,
+    })).toBe(false)
+  })
+
+  it('is executable when allowedTiles has a plowable intersection', () => {
+    const ctx = makeCtx({
+      player: zigzagFixturePlayer(),
+      actionContext: {
+        allowedTiles: [
+          { row: 1, col: 4 },
+          { row: -1, col: 2 },
+        ],
+      },
+    })
+
+    expect(plowAction.canBeExecutedByPlayer(ctx.state, ctx.player, {
+      actionContext: ctx.actionContext,
+    })).toBe(true)
   })
 })
 
@@ -223,5 +290,67 @@ describe('plowAction.resolveChoice', () => {
   it('second call without farmPayload returns fail', () => {
     const result = plowAction.resolveChoice!(makeCtx(), 'pay:plow:0')
     expect(result.type).toBe('fail')
+  })
+
+  it('accepts a submitted tile inside actionContext.allowedTiles', () => {
+    const tile: FarmTilePosition = { row: 1, col: 4 }
+    const ctx = makeCtx({
+      player: zigzagFixturePlayer(),
+      actionContext: {
+        allowedTiles: [{ row: 1, col: 4 }],
+      },
+    })
+
+    const result = plowAction.resolveChoice!(ctx, 'confirm', { tile })
+
+    expect(result.type).toBe('ok')
+    expect(ctx.player.fields.some((f) => f.row === tile.row && f.col === tile.col)).toBe(true)
+  })
+
+  it('rejects a submitted tile outside actionContext.allowedTiles', () => {
+    const tile: FarmTilePosition = { row: 1, col: 2 }
+    const ctx = makeCtx({
+      player: zigzagFixturePlayer(),
+      actionContext: {
+        allowedTiles: [{ row: 1, col: 4 }],
+      },
+    })
+
+    const result = plowAction.resolveChoice!(ctx, 'confirm', { tile })
+
+    expect(result.type).toBe('fail')
+    expect(ctx.player.fields.some((f) => f.row === tile.row && f.col === tile.col)).toBe(false)
+  })
+
+  it('accepts payment-stage farmPayload inside actionContext.allowedTiles', () => {
+    const tile: FarmTilePosition = { row: 1, col: 4 }
+    const ctx = makeCtx({
+      player: zigzagFixturePlayer(),
+      actionContext: {
+        allowedTiles: [{ row: 1, col: 4 }],
+        farmPayload: { tile },
+      },
+    })
+
+    const result = plowAction.resolveChoice!(ctx, 'pay:plow:0')
+
+    expect(result.type).toBe('ok')
+    expect(ctx.player.fields.some((f) => f.row === tile.row && f.col === tile.col)).toBe(true)
+  })
+
+  it('rejects payment-stage farmPayload outside actionContext.allowedTiles', () => {
+    const tile: FarmTilePosition = { row: 1, col: 2 }
+    const ctx = makeCtx({
+      player: zigzagFixturePlayer(),
+      actionContext: {
+        allowedTiles: [{ row: 1, col: 4 }],
+        farmPayload: { tile },
+      },
+    })
+
+    const result = plowAction.resolveChoice!(ctx, 'pay:plow:0')
+
+    expect(result.type).toBe('fail')
+    expect(ctx.player.fields.some((f) => f.row === tile.row && f.col === tile.col)).toBe(false)
   })
 })
