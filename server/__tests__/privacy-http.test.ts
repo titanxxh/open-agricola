@@ -14,8 +14,10 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { handleGameRoute, setSession } from '../game-router.ts'
 import { GameSession } from '../game/authoritative-session.ts'
+import type { GameEvent } from '../../shared/contract/events.ts'
 
 import '../../shared/cards/E/E78_SleightofHand'
+import '../../shared/cards/D/D36_BreedRegistry'
 
 const E78_CARD_ID = 'E78_SleightofHand'
 
@@ -182,6 +184,117 @@ describe('HTTP privacy + seat binding', () => {
       expect(p2.occupationHand.every((c: string) => c !== '?')).toBe(true)
       // p1 hand is masked
       expect(p1.occupationHand.every((c: string) => c === '?')).toBe(true)
+    })
+
+    it('filters active player cardAvailability from other viewers', async () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      state.players = state.players.slice(0, 2)
+      state.currentPlayerIndex = 0
+      state.players[0]!.minorHand = ['D36_BreedRegistry']
+      state.players[1]!.minorHand = ['__test_placeholder__']
+      state.players[1]!.occupationHand = ['__test_placeholder__']
+      session.loadState(state)
+      setSession(session)
+
+      const ownerRes = mockRes()
+      await handleGameRoute(mockReq('GET', '/api/game/state', null, { 'x-viewer-player': 'p1' }), ownerRes)
+      const owner = JSON.parse(ownerRes.body)
+      expect(Object.prototype.hasOwnProperty.call(owner.cardAvailability, 'minor:D36_BreedRegistry')).toBe(true)
+
+      const otherRes = mockRes()
+      await handleGameRoute(mockReq('GET', '/api/game/state', null, { 'x-viewer-player': 'p2' }), otherRes)
+      const other = JSON.parse(otherRes.body)
+      expect(other.cardAvailability).toBeUndefined()
+    })
+
+    it('filters hidden hand-card public event cancellations from other viewers', async () => {
+      const session = new GameSession()
+      const originalGetState = session.getState.bind(session)
+      const resp = originalGetState()
+      const state = resp.state
+      state.players = state.players.slice(0, 2)
+      const p1 = state.players[0]!
+      p1.minorHand = ['D36_BreedRegistry']
+      p1.cardStates = {
+        ...p1.cardStates,
+        D36_BreedRegistry: { extraData: { boardSheep: 1 } },
+      }
+      const hiddenEvent: GameEvent = {
+        schemaVersion: 1,
+        id: 'hidden',
+        seq: 1,
+        round: state.round,
+        phase: state.roundPhase,
+        type: 'card.triggered',
+        visibility: 'public',
+        actorPlayerId: p1.id,
+        cardId: 'D36_BreedRegistry',
+      }
+      const visibleEvent: GameEvent = {
+        schemaVersion: 1,
+        id: 'visible',
+        seq: 2,
+        round: state.round,
+        phase: state.roundPhase,
+        type: 'resource.moved',
+        visibility: 'public',
+        actorPlayerId: p1.id,
+        resources: { wood: 1 },
+        from: { kind: 'supply' },
+        to: { kind: 'player', playerId: p1.id },
+        reason: 'gain',
+      }
+      state.events = []
+      state.nextEventSeq = 1
+      state.publicEventArchive = [
+        {
+          schemaVersion: 1,
+          id: '1',
+          packetSeq: 1,
+          type: 'publicEvents.committed',
+          eventIds: ['hidden', 'visible'],
+          eventSeqs: [1, 2],
+          firstEventSeq: 1,
+          lastEventSeq: 2,
+        },
+        {
+          schemaVersion: 1,
+          id: '2',
+          packetSeq: 2,
+          type: 'publicEvents.canceled',
+          reason: 'undoStep',
+          previousMaxSeq: 2,
+          nextMaxSeq: 0,
+          canceledEventIds: ['hidden', 'visible'],
+          canceledSeqs: [1, 2],
+          canceledEvents: [hiddenEvent, visibleEvent],
+        },
+      ]
+      state.nextPublicEventArchivePacketSeq = 3
+      resp.publicEventCancellations = [{
+        reason: 'undoStep',
+        previousMaxSeq: 2,
+        nextMaxSeq: 0,
+        canceledEventIds: ['hidden', 'visible'],
+        canceledSeqs: [1, 2],
+      }]
+      session.getState = () => resp
+      setSession(session)
+
+      const ownerRes = mockRes()
+      await handleGameRoute(mockReq('GET', '/api/game/state', null, { 'x-viewer-player': 'p1' }), ownerRes)
+      expect(JSON.parse(ownerRes.body).publicEventCancellations).toEqual(resp.publicEventCancellations)
+
+      const otherRes = mockRes()
+      await handleGameRoute(mockReq('GET', '/api/game/state', null, { 'x-viewer-player': 'p2' }), otherRes)
+      expect(JSON.parse(otherRes.body).publicEventCancellations).toEqual([{
+        reason: 'undoStep',
+        previousMaxSeq: 1,
+        nextMaxSeq: 0,
+        canceledEventIds: ['visible'],
+        canceledSeqs: [1],
+      }])
     })
 
     it('unknown viewer id falls back to unfiltered (defensive)', async () => {

@@ -28,7 +28,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 |---|---|---|---|---|---|
 | `A136_DrudgeryReeve` | 高 | shared scoring | BGA `sharedScoring`，每位玩家可选 0..max sets 并 reserve 资源；OA 仅持卡玩家自动最优计分。 | BGA `A/A136_DrudgeryReeve.php`; OA `shared/cards/A/A136_DrudgeryReeve.ts`, `shared/domain/scoring.ts` | 支持 shared costed scoring / before-end choice。 |
 | `C72_FestivalPlanning` | 高 | onBuy private field phase | OA 返回 `reap` leaf，但 `reap` 不是注册 action，BGA 的 private field phase 基本不可执行。 | BGA `C/C72_FestivalPlanning.php`; OA `shared/cards/C/C72_FestivalPlanning.ts`, `shared/actions/internal-actions.ts` | 建模 private field/reap 子行动，再接 optional improvement。 |
-| `D36_BreedRegistry` | 高 | sheep 统计口径 | BGA 统计整局 board/card sheep 并在买入时初始化；OA 只累计后续 action-space collect/exchange。 | BGA `D/D36_BreedRegistry.php`, `Core/Stats.php`; OA `shared/cards/D/D36_BreedRegistry.ts` | 改用统一 sheep stats 或补 board/card sheep 统计。 |
+| `D1_ZigzagHarrow` | 高 | plow target | BGA `onBuy` 限制 plow 到 zigzag 目标；OA unrestricted plow。 | BGA `D/D1_ZigzagHarrow.php`; OA `shared/cards/D/D1_ZigzagHarrow.ts`, `server/__tests__/D1_ZigzagHarrow-session.test.ts` | 透传 allowedTiles 到 plow / farm-edit。 |
 | `E149_MidnightFencer` | 高 | free fencing | BGA 最后 harvest 执行免费 `FENCING`，上限受对手 reserve fence 限制；OA 只记录选择数为 VP。 | BGA `E/E149_MidnightFencer.php`; OA `shared/cards/E/E149_MidnightFencer.ts` | 改成真实 fence 子行动，并按对手可用 fence 限制 max。 |
 | `B85_FarmHand` | 中 | stable 体系 | BGA farmhand stable 进入 stable built/listener/count 体系；OA 主要作为 extraData position + room capacity。 | BGA `B/B85_FarmHand.php`, `Actions/Stables.php`, `Models/PlayerBoard.php`; OA `shared/cards/B/B85_FarmHand.ts`, `shared/domain/supply-tokens.ts` | 让 FarmHand stable 进入通用 stable 统计/事件。 |
 | `B129_Seatmate` | 中 | 4 人座位限制 | BGA 4 人局只在对座未占 round 13 时允许；OA 只要 round 13 被 opponent 占就允许。 | BGA `B/B129_Seatmate.php`; OA `shared/cards/B/B129_Seatmate.ts` | 建模座位/对座限制，或限制 4p 行为。 |
@@ -67,7 +67,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | `C150_ParrotBreeder` | 74 | 159 | 2.15 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
 | `D1_ZigzagHarrow` | 38 | 80 | 2.11 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
 | `B137_Wholesaler` | 57 | 117 | 2.05 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
-| `D36_BreedRegistry` | 50 | 101 | 2.02 | 复核复杂度是否来自基础设施债，而不是后端权威建模所必需。 |
+| `D36_BreedRegistry` | 50 | 101 | 2.02 | 已通过 zone-aware hand listener 收敛到本卡局部状态；后续只复核是否还能进一步压缩实现。 |
 
 比例不是唯一信号：`E123_ResourceHoarder`（85/136 = 0.62）和 `E78_SleightofHand`（42/73 = 0.57）已远低于 BGA，是已完成的简化案例；表里高比例卡也要先看是否伴随行为风险再决定优先级。
 
@@ -100,6 +100,8 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 当前没有开放的基础设施 umbrella 待办。已完成的历史条目已从本节移除；仍需持续关注的通用机制记录在 §5 架构审阅。
 
 本轮新增已完成基础设施：Action-level cancel policy。`plow` / `sow` / `construct` / `stables` / `fence` / `reorganize` / internal `selection` 均不再把 direct `cancel` 当 action-level success path；可选跳过由父级 optional node 的 `__skip__` 表达。`selection` 默认至少选 1 项，只有显式 `minSelections: 0` 才允许空提交，并且提交路径按 `positionFilter` / `selectableTiles` 校验可选位置。`construct` / `fence` 的 doability 会在真实 state 中排除无可提交布局，包括 cloned preview player，避免 direct cancel 被拒绝后出现不可完成 pending；fence layout feasibility 复用缓存的 connected tile sets，避免 availability 检查反复枚举农场组合。
+
+本轮新增已完成基础设施：zone-aware card listener。listener 默认只匹配已打出卡，显式 `zones: ['hand', 'played']` 才能在手牌中监听；匹配结果向 handler 透传 `ownerCardZone`。D36 这类单卡历史需求落在本卡 `cardStates`，不新增全局 sheep stats；手牌卡的局部 `cardStates` / 以该手牌卡为 source 的 public events / 派生 log entry / 过滤后的 event/archive seq cursor / runtime `publicEventCancellations` / 按手牌 id keyed 的 `cardAvailability` 在非 owner snapshot 中隐藏。收获喂食转食物通过通用 `harvest-feed-conversion` synthetic listener dispatch 暴露 `harvest.feedConverted` 事件；future meeple 结算通过通用 `future-meeple-resolved` synthetic listener dispatch 暴露 `futureMeeple.resolved` 事件。两者都不在 session core 写单卡分支。
 
 保留的后续边界：`C23_JobContract`、`B152_JuniorArtist`、`C117_Legworker` 与 space-pairing 的 cost / jump / adjacency 语义相关，不属于 shared lessons action-space id helper 关闭范围。
 
@@ -215,7 +217,11 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | listener | `after.exchange` | `A48_ShavingHorse`, `B21_HayloftBarn`, `B29_CookeryLesson`, `C148_MudWallower`, `C53_GypsysCrock`, `D36_BreedRegistry`, `D56_FatstockStretcher`, `E103_Wolf`, `E53_BoarSpear`, `E85_MasterTanner` |
 | listener | `after.family-growth` | `D150_GodlySpouse`, `D157_PartyOrganizer`, `E113_Godmother` |
 | listener | `after.fence` | `A144_Sequestrator`, `A34_Loppers`, `A40_PottersYard`, `A68_AsparagusGift`, `A73_AgriculturalFertilizers`, `B124_Trimmer`, `B140_FarmyardWorker`, `B27_Toolbox`, `B94_StockProtector`, `D89_Stablehand`, `E108_BlackberryFarmer`, `E74_AshTrees` |
-| listener | `after.gain` | `A48_ShavingHorse`, `B21_HayloftBarn`, `C120_AgriculturalLabourer`, `C52_HuntsmansHat`, `E103_Wolf`, `E118_KindlingGatherer`, `E53_BoarSpear` |
+| listener | `after.gain` | `A48_ShavingHorse`, `B21_HayloftBarn`, `C120_AgriculturalLabourer`, `C52_HuntsmansHat`, `D36_BreedRegistry`, `E103_Wolf`, `E118_KindlingGatherer`, `E53_BoarSpear` |
+| listener | `after.pop-card-stack` | `D36_BreedRegistry` |
+| listener | `after.take-from-card` | `D36_BreedRegistry` |
+| listener | `immediatelyAfter.harvest-feed-conversion` | `D36_BreedRegistry` |
+| listener | `immediatelyAfter.future-meeple-resolved` | `D36_BreedRegistry` |
 | listener | `after.improvement` | `A109_SmallTrader`, `A131_CraftTeacher`, `A41_VegetableSlicer`, `B100_Clutterer`, `B49_Scales`, `C115_Sower`, `C137_CharcoalBurner`, `C43_FarmBuilding`, `C75_Firewood`, `C80_RockyTerrain`, `D118_Bonehead`, `D161_CabbageBuyer`, `D80_BrickHammer`, `E144_WaresSalesman`, `E156_ClaypitOwner`, `E165_MasterHuntsman`, `E18_SeedAlmanac`, `E31_Upholstery` |
 | listener | `after.occupation` | `A139_HollowWarden`, `A96_TaskArtisan`, `B100_Clutterer`, `B103_FieldMerchant`, `B138_ForestGuardian`, `B151_LittlePeasant`, `B155_ArtTeacher`, `B25_BreadPaddle`, `B49_Scales`, `C120_AgriculturalLabourer`, `C68_Bookcase`, `C80_RockyTerrain`, `C95_BasketWeaver`, `D118_Bonehead`, `D163_JourneymanBricklayer`, `D42_EducationBonus`, `D95_SiteManager`, `E101_Blighter`, `E116_FirCutter`, `E144_WaresSalesman`, `E157_Usufructuary`, `E163_Patroness`, `E165_MasterHuntsman`, `E89_Stallwright`, `E95_Miller` |
 | listener | `after.pay` | `B18_GrasslandHarrow`, `C116_FurnitureMaker`, `C148_MudWallower`, `D74_RoyalWood`, `E122_Cottar`, `E123_ResourceHoarder`, `E128_Saddler`, `E54_Contraband` |
@@ -918,7 +924,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D33_SummerHouse` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `D34_LuxuriousHostel` | 已对齐 |  |
 | `D35_FodderChamber` | 已对齐 |  |
-| `D36_BreedRegistry` | 需复核 | BGA 统计整局 board/card sheep 并在买入时初始化；OA 只累计后续 action-space collect/exchange |
+| `D36_BreedRegistry` | 已对齐 | 使用 zone-aware hand listener 在 D36 存在于手牌/已打出时维护本卡 `boardSheep` / `cardSheep` / `sheepConvertedToFood`；买入时初始化 infobox；No Sheep 走当前 animal zones。 |
 | `D37_Sculpture` | 已对齐 |  |
 | `D38_MilkingStool` | 已对齐 |  |
 | `D39_TruffleSlicer` | 已对齐 |  |

@@ -196,6 +196,7 @@ describe('Engine flow nodes', () => {
         },
         cardId: 'C1',
         ownerPlayerId: p1.id,
+        ownerCardZone: 'played',
       },
     ]
 
@@ -250,6 +251,7 @@ describe('Engine flow nodes', () => {
         },
         cardId: 'C1',
         ownerPlayerId: p1.id,
+        ownerCardZone: 'played',
       },
     ]
 
@@ -399,6 +401,93 @@ describe('Engine flow nodes', () => {
         triggerPlayerId: p1.id,
         ownerPlayerId: p2.id,
         mandatory: true,
+      },
+    ])
+  })
+
+  it('preserves hand owner zone through trigger-select activation', () => {
+    const p1 = createPlayer()
+    p1.minorHand = ['HAND_SELECT_CARD']
+    const state = createState()
+    state.players = [p1]
+
+    const seen: Array<{
+      ownerCardId?: string
+      ownerCardZone?: string
+      ownerPlayerId?: string
+      playerId?: string
+    }> = []
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'hand-select-after',
+      cardIds: ['HAND_SELECT_CARD'],
+      zones: ['hand'],
+      actions: ['trigger-hand-select'],
+      phases: ['after'],
+      dispatchMode: 'select',
+      handler: (context: CardListenerContext) => {
+        seen.push({
+          ownerCardId: context.ownerCardId,
+          ownerCardZone: context.ownerCardZone,
+          ownerPlayerId: context.ownerPlayer?.id,
+          playerId: context.player.id,
+        })
+        return { extraData: { applicable: true } }
+      },
+    })
+    setActiveCardRegistry(cardRegistry)
+
+    const triggerAction: ActionDefinition = {
+      id: 'trigger-hand-select',
+      nameKey: 'test.handSelect',
+      descriptionKey: 'test.handSelect',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(triggerAction)
+    const space = createSpace(triggerAction)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('trigger', triggerAction.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const context = () => ({ state, player: p1, space })
+
+    expect(engine.proceed(context()).type).toBe('ok')
+    const prompt = engine.proceed(context())
+    expect(prompt.type).toBe('choice')
+    if (prompt.type !== 'choice') throw new Error('expected trigger-select choice')
+    expect(prompt.choice.options.find((option) => option.value === 'HAND_SELECT_CARD')).toMatchObject({
+      value: 'HAND_SELECT_CARD',
+      sourceCard: 'HAND_SELECT_CARD',
+    })
+
+    const accepted = engine.resolveChoice('HAND_SELECT_CARD', context())
+    expect(accepted.type).toBe('ok')
+    expect(engine.proceed(context()).type).toBe('ok')
+
+    expect(seen).toEqual([
+      {
+        ownerCardId: 'HAND_SELECT_CARD',
+        ownerCardZone: 'hand',
+        ownerPlayerId: p1.id,
+        playerId: p1.id,
+      },
+      {
+        ownerCardId: 'HAND_SELECT_CARD',
+        ownerCardZone: 'hand',
+        ownerPlayerId: p1.id,
+        playerId: p1.id,
+      },
+      {
+        ownerCardId: 'HAND_SELECT_CARD',
+        ownerCardZone: 'hand',
+        ownerPlayerId: p1.id,
+        playerId: p1.id,
       },
     ])
   })

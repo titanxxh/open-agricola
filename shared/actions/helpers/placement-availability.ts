@@ -1,7 +1,7 @@
 import type { ActionChoiceOption, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
 import type { CardListenerContextInput } from '../../cards/card-listeners'
 import { isSpaceOccupied } from '../../domain/space'
-import { getMatchingListeners, executeCardListener } from '../../cards/card-listeners'
+import { getMatchingListeners, executeCardListener, listenerOwnerOptions } from '../../cards/card-listeners'
 import { runActionHooks } from '../hooks'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'
 
@@ -89,9 +89,7 @@ export function computeAllowedPlacementSpaces(
   const matched = getMatchingListeners(listenerContext)
   const listenerResults = matched
     .map(entry =>
-      executeCardListener(entry.registration, listenerContext, {
-        ownerPlayerId: entry.ownerPlayerId,
-      }),
+      executeCardListener(entry.registration, listenerContext, listenerOwnerOptions(entry)),
     )
     .filter((r): r is import('../hooks').ActionHookResult => Boolean(r))
 

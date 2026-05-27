@@ -160,7 +160,7 @@ ESLint 三层强制（`eslint.config.js`）：
 
 客户端 Action Log 以只读 replay timeline 消费 `publicEventArchive`。UI 用 `publicEventArchive` 加当前 `events` 重建 active、canceled、missing 行；canceled 行保留 canceled packet payload 并用删除线渲染。选择 replay 行只生成带 `replay:` 前缀 id 的本地 notification、highlight 和 resource animation cue，不修改 `GameState`、不发送游戏命令，也不推进 live public-event cursor。
 
-Undo 的 runtime `publicEventCancellations` 是同步响应 metadata，不写入 `GameState.events`，也只出现在当前 undo response。成功 undo 如果移除了已提交 public events，HTTP/WS payload 会带 `publicEventCancellations`，客户端用它清理当前 transient public feedback 并把 public event cursor 对齐到 undo 后 snapshot；普通 reconnect/getState 不重放旧 cancellation。持久化取消历史保存在 `publicEventArchive` 的 `publicEvents.canceled` packet。
+Undo 的 runtime `publicEventCancellations` 是同步响应 metadata，不写入 `GameState.events`，也只出现在当前 undo response。成功 undo 如果移除了已提交 public events，HTTP/WS payload 会带 `publicEventCancellations`，客户端用它清理当前 transient public feedback 并把 public event cursor 对齐到 undo 后 snapshot；普通 reconnect/getState 不重放旧 cancellation。持久化取消历史保存在 `publicEventArchive` 的 `publicEvents.canceled` packet。进入 per-viewer payload 前，runtime cancellation 必须与同一 viewer 的 `publicEventArchive` 使用同一套隐藏事件过滤和 seq remap。
 
 首版只允许 `visibility: 'public'` 的规则事件进入 `GameState.events`。私有 prompt、手牌、draft、living-hand 等 per-recipient 信息不写入公共事件流，仍通过 snapshot/privacy/pending 通道处理。`privateEvents` 是独立的 per-viewer 同步附加层：只描述当前快照中目标玩家可见的私有提示和私有手牌/draft 更新（例如 `private.promptShown`、`private.handChanged`、`private.draftUpdated`），由客户端消费为短暂 UI 通知，不进入公共 replay 事件流，也不作为规则来源。卡牌效果导致的手牌变化通过 runtime-only response buffer 发出 `private.handChanged`，不写入 `ActionExecutionResult`、engine snapshot/history 或 `GameState.events`。
 
@@ -349,7 +349,7 @@ shared/engine/
 - `mandatory`：已选择 / 已接受的强制 continuation 会同时标记 host node 和 descendant `ActionNode`；后续 leaf 不可执行时返回 mandatory blocked，session 转成 `engine-blocked`（undo-only），避免只执行 composite 的前半段。
 - `pending: PendingEnvelope | null`：等待输入的数据 envelope。`InteractionRequest` 是 WS/session protocol，不是 tree node。leaf request、`xor` / `or`、optional、trigger-select parallel 和 synthetic confirm/feed/farm-select 都通过 pending envelope 暂停并 cursor-restore。
 
-listener activation 是 internal action leaf：`ActionNode(actionId='activate-card')`，params 携 `{ listenerId, cardId, phase, actionId, event, ownerPlayerId, triggerPlayerId }`。它 bypass 普通 public action pipeline，只执行 listener body 并把返回 flow / follow-up actions 插入 engine。
+listener activation 是 internal action leaf：`ActionNode(actionId='activate-card')`，params 携 `{ listenerId, cardId, phase, actionId, event, ownerPlayerId, ownerCardZone, triggerPlayerId }`。它 bypass 普通 public action pipeline，只执行 listener body 并把返回 flow / follow-up actions 插入 engine。
 
 `BaseNode` 提供共享 metadata / pending / cursor round-trip；具体 traversal 由 `EngineTree` 和五种 node 实现。
 
@@ -597,6 +597,10 @@ Direct `cancel` 不是 protected atomic action 的成功路径。`plow` / `sow` 
 
 作用域 scope：`player` / `opponent` / `any`。card listener 匹配层按 listener id 确定性枚举；phase trailing node 构建层再按 owner 分组（global → active player → 其他玩家），组内按 legacy `order` 降序、卡牌 play order、匹配序稳定排序。需要玩家决定同组 trigger 顺序时，用 `dispatchMode: 'select'` 进入 trigger-select，而不是依赖隐式排序表达规则选择。
 
+Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['played']`，扫描 `improvements` / `minorPlayed` / `occupationPlayed`。只有显式声明 `zones: ['hand']` 或 `zones: ['hand', 'played']` 的 listener 才会扫描 `minorHand` / `occupationHand`。匹配结果携带 `ownerCardId` 与 `ownerCardZone`，并通过 `activate-card` params、trigger-select preview、`executeCardListener()` 透传给 handler；handler 不应自行重扫手牌/已打出数组来推断 owner 区域。
+
+手牌 listener 只用于“卡牌存在于手牌时就必须监听历史”的卡牌局部规则。它仍必须遵守 state-pure flow builder 约束：只读当前 transaction events / state，状态更新通过返回 flow 落到本卡 `cardStates[cardId]`。当该卡仍在手牌中时，per-viewer serialization 必须对非 owner 隐藏对应 `cardStates[cardId]`、以该手牌卡为 source 的 public events、由这些事件派生的 log entry、过滤后的 event/archive seq cursor、runtime `publicEventCancellations` 和按手牌 id keyed 的 `cardAvailability`，避免从局部历史或可打出性元数据反推隐藏手牌。禁止为了单卡历史需求新增 `PlayerState.stats` / `GameState` 顶层全局 stat；没有该卡的对局不应为该卡维护额外历史。
+
 ### 7.5.2 Pay child 架构不变量
 
 `pay` 是 internal settlement child；public host action 负责业务 mutation、事件事实和 completion。不要把业务 mutation 放回 `pay`，也不要用 `seq:[pay, apply-*]` 或顶层 `apply-*` effect 表达同一件事。
@@ -667,7 +671,7 @@ OA 对齐规则：
 - optional accept/decline 语义必须由 flow 表达。典型例子：D27 Retraining 先执行 `set-flag false`，再把 `swap-improvement-with-board` 放入 optional child；decline 只清 flag，不预留 / 回滚公共 major 池。
 - 只影响可达性或费用的 listener 应返回纯 `doable` / `costs` / `bonuses`。典型例子：D82 Hunting Trophy 通过 `space.id` scoped `isDoable` + `computeCosts` 建模 farm/house redevelopment，不再用 before/after flag 或 `activeModifiers` 临时桥。
 
-**2026-05-13 Wave2a 合成 dispatch 边界：`trade-applied` / `reap` 这类没有完整 engine 的 listener dispatch，只通过 immediate-special-effect helper 执行确定性的状态同步叶子。** 该 helper 只遍历非 optional 的 `special-effect` leaf，以及确定性的 `seq` / `parallel` flow；刻意跳过 `gain`、`pay`、interactive、optional、`or` / `xor`、跨 owner targeted flow。需要更丰富合成 listener 效果时，必须接入真实 engine flow 路径，而不是扩展这个 helper；这样 Wave2a 的 cardState-only 合成 listener 能保持 pure handler，同时不重新引入 dispatch-time handler mutation。
+**2026-05-13 Wave2a 合成 dispatch 边界：`trade-applied` / `reap` / `harvest-feed-conversion` / `future-meeple-resolved` 这类没有完整 engine 的 listener dispatch，只通过 immediate-special-effect helper 执行确定性的状态同步叶子。** 该 helper 只遍历非 optional 的 `special-effect` leaf，以及确定性的 `seq` / `parallel` flow；刻意跳过 `gain`、`pay`、interactive、optional、`or` / `xor`、跨 owner targeted flow。需要更丰富合成 listener 效果时，必须接入真实 engine flow 路径，而不是扩展这个 helper；这样 Wave2a 的 cardState-only 合成 listener 能保持 pure handler，同时不重新引入 dispatch-time handler mutation。`harvest-feed-conversion` 只把已提交的 `harvest.feedConverted` 事件放进 listener `transactionEvents`，不合成 `resource.exchanged`；`future-meeple-resolved` 只把已提交的 `futureMeeple.resolved` 事件按目标玩家分组放进 listener `transactionEvents`。这些 synthetic dispatch 都不包含任何单卡分支。
 
 **2026-05-13 Wave2b/c 落地规则：listener 内的 cardState / structural mutation 也必须通过 action leaf 执行。** 本轮把 A68 / A73 / A92 / B18 / B34 / B76 / C48 / C53 / C88 / C93 / C130 / C150 / D36 / D56 / D74 / D158 / E53 / E74 / E85 / E148 的剩余 handler mutation 迁出：
 
@@ -774,6 +778,7 @@ Card lookup bootstrap：`shared/cards-display/types.ts` 的 registered lookup �
 ### 8.3 cardStates 局部状态
 
 - 持续计数 / 单次标记 / 局部状态写入 `player.cardStates[cardId]`，不污染 `PlayerState` 顶层字段。
+- 只服务单卡或少数卡牌的历史记录优先落到 `cardStates[cardId].extraData`；如需覆盖卡牌打出前历史，使用显式 hand-zone listener，而不是新增全局 stat。
 - 复杂"等待玩家下一步选择"的卡牌交互抽显式 continuation 走 `pending` / `EngineStack.push`，不偷塞共享槽位。
 - 推荐结构：`{ cardId, kind:'choice'|'delayedEffect', payload }`。
 - 卡牌可在 `cardStates[cardId].extraData.heldWorkerId` 持有 worker（既不在 takenBy 也不在家）；`shared/cards/helpers/card-held-workers.ts` 提供 `holdWorkerOnCard` / `getWorkerHeldOnCard` / `releaseWorkerFromCard` / `getCardHeldWorkerIds`；`returnHome` 阶段统一释放。
