@@ -43,3 +43,12 @@ public/cards-manifest.json
 
 # superpowers skill artifacts (spec/plan/notes) — never commit
 docs/superpowers/
+
+# Claude Code: track shared settings (hooks) but keep personal/runtime out
+!.claude/
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/worktrees/
+
+# RTK backup files
+*.bak.[0-9]*
