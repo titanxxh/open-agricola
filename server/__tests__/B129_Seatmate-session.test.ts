@@ -67,4 +67,24 @@ describe('B129_Seatmate session', () => {
       expect(session.getActionAvailability(0)[r13Id]).toBe(true)
     },
   )
+
+  it.each<[RoleAtR13]>([['left'], ['right']])(
+    'Test 2: 4p neighbour-only occupies r13, opposite empty, owner enters OK (%s)',
+    (neighbour) => {
+      const { session, owner, r13Id, playerIds, idxMap } = setup({
+        playerCount: 4,
+        takenByR13: [neighbour],
+      })
+      const neighbourId = playerIds[idxMap[neighbour]]!
+      const oppositeId = playerIds[idxMap.opposite]!
+
+      const resp = session.takeAction(0, r13Id)
+      expect(resp.ok).toBe(true)
+
+      const takenByIds = readR13(session, r13Id).takenBy.map((t) => t.playerId)
+      expect(takenByIds).toEqual(expect.arrayContaining([neighbourId, owner.id]))
+      expect(takenByIds).not.toContain(oppositeId)
+      expect(session.getActionAvailability(0)[r13Id]).toBe(true)
+    },
+  )
 })
