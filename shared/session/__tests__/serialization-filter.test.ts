@@ -284,7 +284,7 @@ describe('serializeStateForPlayer', () => {
     }
     state.events = [hiddenTriggerEvent, visibleEvent]
     state.nextEventSeq = 103
-    state.log = [
+    const seededLog: GameState['log'] = [
       { key: 'log.cardTriggered', params: { cardId: 'D36_BreedRegistry' } },
       { key: 'log.cardTriggered', params: { cardId: 'B21_HayloftBarn' } },
       { key: 'log.existing' },
@@ -314,9 +314,10 @@ describe('serializeStateForPlayer', () => {
       },
     ]
     state.nextPublicEventArchivePacketSeq = 3
+    const stateWithLog: GameState = { ...state, log: seededLog }
 
-    const opponentView = serializeStateForPlayer(state, 'p1', emptyCtx())
-    const ownerView = serializeStateForPlayer(state, p2.id, emptyCtx())
+    const opponentView = serializeStateForPlayer(stateWithLog, 'p1', emptyCtx())
+    const ownerView = serializeStateForPlayer(stateWithLog, p2.id, emptyCtx())
     const filteredP2 = opponentView.players.find((player) => player.id === p2.id)!
     const ownerP2 = ownerView.players.find((player) => player.id === p2.id)!
 
@@ -358,7 +359,7 @@ describe('serializeStateForPlayer', () => {
     expect(ownerP2.cardStates.D36_BreedRegistry).toEqual(p2.cardStates.D36_BreedRegistry)
     expect(ownerView.events.map((event) => event.id)).toEqual(['100', '102'])
     expect(ownerView.events.map((event) => event.seq)).toEqual([100, 102])
-    expect(ownerView.log).toEqual(state.log)
+    expect(ownerView.log).toEqual(stateWithLog.log)
     expect(ownerView.publicEventArchive[1]).toMatchObject({
       canceledEventIds: ['101', '102'],
       canceledSeqs: [101, 102],
