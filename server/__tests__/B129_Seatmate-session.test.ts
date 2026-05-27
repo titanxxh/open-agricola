@@ -117,4 +117,69 @@ describe('B129_Seatmate session', () => {
     expect(r13After).toEqual(expectedIds)
     expect(session.getActionAvailability(0)[r13Id]).toBe(false)
   })
+
+  it('Test 5(a): round < 13, listener short-circuits via round guard', () => {
+    const { session, r13Id, playerIds, idxMap } = setup({
+      playerCount: 4,
+      round: 12,
+      takenByR13: ['left'],
+    })
+    const expectedIds = [playerIds[idxMap.left]!].sort()
+
+    const resp = session.takeAction(0, r13Id)
+    expect(resp.ok).toBe(false)
+
+    const r13After = readR13(session, r13Id).takenBy.map((t) => t.playerId).sort()
+    expect(r13After).toEqual(expectedIds)
+    expect(session.getActionAvailability(0)[r13Id]).toBe(false)
+  })
+
+  it('Test 5(b): r13 occupied by owner only, listener short-circuits owner-only', () => {
+    const { session, owner, r13Id } = setup({
+      playerCount: 4,
+      takenByR13: ['owner'],
+    })
+
+    const resp = session.takeAction(0, r13Id)
+    expect(resp.ok).toBe(false)
+
+    const r13After = readR13(session, r13Id).takenBy.map((t) => t.playerId)
+    expect(r13After).toEqual([owner.id])
+    expect(session.getActionAvailability(0)[r13Id]).toBe(false)
+  })
+
+  it('Test 5(c): 2-player falls through to "other player counts" defensive return', () => {
+    const { session, r13Id, playerIds, idxMap } = setup({
+      playerCount: 2,
+      takenByR13: ['left'],
+    })
+    const expectedIds = [playerIds[idxMap.left]!].sort()
+
+    const resp = session.takeAction(0, r13Id)
+    expect(resp.ok).toBe(false)
+
+    const r13After = readR13(session, r13Id).takenBy.map((t) => t.playerId).sort()
+    expect(r13After).toEqual(expectedIds)
+    expect(session.getActionAvailability(0)[r13Id]).toBe(false)
+  })
+
+  it('Test 5(d): B129 does not affect non-r13 spaces', () => {
+    const { session, r13Id, playerIds, idxMap } = setup({
+      playerCount: 4,
+      takenByR13: ['left'],
+    })
+    const leftId = playerIds[idxMap.left]!
+
+    // 在 Test 2 正向 setup 之上叠加 forest 被 left 占
+    const state = session.getState().state
+    const forest = state.actionSpaces.find((s) => s.id === 'forest')!
+    forest.takenBy = [{ playerId: leftId, workerId: 'seed-forest' }]
+    session.loadState(state)
+
+    const resp = session.takeAction(0, 'forest')
+    expect(resp.ok).toBe(false)
+    expect(session.getActionAvailability(0)['forest']).toBe(false)
+    // r13 不应被 forest 改动污染
+    expect(session.getActionAvailability(0)[r13Id]).toBe(true)
+  })
 })
