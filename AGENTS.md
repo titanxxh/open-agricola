@@ -6,6 +6,20 @@
 
 Open Agricola——后端权威 + WebSocket 实时多人同步的 Agricola 桌游在线复刻。三层架构：`shared/`（领域逻辑）+ `server/`（HTTP + WS 服务）+ `client/`（React UI）。
 
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs are tracked in GitHub Issues for `titanxxh/open-agricola` using the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the default five-label triage vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout: read root `CONTEXT.md` and any ADRs under `docs/adr/`. See `docs/agents/domain.md`.
+
 ## Architecture Boundaries
 
 - 三层 `shared/` + `server/` + `client/`，前端只负责渲染、输入收集、视角化展示，不做规则裁定。
