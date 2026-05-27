@@ -87,4 +87,34 @@ describe('B129_Seatmate session', () => {
       expect(session.getActionAvailability(0)[r13Id]).toBe(true)
     },
   )
+
+  it('Test 3: 4p opposite-only occupies r13, owner entry BLOCKED', () => {
+    const { session, r13Id, playerIds, idxMap } = setup({
+      playerCount: 4,
+      takenByR13: ['opposite'],
+    })
+    const oppositeId = playerIds[idxMap.opposite]!
+
+    const resp = session.takeAction(0, r13Id)
+    expect(resp.ok).toBe(false)
+
+    const r13After = readR13(session, r13Id).takenBy.map((t) => t.playerId).sort()
+    expect(r13After).toEqual([oppositeId])
+    expect(session.getActionAvailability(0)[r13Id]).toBe(false)
+  })
+
+  it('Test 4: 4p neighbour AND opposite occupy r13, owner entry BLOCKED', () => {
+    const { session, r13Id, playerIds, idxMap } = setup({
+      playerCount: 4,
+      takenByR13: ['left', 'opposite'],
+    })
+    const expectedIds = [playerIds[idxMap.left]!, playerIds[idxMap.opposite]!].sort()
+
+    const resp = session.takeAction(0, r13Id)
+    expect(resp.ok).toBe(false)
+
+    const r13After = readR13(session, r13Id).takenBy.map((t) => t.playerId).sort()
+    expect(r13After).toEqual(expectedIds)
+    expect(session.getActionAvailability(0)[r13Id]).toBe(false)
+  })
 })
