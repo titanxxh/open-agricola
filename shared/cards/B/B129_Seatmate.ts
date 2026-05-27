@@ -14,8 +14,8 @@ const CARD_ID = B129_Seatmate.id
  * right."
  *
  * 3-player branch: every non-owner is a left/right neighbour, so any
- * non-owner occupant on r13 enables the inject; owner-only occupancy is
- * short-circuited (cannot enter your own occupied space again).
+ * non-owner occupant on r13 enables the inject as long as owner is not already
+ * on r13.
  *
  * 4-player branch: opposite seat is `(ownerIdx + 2) % 4`. Inject only when
  * neighbour(s) occupy r13 AND opposite seat is free. Aligns with BGA
@@ -48,13 +48,11 @@ const computeArgsListener: CardListenerRegistration = {
 
     if (!isSpaceOccupied(round13Space)) return
 
-    // takenBy.length >= 1 由 isSpaceOccupied 保证；every 不会因空数组 vacuously true。
-    if (round13Space.takenBy.every((t) => t.playerId === context.player.id)) return
+    if (spaceHasPlayer(round13Space, context.player.id)) return
 
     const n = context.state.players.length
     if (n === 3) {
-      // 3p 中所有非 owner 都是邻座（卡牌文本 "left and right" 与 BGA 3p 分支自然吻合）；
-      // 前面的 guard 已排除 owner-only，到这里必有非 owner 占用。
+      // 3p 中所有非 owner 都是邻座（卡牌文本 "left and right" 与 BGA 3p 分支自然吻合）。
       return {
         extraOptions: buildExtraOptions(round13Space),
         sourceCard: CARD_ID,

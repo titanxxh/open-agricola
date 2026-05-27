@@ -656,7 +656,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B126_Carpenter` | 已对齐 |  |
 | `B127_Seducer` | 已对齐 |  |
 | `B128_Plumber` | 已对齐 |  |
-| `B129_Seatmate` | 已对齐 | 4p 用 `(ownerIdx+⌊n/2⌋)%n` 计算对座，对座未占 r13 才注入 allow-occupied；3p 任一邻座占即注入；owner-only / round<13 / 其他人数不注入。state.players 顺序约定与 C150_ParrotBreeder 一致。 |
+| `B129_Seatmate` | 已对齐 | 4p 用 `(ownerIdx+⌊n/2⌋)%n` 计算对座，对座未占 r13 且 owner 自己未在 r13 时才注入 allow-occupied；3p 任一邻座占且 owner 自己未在 r13 时注入；round<13 / 其他人数不注入。state.players 顺序约定与 C150_ParrotBreeder 一致。 |
 | `B130_FullPeasant` | 已对齐 |  |
 | `B131_Equipper` | 已对齐 |  |
 | `B132_EstateMaster` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
