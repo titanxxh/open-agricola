@@ -4,9 +4,10 @@ import type { ExtraSowableField, ExtraSowableCrop } from '../card-effects'
 import type {
   ActionFlow, FarmTilePosition, GameState, PlayerState,
 } from '../../contract/types'
+import type { EventSink } from '../../contract/events'
 import { readCardExtraData, writeCardExtraData } from './card-state'
 import { canSow } from '../../actions/effects/sow'
-import { dispatchReapListener } from '../../actions/effects/reap'
+import { dispatchReapListener, type ReapTrigger } from '../../actions/effects/reap'
 import { appendImmediateEvents } from '../../events/append'
 
 type Crop = ExtraSowableCrop
@@ -22,8 +23,12 @@ export type CardFieldReapContext = {
   state: GameState
   player: PlayerState
   crop: Crop
+  amount: number
   /** 该卡上该 crop 经本次扣减后总 remaining === 0 */
   isLast: boolean
+  cardId: string
+  trigger: ReapTrigger
+  sourceCard?: string
 }
 
 export type CardFieldOptions = {
@@ -54,12 +59,134 @@ const readStacks = (player: PlayerState, cardId: string): CardFieldStack[] =>
 const writeStacks = (player: PlayerState, cardId: string, stacks: CardFieldStack[]) =>
   writeCardExtraData(player, cardId, 'cardFieldStacks', stacks)
 
+type CardFieldReapRunOptions = {
+  trigger?: ReapTrigger
+  sourceCard?: string
+  eventSink?: EventSink
+  updateHarvestSummary?: boolean
+}
+
+type CardFieldReaper = (
+  state: GameState,
+  player: PlayerState,
+  options?: CardFieldReapRunOptions,
+) => ActionFlow | undefined
+
+const cardFieldReapers = new Map<string, CardFieldReaper>()
+
+const defaultReapTrigger = (): ReapTrigger => ({ phase: 'harvest' })
+
+const appendFlowChildren = (children: ActionFlow[], flow: ActionFlow | undefined) => {
+  if (!flow) return
+  if (flow.type === 'parallel') {
+    children.push(...flow.children)
+    return
+  }
+  children.push(flow)
+}
+
+const toParallelFlow = (children: ActionFlow[]): ActionFlow | undefined =>
+  children.length > 0 ? { type: 'parallel', children } : undefined
+
+const playedCardIds = (player: PlayerState): string[] => [
+  ...(player.improvements ?? []),
+  ...(player.minorPlayed ?? []),
+  ...(player.occupationPlayed ?? []),
+]
+
+export const hasAnyCardFieldCrops = (player: PlayerState): boolean =>
+  playedCardIds(player).some((cardId) =>
+    readStacks(player, cardId).some((stack) => stack.remaining > 0),
+  )
+
+export const reapAllCardFields = (
+  state: GameState,
+  player: PlayerState,
+  options: CardFieldReapRunOptions = {},
+): ActionFlow | undefined => {
+  const children: ActionFlow[] = []
+  for (const cardId of playedCardIds(player)) {
+    appendFlowChildren(children, cardFieldReapers.get(cardId)?.(state, player, options))
+  }
+  return toParallelFlow(children)
+}
+
 export const makeCardFieldImpl = (
   cardId: string,
   def: CardFieldDef,
   options?: CardFieldOptions,
 ): CardImpl => {
   const baseCol = parseCardBaseCol(cardId)
+
+  const reapCardField = (
+    state: GameState,
+    player: PlayerState,
+    runOptions: CardFieldReapRunOptions = {},
+  ): ActionFlow | undefined => {
+    const stacks = readStacks(player, cardId)
+    if (stacks.length === 0) return
+    const trigger = runOptions.trigger ?? defaultReapTrigger()
+    const perCropAmount = new Map<Crop, number>()
+    const nextStacks: CardFieldStack[] = []
+    for (const stack of stacks) {
+      stack.remaining -= 1
+      player.resources[stack.crop] += 1
+      perCropAmount.set(stack.crop, (perCropAmount.get(stack.crop) ?? 0) + 1)
+      if (stack.remaining > 0) nextStacks.push(stack)
+    }
+    if (runOptions.updateHarvestSummary !== false) {
+      const entry = state.harvestReapSummary?.[player.id]
+      if (entry) {
+        for (const [crop, amount] of perCropAmount) {
+          entry.resources[crop] = (entry.resources[crop] ?? 0) + amount
+        }
+      }
+    }
+    const events = [...perCropAmount].map(([crop, amount]) => ({
+      type: 'resource.moved' as const,
+      resources: { [crop]: amount },
+      from: { kind: 'card' as const, playerId: player.id, cardId },
+      to: { kind: 'player' as const, playerId: player.id },
+      reason: 'reap' as const,
+      trigger,
+      sourceCardId: cardId,
+    }))
+    if (runOptions.eventSink) {
+      events.forEach((event) => runOptions.eventSink!.emit<'resource.moved'>(event))
+    } else if (Number.isSafeInteger(state.round) && state.round > 0) {
+      appendImmediateEvents(
+        state,
+        events,
+        { actorPlayerId: player.id, sourceActionId: 'reap', sourceCardId: cardId },
+      )
+    }
+    writeStacks(player, cardId, nextStacks)
+    const flows: ActionFlow[] = []
+    for (const [crop, amount] of perCropAmount) {
+      appendFlowChildren(
+        flows,
+        dispatchReapListener(state, player, crop, amount, undefined, {
+          trigger,
+          sourceCard: runOptions.sourceCard,
+        }),
+      )
+      const stillHas = nextStacks.some((s) => s.crop === crop)
+      const flow = options?.onReap?.({
+        state,
+        player,
+        crop,
+        amount,
+        isLast: !stillHas,
+        cardId,
+        trigger,
+        sourceCard: runOptions.sourceCard,
+      })
+      if (flow) appendFlowChildren(flows, flow)
+    }
+    return toParallelFlow(flows)
+  }
+
+  cardFieldReapers.set(cardId, reapCardField)
 
   const tileMatchesCard = (tile: FarmTilePosition): number | null => {
     if (tile.row !== -1) return null
@@ -117,50 +244,7 @@ export const makeCardFieldImpl = (
       },
 
       onHarvestFieldPhase: (state, player): ActionFlow | void => {
-        const stacks = readStacks(player, cardId)
-        if (stacks.length === 0) return
-        // Pass 1: decrement each stack, accumulate into summary, track per-crop total
-        const perCropAmount = new Map<Crop, number>()
-        const nextStacks: CardFieldStack[] = []
-        for (const stack of stacks) {
-          stack.remaining -= 1
-          player.resources[stack.crop] += 1
-          perCropAmount.set(stack.crop, (perCropAmount.get(stack.crop) ?? 0) + 1)
-          if (stack.remaining > 0) nextStacks.push(stack)
-        }
-        // Accumulate into harvestReapSummary (modulo entry must already exist)
-        const entry = state.harvestReapSummary?.[player.id]
-        if (entry) {
-          for (const [crop, amount] of perCropAmount) {
-            entry.resources[crop] = (entry.resources[crop] ?? 0) + amount
-          }
-        }
-        if (Number.isSafeInteger(state.round) && state.round > 0) {
-          appendImmediateEvents(
-            state,
-            [...perCropAmount].map(([crop, amount]) => ({
-              type: 'resource.moved' as const,
-              resources: { [crop]: amount },
-              from: { kind: 'card' as const, playerId: player.id, cardId },
-              to: { kind: 'player' as const, playerId: player.id },
-              reason: 'harvest' as const,
-            })),
-            { actorPlayerId: player.id, sourceActionId: 'reap', sourceCardId: cardId },
-          )
-        }
-        writeStacks(player, cardId, nextStacks)
-        // Pass 2: dispatch reap event + collect onReap flows
-        const flows: ActionFlow[] = []
-        for (const [crop, amount] of perCropAmount) {
-          dispatchReapListener(state, player, crop, amount)
-          const stillHas = nextStacks.some((s) => s.crop === crop)
-          const isLast = !stillHas
-          const flow = options?.onReap?.({ state, player, crop, isLast })
-          if (flow) flows.push(flow)
-        }
-        if (flows.length === 0) return
-        if (flows.length === 1) return flows[0]
-        return { type: 'seq', children: flows }
+        return reapCardField(state, player, { trigger: defaultReapTrigger() })
       },
     },
     reaches: [],

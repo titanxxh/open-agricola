@@ -91,7 +91,7 @@ describe('B141 FieldCaretaker — cardField bug fix (4 crops)', () => {
     ])
     const logs = resp.state.log
     const reapDetail = logs.find(
-      (e) => e.key === 'log.harvestReapDetail' && (e.params as { player?: string })?.player === player.name,
+      (e) => e.key === 'log.reapDetail' && (e.params as { player?: string })?.player === player.name,
     )
     expect(reapDetail).toBeDefined()
     expect((reapDetail!.params as { resources: { grain?: number } }).resources.grain).toBeGreaterThanOrEqual(1)

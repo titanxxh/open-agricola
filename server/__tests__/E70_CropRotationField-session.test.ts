@@ -279,16 +279,15 @@ describe('E70_CropRotationField session', () => {
 
       const flow = runCardEffectHook(state, player, CARD_ID, 'onHarvestFieldPhase')
       expect(flow).not.toBeNull()
-      expect(flow!.type).toBe('leaf')
-      if (flow!.type === 'leaf') {
-        expect(flow!.actionId).toBe('sow')
-        expect(flow!.optional).toBe(true)
-        expect(flow!.sourceCard).toBe(CARD_ID)
-        expect(flow!.actionContext).toEqual({
-          allowedFields: 'fromSelectedFields',
-          sourceCard: CARD_ID,
-        })
-      }
+      expect(flow!.type).toBe('parallel')
+      const sow = (flow as Extract<ActionFlow, { type: 'parallel' }>).children[0] as Extract<ActionFlow, { type: 'leaf' }>
+      expect(sow.actionId).toBe('sow')
+      expect(sow.optional).toBe(true)
+      expect(sow.sourceCard).toBe(CARD_ID)
+      expect(sow.actionContext).toEqual({
+        allowedFields: 'fromSelectedFields',
+        sourceCard: CARD_ID,
+      })
 
       // Verify state changes
       expect(player.resources.grain).toBe(1) // gained 1 grain
@@ -317,11 +316,10 @@ describe('E70_CropRotationField session', () => {
 
       const flow = runCardEffectHook(state, player, CARD_ID, 'onHarvestFieldPhase')
       expect(flow).not.toBeNull()
-      expect(flow!.type).toBe('leaf')
-      if (flow!.type === 'leaf') {
-        expect(flow!.actionId).toBe('sow')
-        expect(flow!.optional).toBe(true)
-      }
+      expect(flow!.type).toBe('parallel')
+      const sow = (flow as Extract<ActionFlow, { type: 'parallel' }>).children[0] as Extract<ActionFlow, { type: 'leaf' }>
+      expect(sow.actionId).toBe('sow')
+      expect(sow.optional).toBe(true)
 
       expect(player.resources.vegetable).toBe(1) // gained 1 vegetable
     })

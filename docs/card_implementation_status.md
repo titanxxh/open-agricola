@@ -1,6 +1,6 @@
 # 卡牌实现现状报告
 
-> 生成/更新日期：2026-05-26。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
+> 生成/更新日期：2026-05-27。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。BGA 唯一基准：`/data00/home/xuxinhao.titan/raw/bga-agricola`。
 
 ## 1. 当前快照
 
@@ -11,7 +11,7 @@
 | 自动 metadata 脚本 literal mismatch | 0 |
 | 自动 metadata 脚本 complex mismatch | 4 |
 | 其中 schema-up 已接受差异 | 4 |
-| 需要实现复核的卡牌 | 10 |
+| 需要实现复核的卡牌 | 9 |
 | 已接受 / 产品策略差异 | 40 |
 | 排除的 BGA legacy 或未实现行为目标 | 52 |
 | 本轮审计视为已对齐 | 786 |
@@ -27,7 +27,6 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | 卡牌 | 严重度 | 领域 | 差异 | 证据 | 方向 |
 |---|---|---|---|---|---|
 | `A136_DrudgeryReeve` | 高 | shared scoring | BGA `sharedScoring`，每位玩家可选 0..max sets 并 reserve 资源；OA 仅持卡玩家自动最优计分。 | BGA `A/A136_DrudgeryReeve.php`; OA `shared/cards/A/A136_DrudgeryReeve.ts`, `shared/domain/scoring.ts` | 支持 shared costed scoring / before-end choice。 |
-| `C72_FestivalPlanning` | 高 | onBuy private field phase | OA 返回 `reap` leaf，但 `reap` 不是注册 action，BGA 的 private field phase 基本不可执行。 | BGA `C/C72_FestivalPlanning.php`; OA `shared/cards/C/C72_FestivalPlanning.ts`, `shared/actions/internal-actions.ts` | 建模 private field/reap 子行动，再接 optional improvement。 |
 | `D1_ZigzagHarrow` | 高 | plow target | BGA `onBuy` 限制 plow 到 zigzag 目标；OA unrestricted plow。 | BGA `D/D1_ZigzagHarrow.php`; OA `shared/cards/D/D1_ZigzagHarrow.ts`, `server/__tests__/D1_ZigzagHarrow-session.test.ts` | 透传 allowedTiles 到 plow / farm-edit。 |
 | `E149_MidnightFencer` | 高 | free fencing | BGA 最后 harvest 执行免费 `FENCING`，上限受对手 reserve fence 限制；OA 只记录选择数为 VP。 | BGA `E/E149_MidnightFencer.php`; OA `shared/cards/E/E149_MidnightFencer.ts` | 改成真实 fence 子行动，并按对手可用 fence 限制 max。 |
 | `B85_FarmHand` | 中 | stable 体系 | BGA farmhand stable 进入 stable built/listener/count 体系；OA 主要作为 extraData position + room capacity。 | BGA `B/B85_FarmHand.php`, `Actions/Stables.php`, `Models/PlayerBoard.php`; OA `shared/cards/B/B85_FarmHand.ts`, `shared/domain/supply-tokens.ts` | 让 FarmHand stable 进入通用 stable 统计/事件。 |
@@ -87,6 +86,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | 额外放人目标行动语义已进入通用基础设施 | `place-farmer` constraints / `targetSpaceId` actionContext、ActionNode `expandFlow`、`move-farmer-to-space` relocation | B24/C42 额外放人不在卡牌内手写目标行动；选择目标格后由通用 flow 执行目标 action，并让 downstream hooks 用真实目标 space。E10/D51 的 worker relocation 也走同一目标行动 flow。 |
 | Plow allowlist 已进入通用行动上下文 | `plow.actionContext.allowedTiles`、D1_ZigzagHarrow | 通用 plow allowlist 同时约束 `selectableTiles`、availability、resolveChoice/payment-stage 校验；D1 raw zigzag candidates 不预过滤越界/占用，最终由 plow validation / `allowedTiles` 交集处理，empty intersection optional leaf auto-skip。 |
 | Action-level cancel policy 已进入通用基础设施 | `shared/engine/engine-resolve.ts`、farm-select actions、`reorganize`、internal `selection` | 非 `exchange` / `bake-bread` 的 protected atomic action 直接 `cancel` 会在 hook / action resolve 前被 recoverable reject，pending 保持；optional 只走 parent node 的 `__skip__`。当前 protected set 是 `plow` / `sow` / `construct` / `stables` / `fence` / `reorganize` / `selection`。`selection` 默认至少选 1 项，只有显式 `minSelections: 0` 才允许空提交，并且提交路径按 `positionFilter` / `selectableTiles` 校验可选位置。`construct` / `fence` entry guard 还会过滤无 reachable room / 无 legal fence commit 的真实 state，包括 C88 这类 cloned preview player，避免 confirm-only prompt 进入死路；fence layout feasibility 复用缓存的 connected tile sets，避免 availability 检查反复枚举农场组合。 |
+| Private Field Phase 已进入通用收获基础设施 | `private-field-phase` internal action、`reap` trigger metadata、Card Field reaper registry | C72/E25 不再返回未注册 `reap` leaf；普通田和 Card Field 都走 `reason: 'reap'` 事件与同一套 `immediatelyAfter.reap` listener，并用普通 `parallel` flow 承载反应。 |
 | Cross-player undo boundary 已进入通用基础设施 | `confirm-player-switch`、SessionResponse undo availability、`undoStep` / `undoAction` boundary guard | opponent-scope trigger 切到 owner prompt 后不暴露 undo；后续 undo 只能回到切换后的 prompt，不能跨回触发玩家行动状态。 |
 | DevMode 卡牌注入/回收路径已对齐 played-card 模型 | `devPlayCard`、`devDrawCard`、`player.improvements`、`availableMajorImprovements` | 调试面板直接打出 major 时写入玩家 major 区并移出公共供应区；draw 已打出卡牌时会从任意玩家 played/improvements 区移除并清理对应 `cardStates`，minor/occupation 回目标手牌，major 回公共供应区。 |
 | 旧兼容路径清理 | old engine choice snapshot/restore、encoded choice shortcut、old field/state backfill、old fence `string[]` coercion 已移除；current farm/selection flow 走 `commitSelection`/structured payload | 不维护旧 pending cursor / old state shape；后续新增交互必须通过 `allowedCommands` / `options` 显式暴露并验证 current typed request，不再把非广告 choice value 当便捷入口。 |
@@ -101,6 +101,8 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 本轮新增已完成基础设施：Action-level cancel policy。`plow` / `sow` / `construct` / `stables` / `fence` / `reorganize` / internal `selection` 均不再把 direct `cancel` 当 action-level success path；可选跳过由父级 optional node 的 `__skip__` 表达。`selection` 默认至少选 1 项，只有显式 `minSelections: 0` 才允许空提交，并且提交路径按 `positionFilter` / `selectableTiles` 校验可选位置。`construct` / `fence` 的 doability 会在真实 state 中排除无可提交布局，包括 cloned preview player，避免 direct cancel 被拒绝后出现不可完成 pending；fence layout feasibility 复用缓存的 connected tile sets，避免 availability 检查反复枚举农场组合。
 
 本轮新增已完成基础设施：zone-aware card listener。listener 默认只匹配已打出卡，显式 `zones: ['hand', 'played']` 才能在手牌中监听；匹配结果向 handler 透传 `ownerCardZone`。D36 这类单卡历史需求落在本卡 `cardStates`，不新增全局 sheep stats；手牌卡的局部 `cardStates` / 以该手牌卡为 source 的 public events / 派生 log entry / 过滤后的 event/archive seq cursor / runtime `publicEventCancellations` / 按手牌 id keyed 的 `cardAvailability` 在非 owner snapshot 中隐藏。收获喂食转食物通过通用 `harvest-feed-conversion` synthetic listener dispatch 暴露 `harvest.feedConverted` 事件；future meeple 结算通过通用 `future-meeple-resolved` synthetic listener dispatch 暴露 `futureMeeple.resolved` 事件。两者都不在 session core 写单卡分支。
+
+本轮新增已完成基础设施：Private Field Phase。`private-field-phase` 是内部行动，按来源卡触发只收获玩家自己的普通田和 Card Field，不启动完整 Harvest；事件统一使用 `reason: 'reap'`，并携带 `trigger.phase` 区分 `harvest` / `private-field-phase`。普通田和 Card Field 的 `immediatelyAfter.reap` listener 结果统一收集进普通 `parallel` flow，避免在 dispatch 阶段直接改状态。
 
 保留的后续边界：`C23_JobContract`、`B152_JuniorArtist`、`C117_Legworker` 与 space-pairing 的 cost / jump / adjacency 语义相关，不属于 shared lessons action-space id helper 关闭范围。
 
@@ -779,7 +781,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C69_LandConsolidation` | 已对齐 | Tinsmith Master / Cow Patty extra-crop pending 期间禁用 anytime，避免嵌套 swap |
 | `C70_LettucePatch` | 已对齐 |  |
 | `C71_Slurry` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
-| `C72_FestivalPlanning` | 需复核 | OA 使用未注册 `reap` action，BGA private field phase 基本不可执行 |
+| `C72_FestivalPlanning` | 已对齐 | onBuy 先执行 `private-field-phase` 收获普通田和 Card Field，再进入 optional improvement |
 | `C73_SeaweedFertilizer` | 已对齐 |  |
 | `C74_PrivateForest` | 已对齐 |  |
 | `C75_Firewood` | 已对齐 |  |
@@ -1092,7 +1094,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E22_GuestRoom` | 已接受差异 | 已接受的行为 / 产品差异 |
 | `E23_Apiary` | 已对齐 |  |
 | `E24_Ambition` | 已对齐 |  |
-| `E25_BumperCrop` | 已对齐 |  |
+| `E25_BumperCrop` | 已对齐 | onBuy 走 `private-field-phase`；`2 Grain Fields` 前置同时计入普通 grain field 与带 grain 的 Card Field |
 | `E26_Sundial` | 已对齐 |  |
 | `E27_PiggyBank` | 已对齐 |  |
 | `E28_Bookmark` | 已对齐 |  |

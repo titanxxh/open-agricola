@@ -5,6 +5,7 @@ import { getMajorCard } from '../major'
 import { collectCardsAs } from './card-type'
 import { fieldHasCrop } from '../../domain/field'
 import { getActiveCardRegistry } from '../active-registry'
+import { readCardExtraData } from './card-state'
 
 type CardPrerequisiteSource = Pick<
   CardDefinition,
@@ -28,6 +29,22 @@ const countCardFields = (player: PlayerState) =>
 
 const countFields = (player: PlayerState) =>
   player.fields.length + countCardFields(player)
+
+const playedCardIds = (player: PlayerState): string[] => [
+  ...(player.improvements ?? []),
+  ...(player.minorPlayed ?? []),
+  ...(player.occupationPlayed ?? []),
+]
+
+const countCardFieldsWithCrop = (player: PlayerState, crop: string) =>
+  playedCardIds(player).reduce((count, cardId) => {
+    const stacks = readCardExtraData<Array<{ crop?: string; remaining?: number }>>(
+      player,
+      cardId,
+      'cardFieldStacks',
+    ) ?? []
+    return count + stacks.filter((stack) => stack.crop === crop && (stack.remaining ?? 0) > 0).length
+  }, 0)
 
 const cardHasBaking = (cardId: string) =>
   getMajorCard(cardId)?.isBaking
@@ -71,7 +88,7 @@ const meetsTextClause = (player: PlayerState, clause: string) => {
   const grainFieldsMatch = trimmed.match(/^(\d+)\s+Grain Fields?$/i)
   if (grainFieldsMatch) {
     const grainFields = player.fields.filter((f) => fieldHasCrop(f, 'grain'))
-    return grainFields.length >= Number(grainFieldsMatch[1])
+    return grainFields.length + countCardFieldsWithCrop(player, 'grain') >= Number(grainFieldsMatch[1])
   }
 
   const pastureMatch = trimmed.match(/^(\d+)\s+Pastures?$/i)
