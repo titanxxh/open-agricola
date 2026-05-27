@@ -50,5 +50,21 @@ const readR13 = (session: GameSession, r13Id: string) =>
   session.getState().state.actionSpaces.find((s) => s.id === r13Id)!
 
 describe('B129_Seatmate session', () => {
-  // test cases appended in Tasks 2-6
+  it.each<[RoleAtR13]>([['left'], ['right']])(
+    'Test 1: 3p neighbour-only occupies r13, owner enters OK (%s)',
+    (neighbour) => {
+      const { session, owner, r13Id, playerIds, idxMap } = setup({
+        playerCount: 3,
+        takenByR13: [neighbour],
+      })
+      const neighbourId = playerIds[idxMap[neighbour]]!
+
+      const resp = session.takeAction(0, r13Id)
+      expect(resp.ok).toBe(true)
+
+      const takenByIds = readR13(session, r13Id).takenBy.map((t) => t.playerId)
+      expect(takenByIds).toEqual(expect.arrayContaining([neighbourId, owner.id]))
+      expect(session.getActionAvailability(0)[r13Id]).toBe(true)
+    },
+  )
 })
