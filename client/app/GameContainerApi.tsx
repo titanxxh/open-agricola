@@ -1626,9 +1626,11 @@ export const GameContainerApi = () => {
 
     const statusText = wsStatus.phase === 'waiting'
       ? t(locale, 'platform.waitingForPlayers', { roomId: wsStatus.roomId, current: String(wsStatus.players.length), max: String(wsStatus.maxPlayers) })
-      : wsStatus.message === 'roomDissolved'
-        ? t(locale, 'platform.roomDissolved')
-        : `Error: ${wsStatus.message}`
+      : wsStatus.phase === 'error'
+        ? wsStatus.message === 'roomDissolved'
+          ? t(locale, 'platform.roomDissolved')
+          : `Error: ${wsStatus.message}`
+        : ''
 
     const inviteUrl = wsStatus.phase === 'waiting'
       ? `${window.location.origin}${window.location.pathname}?page=game&transport=ws&room=${wsStatus.roomId}`
