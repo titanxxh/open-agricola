@@ -76,6 +76,14 @@ export const zh = {
       saved: '节省',
       bonusVp: '额外得分',
     },
+    cards: {
+      D132_HideFarmer: {
+        optional: '隐藏未使用农场格？',
+        markSpaces: {
+          prompt: '选择要为多少个未使用农场格支付食物',
+        },
+      },
+    },
     undoStep: '撤销上一步',
     undoAction: '撤销行动',
     endRound: '结束回合',
@@ -1175,6 +1183,13 @@ export const zh = {
     A162_ForestTallyman: { name: '森林记录员', desc: '当森林+泥坑都被占用时：获得 2 黏土 + 3 木。' },
     STUB_BeforeBakeGainClay: { name: '测试：烤面包前得黏土', desc: '测试 stub：烤面包前获得 1 黏土。' },
     D122_ClayCarrier: { anytime: '搬黏土工：付2食物 → 获2黏土' },
+    D132_HideFarmer: {
+      markSpaces: {
+        name: '隐藏未使用农场格',
+        description: '支付食物，使未使用农场格不扣分。',
+        invalid: '食物数量非法',
+      },
+    },
     E86_PenBuilder: { anytime: '围栏工：付1木材 → 动物容量+2' },
     E148_Lazybones: { name: '懒骨头', choice: '预留 {spaces}' },
     A102_Grocer: { anytime: '杂货商：付1食物 → 购买顶部商品' },
@@ -1320,6 +1335,7 @@ export const zh = {
   'resource-quantity': {
     error: {
       'must-pick-at-least-one': '至少选择 1 个',
+      'invalid-count-food': '食物数量非法',
       'invalid-count-sheep': '羊数量非法',
       'invalid-count-boar': '猪数量非法',
       'invalid-count-cattle': '牛数量非法',

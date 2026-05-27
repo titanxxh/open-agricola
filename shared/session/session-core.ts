@@ -95,7 +95,7 @@ import * as draftPhase from './phases/draft.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { getCardEffect } from '../cards/card-effects.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
-import { runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks } from '../cards/card-effects.ts'
+import { runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook } from '../cards/card-effects.ts'
 import { positionKey } from '../domain/farm.ts'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions, runCardListeners } from '../cards/card-listeners.ts'
 import { buildPhaseTrailingNodes, markOptional, stampOwner } from '../engine/engine-utils.ts'
@@ -309,6 +309,7 @@ type StageResumeState = {
     | 'onReturnHome'
     | 'onStartReturnHome'
     | 'onAfterRoundEnd'
+    | 'onBeforeEndGame'
     | 'onStartHarvest'
     | 'onStartHarvestFieldPhase'
     | 'onHarvestFieldPhase'
@@ -2748,6 +2749,9 @@ export class GameCore {
       case 'onAfterRoundEnd':
         this.continueAfterRoundEnd(stageResume.playerIndex, stageResume.cardIndex)
         return
+      case 'onBeforeEndGame':
+        this.continueBeforeEndGameHooks(stageResume.playerIndex, stageResume.cardIndex)
+        return
       case 'onStartHarvest':
         this.continueFromStartHarvest(stageResume.playerIndex, stageResume.cardIndex)
         return
@@ -3829,12 +3833,20 @@ export class GameCore {
     })
     this.state.round += 1
     if (this.state.round > 14) {
-      this.state.players.forEach((p) => runBeforeEndGameHooks(this.state, p))
-      this.state.gameOver = true
-      appendImmediateEvents(this.state, [{ type: 'game.ended' }])
-      return this.respond()
+      return this.continueBeforeEndGameHooks(0, 0)
     }
     return this.continueBeforeStartOfTurn()
+  }
+
+  private continueBeforeEndGameHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
+    if (this.continueStageHook('onBeforeEndGame', playerIndex, cardIndex)) {
+      return this.respond()
+    }
+    if (!this.state.gameOver) {
+      this.state.gameOver = true
+      appendImmediateEvents(this.state, [{ type: 'game.ended' }])
+    }
+    return this.respond()
   }
 
   /**
