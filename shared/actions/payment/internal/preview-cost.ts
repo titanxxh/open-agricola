@@ -23,7 +23,7 @@ import type {
   Resource,
   Trade,
 } from '../../../contract/types'
-import { executeCardListener, getMatchingListeners } from '../../../cards/card-listeners'
+import { executeCardListener, getMatchingListeners, listenerOwnerOptions } from '../../../cards/card-listeners'
 import { applyCostOverride, isComplexCost } from './affordability'
 import { canPayCost, computeAllBuyableCombinations } from './enumerate'
 import { executePaymentSolution } from './execute'
@@ -50,9 +50,7 @@ export const resolveCardCostWithModifiers = (
       cardId,
       actionCardId,
     }
-    const result = executeCardListener(entry.registration, listenerContext, {
-      ownerPlayerId: entry.ownerPlayerId,
-    })
+    const result = executeCardListener(entry.registration, listenerContext, listenerOwnerOptions(entry))
     if (result?.costs && !isComplexCost(baseCost)) {
       cost = applyCostOverride(cost, result.costs)
     }

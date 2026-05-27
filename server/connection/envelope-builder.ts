@@ -1,5 +1,6 @@
 import type { GameSession, SessionResponse } from '../game/authoritative-session.ts'
 import {
+  filterPublicEventCancellationsForPlayer,
   serializeStateForPlayer,
 } from '../../shared/session/serialization.ts'
 import type {
@@ -28,11 +29,18 @@ const buildPayload = (args: Args): GameSyncPayload => {
   const stateOpts = { engineStack: room.session.getEngineStack() }
   const state = serializeStateForPlayer(resp.state, viewerPlayerId, stateOpts)
   const playerIds = resp.state.players.map((player) => player.id)
+  const currentPlayerId = resp.state.players[resp.state.currentPlayerIndex]?.id ?? null
   const privateEvents = privateEventsForViewer(
     resp.interaction,
     playerIds,
     viewerPlayerId,
     resp.privateEvents ?? [],
+  )
+  const publicEventCancellations = filterPublicEventCancellationsForPlayer(
+    resp.state,
+    viewerPlayerId,
+    stateOpts,
+    resp.publicEventCancellations,
   )
   const payload: GameSyncPayload = {
     state,
@@ -43,13 +51,11 @@ const buildPayload = (args: Args): GameSyncPayload => {
     hasActionStartSnapshot: resp.hasActionStartSnapshot,
     ok: resp.ok,
     actionAvailability: resp.actionAvailability,
-    cardAvailability: resp.cardAvailability,
+    cardAvailability: viewerPlayerId === currentPlayerId ? resp.cardAvailability : undefined,
     error: resp.error,
   }
   if (privateEvents.length > 0) payload.privateEvents = privateEvents
-  if (resp.publicEventCancellations?.length) {
-    payload.publicEventCancellations = resp.publicEventCancellations
-  }
+  if (publicEventCancellations?.length) payload.publicEventCancellations = publicEventCancellations
   const defs = room.session.getCustomCardDefs()
   if (defs.length > 0) payload.customCardDefs = defs
   return payload

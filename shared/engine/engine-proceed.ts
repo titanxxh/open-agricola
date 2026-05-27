@@ -588,6 +588,8 @@ const executeActivateCardAction = (
     ...params.event,
     triggerPlayerId,
     ownerPlayerId,
+    ownerCardId: params.cardId,
+    ownerCardZone: params.ownerCardZone,
     mandatory: params.mandatory,
   }
   if (params.countCardUse !== undefined) event.countCardUse = params.countCardUse
@@ -606,6 +608,8 @@ const executeActivateCardAction = (
   }
   const result = executeCardListener(listener, listenerContext, {
     ownerPlayerId,
+    ownerCardId: params.cardId,
+    ownerCardZone: params.ownerCardZone,
   })
   // Track BGA-style per-card `used` stat: count a use only when the listener
   // actually returned an effect. Pure no-op fires and universal listeners

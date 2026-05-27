@@ -10,7 +10,12 @@ import {
   applyIsDoableHooksDetailed,
   runActionHooks,
 } from '../actions/hooks'
-import { getMatchingListeners, executeCardListener, type MatchedCardListener } from '../cards/card-listeners'
+import {
+  executeCardListener,
+  getMatchingListeners,
+  listenerOwnerOptions,
+  type MatchedCardListener,
+} from '../cards/card-listeners'
 import { resolveActionPreviewCost } from '../actions/helpers/cost-preview'
 import { canPayResources } from '../actions/payment/internal'
 import { getSkipComputeReplaceListenerIds } from './replace-guard'
@@ -94,9 +99,7 @@ export class HookDispatcher {
     const matched = getMatchingListeners(listenerContext)
     for (const entry of matched) {
       if (skippedListenerIds.has(entry.registration.id)) continue
-      const result = executeCardListener(entry.registration, listenerContext, {
-        ownerPlayerId: entry.ownerPlayerId,
-      })
+      const result = executeCardListener(entry.registration, listenerContext, listenerOwnerOptions(entry))
       if (result) {
         if (typeof result.actionId === 'string') {
           actionId = result.actionId
@@ -127,9 +130,7 @@ export class HookDispatcher {
     const listenerContext = { ...context, phase: 'isDoable' as const, doable }
     const matched = getMatchingListeners(listenerContext)
     for (const entry of matched) {
-      const result = executeCardListener(entry.registration, listenerContext, {
-        ownerPlayerId: entry.ownerPlayerId,
-      })
+      const result = executeCardListener(entry.registration, listenerContext, listenerOwnerOptions(entry))
       if (result?.doable === false) {
         doable = false
         vetoed = true
@@ -146,9 +147,7 @@ export class HookDispatcher {
     const matched = getMatchingListeners(listenerContext)
     const listenerResults: ActionHookResult[] = []
     for (const entry of matched) {
-      const result = executeCardListener(entry.registration, listenerContext, {
-        ownerPlayerId: entry.ownerPlayerId,
-      })
+      const result = executeCardListener(entry.registration, listenerContext, listenerOwnerOptions(entry))
       if (result) listenerResults.push(result)
     }
     return [...actionResults, ...listenerResults]
@@ -163,9 +162,7 @@ export class HookDispatcher {
     const matched = getMatchingListeners(listenerContext)
     const listenerResults: ActionHookResult[] = []
     for (const entry of matched) {
-      const result2 = executeCardListener(entry.registration, listenerContext, {
-        ownerPlayerId: entry.ownerPlayerId,
-      })
+      const result2 = executeCardListener(entry.registration, listenerContext, listenerOwnerOptions(entry))
       if (result2) listenerResults.push(result2)
     }
     return [...actionResults, ...listenerResults]
@@ -182,9 +179,7 @@ export class HookDispatcher {
     const matched = getMatchingListeners(listenerContext)
     const listenerResults: ActionHookResult[] = []
     for (const entry of matched) {
-      const result = executeCardListener(entry.registration, listenerContext, {
-        ownerPlayerId: entry.ownerPlayerId,
-      })
+      const result = executeCardListener(entry.registration, listenerContext, listenerOwnerOptions(entry))
       if (result) listenerResults.push(result)
     }
     return [...actionResults, ...listenerResults]
