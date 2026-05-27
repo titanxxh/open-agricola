@@ -2,7 +2,6 @@ import type {
   ActionChoiceOption,
   ActionDefinition,
   ActionExecutionResult,
-  ActionSpace,
   GameState,
   PlayerState,
   Resource,
@@ -26,9 +25,13 @@ import {
 } from '../../cards/registry-display'
 import type { CardExchange, ExchangeWindow } from '../../contract/cards'
 import { getMajorCard } from '../../cards/major'
-import { collectComputeExchanges, runCardListeners } from '../../cards/card-listeners'
+import { collectComputeExchanges } from '../../cards/card-listeners'
 import { isMajorCardId } from '../../cards/helpers/card-type'
-import { executeImmediateSpecialEffectFlows } from './internal/immediate-special-effect-flow'
+import { dispatchTradeAppliedListener } from './trade-applied-listener'
+import { exchangeToTrade } from './exchange-to-trade'
+
+export { dispatchTradeAppliedListener } from './trade-applied-listener'
+export { exchangeToTrade } from './exchange-to-trade'
 
 const scaleResources = (resources: Partial<Resource>, times: number) => {
   const scaled: Partial<Resource> = {}
@@ -240,30 +243,6 @@ export const getMaxTradeTimes = (player: PlayerState, trade: Trade): number => {
  * Listener context includes `extraData.sourceId` (trade.sourceId or .source)
  * and `extraData.times`.
  */
-export const dispatchTradeAppliedListener = (
-  state: GameState,
-  player: PlayerState,
-  trade: Trade,
-  times: number,
-  eventSink?: EventSink,
-  transactionEvents: readonly DraftGameEvent[] = [],
-): void => {
-  if (times <= 0) return
-  const sourceId = trade.sourceId ?? trade.source ?? null
-  if (!sourceId) return
-  const space = {} as ActionSpace
-  const results = runCardListeners({
-    state,
-    player,
-    space,
-    actionId: 'trade-applied',
-    phase: 'immediatelyAfter',
-    extraData: { sourceId, times },
-    transactionEvents,
-  })
-  executeImmediateSpecialEffectFlows({ state, player, space, eventSink, results })
-}
-
 /**
  * Apply a trade to player resources (mutates player state)
  * @param player - Player state to mutate
@@ -297,39 +276,7 @@ export const applyTrade = (
  * @param times - Number of times to apply the trade (default 1)
  * @returns New resources after conversion
  */
-export const convertResources = (
-  resources: Partial<Resource>,
-  trade: Trade,
-  times: number = 1,
-): Partial<Resource> => {
-  const result: Partial<Resource> = { ...resources }
-
-  // Deduct 'from' resources
-  const fromKeys = Object.keys(trade.from) as ResourceKey[]
-  for (const key of fromKeys) {
-    const amount = (trade.from[key] ?? 0) * times
-    result[key] = (result[key] ?? 0) - amount
-  }
-
-  // Add 'to' resources
-  const toKeys = Object.keys(trade.to) as ResourceKey[]
-  for (const key of toKeys) {
-    const amount = (trade.to[key] ?? 0) * times
-    result[key] = (result[key] ?? 0) + amount
-  }
-
-  return result
-}
-
-/**
- * Check if resources are all non-negative (valid state)
- * @param resources - Resources to check
- * @returns true if all resource values are >= 0
- */
-export const hasValidResources = (resources: Partial<Resource>): boolean => {
-  const keys = Object.keys(resources) as ResourceKey[]
-  return keys.every((key) => (resources[key] ?? 0) >= 0)
-}
+export { convertResources, hasValidResources } from './exchange-resources'
 
 /**
  * Get all possible trade application counts (0 to max times)
@@ -365,14 +312,6 @@ export const reverseTrade = (trade: Trade): Trade => ({
 // ============================================
 // Anytime Cookery Trades (metadata-driven)
 // ============================================
-
-export const exchangeToTrade = (ex: CardExchange, fallbackId: string): Trade => ({
-  from: ex.from,
-  to: ex.to,
-  max: ex.max,
-  sourceId: ex.sourceId ?? fallbackId,
-  sideEffect: ex.sideEffect,
-})
 
 const getCardExchanges = (cardId: string): readonly CardExchange[] => {
   if (isMajorCardId(cardId)) {

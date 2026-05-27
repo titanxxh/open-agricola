@@ -3,7 +3,6 @@ import type {
   ActionExecutionResult,
   ActionMutationContext,
   ActionSpace,
-  FenceSegment,
   FenceSegmentType,
   GameState,
   PlayerState,
@@ -17,7 +16,7 @@ import type {
 import {
   canAffordTypedFlatCost,
   resolveTypedFlatPaymentSelection,
-} from '../payment/internal'
+} from '../payment/internal/typed-flat'
 import { buildInternalPayChild } from '../helpers/pay-child'
 import { getAllEdgeIds, playerBoard, normalizePlayerFarm } from '../../domain'
 import { FARM_COLS, FARM_ROWS, isBorderEdge } from '../../domain/farm'
@@ -430,13 +429,7 @@ const applyWoodCostOverride = (
   costOverride?: Partial<Resource>,
 ): number => Math.max(0, woodCost + (costOverride?.wood ?? 0))
 
-export const getFenceCount = <T extends { fenceSegments: FenceSegment[] }>(
-  p: T,
-): number => p.fenceSegments.reduce((n, s) => n + (s.type === 'fence' ? 1 : 0), 0)
-
-export const getPalisadeCount = <T extends { fenceSegments: FenceSegment[] }>(
-  p: T,
-): number => p.fenceSegments.reduce((n, s) => n + (s.type === 'palisade' ? 1 : 0), 0)
+export { getFenceCount, getPalisadeCount } from '../../domain/fence-segments'
 
 export const getTotalPastureCells = (player: PlayerState) =>
   player.pastures.reduce((sum, pasture) => sum + pasture.size, 0)

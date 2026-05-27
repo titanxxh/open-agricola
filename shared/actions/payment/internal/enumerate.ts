@@ -27,7 +27,7 @@ import type {
 import {
   convertResources,
   hasValidResources,
-} from '../../effects/exchange'
+} from '../../effects/exchange-resources'
 import { isFireplaceIdentityCard } from '../../../cards/helpers/card-type'
 import { solutionCache, makeCacheKey } from './cache'
 import {

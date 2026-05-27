@@ -36,6 +36,7 @@ export type CardMeta = {
   passing?: boolean
   returnCards?: string[]
   alsoCountsAs?: string[]
+  enablesPalisades?: boolean
 }
 
 export type CardManifestEntry = {

@@ -1,7 +1,7 @@
 import type { GameState, PlayerState, Resource } from '../../contract/types'
 import { initCardState } from '../__stubs__/helpers'
 import { applyCardGain, type CardGain } from './card-gain'
-import { dispatchTradeAppliedListener } from '../../actions/effects/exchange'
+import { dispatchTradeAppliedListener } from '../../actions/effects/trade-applied-listener'
 
 export const markCardCounterIfBoughtByRound = (
   state: GameState,

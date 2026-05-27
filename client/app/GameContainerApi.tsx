@@ -12,7 +12,7 @@ import { emptyResources, resourceKeyList } from '../../shared/contract/state-con
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, parseDraftParamsFromQuery, type GameTransport } from '../services/gameTransport'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
-import { playerCanBuildPalisades } from '../../shared/cards/helpers/card-type'
+import { playerCanBuildPalisades } from '../utils/player-palisades'
 import { useFarmSelection } from '../hooks/useFarmSelection'
 import { buildHarvestFeedOptions } from './hooks/use-harvest-flow'
 import { computeHarvestFeedCounterMax } from './hooks/use-harvest-feed-counter'
