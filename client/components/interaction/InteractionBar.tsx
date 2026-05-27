@@ -379,6 +379,7 @@ type Props = {
   resourceQuantitySelect?: {
     availableByResource: Partial<Record<keyof Resource, number>>
     promptKey?: string
+    requireAtLeastOne?: boolean
     onConfirm: (counts: Partial<Record<keyof Resource, number>>) => void
     onCancel: () => void
   } | null
@@ -574,6 +575,7 @@ export const InteractionBar = ({
               locale={locale}
               availableByResource={resourceQuantitySelect.availableByResource}
               promptKey={resourceQuantitySelect.promptKey}
+              requireAtLeastOne={resourceQuantitySelect.requireAtLeastOne}
               onConfirm={resourceQuantitySelect.onConfirm}
               onCancel={resourceQuantitySelect.onCancel}
             />

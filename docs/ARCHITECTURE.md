@@ -636,6 +636,7 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
   → onStartHarvestFeedingPhase → onBeforeFeed → onHarvestFeedingPhase
     → feed → onEndHarvestFeedingPhase → onAfterFeed
   → breed → onEndHarvest → onAfterHarvest
+终局前:  round 14 的 onAfterRoundEnd 完成并递增到 round 15 后，onBeforeEndGame → gameover
 ```
 
 普通 Harvest 收获用 `reap(..., { trigger: { phase: 'harvest' } })` 移除田里作物，事件层统一记录 `reason: 'reap'`。每种 crop 收获后走 `dispatchReapListener(state, player, crop, amount, ..., { trigger, sourceCard })` 派发 `'reap'` 合成事件；listener 返回的 flow 不在 dispatch 阶段执行，而是收集进普通 `parallel` stage flow，全部完成后再进入 `onAfterReap`。
@@ -644,7 +645,7 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 
 `onAllWorkersPlaced` 在所有人本轮工人放完且 `performRoundEnd` 之前触发；`place-farmer` 的 `params.fromSupply` 模式可在该阶段把 supply worker 标 active 后立即放置。
 
-阶段 hook 已可返回 `ActionFlow`（`continueStageHook` / `continueAllWorkersPlacedHooks`），用于"hook 触发子流程"统一走 `EngineStack.push`。
+阶段 hook 已可返回 `ActionFlow`（`continueStageHook` / `continueAllWorkersPlacedHooks`），用于"hook 触发子流程"统一走 `EngineStack.push`。`onBeforeEndGame?: FlowEffectHandler` 是终局计分前的阶段 hook：round 14 结束后先按玩家/卡牌顺序运行，hook flow 可以产生 pending，并通过 `stageResume.hook='onBeforeEndGame'` 恢复同一 before-endgame 链；全部完成后才写入 `gameOver` 并进入 `gameover` interaction。
 
 ### 7.7 Listener activation purity + BGA 对齐
 
@@ -750,7 +751,7 @@ OA-vs-BGA design notes:
 - Reorganize is a system-driven sub-flow in OA (not a player-triggerable anytime) — the policy never produces a `'reorganize'` entry to filter.
 - `feed` pending is locked in OA because `executeFeedingLogic()` freezes `remaining`/`foodUsed` into the InteractionRequest. BGA allows nested anytime in its `ST_HARVEST_FEED` flow because its predecessor is the `EXCHANGE` state, which has no fixed budget.
 - Idle work-phase turns and `confirm-next-player` are acting-player anytime windows: legal anytime actions remain available before a worker is placed and before control passes to the next player. In `confirm-next-player`, `exchange` stays blocked to avoid recursive generic exchange prompts. `confirm-player-switch` remains blocked because it is a system-controlled cross-player transition inside another flow.
-- `stageResume`-bearing harvest stage hook chains default to blocked to preserve the "system-driven hook chains do not yield to player anytime" invariant; the explicit allow-list (`animal-reorg`, exchange/bake-bread promptKey) overrides this.
+- `stageResume`-bearing stage hook chains default to blocked to preserve the "system-driven hook chains do not yield to player anytime" invariant; the explicit allow-list (`animal-reorg`, exchange/bake-bread promptKey, and D132's `ui.cards.D132_HideFarmer.optional` before-endgame choice prompt) overrides this. D132's nested `resource-quantity-select` prompt stays blocked, because its max is frozen from current food/empty-space state and must not be resumed after arbitrary anytime changes.
 
 ---
 

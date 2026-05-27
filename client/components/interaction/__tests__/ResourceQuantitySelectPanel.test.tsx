@@ -6,6 +6,38 @@ import userEvent from '@testing-library/user-event'
 import { ResourceQuantitySelectPanel } from '../ResourceQuantitySelectPanel'
 
 describe('ResourceQuantitySelectPanel', () => {
+  it('keeps zero disabled by default', () => {
+    const onConfirm = vi.fn()
+    render(
+      <ResourceQuantitySelectPanel
+        locale="en"
+        availableByResource={{ food: 2 }}
+        onConfirm={onConfirm}
+        onCancel={() => {}}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled()
+  })
+
+  it('allows confirming zero when requireAtLeastOne is false', async () => {
+    const user = userEvent.setup()
+    const onConfirm = vi.fn()
+    render(
+      <ResourceQuantitySelectPanel
+        locale="en"
+        availableByResource={{ food: 2 }}
+        requireAtLeastOne={false}
+        onConfirm={onConfirm}
+        onCancel={() => {}}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
+
+    expect(onConfirm).toHaveBeenCalledWith({ food: 0 })
+  })
+
   it('drops stale resource counts when available resources change', async () => {
     const user = userEvent.setup()
     const onConfirm = vi.fn()

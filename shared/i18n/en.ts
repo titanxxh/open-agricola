@@ -76,6 +76,14 @@ export const en = {
       saved: 'Saved',
       bonusVp: 'Bonus VP',
     },
+    cards: {
+      D132_HideFarmer: {
+        optional: 'Hide unused farmyard spaces?',
+        markSpaces: {
+          prompt: 'Choose how many food to pay for unused farmyard spaces',
+        },
+      },
+    },
     undoStep: 'Undo Step',
     undoAction: 'Undo Action',
     endRound: 'End Round',
@@ -1195,6 +1203,13 @@ export const en = {
     A162_ForestTallyman: { name: 'Forest Tallyman', desc: 'When Forest + Clay Pit occupied: get 2 clay + 3 wood.' },
     STUB_BeforeBakeGainClay: { name: 'STUB Before Bake Clay', desc: 'Test stub: before baking bread, gain 1 clay.' },
     D122_ClayCarrier: { anytime: 'Clay Carrier: Pay 2 Food → 2 Clay' },
+    D132_HideFarmer: {
+      markSpaces: {
+        name: 'Hide unused spaces',
+        description: 'Pay food so unused farmyard spaces do not lose points.',
+        invalid: 'Invalid food count',
+      },
+    },
     E86_PenBuilder: { anytime: 'Pen Builder: Pay 1 Wood → +2 Animal Capacity' },
     E148_Lazybones: { name: 'Lazybones', choice: 'Reserve {spaces}' },
     A102_Grocer: { anytime: 'Grocer: Pay 1 Food → Buy top good' },
@@ -1310,6 +1325,7 @@ export const en = {
   'resource-quantity': {
     error: {
       'must-pick-at-least-one': 'Pick at least 1',
+      'invalid-count-food': 'Invalid food count',
       'invalid-count-sheep': 'Invalid sheep count',
       'invalid-count-boar': 'Invalid boar count',
       'invalid-count-cattle': 'Invalid cattle count',

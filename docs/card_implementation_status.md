@@ -11,10 +11,10 @@
 | 自动 metadata 脚本 literal mismatch | 0 |
 | 自动 metadata 脚本 complex mismatch | 4 |
 | 其中 schema-up 已接受差异 | 4 |
-| 需要实现复核的卡牌 | 9 |
+| 需要实现复核的卡牌 | 6 |
 | 已接受 / 产品策略差异 | 40 |
 | 排除的 BGA legacy 或未实现行为目标 | 52 |
-| 本轮审计视为已对齐 | 786 |
+| 本轮审计视为已对齐 | 790 |
 
 说明：`scripts/audit-bga-metadata-diff.ts` 现在会解析 BGA `STABLE` 打印成本和 `passing`。当前 literal mismatch 0（passing 已全部对齐）。当前 complex mismatch 是 4 个已接受的 schema-up prerequisite 差异。
 
@@ -27,11 +27,9 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | 卡牌 | 严重度 | 领域 | 差异 | 证据 | 方向 |
 |---|---|---|---|---|---|
 | `A136_DrudgeryReeve` | 高 | shared scoring | BGA `sharedScoring`，每位玩家可选 0..max sets 并 reserve 资源；OA 仅持卡玩家自动最优计分。 | BGA `A/A136_DrudgeryReeve.php`; OA `shared/cards/A/A136_DrudgeryReeve.ts`, `shared/domain/scoring.ts` | 支持 shared costed scoring / before-end choice。 |
-| `D1_ZigzagHarrow` | 高 | plow target | BGA `onBuy` 限制 plow 到 zigzag 目标；OA unrestricted plow。 | BGA `D/D1_ZigzagHarrow.php`; OA `shared/cards/D/D1_ZigzagHarrow.ts`, `server/__tests__/D1_ZigzagHarrow-session.test.ts` | 透传 allowedTiles 到 plow / farm-edit。 |
 | `E149_MidnightFencer` | 高 | free fencing | BGA 最后 harvest 执行免费 `FENCING`，上限受对手 reserve fence 限制；OA 只记录选择数为 VP。 | BGA `E/E149_MidnightFencer.php`; OA `shared/cards/E/E149_MidnightFencer.ts` | 改成真实 fence 子行动，并按对手可用 fence 限制 max。 |
 | `B85_FarmHand` | 中 | stable 体系 | BGA farmhand stable 进入 stable built/listener/count 体系；OA 主要作为 extraData position + room capacity。 | BGA `B/B85_FarmHand.php`, `Actions/Stables.php`, `Models/PlayerBoard.php`; OA `shared/cards/B/B85_FarmHand.ts`, `shared/domain/supply-tokens.ts` | 让 FarmHand stable 进入通用 stable 统计/事件。 |
 | `C25_SteamMachine` | 中 | adoptive worker | BGA adoptive worker 场景会追加 forceSkip/end turn；OA 只有基础 optional bake。 | BGA `C/C25_SteamMachine.php`; OA `shared/cards/C/C25_SteamMachine.ts` | 补 adoptive/forceSkip 分支或定向确认不适用。 |
-| `D132_HideFarmer` | 中 | 终局选择/支付 | BGA 终局前玩家选择数量、真实支付 food 并隐藏空地；OA scoring solver 自动最优。 | BGA `D/D132_HideFarmer.php`; OA `shared/cards/D/D132_HideFarmer.ts`, `shared/domain/scoring.ts` | 建模 before-end choice + hiddenSpaces。 |
 | `C133_Soldier` | 低 | 终局计分选择 | BGA 玩家选择 0..max 对并 reserve wood/stone；OA 自动最优。 | BGA `C/C133_Soldier.php`; OA `shared/cards/C/C133_Soldier.ts`, `shared/domain/scoring.ts` | 若要严格对齐，改成 before-end choice。 |
 | `E112_GrainThief` | 低 | harvest 时机 | BGA start 选择多个 grain zones，reap 时减少 harvestCount，end 再 gain grain；OA 接受时立即 pop/gain，end restore。 | BGA `E/E112_GrainThief.php`; OA `shared/cards/E/E112_GrainThief.ts` | 补跨卡顺序测试，必要时改成 BGA 时机。 |
 
@@ -88,6 +86,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | Action-level cancel policy 已进入通用基础设施 | `shared/engine/engine-resolve.ts`、farm-select actions、`reorganize`、internal `selection` | 非 `exchange` / `bake-bread` 的 protected atomic action 直接 `cancel` 会在 hook / action resolve 前被 recoverable reject，pending 保持；optional 只走 parent node 的 `__skip__`。当前 protected set 是 `plow` / `sow` / `construct` / `stables` / `fence` / `reorganize` / `selection`。`selection` 默认至少选 1 项，只有显式 `minSelections: 0` 才允许空提交，并且提交路径按 `positionFilter` / `selectableTiles` 校验可选位置。`construct` / `fence` entry guard 还会过滤无 reachable room / 无 legal fence commit 的真实 state，包括 C88 这类 cloned preview player，避免 confirm-only prompt 进入死路；fence layout feasibility 复用缓存的 connected tile sets，避免 availability 检查反复枚举农场组合。 |
 | Private Field Phase 已进入通用收获基础设施 | `private-field-phase` internal action、`reap` trigger metadata、Card Field reaper registry | C72/E25 不再返回未注册 `reap` leaf；普通田和 Card Field 都走 `reason: 'reap'` 事件与同一套 `immediatelyAfter.reap` listener，并用普通 `parallel` flow 承载反应。 |
 | Cross-player undo boundary 已进入通用基础设施 | `confirm-player-switch`、SessionResponse undo availability、`undoStep` / `undoAction` boundary guard | opponent-scope trigger 切到 owner prompt 后不暴露 undo；后续 undo 只能回到切换后的 prompt，不能跨回触发玩家行动状态。 |
+| Before-endgame hook flow 已进入通用基础设施 | `onBeforeEndGame?: FlowEffectHandler`、`stageResume.hook='onBeforeEndGame'`、D132_HideFarmer | round 14 的 `onAfterRoundEnd` 完成后先运行 before-endgame hook flow，再进入 `gameover`；hook pending 可通过 stage resume 回到同一终局前链。`anytime-policy` 仅对白名单 D132 optional choice prompt 放开 anytime，数量选择 prompt 仍保持 stage hook chain 锁定。 |
 | DevMode 卡牌注入/回收路径已对齐 played-card 模型 | `devPlayCard`、`devDrawCard`、`player.improvements`、`availableMajorImprovements` | 调试面板直接打出 major 时写入玩家 major 区并移出公共供应区；draw 已打出卡牌时会从任意玩家 played/improvements 区移除并清理对应 `cardStates`，minor/occupation 回目标手牌，major 回公共供应区。 |
 | 旧兼容路径清理 | old engine choice snapshot/restore、encoded choice shortcut、old field/state backfill、old fence `string[]` coercion 已移除；current farm/selection flow 走 `commitSelection`/structured payload | 不维护旧 pending cursor / old state shape；后续新增交互必须通过 `allowedCommands` / `options` 显式暴露并验证 current typed request，不再把非广告 choice value 当便捷入口。 |
 | 注释里的非阻塞 card-id 示例 | `shared/actions/effects/breed.ts`、`shared/contract/types.ts` 仅把 `A165_PigBreeder` / `D95_SiteManager` 作为例子提到 | 除非附近代码变动，否则保留；它们不是可执行的单卡分支。 |
@@ -103,6 +102,8 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 本轮新增已完成基础设施：zone-aware card listener。listener 默认只匹配已打出卡，显式 `zones: ['hand', 'played']` 才能在手牌中监听；匹配结果向 handler 透传 `ownerCardZone`。D36 这类单卡历史需求落在本卡 `cardStates`，不新增全局 sheep stats；手牌卡的局部 `cardStates` / 以该手牌卡为 source 的 public events / 派生 log entry / 过滤后的 event/archive seq cursor / runtime `publicEventCancellations` / 按手牌 id keyed 的 `cardAvailability` 在非 owner snapshot 中隐藏。收获喂食转食物通过通用 `harvest-feed-conversion` synthetic listener dispatch 暴露 `harvest.feedConverted` 事件；future meeple 结算通过通用 `future-meeple-resolved` synthetic listener dispatch 暴露 `futureMeeple.resolved` 事件。两者都不在 session core 写单卡分支。
 
 本轮新增已完成基础设施：Private Field Phase。`private-field-phase` 是内部行动，按来源卡触发只收获玩家自己的普通田和 Card Field，不启动完整 Harvest；事件统一使用 `reason: 'reap'`，并携带 `trigger.phase` 区分 `harvest` / `private-field-phase`。普通田和 Card Field 的 `immediatelyAfter.reap` listener 结果统一收集进普通 `parallel` flow，避免在 dispatch 阶段直接改状态。
+
+本轮新增已完成基础设施：before-endgame hook flow。`onBeforeEndGame` 作为 `FlowEffectHandler` 在 round 14 后、gameover 前运行，允许卡牌生成终局前 pending 并通过 `stageResume` 恢复；D132 的 optional prompt 是 stage hook chain 中唯一放开 anytime 的 before-endgame choice prompt，后续数量选择不放开，避免 stale max。
 
 保留的后续边界：`C23_JobContract`、`B152_JuniorArtist`、`C117_Legworker` 与 space-pairing 的 cost / jump / adjacency 语义相关，不属于 shared lessons action-space id helper 关闭范围。
 
@@ -161,7 +162,7 @@ Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（
 | A | `A102_Grocer`, `A112_ScytheWorker`, `A132_Publican`, `A136_DrudgeryReeve`, `A137_RiverineShepherd`, `A144_Sequestrator`, `A150_Stagehand`, `A158_CulinaryArtist`, `A159_JoineroftheSea`, `A162_ForestTallyman`, `A165_PigBreeder`, `A17_ReclamationPlow`, `A22_Telegram`, `A25_Bassinet`, `A29_AleBenches`, `A39_Chapel`, `A3_PaperKnife`, `A40_PottersYard`, `A53_Claypipe`, `A58_AsparagusKnife`, `A70_LiftingMachine`, `A71_ClearingSpade`, `A72_CalciumFertilizers`, `A81_InterimStorage`, `A82_WorkCertificate`, `A84_Silage`, `A89_StablePlanner`, `A92_AdoptiveParents` |
 | B | `B124_Trimmer`, `B146_Illusionist`, `B157_Salter`, `B19_MoldboardPlow`, `B21_HayloftBarn`, `B23_FinalScenario`, `B24_Lasso`, `B34_SpecialFood`, `B3_Moonshine`, `B42_ForestInn`, `B48_ForestStone`, `B55_MaintenancePremium`, `B67_HandTruck`, `B76_Ceilings`, `B81_Handcart`, `B83_MuddyPuddles`, `B85_FarmHand` |
 | C | `C104_Collector`, `C115_Sower`, `C120_AgriculturalLabourer`, `C130_OutskirtsDirector`, `C132_TimberShingleMaker`, `C133_Soldier`, `C142_MarketCrier`, `C146_WorkshopAssistant`, `C148_MudWallower`, `C151_SowingDirector`, `C153_PatternMaker`, `C156_HoofCaregiver`, `C162_ForestOwner`, `C167_CattleBuyer`, `C168_AnimalCatcher`, `C18_RollOverPlow`, `C19_SwingPlow`, `C1_Overhaul`, `C22_BasketChair`, `C23_JobContract`, `C24_BedintheGrainField`, `C25_SteamMachine`, `C29_BeerTable`, `C51_FishingNet`, `C57_Crudite`, `C63_CraftBrewery`, `C67_MineralFeeder`, `C69_LandConsolidation`, `C75_Firewood`, `C84_PerennialRye`, `C85_DenBuilder`, `C87_Mason`, `C8_PlantFertilizer`, `C93_InnerDistrictsDirector`, `C99_GardenDesigner` |
-| D | `D101_SugarBaker`, `D102_SampleStableMaker`, `D103_CanalBoatman`, `D107_Bellfounder`, `D10_StorksNest`, `D116_TreeInspector`, `D124_Emissary`, `D126_FieldCultivator`, `D127_HardworkingMan`, `D129_LumberVirtuoso`, `D132_HideFarmer`, `D134_OysterEater`, `D137_TradeTeacher`, `D138_PetLover`, `D14_HammerCrusher`, `D150_GodlySpouse`, `D157_PartyOrganizer`, `D158_BeanCounter`, `D161_CabbageBuyer`, `D167_PureBreeder`, `D20_TurnwrestPlow`, `D22_WorkPermit`, `D23_PioneeringSpirit`, `D26_CarpentersYard`, `D27_Retraining`, `D51_Archway`, `D66_PotterCeramics`, `D70_StrawManure`, `D71_Changeover`, `D72_StableManure`, `D74_RoyalWood`, `D82_HuntingTrophy`, `D92_ChildOmbudsman`, `D93_SheepInspector`, `D94_HenpeckedHusband`, `D96_Furnisher`, `D98_Transactor` |
+| D | `D101_SugarBaker`, `D102_SampleStableMaker`, `D103_CanalBoatman`, `D107_Bellfounder`, `D10_StorksNest`, `D116_TreeInspector`, `D124_Emissary`, `D126_FieldCultivator`, `D127_HardworkingMan`, `D129_LumberVirtuoso`, `D134_OysterEater`, `D137_TradeTeacher`, `D138_PetLover`, `D14_HammerCrusher`, `D150_GodlySpouse`, `D157_PartyOrganizer`, `D158_BeanCounter`, `D161_CabbageBuyer`, `D167_PureBreeder`, `D20_TurnwrestPlow`, `D22_WorkPermit`, `D23_PioneeringSpirit`, `D26_CarpentersYard`, `D27_Retraining`, `D51_Archway`, `D66_PotterCeramics`, `D70_StrawManure`, `D71_Changeover`, `D72_StableManure`, `D74_RoyalWood`, `D82_HuntingTrophy`, `D92_ChildOmbudsman`, `D93_SheepInspector`, `D94_HenpeckedHusband`, `D96_Furnisher`, `D98_Transactor` |
 | E | `E103_Wolf`, `E106_EmergencySeller`, `E10_StrawHat`, `E112_GrainThief`, `E123_ResourceHoarder`, `E125_DelayedWayfarer`, `E134_Omnifarmer`, `E148_Lazybones`, `E162_Entrepreneur`, `E166_Roastmaster`, `E167_DairyCrier`, `E22_GuestRoom`, `E27_PiggyBank`, `E4_Thunderbolt`, `E51_WhaleOil`, `E52_Cubbyhole`, `E53_BoarSpear`, `E58_LunchtimeBeer`, `E5_NightLoot`, `E73_Scythe`, `E74_AshTrees`, `E76_LumberPile`, `E78_SleightofHand`, `E81_AlchemistsLab`, `E83_ShepherdsWhistle`, `E85_MasterTanner`, `E86_PenBuilder` |
 
 ## 10. Hook 点清单
@@ -173,7 +174,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | 类型 | Hook 点 | 卡牌 |
 |---|---|---|
 | effect | `computeBonusScore` | `A101_CookeryOutfitter`, `A133_Braggart`, `A134_FullFarmer`, `A31_DebtSecurity`, `A32_Manger`, `A38_WoolBlankets`, `A98_StableArchitect`, `A99_FellowGrazer`, `B132_EstateMaster`, `B153_Housemaster`, `B30_WoodPalisades`, `B31_PotteryYard`, `B32_Kettle`, `B39_Loom`, `B98_OrganicFarmer`, `B99_Tutor`, `C100_Butler`, `C132_TimberShingleMaker`, `C134_CowPrince`, `C135_Constable`, `C30_HalfTimberedHouse`, `C31_WritingChamber`, `C33_GreeningPlan`, `C35_LanternHouse`, `C39_StudioBoat`, `C59_SchnappsDistillery`, `D100_LordoftheManor`, `D135_GardeningHeadOfficial`, `D136_AnimalActivist`, `D154_ChimneySweep`, `D157_PartyOrganizer`, `D29_MuckRake`, `D30_ArtisanDistrict`, `D31_Storeroom`, `D33_SummerHouse`, `D34_LuxuriousHostel`, `D35_FodderChamber`, `D36_BreedRegistry`, `D38_MilkingStool`, `D60_LargePottery`, `D92_ChildOmbudsman`, `E124_MayorCandidate`, `E134_Omnifarmer`, `E135_Pickler`, `E136_AnimalHusbandryWorker`, `E149_MidnightFencer`, `E153_StoneSculptor`, `E154_Margrave`, `E159_OldMiser`, `E32_Nave`, `E34_LandRegister`, `E35_Misanthropy`, `E37_OxSkull`, `E38_RodCollection` |
-| effect | `computeCostedBonus` | `A136_DrudgeryReeve`, `C133_Soldier`, `C99_GardenDesigner`, `D132_HideFarmer`, `E132_VeggieLover` |
+| effect | `computeCostedBonus` | `A136_DrudgeryReeve`, `C133_Soldier`, `C99_GardenDesigner`, `E132_VeggieLover` |
 | effect | `computeExtraRoomCapacity` | `A10_WoodenShed`, `A127_Lodger`, `A85_Homekeeper`, `B10_Caravan`, `B85_FarmHand`, `C10_BunkBeds`, `D85_Reader`, `E85_MasterTanner` |
 | effect | `computeLockedFarmTiles` | `B38_FutureBuildingSite` |
 | effect | `computeSharedPostScore` | `A135_AnimalReeve`, `B136_HouseSteward`, `C136_RanchProvost` |
@@ -183,7 +184,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | effect | `onAfterReap` | `A106_SlurrySpreader`, `A59_PotatoRidger`, `A64_BarleyMill`, `B21_HayloftBarn`, `B58_CrackWeeder`, `C106_PotatoHarvester`, `C120_AgriculturalLabourer`, `D113_FoodMerchant`, `D126_FieldCultivator`, `D63_Lynchet`, `D65_GrainSieve`, `E134_Omnifarmer` |
 | effect | `onAfterRoundEnd` | `A165_PigBreeder`, `A54_Credit`, `B53_SculptureCourse`, `D167_PureBreeder`, `D64_BakingCourse`, `D79_CarrotMuseum`, `E87_MasterRenovator` |
 | effect | `onAllWorkersPlaced` | `E125_DelayedWayfarer` |
-| effect | `onBeforeEndGame` | `B133_VillagePeasant` |
+| effect | `onBeforeEndGame` | `B133_VillagePeasant`, `D132_HideFarmer` |
 | effect | `onBeforeFeed` | `E159_OldMiser`, `E30_ChildsToy` |
 | effect | `onBeforeHarvest` | `A166_Haydryer`, `C92_AutumnMother`, `D32_WoodRake`, `D98_Transactor` |
 | effect | `onBeforePlayerTurn` | `D134_OysterEater` |
@@ -1021,7 +1022,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D129_LumberVirtuoso` | 已对齐 |  |
 | `D130_RecreationalCarpenter` | 已对齐 |  |
 | `D131_CraftsmanshipPromoter` | 已对齐 |  |
-| `D132_HideFarmer` | 需复核 | BGA 终局前玩家选择数量、真实支付 food 并隐藏空地；OA scoring solver 自动最优 |
+| `D132_HideFarmer` | 已对齐 | 终局前 `onBeforeEndGame` optional flow 选择 0..max 空地，真实支付 food 并写入 `hiddenSpaces`；空地罚分按 `farmyard-usage` used tile key 扣除有限 hiddenSpaces |
 | `D133_BeerTentOperator` | 已对齐 |  |
 | `D134_OysterEater` | 已对齐 |  |
 | `D135_GardeningHeadOfficial` | 已对齐 |  |

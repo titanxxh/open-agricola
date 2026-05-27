@@ -2150,6 +2150,7 @@ export const GameContainerApi = () => {
             ? {
                 availableByResource: interaction.request.availableByResource,
                 promptKey: interaction.request.promptKey,
+                requireAtLeastOne: interaction.request.requireAtLeastOne,
                 onConfirm: (counts) => {
                   if (!isInteractive) return
                   void transport
