@@ -194,9 +194,9 @@ const mapResourceMoved = (
   const gain = positiveResources(event.resources)
   if (Object.keys(gain).length === 0) return null
 
-  if (event.reason === 'harvest') {
+  if (event.reason === 'harvest' || event.reason === 'reap') {
     return {
-      key: 'log.harvestReapDetail',
+      key: event.reason === 'reap' ? 'log.reapDetail' : 'log.harvestReapDetail',
       params: {
         player: playerName(ctx, event.to.playerId),
         resources: gain,

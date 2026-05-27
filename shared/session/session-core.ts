@@ -298,6 +298,7 @@ type StageResumeState = {
   hook:
     | 'onBeforeHarvest'
     | 'onAfterReap'
+    | 'afterHarvestReapReaction'
     | 'onHarvest'
     | 'onEndHarvest'
     | 'onAfterHarvest'
@@ -2382,6 +2383,15 @@ export class GameCore {
 
   private continueHarvestReap(): SessionResponse {
     const harvestOrder = this.getHarvestPlayerIndices()
+    const reactionChildren: ActionFlow[] = []
+    const appendReactionFlow = (flow: ActionFlow | undefined) => {
+      if (!flow) return
+      if (flow.type === 'parallel') {
+        reactionChildren.push(...flow.children)
+        return
+      }
+      reactionChildren.push(flow)
+    }
     harvestOrder.forEach((index) => {
       const player = this.state.players[index]
       if (!player) return
@@ -2399,6 +2409,7 @@ export class GameCore {
         actorPlayerId: player.id,
         sourceActionId: 'reap',
       })
+      appendReactionFlow(result.reactionFlow)
       const entry = this.state.harvestReapSummary![player.id]!
       entry.grainFields += result.reapSummary.grainFields
       entry.vegetableFields += result.reapSummary.vegetableFields
@@ -2420,6 +2431,10 @@ export class GameCore {
         })
       }
     })
+    if (reactionChildren.length > 0) {
+      this.startStageFlow({ type: 'parallel', children: reactionChildren }, 'afterHarvestReapReaction', 0, 0)
+      return this.respond()
+    }
     return this.continueAfterReapEffects()
   }
 
@@ -2695,6 +2710,9 @@ export class GameCore {
         this.continueHarvestFromBeforeHarvest(stageResume.playerIndex, stageResume.cardIndex)
         return
       case 'onAfterReap':
+        this.continueAfterReapEffects(stageResume.playerIndex, stageResume.cardIndex)
+        return
+      case 'afterHarvestReapReaction':
         this.continueAfterReapEffects(stageResume.playerIndex, stageResume.cardIndex)
         return
       case 'onHarvest':

@@ -631,14 +631,18 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 回合结束: onRoundEnd → onAfterRoundEnd
 收获 (4/7/9/11/13/14):
   onBeforeHarvest → onStartHarvest
-  → onStartHarvestFieldPhase → onHarvestFieldPhase → reap [dispatch 'reap']
+  → onStartHarvestFieldPhase → onHarvestFieldPhase → reap [dispatch 'reap'] → reap reaction parallel
     → onAfterReap → onEndHarvestFieldPhase
   → onStartHarvestFeedingPhase → onBeforeFeed → onHarvestFeedingPhase
     → feed → onEndHarvestFeedingPhase → onAfterFeed
   → breed → onEndHarvest → onAfterHarvest
 ```
 
-所有 reap 走 `dispatchReapListener(state, player, crop, amount)` 派发 `'reap'` 合成事件。`onAllWorkersPlaced` 在所有人本轮工人放完且 `performRoundEnd` 之前触发；`place-farmer` 的 `params.fromSupply` 模式可在该阶段把 supply worker 标 active 后立即放置。
+普通 Harvest 收获用 `reap(..., { trigger: { phase: 'harvest' } })` 移除田里作物，事件层统一记录 `reason: 'reap'`。每种 crop 收获后走 `dispatchReapListener(state, player, crop, amount, ..., { trigger, sourceCard })` 派发 `'reap'` 合成事件；listener 返回的 flow 不在 dispatch 阶段执行，而是收集进普通 `parallel` stage flow，全部完成后再进入 `onAfterReap`。
+
+`private-field-phase` 是内部 action，不启动完整 Harvest：来源卡触发时设置 `trigger: { phase: 'private-field-phase', cardId: sourceCard }`，先收获普通田，再收获 Card Field，并跳过 Harvest summary 写入；普通田和 Card Field 的 `immediatelyAfter.reap` 反应同样合并成普通 `parallel` flow。
+
+`onAllWorkersPlaced` 在所有人本轮工人放完且 `performRoundEnd` 之前触发；`place-farmer` 的 `params.fromSupply` 模式可在该阶段把 supply worker 标 active 后立即放置。
 
 阶段 hook 已可返回 `ActionFlow`（`continueStageHook` / `continueAllWorkersPlacedHooks`），用于"hook 触发子流程"统一走 `EngineStack.push`。
 
@@ -671,7 +675,7 @@ OA 对齐规则：
 - optional accept/decline 语义必须由 flow 表达。典型例子：D27 Retraining 先执行 `set-flag false`，再把 `swap-improvement-with-board` 放入 optional child；decline 只清 flag，不预留 / 回滚公共 major 池。
 - 只影响可达性或费用的 listener 应返回纯 `doable` / `costs` / `bonuses`。典型例子：D82 Hunting Trophy 通过 `space.id` scoped `isDoable` + `computeCosts` 建模 farm/house redevelopment，不再用 before/after flag 或 `activeModifiers` 临时桥。
 
-**2026-05-13 Wave2a 合成 dispatch 边界：`trade-applied` / `reap` / `harvest-feed-conversion` / `future-meeple-resolved` 这类没有完整 engine 的 listener dispatch，只通过 immediate-special-effect helper 执行确定性的状态同步叶子。** 该 helper 只遍历非 optional 的 `special-effect` leaf，以及确定性的 `seq` / `parallel` flow；刻意跳过 `gain`、`pay`、interactive、optional、`or` / `xor`、跨 owner targeted flow。需要更丰富合成 listener 效果时，必须接入真实 engine flow 路径，而不是扩展这个 helper；这样 Wave2a 的 cardState-only 合成 listener 能保持 pure handler，同时不重新引入 dispatch-time handler mutation。`harvest-feed-conversion` 只把已提交的 `harvest.feedConverted` 事件放进 listener `transactionEvents`，不合成 `resource.exchanged`；`future-meeple-resolved` 只把已提交的 `futureMeeple.resolved` 事件按目标玩家分组放进 listener `transactionEvents`。这些 synthetic dispatch 都不包含任何单卡分支。
+**2026-05-13 Wave2a 合成 dispatch 边界：`trade-applied` / `harvest-feed-conversion` / `future-meeple-resolved` 这类没有完整 engine 的 listener dispatch，只通过 immediate-special-effect helper 执行确定性的状态同步叶子。** 该 helper 只遍历非 optional 的 `special-effect` leaf，以及确定性的 `seq` / `parallel` flow；刻意跳过 `gain`、`pay`、interactive、optional、`or` / `xor`、跨 owner targeted flow。需要更丰富合成 listener 效果时，必须接入真实 engine flow 路径，而不是扩展这个 helper；这样 Wave2a 的 cardState-only 合成 listener 能保持 pure handler，同时不重新引入 dispatch-time handler mutation。`reap` 已接入真实 engine flow 路径，由 Harvest / `private-field-phase` 收集 listener flow 并推进普通 `parallel`；`harvest-feed-conversion` 只把已提交的 `harvest.feedConverted` 事件放进 listener `transactionEvents`，不合成 `resource.exchanged`；`future-meeple-resolved` 只把已提交的 `futureMeeple.resolved` 事件按目标玩家分组放进 listener `transactionEvents`。这些 synthetic dispatch 都不包含任何单卡分支。
 
 **2026-05-13 Wave2b/c 落地规则：listener 内的 cardState / structural mutation 也必须通过 action leaf 执行。** 本轮把 A68 / A73 / A92 / B18 / B34 / B76 / C48 / C53 / C88 / C93 / C130 / C150 / D36 / D56 / D74 / D158 / E53 / E74 / E85 / E148 的剩余 handler mutation 迁出：
 
@@ -818,18 +822,23 @@ onReap?: (ctx: {
   state: GameState
   player: PlayerState
   crop: ExtraSowableCrop
-  /** 该卡上该 crop 经本次扣减后总 remaining === 0 */
+  amount: number
   isLast: boolean
+  cardId: string
+  trigger: ReapTrigger
+  sourceCard?: string
 }) => ActionFlow | void
 ```
 
-多 crop 各调一次回调；返回多个 flow 时基建用 `seq` 包装。对齐 BGA `$this->field = true`
+多 crop 各调一次回调；返回多个 flow 时基建用普通 `parallel` 包装。对齐 BGA `$this->field = true`
 + `getFieldDetails()` + `onPlayerAfterReap` 语义。
 
 **Harvest reap log 时序**：`harvestReapSummary` 初始化已从 `continueHarvestReap` 提前到
 `continueHarvestFieldStart`，基建在 `onHarvestFieldPhase` 内累加 `summary.resources[crop]`，
-让 `log.harvestReapDetail` 同时包含普通 field 与 cardField 产出（之前 cardField 累加发生在
+让 `log.reapDetail` 同时包含普通 field 与 cardField 产出（之前 cardField 累加发生在
 summary 初始化前会被丢弃）。
+
+`private-field-phase` 复用同一套 Card Field reaper registry，但传入 `updateHarvestSummary: false`，避免私人田地阶段污染普通 Harvest 日志 summary。
 
 当前迁移到该 helper 的 11 张卡：B68 / D75 / E80 / D25 / E72 / C70 / E68 / E69 / E70 /
 B113 / B141。
