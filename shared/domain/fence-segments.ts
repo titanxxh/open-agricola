@@ -20,3 +20,11 @@ export function getAvailableOwnOrdinaryFenceCount(player: PlayerState): number {
       getOwnOrdinaryFenceCount(player),
   )
 }
+
+export const getFenceCount = <T extends { fenceSegments: FenceSegment[] }>(
+  p: T,
+): number => p.fenceSegments.reduce((n, s) => n + (s.type === 'fence' ? 1 : 0), 0)
+
+export const getPalisadeCount = <T extends { fenceSegments: FenceSegment[] }>(
+  p: T,
+): number => p.fenceSegments.reduce((n, s) => n + (s.type === 'palisade' ? 1 : 0), 0)

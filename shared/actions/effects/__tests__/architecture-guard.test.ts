@@ -18,6 +18,8 @@ describe('effects architecture guard', () => {
       'breed.ts',
       'collect.ts',
       'construct.ts',
+      'exchange-resources.ts',
+      'exchange-to-trade.ts',
       'exchange.ts',
       'family-growth.ts',
       'fencing.ts',
@@ -34,6 +36,7 @@ describe('effects architecture guard', () => {
       'sow.ts',
       'special-effect.ts',
       'stables.ts',
+      'trade-applied-listener.ts',
     ])
   })
 
