@@ -24,6 +24,7 @@ export type AnytimePolicyInput = {
 
 const EXCHANGE_PROMPT_PREFIX = 'ui.interactionExchange'
 const BAKE_BREAD_PROMPT_PREFIX = 'ui.interactionBakeBread'
+const D132_HIDE_FARMER_OPTIONAL_PROMPT = 'ui.cards.D132_HideFarmer.optional'
 
 export function computeAnytimePolicy(input: AnytimePolicyInput): AnytimePolicy {
   if (!input.hasActiveContext) {
@@ -51,6 +52,13 @@ export function computeAnytimePolicy(input: AnytimePolicyInput): AnytimePolicy {
       promptKey.startsWith(EXCHANGE_PROMPT_PREFIX))
   ) {
     return { allowed: true, blockedIds: ['exchange'] }
+  }
+  if (
+    input.stageResume?.hook === 'onBeforeEndGame' &&
+    input.interactionKind === 'choice' &&
+    input.promptKey === D132_HIDE_FARMER_OPTIONAL_PROMPT
+  ) {
+    return { allowed: true, blockedIds: [] }
   }
   if (input.stageResume !== null) {
     return { allowed: false, reason: 'stage-hook-chain' }

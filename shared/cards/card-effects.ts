@@ -175,7 +175,7 @@ export type CardEffect = {
   onAfterHarvest?: FlowEffectHandler
   /** Runs once at the start of scoring, before any category computation.
    *  Use to mutate state (e.g. give resources) so categories see them. */
-  onBeforeEndGame?: EffectHandler
+  onBeforeEndGame?: FlowEffectHandler
   onBeforeStartOfTurn?: FlowEffectHandler
   /**
    * Fires immediately before control switches to a new active player at the
