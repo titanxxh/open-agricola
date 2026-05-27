@@ -145,3 +145,5 @@ Commit 标题规范：`feat: ...` / `fix: ...` / `refactor: ...` / `docs: ...`�
 | 卡牌实现现状 | `docs/card_implementation_status.md` |
 | CI Checks | `docs/operations/ci-checks.md` |
 | GitHub OAuth Setup | `docs/operations/github-oauth-app-setup.md` |
+
+@RTK.md
