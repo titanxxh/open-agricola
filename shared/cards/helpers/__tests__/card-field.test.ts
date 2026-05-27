@@ -168,7 +168,7 @@ describe('makeCardFieldImpl', () => {
   })
 
   describe('onHarvestFieldPhase: ActionFlow collection', () => {
-    it('single onReap flow → return that flow directly', () => {
+    it('single onReap flow → wrap in parallel', () => {
       const impl = makeCardFieldImpl('E68_CherryOrchard', { allowedCrops: ['wood'], capacity: 1 }, {
         onReap: () => ({ type: 'leaf', actionId: 'noop', sourceCard: 'E68_CherryOrchard' }),
       })
@@ -178,9 +178,12 @@ describe('makeCardFieldImpl', () => {
       const state = createState(player)
       initSummary(state, player.id)
       const flow = impl.effect.onHarvestFieldPhase!(state, player)
-      expect(flow).toMatchObject({ type: 'leaf', actionId: 'noop' })
+      expect(flow).toMatchObject({
+        type: 'parallel',
+        children: [{ type: 'leaf', actionId: 'noop' }],
+      })
     })
-    it('multiple onReap flows → wrap in seq', () => {
+    it('multiple onReap flows → wrap in parallel', () => {
       const impl = makeCardFieldImpl('E70_CropRotationField', { allowedCrops: ['grain', 'vegetable'], capacity: 2 }, {
         onReap: (ctx) => ({ type: 'leaf', actionId: `flow-${ctx.crop}`, sourceCard: 'E70_CropRotationField' }),
       })
@@ -189,8 +192,8 @@ describe('makeCardFieldImpl', () => {
       })
       const state = createState(player)
       initSummary(state, player.id)
-      const flow = impl.effect.onHarvestFieldPhase!(state, player) as { type: 'seq'; children: any[] }
-      expect(flow.type).toBe('seq')
+      const flow = impl.effect.onHarvestFieldPhase!(state, player) as { type: 'parallel'; children: any[] }
+      expect(flow.type).toBe('parallel')
       expect(flow.children).toHaveLength(2)
     })
   })

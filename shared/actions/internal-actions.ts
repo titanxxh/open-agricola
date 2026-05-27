@@ -34,6 +34,7 @@ import { selectionAction } from './effects/internal/selection'
 import { spendWorkerAction } from './effects/internal/spend-worker'
 import { activateCardEffectAction } from './effects/internal/activate-card-effect'
 import { specialEffectAction } from './effects/special-effect'
+import { privateFieldPhaseAction } from './effects/private-field-phase'
 
 export const internalActionDefinitions: ActionDefinition[] = [
   futureMeeplesAction,
@@ -74,4 +75,5 @@ export const internalActionDefinitions: ActionDefinition[] = [
   selectionAction,
   activateCardEffectAction,
   specialEffectAction,
+  privateFieldPhaseAction,
 ]

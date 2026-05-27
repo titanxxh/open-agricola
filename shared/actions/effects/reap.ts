@@ -1,10 +1,22 @@
-import type { ActionExecutionResult, GameState, HarvestReapSummary, PlayerState } from '../../contract/types'
+import type { ActionExecutionResult, ActionFlow, GameState, HarvestReapSummary, PlayerState } from '../../contract/types'
 import type { ActionSpace } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
 import { fieldTopStack, fieldPopIfDepleted } from '../../domain/field'
 import { runCardListeners } from '../../cards/card-listeners'
-import { executeImmediateSpecialEffectFlows } from './internal/immediate-special-effect-flow'
-import { EventStore } from '../../events/store'
+import type { ActionHookResult } from '../hooks'
+
+export type ReapTrigger = {
+  phase: string
+  actionId?: string
+  cardId?: string
+}
+
+export type ReapOptions = {
+  trigger?: ReapTrigger
+  sourceCard?: string
+}
+
+const defaultReapTrigger = (): ReapTrigger => ({ phase: 'harvest' })
 
 /**
  * Dispatch a 'reap' synthetic action event to card listeners.
@@ -15,9 +27,11 @@ export const dispatchReapListener = (
   player: PlayerState,
   crop: 'grain' | 'vegetable' | 'wood' | 'stone',
   amount: number,
-  eventSink?: EventSink,
-): void => {
+  _eventSink?: EventSink,
+  options: ReapOptions = {},
+): ActionFlow | undefined => {
   if (amount <= 0) return
+  const trigger = options.trigger ?? defaultReapTrigger()
   const space = {} as ActionSpace
   const results = runCardListeners({
     state,
@@ -25,36 +39,27 @@ export const dispatchReapListener = (
     space,
     actionId: 'reap',
     phase: 'immediatelyAfter',
-    extraData: { crop, amount },
+    extraData: {
+      crop,
+      amount,
+      trigger,
+      ...(options.sourceCard ? { sourceCard: options.sourceCard } : {}),
+    },
   }) ?? []
-  if (eventSink) {
-    executeImmediateSpecialEffectFlows({ state, player, space, eventSink, results })
-    return
-  }
-  if (results.length === 0) return
-  if (!Array.isArray(state.events)) state.events = []
-  if (!Number.isSafeInteger(state.nextEventSeq) || state.nextEventSeq < 1) {
-    state.nextEventSeq = 1
-  }
-  const store = new EventStore()
-  const frame = store.beginFrame({
-    actorPlayerId: player.id,
-    sourceActionId: 'reap',
-  })
-  executeImmediateSpecialEffectFlows({ state, player, space, eventSink: frame.sink, results })
-  const completed = frame.complete(state)
-  if (completed.length > 0) {
-    store.commitTransaction(state)
-  } else {
-    store.rollbackTransaction()
-  }
+  const children = results
+    .map((result: ActionHookResult) => result.flow)
+    .filter((flow): flow is ActionFlow => Boolean(flow))
+  if (children.length === 0) return
+  return { type: 'parallel', children }
 }
 
 export const reap = (
   state: GameState,
   player: PlayerState,
   eventSink?: EventSink,
-): ActionExecutionResult & { reapSummary: HarvestReapSummary } => {
+  options: ReapOptions = {},
+): ActionExecutionResult & { reapSummary: HarvestReapSummary; reactionFlow?: ActionFlow } => {
+  const trigger = options.trigger ?? defaultReapTrigger()
   const reapSummary: HarvestReapSummary = {
     resources: {},
     grainFields: 0,
@@ -62,6 +67,15 @@ export const reap = (
     harvestedPositions: [],
   }
   let stoneFields = 0
+  const reactionChildren: ActionFlow[] = []
+  const appendReactionFlow = (flow: ActionFlow | undefined) => {
+    if (!flow) return
+    if (flow.type === 'parallel') {
+      reactionChildren.push(...flow.children)
+      return
+    }
+    reactionChildren.push(flow)
+  }
   player.fields.forEach((field) => {
     const top = fieldTopStack(field)
     if (!top || top.remaining <= 0) return
@@ -86,26 +100,32 @@ export const reap = (
     eventSink?.emit<'farm.cropRemoved'>({
       type: 'farm.cropRemoved',
       crops: [cropEvent],
-      reason: 'harvest',
+      reason: 'reap',
+      trigger,
     })
     eventSink?.emit<'resource.moved'>({
       type: 'resource.moved',
       resources: { [kind]: 1 },
       from: cropEvent.location,
       to: { kind: 'player', playerId: player.id },
-      reason: 'harvest',
+      reason: 'reap',
+      trigger,
     })
   })
 
   if (reapSummary.grainFields > 0) {
-    dispatchReapListener(state, player, 'grain', reapSummary.grainFields, eventSink)
+    appendReactionFlow(dispatchReapListener(state, player, 'grain', reapSummary.grainFields, eventSink, options))
   }
   if (reapSummary.vegetableFields > 0) {
-    dispatchReapListener(state, player, 'vegetable', reapSummary.vegetableFields, eventSink)
+    appendReactionFlow(dispatchReapListener(state, player, 'vegetable', reapSummary.vegetableFields, eventSink, options))
   }
   if (stoneFields > 0) {
-    dispatchReapListener(state, player, 'stone', stoneFields, eventSink)
+    appendReactionFlow(dispatchReapListener(state, player, 'stone', stoneFields, eventSink, options))
   }
 
-  return { type: 'ok', reapSummary }
+  return {
+    type: 'ok',
+    reapSummary,
+    ...(reactionChildren.length > 0 ? { reactionFlow: { type: 'parallel' as const, children: reactionChildren } } : {}),
+  }
 }

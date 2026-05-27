@@ -30,7 +30,7 @@ registerAdHocMinorImprovement(
 
 type MinimalPlayer = Pick<
   PlayerState,
-  'occupationPlayed' | 'extraOccupationsFromCards' | 'fields' | 'pastures' | 'improvements' | 'minorPlayed'
+  'occupationPlayed' | 'extraOccupationsFromCards' | 'fields' | 'pastures' | 'improvements' | 'minorPlayed' | 'cardStates'
 >
 
 function makePlayer(overrides: Partial<MinimalPlayer> = {}): PlayerState {
@@ -41,6 +41,7 @@ function makePlayer(overrides: Partial<MinimalPlayer> = {}): PlayerState {
     pastures: [],
     improvements: [],
     minorPlayed: [],
+    cardStates: {},
     ...overrides,
   } as unknown as PlayerState
 }
@@ -117,5 +118,78 @@ describe('C70 Lettuce Patch as providesField', () => {
     })
     const card = { prerequisite: '2 Fields' }
     expect(meetsCardPrerequisites(player, card)).toBe(true)
+  })
+})
+
+describe('prerequisites: Card Fields with crops', () => {
+  it('ordinary grain fields alone satisfy "2 Grain Fields"', () => {
+    const player = makePlayer({
+      fields: [
+        { row: 1, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] } as unknown as PlayerState['fields'][0],
+        { row: 1, col: 2, stacks: [{ kind: 'grain', remaining: 1 }] } as unknown as PlayerState['fields'][0],
+      ],
+    })
+
+    expect(meetsCardPrerequisites(player, { prerequisite: '2 Grain Fields' })).toBe(true)
+  })
+
+  it('Card Field grain stacks alone satisfy "2 Grain Fields"', () => {
+    const player = makePlayer({
+      minorPlayed: ['B113_PatchCaregiver', 'B141_FieldCaretaker'],
+      cardStates: {
+        B113_PatchCaregiver: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
+        B141_FieldCaretaker: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
+      },
+    })
+
+    expect(meetsCardPrerequisites(player, { prerequisite: '2 Grain Fields' })).toBe(true)
+  })
+
+  it('ordinary grain field plus Card Field grain stack satisfies "2 Grain Fields"', () => {
+    const player = makePlayer({
+      fields: [{ row: 1, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] } as unknown as PlayerState['fields'][0]],
+      minorPlayed: ['TEST_FieldProvider'],
+      cardStates: {
+        TEST_FieldProvider: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
+      },
+    })
+
+    expect(meetsCardPrerequisites(player, { prerequisite: '2 Grain Fields' })).toBe(true)
+  })
+
+  it('combined count below two does not satisfy "2 Grain Fields"', () => {
+    const player = makePlayer({
+      fields: [{ row: 1, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] } as unknown as PlayerState['fields'][0]],
+    })
+
+    expect(meetsCardPrerequisites(player, { prerequisite: '2 Grain Fields' })).toBe(false)
+  })
+
+  it('non-grain Card Fields do not count toward "2 Grain Fields"', () => {
+    const player = makePlayer({
+      fields: [{ row: 1, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] } as unknown as PlayerState['fields'][0]],
+      minorPlayed: ['TEST_FieldProvider'],
+      cardStates: {
+        TEST_FieldProvider: { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 1 }] } },
+      },
+    })
+
+    expect(meetsCardPrerequisites(player, { prerequisite: '2 Grain Fields' })).toBe(false)
+  })
+
+  it('other players card fields are not part of this player prerequisite count', () => {
+    const player = makePlayer({
+      fields: [{ row: 1, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] } as unknown as PlayerState['fields'][0]],
+    })
+    const opponent = makePlayer({
+      minorPlayed: ['B113_PatchCaregiver', 'B141_FieldCaretaker'],
+      cardStates: {
+        B113_PatchCaregiver: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
+        B141_FieldCaretaker: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
+      },
+    })
+
+    expect(meetsCardPrerequisites(player, { prerequisite: '2 Grain Fields' })).toBe(false)
+    expect(meetsCardPrerequisites(opponent, { prerequisite: '2 Grain Fields' })).toBe(true)
   })
 })
