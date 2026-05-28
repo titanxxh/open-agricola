@@ -2,7 +2,6 @@ import type { ActionChoiceOption, InteractionRequest } from '../../contract/type
 import type { PromptKey } from '../../contract/prompt-keys'
 import type { EngineNode, EngineContext, NodeStepResult } from '../types'
 import { BaseNode } from './base'
-import { ActionNode } from './action-node'
 import { isActivateCardActionNode, type ActivateCardActionNode } from '../activation-action'
 
 export type ParallelNodeMode = 'all' | 'trigger-select'
@@ -34,22 +33,39 @@ export class ParallelNode extends BaseNode {
     return this.children.filter(isActivateCardActionNode)
   }
 
+  private remainingTriggerChildren(): { child: EngineNode; metadata: ParallelTriggerChild }[] {
+    if (this.triggerChildren.length === 0) {
+      return this.cardChildren()
+        .filter((child) => child.getState() !== 'resolved')
+        .map((child) => ({ child, metadata: this.triggerChildMetadata(child) }))
+    }
+    return this.triggerChildren
+      .map((metadata) => ({
+        metadata,
+        child: this.children.find((child) => child.id === metadata.nodeId),
+      }))
+      .filter((entry): entry is { child: EngineNode; metadata: ParallelTriggerChild } =>
+        Boolean(entry.child) && entry.child!.getState() !== 'resolved',
+      )
+  }
+
   getRemainingCardIds(): string[] {
     return this.cardChildren()
       .filter((c) => c.getState() !== 'resolved')
       .map((c) => c.params.cardId)
   }
 
-  chooseCard(cardId: string): ActionNode | null {
+  chooseCard(cardId: string): EngineNode | null {
     if (this.mode !== 'trigger-select') return null
-    const child = this.cardChildren().find((c) => c.params.cardId === cardId && c.getState() !== 'resolved') ?? null
-    if (child) this.selectedChildId = child.id
-    return child
+    const entry = this.remainingTriggerChildren().find(({ metadata }) => metadata.cardId === cardId)
+    if (!entry) return null
+    this.selectedChildId = entry.child.id
+    return entry.child
   }
 
   canPassTriggerSelection(): boolean {
     if (this.mode !== 'trigger-select') return false
-    return !this.remainingCardChildren().some((c) => this.triggerChildMetadata(c).mandatory === true)
+    return !this.remainingTriggerChildren().some(({ metadata }) => metadata.mandatory === true)
   }
 
   passAll(): boolean {
@@ -63,7 +79,7 @@ export class ParallelNode extends BaseNode {
 
   resolveRemainingTriggerChildrenForPass(): void {
     if (this.mode !== 'trigger-select') return
-    for (const child of this.cardChildren()) {
+    for (const child of this.children) {
       if (child.getState() !== 'resolved') child.resolve()
     }
     this.checkResolved()
@@ -84,22 +100,17 @@ export class ParallelNode extends BaseNode {
     }
   }
 
-  private remainingCardChildren(): ActivateCardActionNode[] {
-    return this.cardChildren().filter((c) => c.getState() !== 'resolved')
-  }
-
   buildSelectOptions(): ActionChoiceOption[] {
     if (this.mode !== 'trigger-select') return []
-    const remaining = this.remainingCardChildren()
-    const cardOpts = remaining.map((c) => {
-      const metadata = this.triggerChildMetadata(c)
+    const remaining = this.remainingTriggerChildren()
+    const cardOpts = remaining.map(({ metadata }) => {
       return {
         value: metadata.cardId,
         labelKey: `cards.${metadata.cardId}.name`,
         sourceCard: metadata.cardId,
       }
     })
-    const anyMandatory = remaining.some((c) => this.triggerChildMetadata(c).mandatory === true)
+    const anyMandatory = remaining.some(({ metadata }) => metadata.mandatory === true)
     if (!anyMandatory) {
       return [...cardOpts, { value: '__pass__', labelKey: 'ui.interactionSelectTriggerPass' }]
     }
@@ -133,7 +144,7 @@ export class ParallelNode extends BaseNode {
       if (this.selectedChildId) {
         return { kind: 'continue' }
       }
-      if (this.cardChildren().every((c) => c.getState() === 'resolved')) {
+      if (this.remainingTriggerChildren().length === 0) {
         return { kind: 'continue' }
       }
       const options = this.buildSelectOptions()

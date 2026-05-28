@@ -650,6 +650,15 @@ export function buildFlowNode(
   }
   if (flow.type === 'parallel') {
     const parallel = new ParallelNode(nextId(), children)
+    if (flow.mode === 'trigger-select') {
+      parallel.mode = 'trigger-select'
+      parallel.triggerChildren = children.map((child, index) => ({
+        nodeId: child.id,
+        cardId: flow.children[index]?.sourceCard ?? `child-${index}`,
+        listenerId: '',
+        mandatory: flow.children[index]?.optional !== true,
+      }))
+    }
     const node = flow.optional ? markOptional(parallel, flow.promptKey) : parallel
     return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
   }
