@@ -2365,6 +2365,7 @@ export class GameCore {
           resources: {},
           grainFields: 0,
           vegetableFields: 0,
+          harvestedCrops: [],
           harvestedPositions: [],
         }
       })
@@ -2422,6 +2423,12 @@ export class GameCore {
         entry.harvestedPositions = [
           ...(entry.harvestedPositions ?? []),
           ...result.reapSummary.harvestedPositions,
+        ]
+      }
+      if (result.reapSummary.harvestedCrops?.length) {
+        entry.harvestedCrops = [
+          ...(entry.harvestedCrops ?? []),
+          ...result.reapSummary.harvestedCrops,
         ]
       }
       incHarvestedGrain(player, result.reapSummary.resources.grain ?? 0)

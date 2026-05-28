@@ -49,4 +49,37 @@ describe('PlayerStats harvest tracking', () => {
     expect(after.stats.harvestedVegetable).toBe(1)
     expect(after.stats.harvestedGrain).toBe(0)
   })
+
+  it('harvest reap summary keeps harvested crop details during field phase', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.fields = [
+      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
+      { row: 0, col: 1, stacks: [{ kind: 'vegetable', remaining: 1 }] },
+    ]
+    state.harvestReapSummary = Object.fromEntries(state.players.map((p) => [
+      p.id,
+      {
+        resources: {},
+        grainFields: 0,
+        vegetableFields: 0,
+        harvestedPositions: [],
+        harvestedCrops: [],
+      },
+    ]))
+    session.loadState(state)
+
+    const core = session as unknown as {
+      continueHarvestReap: () => void
+      continueAfterReapEffects: () => void
+    }
+    core.continueAfterReapEffects = () => undefined
+    core.continueHarvestReap()
+
+    expect(session.getState().state.harvestReapSummary![player.id]!.harvestedCrops).toEqual([
+      { row: 0, col: 0, crop: 'grain', amount: 1, sources: ['base'] },
+      { row: 0, col: 1, crop: 'vegetable', amount: 1, sources: ['base'] },
+    ])
+  })
 })
