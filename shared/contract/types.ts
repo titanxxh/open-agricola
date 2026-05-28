@@ -340,10 +340,19 @@ export type FutureMeepleRequest =
       }[]
     }
 
+export type HarvestedCropSummaryEntry = {
+  row: number
+  col: number
+  crop: CropStack['kind']
+  amount: number
+  sources: string[]
+}
+
 export type HarvestReapSummary = {
   resources: Partial<Resource>
   grainFields: number
   vegetableFields: number
+  harvestedCrops?: HarvestedCropSummaryEntry[]
   /**
    * Positions of every field tile that produced a crop in this reap pass.
    * Mirror of BGA `getHarvestedFieldTilePositions($crops)`. Cards like
