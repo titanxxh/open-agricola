@@ -55,9 +55,6 @@ describe('E30_ChildsToy session', () => {
       }
     }
 
-    // With the card, newbornCount should have been set to 0 before feeding
-    // So required = max(0, 2 * 2 - 0) = 4
-    // Player had 4 food, so exactly enough — no begging
     expect(resp.state.players[0]!.resources.begging).toBe(0)
     expect(resp.state.players[0]!.resources.food).toBe(0)
   })
@@ -203,19 +200,9 @@ describe('E30_ChildsToy session', () => {
       }
     }
 
-    // After harvest feeding completes (onAfterFeed restores), the newborn flag
-    // remains until normal round end. Verify it survived feeding so post-feed
-    // listeners (e.g. A35 SwimmingClass at onStartReturnHome) still see it.
-    // (After full round end the engine clears all newborn flags in
-    // continueAfterRoundEnd; that is unrelated to this regression.)
-    // NOTE: drainHarvestFlow goes all the way through round end → newborn cleared.
-    // To probe specifically the post-feed-but-pre-roundEnd state would require
-    // intercepting feeding. Instead we assert the new round started cleanly:
-    // there are 3 active workers (size preserved) and food was deducted by 3*2=6.
     const p1 = resp.state.players[0]!
     expect(p1.workers.filter((w) => w.isActive).length).toBe(3)
     expect(p1.resources.food).toBe(4) // 10 - 6
-    // Sanity: newborn flag at end-of-round is cleared by engine (independent of E30).
     expect(newbornCount(p1)).toBe(0)
   })
 

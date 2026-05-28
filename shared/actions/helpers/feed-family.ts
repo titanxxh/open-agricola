@@ -1,11 +1,8 @@
-import type { ActionExecutionResult, PlayerState } from '../../contract/types'
-import { familySize, newbornCount } from '../../domain/player'
+import type { ActionExecutionResult, GameState, PlayerState } from '../../contract/types'
+import { computeHarvestFeedingRequirement } from './harvest-feeding-requirement'
 
-export const feedFamily = (player: PlayerState): ActionExecutionResult => {
-  const size = familySize(player)
-  const newborns = newbornCount(player)
-  const newbornPenalty = Math.min(newborns, size)
-  let requiredFood = Math.max(0, size * 2 - newbornPenalty)
+export const feedFamily = (state: GameState, player: PlayerState): ActionExecutionResult => {
+  let requiredFood = computeHarvestFeedingRequirement(state, player)
   const useFood = Math.min(player.resources.food, requiredFood)
   player.resources.food -= useFood
   requiredFood -= useFood

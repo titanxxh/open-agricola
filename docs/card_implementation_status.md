@@ -85,6 +85,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | Action-level cancel policy 已进入通用基础设施 | `shared/engine/engine-resolve.ts`、farm-select actions、`reorganize`、internal `selection` | 非 `exchange` / `bake-bread` 的 protected atomic action 直接 `cancel` 会在 hook / action resolve 前被 recoverable reject，pending 保持；optional 只走 parent node 的 `__skip__`。当前 protected set 是 `plow` / `sow` / `construct` / `stables` / `fence` / `reorganize` / `selection`。`selection` 默认至少选 1 项，只有显式 `minSelections: 0` 才允许空提交，并且提交路径按 `positionFilter` / `selectableTiles` 校验可选位置。`construct` / `fence` entry guard 还会过滤无 reachable room / 无 legal fence commit 的真实 state，包括 C88 这类 cloned preview player，避免 confirm-only prompt 进入死路；fence layout feasibility 复用缓存的 connected tile sets，避免 availability 检查反复枚举农场组合。 |
 | Private Field Phase 已进入通用收获基础设施 | `private-field-phase` internal action、`reap` trigger metadata、Card Field reaper registry | C72/E25 不再返回未注册 `reap` leaf；普通田和 Card Field 都走 `reason: 'reap'` 事件与同一套 `immediatelyAfter.reap` listener，并用普通 `parallel` flow 承载反应。 |
 | Harvest field stage hook parallel 已进入通用收获基础设施 | `onStartHarvestFieldPhase` / `onHarvestFieldPhase` / `onEndHarvestFieldPhase`、`stageResume`、stage-level `parallel` flow | 三个 field phase hook 进入阶段时先收集全部可触发 card flows，再交给 engine 并行驱动；不再用逐卡 cursor 作为规则语义，普通 `reap` 仍在 `onHarvestFieldPhase` reactions 后发生。 |
+| Harvest feeding requirement modifier 已进入通用收获基础设施 | `computeHarvestFeedingRequirement()`、`registerHarvestFeedingRequirementModifier()`、E30/E159 | E30/E159 对齐 BGA `Player::getHarvestCost()` 公式扩展，不再通过 `onBeforeFeed` / `onAfterFeed` 临时改资源或 worker 标记；喂食主路径只读取通用公式结果。 |
 | Cross-player undo boundary 已进入通用基础设施 | `confirm-player-switch`、SessionResponse undo availability、`undoStep` / `undoAction` boundary guard | opponent-scope trigger 切到 owner prompt 后不暴露 undo；后续 undo 只能回到切换后的 prompt，不能跨回触发玩家行动状态。 |
 | Before-endgame hook flow 已进入通用基础设施 | `onBeforeEndGame?: FlowEffectHandler`、`stageResume.hook='onBeforeEndGame'`、D132_HideFarmer | round 14 的 `onAfterRoundEnd` 完成后先运行 before-endgame hook flow，再进入 `gameover`；hook pending 可通过 stage resume 回到同一终局前链。`anytime-policy` 仅对白名单 D132 optional choice prompt 放开 anytime，数量选择 prompt 仍保持 stage hook chain 锁定。 |
 | DevMode 卡牌注入/回收路径已对齐 played-card 模型 | `devPlayCard`、`devDrawCard`、`player.improvements`、`availableMajorImprovements` | 调试面板直接打出 major 时写入玩家 major 区并移出公共供应区；draw 已打出卡牌时会从任意玩家 played/improvements 区移除并清理对应 `cardStates`，minor/occupation 回目标手牌，major 回公共供应区。 |
@@ -181,13 +182,11 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | effect | `computeLockedFarmTiles` | `B38_FutureBuildingSite` |
 | effect | `computeSharedPostScore` | `A135_AnimalReeve`, `B136_HouseSteward`, `C136_RanchProvost` |
 | effect | `getInvalidAnimals` | `B11_Feedyard`, `C11_WildlifeReserve`, `C12_CattleFarm`, `C148_MudWallower`, `C86_LivestockFeeder`, `E11_PettingZoo`, `E33_BeaverColony`, `E36_HerbalGarden`, `E86_PenBuilder` |
-| effect | `onAfterFeed` | `E30_ChildsToy` |
 | effect | `onAfterHarvest` | `B82_ValueAssets`, `C34_ElephantgrassPlant`, `C66_EternalRyeCultivation`, `D99_EarthenwarePotter`, `E134_Omnifarmer`, `E91_PlowBuilder` |
 | effect | `onAfterReap` | `A106_SlurrySpreader`, `A59_PotatoRidger`, `A64_BarleyMill`, `B21_HayloftBarn`, `B58_CrackWeeder`, `C106_PotatoHarvester`, `C120_AgriculturalLabourer`, `D113_FoodMerchant`, `D126_FieldCultivator`, `D63_Lynchet`, `D65_GrainSieve`, `E134_Omnifarmer` |
 | effect | `onAfterRoundEnd` | `A165_PigBreeder`, `A54_Credit`, `B53_SculptureCourse`, `D167_PureBreeder`, `D64_BakingCourse`, `D79_CarrotMuseum`, `E87_MasterRenovator` |
 | effect | `onAllWorkersPlaced` | `E125_DelayedWayfarer` |
 | effect | `onBeforeEndGame` | `B133_VillagePeasant`, `D132_HideFarmer` |
-| effect | `onBeforeFeed` | `E159_OldMiser`, `E30_ChildsToy` |
 | effect | `onBeforeHarvest` | `A166_Haydryer`, `C92_AutumnMother`, `D32_WoodRake`, `D98_Transactor` |
 | effect | `onBeforePlayerTurn` | `D134_OysterEater` |
 | effect | `onBeforeReturnHome` | `B117_Informant`, `B140_FarmyardWorker`, `B158_DistrictManager`, `B160_PubOwner`, `D130_RecreationalCarpenter`, `D142_PotatoPlanter`, `D51_Archway`, `E10_StrawHat`, `E143_Hewer`, `E158_StoneCustodian`, `E23_Apiary`, `E26_Sundial`, `E27_PiggyBank` |

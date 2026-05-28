@@ -187,8 +187,6 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 - `onStartHarvestFeedingPhase`
 - `onHarvestFeedingPhase`
 - `onEndHarvestFeedingPhase`
-- `onBeforeFeed`
-- `onAfterFeed`
 - `onEndHarvest`
 - `onAfterHarvest`
 - `onBeforeEndGame`

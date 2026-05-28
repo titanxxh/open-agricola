@@ -72,7 +72,7 @@ const card = new MinorImprovement({ ... })
 | `onRoundEnd` / `onAfterRoundEnd` | 每轮结束 | 每轮 |
 | `onBeforeHarvest` / `onStartHarvest` / `onHarvest` / `onEndHarvest` / `onAfterHarvest` | 收获前/中/后 | 每 4-5 轮 |
 | `onStartHarvestFieldPhase` / `onHarvestFieldPhase` / `onEndHarvestFieldPhase` / `onAfterReap` | 收割田地子阶段 | 每收获 |
-| `onStartHarvestFeedingPhase` / `onHarvestFeedingPhase` / `onEndHarvestFeedingPhase` / `onBeforeFeed` / `onAfterFeed` | 喂食子阶段 | 每收获 |
+| `onStartHarvestFeedingPhase` / `onHarvestFeedingPhase` / `onEndHarvestFeedingPhase` | 喂食子阶段 | 每收获 |
 
 **以下 hook 仅对官方卡（直接 import 注册）有效；自定义卡沙盒会过滤掉，写了不会触发**（详见 §7.3）：
 
@@ -175,7 +175,7 @@ registerCardListener({
 
 #### 7.3 沙盒识别的 effect hook（`cardEffectHooks` 白名单交集）
 
-`onBuy` / `onBeforeStartOfTurn` / `onRoundStart` / `onAllWorkersPlaced` / `onEndTurn` / `onBeforeReturnHome` / `onStartReturnHome` / `onReturnHome` / `onRoundEnd` / `onAfterRoundEnd` / `onBeforeHarvest` / `onStartHarvest` / `onStartHarvestFieldPhase` / `onHarvestFieldPhase` / `onEndHarvestFieldPhase` / `onAfterReap` / `onStartHarvestFeedingPhase` / `onHarvestFeedingPhase` / `onEndHarvestFeedingPhase` / `onBeforeFeed` / `onAfterFeed` / `onHarvest` / `onEndHarvest` / `onAfterHarvest`。
+`onBuy` / `onBeforeStartOfTurn` / `onRoundStart` / `onAllWorkersPlaced` / `onEndTurn` / `onBeforeReturnHome` / `onStartReturnHome` / `onReturnHome` / `onRoundEnd` / `onAfterRoundEnd` / `onBeforeHarvest` / `onStartHarvest` / `onStartHarvestFieldPhase` / `onHarvestFieldPhase` / `onEndHarvestFieldPhase` / `onAfterReap` / `onStartHarvestFeedingPhase` / `onHarvestFeedingPhase` / `onEndHarvestFeedingPhase` / `onHarvest` / `onEndHarvest` / `onAfterHarvest`。
 
 **沙盒不识别**（写了也不会触发）：`computeBonusScore` / `computeCostedBonus` / `computeSharedPostScore` / `computeExtraRoomCapacity` / `onComputeAnimalZones` / `onComputeSowableFields` / `onSowExtraField` / `computeLockedFarmTiles` / `handHooks`。终局加分请改成在 `onAfterHarvest`（最后一轮）等阶段串多个 `bonus-vp` leaf 近似实现。围栏折扣改用 listener `computeCosts` phase（actions: `['fence']`）。
 
