@@ -890,6 +890,7 @@ export class GameCore {
       const parallel = new ParallelNode(`par-${counter.value++}`, children)
       if (flow.mode === 'trigger-select') {
         parallel.mode = 'trigger-select'
+        parallel.triggerOwnerPlayerId = ownerPlayerId
         parallel.triggerChildren = children.map((child, index) => ({
           nodeId: child.id,
           cardId: flow.children[index]?.sourceCard ?? `child-${index}`,
@@ -2299,8 +2300,8 @@ export class GameCore {
     playerIndex = 0,
     cardIndex = 0,
   ) {
-    if (playerIndex === 0 && cardIndex === 0 && parallelHarvestFieldStageHooks.has(hook)) {
-      return this.continueParallelStageHook(hook)
+    if (cardIndex === 0 && parallelHarvestFieldStageHooks.has(hook)) {
+      return this.continueParallelStageHook(hook, playerIndex)
     }
     for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
       const player = this.state.players[currentPlayerIndex]
@@ -2324,11 +2325,12 @@ export class GameCore {
 
   private continueParallelStageHook(
     hook: StageResumeState['hook'],
+    playerIndex = 0,
   ) {
-    const children: ActionFlow[] = []
-    for (let currentPlayerIndex = 0; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
+    for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
       const player = this.state.players[currentPlayerIndex]
       if (!player) continue
+      const children: ActionFlow[] = []
       const cards = [
         ...this.getPlayerEffectCardIds(player),
         ...this.getPlayerHandEffectCardIds(player, hook as CardEffectHook),
@@ -2344,10 +2346,17 @@ export class GameCore {
           children.push(ownedFlow)
         }
       }
+      if (children.length === 0) continue
+      this.startStageFlow(
+        { type: 'parallel', mode: 'trigger-select', children },
+        hook,
+        currentPlayerIndex,
+        0,
+        currentPlayerIndex + 1,
+      )
+      return true
     }
-    if (children.length === 0) return false
-    this.startStageFlow({ type: 'parallel', mode: 'trigger-select', children }, hook, 0, 0, this.state.players.length)
-    return true
+    return false
   }
 
   private continueSinglePlayerStageHook(
