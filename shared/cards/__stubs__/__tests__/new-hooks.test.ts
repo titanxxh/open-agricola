@@ -55,6 +55,18 @@ function registerHarvestFieldFlowCards(
 const firstChildSourceCard = (flow: ActionFlow) =>
   flow.type === 'leaf' ? flow.sourceCard : flow.children[0]?.sourceCard
 
+function resolveSourceCardChoice(
+  session: GameSession,
+  resp: ReturnType<GameSession['performRoundEnd']>,
+  sourceCard: string,
+) {
+  expect(resp.interaction.stateId).toBe('wait')
+  if (resp.interaction.stateId !== 'wait') return resp
+  const option = resp.interaction.options?.find((o) => o.sourceCard === sourceCard && o.value !== '__skip__')
+  expect(option).toBeDefined()
+  return session.resolveChoice(resp.interaction.playerIndex ?? 0, option!.value)
+}
+
 describe('New hook stubs - ReturnHome sub-phases', () => {
   beforeEach(() => {
     clearActionHooks()
@@ -147,6 +159,7 @@ describe('New hook stubs - Harvest sub-phases', () => {
     if (source?.kind !== 'flow') return
     expect(source.flow.type).toBe('parallel')
     if (source.flow.type !== 'parallel') return
+    expect(source.flow.mode).toBe('trigger-select')
     expect(source.flow.children.map(firstChildSourceCard)).toEqual(cardIds)
   })
 
@@ -171,6 +184,30 @@ describe('New hook stubs - Harvest sub-phases', () => {
     expect(source.flow.type).toBe('parallel')
     if (source.flow.type !== 'parallel') return
     expect(source.flow.children.map((child) => child.targetPlayerId)).toEqual([p0.id, p1.id])
+  })
+
+  it('harvest field parallel choices resume the stage once after out-of-order resolution', () => {
+    const hook = 'onStartHarvestFieldPhase'
+    const cardIds = registerHarvestFieldFlowCards(hook)
+    const { session, state } = makeSession(4, cardIds)
+    state.players.forEach((player) => {
+      player.resources.food = 20
+    })
+    session.loadState(state)
+
+    let resp = session.performRoundEnd()
+    resp = resolveSourceCardChoice(session, resp, cardIds[1]!)
+    resp = resolveSourceCardChoice(session, resp, cardIds[1]!)
+    resp = resolveSourceCardChoice(session, resp, cardIds[0]!)
+    resp = resolveSourceCardChoice(session, resp, cardIds[0]!)
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('idle')
+    expect(resp.state.roundPhase).not.toBe('field')
+    expect(resp.state.players[0]!.resources.wood).toBe(2)
+    expect(session.getEngineStack().toCursor().frames.some((frame) =>
+      frame.stageResume?.hook === hook,
+    )).toBe(false)
   })
 
   it('HarvestFeedingPhase hooks all fire during feeding phase', () => {

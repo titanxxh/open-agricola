@@ -888,6 +888,15 @@ export class GameCore {
     }
     if (flow.type === 'parallel') {
       const parallel = new ParallelNode(`par-${counter.value++}`, children)
+      if (flow.mode === 'trigger-select') {
+        parallel.mode = 'trigger-select'
+        parallel.triggerChildren = children.map((child, index) => ({
+          nodeId: child.id,
+          cardId: flow.children[index]?.sourceCard ?? `child-${index}`,
+          listenerId: '',
+          mandatory: flow.children[index]?.optional !== true,
+        }))
+      }
       return flow.optional ? markOptional(parallel, flow.promptKey) : parallel
     }
     if (flow.type === 'xor') {
@@ -2327,13 +2336,17 @@ export class GameCore {
       for (const cardId of cards) {
         const flow = runCardEffectHook(this.state, player, cardId, hook as CardEffectHook)
         if (flow) {
-          const ownedFlow: ActionFlow = flow.targetPlayerId ? flow : { ...flow, targetPlayerId: player.id }
+          const ownedFlow: ActionFlow = {
+            ...flow,
+            sourceCard: flow.sourceCard ?? cardId,
+            targetPlayerId: flow.targetPlayerId ?? player.id,
+          }
           children.push(ownedFlow)
         }
       }
     }
     if (children.length === 0) return false
-    this.startStageFlow({ type: 'parallel', children }, hook, 0, 0, this.state.players.length)
+    this.startStageFlow({ type: 'parallel', mode: 'trigger-select', children }, hook, 0, 0, this.state.players.length)
     return true
   }
 

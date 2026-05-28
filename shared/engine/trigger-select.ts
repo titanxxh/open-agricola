@@ -12,9 +12,10 @@ import {
 } from '../cards/card-listeners'
 import { isActivateCardActionNode, type ActivateCardActionNode } from './activation-action'
 import type { ParallelNode } from './nodes'
+import type { EngineNode } from './types'
 
 export type TriggerOptionState = {
-  child: ActivateCardActionNode
+  child: EngineNode
   cardId: string
   listenerId: string
   mandatory: boolean
@@ -141,14 +142,46 @@ const previewResourcesAfterChild = (
   return applyPureResourceFlowPreview(result.flow, context.player.resources) ?? undefined
 }
 
-const unresolvedTriggerChildren = (node: ParallelNode): ActivateCardActionNode[] =>
-  node.children.filter(isActivateCardActionNode).filter((child) => child.getState() !== 'resolved')
+type TriggerSelectableChild = {
+  child: EngineNode
+  cardId: string
+  listenerId: string
+  mandatory: boolean
+}
+
+const unresolvedTriggerChildren = (node: ParallelNode): TriggerSelectableChild[] => {
+  if (node.triggerChildren.length > 0) {
+    return node.triggerChildren
+      .map((metadata) => ({
+        metadata,
+        child: node.children.find((child) => child.id === metadata.nodeId),
+      }))
+      .filter((entry): entry is { metadata: typeof entry.metadata; child: EngineNode } =>
+        Boolean(entry.child) && entry.child!.getState() !== 'resolved',
+      )
+      .map(({ metadata, child }) => ({
+        child,
+        cardId: metadata.cardId,
+        listenerId: metadata.listenerId,
+        mandatory: metadata.mandatory,
+      }))
+  }
+  return node.children
+    .filter(isActivateCardActionNode)
+    .filter((child) => child.getState() !== 'resolved')
+    .map((child) => ({
+      child,
+      cardId: child.params.cardId,
+      listenerId: child.params.listenerId,
+      mandatory: child.params.mandatory === true,
+    }))
+}
 
 const getBeforeActionIds = (node: ParallelNode): string[] => {
   const actionIds = new Set<string>()
-  for (const child of node.children.filter(isActivateCardActionNode)) {
-    if (child.getState() !== 'resolved' && child.params.phase === 'before') {
-      actionIds.add(child.params.actionId)
+  for (const entry of unresolvedTriggerChildren(node)) {
+    if (isActivateCardActionNode(entry.child) && entry.child.params.phase === 'before') {
+      actionIds.add(entry.child.params.actionId)
     }
   }
   return [...actionIds]
@@ -194,29 +227,33 @@ export const evaluateTriggerSelect = (
   const optionStates: TriggerOptionState[] = []
   const options: ActionChoiceOption[] = []
 
-  for (const child of unresolvedTriggerChildren(node)) {
-    const metadata = node.triggerChildren.find((entry) => entry.nodeId === child.id)
-    const listener = getListenerById(child.params.listenerId)
-    const preview = listener ? previewContextForChild(child, context) : null
+  for (const entry of unresolvedTriggerChildren(node)) {
+    const { child } = entry
+    const listener = isActivateCardActionNode(child) ? getListenerById(entry.listenerId) : undefined
+    const preview = listener && isActivateCardActionNode(child) ? previewContextForChild(child, context) : null
     const result = listener && preview
       ? executeCardListener(listener, preview.listenerContext, {
         ownerPlayerId: preview.ownerPlayerId,
-        ownerCardId: metadata?.cardId ?? child.params.cardId,
+        ownerCardId: entry.cardId,
         ownerCardZone: preview.ownerCardZone,
       })
       : undefined
-    const applicable = child.params.phase !== 'isDoable' && resultHasApplicabilitySignal(result)
-    const doable = applicable ? evaluateChildDoable(result, context) : false
+    const applicable = isActivateCardActionNode(child)
+      ? child.params.phase !== 'isDoable' && resultHasApplicabilitySignal(result)
+      : true
+    const doable = isActivateCardActionNode(child)
+      ? (applicable ? evaluateChildDoable(result, context) : false)
+      : true
     const resourcesAfter = doable ? previewResourcesAfterChild(result, context) : undefined
     const state: TriggerOptionState = {
       child,
-      cardId: metadata?.cardId ?? child.params.cardId,
-      listenerId: metadata?.listenerId ?? child.params.listenerId,
-      mandatory: metadata?.mandatory ?? child.params.mandatory === true,
+      cardId: entry.cardId,
+      listenerId: entry.listenerId,
+      mandatory: entry.mandatory,
       applicable,
       doable,
-      actionId: child.params.actionId,
-      phase: child.params.phase,
+      actionId: isActivateCardActionNode(child) ? child.params.actionId : 'stage-hook',
+      phase: isActivateCardActionNode(child) ? child.params.phase : 'stage',
       resourcesAfter,
     }
     optionStates.push(state)
