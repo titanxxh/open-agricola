@@ -28,6 +28,64 @@ describe('reap with stacks', () => {
     expect(res.reapSummary.resources.grain).toBe(1)
   })
 
+  it('records harvested crop details for baseline reap', () => {
+    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
+    const p = mkPlayer([
+      { stacks: [{ kind: 'grain', remaining: 3 }], row: 0, col: 0 },
+    ])
+    const res = reap(mkState(), p)
+    expect(res.reapSummary.harvestedCrops).toEqual([
+      { row: 0, col: 0, crop: 'grain', amount: 1, sources: ['base'] },
+    ])
+    expect(res.reapSummary.harvestedPositions).toEqual([{ row: 0, col: 0 }])
+  })
+
+  it('uses harvest count to reap multiple crops from one field and keeps one position', () => {
+    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
+    const p = mkPlayer([
+      {
+        stacks: [
+          { kind: 'vegetable', remaining: 1 },
+          { kind: 'grain', remaining: 2 },
+        ],
+        row: 0,
+        col: 0,
+      },
+    ])
+    const res = reap(mkState(), p, undefined, {
+      harvestCounts: {
+        '0-0': { count: 3, sources: ['base', 'test-extra'] },
+      },
+    })
+    expect(p.resources.grain).toBe(2)
+    expect(p.resources.vegetable).toBe(1)
+    expect(p.fields[0].stacks).toEqual([])
+    expect(res.reapSummary.grainFields).toBe(2)
+    expect(res.reapSummary.vegetableFields).toBe(1)
+    expect(res.reapSummary.harvestedCrops).toEqual([
+      { row: 0, col: 0, crop: 'grain', amount: 2, sources: ['base', 'test-extra'] },
+      { row: 0, col: 0, crop: 'vegetable', amount: 1, sources: ['base', 'test-extra'] },
+    ])
+    expect(res.reapSummary.harvestedPositions).toEqual([{ row: 0, col: 0 }])
+  })
+
+  it('does not record fields whose final harvest count is zero', () => {
+    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
+    const p = mkPlayer([
+      { stacks: [{ kind: 'grain', remaining: 2 }], row: 0, col: 0 },
+    ])
+    const res = reap(mkState(), p, undefined, {
+      harvestCounts: {
+        '0-0': { count: 0, sources: ['base', 'E112_GrainThief'] },
+      },
+    })
+    expect(p.resources.grain).toBe(0)
+    expect(p.fields[0].stacks).toEqual([{ kind: 'grain', remaining: 2 }])
+    expect(res.reapSummary.resources).toEqual({})
+    expect(res.reapSummary.harvestedCrops).toEqual([])
+    expect(res.reapSummary.harvestedPositions).toEqual([])
+  })
+
   it('pops empty top stack, exposes buried stack next round', () => {
     vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
     const p = mkPlayer([

@@ -5,6 +5,11 @@ import { fieldTopStack, fieldPopIfDepleted } from '../../domain/field'
 import { runCardListeners } from '../../cards/card-listeners'
 import type { ActionHookResult } from '../hooks'
 
+export type ReapHarvestCount = {
+  count: number
+  sources?: string[]
+}
+
 export type ReapTrigger = {
   phase: string
   actionId?: string
@@ -14,9 +19,41 @@ export type ReapTrigger = {
 export type ReapOptions = {
   trigger?: ReapTrigger
   sourceCard?: string
+  harvestCounts?: Record<string, ReapHarvestCount>
 }
 
 const defaultReapTrigger = (): ReapTrigger => ({ phase: 'harvest' })
+
+const fieldKey = (row: number, col: number) => `${row}-${col}`
+
+const appendHarvestedPosition = (
+  reapSummary: HarvestReapSummary,
+  row: number,
+  col: number,
+) => {
+  if (reapSummary.harvestedPositions?.some((pos) => pos.row === row && pos.col === col)) return
+  reapSummary.harvestedPositions!.push({ row, col })
+}
+
+const appendHarvestedCrop = (
+  reapSummary: HarvestReapSummary,
+  row: number,
+  col: number,
+  crop: 'grain' | 'vegetable' | 'wood' | 'stone',
+  amount: number,
+  sources: string[],
+) => {
+  if (amount <= 0) return
+  const existing = reapSummary.harvestedCrops!.find((entry) =>
+    entry.row === row && entry.col === col && entry.crop === crop,
+  )
+  if (existing) {
+    existing.amount += amount
+    existing.sources = [...new Set([...existing.sources, ...sources])]
+    return
+  }
+  reapSummary.harvestedCrops!.push({ row, col, crop, amount, sources })
+}
 
 /**
  * Dispatch a 'reap' synthetic action event to card listeners.
@@ -64,6 +101,7 @@ export const reap = (
     resources: {},
     grainFields: 0,
     vegetableFields: 0,
+    harvestedCrops: [],
     harvestedPositions: [],
   }
   let stoneFields = 0
@@ -77,40 +115,48 @@ export const reap = (
     reactionChildren.push(flow)
   }
   player.fields.forEach((field) => {
-    const top = fieldTopStack(field)
-    if (!top || top.remaining <= 0) return
-    const kind = top.kind
-    const cropEvent = {
-      location: { kind: 'field' as const, playerId: player.id, row: field.row, col: field.col },
-      crop: kind,
-      amount: 1,
+    const override = options.harvestCounts?.[fieldKey(field.row, field.col)]
+    let remainingCount = Math.max(0, Math.floor(override?.count ?? 1))
+    const sources = override?.sources?.length ? override.sources : ['base']
+    while (remainingCount > 0) {
+      const top = fieldTopStack(field)
+      if (!top || top.remaining <= 0) return
+      const kind = top.kind
+      const amount = Math.min(top.remaining, remainingCount)
+      const cropEvent = {
+        location: { kind: 'field' as const, playerId: player.id, row: field.row, col: field.col },
+        crop: kind,
+        amount,
+      }
+      player.resources[kind] = (player.resources[kind] ?? 0) + amount
+      reapSummary.resources[kind] = (reapSummary.resources[kind] ?? 0) + amount
+      if (kind === 'grain') {
+        reapSummary.grainFields += amount
+      } else if (kind === 'vegetable') {
+        reapSummary.vegetableFields += amount
+      } else if (kind === 'stone') {
+        stoneFields += amount
+      }
+      appendHarvestedCrop(reapSummary, field.row, field.col, kind, amount, sources)
+      appendHarvestedPosition(reapSummary, field.row, field.col)
+      top.remaining -= amount
+      remainingCount -= amount
+      fieldPopIfDepleted(field)
+      eventSink?.emit<'farm.cropRemoved'>({
+        type: 'farm.cropRemoved',
+        crops: [cropEvent],
+        reason: 'reap',
+        trigger,
+      })
+      eventSink?.emit<'resource.moved'>({
+        type: 'resource.moved',
+        resources: { [kind]: amount },
+        from: cropEvent.location,
+        to: { kind: 'player', playerId: player.id },
+        reason: 'reap',
+        trigger,
+      })
     }
-    player.resources[kind] = (player.resources[kind] ?? 0) + 1
-    reapSummary.resources[kind] = (reapSummary.resources[kind] ?? 0) + 1
-    if (kind === 'grain') {
-      reapSummary.grainFields += 1
-    } else if (kind === 'vegetable') {
-      reapSummary.vegetableFields += 1
-    } else if (kind === 'stone') {
-      stoneFields += 1
-    }
-    reapSummary.harvestedPositions!.push({ row: field.row, col: field.col })
-    top.remaining -= 1
-    fieldPopIfDepleted(field)
-    eventSink?.emit<'farm.cropRemoved'>({
-      type: 'farm.cropRemoved',
-      crops: [cropEvent],
-      reason: 'reap',
-      trigger,
-    })
-    eventSink?.emit<'resource.moved'>({
-      type: 'resource.moved',
-      resources: { [kind]: 1 },
-      from: cropEvent.location,
-      to: { kind: 'player', playerId: player.id },
-      reason: 'reap',
-      trigger,
-    })
   })
 
   if (reapSummary.grainFields > 0) {
