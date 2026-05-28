@@ -5,7 +5,7 @@ import { getCardMeta } from '../../services/card-meta'
 type CardType = 'occupation' | 'minor' | 'major'
 
 const cardNameKeyPattern =
-  /^(occupations|minorImprovements|improvements)\.([^.]+)\.name$/
+  /^(occupations|minorImprovements|improvements|cards)\.([^.]+)\.name$/
 
 const cardAnytimeKeyPattern =
   /^cards\.([^.]+)\.anytime$/
@@ -91,7 +91,9 @@ export const translateCardText = (
         ? 'occupation'
         : prefix === 'minorImprovements'
           ? 'minor'
-          : 'major'
+          : prefix === 'improvements'
+            ? 'major'
+            : inferCardType(cardId, locale)
     return getCardDisplayName(locale, cardType, cardId)
   }
 
