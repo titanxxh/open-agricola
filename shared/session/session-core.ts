@@ -260,6 +260,12 @@ type SowSelectionPayload = {
   crop: 'grain' | 'vegetable' | 'wood' | 'stone'
 }
 
+const parallelHarvestFieldStageHooks = new Set<StageResumeState['hook']>([
+  'onStartHarvestFieldPhase',
+  'onHarvestFieldPhase',
+  'onEndHarvestFieldPhase',
+])
+
 type SelectionCommitPayload = {
   cancel?: boolean
   positions?: FarmTilePosition[]
@@ -2265,13 +2271,14 @@ export class GameCore {
     hook: StageResumeState['hook'],
     playerIndex: number,
     nextCardIndex: number,
+    resumePlayerIndex = playerIndex,
   ) {
     this.engineStack.push({
       engine: this.createFlowEngine(flow, playerIndex),
       source: { kind: 'flow', flow },
       spaceId: `__stage:${hook}`,
       ownerPlayerIndex: playerIndex,
-      stageResume: { hook, playerIndex, cardIndex: nextCardIndex },
+      stageResume: { hook, playerIndex: resumePlayerIndex, cardIndex: nextCardIndex },
       deferredPlayerSwitch: null,
       reason: 'stage-hook',
     })
@@ -2283,6 +2290,9 @@ export class GameCore {
     playerIndex = 0,
     cardIndex = 0,
   ) {
+    if (playerIndex === 0 && cardIndex === 0 && parallelHarvestFieldStageHooks.has(hook)) {
+      return this.continueParallelStageHook(hook)
+    }
     for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
       const player = this.state.players[currentPlayerIndex]
       if (!player) continue
@@ -2301,6 +2311,30 @@ export class GameCore {
       }
     }
     return false
+  }
+
+  private continueParallelStageHook(
+    hook: StageResumeState['hook'],
+  ) {
+    const children: ActionFlow[] = []
+    for (let currentPlayerIndex = 0; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
+      const player = this.state.players[currentPlayerIndex]
+      if (!player) continue
+      const cards = [
+        ...this.getPlayerEffectCardIds(player),
+        ...this.getPlayerHandEffectCardIds(player, hook as CardEffectHook),
+      ]
+      for (const cardId of cards) {
+        const flow = runCardEffectHook(this.state, player, cardId, hook as CardEffectHook)
+        if (flow) {
+          const ownedFlow: ActionFlow = flow.targetPlayerId ? flow : { ...flow, targetPlayerId: player.id }
+          children.push(ownedFlow)
+        }
+      }
+    }
+    if (children.length === 0) return false
+    this.startStageFlow({ type: 'parallel', children }, hook, 0, 0, this.state.players.length)
+    return true
   }
 
   private continueSinglePlayerStageHook(
