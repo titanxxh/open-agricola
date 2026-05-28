@@ -21,6 +21,16 @@ const hasStartedDescendant = (node: EngineNode): boolean => {
 const isTriggerSelectParallel = (node: EngineNode): node is ParallelNode =>
   node instanceof ParallelNode && node.mode === 'trigger-select'
 
+const isTriggerSelectableChild = (parent: ParallelNode, child: EngineNode) =>
+  parent.triggerChildren.length > 0
+    ? parent.triggerChildren.some((entry) => entry.nodeId === child.id)
+    : isActivateCardActionNode(child)
+
+const hasUnresolvedTriggerChild = (node: ParallelNode) =>
+  node.children.some((child) =>
+    isTriggerSelectableChild(node, child) && child.getState() !== 'resolved',
+  )
+
 export class EngineTree {
   public root: EngineNode
 
@@ -146,7 +156,7 @@ export class EngineTree {
             // BEFORE the engine returns to PARALLEL to prompt the next card.
             for (let i = idx; i < node.children.length; i += 1) {
               const child = node.children[i]
-              if (i > idx && isActivateCardActionNode(child)) break
+              if (i > idx && isTriggerSelectableChild(node, child)) break
               if (child.getState() !== 'resolved') {
                 const next = visit(child)
                 if (next) return next
@@ -154,10 +164,7 @@ export class EngineTree {
             }
           }
         }
-        const hasUnresolvedCard = node.children.some(
-          (c) => isActivateCardActionNode(c) && c.getState() !== 'resolved',
-        )
-        if (hasUnresolvedCard) return node
+        if (hasUnresolvedTriggerChild(node)) return node
         // All cards picked; drain any trailing follow-up nodes.
         for (const child of node.children) {
           if (child.getState() !== 'resolved') {

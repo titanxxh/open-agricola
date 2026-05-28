@@ -581,6 +581,8 @@ export type ActionFlow =
       promptKey?: PromptKey
       children: ActionFlow[]
       optional?: boolean
+      mode?: 'all' | 'trigger-select'
+      sourceCard?: string
       choiceLabelKey?: string
       choiceLabelParams?: Record<string, unknown>
       /**
