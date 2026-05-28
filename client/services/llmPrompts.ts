@@ -136,7 +136,6 @@ const CARD_IMPL = {
 | onStartHarvestFieldPhase / onHarvestFieldPhase / onEndHarvestFieldPhase | 收割田地阶段 | 约每4-5轮 |
 | onAfterReap | 田地收割完成后 | 约每4-5轮 |
 | onStartHarvestFeedingPhase / onHarvestFeedingPhase / onEndHarvestFeedingPhase | 喂食阶段 | 约每4-5轮 |
-| onBeforeFeed / onAfterFeed | 喂食前后 | 约每4-5轮 |
 | onHarvest / onEndHarvest / onAfterHarvest | 收获各阶段 | 约每4-5轮 |
 | onBeforeEndGame | 终局结算前 | 全局一次 |
 

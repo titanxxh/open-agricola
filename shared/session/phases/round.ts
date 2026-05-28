@@ -22,7 +22,7 @@ import { incPlacedFarmers } from '../../session/stats.ts'
 import { recordActionSnapshot } from '../../cards/helpers/action-snapshot.ts'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement.ts'
 import { executeCardListener, getMatchingListeners, listenerOwnerOptions } from '../../cards/card-listeners.ts'
-import { runRoundEndHooks, shouldSkipPlayerTurn } from '../../cards/card-effects.ts'
+import { shouldSkipPlayerTurn } from '../../cards/card-effects.ts'
 import { tagInjectedAnytimeFlow } from '../../engine/action-context-flags.ts'
 import { appendImmediateEvents } from '../../events/append.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
@@ -318,8 +318,7 @@ export const performRoundEnd = (core: GameCore): SessionResponse => {
  */
 export const finalizeRound = (core: GameCore): SessionResponse => {
   core.state.roundPhase = 'preparation'
-  core.state.players.forEach((p) => runRoundEndHooks(core.state, p))
-  return core.invokeAfterRoundEnd()
+  return core.invokeRoundEndHooks()
 }
 
 /**

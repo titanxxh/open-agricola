@@ -1,45 +1,16 @@
-import { ensureCardState } from '../helpers/card-state'
 import { familySize, newbornCount } from '../../domain/player'
+import { registerHarvestFeedingRequirementModifier } from '../../actions/helpers/harvest-feeding-requirement'
 import type { CardImpl } from '../registry'
 import { E30_ChildsToy } from '../../cards-display/E/E30_ChildsToy'
 
 const CARD_ID = E30_ChildsToy.id
 
+registerHarvestFeedingRequirementModifier(CARD_ID, ({ newbornCount }) => newbornCount)
+
 export const E30_ChildsToy_impl = {
   prerequisiteCheck: (player) => familySize(player) - newbornCount(player) === 2,
   effect: {
-  id: CARD_ID,
-  onBeforeFeed: (_state, player) => {
-    // BGA: $E30tax = countFarmers(CHILD) * hasPlayedCard('E30_ChildsToy') added to harvestCost.
-    // Effectively: each newborn requires 2 food instead of 1 during feeding only.
-    // We snapshot the newborn ids and clear isNewborn so feedFamily/executeFeedingLogic's
-    // newborn discount (Math.min(newbornCount, size)) becomes 0. onAfterFeed restores
-    // the original newborn flags so post-feed listeners (e.g. A35 SwimmingClass at
-    // onStartReturnHome, A92 AdoptiveParents) still observe the true newborn state.
-    const cs = ensureCardState(player, CARD_ID)
-    const snapshot: string[] = []
-    for (const w of player.workers) {
-      if (w.isActive && w.isNewborn) {
-        snapshot.push(w.id)
-        w.isNewborn = false
-      }
-    }
-    cs.extraData = { ...(cs.extraData ?? {}), suppressedNewbornIds: snapshot }
+    id: CARD_ID,
   },
-  onAfterFeed: (_state, player) => {
-    const cs = player.cardStates?.[CARD_ID]
-    const ids = cs?.extraData?.suppressedNewbornIds as string[] | undefined
-    if (!ids || ids.length === 0) return
-    const idSet = new Set(ids)
-    for (const w of player.workers) {
-      if (idSet.has(w.id) && w.isActive) w.isNewborn = true
-    }
-    if (cs?.extraData) {
-      const next = { ...cs.extraData }
-      delete next.suppressedNewbornIds
-      cs.extraData = next
-    }
-  },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl

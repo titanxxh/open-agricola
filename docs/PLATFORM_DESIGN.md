@@ -296,7 +296,7 @@ const CARD_IMPL = {
 
 #### effect hook（`CARD_IMPL.effect`）
 
-常用触发点：`onBuy`、`onRoundStart`、`onRoundEnd`、`onAllWorkersPlaced`、`onReturnHome`、`onBeforeFeed`、`onAfterFeed`、`onHarvestFieldPhase`、`onBeforeEndGame`、`computeBonusScore` 等（完整列表见源文件）。
+常用触发点：`onBuy`、`onRoundStart`、`onRoundEnd`、`onAllWorkersPlaced`、`onReturnHome`、`onHarvestFieldPhase`、`onBeforeEndGame`、`computeBonusScore` 等（完整列表见源文件）。
 
 签名：`(state, player) => ActionFlow | void`（`onBuy` 额外接收 `paymentInfo`）。
 
@@ -666,5 +666,4 @@ WorkshopPage
 | 功能   | 说明                |
 | ---- | ----------------- |
 | 邮箱验证 | 注册后验证邮件（需要外部邮件服务） |
-
 

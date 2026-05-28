@@ -41,7 +41,6 @@ export type CardEffectHook = 'onBuy' | 'onRoundStart' | 'onHarvest' | 'onRoundEn
   | 'onStartHarvestFieldPhase' | 'onHarvestFieldPhase' | 'onEndHarvestFieldPhase'
   | 'onAfterReap'
   | 'onStartHarvestFeedingPhase' | 'onHarvestFeedingPhase' | 'onEndHarvestFeedingPhase'
-  | 'onBeforeFeed' | 'onAfterFeed'
   | 'onEndHarvest' | 'onAfterHarvest'
   | 'onBeforeEndGame'
   | 'onBeforeStartOfTurn'
@@ -83,8 +82,6 @@ export const cardEffectHooks: CardEffectField[] = [
   'onStartHarvestFeedingPhase',
   'onHarvestFeedingPhase',
   'onEndHarvestFeedingPhase',
-  'onBeforeFeed',
-  'onAfterFeed',
   'onEndHarvest',
   'onAfterHarvest',
   'onBeforeEndGame',
@@ -103,7 +100,6 @@ export const cardEffectHooks: CardEffectField[] = [
   'getInvalidAnimals',
 ]
 
-type EffectHandler = (state: GameState, player: PlayerState) => void
 type FlowEffectHandler = (state: GameState, player: PlayerState) => ActionFlow | void
 type FlowEffectHandlerWithPayment = (state: GameState, player: PlayerState, paymentInfo?: PaymentInfo) => ActionFlow | void
 
@@ -154,7 +150,7 @@ export type CardEffect = {
   resolveChoice?: ResolveChoiceHandler
   onRoundStart?: FlowEffectHandler
   onHarvest?: FlowEffectHandler
-  onRoundEnd?: EffectHandler
+  onRoundEnd?: FlowEffectHandler
   onEndTurn?: FlowEffectHandler
   onReturnHome?: FlowEffectHandler
   onBeforeReturnHome?: FlowEffectHandler
@@ -169,8 +165,6 @@ export type CardEffect = {
   onStartHarvestFeedingPhase?: FlowEffectHandler
   onHarvestFeedingPhase?: FlowEffectHandler
   onEndHarvestFeedingPhase?: FlowEffectHandler
-  onBeforeFeed?: EffectHandler
-  onAfterFeed?: EffectHandler
   onEndHarvest?: FlowEffectHandler
   onAfterHarvest?: FlowEffectHandler
   /** Runs once at the start of scoring, before any category computation.
@@ -298,28 +292,6 @@ export const runReturnHomeHooks = (state: GameState, player: PlayerState): void 
   }
 }
 
-export const runRoundEndHooks = (state: GameState, player: PlayerState): void => {
-  const allCards = [
-    ...player.improvements,
-    ...player.minorPlayed,
-    ...player.occupationPlayed,
-  ]
-  for (const cardId of allCards) {
-    const effect = getCardEffect(cardId)
-    if (effect?.onRoundEnd) {
-      try {
-        effect.onRoundEnd(state, player)
-      } catch (err) {
-        if (isCustomCard(cardId)) {
-          console.warn(`[card-effects] custom card ${cardId} onRoundEnd threw, skipping:`, err)
-          continue
-        }
-        throw err
-      }
-    }
-  }
-}
-
 const runHookForAllCards = (
   state: GameState,
   player: PlayerState,
@@ -346,12 +318,6 @@ const runHookForAllCards = (
     }
   }
 }
-
-export const runBeforeFeedHooks = (state: GameState, player: PlayerState): void =>
-  runHookForAllCards(state, player, 'onBeforeFeed')
-
-export const runAfterFeedHooks = (state: GameState, player: PlayerState): void =>
-  runHookForAllCards(state, player, 'onAfterFeed')
 
 export const runBeforeEndGameHooks = (state: GameState, player: PlayerState): void =>
   runHookForAllCards(state, player, 'onBeforeEndGame')
