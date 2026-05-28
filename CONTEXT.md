@@ -176,6 +176,10 @@ _Avoid_: Harvest、Harvest Field Phase
 从普通田或 Card Field 顶堆收获作物到玩家 supply 的动作。
 _Avoid_: Harvest
 
+**Harvest Count**:
+田地阶段中一块田本次 Reap 应产出的作物数量。普通田通常为 1，但收获阶段卡牌可能增加、减少或覆盖该数量。
+_Avoid_: 资源总数、整次 Harvest 产量
+
 **Events**:
 事件和 replay 领域，覆盖 `EventStore`、public event archive、event mapping policy、log mapper、replay timeline 和 private event notification。
 _Avoid_: 直接写 UI log 当规则事实
