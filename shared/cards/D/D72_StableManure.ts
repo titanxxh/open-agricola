@@ -1,21 +1,18 @@
 import { positionKey } from '../../domain/farm'
 import type { PlayerState } from '../../contract/types'
-import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
-import { fieldTopStack, fieldIsEmpty } from '../../domain/field'
+import { readCardExtraData } from '../helpers/card-state'
+import { registerHarvestCountModifier } from '../../actions/helpers/harvest-count-registry'
+import { fieldIsEmpty, fieldTopStack, fieldTotalRemaining } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { D72_StableManure } from '../../cards-display/D/D72_StableManure'
 
 const CARD_ID = D72_StableManure.id
 
-registerSelectionEffect('harvest-extra', ({ player, positions }) => {
-  for (const key of positions) {
-    const [r, c] = key.split('-').map(Number)
-    const field = player.fields.find(f => f.row === r && f.col === c)
-    if (!field) continue
-    const top = fieldTopStack(field)
-    if (!top) continue
-    player.resources[top.kind] = (player.resources[top.kind] ?? 0) + 1
-  }
+registerHarvestCountModifier(CARD_ID, ({ player, field }) => {
+  const selected = readCardExtraData<string[]>(player, CARD_ID, 'selectedPositions') ?? []
+  if (!selected.includes(positionKey(field))) return
+  if (fieldIsEmpty(field)) return
+  return { delta: 1, sources: [CARD_ID] }
 })
 
 /**
@@ -32,6 +29,18 @@ const countUnfencedStables = (player: PlayerState): number => {
   return player.stableTiles.filter(s => !pastureTileKeys.has(positionKey(s))).length
 }
 
+const hasGrainThief = (player: PlayerState) =>
+  player.occupationPlayed.includes('E112_GrainThief')
+  || player.minorPlayed.includes('E112_GrainThief')
+
+const eligibleFields = (player: PlayerState) =>
+  player.fields.filter((field) => {
+    const top = fieldTopStack(field)
+    if (!top) return false
+    const min = hasGrainThief(player) && top.kind === 'grain' ? 1 : 2
+    return fieldTotalRemaining(field) >= min
+  })
+
 export const D72_StableManure_impl = {
   effect: {
   id: CARD_ID,
@@ -39,8 +48,7 @@ export const D72_StableManure_impl = {
     const unfencedCount = countUnfencedStables(player)
     if (unfencedCount === 0) return
 
-    // Fields with crops that have remaining > 0 (harvestable)
-    const croppedFields = player.fields.filter(f => !fieldIsEmpty(f))
+    const croppedFields = eligibleFields(player)
     if (croppedFields.length === 0) return
 
     return {
@@ -50,12 +58,17 @@ export const D72_StableManure_impl = {
       optional: true,
       actionContext: {
         selectionKind: 'farm-position',
-        positionFilter: 'has-crop',
-        maxSelections: unfencedCount,
-        selectionEffect: 'harvest-extra',
+        maxSelections: Math.min(unfencedCount, croppedFields.length),
+        selectableTiles: croppedFields.map(({ row, col }) => ({ row, col })),
       },
     }
   },
+  onEndHarvest: () => ({
+    type: 'leaf',
+    actionId: 'special-effect',
+    sourceCard: CARD_ID,
+    params: { kind: 'set-extra-data', key: 'selectedPositions', value: undefined },
+  }),
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl
