@@ -639,7 +639,7 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 终局前:  round 14 的 onAfterRoundEnd 完成并递增到 round 15 后，onBeforeEndGame → gameover
 ```
 
-普通 Harvest 收获用 `reap(..., { trigger: { phase: 'harvest' } })` 移除田里作物，事件层统一记录 `reason: 'reap'`。每种 crop 收获后走 `dispatchReapListener(state, player, crop, amount, ..., { trigger, sourceCard })` 派发 `'reap'` 合成事件；listener 返回的 flow 不在 dispatch 阶段执行，而是收集进普通 `parallel` stage flow，全部完成后再进入 `onAfterReap`。
+普通 Harvest 收获用 `reap(..., { trigger: { phase: 'harvest' } })` 移除田里作物，事件层统一记录 `reason: 'reap'`。每块田先通过 `computeHarvestCount(state, player, field)` 得到本次普通 reap 要移动的 crop 数量和 `sources`；单卡只能通过 `registerHarvestCountModifier(cardId, modifier)` 增减 `delta` 或设置 `override`，不要在 `reap` 主路径添加单卡分支。`HarvestReapSummary.harvestedCrops` 按 field/crop 记录实际收获数量与来源，供 E112/A112/D72/E73 这类同一块田的 modifier 合成与日志审计使用。每种 crop 收获后走 `dispatchReapListener(state, player, crop, amount, ..., { trigger, sourceCard })` 派发 `'reap'` 合成事件；listener 返回的 flow 不在 dispatch 阶段执行，而是收集进普通 `parallel` stage flow，全部完成后再进入 `onAfterReap`。
 
 `private-field-phase` 是内部 action，不启动完整 Harvest：来源卡触发时设置 `trigger: { phase: 'private-field-phase', cardId: sourceCard }`，先收获普通田，再收获 Card Field，并跳过 Harvest summary 写入；普通田和 Card Field 的 `immediatelyAfter.reap` 反应同样合并成普通 `parallel` flow。
 
