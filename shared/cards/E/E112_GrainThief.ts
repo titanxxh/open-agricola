@@ -6,12 +6,17 @@ import { registerHarvestCountModifier } from '../../actions/helpers/harvest-coun
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E112_GrainThief'
+const E73_CARD_ID = 'E73_Scythe'
 const SELECTED_POSITIONS_KEY = 'selectedPositions'
+const E73_FULL_REAP_POSITION_KEY = 'fullReapPosition'
 
 const fieldKey = (field: Field) => `${field.row}-${field.col}`
 
 const selectedPositionKeys = (player: PlayerState) =>
   readCardExtraData<string[]>(player, CARD_ID, SELECTED_POSITIONS_KEY) ?? []
+
+const scytheFullReapPosition = (player: PlayerState) =>
+  readCardExtraData<string>(player, E73_CARD_ID, E73_FULL_REAP_POSITION_KEY)
 
 const selectableGrainFields = (player: PlayerState) =>
   player.fields.filter((field) => {
@@ -43,13 +48,17 @@ const clearSelectionLeaf = (): ActionFlow => ({
 
 const selectedValidGrainFieldCount = (player: PlayerState) => {
   const selected = new Set(selectedPositionKeys(player))
-  return selectableGrainFields(player).filter((field) => selected.has(fieldKey(field))).length
+  const scythePosition = scytheFullReapPosition(player)
+  return selectableGrainFields(player)
+    .filter((field) => selected.has(fieldKey(field)) && fieldKey(field) !== scythePosition)
+    .length
 }
 
 registerHarvestCountModifier(CARD_ID, ({ player, field }) => {
   if (!player.occupationPlayed?.includes(CARD_ID)) return
   const selected = new Set(selectedPositionKeys(player))
   if (!selected.has(fieldKey(field))) return
+  if (fieldKey(field) === scytheFullReapPosition(player)) return
   const top = fieldTopStack(field)
   if (top?.kind !== 'grain' || top.remaining <= 0) return
   return { delta: -1, sources: [CARD_ID] }
