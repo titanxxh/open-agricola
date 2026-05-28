@@ -122,7 +122,7 @@ describe('harvest session flow', () => {
     expect(resp.state.log.some((entry) => entry.key === 'log.harvestPhaseFeed')).toBe(true)
     expect(resp.state.log.some((entry) => entry.key === 'log.harvestPhaseBreed')).toBe(true)
 
-    const reapLogs = resp.state.log.filter((entry) => entry.key === 'log.harvestReapDetail')
+    const reapLogs = resp.state.log.filter((entry) => entry.key === 'log.reapDetail')
     expect(reapLogs).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

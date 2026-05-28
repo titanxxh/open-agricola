@@ -143,11 +143,14 @@ describe('C70_LettucePatch session', () => {
       const stacks = player.cardStates[CARD_ID]?.extraData?.cardFieldStacks as any[]
       expect(stacks[0].remaining).toBe(1)
 
-      // Flow should be optional seq with pay+gain
+      // Flow should be optional conversion choice with pay+gain
       expect(flow).toBeDefined()
-      expect(flow!.type).toBe('seq')
-      expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
-      const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
+      expect(flow!.type).toBe('parallel')
+      const conversion = (flow as Extract<ActionFlow, { type: 'parallel' }>).children[0] as Extract<ActionFlow, { type: 'xor' }>
+      expect(conversion.type).toBe('xor')
+      expect(conversion.optional).toBe(true)
+      expect(conversion.children).toHaveLength(1)
+      const children = (conversion.children[0] as Extract<ActionFlow, { type: 'seq' }>).children
       expect(children).toHaveLength(2)
       // First child: pay 1 vegetable
       expect(children[0].type).toBe('leaf')
@@ -157,6 +160,43 @@ describe('C70_LettucePatch session', () => {
       expect(children[1].type).toBe('leaf')
       expect(children[1].actionId).toBe('gain')
       expect(children[1].params).toEqual({ food: 4 })
+    })
+
+    it('onHarvestFieldPhase offers quantity choices for each vegetable reaped from the card', () => {
+      const session = new GameSession()
+      const state = session.getState().state
+      state.players = state.players.slice(0, 2)
+      state.round = 4
+
+      const player = state.players[0]!
+      player.minorPlayed.push(CARD_ID)
+      player.resources.vegetable = 0
+      player.cardStates[CARD_ID] = {
+        extraData: {
+          cardFieldStacks: [
+            { crop: 'vegetable', remaining: 1 },
+            { crop: 'vegetable', remaining: 1 },
+          ],
+        },
+      }
+
+      session.loadState(state)
+
+      const effect = getCardEffect(CARD_ID)
+      expect(effect).toBeDefined()
+      const flow = effect!.onHarvestFieldPhase!(state, player) as Extract<ActionFlow, { type: 'parallel' }>
+      const conversion = flow.children[0] as Extract<ActionFlow, { type: 'xor' }>
+
+      expect(player.resources.vegetable).toBe(2)
+      expect(conversion.type).toBe('xor')
+      expect(conversion.optional).toBe(true)
+      expect(conversion.children).toHaveLength(2)
+      const first = conversion.children[0] as Extract<ActionFlow, { type: 'seq' }>
+      const second = conversion.children[1] as Extract<ActionFlow, { type: 'seq' }>
+      expect(first.children[0]).toMatchObject({ actionId: 'pay', params: { vegetable: 1 } })
+      expect(first.children[1]).toMatchObject({ actionId: 'gain', params: { food: 4 } })
+      expect(second.children[0]).toMatchObject({ actionId: 'pay', params: { vegetable: 2 } })
+      expect(second.children[1]).toMatchObject({ actionId: 'gain', params: { food: 8 } })
     })
 
     it('full harvest integration: harvests veg and player can convert to food', () => {

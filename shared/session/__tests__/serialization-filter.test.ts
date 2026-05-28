@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { GameEvent } from '../../contract/events'
 import type { GameState } from '../../contract/types'
 import type { DraftState } from '../../draft/types'
 import { createInitialState } from '../state-bootstrap'
@@ -231,5 +232,353 @@ describe('serializeStateForPlayer', () => {
     const p2 = out.players.find((p) => p.id === 'p2')!
     expect(p2.occupationHand).toEqual([])
     expect(p2.minorHand).toEqual([])
+  })
+
+  it('masks cardStates and card-state events for cards still hidden in opponent hands', () => {
+    const state = makePlayingState()
+    const p2 = state.players[1]!
+    p2.minorHand = ['D36_BreedRegistry']
+    p2.minorPlayed = ['B21_HayloftBarn']
+    p2.cardStates = {
+      D36_BreedRegistry: { extraData: { boardSheep: 1 } },
+      B21_HayloftBarn: { extraData: { foodCount: 2 } },
+    }
+    const hiddenTriggerEvent: GameEvent = {
+      schemaVersion: 1,
+      id: '100',
+      seq: 100,
+      round: state.round,
+      phase: state.roundPhase,
+      type: 'card.triggered',
+      visibility: 'public',
+      cardId: 'D36_BreedRegistry',
+      sourceCardId: 'D36_BreedRegistry',
+      triggerActionId: 'gain-sheep',
+      accepted: true,
+    }
+    const hiddenEvent: GameEvent = {
+      schemaVersion: 1,
+      id: '101',
+      seq: 101,
+      round: state.round,
+      phase: state.roundPhase,
+      type: 'card.stateChanged',
+      visibility: 'public',
+      cardId: 'D36_BreedRegistry',
+      targetPlayerId: p2.id,
+      key: 'boardSheep',
+      value: 1,
+    }
+    const visibleEvent: GameEvent = {
+      schemaVersion: 1,
+      id: '102',
+      seq: 102,
+      round: state.round,
+      phase: state.roundPhase,
+      type: 'card.stateChanged',
+      visibility: 'public',
+      cardId: 'B21_HayloftBarn',
+      targetPlayerId: p2.id,
+      key: 'foodCount',
+      value: 2,
+    }
+    state.events = [hiddenTriggerEvent, visibleEvent]
+    state.nextEventSeq = 103
+    const seededLog: GameState['log'] = [
+      { key: 'log.cardTriggered', params: { cardId: 'D36_BreedRegistry' } },
+      { key: 'log.cardTriggered', params: { cardId: 'B21_HayloftBarn' } },
+      { key: 'log.existing' },
+    ]
+    state.publicEventArchive = [
+      {
+        schemaVersion: 1,
+        id: '1',
+        packetSeq: 1,
+        type: 'publicEvents.committed',
+        eventIds: ['100', '101', '102'],
+        eventSeqs: [100, 101, 102],
+        firstEventSeq: 100,
+        lastEventSeq: 102,
+      },
+      {
+        schemaVersion: 1,
+        id: '2',
+        packetSeq: 2,
+        type: 'publicEvents.canceled',
+        reason: 'undoStep',
+        previousMaxSeq: 102,
+        nextMaxSeq: 100,
+        canceledEventIds: ['101', '102'],
+        canceledSeqs: [101, 102],
+        canceledEvents: [hiddenEvent, visibleEvent],
+      },
+    ]
+    state.nextPublicEventArchivePacketSeq = 3
+    const stateWithLog: GameState = { ...state, log: seededLog }
+
+    const opponentView = serializeStateForPlayer(stateWithLog, 'p1', emptyCtx())
+    const ownerView = serializeStateForPlayer(stateWithLog, p2.id, emptyCtx())
+    const filteredP2 = opponentView.players.find((player) => player.id === p2.id)!
+    const ownerP2 = ownerView.players.find((player) => player.id === p2.id)!
+
+    expect(filteredP2.minorHand).toEqual(['?'])
+    expect(filteredP2.cardStates.D36_BreedRegistry).toBeUndefined()
+    expect(filteredP2.cardStates.B21_HayloftBarn).toEqual(p2.cardStates.B21_HayloftBarn)
+    expect(opponentView.events.map((event) => event.id)).toEqual(['102'])
+    expect(opponentView.events.map((event) => event.seq)).toEqual([1])
+    expect(opponentView.log).toEqual([
+      { key: 'log.cardTriggered', params: { cardId: 'B21_HayloftBarn' } },
+      { key: 'log.existing' },
+    ])
+    expect(opponentView.nextEventSeq).toBe(2)
+    expect(opponentView.nextPublicEventArchivePacketSeq).toBe(3)
+    expect(opponentView.publicEventArchive).toEqual([
+      {
+        schemaVersion: 1,
+        id: '1',
+        packetSeq: 1,
+        type: 'publicEvents.committed',
+        eventIds: ['102'],
+        eventSeqs: [1],
+        firstEventSeq: 1,
+        lastEventSeq: 1,
+      },
+      {
+        schemaVersion: 1,
+        id: '2',
+        packetSeq: 2,
+        type: 'publicEvents.canceled',
+        reason: 'undoStep',
+        previousMaxSeq: 1,
+        nextMaxSeq: 0,
+        canceledEventIds: ['102'],
+        canceledSeqs: [1],
+        canceledEvents: [{ ...visibleEvent, seq: 1 }],
+      },
+    ])
+    expect(ownerP2.cardStates.D36_BreedRegistry).toEqual(p2.cardStates.D36_BreedRegistry)
+    expect(ownerView.events.map((event) => event.id)).toEqual(['100', '102'])
+    expect(ownerView.events.map((event) => event.seq)).toEqual([100, 102])
+    expect(ownerView.log).toEqual(stateWithLog.log)
+    expect(ownerView.publicEventArchive[1]).toMatchObject({
+      canceledEventIds: ['101', '102'],
+      canceledSeqs: [101, 102],
+    })
+  })
+
+  it('does not filter visible archive entries that reuse a canceled hidden event id', () => {
+    const state = makePlayingState()
+    const p2 = state.players[1]!
+    p2.minorHand = ['D36_BreedRegistry']
+    p2.minorPlayed = ['B21_HayloftBarn']
+    p2.cardStates = {
+      D36_BreedRegistry: { extraData: { boardSheep: 1 } },
+      B21_HayloftBarn: { extraData: { foodCount: 2 } },
+    }
+    const hiddenEvent: GameEvent = {
+      schemaVersion: 1,
+      id: '1',
+      seq: 1,
+      round: state.round,
+      phase: state.roundPhase,
+      type: 'card.stateChanged',
+      visibility: 'public',
+      cardId: 'D36_BreedRegistry',
+      targetPlayerId: p2.id,
+      key: 'boardSheep',
+      value: 1,
+    }
+    const visibleEvent: GameEvent = {
+      schemaVersion: 1,
+      id: '1',
+      seq: 1,
+      round: state.round,
+      phase: state.roundPhase,
+      type: 'card.stateChanged',
+      visibility: 'public',
+      cardId: 'B21_HayloftBarn',
+      targetPlayerId: p2.id,
+      key: 'foodCount',
+      value: 2,
+    }
+    state.events = [visibleEvent]
+    state.nextEventSeq = 2
+    state.publicEventArchive = [
+      {
+        schemaVersion: 1,
+        id: '1',
+        packetSeq: 1,
+        type: 'publicEvents.committed',
+        eventIds: ['1'],
+        eventSeqs: [1],
+        firstEventSeq: 1,
+        lastEventSeq: 1,
+      },
+      {
+        schemaVersion: 1,
+        id: '2',
+        packetSeq: 2,
+        type: 'publicEvents.canceled',
+        reason: 'undoStep',
+        previousMaxSeq: 1,
+        nextMaxSeq: 0,
+        canceledEventIds: ['1'],
+        canceledSeqs: [1],
+        canceledEvents: [hiddenEvent],
+      },
+      {
+        schemaVersion: 1,
+        id: '3',
+        packetSeq: 3,
+        type: 'publicEvents.committed',
+        eventIds: ['1'],
+        eventSeqs: [1],
+        firstEventSeq: 1,
+        lastEventSeq: 1,
+      },
+    ]
+    state.nextPublicEventArchivePacketSeq = 4
+
+    const opponentView = serializeStateForPlayer(state, 'p1', emptyCtx())
+
+    expect(opponentView.events).toEqual([visibleEvent])
+    expect(opponentView.nextEventSeq).toBe(2)
+    expect(opponentView.publicEventArchive).toEqual([
+      {
+        schemaVersion: 1,
+        id: '1',
+        packetSeq: 1,
+        type: 'publicEvents.committed',
+        eventIds: ['1'],
+        eventSeqs: [1],
+        firstEventSeq: 1,
+        lastEventSeq: 1,
+      },
+    ])
+    expect(opponentView.nextPublicEventArchivePacketSeq).toBe(2)
+  })
+
+  it('remaps committed archive seqs with event ids when visible seqs are reused', () => {
+    const state = makePlayingState()
+    const p2 = state.players[1]!
+    p2.minorHand = ['D36_BreedRegistry']
+    p2.minorPlayed = ['B21_HayloftBarn']
+    p2.cardStates = {
+      D36_BreedRegistry: { extraData: { boardSheep: 1 } },
+      B21_HayloftBarn: { extraData: { foodCount: 2 } },
+    }
+    const oldVisibleEvent: GameEvent = {
+      schemaVersion: 1,
+      id: 'old-visible',
+      seq: 1,
+      round: state.round,
+      phase: state.roundPhase,
+      type: 'card.stateChanged',
+      visibility: 'public',
+      cardId: 'B21_HayloftBarn',
+      targetPlayerId: p2.id,
+      key: 'foodCount',
+      value: 1,
+    }
+    const hiddenEvent: GameEvent = {
+      schemaVersion: 1,
+      id: 'hidden',
+      seq: 2,
+      round: state.round,
+      phase: state.roundPhase,
+      type: 'card.stateChanged',
+      visibility: 'public',
+      cardId: 'D36_BreedRegistry',
+      targetPlayerId: p2.id,
+      key: 'boardSheep',
+      value: 1,
+    }
+    const newVisibleEvent: GameEvent = {
+      schemaVersion: 1,
+      id: 'new-visible',
+      seq: 1,
+      round: state.round,
+      phase: state.roundPhase,
+      type: 'card.stateChanged',
+      visibility: 'public',
+      cardId: 'B21_HayloftBarn',
+      targetPlayerId: p2.id,
+      key: 'foodCount',
+      value: 2,
+    }
+    state.events = [newVisibleEvent]
+    state.nextEventSeq = 2
+    state.publicEventArchive = [
+      {
+        schemaVersion: 1,
+        id: '1',
+        packetSeq: 1,
+        type: 'publicEvents.committed',
+        eventIds: ['old-visible', 'hidden'],
+        eventSeqs: [1, 2],
+        firstEventSeq: 1,
+        lastEventSeq: 2,
+      },
+      {
+        schemaVersion: 1,
+        id: '2',
+        packetSeq: 2,
+        type: 'publicEvents.canceled',
+        reason: 'undoStep',
+        previousMaxSeq: 2,
+        nextMaxSeq: 0,
+        canceledEventIds: ['old-visible', 'hidden'],
+        canceledSeqs: [1, 2],
+        canceledEvents: [oldVisibleEvent, hiddenEvent],
+      },
+      {
+        schemaVersion: 1,
+        id: '3',
+        packetSeq: 3,
+        type: 'publicEvents.committed',
+        eventIds: ['new-visible'],
+        eventSeqs: [1],
+        firstEventSeq: 1,
+        lastEventSeq: 1,
+      },
+    ]
+    state.nextPublicEventArchivePacketSeq = 4
+
+    const opponentView = serializeStateForPlayer(state, 'p1', emptyCtx())
+
+    expect(opponentView.publicEventArchive).toEqual([
+      {
+        schemaVersion: 1,
+        id: '1',
+        packetSeq: 1,
+        type: 'publicEvents.committed',
+        eventIds: ['old-visible'],
+        eventSeqs: [2],
+        firstEventSeq: 2,
+        lastEventSeq: 2,
+      },
+      {
+        schemaVersion: 1,
+        id: '2',
+        packetSeq: 2,
+        type: 'publicEvents.canceled',
+        reason: 'undoStep',
+        previousMaxSeq: 2,
+        nextMaxSeq: 0,
+        canceledEventIds: ['old-visible'],
+        canceledSeqs: [2],
+        canceledEvents: [{ ...oldVisibleEvent, seq: 2 }],
+      },
+      {
+        schemaVersion: 1,
+        id: '3',
+        packetSeq: 3,
+        type: 'publicEvents.committed',
+        eventIds: ['new-visible'],
+        eventSeqs: [1],
+        firstEventSeq: 1,
+        lastEventSeq: 1,
+      },
+    ])
   })
 })

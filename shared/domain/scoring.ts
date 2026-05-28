@@ -1,6 +1,7 @@
 import type { GameState, PlayerState, Resource } from '../contract/types.ts'
-import { FARM_COLS, FARM_ROWS, positionKey } from '../domain/farm.ts'
+import { FARM_COLS, FARM_ROWS } from '../domain/farm.ts'
 import { fieldHasCrop } from '../domain/field.ts'
+import { getUsedFarmyardTileKeys } from './farmyard-usage.ts'
 import { getMajorCard } from '../cards/major/index.ts'
 import {
   getRegisteredMinorImprovement,
@@ -15,7 +16,6 @@ import type {
   CostedBonusHandler,
 } from '../cards/card-effects.ts'
 import { familySize } from '../domain/player.ts'
-import { computeFencedRegions } from './farmyard.ts'
 
 // ---------------------------------------------------------------------------
 // Score types (formerly exported from `shared/logic/scoring.ts`).
@@ -303,25 +303,6 @@ const scoreByMap = (quantity: number, map: Record<string, number>) => {
   return score
 }
 
-const getPastureTileKeys = (player: PlayerState) => {
-  const keys = new Set<string>()
-  player.pastures.forEach((pasture) => {
-    pasture.tiles?.forEach((tile) => keys.add(positionKey(tile)))
-  })
-  const needsDerivedPastureTiles = player.pastures.some(
-    (pasture) => !pasture.tiles || pasture.tiles.length === 0,
-  )
-  if (needsDerivedPastureTiles && player.fenceSegments.length > 0) {
-    const edgeSet = new Set(player.fenceSegments.map((s) => s.edge))
-    computeFencedRegions(edgeSet)
-      .filter((region) => region.fenced)
-      .forEach((region) => {
-        region.tiles.forEach((tile) => keys.add(positionKey(tile)))
-      })
-  }
-  return keys
-}
-
 const totalTiles = FARM_ROWS * FARM_COLS
 
 const applyPostScoreAdjustment = (
@@ -437,15 +418,16 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
       entries: [{ type: 'quantity', quantity: cattleCount, score: cattleScore }],
     })
 
-    const usedTiles = new Set<string>()
-    player.roomTiles.forEach((tile) => usedTiles.add(positionKey(tile)))
-    player.fields.forEach((field) =>
-      usedTiles.add(positionKey({ row: field.row, col: field.col })),
-    )
-    player.stableTiles.forEach((tile) => usedTiles.add(positionKey(tile)))
-    getPastureTileKeys(player).forEach((key) => usedTiles.add(key))
-    const emptyCount = Math.max(0, totalTiles - usedTiles.size)
-    const emptyScore = emptyCount * -1
+    const usedTiles = getUsedFarmyardTileKeys(player)
+    const rawEmptyCount = Math.max(0, totalTiles - usedTiles.size)
+    const hiddenRaw =
+      player.cardStates?.D132_HideFarmer?.extraData?.hiddenSpaces
+    const hiddenSpaces =
+      typeof hiddenRaw === 'number' && Number.isFinite(hiddenRaw)
+        ? Math.max(0, Math.min(rawEmptyCount, Math.floor(hiddenRaw)))
+        : 0
+    const emptyCount = Math.max(0, rawEmptyCount - hiddenSpaces)
+    const emptyScore = emptyCount === 0 ? 0 : emptyCount * -1
     categories.push({
       key: 'empty',
       total: emptyScore,

@@ -4,6 +4,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { B67_HandTruck } from '../../cards-display/B/B67_HandTruck'
+import { getPlayerBakeRates } from '../helpers/exchange-registry'
 
 const CARD_ID = B67_HandTruck.id
 
@@ -13,6 +14,7 @@ const listener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   actions: ['bake-bread'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (getPlayerBakeRates(context.player).length === 0) return
     const accumulationSpaces = context.state.actionSpaces.filter(
       (space) =>
         spaceHasPlayer(space, context.player.id) &&
@@ -22,7 +24,16 @@ const listener: CardListenerRegistration = {
     )
     const workerCount = accumulationSpaces.length
     if (workerCount <= 0) return
-    return { flow: gainLeaf(CARD_ID, { grain: workerCount }), sourceCard: CARD_ID }
+    return {
+      flow: {
+        type: 'seq',
+        optional: true,
+        children: [
+          gainLeaf(CARD_ID, { grain: workerCount }),
+        ],
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 
@@ -42,6 +53,7 @@ const isDoableListener: CardListenerRegistration = {
         ),
     )
     if (!hasWorkersOnAccumulation) return
+    if (getPlayerBakeRates(context.player).length === 0) return
     return { doable: true }
   },
 }

@@ -61,7 +61,7 @@ export const performHarvest = (state: GameState): HarvestSummary => {
     }
 
     const beforeFeed = snapshotResources(player.resources)
-    feedFamily(player)
+    feedFamily(state, player)
     const feedFood = Math.max(0, beforeFeed.food - player.resources.food)
     const feedGrain = Math.max(0, beforeFeed.grain - player.resources.grain)
     const feedVegetable = Math.max(

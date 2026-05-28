@@ -9,6 +9,11 @@ import { C69_LandConsolidation } from '../../cards-display/C/C69_LandConsolidati
 const CARD_ID = C69_LandConsolidation.id
 
 const SWAP_ACTION_ID = 'card_C69_LandConsolidation_swap'
+const EXTRA_CROP_CARDS = new Set(['B115_TinsmithMaster', 'E71_CowPatty'])
+
+const hasExtraCropPending = (context: CardListenerContext): boolean => {
+  return !!context.pendingSourceCard && EXTRA_CROP_CARDS.has(context.pendingSourceCard)
+}
 
 const swapFieldGrainToVegAction: ActionDefinition = {
   id: SWAP_ACTION_ID,
@@ -52,6 +57,7 @@ const anytimeListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (hasExtraCropPending(context)) return
     const qualifying = context.player.fields.filter((f) => {
       const top = fieldTopStack(f)
       return !!top && top.kind === 'grain' && top.remaining === 3 && fieldTotalRemaining(f) === 3

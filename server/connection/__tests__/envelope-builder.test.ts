@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildEnvelope } from '../envelope-builder.ts'
 import { GameSession } from '../../game/authoritative-session.ts'
+import type { GameEvent } from '../../../shared/contract/events.ts'
 
 describe('buildEnvelope', () => {
   const publicEventCancellations = [{
@@ -182,6 +183,163 @@ describe('buildEnvelope', () => {
       expect.objectContaining({ recipientPlayerId: p1.id, cardIds: ['B116_Shoreforester'] }),
     ])
     expect(observer.payload.privateEvents ?? []).toEqual([])
+  })
+
+  it('only sends hand-card availability to the active viewer', () => {
+    const session = new GameSession()
+    const resp = session.withCtx(() => {
+      const next = session.getState()
+      next.state.players = next.state.players.slice(0, 2)
+      next.state.currentPlayerIndex = 0
+      next.state.players[0]!.minorHand = ['D36_BreedRegistry']
+      next.cardAvailability = { 'minor:D36_BreedRegistry': true }
+      return next
+    })
+    const p0 = resp.state.players[0]!
+    const p1 = resp.state.players[1]!
+
+    const active = buildEnvelope({
+      room: { id: 'r1', session },
+      resp,
+      viewerPlayerId: p0.id,
+      version: 1,
+      cause: 'action',
+      emittedAt: 0,
+    })
+    const other = buildEnvelope({
+      room: { id: 'r1', session },
+      resp,
+      viewerPlayerId: p1.id,
+      version: 1,
+      cause: 'action',
+      emittedAt: 0,
+    })
+    const observer = buildEnvelope({
+      room: { id: 'r1', session },
+      resp,
+      viewerPlayerId: null,
+      version: 1,
+      cause: 'action',
+      emittedAt: 0,
+    })
+
+    expect(active.payload.cardAvailability).toEqual({ 'minor:D36_BreedRegistry': true })
+    expect(other.payload.cardAvailability).toBeUndefined()
+    expect(observer.payload.cardAvailability).toBeUndefined()
+  })
+
+  it('filters hidden hand-card public event cancellations per viewer', () => {
+    const session = new GameSession()
+    const resp = session.withCtx(() => {
+      const next = session.getState()
+      const state = next.state
+      state.players = state.players.slice(0, 2)
+      const p0 = state.players[0]!
+      const p1 = state.players[1]!
+      p0.minorHand = ['D36_BreedRegistry']
+      p1.minorHand = ['D36_BreedRegistry']
+      p0.cardStates = {
+        ...p0.cardStates,
+        D36_BreedRegistry: { extraData: { boardSheep: 1 } },
+      }
+      const hiddenEvent: GameEvent = {
+        schemaVersion: 1,
+        id: 'hidden',
+        seq: 1,
+        round: state.round,
+        phase: state.roundPhase,
+        type: 'card.triggered',
+        visibility: 'public',
+        actorPlayerId: p0.id,
+        cardId: 'D36_BreedRegistry',
+      }
+      const visibleEvent: GameEvent = {
+        schemaVersion: 1,
+        id: 'visible',
+        seq: 2,
+        round: state.round,
+        phase: state.roundPhase,
+        type: 'resource.moved',
+        visibility: 'public',
+        actorPlayerId: p0.id,
+        resources: { wood: 1 },
+        from: { kind: 'supply' },
+        to: { kind: 'player', playerId: p0.id },
+        reason: 'gain',
+      }
+      state.events = []
+      state.nextEventSeq = 1
+      state.publicEventArchive = [
+        {
+          schemaVersion: 1,
+          id: '1',
+          packetSeq: 1,
+          type: 'publicEvents.committed',
+          eventIds: ['hidden', 'visible'],
+          eventSeqs: [1, 2],
+          firstEventSeq: 1,
+          lastEventSeq: 2,
+        },
+        {
+          schemaVersion: 1,
+          id: '2',
+          packetSeq: 2,
+          type: 'publicEvents.canceled',
+          reason: 'undoStep',
+          previousMaxSeq: 2,
+          nextMaxSeq: 0,
+          canceledEventIds: ['hidden', 'visible'],
+          canceledSeqs: [1, 2],
+          canceledEvents: [hiddenEvent, visibleEvent],
+        },
+      ]
+      state.nextPublicEventArchivePacketSeq = 3
+      next.publicEventCancellations = [{
+        reason: 'undoStep',
+        previousMaxSeq: 2,
+        nextMaxSeq: 0,
+        canceledEventIds: ['hidden', 'visible'],
+        canceledSeqs: [1, 2],
+      }]
+      return next
+    })
+    const p0 = resp.state.players[0]!
+    const p1 = resp.state.players[1]!
+
+    const owner = buildEnvelope({
+      room: { id: 'r1', session },
+      resp,
+      viewerPlayerId: p0.id,
+      version: 1,
+      cause: 'undo',
+      emittedAt: 0,
+    })
+    const other = buildEnvelope({
+      room: { id: 'r1', session },
+      resp,
+      viewerPlayerId: p1.id,
+      version: 1,
+      cause: 'undo',
+      emittedAt: 0,
+    })
+    const observer = buildEnvelope({
+      room: { id: 'r1', session },
+      resp,
+      viewerPlayerId: null,
+      version: 1,
+      cause: 'undo',
+      emittedAt: 0,
+    })
+
+    expect(owner.payload.publicEventCancellations).toEqual(resp.publicEventCancellations)
+    expect(other.payload.publicEventCancellations).toEqual([{
+      reason: 'undoStep',
+      previousMaxSeq: 1,
+      nextMaxSeq: 0,
+      canceledEventIds: ['visible'],
+      canceledSeqs: [1],
+    }])
+    expect(observer.payload.publicEventCancellations).toEqual(other.payload.publicEventCancellations)
   })
 
   it('masks draft pending picks for player and null-viewer envelopes', () => {

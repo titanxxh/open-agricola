@@ -1,11 +1,23 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { AuthProvider } from './contexts/AuthContext'
-import { LocaleProvider } from './contexts/LocaleContext'
-import { PageRouter } from './app/PageRouter'
+import { LocaleProvider, useLocale } from './contexts/LocaleContext'
 import { loadCardsManifest } from './services/card-meta'
-import './App.css'
+import { GameLoadScreen } from './components/common/GameLoadScreen'
+import { getGameLoadProgress } from './app/game-load-progress'
+import './styles/bootstrap-shell.css'
 
-function App() {
+const PageRouterLazy = lazy(() =>
+  import('./app/PageRouter').then((m) => ({ default: m.PageRouter })),
+)
+
+function RouterShellFallback() {
+  const { t } = useLocale()
+  const { percent, labelKey } = getGameLoadProgress('appShell')
+  return <GameLoadScreen percent={percent} label={t(labelKey)} />
+}
+
+function AppContent() {
+  const { t } = useLocale()
   const [manifestReady, setManifestReady] = useState(false)
   const [manifestError, setManifestError] = useState<string | null>(null)
 
@@ -32,14 +44,23 @@ function App() {
   }
 
   if (!manifestReady) {
-    return <div className="app-bootstrap-loading">Loading cards…</div>
+    const { percent, labelKey } = getGameLoadProgress('manifest')
+    return <GameLoadScreen percent={percent} label={t(labelKey)} />
   }
 
   return (
+    <AuthProvider>
+      <Suspense fallback={<RouterShellFallback />}>
+        <PageRouterLazy />
+      </Suspense>
+    </AuthProvider>
+  )
+}
+
+function App() {
+  return (
     <LocaleProvider>
-      <AuthProvider>
-        <PageRouter />
-      </AuthProvider>
+      <AppContent />
     </LocaleProvider>
   )
 }

@@ -238,7 +238,6 @@ describe('A129_Swagman session', () => {
       }
       const opts = resp.interaction.options ?? []
       const skipOpt = opts.find((o: ActionChoiceOption) => o.value === '__skip__')
-      const cancelOpt = opts.find((o: ActionChoiceOption) => o.value === 'cancel')
       // Swagman's inner optional jump choice is recognised by sourceCard.
       // The single-option mandatory select-trigger may have been auto-resolved
       // by the session, so we may land here without seeing select-trigger.
@@ -258,15 +257,38 @@ describe('A129_Swagman session', () => {
           continue
         }
       }
+      if (resp.interaction.stateId !== 'wait') {
+        break
+      }
+      if (resp.interaction.request.kind === 'farm-select') {
+        const farm = resp.interaction.farm
+        if (farm.farmType === 'plow') {
+          const tile = farm.selectableTiles[0]
+          if (!tile) throw new Error('expected selectable plow tile')
+          resp = session.commitSelectionChoice(0, { tile })
+        } else if (farm.farmType === 'room') {
+          const room = farm.selectableTiles[0]
+          if (!room) throw new Error('expected selectable room tile')
+          resp = session.commitSelectionChoice(0, { rooms: [room] })
+        } else if (farm.farmType === 'stable') {
+          const stable = farm.selectableTiles[0]
+          if (!stable) throw new Error('expected selectable stable tile')
+          resp = session.commitSelectionChoice(0, { stables: [stable] })
+        } else if (farm.farmType === 'sow') {
+          const field = farm.selectableFields[0]
+          const crop = field?.allowedCrops[0]
+          if (!field || !crop) throw new Error('expected selectable sow field')
+          resp = session.commitSelectionChoice(0, {
+            crops: [{ ...field.tile, crop }],
+          })
+        } else {
+          throw new Error('unexpected mandatory fence farm-select in test helper')
+        }
+        safety--
+        continue
+      }
       if (skipOpt) {
         resp = session.resolveChoice(0, '__skip__')
-      } else if (cancelOpt) {
-        // Stable/room/plow farm-select prompts: cancel out of irrelevant choices.
-        if (resp.interaction.request.kind === 'farm-select' || resp.interaction.selection) {
-          resp = session.commitSelectionChoice(0, { cancel: true })
-        } else {
-          resp = session.resolveChoice(0, cancelOpt.value)
-        }
       } else if (opts.length > 0) {
         // unrecognized mandatory choice (e.g. construct/stables OR) — pick first
         resp = session.resolveChoice(0, opts[0]!.value)

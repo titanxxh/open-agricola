@@ -3,6 +3,7 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { AnimalReorgState, PendingChoice, PendingAnimalReorg } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
+import { ResourceText } from '../common/ResourceText'
 import { formatAnimalCounts } from '../../utils/format'
 import type {
   ActionChoiceOption,
@@ -30,6 +31,11 @@ const isResourceExchangeLabelParams = (
 
 const hasPositiveResources = (resources?: Record<string, number | undefined>) =>
   !!resources && Object.values(resources).some((value) => (value ?? 0) > 0)
+
+const renderResourceAwareText = (text: string): ReactNode =>
+  text.includes('<') ? (
+    <ResourceText text={text} className="interaction-option-resource-text" />
+  ) : text
 
 const renderPaymentSourceCards = (
   locale: Locale,
@@ -92,7 +98,7 @@ const renderEffectPreview = (
       </span>
     )
   }
-  return effectPreview.text
+  return renderResourceAwareText(effectPreview.text)
 }
 
 const renderDescriptionAction = (
@@ -104,13 +110,13 @@ const renderDescriptionAction = (
     preview.labelKey,
     preview.labelParams as Record<string, string | number> | undefined,
   )
-  if (!preview.effectPreview) return label
+  if (!preview.effectPreview) return renderResourceAwareText(label)
   return (
     <span className="interaction-description-action">
       <span className="interaction-description-action-main">
         {renderEffectPreview(locale, preview.effectPreview)}
       </span>
-      <span className="interaction-option-subtitle">{label}</span>
+      <span className="interaction-option-subtitle">{renderResourceAwareText(label)}</span>
     </span>
   )
 }
@@ -228,11 +234,12 @@ const renderOptionLabel = (
       card: translateCardText(locale, option.labelParams.cardNameKey),
     })
   }
-  return translateCardText(
+  const label = translateCardText(
     locale,
     option.labelKey,
     option.labelParams as Record<string, string | number> | undefined,
   )
+  return renderResourceAwareText(label)
 }
 
 const renderOptionContent = (
@@ -266,7 +273,7 @@ const renderOptionContent = (
 
 function CollectorMultiSelect({ locale, options, needed, resolveChoice, isInteractive }: {
   locale: Locale
-  options: { value: string; labelKey: string }[]
+  options: ActionChoiceOption[]
   needed: number
   resolveChoice: (value: string) => void
   isInteractive: boolean
@@ -291,18 +298,22 @@ function CollectorMultiSelect({ locale, options, needed, resolveChoice, isIntera
         {t(locale, 'ui.interactionCollectorCount', { selected: selected.size, needed })}
       </div>
       <div className="collector-options">
-        {options.map((option) => (
-          <label key={option.value} className={`collector-option ${selected.has(option.value) ? 'selected' : ''}`}>
-            <input
-              type="checkbox"
-              checked={selected.has(option.value)}
-              onChange={() => toggle(option.value)}
-              disabled={!isInteractive || (!selected.has(option.value) && selected.size >= needed)}
-            />
-            <span className={`res-icon res-icon-${option.value}`} />
-            {translateCardText(locale, option.labelKey)}
-          </label>
-        ))}
+        {options.map((option) => {
+          const content = renderOptionContent(locale, option)
+          const showValueIcon = typeof content === 'string'
+          return (
+            <label key={option.value} className={`collector-option ${selected.has(option.value) ? 'selected' : ''}`}>
+              <input
+                type="checkbox"
+                checked={selected.has(option.value)}
+                onChange={() => toggle(option.value)}
+                disabled={!isInteractive || (!selected.has(option.value) && selected.size >= needed)}
+              />
+              {showValueIcon ? <span className={`res-icon res-icon-${option.value}`} /> : null}
+              {content}
+            </label>
+          )
+        })}
       </div>
       <button
         className="collector-confirm"
@@ -368,6 +379,7 @@ type Props = {
   resourceQuantitySelect?: {
     availableByResource: Partial<Record<keyof Resource, number>>
     promptKey?: string
+    requireAtLeastOne?: boolean
     onConfirm: (counts: Partial<Record<keyof Resource, number>>) => void
     onCancel: () => void
   } | null
@@ -455,7 +467,7 @@ export const InteractionBar = ({
     pendingStableTilesLength === 0
   const isSelectionConfirmDisabled =
     pendingChoice?.promptKey === 'ui.interactionSelection' &&
-    pendingPositionSelectionsLength === 0
+    pendingPositionSelectionsLength < ((pendingChoice.promptParams?.minSelections as number | undefined) ?? 1)
   const hasBodyContent = !!(
     pendingAnimalReorg ||
     resourceBatchExchangeSelect ||
@@ -563,6 +575,7 @@ export const InteractionBar = ({
               locale={locale}
               availableByResource={resourceQuantitySelect.availableByResource}
               promptKey={resourceQuantitySelect.promptKey}
+              requireAtLeastOne={resourceQuantitySelect.requireAtLeastOne}
               onConfirm={resourceQuantitySelect.onConfirm}
               onCancel={resourceQuantitySelect.onCancel}
             />
@@ -591,7 +604,11 @@ export const InteractionBar = ({
           ) : pendingChoice && isInteractive ? (
             <>
               <div className="interaction-title">
-                {t(locale, pendingChoice.promptKey as string ?? 'ui.interactionChooseOne')}
+                {t(
+                  locale,
+                  pendingChoice.promptKey ?? 'ui.interactionChooseOne',
+                  pendingChoice.promptParams as Record<string, string | number> | undefined,
+                )}
               </div>
               {triggerCardName ? (
                 <div className="interaction-subtitle">

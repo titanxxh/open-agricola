@@ -6,6 +6,7 @@ import type {
   ActionExecutionResult,
   ComplexCost,
   FarmTilePosition,
+  GameState,
   PlayerState,
   Resource,
 } from '../../contract/types'
@@ -53,11 +54,35 @@ const constructCostPreview: ActionCostPreview = {
     return cost?.unitFee ?? getBuildRoomCost(context.player.houseType)
   },
   canExecute: (context, costs) =>
-    getMaxBuildableRooms(
+    canStartConstruct(
+      context.state,
       context.player,
       costs,
       readConstructActionContext(context),
-    ) > 0,
+    ),
+}
+
+const boardForPlayer = (state: GameState, player: PlayerState) => {
+  const idx = state.players.indexOf(player)
+  if (idx >= 0) return playerBoard(state, idx)
+  return playerBoard({ ...state, players: [player] }, 0)
+}
+
+const canStartConstruct = (
+  state: GameState,
+  player: PlayerState,
+  costs: Partial<Resource> | undefined,
+  actionContext: Record<string, unknown> | undefined,
+): boolean => {
+  if (getMaxBuildableRooms(player, costs, actionContext) <= 0) return false
+  const costDelta = readConstructCostDelta(actionContext, costs)
+  const farm = boardForPlayer(state, player).farmyard.selectableTiles('room', {
+    costOverride: costDelta,
+    exactCost: readExactCost(actionContext),
+    actionContext,
+  })
+  if (farm.farmType !== 'room') return false
+  return farm.selectableTiles.length > 0 && (farm.maxSelections ?? 0) > 0
 }
 
 const applyPlayerMutation = (target: PlayerState, source: PlayerState) => {
@@ -76,21 +101,6 @@ const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
     result[key as keyof Resource] = value
   })
   return result
-}
-
-const forbidsConstructCancel = (
-  actionContext?: Record<string, unknown>,
-): boolean => actionContext?.cancelPolicy === 'forbidCancel'
-
-const hasReachableConstructSelection = (ctx: ActionMutationContext): boolean => {
-  const idx = ctx.state.players.indexOf(ctx.player)
-  const costDelta = readConstructCostDelta(ctx.actionContext, ctx.costs)
-  const farm = playerBoard(ctx.state, idx).farmyard.selectableTiles('room', {
-    costOverride: costDelta,
-    exactCost: readExactCost(ctx.actionContext),
-    actionContext: ctx.actionContext,
-  })
-  return farm.farmType === 'room' && farm.maxSelections > 0
 }
 
 const buildConstructPayCost = (
@@ -186,7 +196,7 @@ export const constructAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (_state, player, context) =>
-    getMaxBuildableRooms(player, undefined, context?.actionContext) > 0,
+    canStartConstruct(_state, player, undefined, context?.actionContext),
   costPreview: constructCostPreview,
   execute: ({ state, player, costs, actionContext }): ActionExecutionResult => {
     const idx = state.players.indexOf(player)
@@ -203,7 +213,6 @@ export const constructAction: ActionDefinition = {
         farm,
         options: [
           { value: 'confirm', labelKey: 'ui.interactionRoomConfirm' },
-          { value: 'cancel', labelKey: 'ui.interactionRoomCancel' },
         ],
       },
       promptKey: 'ui.interactionRoomSelect',
@@ -211,17 +220,11 @@ export const constructAction: ActionDefinition = {
   },
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
     if (choice === 'cancel') {
-      if (
-        forbidsConstructCancel(ctx.actionContext) &&
-        hasReachableConstructSelection(ctx)
-      ) {
-        return {
-          type: 'fail',
-          errorKey: 'log.buildRoomFail',
-          recoverable: true,
-        }
+      return {
+        type: 'fail',
+        errorKey: 'log.buildRoomFail',
+        recoverable: true,
       }
-      return { type: 'ok' }
     }
 
     // Second call: payment combo selected after multi-combo prompt.

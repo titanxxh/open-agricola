@@ -155,10 +155,11 @@ describe('E69_MelonPatch session', () => {
       expect(stacks ?? []).toEqual([])
       // Should return optional plow
       expect(flow).toBeDefined()
-      expect(flow!.type).toBe('leaf')
-      expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('plow')
-      expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
-      expect((flow as Extract<ActionFlow, { type: 'leaf' }>).sourceCard).toBe(CARD_ID)
+      expect(flow!.type).toBe('parallel')
+      const plow = (flow as Extract<ActionFlow, { type: 'parallel' }>).children[0] as Extract<ActionFlow, { type: 'leaf' }>
+      expect(plow.actionId).toBe('plow')
+      expect(plow.optional).toBe(true)
+      expect(plow.sourceCard).toBe(CARD_ID)
     })
   })
 })

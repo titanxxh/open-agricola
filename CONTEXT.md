@@ -1,0 +1,269 @@
+# Open Agricola
+
+Open Agricola 是一个后端权威、WebSocket 实时多人同步的 Agricola 在线复刻。本文档定义项目共享语言，供 agent、issue、PRD、测试说明和重构讨论使用；具体实现以 `docs/ARCHITECTURE.md` 和当前代码为准。
+
+## Language
+
+**后端权威**:
+规则裁定和 `GameState` 写入只发生在 `shared/` + `server/`。前端发命令，服务端校验、执行、落状态、广播快照。
+_Avoid_: 前端裁定、客户端规则补丁
+
+**三层架构**:
+`shared/` 承载领域模型、行动、引擎、卡牌和协议；`server/` 承载 HTTP、WebSocket、房间、持久化和沙盒执行；`client/` 只渲染、收集输入、管理本地 UI 临时态。
+_Avoid_: client 直接 import `shared/session`、`shared/engine`、卡牌实现
+
+**Session**:
+会话领域层，核心是 `shared/session/session-core.ts` 的 `GameCore`。它协调 `GameState`、`EngineStack`、history、阶段推进、交互构建、undo 和响应生成。
+_Avoid_: WebSocket 连接层
+
+**GameSession**:
+服务端权威会话类，位于 `server/game/authoritative-session.ts`，继承 `GameCore` 并注入自定义卡沙盒运行时。HTTP、WebSocket 和 session 测试都通过它驱动规则。
+_Avoid_: React session、本地 UI store
+
+**GameState**:
+一局游戏的领域真相，包含玩家、行动格、回合、阶段、draft、公开事件、日志缓存、future meeple、收获摘要等可序列化状态。
+_Avoid_: 房间连接、WebSocket version、React state
+
+**PlayerState**:
+玩家的领域状态：资源、工人、房间、田地、动物、手牌、已打出卡、`cardStates`、supply token 消耗等。
+_Avoid_: RoomPlayer、浏览器连接、登录用户
+
+**Room**:
+多人对局容器，持有一个 `GameSession`、座位连接、最大人数、房间状态和持久化元数据。
+_Avoid_: PlayerState
+
+**RoomPlayer**:
+房间里的连接席位，包含 `ws`、`playerIndex`、显示名和可选用户身份；不是规则层玩家状态。
+_Avoid_: PlayerState
+
+**Connection**:
+WebSocket 连接和房间命令路由层，核心包括 `ws-server`、`room-router`、`broadcaster` 和 `envelope-builder`。
+_Avoid_: 规则执行、直接写 GameState
+
+**ClientCommand**:
+浏览器通过 WebSocket 发给服务端的命令，如 `action`、`choice`、`commitSelection`、`anytime`、`roundEnd`、`undoStep`。
+_Avoid_: 直接修改 state 的请求
+
+**StateUpdateEnvelope**:
+服务端广播或单播给客户端的同步包，携带 `GameSyncPayload`、`InteractionState`、分数、版本和 cause。当前同步语义是全量 snapshot。
+_Avoid_: 局部 patch
+
+**Snapshot**:
+服务端发出的完整可序列化状态视图。客户端收到后整体替换本地游戏状态。
+_Avoid_: 乐观更新、增量 patch
+
+**Services**:
+客户端服务层，核心是 `client/services/gameTransport.ts` 的 `WsGameTransport`，负责连接、发送命令和接收状态更新。
+_Avoid_: UI 组件内直接管理协议细节
+
+**App**:
+前端应用编排层，包含 `GameContainerApi`、action log timeline、replay feedback、public/private event UI 等。
+_Avoid_: 规则裁定
+
+**InteractionState**:
+前端唯一交互真相，只有 `idle`、`wait`、`gameover` 三类；`wait.request.kind` 决定 UI 展示选择、农场选择、喂食、动物整理、draft 等哪种交互。
+_Avoid_: 前端从 DOM 或规则代码推断可操作性
+
+**InteractionRequest**:
+等待玩家输入的结构化请求，常见 kind 有 `choice`、`farm-select`、`selection`、`animal-reorg`、`feed`、`confirm-next-player`、`confirm-player-switch`、`card-draft`。
+_Avoid_: 未类型化 pending blob
+
+**Pending Envelope**:
+引擎节点树里承载等待信息的 envelope，包含 `InteractionRequest`、source card、pending action、owner、上下文快照等；`InteractionState` 从它派生。
+_Avoid_: 旧 `PendingAction` union、前端 pending 状态机
+
+**Continuation**:
+一次 pending 被玩家选择后继续执行的后续 flow 或阶段恢复。复杂卡牌的“下一步选择”应走显式 pending / continuation。
+_Avoid_: 共享临时槽位、前端偷补流程
+
+**Engine**:
+节点树执行层，核心包括 `Engine`、`EngineStack`、`engineProceed`、`engineResolve`、`BaseNode`、`ActionNode`、`OrNode`、`XorNode`、`ParallelNode`。
+_Avoid_: 新建并行状态机
+
+**ActionFlow**:
+卡牌、hook、listener 和行动返回的领域 flow 代数，只暴露 `leaf`、`seq`、`parallel`、`xor`、`or` 加 metadata。
+_Avoid_: runtime-only node、为单卡新增 flow 类型
+
+**ActionNode**:
+runtime engine tree 的原子叶节点，按 `actionId` 调用 `ActionDefinition` 的执行和选择逻辑。
+_Avoid_: Action Space
+
+**EngineStack**:
+引擎子流程栈，用于 top action、hook、anytime、动物整理、喂食、farm-select、confirm 等嵌套流程的 push / pop / resume。
+_Avoid_: 直接改 pending
+
+**Sub-flow**:
+由阶段、hook、anytime 或系统流程插入的嵌套执行帧，例如 `animal-reorg`、`harvest-feed`、`confirm-next-player`。
+_Avoid_: 顶层游戏状态机
+
+**Effects**:
+行动效果层，覆盖 collect、construct、fencing、sow、bake-bread、exchange、breed 等公开行动和内部行动。
+_Avoid_: 在 effect 文件里堆叠多卡特例
+
+**Action Space**:
+棋盘上的行动格，是可放工人的公开空间，包含行动定义、累积资源、占用工人等。
+_Avoid_: ActionDefinition、ActionNode
+
+**ActionDefinition**:
+一个行动的规则定义，包含可执行性、费用预览、执行函数、选择解析和可选 inner flow。
+_Avoid_: UI 按钮定义
+
+**Payment Pipeline**:
+统一支付管线，用 `ComplexCost`、`PaymentSolution`、cost modifier、solver 和 executor 处理建房、翻修、围栏、出牌、pay leaf 等成本。
+_Avoid_: 每张卡手写支付分支
+
+**Supply Token**:
+玩家 supply 中的 fence / stable 组件也视为支付资源；支付 supply token 记录到 `player.supplyTokensConsumed`。
+_Avoid_: 固定 15 fence / 4 stable 上限
+
+**Internal Action**:
+不直接暴露给玩家选择的内部执行叶子，例如 payment internal、future meeple、selection、return-to-space、recall worker。
+_Avoid_: 玩家可直接选择的公开行动
+
+**Action Hook**:
+行动生命周期扩展点，如 `isDoable`、`computeReplace`、`computeCosts`、`before`、`during`、`after`、`anytime`。通常由卡牌注册。
+_Avoid_: 前端规则补丁、核心路径单卡 if-else
+
+**Card Effect Hook**:
+卡牌在阶段或计分时被调用的 effect 字段，如 `onBuy`、`onRoundStart`、`onStartHarvestFieldPhase`、`onAfterReap`、`computeBonusScore`。
+_Avoid_: listener phase
+
+**Card Listener**:
+监听 action / event phase 的卡牌反应。listener handler 必须是 state-pure flow builder：只能读 state / events 并返回 flow 或结构化结果。
+_Avoid_: dispatch 阶段直接 mutate state
+
+**Cards**:
+卡牌运行时领域，覆盖 `CardRegistry`、`SessionCardContext`、card effects、card listeners、display lookup 和自定义卡注册。
+_Avoid_: 把单卡规则扩散到主路径
+
+**Card Definition**:
+卡牌外形和通用规则字段，如 id、名称、描述、成本、类型、前置条件、reward、`cardField`。
+_Avoid_: 卡牌运行时局部状态
+
+**Card Impl**:
+卡牌实现文件里的 hook、listener 和 helper 调用，位于 `shared/cards/{Deck}/`，服务端和 sandbox 使用，主 client bundle 禁止引入。
+_Avoid_: cards-display metadata
+
+**Card Display**:
+主前端可读的卡牌展示数据，位于 `shared/cards-display/`，只描述 UI metadata。
+_Avoid_: 规则执行逻辑
+
+**Card State**:
+单卡局部状态，写在 `player.cardStates[cardId]`，用于计数、flag、infobox、stack、extraData 等。
+_Avoid_: 为单卡新增 PlayerState / GameState 顶层字段
+
+**Card Field**:
+一张已打出卡提供的虚拟田，可播种、收获并参与“田”的计数；通过 `CardDefinition.cardField` 和 card-field helper 声明。
+_Avoid_: Harvest hook
+
+**Domain**:
+领域聚合和派生视图层，覆盖农场、动物区、牧场容量、计分、`PlayerBoard` 等不变量校验。
+_Avoid_: React UI 规则裁定
+
+**Harvest**:
+完整收获序列，可能包含田地阶段、喂食阶段、繁殖阶段和收获作用域卡牌效果。
+_Avoid_: Private Field Phase
+
+**Harvest Field Phase**:
+完整 Harvest 内的田地阶段，会对适用玩家执行 Reap，并触发收获田地阶段作用域效果。
+_Avoid_: Private Field Phase
+
+**Private Field Phase**:
+卡牌授予的私人田地阶段，只在某个玩家的农场上执行 Reap，不进入完整 Harvest。
+_Avoid_: Harvest、Harvest Field Phase
+
+**Reap**:
+从普通田或 Card Field 顶堆收获作物到玩家 supply 的动作。
+_Avoid_: Harvest
+
+**Harvest Count**:
+田地阶段中一块田本次 Reap 应产出的作物数量。普通田通常为 1，但收获阶段卡牌可能增加、减少或覆盖该数量。
+_Avoid_: 资源总数、整次 Harvest 产量
+
+**Events**:
+事件和 replay 领域，覆盖 `EventStore`、public event archive、event mapping policy、log mapper、replay timeline 和 private event notification。
+_Avoid_: 直接写 UI log 当规则事实
+
+**Public Event**:
+写入 `GameState.events` 的公开规则事实，用于派生日志、动画提示、审计和 replay。
+_Avoid_: 直接写 state.log
+
+**Private Event**:
+只发给特定 viewer 的私有同步附加层，例如私有 prompt、手牌变化、draft 信息；不进入公共 replay 事件流。
+_Avoid_: public event
+
+**Action Log**:
+`GameState.log` 是 UI 缓存，由 public events mapper 派生；规则代码不把它当事实来源。
+_Avoid_: 业务代码直接写 log
+
+**Workshop**:
+自定义卡和 AI 卡牌设计区域，覆盖卡牌生成、LLM 服务、卡牌美术、工坊 PR 和自定义卡上传。
+_Avoid_: 原版规则主路径
+
+**Custom Code Sandbox**:
+自定义卡代码的校验、编译和隔离执行链路，服务端通过 `server/custom-code/` 和 executor-backed runtime 注入卡牌能力。
+_Avoid_: 直接执行用户源码
+
+**主 client bundle**:
+线上 React 前端，只能使用协议、展示数据、安全领域 helper 和 i18n，不运行完整规则引擎。
+_Avoid_: `shared/session`、`shared/engine`、`shared/cards` impl
+
+**Sandbox client bundle**:
+浏览器内离线 hot-seat / workshop sandbox，可直接运行完整 shared engine。
+_Avoid_: 线上多人主链路
+
+**Session Test**:
+后端边界测试，直接实例化 `GameSession` 并断言 `state`、`pending`、`interaction`、`log`、`scores`。
+_Avoid_: 用 DOM 断言规则正确性
+
+## Relationships
+
+- 一个 **Room** 持有一个 **GameSession**；一个 **GameSession** 持有并写入一个 **GameState**。
+- 浏览器通过 **Services** 里的 `WsGameTransport` 发送 **ClientCommand**；**Connection** 层路由到 **GameSession**；**Broadcaster** 构造 **StateUpdateEnvelope** 并广播。
+- **GameState** 描述游戏规则事实；**RoomPlayer** 描述连接席位；两者不要混用。
+- **GameCore.buildInteraction** 从 **GameState**、**EngineStack**、当前 **Pending Envelope** 和 anytime policy 派生 **InteractionState**。
+- **InteractionState** 是前端启用按钮和渲染交互的依据；前端不从规则代码推断可操作性。
+- **ActionFlow** 编译成 runtime engine tree；`leaf` 变成 **ActionNode**，组合节点变成 sequence / parallel / or / xor runtime node。
+- **EngineStack** 是 hook、anytime、喂食、动物整理、confirm、farm-select 等子流程的唯一嵌套机制。
+- **Action Space** 是棋盘空间；**ActionDefinition** 是行动规则；**ActionNode** 是 runtime 执行叶子。
+- **Effects** 定义公开和内部行动；**Internal Action** 支撑支付、selection、future meeple、worker recall 等非玩家直选叶子。
+- **Action Hook** 修改行动生命周期的可达性、成本、替代、候选或后续 flow；**Card Effect Hook** 处理阶段/计分；**Card Listener** 响应 action/event phase。
+- **Card Listener** 可以构造 flow，但状态修改必须落到 action leaf 执行阶段。
+- **Card Definition** 和 **Card Display** 可以被前端读取；**Card Impl** 只给 server / sandbox 执行规则。
+- 持续计数、单次标记和单卡历史优先写入 **Card State**；只有跨卡通用事实才进入 `GameState` 或 `PlayerState` 顶层。
+- **Domain** 提供农场、动物、牧场、计分等派生视图和不变量；规则路径可以复用，前端只能把它当安全派生 helper。
+- **Harvest** 包含最多一个 **Harvest Field Phase**；**Private Field Phase** 可以执行 **Reap**，但不是 Harvest。
+- **Harvest Field Phase** 可能触发 harvest-scoped card effects；**Private Field Phase** 不能触发这些效果，除非卡牌明确说明。
+- **Card Field** 在 Reap 时参与田地收获，但其副作用是否属于 Harvest 取决于触发上下文。
+- 规则事实先写 **Public Event**，再派生 **Action Log**、notification、highlight、animation 和 replay。
+- 私有手牌、私有 prompt 和 draft 选择通过 **Private Event** 或 viewer 过滤传输，不写入公共事件流。
+- **Workshop** 生成或上传自定义卡；**Custom Code Sandbox** 校验、编译并隔离执行这些卡的 impl。
+- 主 client bundle 只渲染和发命令；sandbox client bundle 可以在浏览器内运行完整 shared engine。
+- 规则正确性优先用 **Session Test**；前端视觉和多人连接行为再用 E2E。
+
+## Example dialogue
+
+> **Dev:** “我需要让一张卡在玩家选择行动格后给额外资源，要改 `client` 吗？”
+> **Domain expert:** “不要。规则应在 `shared/actions` hook 或该卡的 `shared/cards` impl 中表达，前端只消费新的 `InteractionState` / snapshot。”
+
+> **Dev:** “这个效果需要记住本卡本轮触发过一次，应该加 `PlayerState.hasUsedX` 吗？”
+> **Domain expert:** “不要。单卡局部状态写 `player.cardStates[cardId]`，除非它已经是多卡共享领域事实。”
+
+> **Dev:** “Festival Planning 触发 ‘in the field phase of each harvest’ 的卡吗？”
+> **Domain expert:** “不触发。它给的是 Private Field Phase，会 Reap，但不是 Harvest Field Phase。”
+
+## Flagged ambiguities
+
+- “action” 可能指 **ClientCommand**、**Action Space**、**ActionDefinition** 或 **ActionNode**。讨论规则实现时要说明是哪一层。
+- “pending” 可能指 engine 的 **Pending Envelope**、前端的 **InteractionState.wait**、旧测试里的兼容字段或业务上的等待流程。新设计应优先说 `InteractionRequest.kind`。
+- “choice” 可能指 WS `choice` 命令、`InteractionRequest.kind='choice'`、ActionFlow 的 `or/xor` 分支或前端 UI 选择。需要精确到协议/引擎/界面层。
+- “hook” 可能指 **Action Hook** 或 **Card Effect Hook**；“listener” 是另一套 action/event 反应机制，不要混称。
+- “card” 可能指 **Card Definition**、**Card Display**、**Card Impl**、玩家手牌、已打出卡或 **Card State**。改规则时通常指 Card Impl；改 UI 文案时通常指 Card Display。
+- “field phase” 可能指 **Harvest Field Phase** 或 **Private Field Phase**；卡牌文本写“this is not a harvest”时使用 Private Field Phase。
+- “reap” 只是收作物动作，不等同于完整 **Harvest**。
+- “snapshot” 是当前同步方式；不要假设存在增量 patch，除非架构文档明确变更。
+- “log” 是 UI 缓存，不是规则事实来源；新增规则事实应先考虑 public event。
+- “player” 可能指 **PlayerState**、`playerIndex`、`playerId`、**RoomPlayer** 或登录 user；跨层传参时必须明确。
+- “可执行” 在不同层含义不同：行动入口可达性、支付可行性、pending option enabled、UI allowed command 都是不同判断。
+- “前端可见” 不代表“规则允许”；前端显示应以服务端 **InteractionState** 和 `allowedCommands` 为准。
+- “sandbox” 可能指浏览器内 `client/sandbox`，也可能指 server/custom-code 隔离执行；前者是调试 bundle，后者是自定义卡运行时隔离。

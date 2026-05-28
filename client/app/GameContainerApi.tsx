@@ -12,7 +12,7 @@ import { emptyResources, resourceKeyList } from '../../shared/contract/state-con
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, parseDraftParamsFromQuery, type GameTransport } from '../services/gameTransport'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
-import { playerCanBuildPalisades } from '../../shared/cards/helpers/card-type'
+import { playerCanBuildPalisades } from '../utils/player-palisades'
 import { useFarmSelection } from '../hooks/useFarmSelection'
 import { buildHarvestFeedOptions } from './hooks/use-harvest-flow'
 import { computeHarvestFeedCounterMax } from './hooks/use-harvest-feed-counter'
@@ -28,6 +28,8 @@ import { ActionLog } from '../components/board/ActionLog'
 import { GameHeader } from '../components/header/GameHeader'
 import { InteractionBar } from '../components/interaction/InteractionBar'
 import { BrandMark } from '../components/common/BrandMark'
+import { GameLoadScreen } from '../components/common/GameLoadScreen'
+import { getGameLoadProgress, resolveGameLoadPhase } from './game-load-progress'
 import { ResourceLine } from '../components/common/ResourceLine'
 import { Section } from '../components/common/Section'
 import { PublicEventResourceAnimations } from '../components/effects/PublicEventResourceAnimations'
@@ -1607,13 +1609,28 @@ export const GameContainerApi = () => {
   }, [transport])
 
   if (isWs && wsStatus.phase !== 'ready' && !state) {
-    const statusText = wsStatus.phase === 'idle' ? t(locale, 'platform.loading')
-      : wsStatus.phase === 'connecting' ? t(locale, 'platform.loading')
-      : wsStatus.phase === 'creating' ? t(locale, 'platform.loading')
-      : wsStatus.phase === 'joining' ? t(locale, 'platform.loading')
-      : wsStatus.phase === 'waiting' ? t(locale, 'platform.waitingForPlayers', { roomId: wsStatus.roomId, current: String(wsStatus.players.length), max: String(wsStatus.maxPlayers) })
-      : wsStatus.phase === 'error' ? (wsStatus.message === 'roomDissolved' ? t(locale, 'platform.roomDissolved') : `Error: ${wsStatus.message}`)
-      : t(locale, 'platform.loading')
+    const wsProgressPhase =
+      resolveGameLoadPhase({ wsStatus, hasGameView: false }) ??
+      (wsStatus.phase === 'idle' ? 'wsConnecting' : null)
+
+    if (wsProgressPhase) {
+      const { percent, labelKey } = getGameLoadProgress(wsProgressPhase)
+      return (
+        <GameLoadScreen percent={percent} label={t(locale, labelKey)}>
+          <button type="button" className="btn-link ws-status-back" onClick={() => setPage('lobby')}>
+            {t(locale, 'platform.backToLobby')}
+          </button>
+        </GameLoadScreen>
+      )
+    }
+
+    const statusText = wsStatus.phase === 'waiting'
+      ? t(locale, 'platform.waitingForPlayers', { roomId: wsStatus.roomId, current: String(wsStatus.players.length), max: String(wsStatus.maxPlayers) })
+      : wsStatus.phase === 'error'
+        ? wsStatus.message === 'roomDissolved'
+          ? t(locale, 'platform.roomDissolved')
+          : `Error: ${wsStatus.message}`
+        : ''
 
     const inviteUrl = wsStatus.phase === 'waiting'
       ? `${window.location.origin}${window.location.pathname}?page=game&transport=ws&room=${wsStatus.roomId}`
@@ -1677,10 +1694,6 @@ export const GameContainerApi = () => {
             </div>
           )}
 
-          {(wsStatus.phase === 'connecting' || wsStatus.phase === 'creating' || wsStatus.phase === 'joining') && (
-            <div className="ws-spinner" />
-          )}
-
           <button type="button" className="btn-link ws-status-back" onClick={() => setPage('lobby')}>
             {t(locale, 'platform.backToLobby')}
           </button>
@@ -1689,8 +1702,11 @@ export const GameContainerApi = () => {
     )
   }
 
-  if (!state || !currentPlayer || !displayPlayer) {
-    return <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>Loading...</div>
+  if (!hasGameView) {
+    const fetchPhase =
+      resolveGameLoadPhase({ wsStatus: isWs ? wsStatus : undefined, hasGameView: false }) ?? 'fetchingState'
+    const { percent, labelKey } = getGameLoadProgress(fetchPhase)
+    return <GameLoadScreen percent={percent} label={t(locale, labelKey)} />
   }
 
   const notificationStack = privateEventNotifications.length > 0 || displayPublicEventNotifications.length > 0 ? (
@@ -2134,6 +2150,7 @@ export const GameContainerApi = () => {
             ? {
                 availableByResource: interaction.request.availableByResource,
                 promptKey: interaction.request.promptKey,
+                requireAtLeastOne: interaction.request.requireAtLeastOne,
                 onConfirm: (counts) => {
                   if (!isInteractive) return
                   void transport

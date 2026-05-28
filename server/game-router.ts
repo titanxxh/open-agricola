@@ -1,6 +1,10 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { GameSession } from './game/authoritative-session.ts'
-import { serializeState, serializeStateForPlayer } from '../shared/session/serialization.ts'
+import {
+  filterPublicEventCancellationsForPlayer,
+  serializeState,
+  serializeStateForPlayer,
+} from '../shared/session/serialization.ts'
 import {
   playerBoard,
   type SowSelection,
@@ -207,10 +211,14 @@ const respondWith = (
 ) => {
   const ctx = { engineStack: session.getEngineStack() }
   const playerIds = resp.state.players.map((player) => player.id)
+  const currentPlayerId = resp.state.players[resp.state.currentPlayerIndex]?.id ?? null
   const privateEvents = viewerPlayerId === null
     ? []
     : privateEventsForViewer(resp.interaction, playerIds, viewerPlayerId, resp.privateEvents ?? [])
-  const { privateEvents: _privateEvents, ...publicResp } = resp
+  const publicEventCancellations = viewerPlayerId === null
+    ? resp.publicEventCancellations
+    : filterPublicEventCancellationsForPlayer(resp.state, viewerPlayerId, ctx, resp.publicEventCancellations)
+  const { privateEvents: _privateEvents, publicEventCancellations: _publicEventCancellations, ...publicResp } = resp
   const result: Record<string, unknown> = {
     ...publicResp,
     state:
@@ -221,8 +229,13 @@ const respondWith = (
       viewerPlayerId != null
         ? filterInteractionForViewer(resp.interaction, playerIds, viewerPlayerId)
         : resp.interaction,
+    cardAvailability:
+      viewerPlayerId === null || viewerPlayerId === currentPlayerId
+        ? resp.cardAvailability
+        : undefined,
   }
   if (privateEvents.length > 0) result.privateEvents = privateEvents
+  if (publicEventCancellations?.length) result.publicEventCancellations = publicEventCancellations
   // Include custom card definitions so the frontend can register them
   // in its card registry — custom cards render identically to built-in cards.
   const defs = session.getCustomCardDefs()

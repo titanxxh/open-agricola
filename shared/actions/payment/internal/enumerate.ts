@@ -27,7 +27,7 @@ import type {
 import {
   convertResources,
   hasValidResources,
-} from '../../effects/exchange'
+} from '../../effects/exchange-resources'
 import { isFireplaceIdentityCard } from '../../../cards/helpers/card-type'
 import { solutionCache, makeCacheKey } from './cache'
 import {
@@ -100,6 +100,13 @@ const hashSolution = (solution: PaymentSolution): number => {
   if (solution.bonusUsed) {
     h = ((h + solution.bonusUsed.charCodeAt(0) * 17) * 31) >>> 0
   }
+  if (solution.preservedOriginalFor) {
+    for (const source of [...solution.preservedOriginalFor].sort()) {
+      for (const ch of source) {
+        h = ((h + ch.charCodeAt(0) * 29) * 31) >>> 0
+      }
+    }
+  }
   if (solution.bonusChoiceIndex) {
     const entries = Object.entries(solution.bonusChoiceIndex).sort(
       (a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
@@ -132,6 +139,16 @@ const subtractResources = (
 }
 
 const dominates = (a: PaymentSolution, b: PaymentSolution): boolean => {
+  const aBonusSources = (a.bonusUsed ?? '').split(',').filter(Boolean)
+  const bBonusSources = new Set((b.bonusUsed ?? '').split(',').filter(Boolean))
+  if (
+    aBonusSources.some((source) =>
+      b.preservedOriginalFor?.includes(source) && !bBonusSources.has(source),
+    )
+  ) {
+    return false
+  }
+
   const aPaid = a.resourcesPaid
   const bPaid = b.resourcesPaid
   const allKeys = new Set([
@@ -636,10 +653,11 @@ export const computeAllBuyableCombinations = (
         type BonusPath = {
           cost: PaymentResourceMap
           sources: string[]
+          preservedOriginalFor: string[]
           choiceIndices: Record<string, number>
         }
         let bonusPaths: BonusPath[] = [
-          { cost: baseFee, sources: [], choiceIndices: {} },
+          { cost: baseFee, sources: [], preservedOriginalFor: [], choiceIndices: {} },
         ]
 
         for (const bonus of effectiveCost.bonuses ?? []) {
@@ -648,11 +666,20 @@ export const computeAllBuyableCombinations = (
           }
 
           const expanded: BonusPath[] = []
+          const preserveSources = bonus.preserveOriginal
+            ? [...new Set([
+                ...(bonus.sources ?? []),
+                ...(bonus.choices ?? []).flatMap((choice) => choice.sources ?? []),
+              ])]
+            : []
           if (bonus.optional) {
             for (const path of bonusPaths) {
               expanded.push({
                 cost: path.cost,
                 sources: [...path.sources],
+                preservedOriginalFor: preserveSources.length > 0
+                  ? [...new Set([...path.preservedOriginalFor, ...preserveSources])]
+                  : [...path.preservedOriginalFor],
                 choiceIndices: { ...path.choiceIndices },
               })
             }
@@ -707,6 +734,7 @@ export const computeAllBuyableCombinations = (
               expanded.push({
                 cost: nextCost,
                 sources: nextSources,
+                preservedOriginalFor: [...path.preservedOriginalFor],
                 choiceIndices: nextChoiceIndices,
               })
             }
@@ -714,7 +742,7 @@ export const computeAllBuyableCombinations = (
           bonusPaths = expanded
         }
 
-        for (const { cost: effectiveCostFee, sources, choiceIndices } of bonusPaths) {
+        for (const { cost: effectiveCostFee, sources, preservedOriginalFor, choiceIndices } of bonusPaths) {
           const { resources: realCost, supplyTokens } = splitSupplyTokenCost(effectiveCostFee)
           if (canCoverCost(tradeCombo.result, realCost) && canPaySupplyTokens(state, player, effectiveCostFee)) {
             const remaining = subtractResources(tradeCombo.result, realCost)
@@ -728,6 +756,7 @@ export const computeAllBuyableCombinations = (
               resourcesRemaining: remainingWithSupplyTokens as Partial<Resource>,
               tradesUsed,
               bonusUsed: sources.length > 0 ? sources.join(',') : undefined,
+              preservedOriginalFor: preservedOriginalFor.length > 0 ? preservedOriginalFor : undefined,
               bonusChoiceIndex:
                 Object.keys(choiceIndices).length > 0 ? choiceIndices : undefined,
               feeIndex: baseFeesRaw.length > 1 ? feeIdx : undefined,
@@ -757,6 +786,7 @@ export const computeAllBuyableCombinations = (
       resourcesPaid,
       tradesUsed: sol.tradesUsed,
       bonusUsed: sol.bonusUsed,
+      preservedOriginalFor: sol.preservedOriginalFor,
       bonusChoiceIndex: sol.bonusChoiceIndex,
       feeIndex: sol.feeIndex,
     }

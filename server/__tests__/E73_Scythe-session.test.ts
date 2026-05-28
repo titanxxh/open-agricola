@@ -3,9 +3,11 @@ import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/E/E73_Scythe'
-import type { ActionFlow, Field } from '../../shared/contract/types'
+import { E112_GrainThief_impl } from '../../shared/cards/E/E112_GrainThief'
+import type { ActionFlow, ActionSpace, Field } from '../../shared/contract/types'
 import { getAdHocAction } from '../../shared/actions/helpers/ad-hoc-action-registry'
 import { reap } from '../../shared/actions/effects/reap'
+import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 
 const CARD_ID = 'E73_Scythe'
 
@@ -29,7 +31,6 @@ describe('E73_Scythe session — token model + reap full stack', () => {
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
     player.fields = [
-      // single-stack field with 3 grain (qualifies: >=2 crops)
       makeField(0, 0, [{ kind: 'grain', remaining: 3 }]),
     ]
     session.loadState(state)
@@ -57,6 +58,27 @@ describe('E73_Scythe session — token model + reap full stack', () => {
     expect(flow).toBeUndefined()
   })
 
+  it('does not let E112 lower the E73 eligibility threshold', () => {
+    const { session, state } = setupSession()
+    const player = state.players[0]!
+    player.minorPlayed.push(CARD_ID)
+    player.occupationPlayed.push('E112_GrainThief')
+    player.fields = [
+      makeField(0, 0, [{ kind: 'grain', remaining: 1 }]),
+      makeField(0, 1, [{ kind: 'grain', remaining: 2 }]),
+    ]
+    session.loadState(state)
+
+    const effect = getCardEffect(CARD_ID)!
+    const flow = effect.onStartHarvestFieldPhase!(state, player)
+
+    expect(flow).toBeDefined()
+    expect(flow!.type).toBe('xor')
+    const xor = flow as Extract<ActionFlow, { type: 'xor' }>
+    expect(xor.children).toHaveLength(1)
+    expect((xor.children[0] as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ fieldIndex: 1 })
+  })
+
   it('does NOT trigger when no fields planted', () => {
     const { session, state } = setupSession()
     const player = state.players[0]!
@@ -69,17 +91,15 @@ describe('E73_Scythe session — token model + reap full stack', () => {
     expect(flow).toBeUndefined()
   })
 
-  it('reaps the entire stack (multi-stack field — all crops in one go)', () => {
+  it('full-reaps the selected multi-stack field through normal reap', () => {
     const { session, state } = setupSession()
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
     player.fields = [
-      // BGA "multi-stack" example: vegetable on top of grain
       makeField(0, 0, [
         { kind: 'grain', remaining: 1 },
         { kind: 'vegetable', remaining: 1 },
       ]),
-      // a different field with crops — should NOT be touched
       makeField(0, 1, [{ kind: 'grain', remaining: 2 }]),
     ]
     player.resources.grain = 0
@@ -91,10 +111,8 @@ describe('E73_Scythe session — token model + reap full stack', () => {
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('xor')
     const xor = flow as Extract<ActionFlow, { type: 'xor' }>
-    // both fields qualify (totalRemaining ≥2)
     expect(xor.children.length).toBe(2)
 
-    // pick child for field index 0 — execute it via the registered ad-hoc action.
     const firstChild = xor.children[0] as Extract<ActionFlow, { type: 'leaf' }>
     expect(firstChild.actionId).toBe('card_E73_Scythe_harvest-field')
     expect(firstChild.params).toEqual({ fieldIndex: 0 })
@@ -108,16 +126,59 @@ describe('E73_Scythe session — token model + reap full stack', () => {
     } as Parameters<typeof adHoc.execute>[0])
 
     expect(result.type).toBe('ok')
-    // both stacks fully reaped: 1 grain + 1 vegetable
-    expect(player.resources.grain).toBe(1)
+    expect(player.resources.grain).toBe(0)
+    expect(player.resources.vegetable).toBe(0)
+    expect(player.fields[0]!.stacks).toEqual([
+      { kind: 'grain', remaining: 1 },
+      { kind: 'vegetable', remaining: 1 },
+    ])
+
+    const reapResult = reap(state, player)
+
+    expect(player.resources.grain).toBe(2)
     expect(player.resources.vegetable).toBe(1)
-    // selected field is now empty
     expect(player.fields[0]!.stacks.length).toBe(0)
-    // other field untouched (still has its 2 grain)
-    expect(player.fields[1]!.stacks[0]!.remaining).toBe(2)
+    expect(player.fields[1]!.stacks[0]!.remaining).toBe(1)
+    expect(reapResult.reapSummary.harvestedCrops).toEqual([
+      { row: 0, col: 0, crop: 'vegetable', amount: 1, sources: ['base', CARD_ID] },
+      { row: 0, col: 0, crop: 'grain', amount: 1, sources: ['base', CARD_ID] },
+      { row: 0, col: 1, crop: 'grain', amount: 1, sources: ['base'] },
+    ])
   })
 
-  it('reaps a deep multi-stack field (2 grain + 1 vegetable) all at once', () => {
+  it('records selected field position without harvesting immediately', () => {
+    const { session, state } = setupSession()
+    const player = state.players[0]!
+    player.minorPlayed.push(CARD_ID)
+    player.fields = [
+      makeField(0, 0, [
+        { kind: 'grain', remaining: 1 },
+        { kind: 'vegetable', remaining: 1 },
+      ]),
+    ]
+    player.resources.grain = 0
+    player.resources.vegetable = 0
+    session.loadState(state)
+
+    const adHoc = getAdHocAction('card_E73_Scythe_harvest-field')!
+    const result = adHoc.execute({
+      state,
+      player,
+      params: { fieldIndex: 0 },
+      sourceCard: CARD_ID,
+    } as Parameters<typeof adHoc.execute>[0])
+
+    expect(result.type).toBe('ok')
+    expect(player.resources.grain).toBe(0)
+    expect(player.resources.vegetable).toBe(0)
+    expect(player.fields[0]!.stacks).toEqual([
+      { kind: 'grain', remaining: 1 },
+      { kind: 'vegetable', remaining: 1 },
+    ])
+    expect(player.cardStates[CARD_ID]?.extraData?.fullReapPosition).toEqual('0-0')
+  })
+
+  it('full-reaps a deep multi-stack field with normal reap', () => {
     const { session, state } = setupSession()
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
@@ -140,15 +201,15 @@ describe('E73_Scythe session — token model + reap full stack', () => {
     } as Parameters<typeof adHoc.execute>[0])
 
     expect(result.type).toBe('ok')
+
+    reap(state, player)
+
     expect(player.resources.grain).toBe(2)
     expect(player.resources.vegetable).toBe(1)
     expect(player.fields[0]!.stacks.length).toBe(0)
   })
 
-  it('main reap does not double-harvest the field after Scythe empties it', () => {
-    // After Scythe's harvest leaf empties the field, the main reap path
-    // (shared/actions/effects/reap.ts) iterates fields and skips empty ones —
-    // so no double-harvest is possible.
+  it('main reap does not double-harvest the field after Scythe full reap', () => {
     const { session, state } = setupSession()
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
@@ -162,7 +223,6 @@ describe('E73_Scythe session — token model + reap full stack', () => {
     player.resources.vegetable = 0
     session.loadState(state)
 
-    // Scythe-harvest the field
     const adHoc = getAdHocAction('card_E73_Scythe_harvest-field')!
     adHoc.execute({
       state,
@@ -171,14 +231,110 @@ describe('E73_Scythe session — token model + reap full stack', () => {
       sourceCard: CARD_ID,
     } as Parameters<typeof adHoc.execute>[0])
 
+    reap(state, player)
+
     expect(player.resources.grain).toBe(1)
     expect(player.resources.vegetable).toBe(1)
     expect(player.fields[0]!.stacks.length).toBe(0)
 
-    // Now invoke the main reap helper directly — should be a no-op for the empty field.
     reap(state, player)
-    // Resources unchanged: still 1 grain + 1 vegetable (no double).
     expect(player.resources.grain).toBe(1)
     expect(player.resources.vegetable).toBe(1)
+  })
+
+  it('E73 full reap overrides E112 on the same field and E112 does not gain supply grain', () => {
+    const { session, state } = setupSession()
+    const player = state.players[0]!
+    player.minorPlayed.push(CARD_ID)
+    player.occupationPlayed.push('E112_GrainThief')
+    player.fields = [
+      makeField(0, 0, [{ kind: 'grain', remaining: 3 }]),
+    ]
+    player.resources.grain = 0
+    player.cardStates = {
+      [CARD_ID]: { extraData: { fullReapPosition: '0-0' } },
+      E112_GrainThief: { extraData: { selectedPositions: ['0-0'] } },
+    }
+    session.loadState(state)
+
+    const reapResult = reap(state, player)
+
+    expect(player.resources.grain).toBe(3)
+    expect(player.fields[0]!.stacks).toEqual([])
+    expect(reapResult.reapSummary.harvestedCrops).toEqual([
+      { row: 0, col: 0, crop: 'grain', amount: 3, sources: ['base', CARD_ID] },
+    ])
+
+    const endFlow = E112_GrainThief_impl.effect.onEndHarvestFieldPhase!(state, player)
+
+    expect(endFlow).toEqual({
+      type: 'seq',
+      children: [
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: 'E112_GrainThief',
+          params: { kind: 'set-extra-data', key: 'selectedPositions', value: undefined },
+        },
+      ],
+    })
+  })
+
+  it('records full-reap harvestedCrops per crop type and merges repeated crop entries', () => {
+    const { session, state } = setupSession()
+    const player = state.players[0]!
+    player.minorPlayed.push(CARD_ID)
+    player.fields = [
+      makeField(0, 0, [
+        { kind: 'grain', remaining: 1 },
+        { kind: 'vegetable', remaining: 1 },
+        { kind: 'grain', remaining: 2 },
+      ]),
+    ]
+    player.resources.grain = 0
+    player.resources.vegetable = 0
+    player.cardStates = {
+      [CARD_ID]: { extraData: { fullReapPosition: '0-0' } },
+    }
+    session.loadState(state)
+
+    const reapResult = reap(state, player)
+
+    expect(player.resources.grain).toBe(3)
+    expect(player.resources.vegetable).toBe(1)
+    expect(player.fields[0]!.stacks).toEqual([])
+    expect(reapResult.reapSummary.harvestedCrops).toEqual([
+      { row: 0, col: 0, crop: 'grain', amount: 3, sources: ['base', CARD_ID] },
+      { row: 0, col: 0, crop: 'vegetable', amount: 1, sources: ['base', CARD_ID] },
+    ])
+  })
+
+  it('keeps fullReapPosition after field phase reap and clears it with EndHarvest cleanup', () => {
+    const { session, state } = setupSession()
+    const player = state.players[0]!
+    player.minorPlayed.push(CARD_ID)
+    player.fields = [
+      makeField(0, 0, [{ kind: 'grain', remaining: 2 }]),
+    ]
+    player.cardStates = {
+      [CARD_ID]: { extraData: { fullReapPosition: '0-0' } },
+    }
+    session.loadState(state)
+
+    reap(state, player)
+
+    expect(player.cardStates[CARD_ID]?.extraData?.fullReapPosition).toBe('0-0')
+
+    const cleanup = getCardEffect(CARD_ID)!.onEndHarvest!(state, player) as Extract<ActionFlow, { type: 'leaf' }>
+    const result = specialEffectAction.execute({
+      state,
+      player,
+      params: cleanup.params,
+      sourceCard: CARD_ID,
+      space: { id: 'special-effect' } as ActionSpace,
+    } as Parameters<typeof specialEffectAction.execute>[0])
+
+    expect(result.type).toBe('ok')
+    expect(player.cardStates[CARD_ID]?.extraData?.fullReapPosition).toBeUndefined()
   })
 })

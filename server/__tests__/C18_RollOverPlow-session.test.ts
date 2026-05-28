@@ -7,7 +7,7 @@ import type { AnytimeAction } from '../../shared/contract/types';
 const CARD_ID = 'C18_RollOverPlow'
 
 describe('C18_RollOverPlow session', () => {
-  const setup = () => {
+  const setup = (options?: { includeEmptyField?: boolean }) => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -23,6 +23,9 @@ describe('C18_RollOverPlow session', () => {
       { row: 0, col: 3, stacks: [{ kind: 'vegetable', remaining: 2 }] },
       { row: 1, col: 2, stacks: [{ kind: 'grain', remaining: 1 }] },
     ]
+    if (options?.includeEmptyField) {
+      player.fields.push({ row: 1, col: 3, stacks: [] })
+    }
 
     session.loadState(state)
     return session
@@ -85,6 +88,57 @@ describe('C18_RollOverPlow session', () => {
 
     // Should have gained a new field from plowing
     expect(resp.state.players[0]!.fields.length).toBe(4)
+  })
+
+  it('rejects empty discard selection before plow interaction starts', () => {
+    const session = setup()
+    enterActiveInteraction(session)
+
+    let resp = session.takeAnytimeAction(0, 'C18-roll-over-plow-anytime')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
+    expect(resp.interaction.promptKey).toBe('ui.interactionSelection')
+
+    resp = session.commitSelectionChoice(0, { positions: [] })
+
+    expect(resp.ok).toBe(false)
+    expect(resp.error).toBe('not enough selection positions')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
+    expect(resp.interaction.promptKey).toBe('ui.interactionSelection')
+    const player = resp.state.players[0]!
+    expect(player.fields).toHaveLength(3)
+    expect(player.fields.find(f => f.row === 0 && f.col === 2)?.stacks[0]).toEqual({
+      kind: 'grain',
+      remaining: 3,
+    })
+  })
+
+  it('rejects selecting an empty field for discard before plow interaction starts', () => {
+    const session = setup({ includeEmptyField: true })
+    enterActiveInteraction(session)
+
+    let resp = session.takeAnytimeAction(0, 'C18-roll-over-plow-anytime')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
+    expect(resp.interaction.promptKey).toBe('ui.interactionSelection')
+
+    resp = session.commitSelectionChoice(0, { positions: [{ row: 1, col: 3 }] })
+
+    expect(resp.ok).toBe(false)
+    expect(resp.error).toBe('invalid selection position')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
+    expect(resp.interaction.promptKey).toBe('ui.interactionSelection')
+    const player = resp.state.players[0]!
+    expect(player.fields).toHaveLength(4)
+    expect(player.fields.find(f => f.row === 1 && f.col === 3)?.stacks).toEqual([])
+    expect(player.fields.find(f => f.row === 0 && f.col === 2)?.stacks[0]).toEqual({
+      kind: 'grain',
+      remaining: 3,
+    })
   })
 
   it('NOT available with < 3 planted fields', () => {

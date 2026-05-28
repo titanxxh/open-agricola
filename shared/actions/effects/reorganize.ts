@@ -127,7 +127,13 @@ export const reorganizeAction: ActionDefinition = {
     }
   },
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
-    if (choice === 'cancel') return { type: 'ok' }
+    if (choice === 'cancel') {
+      return {
+        type: 'fail',
+        errorKey: 'log.reorganizeFail',
+        recoverable: true,
+      }
+    }
     const rawPayload = payload as unknown
     const zones = Array.isArray(rawPayload)
       ? rawPayload as ZoneAssignment[]

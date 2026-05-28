@@ -99,23 +99,43 @@ describe('B150_LargeScaleFarmer session', () => {
       resp = session.resolveChoice(0, resp.interaction.options[0]!.value)
     }
     // Navigate through any sub-interactions until we hit the B150 optional (has __skip__).
-    // For engine-driven farm prompts (room/stable confirm/cancel), prefer 'cancel' so we
-    // never block the chain by trying to commit a tile without a payload.
     let safety = 15
     let foundOptional = false
     while (safety-- > 0) {
       if (resp.interaction.stateId === 'wait') {
+        if (resp.interaction.request.kind === 'farm-select') {
+          const farm = resp.interaction.farm
+          if (farm.farmType === 'plow') {
+            const tile = farm.selectableTiles[0]
+            if (!tile) throw new Error('expected selectable plow tile')
+            resp = session.commitSelectionChoice(0, { tile })
+          } else if (farm.farmType === 'room') {
+            const room = farm.selectableTiles[0]
+            if (!room) throw new Error('expected selectable room tile')
+            resp = session.commitSelectionChoice(0, { rooms: [room] })
+          } else if (farm.farmType === 'stable') {
+            const stable = farm.selectableTiles[0]
+            if (!stable) throw new Error('expected selectable stable tile')
+            resp = session.commitSelectionChoice(0, { stables: [stable] })
+          } else if (farm.farmType === 'sow') {
+            const field = farm.selectableFields[0]
+            const crop = field?.allowedCrops[0]
+            if (!field || !crop) throw new Error('expected selectable sow field')
+            resp = session.commitSelectionChoice(0, {
+              crops: [{ ...field.tile, crop }],
+            })
+          } else {
+            throw new Error('unexpected mandatory fence farm-select in test helper')
+          }
+          continue
+        }
         const hasSkip = resp.interaction.options?.some((o) => o.value === '__skip__')
         if (hasSkip) {
           foundOptional = true
           break
         }
-        const cancel = resp.interaction.options?.find((o) => o.value === 'cancel')
         const done = resp.interaction.options?.find((o) => o.value === '__done__')
-        const hasConfirm = resp.interaction.options?.some((o) => o.value === 'confirm')
-        if (cancel && hasConfirm) {
-          resp = session.commitSelectionChoice(0, { cancel: true })
-        } else if (done) {
+        if (done) {
           resp = session.resolveChoice(0, done.value)
         } else {
           resp = session.resolveChoice(0, resp.interaction.options[0]!.value)

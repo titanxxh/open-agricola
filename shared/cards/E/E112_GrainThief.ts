@@ -1,88 +1,92 @@
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
-import type { ActionDefinition, ActionFlow } from '../../contract/types'
-import { fieldHasCrop, fieldFindStackOfKind, fieldTopStack } from '../../domain/field'
-import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
+import { readCardExtraData } from '../helpers/card-state'
+import { gainLeaf } from '../helpers/pay-gain-node'
+import type { ActionFlow, FarmTilePosition, Field, PlayerState } from '../../contract/types'
+import { fieldTopStack } from '../../domain/field'
+import { registerHarvestCountModifier } from '../../actions/helpers/harvest-count-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E112_GrainThief'
+const E73_CARD_ID = 'E73_Scythe'
+const SELECTED_POSITIONS_KEY = 'selectedPositions'
+const E73_FULL_REAP_POSITION_KEY = 'fullReapPosition'
 
-const PROTECTED_KEY = 'protectedFields'
+const fieldKey = (field: Field) => `${field.row}-${field.col}`
 
-const PROTECT_ACTION_ID = 'card_E112_GrainThief_protect'
+const selectedPositionKeys = (player: PlayerState) =>
+  readCardExtraData<string[]>(player, CARD_ID, SELECTED_POSITIONS_KEY) ?? []
 
-const grainThiefProtectAction: ActionDefinition = {
-  id: PROTECT_ACTION_ID,
-  nameKey: 'actions.grain-thief-protect.name',
-  descriptionKey: 'actions.grain-thief-protect.description',
-  roundAvailable: 1,
-  gainPerRound: {},
-  canBeExecutedByPlayer: () => true,
-  execute: ({ player, params }) => {
-    const fieldIndex = params?.fieldIndex as number | undefined
-    if (fieldIndex === undefined) return { type: 'fail', errorKey: 'log.actionFail' }
-    const field = player.fields[fieldIndex]
-    if (!field) return { type: 'fail', errorKey: 'log.actionFail' }
+const scytheFullReapPosition = (player: PlayerState) =>
+  readCardExtraData<string>(player, E73_CARD_ID, E73_FULL_REAP_POSITION_KEY)
+
+const selectableGrainFields = (player: PlayerState) =>
+  player.fields.filter((field) => {
     const top = fieldTopStack(field)
-    if (!top || top.kind !== 'grain' || top.remaining <= 0) {
-      return { type: 'fail', errorKey: 'log.actionFail' }
-    }
-    const protected_ = readCardExtraData<{ index: number; remaining: number }[]>(
-      player, CARD_ID, PROTECTED_KEY,
-    ) ?? []
-    protected_.push({ index: fieldIndex, remaining: top.remaining })
-    writeCardExtraData(player, CARD_ID, PROTECTED_KEY, protected_)
-    field.stacks.pop()
-    player.resources.grain += 1
-    return {
-      type: 'ok',
-      resourcesGained: { grain: 1 },
-    }
+    return top?.kind === 'grain' && top.remaining > 0
+  })
+
+const positionsForFields = (fields: Field[]): FarmTilePosition[] =>
+  fields.map(({ row, col }) => ({ row, col }))
+
+const selectionFlow = (fields: Field[]): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'selection',
+  sourceCard: CARD_ID,
+  actionContext: {
+    selectionKind: 'farm-position',
+    selectableTiles: positionsForFields(fields),
+    minSelections: 1,
+    maxSelections: fields.length,
   },
+})
+
+const clearSelectionLeaf = (): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: CARD_ID,
+  params: { kind: 'set-extra-data', key: SELECTED_POSITIONS_KEY, value: undefined },
+})
+
+const selectedValidGrainFieldCount = (player: PlayerState) => {
+  const selected = new Set(selectedPositionKeys(player))
+  const scythePosition = scytheFullReapPosition(player)
+  return selectableGrainFields(player)
+    .filter((field) => selected.has(fieldKey(field)) && fieldKey(field) !== scythePosition)
+    .length
 }
 
-registerAdHocAction(grainThiefProtectAction)
+registerHarvestCountModifier(CARD_ID, ({ player, field }) => {
+  if (!player.occupationPlayed?.includes(CARD_ID)) return
+  const selected = new Set(selectedPositionKeys(player))
+  if (!selected.has(fieldKey(field))) return
+  if (fieldKey(field) === scytheFullReapPosition(player)) return
+  const top = fieldTopStack(field)
+  if (top?.kind !== 'grain' || top.remaining <= 0) return
+  return { delta: -1, sources: [CARD_ID] }
+})
 
 export const E112_GrainThief_impl = {
   effect: {
-  id: CARD_ID,
-  onHarvestFieldPhase: (_state, player) => {
-    // Clear stale data
-    writeCardExtraData(player, CARD_ID, PROTECTED_KEY, null)
-    const grainFields = player.fields
-      .map((f, i) => ({ field: f, index: i }))
-      .filter(({ field }) => fieldHasCrop(field, 'grain'))
-    if (grainFields.length === 0) return
-    const children: ActionFlow[] = grainFields.map(({ field, index }) => {
-      const grainStack = fieldFindStackOfKind(field, 'grain')
+    id: CARD_ID,
+    onStartHarvestFieldPhase: (_state, player) => {
+      const fields = selectableGrainFields(player)
+      if (fields.length === 0) return
       return {
-        type: 'leaf' as const,
-        actionId: PROTECT_ACTION_ID,
-        params: { fieldIndex: index },
-        sourceCard: CARD_ID,
+        type: 'seq',
         optional: true,
-        choiceLabelKey: 'ui.grainThiefProtect',
-        choiceLabelParams: { remaining: grainStack?.remaining ?? 0 },
-      }
-    })
-    return { type: 'seq', children }
+        children: [selectionFlow(fields)],
+      } satisfies ActionFlow
+    },
+    onEndHarvestFieldPhase: (_state, player) => {
+      const count = selectedValidGrainFieldCount(player)
+      if (selectedPositionKeys(player).length === 0) return
+      return {
+        type: 'seq',
+        children: [
+          ...(count > 0 ? [gainLeaf(CARD_ID, { grain: count })] : []),
+          clearSelectionLeaf(),
+        ],
+      } satisfies ActionFlow
+    },
   },
-  onEndHarvestFieldPhase: (_state, player) => {
-    const protectedFields = readCardExtraData<{ index: number; remaining: number }[]>(
-      player, CARD_ID, PROTECTED_KEY,
-    ) ?? []
-    writeCardExtraData(player, CARD_ID, PROTECTED_KEY, null)
-    for (const { index, remaining } of protectedFields) {
-      const field = player.fields[index]
-      if (!field) continue
-      // Restore the grain stack (protection reverses the reap decrement)
-      const grainStack = fieldFindStackOfKind(field, 'grain')
-      if (grainStack) {
-        grainStack.remaining = remaining
-      } else {
-        field.stacks.push({ kind: 'grain', remaining })
-      }
-    }
-  },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl

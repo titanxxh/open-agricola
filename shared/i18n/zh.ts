@@ -76,6 +76,14 @@ export const zh = {
       saved: '节省',
       bonusVp: '额外得分',
     },
+    cards: {
+      D132_HideFarmer: {
+        optional: '隐藏未使用农场格？',
+        markSpaces: {
+          prompt: '选择要为多少个未使用农场格支付食物',
+        },
+      },
+    },
     undoStep: '撤销上一步',
     undoAction: '撤销行动',
     endRound: '结束回合',
@@ -127,6 +135,7 @@ export const zh = {
     interactionCollectorSelect: '选择一种资源类型获得',
     interactionCollectorCount: '已选择: {selected} / 需选择: {needed}',
     interactionWorkshopAssistantSelect: '选择 {needed} 对建筑资源',
+    interactionResourcePair: '1 <{left}> + 1 <{right}>',
     interactionForestInn: '选择木材兑换方案',
     interactionPioneeringSpirit: '选择一种资源获得',
     interactionResourceMarketReedFood: '获得 1 芦苇 + 1 食物',
@@ -483,6 +492,7 @@ export const zh = {
     'bonus-grain': { name: '额外谷物', description: '获得 1 谷物' },
     plow: { name: '开垦', description: '开垦 1 块田地' },
     sow: { name: '播种', description: '在空田播种作物' },
+    'private-field-phase': { name: '私人田地阶段', description: '收获自己的田地，不开始收获阶段' },
     'bake-bread': { name: '烤面包', description: '使用改良烤面包' },
     'anytime-reorg': { name: '重整动物', description: '随时调整动物摆放' },
     reorganize: { name: '动物重组', description: '在牧场/房屋/畜栏间重新分配动物。' },
@@ -796,6 +806,7 @@ export const zh = {
     harvestPhaseReap: '收割',
     harvestPhaseFeed: '喂养',
     harvestPhaseBreed: '繁殖',
+    reapDetail: '{player} 收获 {resources}',
     harvestReapDetail: '{player} 收获 {resources}',
     harvestReapNothing: '{player} 没有可收割的田地',
     harvestReapSkipped: '{player} 本轮跳过收割',
@@ -851,6 +862,7 @@ export const zh = {
     cardTriggerDeclined: '已拒绝',
     cardInfoboxChanged: '{cardId}：{text}',
     cardStackChanged: '{cardId} 卡上资源变化 {resources}',
+    cardResourcePairsStored: '{player} 将 {pairs} 放到 {cardId} 上',
     cardSwappedWithBoard: '{player} 将 {fromCardId} 与 {toCardId} 交换',
     cardReturnedToBoard: '{player} 将 {cardId} 放回牌堆',
     cardDestroyed: '{player} 移除 {cardId}',
@@ -922,6 +934,15 @@ export const zh = {
   },
   platform: {
     loading: '加载中...',
+    loadStep: {
+      manifest: '加载卡牌数据…',
+      appShell: '加载游戏界面…',
+      auth: '验证登录…',
+      wsConnecting: '连接服务器…',
+      wsCreating: '创建房间…',
+      wsJoining: '加入房间…',
+      fetchingState: '同步游戏状态…',
+    },
     loginTitle: 'Open Agricola',
     loginSubtitle: '登录以继续',
     registerSubtitle: '创建新账户',
@@ -1158,20 +1179,17 @@ export const zh = {
     E161_ElderBaker: { name: '老面包师', desc: '获得 3 谷物。' },
     C162_ForestOwner: { name: '森林主人', desc: '主人：4 木。其他人：3 木（主人额外得 1 木）。' },
     C104_Collector: { name: '收藏家', desc: '获得 1 乞讨 + 选择 6/7/8/9 种不同资源（最多 4 次）。' },
-    C146_WorkshopAssistant: {
-      pair: {
-        WC: '1 木 + 1 黏土',
-        WR: '1 木 + 1 芦苇',
-        WS: '1 木 + 1 石',
-        CR: '1 黏土 + 1 芦苇',
-        CS: '1 黏土 + 1 石',
-        RS: '1 芦苇 + 1 石',
-      },
-    },
     A39_Chapel: { name: '教堂', desc: '获得 3 额外分。其他人需付 1 谷物给主人。' },
     A162_ForestTallyman: { name: '森林记录员', desc: '当森林+泥坑都被占用时：获得 2 黏土 + 3 木。' },
     STUB_BeforeBakeGainClay: { name: '测试：烤面包前得黏土', desc: '测试 stub：烤面包前获得 1 黏土。' },
     D122_ClayCarrier: { anytime: '搬黏土工：付2食物 → 获2黏土' },
+    D132_HideFarmer: {
+      markSpaces: {
+        name: '隐藏未使用农场格',
+        description: '支付食物，使未使用农场格不扣分。',
+        invalid: '食物数量非法',
+      },
+    },
     E86_PenBuilder: { anytime: '围栏工：付1木材 → 动物容量+2' },
     E148_Lazybones: { name: '懒骨头', choice: '预留 {spaces}' },
     A102_Grocer: { anytime: '杂货商：付1食物 → 购买顶部商品' },
@@ -1317,6 +1335,7 @@ export const zh = {
   'resource-quantity': {
     error: {
       'must-pick-at-least-one': '至少选择 1 个',
+      'invalid-count-food': '食物数量非法',
       'invalid-count-sheep': '羊数量非法',
       'invalid-count-boar': '猪数量非法',
       'invalid-count-cattle': '牛数量非法',

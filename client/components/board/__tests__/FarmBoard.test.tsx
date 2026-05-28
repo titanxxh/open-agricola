@@ -555,6 +555,53 @@ describe('FarmBoard', () => {
     const segments = html.match(/field-crop-segment/g) ?? []
     expect(segments.length).toBeGreaterThanOrEqual(2)
   })
+
+  it('renders C146 stored pairs from extraData as resource-pair stack on the played card', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    player.occupationPlayed = ['C146_WorkshopAssistant']
+    player.cardStates = {
+      C146_WorkshopAssistant: {
+        extraData: { pairs: ['WC', 'CS'] },
+      },
+    }
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          playedCards: ['occupation:C146_WorkshopAssistant'],
+        })}
+      />,
+    )
+
+    expect(html).toContain('card-stack-pair')
+    expect(html).toContain('res-icon-wood')
+    expect(html).toContain('res-icon-clay')
+    expect(html).toContain('res-icon-stone')
+    expect(html).not.toContain('res-icon-WC')
+    expect(html).not.toContain('res-icon-CS')
+  })
+
+  it('renders bonus VP counters directly on played cards', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+    player.minorPlayed = ['B34_SpecialFood']
+    player.cardStates = {
+      B34_SpecialFood: {
+        counters: { bonusVp: 2 },
+      },
+    }
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          playedCards: ['minor:B34_SpecialFood'],
+        })}
+      />,
+    )
+
+    expect(html).toContain('resource-chip resource-bonusVp')
+    expect(html).toContain('res-icon-bonusVp')
+    expect(html).toContain('resource-chip-count">2</span>')
+  })
 })
 
 // ---------------------------------------------------------------------------

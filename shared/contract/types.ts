@@ -87,6 +87,7 @@ export type Bonus = {
   discount?: Partial<Resource>
   choices?: BonusChoice[]
   optional?: boolean
+  preserveOriginal?: boolean
   sources?: string[]
   /**
    * Player-state conditions evaluated by `computeAllBuyableCombinations`
@@ -155,6 +156,7 @@ export type PaymentSolution = {
   tradesUsed: { trade: Trade; times: number }[]
   cardUsed?: string
   bonusUsed?: string
+  preservedOriginalFor?: string[]
   bonusChoiceIndex?: Record<string, number>
   feeIndex?: number
 }
@@ -338,10 +340,19 @@ export type FutureMeepleRequest =
       }[]
     }
 
+export type HarvestedCropSummaryEntry = {
+  row: number
+  col: number
+  crop: CropStack['kind']
+  amount: number
+  sources: string[]
+}
+
 export type HarvestReapSummary = {
   resources: Partial<Resource>
   grainFields: number
   vegetableFields: number
+  harvestedCrops?: HarvestedCropSummaryEntry[]
   /**
    * Positions of every field tile that produced a crop in this reap pass.
    * Mirror of BGA `getHarvestedFieldTilePositions($crops)`. Cards like
@@ -570,6 +581,8 @@ export type ActionFlow =
       promptKey?: PromptKey
       children: ActionFlow[]
       optional?: boolean
+      mode?: 'all' | 'trigger-select'
+      sourceCard?: string
       choiceLabelKey?: string
       choiceLabelParams?: Record<string, unknown>
       /**

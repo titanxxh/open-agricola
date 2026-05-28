@@ -9,6 +9,7 @@ import type {
 import { payAction } from '../../actions/effects/pay'
 import { gainAction } from '../../actions/effects/gain'
 import { bonusVpAction } from '../../actions/effects/bonus-vp'
+import { plowAction } from '../../actions/effects/plow'
 import { ActionRegistry } from '../registry'
 import { CardRegistry } from '../../cards/registry'
 import { setActiveCardRegistry, requireActiveCardRegistry } from '../../cards/active-registry'
@@ -195,6 +196,7 @@ describe('Engine flow nodes', () => {
         },
         cardId: 'C1',
         ownerPlayerId: p1.id,
+        ownerCardZone: 'played',
       },
     ]
 
@@ -249,6 +251,7 @@ describe('Engine flow nodes', () => {
         },
         cardId: 'C1',
         ownerPlayerId: p1.id,
+        ownerCardZone: 'played',
       },
     ]
 
@@ -398,6 +401,93 @@ describe('Engine flow nodes', () => {
         triggerPlayerId: p1.id,
         ownerPlayerId: p2.id,
         mandatory: true,
+      },
+    ])
+  })
+
+  it('preserves hand owner zone through trigger-select activation', () => {
+    const p1 = createPlayer()
+    p1.minorHand = ['HAND_SELECT_CARD']
+    const state = createState()
+    state.players = [p1]
+
+    const seen: Array<{
+      ownerCardId?: string
+      ownerCardZone?: string
+      ownerPlayerId?: string
+      playerId?: string
+    }> = []
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'hand-select-after',
+      cardIds: ['HAND_SELECT_CARD'],
+      zones: ['hand'],
+      actions: ['trigger-hand-select'],
+      phases: ['after'],
+      dispatchMode: 'select',
+      handler: (context: CardListenerContext) => {
+        seen.push({
+          ownerCardId: context.ownerCardId,
+          ownerCardZone: context.ownerCardZone,
+          ownerPlayerId: context.ownerPlayer?.id,
+          playerId: context.player.id,
+        })
+        return { extraData: { applicable: true } }
+      },
+    })
+    setActiveCardRegistry(cardRegistry)
+
+    const triggerAction: ActionDefinition = {
+      id: 'trigger-hand-select',
+      nameKey: 'test.handSelect',
+      descriptionKey: 'test.handSelect',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const registry = new ActionRegistry()
+    registry.register(triggerAction)
+    const space = createSpace(triggerAction)
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('trigger', triggerAction.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const context = () => ({ state, player: p1, space })
+
+    expect(engine.proceed(context()).type).toBe('ok')
+    const prompt = engine.proceed(context())
+    expect(prompt.type).toBe('choice')
+    if (prompt.type !== 'choice') throw new Error('expected trigger-select choice')
+    expect(prompt.choice.options.find((option) => option.value === 'HAND_SELECT_CARD')).toMatchObject({
+      value: 'HAND_SELECT_CARD',
+      sourceCard: 'HAND_SELECT_CARD',
+    })
+
+    const accepted = engine.resolveChoice('HAND_SELECT_CARD', context())
+    expect(accepted.type).toBe('ok')
+    expect(engine.proceed(context()).type).toBe('ok')
+
+    expect(seen).toEqual([
+      {
+        ownerCardId: 'HAND_SELECT_CARD',
+        ownerCardZone: 'hand',
+        ownerPlayerId: p1.id,
+        playerId: p1.id,
+      },
+      {
+        ownerCardId: 'HAND_SELECT_CARD',
+        ownerCardZone: 'hand',
+        ownerPlayerId: p1.id,
+        playerId: p1.id,
+      },
+      {
+        ownerCardId: 'HAND_SELECT_CARD',
+        ownerCardZone: 'hand',
+        ownerPlayerId: p1.id,
+        playerId: p1.id,
       },
     ])
   })
@@ -1408,6 +1498,52 @@ describe('Engine flow nodes', () => {
     const space = createSpace(action)
 
     const step = engine.proceed({ state, player, space })
+    expect(step.type).toBe('ok')
+    expect(optional.getState()).toBe('resolved')
+  })
+
+  it('optional plow leaf auto-skips when allowed tiles have no plowable intersection', () => {
+    const registry = new ActionRegistry()
+    registry.register(plowAction)
+    const optional = new ActionNode(
+      'action-d1-plow',
+      'plow',
+      'D1_ZigzagHarrow',
+      undefined,
+      undefined,
+      undefined,
+      {
+        allowedTiles: [
+          { row: 1, col: 4 },
+          { row: -1, col: 2 },
+        ],
+      },
+    )
+    optional.optional = true
+    optional.optionalActive = false
+    optional.optionalPromptKey = 'ui.interactionOptionalAction'
+    const engine = new Engine({
+      tree: new EngineTree(optional),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const state = createState()
+    const player = createPlayer()
+    player.fields = [
+      { row: 0, col: 2, stacks: [] },
+      { row: 0, col: 3, stacks: [] },
+      { row: 1, col: 3, stacks: [] },
+    ]
+    player.roomTiles = [
+      { row: 2, col: 0 },
+      { row: 1, col: 0 },
+    ]
+    player.stableTiles = [{ row: 1, col: 4 }]
+    const space = createSpace(plowAction)
+
+    const step = engine.proceed({ state, player, space })
+
     expect(step.type).toBe('ok')
     expect(optional.getState()).toBe('resolved')
   })

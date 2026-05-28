@@ -13,7 +13,7 @@ import { emptyResources } from '../../../shared/contract/state-constants'
 import { familySize } from '../../../shared/domain/player'
 import { readCardResourceStats } from '../../../shared/cards/helpers/card-state'
 import { getWorkerHeldOnCard } from '../../../shared/cards/helpers/card-held-workers'
-import { getFenceCount } from '../../../shared/actions/effects/fencing'
+import { getFenceCount } from '../../../shared/domain/fence-segments'
 import { collectLockedFarmTileKeys } from '../../../shared/cards/card-effects'
 import { isBorderEdge } from '../../../shared/domain/farm'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../../types/ui'
@@ -22,6 +22,18 @@ import { formatCardStatsLines } from '../common/cardStatsFormat'
 import { PlayerCard, type CardType } from '../common/PlayerCard'
 
 type AnimalType = 'sheep' | 'boar' | 'cattle'
+type BuildingResource = 'wood' | 'clay' | 'reed' | 'stone'
+
+const C146_WORKSHOP_ASSISTANT_ID = 'C146_WorkshopAssistant'
+
+const C146_PAIR_STACK_RESOURCES: Record<string, readonly BuildingResource[]> = {
+  WC: ['wood', 'clay'],
+  WR: ['wood', 'reed'],
+  WS: ['wood', 'stone'],
+  CR: ['clay', 'reed'],
+  CS: ['clay', 'stone'],
+  RS: ['reed', 'stone'],
+}
 
 const AnimalCount = ({
   count,
@@ -83,6 +95,33 @@ const FieldCropStack = ({
         </span>
       ))}
     </div>
+  )
+}
+
+const CardStackItem = ({
+  item,
+  index,
+  stackSize,
+}: {
+  item: string
+  index: number
+  stackSize: number
+}) => {
+  const pairResources = C146_PAIR_STACK_RESOURCES[item]
+  if (pairResources) {
+    return (
+      <span className="card-stack-pair">
+        {pairResources.map((resource) => (
+          <span key={resource} className={`res-icon res-icon-${resource}`} />
+        ))}
+      </span>
+    )
+  }
+  return (
+    <span
+      className={`res-icon res-icon-${item}`}
+      title={`#${stackSize - index}: ${item}`}
+    />
   )
 }
 
@@ -317,9 +356,9 @@ const PlayedCardStats = ({
     Object.entries(displayCounters).filter(([key]) => key !== 'bonusVp'),
   )
   const hasCardStacks = !!cardStacks && cardStacks.some((s) => s.remaining > 0)
-  const hasCounters = Object.keys(visibleCounters).length > 0 || stack.length > 0 || hasCardStacks
+  const hasCounters = Object.keys(visibleCounters).length > 0 || bonusVp > 0 || stack.length > 0 || hasCardStacks
   const statsLines = formatCardStatsLines(resourceStats, rawId, locale)
-  const hasResourceStats = statsLines.length > 0 || bonusVp > 0
+  const hasResourceStats = statsLines.length > 0
 
   useLayoutEffect(() => {
     if (!open || !hasResourceStats) return
@@ -375,6 +414,15 @@ const PlayedCardStats = ({
       />
       {futureEntries.length > 0 || hasCounters ? (
         <div className="card-future">
+          {bonusVp > 0 ? (
+            <div
+              className="resource-chip resource-bonusVp"
+              title={t(locale, 'ui.cardStats.bonusVp')}
+            >
+              <span className="res-icon res-icon-bonusVp" />
+              <span className="resource-chip-count">{bonusVp}</span>
+            </div>
+          ) : null}
           {Object.entries(visibleCounters).map(([resKey, count]) => {
             if (count <= 0) return null
             const isKnownResource = resKey in emptyResources
@@ -400,10 +448,11 @@ const PlayedCardStats = ({
           {stack.length > 0 && (
             <div className="card-stack">
               {[...stack].reverse().map((res, i) => (
-                <span
+                <CardStackItem
                   key={`stack-${i}`}
-                  className={`res-icon res-icon-${res}`}
-                  title={`#${stack.length - i}: ${res}`}
+                  item={res}
+                  index={i}
+                  stackSize={stack.length}
                 />
               ))}
             </div>
@@ -479,17 +528,6 @@ const PlayedCardStats = ({
               ) : null}
             </div>
           ))}
-          {bonusVp > 0 ? (
-            <div className="played-card-stats-section">
-              <div className="played-card-stats-label">{t(locale, 'ui.cardStats.bonusVp')}</div>
-              <ResourceLine
-                locale={locale}
-                resources={{}}
-                bonusVp={bonusVp}
-                className="played-card-stats-line"
-              />
-            </div>
-          ) : null}
         </div>
       ) : null}
     </div>
@@ -1072,7 +1110,11 @@ export const FarmBoard = ({
           const cardInfobox = displayPlayer.cardStates?.[rawId]?.infobox
           const cardStateCounters = displayPlayer.cardStates?.[rawId]?.counters ?? {}
           const resourceStats = readCardResourceStats(displayPlayer, rawId)
-          const cardStack = displayPlayer.cardStates?.[rawId]?.stack ?? []
+          const rawExtraData = displayPlayer.cardStates?.[rawId]?.extraData
+          const c146Pairs = rawId === C146_WORKSHOP_ASSISTANT_ID && Array.isArray(rawExtraData?.pairs)
+            ? rawExtraData.pairs.filter((pair): pair is string => typeof pair === 'string')
+            : null
+          const cardStack = c146Pairs ?? displayPlayer.cardStates?.[rawId]?.stack ?? []
           const rawCardCrop = displayPlayer.cardStates?.[rawId]?.extraData?.cardCrop as
             | { crop: 'grain' | 'vegetable' | 'wood'; remaining: number }
             | undefined

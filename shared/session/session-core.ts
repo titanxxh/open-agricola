@@ -1,6 +1,7 @@
 import type {
   DraftGameEvent,
   EventSink,
+  GameEvent,
 } from '../contract/events.ts'
 import type {
   ActionChoiceOption,
@@ -51,6 +52,7 @@ import {
   isPendingChoiceValueAllowed,
   pendingEnvelopeChoices,
 } from '../engine/pending-validation.ts'
+import { isProtectedActionCancel } from '../engine/protected-action-cancel.ts'
 import type { PendingEnvelope } from '../engine/types.ts'
 import type { ReorganizeTrigger } from '../actions/effects/reorganize.ts'
 import {
@@ -93,16 +95,18 @@ import * as draftPhase from './phases/draft.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { getCardEffect } from '../cards/card-effects.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
-import { runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook, runBeforeEndGameHooks } from '../cards/card-effects.ts'
+import { runCardEffectHook } from '../cards/card-effects.ts'
 import { positionKey } from '../domain/farm.ts'
-import { getMatchingListeners, executeCardListener } from '../cards/card-listeners.ts'
+import { getMatchingListeners, executeCardListener, listenerOwnerOptions, runCardListeners } from '../cards/card-listeners.ts'
 import { buildPhaseTrailingNodes, markOptional, stampOwner } from '../engine/engine-utils.ts'
 import { Scoring, playerBoard, type PlayerScoreSummary } from '../domain'
 import { reap } from '../actions/effects/reap.ts'
 import { breedLeaf } from '../actions/effects/breed'
+import { computeHarvestFeedingRequirement } from '../actions/helpers/harvest-feeding-requirement.ts'
+import { executeImmediateSpecialEffectFlows } from '../actions/effects/internal/immediate-special-effect-flow.ts'
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { resetRoundPlacements } from '../cards/helpers/round-placement.ts'
-import { familySize, newbornCount, workersAvailable } from '../domain/player.ts'
+import { familySize, workersAvailable } from '../domain/player.ts'
 import { getAssignedAnimalCount } from '../domain/animals.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/registry-display'
 import { getExchangesInWindow } from '../actions/effects/exchange.ts'
@@ -112,6 +116,7 @@ import {
   getBasicConversionExchange,
 } from '../cards/basic-conversion.ts'
 import { appendImmediateEvents, type ImmediateEventDraft } from '../events/append.ts'
+import { EventStore } from '../events/store.ts'
 import { prependDerivedLogEntries } from '../events/log-cache.ts'
 import {
   appendPublicEventCanceledPacket,
@@ -256,6 +261,12 @@ type SowSelectionPayload = {
   crop: 'grain' | 'vegetable' | 'wood' | 'stone'
 }
 
+const parallelHarvestFieldStageHooks = new Set<StageResumeState['hook']>([
+  'onStartHarvestFieldPhase',
+  'onHarvestFieldPhase',
+  'onEndHarvestFieldPhase',
+])
+
 type SelectionCommitPayload = {
   cancel?: boolean
   positions?: FarmTilePosition[]
@@ -294,6 +305,7 @@ type StageResumeState = {
   hook:
     | 'onBeforeHarvest'
     | 'onAfterReap'
+    | 'afterHarvestReapReaction'
     | 'onHarvest'
     | 'onEndHarvest'
     | 'onAfterHarvest'
@@ -304,6 +316,8 @@ type StageResumeState = {
     | 'onReturnHome'
     | 'onStartReturnHome'
     | 'onAfterRoundEnd'
+    | 'onRoundEnd'
+    | 'onBeforeEndGame'
     | 'onStartHarvest'
     | 'onStartHarvestFieldPhase'
     | 'onHarvestFieldPhase'
@@ -648,6 +662,8 @@ export class GameCore {
   invokeBeforeReturnHomeHooks(): SessionResponse { return this.continueBeforeReturnHomeHooks() }
   /** @internal Round phase — onAfterRoundEnd stage hook chain trampoline. */
   invokeAfterRoundEnd(): SessionResponse { return this.continueAfterRoundEnd() }
+  /** @internal Round phase — onRoundEnd stage hook chain trampoline. */
+  invokeRoundEndHooks(): SessionResponse { return this.continueRoundEndHooks() }
   /** @internal phase access — build a fresh Engine for a top-level action space. */
   createEngineForSpace(actionId: string): Engine { return this.createEngine(actionId) }
   /** @internal phase access — push a synthetic pending-only frame. */
@@ -876,6 +892,16 @@ export class GameCore {
     }
     if (flow.type === 'parallel') {
       const parallel = new ParallelNode(`par-${counter.value++}`, children)
+      if (flow.mode === 'trigger-select') {
+        parallel.mode = 'trigger-select'
+        parallel.triggerOwnerPlayerId = ownerPlayerId
+        parallel.triggerChildren = children.map((child, index) => ({
+          nodeId: child.id,
+          cardId: flow.children[index]?.sourceCard ?? `child-${index}`,
+          listenerId: '',
+          mandatory: flow.children[index]?.optional !== true,
+        }))
+      }
       return flow.optional ? markOptional(parallel, flow.promptKey) : parallel
     }
     if (flow.type === 'xor') {
@@ -1371,6 +1397,9 @@ export class GameCore {
     const blockedIds = new Set(policy.blockedIds)
     const { player, space } = context
     const anytimeEntries: { descriptor: AnytimeAction; flow: ActionFlow }[] = []
+    const pendingEnvelope = this.engineStack.peekPendingEnvelope()
+    const pendingSnapshot = this.peekHostContextSnapshot()
+    const pendingSourceCard = pendingEnvelope?.sourceCard ?? pendingSnapshot?.sourceCard
     for (const action of this.registry.values()) {
       if (!action.anytime) continue
       if (blockedIds.has(action.id)) continue
@@ -1396,15 +1425,14 @@ export class GameCore {
       space,
       actionId: 'anytime',
       phase: 'anytime',
+      pendingSourceCard,
     }
     const matchedAnytime = getMatchingListeners(anytimeContext)
     for (const entry of matchedAnytime) {
       if (!entry.cardId) continue
       if (entry.ownerPlayerId !== player.id) continue
       if (blockedIds.has(entry.registration.id)) continue
-      const result = executeCardListener(entry.registration, anytimeContext, {
-        ownerPlayerId: entry.ownerPlayerId,
-      })
+      const result = executeCardListener(entry.registration, anytimeContext, listenerOwnerOptions(entry))
       if (!result?.flow) continue
       // anytime listeners are queried during build (idempotent peek), not
       // fire — do not increment used here. The increment is done when the
@@ -1458,11 +1486,12 @@ export class GameCore {
 
     if (!frame || !envelope) {
       const anytimeActions = this.buildAnytimeEntries().map((entry) => entry.descriptor)
+      const baseCommands: InteractionCommand[] = anytimeActions.length > 0
+        ? ['takeAction', 'undoStep', 'undoAction', 'takeAnytimeAction']
+        : ['takeAction', 'undoStep', 'undoAction']
       return {
         stateId: 'idle',
-        allowedCommands: anytimeActions.length > 0
-          ? ['takeAction', 'undoStep', 'undoAction', 'takeAnytimeAction']
-          : ['takeAction', 'undoStep', 'undoAction'],
+        allowedCommands: this.filterUndoCommands(baseCommands),
         anytimeActions,
       }
     }
@@ -1484,8 +1513,8 @@ export class GameCore {
     const buildCmds = (
       base: ReadonlyArray<InteractionCommand>,
     ): InteractionCommand[] => {
-      if (!includeAnytimeCmd) return [...base]
-      return [...base, 'takeAnytimeAction']
+      const commands: InteractionCommand[] = includeAnytimeCmd ? [...base, 'takeAnytimeAction'] : [...base]
+      return this.filterUndoCommands(commands)
     }
     const anytimeDescriptors = anytimeEntries.map((entry) => entry.descriptor)
 
@@ -1625,7 +1654,7 @@ export class GameCore {
           sourceCard,
           request,
           options: [],
-          allowedCommands: ['undoStep', 'undoAction'],
+          allowedCommands: this.filterUndoCommands(['undoStep', 'undoAction']),
           anytimeActions: [],
         }
       case 'choice':
@@ -1713,8 +1742,8 @@ export class GameCore {
       ok,
       state: this.state,
       interaction,
-      historyLength: this.history.length,
-      hasActionStartSnapshot: this.actionStartIndex !== null,
+      historyLength: this.canUndoStepNow() ? this.history.length : 0,
+      hasActionStartSnapshot: this.canUndoActionNow(),
       scores: Scoring.computeAll(this.state),
       pastureCapacities: this.getPastureCapacities(),
     }
@@ -1939,6 +1968,34 @@ export class GameCore {
       }
     }
     this.actionStartIndex = null
+  }
+
+  private latestUndoBoundaryIndex(): number {
+    for (let i = this.history.length - 1; i >= 0; i -= 1) {
+      if (this.history[i]?.undoBoundary) return i
+    }
+    return -1
+  }
+
+  private canUndoStepNow(): boolean {
+    if (this.state.pendingUndoBoundary === true) return false
+    const entry = this.history[this.history.length - 1]
+    return !!entry && entry.undoBoundary !== true
+  }
+
+  private canUndoActionNow(): boolean {
+    if (this.state.pendingUndoBoundary === true) return false
+    if (this.actionStartIndex === null) return false
+    return this.actionStartIndex > this.latestUndoBoundaryIndex()
+  }
+
+  private filterUndoCommands(base: ReadonlyArray<InteractionCommand>): InteractionCommand[] {
+    const canUndoStep = this.canUndoStepNow()
+    const canUndoAction = this.canUndoActionNow()
+    return base.filter((command) =>
+      (command !== 'undoStep' || canUndoStep) &&
+      (command !== 'undoAction' || canUndoAction),
+    )
   }
 
   private buildRoundSnapshot(state: GameState): GameState {
@@ -2228,13 +2285,14 @@ export class GameCore {
     hook: StageResumeState['hook'],
     playerIndex: number,
     nextCardIndex: number,
+    resumePlayerIndex = playerIndex,
   ) {
     this.engineStack.push({
       engine: this.createFlowEngine(flow, playerIndex),
       source: { kind: 'flow', flow },
       spaceId: `__stage:${hook}`,
       ownerPlayerIndex: playerIndex,
-      stageResume: { hook, playerIndex, cardIndex: nextCardIndex },
+      stageResume: { hook, playerIndex: resumePlayerIndex, cardIndex: nextCardIndex },
       deferredPlayerSwitch: null,
       reason: 'stage-hook',
     })
@@ -2246,6 +2304,9 @@ export class GameCore {
     playerIndex = 0,
     cardIndex = 0,
   ) {
+    if (cardIndex === 0 && parallelHarvestFieldStageHooks.has(hook)) {
+      return this.continueParallelStageHook(hook, playerIndex)
+    }
     for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
       const player = this.state.players[currentPlayerIndex]
       if (!player) continue
@@ -2262,6 +2323,42 @@ export class GameCore {
         this.startStageFlow(flow, hook, currentPlayerIndex, currentCardIndex + 1)
         return true
       }
+    }
+    return false
+  }
+
+  private continueParallelStageHook(
+    hook: StageResumeState['hook'],
+    playerIndex = 0,
+  ) {
+    for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
+      const player = this.state.players[currentPlayerIndex]
+      if (!player) continue
+      const children: ActionFlow[] = []
+      const cards = [
+        ...this.getPlayerEffectCardIds(player),
+        ...this.getPlayerHandEffectCardIds(player, hook as CardEffectHook),
+      ]
+      for (const cardId of cards) {
+        const flow = runCardEffectHook(this.state, player, cardId, hook as CardEffectHook)
+        if (flow) {
+          const ownedFlow: ActionFlow = {
+            ...flow,
+            sourceCard: flow.sourceCard ?? cardId,
+            targetPlayerId: flow.targetPlayerId ?? player.id,
+          }
+          children.push(ownedFlow)
+        }
+      }
+      if (children.length === 0) continue
+      this.startStageFlow(
+        { type: 'parallel', mode: 'trigger-select', children },
+        hook,
+        currentPlayerIndex,
+        0,
+        currentPlayerIndex + 1,
+      )
+      return true
     }
     return false
   }
@@ -2328,6 +2425,7 @@ export class GameCore {
           resources: {},
           grainFields: 0,
           vegetableFields: 0,
+          harvestedCrops: [],
           harvestedPositions: [],
         }
       })
@@ -2347,6 +2445,15 @@ export class GameCore {
 
   private continueHarvestReap(): SessionResponse {
     const harvestOrder = this.getHarvestPlayerIndices()
+    const reactionChildren: ActionFlow[] = []
+    const appendReactionFlow = (flow: ActionFlow | undefined) => {
+      if (!flow) return
+      if (flow.type === 'parallel') {
+        reactionChildren.push(...flow.children)
+        return
+      }
+      reactionChildren.push(flow)
+    }
     harvestOrder.forEach((index) => {
       const player = this.state.players[index]
       if (!player) return
@@ -2364,6 +2471,7 @@ export class GameCore {
         actorPlayerId: player.id,
         sourceActionId: 'reap',
       })
+      appendReactionFlow(result.reactionFlow)
       const entry = this.state.harvestReapSummary![player.id]!
       entry.grainFields += result.reapSummary.grainFields
       entry.vegetableFields += result.reapSummary.vegetableFields
@@ -2377,6 +2485,12 @@ export class GameCore {
           ...result.reapSummary.harvestedPositions,
         ]
       }
+      if (result.reapSummary.harvestedCrops?.length) {
+        entry.harvestedCrops = [
+          ...(entry.harvestedCrops ?? []),
+          ...result.reapSummary.harvestedCrops,
+        ]
+      }
       incHarvestedGrain(player, result.reapSummary.resources.grain ?? 0)
       incHarvestedVegetable(player, result.reapSummary.resources.vegetable ?? 0)
       if (!this.hasPositiveResources(entry.resources)) {
@@ -2385,6 +2499,10 @@ export class GameCore {
         })
       }
     })
+    if (reactionChildren.length > 0) {
+      this.startStageFlow({ type: 'parallel', children: reactionChildren }, 'afterHarvestReapReaction', 0, 0)
+      return this.respond()
+    }
     return this.continueAfterReapEffects()
   }
 
@@ -2421,13 +2539,6 @@ export class GameCore {
   }
 
   private continueHarvestFeeding(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (playerIndex === 0 && cardIndex === 0) {
-      const harvestOrder = this.getHarvestPlayerIndices()
-      harvestOrder.forEach((index) => {
-        const player = this.state.players[index]
-        if (player) runBeforeFeedHooks(this.state, player)
-      })
-    }
     if (this.continueStageHook('onHarvestFeedingPhase', playerIndex, cardIndex)) {
       return this.respond()
     }
@@ -2440,9 +2551,7 @@ export class GameCore {
 
     for (const i of harvestOrder) {
       const player = this.state.players[i]!
-      const size = familySize(player)
-      const newborn = Math.min(newbornCount(player), size)
-      const required = Math.max(0, size * 2 - newborn)
+      const required = computeHarvestFeedingRequirement(this.state, player)
       const useFood = Math.min(player.resources.food, required)
       player.resources.food -= useFood
       const remaining = required - useFood
@@ -2508,6 +2617,49 @@ export class GameCore {
     return this.finalizeRound()
   }
 
+  private dispatchFutureMeepleResolvedListeners(
+    events: readonly GameEvent[],
+  ): void {
+    const resolvedEvents = events.filter((event) => event.type === 'futureMeeple.resolved')
+    if (resolvedEvents.length === 0) return
+    const space = this.createSyntheticSpace('future-meeple-resolved')
+    for (const player of this.state.players) {
+      const transactionEvents = resolvedEvents.filter((event) => event.playerId === player.id)
+      if (transactionEvents.length === 0) continue
+      const results = runCardListeners({
+        state: this.state,
+        player,
+        space,
+        actionId: 'future-meeple-resolved',
+        phase: 'immediatelyAfter',
+        transactionEvents,
+      })
+      if (results.length === 0) continue
+      if (!Array.isArray(this.state.events)) this.state.events = []
+      if (!Number.isSafeInteger(this.state.nextEventSeq) || this.state.nextEventSeq < 1) {
+        this.state.nextEventSeq = 1
+      }
+      const store = new EventStore()
+      const frame = store.beginFrame({
+        actorPlayerId: player.id,
+        sourceActionId: 'future-meeple-resolved',
+      })
+      executeImmediateSpecialEffectFlows({
+        state: this.state,
+        player,
+        space,
+        eventSink: frame.sink,
+        results,
+      })
+      const completed = frame.complete(this.state)
+      if (completed.length > 0) {
+        store.commitTransaction(this.state)
+      } else {
+        store.rollbackTransaction()
+      }
+    }
+  }
+
   private continueBeforeStartOfTurn(playerIndex = 0, cardIndex = 0): SessionResponse {
     if (this.continueStageHook('onBeforeStartOfTurn', playerIndex, cardIndex)) {
       return this.respond()
@@ -2570,11 +2722,12 @@ export class GameCore {
     })
     applyRoundGrowth(this.state)
     applyFutureMeeples(this.state)
-    appendImmediateEvents(this.state, [
+    const committedStartEvents = appendImmediateEvents(this.state, [
       { type: 'round.started' },
       ...futureResolvedEvents,
       ...actionEvents,
     ])
+    this.dispatchFutureMeepleResolvedListeners(committedStartEvents)
     if (this.continueStageHook('onRoundStart')) {
       return this.respond()
     }
@@ -2618,6 +2771,9 @@ export class GameCore {
       case 'onAfterReap':
         this.continueAfterReapEffects(stageResume.playerIndex, stageResume.cardIndex)
         return
+      case 'afterHarvestReapReaction':
+        this.continueAfterReapEffects(stageResume.playerIndex, stageResume.cardIndex)
+        return
       case 'onHarvest':
         this.continueHarvestEffects(stageResume.playerIndex, stageResume.cardIndex)
         return
@@ -2651,6 +2807,9 @@ export class GameCore {
       case 'onAfterRoundEnd':
         this.continueAfterRoundEnd(stageResume.playerIndex, stageResume.cardIndex)
         return
+      case 'onBeforeEndGame':
+        this.continueBeforeEndGameHooks(stageResume.playerIndex, stageResume.cardIndex)
+        return
       case 'onStartHarvest':
         this.continueFromStartHarvest(stageResume.playerIndex, stageResume.cardIndex)
         return
@@ -2668,6 +2827,9 @@ export class GameCore {
         return
       case 'onEndHarvestFeedingPhase':
         this.continueAfterFeedingPhase(stageResume.playerIndex, stageResume.cardIndex)
+        return
+      case 'onRoundEnd':
+        this.continueRoundEndHooks(stageResume.playerIndex, stageResume.cardIndex)
         return
       case 'onAllWorkersPlaced':
         this.continueAllWorkersPlacedHooks(stageResume.playerIndex, stageResume.cardIndex)
@@ -2768,8 +2930,15 @@ export class GameCore {
       const frameOwnerPlayer = this.state.players[frame.ownerPlayerIndex]
       const player = this.state.players[effectivePlayerIndex]
       if (!frameOwnerPlayer || !player) return
-      if (effectivePlayerIndex !== frame.ownerPlayerIndex) {
-        const existing = frame.deferredPlayerSwitch
+      const existing = frame.deferredPlayerSwitch
+      if (existing && !existing.confirmed && existing.toPlayerIndex === effectivePlayerIndex) {
+        frame.deferredPlayerSwitch = existing
+      } else if (existing?.confirmed && existing.toPlayerIndex !== effectivePlayerIndex) {
+        frame.deferredPlayerSwitch = {
+          fromPlayerIndex: existing.toPlayerIndex,
+          toPlayerIndex: effectivePlayerIndex,
+        }
+      } else if (effectivePlayerIndex !== frame.ownerPlayerIndex) {
         if (
           !existing ||
           existing.fromPlayerIndex !== frame.ownerPlayerIndex ||
@@ -2891,6 +3060,15 @@ export class GameCore {
           frame.engine.flushEventTransaction({ state: this.state, player, space })
           this.flushEngineLog()
           this.startConfirmPlayerSwitch(fromPlayerIndex, toPlayerIndex)
+          return
+        }
+        if (
+          hostRequestKind === 'farm-select' ||
+          hostRequestKind === 'selection' ||
+          !!this.isSelectionPromptKey(pendingEnvelope?.promptKey)
+        ) {
+          frame.engine.flushEventTransaction({ state: this.state, player, space })
+          this.flushEngineLog()
           return
         }
         const pendingHost = this.engineStack.peekPendingHost()
@@ -3031,9 +3209,7 @@ export class GameCore {
     }
     const matched = getMatchingListeners(ctx)
     for (const entry of matched) {
-      const result = executeCardListener(entry.registration, ctx, {
-        ownerPlayerId: entry.ownerPlayerId,
-      })
+      const result = executeCardListener(entry.registration, ctx, listenerOwnerOptions(entry))
       if (result && result.doable === false) return true
     }
     return false
@@ -3086,9 +3262,7 @@ export class GameCore {
       }
       const matched = getMatchingListeners(listenerContext)
       for (const entry of matched) {
-        const r = executeCardListener(entry.registration, listenerContext, {
-          ownerPlayerId: entry.ownerPlayerId,
-        })
+        const r = executeCardListener(entry.registration, listenerContext, listenerOwnerOptions(entry))
         if (!r?.extraOptions) continue
         for (const opt of r.extraOptions) {
           if (opt.value.startsWith(OCCUPIED_SPACE_CHOICE_PREFIX)) {
@@ -3197,7 +3371,6 @@ export class GameCore {
     const pendingPlayerIndex = frame
       ? this.effectiveOwnerIndexForFrame(frame, envelope?.hostNodeId, envelope)
       : -1
-    const pendingPromptKey = envelope?.promptKey
     const pendingOptions = pendingEnvelopeChoices(envelope)
     const pendingSnapshot = pendingContextSnapshot(envelope)
     const pendingActionContext = pendingSnapshot?.actionContext
@@ -3225,25 +3398,21 @@ export class GameCore {
     if (chosenOption?.disabled) {
       return this.respond(false, 'option disabled')
     }
-    if (!this.engine) {
-      if (pendingPromptKey === 'ui.interactionFenceSelect' && value === 'cancel') {
-        // Engine already absent; nothing to clear (Task 10 deleted the
-        // previous GameCore pending field).
-        return this.respond()
-      }
-      return this.respond(false, 'no active engine')
-    }
+    if (!this.engine) return this.respond(false, 'no active engine')
     const player = this.state.players[pendingPlayerIndex]
     const space = this.getSpaceById(this.activeSpaceId)
     if (!player || !space) return this.respond(false, 'invalid state')
 
-    if (pushHistoryEntry) {
+    const resolvedActionId = this.peekHostPendingActionId()
+    const protectedDirectCancel = isProtectedActionCancel(resolvedActionId, value)
+
+    if (pushHistoryEntry && !protectedDirectCancel) {
       this.pushHistory()
     }
     // Card-effect resolveChoice hook: if the pending choice has a sourceCard with a
     // registered CardEffect.resolveChoice, give the card a chance to produce a follow-up
     // ActionFlow that runs after the engine's own choice resolution.
-    if (pendingSourceCard) {
+    if (pendingSourceCard && !protectedDirectCancel) {
       const cardEffect = getCardEffect(pendingSourceCard)
       if (cardEffect?.resolveChoice) {
         const cardFlow = cardEffect.resolveChoice(this.state, player, value, {
@@ -3258,7 +3427,6 @@ export class GameCore {
         }
       }
     }
-    const resolvedActionId = this.peekHostPendingActionId()
     const result = this.engine.resolveChoice(
       value,
       this.buildEngineExecutionContext(player, space),
@@ -3315,7 +3483,8 @@ export class GameCore {
     const envelope = this.engineStack.peekPendingEnvelope()
     const request = envelope?.request
     if (request) {
-      if (!isPendingChoiceValueAllowed(envelope, value)) {
+      const protectedDirectCancel = isProtectedActionCancel(envelope.pendingActionId, value)
+      if (!protectedDirectCancel && !isPendingChoiceValueAllowed(envelope, value)) {
         const disabled = pendingEnvelopeChoices(envelope)
           .some((option) => option.value === value && option.disabled === true)
         if (disabled && String(envelope.promptKey) === 'cards.B3_Moonshine.choice') return this.respond(false, 'choice disabled')
@@ -3396,6 +3565,44 @@ export class GameCore {
       syntheticKind: 'interaction-only',
     }, playerIndex, 'top-level')
     return this.respond()
+  }
+
+  private dispatchHarvestFeedConversionListeners(
+    player: PlayerState,
+    transactionEvents: readonly (GameEvent | DraftGameEvent)[],
+  ): void {
+    const space = this.createSyntheticSpace('harvest-feed-conversion')
+    const results = runCardListeners({
+      state: this.state,
+      player,
+      space,
+      actionId: 'harvest-feed-conversion',
+      phase: 'immediatelyAfter',
+      transactionEvents,
+    })
+    if (results.length === 0) return
+    if (!Array.isArray(this.state.events)) this.state.events = []
+    if (!Number.isSafeInteger(this.state.nextEventSeq) || this.state.nextEventSeq < 1) {
+      this.state.nextEventSeq = 1
+    }
+    const store = new EventStore()
+    const frame = store.beginFrame({
+      actorPlayerId: player.id,
+      sourceActionId: 'harvest-feed-conversion',
+    })
+    executeImmediateSpecialEffectFlows({
+      state: this.state,
+      player,
+      space,
+      eventSink: frame.sink,
+      results,
+    })
+    const completed = frame.complete(this.state)
+    if (completed.length > 0) {
+      store.commitTransaction(this.state)
+    } else {
+      store.rollbackTransaction()
+    }
   }
 
   private handleFeedResolved(
@@ -3504,13 +3711,14 @@ export class GameCore {
             if (fromKey0) addFoodFromConversion(player, fromKey0, total)
           }
         }
-        appendImmediateEvents(this.state, [{
+        const feedConvertedEvents = appendImmediateEvents(this.state, [{
           type: 'harvest.feedConverted',
           playerId: player.id,
           source: sel.sourceName ?? 'Harvest conversion',
           cost: costMap,
           food: gainMap,
         }], { actorPlayerId: player.id })
+        this.dispatchHarvestFeedConversionListeners(player, feedConvertedEvents)
         // Dispatch CardExchange.sideEffect (e.g. E153 StoneSculptor bonusVp).
         if (exchange.sideEffect && times > 0) {
           applyTradeSideEffect(
@@ -3638,10 +3846,6 @@ export class GameCore {
       return this.respond()
     }
     const harvestOrder = this.getHarvestPlayerIndices()
-    harvestOrder.forEach((index) => {
-      const player = this.state.players[index]
-      if (player) runAfterFeedHooks(this.state, player)
-    })
     this.state.harvestBreedSummary = {}
 
     // E58 LunchtimeBeer-style cards opt out of breeding for the current round.
@@ -3675,6 +3879,13 @@ export class GameCore {
   /** S2 Task 10 part 7: thin delegator — body lives in `phases/round.ts`. */
   private finalizeRound(): SessionResponse { return roundPhase.finalizeRound(this) }
 
+  private continueRoundEndHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
+    if (this.continueStageHook('onRoundEnd', playerIndex, cardIndex)) {
+      return this.respond()
+    }
+    return this.continueAfterRoundEnd()
+  }
+
   private continueAfterRoundEnd(playerIndex = 0, cardIndex = 0): SessionResponse {
     if (this.continueStageHook('onAfterRoundEnd', playerIndex, cardIndex)) {
       return this.respond()
@@ -3686,12 +3897,20 @@ export class GameCore {
     })
     this.state.round += 1
     if (this.state.round > 14) {
-      this.state.players.forEach((p) => runBeforeEndGameHooks(this.state, p))
-      this.state.gameOver = true
-      appendImmediateEvents(this.state, [{ type: 'game.ended' }])
-      return this.respond()
+      return this.continueBeforeEndGameHooks(0, 0)
     }
     return this.continueBeforeStartOfTurn()
+  }
+
+  private continueBeforeEndGameHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
+    if (this.continueStageHook('onBeforeEndGame', playerIndex, cardIndex)) {
+      return this.respond()
+    }
+    if (!this.state.gameOver) {
+      this.state.gameOver = true
+      appendImmediateEvents(this.state, [{ type: 'game.ended' }])
+    }
+    return this.respond()
   }
 
   /**
@@ -3791,38 +4010,38 @@ export class GameCore {
     const player = this.state.players[playerIndex]
     const space = this.getSpaceById(this.activeSpaceId)
     if (!player || !space) return this.respond(false, 'invalid state')
+    if (payload.cancel === true) {
+      return this.respond(false, 'action cancel is not allowed')
+    }
 
-    const choiceValue = payload.cancel === true ? 'cancel' : 'confirm'
     let farmPayload: Record<string, unknown> | undefined
-    if (choiceValue === 'confirm') {
-      switch (farmType) {
-        case 'fence':
-          farmPayload = {
-            edges: payload.edges ?? [],
-            palisadeEdges: payload.palisadeEdges ?? [],
-            extraWood: payload.extraWood ?? 0,
-          }
-          break
-        case 'room':
-          farmPayload = { rooms: payload.rooms ?? [] }
-          break
-        case 'stable':
-          farmPayload = { stables: payload.stables ?? [] }
-          break
-        case 'plow':
-          farmPayload = { tile: payload.tile }
-          break
-        case 'sow':
-          farmPayload = { crops: payload.crops ?? [] }
-          break
-      }
+    switch (farmType) {
+      case 'fence':
+        farmPayload = {
+          edges: payload.edges ?? [],
+          palisadeEdges: payload.palisadeEdges ?? [],
+          extraWood: payload.extraWood ?? 0,
+        }
+        break
+      case 'room':
+        farmPayload = { rooms: payload.rooms ?? [] }
+        break
+      case 'stable':
+        farmPayload = { stables: payload.stables ?? [] }
+        break
+      case 'plow':
+        farmPayload = { tile: payload.tile }
+        break
+      case 'sow':
+        farmPayload = { crops: payload.crops ?? [] }
+        break
     }
 
     if (pushHistoryEntry) {
       this.pushHistory()
     }
     const result = this.engine.resolveChoice(
-      choiceValue,
+      'confirm',
       this.buildEngineExecutionContext(player, space),
       farmPayload,
     )
@@ -3880,6 +4099,9 @@ export class GameCore {
     }
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
+    if (payload.cancel === true && (isFarmSelection || isGenericSelection)) {
+      return this.respond(false, 'action cancel is not allowed')
+    }
 
     if (isFarmSelection) {
       return this.resolveFarmSelectionChoice(playerIndex, payload, true)
@@ -3993,45 +4215,14 @@ export class GameCore {
     const interactionContext = this.peekHostContextSnapshot()?.actionContext
     const selectionKind = (interactionContext?.selectionKind as string | undefined) ?? 'farm-position'
     const maxSelections = (interactionContext?.maxSelections as number) ?? 1
-    const minSelections = (interactionContext?.minSelections as number) ?? 0
-
-    if (payload.cancel === true) {
-      if (!this.engine) return this.respond(false, 'no active engine')
-      this.pushHistory()
-      const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('selection')
-      const result = this.engine.resolveChoice('cancel', {
-        ...this.buildEngineExecutionContext(this.state.players[playerIndex]!, space),
-      })
-      if (result.type === 'ok') {
-        this.recordActionResultDetails(
-          result,
-          this.currentFrameOwnerPlayerId(player.id),
-          player.id,
-        )
-      }
-      this.flushEngineLog()
-      if (result.type === 'request') {
-        return this.respond()
-      }
-      if (result.type === 'fail') {
-        if (result.recoverable === true) {
-          return this.respond(false, result.errorKey ?? 'action failed')
-        }
-        this.engineStack.pop()
-        this.actionStartIndex = null
-        this.actionStartPlayerSnapshot = null
-        delete player._activeActionBonusSources
-        this.turnOwnerPlayerIndex = null
-        return this.respond(false, result.errorKey ?? 'action failed')
-      }
-      this.runEngineSteps()
-      if (this.engineStack.peekPendingEnvelope()) return this.respond()
-      return this.continueAfterResolvedFarmChoice(playerIndex)
-    }
+    const minSelections = (interactionContext?.minSelections as number) ?? 1
 
     // occupation-hand: validate card IDs
     if (selectionKind === 'occupation-hand') {
       const cardIds = payload.cardIds ?? []
+      if (cardIds.length < minSelections) {
+        return this.respond(false, 'not enough card selections')
+      }
       if (cardIds.length > maxSelections) {
         return this.respond(false, 'too many card selections')
       }
@@ -4045,9 +4236,8 @@ export class GameCore {
       // `payload` arg; selection.resolveChoice now reads `payload.cards` first
       // and only splits the previous comma-joined `cardIds` choice string
       // when payload is absent.
-      const choiceValue = cardIds.length > 0 ? 'confirm' : 'cancel'
       const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('selection')
-      const result = this.engine?.resolveChoice(choiceValue, {
+      const result = this.engine?.resolveChoice('confirm', {
         ...this.buildEngineExecutionContext(this.state.players[playerIndex]!, space),
       }, { cards: cardIds })
       if (result?.type === 'ok') {
@@ -4079,15 +4269,16 @@ export class GameCore {
       const exists = player.fields.some((f) => f.row === pos.row && f.col === pos.col)
       if (!exists) return this.respond(false, 'invalid field position')
     }
-    const selectableTiles = Array.isArray(interactionContext?.selectableTiles)
-      ? interactionContext.selectableTiles as FarmTilePosition[]
-      : null
-    if (selectableTiles) {
-      const selectableKeys = new Set(selectableTiles.map((pos) => `${pos.row}-${pos.col}`))
-      for (const pos of positions) {
-        if (!selectableKeys.has(`${pos.row}-${pos.col}`)) {
-          return this.respond(false, 'invalid selection position')
-        }
+    const selectionInteraction = playerBoard(this.state, playerIndex)
+      .farmyard
+      .selectableTiles('farm-position', { actionContext: interactionContext })
+    const selectablePositions = selectionInteraction.kind === 'farm-position'
+      ? selectionInteraction.selectablePositions
+      : []
+    const selectableKeys = new Set(selectablePositions.map(positionKey))
+    for (const pos of positions) {
+      if (!selectableKeys.has(positionKey(pos))) {
+        return this.respond(false, 'invalid selection position')
       }
     }
     const allowedSelectionCounts = Array.isArray(interactionContext?.allowedSelectionCounts)
@@ -4100,9 +4291,8 @@ export class GameCore {
 
     this.pushHistory()
     const positionStrings = positions.map((p) => `${p.row}-${p.col}`)
-    const choiceValue = positions.length > 0 ? 'confirm' : 'cancel'
     const space = this.getSpaceById(this.activeSpaceId!) ?? this.createSyntheticSpace('selection')
-    const result = this.engine?.resolveChoice(choiceValue, {
+    const result = this.engine?.resolveChoice('confirm', {
       ...this.buildEngineExecutionContext(this.state.players[playerIndex]!, space),
     }, { positions: positionStrings })
     if (result?.type === 'ok') {
@@ -4164,34 +4354,53 @@ export class GameCore {
   devDrawCard(playerIndex: number, cardId: string): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
-    const isOccupation = this.isOccupationCard(cardId)
-    // Remove from all players' hands first
+    const isMajor = !!getMajorCard(cardId)
+    const isOccupation = !isMajor && this.isOccupationCard(cardId)
     for (const p of this.state.players) {
       p.minorHand = p.minorHand.filter(id => id !== cardId)
       p.occupationHand = p.occupationHand.filter(id => id !== cardId)
+      p.minorPlayed = p.minorPlayed.filter(id => id !== cardId)
+      p.occupationPlayed = p.occupationPlayed.filter(id => id !== cardId)
+      p.improvements = p.improvements.filter(id => id !== cardId)
+      if (p.cardStates?.[cardId]) {
+        delete p.cardStates[cardId]
+      }
     }
-    if (isOccupation) {
+    if (isMajor) {
+      if (!this.state.availableMajorImprovements.includes(cardId)) {
+        this.state.availableMajorImprovements.push(cardId)
+      }
+    } else if (isOccupation) {
       player.occupationHand.push(cardId)
     } else {
       player.minorHand.push(cardId)
     }
-    return this.respond(true, undefined, [
+    const events = isMajor ? [] : [
       {
-        schemaVersion: 1,
-        type: 'private.handChanged',
+        schemaVersion: 1 as const,
+        type: 'private.handChanged' as const,
         recipientPlayerId: player.id,
         cardIds: [cardId],
-        cardType: isOccupation ? 'occupation' : 'minor',
-        reason: 'dev-draw-card',
+        cardType: isOccupation ? 'occupation' as const : 'minor' as const,
+        reason: 'dev-draw-card' as const,
       },
-    ])
+    ]
+    return this.respond(true, undefined, events)
   }
 
   devPlayCard(playerIndex: number, cardId: string): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
+    const isMajor = !!getMajorCard(cardId)
     const isOccupation = this.isOccupationCard(cardId)
-    if (isOccupation) {
+    if (isMajor) {
+      player.minorHand = player.minorHand.filter((id) => id !== cardId)
+      player.occupationHand = player.occupationHand.filter((id) => id !== cardId)
+      if (!player.improvements.includes(cardId)) {
+        player.improvements.push(cardId)
+      }
+      this.state.availableMajorImprovements = this.state.availableMajorImprovements.filter((id) => id !== cardId)
+    } else if (isOccupation) {
       player.occupationHand = player.occupationHand.filter((id) => id !== cardId)
       if (!player.occupationPlayed.includes(cardId)) {
         player.occupationPlayed.push(cardId)
@@ -4237,22 +4446,14 @@ export class GameCore {
   undoStep(): SessionResponse {
     const envelope = this.engineStack.peekPendingEnvelope()
     const interactionFrame = this.engineStack.current()
-    // S2 Task 5/6 — farm-select kind also flows through the
-    // farm-prompt undo special-cancel path (it carries the same
-    // promptKey shape as the previous 'choice' farm-prompts).
+    // Farm-select kind carries the same promptKey shape as the previous
+    // choice farm prompts, so the history-restore undo path applies to both.
     const isPlainChoiceOrFarmSelect =
       envelope &&
       (envelope.request.kind === 'choice' ||
         envelope.request.kind === 'farm-select')
     const farmPrompt = isPlainChoiceOrFarmSelect ? this.isFarmPromptKey(envelope.promptKey) : null
     if (isPlainChoiceOrFarmSelect && farmPrompt && interactionFrame) {
-      const currentPromptKey = envelope.promptKey
-      const currentSpaceId = interactionFrame.spaceId
-      const currentPlayerIndex = this.effectiveOwnerIndexForFrame(
-        interactionFrame,
-        envelope.hostNodeId,
-        envelope,
-      )
       const entry = this.history[this.history.length - 1]
       const canRestorePriorChoice =
         !!entry &&
@@ -4288,16 +4489,6 @@ export class GameCore {
         this.recomputeActionStartIndex()
         return this.applyPreparedPublicEventCancellation(beforeArchive, cancellationPlan)
       }
-      const cancelResult = this.resolveFarmSelectionChoice(currentPlayerIndex, { cancel: true }, false)
-      const stillOnSameFarmPrompt =
-        cancelResult.ok &&
-        cancelResult.interaction.stateId === 'wait' &&
-        cancelResult.interaction.farm !== undefined &&
-        cancelResult.interaction.promptKey === currentPromptKey &&
-        cancelResult.interaction.spaceId === currentSpaceId
-      if (!stillOnSameFarmPrompt) {
-        return cancelResult
-      }
     }
     // Task 0.6 introduced `state.pendingUndoBoundary` to signal an undo-blocker from a
     // card's handler (e.g. after rolling random). pushHistory consumes the flag and marks
@@ -4327,14 +4518,17 @@ export class GameCore {
   }
 
   undoAction(): SessionResponse {
-    if (this.actionStartIndex === null) return this.respond(false, 'no action snapshot')
-    let targetIndex = this.actionStartIndex
-    for (let i = this.history.length - 1; i > this.actionStartIndex; i -= 1) {
-      if (this.history[i]?.undoBoundary) {
-        targetIndex = i
-        break
+    if (!this.canUndoActionNow()) {
+      if (
+        this.state.pendingUndoBoundary === true ||
+        (this.actionStartIndex !== null && this.latestUndoBoundaryIndex() > this.actionStartIndex)
+      ) {
+        return this.respond(false, 'cannot undo past boundary')
       }
+      return this.respond(false, 'no action snapshot')
     }
+    const targetIndex = this.actionStartIndex
+    if (targetIndex === null) return this.respond(false, 'no action snapshot')
     const entry = this.history[targetIndex]
     if (!entry) return this.respond(false, 'no action snapshot')
     const beforeEvents = [...this.state.events]
@@ -4347,11 +4541,7 @@ export class GameCore {
     )
     this.restoreHistory(entry)
     this.history = this.history.slice(0, targetIndex)
-    if (targetIndex === this.actionStartIndex) {
-      this.actionStartIndex = null
-    } else {
-      this.recomputeActionStartIndex()
-    }
+    this.actionStartIndex = null
     return this.applyPreparedPublicEventCancellation(beforeArchive, cancellationPlan)
   }
 }

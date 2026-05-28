@@ -69,6 +69,34 @@ describe('eventsToLogEntries', () => {
     ])
   })
 
+  it('maps Reap resource movement to generic Reap logs', () => {
+    const events = [
+      {
+        schemaVersion: 1,
+        id: '1',
+        seq: 1,
+        round: 4,
+        phase: 'field',
+        type: 'resource.moved',
+        visibility: 'public',
+        actorPlayerId: 'p1',
+        sourceActionId: 'reap',
+        trigger: { phase: 'harvest' },
+        resources: { grain: 1 },
+        from: { kind: 'field', playerId: 'p1', row: 0, col: 0 },
+        to: { kind: 'player', playerId: 'p1' },
+        reason: 'reap',
+      },
+    ] satisfies GameEvent[]
+
+    expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' } })).toEqual([
+      {
+        key: 'log.reapDetail',
+        params: { player: 'Alice', resources: { grain: 1 } },
+      },
+    ])
+  })
+
   it('maps resource paid to action detail logs', () => {
     const events = [
       {

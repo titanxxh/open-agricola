@@ -40,7 +40,7 @@ describe('reorganizeAction engine sub-flow integration', () => {
     if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
     expect(resp.interaction.promptKey).toBe('ui.interactionAnimalReorg')
     const values = (resp.interaction.options ?? []).map((o) => o.value).sort()
-    expect(values).toEqual(['cancel', 'confirm'])
+    expect(values).toEqual(['confirm'])
   })
 
   it('confirm + zones payload places boar on pasture and clears the pending', () => {
@@ -96,30 +96,24 @@ describe('reorganizeAction engine sub-flow integration', () => {
     })
   })
 
-  it('cancel dismisses reorg prompt and re-presents it (boar still unassigned)', () => {
-    // cancel = player declines to reorganize *this time*, but boar remains in
-    // player.resources and the engine re-triggers the animalReorg check
-    // because getAnimalCount still exceeds getAssignedAnimalCount. The session
-    // presents another ui.interactionAnimalReorg choice rather than completing.
+  it('direct cancel is rejected and keeps animal reorg pending', () => {
     const session = setupWorkPhase()
     session.takeAction(0, 'pig-market')
 
     const resp = session.resolveChoice(0, 'cancel')
+    expect(resp.ok).toBe(false)
+    expect(resp.error).toBe('log.reorganizeFail')
     expect(resp.state.players[0]!.resources.boar).toBe(1)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
     expect(resp.interaction.promptKey).toBe('ui.interactionAnimalReorg')
   })
 
-  it('anytime trigger includes cancel option; non-anytime triggers do not', () => {
-    // Verify the engine sub-flow exposes the correct options set per trigger.
-    // We exercise the anytime path via pig-market collect (already confirmed above).
-    // For the non-anytime guard we rely on the unit test in reorganize-engine.test.ts
-    // (which directly calls reorganizeAction.execute with trigger='returning-home').
+  it('anytime trigger does not include cancel option', () => {
     const session = setupWorkPhase()
     const resp = session.takeAction(0, 'pig-market')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
     const hasCancel = (resp.interaction.options ?? []).some((o) => o.value === 'cancel')
-    expect(hasCancel).toBe(true)
+    expect(hasCancel).toBe(false)
   })
 })

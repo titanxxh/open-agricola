@@ -2,7 +2,7 @@ import type { ActionExecutionContext, ActionExecutionResult, ActionSpace, GameSt
 import { runActionHooks, type ActionHookContext, type ActionHookPhase, type ActionHookResult } from '../actions/hooks'
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
-import { exchangeToTrade } from '../actions/effects/exchange'
+import { exchangeToTrade } from '../actions/effects/exchange-to-trade'
 import type { DraftGameEvent, GameEvent } from '../contract/events'
 import { createEventQuery, type EventQuery } from '../events/query'
 
@@ -18,8 +18,11 @@ export type CardListenerContext = ActionExecutionContext & {
   extraData?: Record<string, unknown>
   cardId?: string
   actionCardId?: string
+  pendingSourceCard?: string
   triggerPlayer?: PlayerState
   ownerPlayer?: PlayerState
+  ownerCardId?: string
+  ownerCardZone?: CardListenerZone
   effectPlayer?: PlayerState
   trueAction?: boolean
 }
@@ -30,6 +33,7 @@ export type CardListenerContextInput =
 
 export type CardListenerScope = 'player' | 'opponent' | 'any'
 export type CardListenerDispatchMode = 'serial' | 'select'
+export type CardListenerZone = 'played' | 'hand'
 
 export type CardListenerRegistration = {
   id: string
@@ -37,6 +41,7 @@ export type CardListenerRegistration = {
   actions?: string[]
   phases?: ActionHookPhase[]
   scope?: CardListenerScope
+  zones?: CardListenerZone[]
   mandatory?: boolean
   /**
    * Listener priority. Higher values execute earlier; default is 0.
@@ -58,34 +63,33 @@ export const getRegisteredCardListeners = (): CardListenerRegistration[] => {
   return active ? active.getAllListeners() : []
 }
 
-const getPlayerCardIds = (player: PlayerState) => [
-  ...(player.improvements ?? []),
-  ...(player.minorPlayed ?? []),
-  ...(player.occupationPlayed ?? []),
-]
+const DEFAULT_LISTENER_ZONES: readonly CardListenerZone[] = ['played']
 
-const playerHasAnyCard = (player: PlayerState, cardIds: string[]) =>
-  cardIds.some((id) => getPlayerCardIds(player).includes(id))
+const listenerZones = (registration: CardListenerRegistration): readonly CardListenerZone[] =>
+  registration.zones?.length ? registration.zones : DEFAULT_LISTENER_ZONES
 
-const scopeMatches = (
-  state: GameState,
+const getPlayerCardRefs = (
   player: PlayerState,
-  registration: CardListenerRegistration,
-) => {
-  if (!registration.cardIds || registration.cardIds.length === 0) return true
-  const cardIds = registration.cardIds
-  const scope = registration.scope ?? 'player'
-  if (scope === 'player') {
-    return playerHasAnyCard(player, cardIds)
+  zones: readonly CardListenerZone[],
+): Array<{ cardId: string; zone: CardListenerZone }> => {
+  const refs: Array<{ cardId: string; zone: CardListenerZone }> = []
+  if (zones.includes('played')) {
+    refs.push(...(player.improvements ?? []).map((cardId) => ({ cardId, zone: 'played' as const })))
+    refs.push(...(player.minorPlayed ?? []).map((cardId) => ({ cardId, zone: 'played' as const })))
+    refs.push(...(player.occupationPlayed ?? []).map((cardId) => ({ cardId, zone: 'played' as const })))
   }
-  if (scope === 'opponent') {
-    return (state.players ?? []).some(
-      (entry) =>
-        entry.id !== player.id && playerHasAnyCard(entry, cardIds),
-    )
+  if (zones.includes('hand')) {
+    refs.push(...(player.minorHand ?? []).map((cardId) => ({ cardId, zone: 'hand' as const })))
+    refs.push(...(player.occupationHand ?? []).map((cardId) => ({ cardId, zone: 'hand' as const })))
   }
-  return (state.players ?? []).some((entry) => playerHasAnyCard(entry, cardIds))
+  return refs
 }
+
+const findPlayerCardRef = (
+  player: PlayerState,
+  cardId: string,
+  zones: readonly CardListenerZone[],
+) => getPlayerCardRefs(player, zones).find((ref) => ref.cardId === cardId)
 
 const matchesListenerAction = (
   registration: CardListenerRegistration,
@@ -121,8 +125,11 @@ const getAllListeners = (): CardListenerRegistration[] => {
   return [...base, ...sessionCtx.customListeners]
 }
 
-const getOrderedListeners = (context: CardListenerContext) =>
-  getAllListeners()
+const getOrderedListeners = (
+  context: CardListenerContext,
+  listeners?: readonly CardListenerRegistration[],
+) =>
+  (listeners ? [...listeners] : getAllListeners())
     .filter((registration) => matchesListener(registration, context))
     .sort((left, right) => left.id.localeCompare(right.id))
 
@@ -137,14 +144,13 @@ const normalizeCardListenerContext = (
   }
 }
 
-export const runCardListeners = (context: CardListenerContextInput) => {
-  const listenerContext = normalizeCardListenerContext(context)
+export const runCardListeners = (
+  context: CardListenerContextInput,
+  listeners?: readonly CardListenerRegistration[],
+) => {
   const results: ActionHookResult[] = []
-  getOrderedListeners(listenerContext).forEach((registration) => {
-    if (!scopeMatches(listenerContext.state, listenerContext.player, registration)) {
-      return
-    }
-    const result = registration.handler(listenerContext)
+  getMatchingListeners(context, listeners).forEach((entry) => {
+    const result = executeCardListener(entry.registration, context, listenerOwnerOptions(entry))
     if (result) {
       results.push(result)
     }
@@ -152,11 +158,33 @@ export const runCardListeners = (context: CardListenerContextInput) => {
   return results
 }
 
-export type MatchedCardListener = {
-  registration: CardListenerRegistration
-  cardId: string
-  ownerPlayerId: string
+export type MatchedCardListener =
+  | {
+      registration: CardListenerRegistration
+      cardId: ''
+      ownerPlayerId: ''
+      ownerCardZone?: undefined
+    }
+  | {
+      registration: CardListenerRegistration
+      cardId: string
+      ownerPlayerId: string
+      ownerCardZone: CardListenerZone
+    }
+
+export type CardListenerOwnerOptions = {
+  ownerPlayerId?: string
+  ownerCardId?: string
+  ownerCardZone?: CardListenerZone
 }
+
+export const listenerOwnerOptions = (
+  entry: MatchedCardListener,
+): CardListenerOwnerOptions => ({
+  ownerPlayerId: entry.ownerPlayerId || undefined,
+  ownerCardId: entry.cardId || undefined,
+  ownerCardZone: entry.ownerCardZone,
+})
 
 const findPlayerById = (state: GameState, playerId?: string) =>
   (state.players ?? []).find((player) => player.id === playerId)
@@ -164,9 +192,10 @@ const findPlayerById = (state: GameState, playerId?: string) =>
 const resolveOwnerPlayer = (
   registration: CardListenerRegistration,
   context: CardListenerContext,
-  ownerPlayerId?: string,
+  owner?: CardListenerOwnerOptions,
 ) => {
   if (context.ownerPlayer) return context.ownerPlayer
+  const ownerPlayerId = owner?.ownerPlayerId
   if (ownerPlayerId) {
     const byId = findPlayerById(context.state, ownerPlayerId)
     if (byId) return byId
@@ -175,25 +204,29 @@ const resolveOwnerPlayer = (
   if (scope === 'player') return context.player
   if (!registration.cardIds?.length) return context.player
   if (scope === 'opponent') {
+    const zones = listenerZones(registration)
     return (context.state.players ?? []).find(
       (player) =>
         player.id !== context.player.id &&
-        registration.cardIds!.some((cardId) => getPlayerCardIds(player).includes(cardId)),
+        registration.cardIds!.some((cardId) => findPlayerCardRef(player, cardId, zones)),
     ) ?? context.player
   }
+  const zones = listenerZones(registration)
   return (context.state.players ?? []).find((player) =>
-    registration.cardIds!.some((cardId) => getPlayerCardIds(player).includes(cardId)),
+    registration.cardIds!.some((cardId) => findPlayerCardRef(player, cardId, zones)),
   ) ?? context.player
 }
 
 export const buildCardListenerContext = (
   registration: CardListenerRegistration,
   context: CardListenerContextInput,
-  ownerPlayerId?: string,
+  owner?: string | CardListenerOwnerOptions,
 ): CardListenerContext => {
   const baseContext = normalizeCardListenerContext(context)
+  const ownerOptions =
+    typeof owner === 'string' ? { ownerPlayerId: owner } : owner
   const triggerPlayer = baseContext.triggerPlayer ?? baseContext.player
-  const ownerPlayer = resolveOwnerPlayer(registration, baseContext, ownerPlayerId)
+  const ownerPlayer = resolveOwnerPlayer(registration, baseContext, ownerOptions)
   const effectPlayer = baseContext.effectPlayer ?? ownerPlayer ?? triggerPlayer
   const trueAction =
     typeof baseContext.trueAction === 'boolean'
@@ -203,35 +236,49 @@ export const buildCardListenerContext = (
     ...baseContext,
     triggerPlayer,
     ownerPlayer,
+    ownerCardId: ownerOptions?.ownerCardId ?? baseContext.ownerCardId,
+    ownerCardZone: ownerOptions?.ownerCardZone ?? baseContext.ownerCardZone,
     effectPlayer,
     trueAction,
   }
 }
 
-export const getMatchingListeners = (context: CardListenerContextInput): MatchedCardListener[] => {
+export const getMatchingListeners = (
+  context: CardListenerContextInput,
+  listeners?: readonly CardListenerRegistration[],
+): MatchedCardListener[] => {
   const listenerContext = normalizeCardListenerContext(context)
   const matched: MatchedCardListener[] = []
-  getOrderedListeners(listenerContext).forEach((registration) => {
+  getOrderedListeners(listenerContext, listeners).forEach((registration) => {
     if (!registration.cardIds || registration.cardIds.length === 0) {
       matched.push({ registration, cardId: '', ownerPlayerId: '' })
       return
     }
     const scope = registration.scope ?? 'player'
+    const zones = listenerZones(registration)
     for (const cardId of registration.cardIds) {
       if (scope === 'player') {
-        if (getPlayerCardIds(listenerContext.player).includes(cardId)) {
-          matched.push({ registration, cardId, ownerPlayerId: listenerContext.player.id })
+        const ref = findPlayerCardRef(listenerContext.player, cardId, zones)
+        if (ref) {
+          matched.push({
+            registration,
+            cardId,
+            ownerPlayerId: listenerContext.player.id,
+            ownerCardZone: ref.zone,
+          })
         }
       } else if (scope === 'opponent') {
         for (const p of listenerContext.state.players ?? []) {
-          if (p.id !== listenerContext.player.id && getPlayerCardIds(p).includes(cardId)) {
-            matched.push({ registration, cardId, ownerPlayerId: p.id })
+          const ref = findPlayerCardRef(p, cardId, zones)
+          if (p.id !== listenerContext.player.id && ref) {
+            matched.push({ registration, cardId, ownerPlayerId: p.id, ownerCardZone: ref.zone })
           }
         }
       } else {
         for (const p of listenerContext.state.players ?? []) {
-          if (getPlayerCardIds(p).includes(cardId)) {
-            matched.push({ registration, cardId, ownerPlayerId: p.id })
+          const ref = findPlayerCardRef(p, cardId, zones)
+          if (ref) {
+            matched.push({ registration, cardId, ownerPlayerId: p.id, ownerCardZone: ref.zone })
             break
           }
         }
@@ -244,11 +291,11 @@ export const getMatchingListeners = (context: CardListenerContextInput): Matched
 export const executeCardListener = (
   registration: CardListenerRegistration,
   context: CardListenerContextInput,
-  options?: { ownerPlayerId?: string },
+  options?: CardListenerOwnerOptions,
 ): ActionHookResult | undefined => {
   return (
     registration.handler(
-      buildCardListenerContext(registration, context, options?.ownerPlayerId),
+      buildCardListenerContext(registration, context, options),
     ) ?? undefined
   )
 }
@@ -278,6 +325,7 @@ export const collectComputeChoiceCandidates = (
   player: PlayerState,
   actionId: string,
   actionContext?: Record<string, unknown>,
+  sourceCard?: string,
 ): import('../contract/types').ActionChoiceOption[] => {
   const baseCtx: CardListenerContextInput = {
     state,
@@ -286,12 +334,11 @@ export const collectComputeChoiceCandidates = (
     actionId,
     phase: 'computeChoiceCandidates' as ActionHookPhase,
     actionContext,
+    sourceCard,
   }
   const out: import('../contract/types').ActionChoiceOption[] = []
   for (const matched of getMatchingListeners(baseCtx)) {
-    const result = executeCardListener(matched.registration, baseCtx, {
-      ownerPlayerId: matched.ownerPlayerId,
-    })
+    const result = executeCardListener(matched.registration, baseCtx, listenerOwnerOptions(matched))
     if (result?.extraOptions) {
       out.push(...result.extraOptions)
     }
@@ -325,9 +372,7 @@ export const collectComputeExchanges = (
   }
   const out: Trade[] = []
   for (const matched of getMatchingListeners(baseCtx)) {
-    const result = executeCardListener(matched.registration, baseCtx, {
-      ownerPlayerId: matched.ownerPlayerId,
-    })
+    const result = executeCardListener(matched.registration, baseCtx, listenerOwnerOptions(matched))
     if (!result?.extraExchanges) continue
     const ownerCardId = matched.registration.cardIds?.[0] ?? 'unknown'
     for (const ex of result.extraExchanges) {
@@ -382,9 +427,7 @@ export const collectComputeCostsForFarmChoice = (
   }
   runActionHooks(ctx).forEach((r: ActionHookResult) => merge(r.costs))
   for (const entry of getMatchingListeners(ctx)) {
-    const result = executeCardListener(entry.registration, ctx, {
-      ownerPlayerId: entry.ownerPlayerId,
-    })
+    const result = executeCardListener(entry.registration, ctx, listenerOwnerOptions(entry))
     if (result) merge(result.costs)
   }
   return aggregated

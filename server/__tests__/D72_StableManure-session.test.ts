@@ -7,6 +7,31 @@ import type { ActionChoiceOption } from '../../shared/contract/types'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
 describe('D72_StableManure session', () => {
+  const chooseStableManureSelection = (session: GameSession) => {
+    let resp = session.performRoundEnd()
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected choice')
+
+    const triggerOption = resp.interaction.options?.find(
+      (o: ActionChoiceOption) => o.value === 'D72_StableManure',
+    )
+    expect(triggerOption).toBeDefined()
+    resp = session.resolveChoice(0, triggerOption!.value)
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected optional choice')
+
+    const acceptOption = resp.interaction.options?.find(
+      (o: ActionChoiceOption) => o.value !== '__skip__',
+    )
+    expect(acceptOption).toBeDefined()
+    resp = session.resolveChoice(0, acceptOption!.value)
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
+    return resp
+  }
+
   const setupHarvest = (unfencedStableCount: number) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -55,21 +80,10 @@ describe('D72_StableManure session', () => {
   it('harvests extra crops from selected fields (unfenced stables = 2)', () => {
     const { session } = setupHarvest(2)
 
-    let resp = session.performRoundEnd()
-    // First: optional accept/skip
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected choice')
-
-    const acceptOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
-    expect(acceptOption).toBeDefined()
-    resp = session.resolveChoice(0, acceptOption!.value)
-
-    // Second: selection choice
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
+    chooseStableManureSelection(session)
 
     // Select grain at 0-0 and vegetable at 0-1
-    resp = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 0 }, { row: 0, col: 1 }] })
+    const resp = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 0 }, { row: 0, col: 1 }] })
     expect(resp.ok).toBe(true)
 
     // Continue through harvest phases
@@ -86,19 +100,9 @@ describe('D72_StableManure session', () => {
   it('limits selections to unfenced stable count (1 unfenced stable)', () => {
     const { session } = setupHarvest(1)
 
-    let resp = session.performRoundEnd()
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected choice')
+    chooseStableManureSelection(session)
 
-    const acceptOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
-    expect(acceptOption).toBeDefined()
-    resp = session.resolveChoice(0, acceptOption!.value)
-
-    // selection with maxSelections: 1
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
-
-    resp = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 0 }] })
+    const resp = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 0 }] })
     expect(resp.ok).toBe(true)
 
     // Continue through harvest

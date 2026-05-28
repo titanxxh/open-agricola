@@ -35,7 +35,67 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="initial-load" class="initial-load" aria-busy="true" aria-live="polite">
+        <div class="initial-load-card">
+          <h2 class="initial-load-title">Open Agricola</h2>
+          <p class="initial-load-text">Loading…</p>
+          <div class="initial-load-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="12">
+            <div class="initial-load-progress-fill"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <style>
+      .initial-load {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        margin: 0;
+        background: linear-gradient(135deg, #f5efe6 0%, #e8dfd0 100%);
+        font-family: system-ui, -apple-system, sans-serif;
+        color: #5a3a20;
+      }
+      .initial-load-card {
+        background: #fff;
+        border-radius: 16px;
+        padding: 40px;
+        box-shadow: 0 4px 24px rgba(90, 58, 32, 0.12);
+        width: min(520px, calc(100vw - 40px));
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        text-align: center;
+      }
+      .initial-load-title {
+        margin: 0;
+        font-size: 24px;
+        color: #5a3a20;
+      }
+      .initial-load-text {
+        margin: 0;
+        font-size: 16px;
+        color: #6b5a48;
+      }
+      .initial-load-progress {
+        height: 6px;
+        border-radius: 3px;
+        background: #e8dfd0;
+        overflow: hidden;
+      }
+      .initial-load-progress-fill {
+        height: 100%;
+        width: 12%;
+        border-radius: 3px;
+        background: #5a3a20;
+        animation: initial-load-pulse 1.2s ease-in-out infinite alternate;
+      }
+      @keyframes initial-load-pulse {
+        from { width: 12%; opacity: 0.85; }
+        to { width: 28%; opacity: 1; }
+      }
+    </style>
     <script type="module" src="/client/main.tsx"></script>
   </body>
 </html>

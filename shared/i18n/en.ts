@@ -76,6 +76,14 @@ export const en = {
       saved: 'Saved',
       bonusVp: 'Bonus VP',
     },
+    cards: {
+      D132_HideFarmer: {
+        optional: 'Hide unused farmyard spaces?',
+        markSpaces: {
+          prompt: 'Choose how many food to pay for unused farmyard spaces',
+        },
+      },
+    },
     undoStep: 'Undo Step',
     undoAction: 'Undo Action',
     endRound: 'End Round',
@@ -132,6 +140,7 @@ export const en = {
     interactionCollectorSelect: 'Select a resource type to gain',
     interactionCollectorCount: 'Selected: {selected} / Required: {needed}',
     interactionWorkshopAssistantSelect: 'Choose {needed} pair(s) of building resources',
+    interactionResourcePair: '1 <{left}> + 1 <{right}>',
     interactionForestInn: 'Choose a wood exchange option',
     interactionPioneeringSpirit: 'Choose a resource to gain',
     interactionResourceMarketReedFood: 'Take 1 reed + 1 food',
@@ -502,6 +511,7 @@ export const en = {
     'bonus-grain': { name: 'Bonus Grain', description: 'Gain 1 grain' },
     plow: { name: 'Plow', description: 'Plow 1 field' },
     sow: { name: 'Sow', description: 'Sow in empty fields' },
+    'private-field-phase': { name: 'Private Field Phase', description: 'Reap your own fields without starting a Harvest' },
     'bake-bread': { name: 'Bake Bread', description: 'Bake bread with improvements' },
     'anytime-reorg': { name: 'Reorganize Animals', description: 'Reorganize animals at any time' },
     reorganize: { name: 'Reorganize Animals', description: 'Reassign animals among pastures, house, and stables.' },
@@ -815,6 +825,7 @@ export const en = {
     harvestPhaseReap: 'Reap',
     harvestPhaseFeed: 'Feed',
     harvestPhaseBreed: 'Breed',
+    reapDetail: '{player} reaps {resources}',
     harvestReapDetail: '{player} reaps {resources}',
     harvestReapNothing: '{player} has nothing to reap',
     harvestReapSkipped: '{player} skips reap this round',
@@ -870,6 +881,7 @@ export const en = {
     cardTriggerDeclined: 'declined',
     cardInfoboxChanged: '{cardId}: {text}',
     cardStackChanged: '{cardId} stack changed {resources}',
+    cardResourcePairsStored: '{player} stores {pairs} on {cardId}',
     cardSwappedWithBoard: '{player} swaps {fromCardId} with {toCardId}',
     cardReturnedToBoard: '{player} returns {cardId} to the board',
     cardDestroyed: '{player} removes {cardId}',
@@ -942,6 +954,15 @@ export const en = {
   },
   platform: {
     loading: 'Loading...',
+    loadStep: {
+      manifest: 'Loading card data…',
+      appShell: 'Loading game UI…',
+      auth: 'Checking session…',
+      wsConnecting: 'Connecting to server…',
+      wsCreating: 'Creating room…',
+      wsJoining: 'Joining room…',
+      fetchingState: 'Syncing game state…',
+    },
     loginTitle: 'Open Agricola',
     loginSubtitle: 'Sign in to continue',
     registerSubtitle: 'Create a new account',
@@ -1178,20 +1199,17 @@ export const en = {
     E161_ElderBaker: { name: 'Elder Baker', desc: 'Get 3 grain.' },
     C162_ForestOwner: { name: 'Forest Owner', desc: 'Owner: 4 wood. Others: 3 wood (owner gets 1 extra).' },
     C104_Collector: { name: 'Collector', desc: 'Get 1 begging + choose 6/7/8/9 different goods (max 4 uses).' },
-    C146_WorkshopAssistant: {
-      pair: {
-        WC: '1 wood + 1 clay',
-        WR: '1 wood + 1 reed',
-        WS: '1 wood + 1 stone',
-        CR: '1 clay + 1 reed',
-        CS: '1 clay + 1 stone',
-        RS: '1 reed + 1 stone',
-      },
-    },
     A39_Chapel: { name: 'Chapel', desc: 'Get 3 bonus VP. Others pay 1 grain to owner.' },
     A162_ForestTallyman: { name: 'Forest Tallyman', desc: 'When Forest + Clay Pit occupied: get 2 clay + 3 wood.' },
     STUB_BeforeBakeGainClay: { name: 'STUB Before Bake Clay', desc: 'Test stub: before baking bread, gain 1 clay.' },
     D122_ClayCarrier: { anytime: 'Clay Carrier: Pay 2 Food → 2 Clay' },
+    D132_HideFarmer: {
+      markSpaces: {
+        name: 'Hide unused spaces',
+        description: 'Pay food so unused farmyard spaces do not lose points.',
+        invalid: 'Invalid food count',
+      },
+    },
     E86_PenBuilder: { anytime: 'Pen Builder: Pay 1 Wood → +2 Animal Capacity' },
     E148_Lazybones: { name: 'Lazybones', choice: 'Reserve {spaces}' },
     A102_Grocer: { anytime: 'Grocer: Pay 1 Food → Buy top good' },
@@ -1307,6 +1325,7 @@ export const en = {
   'resource-quantity': {
     error: {
       'must-pick-at-least-one': 'Pick at least 1',
+      'invalid-count-food': 'Invalid food count',
       'invalid-count-sheep': 'Invalid sheep count',
       'invalid-count-boar': 'Invalid boar count',
       'invalid-count-cattle': 'Invalid cattle count',

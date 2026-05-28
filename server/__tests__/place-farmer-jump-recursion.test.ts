@@ -20,6 +20,38 @@ const setup2P = (cardId: string) => {
   return { session, state: session.getState().state }
 }
 
+const commitFirstFarmSelect = (
+  session: GameSession,
+  resp: ReturnType<GameSession['takeAction']>,
+): ReturnType<GameSession['takeAction']> | null => {
+  if (resp.interaction.stateId !== 'wait' || resp.interaction.request.kind !== 'farm-select') return null
+  const farm = resp.interaction.farm
+  if (farm.farmType === 'plow') {
+    const tile = farm.selectableTiles[0]
+    if (!tile) throw new Error('expected selectable plow tile')
+    return session.commitSelectionChoice(0, { tile })
+  }
+  if (farm.farmType === 'room') {
+    const room = farm.selectableTiles[0]
+    if (!room) throw new Error('expected selectable room tile')
+    return session.commitSelectionChoice(0, { rooms: [room] })
+  }
+  if (farm.farmType === 'stable') {
+    const stable = farm.selectableTiles[0]
+    if (!stable) throw new Error('expected selectable stable tile')
+    return session.commitSelectionChoice(0, { stables: [stable] })
+  }
+  if (farm.farmType === 'sow') {
+    const field = farm.selectableFields[0]
+    const crop = field?.allowedCrops[0]
+    if (!field || !crop) throw new Error('expected selectable sow field')
+    return session.commitSelectionChoice(0, {
+      crops: [{ ...field.tile, crop }],
+    })
+  }
+  throw new Error('unexpected mandatory fence farm-select in test helper')
+}
+
 describe('A→A self-jump recursion guard', () => {
   it('A129 listener fires at most once per farmer placement chain (farm-expansion → grain-seeds)', () => {
     const { session, state } = setup2P('A129_Swagman')
@@ -34,17 +66,16 @@ describe('A→A self-jump recursion guard', () => {
       // accept any non-skip option (drives Swagman accept on first prompt; afterwards
       // skips remaining optional follow-ups; mandatory choices fall through to first opt)
       const skip = opts.find(o => o.value === '__skip__')
-      const cancel = opts.find(o => o.value === 'cancel')
       const swagmanOpt = opts.find(o => o.sourceCard === 'A129_Swagman')
-      const hasConfirm = opts.some(o => o.value === 'confirm')
+      const farmResp = commitFirstFarmSelect(session, resp)
+      if (farmResp) {
+        resp = farmResp
+        continue
+      }
       if (swagmanOpt) {
         resp = session.resolveChoice(0, swagmanOpt.value)
-      } else if (cancel && hasConfirm) {
-        resp = session.commitSelectionChoice(0, { cancel: true })
       } else if (skip) {
         resp = session.resolveChoice(0, '__skip__')
-      } else if (cancel) {
-        resp = session.resolveChoice(0, 'cancel')
       } else if (opts.length > 0) {
         resp = session.resolveChoice(0, opts[0]!.value)
       } else {
@@ -78,17 +109,16 @@ describe('A→A self-jump recursion guard', () => {
     while (safety-- > 0 && resp.interaction.stateId === 'wait') {
       const opts = resp.interaction.options ?? []
       const skip = opts.find(o => o.value === '__skip__')
-      const cancel = opts.find(o => o.value === 'cancel')
       const swagmanOpt = opts.find(o => o.sourceCard === 'A129_Swagman')
-      const hasConfirm = opts.some(o => o.value === 'confirm')
+      const farmResp = commitFirstFarmSelect(session, resp)
+      if (farmResp) {
+        resp = farmResp
+        continue
+      }
       if (swagmanOpt) {
         resp = session.resolveChoice(0, swagmanOpt.value)
-      } else if (cancel && hasConfirm) {
-        resp = session.commitSelectionChoice(0, { cancel: true })
       } else if (skip) {
         resp = session.resolveChoice(0, '__skip__')
-      } else if (cancel) {
-        resp = session.resolveChoice(0, 'cancel')
       } else if (opts.length > 0) {
         resp = session.resolveChoice(0, opts[0]!.value)
       } else {
@@ -127,17 +157,16 @@ describe('place-farmer jump runs full ActionNode path (parity smoke)', () => {
         break
       }
       const skip = opts.find(o => o.value === '__skip__')
-      const cancel = opts.find(o => o.value === 'cancel')
       const b150Opt = opts.find(o => o.sourceCard === 'B150_LargeScaleFarmer')
-      const hasConfirm = opts.some(o => o.value === 'confirm')
+      const farmResp = commitFirstFarmSelect(session, resp)
+      if (farmResp) {
+        resp = farmResp
+        continue
+      }
       if (b150Opt) {
         resp = session.resolveChoice(0, b150Opt.value)
-      } else if (cancel && hasConfirm) {
-        resp = session.commitSelectionChoice(0, { cancel: true })
       } else if (skip) {
         resp = session.resolveChoice(0, '__skip__')
-      } else if (cancel) {
-        resp = session.resolveChoice(0, 'cancel')
       } else if (opts.length > 0) {
         resp = session.resolveChoice(0, opts[0]!.value)
       } else {

@@ -178,8 +178,16 @@ describe('farm action events', () => {
       fields: [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] }],
     })
     expect(reap({ players: [reapPlayer], actionSpaces: [] } as GameState, reapPlayer, sink(reapEvents)).type).toBe('ok')
-    expect(reapEvents).toContainEqual(expect.objectContaining({ type: 'farm.cropRemoved' }))
-    expect(reapEvents).toContainEqual(expect.objectContaining({ type: 'resource.moved', reason: 'harvest' }))
+    expect(reapEvents).toContainEqual(expect.objectContaining({
+      type: 'farm.cropRemoved',
+      reason: 'reap',
+      trigger: { phase: 'harvest' },
+    }))
+    expect(reapEvents).toContainEqual(expect.objectContaining({
+      type: 'resource.moved',
+      reason: 'reap',
+      trigger: { phase: 'harvest' },
+    }))
 
     const breedEvents: DraftGameEvent[] = []
     const breedPlayer = player({

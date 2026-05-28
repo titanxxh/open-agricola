@@ -290,6 +290,79 @@ describe('ActionFlow targetPlayerId', () => {
     expect(resp2.interaction.stateId).toBe('wait')
   })
 
+  it('choice after returning from a confirmed target player switch asks for confirmation', () => {
+    const session = setupSession()
+    const state = session.getState().state
+    const p2 = state.players[1]!
+
+    const flow: ActionFlow = {
+      type: 'seq',
+      children: [
+        {
+          type: 'xor',
+          targetPlayerId: p2.id,
+          children: [
+            { type: 'leaf', actionId: 'gain', params: { sheep: 1 }, sourceCard: 'TestReturnSwitch', choiceLabelKey: 'sheep' },
+            { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: 'TestReturnSwitch', choiceLabelKey: 'food' },
+          ],
+        },
+        {
+          type: 'xor',
+          children: [
+            { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: 'TestReturnSwitch', choiceLabelKey: 'wood' },
+            { type: 'leaf', actionId: 'gain', params: { clay: 1 }, sourceCard: 'TestReturnSwitch', choiceLabelKey: 'clay' },
+          ],
+        },
+      ],
+    }
+
+    startFlowEngine(session, flow, 0)
+
+    let resp = session.getState()
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-player-switch')
+
+    resp = confirmPlayerSwitch(session)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.playerIndex).toBe(1)
+
+    const targetOption = resp.interaction.options?.[0]
+    expect(targetOption).toBeDefined()
+    resp = session.resolveChoice(1, targetOption!.value)
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+    expect(resp.interaction.fromPlayerIndex).toBe(1)
+    expect(resp.interaction.toPlayerIndex).toBe(0)
+  })
+
+  it('confirmed target player switch exposes no undo before the target acts', () => {
+    const session = setupSession()
+    const state = session.getState().state
+    const p2 = state.players[1]!
+
+    const flow: ActionFlow = {
+      type: 'xor',
+      targetPlayerId: p2.id,
+      children: [
+        { type: 'leaf', actionId: 'gain', params: { sheep: 1 }, sourceCard: 'TestNoUndoAtSwitch', choiceLabelKey: 'sheep' },
+        { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: 'TestNoUndoAtSwitch', choiceLabelKey: 'food' },
+      ],
+    }
+
+    startFlowEngine(session, flow, 0)
+    const resp = confirmPlayerSwitch(session)
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.playerIndex).toBe(1)
+    expect(resp.interaction.allowedCommands).not.toContain('undoStep')
+    expect(resp.interaction.allowedCommands).not.toContain('undoAction')
+    expect(resp.historyLength).toBe(0)
+    expect(resp.hasActionStartSnapshot).toBe(false)
+  })
+
   it('restores dynamic targeted pending flow and resumes unowned sibling as frame owner', () => {
     const session = setupSession()
     const state = session.getState().state
@@ -349,7 +422,7 @@ describe('ActionFlow targetPlayerId', () => {
     expect(resolved.state.players[1]!.resources.wood).toBe(p2.resources.wood)
   })
 
-  it('undoStep cancels a targeted farm prompt as the effective owner', () => {
+  it('undoStep restores a targeted farm prompt without action cancel', () => {
     const session = setupSession()
     const state = session.getState().state
     const p2 = state.players[1]!
@@ -371,9 +444,17 @@ describe('ActionFlow targetPlayerId', () => {
     expect(pendingResp.interaction.playerIndex).toBe(1)
     expect(pendingResp.interaction.farm).toBeDefined()
 
+    const directCancel = session.commitSelectionChoice(1, { cancel: true })
+    expect(directCancel.ok).toBe(false)
+    expect(directCancel.ok ? '' : directCancel.error).toBe('action cancel is not allowed')
+
     const undoResp = session.undoStep()
-    expect(undoResp.ok).toBe(true)
-    expect(undoResp.ok ? '' : undoResp.error).not.toBe('no pending choice for this player')
+    expect(undoResp.ok).toBe(false)
+    expect(undoResp.ok ? '' : undoResp.error).toBe('cannot undo past boundary')
+    expect(undoResp.interaction.stateId).toBe('wait')
+    if (undoResp.interaction.stateId !== 'wait') throw new Error('expected targeted farm prompt')
+    expect(undoResp.interaction.request.kind).toBe('farm-select')
+    expect(undoResp.interaction.request.options.map(option => option.value)).toEqual(['confirm'])
   })
 
   it('targeted action dynamic flow executes as the target owner', () => {

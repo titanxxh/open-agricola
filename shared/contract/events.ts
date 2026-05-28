@@ -49,7 +49,7 @@ export type ResourceMovedEvent = GameEventBase<'resource.moved'> & {
   resources: Partial<Resource>
   from: ResourceLocation
   to: ResourceLocation
-  reason: 'collect' | 'gain' | 'receive' | 'harvest' | 'breed' | 'cardEffect' | 'return' | 'discard'
+  reason: 'collect' | 'gain' | 'receive' | 'harvest' | 'reap' | 'breed' | 'cardEffect' | 'return' | 'discard'
 }
 
 export type ResourceExchangedEvent = GameEventBase<'resource.exchanged'> & {
@@ -106,7 +106,7 @@ export type FarmCropRemovedEvent = GameEventBase<'farm.cropRemoved'> & {
     crop: 'grain' | 'vegetable' | 'wood' | 'stone'
     amount: number
   }>
-  reason: 'harvest' | 'pay' | 'cardEffect' | 'discard'
+  reason: 'harvest' | 'reap' | 'pay' | 'cardEffect' | 'discard'
 }
 
 export type FarmFieldPlowedEvent = GameEventBase<'farm.fieldPlowed'> & {
@@ -251,6 +251,12 @@ export type CardStackChangedEvent = GameEventBase<'card.stackChanged'> & {
   reason: 'store' | 'take' | 'discard' | 'accumulate' | 'cardEffect'
 }
 
+export type CardResourcePairsStoredEvent = GameEventBase<'card.resourcePairsStored'> & {
+  cardId: string
+  targetPlayerId: string
+  pairs: Partial<Resource>[]
+}
+
 export type CardSwappedWithBoardEvent = GameEventBase<'card.swappedWithBoard'> & {
   playerId: string
   fromPlayerCardId: string
@@ -392,6 +398,7 @@ export type GameEvent =
   | CardStateChangedEvent
   | CardInfoboxChangedEvent
   | CardStackChangedEvent
+  | CardResourcePairsStoredEvent
   | CardSwappedWithBoardEvent
   | CardReturnedToBoardEvent
   | CardDestroyedEvent

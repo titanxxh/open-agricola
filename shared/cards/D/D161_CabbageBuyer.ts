@@ -3,7 +3,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { cardCountsAs } from '../helpers/card-type'
-import type { PlayerState } from '../../contract/types'
+import type { ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { D161_CabbageBuyer } from '../../cards-display/D/D161_CabbageBuyer'
 
@@ -16,7 +16,7 @@ const CARD_ID = D161_CabbageBuyer.id
  * major improvement was built.
  *
  * Implementation:
- *  (a) after:renovate-house — if inside house-redevelopment, set tracker
+ *  (a) after:renovate-house — set tracker
  *  (b) after:improvement-any/minor-improvement — tag improvement kind
  *  (c) after:place-farmer — drain tracker, emit offer to owner
  */
@@ -35,10 +35,25 @@ const getInFlight = (owner: PlayerState): InFlight | undefined =>
 const setInFlight = (owner: PlayerState, value: InFlight | null) =>
   writeCardExtraData(owner, CARD_ID, 'inFlight', value)
 
+const buildOfferFlow = (owner: PlayerState, cost: number): ActionFlow | undefined => {
+  if ((owner.resources.food ?? 0) < cost) return undefined
+  return {
+    type: 'seq',
+    optional: true,
+    children: [
+      payLeaf({ cardId: CARD_ID, cost: { food: cost } }),
+      gainLeaf(CARD_ID, { vegetable: 1 }),
+    ],
+  }
+}
+
 const getBuiltCardId = (choice: string | undefined): string | undefined => {
   if (!choice) return undefined
   return choice.replace(/^major:/, '').replace(/^minor:/, '')
 }
+
+const isNormalRedevelopmentSpace = (spaceId: string | undefined) =>
+  spaceId === 'house-redevelopment' || spaceId === 'farm-redevelopment'
 
 const openTrackerListener: CardListenerRegistration = {
   id: 'D161-cabbage-buyer-open-tracker',
@@ -47,11 +62,17 @@ const openTrackerListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   scope: 'any',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    // Only trigger when inside house-redevelopment action space
-    if (context.space?.id !== 'house-redevelopment') return
-
     const owner = context.ownerPlayer
     if (!owner) return
+
+    if (context.sourceCard && !isNormalRedevelopmentSpace(context.space?.id)) {
+      const flow = buildOfferFlow(owner, 3)
+      if (!flow) return
+      return {
+        flow,
+        sourceCard: CARD_ID,
+      }
+    }
 
     setInFlight(owner, {
       renovatorPId: context.player.id,
@@ -104,19 +125,11 @@ const drainTrackerListener: CardListenerRegistration = {
     setInFlight(owner, null)
 
     const cost = inFlight.hasMajor ? 1 : inFlight.hasMinor ? 2 : 3
-
-    // Owner cannot afford → no offer
-    if ((owner.resources.food ?? 0) < cost) return
+    const flow = buildOfferFlow(owner, cost)
+    if (!flow) return
 
     return {
-      flow: {
-        type: 'seq',
-        optional: true,
-        children: [
-          payLeaf({ cardId: CARD_ID, cost: { food: cost } }),
-          gainLeaf(CARD_ID, { vegetable: 1 }),
-        ],
-      },
+      flow,
       sourceCard: CARD_ID,
     }
   },

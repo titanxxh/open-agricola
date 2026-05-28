@@ -221,7 +221,7 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     expect(restored.resolveChoice(0, 'confirm').ok).toBe(false)
   })
 
-  it('engine-blocked kind survives serialize/rehydrate and exposes only undo commands', () => {
+  it('engine-blocked kind survives serialize/rehydrate and exposes no undo commands without history', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -248,7 +248,7 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     const restoredInteraction = restored.getState().interaction
     expect(restoredInteraction.stateId).toBe('wait')
     if (restoredInteraction.stateId === 'wait') {
-      expect(restoredInteraction.allowedCommands).toEqual(['undoStep', 'undoAction'])
+      expect(restoredInteraction.allowedCommands).toEqual([])
       expect(restoredInteraction.anytimeActions).toEqual([])
       expect(restoredInteraction.options).toEqual([])
       expect(restored.resolveChoice(0, 'confirm').ok).toBe(false)

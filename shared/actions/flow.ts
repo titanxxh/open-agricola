@@ -1,4 +1,4 @@
-import { executeCardListener, getMatchingListeners } from '../cards/card-listeners'
+import { executeCardListener, getMatchingListeners, listenerOwnerOptions } from '../cards/card-listeners'
 import type {
   ActionDefinition,
   ActionFlow,
@@ -129,9 +129,7 @@ const applyChildActionDoable = (
   }
   const matched = getMatchingListeners(listenerContext)
   for (const entry of matched) {
-    const result = executeCardListener(entry.registration, listenerContext, {
-      ownerPlayerId: entry.ownerPlayerId,
-    })
+    const result = executeCardListener(entry.registration, listenerContext, listenerOwnerOptions(entry))
     if (result?.doable === false) {
       doable = false
       vetoed = true

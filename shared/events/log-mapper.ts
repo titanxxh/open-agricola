@@ -5,6 +5,7 @@ import type {
   CardInfoboxChangedEvent,
   CardPassedEvent,
   CardPlayedEvent,
+  CardResourcePairsStoredEvent,
   CardReturnedToBoardEvent,
   CardStackChangedEvent,
   CardSwappedWithBoardEvent,
@@ -193,9 +194,9 @@ const mapResourceMoved = (
   const gain = positiveResources(event.resources)
   if (Object.keys(gain).length === 0) return null
 
-  if (event.reason === 'harvest') {
+  if (event.reason === 'harvest' || event.reason === 'reap') {
     return {
-      key: 'log.harvestReapDetail',
+      key: event.reason === 'reap' ? 'log.reapDetail' : 'log.harvestReapDetail',
       params: {
         player: playerName(ctx, event.to.playerId),
         resources: gain,
@@ -317,6 +318,18 @@ const mapFutureMeepleResolved = (
     round: event.round,
     roomType: event.roomType ?? '',
     resources: resourceSuffix(event.resources),
+  },
+})
+
+const mapCardResourcePairsStored = (
+  event: CardResourcePairsStoredEvent,
+  ctx: EventLogMapperContext,
+): LogEntry => ({
+  key: 'log.cardResourcePairsStored',
+  params: {
+    player: playerName(ctx, event.targetPlayerId),
+    cardId: event.cardId,
+    pairs: event.pairs.map(resourceSuffix),
   },
 })
 
@@ -575,6 +588,10 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
 
       if (event.type === 'card.stackChanged') {
         return [mapCardStackChanged(event)]
+      }
+
+      if (event.type === 'card.resourcePairsStored') {
+        return [mapCardResourcePairsStored(event, ctx)]
       }
 
       if (event.type === 'card.swappedWithBoard') {

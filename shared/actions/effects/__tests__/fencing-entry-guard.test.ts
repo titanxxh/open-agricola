@@ -1,10 +1,20 @@
 import { describe, expect, it } from 'vitest'
+import '../../../cards/B/B38_FutureBuildingSite'
 import { canStartFencing, maxFences } from '../fencing'
-import type { GameState, PlayerState } from '../../../contract/types'
+import { getAllTilePositions, positionKey } from '../../../domain/farm'
+import type { FarmTilePosition, GameState, PlayerState } from '../../../contract/types'
 
 import '../../../cards/E/E16_BriarHedge'
 
 const fakeState = { actionSpaces: [], players: [] } as unknown as GameState
+
+const b38LockedAdjacentRooms: FarmTilePosition[] = [
+  { row: 0, col: 0 },
+  { row: 0, col: 1 },
+  { row: 1, col: 2 },
+  { row: 2, col: 0 },
+  { row: 2, col: 1 },
+]
 
 const createPlayer = (overrides?: Partial<PlayerState>): PlayerState =>
   ({
@@ -65,5 +75,97 @@ describe('canStartFencing entry-guard', () => {
       grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     } })
     expect(canStartFencing(fakeState, player)).toBe(true)
+  })
+
+  it('returns false when policy and locked tiles leave no legal fence commit', () => {
+    const roomTiles = [
+      { row: 1, col: 0 },
+      { row: 1, col: 1 },
+    ]
+    const occupiedKeys = new Set([
+      ...roomTiles.map(positionKey),
+      ...b38LockedAdjacentRooms.map(positionKey),
+      '0-4',
+    ])
+    const player = createPlayer({
+      resources: {
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
+        grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+      },
+      roomTiles,
+      fields: getAllTilePositions()
+        .filter((tile) => !occupiedKeys.has(positionKey(tile)))
+        .map((tile) => ({ ...tile, stacks: [] })),
+      minorPlayed: ['B38_FutureBuildingSite'],
+      cardStates: {
+        B38_FutureBuildingSite: { extraData: { locked: b38LockedAdjacentRooms } },
+      },
+    })
+    const state = { actionSpaces: [], players: [player] } as unknown as GameState
+
+    expect(
+      canStartFencing(state, player, undefined, {
+        fencePolicy: {
+          segmentBounds: { total: { min: 6, max: 6 } },
+          newPastureBounds: {
+            count: { min: 1, max: 1 },
+            totalSize: { min: 2, max: 2 },
+          },
+          costPolicy: { fence: { wood: 0 } },
+        },
+      }),
+    ).toBe(false)
+  })
+
+  it('returns false for costPolicy-only policy when the board has no legal fence commit', () => {
+    const roomTiles = [
+      { row: 1, col: 0 },
+      { row: 1, col: 1 },
+    ]
+    const roomKeys = new Set(roomTiles.map(positionKey))
+    const player = createPlayer({
+      resources: {
+        wood: 10, clay: 0, reed: 0, stone: 0, food: 0,
+        grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+      },
+      roomTiles,
+      fields: getAllTilePositions()
+        .filter((tile) => !roomKeys.has(positionKey(tile)))
+        .map((tile) => ({ ...tile, stacks: [] })),
+    })
+    const state = { actionSpaces: [], players: [player] } as unknown as GameState
+
+    expect(
+      canStartFencing(state, player, undefined, {
+        fencePolicy: {
+          costPolicy: { fence: { wood: 1 } },
+        },
+      }),
+    ).toBe(false)
+  })
+
+  it('returns false for a cloned player when the real board has no legal fence commit', () => {
+    const roomTiles = [
+      { row: 1, col: 0 },
+      { row: 1, col: 1 },
+    ]
+    const roomKeys = new Set(roomTiles.map(positionKey))
+    const player = createPlayer({
+      resources: {
+        wood: 10, clay: 0, reed: 0, stone: 0, food: 0,
+        grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+      },
+      roomTiles,
+      fields: getAllTilePositions()
+        .filter((tile) => !roomKeys.has(positionKey(tile)))
+        .map((tile) => ({ ...tile, stacks: [] })),
+    })
+    const state = { actionSpaces: [], players: [player] } as unknown as GameState
+    const previewPlayer = {
+      ...player,
+      resources: { ...player.resources, wood: 14 },
+    } as PlayerState
+
+    expect(canStartFencing(state, previewPlayer)).toBe(false)
   })
 })

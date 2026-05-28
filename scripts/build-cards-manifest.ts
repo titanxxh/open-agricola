@@ -55,7 +55,7 @@ export type CardsManifest = Record<string, CardManifestEntry>
 const META_FIELDS = new Set([
   'id', 'name', 'deck', 'number', 'category', 'desc',
   'cost', 'altCosts', 'exchanges', 'players', 'prerequisite', 'vp',
-  'isCookery', 'isBaking', 'passing', 'returnCards', 'alsoCountsAs',
+  'isCookery', 'isBaking', 'passing', 'returnCards', 'alsoCountsAs', 'enablesPalisades',
 ])
 
 const CARD_CLASSES = new Set([

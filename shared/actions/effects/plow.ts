@@ -77,12 +77,14 @@ export const getPlowableTiles = (player: PlayerState) => {
 }
 
 const plowCostPreview: ActionCostPreview = {
-  isStructurallyPossible: ({ player }) => getPlowableTiles(player).length > 0,
+  isStructurallyPossible: (context) =>
+    getAvailablePlowTiles(context.player, readPlowActionContext(context)).length > 0,
   getBaseCost: (context) =>
     resolvePlowCost(readPlowActionContext(context), undefined) ?? {},
   canExecute: (context, costs) => {
-    if (getPlowableTiles(context.player).length === 0) return false
-    return canPayPlowCost(context.player, readPlowActionContext(context), costs)
+    const actionContext = readPlowActionContext(context)
+    if (getAvailablePlowTiles(context.player, actionContext).length === 0) return false
+    return canPayPlowCost(context.player, actionContext, costs)
   },
 }
 
@@ -98,6 +100,42 @@ const readPlowActionContext = (
   const paramsActionContext = context.params?.actionContext
   if (!paramsActionContext || typeof paramsActionContext !== 'object') return undefined
   return paramsActionContext as Record<string, unknown>
+}
+
+const isFarmTilePosition = (value: unknown): value is FarmTilePosition => {
+  if (!value || typeof value !== 'object') return false
+  const tile = value as Partial<FarmTilePosition>
+  return typeof tile.row === 'number' && typeof tile.col === 'number'
+}
+
+const readAllowedTiles = (
+  actionContext: Record<string, unknown> | undefined,
+): FarmTilePosition[] | undefined => {
+  const allowedTiles = actionContext?.allowedTiles
+  if (!Array.isArray(allowedTiles)) return undefined
+  return allowedTiles.filter(isFarmTilePosition)
+}
+
+const getAvailablePlowTiles = (
+  player: PlayerState,
+  actionContext: Record<string, unknown> | undefined,
+) => {
+  const plowableTiles = getPlowableTiles(player)
+  const allowedTiles = readAllowedTiles(actionContext)
+  if (!allowedTiles) return plowableTiles
+  const allowedKeys = new Set(allowedTiles.map(positionKey))
+  return plowableTiles.filter((tile) => allowedKeys.has(positionKey(tile)))
+}
+
+const isPlowTileAllowed = (
+  tile: unknown,
+  actionContext: Record<string, unknown> | undefined,
+): tile is FarmTilePosition => {
+  if (!isFarmTilePosition(tile)) return false
+  const allowedTiles = readAllowedTiles(actionContext)
+  if (!allowedTiles) return true
+  const allowedKeys = new Set(allowedTiles.map(positionKey))
+  return allowedKeys.has(positionKey(tile))
 }
 
 const resolvePlowCost = (
@@ -187,7 +225,7 @@ export const plowAction: ActionDefinition = {
   costPreview: plowCostPreview,
   execute: ({ player, actionContext, costs }): ActionExecutionResult => {
     const selectableTiles = canPayPlowCost(player, actionContext, costs)
-      ? getPlowableTiles(player)
+      ? getAvailablePlowTiles(player, actionContext)
       : []
     return {
       type: 'request',
@@ -196,14 +234,15 @@ export const plowAction: ActionDefinition = {
         farm: { farmType: 'plow', selectableTiles },
         options: [
           { value: 'confirm', labelKey: 'ui.interactionPlowConfirm' },
-          { value: 'cancel', labelKey: 'ui.interactionPlowCancel' },
         ],
       },
       promptKey: 'ui.interactionPlowSelect',
     }
   },
   resolveChoice: (ctx, choice, payload): ActionExecutionResult => {
-    if (choice === 'cancel') return { type: 'ok' }
+    if (choice === 'cancel') {
+      return { type: 'fail', errorKey: 'log.action', recoverable: true }
+    }
 
     const lockedKeys = collectLockedFarmTileKeys(ctx.player)
 
@@ -211,10 +250,10 @@ export const plowAction: ActionDefinition = {
     const idx = ctx.state.players.indexOf(ctx.player)
     if (choice.startsWith('pay:plow:')) {
       const farmPayload = ctx.actionContext?.farmPayload as
-        | { tile?: FarmTilePosition }
+        | { tile?: unknown }
         | undefined
       const tile = farmPayload?.tile
-      if (!tile) return { type: 'fail', errorKey: 'log.action' }
+      if (!isPlowTileAllowed(tile, ctx.actionContext)) return { type: 'fail', errorKey: 'log.action' }
       const validated = playerBoard(ctx.state, idx).farmyard.canPlow(tile, lockedKeys)
       if (!validated.ok) {
         return { type: 'fail', errorKey: validated.error?.code ?? 'log.action' }
@@ -224,7 +263,8 @@ export const plowAction: ActionDefinition = {
 
     // First call: client submitted tile geometry alongside `confirm`.
     if (payload && choice === 'confirm') {
-      const tile = (payload as { tile?: FarmTilePosition }).tile
+      const tile = (payload as { tile?: unknown }).tile
+      if (!isPlowTileAllowed(tile, ctx.actionContext)) return { type: 'fail', errorKey: 'log.action' }
       const validated = playerBoard(ctx.state, idx).farmyard.canPlow(tile, lockedKeys)
       if (!validated.ok) {
         return { type: 'fail', errorKey: validated.error?.code ?? 'log.action' }

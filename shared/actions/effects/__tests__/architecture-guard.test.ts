@@ -18,6 +18,8 @@ describe('effects architecture guard', () => {
       'breed.ts',
       'collect.ts',
       'construct.ts',
+      'exchange-resources.ts',
+      'exchange-to-trade.ts',
       'exchange.ts',
       'family-growth.ts',
       'fencing.ts',
@@ -28,12 +30,14 @@ describe('effects architecture guard', () => {
       'pay.ts',
       'place-farmer.ts',
       'plow.ts',
+      'private-field-phase.ts',
       'reap.ts',
       'renovation.ts',
       'reorganize.ts',
       'sow.ts',
       'special-effect.ts',
       'stables.ts',
+      'trade-applied-listener.ts',
     ])
   })
 
@@ -65,6 +69,7 @@ describe('effects architecture guard', () => {
       'place-farmer',
       'plow',
       'pop-card-stack',
+      'private-field-phase',
       'push-to-card-stack',
       'recall-placed-worker',
       'renovate-house',

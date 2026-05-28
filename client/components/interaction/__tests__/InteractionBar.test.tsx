@@ -1,11 +1,16 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { fireEvent, render, screen } from '@testing-library/react'
 
 import type { AnytimeAction } from '../../../../shared/contract/types'
 import type { PendingChoice } from '../../../types/ui'
+import {
+  __resetCardsManifestCache,
+  loadCardsManifest,
+  type CardsManifestPayload,
+} from '../../../services/card-meta'
 import { InteractionBar } from '../InteractionBar'
 
 const noop = () => {}
@@ -24,7 +29,127 @@ const pendingChoice: PendingChoice = {
   spaceId: 'test-space',
 }
 
+afterEach(() => {
+  __resetCardsManifestCache()
+  vi.unstubAllGlobals()
+})
+
 describe('InteractionBar', () => {
+  it('allows empty confirm for optional farm-position selection prompts', () => {
+    const resolveChoice = vi.fn()
+    const optionalSelectionChoice: PendingChoice = {
+      promptKey: 'ui.interactionSelection',
+      promptParams: { minSelections: 0, maxSelections: 1 },
+      options: [{ value: 'confirm', labelKey: 'ui.interactionSelectionConfirm' }],
+      playerIndex: 0,
+      spaceId: 'test-space',
+    }
+
+    render(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={optionalSelectionChoice}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={1}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={resolveChoice}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={0}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+      />,
+    )
+
+    const confirm = screen.getByRole('button', { name: 'Confirm' })
+    expect(confirm).not.toBeDisabled()
+
+    fireEvent.click(confirm)
+    expect(resolveChoice).toHaveBeenCalledWith('confirm')
+  })
+
+  it('keeps confirm disabled for required farm-position selection prompts with no selection', () => {
+    const requiredSelectionChoice: PendingChoice = {
+      promptKey: 'ui.interactionSelection',
+      promptParams: { minSelections: 1, maxSelections: 1 },
+      options: [{ value: 'confirm', labelKey: 'ui.interactionSelectionConfirm' }],
+      playerIndex: 0,
+      spaceId: 'test-space',
+    }
+
+    render(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={requiredSelectionChoice}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={1}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={0}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled()
+  })
+
   it('renders animal reorg pending summary and confirm action in the bottom bar', () => {
     const html = renderToStaticMarkup(
       <InteractionBar
@@ -406,6 +531,135 @@ describe('InteractionBar', () => {
     expect(html).toContain('Please choose an option')
   })
 
+  it('renders multi-select prompt params and resource labels as icons', () => {
+    const html = renderToStaticMarkup(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={{
+          promptKey: 'ui.interactionWorkshopAssistantSelect',
+          promptParams: { needed: 2 },
+          options: [
+            { value: 'WC', labelKey: 'ui.interactionResourcePair', labelParams: { left: 'WOOD', right: 'CLAY' } },
+            { value: 'WR', labelKey: 'ui.interactionResourcePair', labelParams: { left: 'WOOD', right: 'REED' } },
+          ],
+          playerIndex: 0,
+          spaceId: 'card_C146_WorkshopAssistant_choosePairs',
+        }}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={0}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+      />,
+    )
+
+    expect(html).toContain('Choose 2 pair(s) of building resources')
+    expect(html).not.toContain('{needed}')
+    expect(html).toContain('res-icon-wood')
+    expect(html).toContain('res-icon-clay')
+    expect(html).toContain('res-icon-reed')
+    expect(html).not.toContain('1 wood + 1 clay')
+  })
+
+  it('renders description-preview resource labels as icons', () => {
+    const html = renderToStaticMarkup(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={{
+          promptKey: 'ui.interactionChooseOne',
+          sourceCard: 'C146_WorkshopAssistant',
+          options: [
+            {
+              value: 'flow-1',
+              labelKey: 'ui.interactionResourcePair',
+              labelParams: { left: 'WOOD', right: 'REED' },
+              descriptionPreview: {
+                kind: 'action',
+                labelKey: 'ui.interactionResourcePair',
+                labelParams: { left: 'WOOD', right: 'REED' },
+              },
+            },
+            { value: '__skip__', labelKey: 'ui.interactionOptionalSkip' },
+          ],
+          playerIndex: 0,
+          spaceId: 'card_C146_WorkshopAssistant_takePair',
+        }}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={0}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+      />,
+    )
+
+    expect(html).toContain('res-icon-wood')
+    expect(html).toContain('res-icon-reed')
+    expect(html).not.toContain('&lt;WOOD&gt;')
+    expect(html).not.toContain('&lt;REED&gt;')
+  })
+
   it('renders engine-blocked prompt without choice action buttons', () => {
     const html = renderToStaticMarkup(
       <InteractionBar
@@ -658,6 +912,87 @@ describe('InteractionBar', () => {
 
     expect(html).toContain('E149 Pavernun')
     expect(html).not.toContain('occupations.E149_Pavernun.name')
+  })
+
+  it('renders generic cards.*.name option labels through card metadata', async () => {
+    const manifest: CardsManifestPayload = {
+      A112_ScytheWorker: {
+        meta: {
+          id: 'A112_ScytheWorker',
+          name: 'Scythe Worker',
+          deck: 'A',
+          number: 112,
+          type: 'occupation',
+        },
+        module: 'shared/cards-display/A/A112_ScytheWorker',
+        reaches: [],
+      },
+    }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => manifest,
+    } as Response))
+    await loadCardsManifest()
+
+    const triggerSelectChoice: PendingChoice = {
+      promptKey: 'ui.interactionSelectTrigger',
+      options: [
+        {
+          value: 'A112_ScytheWorker',
+          labelKey: 'cards.A112_ScytheWorker.name',
+          sourceCard: 'A112_ScytheWorker',
+        },
+        { value: '__pass__', labelKey: 'ui.interactionSelectTriggerPass' },
+      ],
+      playerIndex: 0,
+      spaceId: 'harvest',
+    }
+    const html = renderToStaticMarkup(
+      <InteractionBar
+        pendingAnimalReorg={null}
+        pendingChoice={triggerSelectChoice}
+        pendingEngineBlocked={null}
+        pendingNextPlayerIndex={null}
+        pendingPlayerSwitch={null}
+        locale="en"
+        playerNames={['P1', 'P2']}
+        pendingRoomTilesLength={0}
+        maxRoomSelections={0}
+        pendingStableTilesLength={0}
+        maxStableSelections={0}
+        pendingSowSelectionsLength={0}
+        pendingPositionSelectionsLength={0}
+        maxPositionSelections={0}
+        hasPendingPlowSelection={false}
+        fenceErrorText=""
+        roomErrorText=""
+        stableErrorText=""
+        plowErrorText=""
+        sowErrorText=""
+        isSelectingFences={false}
+        isSelectingRooms={false}
+        isSelectingStables={false}
+        isSelectingPlow={false}
+        isSelectingSow={false}
+        isInteractive={true}
+        resolveChoice={noop}
+        confirmNextPlayer={noop}
+        confirmPlayerSwitch={noop}
+        harvestFeedPlayerName={null}
+        confirmHarvestFeed={noop}
+        onUndo={noop}
+        onUndoAction={noop}
+        onShowScoring={noop}
+        historyLength={1}
+        hasActionStartSnapshot={false}
+        anytimeActions={[]}
+        takeAnytimeAction={noop}
+      />,
+    )
+
+    expect(html).toContain('Scythe Worker')
+    expect(html).not.toContain('cards.A112_ScytheWorker.name')
   })
 
   it('shows the trigger card name in a subtitle when pending choice has sourceCard', () => {

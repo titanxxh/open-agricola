@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import '../../../cards/B/B38_FutureBuildingSite'
 import { constructAction } from '../construct'
 import type {
   ActionExecutionContext,
@@ -10,6 +11,14 @@ import type {
 } from '../../../contract/types'
 
 const dummySpace: ActionSpace = { id: 'construct', type: 'construct' } as unknown as ActionSpace
+
+const b38LockedAdjacentRooms: FarmTilePosition[] = [
+  { row: 0, col: 0 },
+  { row: 0, col: 1 },
+  { row: 1, col: 2 },
+  { row: 2, col: 0 },
+  { row: 2, col: 1 },
+]
 
 const makeCtx = (
   opts: {
@@ -63,12 +72,30 @@ const makeCtx = (
 }
 
 describe('constructAction.resolveChoice', () => {
-  it('cancel returns ok', () => {
-    const result = constructAction.resolveChoice!(makeCtx(), 'cancel')
-    expect(result.type).toBe('ok')
+  it('is not executable when locked tiles leave no reachable room selection', () => {
+    const ctx = makeCtx({
+      player: {
+        minorPlayed: ['B38_FutureBuildingSite'],
+        cardStates: {
+          B38_FutureBuildingSite: { extraData: { locked: b38LockedAdjacentRooms } },
+        },
+      },
+    })
+
+    expect(constructAction.canBeExecutedByPlayer(ctx.state, ctx.player)).toBe(false)
+    expect(constructAction.costPreview?.canExecute?.(ctx)).toBe(false)
   })
 
-  it('cancel returns ok when forbidCancel has no reachable room selection', () => {
+  it('cancel returns recoverable fail', () => {
+    const result = constructAction.resolveChoice!(makeCtx(), 'cancel')
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'log.buildRoomFail',
+      recoverable: true,
+    })
+  })
+
+  it('cancel returns recoverable fail when forbidCancel has no reachable room selection', () => {
     const result = constructAction.resolveChoice!(
       makeCtx({
         player: {
@@ -89,7 +116,11 @@ describe('constructAction.resolveChoice', () => {
       'cancel',
     )
 
-    expect(result.type).toBe('ok')
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'log.buildRoomFail',
+      recoverable: true,
+    })
   })
 
   it('first call with payload + single payment combo finalizes immediately', () => {
@@ -172,6 +203,8 @@ describe('constructAction.resolveChoice', () => {
     if (result.type !== 'request') return
     expect(result.request.kind).toBe('farm-select')
     if (result.request.kind !== 'farm-select') return
+    const optionValues = result.request.options.map((option) => option.value)
+    expect(optionValues).toEqual(['confirm'])
     expect(result.request.farm.maxSelections).toBe(1)
     expect(result.request.farm.selectableTiles.length).toBeGreaterThan(0)
   })

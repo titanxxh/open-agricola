@@ -228,9 +228,10 @@ export function buildActivationActionNodes(
       cardId: entry.cardId,
       phase,
       actionId,
-      event,
-      ownerPlayerId: entry.ownerPlayerId,
-      triggerPlayerId,
+        event,
+        ownerPlayerId: entry.ownerPlayerId,
+        ownerCardZone: entry.ownerCardZone,
+        triggerPlayerId,
       mandatory: entry.registration.mandatory === true,
       countCardUse: typeof event.countCardUse === 'boolean' ? event.countCardUse : undefined,
       transactionEvents: transactionEvents ? [...transactionEvents] : undefined,
@@ -311,6 +312,7 @@ export function buildPhaseTrailingNodes(
         event: baseEvent,
         triggerPlayerId: effectiveTriggerPlayerId,
         ownerPlayerId: p.ml.ownerPlayerId,
+        ownerCardZone: p.ml.ownerCardZone,
         mandatory: p.ml.registration.mandatory === true,
         countCardUse:
           typeof baseEvent.countCardUse === 'boolean' ? baseEvent.countCardUse : undefined,
@@ -648,6 +650,15 @@ export function buildFlowNode(
   }
   if (flow.type === 'parallel') {
     const parallel = new ParallelNode(nextId(), children)
+    if (flow.mode === 'trigger-select') {
+      parallel.mode = 'trigger-select'
+      parallel.triggerChildren = children.map((child, index) => ({
+        nodeId: child.id,
+        cardId: flow.children[index]?.sourceCard ?? `child-${index}`,
+        listenerId: '',
+        mandatory: flow.children[index]?.optional !== true,
+      }))
+    }
     const node = flow.optional ? markOptional(parallel, flow.promptKey) : parallel
     return attachChoiceLabel(node, flow.choiceLabelKey, flow.choiceLabelParams)
   }

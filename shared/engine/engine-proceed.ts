@@ -29,7 +29,6 @@ import {
   type CardListenerContext,
 } from '../cards/card-listeners'
 import { incCardUsed } from '../cards/helpers/card-state'
-import type { ReorganizeTrigger } from '../actions/effects/reorganize'
 import type { EngineInternals } from './engine-internals'
 import {
   applyDefaultSourceCardToFlow,
@@ -589,6 +588,8 @@ const executeActivateCardAction = (
     ...params.event,
     triggerPlayerId,
     ownerPlayerId,
+    ownerCardId: params.cardId,
+    ownerCardZone: params.ownerCardZone,
     mandatory: params.mandatory,
   }
   if (params.countCardUse !== undefined) event.countCardUse = params.countCardUse
@@ -607,6 +608,8 @@ const executeActivateCardAction = (
   }
   const result = executeCardListener(listener, listenerContext, {
     ownerPlayerId,
+    ownerCardId: params.cardId,
+    ownerCardZone: params.ownerCardZone,
   })
   // Track BGA-style per-card `used` stat: count a use only when the listener
   // actually returned an effect. Pure no-op fires and universal listeners
@@ -1242,9 +1245,9 @@ export function engineProceed(
         //
         // GameCore.resolvePendingChoice still validates the player's
         // submitted value via `pending.options.find((o) => o.value === value)`
-        // (shared/session/session-core.ts ~L2249). Reorg confirm/cancel
-        // therefore must surface as concrete options on the pending
-        // surface or the validator rejects the resolution.
+        // (shared/session/session-core.ts ~L2249). Reorg confirm therefore
+        // must surface as a concrete option on the pending surface, while
+        // cancel remains absent and is rejected before action resolution.
         //
         // Removing this shim requires teaching resolvePendingChoice to
         // bypass the options.find check for `request.kind === 'animal-reorg'`
@@ -1254,18 +1257,11 @@ export function engineProceed(
         // rewritten and pending.options is removed) is the natural
         // place to delete it.
         //
-        // The cancel option is omitted for non-anytime triggers,
-        // mirroring the pre-migration `buildOptions(trigger)` helper.
-        const trigger =
-          (executionContext.actionContext?.trigger as ReorganizeTrigger | undefined) ?? 'anytime'
         const confirm: ActionChoiceOption = {
           value: 'confirm',
           labelKey: 'ui.interactionAnimalReorgConfirm',
         }
-        choiceOptions =
-          trigger === 'anytime'
-            ? [confirm, { value: 'cancel', labelKey: 'ui.interactionAnimalReorgCancel' }]
-            : [confirm]
+        choiceOptions = [confirm]
       } else if (result.request.kind === 'farm-select') {
         // Task 5/6: farm-select leaves emit InteractionFarmSelection plus an
         // optional `options` list (confirm/cancel) so resolvePendingChoice's

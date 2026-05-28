@@ -8,6 +8,7 @@ type Props = {
   locale: Locale
   availableByResource: Partial<Record<ResourceKey, number>>
   promptKey?: string
+  requireAtLeastOne?: boolean
   onConfirm: (counts: Partial<Record<ResourceKey, number>>) => void
   onCancel: () => void
 }
@@ -28,7 +29,7 @@ const createCounts = (
   ])) as Partial<Record<ResourceKey, number>>
 
 export const ResourceQuantitySelectPanel = ({
-  locale, availableByResource, promptKey, onConfirm, onCancel,
+  locale, availableByResource, promptKey, requireAtLeastOne = true, onConfirm, onCancel,
 }: Props) => {
   const entries = useMemo(
     () => Object.entries(availableByResource) as Array<[ResourceKey, number]>,
@@ -72,7 +73,7 @@ export const ResourceQuantitySelectPanel = ({
         <button
           type="button"
           className="is-primary"
-          disabled={total < 1}
+          disabled={requireAtLeastOne && total < 1}
           onClick={() => onConfirm(currentCounts)}
         >
           {t(locale, 'ui.interactionResourceQuantityConfirm')}

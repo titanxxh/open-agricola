@@ -644,17 +644,18 @@ describe('listener purity wave 2b/c', () => {
 
   it('D36 BreedRegistry after-collect stores sheep counter and infobox by flow only', () => {
     const p = player('D36_BreedRegistry', {
-      cardStates: { D36_BreedRegistry: { extraData: { sheepGained: 1 }, infobox: '1 / 2' } },
+      cardStates: { D36_BreedRegistry: { extraData: { boardSheep: 1 }, infobox: '1 / 2' } },
     })
     const game = state([p])
     const before = stateSnapshot(game)
 
     const actionEvents = [movedToPlayer({ sheep: 1 }, p.id)]
-    const result = listenerById(D36_BreedRegistry_impl.listeners, 'D36-breed-registry-after-collect')
+    const result = listenerById(D36_BreedRegistry_impl.listeners, 'D36-breed-registry-after-sheep-gain')
       .handler(context(p, {
         state: game,
         actionId: 'collect',
         phase: 'after',
+        ownerCardZone: 'played',
         result: { type: 'ok', resourcesGained: { sheep: 1 } },
         transactionEvents: actionEvents,
         actionEvents,
@@ -664,7 +665,7 @@ describe('listener purity wave 2b/c', () => {
     expect(result?.flow).toMatchObject({
       type: 'seq',
       children: [
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'D36_BreedRegistry', params: { kind: 'set-extra-data', key: 'sheepGained', value: 2 } },
+        { type: 'leaf', actionId: 'special-effect', sourceCard: 'D36_BreedRegistry', params: { kind: 'set-extra-data', key: 'boardSheep', value: 2 } },
         { type: 'leaf', actionId: 'special-effect', sourceCard: 'D36_BreedRegistry', params: { kind: 'set-infobox', text: '2 / 2' } },
       ],
     })
@@ -676,7 +677,7 @@ describe('listener purity wave 2b/c', () => {
     const before = stateSnapshot(game)
     const actionEvents = [exchangedByPlayer({ sheep: 1 }, { food: 2 }, p.id)]
 
-    const result = listenerById(D36_BreedRegistry_impl.listeners, 'D36-breed-registry-after-exchange')
+    const result = listenerById(D36_BreedRegistry_impl.listeners, 'D36-breed-registry-after-exchange-sheep-conversion')
       .handler(context(p, {
         state: game,
         actionId: 'exchange',
@@ -690,7 +691,7 @@ describe('listener purity wave 2b/c', () => {
       type: 'leaf',
       actionId: 'special-effect',
       sourceCard: 'D36_BreedRegistry',
-      params: { kind: 'set-extra-data', key: 'sheepConverted', value: true },
+      params: { kind: 'set-extra-data', key: 'sheepConvertedToFood', value: true },
     })
   })
 

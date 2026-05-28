@@ -22,6 +22,7 @@ import {
   isPendingChoiceValueAllowed,
   pendingEnvelopeChoices,
 } from './pending-validation'
+import { rejectProtectedActionCancel } from './protected-action-cancel'
 import { evaluateTriggerSelect, type TriggerSelectEvaluationOptions } from './trigger-select'
 import {
   applyDefaultSourceCardToFlow,
@@ -108,11 +109,18 @@ const ensureEventState = (state: EngineContext['state']): void => {
 const currentEventReadContext = (
   int: EngineInternals,
   actionEvents?: readonly GameEvent[],
+  preservedTransactionEvents?: readonly GameEvent[],
+  preservedActionEvents?: readonly GameEvent[],
 ) => {
-  const transactionEvents = [...int.events.currentTransactionEvents()]
+  const transactionEvents = [
+    ...(preservedTransactionEvents ?? []),
+    ...int.events.currentTransactionEvents(),
+  ]
   return {
     transactionEvents,
-    actionEvents: actionEvents ? [...actionEvents] : undefined,
+    actionEvents: actionEvents
+      ? [...(preservedActionEvents ?? []), ...actionEvents]
+      : undefined,
     eventQuery: createEventQuery(transactionEvents),
   }
 }
@@ -339,6 +347,12 @@ export function engineResolveChoice(
     const explicitPending = node?.getPending()
     if (node && explicitPending) {
       const envelope = pendingEnvelopeFromHostNode(node)
+      const pendingActionId = envelope?.pendingActionId
+        ?? (node instanceof ActionNode ? node.actionId : null)
+      const protectedCancelFailure = rejectProtectedActionCancel(pendingActionId, choice)
+      if (protectedCancelFailure) {
+        return protectedCancelFailure
+      }
       if (envelope && !isPendingChoiceValueAllowed(envelope, choice)) {
         return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
       }
@@ -780,6 +794,10 @@ export function engineResolveChoice(
   if (!actionId) {
     return { type: 'ok' }
   }
+  const protectedCancelFailure = rejectProtectedActionCancel(actionId, choice)
+  if (protectedCancelFailure) {
+    return protectedCancelFailure
+  }
   const action = int.registry.get(actionId)
   if (!action) {
     return { type: 'ok' }
@@ -799,6 +817,13 @@ export function engineResolveChoice(
       skipBeforeTriggers: true,
     }
   }
+  const pendingEventReadContext = (actionEvents?: readonly GameEvent[]) =>
+    currentEventReadContext(
+      int,
+      actionEvents,
+      pendingActionNode?.deferredHostTransactionEvents,
+      pendingActionNode?.deferredHostActionEvents,
+    )
   executionContext.space = resolveExecutionSpace(
     context.state,
     executionContext.space,
@@ -809,7 +834,7 @@ export function engineResolveChoice(
   if (choice !== 'cancel') {
     const replaceResult = int.hooks.applyComputeReplace({
       ...executionContext,
-      ...currentEventReadContext(int),
+      ...pendingEventReadContext(),
       actionId,
     })
     committedActionId = replaceResult.actionId
@@ -820,7 +845,7 @@ export function engineResolveChoice(
     }
     committedAction = replacementAction
     const skipBefore = pendingActionNode?.beforePhaseResolved === true
-    const beforeEventReadContext = currentEventReadContext(int)
+    const beforeEventReadContext = pendingEventReadContext()
     const beforePhase = skipBefore
       ? { matchedListeners: [] }
       : int.hooks.before({ ...executionContext, ...beforeEventReadContext, actionId: committedActionId })
@@ -841,7 +866,7 @@ export function engineResolveChoice(
       return { type: 'ok' }
     }
     const doable = int.hooks.applyIsDoable(
-      { ...executionContext, ...currentEventReadContext(int), actionId: committedActionId },
+      { ...executionContext, ...pendingEventReadContext(), actionId: committedActionId },
       committedAction,
       committedAction.canBeExecutedByPlayer(
         executionContext.state,
@@ -857,7 +882,7 @@ export function engineResolveChoice(
     }
     const costResults = int.hooks.computeCosts({
       ...executionContext,
-      ...currentEventReadContext(int),
+      ...pendingEventReadContext(),
       actionId: committedActionId,
     })
     const costOverride = costResults.reduce<Partial<PlayerState['resources']>>(
@@ -944,8 +969,8 @@ export function engineResolveChoice(
       result,
       committedActionId,
       executionContext,
-      currentEventReadContext(int).transactionEvents,
-      completedEvents,
+      pendingEventReadContext(completedEvents).transactionEvents,
+      pendingEventReadContext(completedEvents).actionEvents ?? completedEvents,
       choice,
     )
     deferredHostNode.deferredHostResultTargetNodeId =
@@ -962,7 +987,7 @@ export function engineResolveChoice(
     int.tree.insertAfter(insertAnchor, [...beforeHostNodes, deferredHostNode])
     return result
   }
-  int.hooks.during({ ...executionContext, ...currentEventReadContext(int, completedEvents), actionId: committedActionId }, result)
+  int.hooks.during({ ...executionContext, ...pendingEventReadContext(completedEvents), actionId: committedActionId }, result)
   if (result.type === 'fail' && result.recoverable === true && pendingHost && pendingEnvelope) {
     const contextSnapshot = pendingEnvelope.contextSnapshot as InteractionContextSnapshot | undefined
     applyInteractionRequest(int, {
@@ -1015,7 +1040,7 @@ export function engineResolveChoice(
     return result
   }
   const insertionTargetId = pendingEnvelope?.ownerNodeId ?? pendingHost?.id ?? int.pendingNodeIdRef.value
-  const eventReadContext = currentEventReadContext(int, completedEvents)
+  const eventReadContext = pendingEventReadContext(completedEvents)
   const immediatePhase = int.hooks.immediatelyAfter(
     { ...executionContext, ...eventReadContext, actionId: committedActionId, choice },
     result,

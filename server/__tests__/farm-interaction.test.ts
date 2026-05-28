@@ -286,6 +286,33 @@ describe('farm interaction builders', () => {
     expect(resp.state.players[0]!.fields).toContainEqual({ row: 0, col: 0, stacks: [] })
   })
 
+  it('plow farm-select rejects cancel and keeps pending fields unchanged', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    state.roundPhase = 'work'
+    setWorkersAtHome(state, state.players[0]!, 2)
+    session.loadState(state)
+
+    const pending = session.takeAction(0, 'farmland')
+    expect(pending.ok).toBe(true)
+    expect(pending.interaction.stateId).toBe('wait')
+    if (pending.interaction.stateId !== 'wait') return
+    expect(pending.interaction.request.kind).toBe('farm-select')
+    expect(pending.interaction.options?.map((option) => option.value)).toEqual(['confirm'])
+
+    const rejected = session.commitSelectionChoice(0, { cancel: true })
+
+    expect(rejected.ok).toBe(false)
+    expect(rejected.error).toBe('action cancel is not allowed')
+    expect(rejected.interaction.stateId).toBe('wait')
+    if (rejected.interaction.stateId !== 'wait') return
+    expect(rejected.interaction.request.kind).toBe('farm-select')
+    expect(rejected.state.players[0]!.fields).toEqual([])
+  })
+
   it('rejects direct resolveChoice farm payload on farm-select', () => {
     const session = new GameSession()
     const state = session.getState().state

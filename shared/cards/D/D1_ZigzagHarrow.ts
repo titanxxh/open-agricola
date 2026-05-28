@@ -78,16 +78,14 @@ export const D1_ZigzagHarrow_impl = {
   prerequisiteCheck: (player) => computeZigzagCandidates(player).length > 0,
   effect: {
     id: CARD_ID,
-    onBuy: () => ({
+    onBuy: (_state, player) => ({
       type: 'leaf' as const,
       actionId: 'plow',
       sourceCard: CARD_ID,
       optional: true,
-      // Plow target restriction to zigzag candidates is still deferred —
-      // requires `actionContext.allowedTiles` threading through plow leaf →
-      // farm-edit UI. Tracked in `docs/card_implementation_status.md` as the
-      // residual D1 simplification (buyable gate is now aligned with BGA; plow
-      // location gate is not).
+      actionContext: {
+        allowedTiles: computeZigzagCandidates(player),
+      },
     }),
   },
   reaches: [] as readonly string[],
