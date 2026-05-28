@@ -95,17 +95,18 @@ import * as draftPhase from './phases/draft.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { getCardEffect } from '../cards/card-effects.ts'
 import type { CardEffectHook } from '../cards/card-effects.ts'
-import { runBeforeFeedHooks, runAfterFeedHooks, runCardEffectHook } from '../cards/card-effects.ts'
+import { runCardEffectHook } from '../cards/card-effects.ts'
 import { positionKey } from '../domain/farm.ts'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions, runCardListeners } from '../cards/card-listeners.ts'
 import { buildPhaseTrailingNodes, markOptional, stampOwner } from '../engine/engine-utils.ts'
 import { Scoring, playerBoard, type PlayerScoreSummary } from '../domain'
 import { reap } from '../actions/effects/reap.ts'
 import { breedLeaf } from '../actions/effects/breed'
+import { computeHarvestFeedingRequirement } from '../actions/helpers/harvest-feeding-requirement.ts'
 import { executeImmediateSpecialEffectFlows } from '../actions/effects/internal/immediate-special-effect-flow.ts'
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { resetRoundPlacements } from '../cards/helpers/round-placement.ts'
-import { familySize, newbornCount, workersAvailable } from '../domain/player.ts'
+import { familySize, workersAvailable } from '../domain/player.ts'
 import { getAssignedAnimalCount } from '../domain/animals.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/registry-display'
 import { getExchangesInWindow } from '../actions/effects/exchange.ts'
@@ -315,6 +316,7 @@ type StageResumeState = {
     | 'onReturnHome'
     | 'onStartReturnHome'
     | 'onAfterRoundEnd'
+    | 'onRoundEnd'
     | 'onBeforeEndGame'
     | 'onStartHarvest'
     | 'onStartHarvestFieldPhase'
@@ -660,6 +662,8 @@ export class GameCore {
   invokeBeforeReturnHomeHooks(): SessionResponse { return this.continueBeforeReturnHomeHooks() }
   /** @internal Round phase — onAfterRoundEnd stage hook chain trampoline. */
   invokeAfterRoundEnd(): SessionResponse { return this.continueAfterRoundEnd() }
+  /** @internal Round phase — onRoundEnd stage hook chain trampoline. */
+  invokeRoundEndHooks(): SessionResponse { return this.continueRoundEndHooks() }
   /** @internal phase access — build a fresh Engine for a top-level action space. */
   createEngineForSpace(actionId: string): Engine { return this.createEngine(actionId) }
   /** @internal phase access — push a synthetic pending-only frame. */
@@ -2535,13 +2539,6 @@ export class GameCore {
   }
 
   private continueHarvestFeeding(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (playerIndex === 0 && cardIndex === 0) {
-      const harvestOrder = this.getHarvestPlayerIndices()
-      harvestOrder.forEach((index) => {
-        const player = this.state.players[index]
-        if (player) runBeforeFeedHooks(this.state, player)
-      })
-    }
     if (this.continueStageHook('onHarvestFeedingPhase', playerIndex, cardIndex)) {
       return this.respond()
     }
@@ -2554,9 +2551,7 @@ export class GameCore {
 
     for (const i of harvestOrder) {
       const player = this.state.players[i]!
-      const size = familySize(player)
-      const newborn = Math.min(newbornCount(player), size)
-      const required = Math.max(0, size * 2 - newborn)
+      const required = computeHarvestFeedingRequirement(this.state, player)
       const useFood = Math.min(player.resources.food, required)
       player.resources.food -= useFood
       const remaining = required - useFood
@@ -2832,6 +2827,9 @@ export class GameCore {
         return
       case 'onEndHarvestFeedingPhase':
         this.continueAfterFeedingPhase(stageResume.playerIndex, stageResume.cardIndex)
+        return
+      case 'onRoundEnd':
+        this.continueRoundEndHooks(stageResume.playerIndex, stageResume.cardIndex)
         return
       case 'onAllWorkersPlaced':
         this.continueAllWorkersPlacedHooks(stageResume.playerIndex, stageResume.cardIndex)
@@ -3848,10 +3846,6 @@ export class GameCore {
       return this.respond()
     }
     const harvestOrder = this.getHarvestPlayerIndices()
-    harvestOrder.forEach((index) => {
-      const player = this.state.players[index]
-      if (player) runAfterFeedHooks(this.state, player)
-    })
     this.state.harvestBreedSummary = {}
 
     // E58 LunchtimeBeer-style cards opt out of breeding for the current round.
@@ -3884,6 +3878,13 @@ export class GameCore {
 
   /** S2 Task 10 part 7: thin delegator — body lives in `phases/round.ts`. */
   private finalizeRound(): SessionResponse { return roundPhase.finalizeRound(this) }
+
+  private continueRoundEndHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
+    if (this.continueStageHook('onRoundEnd', playerIndex, cardIndex)) {
+      return this.respond()
+    }
+    return this.continueAfterRoundEnd()
+  }
 
   private continueAfterRoundEnd(playerIndex = 0, cardIndex = 0): SessionResponse {
     if (this.continueStageHook('onAfterRoundEnd', playerIndex, cardIndex)) {

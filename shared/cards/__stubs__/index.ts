@@ -8,6 +8,7 @@ import { listener as computeArgsExtraOption } from './Stub_ComputeArgs_ExtraOpti
 import { listener as isDoableOverride } from './Stub_IsDoable_Override'
 import { effect as onReturnHomeAccumulate } from './Stub_OnReturnHome_Accumulate'
 import { effect as onRoundEndEffect } from './Stub_OnRoundEnd'
+import { effect as onRoundEndFlowEffect } from './Stub_OnRoundEndFlow'
 import { listener as scopeOpponent } from './Stub_Scope_Opponent'
 import { listener as afterActionOptionalConstruct } from './Stub_AfterAction_OptionalConstruct'
 import { afterListener as payGainVpAfter } from './Stub_PayGainVp'
@@ -37,6 +38,7 @@ const allListeners = [
 const allEffects = [
   onReturnHomeAccumulate,
   onRoundEndEffect,
+  onRoundEndFlowEffect,
   beforeReturnHomeEffect,
   startReturnHomeEffect,
   afterRoundEndEffect,

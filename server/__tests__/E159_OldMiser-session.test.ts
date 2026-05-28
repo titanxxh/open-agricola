@@ -90,10 +90,6 @@ describe('E159_OldMiser session', () => {
         }
       }
 
-      // With Old Miser: 2 adults need 1 food each = 2 food.
-      // Player had 2 food, so exactly enough — no begging.
-      // The food given by onBeforeFeed (familySize=2) makes effective cost:
-      // required=4, food=2+2=4, remaining=0
       expect(resp.state.players[0]!.resources.begging).toBe(0)
       expect(resp.state.players[0]!.resources.food).toBe(0)
     })
@@ -188,8 +184,6 @@ describe('E159_OldMiser session', () => {
         }
       }
 
-      // With Old Miser: 2 adults need 1 each = 2, newborn needs 0 = total 2
-      // Formula: required = 3*2 - 1 = 5, food given = 2 + 3(bonus) = 5, remaining = 0
       expect(resp.state.players[0]!.resources.begging).toBe(0)
       expect(resp.state.players[0]!.resources.food).toBe(0)
     })
