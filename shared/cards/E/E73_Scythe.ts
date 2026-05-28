@@ -35,7 +35,7 @@ registerHarvestCountModifier(CARD_ID, ({ player, field }) => {
   if (!player.minorPlayed?.includes(CARD_ID)) return
   const selected = readCardExtraData<string>(player, CARD_ID, FULL_REAP_POSITION_KEY)
   if (selected !== fieldKey(field.row, field.col)) return
-  return { override: fieldTotalRemaining(field), sources: [CARD_ID] }
+  return { override: fieldTotalRemaining(field), sources: [CARD_ID], scope: 'field' }
 })
 
 export const E73_Scythe_impl = {

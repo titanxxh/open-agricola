@@ -40,7 +40,7 @@ describe('reap with stacks', () => {
     expect(res.reapSummary.harvestedPositions).toEqual([{ row: 0, col: 0 }])
   })
 
-  it('uses harvest count to reap multiple crops from one field and keeps one position', () => {
+  it('uses field-scope harvest count to reap multiple crops from one field and keeps field counters distinct from amounts', () => {
     vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
     const p = mkPlayer([
       {
@@ -54,19 +54,46 @@ describe('reap with stacks', () => {
     ])
     const res = reap(mkState(), p, undefined, {
       harvestCounts: {
-        '0-0': { count: 3, sources: ['base', 'test-extra'] },
+        '0-0': { count: 3, sources: ['base', 'test-extra'], scope: 'field' },
       },
     })
     expect(p.resources.grain).toBe(2)
     expect(p.resources.vegetable).toBe(1)
     expect(p.fields[0].stacks).toEqual([])
-    expect(res.reapSummary.grainFields).toBe(2)
+    expect(res.reapSummary.grainFields).toBe(1)
     expect(res.reapSummary.vegetableFields).toBe(1)
     expect(res.reapSummary.harvestedCrops).toEqual([
       { row: 0, col: 0, crop: 'grain', amount: 2, sources: ['base', 'test-extra'] },
       { row: 0, col: 0, crop: 'vegetable', amount: 1, sources: ['base', 'test-extra'] },
     ])
     expect(res.reapSummary.harvestedPositions).toEqual([{ row: 0, col: 0 }])
+  })
+
+  it('keeps ordinary harvest count modifiers on the original top stack', () => {
+    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
+    const p = mkPlayer([
+      {
+        stacks: [
+          { kind: 'vegetable', remaining: 1 },
+          { kind: 'grain', remaining: 1 },
+        ],
+        row: 0,
+        col: 0,
+      },
+    ])
+    const res = reap(mkState(), p, undefined, {
+      harvestCounts: {
+        '0-0': { count: 2, sources: ['base', 'test-extra'] },
+      },
+    })
+    expect(p.resources.grain).toBe(1)
+    expect(p.resources.vegetable).toBe(0)
+    expect(p.fields[0].stacks).toEqual([{ kind: 'vegetable', remaining: 1 }])
+    expect(res.reapSummary.grainFields).toBe(1)
+    expect(res.reapSummary.vegetableFields).toBe(0)
+    expect(res.reapSummary.harvestedCrops).toEqual([
+      { row: 0, col: 0, crop: 'grain', amount: 1, sources: ['base', 'test-extra'] },
+    ])
   })
 
   it('does not record fields whose final harvest count is zero', () => {
