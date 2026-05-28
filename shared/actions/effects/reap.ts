@@ -4,6 +4,7 @@ import type { EventSink } from '../../contract/events'
 import { fieldTopStack, fieldPopIfDepleted } from '../../domain/field'
 import { runCardListeners } from '../../cards/card-listeners'
 import type { ActionHookResult } from '../hooks'
+import { computeHarvestCount } from '../helpers/harvest-count-registry'
 
 export type ReapHarvestCount = {
   count: number
@@ -116,8 +117,9 @@ export const reap = (
   }
   player.fields.forEach((field) => {
     const override = options.harvestCounts?.[fieldKey(field.row, field.col)]
-    let remainingCount = Math.max(0, Math.floor(override?.count ?? 1))
-    const sources = override?.sources?.length ? override.sources : ['base']
+    const harvestCount = override ?? computeHarvestCount(state, player, field)
+    let remainingCount = Math.max(0, Math.floor(harvestCount.count))
+    const sources = harvestCount.sources?.length ? harvestCount.sources : ['base']
     while (remainingCount > 0) {
       const top = fieldTopStack(field)
       if (!top || top.remaining <= 0) return
