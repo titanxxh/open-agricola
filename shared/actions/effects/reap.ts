@@ -9,6 +9,7 @@ import { computeHarvestCount } from '../helpers/harvest-count-registry'
 export type ReapHarvestCount = {
   count: number
   sources?: string[]
+  scope?: 'top-stack' | 'field'
 }
 
 export type ReapTrigger = {
@@ -105,7 +106,8 @@ export const reap = (
     harvestedCrops: [],
     harvestedPositions: [],
   }
-  let stoneFields = 0
+  const reapedCropAmounts: Partial<Record<'grain' | 'vegetable' | 'wood' | 'stone', number>> = {}
+  const countedFieldCrops = new Set<string>()
   const reactionChildren: ActionFlow[] = []
   const appendReactionFlow = (flow: ActionFlow | undefined) => {
     if (!flow) return
@@ -119,6 +121,10 @@ export const reap = (
     const override = options.harvestCounts?.[fieldKey(field.row, field.col)]
     const harvestCount = override ?? computeHarvestCount(state, player, field)
     let remainingCount = Math.max(0, Math.floor(harvestCount.count))
+    if ((harvestCount.scope ?? 'top-stack') !== 'field') {
+      const top = fieldTopStack(field)
+      remainingCount = Math.min(remainingCount, Math.max(0, top?.remaining ?? 0))
+    }
     const sources = harvestCount.sources?.length ? harvestCount.sources : ['base']
     while (remainingCount > 0) {
       const top = fieldTopStack(field)
@@ -132,12 +138,18 @@ export const reap = (
       }
       player.resources[kind] = (player.resources[kind] ?? 0) + amount
       reapSummary.resources[kind] = (reapSummary.resources[kind] ?? 0) + amount
+      reapedCropAmounts[kind] = (reapedCropAmounts[kind] ?? 0) + amount
+      const countedFieldCropKey = `${field.row}-${field.col}-${kind}`
       if (kind === 'grain') {
-        reapSummary.grainFields += amount
+        if (!countedFieldCrops.has(countedFieldCropKey)) {
+          reapSummary.grainFields += 1
+          countedFieldCrops.add(countedFieldCropKey)
+        }
       } else if (kind === 'vegetable') {
-        reapSummary.vegetableFields += amount
-      } else if (kind === 'stone') {
-        stoneFields += amount
+        if (!countedFieldCrops.has(countedFieldCropKey)) {
+          reapSummary.vegetableFields += 1
+          countedFieldCrops.add(countedFieldCropKey)
+        }
       }
       appendHarvestedCrop(reapSummary, field.row, field.col, kind, amount, sources)
       appendHarvestedPosition(reapSummary, field.row, field.col)
@@ -161,14 +173,14 @@ export const reap = (
     }
   })
 
-  if (reapSummary.grainFields > 0) {
-    appendReactionFlow(dispatchReapListener(state, player, 'grain', reapSummary.grainFields, eventSink, options))
+  if ((reapedCropAmounts.grain ?? 0) > 0) {
+    appendReactionFlow(dispatchReapListener(state, player, 'grain', reapedCropAmounts.grain!, eventSink, options))
   }
-  if (reapSummary.vegetableFields > 0) {
-    appendReactionFlow(dispatchReapListener(state, player, 'vegetable', reapSummary.vegetableFields, eventSink, options))
+  if ((reapedCropAmounts.vegetable ?? 0) > 0) {
+    appendReactionFlow(dispatchReapListener(state, player, 'vegetable', reapedCropAmounts.vegetable!, eventSink, options))
   }
-  if (stoneFields > 0) {
-    appendReactionFlow(dispatchReapListener(state, player, 'stone', stoneFields, eventSink, options))
+  if ((reapedCropAmounts.stone ?? 0) > 0) {
+    appendReactionFlow(dispatchReapListener(state, player, 'stone', reapedCropAmounts.stone!, eventSink, options))
   }
 
   return {

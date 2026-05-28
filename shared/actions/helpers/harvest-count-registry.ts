@@ -11,6 +11,7 @@ export type HarvestCountModifierResult = {
   delta?: number
   override?: number
   sources?: string[]
+  scope?: 'top-stack' | 'field'
 }
 
 export type HarvestCountModifier = (
@@ -34,6 +35,7 @@ export const computeHarvestCount = (
   const sources = new Set<string>(['base'])
   let count = 1
   let override: number | undefined
+  let scope: 'top-stack' | 'field' = 'top-stack'
 
   for (const [cardId, modifier] of modifiers) {
     const result = modifier({ state, player, field })
@@ -42,11 +44,13 @@ export const computeHarvestCount = (
     nextSources.forEach((source) => sources.add(source))
     if (typeof result.delta === 'number') count += result.delta
     if (typeof result.override === 'number') override = result.override
+    if (result.scope) scope = result.scope
   }
 
   const rawCount = override ?? count
   return {
     count: Math.max(0, Math.min(fieldTotalRemaining(field), Math.floor(rawCount))),
     sources: [...sources],
+    scope,
   }
 }
