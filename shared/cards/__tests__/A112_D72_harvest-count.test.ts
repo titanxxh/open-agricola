@@ -4,6 +4,7 @@ import type { Field, GameState, PlayerState } from '../../contract/types'
 import * as cardListeners from '../card-listeners'
 import { A112_ScytheWorker_impl } from '../A/A112_ScytheWorker'
 import { D72_StableManure_impl } from '../D/D72_StableManure'
+import '../E/E112_GrainThief'
 
 const makePlayer = (fields: Field[]): PlayerState => ({
   id: 'p1',
@@ -144,6 +145,63 @@ describe('A112 and D72 harvest count integration', () => {
       },
     })
     expect((flow as { actionContext?: Record<string, unknown> }).actionContext?.selectionEffect).toBeUndefined()
+  })
+
+  it('A112 and E112 on the same grain field cancel to one harvest count and report both sources', () => {
+    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => [])
+    const player = makePlayer([
+      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 3 }] },
+    ])
+    player.occupationPlayed.push('A112_ScytheWorker', 'E112_GrainThief')
+    player.cardStates.A112_ScytheWorker = {
+      extraData: { selectedPositions: ['0-0'] },
+    }
+    player.cardStates.E112_GrainThief = {
+      extraData: { selectedPositions: ['0-0'] },
+    }
+
+    const result = reap(makeState(player), player)
+
+    expect(player.resources.grain).toBe(1)
+    expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
+    const entry = result.reapSummary.harvestedCrops[0]!
+    expect(entry).toMatchObject({
+      row: 0,
+      col: 0,
+      crop: 'grain',
+      amount: 1,
+    })
+    expect(entry.sources).toHaveLength(3)
+    expect(entry.sources).toEqual(expect.arrayContaining(['base', 'A112_ScytheWorker', 'E112_GrainThief']))
+  })
+
+  it('D72 and E112 on the same grain field cancel to one harvest count and report both sources', () => {
+    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => [])
+    const player = makePlayer([
+      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 3 }] },
+    ])
+    player.occupationPlayed.push('E112_GrainThief')
+    player.minorPlayed.push('D72_StableManure')
+    player.cardStates.D72_StableManure = {
+      extraData: { selectedPositions: ['0-0'] },
+    }
+    player.cardStates.E112_GrainThief = {
+      extraData: { selectedPositions: ['0-0'] },
+    }
+
+    const result = reap(makeState(player), player)
+
+    expect(player.resources.grain).toBe(1)
+    expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
+    const entry = result.reapSummary.harvestedCrops[0]!
+    expect(entry).toMatchObject({
+      row: 0,
+      col: 0,
+      crop: 'grain',
+      amount: 1,
+    })
+    expect(entry.sources).toHaveLength(3)
+    expect(entry.sources).toEqual(expect.arrayContaining(['base', 'D72_StableManure', 'E112_GrainThief']))
   })
 
   it('E112 relaxes A112 and D72 grain-field selection thresholds only', () => {
