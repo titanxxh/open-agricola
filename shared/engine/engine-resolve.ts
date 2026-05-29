@@ -46,6 +46,7 @@ import { eventsToLogEntries } from '../events/log-mapper'
 import type { GameEvent } from '../contract/events'
 import { createEventQuery } from '../events/query'
 import { createBufferedEventSink, emitCardTriggered } from './card-trigger-events'
+import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
@@ -682,6 +683,9 @@ export function engineResolveChoice(
           : result
       }
       const eventReadContext = currentEventReadContext(int, completedEvents)
+      const triggerSnapshot = result.type === 'ok'
+        ? createTriggerSnapshot(context.state)
+        : undefined
       const immediatePhase = int.hooks.immediatelyAfter(
         { ...executionContext, ...eventReadContext, actionId, choice },
         result,
@@ -728,6 +732,7 @@ export function engineResolveChoice(
         trailingTransactionEvents,
         trailingActionEvents,
         trailingActionEventStartIndex,
+        triggerSnapshot,
       )
       const afterActivateNodes = buildPhaseTrailingNodes(
         int,
@@ -740,6 +745,7 @@ export function engineResolveChoice(
         trailingTransactionEvents,
         trailingActionEvents,
         trailingActionEventStartIndex,
+        triggerSnapshot,
       )
       const afterHostNodes = result.type === 'ok'
         ? buildInternalActionChildNodes(
@@ -1041,6 +1047,9 @@ export function engineResolveChoice(
   }
   const insertionTargetId = pendingEnvelope?.ownerNodeId ?? pendingHost?.id ?? int.pendingNodeIdRef.value
   const eventReadContext = pendingEventReadContext(completedEvents)
+  const triggerSnapshot = result.type === 'ok'
+    ? createTriggerSnapshot(context.state)
+    : undefined
   const immediatePhase = int.hooks.immediatelyAfter(
     { ...executionContext, ...eventReadContext, actionId: committedActionId, choice },
     result,
@@ -1087,6 +1096,7 @@ export function engineResolveChoice(
     trailingTransactionEvents,
     trailingActionEvents,
     trailingActionEventStartIndex,
+    triggerSnapshot,
   )
   const afterActivateNodes = buildPhaseTrailingNodes(
     int,
@@ -1099,6 +1109,7 @@ export function engineResolveChoice(
     trailingTransactionEvents,
     trailingActionEvents,
     trailingActionEventStartIndex,
+    triggerSnapshot,
   )
   const afterHostNodes =
     result.type === 'ok' && pendingHost instanceof ActionNode

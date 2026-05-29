@@ -1,6 +1,7 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { countTriggerCardsAs } from '../helpers/trigger-snapshot'
 import type { CardImpl } from '../registry'
 import { D42_EducationBonus } from '../../cards-display/D/D42_EducationBonus'
 
@@ -14,7 +15,7 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const n = context.player.occupationPlayed.length
+    const n = countTriggerCardsAs(context, context.player, 'occupation')
     if (n > 6) return
     if (n === 6) {
       const canPlow = context.player.fields.length < 5 // rough check for available farm tiles

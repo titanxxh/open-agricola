@@ -1,5 +1,6 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { countTriggerCardsAs } from '../helpers/trigger-snapshot'
 import type { CardImpl } from '../registry'
 import { E89_Stallwright } from '../../cards-display/E/E89_Stallwright'
 
@@ -13,7 +14,7 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const n = context.player.occupationPlayed.length
+    const n = countTriggerCardsAs(context, context.player, 'occupation')
     if (!TRIGGER_COUNTS.has(n)) return
     return {
       flow: {

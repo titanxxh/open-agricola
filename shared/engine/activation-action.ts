@@ -1,5 +1,6 @@
 import type { ActionHookPhase } from '../actions/hooks'
 import type { CardListenerZone } from '../cards/card-listeners'
+import type { TriggerSnapshot } from '../cards/helpers/trigger-snapshot'
 import type { GameEvent } from '../contract/events'
 import { ActionNode } from './nodes/action-node'
 import type { EngineNode } from './types'
@@ -20,6 +21,7 @@ export type ActivateCardActionParams = {
   transactionEvents?: GameEvent[]
   actionEvents?: GameEvent[]
   actionEventStartIndex?: number
+  triggerSnapshot?: TriggerSnapshot
 }
 
 export type ActivateCardActionNode = ActionNode & {

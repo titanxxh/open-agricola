@@ -102,6 +102,7 @@ const previewContextForChild = (
       transactionEvents: context.transactionEvents ?? params.transactionEvents,
       actionEvents: context.actionEvents ?? params.actionEvents,
       eventQuery: context.eventQuery,
+      triggerSnapshot: params.triggerSnapshot,
       ...event,
     },
   }
