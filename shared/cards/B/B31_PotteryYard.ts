@@ -1,15 +1,12 @@
 import type { CardImpl } from '../registry'
+import { playerHasCardCapability } from '../helpers/card-type'
 import { B31_PotteryYard } from '../../cards-display/B/B31_PotteryYard'
 
 const CARD_ID = B31_PotteryYard.id
 
-const POTTERY_IDS = ['Major_Pottery', 'D60_LargePottery']
-
 export const B31_PotteryYard_impl = {
-  prerequisiteCheck: (player) => {
-    const owned = new Set<string>([...player.improvements, ...player.minorPlayed])
-    return POTTERY_IDS.some((id) => owned.has(id))
-  },
+  prerequisiteCheck: (player) =>
+    playerHasCardCapability(player, 'potteryIdentity', { asType: 'major' }),
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {

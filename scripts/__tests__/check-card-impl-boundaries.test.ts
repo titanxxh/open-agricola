@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { checkCardImplBoundaries } from '../check-card-impl-boundaries'
+import { cardImplBoundaryExitCode, checkCardImplBoundaries } from '../check-card-impl-boundaries'
 
 const writeFixture = (root: string, rel: string, content: string): string => {
   const full = path.join(root, rel)
@@ -98,5 +98,40 @@ describe('check-card-impl-boundaries', () => {
     ].join('\n'))
 
     expect(checkCardImplBoundaries([file]).violations).toEqual([])
+  })
+
+  it('fails by default when boundary violations remain', () => {
+    expect(
+      cardImplBoundaryExitCode({
+        filesChecked: 1,
+        violations: [
+          {
+            file: 'shared/cards/A/A1_Shelter.ts',
+            line: 4,
+            cardId: 'A1_Shelter',
+            referencedCardId: 'E89_Stallwright',
+          },
+        ],
+      }),
+    ).toBe(1)
+  })
+
+  it('can still be run in explicit warn-only mode', () => {
+    expect(
+      cardImplBoundaryExitCode(
+        {
+          filesChecked: 1,
+          violations: [
+            {
+              file: 'shared/cards/A/A1_Shelter.ts',
+              line: 4,
+              cardId: 'A1_Shelter',
+              referencedCardId: 'E89_Stallwright',
+            },
+          ],
+        },
+        { warnOnly: true },
+      ),
+    ).toBe(0)
   })
 })

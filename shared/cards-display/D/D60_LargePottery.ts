@@ -18,6 +18,7 @@ export const D60_LargePottery = new MinorImprovement({
   vp: 3,
   extraVp: true,
   prerequisite: 'Return the Pottery',
+  potteryIdentity: true,
   alsoCountsAs: ['major'],
   evenMoreSet: true,
   waresSalesmanGains: [{ clay: 1, reed: 1 }],

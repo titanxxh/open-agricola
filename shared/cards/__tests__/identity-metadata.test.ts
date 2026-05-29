@@ -6,8 +6,10 @@ import type { ActionFlow } from '../../contract/types'
 import { getRegisteredCardListeners } from '../card-listeners'
 import { MinorImprovement } from '../../cards-display/types'
 import { registerAdHocMinorImprovement } from '../registry-runtime'
+import { playerHasCardCapability } from '../helpers/card-type'
 import { B153_Housemaster_impl } from '../B/B153_Housemaster'
 
+import '../A/A60_OrientalFireplace'
 import '../C/C75_Firewood'
 import '../E/E144_WaresSalesman'
 import '../D/D60_LargePottery'
@@ -86,6 +88,21 @@ const runWaresSalesman = (choice: string) =>
   } as unknown as CardListenerContext)
 
 describe('identity metadata migrations', () => {
+  describe('played-card capabilities', () => {
+    it('treats Oriental Fireplace as a fireplace-like played major', () => {
+      const player = makePlayer({
+        minorPlayed: ['A60_OrientalFireplace'],
+      })
+
+      expect(playerHasCardCapability(player, 'fireplaceIdentity', { asType: 'major' })).toBe(true)
+    })
+
+    it('treats Pottery and Large Pottery as pottery-like played majors', () => {
+      expect(playerHasCardCapability(makePlayer({ improvements: ['Major_Pottery'] }), 'potteryIdentity', { asType: 'major' })).toBe(true)
+      expect(playerHasCardCapability(makePlayer({ minorPlayed: ['D60_LargePottery'] }), 'potteryIdentity', { asType: 'major' })).toBe(true)
+    })
+  })
+
   describe('B153_Housemaster', () => {
     it('scores major-like minors through major identity collection', () => {
       const player = makePlayer({

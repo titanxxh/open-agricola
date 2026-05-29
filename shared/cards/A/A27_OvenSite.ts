@@ -1,16 +1,13 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { playerHasCardCapability } from '../helpers/card-type'
 import type { CardImpl } from '../registry'
 import { A27_OvenSite } from '../../cards-display/A/A27_OvenSite'
 
 const CARD_ID = A27_OvenSite.id
 
 const OVEN_IDS = ['Major_ClayOven', 'Major_StoneOven'] as const
-
-const FIREPLACE_IDS = ['Major_Fireplace1', 'Major_Fireplace2', 'A60_OrientalFireplace']
-
-const HEARTH_IDS = ['Major_CookingHearth1', 'Major_CookingHearth2']
 
 const computeCostsListener: CardListenerRegistration = {
   id: 'A27-oven-site-compute-costs',
@@ -58,9 +55,8 @@ export const A27_OvenSite_impl = {
   }),
 },
   prerequisiteCheck: (player) => {
-    const owned = new Set<string>([...player.improvements, ...player.minorPlayed])
-    const hasFireplace = FIREPLACE_IDS.some((id) => owned.has(id))
-    const hasHearth = HEARTH_IDS.some((id) => owned.has(id))
+    const hasFireplace = playerHasCardCapability(player, 'fireplaceIdentity', { asType: 'major' })
+    const hasHearth = playerHasCardCapability(player, 'cookingHearthIdentity', { asType: 'major' })
     return hasFireplace && hasHearth
   },
   reaches: [] as readonly string[],

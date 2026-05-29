@@ -85,6 +85,9 @@ jobs:
       - name: Check no-DSL (strict — DSL path fully removed)
         run: pnpm run check:no-dsl -- --strict
 
+      - name: Check card implementation boundaries
+        run: pnpm run check:card-impl-boundaries
+
       - name: Check bundle size (strict)
         run: pnpm run check:bundle-size
 

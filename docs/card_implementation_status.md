@@ -95,7 +95,8 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | Trailing trigger snapshot 已进入通用 listener 基础设施 | `TriggerSnapshot`、`ActivateCardActionParams.triggerSnapshot`、deferred host cursor、B49/D42/E89/E97 | host action commit 后、trailing listener 执行前冻结每位玩家的已打出 occupation/minor/major/improvement/played 列表与派生 count；activation cursor 持久化 snapshot，按第 N 张职业/改良或平衡数量判断的 listener 读 snapshot helper，不读执行时 live count。 |
 | Cross-player undo boundary 已进入通用基础设施 | `confirm-player-switch`、SessionResponse undo availability、`undoStep` / `undoAction` boundary guard | opponent-scope trigger 切到 owner prompt 后不暴露 undo；后续 undo 只能回到切换后的 prompt，不能跨回触发玩家行动状态。 |
 | Before-endgame hook flow 已进入通用基础设施 | `onBeforeEndGame?: FlowEffectHandler`、`stageResume.hook='onBeforeEndGame'`、D132_HideFarmer | round 14 的 `onAfterRoundEnd` 完成后先运行 before-endgame hook flow，再进入 `gameover`；hook pending 可通过 stage resume 回到同一终局前链。`anytime-policy` 仅对白名单 D132 optional choice prompt 放开 anytime，数量选择 prompt 仍保持 stage hook chain 锁定。 |
-| Card capability metadata 已进入通用基础设施 | `CardDefinition.preventsHandDiscard` / `fireplaceIdentity` / `cookingHearthIdentity` / `ovenIdentity` / `animalHolder` / `blocksHouseAnimalZones` / `waresSalesmanGains`、`playerHasCardCapability()`、`getPlayedCardDefinitions()`、`collectCardDefinitionsAs()` | 运行时跨卡身份/能力读取不再直接读外卡 id；helper 只扫已打出区，并通过 `asType` 复用 `cardCountsAs`。B146/C35、B153 major identity、C75 fireplace/hearth/oven identity、E144 wares gain、D86 animal-holder occupation filtering、D12 house animal zone blocking 都已迁到 metadata/helper。 |
+| Card capability metadata 已进入通用基础设施 | `CardDefinition.preventsHandDiscard` / `fireplaceIdentity` / `cookingHearthIdentity` / `ovenIdentity` / `potteryIdentity` / `animalHolder` / `blocksHouseAnimalZones` / `waresSalesmanGains`、`playerHasCardCapability()`、`getPlayedCardDefinitions()`、`collectCardDefinitionsAs()` | 运行时跨卡身份/能力读取不再直接读外卡 id；helper 只扫已打出区，并通过 `asType` 复用 `cardCountsAs`。B146/C35、B153 major identity、C75/A27 fireplace/hearth/oven identity、B31 pottery identity、E144 wares gain、D86 animal-holder occupation filtering、D12 house animal zone blocking 都已迁到 metadata/helper。 |
+| Card implementation boundary guard 已进入常规验证 | `pnpm run check:card-impl-boundaries`、`.github/workflows/ci.yml` verify job、`scripts/check-card-impl-boundaries.ts` | 生产 `shared/cards/A-E/*.ts` 中的运行时跨非 Major 卡 id 读取默认失败；`Major_*`、`reaches`、`allowedPurchases`、prerequisite candidate list 仍是明确例外。 |
 | House animal zone tag 已进入通用动物分区基础设施 | `AnimalZone.houseAnimalZone`、`isHouseAnimalZone()`、`countHouseAnimals()`、D12/D148/D164 | D148 house-edge card zone 标记为 house animal zone；`computeAnimalZones()` 在所有卡牌 zone 添加后统一用 `blocksHouseAnimalZones` 过滤普通 house zone 和 tagged house zone；D164 统计 house 动物时走 tagged zone helper。 |
 | DevMode 卡牌注入/回收路径已对齐 played-card 模型 | `devPlayCard`、`devDrawCard`、`player.improvements`、`availableMajorImprovements` | 调试面板直接打出 major 时写入玩家 major 区并移出公共供应区；draw 已打出卡牌时会从任意玩家 played/improvements 区移除并清理对应 `cardStates`，minor/occupation 回目标手牌，major 回公共供应区。 |
 | 旧兼容路径清理 | old engine choice snapshot/restore、encoded choice shortcut、old field/state backfill、old fence `string[]` coercion 已移除；current farm/selection flow 走 `commitSelection`/structured payload | 不维护旧 pending cursor / old state shape；后续新增交互必须通过 `allowedCommands` / `options` 显式暴露并验证 current typed request，不再把非广告 choice value 当便捷入口。 |
@@ -107,11 +108,11 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 
 当前没有开放的基础设施 umbrella 待办。已完成的历史条目已从本节移除；仍需持续关注的通用机制记录在 §5 架构审阅。
 
-本轮新增进行中基础设施：Card implementation boundary guard。`pnpm run check:card-impl-boundaries` 使用 TypeScript AST 扫描生产 `shared/cards/A-E/*.ts` 中的运行时跨卡 id 读取；当前为 warn-only，用于驱动 cross-card runtime closure 迁移，待迁移完成后再切入严格验证路径。
+本轮新增已完成基础设施：Card implementation boundary guard。`pnpm run check:card-impl-boundaries` 使用 TypeScript AST 扫描生产 `shared/cards/A-E/*.ts` 中的运行时跨卡 id 读取，并已接入 CI verify job；默认阻断违规，只有显式 `--warn-only` 才作为本地审计模式运行。
 
 本轮新增已完成基础设施：Pasture capacity modifier。`computeAnimalZones()` 在构造 pasture zone 时收集已打出卡的 `computePastureCapacityModifiers()`，先应用 replacement，再应用 additive，同类按打出顺序。A12_DrinkingTrough、D11_LawnFertilizer、B72_LoveforAgriculture 已迁入该机制；size-one pasture replacement 不再通过 D11 直接读取 A12，也不再用 `lawnFertilized` scratch marker 避免 double-add。
 
-本轮新增已完成基础设施：Card capability metadata 与 played-card helper。`CardDefinition` 增加 typed runtime metadata，`CardBase.toJSON()` 原样保留；`getPlayedCardDefinitions()` / `collectCardDefinitionsAs()` / `playerHasCardCapability()` 只检查已打出区，`asType` 复用 `cardCountsAs`。B146/C35 的 hand-discard prevention 已从直接 C35 id 读取迁到 `preventsHandDiscard`；B153、C75、E144、D86、D12 已分别迁到 major identity collection、fireplace/hearth/oven identity、wares gain metadata、animal-holder occupation filtering、house animal zone blocking。
+本轮新增已完成基础设施：Card capability metadata 与 played-card helper。`CardDefinition` 增加 typed runtime metadata，`CardBase.toJSON()` 原样保留；`getPlayedCardDefinitions()` / `collectCardDefinitionsAs()` / `playerHasCardCapability()` 只检查已打出区，`asType` 复用 `cardCountsAs`。B146/C35 的 hand-discard prevention 已从直接 C35 id 读取迁到 `preventsHandDiscard`；B153、C75/A27、B31、E144、D86、D12 已分别迁到 major identity collection、fireplace/hearth/oven identity、pottery identity、wares gain metadata、animal-holder occupation filtering、house animal zone blocking。
 
 本轮新增已完成基础设施：House animal zone tag。`AnimalZone.houseAnimalZone` 标记“视作 house 动物区”的非 house zone；`computeAnimalZones()` 在所有 `onComputeAnimalZones` 完成后，如果玩家有 `blocksHouseAnimalZones` capability，就统一移除 `zoneType === 'house'` 或 `houseAnimalZone === true` 的 zone。`countHouseAnimals()` 用同一判定统计 D164 这类 house-zone 规则，避免 D164 读取 D148 id。
 
@@ -405,7 +406,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A24_ThreshingBoard` | 已对齐 |  |
 | `A25_Bassinet` | 已对齐 |  |
 | `A26_SleepingCorner` | 已对齐 |  |
-| `A27_OvenSite` | 已对齐 |  |
+| `A27_OvenSite` | 已对齐 | prerequisite 改用 `fireplaceIdentity` / `cookingHearthIdentity` played-card capability；不再直接枚举 A60_OrientalFireplace。 |
 | `A28_ForestSchool` | 已对齐 |  |
 | `A29_AleBenches` | 已对齐 |  |
 | `A30_BakingSheet` | 已对齐 |  |
@@ -589,7 +590,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B28_ForestryStudies` | 已对齐 |  |
 | `B29_CookeryLesson` | 已对齐 | lessons-3 行动格覆盖已由共享 lessons-space helper 对齐 |
 | `B30_WoodPalisades` | 已对齐 |  |
-| `B31_PotteryYard` | 已对齐 |  |
+| `B31_PotteryYard` | 已对齐 | prerequisite 改用 `potteryIdentity` played-card capability；D60_LargePottery 通过 dual-type major 身份参与判断。 |
 | `B32_Kettle` | 已对齐 |  |
 | `B33_Mantlepiece` | 已对齐 | desc/cost/vp/prereq/onBuy 得分对齐；BGA/OA 均未见 runtime 禁止 renovate 逻辑 |
 | `B34_SpecialFood` | 已对齐 | A137/Riverine Shepherd 式行动格动物移动 provenance 已有定向 session 覆盖，bonus VP 只记一次并在牌面显示累计值 |
