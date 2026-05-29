@@ -5,6 +5,7 @@ import type { ActionFlow, PlayerState } from '../../contract/types'
 import type { FarmSownEvent } from '../../contract/events'
 import { fieldTopStack } from '../../domain/field'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
+import { extraCropPlacementActionContext } from '../../actions/helpers/extra-crop-placement-context'
 import type { CardImpl } from '../registry'
 import { B115_TinsmithMaster } from '../../cards-display/B/B115_TinsmithMaster'
 
@@ -72,13 +73,13 @@ const afterSowListener: CardListenerRegistration = {
         actionId: 'selection',
         sourceCard: CARD_ID,
         optional: true,
-        actionContext: {
+        actionContext: extraCropPlacementActionContext({
           selectionKind: 'farm-position',
           selectableTiles: freshFields.map(({ row, col }) => ({ row, col })),
           minSelections: 1,
           maxSelections: freshFields.length,
           selectionEffect: SELECTION_EFFECT,
-        },
+        }),
       } satisfies ActionFlow,
       sourceCard: CARD_ID,
     }

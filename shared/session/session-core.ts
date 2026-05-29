@@ -1402,6 +1402,7 @@ export class GameCore {
     const pendingEnvelope = this.engineStack.peekPendingEnvelope()
     const pendingSnapshot = this.peekHostContextSnapshot()
     const pendingSourceCard = pendingEnvelope?.sourceCard ?? pendingSnapshot?.sourceCard
+    const pendingActionContext = pendingSnapshot?.actionContext
     for (const action of this.registry.values()) {
       if (!action.anytime) continue
       if (blockedIds.has(action.id)) continue
@@ -1428,6 +1429,7 @@ export class GameCore {
       actionId: 'anytime',
       phase: 'anytime',
       pendingSourceCard,
+      actionContext: pendingActionContext,
     }
     const matchedAnytime = getMatchingListeners(anytimeContext)
     for (const entry of matchedAnytime) {
