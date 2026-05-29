@@ -116,6 +116,10 @@ _Avoid_: 每张卡手写支付分支
 玩家 supply 中的 fence / stable 组件也视为支付资源；支付 supply token 记录到 `player.supplyTokensConsumed`。
 _Avoid_: 固定 15 fence / 4 stable 上限
 
+**卡牌口径 Stable**:
+卡牌文本中“你拥有的 stable”“本次建造的 stable”“unfenced stable”使用的畜栏口径；包含普通畜栏和 Farm Hand stable 这类只参与卡牌统计的特殊畜栏。
+_Avoid_: 动物容量、牧场容量、可安置动物的 stable
+
 **Internal Action**:
 不直接暴露给玩家选择的内部执行叶子，例如 payment internal、future meeple、selection、return-to-space、recall worker。
 _Avoid_: 玩家可直接选择的公开行动
