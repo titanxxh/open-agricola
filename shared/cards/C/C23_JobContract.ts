@@ -1,8 +1,8 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
-import { addWorkerRef, isSpaceOccupied } from '../../domain/space'
-import { smallestAvailableWorker } from '../../domain/player'
+import { addSyntheticLinkedOccupancyRef, isSpaceOccupied } from '../../domain/space'
+import { getRoundPlacementDetails } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 import { C23_JobContract } from '../../cards-display/C/C23_JobContract'
 
@@ -46,6 +46,15 @@ const getLessonsSpace = (state: GameState, player: PlayerState) => {
   return chosen
 }
 
+const linkedWorkerIdForCurrentPlacement = (context: CardListenerContext): string | null => {
+  const spaceId = context.space?.id
+  if (!spaceId) return null
+  const placements = getRoundPlacementDetails(context.player)
+  const placement = [...placements].reverse().find((entry) => entry.spaceId === spaceId)
+  if (placement) return placement.workerId
+  return context.space?.takenBy.find((ref) => ref.playerId === context.player.id)?.workerId ?? null
+}
+
 const listener: CardListenerRegistration = {
   id: 'C23-job-contract-after-day-laborer',
   cardIds: [CARD_ID],
@@ -63,8 +72,9 @@ const listener: CardListenerRegistration = {
     // leaf is still safe to offer — the player can simply skip the seq.
 
     // Mark the lessons space as occupied by this player (fake-farmer).
-    const worker = smallestAvailableWorker(context.state, context.player)
-    addWorkerRef(lessonsSpace, context.player.id, worker?.id ?? '1')
+    const linkedWorkerId = linkedWorkerIdForCurrentPlacement(context)
+    if (!linkedWorkerId) return
+    addSyntheticLinkedOccupancyRef(lessonsSpace, context.player.id, linkedWorkerId, CARD_ID)
 
     const lessonsCost =
       lessonsSpace.id === 'lessons-4'

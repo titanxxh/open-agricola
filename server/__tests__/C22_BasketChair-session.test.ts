@@ -13,7 +13,7 @@ import {
   setWorkersAtHome,
   workersAvailable,
 } from '../../shared/domain/player'
-import { addWorkerRef } from '../../shared/domain/space'
+import { addSyntheticLinkedOccupancyRef, addWorkerRef, isSyntheticLinkedOccupancy } from '../../shared/domain/space'
 
 import '../../shared/cards/C/C22_BasketChair'
 import '../../shared/cards/C/C23_JobContract'
@@ -275,7 +275,7 @@ describe('C22_BasketChair session', () => {
     simulatePlacement(session, 0, 'day-laborer', '1')
     const withDayLaborer = session.getState().state
     const lessons = withDayLaborer.actionSpaces.find((s) => s.id === 'lessons')!
-    addWorkerRef(lessons, player.id, '3')
+    addSyntheticLinkedOccupancyRef(lessons, player.id, '1', 'C23_JobContract')
     session.loadState(withDayLaborer)
 
     let resp = buyC22ViaMeetingPlace(session)
@@ -293,14 +293,37 @@ describe('C22_BasketChair session', () => {
     expect(lessonsAfter.takenBy.some((t) => t.playerId === 'p1')).toBe(false)
   })
 
-  it('case 9 — C23 cleanup preserves a real lessons worker', () => {
-    const session = setup({ activeWorkers: 4 })
-    const state = session.getState().state
-    state.players[0]!.minorPlayed.push('C23_JobContract')
-    session.loadState(state)
+  it('case 8b — C23 cleanup keeps synthetic occupancy for a different linked worker', () => {
+    const session = setup({ activeWorkers: 5 })
+    simulatePlacement(session, 0, 'day-laborer', '1')
+    const withDayLaborer = session.getState().state
+    const lessons = withDayLaborer.actionSpaces.find((s) => s.id === 'lessons')!
+    addSyntheticLinkedOccupancyRef(lessons, withDayLaborer.players[0]!.id, '2', 'C23_JobContract')
+    session.loadState(withDayLaborer)
 
-    simulatePlacement(session, 0, 'forest', '1')
-    simulatePlacement(session, 0, 'lessons', '2')
+    let resp = buyC22ViaMeetingPlace(session)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const acceptOption = resp.interaction.options?.find((o) => o.value !== '__skip__')
+    expect(acceptOption).toBeDefined()
+
+    resp = session.resolveChoice(0, acceptOption!.value)
+    expect(resp.ok).toBe(true)
+
+    const lessonsAfter = resp.state.actionSpaces.find((s) => s.id === 'lessons')!
+    const remaining = lessonsAfter.takenBy.find((t) => t.playerId === 'p1')
+    expect(remaining?.workerId).toBe('2')
+    expect(isSyntheticLinkedOccupancy(remaining, { linkedWorkerId: '2' })).toBe(true)
+  })
+
+  it('case 9 — C23 cleanup preserves a real lessons worker', () => {
+    const session = setup({ activeWorkers: 5 })
+    simulatePlacement(session, 0, 'day-laborer', '1')
+    const withDayLaborer = session.getState().state
+    const lessonsBefore = withDayLaborer.actionSpaces.find((s) => s.id === 'lessons')!
+    addSyntheticLinkedOccupancyRef(lessonsBefore, withDayLaborer.players[0]!.id, '1', 'C23_JobContract')
+    addWorkerRef(lessonsBefore, withDayLaborer.players[0]!.id, '4')
+    session.loadState(withDayLaborer)
 
     let resp = buyC22ViaMeetingPlace(session)
     expect(resp.interaction.stateId).toBe('wait')
@@ -313,8 +336,11 @@ describe('C22_BasketChair session', () => {
 
     const forest = resp.state.actionSpaces.find((s) => s.id === 'forest')!
     const lessons = resp.state.actionSpaces.find((s) => s.id === 'lessons')!
+    const dayLaborer = resp.state.actionSpaces.find((s) => s.id === 'day-laborer')!
     expect(forest.takenBy.some((t) => t.playerId === 'p1')).toBe(false)
-    expect(lessons.takenBy.some((t) => t.playerId === 'p1' && t.workerId === '2')).toBe(true)
+    expect(dayLaborer.takenBy.some((t) => t.playerId === 'p1')).toBe(false)
+    expect(lessons.takenBy.some((t) => t.playerId === 'p1' && t.workerId === '1')).toBe(false)
+    expect(lessons.takenBy.some((t) => t.playerId === 'p1' && t.workerId === '4')).toBe(true)
   })
 
   it('case 10 — C23 fake lessons worker stays when C22 recalls a non-day-laborer worker', () => {
@@ -328,7 +354,7 @@ describe('C22_BasketChair session', () => {
     simulatePlacement(session, 0, 'day-laborer', '2')
     const withDayLaborer = session.getState().state
     const lessons = withDayLaborer.actionSpaces.find((s) => s.id === 'lessons')!
-    addWorkerRef(lessons, player.id, '4')
+    addSyntheticLinkedOccupancyRef(lessons, player.id, '2', 'C23_JobContract')
     session.loadState(withDayLaborer)
 
     let resp = buyC22ViaMeetingPlace(session)
@@ -345,6 +371,8 @@ describe('C22_BasketChair session', () => {
     const lessonsAfter = resp.state.actionSpaces.find((s) => s.id === 'lessons')!
     expect(forest.takenBy.some((t) => t.playerId === 'p1')).toBe(false)
     expect(dayLaborer.takenBy.some((t) => t.playerId === 'p1' && t.workerId === '2')).toBe(true)
-    expect(lessonsAfter.takenBy.some((t) => t.playerId === 'p1' && t.workerId === '4')).toBe(true)
+    const remaining = lessonsAfter.takenBy.find((t) => t.playerId === 'p1')
+    expect(remaining?.workerId).toBe('2')
+    expect(isSyntheticLinkedOccupancy(remaining, { linkedWorkerId: '2' })).toBe(true)
   })
 })
