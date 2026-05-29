@@ -1,5 +1,6 @@
 import type { GameState, PlayerState, SupplyTokenKey } from '../contract/types'
 import { getOwnOrdinaryFenceCount, MAX_ORDINARY_FENCE_PIECES } from './fence-segments'
+import { getFarmHandStableInUseCount, getOrdinaryStableCount } from './stables'
 
 export const MAX_STABLE_PIECES = 4
 
@@ -44,15 +45,12 @@ export const getReservedFutureStableCount = (_state: GameState, player: PlayerSt
 export const getReservedActionSpaceStableCount = (player: PlayerState): number =>
   readStringArray(player.cardStates?.E148_Lazybones?.extraData?.reservedActionSpaces).length
 
-export const getFarmHandStableInUseCount = (player: PlayerState): number =>
-  player.cardStates?.B85_FarmHand?.extraData?.position ? 1 : 0
-
 export const getAvailableStableSupplyCount = (state: GameState, player: PlayerState): number =>
   Math.max(
     0,
     MAX_STABLE_PIECES
       - readConsumedSupplyTokenCount(player, 'stable')
-      - player.stableTiles.length
+      - getOrdinaryStableCount(player)
       - getReservedFutureStableCount(state, player)
       - getReservedActionSpaceStableCount(player)
       - getFarmHandStableInUseCount(player),
