@@ -7,6 +7,7 @@ import {
 } from '../../actions/effects/fencing'
 import { getOwnOrdinaryFenceCount } from '../../domain/fence-segments'
 import { getOwnOrdinaryFenceBuildLimit } from '../../domain/supply-tokens'
+import { getOrdinaryStableCount } from '../../domain/stables'
 import type { CardImpl } from '../registry'
 import { C88_CarpentersApprentice } from '../../cards-display/C/C88_CarpentersApprentice'
 
@@ -31,7 +32,7 @@ const stablesCostListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     // BGA `countCarpenterDiscounts`: only the 3rd and 4th stable get -1 wood.
     // Players never build a 5th (max stable count is 4) but cap defensively.
-    const stablesBuilt = context.player.stableTiles.length
+    const stablesBuilt = getOrdinaryStableCount(context.player)
     if (stablesBuilt < 2 || stablesBuilt >= 4) return
     return { costs: { wood: -1 } }
   },

@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getStableTilesBuiltThisAction } from '../helpers/action-snapshot'
+import { getOrdinaryStableCount } from '../../domain/stables'
 import type { CardImpl } from '../registry'
 import { C56_FeedFence } from '../../cards-display/C/C56_FeedFence'
 
@@ -16,7 +17,7 @@ const afterListener: CardListenerRegistration = {
     const built = getStableTilesBuiltThisAction(context.player)
     if (built <= 0) return
     // +2 bonus for 4th stable (when player now has exactly 4 stables)
-    const bonusFood = context.player.stableTiles.length === 4 ? 2 : 0
+    const bonusFood = getOrdinaryStableCount(context.player) === 4 ? 2 : 0
     const totalFood = built + bonusFood
     return { flow: gainLeaf(CARD_ID, { food: totalFood }), sourceCard: CARD_ID }
   },
