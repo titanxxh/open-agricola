@@ -44,332 +44,188 @@ const createState = (...players: PlayerState[]): GameState => ({
   gameOver: true, workPhaseObtainedResources: {},
 }) as GameState
 
-const setStored = (player: PlayerState, stored: string[], usedThisHarvest = false): void => {
+const setStored = (player: PlayerState, stored: string[]): void => {
   player.cardStates ??= {}
   player.cardStates[CARD_ID] = {
-    extraData: { storedGoods: stored, usedThisHarvest },
+    extraData: { storedGoods: stored },
+  }
+}
+
+const setupEffect = () => {
+  const session = new GameSession()
+  const effect = getCardEffect(CARD_ID)
+  expect(effect).toBeDefined()
+  return { session, effect: effect! }
+}
+
+const optionValues = (flow: ActionFlow | undefined): string[] => {
+  expect(flow).toBeDefined()
+  const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
+  expect(leaf.actionId).toBe('emit-choice')
+  return ((leaf.params as { options: Array<{ value: string }> }).options)
+    .map((option) => option.value)
+    .sort()
+}
+
+type SessionResponseLike = {
+  state: GameState
+  interaction: { stateId: string; playerIndex: number }
+}
+
+const addHarvestOutcome = (
+  state: GameState,
+  player: PlayerState,
+  crops: Array<'grain' | 'vegetable'> = [],
+  animals: Array<'sheep' | 'boar' | 'cattle'> = [],
+) => {
+  state.harvestReapSummary = {
+    [player.id]: {
+      resources: Object.fromEntries(crops.map((crop) => [crop, 1])),
+      grainFields: crops.includes('grain') ? 1 : 0,
+      vegetableFields: crops.includes('vegetable') ? 1 : 0,
+      harvestedCrops: crops.map((crop, index) => ({
+        row: 0,
+        col: index,
+        crop,
+        amount: 1,
+        sources: ['base'],
+      })),
+    },
+  }
+  state.harvestBreedSummary = {
+    [player.id]: {
+      resources: Object.fromEntries(animals.map((animal) => [animal, 1])),
+      animalTypes: animals.length,
+      animalCount: animals.length,
+    },
   }
 }
 
 describe('E134_Omnifarmer session', () => {
   describe('computeBonusScore', () => {
-    it('returns 0 when storedGoods is empty', () => {
+    it.each([
+      [[], 0],
+      [['grain'], 0],
+      [['grain', 'vegetable'], 3],
+      [['grain', 'vegetable', 'sheep'], 5],
+      [['grain', 'vegetable', 'sheep', 'boar'], 7],
+      [['grain', 'vegetable', 'sheep', 'boar', 'cattle'], 9],
+    ])('scores stored goods %#', (stored, expected) => {
       const player = createPlayer()
       player.occupationPlayed = [CARD_ID]
+      setStored(player, stored)
+
+      const [result] = computeScores(createState(player))
+      const bonusCat = result.categories.find(c => c.key === 'cardStateBonusVp')
+      expect(bonusCat?.total ?? 0).toBe(expected)
+    })
+  })
+
+  describe('onAfterHarvest', () => {
+    it('offers crop candidates from current harvest outcome, not live resources', () => {
+      const { effect } = setupEffect()
+      const player = createPlayer()
+      player.occupationPlayed.push(CARD_ID)
+      player.resources.vegetable = 5
       setStored(player, [])
+      const state = createState(player)
+      addHarvestOutcome(state, player, ['grain'])
 
-      const [result] = computeScores(createState(player))
-      const bonusCat = result.categories.find(c => c.key === 'cardStateBonusVp')
-      expect(bonusCat?.total ?? 0).toBe(0)
+      expect(optionValues(effect.onAfterHarvest!(state, player))).toEqual(['grain', 'skip'])
     })
 
-    it('returns 0 when storedGoods has 1 type', () => {
+    it('offers newborn animal candidates from current harvest outcome', () => {
+      const { effect } = setupEffect()
       const player = createPlayer()
-      player.occupationPlayed = [CARD_ID]
+      player.occupationPlayed.push(CARD_ID)
       setStored(player, ['grain'])
+      const state = createState(player)
+      addHarvestOutcome(state, player, [], ['sheep', 'boar'])
 
-      const [result] = computeScores(createState(player))
-      const bonusCat = result.categories.find(c => c.key === 'cardStateBonusVp')
-      expect(bonusCat?.total ?? 0).toBe(0)
+      expect(optionValues(effect.onAfterHarvest!(state, player))).toEqual(['boar', 'sheep', 'skip'])
     })
 
-    it('returns 3 VP for 2 types', () => {
+    it('does not offer sheep only because Dollys Mother is played', () => {
+      const { effect } = setupEffect()
       const player = createPlayer()
-      player.occupationPlayed = [CARD_ID]
-      setStored(player, ['grain', 'vegetable'])
-
-      const [result] = computeScores(createState(player))
-      const bonusCat = result.categories.find(c => c.key === 'cardStateBonusVp')
-      expect(bonusCat?.total ?? 0).toBe(3)
-    })
-
-    it('returns 5 VP for 3 types', () => {
-      const player = createPlayer()
-      player.occupationPlayed = [CARD_ID]
-      setStored(player, ['grain', 'vegetable', 'sheep'])
-
-      const [result] = computeScores(createState(player))
-      const bonusCat = result.categories.find(c => c.key === 'cardStateBonusVp')
-      expect(bonusCat?.total ?? 0).toBe(5)
-    })
-
-    it('returns 7 VP for 4 types', () => {
-      const player = createPlayer()
-      player.occupationPlayed = [CARD_ID]
-      setStored(player, ['grain', 'vegetable', 'sheep', 'boar'])
-
-      const [result] = computeScores(createState(player))
-      const bonusCat = result.categories.find(c => c.key === 'cardStateBonusVp')
-      expect(bonusCat?.total ?? 0).toBe(7)
-    })
-
-    it('returns 9 VP for 5 types', () => {
-      const player = createPlayer()
-      player.occupationPlayed = [CARD_ID]
-      setStored(player, ['grain', 'vegetable', 'sheep', 'boar', 'cattle'])
-
-      const [result] = computeScores(createState(player))
-      const bonusCat = result.categories.find(c => c.key === 'cardStateBonusVp')
-      expect(bonusCat?.total ?? 0).toBe(9)
-    })
-  })
-
-  describe('onAfterHarvest clears usedThisHarvest', () => {
-    it('clears usedThisHarvest flag after harvest', () => {
-      const session = new GameSession()
-      const state = session.getState().state
-      state.players = state.players.slice(0, 2)
-
-      const player = state.players[0]!
       player.occupationPlayed.push(CARD_ID)
-      setStored(player, ['grain'], true)
-      session.loadState(state)
-
-      const effect = getCardEffect(CARD_ID)
-      expect(effect).toBeDefined()
-      effect!.onAfterHarvest!(state, player)
-
-      const stored = player.cardStates?.[CARD_ID]?.extraData
-      expect(stored?.storedGoods).toEqual(['grain'])
-      expect(stored?.usedThisHarvest).toBe(false)
-    })
-
-    it('is a no-op if usedThisHarvest is already false', () => {
-      const session = new GameSession()
-      const state = session.getState().state
-      state.players = state.players.slice(0, 2)
-
-      const player = state.players[0]!
-      player.occupationPlayed.push(CARD_ID)
-      setStored(player, ['grain'], false)
-      session.loadState(state)
-
-      const effect = getCardEffect(CARD_ID)
-      effect!.onAfterHarvest!(state, player)
-      const stored = player.cardStates?.[CARD_ID]?.extraData
-      expect(stored?.storedGoods).toEqual(['grain'])
-      expect(stored?.usedThisHarvest).toBe(false)
-    })
-  })
-
-  describe('onAfterReap', () => {
-    it('returns a choice flow with skip + grain + vegetable when both present and none stored', () => {
-      const session = new GameSession()
-      const state = session.getState().state
-      state.players = state.players.slice(0, 2)
-
-      const player = state.players[0]!
-      player.occupationPlayed.push(CARD_ID)
-      player.resources.grain = 2
-      player.resources.vegetable = 1
-      setStored(player, [], false)
-      session.loadState(state)
-
-      const effect = getCardEffect(CARD_ID)
-      const flow = effect!.onAfterReap!(state, player) as ActionFlow | undefined
-      expect(flow).toBeDefined()
-      // emit-choice leaf with options[skip, grain, vegetable]
-      const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
-      expect(leaf.type).toBe('leaf')
-      expect(leaf.actionId).toBe('emit-choice')
-      const options = (leaf.params as { options: Array<{ value: string }> }).options
-      const values = options.map(o => o.value).sort()
-      expect(values).toEqual(['grain', 'skip', 'vegetable'])
-    })
-
-    it('returns undefined when usedThisHarvest is true', () => {
-      const session = new GameSession()
-      const state = session.getState().state
-      state.players = state.players.slice(0, 2)
-
-      const player = state.players[0]!
-      player.occupationPlayed.push(CARD_ID)
-      player.resources.grain = 2
-      player.resources.vegetable = 1
-      setStored(player, [], true)
-      session.loadState(state)
-
-      const effect = getCardEffect(CARD_ID)
-      const flow = effect!.onAfterReap!(state, player)
-      expect(flow).toBeUndefined()
-    })
-
-    it('returns flow with vegetable only when grain already stored', () => {
-      const session = new GameSession()
-      const state = session.getState().state
-      state.players = state.players.slice(0, 2)
-
-      const player = state.players[0]!
-      player.occupationPlayed.push(CARD_ID)
-      player.resources.grain = 2
-      player.resources.vegetable = 1
-      setStored(player, ['grain'], false)
-      session.loadState(state)
-
-      const effect = getCardEffect(CARD_ID)
-      const flow = effect!.onAfterReap!(state, player) as ActionFlow | undefined
-      expect(flow).toBeDefined()
-      const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
-      expect(leaf.actionId).toBe('emit-choice')
-      const options = (leaf.params as { options: Array<{ value: string }> }).options
-      const values = options.map(o => o.value).sort()
-      expect(values).toEqual(['skip', 'vegetable'])
-    })
-
-    it('returns undefined when player has no grain or vegetable', () => {
-      const session = new GameSession()
-      const state = session.getState().state
-      state.players = state.players.slice(0, 2)
-
-      const player = state.players[0]!
-      player.occupationPlayed.push(CARD_ID)
-      player.resources.grain = 0
-      player.resources.vegetable = 0
-      setStored(player, [], false)
-      session.loadState(state)
-
-      const effect = getCardEffect(CARD_ID)
-      const flow = effect!.onAfterReap!(state, player)
-      expect(flow).toBeUndefined()
-    })
-  })
-
-  describe('onHarvestFeedingPhase', () => {
-    it('returns flow offering sheep deposit when sheep>=3', () => {
-      const session = new GameSession()
-      const state = session.getState().state
-      state.players = state.players.slice(0, 2)
-
-      const player = state.players[0]!
-      player.occupationPlayed.push(CARD_ID)
-      player.resources.sheep = 3
-      setStored(player, [], false)
-      session.loadState(state)
-
-      const effect = getCardEffect(CARD_ID)
-      const flow = effect!.onHarvestFeedingPhase!(state, player) as ActionFlow | undefined
-      expect(flow).toBeDefined()
-      const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
-      expect(leaf.actionId).toBe('emit-choice')
-      const options = (leaf.params as { options: Array<{ value: string }> }).options
-      const values = options.map(o => o.value).sort()
-      expect(values).toContain('sheep')
-      expect(values).toContain('skip')
-    })
-
-    it('returns undefined when no animal type meets threshold', () => {
-      const session = new GameSession()
-      const state = session.getState().state
-      state.players = state.players.slice(0, 2)
-
-      const player = state.players[0]!
-      player.occupationPlayed.push(CARD_ID)
-      player.resources.sheep = 2
-      player.resources.boar = 0
-      player.resources.cattle = 0
-      setStored(player, [], false)
-      session.loadState(state)
-
-      const effect = getCardEffect(CARD_ID)
-      const flow = effect!.onHarvestFeedingPhase!(state, player)
-      expect(flow).toBeUndefined()
-    })
-
-    it('returns undefined when usedThisHarvest is true', () => {
-      const session = new GameSession()
-      const state = session.getState().state
-      state.players = state.players.slice(0, 2)
-
-      const player = state.players[0]!
-      player.occupationPlayed.push(CARD_ID)
+      player.minorPlayed.push('E84_DollysMother')
       player.resources.sheep = 5
-      setStored(player, [], true)
-      session.loadState(state)
+      setStored(player, [])
+      const state = createState(player)
+      addHarvestOutcome(state, player)
 
-      const effect = getCardEffect(CARD_ID)
-      const flow = effect!.onHarvestFeedingPhase!(state, player)
-      expect(flow).toBeUndefined()
-    })
-
-    it('offers all three animals when all meet threshold', () => {
-      const session = new GameSession()
-      const state = session.getState().state
-      state.players = state.players.slice(0, 2)
-
-      const player = state.players[0]!
-      player.occupationPlayed.push(CARD_ID)
-      player.resources.sheep = 3
-      player.resources.boar = 3
-      player.resources.cattle = 3
-      setStored(player, [], false)
-      session.loadState(state)
-
-      const effect = getCardEffect(CARD_ID)
-      const flow = effect!.onHarvestFeedingPhase!(state, player) as ActionFlow | undefined
-      expect(flow).toBeDefined()
-      const leaf = flow as Extract<ActionFlow, { type: 'leaf' }>
-      const options = (leaf.params as { options: Array<{ value: string }> }).options
-      const values = options.map(o => o.value).sort()
-      expect(values).toEqual(['boar', 'cattle', 'sheep', 'skip'])
+      expect(effect.onAfterHarvest!(state, player)).toBeUndefined()
     })
   })
 
   describe('resolveChoice', () => {
-    it('marks deposit and pays the resource via follow-up flow', () => {
-      const session = new GameSession()
-      const state = session.getState().state
-      state.players = state.players.slice(0, 2)
-
-      const player = state.players[0]!
+    it('stores a valid current-harvest good and returns a payment flow', () => {
+      const { effect } = setupEffect()
+      const player = createPlayer()
       player.occupationPlayed.push(CARD_ID)
-      player.resources.grain = 2
-      setStored(player, [], false)
-      session.loadState(state)
+      player.resources.grain = 1
+      setStored(player, [])
+      const state = createState(player)
+      addHarvestOutcome(state, player, ['grain'])
 
-      const effect = getCardEffect(CARD_ID)
-      const followUp = effect!.resolveChoice!(state, player, 'grain', { sourceCard: CARD_ID })
-      // storedGoods updated synchronously
-      const stored = player.cardStates?.[CARD_ID]?.extraData
-      expect(stored?.storedGoods).toEqual(['grain'])
-      expect(stored?.usedThisHarvest).toBe(true)
-      // follow-up flow pays 1 grain
+      const followUp = effect.resolveChoice!(state, player, 'grain', { sourceCard: CARD_ID })
+
       expect(followUp).toBeDefined()
+      expect(player.cardStates?.[CARD_ID]?.extraData).toEqual({ storedGoods: ['grain'] })
     })
 
-    it('skip choice does not modify state and returns undefined', () => {
-      const session = new GameSession()
-      const state = session.getState().state
-      state.players = state.players.slice(0, 2)
-
-      const player = state.players[0]!
+    it('rejects forged choices outside current harvest outcome', () => {
+      const { effect } = setupEffect()
+      const player = createPlayer()
       player.occupationPlayed.push(CARD_ID)
-      player.resources.grain = 2
-      setStored(player, [], false)
-      session.loadState(state)
+      player.resources.sheep = 1
+      setStored(player, [])
+      const state = createState(player)
+      addHarvestOutcome(state, player, ['grain'])
 
-      const effect = getCardEffect(CARD_ID)
-      const followUp = effect!.resolveChoice!(state, player, 'skip', { sourceCard: CARD_ID })
+      const followUp = effect.resolveChoice!(state, player, 'sheep', { sourceCard: CARD_ID })
+
       expect(followUp).toBeUndefined()
-      const stored = player.cardStates?.[CARD_ID]?.extraData
-      expect(stored?.storedGoods).toEqual([])
-      expect(stored?.usedThisHarvest).toBe(false)
+      expect(player.cardStates?.[CARD_ID]?.extraData).toEqual({ storedGoods: [] })
     })
 
-    it('does not duplicate already-stored type', () => {
-      const session = new GameSession()
-      const state = session.getState().state
-      state.players = state.players.slice(0, 2)
-
-      const player = state.players[0]!
+    it('rejects current-harvest goods that are unavailable to pay', () => {
+      const { effect } = setupEffect()
+      const player = createPlayer()
       player.occupationPlayed.push(CARD_ID)
-      player.resources.grain = 2
-      setStored(player, ['grain'], false)
-      session.loadState(state)
+      player.resources.grain = 0
+      setStored(player, [])
+      const state = createState(player)
+      addHarvestOutcome(state, player, ['grain'])
 
-      const effect = getCardEffect(CARD_ID)
-      effect!.resolveChoice!(state, player, 'grain', { sourceCard: CARD_ID })
-      const stored = player.cardStates?.[CARD_ID]?.extraData
-      expect(stored?.storedGoods).toEqual(['grain'])
+      const followUp = effect.resolveChoice!(state, player, 'grain', { sourceCard: CARD_ID })
+
+      expect(followUp).toBeUndefined()
+      expect(player.cardStates?.[CARD_ID]?.extraData).toEqual({ storedGoods: [] })
     })
+  })
+
+  it('keeps summaries through onAfterHarvest pending and cleans them after resolution', () => {
+    const { session } = setupEffect()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    const player = state.players[0]!
+    player.occupationPlayed.push(CARD_ID)
+    player.resources.grain = 1
+    setStored(player, [])
+    addHarvestOutcome(state, player, ['grain'])
+    session.loadState(state)
+
+    const resp = (session as unknown as { continueAfterHarvestEffects: () => SessionResponseLike }).continueAfterHarvestEffects()
+
+    expect(resp.state.harvestReapSummary).toBeDefined()
+    expect(resp.state.harvestBreedSummary).toBeDefined()
+    expect(resp.interaction.stateId).toBe('wait')
+
+    const done = session.resolveChoice(resp.interaction.playerIndex, 'skip')
+
+    expect(done.state.harvestReapSummary).toBeUndefined()
+    expect(done.state.harvestBreedSummary).toBeUndefined()
   })
 })
