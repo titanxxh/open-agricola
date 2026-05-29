@@ -74,6 +74,8 @@ const card = new MinorImprovement({ ... })
 | `onStartHarvestFieldPhase` / `onHarvestFieldPhase` / `onEndHarvestFieldPhase` / `onAfterReap` | 收割田地子阶段 | 每收获 |
 | `onStartHarvestFeedingPhase` / `onHarvestFeedingPhase` / `onEndHarvestFeedingPhase` | 喂食子阶段 | 每收获 |
 
+`onBeforePlayerTurn` 是 non-flow skip-control exception，只能同步返回 `{ skipTurn?: true } | void`，用于 labor turn 入口跳过本次放工人机会；不能返回 `ActionFlow` 或产生 pending。
+
 **以下 hook 仅对官方卡（直接 import 注册）有效；自定义卡沙盒会过滤掉，写了不会触发**（详见 §7.3）：
 
 | hook | 触发时机 |
@@ -175,7 +177,7 @@ registerCardListener({
 
 #### 7.3 沙盒识别的 effect hook（`cardEffectHooks` 白名单交集）
 
-`onBuy` / `onBeforeStartOfTurn` / `onRoundStart` / `onAllWorkersPlaced` / `onEndTurn` / `onBeforeReturnHome` / `onStartReturnHome` / `onReturnHome` / `onRoundEnd` / `onAfterRoundEnd` / `onBeforeHarvest` / `onStartHarvest` / `onStartHarvestFieldPhase` / `onHarvestFieldPhase` / `onEndHarvestFieldPhase` / `onAfterReap` / `onStartHarvestFeedingPhase` / `onHarvestFeedingPhase` / `onEndHarvestFeedingPhase` / `onHarvest` / `onEndHarvest` / `onAfterHarvest`。
+`onBuy` / `onBeforeStartOfTurn` / `onBeforePlayerTurn`（non-flow skip-control，只返回 `{ skipTurn?: true } | void`） / `onRoundStart` / `onAllWorkersPlaced` / `onEndTurn` / `onBeforeReturnHome` / `onStartReturnHome` / `onReturnHome` / `onRoundEnd` / `onAfterRoundEnd` / `onBeforeHarvest` / `onStartHarvest` / `onStartHarvestFieldPhase` / `onHarvestFieldPhase` / `onEndHarvestFieldPhase` / `onAfterReap` / `onStartHarvestFeedingPhase` / `onHarvestFeedingPhase` / `onEndHarvestFeedingPhase` / `onHarvest` / `onEndHarvest` / `onAfterHarvest`。
 
 **沙盒不识别**（写了也不会触发）：`computeBonusScore` / `computeCostedBonus` / `computeSharedPostScore` / `computeExtraRoomCapacity` / `onComputeAnimalZones` / `onComputeSowableFields` / `onSowExtraField` / `computeLockedFarmTiles` / `handHooks`。终局加分请改成在 `onAfterHarvest`（最后一轮）等阶段串多个 `bonus-vp` leaf 近似实现。围栏折扣改用 listener `computeCosts` phase（actions: `['fence']`）。
 
