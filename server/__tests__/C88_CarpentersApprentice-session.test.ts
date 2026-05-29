@@ -45,7 +45,7 @@ const fenceCostWood = (player: PlayerState, newFenceEdges: string[]): number => 
 const fenceEdges = (n: number): string[] =>
   Array.from({ length: n }, (_, i) => `new-edge-${i}`)
 
-const stablesDiscount = (player: PlayerState): number => {
+const stablesDiscount = (player: PlayerState, stableCount = 1): number => {
   const listeners = getRegisteredCardListeners().filter((l) =>
     l.cardIds?.includes('C88_CarpentersApprentice'),
   )
@@ -61,6 +61,7 @@ const stablesDiscount = (player: PlayerState): number => {
     space: {} as never,
     actionId: 'stables',
     phase: 'computeCosts',
+    params: { stableCount },
   } as unknown as CardListenerContext
   const result = stableListener.handler(ctx)
   if (!result || typeof result !== 'object') return 0
@@ -130,12 +131,18 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
   })
 
   describe('stables-cost listener cap (3rd & 4th stables only)', () => {
-    const makePlayer = (stables: number): PlayerState => {
+    const makePlayer = (stables: number, farmHand = false): PlayerState => {
       const session = new GameSession()
       const state = session.getState().state
       const p = state.players[0]!
       p.occupationPlayed.push('C88_CarpentersApprentice')
       p.stableTiles = Array.from({ length: stables }, (_, i) => ({ row: 0, col: i }))
+      if (farmHand) {
+        p.cardStates = {
+          ...p.cardStates,
+          B85_FarmHand: { extraData: { position: { row: 2, col: 2 } } },
+        }
+      }
       return p
     }
 
@@ -157,6 +164,26 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
 
     it('4 stables built → no further discount (cap)', () => {
       expect(stablesDiscount(makePlayer(4))).toBe(0)
+    })
+
+    it('before counts the B85 FarmHand stable: 1 ordinary + B85 (card-facing=2) → next (3rd) is -1', () => {
+      expect(stablesDiscount(makePlayer(1, true))).toBe(-1)
+    })
+
+    it('mixed build crossing 3rd & 4th: 2 card-facing + build 2 → total discount -2', () => {
+      expect(stablesDiscount(makePlayer(2), 2)).toBe(-2)
+    })
+
+    it('mixed build with only the 3rd discounted: 1 card-facing + build 2 (2nd & 3rd) → -1', () => {
+      expect(stablesDiscount(makePlayer(1), 2)).toBe(-1)
+    })
+
+    it('mixed build below the discount band: 0 card-facing + build 2 (1st & 2nd) → 0', () => {
+      expect(stablesDiscount(makePlayer(0), 2)).toBe(0)
+    })
+
+    it('mixed build all-discount band: 2 card-facing + build 1 → -1 (3rd only)', () => {
+      expect(stablesDiscount(makePlayer(2), 1)).toBe(-1)
     })
   })
 })

@@ -29,6 +29,7 @@ import {
 import { buildInternalPayChild } from '../helpers/pay-child'
 import { playerBoard } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
+import { collectComputeCostsForFarmChoice } from '../../cards/card-listeners'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 import {
@@ -167,6 +168,67 @@ const resolveStableTotalCost = (
   )
 }
 
+/**
+ * Aggregate computeCosts/stables card discounts that depend on how many
+ * stables this build crosses (e.g. C88 Carpenter's Apprentice gives the 3rd
+ * and 4th card-facing stable -1 wood each). Mirrors fencing's
+ * `computeFreeFenceTotal`: the listener is fed the per-build `stableCount` and
+ * returns a single aggregate delta, which is applied to the base total cost.
+ */
+const applyStableBuildDiscount = (
+  state: GameState,
+  player: PlayerState,
+  baseCost: Partial<Resource> | null,
+  totalUnits: number,
+): Partial<Resource> | null => {
+  if (!baseCost) return baseCost
+  const override = collectComputeCostsForFarmChoice(state, player, 'stables', {
+    stableCount: totalUnits,
+  })
+  const result: Partial<Resource> = { ...baseCost }
+  for (const [key, delta] of Object.entries(override)) {
+    if (typeof delta !== 'number' || delta === 0) continue
+    const k = key as keyof Resource
+    result[k] = Math.max(0, (result[k] ?? 0) + delta)
+    if (result[k] === 0) delete result[k]
+  }
+  return result
+}
+
+const resolveStableTotalCostWithDiscount = (
+  state: GameState,
+  player: PlayerState,
+  actionContext: Record<string, unknown> | undefined,
+  costs: Partial<Resource> | undefined,
+  totalUnits: number,
+): Partial<Resource> | null =>
+  // `costs` carries the dispatcher's per-unit computeCosts delta (e.g. a flat
+  // per-stable modifier). C88 deliberately stays out of that pass — it needs
+  // the real build count — and is applied here against `totalUnits` via
+  // applyStableBuildDiscount, so the two never double-count the same card.
+  applyStableBuildDiscount(
+    state,
+    player,
+    resolveStableTotalCost(actionContext, costs, totalUnits),
+    totalUnits,
+  )
+
+const mergeCostDelta = (
+  base: Partial<Resource> | undefined,
+  extra: Partial<Resource>,
+): Partial<Resource> | undefined => {
+  const keys = Object.keys(extra)
+  if (keys.length === 0) return base
+  const merged: Partial<Resource> = { ...(base ?? {}) }
+  for (const key of keys) {
+    const value = extra[key as keyof Resource]
+    if (typeof value !== 'number' || value === 0) continue
+    const k = key as keyof Resource
+    merged[k] = (merged[k] ?? 0) + value
+  }
+  return merged
+}
+
 const buildStableFarmSelection = (
   state: GameState,
   player: PlayerState,
@@ -178,8 +240,14 @@ const buildStableFarmSelection = (
   const reserve = getAvailableStableSupplyCount(state, player)
   const selectionMax = typeof max === 'number' ? Math.min(max, reserve) : reserve
   const idx = state.players.indexOf(player)
+  // The farmyard's max-stable affordability scan needs the count-dependent C88
+  // discount, which it cannot derive on its own. Probe the discount for the
+  // next single stable and fold it into the cost override.
+  const nextStableDiscount = collectComputeCostsForFarmChoice(state, player, 'stables', {
+    stableCount: 1,
+  })
   const farm = playerBoard(state, idx).farmyard.selectableTiles('stable', {
-    costOverride: readStableCostDelta(actionContext, costs),
+    costOverride: mergeCostDelta(readStableCostDelta(actionContext, costs), nextStableDiscount),
     exactCost: readExactCost(actionContext),
     zoneFilter: zoneFilter === 'pasture-1' ? 'pasture-1' : undefined,
     max: selectionMax,
@@ -251,7 +319,13 @@ const finalizeStables = (
   }
   const placementError = stables.length > 0 ? validateStablePlacement(ctx, stables) : undefined
   if (placementError) return placementError
-  const totalCost = resolveStableTotalCost(ctx.actionContext, ctx.costs, totalUnits)
+  const totalCost = resolveStableTotalCostWithDiscount(
+    ctx.state,
+    ctx.player,
+    ctx.actionContext,
+    ctx.costs,
+    totalUnits,
+  )
   if (!totalCost) return { type: 'fail', errorKey: 'log.buildStableFail' }
   const payment = resolveTypedFlatPaymentSelection(
     ctx.player,
@@ -377,7 +451,13 @@ export const stablesAction: ActionDefinition = {
       }
       const placementError = stables.length > 0 ? validateStablePlacement(ctx, stables) : undefined
       if (placementError) return placementError
-      const totalCost = resolveStableTotalCost(ctx.actionContext, ctx.costs, totalUnits)
+      const totalCost = resolveStableTotalCostWithDiscount(
+        ctx.state,
+        ctx.player,
+        ctx.actionContext,
+        ctx.costs,
+        totalUnits,
+      )
       if (!totalCost) return { type: 'fail', errorKey: 'log.buildStableFail' }
       const payment = resolveTypedFlatPaymentSelection(
         ctx.player,
