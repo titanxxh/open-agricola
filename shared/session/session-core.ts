@@ -132,6 +132,7 @@ import {
   isMinorImprovementPlayable,
 } from '../actions/effects/improvement.ts'
 import { isBlockedByMajorImprovementActionGate } from '../actions/helpers/improvement-helpers'
+import { getPlayerActionSpaceConfig } from '../cards/player-action-space.ts'
 import {
   getOccupationActionCost,
   isOccupationPlayable,
@@ -4367,21 +4368,36 @@ export class GameCore {
     return false
   }
 
+  private clearDevCardState(player: PlayerState, cardId: string): void {
+    player.minorHand = player.minorHand.filter(id => id !== cardId)
+    player.occupationHand = player.occupationHand.filter(id => id !== cardId)
+    player.minorPlayed = player.minorPlayed.filter(id => id !== cardId)
+    player.occupationPlayed = player.occupationPlayed.filter(id => id !== cardId)
+    player.improvements = player.improvements.filter(id => id !== cardId)
+    player.extraOccupationsFromCards = (player.extraOccupationsFromCards ?? []).filter(id => id !== cardId)
+    player.activeModifiers = (player.activeModifiers ?? []).filter(modifier => modifier.cardId !== cardId)
+    player.playedCards = (player.playedCards ?? []).filter(
+      id => id !== cardId && id !== `minor:${cardId}` && id !== `occupation:${cardId}` && id !== `major:${cardId}`,
+    )
+    if (player.cardStates?.[cardId]) {
+      delete player.cardStates[cardId]
+    }
+  }
+
+  private clearDevDynamicActionSpace(cardId: string): void {
+    if (!getPlayerActionSpaceConfig(cardId)) return
+    this.state.actionSpaces = this.state.actionSpaces.filter(space => space.id !== cardId)
+  }
+
   devDrawCard(playerIndex: number, cardId: string): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
     const isMajor = !!getMajorCard(cardId)
     const isOccupation = !isMajor && this.isOccupationCard(cardId)
     for (const p of this.state.players) {
-      p.minorHand = p.minorHand.filter(id => id !== cardId)
-      p.occupationHand = p.occupationHand.filter(id => id !== cardId)
-      p.minorPlayed = p.minorPlayed.filter(id => id !== cardId)
-      p.occupationPlayed = p.occupationPlayed.filter(id => id !== cardId)
-      p.improvements = p.improvements.filter(id => id !== cardId)
-      if (p.cardStates?.[cardId]) {
-        delete p.cardStates[cardId]
-      }
+      this.clearDevCardState(p, cardId)
     }
+    this.clearDevDynamicActionSpace(cardId)
     if (isMajor) {
       if (!this.state.availableMajorImprovements.includes(cardId)) {
         this.state.availableMajorImprovements.push(cardId)
@@ -4409,22 +4425,20 @@ export class GameCore {
     if (!player) return this.respond(false, 'player not found')
     const isMajor = !!getMajorCard(cardId)
     const isOccupation = this.isOccupationCard(cardId)
+    for (const p of this.state.players) {
+      this.clearDevCardState(p, cardId)
+    }
+    this.clearDevDynamicActionSpace(cardId)
     if (isMajor) {
-      player.minorHand = player.minorHand.filter((id) => id !== cardId)
-      player.occupationHand = player.occupationHand.filter((id) => id !== cardId)
-      if (!player.improvements.includes(cardId)) {
-        player.improvements.push(cardId)
-      }
+      player.improvements.push(cardId)
       this.state.availableMajorImprovements = this.state.availableMajorImprovements.filter((id) => id !== cardId)
     } else if (isOccupation) {
-      player.occupationHand = player.occupationHand.filter((id) => id !== cardId)
-      if (!player.occupationPlayed.includes(cardId)) {
-        player.occupationPlayed.push(cardId)
-      }
+      player.occupationPlayed.push(cardId)
     } else {
-      player.minorHand = player.minorHand.filter((id) => id !== cardId)
-      if (!player.minorPlayed.includes(cardId)) {
-        player.minorPlayed.push(cardId)
+      player.minorPlayed.push(cardId)
+      if (getMinorImprovement(cardId)?.providesOccupation) {
+        player.extraOccupationsFromCards = player.extraOccupationsFromCards ?? []
+        player.extraOccupationsFromCards.push(cardId)
       }
     }
     getCardModifiers(cardId).forEach((modifier) => {
@@ -4435,6 +4449,10 @@ export class GameCore {
     // Trigger onBuy hook (creates PlayerActionCard action spaces, etc.)
     runCardEffectHook(this.state, player, cardId, 'onBuy')
     this.syncDynamicActionSpaces()
+    const dynamicSpace = this.state.actionSpaces.find(space => space.id === cardId)
+    if (dynamicSpace && getPlayerActionSpaceConfig(cardId)) {
+      this.registry.register(dynamicSpace)
+    }
     return this.respond()
   }
 
