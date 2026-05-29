@@ -348,11 +348,22 @@ export type HarvestedCropSummaryEntry = {
   sources: string[]
 }
 
+export type HarvestCountApplication = {
+  row: number
+  col: number
+  crop: CropStack['kind']
+  count: number
+  sources: string[]
+  tags: string[]
+  scope: 'top-stack' | 'field'
+}
+
 export type HarvestReapSummary = {
   resources: Partial<Resource>
   grainFields: number
   vegetableFields: number
   harvestedCrops?: HarvestedCropSummaryEntry[]
+  harvestCountApplications?: HarvestCountApplication[]
   /**
    * Positions of every field tile that produced a crop in this reap pass.
    * Mirror of BGA `getHarvestedFieldTilePositions($crops)`. Cards like

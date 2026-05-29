@@ -9,6 +9,7 @@ import { computeHarvestCount } from '../helpers/harvest-count-registry'
 export type ReapHarvestCount = {
   count: number
   sources?: string[]
+  tags?: string[]
   scope?: 'top-stack' | 'field'
 }
 
@@ -55,6 +56,28 @@ const appendHarvestedCrop = (
     return
   }
   reapSummary.harvestedCrops!.push({ row, col, crop, amount, sources })
+}
+
+const appendHarvestCountApplication = (
+  reapSummary: HarvestReapSummary,
+  row: number,
+  col: number,
+  crop: 'grain' | 'vegetable' | 'wood' | 'stone',
+  count: number,
+  sources: string[],
+  tags: string[],
+  scope: 'top-stack' | 'field',
+) => {
+  const existing = reapSummary.harvestCountApplications!.find((entry) =>
+    entry.row === row && entry.col === col && entry.crop === crop && entry.scope === scope,
+  )
+  if (existing) {
+    existing.count += count
+    existing.sources = [...new Set([...existing.sources, ...sources])]
+    existing.tags = [...new Set([...existing.tags, ...tags])]
+    return
+  }
+  reapSummary.harvestCountApplications!.push({ row, col, crop, count, sources, tags, scope })
 }
 
 /**
@@ -104,6 +127,7 @@ export const reap = (
     grainFields: 0,
     vegetableFields: 0,
     harvestedCrops: [],
+    harvestCountApplications: [],
     harvestedPositions: [],
   }
   const reapedCropAmounts: Partial<Record<'grain' | 'vegetable' | 'wood' | 'stone', number>> = {}
@@ -126,6 +150,14 @@ export const reap = (
       remainingCount = Math.min(remainingCount, Math.max(0, top?.remaining ?? 0))
     }
     const sources = harvestCount.sources?.length ? harvestCount.sources : ['base']
+    const tags = harvestCount.tags ?? []
+    const scope = harvestCount.scope ?? 'top-stack'
+    if (remainingCount === 0 && tags.length > 0) {
+      const top = fieldTopStack(field)
+      if (top && top.remaining > 0) {
+        appendHarvestCountApplication(reapSummary, field.row, field.col, top.kind, 0, sources, tags, scope)
+      }
+    }
     while (remainingCount > 0) {
       const top = fieldTopStack(field)
       if (!top || top.remaining <= 0) return
@@ -152,6 +184,7 @@ export const reap = (
         }
       }
       appendHarvestedCrop(reapSummary, field.row, field.col, kind, amount, sources)
+      appendHarvestCountApplication(reapSummary, field.row, field.col, kind, amount, sources, tags, scope)
       appendHarvestedPosition(reapSummary, field.row, field.col)
       top.remaining -= amount
       remainingCount -= amount

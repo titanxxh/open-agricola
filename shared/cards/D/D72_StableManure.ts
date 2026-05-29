@@ -1,7 +1,10 @@
 import { positionKey } from '../../domain/farm'
-import type { PlayerState } from '../../contract/types'
+import type { GameState, PlayerState } from '../../contract/types'
 import { readCardExtraData } from '../helpers/card-state'
-import { registerHarvestCountModifier } from '../../actions/helpers/harvest-count-registry'
+import {
+  computeHarvestSelectionThreshold,
+  registerHarvestCountModifier,
+} from '../../actions/helpers/harvest-count-registry'
 import { fieldIsEmpty, fieldTopStack, fieldTotalRemaining } from '../../domain/field'
 import type { CardImpl } from '../registry'
 import { D72_StableManure } from '../../cards-display/D/D72_StableManure'
@@ -29,26 +32,25 @@ const countUnfencedStables = (player: PlayerState): number => {
   return player.stableTiles.filter(s => !pastureTileKeys.has(positionKey(s))).length
 }
 
-const hasGrainThief = (player: PlayerState) =>
-  player.occupationPlayed.includes('E112_GrainThief')
-  || player.minorPlayed.includes('E112_GrainThief')
-
-const eligibleFields = (player: PlayerState) =>
+const eligibleFields = (state: GameState, player: PlayerState) =>
   player.fields.filter((field) => {
     const top = fieldTopStack(field)
     if (!top) return false
-    const min = hasGrainThief(player) && top.kind === 'grain' ? 1 : 2
+    const min = computeHarvestSelectionThreshold(state, player, field, {
+      sourceCard: CARD_ID,
+      baseThreshold: 2,
+    }).threshold
     return fieldTotalRemaining(field) >= min
   })
 
 export const D72_StableManure_impl = {
   effect: {
   id: CARD_ID,
-  onStartHarvestFieldPhase: (_state, player) => {
+  onStartHarvestFieldPhase: (state, player) => {
     const unfencedCount = countUnfencedStables(player)
     if (unfencedCount === 0) return
 
-    const croppedFields = eligibleFields(player)
+    const croppedFields = eligibleFields(state, player)
     if (croppedFields.length === 0) return
 
     return {
