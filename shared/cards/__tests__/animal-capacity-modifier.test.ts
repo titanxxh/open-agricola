@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { computeAnimalZones, getTotalAnimalCapacity } from '../../domain/animal-zones'
 import type { PlayerState, Pasture } from '../../contract/types'
+import { withActiveRegistry } from '../active-registry'
+import { CardRegistry } from '../registry'
 
 import '../A/A12_DrinkingTrough'
+import '../B/B72_LoveforAgriculture'
+import '../D/D11_LawnFertilizer'
 import '../E/E33_BeaverColony'
 
 const createPlayer = (overrides?: Partial<PlayerState>): PlayerState =>
@@ -132,5 +136,100 @@ describe('A12_DrinkingTrough', () => {
     })
     const zones = computeAnimalZones(player)
     expect(zones.find((z) => z.id === 'p1')!.capacity).toBe(4)
+  })
+})
+
+describe('pasture capacity modifiers', () => {
+  it('applies D11 replacement to size-one pastures only', () => {
+    const player = createPlayer({
+      minorPlayed: ['D11_LawnFertilizer'],
+      pastures: [makePasture('p1', 1, 0), makePasture('p2', 1, 1), makePasture('p3', 2, 0)],
+    })
+    const zones = computeAnimalZones(player)
+    expect(zones.find((z) => z.id === 'p1')!.capacity).toBe(3)
+    expect(zones.find((z) => z.id === 'p2')!.capacity).toBe(6)
+    expect(zones.find((z) => z.id === 'p3')!.capacity).toBe(4)
+  })
+
+  it('applies A12 additive pasture capacity without changing non-pasture zones', () => {
+    const player = createPlayer({
+      minorPlayed: ['A12_DrinkingTrough'],
+      pastures: [makePasture('p1', 1, 0)],
+      stableTiles: [{ row: 0, col: 0 }] as any,
+    })
+    const zones = computeAnimalZones(player)
+    expect(zones.find((z) => z.id === 'p1')!.capacity).toBe(4)
+    expect(zones.find((z) => z.id === 'house')!.capacity).toBe(1)
+    expect(zones.find((z) => z.zoneType === 'stable')!.capacity).toBe(1)
+  })
+
+  it('applies replacement before additive pasture capacity modifiers', () => {
+    const player = createPlayer({
+      minorPlayed: ['D11_LawnFertilizer', 'A12_DrinkingTrough'],
+      pastures: [makePasture('p1', 1, 0)],
+    })
+    const zones = computeAnimalZones(player)
+    expect(zones.find((z) => z.id === 'p1')!.capacity).toBe(5)
+  })
+
+  it('keeps replacement before additive modifiers even when additive cards were played first', () => {
+    const player = createPlayer({
+      minorPlayed: ['B72_LoveforAgriculture', 'D11_LawnFertilizer', 'A12_DrinkingTrough'],
+      pastures: [makePasture('p1', 1, 0)],
+      cardStates: {
+        B72_LoveforAgriculture: {
+          extraData: {
+            pastureCrops: [{
+              pastureId: 'p1',
+              tiles: [],
+              crop: 'grain',
+              remaining: 3,
+            }],
+          },
+        },
+      },
+    })
+    const zones = computeAnimalZones(player)
+    expect(zones.find((z) => z.id === 'p1')!.capacity).toBe(4)
+  })
+
+  it('applies same-kind pasture capacity modifiers in played order', () => {
+    const registry = new CardRegistry()
+    registry.registerEffects([
+      {
+        id: 'TEST_ReplaceThree',
+        computePastureCapacityModifiers: () => [{
+          sourceCard: 'TEST_ReplaceThree',
+          kind: 'replacement',
+          apply: () => 3,
+        }],
+      },
+      {
+        id: 'TEST_ReplaceSeven',
+        computePastureCapacityModifiers: () => [{
+          sourceCard: 'TEST_ReplaceSeven',
+          kind: 'replacement',
+          apply: () => 7,
+        }],
+      },
+    ])
+
+    const firstOrder = createPlayer({
+      minorPlayed: ['TEST_ReplaceThree', 'TEST_ReplaceSeven'],
+      pastures: [makePasture('p1', 1, 0)],
+    })
+    const secondOrder = createPlayer({
+      minorPlayed: ['TEST_ReplaceSeven', 'TEST_ReplaceThree'],
+      pastures: [makePasture('p1', 1, 0)],
+    })
+
+    expect(withActiveRegistry(
+      registry,
+      () => computeAnimalZones(firstOrder).find((z) => z.id === 'p1')!.capacity,
+    )).toBe(7)
+    expect(withActiveRegistry(
+      registry,
+      () => computeAnimalZones(secondOrder).find((z) => z.id === 'p1')!.capacity,
+    )).toBe(3)
   })
 })
