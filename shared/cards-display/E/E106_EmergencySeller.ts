@@ -14,4 +14,5 @@ export const E106_EmergencySeller = new Occupation({
     '<REED>/<STONE> <ARROW> 3 <FOOD>',
   ],
   players: '1+',
+  waresSalesmanGains: [{ wood: 1, reed: 1 }, { clay: 1, reed: 1 }, { reed: 2 }, { stone: 1, reed: 1 }],
 })

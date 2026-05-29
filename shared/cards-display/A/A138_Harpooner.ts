@@ -11,4 +11,5 @@ export const A138_Harpooner = new Occupation({
   desc: ['Each time you use the __Fishing__ space you can also pay 1 <WOOD> to get 1 <FOOD> for each person you have, and 1 <REED>'],
   cost: {},
   players: '3+',
+  waresSalesmanGains: [{ wood: 1, reed: 1 }],
 })

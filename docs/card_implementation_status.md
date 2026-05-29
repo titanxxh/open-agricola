@@ -11,10 +11,10 @@
 | 自动 metadata 脚本 literal mismatch | 0 |
 | 自动 metadata 脚本 complex mismatch | 4 |
 | 其中 schema-up 已接受差异 | 4 |
-| 需要实现复核的卡牌 | 13 |
+| 需要实现复核的卡牌 | 11 |
 | 已接受 / 产品策略差异 | 40 |
 | 排除的 BGA legacy 或未实现行为目标 | 52 |
-| 本轮审计视为已对齐 | 783 |
+| 本轮审计视为已对齐 | 785 |
 
 说明：`scripts/audit-bga-metadata-diff.ts` 现在会解析 BGA `STABLE` 打印成本和 `passing`。当前 literal mismatch 0（passing 已全部对齐）。当前 complex mismatch 是 4 个已接受的 schema-up prerequisite 差异。
 
@@ -29,8 +29,6 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | `A136_DrudgeryReeve` | 高 | shared scoring | BGA `sharedScoring`，每位玩家可选 0..max sets 并 reserve 资源；OA 仅持卡玩家自动最优计分。 | BGA `A/A136_DrudgeryReeve.php`; OA `shared/cards/A/A136_DrudgeryReeve.ts`, `shared/domain/scoring.ts` | 支持 shared costed scoring / before-end choice。 |
 | `E149_MidnightFencer` | 高 | free fencing | BGA 最后 harvest 执行免费 `FENCING`，上限受对手 reserve fence 限制；OA 只记录选择数为 VP。 | BGA `E/E149_MidnightFencer.php`; OA `shared/cards/E/E149_MidnightFencer.ts` | 改成真实 fence 子行动，并按对手可用 fence 限制 max。 |
 | `B49_Scales` / `D42_EducationBonus` / `E89_Stallwright` / `E97_Beneficiary` | 高 | trailing trigger snapshot | OA 当前部分 trailing listener 在延迟 flow 执行时读取 live 已打出卡牌数量；E97 连续打职业/改良会让触发时数量和执行时数量不一致，且 E97 仍内嵌 E89 特判。 | OA `shared/cards/B/B49_Scales.ts`, `shared/cards/D/D42_EducationBonus.ts`, `shared/cards/E/E89_Stallwright.ts`, `shared/cards/E/E97_Beneficiary.ts` | 实现 trigger frame / `TriggerSnapshot`；E89/D42/B49 改读 snapshot helper；删除 E97 内嵌 E89 分支。 |
-| `B153_Housemaster` | 中 | major identity scoring | BGA `getCards(MAJOR, true)` 会纳入 `getOtherCardTypes() => [MAJOR]` 的已打出 minor；OA 当前只看真实 major，并保留 A60 单卡特判，漏掉 D59/D60/D25/C60 等 major-like minor。 | BGA `B/B153_Housemaster.php`; OA `shared/cards/B/B153_Housemaster.ts`, `shared/cards/helpers/card-type.ts` | 用 `collectCardsAs(player, 'major')` / definition helper 汇总 VP，删除 A60 特判。 |
-| `C75_Firewood` | 中 | improvement identity trigger | OA 当前维护 fixed oven/fireplace id set，漏掉已作为 Fireplace 扩展实现的 D25，且若直接改读 `isBaking` 会误触发 D64_BakingCourse。 | BGA `C/C75_Firewood.php`; OA `shared/cards/C/C75_Firewood.ts`, `shared/cards-display/D/D25_WitchesDanceFloor.ts` | 增加 `fireplaceIdentity` / `cookingHearthIdentity` / `ovenIdentity` 语义，C75 按 identity 触发。 |
 | `E84_DollysMother` | 中 | breeding modifier | OA 当前通过 `onEndHarvestFeedingPhase` 添加 virtual sheep、`onEndHarvest` 再移除，breed summary 不是直接由阈值规则产生。 | BGA `E/E84_DollysMother.php`; OA `shared/cards/E/E84_DollysMother.ts`, `shared/actions/effects/breed.ts` | 增加 `CardImpl.effect.computeBreedThreshold` 通用扩展：E84 仅在 harvest breed 返回 sheep threshold=1，breed phase 直接产生 newborn sheep 并写入 summary。 |
 | `E134_Omnifarmer` | 中 | harvest outcome fact | OA 当前用 live resources 和 E84 特判推导可存 sheep/crop；正确语义应基于本次 harvest 实际 reaped crops 与 newborn animals。 | BGA `E/E134_Omnifarmer.php`; OA `shared/cards/E/E134_Omnifarmer.ts`, `shared/session/session-core.ts`, `shared/contract/types.ts` | 保留 harvest reap/breed summary 到 after-harvest，E134 改读本次 harvest outcome，不读 E84 或 live 阈值。 |
 | `B85_FarmHand` | 中 | stable 体系 | BGA farmhand stable 进入 stable built/listener/count 体系；OA 主要作为 extraData position + room capacity。 | BGA `B/B85_FarmHand.php`, `Actions/Stables.php`, `Models/PlayerBoard.php`; OA `shared/cards/B/B85_FarmHand.ts`, `shared/domain/supply-tokens.ts` | 让 FarmHand stable 进入通用 stable 统计/事件。 |
@@ -93,7 +91,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | Harvest feeding requirement modifier 已进入通用收获基础设施 | `computeHarvestFeedingRequirement()`、`registerHarvestFeedingRequirementModifier()`、E30/E159 | E30/E159 对齐 BGA `Player::getHarvestCost()` 公式扩展，不再通过 `onBeforeFeed` / `onAfterFeed` 临时改资源或 worker 标记；喂食主路径只读取通用公式结果。 |
 | Cross-player undo boundary 已进入通用基础设施 | `confirm-player-switch`、SessionResponse undo availability、`undoStep` / `undoAction` boundary guard | opponent-scope trigger 切到 owner prompt 后不暴露 undo；后续 undo 只能回到切换后的 prompt，不能跨回触发玩家行动状态。 |
 | Before-endgame hook flow 已进入通用基础设施 | `onBeforeEndGame?: FlowEffectHandler`、`stageResume.hook='onBeforeEndGame'`、D132_HideFarmer | round 14 的 `onAfterRoundEnd` 完成后先运行 before-endgame hook flow，再进入 `gameover`；hook pending 可通过 stage resume 回到同一终局前链。`anytime-policy` 仅对白名单 D132 optional choice prompt 放开 anytime，数量选择 prompt 仍保持 stage hook chain 锁定。 |
-| Card capability metadata 已进入通用基础设施 | `CardDefinition.preventsHandDiscard` / `fireplaceIdentity` / `cookingHearthIdentity` / `ovenIdentity` / `animalHolder` / `blocksHouseAnimalZones` / `waresSalesmanGains`、`playerHasCardCapability()`、`getPlayedCardDefinitions()`、`collectCardDefinitionsAs()` | 运行时跨卡身份/能力读取不再直接读外卡 id；helper 只扫已打出区，并通过 `asType` 复用 `cardCountsAs`。B146/C35 的弃手牌禁止已迁到 `preventsHandDiscard`。 |
+| Card capability metadata 已进入通用基础设施 | `CardDefinition.preventsHandDiscard` / `fireplaceIdentity` / `cookingHearthIdentity` / `ovenIdentity` / `animalHolder` / `blocksHouseAnimalZones` / `waresSalesmanGains`、`playerHasCardCapability()`、`getPlayedCardDefinitions()`、`collectCardDefinitionsAs()` | 运行时跨卡身份/能力读取不再直接读外卡 id；helper 只扫已打出区，并通过 `asType` 复用 `cardCountsAs`。B146/C35、B153 major identity、C75 fireplace/hearth/oven identity、E144 wares gain 都已迁到 metadata/helper。 |
 | DevMode 卡牌注入/回收路径已对齐 played-card 模型 | `devPlayCard`、`devDrawCard`、`player.improvements`、`availableMajorImprovements` | 调试面板直接打出 major 时写入玩家 major 区并移出公共供应区；draw 已打出卡牌时会从任意玩家 played/improvements 区移除并清理对应 `cardStates`，minor/occupation 回目标手牌，major 回公共供应区。 |
 | 旧兼容路径清理 | old engine choice snapshot/restore、encoded choice shortcut、old field/state backfill、old fence `string[]` coercion 已移除；current farm/selection flow 走 `commitSelection`/structured payload | 不维护旧 pending cursor / old state shape；后续新增交互必须通过 `allowedCommands` / `options` 显式暴露并验证 current typed request，不再把非广告 choice value 当便捷入口。 |
 | 注释里的非阻塞 card-id 示例 | `shared/actions/effects/breed.ts`、`shared/contract/types.ts` 仅把 `A165_PigBreeder` / `D95_SiteManager` 作为例子提到 | 除非附近代码变动，否则保留；它们不是可执行的单卡分支。 |
@@ -106,7 +104,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 
 本轮新增进行中基础设施：Card implementation boundary guard。`pnpm run check:card-impl-boundaries` 使用 TypeScript AST 扫描生产 `shared/cards/A-E/*.ts` 中的运行时跨卡 id 读取；当前为 warn-only，用于驱动 cross-card runtime closure 迁移，待迁移完成后再切入严格验证路径。
 
-本轮新增已完成基础设施：Card capability metadata 与 played-card helper。`CardDefinition` 增加 typed runtime metadata，`CardBase.toJSON()` 原样保留；`getPlayedCardDefinitions()` / `collectCardDefinitionsAs()` / `playerHasCardCapability()` 只检查已打出区，`asType` 复用 `cardCountsAs`。B146/C35 的 hand-discard prevention 已从直接 C35 id 读取迁到 `preventsHandDiscard`。
+本轮新增已完成基础设施：Card capability metadata 与 played-card helper。`CardDefinition` 增加 typed runtime metadata，`CardBase.toJSON()` 原样保留；`getPlayedCardDefinitions()` / `collectCardDefinitionsAs()` / `playerHasCardCapability()` 只检查已打出区，`asType` 复用 `cardCountsAs`。B146/C35 的 hand-discard prevention 已从直接 C35 id 读取迁到 `preventsHandDiscard`；B153、C75、E144 已分别迁到 major identity collection、fireplace/hearth/oven identity、wares gain metadata。
 
 本轮新增已完成基础设施：Action-level cancel policy。`plow` / `sow` / `construct` / `stables` / `fence` / `reorganize` / internal `selection` 均不再把 direct `cancel` 当 action-level success path；可选跳过由父级 optional node 的 `__skip__` 表达。`selection` 默认至少选 1 项，只有显式 `minSelections: 0` 才允许空提交，并且提交路径按 `positionFilter` / `selectableTiles` 校验可选位置。`construct` / `fence` 的 doability 会在真实 state 中排除无可提交布局，包括 cloned preview player，避免 direct cancel 被拒绝后出现不可完成 pending；fence layout feasibility 复用缓存的 connected tile sets，避免 availability 检查反复枚举农场组合。
 
@@ -694,7 +692,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B150_LargeScaleFarmer` | 已对齐 |  |
 | `B151_LittlePeasant` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `B152_JuniorArtist` | 已对齐 |  |
-| `B153_Housemaster` | 需复核 | 终局计分应按 major identity 汇总真实 major 与 `alsoCountsAs: ['major']` 的 minor；当前实现只看真实 major，并保留 A60 单卡特判。 |
+| `B153_Housemaster` | 已对齐 | 终局计分按 major identity 汇总真实 major 与 `alsoCountsAs: ['major']` 的 minor，不再保留 A60 单卡特判。 |
 | `B154_SheepKeeper` | 已接受差异 | schema-up prerequisite / isBuyable metadata 差异 |
 | `B155_ArtTeacher` | 已对齐 |  |
 | `B156_StorehouseKeeper` | 已对齐 |  |
@@ -796,7 +794,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C72_FestivalPlanning` | 已对齐 | onBuy 先执行 `private-field-phase` 收获普通田和 Card Field，再进入 optional improvement |
 | `C73_SeaweedFertilizer` | 已对齐 |  |
 | `C74_PrivateForest` | 已对齐 |  |
-| `C75_Firewood` | 需复核 | 应按 `fireplaceIdentity` / `cookingHearthIdentity` / `ovenIdentity` 触发；当前 fixed id set 漏掉 D25，且不能用宽泛 `isBaking` 代替。 |
+| `C75_Firewood` | 已对齐 | 按 `fireplaceIdentity` / `cookingHearthIdentity` / `ovenIdentity` 触发；D25_WitchesDanceFloor 触发，D64_BakingCourse 不触发。 |
 | `C76_WoodCart` | 已对齐 |  |
 | `C77_ClaySupply` | 已对齐 |  |
 | `C78_ReedHattedToad` | 已对齐 |  |
@@ -1225,7 +1223,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E141_VegetableVendor` | 已对齐 |  |
 | `E142_Smuggler` | 已对齐 |  |
 | `E143_Hewer` | 已对齐 |  |
-| `E144_WaresSalesman` | 已对齐 |  |
+| `E144_WaresSalesman` | 已对齐 | 按 `waresSalesmanGains` metadata 读取 single/multiple gain options，不再维护硬编码 improvement id 分组。 |
 | `E145_Parvenu` | 已对齐 |  |
 | `E146_Reseller` | 已对齐 |  |
 | `E147_AnimalDriver` | 已对齐 |  |

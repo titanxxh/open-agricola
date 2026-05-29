@@ -8,6 +8,7 @@ export const basketmaker: MajorCardDisplay = {
   cost: { reed: 2, stone: 2 },
   vp: 2,
   extraVp: true,
+  waresSalesmanGains: [{ reed: 2 }],
   desc: [
     '[Harvest]',
     '<REED> <ARROW-1X> 3<FOOD>',

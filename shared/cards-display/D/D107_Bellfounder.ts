@@ -12,4 +12,5 @@ export const D107_Bellfounder = new Occupation({
   cost: {},
   players: "1+",
   extraVp: true,
+  waresSalesmanGains: [{ clay: 1, reed: 1 }],
 })

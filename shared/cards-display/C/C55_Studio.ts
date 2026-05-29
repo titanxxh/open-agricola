@@ -11,4 +11,5 @@ export const C55_Studio = new MinorImprovement({
   desc: ["In the feeding phase of each harvest, you can use this card to turn exactly 1 <WOOD>/<CLAY>/<STONE> into 2/2/3 <FOOD>."],
   vp: 1,
   cost: { clay: 1, reed: 1 },
+  waresSalesmanGains: [{ wood: 1, reed: 1 }, { clay: 1, reed: 1 }, { stone: 1, reed: 1 }],
 })

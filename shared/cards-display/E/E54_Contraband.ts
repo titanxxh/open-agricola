@@ -12,4 +12,5 @@ export const E54_Contraband = new MinorImprovement({
     'Each time you play or build an improvement after this, you can pay 1 additional building resource of a type in the printed cost to get 3 <FOOD>.',
   ],
   cost: { food: 1 },
+  waresSalesmanGains: [{ wood: 1, reed: 1 }, { clay: 1, reed: 1 }, { reed: 2 }, { stone: 1, reed: 1 }],
 })

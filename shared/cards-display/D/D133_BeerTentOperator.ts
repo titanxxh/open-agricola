@@ -12,4 +12,5 @@ export const D133_BeerTentOperator = new Occupation({
   cost: {},
   players: "3+",
   extraVp: true,
+  waresSalesmanGains: [{ wood: 1, reed: 1 }],
 })

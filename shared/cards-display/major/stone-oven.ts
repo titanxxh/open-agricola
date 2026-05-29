@@ -9,6 +9,7 @@ export const stoneOven: MajorCardDisplay = {
   vp: 3,
   extraVp: false,
   isBaking: true,
+  ovenIdentity: true,
   desc: [
     '[__Bake Bread__ action:]',
     '<GRAIN> <ARROW-2X> 4<FOOD>',
