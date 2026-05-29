@@ -137,6 +137,27 @@ describe('C42_RavenousHunger', () => {
     expect(children[1].actionContext).toMatchObject({ constraints: expect.arrayContaining(['forest']) })
   })
 
+  it('after vegetable-seeds: constraints include only legal accumulation spaces', () => {
+    const listener = findListener('C42-ravenous-hunger-after-place-farmer')
+    expect(listener).toBeDefined()
+
+    const player = createPlayer()
+    const state = createState(player, createPlayer('p2'))
+    const forest = createSpace('forest', { wood: 3 })
+    forest.takenBy = [{ playerId: 'p2', workerId: '1' }]
+    state.actionSpaces = [forest, createSpace('fishing', { food: 1 }), createSpace('farmland')]
+
+    const result = executeCardListener(listener!, {
+      state, player, space: createSpace('vegetable-seeds'),
+      actionId: 'place-farmer', phase: 'after',
+    } as unknown as CardListenerContext)
+
+    expect(result).toBeDefined()
+    expect(result!.flow!.type).toBe('seq')
+    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
+    expect(children[1].actionContext).toEqual({ constraints: ['fishing'] })
+  })
+
   it('does not trigger on non-vegetable-seeds spaces', () => {
     const listener = findListener('C42-ravenous-hunger-after-place-farmer')
     expect(listener).toBeDefined()
@@ -225,6 +246,23 @@ describe('C42_RavenousHunger', () => {
       const space = state.actionSpaces.find((candidate) => candidate.id === spaceId)
       return !!space && Object.values(space.gainPerRound).some((amount) => (amount ?? 0) > 0)
     })).toBe(true)
+  })
+
+  it('after vegetable-seeds does not offer a second placement when no accumulation space is legal', () => {
+    const session = setupSession()
+    const state = session.getState().state
+    for (const space of state.actionSpaces) {
+      if (Object.values(space.gainPerRound).some((amount) => (amount ?? 0) > 0)) {
+        space.takenBy = [{ playerId: 'p2', workerId: '1' }]
+      }
+    }
+    session.loadState(state)
+
+    const resp = session.takeAction(0, 'vegetable-seeds')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.request.kind).not.toBe('choice')
+    expect(isCardFlagged(resp.state.players[0]!, CARD_ID)).toBe(false)
   })
 
   it('second placement on an accumulation space collects and gains one extra accumulating resource', () => {

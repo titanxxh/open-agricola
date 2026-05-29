@@ -1,6 +1,7 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow } from '../../contract/types'
+import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability'
 import { isCardFlagged } from '../helpers/card-state'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
@@ -19,13 +20,18 @@ const listener: CardListenerRegistration = {
     if (isCardFlagged(context.player, CARD_ID)) return
     if (workersAvailable(context.state, context.player) <= 0) return
     const usedMarket = MARKET_SPACES.includes(context.space?.id ?? '')
+    const allowed = computeAllowedPlacementSpaces(context.state, context.player, { sourceCard: CARD_ID })
+    const constraints = usedMarket
+      ? allowed.map((placement) => placement.spaceId)
+      : allowed
+        .filter((placement) => MARKET_SPACES.includes(placement.spaceId))
+        .map((placement) => placement.spaceId)
+    if (constraints.length === 0) return
     const placeFarmer: Extract<ActionFlow, { type: 'leaf' }> = {
       type: 'leaf',
       actionId: 'place-farmer',
       sourceCard: CARD_ID,
-    }
-    if (!usedMarket) {
-      placeFarmer.actionContext = { constraints: MARKET_SPACES }
+      actionContext: { constraints },
     }
     return {
       flow: {
