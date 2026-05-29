@@ -19,4 +19,15 @@ describe('E43_BarnCats prerequisite', () => {
     player.stableTiles = [{ row: 0, col: 4 }]
     expect(meetsCardPrerequisites(player, E43_BarnCats, state.round, state)).toBe(true)
   })
+
+  it('allows when the only stable is the B85 FarmHand stable (card-facing count)', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.stableTiles = []
+    player.cardStates = {
+      B85_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
+    }
+    expect(meetsCardPrerequisites(player, E43_BarnCats, state.round, state)).toBe(true)
+  })
 })
