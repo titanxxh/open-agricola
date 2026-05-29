@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { ActionSpace, WorkerRef } from '../../contract/types'
 import {
+  addSyntheticLinkedOccupancyRef,
   addWorkerRef,
   isSpaceOccupied,
+  isSyntheticLinkedOccupancy,
+  removeSyntheticLinkedOccupancyRefs,
   removeWorkerRef,
   spaceHasPlayer,
   spaceOccupantCount,
@@ -63,5 +66,55 @@ describe('space helpers', () => {
   it('removeWorkerRef returns null when no match', () => {
     const s = mkSpace([{ playerId: 'p1', workerId: '1' }])
     expect(removeWorkerRef(s, 'p2')).toBe(null)
+  })
+
+  it('adds and recognizes synthetic linked occupancy metadata', () => {
+    const s = mkSpace([])
+    addSyntheticLinkedOccupancyRef(s, 'p1', '1', 'C23_JobContract')
+
+    expect(s.takenBy).toEqual([{
+      playerId: 'p1',
+      workerId: '1',
+      synthetic: {
+        kind: 'linked-occupancy',
+        sourceCard: 'C23_JobContract',
+        linkedWorkerId: '1',
+      },
+    }])
+    expect(isSyntheticLinkedOccupancy(s.takenBy[0], {
+      sourceCard: 'C23_JobContract',
+      linkedWorkerId: '1',
+    })).toBe(true)
+  })
+
+  it('removes only matching synthetic linked occupancy refs', () => {
+    const s = mkSpace([{ playerId: 'p1', workerId: '4' }])
+    addSyntheticLinkedOccupancyRef(s, 'p1', '1', 'C23_JobContract')
+    addSyntheticLinkedOccupancyRef(s, 'p1', '2', 'C23_JobContract')
+    addSyntheticLinkedOccupancyRef(s, 'p2', '1', 'C23_JobContract')
+
+    removeSyntheticLinkedOccupancyRefs(s, 'p1', '1')
+
+    expect(s.takenBy).toEqual([
+      { playerId: 'p1', workerId: '4' },
+      {
+        playerId: 'p1',
+        workerId: '2',
+        synthetic: {
+          kind: 'linked-occupancy',
+          sourceCard: 'C23_JobContract',
+          linkedWorkerId: '2',
+        },
+      },
+      {
+        playerId: 'p2',
+        workerId: '1',
+        synthetic: {
+          kind: 'linked-occupancy',
+          sourceCard: 'C23_JobContract',
+          linkedWorkerId: '1',
+        },
+      },
+    ])
   })
 })

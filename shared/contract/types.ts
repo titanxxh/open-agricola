@@ -183,6 +183,11 @@ export type Worker = {
 export type WorkerRef = {
   playerId: string
   workerId: string
+  synthetic?: {
+    kind: 'linked-occupancy'
+    sourceCard: string
+    linkedWorkerId: string
+  }
 }
 
 export type FenceSegmentType = 'fence' | 'palisade'

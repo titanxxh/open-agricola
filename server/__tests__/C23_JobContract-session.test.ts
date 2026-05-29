@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../shared/contract/types'
+import { isSyntheticLinkedOccupancy } from '../../shared/domain/space'
 
 import '../../shared/cards/C/C23_JobContract'
 
@@ -117,6 +118,11 @@ describe('C23_JobContract listener', () => {
     // other players cannot use it this round even though we have nothing
     // playable in hand.
     expect(lessonsSpace.takenBy.some((t) => t.playerId === player.id)).toBe(true)
+    expect(lessonsSpace.takenBy[0]?.workerId).toBe('1')
+    expect(isSyntheticLinkedOccupancy(lessonsSpace.takenBy[0], {
+      sourceCard: CARD_ID,
+      linkedWorkerId: '1',
+    })).toBe(true)
   })
 
   it('offers optional occupation flow and marks lessons as taken', () => {
