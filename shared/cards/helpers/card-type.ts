@@ -1,6 +1,6 @@
 import type { PlayerState } from '../../contract/types'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../../cards-display/types'
-import type { CardType } from '../../contract/cards'
+import type { CardDefinition, CardType } from '../../contract/cards'
 import { getMajorCard } from '../major'
 
 /**
@@ -61,6 +61,53 @@ export const collectCardsAs = (
   }
   return [...seen]
 }
+
+export type CardCapability =
+  | 'preventsHandDiscard'
+  | 'fireplaceIdentity'
+  | 'cookingHearthIdentity'
+  | 'ovenIdentity'
+  | 'animalHolder'
+  | 'blocksHouseAnimalZones'
+
+export type PlayedCardDefinitionOptions = {
+  asType?: CardType
+}
+
+export const getCardDefinitionById = (cardId: string): CardDefinition | undefined =>
+  getMajorCard(cardId)
+  ?? getRegisteredMinorImprovement(cardId)
+  ?? getRegisteredOccupation(cardId)
+
+export const getPlayedCardDefinitions = (
+  player: PlayerState,
+  options: PlayedCardDefinitionOptions = {},
+): CardDefinition[] => {
+  const ids = options.asType
+    ? collectCardsAs(player, options.asType)
+    : [...new Set([
+      ...player.improvements,
+      ...player.minorPlayed,
+      ...player.occupationPlayed,
+    ])]
+  return ids.flatMap((id) => {
+    const def = getCardDefinitionById(id)
+    return def ? [def] : []
+  })
+}
+
+export const collectCardDefinitionsAs = (
+  player: PlayerState,
+  asType: CardType,
+): CardDefinition[] =>
+  getPlayedCardDefinitions(player, { asType })
+
+export const playerHasCardCapability = (
+  player: PlayerState,
+  capability: CardCapability,
+  options: PlayedCardDefinitionOptions = {},
+): boolean =>
+  getPlayedCardDefinitions(player, options).some((def) => def[capability] === true)
 
 /**
  * `fireplaceIdentity` query — true for the Major Fireplace cards plus any

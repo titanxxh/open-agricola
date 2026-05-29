@@ -70,6 +70,12 @@ export type CardDefinition = {
    */
   isField?: boolean
   fireplaceIdentity?: boolean
+  cookingHearthIdentity?: boolean
+  ovenIdentity?: boolean
+  preventsHandDiscard?: boolean
+  animalHolder?: boolean
+  blocksHouseAnimalZones?: boolean
+  waresSalesmanGains?: readonly Partial<Resource>[]
   mustBePlayedViaMinorAction?: boolean
   /**
    * BGA `isBuyable` actionType gate ('Major' / 'MajorOrMinor'): A10 Wooden
