@@ -47,6 +47,34 @@ export type CardEffectHook = 'onBuy' | 'onRoundStart' | 'onHarvest' | 'onRoundEn
   | 'onBeforePlayerTurn'
   | 'onAllWorkersPlaced'
 
+export type FlowCardEffectHook = Exclude<CardEffectHook, 'onBeforePlayerTurn'>
+
+export const flowCardEffectHooks: FlowCardEffectHook[] = [
+  'onBuy',
+  'onRoundStart',
+  'onHarvest',
+  'onRoundEnd',
+  'onEndTurn',
+  'onReturnHome',
+  'onBeforeReturnHome',
+  'onStartReturnHome',
+  'onAfterRoundEnd',
+  'onBeforeHarvest',
+  'onStartHarvest',
+  'onStartHarvestFieldPhase',
+  'onHarvestFieldPhase',
+  'onEndHarvestFieldPhase',
+  'onAfterReap',
+  'onStartHarvestFeedingPhase',
+  'onHarvestFeedingPhase',
+  'onEndHarvestFeedingPhase',
+  'onEndHarvest',
+  'onAfterHarvest',
+  'onBeforeEndGame',
+  'onBeforeStartOfTurn',
+  'onAllWorkersPlaced',
+]
+
 /**
  * All function-type fields on CardEffect that the custom-card sandbox is allowed
  * to define.  This is a superset of CardEffectHook: it also includes hooks with
@@ -246,7 +274,7 @@ export const runCardEffectHook = (
   state: GameState,
   player: PlayerState,
   cardId: string,
-  hook: CardEffectHook,
+  hook: FlowCardEffectHook,
   paymentInfo?: PaymentInfo,
 ): ActionFlow | null => {
   const effect = getCardEffect(cardId)
