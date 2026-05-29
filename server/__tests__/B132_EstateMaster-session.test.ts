@@ -60,13 +60,14 @@ const addCardToPlayer = (player: PlayerState) => {
   player.playedCards.push(`occupation:${CARD_ID}`)
 }
 
-const expectBonusVpReaction = (flow: unknown, amount: number) => {
+const expectBonusVpReaction = (flow: unknown, amount: number, targetPlayerId = 'p1') => {
   expect(flow).toEqual({
     type: 'parallel',
     children: [{
       type: 'leaf',
       actionId: 'special-effect',
       sourceCard: CARD_ID,
+      targetPlayerId,
       params: { kind: 'increment-counter', key: 'bonusVp', amount },
     }],
   })

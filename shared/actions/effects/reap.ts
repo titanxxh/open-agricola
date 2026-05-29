@@ -3,7 +3,6 @@ import type { ActionSpace } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
 import { fieldTopStack } from '../../domain/field'
 import { runCardListeners } from '../../cards/card-listeners'
-import type { ActionHookResult } from '../hooks'
 import { computeHarvestCount } from '../helpers/harvest-count-registry'
 
 export type ReapHarvestCount = {
@@ -95,7 +94,7 @@ export const dispatchReapListener = (
   if (amount <= 0) return
   const trigger = options.trigger ?? defaultReapTrigger()
   const space = {} as ActionSpace
-  const results = runCardListeners({
+  const context = {
     state,
     player,
     space,
@@ -107,9 +106,9 @@ export const dispatchReapListener = (
       trigger,
       ...(options.sourceCard ? { sourceCard: options.sourceCard } : {}),
     },
-  }) ?? []
-  const children = results
-    .map((result: ActionHookResult) => result.flow)
+  } as const
+  const children = (runCardListeners(context, undefined, { stampFlowOwner: true }) ?? [])
+    .map((result) => result.flow)
     .filter((flow): flow is ActionFlow => Boolean(flow))
   if (children.length === 0) return
   return { type: 'parallel', children }
