@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import type { GameState, PlayerState, Pasture } from '../../../contract/types'
 import { breed } from '../breed'
+import { getBreedThreshold, type CardEffect } from '../../../cards/card-effects'
+import { withActiveRegistry } from '../../../cards/active-registry'
+import { CardRegistry } from '../../../cards/registry'
+import { E84_DollysMother_impl } from '../../../cards/E/E84_DollysMother'
 
 const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState =>
   ({
@@ -40,6 +44,12 @@ const makePasture = (capacityTiles: number): Pasture => ({
   animalType: null,
   animalCount: 0,
 })
+
+const withEffects = <T>(effects: CardEffect[], fn: () => T): T => {
+  const registry = new CardRegistry()
+  effects.forEach((effect) => registry.setEffect(effect))
+  return withActiveRegistry(registry, fn)
+}
 
 describe('breed core helper', () => {
   it('breeds 1 of each type when ≥2 + capacity available', () => {
@@ -99,5 +109,96 @@ describe('breed core helper', () => {
     const { breedSummary } = breed(state, player, { sourceCard: 'harvest' })
     expect(breedSummary.animalCount).toBe(1)
     expect(breedSummary.animalTypes).toBe(1)
+  })
+
+  it('uses default breeding threshold 2 when no modifier applies', () => {
+    const player = makePlayer()
+    const state = makeState(player)
+
+    expect(getBreedThreshold(state, player, 'sheep', { sourceCard: 'harvest' })).toBe(2)
+  })
+
+  it('uses the minimum matching breeding threshold modifier', () => {
+    const player = makePlayer({
+      minorPlayed: ['TEST_Threshold3', 'TEST_Threshold1'],
+    })
+    const state = makeState(player)
+
+    const threshold = withEffects([
+      {
+        id: 'TEST_Threshold3',
+        computeBreedThreshold: (_state, _player, animalType) =>
+          animalType === 'boar' ? 3 : undefined,
+      },
+      {
+        id: 'TEST_Threshold1',
+        computeBreedThreshold: (_state, _player, animalType) =>
+          animalType === 'boar' ? 1 : undefined,
+      },
+    ], () => getBreedThreshold(state, player, 'boar', { sourceCard: 'harvest' }))
+
+    expect(threshold).toBe(1)
+  })
+
+  it('breeds through the generic threshold helper', () => {
+    const player = makePlayer({
+      resources: {
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
+        vegetable: 0, sheep: 0, boar: 1, cattle: 0, begging: 0,
+      },
+      pastures: [makePasture(1)],
+      minorPlayed: ['TEST_BoarThreshold'],
+    } as Partial<PlayerState>)
+    const state = makeState(player)
+
+    const result = withEffects([
+      {
+        id: 'TEST_BoarThreshold',
+        computeBreedThreshold: (_state, _player, animalType) =>
+          animalType === 'boar' ? 1 : undefined,
+      },
+    ], () => breed(state, player, { sourceCard: 'harvest' }))
+
+    expect(result.breedSummary.resources.boar).toBe(1)
+    expect(player.resources.boar).toBe(2)
+  })
+
+  it('E84 lowers only harvest sheep breeding threshold and does not write virtual sheep state', () => {
+    const player = makePlayer({
+      resources: {
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
+        vegetable: 0, sheep: 1, boar: 0, cattle: 0, begging: 0,
+      },
+      pastures: [makePasture(1)],
+      minorPlayed: ['E84_DollysMother'],
+    } as Partial<PlayerState>)
+    const state = makeState(player)
+
+    const result = withEffects([E84_DollysMother_impl.effect], () =>
+      breed(state, player, { sourceCard: 'harvest' }),
+    )
+
+    expect(result.breedSummary.resources.sheep).toBe(1)
+    expect(player.resources.sheep).toBe(2)
+    expect(player.cardStates.E84_DollysMother?.extraData?.virtualSheepAdded).toBeUndefined()
+  })
+
+  it('E84 does not lower card-triggered sheep breeding threshold', () => {
+    const player = makePlayer({
+      resources: {
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
+        vegetable: 0, sheep: 1, boar: 0, cattle: 0, begging: 0,
+      },
+      pastures: [makePasture(1)],
+      minorPlayed: ['E84_DollysMother'],
+    } as Partial<PlayerState>)
+    const state = makeState(player)
+
+    const result = withEffects([E84_DollysMother_impl.effect], () =>
+      breed(state, player, { sourceCard: 'A165_PigBreeder', animalTypes: ['sheep'] }),
+    )
+
+    expect(result.breedSummary.resources.sheep).toBeUndefined()
+    expect(player.resources.sheep).toBe(1)
   })
 })

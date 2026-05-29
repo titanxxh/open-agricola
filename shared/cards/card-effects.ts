@@ -28,6 +28,19 @@ export type Meeple = {
   type: 'sheep' | 'boar' | 'cattle'
 }
 
+export type BreedAnimalType = 'sheep' | 'boar' | 'cattle'
+
+export type BreedThresholdContext = {
+  sourceCard: string
+}
+
+export type BreedThresholdHandler = (
+  state: GameState,
+  player: PlayerState,
+  animalType: BreedAnimalType,
+  ctx: BreedThresholdContext,
+) => number | undefined
+
 export type PastureCapacityContext = {
   player: PlayerState
   state: GameState
@@ -232,6 +245,7 @@ export type CardEffect = {
     player: PlayerState,
     state: GameState,
   ) => PastureCapacityModifier[]
+  computeBreedThreshold?: BreedThresholdHandler
   onComputeAnimalZones?: (
     player: PlayerState,
     zones: AnimalZone[],
@@ -401,6 +415,37 @@ export const shouldEnforceReorganizeOnLastHarvest = (
     }
   }
   return false
+}
+
+export const getBreedThreshold = (
+  state: GameState,
+  player: PlayerState,
+  animalType: BreedAnimalType,
+  ctx: BreedThresholdContext,
+): number => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  let threshold = 2
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    const handler = effect?.computeBreedThreshold
+    if (!handler) continue
+    try {
+      const next = handler(state, player, animalType, ctx)
+      if (typeof next !== 'number' || Number.isNaN(next)) continue
+      threshold = Math.min(threshold, Math.max(1, Math.floor(next)))
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(`[card-effects] custom card ${cardId} computeBreedThreshold threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return threshold
 }
 
 /**
