@@ -5,11 +5,15 @@ import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import type { FenceSegment, Field } from '../../shared/contract/types'
 
 import '../../shared/cards/B/B2_MiniPasture'
+import '../../shared/cards/B/B49_Scales'
 import '../../shared/cards/B/B82_ValueAssets'
 import '../../shared/cards/B/B93_Confidant'
 import '../../shared/cards/B/B149_OpenAirFarmer'
 import '../../shared/cards/C/C2_Stable'
 import '../../shared/cards/A/A28_ForestSchool'
+import '../../shared/cards/A/A85_Homekeeper'
+import '../../shared/cards/A/A118_Treegardener'
+import '../../shared/cards/D/D42_EducationBonus'
 import '../../shared/cards/E/E1_PoleBarns'
 import '../../shared/cards/E/E16_BriarHedge'
 import '../../shared/cards/E/E89_Stallwright'
@@ -118,13 +122,65 @@ const setupBeneficiaryWithStallwright = (minorHand: string[] = [FILLER]) => {
   }
 
   const player = state.players[0]!
-  player.occupationPlayed = ['E89_Stallwright', 'A1_OtherOccupation']
+  player.occupationPlayed = ['E89_Stallwright', 'A85_Homekeeper']
   player.occupationHand = ['E97_Beneficiary', 'A114_SeasonalWorker']
   player.minorHand = minorHand
   player.resources = {
     ...player.resources,
     food: 10,
     wood: 0,
+  }
+
+  session.loadState(state)
+  return session
+}
+
+const setupBeneficiaryWithEducationBonus = () => {
+  const session = new GameSession(undefined, undefined, { playerCount: 4 })
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  state.round = 1
+
+  for (const player of state.players) {
+    setWorkersAtHome(state, player, 2)
+    player.minorHand = [FILLER]
+    player.occupationHand = [FILLER]
+  }
+
+  const player = state.players[0]!
+  player.occupationPlayed = ['A85_Homekeeper', 'A118_Treegardener']
+  player.minorPlayed = ['D42_EducationBonus']
+  player.occupationHand = ['E97_Beneficiary', 'A114_SeasonalWorker']
+  player.resources = {
+    ...player.resources,
+    food: 10,
+    reed: 0,
+    stone: 0,
+  }
+
+  session.loadState(state)
+  return session
+}
+
+const setupBeneficiaryWithScales = () => {
+  const session = new GameSession(undefined, undefined, { playerCount: 4 })
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  state.round = 1
+
+  for (const player of state.players) {
+    setWorkersAtHome(state, player, 2)
+    player.minorHand = [FILLER]
+    player.occupationHand = [FILLER]
+  }
+
+  const player = state.players[0]!
+  player.occupationPlayed = ['A85_Homekeeper', 'A118_Treegardener']
+  player.occupationHand = ['E97_Beneficiary', 'A114_SeasonalWorker']
+  player.minorPlayed = ['B49_Scales', 'B82_ValueAssets', 'C2_Stable']
+  player.resources = {
+    ...player.resources,
+    food: 10,
   }
 
   session.loadState(state)
@@ -508,11 +564,16 @@ describe('formatCost card session regressions', () => {
     expect(fenced.state.players[0]!.pastures).toHaveLength(1)
   })
 
-  it('E97_Beneficiary offers Stallwright stable before the extra occupation branch', () => {
+  it('E97_Beneficiary leaves Stallwright to trigger after the extra occupation branch', () => {
     const session = setupBeneficiaryWithStallwright()
 
     const played = playOccupation(session, 'E97_Beneficiary')
     const acceptedOccupationBranch = chooseByLabel(session, played, 'actions.lessons.name')
+    expect(acceptedOccupationBranch.interaction.stateId).toBe('wait')
+    if (acceptedOccupationBranch.interaction.stateId !== 'wait') return
+    expect(acceptedOccupationBranch.state.players[0]!.occupationPlayed).toContain('A114_SeasonalWorker')
+    expect(acceptedOccupationBranch.interaction.options?.some((entry) => entry.labelKey === 'actions.stables.name')).toBe(true)
+
     const acceptedStable = chooseByLabel(session, acceptedOccupationBranch, 'actions.stables.name')
     expect(acceptedStable.interaction.stateId).toBe('wait')
     if (acceptedStable.interaction.stateId !== 'wait') return
@@ -556,5 +617,40 @@ describe('formatCost card session regressions', () => {
     expect(completedBonus.interaction.stateId).toBe('wait')
     if (completedBonus.interaction.stateId !== 'wait') return
     expect(completedBonus.interaction.options?.some((entry) => entry.labelKey === 'actions.stables.name')).toBe(true)
+  })
+
+  it('D42_EducationBonus uses the original occupation trigger count across Beneficiary extra occupation', () => {
+    const session = setupBeneficiaryWithEducationBonus()
+
+    const played = playOccupation(session, 'E97_Beneficiary')
+    const acceptedOccupationBranch = chooseByLabel(session, played, 'actions.lessons.name')
+    const playedExtraOccupation = chooseCardIfPrompted(session, acceptedOccupationBranch, 'A114_SeasonalWorker')
+
+    const player = playedExtraOccupation.state.players[0]!
+    expect(player.occupationPlayed).toEqual([
+      'A85_Homekeeper',
+      'A118_Treegardener',
+      'E97_Beneficiary',
+      'A114_SeasonalWorker',
+    ])
+    expect(readCardResourceStats(player, 'D42_EducationBonus')?.gained.reed).toBe(1)
+    expect(readCardResourceStats(player, 'D42_EducationBonus')?.gained.stone).toBe(1)
+  })
+
+  it('B49_Scales checks balanced counts from the original Beneficiary trigger', () => {
+    const session = setupBeneficiaryWithScales()
+
+    const played = playOccupation(session, 'E97_Beneficiary')
+    const acceptedOccupationBranch = chooseByLabel(session, played, 'actions.lessons.name')
+    const playedExtraOccupation = chooseCardIfPrompted(session, acceptedOccupationBranch, 'A114_SeasonalWorker')
+
+    const player = playedExtraOccupation.state.players[0]!
+    expect(player.occupationPlayed).toEqual([
+      'A85_Homekeeper',
+      'A118_Treegardener',
+      'E97_Beneficiary',
+      'A114_SeasonalWorker',
+    ])
+    expect(readCardResourceStats(player, 'B49_Scales')?.gained.food).toBe(2)
   })
 })

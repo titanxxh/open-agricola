@@ -99,6 +99,7 @@ import { runCardEffectHook } from '../cards/card-effects.ts'
 import { positionKey } from '../domain/farm.ts'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions, runCardListeners } from '../cards/card-listeners.ts'
 import { buildPhaseTrailingNodes, markOptional, stampOwner } from '../engine/engine-utils.ts'
+import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot.ts'
 import { Scoring, playerBoard, type PlayerScoreSummary } from '../domain'
 import { reap } from '../actions/effects/reap.ts'
 import { breedLeaf } from '../actions/effects/breed'
@@ -950,6 +951,10 @@ export class GameCore {
       this.state,
       {},
       context.player.id,
+      undefined,
+      undefined,
+      undefined,
+      createTriggerSnapshot(this.state),
     )
     if (nodes.length === 0) return false
 

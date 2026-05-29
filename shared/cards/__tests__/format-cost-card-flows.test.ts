@@ -6,9 +6,12 @@ import type { DraftGameEvent } from '../../contract/events'
 
 import '../A/A13_RenovationCompany'
 import '../A/A15_CarpentersAxe'
+import '../A/A85_Homekeeper'
 import '../A/A89_StablePlanner'
+import '../A/A118_Treegardener'
 import '../B/B2_MiniPasture'
 import '../B/B16_MiningHammer'
+import '../B/B49_Scales'
 import '../B/B88_EstablishedPerson'
 import '../B/B89_Groom'
 import '../B/B93_Confidant'
@@ -18,6 +21,7 @@ import '../C/C89_StableMaster'
 import '../C/C94_StableCleaner'
 import '../C/C149_ResourceRecycler'
 import '../D/D16_WoodenWheyBucket'
+import '../D/D42_EducationBonus'
 import '../D/D89_Stablehand'
 import '../D/D149_CasualWorker'
 import '../E/E1_PoleBarns'
@@ -467,7 +471,7 @@ describe('formatCost migrated card flows', () => {
 
   it('E89_Stallwright emits one free stable on configured occupation count', () => {
     const actor = player({
-      occupationPlayed: ['E89_Stallwright', 'A1_OtherOccupation'],
+      occupationPlayed: ['E89_Stallwright', 'A85_Homekeeper'],
     })
     const gameState = state(actor)
     const result = executeCardListener(listener('E89-stallwright-after-occupation'), context(gameState, actor, {
@@ -482,7 +486,7 @@ describe('formatCost migrated card flows', () => {
 
   it('E89_Stallwright still offers the third-occupation stable when Beneficiary bonus is skipped', () => {
     const actor = player({
-      occupationPlayed: ['E89_Stallwright', 'A1_OtherOccupation', 'E97_Beneficiary'],
+      occupationPlayed: ['E89_Stallwright', 'A85_Homekeeper', 'E97_Beneficiary'],
     })
     const gameState = state(actor)
     const result = executeCardListener(listener('E89-stallwright-after-occupation'), context(gameState, actor, {
@@ -501,7 +505,7 @@ describe('formatCost migrated card flows', () => {
 
   it('E89_Stallwright does not duplicate when Beneficiary already played the extra occupation branch', () => {
     const actor = player({
-      occupationPlayed: ['E89_Stallwright', 'A1_OtherOccupation', 'E97_Beneficiary', 'A114_SeasonalWorker'],
+      occupationPlayed: ['E89_Stallwright', 'A85_Homekeeper', 'E97_Beneficiary', 'A114_SeasonalWorker'],
     })
     const gameState = state(actor)
     const result = executeCardListener(listener('E89-stallwright-after-occupation'), context(gameState, actor, {
@@ -521,7 +525,7 @@ describe('formatCost migrated card flows', () => {
     expect(result).toBeUndefined()
   })
 
-  it('E97_Beneficiary emits one-food occupation and Stallwright free stable branch', () => {
+  it('E97_Beneficiary emits one-food occupation without embedding Stallwright', () => {
     const actor = player({
       occupationPlayed: ['E89_Stallwright', 'A1_OtherOccupation', 'E97_Beneficiary'],
       occupationHand: ['A114_SeasonalWorker'],
@@ -539,18 +543,9 @@ describe('formatCost migrated card flows', () => {
     })
     expect(occupationBranch.children[1]).toMatchObject({
       type: 'leaf',
-      actionId: 'stables',
-      optional: true,
-    })
-    expect(occupationBranch.children[2]).toMatchObject({
-      type: 'leaf',
       actionId: 'occupation',
       params: { exactCost: { food: 1 } },
     })
-    const stable = expectLeaf(flow, 'stables')
-    expect(stable.optional).toBe(true)
-    expect(stable.actionContext).toMatchObject({ max: 1, exactCost: { max: 1 } })
-    expectNoLegacyCostFields(stable)
     const occupation = expectLeaf(flow, 'occupation')
     expect(occupation.params).toEqual({ exactCost: { food: 1 } })
   })

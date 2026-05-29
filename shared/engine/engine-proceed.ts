@@ -57,6 +57,7 @@ import { eventsToLogEntries } from '../events/log-mapper'
 import type { GameEvent } from '../contract/events'
 import { createEventQuery } from '../events/query'
 import { createBufferedEventSink, emitCardTriggered } from './card-trigger-events'
+import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
@@ -460,6 +461,7 @@ const buildDeferredHostContinuationNode = (
   node.deferredHostCommitCompleted = true
   node.deferredHostTransactionEvents = sourceNode.deferredHostTransactionEvents
   node.deferredHostActionEvents = sourceNode.deferredHostActionEvents
+  node.deferredHostTriggerSnapshot = sourceNode.deferredHostTriggerSnapshot
   node.deferredHostChoice = sourceNode.deferredHostChoice
   node.deferredHostResultTargetNodeId = sourceNode.deferredHostResultTargetNodeId
   node.deferredHostResultKey = sourceNode.deferredHostResultKey
@@ -605,6 +607,7 @@ const executeActivateCardAction = (
     phase: params.phase,
     ...eventReadContext,
     ...event,
+    triggerSnapshot: params.triggerSnapshot,
   }
   const result = executeCardListener(listener, listenerContext, {
     ownerPlayerId,
@@ -691,6 +694,7 @@ const executeDeferredHostAction = (
     ensureEventState(context.state)
     completedEvents = eventFrame.complete(context.state)
     recordEventLogDerivation(int, completedEvents, result)
+    node.deferredHostTriggerSnapshot = createTriggerSnapshot(context.state)
   }
   if (result.type === 'ok' && !node.deferredHostCommitCompleted) {
     const afterHostCommitNodes = buildInternalActionChildNodes(
@@ -711,6 +715,9 @@ const executeDeferredHostAction = (
     : completedEvents
       ? currentEventReadContext(int, completedEvents)
       : currentEventReadContext(int, node.deferredHostActionEvents)
+  const triggerSnapshot =
+    node.deferredHostTriggerSnapshot ?? createTriggerSnapshot(context.state)
+  node.deferredHostTriggerSnapshot = triggerSnapshot
   const duringPhase = int.hooks.during(
     { ...executionContext, ...eventReadContext, actionId: node.actionId },
     result,
@@ -755,6 +762,7 @@ const executeDeferredHostAction = (
     executionContext.player.id,
     eventReadContext.transactionEvents,
     eventReadContext.actionEvents,
+    triggerSnapshot,
   )
   const immediateActivateNodes = buildPhaseTrailingNodes(
     int,
@@ -766,6 +774,8 @@ const executeDeferredHostAction = (
     executionContext.player.id,
     trailingTransactionEvents,
     trailingActionEvents,
+    undefined,
+    triggerSnapshot,
   )
   const afterActivateNodes = buildPhaseTrailingNodes(
     int,
@@ -777,6 +787,8 @@ const executeDeferredHostAction = (
     executionContext.player.id,
     trailingTransactionEvents,
     trailingActionEvents,
+    undefined,
+    triggerSnapshot,
   )
   const afterHostNodes = buildInternalActionChildNodes(
     int,
@@ -1200,6 +1212,9 @@ export function engineProceed(
       return { type: 'ok', nodeId: node.id, actionId: replacedActionId, result }
     }
     const eventReadContext = currentEventReadContext(int, completedEvents)
+    const triggerSnapshot = result.type === 'ok'
+      ? createTriggerSnapshot(context.state)
+      : undefined
     const duringPhase = int.hooks.during(
       { ...executionContext, ...eventReadContext, actionId: replacedActionId },
       result,
@@ -1333,6 +1348,7 @@ export function engineProceed(
       executionContext.player.id,
       eventReadContext.transactionEvents,
       eventReadContext.actionEvents,
+      triggerSnapshot,
     )
     const immediatePhase = int.hooks.immediatelyAfter(
       { ...executionContext, ...eventReadContext, actionId: replacedActionId },
@@ -1377,6 +1393,7 @@ export function engineProceed(
       trailingTransactionEvents,
       trailingActionEvents,
       trailingActionEventStartIndex,
+      triggerSnapshot,
     )
     const afterActivateNodes = buildPhaseTrailingNodes(
       int,
@@ -1389,6 +1406,7 @@ export function engineProceed(
       trailingTransactionEvents,
       trailingActionEvents,
       trailingActionEventStartIndex,
+      triggerSnapshot,
     )
     const afterHostNodes = result.type === 'ok'
       ? buildInternalActionChildNodes(

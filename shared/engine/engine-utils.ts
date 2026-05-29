@@ -28,6 +28,7 @@ import type { EngineInternals } from './engine-internals'
 import type { ActionRegistry } from './registry'
 import { getPlayOrderIndex } from './matched-trigger'
 import type { MatchedCardListener } from '../cards/card-listeners'
+import type { TriggerSnapshot } from '../cards/helpers/trigger-snapshot'
 import type { GameState } from '../contract/types'
 import {
   ACTIVATE_CARD_ACTION_ID,
@@ -220,6 +221,7 @@ export function buildActivationActionNodes(
   triggerPlayerId?: string,
   transactionEvents?: readonly GameEvent[],
   actionEvents?: readonly GameEvent[],
+  triggerSnapshot?: TriggerSnapshot,
 ): EngineNode[] {
   return matched.map((entry, index) => {
     const nodeId = `activate-${phase}-${actionId}-${index}-${int.counterRef.value++}`
@@ -236,6 +238,7 @@ export function buildActivationActionNodes(
       countCardUse: typeof event.countCardUse === 'boolean' ? event.countCardUse : undefined,
       transactionEvents: transactionEvents ? [...transactionEvents] : undefined,
       actionEvents: actionEvents ? [...actionEvents] : undefined,
+      triggerSnapshot,
     }
     const node = new ActionNode(
       nodeId,
@@ -259,6 +262,7 @@ export function buildPhaseTrailingNodes(
   transactionEvents?: readonly GameEvent[],
   actionEvents?: readonly GameEvent[],
   actionEventStartIndex?: number,
+  triggerSnapshot?: TriggerSnapshot,
 ): EngineNode[] {
   if (matchedListeners.length === 0) return []
 
@@ -319,6 +323,7 @@ export function buildPhaseTrailingNodes(
         transactionEvents: transactionEvents ? [...transactionEvents] : undefined,
         actionEvents: actionEvents ? [...actionEvents] : undefined,
         actionEventStartIndex,
+        triggerSnapshot,
       }
       const node = new ActionNode(
         nodeId,

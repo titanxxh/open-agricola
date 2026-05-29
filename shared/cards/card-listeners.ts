@@ -5,6 +5,7 @@ import { getActiveCardRegistry } from './active-registry'
 import { exchangeToTrade } from '../actions/effects/exchange-to-trade'
 import type { DraftGameEvent, GameEvent } from '../contract/events'
 import { createEventQuery, type EventQuery } from '../events/query'
+import type { TriggerSnapshot } from './helpers/trigger-snapshot'
 
 export type CardListenerContext = ActionExecutionContext & {
   actionId: string
@@ -25,6 +26,7 @@ export type CardListenerContext = ActionExecutionContext & {
   ownerCardZone?: CardListenerZone
   effectPlayer?: PlayerState
   trueAction?: boolean
+  triggerSnapshot?: TriggerSnapshot
 }
 
 export type CardListenerContextInput =

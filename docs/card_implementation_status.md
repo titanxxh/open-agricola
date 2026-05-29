@@ -11,10 +11,10 @@
 | 自动 metadata 脚本 literal mismatch | 0 |
 | 自动 metadata 脚本 complex mismatch | 4 |
 | 其中 schema-up 已接受差异 | 4 |
-| 需要实现复核的卡牌 | 11 |
+| 需要实现复核的卡牌 | 5 |
 | 已接受 / 产品策略差异 | 40 |
 | 排除的 BGA legacy 或未实现行为目标 | 51 |
-| 本轮审计视为已对齐 | 786 |
+| 本轮审计视为已对齐 | 792 |
 
 说明：`scripts/audit-bga-metadata-diff.ts` 现在会解析 BGA `STABLE` 打印成本和 `passing`。当前 literal mismatch 0（passing 已全部对齐）。当前 complex mismatch 是 4 个已接受的 schema-up prerequisite 差异。
 
@@ -28,7 +28,6 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 |---|---|---|---|---|---|
 | `A136_DrudgeryReeve` | 高 | shared scoring | BGA `sharedScoring`，每位玩家可选 0..max sets 并 reserve 资源；OA 仅持卡玩家自动最优计分。 | BGA `A/A136_DrudgeryReeve.php`; OA `shared/cards/A/A136_DrudgeryReeve.ts`, `shared/domain/scoring.ts` | 支持 shared costed scoring / before-end choice。 |
 | `E149_MidnightFencer` | 高 | free fencing | BGA 最后 harvest 执行免费 `FENCING`，上限受对手 reserve fence 限制；OA 只记录选择数为 VP。 | BGA `E/E149_MidnightFencer.php`; OA `shared/cards/E/E149_MidnightFencer.ts` | 改成真实 fence 子行动，并按对手可用 fence 限制 max。 |
-| `B49_Scales` / `D42_EducationBonus` / `E89_Stallwright` / `E97_Beneficiary` | 高 | trailing trigger snapshot | OA 当前部分 trailing listener 在延迟 flow 执行时读取 live 已打出卡牌数量；E97 连续打职业/改良会让触发时数量和执行时数量不一致，且 E97 仍内嵌 E89 特判。 | OA `shared/cards/B/B49_Scales.ts`, `shared/cards/D/D42_EducationBonus.ts`, `shared/cards/E/E89_Stallwright.ts`, `shared/cards/E/E97_Beneficiary.ts` | 实现 trigger frame / `TriggerSnapshot`；E89/D42/B49 改读 snapshot helper；删除 E97 内嵌 E89 分支。 |
 | `B85_FarmHand` | 中 | stable 体系 | BGA farmhand stable 进入 stable built/listener/count 体系；OA 主要作为 extraData position + room capacity。 | BGA `B/B85_FarmHand.php`, `Actions/Stables.php`, `Models/PlayerBoard.php`; OA `shared/cards/B/B85_FarmHand.ts`, `shared/domain/supply-tokens.ts` | 让 FarmHand stable 进入通用 stable 统计/事件。 |
 | `C25_SteamMachine` | 中 | adoptive worker | BGA adoptive worker 场景会追加 forceSkip/end turn；OA 只有基础 optional bake。 | BGA `C/C25_SteamMachine.php`; OA `shared/cards/C/C25_SteamMachine.ts` | 补 adoptive/forceSkip 分支或定向确认不适用。 |
 | `C133_Soldier` | 低 | 终局计分选择 | BGA 玩家选择 0..max 对并 reserve wood/stone；OA 自动最优。 | BGA `C/C133_Soldier.php`; OA `shared/cards/C/C133_Soldier.ts`, `shared/domain/scoring.ts` | 若要严格对齐，改成 before-end choice。 |
@@ -93,6 +92,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | Harvest feeding requirement modifier 已进入通用收获基础设施 | `computeHarvestFeedingRequirement()`、`registerHarvestFeedingRequirementModifier()`、E30/E159 | E30/E159 对齐 BGA `Player::getHarvestCost()` 公式扩展，不再通过 `onBeforeFeed` / `onAfterFeed` 临时改资源或 worker 标记；喂食主路径只读取通用公式结果。 |
 | Harvest count applications 已进入通用收获基础设施 | `HarvestReapSummary.harvestCountApplications`、`HarvestCountModifierResult.tags`、`computeHarvestSelectionThreshold()` | 普通 reap 记录 field/crop/count/source/tag/scope；E73 full-field 使用 `full-field-reap` tag，E112 supply-style 使用 `supply-instead-of-field` tag；E112 end field phase 只读本次 applications，不再读取 E73 状态；A112/D72 的额外收获选择门槛走通用 threshold modifier。 |
 | Harvest outcome helper 已进入通用收获基础设施 | `getHarvestOutcome()`、`harvestReapSummary`、`harvestBreedSummary`、E134 | reap/breed summary 保留到 `onAfterHarvest` 完成后再清理；helper 从本次实际 harvested crop 与 newborn animal summary 组合 outcome；E134 只在 after-harvest 读取 outcome，不再读 live resources 或 E84。 |
+| Trailing trigger snapshot 已进入通用 listener 基础设施 | `TriggerSnapshot`、`ActivateCardActionParams.triggerSnapshot`、deferred host cursor、B49/D42/E89/E97 | host action commit 后、trailing listener 执行前冻结每位玩家的已打出 occupation/minor/major/improvement/played 列表与派生 count；activation cursor 持久化 snapshot，按第 N 张职业/改良或平衡数量判断的 listener 读 snapshot helper，不读执行时 live count。 |
 | Cross-player undo boundary 已进入通用基础设施 | `confirm-player-switch`、SessionResponse undo availability、`undoStep` / `undoAction` boundary guard | opponent-scope trigger 切到 owner prompt 后不暴露 undo；后续 undo 只能回到切换后的 prompt，不能跨回触发玩家行动状态。 |
 | Before-endgame hook flow 已进入通用基础设施 | `onBeforeEndGame?: FlowEffectHandler`、`stageResume.hook='onBeforeEndGame'`、D132_HideFarmer | round 14 的 `onAfterRoundEnd` 完成后先运行 before-endgame hook flow，再进入 `gameover`；hook pending 可通过 stage resume 回到同一终局前链。`anytime-policy` 仅对白名单 D132 optional choice prompt 放开 anytime，数量选择 prompt 仍保持 stage hook chain 锁定。 |
 | Card capability metadata 已进入通用基础设施 | `CardDefinition.preventsHandDiscard` / `fireplaceIdentity` / `cookingHearthIdentity` / `ovenIdentity` / `animalHolder` / `blocksHouseAnimalZones` / `waresSalesmanGains`、`playerHasCardCapability()`、`getPlayedCardDefinitions()`、`collectCardDefinitionsAs()` | 运行时跨卡身份/能力读取不再直接读外卡 id；helper 只扫已打出区，并通过 `asType` 复用 `cardCountsAs`。B146/C35、B153 major identity、C75 fireplace/hearth/oven identity、E144 wares gain、D86 animal-holder occupation filtering、D12 house animal zone blocking 都已迁到 metadata/helper。 |
@@ -120,6 +120,8 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 本轮新增已完成基础设施：Breeding threshold modifier。`breed()` 对每个 animal type 调 `getBreedThreshold(state, player, animalType, { sourceCard })`；默认 threshold=2，多个已打出卡返回同一动物门槛时取最小值。E84_DollysMother 已迁为 `computeBreedThreshold`，仅 harvest-source sheep breeding 降为 1；card-triggered breed 不受影响，且不再写 `virtualSheepAdded` 或临时改 live 资源。
 
 本轮新增已完成基础设施：Harvest outcome helper。`harvestReapSummary` 不再在 field phase 后清理，而是和 `harvestBreedSummary` 一起保留到 `onAfterHarvest` 完成后清理；`getHarvestOutcome(state, playerId)` 从两份 summary 组合本次实际 harvested crop types 与 newborn animal types。E134_Omnifarmer 已迁到 `onAfterHarvest` 读取 outcome，提交选择时重新校验 outcome、stored goods 和当前可支付资源。
+
+本轮新增已完成基础设施：Trailing trigger snapshot。`activate-card` params 携带 `TriggerSnapshot`，deferred host continuation 在 onBuy / afterHostCommit flow 前冻结 snapshot 并随 cursor 恢复；B49_Scales、D42_EducationBonus、E89_Stallwright 改用 snapshot helper 读取触发时 played-card count，E97_Beneficiary 不再内嵌 E89 stable 分支。
 
 本轮新增已完成基础设施：Action-level cancel policy。`plow` / `sow` / `construct` / `stables` / `fence` / `reorganize` / internal `selection` 均不再把 direct `cancel` 当 action-level success path；可选跳过由父级 optional node 的 `__skip__` 表达。`selection` 默认至少选 1 项，只有显式 `minSelections: 0` 才允许空提交，并且提交路径按 `positionFilter` / `selectableTiles` 校验可选位置。`construct` / `fence` 的 doability 会在真实 state 中排除无可提交布局，包括 cloned preview player，避免 direct cancel 被拒绝后出现不可完成 pending；fence layout feasibility 复用缓存的 connected tile sets，避免 availability 检查反复枚举农场组合。
 
@@ -605,7 +607,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B46_ClubHouse` | 已对齐 |  |
 | `B47_HerringPot` | 已对齐 |  |
 | `B48_ForestStone` | 已对齐 |  |
-| `B49_Scales` | 需复核 | 监听 `after.occupation` / `after.improvement` 的入口方向正确，但计数仍读 live played-card 状态；需迁移到 trigger snapshot helper，避免连续打职业/改良时使用执行时数量。 |
+| `B49_Scales` | 已对齐 | `after.occupation` / `after.improvement` 用 trigger snapshot helper 判断触发时职业/改良平衡；连续打职业/改良导致 live count 改变时仍按触发帧结算。 |
 | `B50_ButterChurn` | 已对齐 |  |
 | `B51_DiggingSpade` | 已对齐 |  |
 | `B52_GrowingFarm` | 已对齐 |  |
@@ -958,7 +960,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D39_TruffleSlicer` | 已对齐 |  |
 | `D40_Cesspit` | 已对齐 |  |
 | `D41_HorseDrawnBoat` | 已对齐 |  |
-| `D42_EducationBonus` | 需复核 | after.occupation 奖励依赖触发时职业数量；当前实现读 live `occupationPlayed.length`，需迁移到 trigger snapshot helper。 |
+| `D42_EducationBonus` | 已对齐 | after.occupation 奖励改读 trigger snapshot 职业数量；E97 连续额外打职业时按各自 host action 的触发帧发放资源。 |
 | `D43_Hutch` | 已对齐 |  |
 | `D44_ForestWell` | 已对齐 |  |
 | `D45_SheepWell` | 已对齐 |  |
@@ -1185,7 +1187,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E86_PenBuilder` | 已对齐 |  |
 | `E87_MasterRenovator` | 已对齐 |  |
 | `E88_MasterFencer` | 已对齐 | BGA `formatCost([WOOD => 0])` 通过 nested `fencePolicy` 表达付 2/3 wood 后最多 3/4 段总免费 fence。 |
-| `E89_Stallwright` | 需复核 | BGA `formatCost(['max' => 1])` 通过 `stables` `actionContext.exactCost` 表达；但第三职业判断必须使用触发时职业数量快照，不能由 E97 内嵌特判或执行时 live 数量决定。 |
+| `E89_Stallwright` | 已对齐 | BGA `formatCost(['max' => 1])` 通过 `stables` `actionContext.exactCost` 表达；第 2/3/5/7 张职业判断改读 trigger snapshot，不依赖 E97 内嵌特判或执行时 live 数量。 |
 | `E90_DungCollector` | 已对齐 |  |
 | `E91_PlowBuilder` | 已对齐 |  |
 | `E92_FieldDoctor` | 已对齐 |  |
@@ -1193,7 +1195,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E94_Prophet` | 已对齐 | 即时翻修 / fencing 子行动使用当前 `renovate-house` / `fence` action id。 |
 | `E95_Miller` | 已对齐 |  |
 | `E96_Elder` | 已对齐 |  |
-| `E97_Beneficiary` | 需复核 | 额外 occupation 用 `params.exactCost: { food: 1 }` 的方向保留；当前内嵌 E89 stable 特判需删除，改由 E89 自身 trailing listener 基于 trigger snapshot 触发。 |
+| `E97_Beneficiary` | 已对齐 | 额外 occupation 保留 `params.exactCost: { food: 1 }`；已删除 E89 stable 内嵌分支，E89/D42/B49 等 trailing listener 由 trigger snapshot 自行结算。 |
 | `E98_Prodigy` | 已对齐 |  |
 | `E99_UncaringParents` | 已对齐 |  |
 | `E100_MuseumCaretaker` | 已对齐 |  |
