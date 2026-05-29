@@ -6,6 +6,7 @@ import { validateSowSelection } from '../../shared/domain/farmyard'
 import { E68_CherryOrchard } from '../../shared/cards-display/E/E68_CherryOrchard'
 
 import { markAllWorkersUsed } from '../../shared/domain/player'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 const CARD_ID = 'E68_CherryOrchard'
 const VIRTUAL_TILE = { row: -1, col: 5068 }
 const harvestRounds = [4, 7, 9, 11, 13, 14]
@@ -197,7 +198,8 @@ describe('E68_CherryOrchard session', () => {
       cardCrop: { crop: 'wood', remaining: 1 },
     })
 
-    const resp = session.performRoundEnd()
+    let resp = session.performRoundEnd()
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
     const playerAfter = resp.state.players[0]!
 
     expect(playerAfter.resources.wood).toBe(1)
