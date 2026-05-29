@@ -570,6 +570,16 @@ anytime                  额外注册的 anytime 行动
 
 卡牌 listener 通过 `CardListenerContext.transactionEvents` 和 `eventQuery` 读取当前 action frame 的事件。普通 listener 看到的是已经 emit 的当前 frame 事件；`trade-applied` 这类合成 listener 可以读取当前 exchange 的 `DraftGameEvent`，但不能依赖尚未提交的全局 `state.events`。listener handler 仍必须是 state-pure flow builder，状态修改只能通过返回 flow/leaf 进入 engine。
 
+**架构决策（2026-05-29）：trailing trigger frame 必须固定在 host action 成功触发时。** `during` / `immediatelyAfter` / `after` 这类 trailing phases 的 listener 可能被编译成稍后执行的 `activate-card` leaf；执行前还可能先跑 `afterHostCommitListeners` / `onBuy` flow，并继续打出职业或改良。为避免 listener handler 在真正执行时读到 later live state，engine 在 host action commit 后、任何 `afterHostCommitListeners` 修改 state 前，捕获一个 trigger frame：当前 `transactionEvents` / `actionEvents`，以及本次 `during` / `immediatelyAfter` / `after` 的 matched card listener set 与顺序。若 host action 经过 deferred continuation，continuation 必须复用这个 trigger frame，不得按 later state 重新匹配 listener 或重排 listener。v1 trigger frame 只约束 card listener，不冻结 action hook results；当前生产路径没有 trailing action hook 注册，后续如有需求再为 action hook 单独扩展。
+
+`CardListenerContext.triggerSnapshot` 保存触发时只读事实，只在 successful action 后的 trailing phases 提供：`during` / `immediatelyAfter` / `after`。`before`、`isDoable`、`computeCosts`、`computeArgs`、`computeChoiceCandidates`、`computeReplace`、`anytime`、`computeExchanges` 不提供 snapshot，继续读取 live state。第一阶段保存每个玩家的 card type 列表快照和由列表长度派生的 count：`occupation`、`minor`、`major`、`improvement`、`played`。列表来源固定为 host action commit 后的现有 card type 语义：`occupation/minor/major` 都使用 `collectCardsAs(player, type)`，`major` 包含 `alsoCountsAs: ['major']` 的已打出 minor；`improvement` 是 `minor` 与 `major` 类型列表的 unique union，`played` 是 `occupation` / `minor` / `major` 类型列表的 unique union，dual-type card 不重复计数。列表顺序沿用 `collectCardsAs`：按 `player.improvements` → `player.minorPlayed` → `player.occupationPlayed` 扫描，unique union 保留第一次出现顺序，不额外排序。`card.played` 事件只用于判断当前 action 是否真的打出了 card 及其类型/id，不用于推导历史数量。snapshot helper 在没有 `triggerSnapshot` 时可 fallback 到 live player，但这只用于直接调用 listener 的单元测试、旧 helper 调用或非 trailing phase 兼容；engine 正常执行 `during` / `immediatelyAfter` / `after` 时必须提供 snapshot。`CardListenerContext.player` / `ownerPlayer` 仍是 live player，用于执行 flow 和写状态；按“第 N 张职业 / 第 N 张改良 / 职业数与改良数是否相等”判断的 listener 必须通过 trigger snapshot helper 读取数量，不能直接读 live `context.player.*Played.length`。`check:card-impl-boundaries` 会守住这个约束：trailing listener 中直接读取 live played-count 报错，非 trailing phase 不受该 snapshot guard 约束；membership 判断如 `context.player.*Played.includes(...)` 不因 snapshot guard 禁止，具体外卡 id 由跨卡 id guard 处理。后续若出现新的触发时事实需求，再扩展 `triggerSnapshot`，不引入完整 `PlayerState` 克隆。
+
+matched card listener set 冻结后，activation 前不重新检查 owner card 是否仍在原 zone。触发资格由 trigger-time 判定；listener body 执行时仍使用 live `ownerPlayer` / `effectPlayer` 承接收益、pending 和状态写入。
+
+trigger frame 必须随 trailing `activate-card` node 持久化：`ActivateCardActionParams` 携带 `triggerSnapshot`，`transactionEvents` / `actionEvents` / `triggerSnapshot` 随 node cursor 序列化与恢复。pending 恢复后继续使用 cursor 中的 trigger frame，禁止从恢复后的 live state 重算 snapshot、重新匹配 listener 或重排 listener。该约束必须有 cursor roundtrip 测试覆盖。
+
+卡牌不得用宿主 `onBuy` flow 补偿另一个 trailing listener 的数量判断。E97 这类“onBuy 继续打职业”的卡只表达自己的额外 action；E89 / D42 这类按第几张职业触发的效果必须留在自己的 listener 中，通过 trigger snapshot 读触发时数量。
+
 `ActionHookResult { doable?, actionId?, extraOptions?, followUpActions?, flow?, costs?, reserveResources?, sourceCard? }`。`reserveResources` 用于让选项级 `isDoable` 声明“本次 payment 结算后仍需保留的真实资源下限”，由 host action 传给 internal `pay` child 过滤 payment solutions；规则事实写入 `GameState.events`，不要再为单卡补日志字段。
 
 当前事件覆盖已包括资源主干（collect/gain/pay/exchange）、农场主干（sow/plow/construct/stables/fencing/reap/breed/reorganize）、worker 放置/返家/新生儿、round/work/return-home/harvest phase、action reveal/accumulate、future meeple、legacy action detail 以及 `special-effect` mutation 分支。`state.log` 作为 UI 缓存保留，由事件 mapper 和 session cache writer 派生；业务代码不再通过旧日志字段记录规则事实。
@@ -592,7 +602,7 @@ Direct `cancel` 不是 protected atomic action 的成功路径。`plow` / `sow` 
    `occupation` 的手牌选项构建与 forged choice 校验也会用 `choice=<occupationId>` 跑选项级 `isDoable` card listener；这用于 B93 这类“打出后必须支付 onBuy 最低后续成本”的前置过滤。listener 返回的 `reserveResources` 会继续传入 occupation payment leaf，确保后续必付成本不能被职业付款选项提前花掉。
 8. 然后执行 `computeCosts`，把费用覆盖写入本次 `executionContext.costs`。因此 before unlocker / resource gain / exchange 可以先改变真实 state，再影响后续 strict doable 与费用枚举。
 9. 随后执行 action 本体：`getBaseChoiceOptions` opt-in path 先走 `computeChoiceCandidates`，否则走 `ActionDefinition.execute()`；`resolveChoice` continuation 也按同一条 public action 顺序恢复，先完成 pending 选择，再继续 host internal children / trailing phases。`execute()` 或 `resolveChoice()` 返回 request 时创建 pending；无 request 时继续 `during` / `immediatelyAfter` / `after`。
-10. `during` / `immediatelyAfter` / `after` 是 host action 成功后的 trailing phases；`beforeHostListeners` settlement 必须先完成，`afterHostCommitListeners` 在 host commit 后、trailing phases 前运行，`afterHostListeners` settlement 则故意保留在 BGA slot 中，等 host `after` 之后再运行。
+10. `during` / `immediatelyAfter` / `after` 是 host action 成功后的 trailing phases；它们的 trigger frame 在 host commit 后立即固定。`beforeHostListeners` settlement 必须先完成，`afterHostCommitListeners` 在 host commit 后、trailing phases 的 activation 真正执行前运行，`afterHostListeners` settlement 则故意保留在 BGA slot 中，等 host `after` 之后再运行。
 11. `activate-card` 是 internal leaf，绕过上述 public action 流水线：只执行指定 listener body，并把 listener 返回的 `flow` / `followUpActions` 交回 engine 插入执行。
 
 作用域 scope：`player` / `opponent` / `any`。card listener 匹配层按 listener id 确定性枚举；phase trailing node 构建层再按 owner 分组（global → active player → 其他玩家），组内按 legacy `order` 降序、卡牌 play order、匹配序稳定排序。需要玩家决定同组 trigger 顺序时，用 `dispatchMode: 'select'` 进入 trigger-select，而不是依赖隐式排序表达规则选择。
@@ -642,6 +652,8 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 普通 Harvest 收获用 `reap(..., { trigger: { phase: 'harvest' } })` 移除田里作物，事件层统一记录 `reason: 'reap'`。每块田先通过 `computeHarvestCount(state, player, field)` 得到本次普通 reap 要移动的 crop 数量、`sources` 和 `scope`；单卡只能通过 `registerHarvestCountModifier(cardId, modifier)` 增减 `delta`、设置 `override` 或把 `scope` 升为 `field`，不要在 `reap` 主路径添加单卡分支。默认 `top-stack` scope 只收原始顶堆，只有 E73 这类 full-field 能用 `field` scope 跨堆。`HarvestReapSummary.harvestedCrops` 按 field/crop 记录实际收获数量与来源，供 E112/A112/D72/E73 这类同一块田的 modifier 合成与日志审计使用；`grainFields` / `vegetableFields` 仍按收获过的田数计数，不按 crop amount 计数。每种 crop 收获后走 `dispatchReapListener(state, player, crop, amount, ..., { trigger, sourceCard })` 派发 `'reap'` 合成事件；listener 返回的 flow 不在 dispatch 阶段执行，而是收集进普通 `parallel` stage flow，全部完成后再进入 `onAfterReap`。
 
 喂食需求通过 `computeHarvestFeedingRequirement(state, player)` 计算，默认公式是 `familySize * 2 - newbornCount`；E30/E159 这类只改变所需食物数量的卡通过 `registerHarvestFeedingRequirementModifier(cardId, modifier)` 扩展公式，不新增 `BeforeFeed` / `AfterFeed` 阶段 hook，也不在喂食主路径写单卡分支。
+
+Harvest outcome summary 是本次 Harvest 的事实，不是中间日志缓存。`harvestReapSummary` 在 field phase 累计本次实际 reaped crops；`harvestBreedSummary` 在 breed phase 累计本次实际 newborn animals。两份 summary 必须保留到 `onEndHarvest` / `onAfterHarvest` 全部完成后再清理，供 E134 这类“本次 harvest 后处理”读取实际收获/繁殖结果。不新增 `state.harvestOutcomeSummary` 顶层状态；卡牌通过 helper 从现有两份 summary 组合读取 outcome。Breed phase 通过 `CardImpl.effect.computeBreedThreshold(state, player, animalType, { sourceCard })` 计算每种动物的繁殖阈值，默认 2，同一 animal type 多个 modifier 取最小 threshold；E84 只在 `sourceCard === 'harvest'` 时返回 sheep threshold=1，让 1 sheep + capacity 直接在 harvest breed 中产生 newborn sheep，并写入 `harvestBreedSummary.resources.sheep`。卡牌不得用具体卡牌 id、live animal count 或 virtual resource 推导 newborn 事实；breeding modifier 的影响必须先体现在 `harvestBreedSummary.resources` 中，再由后续卡牌消费。
 
 `private-field-phase` 是内部 action，不启动完整 Harvest：来源卡触发时设置 `trigger: { phase: 'private-field-phase', cardId: sourceCard }`，先收获普通田，再收获 Card Field，并跳过 Harvest summary 写入；普通田和 Card Field 的 `immediatelyAfter.reap` 反应同样合并成普通 `parallel` flow。
 
@@ -839,7 +851,8 @@ onReap?: (ctx: {
 **Harvest reap log 时序**：`harvestReapSummary` 初始化已从 `continueHarvestReap` 提前到
 `continueHarvestFieldStart`，基建在 `onHarvestFieldPhase` 内累加 `summary.resources[crop]`，
 让 `log.reapDetail` 同时包含普通 field 与 cardField 产出（之前 cardField 累加发生在
-summary 初始化前会被丢弃）。
+summary 初始化前会被丢弃）。该 summary 的生命周期不是 field phase 局部变量，必须延续到
+`onAfterHarvest` 完成后再清理。
 
 `private-field-phase` 复用同一套 Card Field reaper registry，但传入 `updateHarvestSummary: false`，避免私人田地阶段污染普通 Harvest 日志 summary。
 

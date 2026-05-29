@@ -11,10 +11,10 @@
 | 自动 metadata 脚本 literal mismatch | 0 |
 | 自动 metadata 脚本 complex mismatch | 4 |
 | 其中 schema-up 已接受差异 | 4 |
-| 需要实现复核的卡牌 | 5 |
+| 需要实现复核的卡牌 | 13 |
 | 已接受 / 产品策略差异 | 40 |
 | 排除的 BGA legacy 或未实现行为目标 | 52 |
-| 本轮审计视为已对齐 | 791 |
+| 本轮审计视为已对齐 | 783 |
 
 说明：`scripts/audit-bga-metadata-diff.ts` 现在会解析 BGA `STABLE` 打印成本和 `passing`。当前 literal mismatch 0（passing 已全部对齐）。当前 complex mismatch 是 4 个已接受的 schema-up prerequisite 差异。
 
@@ -28,6 +28,11 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 |---|---|---|---|---|---|
 | `A136_DrudgeryReeve` | 高 | shared scoring | BGA `sharedScoring`，每位玩家可选 0..max sets 并 reserve 资源；OA 仅持卡玩家自动最优计分。 | BGA `A/A136_DrudgeryReeve.php`; OA `shared/cards/A/A136_DrudgeryReeve.ts`, `shared/domain/scoring.ts` | 支持 shared costed scoring / before-end choice。 |
 | `E149_MidnightFencer` | 高 | free fencing | BGA 最后 harvest 执行免费 `FENCING`，上限受对手 reserve fence 限制；OA 只记录选择数为 VP。 | BGA `E/E149_MidnightFencer.php`; OA `shared/cards/E/E149_MidnightFencer.ts` | 改成真实 fence 子行动，并按对手可用 fence 限制 max。 |
+| `B49_Scales` / `D42_EducationBonus` / `E89_Stallwright` / `E97_Beneficiary` | 高 | trailing trigger snapshot | OA 当前部分 trailing listener 在延迟 flow 执行时读取 live 已打出卡牌数量；E97 连续打职业/改良会让触发时数量和执行时数量不一致，且 E97 仍内嵌 E89 特判。 | OA `shared/cards/B/B49_Scales.ts`, `shared/cards/D/D42_EducationBonus.ts`, `shared/cards/E/E89_Stallwright.ts`, `shared/cards/E/E97_Beneficiary.ts` | 实现 trigger frame / `TriggerSnapshot`；E89/D42/B49 改读 snapshot helper；删除 E97 内嵌 E89 分支。 |
+| `B153_Housemaster` | 中 | major identity scoring | BGA `getCards(MAJOR, true)` 会纳入 `getOtherCardTypes() => [MAJOR]` 的已打出 minor；OA 当前只看真实 major，并保留 A60 单卡特判，漏掉 D59/D60/D25/C60 等 major-like minor。 | BGA `B/B153_Housemaster.php`; OA `shared/cards/B/B153_Housemaster.ts`, `shared/cards/helpers/card-type.ts` | 用 `collectCardsAs(player, 'major')` / definition helper 汇总 VP，删除 A60 特判。 |
+| `C75_Firewood` | 中 | improvement identity trigger | OA 当前维护 fixed oven/fireplace id set，漏掉已作为 Fireplace 扩展实现的 D25，且若直接改读 `isBaking` 会误触发 D64_BakingCourse。 | BGA `C/C75_Firewood.php`; OA `shared/cards/C/C75_Firewood.ts`, `shared/cards-display/D/D25_WitchesDanceFloor.ts` | 增加 `fireplaceIdentity` / `cookingHearthIdentity` / `ovenIdentity` 语义，C75 按 identity 触发。 |
+| `E84_DollysMother` | 中 | breeding modifier | OA 当前通过 `onEndHarvestFeedingPhase` 添加 virtual sheep、`onEndHarvest` 再移除，breed summary 不是直接由阈值规则产生。 | BGA `E/E84_DollysMother.php`; OA `shared/cards/E/E84_DollysMother.ts`, `shared/actions/effects/breed.ts` | 增加 `CardImpl.effect.computeBreedThreshold` 通用扩展：E84 仅在 harvest breed 返回 sheep threshold=1，breed phase 直接产生 newborn sheep 并写入 summary。 |
+| `E134_Omnifarmer` | 中 | harvest outcome fact | OA 当前用 live resources 和 E84 特判推导可存 sheep/crop；正确语义应基于本次 harvest 实际 reaped crops 与 newborn animals。 | BGA `E/E134_Omnifarmer.php`; OA `shared/cards/E/E134_Omnifarmer.ts`, `shared/session/session-core.ts`, `shared/contract/types.ts` | 保留 harvest reap/breed summary 到 after-harvest，E134 改读本次 harvest outcome，不读 E84 或 live 阈值。 |
 | `B85_FarmHand` | 中 | stable 体系 | BGA farmhand stable 进入 stable built/listener/count 体系；OA 主要作为 extraData position + room capacity。 | BGA `B/B85_FarmHand.php`, `Actions/Stables.php`, `Models/PlayerBoard.php`; OA `shared/cards/B/B85_FarmHand.ts`, `shared/domain/supply-tokens.ts` | 让 FarmHand stable 进入通用 stable 统计/事件。 |
 | `C25_SteamMachine` | 中 | adoptive worker | BGA adoptive worker 场景会追加 forceSkip/end turn；OA 只有基础 optional bake。 | BGA `C/C25_SteamMachine.php`; OA `shared/cards/C/C25_SteamMachine.ts` | 补 adoptive/forceSkip 分支或定向确认不适用。 |
 | `C133_Soldier` | 低 | 终局计分选择 | BGA 玩家选择 0..max 对并 reserve wood/stone；OA 自动最优。 | BGA `C/C133_Soldier.php`; OA `shared/cards/C/C133_Soldier.ts`, `shared/domain/scoring.ts` | 若要严格对齐，改成 before-end choice。 |
@@ -582,7 +587,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B46_ClubHouse` | 已对齐 |  |
 | `B47_HerringPot` | 已对齐 |  |
 | `B48_ForestStone` | 已对齐 |  |
-| `B49_Scales` | 已对齐 | 监听 `after.occupation` / `after.improvement`，仅在当前 action 产生匹配 `card.played` 时触发；passing minor 不触发 |
+| `B49_Scales` | 需复核 | 监听 `after.occupation` / `after.improvement` 的入口方向正确，但计数仍读 live played-card 状态；需迁移到 trigger snapshot helper，避免连续打职业/改良时使用执行时数量。 |
 | `B50_ButterChurn` | 已对齐 |  |
 | `B51_DiggingSpade` | 已对齐 |  |
 | `B52_GrowingFarm` | 已对齐 |  |
@@ -686,7 +691,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B150_LargeScaleFarmer` | 已对齐 |  |
 | `B151_LittlePeasant` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `B152_JuniorArtist` | 已对齐 |  |
-| `B153_Housemaster` | 已对齐 |  |
+| `B153_Housemaster` | 需复核 | 终局计分应按 major identity 汇总真实 major 与 `alsoCountsAs: ['major']` 的 minor；当前实现只看真实 major，并保留 A60 单卡特判。 |
 | `B154_SheepKeeper` | 已接受差异 | schema-up prerequisite / isBuyable metadata 差异 |
 | `B155_ArtTeacher` | 已对齐 |  |
 | `B156_StorehouseKeeper` | 已对齐 |  |
@@ -788,7 +793,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C72_FestivalPlanning` | 已对齐 | onBuy 先执行 `private-field-phase` 收获普通田和 Card Field，再进入 optional improvement |
 | `C73_SeaweedFertilizer` | 已对齐 |  |
 | `C74_PrivateForest` | 已对齐 |  |
-| `C75_Firewood` | 已对齐 |  |
+| `C75_Firewood` | 需复核 | 应按 `fireplaceIdentity` / `cookingHearthIdentity` / `ovenIdentity` 触发；当前 fixed id set 漏掉 D25，且不能用宽泛 `isBaking` 代替。 |
 | `C76_WoodCart` | 已对齐 |  |
 | `C77_ClaySupply` | 已对齐 |  |
 | `C78_ReedHattedToad` | 已对齐 |  |
@@ -935,7 +940,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D39_TruffleSlicer` | 已对齐 |  |
 | `D40_Cesspit` | 已对齐 |  |
 | `D41_HorseDrawnBoat` | 已对齐 |  |
-| `D42_EducationBonus` | 已对齐 |  |
+| `D42_EducationBonus` | 需复核 | after.occupation 奖励依赖触发时职业数量；当前实现读 live `occupationPlayed.length`，需迁移到 trigger snapshot helper。 |
 | `D43_Hutch` | 已对齐 |  |
 | `D44_ForestWell` | 已对齐 |  |
 | `D45_SheepWell` | 已对齐 |  |
@@ -1157,12 +1162,12 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E81_AlchemistsLab` | 已对齐 |  |
 | `E82_Profiteering` | 已对齐 |  |
 | `E83_ShepherdsWhistle` | 已对齐 |  |
-| `E84_DollysMother` | 已对齐 |  |
+| `E84_DollysMother` | 需复核 | 应通过 `computeBreedThreshold` 让 1 sheep + capacity 在 harvest breed phase 直接产生 newborn sheep；当前实现用 virtual sheep 状态临时改 live 资源。 |
 | `E85_MasterTanner` | 已对齐 |  |
 | `E86_PenBuilder` | 已对齐 |  |
 | `E87_MasterRenovator` | 已对齐 |  |
 | `E88_MasterFencer` | 已对齐 | BGA `formatCost([WOOD => 0])` 通过 nested `fencePolicy` 表达付 2/3 wood 后最多 3/4 段总免费 fence。 |
-| `E89_Stallwright` | 已对齐 | BGA `formatCost(['max' => 1])` 通过 `stables` `actionContext.exactCost` 表达；E97 的额外 occupation 分支若执行会让职业数变为 4，避免第三职业 stable 重复；E97 bonus 被跳过或只执行 minor 分支后仍由 E89 自身触发。 |
+| `E89_Stallwright` | 需复核 | BGA `formatCost(['max' => 1])` 通过 `stables` `actionContext.exactCost` 表达；但第三职业判断必须使用触发时职业数量快照，不能由 E97 内嵌特判或执行时 live 数量决定。 |
 | `E90_DungCollector` | 已对齐 |  |
 | `E91_PlowBuilder` | 已对齐 |  |
 | `E92_FieldDoctor` | 已对齐 |  |
@@ -1170,7 +1175,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E94_Prophet` | 已对齐 | 即时翻修 / fencing 子行动使用当前 `renovate-house` / `fence` action id。 |
 | `E95_Miller` | 已对齐 |  |
 | `E96_Elder` | 已对齐 |  |
-| `E97_Beneficiary` | 已对齐 | 额外 occupation 用 `params.exactCost: { food: 1 }`；若已出 E89，则内嵌 BGA `formatCost(['max' => 1])` 免费 stable 并排在额外 occupation 前，且 stable 归因到 `E89_Stallwright`；`occupation-gate` 只负责 OR 分支可执行性，避免 optional stable 影响 gating。 |
+| `E97_Beneficiary` | 需复核 | 额外 occupation 用 `params.exactCost: { food: 1 }` 的方向保留；当前内嵌 E89 stable 特判需删除，改由 E89 自身 trailing listener 基于 trigger snapshot 触发。 |
 | `E98_Prodigy` | 已对齐 |  |
 | `E99_UncaringParents` | 已对齐 |  |
 | `E100_MuseumCaretaker` | 已对齐 |  |
@@ -1207,7 +1212,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E131_MarketMaster` | 已对齐 |  |
 | `E132_VeggieLover` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `E133_ChampionBreeder` | 已对齐 |  |
-| `E134_Omnifarmer` | 已对齐 |  |
+| `E134_Omnifarmer` | 需复核 | 应在 harvest outcome 完整形成后基于本次实际 `reapedCrops` / `newbornAnimals` 提供一次存 goods 选择；当前实现分散在 `onAfterReap` / `onHarvestFeedingPhase`，并用 live resources 与 E84 特判推导。 |
 | `E135_Pickler` | 已对齐 |  |
 | `E136_AnimalHusbandryWorker` | 已对齐 | BGA ordinary `FENCING` 子行动映射到内部 `fence` leaf。 |
 | `E137_FlaxFarmer` | 已对齐 |  |
