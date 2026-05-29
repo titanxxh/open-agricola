@@ -35,12 +35,14 @@ describe('C56_FeedFence session', () => {
   }
 
   it('grants the 4th-stable bonus when the 4th stable is the B85 FarmHand stable (card-facing count)', () => {
-    // 3 ordinary tiles (1 built this action) + B85 FarmHand stable
-    // -> card-facing count = 4 -> +2 food bonus on top of 1 built = 3 food.
+    // B85 already in use before this action; the snapshot baseline is the
+    // card-facing count (2 ordinary + B85 = 3). Now 3 ordinary tiles
+    // (1 built this action) + B85 -> card-facing count = 4 -> +2 food bonus
+    // on top of 1 built = 3 food.
     const result = runAfterStables((player) => {
       player.stableTiles = [{ row: 2, col: 2 }, { row: 2, col: 3 }, { row: 2, col: 4 }]
       player.cardStates = {
-        __actionSnapshot__: { extraData: { stableTiles: 2 } },
+        __actionSnapshot__: { extraData: { stableTiles: 3 } },
         B85_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
       }
     })

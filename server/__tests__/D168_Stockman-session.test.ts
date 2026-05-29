@@ -35,13 +35,14 @@ describe('D168_Stockman session', () => {
   }
 
   it('counts the B85 FarmHand stable when locating the ordinal stable (card-facing count)', () => {
-    // Ordinary before = 0, now 1 ordinary tile built this action, plus the
-    // B85 FarmHand stable already in use -> card-facing nAfter = 2, so the
-    // newly built tile is the 2nd stable -> gains 1 cattle.
+    // B85 already in use before this action; the snapshot baseline is the
+    // card-facing count (0 ordinary + B85 = 1). Now 1 ordinary tile built
+    // this action + B85 -> card-facing nAfter = 2, so the newly built tile
+    // is the 2nd stable -> gains 1 cattle.
     const result = runAfterStables((player) => {
       player.stableTiles = [{ row: 2, col: 2 }]
       player.cardStates = {
-        __actionSnapshot__: { extraData: { stableTiles: 0 } },
+        __actionSnapshot__: { extraData: { stableTiles: 1 } },
         B85_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
       }
     })

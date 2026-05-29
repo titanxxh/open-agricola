@@ -35,13 +35,14 @@ describe('E114_ShedBuilder session', () => {
   }
 
   it('counts the B85 FarmHand stable when locating the ordinal stable (card-facing count)', () => {
-    // Ordinary before = 1, now 2 ordinary tiles (1 built this action), plus the
-    // B85 FarmHand stable -> card-facing nAfter = 3, so the newly built tile is
-    // the 3rd stable -> gains 1 vegetable (not grain).
+    // B85 already in use before this action; the snapshot baseline is the
+    // card-facing count (1 ordinary + B85 = 2). Now 2 ordinary tiles
+    // (1 built this action) + B85 -> card-facing nAfter = 3, so the newly
+    // built tile is the 3rd stable -> gains 1 vegetable (not grain).
     const result = runAfterStables((player) => {
       player.stableTiles = [{ row: 2, col: 2 }, { row: 2, col: 3 }]
       player.cardStates = {
-        __actionSnapshot__: { extraData: { stableTiles: 1 } },
+        __actionSnapshot__: { extraData: { stableTiles: 2 } },
         B85_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
       }
     })
