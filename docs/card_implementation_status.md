@@ -885,7 +885,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C143_StoneBuyer` | 已对齐 |  |
 | `C144_ReedRoofRenovator` | 已对齐 |  |
 | `C145_ForestReviewer` | 已对齐 |  |
-| `C146_WorkshopAssistant` | 已对齐 | onBuy 将 pair key 存入 `extraData.pairs` 并记录所选资源 pair 日志；其他玩家 renovation 后 owner 可 optional 取回一对并记录 used/gained；owner prompt 进入/返回行动玩家都经过确认玩家切换，且切换边界不暴露 undo；交互栏 pair 选择使用资源图标并替换 needed 参数；Played Cards 区从 `extraData.pairs` 渲染卡上资源 pair stack |
+| `C146_WorkshopAssistant` | 已对齐 | onBuy 将 pair key 存入 `extraData.pairs` 并记录所选资源 pair 日志；其他玩家 renovation 后 owner 可 optional 取回一对，资源移动走标准 `gain`/`resource.moved` 语义并记录 used/gained；owner prompt 进入/返回行动玩家都经过确认玩家切换，且切换边界不暴露 undo；交互栏 pair 选择使用资源图标并替换 needed 参数；Played Cards 区从 `extraData.pairs` 渲染卡上资源 pair stack |
 | `C147_Cowherd` | 已对齐 |  |
 | `C148_MudWallower` | 已对齐 |  |
 | `C149_ResourceRecycler` | 已对齐 |  |
