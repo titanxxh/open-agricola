@@ -1,7 +1,7 @@
 import type { ActionExecutionResult, ActionFlow, GameState, HarvestReapSummary, PlayerState } from '../../contract/types'
 import type { ActionSpace } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
-import { fieldTopStack, fieldPopIfDepleted } from '../../domain/field'
+import { fieldTopStack } from '../../domain/field'
 import { runCardListeners } from '../../cards/card-listeners'
 import type { ActionHookResult } from '../hooks'
 import { computeHarvestCount } from '../helpers/harvest-count-registry'
@@ -145,24 +145,30 @@ export const reap = (
     const override = options.harvestCounts?.[fieldKey(field.row, field.col)]
     const harvestCount = override ?? computeHarvestCount(state, player, field)
     let remainingCount = Math.max(0, Math.floor(harvestCount.count))
-    if ((harvestCount.scope ?? 'top-stack') !== 'field') {
-      const top = fieldTopStack(field)
-      remainingCount = Math.min(remainingCount, Math.max(0, top?.remaining ?? 0))
-    }
     const sources = harvestCount.sources?.length ? harvestCount.sources : ['base']
     const tags = harvestCount.tags ?? []
     const scope = harvestCount.scope ?? 'top-stack'
+    const supplyInsteadOfField = tags.includes('supply-instead-of-field') && !tags.includes('full-field-reap')
+    let suppliedTopStackIndex = -1
+    const suppliedTop = supplyInsteadOfField ? fieldTopStack(field) : undefined
+    if (suppliedTop?.kind === 'grain' && suppliedTop.remaining > 0) {
+      suppliedTopStackIndex = field.stacks.length - 1
+      appendHarvestCountApplication(reapSummary, field.row, field.col, suppliedTop.kind, 0, sources, tags, scope)
+    }
     if (remainingCount === 0 && tags.length > 0) {
       const top = fieldTopStack(field)
       if (top && top.remaining > 0) {
         appendHarvestCountApplication(reapSummary, field.row, field.col, top.kind, 0, sources, tags, scope)
       }
     }
-    while (remainingCount > 0) {
-      const top = fieldTopStack(field)
-      if (!top || top.remaining <= 0) return
-      const kind = top.kind
-      const amount = Math.min(top.remaining, remainingCount)
+    for (let stackIndex = field.stacks.length - 1; remainingCount > 0 && stackIndex >= 0; stackIndex -= 1) {
+      const stack = field.stacks[stackIndex]
+      if (!stack || stack.remaining <= 0) continue
+      const kind = stack.kind
+      const suppliedAmount = stackIndex === suppliedTopStackIndex ? 1 : 0
+      const harvestableAmount = Math.max(0, stack.remaining - suppliedAmount)
+      if (harvestableAmount <= 0) continue
+      const amount = Math.min(harvestableAmount, remainingCount)
       const cropEvent = {
         location: { kind: 'field' as const, playerId: player.id, row: field.row, col: field.col },
         crop: kind,
@@ -186,9 +192,9 @@ export const reap = (
       appendHarvestedCrop(reapSummary, field.row, field.col, kind, amount, sources)
       appendHarvestCountApplication(reapSummary, field.row, field.col, kind, amount, sources, tags, scope)
       appendHarvestedPosition(reapSummary, field.row, field.col)
-      top.remaining -= amount
+      stack.remaining -= amount
       remainingCount -= amount
-      fieldPopIfDepleted(field)
+      if (stack.remaining <= 0) field.stacks.splice(stackIndex, 1)
       eventSink?.emit<'farm.cropRemoved'>({
         type: 'farm.cropRemoved',
         crops: [cropEvent],
