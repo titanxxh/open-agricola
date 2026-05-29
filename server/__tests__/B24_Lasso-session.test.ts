@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
+import { isCardFlagged } from '../../shared/cards/helpers/card-state'
 import type { ActionChoiceOption, ActionSpace, Resource } from '../../shared/contract/types'
 import '../../shared/cards/B/B24_Lasso'
 
@@ -83,6 +84,23 @@ const placedSpaces = (session: GameSession) =>
     .map((space) => space.id)
 
 describe('B24_Lasso session', () => {
+  it('after a non-market first placement does not offer a second placement when no animal market is legal', () => {
+    const session = setup()
+    const state = session.getState().state
+    for (const spaceId of MARKET_SPACES) {
+      state.actionSpaces.find((space) => space.id === spaceId)!.takenBy = [
+        { playerId: 'p2', workerId: '1' },
+      ]
+    }
+    session.loadState(state)
+
+    const resp = session.takeAction(0, 'forest')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.request.kind).not.toBe('choice')
+    expect(isCardFlagged(resp.state.players[0]!, CARD_ID)).toBe(false)
+  })
+
   it('after a non-market first placement offers only animal markets for the second placement', () => {
     const session = setup()
 
@@ -94,6 +112,42 @@ describe('B24_Lasso session', () => {
     const options = waitOptions(resp).map((option) => option.value)
 
     expect(options).toEqual(MARKET_SPACES)
+  })
+
+  it('after a non-market first placement offers only legal animal markets', () => {
+    const session = setup()
+    const state = session.getState().state
+    state.actionSpaces.find((space) => space.id === 'pig-market')!.takenBy = [
+      { playerId: 'p2', workerId: '1' },
+    ]
+    state.actionSpaces.find((space) => space.id === 'cattle-market')!.takenBy = [
+      { playerId: 'p2', workerId: '2' },
+    ]
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'forest')
+    expect(resp.ok).toBe(true)
+    resp = acceptOptional(session, resp)
+
+    expect(resp.ok).toBe(true)
+    expect(placedSpaces(session).sort()).toEqual(['forest', 'sheep-market'])
+  })
+
+  it('after an animal-market first placement does not offer a second placement when no target is legal', () => {
+    const session = setup()
+    const state = session.getState().state
+    for (const space of state.actionSpaces) {
+      if (space.id !== 'sheep-market') {
+        space.takenBy = [{ playerId: 'p2', workerId: '1' }]
+      }
+    }
+    session.loadState(state)
+
+    const resp = session.takeAction(0, 'sheep-market')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.request.kind).not.toBe('choice')
+    expect(isCardFlagged(resp.state.players[0]!, CARD_ID)).toBe(false)
   })
 
   it('after an animal-market first placement offers any legal second target and runs target action flow', () => {
@@ -123,6 +177,7 @@ describe('B24_Lasso session', () => {
 
     expect(skipped.ok).toBe(true)
     expect(placedSpaces(session)).toEqual(['forest'])
+    expect(isCardFlagged(skipped.state.players[0]!, CARD_ID)).toBe(false)
   })
 
   it('does not recursively trigger from the second placement', () => {

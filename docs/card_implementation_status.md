@@ -583,7 +583,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B21_HayloftBarn` | 已对齐 | 通过 resource exchange 获得的 grain 已由 provenance helper 触发 |
 | `B22_WalkingBoots` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `B23_FinalScenario` | 已对齐 | 第 14 轮行动 reveal / exclusive gate / clear event 已由后端权威建模 |
-| `B24_Lasso` | 已对齐 | 任意首次放人后提供 optional second placement；非动物市场首放时第二人限制动物市场，动物市场首放时可去任意合法格，并经通用 target action flow 执行目标行动 |
+| `B24_Lasso` | 已对齐 | 任意首次放人后先用 placement availability 计算合法 second-placement target；非动物市场首放仅在有合法动物市场时触发，动物市场首放仅在有任意合法 target 时触发，并经通用 target action flow 执行目标行动 |
 | `B25_BreadPaddle` | 已对齐 |  |
 | `B26_AgrarianFences` | 已对齐 |  |
 | `B27_Toolbox` | 已对齐 | 重审未见实质行为差异；建 room/stable/fence 后可买 Joinery/Pottery/Basket，子行动 `trueAction=false` |
@@ -781,7 +781,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C39_StudioBoat` | 已对齐 |  |
 | `C40_CanvasSack` | 已对齐 |  |
 | `C41_FarmStore` | 已对齐 |  |
-| `C42_RavenousHunger` | 已对齐 | Vegetable Seeds 后 optional second placement 只列累积格；目标 collect 通过 `after.collect` flag 追加对应累积资源 +1，并在结算后 unflag |
+| `C42_RavenousHunger` | 已对齐 | Vegetable Seeds 后先用 placement availability 过滤实际可进入的累积格；有合法 target 才创建 optional second placement，目标 collect 通过 `after.collect` flag 追加对应累积资源 +1，并在结算后 unflag |
 | `C43_FarmBuilding` | 已对齐 |  |
 | `C44_ChickenCoop` | 已对齐 |  |
 | `C45_Stew` | 已对齐 |  |
