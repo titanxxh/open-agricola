@@ -506,6 +506,8 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 
 `collect` 是 accumulation-space partial-take 的统一入口，接受可选 `actionContext: { spaceId?, resource?, amount? }`。`spaceId` 用于指向非当前 action space（卡牌效果触发的偷取场景）；`resource` + `amount` 用于 partial-take（不全取空一格）。旧的 `take-from-space` internal action 已删除并迁移到 `collect`，相关 i18n key 一并清理。
 
+额外加作物的 follow-up selection 通过 `actionContext.extraCropPlacement` 表达 provenance；pending / anytime 构造必须从 `contextSnapshot.actionContext` 传递该 marker，后续卡牌只读语义 marker，不判断创建 pending 的 sourceCard id。
+
 ### 7.4 payment/
 
 `shared/actions/payment/`：

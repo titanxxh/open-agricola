@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { positionKey } from '../../domain/farm'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
+import { extraCropPlacementActionContext } from '../../actions/helpers/extra-crop-placement-context'
 import type { ActionFlow, PlayerState } from '../../contract/types'
 import type { FarmSownEvent } from '../../contract/events'
 import { fieldTopStack } from '../../domain/field'
@@ -105,13 +106,13 @@ const afterSowListener: CardListenerRegistration = {
         actionId: 'selection',
         sourceCard: CARD_ID,
         optional: true,
-        actionContext: {
+        actionContext: extraCropPlacementActionContext({
           selectionKind: 'farm-position',
           selectableTiles: eligible.map(({ row, col }) => ({ row, col })),
           minSelections: 1,
           maxSelections: 1,
           selectionEffect: 'cow-patty-bonus-crop',
-        },
+        }),
       } as ActionFlow,
       sourceCard: CARD_ID,
     }

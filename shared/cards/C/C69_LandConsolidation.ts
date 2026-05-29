@@ -3,16 +3,16 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionDefinition } from '../../contract/types'
 import { fieldTopStack, fieldTotalRemaining } from '../../domain/field'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
+import { isExtraCropPlacementActionContext } from '../../actions/helpers/extra-crop-placement-context'
 import type { CardImpl } from '../registry'
 import { C69_LandConsolidation } from '../../cards-display/C/C69_LandConsolidation'
 
 const CARD_ID = C69_LandConsolidation.id
 
 const SWAP_ACTION_ID = 'card_C69_LandConsolidation_swap'
-const EXTRA_CROP_CARDS = new Set(['B115_TinsmithMaster', 'E71_CowPatty'])
 
 const hasExtraCropPending = (context: CardListenerContext): boolean => {
-  return !!context.pendingSourceCard && EXTRA_CROP_CARDS.has(context.pendingSourceCard)
+  return isExtraCropPlacementActionContext(context.actionContext)
 }
 
 const swapFieldGrainToVegAction: ActionDefinition = {
