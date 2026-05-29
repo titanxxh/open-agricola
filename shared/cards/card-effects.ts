@@ -1,4 +1,4 @@
-import type { ActionFlow, FarmTilePosition, GameState, PaymentResourceMap, PlayerState, Resource } from '../contract/types'
+import type { ActionFlow, FarmTilePosition, GameState, Pasture, PaymentResourceMap, PlayerState, Resource } from '../contract/types'
 import type { PrivateGameEvent } from '../contract/private-events'
 import type { AnimalZone, PlayerScoreSummary, ScoreCategoryResult } from '../domain'
 import { getCurrentSessionContext } from './session-card-context'
@@ -26,6 +26,20 @@ export type ExtraSowableCrop = ExtraSowableField['allowedCrops'][number]
  */
 export type Meeple = {
   type: 'sheep' | 'boar' | 'cattle'
+}
+
+export type PastureCapacityContext = {
+  player: PlayerState
+  state: GameState
+  pasture: Pasture
+  pastureIndex: number
+}
+
+export type PastureCapacityModifier = {
+  sourceCard: string
+  kind: 'replacement' | 'additive'
+  appliesTo?: (ctx: PastureCapacityContext) => boolean
+  apply: (capacity: number, ctx: PastureCapacityContext) => number
 }
 
 export type PaymentInfo = {
@@ -214,6 +228,10 @@ export type CardEffect = {
   computeCostedBonus?: CostedBonusHandler
   computeSharedPostScore?: SharedPostScoreHandler
   computeExtraRoomCapacity?: (player: PlayerState) => number
+  computePastureCapacityModifiers?: (
+    player: PlayerState,
+    state: GameState,
+  ) => PastureCapacityModifier[]
   onComputeAnimalZones?: (
     player: PlayerState,
     zones: AnimalZone[],

@@ -5,17 +5,13 @@ const CARD_ID = D11_LawnFertilizer.id
 
 export const D11_LawnFertilizer_impl = {
   effect: {
-  id: CARD_ID,
-  onComputeAnimalZones: (player, zones, _state) => {
-    const hasA12 = player.minorPlayed.includes('A12_DrinkingTrough')
-    for (const zone of zones) {
-      if (zone.zoneType !== 'pasture' || zone.pastureIndex === undefined) continue
-      const pasture = player.pastures[zone.pastureIndex]
-      if (!pasture || pasture.size !== 1) continue
-      zone.capacity = 3 * (pasture.stables + 1) + (hasA12 ? 2 : 0)
-      ;(zone as unknown as { lawnFertilized?: boolean }).lawnFertilized = true
-    }
+    id: CARD_ID,
+    computePastureCapacityModifiers: () => [{
+      sourceCard: CARD_ID,
+      kind: 'replacement',
+      appliesTo: ({ pasture }) => pasture.size === 1,
+      apply: (_capacity, { pasture }) => 3 * (pasture.stables + 1),
+    }],
   },
-},
-  reaches: ['A12_DrinkingTrough'] as readonly string[],
+  reaches: [] as readonly string[],
 } satisfies CardImpl
