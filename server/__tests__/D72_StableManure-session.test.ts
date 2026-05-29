@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
+import { getCardEffect } from '../../shared/cards/card-effects'
 import '../../shared/cards/D/D72_StableManure'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
@@ -123,6 +124,21 @@ describe('D72_StableManure session', () => {
       // (it could be another card's choice)
       expect(resp.interaction.promptKey).not.toBe('ui.interactionOptionalAction')
     }
+  })
+
+  it('counts the B85 FarmHand stable as unfenced (card-facing count)', () => {
+    const { session } = setupHarvest(0)
+    const state = session.getState().state
+    const p = state.players[0]!
+    p.cardStates = {
+      ...p.cardStates,
+      B85_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
+    }
+    session.loadState(state)
+
+    const effect = getCardEffect('D72_StableManure')
+    const flow = effect!.onStartHarvestFieldPhase!(state, p)
+    expect(flow).toBeDefined()
   })
 
   it('does not trigger when no cropped fields', () => {
