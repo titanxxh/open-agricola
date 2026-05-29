@@ -22,4 +22,27 @@ describe('devPlayCard major improvements', () => {
     expect(getPlayedCardKeys(player)).toContain('major:Major_Fireplace1')
     expect(resp.state.availableMajorImprovements).not.toContain('Major_Fireplace1')
   })
+
+  it('moves a major from the former owner and clears stale old-owner state', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.players[1]!.improvements = ['Major_Fireplace1']
+    state.players[1]!.cardStates = {
+      Major_Fireplace1: { counters: { food: 1 } },
+    }
+    state.availableMajorImprovements = state.availableMajorImprovements.filter(
+      (id) => id !== 'Major_Fireplace1',
+    )
+    session.loadState(state)
+
+    const resp = session.devPlayCard(0, 'Major_Fireplace1')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.improvements).toContain('Major_Fireplace1')
+    expect(resp.state.players[1]!.improvements).not.toContain('Major_Fireplace1')
+    expect(resp.state.players[1]!.cardStates?.Major_Fireplace1).toBeUndefined()
+    expect(getPlayedCardKeys(resp.state.players[1]!)).not.toContain('major:Major_Fireplace1')
+    expect(resp.state.availableMajorImprovements).not.toContain('Major_Fireplace1')
+  })
 })
