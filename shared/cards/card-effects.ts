@@ -1,4 +1,4 @@
-import type { ActionFlow, FarmTilePosition, GameState, PaymentResourceMap, PlayerState, Resource } from '../contract/types'
+import type { ActionFlow, FarmTilePosition, GameState, Pasture, PaymentResourceMap, PlayerState, Resource } from '../contract/types'
 import type { PrivateGameEvent } from '../contract/private-events'
 import type { AnimalZone, PlayerScoreSummary, ScoreCategoryResult } from '../domain'
 import { getCurrentSessionContext } from './session-card-context'
@@ -28,6 +28,33 @@ export type Meeple = {
   type: 'sheep' | 'boar' | 'cattle'
 }
 
+export type BreedAnimalType = 'sheep' | 'boar' | 'cattle'
+
+export type BreedThresholdContext = {
+  sourceCard: string
+}
+
+export type BreedThresholdHandler = (
+  state: GameState,
+  player: PlayerState,
+  animalType: BreedAnimalType,
+  ctx: BreedThresholdContext,
+) => number | undefined
+
+export type PastureCapacityContext = {
+  player: PlayerState
+  state: GameState
+  pasture: Pasture
+  pastureIndex: number
+}
+
+export type PastureCapacityModifier = {
+  sourceCard: string
+  kind: 'replacement' | 'additive'
+  appliesTo?: (ctx: PastureCapacityContext) => boolean
+  apply: (capacity: number, ctx: PastureCapacityContext) => number
+}
+
 export type PaymentInfo = {
   resourcesPaid: PaymentResourceMap
   feeIndex?: number
@@ -46,6 +73,34 @@ export type CardEffectHook = 'onBuy' | 'onRoundStart' | 'onHarvest' | 'onRoundEn
   | 'onBeforeStartOfTurn'
   | 'onBeforePlayerTurn'
   | 'onAllWorkersPlaced'
+
+export type FlowCardEffectHook = Exclude<CardEffectHook, 'onBeforePlayerTurn'>
+
+export const flowCardEffectHooks: FlowCardEffectHook[] = [
+  'onBuy',
+  'onRoundStart',
+  'onHarvest',
+  'onRoundEnd',
+  'onEndTurn',
+  'onReturnHome',
+  'onBeforeReturnHome',
+  'onStartReturnHome',
+  'onAfterRoundEnd',
+  'onBeforeHarvest',
+  'onStartHarvest',
+  'onStartHarvestFieldPhase',
+  'onHarvestFieldPhase',
+  'onEndHarvestFieldPhase',
+  'onAfterReap',
+  'onStartHarvestFeedingPhase',
+  'onHarvestFeedingPhase',
+  'onEndHarvestFeedingPhase',
+  'onEndHarvest',
+  'onAfterHarvest',
+  'onBeforeEndGame',
+  'onBeforeStartOfTurn',
+  'onAllWorkersPlaced',
+]
 
 /**
  * All function-type fields on CardEffect that the custom-card sandbox is allowed
@@ -186,6 +241,11 @@ export type CardEffect = {
   computeCostedBonus?: CostedBonusHandler
   computeSharedPostScore?: SharedPostScoreHandler
   computeExtraRoomCapacity?: (player: PlayerState) => number
+  computePastureCapacityModifiers?: (
+    player: PlayerState,
+    state: GameState,
+  ) => PastureCapacityModifier[]
+  computeBreedThreshold?: BreedThresholdHandler
   onComputeAnimalZones?: (
     player: PlayerState,
     zones: AnimalZone[],
@@ -246,7 +306,7 @@ export const runCardEffectHook = (
   state: GameState,
   player: PlayerState,
   cardId: string,
-  hook: CardEffectHook,
+  hook: FlowCardEffectHook,
   paymentInfo?: PaymentInfo,
 ): ActionFlow | null => {
   const effect = getCardEffect(cardId)
@@ -355,6 +415,37 @@ export const shouldEnforceReorganizeOnLastHarvest = (
     }
   }
   return false
+}
+
+export const getBreedThreshold = (
+  state: GameState,
+  player: PlayerState,
+  animalType: BreedAnimalType,
+  ctx: BreedThresholdContext,
+): number => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  let threshold = 2
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    const handler = effect?.computeBreedThreshold
+    if (!handler) continue
+    try {
+      const next = handler(state, player, animalType, ctx)
+      if (typeof next !== 'number' || Number.isNaN(next)) continue
+      threshold = Math.min(threshold, Math.max(1, Math.floor(next)))
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(`[card-effects] custom card ${cardId} computeBreedThreshold threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return threshold
 }
 
 /**

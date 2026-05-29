@@ -1,22 +1,20 @@
 import { readCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import type { ActionFlow, FarmTilePosition, Field, PlayerState } from '../../contract/types'
+import type { ActionFlow, FarmTilePosition, Field, GameState, PlayerState } from '../../contract/types'
 import { fieldTopStack } from '../../domain/field'
-import { registerHarvestCountModifier } from '../../actions/helpers/harvest-count-registry'
+import {
+  registerHarvestCountModifier,
+  registerHarvestSelectionThresholdModifier,
+} from '../../actions/helpers/harvest-count-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E112_GrainThief'
-const E73_CARD_ID = 'E73_Scythe'
 const SELECTED_POSITIONS_KEY = 'selectedPositions'
-const E73_FULL_REAP_POSITION_KEY = 'fullReapPosition'
 
 const fieldKey = (field: Field) => `${field.row}-${field.col}`
 
 const selectedPositionKeys = (player: PlayerState) =>
   readCardExtraData<string[]>(player, CARD_ID, SELECTED_POSITIONS_KEY) ?? []
-
-const scytheFullReapPosition = (player: PlayerState) =>
-  readCardExtraData<string>(player, E73_CARD_ID, E73_FULL_REAP_POSITION_KEY)
 
 const selectableGrainFields = (player: PlayerState) =>
   player.fields.filter((field) => {
@@ -46,22 +44,34 @@ const clearSelectionLeaf = (): ActionFlow => ({
   params: { kind: 'set-extra-data', key: SELECTED_POSITIONS_KEY, value: undefined },
 })
 
-const selectedValidGrainFieldCount = (player: PlayerState) => {
+const selectedSupplyApplicationCount = (state: GameState, player: PlayerState) => {
   const selected = new Set(selectedPositionKeys(player))
-  const scythePosition = scytheFullReapPosition(player)
-  return selectableGrainFields(player)
-    .filter((field) => selected.has(fieldKey(field)) && fieldKey(field) !== scythePosition)
-    .length
+  const counted = new Set<string>()
+  for (const app of state.harvestReapSummary?.[player.id]?.harvestCountApplications ?? []) {
+    if (app.crop !== 'grain') continue
+    const key = `${app.row}-${app.col}`
+    if (!selected.has(key)) continue
+    if (!app.tags.includes('supply-instead-of-field')) continue
+    if (app.tags.includes('full-field-reap')) continue
+    counted.add(key)
+  }
+  return counted.size
 }
 
 registerHarvestCountModifier(CARD_ID, ({ player, field }) => {
   if (!player.occupationPlayed?.includes(CARD_ID)) return
   const selected = new Set(selectedPositionKeys(player))
   if (!selected.has(fieldKey(field))) return
-  if (fieldKey(field) === scytheFullReapPosition(player)) return
   const top = fieldTopStack(field)
   if (top?.kind !== 'grain' || top.remaining <= 0) return
-  return { delta: -1, sources: [CARD_ID] }
+  return { delta: -1, sources: [CARD_ID], tags: ['supply-instead-of-field'] }
+})
+
+registerHarvestSelectionThresholdModifier(CARD_ID, ({ player, field }) => {
+  if (!player.occupationPlayed?.includes(CARD_ID)) return
+  const top = fieldTopStack(field)
+  if (top?.kind !== 'grain') return
+  return { threshold: 1, sources: [CARD_ID] }
 })
 
 export const E112_GrainThief_impl = {
@@ -76,8 +86,8 @@ export const E112_GrainThief_impl = {
         children: [selectionFlow(fields)],
       } satisfies ActionFlow
     },
-    onEndHarvestFieldPhase: (_state, player) => {
-      const count = selectedValidGrainFieldCount(player)
+    onEndHarvestFieldPhase: (state, player) => {
+      const count = selectedSupplyApplicationCount(state, player)
       if (selectedPositionKeys(player).length === 0) return
       return {
         type: 'seq',

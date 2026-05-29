@@ -9,6 +9,7 @@ import type {
   PlayerState,
   Resource,
 } from '../../contract/types'
+import type { FarmStableBuiltEvent } from '../../contract/events'
 import { getNextEmptyTileForPlayer, positionKey } from '../../domain/farm'
 import {
   payResources,
@@ -28,8 +29,29 @@ import {
 import { buildInternalPayChild } from '../helpers/pay-child'
 import { playerBoard } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
+import { collectComputeCostsForFarmChoice } from '../../cards/card-listeners'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
+import {
+  applyFarmHandStable,
+  getFarmHandStablePositions,
+} from '../../cards/B/B85_FarmHand'
+
+const FARM_HAND_CARD_ID = 'B85_FarmHand'
+
+const isFarmHandEntry = (actionContext?: Record<string, unknown>): boolean =>
+  actionContext?.farmHand === true
+
+const readFarmHandPayload = (
+  actionContext: Record<string, unknown> | undefined,
+  source: { farmHand?: FarmTilePosition } | undefined,
+): FarmTilePosition | undefined => {
+  if (!isFarmHandEntry(actionContext)) return undefined
+  const farmHand = source?.farmHand
+  if (!farmHand) return undefined
+  if (typeof farmHand.row !== 'number' || typeof farmHand.col !== 'number') return undefined
+  return { row: farmHand.row, col: farmHand.col }
+}
 
 /**
  * Construct a minimal GameState wrapping a single player. Used by
@@ -146,6 +168,67 @@ const resolveStableTotalCost = (
   )
 }
 
+/**
+ * Aggregate computeCosts/stables card discounts that depend on how many
+ * stables this build crosses (e.g. C88 Carpenter's Apprentice gives the 3rd
+ * and 4th card-facing stable -1 wood each). Mirrors fencing's
+ * `computeFreeFenceTotal`: the listener is fed the per-build `stableCount` and
+ * returns a single aggregate delta, which is applied to the base total cost.
+ */
+const applyStableBuildDiscount = (
+  state: GameState,
+  player: PlayerState,
+  baseCost: Partial<Resource> | null,
+  totalUnits: number,
+): Partial<Resource> | null => {
+  if (!baseCost) return baseCost
+  const override = collectComputeCostsForFarmChoice(state, player, 'stables', {
+    stableCount: totalUnits,
+  })
+  const result: Partial<Resource> = { ...baseCost }
+  for (const [key, delta] of Object.entries(override)) {
+    if (typeof delta !== 'number' || delta === 0) continue
+    const k = key as keyof Resource
+    result[k] = Math.max(0, (result[k] ?? 0) + delta)
+    if (result[k] === 0) delete result[k]
+  }
+  return result
+}
+
+const resolveStableTotalCostWithDiscount = (
+  state: GameState,
+  player: PlayerState,
+  actionContext: Record<string, unknown> | undefined,
+  costs: Partial<Resource> | undefined,
+  totalUnits: number,
+): Partial<Resource> | null =>
+  // `costs` carries the dispatcher's per-unit computeCosts delta (e.g. a flat
+  // per-stable modifier). C88 deliberately stays out of that pass — it needs
+  // the real build count — and is applied here against `totalUnits` via
+  // applyStableBuildDiscount, so the two never double-count the same card.
+  applyStableBuildDiscount(
+    state,
+    player,
+    resolveStableTotalCost(actionContext, costs, totalUnits),
+    totalUnits,
+  )
+
+const mergeCostDelta = (
+  base: Partial<Resource> | undefined,
+  extra: Partial<Resource>,
+): Partial<Resource> | undefined => {
+  const keys = Object.keys(extra)
+  if (keys.length === 0) return base
+  const merged: Partial<Resource> = { ...(base ?? {}) }
+  for (const key of keys) {
+    const value = extra[key as keyof Resource]
+    if (typeof value !== 'number' || value === 0) continue
+    const k = key as keyof Resource
+    merged[k] = (merged[k] ?? 0) + value
+  }
+  return merged
+}
+
 const buildStableFarmSelection = (
   state: GameState,
   player: PlayerState,
@@ -157,12 +240,23 @@ const buildStableFarmSelection = (
   const reserve = getAvailableStableSupplyCount(state, player)
   const selectionMax = typeof max === 'number' ? Math.min(max, reserve) : reserve
   const idx = state.players.indexOf(player)
-  return playerBoard(state, idx).farmyard.selectableTiles('stable', {
-    costOverride: readStableCostDelta(actionContext, costs),
+  // The farmyard's max-stable affordability scan needs the count-dependent C88
+  // discount, which it cannot derive on its own. Probe the discount for the
+  // next single stable and fold it into the cost override.
+  const nextStableDiscount = collectComputeCostsForFarmChoice(state, player, 'stables', {
+    stableCount: 1,
+  })
+  const farm = playerBoard(state, idx).farmyard.selectableTiles('stable', {
+    costOverride: mergeCostDelta(readStableCostDelta(actionContext, costs), nextStableDiscount),
     exactCost: readExactCost(actionContext),
     zoneFilter: zoneFilter === 'pasture-1' ? 'pasture-1' : undefined,
     max: selectionMax,
   })
+  if (farm.farmType !== 'stable') return farm
+  const farmHandPositions = isFarmHandEntry(actionContext)
+    ? getFarmHandStablePositions(state, player)
+    : []
+  return farmHandPositions.length > 0 ? { ...farm, farmHandPositions } : farm
 }
 
 const isStableStructurallyPossible = ({ state, player }: ActionAvailabilityContext) =>
@@ -179,7 +273,9 @@ const canExecuteStableCostPreview = (
     readStableActionContext(context),
     costs,
   )
-  return farm.farmType === 'stable' && farm.maxSelections > 0
+  if (farm.farmType !== 'stable') return false
+  if (farm.maxSelections > 0) return true
+  return (farm.farmHandPositions?.length ?? 0) > 0
 }
 
 const stablesCostPreview: ActionCostPreview = {
@@ -215,13 +311,21 @@ const finalizeStables = (
   ctx: ActionMutationContext,
   stables: FarmTilePosition[],
   paymentChoice: string | undefined,
+  farmHand: FarmTilePosition | undefined,
 ): ActionExecutionResult => {
-  if (stables.length > getAvailableStableSupplyCount(ctx.state, ctx.player)) {
+  const totalUnits = stables.length + (farmHand ? 1 : 0)
+  if (totalUnits > getAvailableStableSupplyCount(ctx.state, ctx.player)) {
     return { type: 'fail', errorKey: 'log.buildStableFail' }
   }
-  const placementError = validateStablePlacement(ctx, stables)
+  const placementError = stables.length > 0 ? validateStablePlacement(ctx, stables) : undefined
   if (placementError) return placementError
-  const totalCost = resolveStableTotalCost(ctx.actionContext, ctx.costs, stables.length)
+  const totalCost = resolveStableTotalCostWithDiscount(
+    ctx.state,
+    ctx.player,
+    ctx.actionContext,
+    ctx.costs,
+    totalUnits,
+  )
   if (!totalCost) return { type: 'fail', errorKey: 'log.buildStableFail' }
   const payment = resolveTypedFlatPaymentSelection(
     ctx.player,
@@ -235,19 +339,33 @@ const finalizeStables = (
   if (payment.type !== 'selected') return { type: 'fail', errorKey: 'log.buildStableFail' }
   const nextPlayer = JSON.parse(JSON.stringify(ctx.player)) as PlayerState
   nextPlayer.stableTiles = [...nextPlayer.stableTiles, ...stables]
+  if (farmHand && !applyFarmHandStable(ctx.state, nextPlayer, farmHand)) {
+    return { type: 'fail', errorKey: 'log.buildStableFail' }
+  }
   applyPlayerMutation(ctx.player, nextPlayer)
   if (ctx.sourceCard) {
     addCardResourceGained(ctx.player, ctx.sourceCard, { stable: stables.length })
   }
   const resourcesPaid = sanitizePayableCost(payment.solution.resourcesPaid)
+  const stableItems: FarmStableBuiltEvent['stables'] = stables.map((stable) => ({
+    playerId: ctx.player.id,
+    row: stable.row,
+    col: stable.col,
+    kind: 'normal',
+  }))
+  if (farmHand) {
+    stableItems.push({
+      playerId: ctx.player.id,
+      row: farmHand.row,
+      col: farmHand.col,
+      kind: 'special',
+      sourceCardId: FARM_HAND_CARD_ID,
+    })
+  }
   ctx.eventSink?.emit<'farm.stableBuilt'>({
     type: 'farm.stableBuilt',
     sourceActionId: ctx.space.id,
-    stables: stables.map((stable) => ({
-      playerId: ctx.player.id,
-      row: stable.row,
-      col: stable.col,
-    })),
+    stables: stableItems,
   })
   return {
     type: 'ok',
@@ -307,27 +425,39 @@ export const stablesAction: ActionDefinition = {
     // Second call: payment combo selected after multi-combo prompt.
     if (choice.startsWith('pay:stable:')) {
       const farmPayload = ctx.actionContext?.farmPayload as
-        | { stables?: FarmTilePosition[] }
+        | { stables?: FarmTilePosition[]; farmHand?: FarmTilePosition }
         | undefined
       const stables = farmPayload?.stables
-      if (!Array.isArray(stables) || stables.length === 0) {
+      const farmHand = readFarmHandPayload(ctx.actionContext, farmPayload)
+      if (!Array.isArray(stables) || (stables.length === 0 && !farmHand)) {
         return { type: 'fail', errorKey: 'log.buildStableFail' }
       }
-      return finalizeStables(ctx, stables, choice)
+      return finalizeStables(ctx, stables, choice, farmHand)
     }
 
     // First call: client submitted stable geometry alongside `confirm`.
     if (payload && choice === 'confirm') {
-      const stables = (payload as { stables?: FarmTilePosition[] }).stables
-      if (!Array.isArray(stables) || stables.length === 0) {
+      const stables = (payload as { stables?: FarmTilePosition[] }).stables ?? []
+      const farmHand = readFarmHandPayload(
+        ctx.actionContext,
+        payload as { farmHand?: FarmTilePosition },
+      )
+      const totalUnits = stables.length + (farmHand ? 1 : 0)
+      if (totalUnits === 0) {
         return { type: 'fail', errorKey: 'NO_SELECTION' }
       }
-      if (stables.length > getAvailableStableSupplyCount(ctx.state, ctx.player)) {
+      if (totalUnits > getAvailableStableSupplyCount(ctx.state, ctx.player)) {
         return { type: 'fail', errorKey: 'log.buildStableFail' }
       }
-      const placementError = validateStablePlacement(ctx, stables)
+      const placementError = stables.length > 0 ? validateStablePlacement(ctx, stables) : undefined
       if (placementError) return placementError
-      const totalCost = resolveStableTotalCost(ctx.actionContext, ctx.costs, stables.length)
+      const totalCost = resolveStableTotalCostWithDiscount(
+        ctx.state,
+        ctx.player,
+        ctx.actionContext,
+        ctx.costs,
+        totalUnits,
+      )
       if (!totalCost) return { type: 'fail', errorKey: 'log.buildStableFail' }
       const payment = resolveTypedFlatPaymentSelection(
         ctx.player,
@@ -345,14 +475,14 @@ export const stablesAction: ActionDefinition = {
           request: { kind: 'choice', options },
           promptKey: payment.promptKey,
           extraData: {
-            actionContextWrite: { farmPayload: { stables } },
+            actionContextWrite: { farmPayload: { stables, farmHand } },
           },
         }
       }
       if (payment.type === 'fail') {
         return { type: 'fail', errorKey: 'log.buildStableFail' }
       }
-      return finalizeStables(ctx, stables, undefined)
+      return finalizeStables(ctx, stables, undefined, farmHand)
     }
 
     return { type: 'fail', errorKey: 'log.buildStableFail' }

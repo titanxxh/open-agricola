@@ -10,6 +10,7 @@ export const C11_WildlifeReserve = new MinorImprovement({
   category: 'FARM_PLANNER',
   desc: ['This card can hold up to 1 <SHEEP>, 1 <PIG>, and 1 <CATTLE>.'],
   cost: { wood: 2 },
+  animalHolder: true,
   vp: 1,
   prerequisite: '2 Occupations',
   occupationPrerequisites: { min: 2 },

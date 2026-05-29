@@ -4,6 +4,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E144_WaresSalesman } from '../../cards-display/E/E144_WaresSalesman'
+import { getCardDefinitionById } from '../helpers/card-type'
 
 const CARD_ID = E144_WaresSalesman.id
 
@@ -20,72 +21,11 @@ const CARD_ID = E144_WaresSalesman.id
 
 type ResourceGain = Partial<Resource>
 
-const WOOD_REED: ResourceGain = { wood: 1, reed: 1 }
-
-const CLAY_REED: ResourceGain = { clay: 1, reed: 1 }
-
-const REED_2: ResourceGain = { reed: 2 }
-
-const STONE_REED: ResourceGain = { stone: 1, reed: 1 }
-
-const WOOD_REED_CARDS = new Set([
-  'A108_MushroomCollector',
-  'A138_Harpooner',
-  'A56_Basket',
-  'C153_PatternMaker',
-  'A34_Loppers',
-  'A48_ShavingHorse',
-  'A159_JoineroftheSea',
-  'B42_ForestInn',
-  'B53_SculptureCourse',
-  'B109_PaperMaker',
-  'C55_Studio',
-  'D155_Ebonist',
-  'D133_BeerTentOperator',
-  'E54_Contraband',
-  'E106_EmergencySeller',
-  'Major_Joinery',
-])
-
-const CLAY_REED_CARDS = new Set([
-  'A40_PottersYard',
-  'C55_Studio',
-  'D60_LargePottery',
-  'D107_Bellfounder',
-  'E39_Paintbrush',
-  'E54_Contraband',
-  'E106_EmergencySeller',
-  'Major_Pottery',
-])
-
-const REED_2_CARDS = new Set([
-  'C139_BasketmakersWife',
-  'D46_PelletPress',
-  'E54_Contraband',
-  'E106_EmergencySeller',
-  'E109_BraidMaker',
-  'Major_Basket',
-])
-
-const STONE_REED_CARDS = new Set([
-  'D108_StoneCarver',
-  'B53_SculptureCourse',
-  'C55_Studio',
-  'E54_Contraband',
-  'E106_EmergencySeller',
-  'E153_StoneSculptor',
-])
-
 const stripPrefix = (choice: string): string =>
   choice.replace(/^(minor|major):/, '')
 
 const getGainsFor = (cardId: string): ResourceGain[] => {
-  const gains: ResourceGain[] = []
-  if (WOOD_REED_CARDS.has(cardId)) gains.push(WOOD_REED)
-  if (CLAY_REED_CARDS.has(cardId)) gains.push(CLAY_REED)
-  if (REED_2_CARDS.has(cardId)) gains.push(REED_2)
-  if (STONE_REED_CARDS.has(cardId)) gains.push(STONE_REED)
-  return gains
+  return [...(getCardDefinitionById(cardId)?.waresSalesmanGains ?? [])]
 }
 
 const buildFlow = (cardId: string): ActionFlow | null => {

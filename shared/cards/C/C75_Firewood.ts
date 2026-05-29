@@ -4,24 +4,19 @@ import type { GameState, PlayerState } from '../../contract/types'
 import { initCardState } from '../__stubs__/helpers'
 import type { CardImpl } from '../registry'
 import { C75_Firewood } from '../../cards-display/C/C75_Firewood'
+import { getCardDefinitionById } from '../helpers/card-type'
 
 const CARD_ID = C75_Firewood.id
 
-const OVEN_IMPROVEMENTS = new Set([
-  'Major_Fireplace1',
-  'Major_Fireplace2',
-  'Major_CookingHearth1',
-  'Major_CookingHearth2',
-  'Major_ClayOven',
-  'Major_StoneOven',
-  'E63_IronOven',
-  'E64_SimpleOven',
-  'D59_EarthOven',
-  'A60_OrientalFireplace',
-])
-
 const getBuiltImprovementId = (choice: string | undefined) =>
   choice ? choice.replace(/^major:/, '').replace(/^minor:/, '') : undefined
+
+const isFirewoodTrigger = (cardId: string): boolean => {
+  const def = getCardDefinitionById(cardId)
+  return def?.fireplaceIdentity === true
+    || def?.cookingHearthIdentity === true
+    || def?.ovenIdentity === true
+}
 
 const buildTakeWoodFlow = (woodOnCard: number): ActionHookResult | void => {
   const maxWood = Math.min(4, woodOnCard)
@@ -59,7 +54,7 @@ const firewoodAfterBuildListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const { player, choice } = context
     const builtCardId = getBuiltImprovementId(choice)
-    if (!builtCardId || !OVEN_IMPROVEMENTS.has(builtCardId)) return
+    if (!builtCardId || !isFirewoodTrigger(builtCardId)) return
     const woodOnCard = player.cardStates?.[CARD_ID]?.counters?.['wood'] ?? 0
     return buildTakeWoodFlow(woodOnCard)
   },

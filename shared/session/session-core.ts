@@ -94,11 +94,12 @@ import * as harvestPhase from './phases/harvest.ts'
 import * as draftPhase from './phases/draft.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { getCardEffect } from '../cards/card-effects.ts'
-import type { CardEffectHook } from '../cards/card-effects.ts'
+import type { FlowCardEffectHook } from '../cards/card-effects.ts'
 import { runCardEffectHook } from '../cards/card-effects.ts'
 import { positionKey } from '../domain/farm.ts'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions, runCardListeners } from '../cards/card-listeners.ts'
 import { buildPhaseTrailingNodes, markOptional, stampOwner } from '../engine/engine-utils.ts'
+import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot.ts'
 import { Scoring, playerBoard, type PlayerScoreSummary } from '../domain'
 import { reap } from '../actions/effects/reap.ts'
 import { breedLeaf } from '../actions/effects/breed'
@@ -131,6 +132,7 @@ import {
   isMinorImprovementPlayable,
 } from '../actions/effects/improvement.ts'
 import { isBlockedByMajorImprovementActionGate } from '../actions/helpers/improvement-helpers'
+import { getPlayerActionSpaceConfig } from '../cards/player-action-space.ts'
 import {
   getOccupationActionCost,
   isOccupationPlayable,
@@ -278,6 +280,7 @@ type SelectionCommitPayload = {
   extraWood?: number
   rooms?: FarmTilePosition[]
   stables?: FarmTilePosition[]
+  farmHand?: FarmTilePosition
   tile?: FarmTilePosition
   crops?: SowSelectionPayload[]
 }
@@ -335,6 +338,8 @@ type StageResumeState = {
     originPlayerIndex?: number | null
   }
 }
+
+type StageCardEffectHook = Extract<StageResumeState['hook'], FlowCardEffectHook>
 
 export type SessionResponse = {
   ok: boolean
@@ -948,6 +953,10 @@ export class GameCore {
       this.state,
       {},
       context.player.id,
+      undefined,
+      undefined,
+      undefined,
+      createTriggerSnapshot(this.state),
     )
     if (nodes.length === 0) return false
 
@@ -1215,7 +1224,7 @@ export class GameCore {
   }
 
   /** Return hand card IDs whose registered effect declares `handHooks` containing `hook`. */
-  private getPlayerHandEffectCardIds(player: PlayerState, hook: CardEffectHook) {
+  private getPlayerHandEffectCardIds(player: PlayerState, hook: FlowCardEffectHook) {
     const handCards = [...player.occupationHand, ...player.minorHand]
     return handCards.filter(id => {
       const effect = getCardEffect(id)
@@ -1400,6 +1409,7 @@ export class GameCore {
     const pendingEnvelope = this.engineStack.peekPendingEnvelope()
     const pendingSnapshot = this.peekHostContextSnapshot()
     const pendingSourceCard = pendingEnvelope?.sourceCard ?? pendingSnapshot?.sourceCard
+    const pendingActionContext = pendingSnapshot?.actionContext
     for (const action of this.registry.values()) {
       if (!action.anytime) continue
       if (blockedIds.has(action.id)) continue
@@ -1426,6 +1436,7 @@ export class GameCore {
       actionId: 'anytime',
       phase: 'anytime',
       pendingSourceCard,
+      actionContext: pendingActionContext,
     }
     const matchedAnytime = getMatchingListeners(anytimeContext)
     for (const entry of matchedAnytime) {
@@ -2300,7 +2311,7 @@ export class GameCore {
   }
 
   private continueStageHook(
-    hook: StageResumeState['hook'],
+    hook: StageCardEffectHook,
     playerIndex = 0,
     cardIndex = 0,
   ) {
@@ -2312,13 +2323,13 @@ export class GameCore {
       if (!player) continue
       const cards = [
         ...this.getPlayerEffectCardIds(player),
-        ...this.getPlayerHandEffectCardIds(player, hook as CardEffectHook),
+        ...this.getPlayerHandEffectCardIds(player, hook),
       ]
       const startCardIndex = currentPlayerIndex === playerIndex ? cardIndex : 0
       for (let currentCardIndex = startCardIndex; currentCardIndex < cards.length; currentCardIndex += 1) {
         const cardId = cards[currentCardIndex]
         if (!cardId) continue
-        const flow = runCardEffectHook(this.state, player, cardId, hook as CardEffectHook)
+        const flow = runCardEffectHook(this.state, player, cardId, hook)
         if (!flow) continue
         this.startStageFlow(flow, hook, currentPlayerIndex, currentCardIndex + 1)
         return true
@@ -2327,32 +2338,55 @@ export class GameCore {
     return false
   }
 
+  private stageFlowNeedsPlayerInteraction(flow: ActionFlow): boolean {
+    if (flow.optional) return true
+    if (flow.type === 'leaf') {
+      const definition = this.registry.get(flow.actionId)
+      return Boolean(definition?.resolveChoice && !definition.skipChoiceWrap)
+    }
+    if (flow.type === 'or' || flow.type === 'xor') return true
+    if (flow.type === 'parallel' && flow.mode === 'trigger-select') return true
+    return flow.children.some((child) => this.stageFlowNeedsPlayerInteraction(child))
+  }
+
   private continueParallelStageHook(
-    hook: StageResumeState['hook'],
+    hook: StageCardEffectHook,
     playerIndex = 0,
   ) {
     for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
       const player = this.state.players[currentPlayerIndex]
       if (!player) continue
-      const children: ActionFlow[] = []
+      const autoChildren: ActionFlow[] = []
+      const promptedChildren: ActionFlow[] = []
       const cards = [
         ...this.getPlayerEffectCardIds(player),
-        ...this.getPlayerHandEffectCardIds(player, hook as CardEffectHook),
+        ...this.getPlayerHandEffectCardIds(player, hook),
       ]
       for (const cardId of cards) {
-        const flow = runCardEffectHook(this.state, player, cardId, hook as CardEffectHook)
+        const flow = runCardEffectHook(this.state, player, cardId, hook)
         if (flow) {
           const ownedFlow: ActionFlow = {
             ...flow,
             sourceCard: flow.sourceCard ?? cardId,
             targetPlayerId: flow.targetPlayerId ?? player.id,
           }
-          children.push(ownedFlow)
+          if (this.stageFlowNeedsPlayerInteraction(ownedFlow)) {
+            promptedChildren.push(ownedFlow)
+          } else {
+            autoChildren.push(ownedFlow)
+          }
         }
       }
-      if (children.length === 0) continue
+      if (autoChildren.length === 0 && promptedChildren.length === 0) continue
+      const children: ActionFlow[] = []
+      if (autoChildren.length > 0) {
+        children.push({ type: 'parallel', children: autoChildren })
+      }
+      if (promptedChildren.length > 0) {
+        children.push({ type: 'parallel', mode: 'trigger-select', children: promptedChildren })
+      }
       this.startStageFlow(
-        { type: 'parallel', mode: 'trigger-select', children },
+        children.length === 1 ? children[0]! : { type: 'seq', children },
         hook,
         currentPlayerIndex,
         0,
@@ -2364,7 +2398,7 @@ export class GameCore {
   }
 
   private continueSinglePlayerStageHook(
-    hook: StageResumeState['hook'],
+    hook: StageCardEffectHook,
     playerIndex: number,
     cardIndex = 0,
   ) {
@@ -2374,7 +2408,7 @@ export class GameCore {
     for (let currentCardIndex = cardIndex; currentCardIndex < cards.length; currentCardIndex += 1) {
       const cardId = cards[currentCardIndex]
       if (!cardId) continue
-      const flow = runCardEffectHook(this.state, player, cardId, hook as CardEffectHook)
+      const flow = runCardEffectHook(this.state, player, cardId, hook)
       if (!flow) continue
       this.startStageFlow(flow, hook, playerIndex, currentCardIndex + 1)
       return true
@@ -2426,6 +2460,7 @@ export class GameCore {
           grainFields: 0,
           vegetableFields: 0,
           harvestedCrops: [],
+          harvestCountApplications: [],
           harvestedPositions: [],
         }
       })
@@ -2491,6 +2526,12 @@ export class GameCore {
           ...result.reapSummary.harvestedCrops,
         ]
       }
+      if (result.reapSummary.harvestCountApplications?.length) {
+        entry.harvestCountApplications = [
+          ...(entry.harvestCountApplications ?? []),
+          ...result.reapSummary.harvestCountApplications,
+        ]
+      }
       incHarvestedGrain(player, result.reapSummary.resources.grain ?? 0)
       incHarvestedVegetable(player, result.reapSummary.resources.vegetable ?? 0)
       if (!this.hasPositiveResources(entry.resources)) {
@@ -2517,7 +2558,6 @@ export class GameCore {
     if (this.continueStageHook('onEndHarvestFieldPhase', playerIndex, cardIndex)) {
       return this.respond()
     }
-    delete this.state.harvestReapSummary
     this.state.roundPhase = 'harvest'
     return this.continueHarvestEffects()
   }
@@ -2613,6 +2653,7 @@ export class GameCore {
     if (this.continueStageHook('onAfterHarvest', playerIndex, cardIndex)) {
       return this.respond()
     }
+    delete this.state.harvestReapSummary
     delete this.state.harvestBreedSummary
     return this.finalizeRound()
   }
@@ -4027,7 +4068,7 @@ export class GameCore {
         farmPayload = { rooms: payload.rooms ?? [] }
         break
       case 'stable':
-        farmPayload = { stables: payload.stables ?? [] }
+        farmPayload = { stables: payload.stables ?? [], farmHand: payload.farmHand }
         break
       case 'plow':
         farmPayload = { tile: payload.tile }
@@ -4351,21 +4392,36 @@ export class GameCore {
     return false
   }
 
+  private clearDevCardState(player: PlayerState, cardId: string): void {
+    player.minorHand = player.minorHand.filter(id => id !== cardId)
+    player.occupationHand = player.occupationHand.filter(id => id !== cardId)
+    player.minorPlayed = player.minorPlayed.filter(id => id !== cardId)
+    player.occupationPlayed = player.occupationPlayed.filter(id => id !== cardId)
+    player.improvements = player.improvements.filter(id => id !== cardId)
+    player.extraOccupationsFromCards = (player.extraOccupationsFromCards ?? []).filter(id => id !== cardId)
+    player.activeModifiers = (player.activeModifiers ?? []).filter(modifier => modifier.cardId !== cardId)
+    player.playedCards = (player.playedCards ?? []).filter(
+      id => id !== cardId && id !== `minor:${cardId}` && id !== `occupation:${cardId}` && id !== `major:${cardId}`,
+    )
+    if (player.cardStates?.[cardId]) {
+      delete player.cardStates[cardId]
+    }
+  }
+
+  private clearDevDynamicActionSpace(cardId: string): void {
+    if (!getPlayerActionSpaceConfig(cardId)) return
+    this.state.actionSpaces = this.state.actionSpaces.filter(space => space.id !== cardId)
+  }
+
   devDrawCard(playerIndex: number, cardId: string): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
     const isMajor = !!getMajorCard(cardId)
     const isOccupation = !isMajor && this.isOccupationCard(cardId)
     for (const p of this.state.players) {
-      p.minorHand = p.minorHand.filter(id => id !== cardId)
-      p.occupationHand = p.occupationHand.filter(id => id !== cardId)
-      p.minorPlayed = p.minorPlayed.filter(id => id !== cardId)
-      p.occupationPlayed = p.occupationPlayed.filter(id => id !== cardId)
-      p.improvements = p.improvements.filter(id => id !== cardId)
-      if (p.cardStates?.[cardId]) {
-        delete p.cardStates[cardId]
-      }
+      this.clearDevCardState(p, cardId)
     }
+    this.clearDevDynamicActionSpace(cardId)
     if (isMajor) {
       if (!this.state.availableMajorImprovements.includes(cardId)) {
         this.state.availableMajorImprovements.push(cardId)
@@ -4393,22 +4449,20 @@ export class GameCore {
     if (!player) return this.respond(false, 'player not found')
     const isMajor = !!getMajorCard(cardId)
     const isOccupation = this.isOccupationCard(cardId)
+    for (const p of this.state.players) {
+      this.clearDevCardState(p, cardId)
+    }
+    this.clearDevDynamicActionSpace(cardId)
     if (isMajor) {
-      player.minorHand = player.minorHand.filter((id) => id !== cardId)
-      player.occupationHand = player.occupationHand.filter((id) => id !== cardId)
-      if (!player.improvements.includes(cardId)) {
-        player.improvements.push(cardId)
-      }
+      player.improvements.push(cardId)
       this.state.availableMajorImprovements = this.state.availableMajorImprovements.filter((id) => id !== cardId)
     } else if (isOccupation) {
-      player.occupationHand = player.occupationHand.filter((id) => id !== cardId)
-      if (!player.occupationPlayed.includes(cardId)) {
-        player.occupationPlayed.push(cardId)
-      }
+      player.occupationPlayed.push(cardId)
     } else {
-      player.minorHand = player.minorHand.filter((id) => id !== cardId)
-      if (!player.minorPlayed.includes(cardId)) {
-        player.minorPlayed.push(cardId)
+      player.minorPlayed.push(cardId)
+      if (getMinorImprovement(cardId)?.providesOccupation) {
+        player.extraOccupationsFromCards = player.extraOccupationsFromCards ?? []
+        player.extraOccupationsFromCards.push(cardId)
       }
     }
     getCardModifiers(cardId).forEach((modifier) => {
@@ -4419,6 +4473,10 @@ export class GameCore {
     // Trigger onBuy hook (creates PlayerActionCard action spaces, etc.)
     runCardEffectHook(this.state, player, cardId, 'onBuy')
     this.syncDynamicActionSpaces()
+    const dynamicSpace = this.state.actionSpaces.find(space => space.id === cardId)
+    if (dynamicSpace && getPlayerActionSpaceConfig(cardId)) {
+      this.registry.register(dynamicSpace)
+    }
     return this.respond()
   }
 

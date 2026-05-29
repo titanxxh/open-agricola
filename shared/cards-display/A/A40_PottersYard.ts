@@ -12,4 +12,5 @@ export const A40_PottersYard = new MinorImprovement({
   cost: { wood: 1, reed: 1 },
   prerequisite: 'At Most 7 Unused Farmyard Spaces',
   evenMoreSet: true,
+  waresSalesmanGains: [{ clay: 1, reed: 1 }],
 })

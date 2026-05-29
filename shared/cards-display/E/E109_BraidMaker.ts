@@ -13,6 +13,7 @@ export const E109_BraidMaker = new Occupation({
   ],
   cost: {},
   players: '1+',
+  waresSalesmanGains: [{ reed: 2 }],
   exchanges: [
     { from: { reed: 1 }, to: { food: 2 }, max: 1, triggers: ['anytime'] },
   ],

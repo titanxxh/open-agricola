@@ -1,8 +1,9 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged } from '../helpers/card-state'
-import type { ActionFlow, Resource } from '../../contract/types'
+import type { ActionFlow, ActionSpace, Resource } from '../../contract/types'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { C42_RavenousHunger } from '../../cards-display/C/C42_RavenousHunger'
@@ -10,8 +11,11 @@ import { C42_RavenousHunger } from '../../cards-display/C/C42_RavenousHunger'
 const CARD_ID = C42_RavenousHunger.id
 
 const accumulationSpaceIds = (context: CardListenerContext) =>
-  context.state.actionSpaces
-    .filter((space) => Object.values(space.gainPerRound).some((amount) => (amount ?? 0) > 0))
+  computeAllowedPlacementSpaces(context.state, context.player, { sourceCard: CARD_ID })
+    .map((placement) => context.state.actionSpaces.find((space) => space.id === placement.spaceId))
+    .filter((space): space is ActionSpace =>
+      !!space && Object.values(space.gainPerRound).some((amount) => (amount ?? 0) > 0),
+    )
     .map((space) => space.id)
 
 const collectedSpaceId = (context: CardListenerContext) => {

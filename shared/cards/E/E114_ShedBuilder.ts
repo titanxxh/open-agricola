@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getStableTilesBuiltThisAction } from '../helpers/action-snapshot'
+import { getStableCountForCards } from '../../domain/stables'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E114_ShedBuilder } from '../../cards-display/E/E114_ShedBuilder'
@@ -16,7 +17,7 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const builtThisAction = getStableTilesBuiltThisAction(context.player)
     if (builtThisAction <= 0) return
-    const nAfter = context.player.stableTiles.length
+    const nAfter = getStableCountForCards(context.player)
     const nBefore = nAfter - builtThisAction
     const gains: Partial<Resource> = {}
     for (let i = nBefore + 1; i <= nAfter; i++) {

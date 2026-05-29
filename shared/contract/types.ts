@@ -183,6 +183,11 @@ export type Worker = {
 export type WorkerRef = {
   playerId: string
   workerId: string
+  synthetic?: {
+    kind: 'linked-occupancy'
+    sourceCard: string
+    linkedWorkerId: string
+  }
 }
 
 export type FenceSegmentType = 'fence' | 'palisade'
@@ -348,11 +353,22 @@ export type HarvestedCropSummaryEntry = {
   sources: string[]
 }
 
+export type HarvestCountApplication = {
+  row: number
+  col: number
+  crop: CropStack['kind']
+  count: number
+  sources: string[]
+  tags: string[]
+  scope: 'top-stack' | 'field'
+}
+
 export type HarvestReapSummary = {
   resources: Partial<Resource>
   grainFields: number
   vegetableFields: number
   harvestedCrops?: HarvestedCropSummaryEntry[]
+  harvestCountApplications?: HarvestCountApplication[]
   /**
    * Positions of every field tile that produced a crop in this reap pass.
    * Mirror of BGA `getHarvestedFieldTilePositions($crops)`. Cards like
@@ -724,7 +740,12 @@ export type InteractionRequest =
           }
         | { farmType: 'fence'; selectableEdges: string[]; extraWood?: number }
         | { farmType: 'room'; selectableTiles: FarmTilePosition[]; maxSelections: number }
-        | { farmType: 'stable'; selectableTiles: FarmTilePosition[]; maxSelections: number }
+        | {
+            farmType: 'stable'
+            selectableTiles: FarmTilePosition[]
+            maxSelections: number
+            farmHandPositions?: FarmTilePosition[]
+          }
       options?: ActionChoiceOption[]
     }
   | {
@@ -825,6 +846,7 @@ export type InteractionFarmSelection =
       farmType: 'stable'
       selectableTiles: FarmTilePosition[]
       maxSelections: number
+      farmHandPositions?: FarmTilePosition[]
     }
   | {
       farmType: 'plow'

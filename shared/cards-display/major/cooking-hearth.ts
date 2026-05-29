@@ -13,6 +13,7 @@ export const cookingHearth1: MajorCardDisplay = {
   extraVp: false,
   isCookery: true,
   isBaking: true,
+  cookingHearthIdentity: true,
   returnCards: ['Major_Fireplace1', 'Major_Fireplace2'],
   desc: [
     '[Anytime]',

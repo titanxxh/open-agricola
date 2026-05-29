@@ -2,7 +2,6 @@ import type { CardImpl } from '../registry'
 import { E97_Beneficiary } from '../../cards-display/E/E97_Beneficiary'
 
 const CARD_ID = E97_Beneficiary.id
-const STALLWRIGHT_ID = 'E89_Stallwright'
 
 export const E97_Beneficiary_impl = {
   effect: {
@@ -25,15 +24,6 @@ export const E97_Beneficiary_impl = {
                 sourceCard: CARD_ID,
                 actionContext: { occupationParams: { exactCost: { food: 1 } } },
               },
-              ...(player.occupationPlayed.includes(STALLWRIGHT_ID)
-                ? [{
-                    type: 'leaf' as const,
-                    actionId: 'stables',
-                    sourceCard: STALLWRIGHT_ID,
-                    optional: true,
-                    actionContext: { max: 1, exactCost: { max: 1 }, trueAction: false },
-                  }]
-                : []),
               {
                 type: 'leaf' as const,
                 actionId: 'occupation',

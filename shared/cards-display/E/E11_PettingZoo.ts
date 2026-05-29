@@ -10,4 +10,5 @@ export const E11_PettingZoo = new MinorImprovement({
   category: 'FARMYARD_-_PLACE_FOR_ANIMALS',
   desc: ['As long as you have a pasture orthogonally adjacent to your house, you can keep animals of any type on this card, up to the number of rooms in your house.'],
   cost: { wood: 1 },
+  animalHolder: true,
 })

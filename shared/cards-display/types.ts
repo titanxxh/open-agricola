@@ -68,6 +68,13 @@ export class CardBase {
   isField?: boolean
   cardField?: { allowedCrops: readonly ('grain' | 'vegetable' | 'wood' | 'stone')[]; capacity: number }
   fireplaceIdentity?: boolean
+  cookingHearthIdentity?: boolean
+  ovenIdentity?: boolean
+  potteryIdentity?: boolean
+  preventsHandDiscard?: boolean
+  animalHolder?: boolean
+  blocksHouseAnimalZones?: boolean
+  waresSalesmanGains?: readonly Partial<Resource>[]
   mustBePlayedViaMinorAction?: boolean
   mustBePlayedViaMajorImprovementAction?: boolean
   enablesPalisades?: boolean
@@ -115,6 +122,13 @@ export class CardBase {
     if (this.isField) def.isField = this.isField
     if (this.cardField) def.cardField = this.cardField
     if (this.fireplaceIdentity) def.fireplaceIdentity = this.fireplaceIdentity
+    if (this.cookingHearthIdentity) def.cookingHearthIdentity = this.cookingHearthIdentity
+    if (this.ovenIdentity) def.ovenIdentity = this.ovenIdentity
+    if (this.potteryIdentity) def.potteryIdentity = this.potteryIdentity
+    if (this.preventsHandDiscard) def.preventsHandDiscard = this.preventsHandDiscard
+    if (this.animalHolder) def.animalHolder = this.animalHolder
+    if (this.blocksHouseAnimalZones) def.blocksHouseAnimalZones = this.blocksHouseAnimalZones
+    if (this.waresSalesmanGains) def.waresSalesmanGains = this.waresSalesmanGains
     if (this.mustBePlayedViaMinorAction) def.mustBePlayedViaMinorAction = this.mustBePlayedViaMinorAction
     if (this.mustBePlayedViaMajorImprovementAction) def.mustBePlayedViaMajorImprovementAction = this.mustBePlayedViaMajorImprovementAction
     if (this.enablesPalisades) def.enablesPalisades = this.enablesPalisades

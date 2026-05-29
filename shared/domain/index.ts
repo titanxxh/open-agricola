@@ -12,6 +12,8 @@ export {
   type AnimalZone,
   getTotalAnimalCapacity,
   getPastureCapacity,
+  isHouseAnimalZone,
+  countHouseAnimals,
 } from './animal-zones.ts'
 export { computePasturesFromFences, type Pasture } from './pasture.ts'
 export {

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { getCardEffect } from '../../shared/cards/card-effects'
+import { getCardEffect, getExtraRoomCapacity } from '../../shared/cards/card-effects'
 import { runSelectionEffect } from '../../shared/actions/helpers/selection-effect-registry'
+import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
 import type { GameState, PlayerState , ActionFlow } from '../../shared/contract/types'
 
 import '../../shared/cards/E/E76_LumberPile'
+import '../../shared/cards/B/B85_FarmHand'
 
 const CARD_ID = 'E76_LumberPile'
 const FIELD_EFFECT = 'lumber-pile-return-stables'
@@ -122,6 +124,7 @@ describe('E76_LumberPile card effect', () => {
 
   it('lists the B85 FarmHand tile alongside normal stables and returns it for 3 wood', () => {
     const player = createPlayer('p1')
+    player.occupationPlayed.push('B85_FarmHand')
     player.stableTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }]
     player.cardStates = {
       B85_FarmHand: {
@@ -139,6 +142,7 @@ describe('E76_LumberPile card effect', () => {
     ])
 
     const initialWood = player.resources.wood
+    expect(getExtraRoomCapacity(player)).toBe(1)
     runSelectionEffect(FIELD_EFFECT, {
       player,
       positions: ['0-0', '3-2', '0-1'],
@@ -149,5 +153,33 @@ describe('E76_LumberPile card effect', () => {
     expect(player.cardStates!.B85_FarmHand!.extraData?.position).toBeUndefined()
     // once-per-game flag persists so B85 cannot be re-used.
     expect(player.cardStates!.B85_FarmHand!.flagged).toBe(true)
+    expect(getExtraRoomCapacity(player)).toBe(0)
+  })
+
+  it('returning the B85 FarmHand tile releases its stable supply token', () => {
+    const player = createPlayer('p1')
+    player.stableTiles = [
+      { row: 0, col: 0 },
+      { row: 1, col: 0 },
+      { row: 2, col: 0 },
+    ]
+    player.cardStates = {
+      B85_FarmHand: {
+        flagged: true,
+        extraData: { position: { row: 3, col: 2 } },
+      },
+    }
+    const state = createState([player])
+    expect(getAvailableStableSupplyCount(state, player)).toBe(0)
+
+    runSelectionEffect(FIELD_EFFECT, {
+      player,
+      positions: ['3-2'],
+      sourceCard: CARD_ID,
+      state,
+      cards: [],
+    })
+
+    expect(getAvailableStableSupplyCount(state, player)).toBe(1)
   })
 })

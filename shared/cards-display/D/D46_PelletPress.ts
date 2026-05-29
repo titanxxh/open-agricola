@@ -14,4 +14,5 @@ export const D46_PelletPress = new MinorImprovement({
   cost: { clay: 2 },
   prerequisite: '2 Occupations',
   occupationPrerequisites: { min: 2 },
+  waresSalesmanGains: [{ reed: 2 }],
 })

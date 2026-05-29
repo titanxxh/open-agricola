@@ -97,6 +97,29 @@ describe('C49_BeerStall session', () => {
     expect(flow).toBeUndefined()
   })
 
+  it('counts the B85 FarmHand stable as one empty unfenced stable (card-facing count)', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+
+    const player = state.players[0]!
+    player.minorPlayed.push(CARD_ID)
+    player.resources.grain = 3
+    player.stableTiles = []
+    player.pastures = []
+    player.stableAnimals = {}
+    player.cardStates = {
+      B85_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
+    }
+
+    session.loadState(state)
+
+    const effect = getCardEffect(CARD_ID)
+    const flow = effect!.onHarvestFeedingPhase!(state, player)
+    expect(flow).toBeDefined()
+    expect(flow!.type).toBe('seq')
+  })
+
   it('offers xor with multiple options when multiple empty unfenced stables and grain', () => {
     const session = new GameSession()
     const state = session.getState().state

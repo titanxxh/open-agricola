@@ -8,6 +8,8 @@ export const pottery: MajorCardDisplay = {
   cost: { clay: 2, stone: 2 },
   vp: 2,
   extraVp: true,
+  potteryIdentity: true,
+  waresSalesmanGains: [{ clay: 1, reed: 1 }],
   desc: [
     '[Harvest]',
     '<CLAY> <ARROW-1X> 2<FOOD>',

@@ -66,6 +66,7 @@ describe('PlayerStats harvest tracking', () => {
         vegetableFields: 0,
         harvestedPositions: [],
         harvestedCrops: [],
+        harvestCountApplications: [],
       },
     ]))
     session.loadState(state)
@@ -80,6 +81,10 @@ describe('PlayerStats harvest tracking', () => {
     expect(session.getState().state.harvestReapSummary![player.id]!.harvestedCrops).toEqual([
       { row: 0, col: 0, crop: 'grain', amount: 1, sources: ['base'] },
       { row: 0, col: 1, crop: 'vegetable', amount: 1, sources: ['base'] },
+    ])
+    expect(session.getState().state.harvestReapSummary![player.id]!.harvestCountApplications).toEqual([
+      { row: 0, col: 0, crop: 'grain', count: 1, sources: ['base'], tags: [], scope: 'top-stack' },
+      { row: 0, col: 1, crop: 'vegetable', count: 1, sources: ['base'], tags: [], scope: 'top-stack' },
     ])
   })
 })

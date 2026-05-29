@@ -2,6 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardPlayedEvent, DraftGameEvent } from '../../contract/events'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { countTriggerCardsAs } from '../helpers/trigger-snapshot'
 import type { CardImpl } from '../registry'
 import { B49_Scales } from '../../cards-display/B/B49_Scales'
 
@@ -38,9 +39,8 @@ const hasPlayedCardForAction = (
 
 const checkBalance = (context: CardListenerContext): ActionHookResult | void => {
 
-  const occCount = context.player.occupationPlayed.length
-  const impCount =
-    context.player.minorPlayed.length + context.player.improvements.length
+  const occCount = countTriggerCardsAs(context, context.player, 'occupation')
+  const impCount = countTriggerCardsAs(context, context.player, 'improvement')
 
   if (occCount === impCount) {
     return { flow: gainLeaf(CARD_ID, { food: 2 }), sourceCard: CARD_ID }

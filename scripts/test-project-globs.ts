@@ -1,9 +1,15 @@
 import { defaultExclude } from 'vitest/config'
 
+const BASE_DEFAULT_EXCLUDE = defaultExclude.filter(pattern =>
+  pattern !== '**/.worktree/**' && pattern !== '.worktree/**')
+const isInsideWorktree = process.cwd().split(/[\\/]/).includes('.worktree')
+
 export const SLOW_INCLUDE = ['server/__tests__/[A-E][0-9]*_*-session.test.ts']
 export const LLM_GLOB = 'tests/llm-card-gen/**'
 export const LLM_INCLUDE = ['tests/llm-card-gen/**/*.test.ts']
-export const BASE_EXCLUDE = [...defaultExclude, '**/.worktree/**']
+export const BASE_EXCLUDE = isInsideWorktree
+  ? BASE_DEFAULT_EXCLUDE
+  : [...BASE_DEFAULT_EXCLUDE, '.worktree/**']
 export const SHARED_EXCLUDE = [...BASE_EXCLUDE, LLM_GLOB]
 export const FAST_EXCLUDE = [...SHARED_EXCLUDE, ...SLOW_INCLUDE]
 

@@ -1,15 +1,16 @@
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
+import { getStableCountForCards } from '../../domain/stables'
 import type { CardImpl } from '../registry'
 import { E43_BarnCats } from '../../cards-display/E/E43_BarnCats'
 
 const CARD_ID = E43_BarnCats.id
 
 export const E43_BarnCats_impl = {
-  prerequisiteCheck: (player) => player.stableTiles.length >= 1,
+  prerequisiteCheck: (player) => getStableCountForCards(player) >= 1,
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
-    const stables = player.stableTiles.length
+    const stables = getStableCountForCards(player)
     if (stables === 0) return
 
     // 1 stable → 2 rounds, 2 → 3, 3 → 4, 4 → 5

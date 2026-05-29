@@ -1,6 +1,7 @@
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { getStableCountForCards } from '../../domain/stables'
 import type { CardImpl } from '../registry'
 import { B54_Tumbrel } from '../../cards-display/B/B54_Tumbrel'
 
@@ -26,7 +27,7 @@ const listener: CardListenerRegistration = {
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isUnconditionalSow(context)) return
-    const stableCount = context.player.stableTiles.length
+    const stableCount = getStableCountForCards(context.player)
     if (stableCount <= 0) return
     return { flow: gainLeaf(CARD_ID, { food: stableCount }), sourceCard: CARD_ID }
   },

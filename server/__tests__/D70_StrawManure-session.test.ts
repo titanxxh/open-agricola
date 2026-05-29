@@ -3,8 +3,10 @@ import { GameSession } from '../game/authoritative-session'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import '../../shared/cards/D/D70_StrawManure'
-import type { ActionChoiceOption } from '../../shared/contract/types'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { resolveNonSkipChoice, resolveSkipChoice, resolveTriggerIfPresent } from './_helpers/trigger-select'
+
+const CARD_ID = 'D70_StrawManure'
 
 describe('D70_StrawManure session', () => {
   const setupHarvest = () => {
@@ -37,24 +39,15 @@ describe('D70_StrawManure session', () => {
     const { session } = setupHarvest()
 
     let resp = session.performRoundEnd()
-    // First choice: optional accept/skip for the Straw Manure sequence
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected choice')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
+    resp = resolveNonSkipChoice(session, resp)
 
-    // Accept the optional sequence
-    const acceptOption = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
-    expect(acceptOption).toBeDefined()
-    resp = session.resolveChoice(0, acceptOption!.value)
-
-    // Second choice: selection for vegetable fields
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
 
-    // Select both vegetable fields: 0-0 and 0-1
     resp = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 0 }, { row: 0, col: 1 }] })
     expect(resp.ok).toBe(true)
 
-    // After resolving, continue through harvest phases (feed, breed)
     autoAdvanceRoundEnd(session)
 
     const p = session.getState().state.players[0]!
@@ -81,13 +74,9 @@ describe('D70_StrawManure session', () => {
     const { session } = setupHarvest()
 
     let resp = session.performRoundEnd()
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected choice')
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
+    resp = resolveSkipChoice(session, resp)
 
-    // Skip the optional
-    resp = session.resolveChoice(0, '__skip__')
-
-    // Continue through harvest
     autoAdvanceRoundEnd(session)
 
     const p = session.getState().state.players[0]!

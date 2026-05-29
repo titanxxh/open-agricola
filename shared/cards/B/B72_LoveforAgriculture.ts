@@ -18,6 +18,9 @@ type PastureCrop = {
 
 const posKey = (tile: FarmTilePosition) => `${tile.row}-${tile.col}`
 
+const getPastureSize = (pasture: { tiles?: FarmTilePosition[]; size: number }) =>
+  pasture.tiles && pasture.tiles.length > 0 ? pasture.tiles.length : pasture.size
+
 const getPastureCrops = (player: PlayerState): PastureCrop[] =>
   readCardExtraData<PastureCrop[]>(player, CARD_ID, 'pastureCrops') ?? []
 
@@ -158,19 +161,16 @@ export const B72_LoveforAgriculture_impl = {
     setPastureCrops(player, remaining)
   },
 
-  // Reduce animal capacity of sown pastures
-  onComputeAnimalZones: (player, zones, _state) => {
+  computePastureCapacityModifiers: (player) => {
     const crops = getPastureCrops(player)
-    if (crops.length === 0) return
-    for (const zone of zones) {
-      if (zone.zoneType !== 'pasture') continue
-      const sown = crops.find((c) => c.pastureId === zone.id)
-      if (!sown) continue
-      const pasture = player.pastures.find((p) => p.id === zone.id)
-      if (!pasture) continue
-      const pastureSize = pasture.tiles?.length ?? pasture.size
-      zone.capacity = Math.max(0, zone.capacity - pastureSize)
-    }
+    if (crops.length === 0) return []
+    const sownPastureIds = new Set(crops.map((crop) => crop.pastureId))
+    return [{
+      sourceCard: CARD_ID,
+      kind: 'additive',
+      appliesTo: ({ pasture }) => sownPastureIds.has(pasture.id),
+      apply: (capacity, { pasture }) => Math.max(0, capacity - getPastureSize(pasture)),
+    }]
   },
 },
   reaches: [] as readonly string[],

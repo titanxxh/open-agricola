@@ -1,4 +1,5 @@
 import type { PlayerState } from '../../contract/types'
+import { getStableCountForCards } from '../../domain/stables'
 import { ensureCardState } from './card-state'
 
 const ACTION_SNAPSHOT_CARD_ID = '__actionSnapshot__'
@@ -10,7 +11,7 @@ export const recordActionSnapshot = (
   const cardState = ensureCardState(player, ACTION_SNAPSHOT_CARD_ID)
   cardState.extraData = {
     token,
-    stableTiles: player.stableTiles.length,
+    stableTiles: getStableCountForCards(player),
     roomTiles: player.roomTiles.length,
     fenceSegments: player.fenceSegments.length,
   }
@@ -23,7 +24,7 @@ export const getStableTilesBuiltThisAction = (player: PlayerState) => {
   const before =
     player.cardStates?.[ACTION_SNAPSHOT_CARD_ID]?.extraData?.stableTiles as number | undefined
   if (typeof before !== 'number') return 0
-  return Math.max(0, player.stableTiles.length - before)
+  return Math.max(0, getStableCountForCards(player) - before)
 }
 
 export const getRoomsBuiltThisAction = (player: PlayerState) => {

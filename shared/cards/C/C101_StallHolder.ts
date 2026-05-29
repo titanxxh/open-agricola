@@ -2,7 +2,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
-import { playerBoard } from '../../domain'
+import { getUnfencedStableCountForCards } from '../../domain/stables'
 import type { CardImpl } from '../registry'
 import { C101_StallHolder } from '../../cards-display/C/C101_StallHolder'
 
@@ -15,8 +15,7 @@ const anytimeListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
     if (context.player.resources.grain < 2) return
-    const idx = context.state.players.indexOf(context.player)
-    const unfencedStables = playerBoard(context.state, idx).animals.looseStableKeys().length
+    const unfencedStables = getUnfencedStableCountForCards(context.player)
     const foodGain = unfencedStables + 1
     return {
       flow: {

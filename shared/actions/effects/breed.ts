@@ -8,9 +8,8 @@ import type {
 } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
 import { playerBoard, getTotalAnimalCapacity } from '../../domain'
-import { shouldEnforceReorganizeOnLastHarvest } from '../../cards/card-effects'
-
-export type BreedAnimalType = 'sheep' | 'boar' | 'cattle'
+import { getBreedThreshold, shouldEnforceReorganizeOnLastHarvest } from '../../cards/card-effects'
+import type { BreedAnimalType } from '../../cards/card-effects'
 
 export type BreedOptions = {
   animalTypes?: ReadonlyArray<BreedAnimalType>
@@ -41,7 +40,7 @@ export const breed = (
   const summary: HarvestBreedSummary = { resources: {}, animalTypes: 0, animalCount: 0 }
   for (const type of types) {
     if (freeCapacity <= 0) break
-    if (player.resources[type] < 2) continue
+    if (player.resources[type] < getBreedThreshold(state, player, type, { sourceCard: opts.sourceCard })) continue
     player.resources[type] += 1
     summary.resources[type] = 1
     summary.animalTypes += 1

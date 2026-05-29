@@ -23,6 +23,7 @@ import {
 } from '../cards/card-effects.ts'
 import { computePasturesFromFences, type Pasture as PastureView } from './pasture.ts'
 import { isOwnOrdinaryFenceSegment } from './fence-segments.ts'
+import { getOrdinaryStableCount } from './stables.ts'
 
 // ---------------------------------------------------------------------------
 // Local farm validation types for the inlined validators. These mirror the
@@ -1352,7 +1353,7 @@ export const buildStableFarmInteraction = (
   }
   const structuralMax = Math.min(
     selectableTiles.length,
-    Math.max(0, 4 - normalized.stableTiles.length),
+    Math.max(0, 4 - getOrdinaryStableCount(player)),
     options?.max ?? Number.POSITIVE_INFINITY,
   )
   let resourceMax = 0

@@ -1,5 +1,5 @@
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
-import { playerBoard } from '../../domain'
+import { getEmptyUnfencedStableCountForCards } from '../../domain/stables'
 import type { CardImpl } from '../registry'
 import { C49_BeerStall } from '../../cards-display/C/C49_BeerStall'
 
@@ -8,10 +8,8 @@ const CARD_ID = C49_BeerStall.id
 export const C49_BeerStall_impl = {
   effect: {
   id: CARD_ID,
-  onHarvestFeedingPhase: (state, player) => {
-    const idx = state.players.indexOf(player)
-    const looseKeys = playerBoard(state, idx).animals.looseStableKeys()
-    const emptyStables = looseKeys.filter(k => !player.stableAnimals?.[k]).length
+  onHarvestFeedingPhase: (_state, player) => {
+    const emptyStables = getEmptyUnfencedStableCountForCards(player)
     if (emptyStables <= 0 || player.resources.grain < 1) return
     const maxExchanges = Math.min(emptyStables, player.resources.grain)
     if (maxExchanges === 1) {

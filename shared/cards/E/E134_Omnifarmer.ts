@@ -1,6 +1,7 @@
 import { payLeaf } from '../helpers/pay-gain-node'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
-import type { ActionChoiceOption, ActionFlow, PlayerState } from '../../contract/types'
+import { getHarvestOutcome } from '../../actions/helpers/harvest-outcome'
+import type { ActionChoiceOption, ActionFlow, GameState, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { E134_Omnifarmer } from '../../cards-display/E/E134_Omnifarmer'
 
@@ -10,13 +11,8 @@ type Storable = 'grain' | 'vegetable' | 'sheep' | 'boar' | 'cattle'
 
 const KEY_STORED = 'storedGoods'
 
-const KEY_USED = 'usedThisHarvest'
-
 const readStored = (player: PlayerState): Storable[] =>
   readCardExtraData<Storable[]>(player, CARD_ID, KEY_STORED) ?? []
-
-const readUsed = (player: PlayerState): boolean =>
-  readCardExtraData<boolean>(player, CARD_ID, KEY_USED) ?? false
 
 const buildChoiceFlow = (types: Storable[]): ActionFlow | undefined => {
   if (types.length === 0) return undefined
@@ -39,42 +35,34 @@ const buildChoiceFlow = (types: Storable[]): ActionFlow | undefined => {
   }
 }
 
+const outcomeStorableTypes = (state: GameState, player: PlayerState): Storable[] => {
+  const stored = readStored(player)
+  if (stored.length >= 5) return []
+  const outcome = getHarvestOutcome(state, player.id)
+  const types = [
+    ...outcome.harvestedCropTypes,
+    ...outcome.newbornAnimalTypes,
+  ] as Storable[]
+  return types.filter((type, index) =>
+    !stored.includes(type) && types.indexOf(type) === index,
+  )
+}
+
 export const E134_Omnifarmer_impl = {
   effect: {
     id: CARD_ID,
-    onAfterReap: (_state, player) => {
-      if (readUsed(player)) return
-      const stored = readStored(player)
-      if (stored.length >= 5) return
-      const types: Storable[] = []
-      if (player.resources.grain > 0 && !stored.includes('grain')) types.push('grain')
-      if (player.resources.vegetable > 0 && !stored.includes('vegetable')) types.push('vegetable')
-      return buildChoiceFlow(types)
+    onAfterHarvest: (state, player) => {
+      return buildChoiceFlow(outcomeStorableTypes(state, player))
     },
-    onHarvestFeedingPhase: (_state, player) => {
-      if (readUsed(player)) return
-      const stored = readStored(player)
-      if (stored.length >= 5) return
-      const hasE84 = player.minorPlayed?.includes('E84_DollysMother') ?? false
-      const sheepThreshold = hasE84 ? 2 : 3
-      const types: Storable[] = []
-      if (player.resources.sheep >= sheepThreshold && !stored.includes('sheep')) types.push('sheep')
-      if (player.resources.boar >= 3 && !stored.includes('boar')) types.push('boar')
-      if (player.resources.cattle >= 3 && !stored.includes('cattle')) types.push('cattle')
-      return buildChoiceFlow(types)
-    },
-    onAfterHarvest: (_state, player) => {
-      if (!readUsed(player)) return
-      writeCardExtraData(player, CARD_ID, KEY_USED, false)
-    },
-    resolveChoice: (_state, player, choice) => {
+    resolveChoice: (state, player, choice) => {
       if (choice === 'skip') return
       const validTypes: Storable[] = ['grain', 'vegetable', 'sheep', 'boar', 'cattle']
       if (!validTypes.includes(choice as Storable)) return
       const stored = readStored(player)
       if (stored.includes(choice as Storable)) return
+      if (!outcomeStorableTypes(state, player).includes(choice as Storable)) return
+      if ((player.resources[choice as Storable] ?? 0) <= 0) return
       writeCardExtraData(player, CARD_ID, KEY_STORED, [...stored, choice as Storable])
-      writeCardExtraData(player, CARD_ID, KEY_USED, true)
       return payLeaf({ cardId: CARD_ID, cost: { [choice as Storable]: 1 } })
     },
     computeBonusScore: (_state, player) => {
@@ -83,5 +71,5 @@ export const E134_Omnifarmer_impl = {
       return vpMap[Math.min(n, 5)]!
     },
   },
-  reaches: ['E84_DollysMother'] as readonly string[],
+  reaches: [] as readonly string[],
 } satisfies CardImpl

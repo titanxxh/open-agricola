@@ -6,6 +6,7 @@ import type {
   InteractionRequest,
 } from '../../contract/types'
 import type { GameEvent } from '../../contract/events'
+import type { TriggerSnapshot } from '../../cards/helpers/trigger-snapshot'
 import type { EngineContext, NodeStepResult } from '../types'
 import { BaseNode } from './base'
 
@@ -27,6 +28,7 @@ export class ActionNode extends BaseNode {
   public deferredHostCommitCompleted?: boolean
   public deferredHostTransactionEvents?: GameEvent[]
   public deferredHostActionEvents?: GameEvent[]
+  public deferredHostTriggerSnapshot?: TriggerSnapshot
   public deferredHostChoice?: string
   public deferredHostResultTargetNodeId?: string
   public deferredHostResultKey?: string
@@ -118,6 +120,7 @@ export class ActionNode extends BaseNode {
       deferredHostCommitCompleted: this.deferredHostCommitCompleted,
       deferredHostTransactionEvents: this.deferredHostTransactionEvents,
       deferredHostActionEvents: this.deferredHostActionEvents,
+      deferredHostTriggerSnapshot: this.deferredHostTriggerSnapshot,
       deferredHostChoice: this.deferredHostChoice,
       deferredHostResultTargetNodeId: this.deferredHostResultTargetNodeId,
       deferredHostResultKey: this.deferredHostResultKey,

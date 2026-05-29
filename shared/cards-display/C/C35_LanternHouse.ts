@@ -16,4 +16,5 @@ export const C35_LanternHouse = new MinorImprovement({
   prerequisite: 'No occupation',
   occupationPrerequisites: { max: 0 },
   extraVp: true,
+  preventsHandDiscard: true,
 })

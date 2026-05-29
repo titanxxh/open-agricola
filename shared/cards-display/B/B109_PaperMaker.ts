@@ -11,4 +11,5 @@ export const B109_PaperMaker = new Occupation({
   desc: ["Immediately before playing each occupation after this one, you can pay 1 <WOOD> total to get 1 <FOOD> for each occupation you have in front of you."],
   cost: {},
   players: "1+",
+  waresSalesmanGains: [{ wood: 1, reed: 1 }],
 })

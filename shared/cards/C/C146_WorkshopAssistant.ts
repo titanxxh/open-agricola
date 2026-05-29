@@ -10,7 +10,6 @@ import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registr
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import {
-  addCardResourceGained,
   incCardUsed,
   readCardExtraData,
   writeCardExtraData,
@@ -22,6 +21,7 @@ const CARD_ID = C146_WorkshopAssistant.id
 
 const CHOOSE_PAIRS_ACTION_ID = 'card_C146_WorkshopAssistant_choosePairs'
 const TAKE_PAIR_ACTION_ID = 'card_C146_WorkshopAssistant_takePair'
+const COMMIT_TAKE_PAIR_ACTION_ID = 'card_C146_WorkshopAssistant_commitTakePair'
 
 const PAIRS = [
   ['WC', { wood: 1, clay: 1 }, 'WOOD', 'CLAY'],
@@ -139,8 +139,8 @@ const choosePairsAction: ActionDefinition = {
 
 registerAdHocAction(choosePairsAction)
 
-const takePairAction: ActionDefinition = {
-  id: TAKE_PAIR_ACTION_ID,
+const commitTakePairAction: ActionDefinition = {
+  id: COMMIT_TAKE_PAIR_ACTION_ID,
   nameKey: `occupations.${CARD_ID}.name`,
   descriptionKey: `occupations.${CARD_ID}.description`,
   roundAvailable: 1,
@@ -153,14 +153,44 @@ const takePairAction: ActionDefinition = {
     const removeIndex = pairs.indexOf(key)
     const nextPairs = pairs.filter((pair, index) => pair !== key || index !== removeIndex)
     writeStoredPairs(player, nextPairs)
-    const gain = sumPairs([key])
-    for (const [resource, amount] of Object.entries(gain)) {
-      const r = resource as keyof Resource
-      player.resources[r] = (player.resources[r] ?? 0) + (amount ?? 0)
-    }
     incCardUsed(player, CARD_ID)
-    addCardResourceGained(player, CARD_ID, gain)
-    return { type: 'ok', resourcesGained: gain, extraData: { pairs: nextPairs } }
+    return { type: 'ok', extraData: { pairs: nextPairs } }
+  },
+}
+
+registerAdHocAction(commitTakePairAction)
+
+const takePairAction: ActionDefinition = {
+  id: TAKE_PAIR_ACTION_ID,
+  nameKey: `occupations.${CARD_ID}.name`,
+  descriptionKey: `occupations.${CARD_ID}.description`,
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: () => true,
+  execute: ({ player, params }) => {
+    const key = (params as { pair?: string } | undefined)?.pair
+    const pairs = readStoredPairs(player)
+    if (!key || !pairs.includes(key)) return { type: 'fail', errorKey: 'log.actionFail' }
+    return {
+      type: 'flow',
+      flow: {
+        type: 'seq',
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'gain',
+            params: sumPairs([key]),
+            sourceCard: CARD_ID,
+          },
+          {
+            type: 'leaf',
+            actionId: COMMIT_TAKE_PAIR_ACTION_ID,
+            params: { pair: key },
+            sourceCard: CARD_ID,
+          },
+        ],
+      },
+    }
   },
 }
 

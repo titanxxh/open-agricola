@@ -4,6 +4,7 @@ import type { InteractionState } from '../../shared/contract/types'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/B/B75_WoodWorkshop'
 import '../../shared/cards/A/A48_ShavingHorse'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 const B75 = 'B75_WoodWorkshop'
 const A48 = 'A48_ShavingHorse'
@@ -94,12 +95,8 @@ describe('B75_WoodWorkshop session', () => {
     expect(wait.interaction.promptKey).toBe('ui.interactionSelectTrigger')
 
     resp = session.resolveChoice(0, B75)
-    wait = expectWait(resp)
-    expect(wait.state.players[0]!.resources.wood).toBe(5)
-    expect(wait.interaction.promptKey).toBe('ui.interactionSelectTrigger')
-    expect(wait.interaction.options?.map((option) => option.value)).toContain(A48)
-
-    resp = session.resolveChoice(0, A48)
+    expect(resp.state.players[0]!.resources.wood).toBe(5)
+    resp = resolveTriggerIfPresent(session, resp, A48)
     wait = expectWait(resp)
     expect(wait.interaction.promptKey).toBe('ui.interactionOptionalAction')
     expect(wait.interaction.sourceCard).toBe(A48)

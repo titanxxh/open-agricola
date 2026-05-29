@@ -206,6 +206,8 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 <!-- prompt-sync:end id=card-effect-hooks -->
 
 
+`onBeforePlayerTurn` 是 non-flow skip-control exception：签名是 `(state, player) => { skipTurn?: boolean } | void`，只用于 labor turn 入口同步跳过该玩家本次放工人机会；不能返回 `ActionFlow`，不能创建 pending。
+
 
 额外允许的 meta 字段（不在 `cardEffectHooks` 数组中，但 AST validator 放行）：`id`、`handHooks`。
 

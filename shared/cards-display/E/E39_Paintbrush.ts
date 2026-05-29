@@ -12,4 +12,5 @@ export const E39_Paintbrush = new MinorImprovement({
   cost: { wood: 1 },
   prerequisite: '1 pig',
   extraVp: true,
+  waresSalesmanGains: [{ clay: 1, reed: 1 }],
 })

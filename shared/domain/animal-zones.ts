@@ -1,6 +1,7 @@
 import type { GameState, PlayerState, Pasture } from '../contract/types.ts'
 import { positionKey } from '../domain/farm.ts'
-import { getCardEffect, type Meeple } from '../cards/card-effects.ts'
+import { getCardEffect, type Meeple, type PastureCapacityModifier } from '../cards/card-effects.ts'
+import { playerHasCardCapability } from '../cards/helpers/card-type.ts'
 
 // ---------------------------------------------------------------------------
 // AnimalZone type and computation helpers (formerly in
@@ -13,6 +14,7 @@ export type AnimalZone = {
   zoneType: 'pasture' | 'house' | 'stable' | 'card'
   capacity: number
   blocked?: boolean
+  houseAnimalZone?: boolean
   animalType?: string | null
   animalCount?: number
   cardId?: string
@@ -21,9 +23,63 @@ export type AnimalZone = {
 
 type AnimalType = 'sheep' | 'boar' | 'cattle'
 
+export const isHouseAnimalZone = (zone: AnimalZone): boolean =>
+  zone.zoneType === 'house' || zone.houseAnimalZone === true
+
+export const countHouseAnimals = (
+  player: PlayerState,
+  state: GameState = { completedFeedingPhases: 0 } as GameState,
+  type?: AnimalType,
+): number =>
+  computeAnimalZones(player, state)
+    .filter(isHouseAnimalZone)
+    .reduce((sum, zone) => {
+      const count = zone.animalCount ?? 0
+      if (count <= 0) return sum
+      if (!zone.animalType) return sum
+      if (type && zone.animalType !== type) return sum
+      return sum + count
+    }, 0)
+
 /** Pasture capacity formula: `size * 2 * 2^stables`. */
 export const getPastureCapacity = (pasture: Pasture) =>
   pasture.size * 2 * Math.pow(2, pasture.stables)
+
+const getPlayedCardIds = (player: PlayerState) => [
+  ...(player.minorPlayed ?? []),
+  ...(player.occupationPlayed ?? []),
+  ...(player.improvements ?? []),
+]
+
+const collectPastureCapacityModifiers = (
+  player: PlayerState,
+  state: GameState,
+): PastureCapacityModifier[] =>
+  getPlayedCardIds(player).flatMap((cardId) =>
+    getCardEffect(cardId)?.computePastureCapacityModifiers?.(player, state) ?? [],
+  )
+
+const applyPastureCapacityModifiers = (
+  baseCapacity: number,
+  ctx: {
+    player: PlayerState
+    state: GameState
+    pasture: Pasture
+    pastureIndex: number
+  },
+  modifiers: PastureCapacityModifier[],
+): number => {
+  let capacity = baseCapacity
+  for (const modifier of modifiers.filter((mod) => mod.kind === 'replacement')) {
+    if (modifier.appliesTo && !modifier.appliesTo(ctx)) continue
+    capacity = modifier.apply(capacity, ctx)
+  }
+  for (const modifier of modifiers.filter((mod) => mod.kind === 'additive')) {
+    if (modifier.appliesTo && !modifier.appliesTo(ctx)) continue
+    capacity = modifier.apply(capacity, ctx)
+  }
+  return capacity
+}
 
 /** Loose-stable tile keys (stables not inside any pasture). */
 export const getLooseStableKeys = (player: PlayerState) => {
@@ -42,19 +98,29 @@ export const computeAnimalZones = (
   player: PlayerState,
   state: GameState = { completedFeedingPhases: 0 } as GameState,
 ): AnimalZone[] => {
+  const allCards = getPlayedCardIds(player)
+  const pastureCapacityModifiers = collectPastureCapacityModifiers(player, state)
   const zones: AnimalZone[] = [
-    ...player.pastures.map((pasture, index) => ({
-      id: pasture.id,
-      zoneType: 'pasture' as const,
-      capacity: getPastureCapacity(pasture),
-      animalType: (pasture.animalType as string) ?? null,
-      animalCount: pasture.animalCount,
-      pastureIndex: index,
-    })),
+    ...player.pastures.map((pasture, index) => {
+      const capacity = applyPastureCapacityModifiers(
+        getPastureCapacity(pasture),
+        { player, state, pasture, pastureIndex: index },
+        pastureCapacityModifiers,
+      )
+      return {
+        id: pasture.id,
+        zoneType: 'pasture' as const,
+        capacity,
+        animalType: (pasture.animalType as string) ?? null,
+        animalCount: pasture.animalCount,
+        pastureIndex: index,
+      }
+    }),
     {
       id: 'house',
       zoneType: 'house' as const,
       capacity: 1,
+      houseAnimalZone: true,
       animalType: (player.houseAnimalType as string) ?? null,
       animalCount: player.houseAnimalCount ?? 0,
     },
@@ -66,11 +132,6 @@ export const computeAnimalZones = (
       animalCount: player.stableAnimals?.[key] ? 1 : 0,
     })),
   ]
-  const allCards = [
-    ...(player.minorPlayed ?? []),
-    ...(player.occupationPlayed ?? []),
-    ...(player.improvements ?? []),
-  ]
   for (const cardId of allCards) {
     const effect = getCardEffect(cardId)
     if (effect?.onComputeAnimalZones) {
@@ -78,6 +139,11 @@ export const computeAnimalZones = (
       if (Array.isArray(result)) {
         zones.push(...result)
       }
+    }
+  }
+  if (playerHasCardCapability(player, 'blocksHouseAnimalZones')) {
+    for (let i = zones.length - 1; i >= 0; i -= 1) {
+      if (isHouseAnimalZone(zones[i]!)) zones.splice(i, 1)
     }
   }
   zones.forEach((zone) => {
