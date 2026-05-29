@@ -98,6 +98,8 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 
 当前没有开放的基础设施 umbrella 待办。已完成的历史条目已从本节移除；仍需持续关注的通用机制记录在 §5 架构审阅。
 
+本轮新增进行中基础设施：Card implementation boundary guard。`pnpm run check:card-impl-boundaries` 使用 TypeScript AST 扫描生产 `shared/cards/A-E/*.ts` 中的运行时跨卡 id 读取；当前为 warn-only，用于驱动 cross-card runtime closure 迁移，待迁移完成后再切入严格验证路径。
+
 本轮新增已完成基础设施：Action-level cancel policy。`plow` / `sow` / `construct` / `stables` / `fence` / `reorganize` / internal `selection` 均不再把 direct `cancel` 当 action-level success path；可选跳过由父级 optional node 的 `__skip__` 表达。`selection` 默认至少选 1 项，只有显式 `minSelections: 0` 才允许空提交，并且提交路径按 `positionFilter` / `selectableTiles` 校验可选位置。`construct` / `fence` 的 doability 会在真实 state 中排除无可提交布局，包括 cloned preview player，避免 direct cancel 被拒绝后出现不可完成 pending；fence layout feasibility 复用缓存的 connected tile sets，避免 availability 检查反复枚举农场组合。
 
 本轮新增已完成基础设施：zone-aware card listener。listener 默认只匹配已打出卡，显式 `zones: ['hand', 'played']` 才能在手牌中监听；匹配结果向 handler 透传 `ownerCardZone`。D36 这类单卡历史需求落在本卡 `cardStates`，不新增全局 sheep stats；手牌卡的局部 `cardStates` / 以该手牌卡为 source 的 public events / 派生 log entry / 过滤后的 event/archive seq cursor / runtime `publicEventCancellations` / 按手牌 id keyed 的 `cardAvailability` 在非 owner snapshot 中隐藏。收获喂食转食物通过通用 `harvest-feed-conversion` synthetic listener dispatch 暴露 `harvest.feedConverted` 事件；future meeple 结算通过通用 `future-meeple-resolved` synthetic listener dispatch 暴露 `futureMeeple.resolved` 事件。两者都不在 session core 写单卡分支。
