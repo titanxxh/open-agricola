@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
-import type { ActionChoiceOption, FarmTilePosition, PlayerState } from '../../shared/contract/types'
+import type { FarmTilePosition, PlayerState } from '../../shared/contract/types'
 import '../../shared/cards/B/B165_GameProvider'
+import { resolveNonSkipChoice, resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 const CARD_ID = 'B165_GameProvider'
 
@@ -38,11 +39,8 @@ const setupHarvest = (
 
 const acceptB165 = (session: GameSession) => {
   let resp = session.performRoundEnd()
-  expect(resp.interaction.stateId).toBe('wait')
-  if (resp.interaction.stateId !== 'wait') throw new Error('expected optional choice')
-  const accept = resp.interaction.options?.find((option: ActionChoiceOption) => option.value !== '__skip__')
-  expect(accept).toBeDefined()
-  resp = session.resolveChoice(0, accept!.value)
+  resp = resolveTriggerIfPresent(session, resp, CARD_ID)
+  resp = resolveNonSkipChoice(session, resp)
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
   expect(resp.interaction.sourceCard).toBe(CARD_ID)

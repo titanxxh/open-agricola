@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { markAllWorkersUsed } from '../../shared/domain/player'
-import type { ActionChoiceOption, ActionFlow, FarmTilePosition, GameState, PlayerState } from '../../shared/contract/types'
+import type { ActionFlow, FarmTilePosition, GameState, PlayerState } from '../../shared/contract/types'
+import { resolveNonSkipChoice, resolveSkipChoice, resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/C/C57_Crudite'
 
@@ -98,19 +99,13 @@ const fieldCountsOf = (player: PlayerState) =>
   player.fields.map((field) => field.stacks.at(-1)?.remaining ?? 0)
 
 const acceptOptional = (session: GameSession, resp: ReturnType<GameSession['performRoundEnd']>) => {
-  expect(resp.interaction.stateId).toBe('wait')
-  if (resp.interaction.stateId !== 'wait') throw new Error('expected optional choice')
-  const option = resp.interaction.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
-  expect(option).toBeDefined()
-  return session.resolveChoice(resp.interaction.playerIndex, option!.value)
+  resp = resolveTriggerIfPresent(session, resp, CARD_ID)
+  return resolveNonSkipChoice(session, resp)
 }
 
 const skipOptional = (session: GameSession, resp: ReturnType<GameSession['performRoundEnd']>) => {
-  expect(resp.interaction.stateId).toBe('wait')
-  if (resp.interaction.stateId !== 'wait') throw new Error('expected optional choice')
-  const option = resp.interaction.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
-  expect(option).toBeDefined()
-  return session.resolveChoice(resp.interaction.playerIndex, option!.value)
+  resp = resolveTriggerIfPresent(session, resp, CARD_ID)
+  return resolveSkipChoice(session, resp)
 }
 
 const expectC57Selection = (resp: ReturnType<GameSession['performRoundEnd']>) => {

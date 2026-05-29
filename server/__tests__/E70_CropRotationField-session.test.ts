@@ -8,6 +8,7 @@ import { buildSowFarmInteraction } from '../../shared/domain/farmyard'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import '../../shared/cards/E/E70_CropRotationField'
 import '../../shared/cards/E/E69_MelonPatch'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 const CARD_ID = 'E70_CropRotationField'
 const OTHER_EXTRA_CARD_ID = 'E69_MelonPatch'
@@ -194,6 +195,7 @@ describe('E70_CropRotationField session', () => {
       addMinorCard(session, OTHER_EXTRA_CARD_ID)
 
       let resp = session.performRoundEnd()
+      resp = resolveTriggerIfPresent(session, resp, CARD_ID)
       expect(resp.ok).toBe(true)
       expect(resp.interaction.stateId).toBe('wait')
       expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
