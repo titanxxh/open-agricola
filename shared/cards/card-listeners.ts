@@ -1,4 +1,4 @@
-import type { ActionExecutionContext, ActionExecutionResult, ActionSpace, GameState, PlayerState, Resource, Trade } from '../contract/types'
+import type { ActionExecutionContext, ActionExecutionResult, ActionFlow, ActionSpace, GameState, PlayerState, Resource, Trade } from '../contract/types'
 import { runActionHooks, type ActionHookContext, type ActionHookPhase, type ActionHookResult } from '../actions/hooks'
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
@@ -146,15 +146,26 @@ const normalizeCardListenerContext = (
   }
 }
 
+type RunCardListenersOptions = {
+  stampFlowOwner?: boolean
+}
+
+const stampFlowOwner = (flow: ActionFlow, ownerPlayerId: string): ActionFlow =>
+  flow.targetPlayerId ? flow : { ...flow, targetPlayerId: ownerPlayerId }
+
 export const runCardListeners = (
   context: CardListenerContextInput,
   listeners?: readonly CardListenerRegistration[],
+  options: RunCardListenersOptions = {},
 ) => {
   const results: ActionHookResult[] = []
   getMatchingListeners(context, listeners).forEach((entry) => {
     const result = executeCardListener(entry.registration, context, listenerOwnerOptions(entry))
     if (result) {
-      results.push(result)
+      const flow = result.flow && options.stampFlowOwner && entry.ownerPlayerId
+        ? stampFlowOwner(result.flow, entry.ownerPlayerId)
+        : result.flow
+      results.push(flow === result.flow ? result : { ...result, flow })
     }
   })
   return results
