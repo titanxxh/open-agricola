@@ -2526,7 +2526,6 @@ export class GameCore {
     if (this.continueStageHook('onEndHarvestFieldPhase', playerIndex, cardIndex)) {
       return this.respond()
     }
-    delete this.state.harvestReapSummary
     this.state.roundPhase = 'harvest'
     return this.continueHarvestEffects()
   }
@@ -2622,6 +2621,7 @@ export class GameCore {
     if (this.continueStageHook('onAfterHarvest', playerIndex, cardIndex)) {
       return this.respond()
     }
+    delete this.state.harvestReapSummary
     delete this.state.harvestBreedSummary
     return this.finalizeRound()
   }
