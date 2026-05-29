@@ -1,14 +1,11 @@
-import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { FarmTilePosition, PlayerState } from '../../contract/types'
+import type { FarmTilePosition, GameState, PlayerState } from '../../contract/types'
 import { FARM_ROWS, FARM_COLS, positionKey } from '../../domain/farm'
-import { payLeaf } from '../helpers/pay-gain-node'
 import {
   isCardFlagged,
   readCardExtraData,
+  setCardFlag,
   writeCardExtraData,
 } from '../helpers/card-state'
-import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import type { CardImpl } from '../registry'
 import { B85_FarmHand } from '../../cards-display/B/B85_FarmHand'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
@@ -17,8 +14,6 @@ const CARD_ID = B85_FarmHand.id
 
 const POSITION_KEY = 'position'
 
-const SELECT_EFFECT = 'farmhand-stable-select'
-
 /**
  * B85 Farm Hand (Occupation, 1+):
  * "Once this game, if you have 4 field tiles in a 2×2, you can build a
@@ -26,38 +21,42 @@ const SELECT_EFFECT = 'farmhand-stable-select'
  *  This stable provides room for a person but not animals."
  *
  * BGA rulings:
- *   - Only during an exact Build Stables action (NOT Lazybones E148 /
- *     Stable Planner A089 / any other "build a stable" effect).
+ *   - Only during the exact Build Stables action reached from Farm
+ *     Expansion (NOT Lazybones E148 / Stable Planner A089 / Stable
+ *     Cleaner C94 / any other "build a stable" effect). The entry is
+ *     modelled as a wrapper on the Farm Expansion `stables` leaf rather
+ *     than a generic anytime listener — see `common-farm-expansion.ts`
+ *     (`actionContext.farmHand`).
  *   - Can be returned by D102 SampleStableMaker / E76 LumberPile.
+ *
+ * The FarmHand stable position joins the regular `stables` `farm-select`
+ * interaction (`farmHandPositions`); the player may submit only the
+ * FarmHand position without picking any ordinary stable. Build payment,
+ * the `farm.stableBuilt` event, the after-stables listener and the action
+ * snapshot all run on the shared `stables` settlement path — so cost
+ * modifiers (e.g. C88) apply uniformly.
  *
  * State (`cardStates.B85_FarmHand`):
  *   - `extraData.position: { row, col }` — top-left of the 2×2 field
  *     block. Present only while the FarmHand stable is built.
- *   - `flags.used: boolean` — once-per-game sentinel; stays true even
- *     after D102 / E76 returns the tile.
+ *   - `flagged: boolean` — once-per-game sentinel; stays true even after
+ *     D102 / E76 returns the tile.
  *
  * Housing bonus plugs into the shared `computeExtraRoomCapacity` hook
  * (same mechanism as A10 WoodenShed / A85 Homekeeper / A127 Lodger /
- * C10 BunkBeds / D85 Reader / E85 MasterTanner). No change to
- * `player.rooms` — renovation cost, scoring, and stone-house bonus
- * stay untouched; animal logic is unaffected because the position is
- * never pushed into `stableTiles`.
- *
- * The "occupant moves to other rooms on return" BGA ruling is modelled
- * implicitly: `familySize` is unchanged, capacity drops by 1, so the
- * next family-growth attempt blocks naturally — no explicit relocation
- * UI. Documented in `docs/card_implementation_status.md`.
- *
- * BGA additionally serialises cost-modifier cards via
- * `orderComputeCardCosts`. We do not implement listener ordering (see
- * memory note); our bonus expander unions all orderings, which is a
- * strict superset of any single ordering.
+ * C10 BunkBeds / D85 Reader / E85 MasterTanner). The position is never
+ * pushed into `stableTiles`, so animal zones / pasture capacity / loose
+ * stable capacity are untouched; the card-facing stable count is derived
+ * separately in `shared/domain/stables.ts`.
  */
 
-const readFarmHandPosition = (player: PlayerState) =>
+export const readFarmHandPosition = (player: PlayerState) =>
   readCardExtraData<FarmTilePosition>(player, CARD_ID, POSITION_KEY)
 
 const isFarmHandUsed = (player: PlayerState) => isCardFlagged(player, CARD_ID)
+
+const playerHasCard = (player: PlayerState) =>
+  player.occupationPlayed.includes(CARD_ID)
 
 export const getFarmHandCandidates = (player: PlayerState): FarmTilePosition[] => {
   const fieldKeys = new Set(
@@ -79,59 +78,49 @@ export const getFarmHandCandidates = (player: PlayerState): FarmTilePosition[] =
   return candidates
 }
 
-registerSelectionEffect(SELECT_EFFECT, ({ player, positions }) => {
-  if (positions.length === 0) return
-  const [rowStr, colStr] = positions[0]!.split('-')
-  const row = Number(rowStr)
-  const col = Number(colStr)
-  if (!Number.isFinite(row) || !Number.isFinite(col)) return
-  writeCardExtraData(player, CARD_ID, POSITION_KEY, { row, col })
-})
+/**
+ * FarmHand positions offered inside a Build Stables `farm-select`. Empty
+ * unless the player owns an unused B85 and has at least one stable supply
+ * token left after every other reservation.
+ */
+export const getFarmHandStablePositions = (
+  state: GameState,
+  player: PlayerState,
+): FarmTilePosition[] => {
+  if (!playerHasCard(player)) return []
+  if (isFarmHandUsed(player)) return []
+  if (getAvailableStableSupplyCount(state, player) <= 0) return []
+  return getFarmHandCandidates(player)
+}
 
-const anytimeListener: CardListenerRegistration = {
-  id: 'B85-farm-hand-anytime',
-  cardIds: [CARD_ID],
-  phases: ['anytime' as ActionHookPhase],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    // Once-per-game gate: `flags.used` survives a D102/E76 return.
-    if (isFarmHandUsed(context.player)) return
-    // BGA ruling: only the exact Build Stables action qualifies.
-    if (context.space?.id !== 'stables') return
-    if (getAvailableStableSupplyCount(context.state, context.player) <= 0) return
-    // Pay 1 wood (matches BGA's `canAffordStablePlan(…, 1)` with the
-    // standard 1-wood-per-stable cost).
-    if ((context.player.resources.wood ?? 0) < 1) return
-    const candidates = getFarmHandCandidates(context.player)
-    if (candidates.length === 0) return
+const isFarmHandPositionLegal = (
+  state: GameState,
+  player: PlayerState,
+  position: FarmTilePosition,
+): boolean =>
+  getFarmHandStablePositions(state, player).some(
+    (candidate) => candidate.row === position.row && candidate.col === position.col,
+  )
 
-    return {
-      flow: {
-        type: 'seq',
-        children: [
-          payLeaf({ cardId: CARD_ID, cost: { wood: 1 } }),
-          {
-            type: 'leaf',
-            actionId: 'selection',
-            sourceCard: CARD_ID,
-            actionContext: {
-              selectionKind: 'farm-position',
-              selectionEffect: SELECT_EFFECT,
-              maxSelections: 1,
-              minSelections: 1,
-              selectableTiles: candidates,
-            },
-          },
-          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
-        ],
-      },
-      sourceCard: CARD_ID,
-      labelKey: 'cards.B85_FarmHand.anytime',
-    }
-  },
+/**
+ * Settle a chosen FarmHand stable: write the once-per-game flag and the
+ * position. Supply consumption is implicit — `getAvailableStableSupplyCount`
+ * already treats the stored position as one occupied token. Returns false
+ * when the position is not a legal FarmHand candidate (already used,
+ * supply exhausted, or not a 2×2 field centre).
+ */
+export const applyFarmHandStable = (
+  state: GameState,
+  player: PlayerState,
+  position: FarmTilePosition,
+): boolean => {
+  if (!isFarmHandPositionLegal(state, player, position)) return false
+  setCardFlag(player, CARD_ID, true)
+  writeCardExtraData(player, CARD_ID, POSITION_KEY, { row: position.row, col: position.col })
+  return true
 }
 
 export const B85_FarmHand_impl = {
-  listeners: [anytimeListener],
   effect: {
     id: CARD_ID,
     /**

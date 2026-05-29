@@ -15,7 +15,7 @@ export const farmExpansion: ActionDefinition = {
     promptKey: 'ui.interactionFarmExpansionSelect',
     children: [
       { type: 'leaf', actionId: 'construct' },
-      { type: 'leaf', actionId: 'stables' },
+      { type: 'leaf', actionId: 'stables', actionContext: { farmHand: true } },
     ],
   },
 }

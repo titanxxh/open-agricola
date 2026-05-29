@@ -740,7 +740,12 @@ export type InteractionRequest =
           }
         | { farmType: 'fence'; selectableEdges: string[]; extraWood?: number }
         | { farmType: 'room'; selectableTiles: FarmTilePosition[]; maxSelections: number }
-        | { farmType: 'stable'; selectableTiles: FarmTilePosition[]; maxSelections: number }
+        | {
+            farmType: 'stable'
+            selectableTiles: FarmTilePosition[]
+            maxSelections: number
+            farmHandPositions?: FarmTilePosition[]
+          }
       options?: ActionChoiceOption[]
     }
   | {
@@ -841,6 +846,7 @@ export type InteractionFarmSelection =
       farmType: 'stable'
       selectableTiles: FarmTilePosition[]
       maxSelections: number
+      farmHandPositions?: FarmTilePosition[]
     }
   | {
       farmType: 'plow'
