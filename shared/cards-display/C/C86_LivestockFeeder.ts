@@ -8,6 +8,7 @@ export const C86_LivestockFeeder = new Occupation({
   category: "FARM_PLANNER",
   desc: ["When you play this card, you immediately get 1 <GRAIN>. This card can hold 1 animal of any type for each <GRAIN> in your supply."],
   cost: {},
+  animalHolder: true,
   occupationPrerequisites: {"min":2},
   players: "1+",
 })
