@@ -10,6 +10,7 @@ export const C148_MudWallower = new Occupation({
   category: 'FARM_PLANNER',
   desc: ['Every fourth time you use an accumulation space, you get 1 <PIG>, held by this card.'],
   cost: {},
+  animalHolder: true,
   players: '4+',
   evenMoreSet: true,
 })

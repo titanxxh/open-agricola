@@ -10,5 +10,6 @@ export const B86_TruffleSearcher = new Occupation({
   category: 'FARM_PLANNER',
   desc: ['This card can hold a number of <PIG> equal to the number of completed feeding phases.'],
   cost: {},
+  animalHolder: true,
   players: '1+',
 })
