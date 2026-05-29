@@ -125,7 +125,13 @@ export type FarmRenovatedEvent = GameEventBase<'farm.renovated'> & {
 }
 
 export type FarmStableBuiltEvent = GameEventBase<'farm.stableBuilt'> & {
-  stables: Array<{ playerId: string; row: number; col: number }>
+  stables: Array<{
+    playerId: string
+    row: number
+    col: number
+    kind?: 'normal' | 'special'
+    sourceCardId?: string
+  }>
 }
 
 export type FarmFenceBuiltEvent = GameEventBase<'farm.fenceBuilt'> & {
