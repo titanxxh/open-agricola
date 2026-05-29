@@ -94,7 +94,7 @@ import * as harvestPhase from './phases/harvest.ts'
 import * as draftPhase from './phases/draft.ts'
 import { getCardModifiers } from '../cards/card-modifiers.ts'
 import { getCardEffect } from '../cards/card-effects.ts'
-import type { CardEffectHook } from '../cards/card-effects.ts'
+import type { FlowCardEffectHook } from '../cards/card-effects.ts'
 import { runCardEffectHook } from '../cards/card-effects.ts'
 import { positionKey } from '../domain/farm.ts'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions, runCardListeners } from '../cards/card-listeners.ts'
@@ -335,6 +335,8 @@ type StageResumeState = {
     originPlayerIndex?: number | null
   }
 }
+
+type StageCardEffectHook = Extract<StageResumeState['hook'], FlowCardEffectHook>
 
 export type SessionResponse = {
   ok: boolean
@@ -1215,7 +1217,7 @@ export class GameCore {
   }
 
   /** Return hand card IDs whose registered effect declares `handHooks` containing `hook`. */
-  private getPlayerHandEffectCardIds(player: PlayerState, hook: CardEffectHook) {
+  private getPlayerHandEffectCardIds(player: PlayerState, hook: FlowCardEffectHook) {
     const handCards = [...player.occupationHand, ...player.minorHand]
     return handCards.filter(id => {
       const effect = getCardEffect(id)
@@ -2300,7 +2302,7 @@ export class GameCore {
   }
 
   private continueStageHook(
-    hook: StageResumeState['hook'],
+    hook: StageCardEffectHook,
     playerIndex = 0,
     cardIndex = 0,
   ) {
@@ -2312,13 +2314,13 @@ export class GameCore {
       if (!player) continue
       const cards = [
         ...this.getPlayerEffectCardIds(player),
-        ...this.getPlayerHandEffectCardIds(player, hook as CardEffectHook),
+        ...this.getPlayerHandEffectCardIds(player, hook),
       ]
       const startCardIndex = currentPlayerIndex === playerIndex ? cardIndex : 0
       for (let currentCardIndex = startCardIndex; currentCardIndex < cards.length; currentCardIndex += 1) {
         const cardId = cards[currentCardIndex]
         if (!cardId) continue
-        const flow = runCardEffectHook(this.state, player, cardId, hook as CardEffectHook)
+        const flow = runCardEffectHook(this.state, player, cardId, hook)
         if (!flow) continue
         this.startStageFlow(flow, hook, currentPlayerIndex, currentCardIndex + 1)
         return true
@@ -2328,7 +2330,7 @@ export class GameCore {
   }
 
   private continueParallelStageHook(
-    hook: StageResumeState['hook'],
+    hook: StageCardEffectHook,
     playerIndex = 0,
   ) {
     for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
@@ -2337,10 +2339,10 @@ export class GameCore {
       const children: ActionFlow[] = []
       const cards = [
         ...this.getPlayerEffectCardIds(player),
-        ...this.getPlayerHandEffectCardIds(player, hook as CardEffectHook),
+        ...this.getPlayerHandEffectCardIds(player, hook),
       ]
       for (const cardId of cards) {
-        const flow = runCardEffectHook(this.state, player, cardId, hook as CardEffectHook)
+        const flow = runCardEffectHook(this.state, player, cardId, hook)
         if (flow) {
           const ownedFlow: ActionFlow = {
             ...flow,
@@ -2364,7 +2366,7 @@ export class GameCore {
   }
 
   private continueSinglePlayerStageHook(
-    hook: StageResumeState['hook'],
+    hook: StageCardEffectHook,
     playerIndex: number,
     cardIndex = 0,
   ) {
@@ -2374,7 +2376,7 @@ export class GameCore {
     for (let currentCardIndex = cardIndex; currentCardIndex < cards.length; currentCardIndex += 1) {
       const cardId = cards[currentCardIndex]
       if (!cardId) continue
-      const flow = runCardEffectHook(this.state, player, cardId, hook as CardEffectHook)
+      const flow = runCardEffectHook(this.state, player, cardId, hook)
       if (!flow) continue
       this.startStageFlow(flow, hook, playerIndex, currentCardIndex + 1)
       return true

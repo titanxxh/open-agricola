@@ -78,6 +78,34 @@ describe('onBeforePlayerTurn hook (game-core skip-turn dispatch)', () => {
     expect(resp.state.currentPlayerIndex).toBe(1)
   })
 
+  it('does not treat ActionFlow-shaped returns as stage flow', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+
+    const p1 = state.players[1]!
+    p1.resources.food = 0
+    p1.occupationPlayed.push(TEST_CARD)
+    installSkipOnceCard({
+      onBeforePlayerTurn: () => ({
+        type: 'leaf',
+        actionId: 'gain',
+        params: { resources: { food: 1 } },
+      } as unknown as { skipTurn?: boolean }),
+    })
+
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'day-laborer')
+    expect(resp.ok).toBe(true)
+    resp = confirmNextPlayer(session)
+    expect(resp.ok).toBe(true)
+    expect(resp.state.currentPlayerIndex).toBe(1)
+    expect(resp.interaction.stateId).toBe('idle')
+    expect(resp.state.players[1]!.resources.food).toBe(0)
+  })
+
   it('caps consecutive skips at players.length to avoid infinite loop', () => {
     const session = new GameSession()
     const state = session.getState().state

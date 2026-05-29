@@ -54,6 +54,12 @@ describe('D134_OysterEater skip-next-placement (onBeforePlayerTurn)', () => {
     // the second worker available).
     expect(resp.state.currentPlayerIndex).toBe(1)
     expect(resp.state.players[0]!.cardStates?.D134_OysterEater?.extraData?.skipNextPlacement).toBeUndefined()
+    expect(resp.interaction.stateId).toBe('idle')
+    expect(resp.state.events).toContainEqual(expect.objectContaining({
+      type: 'turn.skipped',
+      playerId: owner.id,
+      reason: 'cardEffect',
+    }))
   })
 
   it('owner skips only once when flag is 1', () => {

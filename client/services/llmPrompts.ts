@@ -120,13 +120,13 @@ const CARD_IMPL = {
 
 ## effect 阶段 hook
 
-每个 hook 签名为 \`(state, player) => ActionFlow | void\`（\`onBuy\` 额外接收 \`paymentInfo\`）。
+除特别说明外，每个 hook 签名为 \`(state, player) => ActionFlow | void\`（\`onBuy\` 额外接收 \`paymentInfo\`）。
 
 | hook | 触发时机 | 频率 |
 |------|----------|------|
 | onBuy | 打出此卡时 | 一次 |
 | onBeforeStartOfTurn | 每轮发新行动前 | 每轮 |
-| onBeforePlayerTurn | 玩家个人回合开始前（可返回 \`{skipTurn:true}\` 跳过本人回合） | 每行动 |
+| onBeforePlayerTurn | 玩家个人回合开始前（non-flow skip-control，只可返回 \`{skipTurn:true}\` 跳过本人回合，不返回 ActionFlow） | 每行动 |
 | onRoundStart | 新一轮格子翻开后 | 每轮 |
 | onAllWorkersPlaced | 所有工人放置完成 | 每轮 |
 | onEndTurn | 每名玩家行动结束后 | 每行动 |
