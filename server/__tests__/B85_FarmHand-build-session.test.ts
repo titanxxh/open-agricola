@@ -16,8 +16,11 @@ import {
 import { positionKey } from '../../shared/domain/farm'
 import { playerBoard } from '../../shared/domain'
 import type { GameEvent } from '../../shared/contract/events'
+import { runSelectionEffect } from '../../shared/actions/helpers/selection-effect-registry'
 
 import '../../shared/cards/B/B85_FarmHand'
+import '../../shared/cards/D/D102_SampleStableMaker'
+import '../../shared/cards/E/E76_LumberPile'
 
 const CARD_ID = 'B85_FarmHand'
 
@@ -226,5 +229,96 @@ describe('B85 FarmHand — candidate detection', () => {
     } as Partial<PlayerState>)
     const player = session.getState().state.players[0]!
     expect(getFarmHandCandidates(player)).toEqual([])
+  })
+})
+
+describe('B85 FarmHand — return-stable lifecycle (#187)', () => {
+  const buildFarmHand = () => {
+    const session = setupBuildStables()
+    enterStableSelect(session)
+    const commit = session.commitSelectionChoice(0, { farmHand: FARM_HAND_TILE })
+    expect(commit.ok).toBe(true)
+    const player = commit.state.players[0]!
+    expect(readFarmHandPosition(player)).toEqual(FARM_HAND_TILE)
+    expect(getExtraRoomCapacity(player)).toBe(1)
+    return { session, state: commit.state, player }
+  }
+
+  const positionStr = positionKey(FARM_HAND_TILE)
+
+  it('E76 return clears the FarmHand stable and reverses its lifecycle', () => {
+    const { state, player } = buildFarmHand()
+    const supplyBefore = getAvailableStableSupplyCount(state, player)
+
+    const flow = runSelectionEffect('lumber-pile-return-stables', {
+      player,
+      positions: [positionStr],
+      cards: [],
+      sourceCard: 'E76_LumberPile',
+      state,
+    })
+
+    expect(flow).toBeUndefined()
+    expect(readFarmHandPosition(player)).toBeUndefined()
+    expect(player.cardStates?.[CARD_ID]?.flagged).toBe(true)
+    expect(getExtraRoomCapacity(player)).toBe(0)
+    expect(getAvailableStableSupplyCount(state, player)).toBe(supplyBefore + 1)
+    expect(player.stableTiles).toEqual([])
+  })
+
+  it('D102 return clears the FarmHand stable and reverses its lifecycle', () => {
+    const { state, player } = buildFarmHand()
+    const supplyBefore = getAvailableStableSupplyCount(state, player)
+
+    const flow = runSelectionEffect('sample-stable-maker-return', {
+      player,
+      positions: [positionStr],
+      cards: [],
+      sourceCard: 'D102_SampleStableMaker',
+      state,
+    })
+
+    expect(flow).toBeUndefined()
+    expect(readFarmHandPosition(player)).toBeUndefined()
+    expect(player.cardStates?.[CARD_ID]?.flagged).toBe(true)
+    expect(getExtraRoomCapacity(player)).toBe(0)
+    expect(getAvailableStableSupplyCount(state, player)).toBe(supplyBefore + 1)
+  })
+
+  it('does not create an animal-reorganization flow when returning the FarmHand stable', () => {
+    const { state, player } = buildFarmHand()
+    const capacityBefore = getTotalAnimalCapacity(player, state)
+
+    const flow = runSelectionEffect('lumber-pile-return-stables', {
+      player,
+      positions: [positionStr],
+      cards: [],
+      sourceCard: 'E76_LumberPile',
+      state,
+    })
+
+    expect(flow).toBeUndefined()
+    const zones = computeAnimalZones(player, state)
+    expect(zones.map((zone) => zone.id)).not.toContain(`stable:${positionStr}`)
+    expect(getTotalAnimalCapacity(player, state)).toBe(capacityBefore)
+  })
+
+  it('offers no FarmHand position on a later Build Stables once it has been returned', () => {
+    const returnedSession = setupBuildStables({
+      cardStates: { [CARD_ID]: { flagged: true, extraData: {} } },
+    } as Partial<PlayerState>)
+    const state = returnedSession.getState().state
+    const player = state.players[0]!
+
+    expect(readFarmHandPosition(player)).toBeUndefined()
+    expect(getFarmHandStablePositions(state, player)).toEqual([])
+
+    const resp = enterStableSelect(returnedSession)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const farm = resp.interaction.farm
+    expect(farm?.farmType).toBe('stable')
+    if (farm?.farmType !== 'stable') return
+    expect(farm.farmHandPositions).toBeUndefined()
   })
 })
