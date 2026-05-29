@@ -7,7 +7,8 @@ export const E72_ArtichokeField_impl = makeCardFieldImpl(
   CARD_ID,
   { allowedCrops: ['grain', 'vegetable'], capacity: 1 },
   {
-    onReap: ({ player }) => {
+    onReap: ({ player, trigger }) => {
+      if (trigger.phase !== 'harvest') return
       player.resources.food += 1
     },
   },
