@@ -279,6 +279,71 @@ describe('A112 and D72 harvest count integration', () => {
     ])
   })
 
+  it('D72 harvests two grain from a selected grain field with two top-stack grain', () => {
+    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => [])
+    const player = makePlayer([
+      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
+    ])
+    player.minorPlayed.push('D72_StableManure')
+    player.cardStates.D72_StableManure = {
+      extraData: { selectedPositions: ['0-0'] },
+    }
+
+    const result = reap(makeState(player), player)
+
+    expect(player.resources.grain).toBe(2)
+    expect(player.fields[0]!.stacks).toEqual([])
+    expect(result.reapSummary.harvestedCrops).toEqual([
+      {
+        row: 0,
+        col: 0,
+        crop: 'grain',
+        amount: 2,
+        sources: ['base', 'D72_StableManure'],
+      },
+    ])
+  })
+
+  it('D72 harvests the lower stack when the selected top stack is depleted', () => {
+    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => [])
+    const player = makePlayer([
+      {
+        row: 0,
+        col: 0,
+        stacks: [
+          { kind: 'vegetable', remaining: 1 },
+          { kind: 'grain', remaining: 1 },
+        ],
+      },
+    ])
+    player.minorPlayed.push('D72_StableManure')
+    player.cardStates.D72_StableManure = {
+      extraData: { selectedPositions: ['0-0'] },
+    }
+
+    const result = reap(makeState(player), player)
+
+    expect(player.resources.grain).toBe(1)
+    expect(player.resources.vegetable).toBe(1)
+    expect(player.fields[0]!.stacks).toEqual([])
+    expect(result.reapSummary.harvestedCrops).toEqual([
+      {
+        row: 0,
+        col: 0,
+        crop: 'grain',
+        amount: 1,
+        sources: ['base', 'D72_StableManure'],
+      },
+      {
+        row: 0,
+        col: 0,
+        crop: 'vegetable',
+        amount: 1,
+        sources: ['base', 'D72_StableManure'],
+      },
+    ])
+  })
+
   it('D72 without E112 only offers fields with at least two crops total', () => {
     const player = makePlayer([
       { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] },
@@ -360,6 +425,83 @@ describe('A112 and D72 harvest count integration', () => {
     })
     expect(entry.sources).toHaveLength(3)
     expect(entry.sources).toEqual(expect.arrayContaining(['base', 'D72_StableManure', 'E112_GrainThief']))
+  })
+
+  it('D72 and E112 harvest the lower stack when E112 supplies the depleted top grain stack', () => {
+    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => [])
+    const player = makePlayer([
+      {
+        row: 0,
+        col: 0,
+        stacks: [
+          { kind: 'vegetable', remaining: 1 },
+          { kind: 'grain', remaining: 1 },
+        ],
+      },
+    ])
+    player.occupationPlayed.push('E112_GrainThief')
+    player.minorPlayed.push('D72_StableManure')
+    player.cardStates.D72_StableManure = {
+      extraData: { selectedPositions: ['0-0'] },
+    }
+    player.cardStates.E112_GrainThief = {
+      extraData: { selectedPositions: ['0-0'] },
+    }
+    const state = makeState(player)
+
+    const result = reap(state, player)
+    state.harvestReapSummary = { [player.id]: result.reapSummary }
+    const endFieldFlow = E112_GrainThief_impl.effect.onEndHarvestFieldPhase!(state, player)
+
+    expect(player.resources.grain).toBe(0)
+    expect(player.resources.vegetable).toBe(1)
+    expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 1 }])
+    expect(result.reapSummary.harvestedCrops).toEqual([
+      {
+        row: 0,
+        col: 0,
+        crop: 'vegetable',
+        amount: 1,
+        sources: ['base', 'D72_StableManure', 'E112_GrainThief'],
+      },
+    ])
+    expect(result.reapSummary.harvestCountApplications).toEqual([
+      {
+        row: 0,
+        col: 0,
+        crop: 'grain',
+        count: 0,
+        sources: ['base', 'D72_StableManure', 'E112_GrainThief'],
+        tags: ['supply-instead-of-field'],
+        scope: 'top-stack',
+      },
+      {
+        row: 0,
+        col: 0,
+        crop: 'vegetable',
+        count: 1,
+        sources: ['base', 'D72_StableManure', 'E112_GrainThief'],
+        tags: ['supply-instead-of-field'],
+        scope: 'top-stack',
+      },
+    ])
+    expect(endFieldFlow).toMatchObject({
+      type: 'seq',
+      children: [
+        {
+          type: 'leaf',
+          actionId: 'gain',
+          sourceCard: 'E112_GrainThief',
+          params: { grain: 1 },
+        },
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: 'E112_GrainThief',
+          params: { kind: 'set-extra-data', key: 'selectedPositions', value: undefined },
+        },
+      ],
+    })
   })
 
   it('E112 relaxes A112 and D72 grain-field selection thresholds only', () => {

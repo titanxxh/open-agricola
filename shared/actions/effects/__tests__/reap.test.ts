@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { reap } from '../reap'
+import type { DraftGameEvent } from '../../../contract/events'
 import type { GameState, PlayerState, Field } from '../../../contract/types'
 import * as cardListeners from '../../../cards/card-listeners'
 
@@ -69,8 +70,9 @@ describe('reap with stacks', () => {
     expect(res.reapSummary.harvestedPositions).toEqual([{ row: 0, col: 0 }])
   })
 
-  it('keeps ordinary harvest count modifiers on the original top stack', () => {
+  it('continues ordinary harvest count modifiers into the next stack when the top stack is depleted', () => {
     vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {})
+    const events: DraftGameEvent[] = []
     const p = mkPlayer([
       {
         stacks: [
@@ -81,18 +83,28 @@ describe('reap with stacks', () => {
         col: 0,
       },
     ])
-    const res = reap(mkState(), p, undefined, {
+    const res = reap(mkState(), p, {
+      emit: (event) => events.push(event),
+      emitMany: (nextEvents) => events.push(...nextEvents),
+    }, {
       harvestCounts: {
         '0-0': { count: 2, sources: ['base', 'test-extra'] },
       },
     })
     expect(p.resources.grain).toBe(1)
-    expect(p.resources.vegetable).toBe(0)
-    expect(p.fields[0].stacks).toEqual([{ kind: 'vegetable', remaining: 1 }])
+    expect(p.resources.vegetable).toBe(1)
+    expect(p.fields[0].stacks).toEqual([])
     expect(res.reapSummary.grainFields).toBe(1)
-    expect(res.reapSummary.vegetableFields).toBe(0)
+    expect(res.reapSummary.vegetableFields).toBe(1)
     expect(res.reapSummary.harvestedCrops).toEqual([
       { row: 0, col: 0, crop: 'grain', amount: 1, sources: ['base', 'test-extra'] },
+      { row: 0, col: 0, crop: 'vegetable', amount: 1, sources: ['base', 'test-extra'] },
+    ])
+    expect(events).toEqual([
+      expect.objectContaining({ type: 'farm.cropRemoved', crops: [expect.objectContaining({ crop: 'grain', amount: 1 })] }),
+      expect.objectContaining({ type: 'resource.moved', resources: { grain: 1 } }),
+      expect.objectContaining({ type: 'farm.cropRemoved', crops: [expect.objectContaining({ crop: 'vegetable', amount: 1 })] }),
+      expect.objectContaining({ type: 'resource.moved', resources: { vegetable: 1 } }),
     ])
   })
 
