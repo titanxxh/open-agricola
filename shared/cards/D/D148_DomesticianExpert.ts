@@ -1,4 +1,5 @@
 import type { CardImpl } from '../registry'
+import type { PlayerState } from '../../contract/types'
 import { D148_DomesticianExpert } from '../../cards-display/D/D148_DomesticianExpert'
 
 const CARD_ID = D148_DomesticianExpert.id
@@ -14,24 +15,30 @@ const countAdjacentRoomPairs = (roomTiles: Array<{row: number, col: number}>): n
   return pairs
 }
 
+const countHeldSheep = (player: PlayerState): number => {
+  const extra = player.cardStates?.[CARD_ID]?.extraData as { held?: unknown; animalType?: unknown } | undefined
+  if (extra?.animalType !== 'sheep') return 0
+  if (typeof extra.held !== 'number' || !Number.isFinite(extra.held)) return 0
+  return Math.max(0, Math.floor(extra.held))
+}
+
 export const D148_DomesticianExpert_impl = {
   effect: {
   id: CARD_ID,
   onComputeAnimalZones: (player, zones, _state) => {
-    // BGA: NEGATED_BY_MILKING_PLACE — if D12_MilkingPlace is played, this card
-    // adds no zone. (D12's filter also strips D148_special on its end.)
-    if ((player.minorPlayed ?? []).includes('D12_MilkingPlace')) return
     const roomTiles = player.roomTiles ?? []
     const pairs = countAdjacentRoomPairs(roomTiles)
     if (pairs === 0) return
     zones.push({
       id: `card:${CARD_ID}`,
       zoneType: 'card',
+      cardId: CARD_ID,
+      houseAnimalZone: true,
       capacity: pairs * 2,
       animalType: 'sheep',
-      animalCount: 0,
+      animalCount: Math.min(countHeldSheep(player), pairs * 2),
     })
   },
 },
-  reaches: ['D12_MilkingPlace'] as readonly string[],
+  reaches: [] as readonly string[],
 } satisfies CardImpl

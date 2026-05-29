@@ -1,6 +1,7 @@
 import type { GameState, PlayerState, Pasture } from '../contract/types.ts'
 import { positionKey } from '../domain/farm.ts'
 import { getCardEffect, type Meeple, type PastureCapacityModifier } from '../cards/card-effects.ts'
+import { playerHasCardCapability } from '../cards/helpers/card-type.ts'
 
 // ---------------------------------------------------------------------------
 // AnimalZone type and computation helpers (formerly in
@@ -13,6 +14,7 @@ export type AnimalZone = {
   zoneType: 'pasture' | 'house' | 'stable' | 'card'
   capacity: number
   blocked?: boolean
+  houseAnimalZone?: boolean
   animalType?: string | null
   animalCount?: number
   cardId?: string
@@ -20,6 +22,24 @@ export type AnimalZone = {
 }
 
 type AnimalType = 'sheep' | 'boar' | 'cattle'
+
+export const isHouseAnimalZone = (zone: AnimalZone): boolean =>
+  zone.zoneType === 'house' || zone.houseAnimalZone === true
+
+export const countHouseAnimals = (
+  player: PlayerState,
+  state: GameState = { completedFeedingPhases: 0 } as GameState,
+  type?: AnimalType,
+): number =>
+  computeAnimalZones(player, state)
+    .filter(isHouseAnimalZone)
+    .reduce((sum, zone) => {
+      const count = zone.animalCount ?? 0
+      if (count <= 0) return sum
+      if (!zone.animalType) return sum
+      if (type && zone.animalType !== type) return sum
+      return sum + count
+    }, 0)
 
 /** Pasture capacity formula: `size * 2 * 2^stables`. */
 export const getPastureCapacity = (pasture: Pasture) =>
@@ -100,6 +120,7 @@ export const computeAnimalZones = (
       id: 'house',
       zoneType: 'house' as const,
       capacity: 1,
+      houseAnimalZone: true,
       animalType: (player.houseAnimalType as string) ?? null,
       animalCount: player.houseAnimalCount ?? 0,
     },
@@ -118,6 +139,11 @@ export const computeAnimalZones = (
       if (Array.isArray(result)) {
         zones.push(...result)
       }
+    }
+  }
+  if (playerHasCardCapability(player, 'blocksHouseAnimalZones')) {
+    for (let i = zones.length - 1; i >= 0; i -= 1) {
+      if (isHouseAnimalZone(zones[i]!)) zones.splice(i, 1)
     }
   }
   zones.forEach((zone) => {
