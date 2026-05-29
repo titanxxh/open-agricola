@@ -136,6 +136,8 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 
 保留的后续边界：`C23_JobContract`、`B152_JuniorArtist`、`C117_Legworker` 与 space-pairing 的 cost / jump / adjacency 语义相关，不属于 shared lessons action-space id helper 关闭范围。
 
+本轮新增已完成基础设施：Stable count semantics helper。`shared/domain/stables.ts` 集中畜栏计数口径：`getOrdinaryStableCount`（普通 stable tile，用于动物容量 / placement / supply）、`getStableCountForCards`、`getUnfencedStableCountForCards`、`getEmptyUnfencedStableCountForCards`（card-facing 口径在 helper 内部封装 B85 FarmHand position 读取，B85 永远算 1 个 unfenced / empty-unfenced stable）。`getFarmHandStableInUseCount` 从 `supply-tokens.ts` 移入本 helper，`getAvailableStableSupplyCount` 改用 `getOrdinaryStableCount`。业务代码不再直接读 `player.stableTiles.length`，由 `shared/domain/__tests__/stable-count-guardrail.test.ts` 静态扫描 `shared/cards/**` 与 `shared/domain/**` 阻断（白名单仅 `shared/domain/stables.ts` 与测试/fixture）。本轮仅做语义不变的机械替换，card-facing 口径校准留给后续 issue。
+
 ## 7. Log 系统对比
 
 BGA 的日志是两层结构：`Core/Notifications.php` 负责玩家可见 gamelog 和客户端状态/动画通知，`Helpers/Log.php` 负责数据库变更、checkpoint/step/engine 边界、undo 后取消旧 gamelog packet 并发 `clearTurn` / `refreshUI` / `refreshHand`。
