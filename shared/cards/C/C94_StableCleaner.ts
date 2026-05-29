@@ -16,6 +16,9 @@ const collectStablesCostDelta = (context: CardListenerContext): Partial<Resource
     actionId: 'stables',
     phase: 'computeCosts',
     actionContext: STABLES_CONTEXT,
+    // Probe affordability of building one more stable (e.g. C88's 3rd/4th
+    // discount), which is what this anytime action can build.
+    params: { stableCount: 1 },
     sourceCard: CARD_ID,
   })
   const delta: Partial<Resource> = {}

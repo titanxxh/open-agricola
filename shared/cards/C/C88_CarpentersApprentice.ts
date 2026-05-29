@@ -7,7 +7,7 @@ import {
 } from '../../actions/effects/fencing'
 import { getOwnOrdinaryFenceCount } from '../../domain/fence-segments'
 import { getOwnOrdinaryFenceBuildLimit } from '../../domain/supply-tokens'
-import { getOrdinaryStableCount } from '../../domain/stables'
+import { getStableCountForCards } from '../../domain/stables'
 import type { CardImpl } from '../registry'
 import { C88_CarpentersApprentice } from '../../cards-display/C/C88_CarpentersApprentice'
 
@@ -30,11 +30,24 @@ const stablesCostListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['stables'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    // BGA `countCarpenterDiscounts`: only the 3rd and 4th stable get -1 wood.
-    // Players never build a 5th (max stable count is 4) but cap defensively.
-    const stablesBuilt = getOrdinaryStableCount(context.player)
-    if (stablesBuilt < 2 || stablesBuilt >= 4) return
-    return { costs: { wood: -1 } }
+    // BGA `countCarpenterDiscounts`: stable #3 and #4 each cost 1 wood less,
+    // counted by card-facing stable count (ordinary + B85 FarmHand). The total
+    // discount depends on how many of the 3rd/4th seats this build crosses, so
+    // it is a single aggregate amount rather than a per-unit delta. Callers
+    // therefore must pass `params.stableCount` = the stables this build/probe
+    // covers (ordinary + FarmHand); the dispatcher's per-unit computeCosts pass
+    // omits it (it cannot scale a partial discount) and yields no discount.
+    const totalBuilt = typeof context.params?.stableCount === 'number'
+      ? context.params.stableCount
+      : 0
+    if (totalBuilt <= 0) return
+    const before = getStableCountForCards(context.player)
+    const after = before + totalBuilt
+    let discounted = 0
+    if (before < 3 && after >= 3) discounted += 1
+    if (before < 4 && after >= 4) discounted += 1
+    if (discounted <= 0) return
+    return { costs: { wood: -discounted } }
   },
 }
 
