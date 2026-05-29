@@ -65,6 +65,23 @@ describe('C101_StallHolder session', () => {
     expect(isCardFlagged(player, 'C101_StallHolder')).toBe(true)
   })
 
+  it('counts the B85 FarmHand stable as unfenced (card-facing count)', () => {
+    const session = setup({ stableCount: 0 })
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.cardStates = {
+      ...player.cardStates,
+      B85_FarmHand: { extraData: { position: { row: 0, col: 0 } } },
+    }
+    session.loadState(state)
+
+    enterActiveInteraction(session)
+
+    const resp = session.takeAnytimeAction(0, 'C101-stall-holder-anytime')
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.food).toBe(2) // 1 unfenced stable + 1
+  })
+
   it('not available without 2 grain', () => {
     const session = setup()
     const state = session.getState().state

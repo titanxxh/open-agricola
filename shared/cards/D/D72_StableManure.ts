@@ -6,6 +6,7 @@ import {
   registerHarvestCountModifier,
 } from '../../actions/helpers/harvest-count-registry'
 import { fieldIsEmpty, fieldTopStack, fieldTotalRemaining } from '../../domain/field'
+import { getUnfencedStableCountForCards } from '../../domain/stables'
 import type { CardImpl } from '../registry'
 import { D72_StableManure } from '../../cards-display/D/D72_StableManure'
 
@@ -17,20 +18,6 @@ registerHarvestCountModifier(CARD_ID, ({ player, field }) => {
   if (fieldIsEmpty(field)) return
   return { delta: 1, sources: [CARD_ID] }
 })
-
-/**
- * Count stables not inside any fenced pasture.
- * A stable is "unfenced" if its tile does not belong to any pasture.
- */
-const countUnfencedStables = (player: PlayerState): number => {
-  const pastureTileKeys = new Set<string>()
-  for (const pasture of player.pastures) {
-    for (const tile of pasture.tiles) {
-      pastureTileKeys.add(positionKey(tile))
-    }
-  }
-  return player.stableTiles.filter(s => !pastureTileKeys.has(positionKey(s))).length
-}
 
 const eligibleFields = (state: GameState, player: PlayerState) =>
   player.fields.filter((field) => {
@@ -47,7 +34,7 @@ export const D72_StableManure_impl = {
   effect: {
   id: CARD_ID,
   onStartHarvestFieldPhase: (state, player) => {
-    const unfencedCount = countUnfencedStables(player)
+    const unfencedCount = getUnfencedStableCountForCards(player)
     if (unfencedCount === 0) return
 
     const croppedFields = eligibleFields(state, player)
