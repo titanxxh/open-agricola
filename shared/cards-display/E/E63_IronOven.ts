@@ -16,6 +16,7 @@ export const E63_IronOven = new MinorImprovement({
   cost: { stone: 3 },
   vp: 2,
   isBaking: true,
+  ovenIdentity: true,
   exchanges: [
     { from: { grain: 1 }, to: { food: 6 }, max: 1, triggers: ['bake-bread'] },
   ],

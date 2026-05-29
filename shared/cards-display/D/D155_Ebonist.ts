@@ -11,6 +11,7 @@ export const D155_Ebonist = new Occupation({
   desc: ['Each harvest, you can use this card to turn exactly 1 <WOOD> into 1 <FOOD> and 1 <GRAIN>.'],
   cost: {},
   players: '4+',
+  waresSalesmanGains: [{ wood: 1, reed: 1 }],
   exchanges: [
     { from: { wood: 1 }, to: { food: 1, grain: 1 }, max: 1, sourceId: CARD_ID, triggers: ['harvest'] },
   ],

@@ -1,0 +1,170 @@
+import { describe, expect, it } from 'vitest'
+import type { GameState, PlayerState } from '../../contract/types'
+import type { ActionSpace } from '../../contract/types'
+import type { CardListenerContext } from '../card-listeners'
+import type { ActionFlow } from '../../contract/types'
+import { getRegisteredCardListeners } from '../card-listeners'
+import { MinorImprovement } from '../../cards-display/types'
+import { registerAdHocMinorImprovement } from '../registry-runtime'
+import { B153_Housemaster_impl } from '../B/B153_Housemaster'
+
+import '../C/C75_Firewood'
+import '../E/E144_WaresSalesman'
+import '../D/D60_LargePottery'
+import '../B/B68_Beanfield'
+import '../D/D25_WitchesDanceFloor'
+import '../D/D64_BakingCourse'
+
+registerAdHocMinorImprovement(new MinorImprovement({
+  id: 'TEST_WaresSingle',
+  name: 'Test Wares Single',
+  deck: 'TEST',
+  number: 1,
+  desc: [],
+  waresSalesmanGains: [{ wood: 1, reed: 1 }],
+}))
+
+registerAdHocMinorImprovement(new MinorImprovement({
+  id: 'TEST_WaresMulti',
+  name: 'Test Wares Multi',
+  deck: 'TEST',
+  number: 2,
+  desc: [],
+  waresSalesmanGains: [{ clay: 1, reed: 1 }, { reed: 2 }],
+}))
+
+registerAdHocMinorImprovement(new MinorImprovement({
+  id: 'TEST_WaresNone',
+  name: 'Test Wares None',
+  deck: 'TEST',
+  number: 3,
+  desc: [],
+}))
+
+const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState =>
+  ({
+    improvements: [],
+    minorPlayed: [],
+    occupationPlayed: [],
+    minorHand: [],
+    occupationHand: [],
+    cardStates: {},
+    ...overrides,
+  }) as unknown as PlayerState
+
+const state = {} as GameState
+
+const firewoodListener = () =>
+  getRegisteredCardListeners().find((listener) => listener.id === 'C75-firewood-after-build')!
+
+const runFirewood = (choice: string) => {
+  const player = makePlayer({
+    minorPlayed: ['C75_Firewood'],
+    cardStates: { C75_Firewood: { counters: { wood: 2 } } },
+  })
+  return firewoodListener().handler({
+    state,
+    player,
+    space: {} as ActionSpace,
+    actionId: 'improvement',
+    phase: 'after',
+    choice,
+  } as unknown as CardListenerContext)
+}
+
+const waresListener = () =>
+  getRegisteredCardListeners().find((listener) => listener.id === 'E144-wares-salesman-after-improvement')!
+
+const runWaresSalesman = (choice: string) =>
+  waresListener().handler({
+    state,
+    player: makePlayer({ occupationPlayed: ['E144_WaresSalesman'] }),
+    space: {} as ActionSpace,
+    actionId: 'improvement',
+    phase: 'after',
+    choice,
+  } as unknown as CardListenerContext)
+
+describe('identity metadata migrations', () => {
+  describe('B153_Housemaster', () => {
+    it('scores major-like minors through major identity collection', () => {
+      const player = makePlayer({
+        minorPlayed: ['D60_LargePottery'],
+      })
+
+      expect(B153_Housemaster_impl.effect.computeBonusScore!(state, player)).toBe(1)
+    })
+
+    it('does not score ordinary minors as majors', () => {
+      const player = makePlayer({
+        minorPlayed: ['B68_Beanfield'],
+      })
+
+      expect(B153_Housemaster_impl.effect.computeBonusScore!(state, player)).toBe(0)
+    })
+  })
+
+  describe('C75_Firewood', () => {
+    it('triggers from explicit fireplace identity on Witches Dance Floor', () => {
+      const result = runFirewood('minor:D25_WitchesDanceFloor')
+
+      expect(result?.flow?.type).toBe('xor')
+      expect((result?.flow as Extract<ActionFlow, { type: 'xor' }>).children).toHaveLength(2)
+    })
+
+    it('does not trigger from a baking card without fireplace, cooking-hearth, or oven identity', () => {
+      expect(runFirewood('minor:D64_BakingCourse')).toBeUndefined()
+    })
+  })
+
+  describe('E144_WaresSalesman', () => {
+    it('uses card metadata for a single wares gain', () => {
+      const result = runWaresSalesman('minor:TEST_WaresSingle')
+
+      expect(result?.flow).toMatchObject({
+        type: 'leaf',
+        actionId: 'gain',
+        params: { wood: 1, reed: 1 },
+      })
+    })
+
+    it('uses card metadata for multiple wares gain choices', () => {
+      const result = runWaresSalesman('minor:TEST_WaresMulti')
+
+      expect(result?.flow?.type).toBe('xor')
+      expect((result?.flow as Extract<ActionFlow, { type: 'xor' }>).children.map((child) => child.params)).toEqual([
+        { clay: 1, reed: 1 },
+        { reed: 2 },
+      ])
+    })
+
+    it('uses production card metadata for wares gain choices', () => {
+      const result = runWaresSalesman('minor:C55_Studio')
+
+      expect(result?.flow?.type).toBe('xor')
+      expect((result?.flow as Extract<ActionFlow, { type: 'xor' }>).children.map((child) => child.params)).toEqual([
+        { wood: 1, reed: 1 },
+        { clay: 1, reed: 1 },
+        { stone: 1, reed: 1 },
+      ])
+    })
+
+    it('uses major card metadata for wares gain choices', () => {
+      const result = runWaresSalesman('major:Major_Joinery')
+
+      expect(result?.flow).toMatchObject({
+        type: 'leaf',
+        actionId: 'gain',
+        params: { wood: 1, reed: 1 },
+      })
+    })
+
+    it('does not trigger for cards without wares metadata', () => {
+      expect(runWaresSalesman('minor:TEST_WaresNone')).toBeUndefined()
+    })
+
+    it('does not trigger for major cards without wares metadata', () => {
+      expect(runWaresSalesman('major:Major_Well')).toBeUndefined()
+    })
+  })
+})

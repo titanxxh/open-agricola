@@ -9,6 +9,7 @@ export const clayOven: MajorCardDisplay = {
   vp: 2,
   extraVp: false,
   isBaking: true,
+  ovenIdentity: true,
   desc: [
     '[__Bake Bread__ action:]',
     '<GRAIN> <ARROW-1X> 5<FOOD>',

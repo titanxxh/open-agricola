@@ -12,6 +12,7 @@ export const E153_StoneSculptor = new Occupation({
   cost: {},
   players: '4+',
   extraVp: true,
+  waresSalesmanGains: [{ stone: 1, reed: 1 }],
   exchanges: [
     {
       from: { stone: 1 },

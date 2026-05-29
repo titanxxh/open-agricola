@@ -14,4 +14,5 @@ export const C153_PatternMaker = new Occupation({
   cost: {},
   players: '4+',
   extraVp: true,
+  waresSalesmanGains: [{ wood: 1, reed: 1 }],
 })

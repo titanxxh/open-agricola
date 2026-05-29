@@ -16,6 +16,7 @@ export const E64_SimpleOven = new MinorImprovement({
   cost: { clay: 2 },
   vp: 1,
   isBaking: true,
+  ovenIdentity: true,
   exchanges: [
     { from: { grain: 1 }, to: { food: 3 }, max: 1, triggers: ['bake-bread'] },
   ],

@@ -13,4 +13,5 @@ export const A159_JoineroftheSea = new Occupation({
   ],
   cost: {},
   players: '4+',
+  waresSalesmanGains: [{ wood: 1, reed: 1 }],
 })
