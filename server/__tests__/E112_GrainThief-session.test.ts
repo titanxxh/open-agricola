@@ -57,9 +57,6 @@ const makePlayer = (): PlayerState => ({
 const fieldCountsOf = (player: PlayerState) =>
   player.fields.map((field) => field.stacks.at(-1)?.remaining ?? 0)
 
-const grainHarvestedCropsOf = (resp: ReturnType<GameSession['performRoundEnd']>, player: PlayerState) =>
-  resp.state.harvestReapSummary?.[player.id]?.harvestedCrops?.filter((crop) => crop.crop === 'grain') ?? []
-
 const setupSession = () => {
   const session = new GameSession()
   const state = session.getState().state
@@ -155,21 +152,12 @@ describe('E112_GrainThief harvest timing', () => {
 
     resp = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 0 }] })
 
-    let player = resp.state.players[0]!
-    expect(fieldCountsOf(player)).toEqual([2, 0, 1])
-    expect(player.resources.grain).toBe(1)
-    expect(player.cardStates[CARD_ID]?.extraData?.selectedPositions).toEqual(['0-0'])
-    expect(grainHarvestedCropsOf(resp, player)).toEqual([
-      { row: 0, col: 1, crop: 'grain', amount: 1, sources: ['base'] },
-    ])
-
-    resp = selectE112Trigger(session, resp)
-
-    player = resp.state.players[0]!
+    const player = resp.state.players[0]!
     expect(fieldCountsOf(player)).toEqual([2, 0, 1])
     expect(player.resources.grain).toBe(2)
     expect(player.cardStates[CARD_ID]?.extraData?.selectedPositions).toBeUndefined()
     expect(resp.state.harvestReapSummary).toBeUndefined()
+    expect(resp.interaction.stateId).toBe('idle')
   })
 
   it('can select multiple grain fields and gains once per still valid selected field at end phase', () => {
@@ -181,17 +169,11 @@ describe('E112_GrainThief harvest timing', () => {
 
     resp = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 0 }, { row: 0, col: 1 }] })
 
-    let player = resp.state.players[0]!
-    expect(fieldCountsOf(player)).toEqual([2, 1, 1])
-    expect(player.resources.grain).toBe(0)
-    expect(grainHarvestedCropsOf(resp, player)).toEqual([])
-
-    resp = selectE112Trigger(session, resp)
-
-    player = resp.state.players[0]!
+    const player = resp.state.players[0]!
     expect(fieldCountsOf(player)).toEqual([2, 1, 1])
     expect(player.resources.grain).toBe(2)
     expect(player.cardStates[CARD_ID]?.extraData?.selectedPositions).toBeUndefined()
+    expect(resp.interaction.stateId).toBe('idle')
   })
 
   it('optional skip does not write card state and normal reap harvests grain fields', () => {

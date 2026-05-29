@@ -2337,6 +2337,17 @@ export class GameCore {
     return false
   }
 
+  private stageFlowNeedsPlayerInteraction(flow: ActionFlow): boolean {
+    if (flow.optional) return true
+    if (flow.type === 'leaf') {
+      const definition = this.registry.get(flow.actionId)
+      return Boolean(definition?.resolveChoice && !definition.skipChoiceWrap)
+    }
+    if (flow.type === 'or' || flow.type === 'xor') return true
+    if (flow.type === 'parallel' && flow.mode === 'trigger-select') return true
+    return flow.children.some((child) => this.stageFlowNeedsPlayerInteraction(child))
+  }
+
   private continueParallelStageHook(
     hook: StageCardEffectHook,
     playerIndex = 0,
@@ -2344,7 +2355,8 @@ export class GameCore {
     for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
       const player = this.state.players[currentPlayerIndex]
       if (!player) continue
-      const children: ActionFlow[] = []
+      const autoChildren: ActionFlow[] = []
+      const promptedChildren: ActionFlow[] = []
       const cards = [
         ...this.getPlayerEffectCardIds(player),
         ...this.getPlayerHandEffectCardIds(player, hook),
@@ -2357,12 +2369,23 @@ export class GameCore {
             sourceCard: flow.sourceCard ?? cardId,
             targetPlayerId: flow.targetPlayerId ?? player.id,
           }
-          children.push(ownedFlow)
+          if (this.stageFlowNeedsPlayerInteraction(ownedFlow)) {
+            promptedChildren.push(ownedFlow)
+          } else {
+            autoChildren.push(ownedFlow)
+          }
         }
       }
-      if (children.length === 0) continue
+      if (autoChildren.length === 0 && promptedChildren.length === 0) continue
+      const children: ActionFlow[] = []
+      if (autoChildren.length > 0) {
+        children.push({ type: 'parallel', children: autoChildren })
+      }
+      if (promptedChildren.length > 0) {
+        children.push({ type: 'parallel', mode: 'trigger-select', children: promptedChildren })
+      }
       this.startStageFlow(
-        { type: 'parallel', mode: 'trigger-select', children },
+        children.length === 1 ? children[0]! : { type: 'seq', children },
         hook,
         currentPlayerIndex,
         0,
