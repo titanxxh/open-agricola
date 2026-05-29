@@ -90,6 +90,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | Private Field Phase 已进入通用收获基础设施 | `private-field-phase` internal action、`reap` trigger metadata、Card Field reaper registry | C72/E25 不再返回未注册 `reap` leaf；普通田和 Card Field 都走 `reason: 'reap'` 事件与同一套 `immediatelyAfter.reap` listener，并用普通 `parallel` flow 承载反应。 |
 | Harvest field stage hook parallel 已进入通用收获基础设施 | `onStartHarvestFieldPhase` / `onHarvestFieldPhase` / `onEndHarvestFieldPhase`、`stageResume`、stage-level `parallel` flow | 三个 field phase hook 进入阶段时先收集全部可触发 card flows，再交给 engine 并行驱动；不再用逐卡 cursor 作为规则语义，普通 `reap` 仍在 `onHarvestFieldPhase` reactions 后发生。 |
 | Harvest feeding requirement modifier 已进入通用收获基础设施 | `computeHarvestFeedingRequirement()`、`registerHarvestFeedingRequirementModifier()`、E30/E159 | E30/E159 对齐 BGA `Player::getHarvestCost()` 公式扩展，不再通过 `onBeforeFeed` / `onAfterFeed` 临时改资源或 worker 标记；喂食主路径只读取通用公式结果。 |
+| Harvest count applications 已进入通用收获基础设施 | `HarvestReapSummary.harvestCountApplications`、`HarvestCountModifierResult.tags`、`computeHarvestSelectionThreshold()` | 普通 reap 记录 field/crop/count/source/tag/scope；E73 full-field 使用 `full-field-reap` tag，E112 supply-style 使用 `supply-instead-of-field` tag；E112 end field phase 只读本次 applications，不再读取 E73 状态；A112/D72 的额外收获选择门槛走通用 threshold modifier。 |
 | Cross-player undo boundary 已进入通用基础设施 | `confirm-player-switch`、SessionResponse undo availability、`undoStep` / `undoAction` boundary guard | opponent-scope trigger 切到 owner prompt 后不暴露 undo；后续 undo 只能回到切换后的 prompt，不能跨回触发玩家行动状态。 |
 | Before-endgame hook flow 已进入通用基础设施 | `onBeforeEndGame?: FlowEffectHandler`、`stageResume.hook='onBeforeEndGame'`、D132_HideFarmer | round 14 的 `onAfterRoundEnd` 完成后先运行 before-endgame hook flow，再进入 `gameover`；hook pending 可通过 stage resume 回到同一终局前链。`anytime-policy` 仅对白名单 D132 optional choice prompt 放开 anytime，数量选择 prompt 仍保持 stage hook chain 锁定。 |
 | Card capability metadata 已进入通用基础设施 | `CardDefinition.preventsHandDiscard` / `fireplaceIdentity` / `cookingHearthIdentity` / `ovenIdentity` / `animalHolder` / `blocksHouseAnimalZones` / `waresSalesmanGains`、`playerHasCardCapability()`、`getPlayedCardDefinitions()`、`collectCardDefinitionsAs()` | 运行时跨卡身份/能力读取不再直接读外卡 id；helper 只扫已打出区，并通过 `asType` 复用 `cardCountsAs`。B146/C35、B153 major identity、C75 fireplace/hearth/oven identity、E144 wares gain、D86 animal-holder occupation filtering、D12 house animal zone blocking 都已迁到 metadata/helper。 |
@@ -111,6 +112,8 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 本轮新增已完成基础设施：Card capability metadata 与 played-card helper。`CardDefinition` 增加 typed runtime metadata，`CardBase.toJSON()` 原样保留；`getPlayedCardDefinitions()` / `collectCardDefinitionsAs()` / `playerHasCardCapability()` 只检查已打出区，`asType` 复用 `cardCountsAs`。B146/C35 的 hand-discard prevention 已从直接 C35 id 读取迁到 `preventsHandDiscard`；B153、C75、E144、D86、D12 已分别迁到 major identity collection、fireplace/hearth/oven identity、wares gain metadata、animal-holder occupation filtering、house animal zone blocking。
 
 本轮新增已完成基础设施：House animal zone tag。`AnimalZone.houseAnimalZone` 标记“视作 house 动物区”的非 house zone；`computeAnimalZones()` 在所有 `onComputeAnimalZones` 完成后，如果玩家有 `blocksHouseAnimalZones` capability，就统一移除 `zoneType === 'house'` 或 `houseAnimalZone === true` 的 zone。`countHouseAnimals()` 用同一判定统计 D164 这类 house-zone 规则，避免 D164 读取 D148 id。
+
+本轮新增已完成基础设施：Harvest count applications 与 harvest selection threshold modifier。`reap()` 在本次 `HarvestReapSummary.harvestCountApplications` 中记录 field/crop/count/source/tag/scope；`HarvestCountModifierResult.tags` 表达 full-field reap、supply-instead-of-field 这类语义标签；E112 end field phase 只读取本次 applications 判断是否补 grain，不再读取 E73 状态；A112/D72 的可选田门槛改由 `computeHarvestSelectionThreshold()` 统一计算，E112 通过注册 modifier 把 grain field 门槛降为 1。
 
 本轮新增已完成基础设施：Action-level cancel policy。`plow` / `sow` / `construct` / `stables` / `fence` / `reorganize` / internal `selection` 均不再把 direct `cancel` 当 action-level success path；可选跳过由父级 optional node 的 `__skip__` 表达。`selection` 默认至少选 1 项，只有显式 `minSelections: 0` 才允许空提交，并且提交路径按 `positionFilter` / `selectableTiles` 校验可选位置。`construct` / `fence` 的 doability 会在真实 state 中排除无可提交布局，包括 cloned preview player，避免 direct cancel 被拒绝后出现不可完成 pending；fence layout feasibility 复用缓存的 connected tile sets，避免 availability 检查反复枚举农场组合。
 
@@ -478,7 +481,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `A109_SmallTrader` | 已对齐 |  |
 | `A110_Roughcaster` | 已对齐 |  |
 | `A111_WallBuilder` | 已对齐 |  |
-| `A112_ScytheWorker` | 已对齐 |  |
+| `A112_ScytheWorker` | 已对齐 | 额外收获选择门槛走 `computeHarvestSelectionThreshold()`；选中田通过 Harvest Count modifier 增加 count，并在 `harvestCountApplications` 记录来源 |
 | `A113_HeresyTeacher` | 已接受差异 | 已接受的行为 / 产品差异 |
 | `A114_SeasonalWorker` | 已对齐 |  |
 | `A115_ChiefForester` | 已对齐 |  |
@@ -978,7 +981,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D69_SmallGreenhouse` | 已对齐 |  |
 | `D70_StrawManure` | 已对齐 |  |
 | `D71_Changeover` | 已对齐 |  |
-| `D72_StableManure` | 已对齐 |  |
+| `D72_StableManure` | 已对齐 | 额外收获选择门槛走 `computeHarvestSelectionThreshold()`；选中田通过 Harvest Count modifier 增加 count，并在 `harvestCountApplications` 记录来源 |
 | `D73_SupplyBoat` | 已对齐 |  |
 | `D74_RoyalWood` | 已接受差异 | BGA banned，但 OA 按产品策略保留；stables 支付因 afterHost slot 通过 after-pay provenance 统计 |
 | `D75_WoodField` | 已对齐 |  |
@@ -1159,7 +1162,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E70_CropRotationField` | 已接受差异 | 已接受的行为 / 产品差异 |
 | `E71_CowPatty` | 已对齐 | 单个 eligible 也走 optional selection，多田使用精确 selectableTiles |
 | `E72_ArtichokeField` | 已接受差异 | 已接受的行为 / 产品差异 |
-| `E73_Scythe` | 已对齐 | 选择时记录 `fullReapPosition`，普通 reap 通过 Harvest Count override 收完整块田；位置保留到 EndHarvest 清理，和 E112 同田时 E73 优先 |
+| `E73_Scythe` | 已对齐 | 选择时记录 `fullReapPosition`，普通 reap 通过 Harvest Count override 收完整块田，并用 `full-field-reap` tag / `field` scope 写入 `harvestCountApplications`；位置保留到 EndHarvest 清理 |
 | `E74_AshTrees` | 已对齐 |  |
 | `E75_StoneAxe` | 已对齐 |  |
 | `E76_LumberPile` | 已对齐 |  |
@@ -1198,7 +1201,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E109_BraidMaker` | 已对齐 |  |
 | `E110_Dentist` | 已对齐 |  |
 | `E111_Recluse` | 已对齐 |  |
-| `E112_GrainThief` | 已对齐 | start 选择 grain fields，reap 通过 Harvest Count modifier 跳过 selected field；若同田被 E73 full reap 覆盖则不降 harvest count、不在 end field phase 供给补 grain；end field phase 清理 selectedPositions |
+| `E112_GrainThief` | 已对齐 | start 选择 grain fields；reap 通过 Harvest Count modifier 写入 `supply-instead-of-field` tag，end field phase 只读 `harvestCountApplications`，带 `full-field-reap` tag 的同田不补 grain；同时注册 selection threshold modifier，把 A112/D72 的 grain field 门槛降为 1；end harvest 清理 selectedPositions |
 | `E113_Godmother` | 已对齐 |  |
 | `E114_ShedBuilder` | 已对齐 |  |
 | `E115_SeedServant` | 已对齐 |  |

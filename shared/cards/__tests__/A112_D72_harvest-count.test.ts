@@ -1,10 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { reap } from '../../actions/effects/reap'
+import {
+  computeHarvestSelectionThreshold,
+  registerHarvestSelectionThresholdModifier,
+  unregisterHarvestSelectionThresholdModifier,
+} from '../../actions/helpers/harvest-count-registry'
 import type { Field, GameState, PlayerState } from '../../contract/types'
 import * as cardListeners from '../card-listeners'
 import { A112_ScytheWorker_impl } from '../A/A112_ScytheWorker'
 import { D72_StableManure_impl } from '../D/D72_StableManure'
-import '../E/E112_GrainThief'
+import { E112_GrainThief_impl } from '../E/E112_GrainThief'
+import '../E/E73_Scythe'
 
 const makePlayer = (fields: Field[]): PlayerState => ({
   id: 'p1',
@@ -43,6 +49,158 @@ const makeState = (player: PlayerState): GameState => ({
 describe('A112 and D72 harvest count integration', () => {
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it('normal reap records a base harvest count application', () => {
+    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => [])
+    const player = makePlayer([
+      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
+    ])
+
+    const result = reap(makeState(player), player)
+
+    expect(result.reapSummary.harvestCountApplications).toEqual([
+      {
+        row: 0,
+        col: 0,
+        crop: 'grain',
+        count: 1,
+        sources: ['base'],
+        tags: [],
+        scope: 'top-stack',
+      },
+    ])
+  })
+
+  it('E73 full-field reap records a tagged field-scope application', () => {
+    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => [])
+    const player = makePlayer([
+      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 3 }] },
+    ])
+    player.minorPlayed.push('E73_Scythe')
+    player.cardStates.E73_Scythe = {
+      extraData: { fullReapPosition: '0-0' },
+    }
+
+    const result = reap(makeState(player), player)
+
+    expect(result.reapSummary.harvestCountApplications).toEqual([
+      {
+        row: 0,
+        col: 0,
+        crop: 'grain',
+        count: 3,
+        sources: ['base', 'E73_Scythe'],
+        tags: ['full-field-reap'],
+        scope: 'field',
+      },
+    ])
+  })
+
+  it('E112 supply-style reap records a tagged zero-count application', () => {
+    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => [])
+    const player = makePlayer([
+      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
+    ])
+    player.occupationPlayed.push('E112_GrainThief')
+    player.cardStates.E112_GrainThief = {
+      extraData: { selectedPositions: ['0-0'] },
+    }
+
+    const result = reap(makeState(player), player)
+
+    expect(player.resources.grain).toBe(0)
+    expect(player.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
+    expect(result.reapSummary.harvestCountApplications).toEqual([
+      {
+        row: 0,
+        col: 0,
+        crop: 'grain',
+        count: 0,
+        sources: ['base', 'E112_GrainThief'],
+        tags: ['supply-instead-of-field'],
+        scope: 'top-stack',
+      },
+    ])
+  })
+
+  it('E112 end field phase grants supply grain from harvest count applications', () => {
+    const player = makePlayer([
+      { row: 0, col: 0, stacks: [] },
+      { row: 0, col: 1, stacks: [] },
+    ])
+    player.occupationPlayed.push('E112_GrainThief')
+    player.cardStates.E112_GrainThief = {
+      extraData: { selectedPositions: ['0-0', '0-1'] },
+    }
+    const state = makeState(player)
+    state.harvestReapSummary = {
+      [player.id]: {
+        resources: { grain: 2 },
+        grainFields: 1,
+        vegetableFields: 0,
+        harvestCountApplications: [
+          {
+            row: 0,
+            col: 0,
+            crop: 'grain',
+            count: 0,
+            sources: ['base', 'E112_GrainThief'],
+            tags: ['supply-instead-of-field'],
+            scope: 'top-stack',
+          },
+          {
+            row: 0,
+            col: 1,
+            crop: 'grain',
+            count: 2,
+            sources: ['base', 'E112_GrainThief', 'E73_Scythe'],
+            tags: ['supply-instead-of-field', 'full-field-reap'],
+            scope: 'field',
+          },
+        ],
+      },
+    }
+
+    const flow = E112_GrainThief_impl.effect.onEndHarvestFieldPhase!(state, player)
+
+    expect(flow).toMatchObject({
+      type: 'seq',
+      children: [
+        {
+          type: 'leaf',
+          actionId: 'gain',
+          sourceCard: 'E112_GrainThief',
+          params: { grain: 1 },
+        },
+        {
+          type: 'leaf',
+          actionId: 'special-effect',
+          sourceCard: 'E112_GrainThief',
+          params: { kind: 'set-extra-data', key: 'selectedPositions', value: undefined },
+        },
+      ],
+    })
+  })
+
+  it('generic harvest selection threshold modifiers can lower field thresholds', () => {
+    const modifierId = '__TEST_harvest_threshold__'
+    registerHarvestSelectionThresholdModifier(modifierId, ({ field }) => {
+      const top = field.stacks[0]
+      if (top?.kind !== 'vegetable') return
+      return { threshold: 1, sources: [modifierId] }
+    })
+    const player = makePlayer([
+      { row: 0, col: 0, stacks: [{ kind: 'vegetable', remaining: 1 }] },
+    ])
+
+    const result = computeHarvestSelectionThreshold(makeState(player), player, player.fields[0]!, {
+      sourceCard: 'D72_StableManure',
+      baseThreshold: 2,
+    })
+
+    expect(result).toEqual({ threshold: 1, sources: [modifierId] })
+    unregisterHarvestSelectionThresholdModifier(modifierId)
   })
 
   it('A112 adds one harvest count to selected grain fields and reports its source', () => {
