@@ -120,7 +120,8 @@ describe('B146_Illusionist listener handler', () => {
   it('does nothing when Lantern House (C35) is played', () => {
     const listener = findListener()!
     const player = createPlayer('p1')
-    player.occupationPlayed.push(CARD_ID, 'C35_LanternHouse')
+    player.occupationPlayed.push(CARD_ID)
+    player.minorPlayed.push('C35_LanternHouse')
     player.occupationHand = ['A9_SheepFarmer']
     const forest = createSpace('forest', { wood: 3 })
     forest.takenBy = player.id
@@ -186,6 +187,27 @@ describe('B146_Illusionist listener handler', () => {
     expect(flow.children[1].actionId).toBe('gain')
     expect(flow.children[1].params).toEqual({ wood: 1 })
     expect(flow.children[1].sourceCard).toBe(CARD_ID)
+  })
+
+  it('still triggers when a played card does not prevent hand discard', () => {
+    const listener = findListener()!
+    const player = createPlayer('p1')
+    player.occupationPlayed.push(CARD_ID)
+    player.minorPlayed.push('B68_Beanfield')
+    player.occupationHand = ['A9_SheepFarmer']
+    const forest = createSpace('forest', { wood: 3 })
+    forest.takenBy = player.id
+    const state = createState([player], [forest])
+
+    const result = executeCardListener(listener, {
+      state,
+      player,
+      space: forest,
+      actionId: 'collect',
+      phase: 'before',
+    } as unknown as CardListenerContext)
+
+    expect(result).toBeDefined()
   })
 
   it('picks clay when accumulating clay', () => {

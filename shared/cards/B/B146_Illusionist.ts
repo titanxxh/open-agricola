@@ -5,6 +5,7 @@ import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registr
 import type { CardImpl } from '../registry'
 import { B146_Illusionist } from '../../cards-display/B/B146_Illusionist'
 import { cardEffectHandChangedEvent } from '../../session/private-hand-events'
+import { playerHasCardCapability } from '../helpers/card-type'
 
 const CARD_ID = B146_Illusionist.id
 
@@ -90,7 +91,7 @@ registerAdHocAction(discardFromHandAction)
  *     `space.resources` has >0 wood/clay/reed/stone (this naturally scopes
  *     to the building-resource accumulation spaces: forest, copse, grove,
  *     clay-pit, reed-bank, eastern-quarry, western-quarry, etc.).
- *   - If `C35_LanternHouse` is played, skip (BGA ruling).
+ *   - If a played card prevents hand discard, skip.
  *   - If the union of occupationHand + minorHand is empty, skip.
  *   - Return optional seq: [ discard-from-hand, gain({ resource: 1 }) ]. The
  *     `discard-from-hand` action presents each hand card as a dynamic choice
@@ -117,8 +118,7 @@ const listener: CardListenerRegistration = {
   actions: ['collect'],
   scope: 'player',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    // BGA ruling: Lantern House disables Illusionist.
-    if (context.player.occupationPlayed.includes('C35_LanternHouse')) return
+    if (playerHasCardCapability(context.player, 'preventsHandDiscard')) return
 
     const hand = [
       ...(context.player.occupationHand ?? []),

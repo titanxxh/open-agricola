@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PlayerState } from '../../../contract/types'
-import { cardCountsAs, collectCardsAs } from '../card-type'
+import { cardCountsAs, collectCardsAs, playerHasCardCapability } from '../card-type'
 
 import '../../major'
 import '../../D/D60_LargePottery'
@@ -9,6 +9,7 @@ import '../../D/D25_WitchesDanceFloor'
 import '../../A/A60_OrientalFireplace'
 import '../../C/C60_SmallPottersOven'
 import '../../B/B68_Beanfield'
+import '../../C/C35_LanternHouse'
 
 const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState =>
   ({
@@ -98,5 +99,28 @@ describe('collectCardsAs', () => {
     expect(new Set(collectCardsAs(p, 'minor'))).toEqual(
       new Set(['D60_LargePottery', 'B68_Beanfield']),
     )
+  })
+})
+
+describe('playerHasCardCapability', () => {
+  it('only reads played cards when checking hand-discard prevention', () => {
+    const inHand = makePlayer({
+      minorHand: ['C35_LanternHouse'],
+    })
+    expect(playerHasCardCapability(inHand, 'preventsHandDiscard')).toBe(false)
+
+    const played = makePlayer({
+      minorPlayed: ['C35_LanternHouse'],
+    })
+    expect(playerHasCardCapability(played, 'preventsHandDiscard')).toBe(true)
+  })
+
+  it('uses counts-as semantics when filtering by card type', () => {
+    const player = makePlayer({
+      minorPlayed: ['D25_WitchesDanceFloor'],
+    })
+
+    expect(playerHasCardCapability(player, 'fireplaceIdentity', { asType: 'major' })).toBe(true)
+    expect(playerHasCardCapability(player, 'fireplaceIdentity', { asType: 'occupation' })).toBe(false)
   })
 })
