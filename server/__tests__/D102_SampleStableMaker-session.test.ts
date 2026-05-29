@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { getCardEffect } from '../../shared/cards/card-effects'
+import { getCardEffect, getExtraRoomCapacity } from '../../shared/cards/card-effects'
 import { runSelectionEffect } from '../../shared/actions/helpers/selection-effect-registry'
 import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
 import type { GameState, PlayerState , ActionFlow } from '../../shared/contract/types'
 
 import '../../shared/cards/D/D102_SampleStableMaker'
+import '../../shared/cards/B/B85_FarmHand'
 
 const CARD_ID = 'D102_SampleStableMaker'
 const FIELD_EFFECT = 'sample-stable-maker-return'
@@ -139,6 +140,7 @@ describe('D102_SampleStableMaker card effect', () => {
 
   it('returns the B85 FarmHand tile and pays the normal resource reward', () => {
     const player = createOwner()
+    player.occupationPlayed.push('B85_FarmHand')
     player.stableTiles = []
     player.cardStates = {
       B85_FarmHand: {
@@ -151,6 +153,7 @@ describe('D102_SampleStableMaker card effect', () => {
       grain: player.resources.grain,
       food: player.resources.food,
     }
+    expect(getExtraRoomCapacity(player)).toBe(1)
     runSelectionEffect(FIELD_EFFECT, {
       player,
       positions: ['2-1'],
@@ -161,6 +164,7 @@ describe('D102_SampleStableMaker card effect', () => {
     expect(player.cardStates!.B85_FarmHand!.extraData?.position).toBeUndefined()
     expect(player.cardStates!.B85_FarmHand!.flagged).toBe(true)
     expect(player.stableTiles).toEqual([])
+    expect(getExtraRoomCapacity(player)).toBe(0)
     expect(player.resources.wood).toBe(initial.wood + 1)
     expect(player.resources.grain).toBe(initial.grain + 1)
     expect(player.resources.food).toBe(initial.food + 1)
