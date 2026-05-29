@@ -280,6 +280,7 @@ type SelectionCommitPayload = {
   extraWood?: number
   rooms?: FarmTilePosition[]
   stables?: FarmTilePosition[]
+  farmHand?: FarmTilePosition
   tile?: FarmTilePosition
   crops?: SowSelectionPayload[]
 }
@@ -4067,7 +4068,7 @@ export class GameCore {
         farmPayload = { rooms: payload.rooms ?? [] }
         break
       case 'stable':
-        farmPayload = { stables: payload.stables ?? [] }
+        farmPayload = { stables: payload.stables ?? [], farmHand: payload.farmHand }
         break
       case 'plow':
         farmPayload = { tile: payload.tile }

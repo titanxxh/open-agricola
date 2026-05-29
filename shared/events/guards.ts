@@ -190,6 +190,21 @@ const assertBoardPositions = (
   })
 }
 
+const assertStableBuiltPositions = (value: unknown, path: string): void => {
+  if (!Array.isArray(value)) throw new Error(`GameEvent ${path} must be an array`)
+  value.forEach((entry, index) => {
+    const record = assertRecord(entry, `${path}[${index}]`)
+    assertOnlyKeys(record, ['playerId', 'row', 'col', 'kind', 'sourceCardId'], `${path}[${index}]`)
+    assertStringField(record.playerId, `${path}[${index}].playerId`)
+    assertFiniteNumberField(record.row, `${path}[${index}].row`)
+    assertFiniteNumberField(record.col, `${path}[${index}].col`)
+    if (record.kind !== undefined && record.kind !== 'normal' && record.kind !== 'special') {
+      throw new Error(`GameEvent ${path}[${index}].kind must be 'normal' or 'special'`)
+    }
+    assertOptionalStringField(record.sourceCardId, `${path}[${index}].sourceCardId`)
+  })
+}
+
 const assertNoPrivatePayload = (value: unknown, path: string): void => {
   if (Array.isArray(value)) {
     value.forEach((entry, index) => assertNoPrivatePayload(entry, `${path}[${index}]`))
@@ -430,7 +445,7 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       assertBoardPositions(event.rooms, 'rooms', ['row', 'col'])
       return
     case 'farm.stableBuilt':
-      assertBoardPositions(event.stables, 'stables', ['playerId', 'row', 'col'])
+      assertStableBuiltPositions(event.stables, 'stables')
       return
     case 'farm.fenceBuilt':
       if (!Array.isArray(event.fences)) throw new Error('GameEvent fences must be an array')
