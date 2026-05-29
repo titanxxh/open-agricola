@@ -4,6 +4,7 @@ import type { GameState, PlayerState, Resource } from '../../../contract/types'
 import * as cardListeners from '../../../cards/card-listeners'
 import { makeCardFieldImpl } from '../../../cards/helpers/card-field'
 import '../../../cards/E/E68_CherryOrchard'
+import '../../../cards/E/E72_ArtichokeField'
 
 const emptyResources = (): Resource => ({
   wood: 0,
@@ -252,6 +253,38 @@ describe('private-field-phase action', () => {
     } as never)
 
     expect(player.resources.grain).toBe(1)
+    expect(result.type).toBe('ok')
+  })
+
+  it('reaps E72 Artichoke Field in private-field-phase without harvest-only bonus food', () => {
+    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => [])
+    const action = internalActionDefinitions.find((entry) => entry.id === 'private-field-phase')
+    expect(action).toBeDefined()
+    const player = {
+      id: 'p1',
+      resources: emptyResources(),
+      fields: [],
+      minorPlayed: ['E72_ArtichokeField'],
+      occupationPlayed: [],
+      improvements: [],
+      cardStates: {
+        E72_ArtichokeField: {
+          extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] },
+        },
+      },
+    } as unknown as PlayerState
+    const state = { players: [player] } as unknown as GameState
+
+    const result = action!.execute({
+      state,
+      player,
+      space: { id: 'private-field-phase' },
+      sourceCard: 'C72_FestivalPlanning',
+    } as never)
+
+    expect(player.resources.grain).toBe(1)
+    expect(player.resources.food).toBe(0)
+    expect(player.cardStates.E72_ArtichokeField?.extraData?.cardFieldStacks).toEqual([])
     expect(result.type).toBe('ok')
   })
 })
