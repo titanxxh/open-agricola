@@ -324,6 +324,36 @@ describe('C146 — multi-select pairs (onBuy)', () => {
     expect(resp.interaction.options?.some((option) => option.value !== '__skip__')).toBe(true)
   })
 
+  it('accepting a single stored pair moves resources through standard card gain semantics', () => {
+    const { session } = setupRenovationWithStoredPairs(['WC'])
+    const beforeOwner = session.getState().state.players[0]!
+    const beforeWood = beforeOwner.resources.wood
+    const beforeClay = beforeOwner.resources.clay
+    const resp = driveOpponentRenovationToC146(session)
+    const accept = resp.interaction.options?.find((option) => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+
+    const taken = session.resolveChoice(0, accept!.value)
+    const liveOwner = taken.state.players[0]!
+    expect(readCardExtraData<string[]>(liveOwner, CARD_ID, 'pairs')).toEqual([])
+    expect(liveOwner.resources.wood).toBe(beforeWood + 1)
+    expect(liveOwner.resources.clay).toBe(beforeClay + 1)
+    expect(liveOwner.stats.resourcesFromCards).toMatchObject({ wood: 1, clay: 1 })
+    expect(taken.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.moved',
+        resources: { wood: 1, clay: 1 },
+        from: { kind: 'card', playerId: liveOwner.id, cardId: CARD_ID },
+        to: { kind: 'player', playerId: liveOwner.id },
+        reason: 'cardEffect',
+        sourceActionId: 'gain',
+        sourceCardId: CARD_ID,
+      }),
+    ]))
+    expect(readCardResourceStats(liveOwner, CARD_ID)?.used ?? 0).toBe(1)
+    expect(readCardResourceStats(liveOwner, CARD_ID)?.gained).toMatchObject({ wood: 1, clay: 1 })
+  })
+
   it('opponent renovation owner prompt cannot undo past the player-switch boundary', () => {
     const { session } = setupRenovationWithStoredPairs(['WC'])
     const resp = driveOpponentRenovationToC146(session)
@@ -454,5 +484,34 @@ describe('C146 — multi-select pairs (onBuy)', () => {
     expect(liveOwner.resources.clay).toBe(beforeClay + 1)
     expect(readCardResourceStats(liveOwner, CARD_ID)?.used ?? 0).toBe(1)
     expect(readCardResourceStats(liveOwner, CARD_ID)?.gained).toMatchObject({ wood: 1, clay: 1 })
+  })
+
+  it('rejects an invalid stored-pair key without changing resources, card state, or stats', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    const owner = state.players[0]!
+    owner.occupationPlayed.push(CARD_ID)
+    owner.playedCards = [`occupation:${CARD_ID}`]
+    owner.cardStates = { [CARD_ID]: { extraData: { pairs: ['WC', 'RS'] } } }
+    owner.resources.wood = 3
+    owner.resources.clay = 4
+    owner.resources.reed = 5
+    owner.resources.stone = 6
+    session.loadState(state)
+
+    const def = getActionDefinition('card_C146_WorkshopAssistant_takePair')!
+    const result = def.execute({
+      state,
+      player: owner,
+      space: createSpace('card_C146_WorkshopAssistant_takePair'),
+      params: { pair: 'WR' },
+    } as unknown as ActionExecutionContext)
+
+    expect(result.type).toBe('fail')
+    expect(owner.resources).toMatchObject({ wood: 3, clay: 4, reed: 5, stone: 6 })
+    expect(readCardExtraData<string[]>(owner, CARD_ID, 'pairs')).toEqual(['WC', 'RS'])
+    expect(readCardResourceStats(owner, CARD_ID)?.used ?? 0).toBe(0)
+    expect(readCardResourceStats(owner, CARD_ID)?.gained ?? {}).toEqual({})
   })
 })
