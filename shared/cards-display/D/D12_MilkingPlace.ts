@@ -11,4 +11,5 @@ export const D12_MilkingPlace = new MinorImprovement({
   desc: ['In the feeding phase of each harvest, you get 1 <FOOD>. You can no longer hold animals in your house (not even via another card).'],
   cost: { grain: 1 },
   vp: 1,
+  blocksHouseAnimalZones: true,
 })
