@@ -70,6 +70,7 @@ export class CardBase {
   fireplaceIdentity?: boolean
   cookingHearthIdentity?: boolean
   ovenIdentity?: boolean
+  potteryIdentity?: boolean
   preventsHandDiscard?: boolean
   animalHolder?: boolean
   blocksHouseAnimalZones?: boolean
@@ -123,6 +124,7 @@ export class CardBase {
     if (this.fireplaceIdentity) def.fireplaceIdentity = this.fireplaceIdentity
     if (this.cookingHearthIdentity) def.cookingHearthIdentity = this.cookingHearthIdentity
     if (this.ovenIdentity) def.ovenIdentity = this.ovenIdentity
+    if (this.potteryIdentity) def.potteryIdentity = this.potteryIdentity
     if (this.preventsHandDiscard) def.preventsHandDiscard = this.preventsHandDiscard
     if (this.animalHolder) def.animalHolder = this.animalHolder
     if (this.blocksHouseAnimalZones) def.blocksHouseAnimalZones = this.blocksHouseAnimalZones

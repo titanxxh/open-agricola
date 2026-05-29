@@ -20,6 +20,18 @@ export type CardImplBoundaryResult = {
   filesChecked: number
 }
 
+export type CardImplBoundaryExitOptions = {
+  warnOnly?: boolean
+}
+
+export function cardImplBoundaryExitCode(
+  result: CardImplBoundaryResult,
+  options: CardImplBoundaryExitOptions = {},
+): 0 | 1 {
+  if (result.violations.length === 0) return 0
+  return options.warnOnly ? 0 : 1
+}
+
 function cardIdFromFile(file: string): string {
   return path.basename(file, '.ts')
 }
@@ -168,7 +180,7 @@ function walkProductionCardFiles(repoRoot: string): string[] {
 
 if (process.argv[1] && process.argv[1].endsWith('check-card-impl-boundaries.ts')) {
   const repoRoot = path.resolve(__dirname, '..')
-  const strict = process.argv.includes('--strict')
+  const warnOnly = process.argv.includes('--warn-only')
   const result = checkCardImplBoundaries(walkProductionCardFiles(repoRoot))
   if (result.violations.length === 0) {
     console.log(`[check-card-impl-boundaries] checked ${result.filesChecked} files, no boundary violations found`)
@@ -181,7 +193,6 @@ if (process.argv[1] && process.argv[1].endsWith('check-card-impl-boundaries.ts')
       `  ${path.relative(repoRoot, violation.file)}:${violation.line} ${violation.cardId} -> ${violation.referencedCardId}`,
     )
   }
-  if (strict) process.exit(1)
-  console.warn('[check-card-impl-boundaries] warn-only mode: migration is not complete yet')
-  process.exit(0)
+  if (warnOnly) console.warn('[check-card-impl-boundaries] warn-only mode enabled')
+  process.exit(cardImplBoundaryExitCode(result, { warnOnly }))
 }
