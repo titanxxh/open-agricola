@@ -1,6 +1,6 @@
 import type { PlayerState, Resource } from '../../../shared/contract/types'
 import type { Locale } from '../../../shared/i18n'
-import type { HarvestSummary } from '../../../shared/session/round'
+import type { HarvestSummary } from '../../../shared/session/harvest-summary'
 import { getMajorCardDisplay } from '../../../shared/cards-display/major'
 import {
   BASIC_CONVERSION_SOURCE_ID,
