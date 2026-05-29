@@ -135,7 +135,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 
 保留的后续边界：`C23_JobContract`、`B152_JuniorArtist`、`C117_Legworker` 与 space-pairing 的 cost / jump / adjacency 语义相关，不属于 shared lessons action-space id helper 关闭范围。
 
-本轮新增已完成基础设施：Stable count semantics helper。`shared/domain/stables.ts` 集中畜栏计数口径：`getOrdinaryStableCount`（普通 stable tile，用于动物容量 / placement / supply）、`getStableCountForCards`、`getUnfencedStableCountForCards`、`getEmptyUnfencedStableCountForCards`（card-facing 口径在 helper 内部封装 B85 FarmHand position 读取，B85 永远算 1 个 unfenced / empty-unfenced stable）。`getFarmHandStableInUseCount` 从 `supply-tokens.ts` 移入本 helper，`getAvailableStableSupplyCount` 改用 `getOrdinaryStableCount`。业务代码不再直接读 `player.stableTiles.length`，由 `shared/domain/__tests__/stable-count-guardrail.test.ts` 静态扫描 `shared/cards/**` 与 `shared/domain/**` 阻断（白名单仅 `shared/domain/stables.ts` 与测试/fixture）。C88 折扣口径已校准为 card-facing（`getStableCountForCards`，含 B85），混合普通 + B85 stable 建造经 `stables.ts` 的 `applyStableBuildDiscount`（`collectComputeCostsForFarmChoice` 按真实 `params.stableCount` 重算总额折扣）统一结算，详见 §C88 appendix。
+本轮新增已完成基础设施：Stable count semantics helper。`shared/domain/stables.ts` 集中畜栏计数口径：`getOrdinaryStableCount`（普通 stable tile，用于动物容量 / placement / supply）、`getStableCountForCards`、`getUnfencedStableCountForCards`、`getEmptyUnfencedStableCountForCards`（card-facing 口径在 helper 内部封装 B85 FarmHand position 读取，B85 永远算 1 个 unfenced / empty-unfenced stable）。`getFarmHandStableInUseCount` 从 `supply-tokens.ts` 移入本 helper，`getAvailableStableSupplyCount` 改用 `getOrdinaryStableCount`。业务代码不再直接读 `player.stableTiles.length`，由 `shared/domain/__tests__/stable-count-guardrail.test.ts` 静态扫描 `shared/cards/**` 与 `shared/domain/**` 阻断（白名单仅 `shared/domain/stables.ts` 与测试/fixture）。#184：C88 折扣口径已校准为 card-facing（`getStableCountForCards`，含 B85），混合普通 + B85 stable 建造经 `stables.ts` 的 `applyStableBuildDiscount`（`collectComputeCostsForFarmChoice` 按真实 `params.stableCount` 重算总额折扣）统一结算，详见 §C88 appendix。#186：完成其余 card-facing 口径校准——`B54`/`E43`/`D168`/`E114`/`C56` 改用 `getStableCountForCards`（“你拥有畜栏 / 第 N 座畜栏”序数定位含 B85），`C101`/`D72` 改用 `getUnfencedStableCountForCards`，`C49` 改用 `getEmptyUnfencedStableCountForCards`（B85 永远算 1 个 empty unfenced）；动物容量 / placement / supply / `getStableTilesBuiltThisAction`（after-stables 本次建造数，归 #185）继续用 `getOrdinaryStableCount`，B85 不获得动物容量。
 
 ## 7. Log 系统对比
 
@@ -614,7 +614,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `B51_DiggingSpade` | 已对齐 |  |
 | `B52_GrowingFarm` | 已对齐 |  |
 | `B53_SculptureCourse` | 已对齐 |  |
-| `B54_Tumbrel` | 已对齐 |  |
+| `B54_Tumbrel` | 已对齐 | #186 sow 后“每座畜栏 1 food”改用 `getStableCountForCards`（含 B85，对齐 BGA `countStablesForCards`） |
 | `B55_MaintenancePremium` | 已对齐 |  |
 | `B56_Brook` | 已接受差异 | schema-up prerequisite / isBuyable metadata 差异 |
 | `B57_Scullery` | 已对齐 |  |
@@ -789,14 +789,14 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C46_Mandoline` | 已对齐 |  |
 | `C47_GardenClaw` | 已对齐 |  |
 | `C48_Farmstead` | 已对齐 |  |
-| `C49_BeerStall` | 已对齐 |  |
+| `C49_BeerStall` | 已对齐 | #186 “空未围畜栏”改用 `getEmptyUnfencedStableCountForCards`（B85 永远算 1 个 empty，对齐 BGA `getEmptyUnfencedStables`） |
 | `C50_StableYard` | 已对齐 |  |
 | `C51_FishingNet` | 已对齐 |  |
 | `C52_HuntsmansHat` | 已对齐 | cooking prerequisite 与 action-space boar/pig gain 得 food 路径对齐；未见当前 OA action-space 差异 |
 | `C53_GypsysCrock` | 已对齐 |  |
 | `C54_MarketBooth` | 已对齐 | printed cost 为 1 stable；收获 exchange 支付 grain + reserve fence |
 | `C55_Studio` | 已对齐 |  |
-| `C56_FeedFence` | 已对齐 |  |
+| `C56_FeedFence` | 已对齐 | #186 “第 4 座畜栏 +2 food”bonus 口径改用 `getStableCountForCards === 4`（含 B85，对齐 BGA `countStablesForCards()==4`）；本次建造数仍走 `getStableTilesBuiltThisAction`（归 #185） |
 | `C57_Crudite` | 已对齐 |  |
 | `C58_Woodcraft` | 已对齐 |  |
 | `C59_SchnappsDistillery` | 已对齐 |  |
@@ -841,7 +841,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `C98_CubeCutter` | 已对齐 |  |
 | `C99_GardenDesigner` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `C100_Butler` | 已对齐 |  |
-| `C101_StallHolder` | 已对齐 |  |
+| `C101_StallHolder` | 已对齐 | #186 “未围畜栏数”改用 `getUnfencedStableCountForCards`（含 B85，对齐 BGA `countUnfencedStablesForCards`） |
 | `C102_TreeGuard` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `C103_GreenGrocer` | 已对齐 |  |
 | `C104_Collector` | 已对齐 |  |
@@ -992,7 +992,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D69_SmallGreenhouse` | 已对齐 |  |
 | `D70_StrawManure` | 已对齐 |  |
 | `D71_Changeover` | 已对齐 |  |
-| `D72_StableManure` | 已对齐 | 额外收获选择门槛走 `computeHarvestSelectionThreshold()`；选中田通过 Harvest Count modifier 增加 count，并在 top stack 收空后继续收同田下一层 stack，在 `harvestCountApplications` 记录来源 |
+| `D72_StableManure` | 已对齐 | 额外收获选择门槛走 `computeHarvestSelectionThreshold()`；选中田通过 Harvest Count modifier 增加 count，并在 top stack 收空后继续收同田下一层 stack，在 `harvestCountApplications` 记录来源。#186 “未围畜栏数”改用 `getUnfencedStableCountForCards`（含 B85，对齐 BGA `countUnfencedStablesForCards`） |
 | `D73_SupplyBoat` | 已对齐 |  |
 | `D74_RoyalWood` | 已接受差异 | BGA banned，但 OA 按产品策略保留；stables 支付因 afterHost slot 通过 after-pay provenance 统计 |
 | `D75_WoodField` | 已对齐 |  |
@@ -1088,7 +1088,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `D165_PigStalker` | 已对齐 |  |
 | `D166_StableMilker` | 已对齐 |  |
 | `D167_PureBreeder` | 已对齐 |  |
-| `D168_Stockman` | 已对齐 |  |
+| `D168_Stockman` | 已对齐 | #186 第 2/3/4 座畜栏序数定位（`nAfter`）改用 `getStableCountForCards`（含 B85，对齐 BGA `countStablesForCards`）；本次建造数仍走 `getStableTilesBuiltThisAction`（归 #185） |
 | `D169_Plowsmith` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `D170_FoldBuilder` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
 | `D171_SeniorTeacher` | 排除 | BGA implemented=false，本轮无运行时对齐目标 |
@@ -1143,7 +1143,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E40_BeeStatue` | 已对齐 |  |
 | `E41_MuddyWaters` | 已对齐 |  |
 | `E42_WaterGully` | 已对齐 |  |
-| `E43_BarnCats` | 已对齐 |  |
+| `E43_BarnCats` | 已对齐 | #186 prerequisite（1 stable）与 onBuy 的“你拥有畜栏数”改用 `getStableCountForCards`（含 B85，对齐 BGA `countStablesForCards`） |
 | `E44_FodderBeets` | 已对齐 |  |
 | `E45_FruitLadder` | 已对齐 |  |
 | `E46_WaterlilyPond` | 已对齐 |  |
@@ -1214,7 +1214,7 @@ Protected atomic action 的 direct `cancel` 在 public action lifecycle 之前�
 | `E111_Recluse` | 已对齐 |  |
 | `E112_GrainThief` | 已对齐 | start 选择 grain fields；reap 通过 Harvest Count modifier 写入 `supply-instead-of-field` tag，end field phase 只读 `harvestCountApplications`，带 `full-field-reap` tag 的同田不补 grain；D72 额外 count 可在 E112 供应堆替代 top grain 后继续收下一层 crop；同时注册 selection threshold modifier，把 A112/D72 的 grain field 门槛降为 1；end harvest 清理 selectedPositions |
 | `E113_Godmother` | 已对齐 |  |
-| `E114_ShedBuilder` | 已对齐 |  |
+| `E114_ShedBuilder` | 已对齐 | #186 第 1-4 座畜栏序数定位（`nAfter`）改用 `getStableCountForCards`（含 B85，对齐 BGA `countStablesForCards`）；本次建造数仍走 `getStableTilesBuiltThisAction`（归 #185） |
 | `E115_SeedServant` | 已对齐 |  |
 | `E116_FirCutter` | 已对齐 |  |
 | `E117_PipeSmoker` | 已对齐 |  |
