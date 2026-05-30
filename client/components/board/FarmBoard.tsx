@@ -242,6 +242,7 @@ export type FarmBoardProps = {
   stableSelectableSet: Set<string>
   farmHandSelectableSet: Set<string>
   pendingFarmHandKey: string | null
+  builtSpecialStableKeys: Set<string>
   maxStableSelections: number
   plowSelectableSet: Set<string>
   pendingPlowTile: FarmTilePosition | null
@@ -557,6 +558,7 @@ export const FarmBoard = ({
   stableSelectableSet,
   farmHandSelectableSet,
   pendingFarmHandKey,
+  builtSpecialStableKeys,
   maxStableSelections,
   plowSelectableSet,
   pendingPlowTile,
@@ -1064,6 +1066,20 @@ export const FarmBoard = ({
           const centerKey = centerTopLeft
             ? `${centerTopLeft.row}-${centerTopLeft.col}`
             : null
+          if (centerKey && builtSpecialStableKeys.has(centerKey)) {
+            return (
+              <div key={cell.key} className="farm-cell farm-post">
+                <div
+                  className="farmhand-center-overlay farmhand-center-built"
+                  data-farmhand-center-key={centerKey}
+                  data-player-color={displayPlayer.color}
+                  title={t(locale, 'ui.tileStable')}
+                >
+                  <span className="res-icon res-icon-barn farmhand-center-icon" aria-hidden="true" />
+                </div>
+              </div>
+            )
+          }
           const isFarmHandCenter =
             isInteractive && !!centerKey && farmHandSelectableSet.has(centerKey)
           if (isFarmHandCenter && centerTopLeft && centerKey) {
