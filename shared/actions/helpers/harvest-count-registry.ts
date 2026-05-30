@@ -63,18 +63,28 @@ export const computeHarvestCount = (
   const tags = new Set<string>()
   let count = 1
   let override: number | undefined
+  let overrideSources: string[] | undefined
   let scope: 'top-stack' | 'field' = 'top-stack'
+  const deltaSources: string[] = []
 
   for (const [cardId, modifier] of modifiers) {
     const result = modifier({ state, player, field })
     if (!result) continue
     const nextSources = result.sources?.length ? result.sources : [cardId]
-    nextSources.forEach((source) => sources.add(source))
     result.tags?.forEach((tag) => tags.add(tag))
-    if (typeof result.delta === 'number') count += result.delta
-    if (typeof result.override === 'number') override = result.override
+    if (typeof result.delta === 'number') {
+      count += result.delta
+      deltaSources.push(...nextSources)
+    }
+    if (typeof result.override === 'number') {
+      override = result.override
+      overrideSources = nextSources
+    }
     if (result.scope) scope = result.scope
   }
+
+  const contributingSources = override !== undefined ? overrideSources ?? [] : deltaSources
+  contributingSources.forEach((source) => sources.add(source))
 
   const rawCount = override ?? count
   return {
