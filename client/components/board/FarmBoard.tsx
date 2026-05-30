@@ -239,6 +239,8 @@ export type FarmBoardProps = {
   pendingStableSet: Set<string>
   roomSelectableSet: Set<string>
   stableSelectableSet: Set<string>
+  farmHandSelectableSet: Set<string>
+  pendingFarmHandKey: string | null
   maxStableSelections: number
   plowSelectableSet: Set<string>
   pendingPlowTile: FarmTilePosition | null
@@ -271,6 +273,7 @@ export type FarmBoardProps = {
   fencePlacementMode?: 'fence' | 'palisade'
   toggleRoomTile: (tile: FarmTilePosition) => void
   toggleStableTile: (tile: FarmTilePosition) => void
+  toggleFarmHand: (tile: FarmTilePosition) => void
   togglePlowTile: (tile: FarmTilePosition) => void
   updateSowSelection: (tile: FarmTilePosition, value: string) => void
   toggleFenceEdge: (edgeId: string) => void
@@ -551,6 +554,8 @@ export const FarmBoard = ({
   pendingStableSet,
   roomSelectableSet,
   stableSelectableSet,
+  farmHandSelectableSet,
+  pendingFarmHandKey,
   maxStableSelections,
   plowSelectableSet,
   pendingPlowTile,
@@ -575,6 +580,7 @@ export const FarmBoard = ({
   fencePlacementMode,
   toggleRoomTile,
   toggleStableTile,
+  toggleFarmHand,
   togglePlowTile,
   updateSowSelection,
   toggleFenceEdge,
@@ -741,6 +747,10 @@ export const FarmBoard = ({
             isInteractive &&
             stableSelectableSet.has(tileKey) &&
             (!maxStableReached || isStableSelected)
+          const isFarmHandSelectable =
+            isInteractive && farmHandSelectableSet.has(tileKey)
+          const isFarmHandSelected =
+            isInteractive && pendingFarmHandKey === tileKey
           const isPlowSelectable =
             isInteractive && plowSelectableSet.has(tileKey)
           const isPlowSelected =
@@ -750,9 +760,9 @@ export const FarmBoard = ({
           const isFieldSelectable = isInteractive && positionSelectableSet.has(tileKey)
           const isFieldSelected = isInteractive && pendingPositionSelections.has(tileKey)
           const isTileSelectable =
-            isRoomSelectable || isPlowSelectable || isStableSelectable || isFieldSelectable
+            isRoomSelectable || isPlowSelectable || isStableSelectable || isFarmHandSelectable || isFieldSelectable
           const isTileSelected =
-            isRoomSelected || isPlowSelected || isStableSelected || isFieldSelected
+            isRoomSelected || isPlowSelected || isStableSelected || isFarmHandSelected || isFieldSelected
           const isTileLocked = lockedTileKeys.has(tileKey)
           const fieldInfo = fieldMap.get(tileKey)
           const isEmptyField = !!fieldInfo && fieldInfo.stacks.length === 0
@@ -819,7 +829,9 @@ export const FarmBoard = ({
                       : ''
               }${isTileLocked ? ' locked' : ''}${isTileSelectable ? ' selectable' : ''}${isTileSelected ? ' selected' : ''}${
                 isStableSelectable ? ' stable-selectable' : ''
-              }${isStableSelected ? ' stable-selected' : ''}${highlightedFarmTileKeys.has(tileKey) ? ' event-highlight' : ''}`}
+              }${isStableSelected ? ' stable-selected' : ''}${
+                isFarmHandSelectable ? ' farmhand-selectable' : ''
+              }${isFarmHandSelected ? ' farmhand-selected' : ''}${highlightedFarmTileKeys.has(tileKey) ? ' event-highlight' : ''}`}
               onClick={() => {
                 if (isRoomSelectable) {
                   toggleRoomTile({ row: tileRow, col: tileCol })
@@ -827,6 +839,10 @@ export const FarmBoard = ({
                 }
                 if (isStableSelectable) {
                   toggleStableTile({ row: tileRow, col: tileCol })
+                  return
+                }
+                if (isFarmHandSelectable) {
+                  toggleFarmHand({ row: tileRow, col: tileCol })
                   return
                 }
                 if (isFieldSelectable) {
