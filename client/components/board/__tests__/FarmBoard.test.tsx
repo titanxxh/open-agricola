@@ -177,6 +177,55 @@ describe('FarmBoard', () => {
     expect(html).not.toContain('Stable')
   })
 
+  it('colors the built stable barn icon by the display player color', () => {
+    const player = createPlayer('p1', 'Player B', 'blue')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 }],
+          stablePositions: new Set(['0-0']),
+        })}
+      />,
+    )
+
+    expect(html).toMatch(/stable-barn-icon[^>]*data-player-color="blue"/)
+  })
+
+  it('keeps the animal badge on a built stable tile alongside the barn icon', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 }],
+          stablePositions: new Set(['0-0']),
+          stableDisplayMap: new Map([['0-0', { animalType: 'sheep', animalCount: 1 }]]),
+        })}
+      />,
+    )
+
+    expect(html).toContain('stable-barn-icon')
+    expect(html).toContain('pasture-info')
+  })
+
+  it('does not render a barn icon on a buildable stable candidate tile', () => {
+    const player = createPlayer('p1', 'Player A', 'red')
+
+    const html = renderToStaticMarkup(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          farmCells: [{ key: 'tile-0-0', type: 'tile', tileRow: 0, tileCol: 0 }],
+          stableSelectableSet: new Set(['0-0']),
+          maxStableSelections: 1,
+        })}
+      />,
+    )
+
+    expect(html).toMatch(/farm-tile[^"]*\bstable-selectable\b/)
+    expect(html).not.toContain('stable-barn-icon')
+  })
+
   it('marks highlighted fence edges', () => {
     const player = createPlayer('p1', 'Player A', 'red')
 
