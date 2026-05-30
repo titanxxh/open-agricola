@@ -194,6 +194,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 - `onBeforePlayerTurn`
 - `onAllWorkersPlaced`
 - `resolveChoice`
+- `contributeExtraTurn`
 - `computeBonusScore`
 - `computeCostedBonus`
 - `computeSharedPostScore`
