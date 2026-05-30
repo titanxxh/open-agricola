@@ -128,7 +128,7 @@ describe('FarmBoard', () => {
     expect(html).toMatch(/farm-tile[^"]*\bevent-highlight\b/)
   })
 
-  it('renders a B85 farmHand candidate as a clickable ghost overlay at the 2x2 center post', () => {
+  it('renders a B85 farmHand candidate as a clickable frame at the 2x2 center post', () => {
     const player = createPlayer('p1', 'Player A', 'red')
 
     const html = renderToStaticMarkup(

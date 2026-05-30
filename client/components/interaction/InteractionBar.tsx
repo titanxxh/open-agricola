@@ -486,6 +486,10 @@ export const InteractionBar = ({
     pendingChoice?.sourceCard
       ? getAnyCardDisplayName(locale, pendingChoice.sourceCard)
       : null
+  const stableSelectedCount = pendingStableTilesLength + (pendingFarmHandSelected ? 1 : 0)
+  const stableMaxLabel = pendingFarmHandSelected
+    ? `${maxStableSelections}+`
+    : maxStableSelections
 
   return (
     <div className="interaction-bar">
@@ -629,8 +633,8 @@ export const InteractionBar = ({
               {pendingChoice.promptKey === 'ui.interactionStableSelect' ? (
                 <div className="interaction-subtitle">
                   {t(locale, 'ui.interactionStableSelectSubtitle', {
-                    selected: pendingStableTilesLength,
-                    max: maxStableSelections,
+                    selected: stableSelectedCount,
+                    max: stableMaxLabel,
                   })}
                 </div>
               ) : null}

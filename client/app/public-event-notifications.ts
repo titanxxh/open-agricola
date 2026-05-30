@@ -338,6 +338,7 @@ export const collectPublicEventHighlightTargets = (
     }
     if (event.type === 'farm.stableBuilt') {
       for (const stable of event.stables) {
+        if (stable.kind === 'special') continue
         pushFarmTile({ playerId: stable.playerId, key: `${stable.row}-${stable.col}` })
       }
       continue
