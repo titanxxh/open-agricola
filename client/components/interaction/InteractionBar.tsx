@@ -341,6 +341,7 @@ type Props = {
   maxRoomSelections: number
   pendingStableTilesLength: number
   maxStableSelections: number
+  pendingFarmHandSelected?: boolean
   pendingSowSelectionsLength?: number
   pendingPositionSelectionsLength: number
   maxPositionSelections: number
@@ -408,6 +409,7 @@ export const InteractionBar = ({
   maxRoomSelections,
   pendingStableTilesLength,
   maxStableSelections,
+  pendingFarmHandSelected = false,
   pendingSowSelectionsLength,
   pendingPositionSelectionsLength,
   maxPositionSelections,
@@ -464,7 +466,8 @@ export const InteractionBar = ({
     pendingRoomTilesLength === 0
   const isStableConfirmDisabled =
     pendingChoice?.promptKey === 'ui.interactionStableSelect' &&
-    pendingStableTilesLength === 0
+    pendingStableTilesLength === 0 &&
+    !pendingFarmHandSelected
   const isSelectionConfirmDisabled =
     pendingChoice?.promptKey === 'ui.interactionSelection' &&
     pendingPositionSelectionsLength < ((pendingChoice.promptParams?.minSelections as number | undefined) ?? 1)
@@ -629,6 +632,12 @@ export const InteractionBar = ({
                     selected: pendingStableTilesLength,
                     max: maxStableSelections,
                   })}
+                </div>
+              ) : null}
+              {pendingChoice.promptKey === 'ui.interactionStableSelect' &&
+              pendingFarmHandSelected ? (
+                <div className="interaction-subtitle interaction-farmhand-hint">
+                  {t(locale, 'ui.interactionFarmHandHint')}
                 </div>
               ) : null}
               {pendingChoice.promptKey === 'ui.interactionSowSelect' ? (

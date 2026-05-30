@@ -228,6 +228,7 @@ export const zh = {
     interactionStableConfirm: '确认建造',
     interactionStableCancel: '取消',
     interactionStableSelectSubtitle: '已选 {selected} / 最多 {max}',
+    interactionFarmHandHint: '已选择帮工特殊畜栏位',
     interactionSowSelectSubtitle: '已选 {selected} 块田地',
     interactionOptionalAction: '可选动作',
     interactionTriggeredByCard: '由 {card} 触发',
