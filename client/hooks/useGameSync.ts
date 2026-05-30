@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { GameState } from '../../shared/contract/types'
 import type { PlayerScoreSummary } from '../../shared/domain'
 import type { ClientInteractionState, GameSyncPayload, PrivateGameEvent } from '../../shared/contract/protocol/game'
-import { rehydrateStateForClient } from '../services/rehydrate'
+import { rehydrateStateForClient, type ClientGameState } from '../services/rehydrate'
 import { registerCustomCard } from '../../shared/cards/custom-registry'
 
 export const useGameSync = () => {
-  const [state, setState] = useState<GameState | null>(null)
+  const [state, setState] = useState<ClientGameState | null>(null)
   const [interaction, setInteraction] = useState<ClientInteractionState>({
     stateId: 'idle',
     allowedCommands: [],

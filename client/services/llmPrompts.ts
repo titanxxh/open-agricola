@@ -154,6 +154,7 @@ const CARD_IMPL = {
 | computeLockedFarmTiles | 返回锁定位置 | 田地锁定 |
 | getInvalidAnimals | \`(zone, raise) => Meeple[]\` | 卡牌专属动物分区禁入校验 |
 | getSpecialStablePositions / applySpecialStable | \`(state, player[, position]) => FarmTilePosition[] / boolean\` | Build Stables 特殊 stable（如 B85 的 2×2 中心） |
+| getBuiltSpecialStables | \`(player) => FarmTilePosition[]\` | 当前矗立的特殊 stable（驱动 snapshot specialStables 展示派生） |
 | resolveChoice | \`(state, player, choice, ctx) => ActionFlow\` | 处理玩家选择 |
 | handHooks (meta) | \`CardEffectHook[]\` | 声明手牌时也触发的 hook |
 
