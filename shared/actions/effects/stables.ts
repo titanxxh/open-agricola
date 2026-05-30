@@ -12,6 +12,7 @@ import type {
 import type { FarmStableBuiltEvent } from '../../contract/events'
 import { getNextEmptyTileForPlayer, positionKey } from '../../domain/farm'
 import {
+  canAffordTypedFlatCost,
   payResources,
   readExactCost,
   resolveUnitCostWithDelta,
@@ -216,22 +217,6 @@ const resolveStableTotalCostWithDiscount = (
     totalUnits,
   )
 
-const mergeCostDelta = (
-  base: Partial<Resource> | undefined,
-  extra: Partial<Resource>,
-): Partial<Resource> | undefined => {
-  const keys = Object.keys(extra)
-  if (keys.length === 0) return base
-  const merged: Partial<Resource> = { ...(base ?? {}) }
-  for (const key of keys) {
-    const value = extra[key as keyof Resource]
-    if (typeof value !== 'number' || value === 0) continue
-    const k = key as keyof Resource
-    merged[k] = (merged[k] ?? 0) + value
-  }
-  return merged
-}
-
 const buildStableFarmSelection = (
   state: GameState,
   player: PlayerState,
@@ -243,19 +228,31 @@ const buildStableFarmSelection = (
   const reserve = getAvailableStableSupplyCount(state, player)
   const selectionMax = typeof max === 'number' ? Math.min(max, reserve) : reserve
   const idx = state.players.indexOf(player)
-  // The farmyard's max-stable affordability scan needs the count-dependent C88
-  // discount, which it cannot derive on its own. Probe the discount for the
-  // next single stable and fold it into the cost override.
-  const nextStableDiscount = collectComputeCostsForFarmChoice(state, player, 'stables', {
-    stableCount: 1,
-  })
+  // Affordability must use the count-dependent TOTAL cost, which the farmyard's
+  // per-unit `costOverride` scan cannot express when a discount is non-uniform
+  // (e.g. C88 only cheapens the 3rd/4th card-facing stable). Probe each build
+  // count 1..reserve through `resolveStableTotalCostWithDiscount` — the same
+  // total used at settlement — and take the largest count the player can pay.
+  // Total cost is monotonic in count (each extra stable adds ≥1 wood), so the
+  // first unaffordable count terminates the scan.
+  let affordableMax = 0
+  for (let count = 1; count <= selectionMax; count += 1) {
+    const total = resolveStableTotalCostWithDiscount(state, player, actionContext, costs, count)
+    if (!total) break
+    if (!canAffordTypedFlatCost(player, total, 'stables', state)) break
+    affordableMax = count
+  }
   const farm = playerBoard(state, idx).farmyard.selectableTiles('stable', {
-    costOverride: mergeCostDelta(readStableCostDelta(actionContext, costs), nextStableDiscount),
+    costOverride: readStableCostDelta(actionContext, costs),
     exactCost: readExactCost(actionContext),
     zoneFilter: zoneFilter === 'pasture-1' ? 'pasture-1' : undefined,
     max: selectionMax,
   })
   if (farm.farmType !== 'stable') return farm
+  // Replace the farmyard's per-unit affordability cap with our count-aware one.
+  // `affordableMax` already folds in supply reserve and `actionContext.max`
+  // (its scan bound is `selectionMax`); geometry bounds it via selectable tiles.
+  farm.maxSelections = Math.min(farm.selectableTiles.length, affordableMax)
   const farmHandPositions = isSpecialStableEntry(actionContext)
     ? collectSpecialStablePositions(state, player).map((c) => c.position)
     : []
