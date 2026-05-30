@@ -203,6 +203,8 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 - `onSowExtraField`
 - `computeLockedFarmTiles`
 - `getInvalidAnimals`
+- `getSpecialStablePositions`
+- `applySpecialStable`
 <!-- prompt-sync:end id=card-effect-hooks -->
 
 
@@ -223,6 +225,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 | `onComputeAnimalZones`                       | 接收 `(zones, state, player)` 或 `(state, player, zones)`           | 动物分区扩展（双接口）                                         |
 | `onComputeSowableFields` / `onSowExtraField` | 返回额外可播种田/处理播种                                                    | 播种扩展                                                |
 | `computeLockedFarmTiles`                     | 返回锁定田地位置                                                         | 田地锁定                                                |
+| `getSpecialStablePositions` / `applySpecialStable` | `(state, player[, position]) => FarmTilePosition[] / boolean`  | Build Stables 特殊 stable（如 B85 的 2×2 田地中心）            |
 | `handHooks`（meta）                            | `CardEffectHook[]`                                               | 声明哪些 hook 在卡牌还在手牌时也触发                               |
 
 > 围栏折扣（E16 BriarHedge / C16 FieldFences）现走 listener `computeCosts` phase（actions: `['fence']`）；详见 ARCHITECTURE.md §15.7。
