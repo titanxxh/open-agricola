@@ -117,6 +117,7 @@ export type CardEffectField = CardEffectHook
   | 'onComputeAnimalZones' | 'onComputeSowableFields' | 'onSowExtraField'
   | 'computeLockedFarmTiles'
   | 'getInvalidAnimals'
+  | 'getSpecialStablePositions' | 'applySpecialStable'
 
 export const cardEffectHooks: CardEffectField[] = [
   'onBuy',
@@ -153,6 +154,8 @@ export const cardEffectHooks: CardEffectField[] = [
   'onSowExtraField',
   'computeLockedFarmTiles',
   'getInvalidAnimals',
+  'getSpecialStablePositions',
+  'applySpecialStable',
 ]
 
 type FlowEffectHandler = (state: GameState, player: PlayerState) => ActionFlow | void
@@ -273,6 +276,20 @@ export type CardEffect = {
   onSowExtraField?: (player: PlayerState, tile: FarmTilePosition, crop: ExtraSowableCrop) => boolean
   /** Return farmyard tiles currently locked by this card. Empty = no lock active. */
   computeLockedFarmTiles?: (player: PlayerState) => FarmTilePosition[]
+  /**
+   * Extra "special" stable tiles this card lets the player build during a
+   * Farm-Expansion Build Stables `farm-select` (e.g. B85 FarmHand's 2×2 field
+   * centre). These join the regular stable selection via the `farmHandPositions`
+   * protocol field but are settled by the owning card, not the ordinary
+   * `stableTiles` path. Only consulted at the farm-expansion stables entry.
+   */
+  getSpecialStablePositions?: (state: GameState, player: PlayerState) => FarmTilePosition[]
+  /**
+   * Settle one special stable returned by `getSpecialStablePositions`. Mutates
+   * the player (flags / card state) and returns true on success, false when the
+   * position is not a legal candidate for this card.
+   */
+  applySpecialStable?: (state: GameState, player: PlayerState, position: FarmTilePosition) => boolean
   /**
    * BGA `enforceReorganizeOnLastHarvest`: cards like B104 SheepWalker, B35
    * HookKnife, A153 PigOwner force an animal reorg on the round-14 harvest
@@ -583,4 +600,76 @@ export const collectLockedFarmTileKeys = (player: PlayerState): Set<string> => {
     }
   }
   return lockedKeys
+}
+
+export type SpecialStableCandidate = {
+  position: FarmTilePosition
+  sourceCardId: string
+}
+
+/**
+ * Collect special-stable candidates (e.g. B85 FarmHand's 2×2 field centre)
+ * from every card the player owns that implements `getSpecialStablePositions`.
+ * Each candidate carries the owning card id so the settlement path can tag the
+ * resulting `farm.stableBuilt` item with `kind:'special'` + `sourceCardId`.
+ */
+export const collectSpecialStablePositions = (
+  state: GameState,
+  player: PlayerState,
+): SpecialStableCandidate[] => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  const candidates: SpecialStableCandidate[] = []
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    if (!effect?.getSpecialStablePositions) continue
+    try {
+      for (const position of effect.getSpecialStablePositions(state, player)) {
+        candidates.push({ position, sourceCardId: cardId })
+      }
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(`[card-effects] custom card ${cardId} getSpecialStablePositions threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return candidates
+}
+
+/**
+ * Apply a special stable at `position` by delegating to whichever owned card
+ * accepts it. Returns the owning card id on success, or null when no card
+ * could settle the position.
+ */
+export const applySpecialStableAt = (
+  state: GameState,
+  player: PlayerState,
+  position: FarmTilePosition,
+): { sourceCardId: string } | null => {
+  const allCards = [
+    ...player.improvements,
+    ...player.minorPlayed,
+    ...player.occupationPlayed,
+  ]
+  for (const cardId of allCards) {
+    const effect = getCardEffect(cardId)
+    if (!effect?.applySpecialStable) continue
+    try {
+      if (effect.applySpecialStable(state, player, position)) {
+        return { sourceCardId: cardId }
+      }
+    } catch (err) {
+      if (isCustomCard(cardId)) {
+        console.warn(`[card-effects] custom card ${cardId} applySpecialStable threw, skipping:`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  return null
 }
