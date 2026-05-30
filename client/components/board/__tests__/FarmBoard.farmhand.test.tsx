@@ -136,6 +136,7 @@ describe('FarmBoard farmHand center overlay interaction', () => {
 
     const overlay = container.querySelector('[data-farmhand-center-key="1-2"]')
     expect(overlay).not.toBeNull()
+    expect(overlay?.querySelector('.res-icon-barn')).toBeNull()
     fireEvent.click(overlay!)
     expect(toggleFarmHand).toHaveBeenCalledTimes(1)
     expect(toggleFarmHand).toHaveBeenCalledWith({ row: 1, col: 2 })
@@ -188,23 +189,6 @@ describe('FarmBoard farmHand center overlay interaction', () => {
     ).not.toBeNull()
   })
 
-  it('carries the display player color onto the candidate overlay', () => {
-    const player = { ...createPlayer(), color: 'blue' as const }
-    const { container } = render(
-      <FarmBoard
-        {...createProps(player, {
-          players: [player],
-          currentPlayer: player,
-          displayPlayer: player,
-          farmCells: [{ key: '2-2', type: 'post' }],
-          farmHandSelectableSet: new Set(['0-0']),
-        })}
-      />,
-    )
-
-    const overlay = container.querySelector('[data-farmhand-center-key="0-0"]')
-    expect(overlay?.getAttribute('data-player-color')).toBe('blue')
-  })
 })
 
 describe('FarmBoard built special-stable center overlay', () => {
@@ -226,6 +210,8 @@ describe('FarmBoard built special-stable center overlay', () => {
     expect(overlay).not.toBeNull()
     expect(overlay?.classList.contains('farmhand-center-built')).toBe(true)
     expect(overlay?.querySelector('.res-icon-barn')).not.toBeNull()
+    expect(overlay?.classList.contains('farmhand-center-candidate')).toBe(false)
+    expect(overlay?.classList.contains('farmhand-center-selected')).toBe(false)
     expect(overlay?.getAttribute('data-player-color')).toBe('green')
   })
 

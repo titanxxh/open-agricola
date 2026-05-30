@@ -213,7 +213,7 @@ describe('InteractionBar', () => {
       spaceId: 'stable-space',
     }
 
-    const html = renderToStaticMarkup(
+    const { container } = render(
       <InteractionBar
         pendingAnimalReorg={null}
         pendingChoice={stableSelectChoice}
@@ -224,8 +224,8 @@ describe('InteractionBar', () => {
         playerNames={['P1', 'P2']}
         pendingRoomTilesLength={0}
         maxRoomSelections={0}
-        pendingStableTilesLength={0}
-        maxStableSelections={1}
+        pendingStableTilesLength={1}
+        maxStableSelections={4}
         pendingFarmHandSelected={true}
         pendingSowSelectionsLength={0}
         pendingPositionSelectionsLength={0}
@@ -257,7 +257,8 @@ describe('InteractionBar', () => {
       />,
     )
 
-    expect(html).toContain('Farm Hand stable selected')
+    expect(container.textContent).toContain('Selected 2 / Max 4+')
+    expect(container.textContent).toContain('Farm Hand stable selected')
   })
 
   it('keeps stable-select confirm disabled when nothing is selected', () => {

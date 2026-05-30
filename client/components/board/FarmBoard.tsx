@@ -1094,13 +1094,10 @@ export const FarmBoard = ({
                       : ' farmhand-center-candidate'
                   }`}
                   data-farmhand-center-key={centerKey}
-                  data-player-color={displayPlayer.color}
                   aria-pressed={isCenterSelected}
                   title={t(locale, 'ui.tileStable')}
                   onClick={() => toggleFarmHand(centerTopLeft)}
-                >
-                  <span className="res-icon res-icon-barn farmhand-center-icon" aria-hidden="true" />
-                </button>
+                />
               </div>
             )
           }

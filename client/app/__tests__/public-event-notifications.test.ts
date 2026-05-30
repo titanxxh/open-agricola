@@ -391,6 +391,24 @@ describe('public event notifications', () => {
     expect(collectPublicEventHighlightTargets([event]).fenceEdges).toEqual([])
   })
 
+  it('does not highlight a farm tile for special stables', () => {
+    const event = {
+      ...base,
+      type: 'farm.stableBuilt',
+      stables: [
+        {
+          playerId: 'p1',
+          row: 1,
+          col: 1,
+          kind: 'special',
+          sourceCardId: 'B85_FarmHand',
+        },
+      ],
+    } satisfies GameEvent
+
+    expect(collectPublicEventHighlightTargets([event]).farmTiles).toEqual([])
+  })
+
   it('maps resource.moved action-space to player resource animation', () => {
     const event = {
       ...base,
