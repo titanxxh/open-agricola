@@ -177,30 +177,27 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
     return session
   }
 
-  // Drain any non-A92 optional choices or select-trigger prompts that wish-children's
-  // flow may surface before A92's offer. Stops when A92's select-trigger (or optional
-  // choice in legacy mode) is at the front.
-  const advanceToA92Offer = (
+  const A92_ANYTIME = 'A92-adoptive-parents-anytime-grow'
+
+  // Drain the FG flow's own optional minor-improvement tail (stop before the
+  // rotation confirm) so the engine is back to an interactive window where the
+  // A92 anytime grow-only entry is offered. Under the BGA pull model A92 no
+  // longer auto-pushes a grow after FG — it is a `phases:['anytime']` listener
+  // the player must invoke explicitly.
+  const drainFgPrompts = (
     session: GameSession,
     initial: ReturnType<typeof session.takeAction>,
   ) => {
     let resp = initial
-    for (let i = 0; i < 5; i++) {
-      if (resp.interaction.stateId !== 'wait') break
-      const req = resp.interaction.request
-      if (req.kind === 'select-trigger') {
-        // Stop here: caller will decide to activate A92 or pass
-        break
-      }
-      const accept = resp.interaction.options?.find((o) => o.value !== '__skip__')
-      if (accept?.sourceCard === 'A92_AdoptiveParents') break
+    let guard = 0
+    while (resp.interaction.stateId === 'wait' && guard++ < 8) {
+      if (resp.interaction.request.kind === 'confirm-next-player') break
       resp = session.resolveChoice(0, '__skip__')
-      expect(resp.ok).toBe(true)
     }
     return resp
   }
 
-  it('A92 accepts: removes newborn WorkerRef from FG space, flips isNewborn=false, syncs legacy fields', () => {
+  it('A92 capability A: anytime grow-only removes newborn WorkerRef from FG space, flips isNewborn=false', () => {
     const session = setup()
 
     // Step 1: do Family Growth — wish-children places parent worker '1' + newborn '3' on space.
@@ -209,94 +206,51 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
     expect(fgResp.state.actionSpaces.find((s) => s.id === 'wish-children')!.takenBy).toHaveLength(2)
     expect(newbornCount(fgResp.state.players[0]!)).toBe(1)
 
-    // Step 2: drain to A92's offer.
-    const a92Resp = advanceToA92Offer(session, fgResp)
-    expect(a92Resp.interaction.stateId).toBe('wait')
-    if (a92Resp.interaction.stateId !== 'wait') return
+    // Step 2: drain the FG flow's own optional tail.
+    drainFgPrompts(session, fgResp)
+    const foodBefore = session.getState().state.players[0]!.resources.food
 
-    // Step 3: accept the A92 offer.
-    // Under PARALLEL dispatch, a92Resp presents a select-trigger prompt; activating A92
-    // then exposes the actual optional pay choice.
-    const req = a92Resp.interaction.request
-    let payResp = a92Resp
-    if (req.kind === 'select-trigger') {
-      const a92TriggerOpt = req.options.find((o) => o.sourceCard === 'A92_AdoptiveParents')
-      expect(a92TriggerOpt).toBeDefined()
-      if (!a92TriggerOpt) return
-      payResp = session.resolveChoice(0, a92TriggerOpt.value)
-      expect(payResp.ok).toBe(true)
-      expect(payResp.interaction.stateId).toBe('wait')
-    }
+    // Step 3: capability A — invoke the anytime grow-only entry. Pay 1 food,
+    // promote the newborn off the FG space (child→adult). No place-farmer, so
+    // alternation with the opponent is preserved.
+    const grown = session.takeAnytimeAction(0, A92_ANYTIME)
+    expect(grown.ok).toBe(true)
 
-    // Now payResp holds the optional pay choice for A92
-    const acceptOption = payResp.interaction.options?.find((o) => o.value !== '__skip__')
-    expect(acceptOption).toBeDefined()
-    expect(acceptOption!.sourceCard).toBe('A92_AdoptiveParents')
-    if (!acceptOption) return
-
-    const afterAcceptResp = session.resolveChoice(0, acceptOption.value)
-    expect(afterAcceptResp.ok).toBe(true)
-
-    // The newborn→adult conversion fires in immediatelyAfter gain (after pay-resources runs).
-    // At this point worker3 should be adult, FG space should have only 1 ref.
-    // The extra place-farmer presents a space-selection choice.
-    expect(afterAcceptResp.interaction.stateId).toBe('wait')
-
-    const p1Mid = afterAcceptResp.state.players[0]!
+    const p1Mid = session.getState().state.players[0]!
     const worker3Mid = p1Mid.workers.find((w) => w.id === '3')
     expect(worker3Mid).toBeDefined()
     expect(worker3Mid!.isActive).toBe(true)
     expect(worker3Mid!.isNewborn).toBe(false)
 
-    // FG space takenBy should have only 1 ref now (parent; newborn ref removed)
-    const fgSpaceMid = afterAcceptResp.state.actionSpaces.find((s) => s.id === 'wish-children')
-    expect(fgSpaceMid!.takenBy).toHaveLength(1)
+    // FG space takenBy should have only 1 ref now (parent; promoted worker left).
+    const fgSpaceMid = session.getState().state.actionSpaces.find((s) => s.id === 'wish-children')
+    expect(fgSpaceMid!.takenBy.filter((r) => r.playerId === p1Mid.id)).toHaveLength(1)
     expect(fgSpaceMid!.takenBy[0]!.workerId).toBe('1')
 
-    // Legacy fields synced after conversion
+    // Legacy fields synced after conversion; 1 food paid.
     expect(newbornCount(p1Mid)).toBe(0)
-    // Food: started with 5, paid 1 → 4
-    expect(p1Mid.resources.food).toBe(4)
-
-    // Step 4: resolve the extra place-farmer space selection to complete the action.
-    if (afterAcceptResp.interaction.stateId !== 'wait') return
-    const placeOption = afterAcceptResp.interaction.options?.find((o) => o.value !== '__skip__')
-    if (placeOption) {
-      const finalResp = session.resolveChoice(0, placeOption.value)
-      expect(finalResp.ok).toBe(true)
-    }
+    expect(p1Mid.resources.food).toBe(foodBefore - 1)
   })
 
-  it('A92 skip: newborn remains in FG space, isNewborn stays true, no conversion', () => {
+  it('A92 capability A: not invoking the anytime entry leaves the newborn parked on the FG space', () => {
     const session = setup()
 
-    // Step 1: Family Growth
+    // Step 1: Family Growth.
     const fgResp = session.takeAction(0, 'wish-children')
     expect(fgResp.ok).toBe(true)
 
-    // Step 2: drain to A92's offer, then skip it.
-    const a92Resp = advanceToA92Offer(session, fgResp)
-    let skipResp = a92Resp
-    if (a92Resp.interaction.stateId === 'wait') {
-      const req = a92Resp.interaction.request
-      if (req.kind === 'select-trigger') {
-        // Pass all triggers (decline A92 activation)
-        skipResp = session.resolveChoice(0, '__pass__')
-      } else {
-        skipResp = session.resolveChoice(0, '__skip__')
-      }
-    }
-    expect(skipResp.ok).toBe(true)
+    // Step 2: drain the FG flow but never invoke A92's anytime grow.
+    const idle = drainFgPrompts(session, fgResp)
 
-    const p1 = skipResp.state.players[0]!
+    const p1 = idle.state.players[0]!
     const worker3 = p1.workers.find((w) => w.id === '3')
     expect(worker3!.isNewborn).toBe(true)
 
-    // FG space still has 2 refs (parent + newborn untouched)
-    const fgSpace = skipResp.state.actionSpaces.find((s) => s.id === 'wish-children')
-    expect(fgSpace!.takenBy).toHaveLength(2)
+    // FG space still has 2 refs (parent + newborn untouched).
+    const fgSpace = session.getState().state.actionSpaces.find((s) => s.id === 'wish-children')
+    expect(fgSpace!.takenBy.filter((r) => r.playerId === p1.id)).toHaveLength(2)
 
-    // Legacy fields: newbornCount still 1, no food spent
+    // Legacy fields: newbornCount still 1, no food spent.
     expect(newbornCount(p1)).toBe(1)
     expect(p1.resources.food).toBe(5)
   })

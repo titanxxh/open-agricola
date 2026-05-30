@@ -12,6 +12,13 @@ const makePlayer = (id: string, startPlayer = false, activeWorkers = 1): PlayerS
       isActive: true,
       isNewborn: false,
     })),
+    // Played-card arrays are required: `nextSeatedPlayerIdx` now consults
+    // `hasPendingExtraTurn`, which iterates these. A bare 0-worker player with
+    // no cards contributes no extra turn, so the seat-walk still skips it.
+    improvements: [],
+    minorPlayed: [],
+    occupationPlayed: [],
+    resources: { food: 0 },
     cardStates: {},
   } as unknown as PlayerState)
 
