@@ -17,6 +17,8 @@ import { positionKey } from '../../shared/domain/farm'
 import { playerBoard } from '../../shared/domain'
 import type { GameEvent } from '../../shared/contract/events'
 import { runSelectionEffect } from '../../shared/actions/helpers/selection-effect-registry'
+import { serializeStateForPlayer } from '../../shared/session/serialization'
+import { EngineStack } from '../../shared/engine'
 
 import '../../shared/cards/B/B85_FarmHand'
 import '../../shared/cards/D/D102_SampleStableMaker'
@@ -320,5 +322,61 @@ describe('B85 FarmHand — return-stable lifecycle (#187)', () => {
     expect(farm?.farmType).toBe('stable')
     if (farm?.farmType !== 'stable') return
     expect(farm.farmHandPositions).toBeUndefined()
+  })
+})
+
+describe('B85 FarmHand — snapshot specialStables display field', () => {
+  const serializeFor = (state: ReturnType<GameSession['getState']>['state'], viewerId: string) =>
+    serializeStateForPlayer(state, viewerId, { engineStack: new EngineStack() })
+
+  it('omits specialStables before the FarmHand stable is built', () => {
+    const session = setupBuildStables()
+    const state = session.getState().state
+    const view = serializeFor(state, state.players[0]!.id)
+    expect(view.players[0]!.specialStables).toEqual([])
+  })
+
+  it('derives a built specialStable entry for the owner after building', () => {
+    const session = setupBuildStables()
+    enterStableSelect(session)
+    const commit = session.commitSelectionChoice(0, { farmHand: FARM_HAND_TILE })
+    expect(commit.ok).toBe(true)
+
+    const ownerId = commit.state.players[0]!.id
+    const ownerView = serializeFor(commit.state, ownerId)
+    expect(ownerView.players[0]!.specialStables).toEqual([
+      { position: FARM_HAND_TILE, sourceCardId: CARD_ID },
+    ])
+  })
+
+  it('exposes the built specialStable to opponents too (board is public)', () => {
+    const session = setupBuildStables()
+    enterStableSelect(session)
+    const commit = session.commitSelectionChoice(0, { farmHand: FARM_HAND_TILE })
+    expect(commit.ok).toBe(true)
+
+    const opponentView = serializeFor(commit.state, commit.state.players[1]!.id)
+    expect(opponentView.players[0]!.specialStables).toEqual([
+      { position: FARM_HAND_TILE, sourceCardId: CARD_ID },
+    ])
+  })
+
+  it('clears specialStables after the FarmHand stable is returned', () => {
+    const session = setupBuildStables()
+    enterStableSelect(session)
+    const commit = session.commitSelectionChoice(0, { farmHand: FARM_HAND_TILE })
+    expect(commit.ok).toBe(true)
+
+    const player = commit.state.players[0]!
+    runSelectionEffect('lumber-pile-return-stables', {
+      player,
+      positions: [positionKey(FARM_HAND_TILE)],
+      cards: [],
+      sourceCard: 'E76_LumberPile',
+      state: commit.state,
+    })
+
+    const view = serializeFor(commit.state, player.id)
+    expect(view.players[0]!.specialStables).toEqual([])
   })
 })
